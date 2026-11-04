@@ -2,7 +2,7 @@ import type {SessionDraftControls} from '../../contracts';
 
 import type { IChatInputConfig } from '../../domain/ports/IChatInputPresenter';
 import {readInputDraft} from '../../domain/input-draft';
-import {isTargetRef} from '@itookit/llm-flow/contracts';
+import {isTargetRef} from '@nestos/llm-flow/contracts';
 import {readInputContextDraft} from '../../domain/context-draft';
 import {DraftFilesCodec, type DraftFileRecord} from '../../services/DraftFilesCodec';
 import {validDraftToken} from '../../domain/draft-file-identity';

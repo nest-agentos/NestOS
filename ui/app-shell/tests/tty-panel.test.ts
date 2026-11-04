@@ -5,8 +5,8 @@
  * jsdom 环境由 app-shell 提供（llm-ui 的 vitest 无 jsdom）。
  */
 import { expect, it } from 'vitest';
-import { t } from '@itookit/common';
-import { TtyPanel } from '@itookit/llm-ui';
+import { t } from '@nestos/common';
+import { TtyPanel } from '@nestos/llm-ui';
 import { TtyController } from '../../llm-ui-adapter/src/components/tty/TtyController';
 
 function node(): HTMLElement {

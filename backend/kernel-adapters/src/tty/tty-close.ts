@@ -1,7 +1,7 @@
 // @file: kernel-adapters/src/tty/tty-close.ts
 // tty_close — terminate an active TTY session gracefully.
 
-import type { ToolMeta, ToolDefinition, ToolHandler, ITTYSessionManager } from '@itookit/tools/contracts';
+import type { ToolMeta, ToolDefinition, ToolHandler, ITTYSessionManager } from '@nestos/tools/contracts';
 
 export const ttyCloseMeta: ToolMeta = {
     id:          'tty_close',

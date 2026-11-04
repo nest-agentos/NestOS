@@ -2,9 +2,9 @@ import {maintenancePrompts} from './kanban-maintenance';
 import {LIFECYCLE_PROMPT_SUFFIXES} from '../run/prompt-lifecycle';
 import {developmentStage} from './kanban-development-log';
 import migrations from './kanban-development-prompt-migrations.json';
-import {sha256HexSync, t} from '@itookit/common';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {KanbanAutomationTarget, KanbanBoard} from '@itookit/kanban/contracts';
+import {sha256HexSync, t} from '@nestos/common';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {KanbanAutomationTarget, KanbanBoard} from '@nestos/kanban/contracts';
 import {freezePrompts, readPrompt, failure, type PromptJournal, type PromptBundle} from '../run/prompt-bundle';
 import defaults from './kanban-development-prompts.json';
 

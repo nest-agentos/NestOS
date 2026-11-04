@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import {prepareAgentFlow} from '../../llm-ui-adapter/src/flows/agent-flow';
 
 const agent = {id: 'flow-agent', name: 'Flow', execution: {kind: 'flow' as const, flowId: 'test'}};

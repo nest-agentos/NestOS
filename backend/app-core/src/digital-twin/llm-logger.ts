@@ -1,4 +1,4 @@
-import type { ILLMLogger, LLMRequestLog, LLMResponseLog } from '@itookit/driver-llm/contracts';
+import type { ILLMLogger, LLMRequestLog, LLMResponseLog } from '@nestos/driver-llm/contracts';
 
 /** Host diagnostics must not create untracked copies of personal context or its generated answers. */
 export class TwinSafeLlmLogger implements ILLMLogger {

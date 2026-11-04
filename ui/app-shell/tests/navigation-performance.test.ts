@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { bindApplicationBackend } from '@itookit/app-core/host';
-import type { LocalApplicationServices } from '@itookit/app-contracts/services';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { bindApplicationBackend } from '@nestos/app-core/host';
+import type { LocalApplicationServices } from '@nestos/app-contracts/services';
 import { Workbench } from '../src/core/Workbench';
 import { withInitialDirectory } from '../src/browser/initial-directory';
 import { VfsJsonStore } from '../src/persistence/vfs-json-store';

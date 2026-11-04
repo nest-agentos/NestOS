@@ -1,5 +1,5 @@
-import {escapeHTML, formatFileSize, t} from '@itookit/common';
-import {validFlowFiles, type FlowFileConstraints, type FlowParameter, type JsonValue} from '@itookit/llm-flow/contracts';
+import {escapeHTML, formatFileSize, t} from '@nestos/common';
+import {validFlowFiles, type FlowFileConstraints, type FlowParameter, type JsonValue} from '@nestos/llm-flow/contracts';
 import type {FlowFileAssetPort} from './FlowFileAssetPort';
 import type {FlowInitialFiles} from './FlowImageFields';
 

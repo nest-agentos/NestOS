@@ -1,4 +1,4 @@
-import type { KernelAdaptersRuntimeOptions } from '@itookit/kernel-adapters';
+import type { KernelAdaptersRuntimeOptions } from '@nestos/kernel-adapters';
 import type { RemoteFileConnection, ProjectRemoteMount } from '../remote-mounts';
 
 /** Structural support is separate from project grants and connection health. */

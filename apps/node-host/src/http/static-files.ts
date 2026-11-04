@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 const compress = promisify(gzip);
 type Asset = { body: Buffer; etag: string };

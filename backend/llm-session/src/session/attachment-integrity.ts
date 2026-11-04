@@ -1,5 +1,5 @@
-import {sha256Hex} from '@itookit/llm-context';
-import {guessMimeType} from '@itookit/vfs-core';
+import {sha256Hex} from '@nestos/llm-context';
+import {guessMimeType} from '@nestos/vfs-core';
 import {attachmentMetadata, isAttachmentContentIdentity, type ChatAttachment} from '../contracts/chat';
 import type {ISessionRepository} from '../persistence/types';
 import type {SessionLogger} from '../utils/host-ports';

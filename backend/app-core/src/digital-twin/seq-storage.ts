@@ -1,5 +1,5 @@
-import { randomUUID } from '@itookit/common';
-import { FSError, type IFileSystem, type ISeqFileTransaction } from '@itookit/vfs-core';
+import { randomUUID } from '@nestos/common';
+import { FSError, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
 import { decodeIdentity, identity } from './codec';
 import type { TwinIdentity } from './contracts';
 

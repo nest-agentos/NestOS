@@ -3,7 +3,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {afterEach, expect, it, vi} from 'vitest';
-import type {ToolConnectionType} from '@itookit/app-contracts/services';
+import type {ToolConnectionType} from '@nestos/app-contracts/services';
 import {NodeToolConnections} from '../src/runtime/tool-connections';
 
 const type: ToolConnectionType = {id: 'fixture', name: 'Fixture', description: '', fields: [{name: 'clientId', label: 'Client', required: true},

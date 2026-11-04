@@ -1,5 +1,5 @@
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { Tag } from '@itookit/app-contracts/settings';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { Tag } from '@nestos/app-contracts/settings';
 
 export const TAG_STORE_PATH = '/tags.seq';
 const PREFIX = 'tag/';

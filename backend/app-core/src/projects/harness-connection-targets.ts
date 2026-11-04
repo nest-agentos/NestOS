@@ -1,6 +1,6 @@
-import { FSError } from '@itookit/vfs-core';
-import type { HarnessExecutionConnection, HarnessExecutionConnectionTarget } from '@itookit/kernel-adapters/contracts';
-import type { HarnessClient, HarnessProfile } from '@itookit/cells-driver';
+import { FSError } from '@nestos/vfs-core';
+import type { HarnessExecutionConnection, HarnessExecutionConnectionTarget } from '@nestos/kernel-adapters/contracts';
+import type { HarnessClient, HarnessProfile } from '@nestos/cells-driver';
 import type { ProjectFolder } from './project-service';
 import type { ProjectRemoteMountService } from './remote-mounts';
 import { canonical, harnessProjectIdentity } from './harness-connection-policy';

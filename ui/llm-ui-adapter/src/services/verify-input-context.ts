@@ -1,5 +1,5 @@
-import {createModuleLogger} from '@itookit/common';
-import type {ContextOptionsReader} from '@itookit/llm-session/contracts';
+import {createModuleLogger} from '@nestos/common';
+import type {ContextOptionsReader} from '@nestos/llm-session/contracts';
 import {readInputContextDraft} from '../domain/context-draft';
 import {assertContextOptionSelection, assertContextOptionsPage} from '../domain/context-options';
 const log = createModuleLogger('input-context-admission');

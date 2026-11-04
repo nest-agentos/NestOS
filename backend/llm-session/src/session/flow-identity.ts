@@ -1,5 +1,5 @@
 import type { FlowActor, FlowInteraction } from '../contracts';
-import type { TaskRecord } from '@itookit/durable-kernel';
+import type { TaskRecord } from '@nestos/durable-kernel';
 
 export function record(value: unknown): Record<string, any> {
     return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};

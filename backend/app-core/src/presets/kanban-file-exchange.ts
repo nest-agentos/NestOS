@@ -1,7 +1,7 @@
-import type {SubmissionRequest} from '@itookit/llm-session/contracts';
-import type {Kernel} from '@itookit/durable-kernel';
-import type {KanbanService} from '@itookit/kanban/contracts';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
+import type {Kernel} from '@nestos/durable-kernel';
+import type {KanbanService} from '@nestos/kanban/contracts';
+import type {ProjectService} from '@nestos/app-contracts/services';
 import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../projects/remote-mounts';
 import type {KanbanAutomationJournal} from '../kanban/automation-journal';
 import type {sessionSubmission, SessionSubmissionObservation} from '../run/session-submission';
@@ -38,9 +38,9 @@ export async function developmentFileExchange(options: DevelopmentExchangeOption
     } finally {await view.dispose();}
 }
 
-export function developmentWorkExchange(options: DevelopmentExchangeOptions & {calls: Pick<import('@itookit/llm-session').IndependentCallService, 'list'>}) {
+export function developmentWorkExchange(options: DevelopmentExchangeOptions & {calls: Pick<import('@nestos/llm-session').IndependentCallService, 'list'>}) {
     return async (input: {id: string; record: DevelopmentWorkspaceRecord; service: KanbanService;
-        observation: import('@itookit/kanban/execution').KanbanExecutionObservation; finalPublished?: boolean | (() => Promise<boolean>); report?(stage: string, id: string, code?: string): Promise<void>}) => {
+        observation: import('@nestos/kanban/execution').KanbanExecutionObservation; finalPublished?: boolean | (() => Promise<boolean>); report?(stage: string, id: string, code?: string): Promise<void>}) => {
         if (input.record.exchangeVersion !== 2) return input.observation;
         const sessionId = input.observation.executionSessionId;
         if (!sessionId) return input.observation;

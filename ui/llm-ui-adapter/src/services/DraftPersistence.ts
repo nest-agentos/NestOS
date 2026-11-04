@@ -1,5 +1,5 @@
-import type {ConversationUIState} from '@itookit/llm-session/contracts';
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
+import type {ConversationUIState} from '@nestos/llm-session/contracts';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
 import {canonicalJson} from '../utils/canonical-json';
 import {writeUIStateConditionally, type ConditionalUIRepository} from './conditional-ui-state';
 export type BranchDraft = NonNullable<ConversationUIState['branchDrafts']>[string];

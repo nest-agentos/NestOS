@@ -1,7 +1,7 @@
 import {expect, it} from 'vitest';
 import {presentCollectionTools} from '../src/digital-twin/collection-tools';
-import type {TwinScannerTool} from '@itookit/app-contracts';
-import type {ToolPackageInfo} from '@itookit/app-contracts/services';
+import type {TwinScannerTool} from '@nestos/app-contracts';
+import type {ToolPackageInfo} from '@nestos/app-contracts/services';
 
 it('projects generic package presentation without changing fixed Tool identity or hiding an existing compatibility target', () => {
     const tools: TwinScannerTool[] = ['fixture.collect', 'fixture.legacy'].map(id => ({target: {kind: 'tool', id, version: '1', digest: id},

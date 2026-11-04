@@ -1,4 +1,4 @@
-import type {KanbanBoard,KanbanItem} from '@itookit/kanban/contracts';
+import type {KanbanBoard,KanbanItem} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 
 export interface DecisionContext {sourceBoardId:string;recordId:string;recordRevision:number;runId:string}

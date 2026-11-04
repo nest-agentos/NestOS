@@ -1,8 +1,8 @@
-import {FSError,type IFileSystem} from '@itookit/vfs-core';
+import {FSError,type IFileSystem} from '@nestos/vfs-core';
 import {parseSessionFile} from './session-file-result';
 import {publishImmutableFile as publishFile, readPrompt} from './prompt-bundle';
-import {consumeWorkMessages,parseWorkMessage,unresolvedWorkIssues} from '@itookit/kanban/execution';
-import type {WorkMessage,WorkMessageScope} from '@itookit/kanban/execution';
+import {consumeWorkMessages,parseWorkMessage,unresolvedWorkIssues} from '@nestos/kanban/execution';
+import type {WorkMessage,WorkMessageScope} from '@nestos/kanban/execution';
 export type WorkspaceMessage=WorkMessage;
 export type WorkspaceMessageScope=WorkMessageScope;
 interface Journal {get<T>(key:string):Promise<T|undefined>;update<T>(key:string,change:(old:T|undefined)=>T):Promise<T>}

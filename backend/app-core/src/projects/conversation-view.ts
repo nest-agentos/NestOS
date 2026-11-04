@@ -1,8 +1,8 @@
-import { FSError } from '@itookit/vfs-core';
-import type { HarnessConversationPort, HarnessConversationSnapshot, HarnessUsage } from '@itookit/cells-driver';
-import type { UsageCostEstimate } from '@itookit/kernel-adapters/contracts';
+import { FSError } from '@nestos/vfs-core';
+import type { HarnessConversationPort, HarnessConversationSnapshot, HarnessUsage } from '@nestos/cells-driver';
+import type { UsageCostEstimate } from '@nestos/kernel-adapters/contracts';
 
-import type { ProjectConversationPort, ProjectConversationSnapshot } from '@itookit/app-contracts/services';
+import type { ProjectConversationPort, ProjectConversationSnapshot } from '@nestos/app-contracts/services';
 /** One host-side cursor pump serves every subscriber to this conversation view. */
 export function observeConversation(source: HarnessConversationPort, quote?: (usage: HarnessUsage) => UsageCostEstimate, conversationId?: string, activityChanged?: () => void): ProjectConversationPort {
     return new ConversationView(source, quote, conversationId, activityChanged).port();

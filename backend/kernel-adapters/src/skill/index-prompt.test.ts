@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import type { SkillDefinition } from '@itookit/tools/contracts';
+import type { SkillDefinition } from '@nestos/tools/contracts';
 import { skillIndexPrompt } from './index-prompt';
 
 const skill = (id: string, description: string, priority = 0) => ({ id, name: id, description, priority } as SkillDefinition);

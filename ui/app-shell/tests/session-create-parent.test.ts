@@ -1,9 +1,9 @@
 import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { SessionFilesService, createSessionAttachmentMounts } from '@itookit/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { SessionFilesService, createSessionAttachmentMounts } from '@nestos/app-core';
 
 it.each([null, '/group'] as const)('creates a sibling Session when the selected Session belongs to %s', async folder => {
     const storage = new Map<string, string>();

@@ -1,6 +1,6 @@
 // @file: llm-ui/domain/ports/IStatusPresenter.ts
 
-import type { SessionSnapshot } from '@itookit/llm-session/contracts';
+import type { SessionSnapshot } from '@nestos/llm-session/contracts';
 
 export interface IStatusPresenter {
     update(status: string): void;

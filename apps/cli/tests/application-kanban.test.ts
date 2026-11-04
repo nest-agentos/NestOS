@@ -2,7 +2,7 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import type {ApplicationClient} from '@itookit/app-contracts/services';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
 import {kanbanCommand} from '../src/application-kanban';
 const paths: string[] = [];
 afterEach(async () => {for (const path of paths.splice(0)) await rm(path, {recursive: true, force: true});});

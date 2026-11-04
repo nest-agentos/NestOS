@@ -1,8 +1,8 @@
 import {expect, it} from 'vitest';
-import type {VFSNodeUI} from '@itookit/vfs-ui';
-import {resolveBrowserTarget} from '@itookit/app-contracts';
+import type {VFSNodeUI} from '@nestos/vfs-ui';
+import {resolveBrowserTarget} from '@nestos/app-contracts';
 import {fileFirst, navigationPriority, projectItems} from '../src/projects/navigation-policy';
-import { ACTION_ICONS, FILE_ICONS, t } from '@itookit/common';
+import { ACTION_ICONS, FILE_ICONS, t } from '@nestos/common';
 
 const item = (id: string) => ({id, metadata: {title: id, createdAt: '', lastModified: '', custom: {}}}) as VFSNodeUI;
 

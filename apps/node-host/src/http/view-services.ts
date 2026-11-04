@@ -1,12 +1,12 @@
 import {NodeServerTerminals} from '../terminal/server-terminals';
-import { createNestosFlowLibrary, type ApplicationRuntime } from '@itookit/app-core';
-import { openApplicationView, restrictApplicationFiles } from '@itookit/app-core/host';
-import { APPLICATION_WORKSPACES } from '@itookit/app-contracts';
-import { createNestosLlmPresets } from '@itookit/kernel-adapters/llm/presets';
-import type { ApplicationServices, ToolboxResources } from '@itookit/app-contracts/services';
-import type { RpcPeer } from '@itookit/app-transport/application';
-import type { ViewDomain } from '@itookit/app-transport/application';
-import type { HostedApplicationClient } from '@itookit/app-contracts/services';
+import { createNestosFlowLibrary, type ApplicationRuntime } from '@nestos/app-core';
+import { openApplicationView, restrictApplicationFiles } from '@nestos/app-core/host';
+import { APPLICATION_WORKSPACES } from '@nestos/app-contracts';
+import { createNestosLlmPresets } from '@nestos/kernel-adapters/llm/presets';
+import type { ApplicationServices, ToolboxResources } from '@nestos/app-contracts/services';
+import type { RpcPeer } from '@nestos/app-transport/application';
+import type { ViewDomain } from '@nestos/app-transport/application';
+import type { HostedApplicationClient } from '@nestos/app-contracts/services';
 
 export interface HostedView { root: HostedApplicationClient; prepare(peer: RpcPeer, domains?: ReadonlySet<ViewDomain>): Promise<void>; close(): Promise<void> }
 const ROOTS = ['/etc', '/home/admin', ...APPLICATION_WORKSPACES.map(name => `/home/admin/${name}`)];

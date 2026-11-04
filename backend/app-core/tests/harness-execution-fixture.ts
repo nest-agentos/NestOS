@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
-import type { EffectExecutionContext, EffectSessionState, JsonValue, SharedStateEntry } from '@itookit/durable-kernel';
-import type { HarnessClient, HarnessEvent, HarnessHistory, HarnessMutationOptions, HarnessProfile, HarnessReceipt } from '@itookit/cells-driver';
-import type { HarnessExecutionRequest } from '@itookit/kernel-adapters/contracts';
+import type { EffectExecutionContext, EffectSessionState, JsonValue, SharedStateEntry } from '@nestos/durable-kernel';
+import type { HarnessClient, HarnessEvent, HarnessHistory, HarnessMutationOptions, HarnessProfile, HarnessReceipt } from '@nestos/cells-driver';
+import type { HarnessExecutionRequest } from '@nestos/kernel-adapters/contracts';
 import { createHarnessExecutionProvider } from '../src/projects/harness-execution';
 import {settleExecutionContext} from '../src/projects/harness-execution-context';
 

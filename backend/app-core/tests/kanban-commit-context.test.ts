@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {freezeCommitContext, verifyCommitContexts, parseCommitTrailers} from '../src/presets/kanban-commit-context';
 import {resolveCommitRequest, preloadCommitContexts} from '../src/presets/kanban-commit-query';

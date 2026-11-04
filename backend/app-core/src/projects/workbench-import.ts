@@ -1,7 +1,7 @@
-import type { ISessionRepository } from '@itookit/llm-session';
-import { FSError } from '@itookit/vfs-core';
-import type { ProjectService } from '@itookit/app-contracts/services';
-import type { SessionLifecycleService } from '@itookit/app-contracts/services';
+import type { ISessionRepository } from '@nestos/llm-session';
+import { FSError } from '@nestos/vfs-core';
+import type { ProjectService } from '@nestos/app-contracts/services';
+import type { SessionLifecycleService } from '@nestos/app-contracts/services';
 import type { ProjectTarget } from './targets';
 import { importSessionBundle } from '../session/session-bundle';
 import { importFileArchive, type FileArchiveEntry } from '../session/file-archive';

@@ -5,7 +5,7 @@
 // 接管只在旧租约到期后发生（不能凭“我更快”强夺仍在心跳的拥有者），fencing 由每次调度
 // 步进前的 assertOwned 完成：epoch 变化即停止推进，旧拥有者的后续写入不会推进业务状态。
 
-import { KernelErrorCode, type SharedLeaseCondition, type JsonValue, type SessionHandle } from '@itookit/durable-kernel';
+import { KernelErrorCode, type SharedLeaseCondition, type JsonValue, type SessionHandle } from '@nestos/durable-kernel';
 
 export interface SchedulerLeaseRecord {
     version: 1;

@@ -1,6 +1,6 @@
-import { escapeHTML, escapeAttr, t } from '@itookit/common';
-import { type RestorableItem, type IAgentManagementService } from '@itookit/kernel-adapters/contracts';
-import { BaseSettingsEditor, Toast, Modal, type EditorOptions } from '@itookit/ui-common-adapter';
+import { escapeHTML, escapeAttr, t } from '@nestos/common';
+import { type RestorableItem, type IAgentManagementService } from '@nestos/kernel-adapters/contracts';
+import { BaseSettingsEditor, Toast, Modal, type EditorOptions } from '@nestos/ui-common-adapter';
 import { InitialFilesSection, type InitialFilesPort } from './initial-files';
 
 type ItemType = RestorableItem['type'];

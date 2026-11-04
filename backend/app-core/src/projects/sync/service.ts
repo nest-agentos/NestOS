@@ -1,4 +1,4 @@
-import { assertSync, scopedStore, bindingToken, nextDecimal, type Binding, type Coordinator, type StateStore, type StoredFilePlan, type FilePlan } from '@itookit/vfs-sync';
+import { assertSync, scopedStore, bindingToken, nextDecimal, type Binding, type Coordinator, type StateStore, type StoredFilePlan, type FilePlan } from '@nestos/vfs-sync';
 
 export interface ProjectSyncSession {
     store: StateStore;

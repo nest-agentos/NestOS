@@ -1,12 +1,12 @@
-import { escapeHTML, formatFileSize, t } from '@itookit/common';
-import { validFlowImages, type FlowImageConstraints, type FlowParameter } from '@itookit/llm-flow/contracts';
+import { escapeHTML, formatFileSize, t } from '@nestos/common';
+import { validFlowImages, type FlowImageConstraints, type FlowParameter } from '@nestos/llm-flow/contracts';
 import { FlowImageError, imageSelectionTrace } from './FlowImageDiagnostics';
 import {observePromise} from '../utils/observe-promise';
 import type {FlowFileAssetPort} from './FlowFileAssetPort';
 
-export interface FlowImageAssetPort extends Partial<FlowFileAssetPort> {import(url: string): Promise<import('@itookit/llm-flow/contracts').JsonValue>; read(reference: unknown): Promise<string>}
+export interface FlowImageAssetPort extends Partial<FlowFileAssetPort> {import(url: string): Promise<import('@nestos/llm-flow/contracts').JsonValue>; read(reference: unknown): Promise<string>}
 export type FlowInitialFiles = Readonly<Record<string, readonly File[]>>;
-const importedFiles = new WeakMap<FlowImageAssetPort, WeakMap<File, Promise<import('@itookit/llm-flow/contracts').JsonValue>>>();
+const importedFiles = new WeakMap<FlowImageAssetPort, WeakMap<File, Promise<import('@nestos/llm-flow/contracts').JsonValue>>>();
 interface ImageField {
     root: HTMLElement; picker: HTMLInputElement; field: HTMLTextAreaElement; preview: HTMLElement;
     constraints: FlowImageConstraints; assets?: FlowImageAssetPort;

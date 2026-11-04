@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type {FlowDraft} from '@itookit/llm-flow/contracts';
+import {t} from '@nestos/common';
+import type {FlowDraft} from '@nestos/llm-flow/contracts';
 
 /** Overview navigation retains the original graph and node editor as the single authoring surface. */
 export function mountFlowSteps(canvas: HTMLElement, draft: FlowDraft, select: (id: string) => void, expanded = false): void {

@@ -1,7 +1,7 @@
-import { extractNodeOutput } from '@itookit/llm-tasks';
+import { extractNodeOutput } from '@nestos/llm-tasks';
 import { renderFlowText, renderFlowTemplate } from '../../contracts';
 import type { JsonValue, FlowTemplateContext } from '../../contracts';
-import type { TaskSpec } from '@itookit/durable-kernel';
+import type { TaskSpec } from '@nestos/durable-kernel';
 import { resolve } from '../operations';
 import type { DispatchState, PreparedBranch } from './types';
 import { json, object } from './value';

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatMessage } from '@itookit/llm-context';
-import { compactMessages } from '@itookit/llm-context';
+import type { ChatMessage } from '@nestos/llm-context';
+import { compactMessages } from '@nestos/llm-context';
 import { DurableAgentProgram } from './agent-program';
-import { ProviderMessageAdapter } from '@itookit/llm-context';
+import { ProviderMessageAdapter } from '@nestos/llm-context';
 
 const call = (id: string) => ({ id, type: 'function' as const, function: { name: 'inspect', arguments: '{}' } });
 

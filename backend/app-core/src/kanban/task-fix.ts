@@ -1,5 +1,5 @@
-import type {KanbanDispatch,KanbanFixSession} from '@itookit/kanban/contracts';
-import type {SessionInstruction} from '@itookit/llm-session/contracts';
+import type {KanbanDispatch,KanbanFixSession} from '@nestos/kanban/contracts';
+import type {SessionInstruction} from '@nestos/llm-session/contracts';
 import type {Options,SavedFix} from './task-fix-contracts';
 import {createPublishedKanbanWorkExecutor} from './published-work';
 import {automationTarget} from './automation-targets';

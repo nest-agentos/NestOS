@@ -1,5 +1,5 @@
 import {afterEach, expect, it} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {UserEventService} from '../src/events/service';
 import {reportKanbanHealth} from '../src/kanban/health-events';
 let close:(()=>Promise<void>)|undefined;

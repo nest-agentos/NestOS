@@ -1,8 +1,8 @@
 import {workLogSnapshots} from './work-log-snapshots';
-import {sha256HexSync, randomUUID} from '@itookit/common';
-import {KanbanError} from '@itookit/kanban';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {KanbanService, KanbanRecordQuery, KanbanRecordPage, KanbanRecordSummary, KanbanRecordActivity, KanbanExternalReference, KanbanItemSummary} from '@itookit/kanban/contracts';
+import {sha256HexSync, randomUUID} from '@nestos/common';
+import {KanbanError} from '@nestos/kanban';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {KanbanService, KanbanRecordQuery, KanbanRecordPage, KanbanRecordSummary, KanbanRecordActivity, KanbanExternalReference, KanbanItemSummary} from '@nestos/kanban/contracts';
 import {KanbanWorkLogStore} from './work-log-store';
 import {activityRecord, ancestorIds, eventActivity, lifecycleReferences} from './work-log-events';
 import type {UserEventService} from '../events/service';

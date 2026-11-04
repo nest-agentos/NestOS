@@ -1,5 +1,5 @@
 export type { InitialFilesPort } from './editors/initial-files';
-export type { WorkspaceFileSource } from '@itookit/app-contracts/settings';
+export type { WorkspaceFileSource } from '@nestos/app-contracts/settings';
 // @file: app-settings/index.ts
 import './styles/styles.css';
 import { SettingsEngine } from './engine/SettingsEngine';

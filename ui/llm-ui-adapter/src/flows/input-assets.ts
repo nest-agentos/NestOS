@@ -1,7 +1,7 @@
-import {createModuleLogger, sha256Hex} from '@itookit/common';
-import {InputAssetCommand, INPUT_ASSET_MAX_BYTES, type InputFileIdentity, type InputFileInspection} from '@itookit/app-contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
-import type {JsonValue} from '@itookit/llm-flow/contracts';
+import {createModuleLogger, sha256Hex} from '@nestos/common';
+import {InputAssetCommand, INPUT_ASSET_MAX_BYTES, type InputFileIdentity, type InputFileInspection} from '@nestos/app-contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
+import type {JsonValue} from '@nestos/llm-flow/contracts';
 import type {FlowImageAssetPort} from '../components/FlowImageFields';
 import type {FlowFileAssetPort} from '../components/FlowFileAssetPort';
 import {observePromise} from '../utils/observe-promise';

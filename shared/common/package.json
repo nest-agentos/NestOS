@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/common",
+  "name": "@nestos/common",
   "version": "0.4.1",
   "description": "Common utilities and types for the itookit ecosystem (UI-free).",
   "type": "module",
@@ -48,13 +48,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nest-agentos/NestOS.git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
     "directory": "shared/common"
   },
   "bugs": {
     "url": "https://github.com/nest-agentos/NestOS/issues"
   },
-  "homepage": "https://github.com/nest-agentos/NestOS/tree/main/shared/common#readme",
+  "homepage": "https://github.com/nest-agentos/NestOS#readme",
   "dependencies": {},
   "devDependencies": {
     "tsup": "^8.5.1",

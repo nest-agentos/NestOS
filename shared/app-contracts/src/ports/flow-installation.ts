@@ -1,6 +1,6 @@
 /** Dependencies name tools, while trusted host catalogs own packages and executable locations. */
-import type {FlowToolDependency} from '@itookit/llm-flow/contracts';
-export type {FlowToolDependency} from '@itookit/llm-flow/contracts';
+import type {FlowToolDependency} from '@nestos/llm-flow/contracts';
+export type {FlowToolDependency} from '@nestos/llm-flow/contracts';
 export interface ToolDependencyState extends FlowToolDependency {
     status: 'ready' | 'missing' | 'failed';
     code?: string;
@@ -37,7 +37,7 @@ export interface ToolPackageInfo {
     code?: string;
     reason?: string;
 }
-export type ToolPackageFlow = import('@itookit/llm-flow/contracts').FlowDraft;
+export type ToolPackageFlow = import('@nestos/llm-flow/contracts').FlowDraft;
 export interface ToolDependencyResolver {
     onChange?(listener: () => void): () => void;
     switchVersion?(id: string, version: string, expectedVersion: string, operationId?: string): Promise<void>;
@@ -91,8 +91,8 @@ export interface ToolPackageGuide {
 export interface ToolPackageSettings {
     enabled: boolean;
     disabledTools?: string[];
-    defaults: Record<string, Record<string, import('@itookit/llm-flow/contracts').JsonValue>>;
+    defaults: Record<string, Record<string, import('@nestos/llm-flow/contracts').JsonValue>>;
 }
 export interface ToolPackageConfiguration extends ToolPackageSettings {
-    tools: Array<{id: string; enableWith?: string; label?: string; hidden?: boolean; advanced?: string[]; parameters: import('@itookit/llm-flow/contracts').FlowParameter[]; optionLabels?: Record<string, Record<string, string>>}>;
+    tools: Array<{id: string; enableWith?: string; label?: string; hidden?: boolean; advanced?: string[]; parameters: import('@nestos/llm-flow/contracts').FlowParameter[]; optionLabels?: Record<string, Record<string, string>>}>;
 }

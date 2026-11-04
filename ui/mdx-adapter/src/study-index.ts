@@ -1,8 +1,8 @@
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {ScopedPersistenceStore, StudyChange, StudyDocument, StudyEntry} from '@itookit/mdxeditor';
-import {extractStudyCards} from '@itookit/mdxeditor';
-import {CLOZE_SRS_PATH, CLOZE_DOCUMENT_KEY, clozeDocumentPrefix, parseClozeStorageKey, type ClozeDocumentRecord} from '@itookit/app-contracts';
-import {createModuleLogger, randomUUID, sha256HexSync} from '@itookit/common';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {ScopedPersistenceStore, StudyChange, StudyDocument, StudyEntry} from '@nestos/mdxeditor';
+import {extractStudyCards} from '@nestos/mdxeditor';
+import {CLOZE_SRS_PATH, CLOZE_DOCUMENT_KEY, clozeDocumentPrefix, parseClozeStorageKey, type ClozeDocumentRecord} from '@nestos/app-contracts';
+import {createModuleLogger, randomUUID, sha256HexSync} from '@nestos/common';
 
 export const STUDY_REFRESH_MS = 5 * 60 * 1000;
 const log = createModuleLogger('study-index');

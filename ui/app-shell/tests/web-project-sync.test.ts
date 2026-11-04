@@ -6,18 +6,18 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import { IndexedDBSyncStore } from '@itookit/sync-adapters';
-import { createCellsDriver } from '@itookit/cells-driver';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import { IndexedDBSyncStore } from '@nestos/sync-adapters';
+import { createCellsDriver } from '@nestos/cells-driver';
 import { webcrypto } from 'node:crypto';
-import { randomId } from '@itookit/vfs-sync';
-import type { ProjectService } from '@itookit/app-core';
-import { createApplicationRuntime, ProjectSyncService, RemoteConnectionUnavailableError } from '@itookit/app-core';
+import { randomId } from '@nestos/vfs-sync';
+import type { ProjectService } from '@nestos/app-core';
+import { createApplicationRuntime, ProjectSyncService, RemoteConnectionUnavailableError } from '@nestos/app-core';
 import { initialState } from '../../../tests/helpers/sync';
-import type { StoredFilePlan } from '@itookit/vfs-sync';
+import type { StoredFilePlan } from '@nestos/vfs-sync';
 import { WebProjectSync } from '../../../apps/web-app/src/sync';
 
-vi.mock('@itookit/app-shell', async () => ({ showProjectSyncSetup: (await import('../src/projects/sync/setup')).showProjectSyncSetup }));
+vi.mock('@nestos/app-shell', async () => ({ showProjectSyncSetup: (await import('../src/projects/sync/setup')).showProjectSyncSetup }));
 
 async function server(directoryProjects = false, apiKey = false) {
     const directory = await mkdtemp(join(tmpdir(), 'web-project-sync-')), config = join(directory, 'server.toml');
@@ -90,7 +90,7 @@ it('only resolves a sync client when an operation needs it and preserves its met
     state.binding = {...state.binding, root: a.project.project.directory, sourceId: a.backend.storageAccess().identity, connectionId: 'server'};
     const store = new IndexedDBSyncStore(a.backend.storageAccess(), state.binding.bindingId); await store.initialize(state);
     const resolve = vi.spyOn(a.projects.remoteMounts!, 'resolveConnection');
-    const {HttpSyncClient} = await import('@itookit/sync-adapters');
+    const {HttpSyncClient} = await import('@nestos/sync-adapters');
     let receiver: unknown;
     vi.spyOn(HttpSyncClient.prototype, 'capabilities').mockImplementation(async function () {receiver = this; throw new Error('capability unavailable');});
     const service = new ProjectSyncService(a.sync, a.sync.coordinator);
@@ -180,7 +180,7 @@ it('identifies remote export sources before contacting sync regardless of projec
 
 it('resumes binding after a committed project creation loses its response', async () => {
     const running = await server(), a = await device(running.endpoint); let lose = true;
-    const { HttpSyncClient } = await import('@itookit/sync-adapters');
+    const { HttpSyncClient } = await import('@nestos/sync-adapters');
     const original = HttpSyncClient.prototype.execute;
     vi.spyOn(HttpSyncClient.prototype, 'execute').mockImplementation(async function(command) {
         const result = await original.call(this, command);

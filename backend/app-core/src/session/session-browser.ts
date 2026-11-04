@@ -3,7 +3,7 @@ import {readDirectoryView} from './directory-view';
 import { SessionActivityProjection } from './session-activity';
 import { RemoteSessionProjection } from './remote-session-projection';
 import { conversationDirectory, conversationDirectoryNode, conversationNavigationNodes } from '../projects/conversation-directory';
-import { conversationResourcePath } from '@itookit/app-contracts';
+import { conversationResourcePath } from '@nestos/app-contracts';
 import { FOLDER_SEGMENT_PREFIX, isFolderSegment, isFileTarget, filesBrowserPrefix, parentBrowserPath, browserName,
     resolveBrowserTarget, browserTargetFolder, folderBrowserPath, folderPathFromBrowserPath, type FileTarget, type BrowserTarget } from './browser-routes';
 export { resolveBrowserTarget, browserTargetFolder, folderBrowserPath, folderPathFromBrowserPath } from './browser-routes';
@@ -11,15 +11,15 @@ export type { BrowserTarget } from './browser-routes';
 import { WORKSPACE_PATH, projectRelativePath } from '../vfs/workspace-namespace';
 import { sessionFamilyRoots } from '../projects/session-family';
 import { containedProjectRoots, projectFileLocation, type ProjectFileLocation, type ProjectFileRoot } from '../projects/file-location';
-import { transferFileSystemEntry, checkOperation, createFileSystemSource, FSError, type FSNode, type IStorageBackend, type IFileSystem, type OperationOptions } from '@itookit/vfs-core';
-import { t, ENTITY_ICONS, ACTION_ICONS, FILE_ICONS, fileTypeIcon, harnessPresentation } from '@itookit/common';
-import type { ISessionRepository, SessionFolder } from '@itookit/llm-session';
-import type { EventEnvelope, TaskRecord } from '@itookit/durable-kernel';
-import { taskStat } from '@itookit/durable-kernel';
-import type { SessionFilesService } from '@itookit/app-contracts/services';
+import { transferFileSystemEntry, checkOperation, createFileSystemSource, FSError, type FSNode, type IStorageBackend, type IFileSystem, type OperationOptions } from '@nestos/vfs-core';
+import { t, ENTITY_ICONS, ACTION_ICONS, FILE_ICONS, fileTypeIcon, harnessPresentation } from '@nestos/common';
+import type { ISessionRepository, SessionFolder } from '@nestos/llm-session';
+import type { EventEnvelope, TaskRecord } from '@nestos/durable-kernel';
+import { taskStat } from '@nestos/durable-kernel';
+import type { SessionFilesService } from '@nestos/app-contracts/services';
 import { exportSessionBundle, importSessionBundle, isSessionBundle } from './session-bundle';
 import type { ProjectRemoteMount } from '../projects/remote-mounts';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import type { ProjectService } from '@nestos/app-contracts/services';
 import { SessionLifecycleService } from './session-lifecycle';
 
 /**
@@ -63,9 +63,9 @@ export interface SessionBrowserDependencies {
     repository: ISessionRepository;
     projects?: ProjectService;
     files: SessionFilesService;
-    kernel: import('@itookit/durable-kernel/contracts').KernelViewPort;
+    kernel: import('@nestos/durable-kernel/contracts').KernelViewPort;
     /** Defaults to a service over `repository` and `kernel`. */
-    lifecycle?: import('@itookit/app-contracts/services').SessionLifecycleService;
+    lifecycle?: import('@nestos/app-contracts/services').SessionLifecycleService;
     /** Optional host presentation policy. Raw project/Session file APIs are unaffected. */
     filterDisplayedFiles?(fs: IFileSystem, nodes: FSNode[], signal?: AbortSignal): Promise<FSNode[]>;
 }
@@ -75,10 +75,10 @@ class BrowserBackend implements IStorageBackend {
     setSessionFilter(agentId?: string): void { this.agentFilter = agentId; this.invalidateNavigation(); }
     private get remoteSessions() { return new RemoteSessionProjection(this.deps.projects); }
     readonly name = 'session-browser';
-    private readonly lifecycle: import('@itookit/app-contracts/services').SessionLifecycleService;
-    private snapshot?: Promise<[SessionFolder[], import('@itookit/llm-session').SessionSummary[]]>;
+    private readonly lifecycle: import('@nestos/app-contracts/services').SessionLifecycleService;
+    private snapshot?: Promise<[SessionFolder[], import('@nestos/llm-session').SessionSummary[]]>;
     private folderSnapshot?: Promise<SessionFolder[]>;
-    private directorySnapshots = new Map<string | null, Promise<import('@itookit/llm-session').SessionSummary[]>>();
+    private directorySnapshots = new Map<string | null, Promise<import('@nestos/llm-session').SessionSummary[]>>();
     private subscriptions: Array<() => void> = [];
     private readonly activity: SessionActivityProjection;
     constructor(private readonly deps: SessionBrowserDependencies) {
@@ -141,7 +141,7 @@ class BrowserBackend implements IStorageBackend {
             metadata: { title, _showAll: true, _fileDetails: false, ...(readOnly ? { _readOnly: true } : {}) }, icon: directory ? '📁' : '📋' };
         return directory ? { ...base, type: 'directory' } : { ...base, type: 'file', size: 0 };
     }
-    private async withFiles<T>(target: FileTarget, fn: (fs: import('@itookit/vfs-core').IFileSystem) => Promise<T>): Promise<T> {
+    private async withFiles<T>(target: FileTarget, fn: (fs: import('@nestos/vfs-core').IFileSystem) => Promise<T>): Promise<T> {
         if (target.kind === 'project-files') {
             if (!this.deps.projects) throw new FSError('ENOENT', 'Projects unavailable');
             const owner = await this.deps.projects.openWorkspace(target.folder);
@@ -179,7 +179,7 @@ class BrowserBackend implements IStorageBackend {
     private projectProjection(target: FileTarget): Promise<FileProjection | undefined> {
         return target.kind === 'project-files' ? this.fileProjection(target.folder, true) : Promise.resolve(undefined);
     }
-    private async mapped(fs: import('@itookit/vfs-core').IFileSystem, node: FSNode, prefix: string, projection?: FileProjection): Promise<FSNode> {
+    private async mapped(fs: import('@nestos/vfs-core').IFileSystem, node: FSNode, prefix: string, projection?: FileProjection): Promise<FSNode> {
         const readOnly = node.metadata?._readOnly === true || (await fs.capabilitiesAt(node.path)).readonly;
         const routePath = (path: string) => prefix.endsWith('/@files') ? projectRelativePath(path) : path;
         const favorite = !!projection?.favorite(node.path, node.type === 'directory' ? 'directory' : 'file');
@@ -199,7 +199,7 @@ class BrowserBackend implements IStorageBackend {
         return { ...this.node(this.sessionBrowserPath(manifest.id, manifest.folder), manifest.title, true, manifest.updatedAt),
             createdAt: manifest.createdAt, icon: source.icon, metadata: { title: manifest.title, createdWithAgentId: manifest.createdWithAgentId, harnessKind: 'nestos', harnessLabel: source.label, _favorite: this.deps.projects?.favorites.hasSession(manifest.id), _showAll: true, _fileDetails: false, parentSessionId: manifest.parentSessionId ?? null } };
     }
-    private sessionNodes(sessions: import('@itookit/llm-session').SessionSummary[], folder: string | null, agentId: string | null = this.agentFilter ?? null): FSNode[] {
+    private sessionNodes(sessions: import('@nestos/llm-session').SessionSummary[], folder: string | null, agentId: string | null = this.agentFilter ?? null): FSNode[] {
         sessions = sessions.filter(session => !agentId || session.createdWithAgentId === agentId);
         const roots = sessionFamilyRoots(sessions);
         const byId = new Map(sessions.map(session => [session.id, session]));
@@ -687,7 +687,7 @@ class BrowserBackend implements IStorageBackend {
     }
     async getAllTags(): Promise<string[]> { return []; }
 }
-export async function createSessionBrowser(deps: SessionBrowserDependencies): Promise<import('@itookit/app-contracts/services').SessionBrowserPort> {
+export async function createSessionBrowser(deps: SessionBrowserDependencies): Promise<import('@nestos/app-contracts/services').SessionBrowserPort> {
     const backend = new BrowserBackend(deps.displayedFilesPolicy === 'gitignore' ? { ...deps, filterDisplayedFiles: filterDirectoryFiles } : deps);
     const owner = await createFileSystemSource({ tags: false, backend, viewId: 'session-browser:admin', access: 'rw' });
     const rename = owner.fs.driver.rename.bind(owner.fs.driver);

@@ -1,9 +1,9 @@
 import {showDiagnostics} from '../diagnostics/dialog';
-import type {ApplicationDiagnostics} from '@itookit/app-contracts/services';
-import { cellsConfiguration } from '@itookit/app-contracts';
-import type { ProjectRemoteMountPort, ProjectService } from '@itookit/app-contracts/services';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
-import { t } from '@itookit/common';
+import type {ApplicationDiagnostics} from '@nestos/app-contracts/services';
+import { cellsConfiguration } from '@nestos/app-contracts';
+import type { ProjectRemoteMountPort, ProjectService } from '@nestos/app-contracts/services';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
+import { t } from '@nestos/common';
 import { showHarnessControl } from '../harness/control';
 
 /** Presentation only; standard discovery and extension verification are owned by MCPManager. */

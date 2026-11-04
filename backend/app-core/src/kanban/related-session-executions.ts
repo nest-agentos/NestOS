@@ -1,6 +1,6 @@
-import {taskStat, type Kernel, type TaskRecord} from '@itookit/durable-kernel';
-import type {ISessionRepository, Round} from '@itookit/llm-session/contracts';
-import type {KanbanSessionExecution} from '@itookit/kanban/contracts';
+import {taskStat, type Kernel, type TaskRecord} from '@nestos/durable-kernel';
+import type {ISessionRepository, Round} from '@nestos/llm-session/contracts';
+import type {KanbanSessionExecution} from '@nestos/kanban/contracts';
 import {readContextCatalog} from '../projects/harness-context-catalog';
 import {harnessExecutionJournalKey, type ExecutionJournalData} from '../projects/harness-execution-journal';
 import {requireValue} from './validation';

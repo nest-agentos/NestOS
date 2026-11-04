@@ -1,5 +1,5 @@
 import type {ConversationSnapshot} from '../contracts';
-import type {OperationReceipt} from '@itookit/llm-ui';
+import type {OperationReceipt} from '@nestos/llm-ui';
 
 
 /** Control acknowledgement never supplies a user history message or consumes a draft. */

@@ -6,7 +6,7 @@ vi.mock('../src/runtime', () => ({
     CliStorageResolver: class { async resolve() { return {}; } },
     cliStorage: (id: string) => ({ id }),
 }));
-vi.mock('@itookit/durable-kernel', () => ({
+vi.mock('@nestos/durable-kernel', () => ({
     SeqFileKernelStore: class { async getShared() { return state.entry; } },
 }));
 import { assertRunNotScheduled } from '../src/run-scheduler-lease';

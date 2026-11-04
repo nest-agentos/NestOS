@@ -1,4 +1,4 @@
-import type { DagRunSpec, FlowRevision, JsonValue, FlowCallSource, FlowResolvedInput } from '@itookit/llm-flow/contracts';
+import type { DagRunSpec, FlowRevision, JsonValue, FlowCallSource, FlowResolvedInput } from '@nestos/llm-flow/contracts';
 
 export const FlowInvocationCommand = { Invoke: 'session.flow.invoke', List: 'session.flow.invocations' } as const;
 export interface FlowInvocationInput {
@@ -17,7 +17,7 @@ export interface FlowInvocationRecord extends FlowInvocationInput {
     /** Host-owned route; parent records are references, not another execution. */
     executionSessionId?: string;
     callerSessionId?: string;
-    target?: import('@itookit/llm-flow/contracts').TargetRef;
+    target?: import('@nestos/llm-flow/contracts').TargetRef;
     /** Missing only in legacy records; use flowInvocationId for their stable read identity. */
     invocationId?: string;
     flow: FlowRevision;

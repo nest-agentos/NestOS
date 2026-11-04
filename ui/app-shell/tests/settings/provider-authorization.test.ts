@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { ProviderAuthorizationPanel } from '@itookit/llm-ui-adapter/settings';
-import { ProviderSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import { t, type LocaleKey } from '@itookit/common';
-import * as ui from '@itookit/ui-common';
-import type { ProviderAuthorizationState } from '@itookit/kernel-adapters/contracts';
+import { ProviderAuthorizationPanel } from '@nestos/llm-ui-adapter/settings';
+import { ProviderSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import { t, type LocaleKey } from '@nestos/common';
+import * as ui from '@nestos/ui-common';
+import type { ProviderAuthorizationState } from '@nestos/kernel-adapters/contracts';
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 function button(root: HTMLElement, key: LocaleKey): HTMLButtonElement {

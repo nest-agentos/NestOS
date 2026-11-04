@@ -1,7 +1,7 @@
-import { t } from '@itookit/common';
-import type { ProjectSyncService } from '@itookit/app-contracts/services';
-import type { SyncState } from '@itookit/vfs-sync';
-import type { MenuItem } from '@itookit/vfs-ui';
+import { t } from '@nestos/common';
+import type { ProjectSyncService } from '@nestos/app-contracts/services';
+import type { SyncState } from '@nestos/vfs-sync';
+import type { MenuItem } from '@nestos/vfs-ui';
 import { SyncDialog, paragraph } from './dialog';
 import { showSyncPreview, syncPreview } from './preview';
 import { projectSyncIndicator, type SyncConnectionStatus } from './presentation';

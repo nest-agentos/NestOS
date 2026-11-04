@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { isModelDefaults } from '@itookit/kernel-adapters/contracts';
+import { isModelDefaults } from '@nestos/kernel-adapters/contracts';
 import { validateAgentModelDefaults } from '../src/services/agent-model-defaults';
 
 const provider = { id: 'p', name: 'Provider', implementation: 'openai-compatible', models: [{ id: 'chat', name: 'Chat' }] } as never;

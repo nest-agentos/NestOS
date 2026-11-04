@@ -1,5 +1,5 @@
-import type { TaskRecord } from '@itookit/durable-kernel/contracts';
-import type { PendingInteractionTaskSource } from '@itookit/durable-kernel/contracts';
+import type { TaskRecord } from '@nestos/durable-kernel/contracts';
+import type { PendingInteractionTaskSource } from '@nestos/durable-kernel/contracts';
 
 const TERMINAL = ['succeeded', 'failed', 'cancelled'];
 

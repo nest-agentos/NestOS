@@ -1,10 +1,10 @@
-import type {AgentDefinition, AgentPublishedRevision, AgentPublicationStatus, AgentPublishRequest, AgentRevisionContent} from '@itookit/kernel-adapters/contracts';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {SystemPromptDefinition} from '@itookit/tools/contracts';
+import type {AgentDefinition, AgentPublishedRevision, AgentPublicationStatus, AgentPublishRequest, AgentRevisionContent} from '@nestos/kernel-adapters/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {SystemPromptDefinition} from '@nestos/tools/contracts';
 import type {SessionLogger} from '../utils/host-ports';
 import {AgentRevisionStore, assertPublishRequest, publicationError} from '../persistence/agent-revisions';
 import {agentRevisionDigest, agentSourceDigest, canonicalAgentJson} from './agent-definition-digest';
-import {callableExposure} from '@itookit/llm-flow/contracts';
+import {callableExposure} from '@nestos/llm-flow/contracts';
 import {assertAgentRevisionContent} from '../persistence/agent-revision-validation';
 
 export interface AgentPublicationDependencies {

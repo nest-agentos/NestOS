@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { ProviderSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import { ConnectionSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
-import { t } from '@itookit/common';
-import { readProviderForm } from '@itookit/llm-ui-adapter/settings';
+import { ProviderSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import { ConnectionSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
+import { t } from '@nestos/common';
+import { readProviderForm } from '@nestos/llm-ui-adapter/settings';
 
 const editors: Array<ProviderSettingsEditor | ConnectionSettingsEditor> = [];
 afterEach(async () => {

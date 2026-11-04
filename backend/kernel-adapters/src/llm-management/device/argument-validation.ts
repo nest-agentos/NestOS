@@ -1,7 +1,7 @@
-import { isReasoningCapabilities, isMediaCatalog } from '@itookit/driver-llm/contracts';
-import type { LLMConnection, LLMProvider } from '@itookit/driver-llm/contracts';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
-import type { ChatMessage } from '@itookit/llm-context';
+import { isReasoningCapabilities, isMediaCatalog } from '@nestos/driver-llm/contracts';
+import type { LLMConnection, LLMProvider } from '@nestos/driver-llm/contracts';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
+import type { ChatMessage } from '@nestos/llm-context';
 import { LLM_IOCTL } from '../contracts/device';
 
 const PROTOCOLS = ['openai-chat', 'openai-responses', 'anthropic-messages', 'gemini-generate'];

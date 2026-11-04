@@ -1,6 +1,6 @@
-import { t } from '@itookit/common';
-import { ContentTransferCommand, type ContentCapture, type ContentTransfer, type ICommandBus, type TransferReference } from '@itookit/llm-session/contracts';
-import type { FlowParameter, JsonValue } from '@itookit/llm-flow/contracts';
+import { t } from '@nestos/common';
+import { ContentTransferCommand, type ContentCapture, type ContentTransfer, type ICommandBus, type TransferReference } from '@nestos/llm-session/contracts';
+import type { FlowParameter, JsonValue } from '@nestos/llm-flow/contracts';
 import type { FlowParameterExtension } from '../components/FlowParameterForm';
 import { ContentSourcePicker } from './content-source-picker';
 

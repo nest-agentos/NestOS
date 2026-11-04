@@ -1,6 +1,6 @@
-import { t, traceBoot, fileTypeIcon, type LocaleKey } from '@itookit/common';
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { EditorFactory, EditorOptions } from '@itookit/ui-common-adapter';
+import { t, traceBoot, fileTypeIcon, type LocaleKey } from '@nestos/common';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { EditorFactory, EditorOptions } from '@nestos/ui-common-adapter';
 /**
  * @file SystemFSExploreEditor.ts
  * @desc Debug settings page — read-only view of all VFS modules.
@@ -19,13 +19,13 @@ import type { EditorFactory, EditorOptions } from '@itookit/ui-common-adapter';
  * Hidden files (names starting with ".") are visible in the tree but their
  * content is replaced with a placeholder by SystemVFSEngine.readContent().
  */
-import { BaseSettingsEditor } from '@itookit/ui-common-adapter';
-import { createVFSUI, fromVFS, VFSUIShell } from '@itookit/vfs-ui';
-import '@itookit/mdxeditor/style.css';
+import { BaseSettingsEditor } from '@nestos/ui-common-adapter';
+import { createVFSUI, fromVFS, VFSUIShell } from '@nestos/vfs-ui';
+import '@nestos/mdxeditor/style.css';
 
 const defaultEditorFactory: EditorFactory = async (container, options) =>
-    (await import('@itookit/mdx-adapter')).defaultEditorFactory(container, options);
-import type { SettingsPort as SettingsService } from '@itookit/app-contracts/settings';
+    (await import('@nestos/mdx-adapter')).defaultEditorFactory(container, options);
+import type { SettingsPort as SettingsService } from '@nestos/app-contracts/settings';
 import { createSystemFileInspector } from './system-fs/system-file-inspector';
 
 export type FileBrowserConnector = (browser: VFSUIShell, fs: IFileSystem, container: HTMLElement, factory: EditorFactory) => () => void;

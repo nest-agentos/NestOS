@@ -1,6 +1,6 @@
-import {mergeOperationRecords, type OperationRecord} from '@itookit/llm-ui';
-import type {ISessionRepository} from '@itookit/llm-session/contracts';
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
+import {mergeOperationRecords, type OperationRecord} from '@nestos/llm-ui';
+import type {ISessionRepository} from '@nestos/llm-session/contracts';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
 import {writeUIStateConditionally} from './conditional-ui-state';
 import {canonicalJson} from '../utils/canonical-json';
 const log = createModuleLogger('workspace-operation-store');

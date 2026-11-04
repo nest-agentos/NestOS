@@ -1,21 +1,21 @@
 import {collectWithTool, type ToolCollectorOptions} from './tool-collector';
 import {collectionTools, presentCollectionTools, validateCollectionTool} from './collection-tools';
-import type {TwinCollectionExecutor} from '@itookit/app-contracts';
-import type {IndependentCallService, SessionRepository} from '@itookit/llm-session';
-import {KernelError, KernelErrorCode, type Kernel, type TaskCallResult} from '@itookit/durable-kernel';
-import type {DagRunSpec} from '@itookit/llm-flow/contracts';
+import type {TwinCollectionExecutor} from '@nestos/app-contracts';
+import type {IndependentCallService, SessionRepository} from '@nestos/llm-session';
+import {KernelError, KernelErrorCode, type Kernel, type TaskCallResult} from '@nestos/durable-kernel';
+import type {DagRunSpec} from '@nestos/llm-flow/contracts';
 import {traceAnalysis, TwinDiagnosticError} from './diagnostics';
 import {collectionProgress} from './collection-progress';
-type Progress = import('@itookit/app-contracts').TwinCollectionProgress;
+type Progress = import('@nestos/app-contracts').TwinCollectionProgress;
 
 export interface TwinCollectionRequest {runId: string; sessionId: string; executor: TwinCollectionExecutor}
 export interface TwinCollectionPort {
-    tools?(): import('@itookit/app-contracts').TwinScannerTool[] | Promise<import('@itookit/app-contracts').TwinScannerTool[]>;
+    tools?(): import('@nestos/app-contracts').TwinScannerTool[] | Promise<import('@nestos/app-contracts').TwinScannerTool[]>;
     validate?(executor: TwinCollectionExecutor): void;
     collect(request: TwinCollectionRequest, attached: (taskId: string) => Promise<void>, bind: (sessionId: string) => Promise<void>): Promise<Progress | void>;
     cancelCollection(sessionId: string, taskId?: string): Promise<void>;
 }
-interface Options {tools?: ToolCollectorOptions; packages?: Pick<import('@itookit/app-contracts/services').ToolDependencyResolver, 'list'>; kernel: Kernel; repository: SessionRepository; ready(): {calls: IndependentCallService}}
+interface Options {tools?: ToolCollectorOptions; packages?: Pick<import('@nestos/app-contracts/services').ToolDependencyResolver, 'list'>; kernel: Kernel; repository: SessionRepository; ready(): {calls: IndependentCallService}}
 
 /** Collection runs a fixed Tool or a published static Tool Flow, without model access. */
 export class PublishedScannerCollector implements TwinCollectionPort {

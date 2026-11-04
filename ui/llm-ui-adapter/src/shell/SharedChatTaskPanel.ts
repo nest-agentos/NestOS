@@ -1,9 +1,9 @@
-import type {TaskRecord} from '@itookit/durable-kernel/contracts';
+import type {TaskRecord} from '@nestos/durable-kernel/contracts';
 import {FlowTaskInputDialog} from './FlowTaskInputDialog';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
-import {createInteractionCard, TtyPanel, type InteractionCard, type InteractionView, type InteractionResponse} from '@itookit/llm-ui';
-import {getLocale, t} from '@itookit/common';
-import type {InteractionRequest, JsonValue} from '@itookit/durable-kernel/contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
+import {createInteractionCard, TtyPanel, type InteractionCard, type InteractionView, type InteractionResponse} from '@nestos/llm-ui';
+import {getLocale, t} from '@nestos/common';
+import type {InteractionRequest, JsonValue} from '@nestos/durable-kernel/contracts';
 import type {RunAttachmentCallbacks, RunAttachmentController} from './RunAttachmentController';
 import {readDirectCommandOutcome} from '../commands/direct-command';
 import {inputInteraction} from './input-interaction';

@@ -1,4 +1,4 @@
-import {FSError} from '@itookit/vfs-core';
+import {FSError} from '@nestos/vfs-core';
 
 /** Human-readable project IDs are scoped to one project catalog. */
 export function validateProjectId(id: string): string {

@@ -1,8 +1,8 @@
-import type {TwinScannerExecutor} from '@itookit/app-contracts';
-import type {ICommandBus, IndependentCallInput, RootTargetCatalog} from '@itookit/llm-session/contracts';
-import {SessionCommand} from '@itookit/llm-session/contracts';
-import type {IndependentCallService, SessionRepository} from '@itookit/llm-session';
-import type {Kernel, TaskCallResult} from '@itookit/durable-kernel';
+import type {TwinScannerExecutor} from '@nestos/app-contracts';
+import type {ICommandBus, IndependentCallInput, RootTargetCatalog} from '@nestos/llm-session/contracts';
+import {SessionCommand} from '@nestos/llm-session/contracts';
+import type {IndependentCallService, SessionRepository} from '@nestos/llm-session';
+import type {Kernel, TaskCallResult} from '@nestos/durable-kernel';
 import {parseCandidates, type TwinExtractionPort} from './extraction';
 import type {TwinAnalysisJob} from './domain';
 import {traceAnalysis, TwinDiagnosticError} from './diagnostics';
@@ -111,11 +111,11 @@ export class PublishedScannerExecutor implements TwinScannerExecutionPort {
 
 /** Inspect executable structure only; input values remain opaque application data. */
 export function assertScannerPlan(value: unknown): void {
-    const task = value as {program?: {kind?: string}; input?: {initialScheduler?: {spec?: import('@itookit/llm-flow/contracts').DagRunSpec}}};
+    const task = value as {program?: {kind?: string}; input?: {initialScheduler?: {spec?: import('@nestos/llm-flow/contracts').DagRunSpec}}};
     if (['kernel-adapters.harness', 'kernel-adapters.media', 'kernel.call'].includes(task.program?.kind ?? '')) throw new Error('TWIN_SCANNER_EXECUTION_UNSUPPORTED');
     if (task.program?.kind === 'flow.aggregate') assertScannerGraph(task.input?.initialScheduler?.spec, 0);
 }
-function assertScannerGraph(graph: import('@itookit/llm-flow/contracts').DagRunSpec | undefined, depth: number): void {
+function assertScannerGraph(graph: import('@nestos/llm-flow/contracts').DagRunSpec | undefined, depth: number): void {
     if (!graph || depth > 64) throw new Error('TWIN_SCANNER_PLAN_LIMIT');
     for (const node of graph.nodes) {
         const config = node.config as {execution?: {kind?: string}; delegation?: unknown; subtasks?: unknown};

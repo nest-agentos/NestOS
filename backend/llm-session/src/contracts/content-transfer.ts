@@ -1,4 +1,4 @@
-import type { JsonValue } from '@itookit/llm-flow/contracts';
+import type { JsonValue } from '@nestos/llm-flow/contracts';
 
 export const ContentTransferCommand = {
     Capture: 'session.content.capture', Resolve: 'session.content.resolve', CreateChild: 'session.content.create-child',

@@ -8,7 +8,7 @@ import { parse, stringify } from 'yaml';
 import { planSnapshot } from '../local-library-plan.mjs';
 
 const repository = fileURLToPath(new URL('../..', import.meta.url));
-const catalog = ['core', 'parent', 'leaf', 'other'].map(directory => ({ name: `@itookit/${directory}`, directory }));
+const catalog = ['core', 'parent', 'leaf', 'other'].map(directory => ({ name: `@nestos/${directory}`, directory }));
 const all = catalog.map(item => item.name);
 const dependentNames = all.slice(0, 3);
 const locked = (version, specifier = version) => ({ specifier, version });
@@ -25,8 +25,8 @@ function fixture(t) {
     write('pnpm-workspace.yaml', { packages: ['libraries/*', 'apps/*'], overrides: { unused: '1.0.0' } });
     write('tsconfig.base.json', { compilerOptions: { target: 'ES2022' } });
     for (const item of catalog) write(`libraries/${item.directory}/package.json`, { name: item.name, version: '1.0.0',
-        dependencies: { core: { compat: 'npm:@vendor/sdk@1.0.0' }, parent: { '@itookit/core': 'workspace:*' },
-            leaf: { '@itookit/parent': 'workspace:*' }, other: {} }[item.directory] });
+        dependencies: { core: { compat: 'npm:@vendor/sdk@1.0.0' }, parent: { '@nestos/core': 'workspace:*' },
+            leaf: { '@nestos/parent': 'workspace:*' }, other: {} }[item.directory] });
     const lock = lockFixture(); write('pnpm-lock.yaml', lock);
     const first = planSnapshot(root, catalog), base = { packages: first.records };
     return { root, lock, write, plan: () => planSnapshot(root, catalog, { base }),
@@ -67,8 +67,8 @@ for (const name of ['@vendor/sdk', 'transitive', 'optional', 'peer']) {
         f.write('pnpm-lock.yaml', f.lock);
         const plan = f.plan();
         assert.deepEqual(plan.selected, dependentNames);
-        assert.deepEqual(plan.reasons['@itookit/core'], ['build-inputs-changed']);
-        assert.deepEqual(plan.reasons['@itookit/parent'], ['dependency-rebuilt']);
+        assert.deepEqual(plan.reasons['@nestos/core'], ['build-inputs-changed']);
+        assert.deepEqual(plan.reasons['@nestos/parent'], ['dependency-rebuilt']);
     });
 }
 
@@ -144,10 +144,10 @@ test('used catalog entries and patch bytes are watched independently of lockfile
 test('stale external importers conservatively watch the lockfile instead of silently reusing artifacts', t => {
     const f = fixture(t), source = f.json('libraries/other/package.json');
     source.dependencies.newDependency = '^1.0.0'; f.write('libraries/other/package.json', source);
-    assert.deepEqual(f.plan().selected, ['@itookit/other']);
+    assert.deepEqual(f.plan().selected, ['@nestos/other']);
     const base = { packages: f.plan().records };
     f.lock.packages['unrelated@1.0.0'].resolution.integrity = 'changed'; f.write('pnpm-lock.yaml', f.lock);
-    assert.deepEqual(planSnapshot(f.root, catalog, { base }).selected, ['@itookit/other']);
+    assert.deepEqual(planSnapshot(f.root, catalog, { base }).selected, ['@nestos/other']);
 });
 
 test('missing lock records, unsupported formats and invalid YAML report specific non-sensitive errors', t => {

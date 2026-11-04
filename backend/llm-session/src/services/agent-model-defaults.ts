@@ -1,4 +1,4 @@
-import { isModelDefaults, modelForOperation, type ModelDefaults } from '@itookit/kernel-adapters/contracts';
+import { isModelDefaults, modelForOperation, type ModelDefaults } from '@nestos/kernel-adapters/contracts';
 import type { IAgentConfigService } from '../contracts';
 
 /** Validate configuration metadata only; runtime admission checks current credentials. */

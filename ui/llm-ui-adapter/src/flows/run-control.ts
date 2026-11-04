@@ -1,6 +1,6 @@
-import {createModuleLogger, t} from '@itookit/common';
-import {FlowCommand, type DurableFlowSnapshot} from '@itookit/llm-flow/contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {createModuleLogger, t} from '@nestos/common';
+import {FlowCommand, type DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 import {ControlOperations, type ControlInput} from './control-operations';
 import {invocationControl} from './invocation-control';
 

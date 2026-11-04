@@ -1,7 +1,7 @@
-import { createModuleLogger, randomUUID } from '@itookit/common';
-import type { AgentComposition, AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import { createFlowRevision, flowRevisionToDraft, FlowDefinitionStore, type FlowStore } from '@itookit/llm-flow';
-import { DELEGATION_DEFAULTS, DELEGATION_LIMITS, type FlowDraft, type FlowRevision } from '@itookit/llm-flow/contracts';
+import { createModuleLogger, randomUUID } from '@nestos/common';
+import type { AgentComposition, AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import { createFlowRevision, flowRevisionToDraft, FlowDefinitionStore, type FlowStore } from '@nestos/llm-flow';
+import { DELEGATION_DEFAULTS, DELEGATION_LIMITS, type FlowDraft, type FlowRevision } from '@nestos/llm-flow/contracts';
 
 interface AgentReader { getAgentConfig(id: string): Promise<AgentDefinition | null> }
 const log = createModuleLogger('agent-composition');

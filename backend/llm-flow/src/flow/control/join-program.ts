@@ -1,6 +1,6 @@
 import type { DagNodeOutcome, FlowWaitPolicy, JsonValue } from '../../contracts';
-import type { Decision, DurableTaskProgram, TaskInputEvent } from '@itookit/durable-kernel';
-import { extractNodeOutput } from '@itookit/llm-tasks';
+import type { Decision, DurableTaskProgram, TaskInputEvent } from '@nestos/durable-kernel';
+import { extractNodeOutput } from '@nestos/llm-tasks';
 
 export interface JoinInput {
     policy: FlowWaitPolicy;

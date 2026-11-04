@@ -1,4 +1,4 @@
-# @itookit/llm-context
+# @nestos/llm-context
 
 零运行时依赖的上下文模块：对话装配、Profile、持久请求快照、工作窗口、Notes、原始历史检索、工具输出外置和自动 GC。
 
@@ -13,7 +13,7 @@
 窗口与计量策略可替换：
 
 ```ts
-import { createContextEngine, createContextService } from '@itookit/llm-context';
+import { createContextEngine, createContextService } from '@nestos/llm-context';
 
 const engine = createContextEngine({
   defaultPolicy: { maxMessages: 100, keepRecent: 20, maxInputTokens: 32_000 },

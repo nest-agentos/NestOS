@@ -1,18 +1,18 @@
-import {createBrowserImageTools} from '@itookit/image-tools/browser';
-import { createNestosLlmPresets } from '@itookit/kernel-adapters/llm/presets';
-import { openApplicationView } from '@itookit/app-core/host';
-import { createNestosFlowLibrary } from '@itookit/app-core';
-import { createCellsDriver } from '@itookit/cells-driver';
+import {createBrowserImageTools} from '@nestos/image-tools/browser';
+import { createNestosLlmPresets } from '@nestos/kernel-adapters/llm/presets';
+import { openApplicationView } from '@nestos/app-core/host';
+import { createNestosFlowLibrary } from '@nestos/app-core';
+import { createCellsDriver } from '@nestos/cells-driver';
 import { createTauriMCPTransport } from './shell/tauri-mcp-transport';
 import { recordDiagnostic, observeTools } from './log/desktop-diagnostics';
-import { errorDetails, t } from '@itookit/common';
+import { errorDetails, t } from '@nestos/common';
 import { TauriSessionDirectories } from './services/session-directories';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { installWindowClose } from './shell/window-lifecycle';
 import { createTauriSessionProcesses } from './shell/session-bash';
 import { TauriFlowWorkspaces } from './shell/flow-workspaces';
-import { createFileSystemSource } from '@itookit/vfs-core';
+import { createFileSystemSource } from '@nestos/vfs-core';
 /**
  * @file apps/tauri-app/src/main.ts
  *
@@ -27,11 +27,11 @@ import { createFileSystemSource } from '@itookit/vfs-core';
  *  4. Wire tauri-only features: loading overlay, dynamic local mounts
  */
 
-import { initApp, installMobileNavigation, windowSessionLeaseToken, workspaceRoot, type AppUI } from '@itookit/app-shell';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
+import { initApp, installMobileNavigation, windowSessionLeaseToken, workspaceRoot, type AppUI } from '@nestos/app-shell';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
 import { createFlowContextMenuConfig, createAIContextMenuConfig,
-    restoreFlowLibrary } from '@itookit/llm-ui-adapter/startup';
+    restoreFlowLibrary } from '@nestos/llm-ui-adapter/startup';
 import {
     ProviderSettingsEditor,
     ConnectionSettingsEditor,
@@ -39,14 +39,14 @@ import {
     MCPSettingsEditor,
     CostEditor,
     SystemPromptSettingsEditor,
-} from '@itookit/llm-ui-adapter/settings';
+} from '@nestos/llm-ui-adapter/settings';
 import { WORKSPACES } from './config/modules';
 import { TauriSqlSidecarDb } from './db/tauri-sql-sidecar';
 import { TauriFsOps } from './fs/tauri-fs-ops';
 import { TauriLLMLogger } from './log/tauri-llm-logger';
 import { startVfsTrace } from './log/vfs-trace';
 import { createSendBoundary } from './log/send-boundary';
-import { SessionCommand } from '@itookit/llm-session';
+import { SessionCommand } from '@nestos/llm-session';
 import { TauriSkillSource } from './kernel/tauri-skill-source';
 
 // ── Path helpers ───────────────────────────────────────────────────────────────
@@ -269,19 +269,19 @@ async function bootstrap(): Promise<void> {
     // 3. Hand off to app-shell
     // Session Bash runs through the platform directory-grant namespace.
     const ui: AppUI = {
-        prepareChatSubmission: async options => (await import('@itookit/llm-ui-adapter/independent')).prepareSessionChatRequest(options),
+        prepareChatSubmission: async options => (await import('@nestos/llm-ui-adapter/independent')).prepareSessionChatRequest(options),
         createChatEditor: (agents, deps) => lazyEditorFactory(async () =>
-            (await import('@itookit/llm-ui-adapter/chat')).createLLMFactory(agents, {
+            (await import('@nestos/llm-ui-adapter/chat')).createLLMFactory(agents, {
                 ...deps, onLoadMetrics: metrics => { void recordDiagnostic('session.load.ready', metrics); },
             })),
         createAgentEditor: (agents, capabilities) => lazyEditorFactory(async () =>
-            (await import('@itookit/llm-ui-adapter/settings')).createAgentEditorFactory(agents, capabilities)),
+            (await import('@nestos/llm-ui-adapter/settings')).createAgentEditorFactory(agents, capabilities)),
         createFlowEditor: deps => lazyEditorFactory(async () =>
-            (await import('@itookit/llm-ui-adapter/chat')).createFlowsEditorFactory(deps)),
+            (await import('@nestos/llm-ui-adapter/chat')).createFlowsEditorFactory(deps)),
         createFlowContextMenu: deps => createFlowContextMenuConfig({ ...deps, library: createNestosFlowLibrary() }),
         restoreFlowLibrary: commands => restoreFlowLibrary(commands, createNestosFlowLibrary()),
         createSkillEditor: agents => lazyEditorFactory(async () =>
-            (await import('@itookit/llm-ui-adapter/settings')).createSkillsEditorFactory(agents)),
+            (await import('@nestos/llm-ui-adapter/settings')).createSkillsEditorFactory(agents)),
         createAIContextMenu: createAIContextMenuConfig,
         llmUiEditors: {
             ProviderSettingsEditor,

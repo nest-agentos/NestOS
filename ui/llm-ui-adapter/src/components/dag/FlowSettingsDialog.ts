@@ -2,13 +2,13 @@
 // Flow-level settings modal: named connection slots (bound to global LLM
 // connections + one default) and declared runtime parameters with defaults.
 
-import type { FlowConnection, FlowVariables, FlowDefaults, FlowParameter, FlowRunPolicy, JsonValue } from '@itookit/llm-flow/contracts';
-import { validImageConstraints, validFileConstraints } from '@itookit/llm-flow/contracts';
-import { escapeHTML, t } from '@itookit/common';
+import type { FlowConnection, FlowVariables, FlowDefaults, FlowParameter, FlowRunPolicy, JsonValue } from '@nestos/llm-flow/contracts';
+import { validImageConstraints, validFileConstraints } from '@nestos/llm-flow/contracts';
+import { escapeHTML, t } from '@nestos/common';
 
 export interface FlowSettingsOptions {
-    exposure?: import('@itookit/llm-flow/contracts').CallableExposure;
-    outputs?: import('@itookit/llm-flow/contracts').FlowDraft['outputs'];
+    exposure?: import('@nestos/llm-flow/contracts').CallableExposure;
+    outputs?: import('@nestos/llm-flow/contracts').FlowDraft['outputs'];
     connections: FlowConnection[];
     defaultConnection?: string;
     parameters: FlowParameter[];
@@ -26,8 +26,8 @@ export interface FlowSettingsOptions {
 export interface EntityOption { id: string; name: string; description?: string; parameters?: Record<string, unknown>; version?: string }
 
 export interface FlowSettingsResult {
-    exposure?: import('@itookit/llm-flow/contracts').CallableExposure;
-    outputs?: import('@itookit/llm-flow/contracts').FlowDraft['outputs'];
+    exposure?: import('@nestos/llm-flow/contracts').CallableExposure;
+    outputs?: import('@nestos/llm-flow/contracts').FlowDraft['outputs'];
     connections: FlowConnection[];
     defaultConnection?: string;
     parameters: FlowParameter[];

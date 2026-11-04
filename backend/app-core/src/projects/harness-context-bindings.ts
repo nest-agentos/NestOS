@@ -1,8 +1,8 @@
-import {sha256HexSync} from '@itookit/common';
-import {assertHarnessContextRequest} from '@itookit/kernel-adapters/contracts';
-import type {EffectSessionState} from '@itookit/durable-kernel';
+import {sha256HexSync} from '@nestos/common';
+import {assertHarnessContextRequest} from '@nestos/kernel-adapters/contracts';
+import type {EffectSessionState} from '@nestos/durable-kernel';
 import type {ContextBinding, ContextBindingOperation, HarnessConnectionSnapshot, HarnessContextRequest,
-    NativeContextRef, ContextCheckpoint} from '@itookit/kernel-adapters/contracts';
+    NativeContextRef, ContextCheckpoint} from '@nestos/kernel-adapters/contracts';
 import {canonical} from './harness-connection-policy';
 import {executionError, jsonValue} from './harness-execution-journal';
 

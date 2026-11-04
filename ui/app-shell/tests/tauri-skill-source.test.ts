@@ -15,9 +15,9 @@ it('keeps correction logs relative to the project root for nested Skill scopes',
 });
 
 it('discovers and loads supporting files only through each Session view, then rebuilds after replacement', async () => {
-    const { createVFS, MemoryBackend } = await import('@itookit/vfs-core');
-    const { createKernelAdaptersRuntime } = await import('@itookit/kernel-adapters');
-    const { createVFSToolContext } = await import('@itookit/app-core');
+    const { createVFS, MemoryBackend } = await import('@nestos/vfs-core');
+    const { createKernelAdaptersRuntime } = await import('@nestos/kernel-adapters');
+    const { createVFSToolContext } = await import('@nestos/app-core');
     const { manager } = await createVFS({ rootBackend: new MemoryBackend() });
     const first = await manager.openFileSystem('/module/first');
     const second = await manager.openFileSystem('/module/second');

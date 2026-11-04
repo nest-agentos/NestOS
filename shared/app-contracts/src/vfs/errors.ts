@@ -1,10 +1,10 @@
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 /**
  * A Session still has non-terminal Tasks, so its mounts cannot change.
  *
  * The platform-agnostic layer raises a structured error; the host maps it to localized
- * text (`error.sessionUnfinishedTasks` in `@itookit/common`) instead of this package
+ * text (`error.sessionUnfinishedTasks` in `@nestos/common`) instead of this package
  * owning user-facing copy.
  */
 export class SessionUnfinishedTasksError extends FSError {

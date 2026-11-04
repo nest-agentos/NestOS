@@ -1,7 +1,7 @@
 import essayReview from './essay-review.json';
 import ankiGenerate from './anki-generate.json';
-import type { FlowDraft } from '@itookit/llm-flow/contracts';
-import type { Drawer } from '@itookit/app-contracts';
+import type { FlowDraft } from '@nestos/llm-flow/contracts';
+import type { Drawer } from '@nestos/app-contracts';
 
 /** Host templates are copied so consumers cannot mutate the shared product catalog. */
 export function createNestosFlowLibrary(): FlowDraft[] {

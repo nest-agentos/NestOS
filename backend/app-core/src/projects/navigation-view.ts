@@ -1,7 +1,7 @@
-import { FSError } from '@itookit/vfs-core';
-import { browserTargetFolder, folderBrowserPath, projectConversationsPath, resolveBrowserTarget } from '@itookit/app-contracts';
-import type { ISessionRepository } from '@itookit/llm-session/contracts';
-import type { ProjectNavigationRequest, ProjectNavigationView, ProjectService } from '@itookit/app-contracts/services';
+import { FSError } from '@nestos/vfs-core';
+import { browserTargetFolder, folderBrowserPath, projectConversationsPath, resolveBrowserTarget } from '@nestos/app-contracts';
+import type { ISessionRepository } from '@nestos/llm-session/contracts';
+import type { ProjectNavigationRequest, ProjectNavigationView, ProjectService } from '@nestos/app-contracts/services';
 
 /** Resolve organization beside storage; the frontend only consumes prepared navigation. */
 export async function readProjectNavigation(projects: ProjectService,

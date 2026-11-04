@@ -1,10 +1,10 @@
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger, type OperationRecord} from '@itookit/llm-ui';
-import {FlowInvocationCommand, type FlowInvocationInput} from '@itookit/llm-session/contracts';
+import {createOperationLedger, type OperationRecord} from '@nestos/llm-ui';
+import {FlowInvocationCommand, type FlowInvocationInput} from '@nestos/llm-session/contracts';
 import {InvocationOperations} from './invocation-operations';
 const diagnostics = vi.hoisted(() => ({info: vi.fn(), warn: vi.fn()}));
-vi.mock('@itookit/common', async original => {
-    const actual = await original<typeof import('@itookit/common')>();
+vi.mock('@nestos/common', async original => {
+    const actual = await original<typeof import('@nestos/common')>();
     return {...actual, createModuleLogger: (name: string) => name === 'flow-invocation-submission' ? diagnostics : actual.createModuleLogger(name)};
 });
 const input: FlowInvocationInput = {sessionId: 's', requestId: 'operation', execution: 'child', flowId: 'f', revision: 1, parameters: {text: 'PRIVATE_INPUT'}};

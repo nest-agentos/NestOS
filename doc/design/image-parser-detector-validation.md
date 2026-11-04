@@ -80,7 +80,7 @@
 仅运行50个合成场景：
 
 ```bash
-pnpm --filter @itookit/image-parser test:detector
+pnpm --filter @nestos/image-parser test:detector
 ```
 
 命令会输出JSON路径并在验收失败时退出1。它是显式接入门槛，不等于普通单元测试失败，也不会在安装或普通test中下载样图。报告记录数值门槛、算法哈希及尚未完成的正式接口/浏览器验收项；即使数值门槛通过，也不会自动宣称生产就绪。
@@ -94,7 +94,7 @@ node libraries/image-parser/scripts/fetch-paper-validation-dataset.mjs \
 IMAGE_PARSER_BROWSER_ROOT="$PWD" \
 IMAGE_PARSER_INPUT_URL=/tmp/image-parser-validation/dataset/manifest.json \
 IMAGE_PARSER_RESULT_FILE="$PWD/tmp/image-parser-validation/report.json" \
-pnpm --filter @itookit/image-parser test:detector
+pnpm --filter @nestos/image-parser test:detector
 ```
 
 这条命令默认只包含50个合成场景与17个上游样图。本次68例中的用户照片是额外登记项，expected=partial、points=null；不将其估计角点作为真值。手机视口压力运行再加 `IMAGE_PARSER_CPU_RATE=4 IMAGE_PARSER_MOBILE=1`。需要先完成前一运行，避免并发干扰性能；未提供样图时不声称跑过真实数据。

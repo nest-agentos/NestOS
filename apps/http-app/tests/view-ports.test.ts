@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProviderAuthorizationHost } from '@itookit/kernel-adapters/llm/core';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { RpcPeer } from '@itookit/app-transport/application';
-import { createHostedView } from '@itookit/node-host/http';
-import { installViewProjections } from '@itookit/app-transport/application';
+import type { ProviderAuthorizationHost } from '@nestos/kernel-adapters/llm/core';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { RpcPeer } from '@nestos/app-transport/application';
+import { createHostedView } from '@nestos/node-host/http';
+import { installViewProjections } from '@nestos/app-transport/application';
 
 const releases: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const release of releases.splice(0).reverse()) await release(); vi.unstubAllGlobals(); });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {getLogger, t} from '@itookit/common';
-import type {FlowInstallationReport} from '@itookit/app-contracts/services';
+import {getLogger, t} from '@nestos/common';
+import type {FlowInstallationReport} from '@nestos/app-contracts/services';
 import {showFlowDependencies} from '../src/configuration/flow-dependencies-dialog';
 
 const controllers: AbortController[] = [], opened: Promise<void>[] = [];

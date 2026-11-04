@@ -1,5 +1,5 @@
-import { TOOLBOX_KINDS, toolboxPath, type ToolboxKind } from '@itookit/app-contracts';
-export { TOOLBOX_KINDS, toolboxPath, toolboxKind, toolboxSourcePath, type ToolboxKind } from '@itookit/app-contracts';
+import { TOOLBOX_KINDS, toolboxPath, type ToolboxKind } from '@nestos/app-contracts';
+export { TOOLBOX_KINDS, toolboxPath, toolboxKind, toolboxSourcePath, type ToolboxKind } from '@nestos/app-contracts';
 export const TOOLBOX_FILTERS = ['all', 'models', 'flows', 'tools', 'mcp', 'skills', 'prompts', 'agents'] as const;
 export type ToolboxFilter = typeof TOOLBOX_FILTERS[number];
 export function toolboxFilter(kind: ToolboxKind): ToolboxFilter { return kind === 'providers' || kind === 'connections' ? 'models' : kind; }

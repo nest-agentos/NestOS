@@ -1,7 +1,7 @@
 // @file: app-settings/editors/storage/StorageOverviewSection.ts
 
 
-import type { SettingsPort, StorageUsage } from '@itookit/app-contracts/settings';
+import type { SettingsPort, StorageUsage } from '@nestos/app-contracts/settings';
 
 export class StorageOverviewSection {
   private storageInfo: StorageUsage | null = null;

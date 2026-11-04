@@ -1,5 +1,5 @@
-import {createModuleLogger} from '@itookit/common';
-import type {ApplicationBackend, ClientDiagnostic} from '@itookit/app-contracts/services';
+import {createModuleLogger} from '@nestos/common';
+import type {ApplicationBackend, ClientDiagnostic} from '@nestos/app-contracts/services';
 
 export function resultQueryFailure(error: unknown): Error & {code: string; remoteCode?: string; requestId?: string} {
     const source = error as {code?: unknown; remoteCode?: unknown; requestId?: unknown; name?: unknown};

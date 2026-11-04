@@ -1,7 +1,7 @@
-import { createModuleLogger, randomUUID, t } from '@itookit/common';
+import { createModuleLogger, randomUUID, t } from '@nestos/common';
 import type { ToolboxKind } from './routes';
-import type { ToolboxDrawers } from '@itookit/app-contracts/services';
-import { drawerKind } from '@itookit/app-contracts';
+import type { ToolboxDrawers } from '@nestos/app-contracts/services';
+import { drawerKind } from '@nestos/app-contracts';
 import { drawerField } from './drawer-field';
 import { providerTemplateFields } from './provider-template-fields';
 import { resourceIcon } from './resource-icons';

@@ -2,10 +2,10 @@ import {chmod, lstat, mkdtemp, readFile, rm} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {afterEach, expect, it, vi} from 'vitest';
-import type {ToolConnectionType} from '@itookit/app-contracts/services';
+import type {ToolConnectionType} from '@nestos/app-contracts/services';
 import {NodeToolConnections} from '../src/runtime/tool-connections';
 import {ToolOAuthApplications} from '../src/runtime/tool-oauth-applications';
-import {RpcPeer} from '@itookit/app-transport/application';
+import {RpcPeer} from '@nestos/app-transport/application';
 
 const type: ToolConnectionType = {id: 'fixture', name: 'Fixture', description: '', fields: [
     {name: 'client', label: 'Client', required: true}, {name: 'secret', label: 'Secret', secret: true, required: true},

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {FlowCommand, type FlowDraft} from '@itookit/llm-flow/contracts';
+import {FlowCommand, type FlowDraft} from '@nestos/llm-flow/contracts';
 import {FlowsEditor} from '../../llm-ui-adapter/src/components/FlowsEditor';
 
 const editors: FlowsEditor[] = [];

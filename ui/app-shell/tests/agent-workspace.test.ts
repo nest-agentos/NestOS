@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {bindApplicationBackend} from '@itookit/app-core/host';
-import {folderBrowserPath, resolveBrowserTarget, projectConversationsPath} from '@itookit/app-contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {bindApplicationBackend} from '@nestos/app-core/host';
+import {folderBrowserPath, resolveBrowserTarget, projectConversationsPath} from '@nestos/app-contracts';
 import {SessionWorkbench} from '../src/projects/SessionWorkbench';
 import {AgentProjectPreferences} from '../src/projects/agent-project-preferences';
 import {createAgentEditorFactory} from '../../llm-ui-adapter/src/settings';
 import {SessionDraftEditor} from '../../llm-ui-adapter/src/shell/drafts/SessionDraftEditor';
-import type {EditorOptions} from '@itookit/ui-common-adapter';
+import type {EditorOptions} from '@nestos/ui-common-adapter';
 
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren(); vi.unstubAllGlobals(); vi.restoreAllMocks();});

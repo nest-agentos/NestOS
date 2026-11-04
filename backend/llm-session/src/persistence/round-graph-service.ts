@@ -6,8 +6,8 @@
 // structural operations here and focuses on the ILog contract (fold, draft).
 
 import type { Round, RoundId, Ref, RoundResult, ExecutionRef } from '../contracts';
-import type { ChatMessage } from '@itookit/llm-context';
-import type { ContextProfileId } from '@itookit/llm-context';
+import type { ChatMessage } from '@nestos/llm-context';
+import type { ContextProfileId } from '@nestos/llm-context';
 import type { RoundManifest, PersistedRound, BranchMeta } from './round-types';
 import type { RoundLogEvent, RoundChangeSet } from './round-events';
 import { ulid } from './ulid';

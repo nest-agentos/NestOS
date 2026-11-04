@@ -1,6 +1,6 @@
 import type {InteractionDraftStorage} from '../domain/interaction-draft';
-import type {ChatMessage, ExtensionRenderer, MessagePart, OperationLedger} from '@itookit/llm-ui';
-import type {ICommandBus, IndependentCallView, SessionGroup} from '@itookit/llm-session/contracts';
+import type {ChatMessage, ExtensionRenderer, MessagePart, OperationLedger} from '@nestos/llm-ui';
+import type {ICommandBus, IndependentCallView, SessionGroup} from '@nestos/llm-session/contracts';
 import {IndependentCallPanel} from '../components/IndependentCallPanel';
 
 export const independentCallPart = 'mindos.independent-call';

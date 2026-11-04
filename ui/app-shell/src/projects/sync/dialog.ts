@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 
 /** Closing a view never cancels a command already submitted to the server. */
 export class SyncDialog {

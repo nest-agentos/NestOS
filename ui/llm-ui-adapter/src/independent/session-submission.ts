@@ -1,11 +1,11 @@
-import {isTargetRef} from '@itookit/llm-flow/contracts';
-import type {IAgentConfigService} from '@itookit/kernel-adapters/contracts';
-import type {ICommandBus, RootCallTarget, SubmissionRequest} from '@itookit/llm-session/contracts';
-import type {ChatSubmission} from '@itookit/llm-ui';
+import {isTargetRef} from '@nestos/llm-flow/contracts';
+import type {IAgentConfigService} from '@nestos/kernel-adapters/contracts';
+import type {ICommandBus, RootCallTarget, SubmissionRequest} from '@nestos/llm-session/contracts';
+import type {ChatSubmission} from '@nestos/llm-ui';
 import {prepareAgentFlow, prepareCallTarget} from '../flows/agent-flow';
 import {buildExecutorOptions} from '../shell/AgentProvider';
 import {AssetService} from '../services/AssetService';
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 
 /** Reuse the existing published input form and immutable attachment preparation. */
 export async function prepareSessionChatRequest(options: {

@@ -1,7 +1,7 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {SessionCommand, type ContextOptionsPage, type RootTargetCatalog} from '@itookit/llm-session/contracts';
-import type {AgentDefinition} from '@itookit/kernel-adapters/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {SessionCommand, type ContextOptionsPage, type RootTargetCatalog} from '@nestos/llm-session/contracts';
+import type {AgentDefinition} from '@nestos/kernel-adapters/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {contextOptionsFixture} from './harness-context-options-fixture';
 

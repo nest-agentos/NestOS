@@ -1,4 +1,4 @@
-import { FSError, normalizeVirtualPath } from '@itookit/vfs-core';
+import { FSError, normalizeVirtualPath } from '@nestos/vfs-core';
 import { workspacePath } from '../vfs/workspace-namespace';
 
 export type BrowserTarget =

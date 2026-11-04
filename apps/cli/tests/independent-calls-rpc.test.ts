@@ -1,9 +1,9 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {RpcPeer} from '@itookit/app-transport/application';
-import {IndependentCallCommand, SessionCommand, type IndependentCallReceipt, type IndependentCallView, type ICommandBus, type RootTargetCatalog} from '@itookit/llm-session/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {RpcPeer} from '@nestos/app-transport/application';
+import {IndependentCallCommand, SessionCommand, type IndependentCallReceipt, type IndependentCallView, type ICommandBus, type RootTargetCatalog} from '@nestos/llm-session/contracts';
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close();});
 async function fixture() {

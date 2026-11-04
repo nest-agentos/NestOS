@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
-import type { ProjectSyncService } from '@itookit/app-core';
-import type { StoredFilePlan, SyncState } from '@itookit/vfs-sync';
+import { t } from '@nestos/common';
+import type { ProjectSyncService } from '@nestos/app-core';
+import type { StoredFilePlan, SyncState } from '@nestos/vfs-sync';
 import { ProjectSyncMenu } from '../src/projects/sync/menu';
 import { showSyncPreview } from '../src/projects/sync/preview';
 import { ProjectNavigation } from '../src/projects/ProjectNavigation';

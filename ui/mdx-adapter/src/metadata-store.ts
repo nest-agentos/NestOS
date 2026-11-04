@@ -1,6 +1,6 @@
 // @mdx/core/store/engine-metadata-store.ts
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { ScopedPersistenceStore } from '@itookit/mdxeditor';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { ScopedPersistenceStore } from '@nestos/mdxeditor';
 
 type PluginDataRecord = Record<string, unknown>;
 

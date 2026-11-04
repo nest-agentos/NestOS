@@ -7,9 +7,9 @@ import {
   tryParseJson,
   formatJsonSummary,
   parseMarkdown,
-} from '@itookit/common';
+} from '@nestos/common';
 
-import type { Heading, TaskCounts } from '@itookit/common';
+import type { Heading, TaskCounts } from '@nestos/common';
 interface FileMetadata { taskCount?: TaskCounts; clozeCount?: number; mermaidCount?: number; mentions?: Record<string, string[]> }
 interface ParseResult { summary: string; searchableText: string; headings: Heading[]; metadata: FileMetadata }
 
@@ -62,4 +62,4 @@ export function parseFileInfo(
 }
 
 // 导出辅助函数供其他 VFS 组件直接使用
-export { extractTaskCounts } from '@itookit/common';
+export { extractTaskCounts } from '@nestos/common';

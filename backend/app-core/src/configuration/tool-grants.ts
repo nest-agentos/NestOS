@@ -1,7 +1,7 @@
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import { toolGrant } from '@itookit/app-contracts';
-export { toolGrant } from '@itookit/app-contracts';
-import { FSError } from '@itookit/vfs-core';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import { toolGrant } from '@nestos/app-contracts';
+export { toolGrant } from '@nestos/app-contracts';
+import { FSError } from '@nestos/vfs-core';
 export interface ToolGrantTarget { id: string; serverId?: string }
 export interface AgentGrantStore { getAgents(): Promise<AgentDefinition[]>; saveAgent(agent: AgentDefinition): Promise<void> }
 export async function saveToolGrant(store: AgentGrantStore, tool: ToolGrantTarget, agentId: string, enabled: boolean): Promise<void> {

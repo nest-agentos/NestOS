@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { EffectExecutionContext, Kernel } from '@itookit/durable-kernel';
+import type { EffectExecutionContext, Kernel } from '@nestos/durable-kernel';
 import { createHarnessCleanupState } from '../src/projects/harness-cleanup-state';
 import { harnessExecutionJournalKey } from '../src/projects/harness-execution';
 import { renewSessionWriteLease, type SessionLeaseRecord } from '../src/kernel/session-lease';

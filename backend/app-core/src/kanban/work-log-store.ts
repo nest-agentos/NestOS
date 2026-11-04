@@ -1,5 +1,5 @@
-import {FSError, type IFileSystem, type ISeqFileTransaction} from '@itookit/vfs-core';
-import type {KanbanProjectRecord, KanbanRecordSummary} from '@itookit/kanban/contracts';
+import {FSError, type IFileSystem, type ISeqFileTransaction} from '@nestos/vfs-core';
+import type {KanbanProjectRecord, KanbanRecordSummary} from '@nestos/kanban/contracts';
 
 const path = '/var/lib/kanban/work-log.seq';
 const snapshotVersion = '2';

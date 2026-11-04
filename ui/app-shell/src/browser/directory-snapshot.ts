@@ -1,5 +1,5 @@
-import { checkOperation, createFile, type IFileSystem, type OperationOptions } from '@itookit/vfs-core';
-import type { NavigationDirectory } from '@itookit/app-contracts/services';
+import { checkOperation, createFile, type IFileSystem, type OperationOptions } from '@nestos/vfs-core';
+import type { NavigationDirectory } from '@nestos/app-contracts/services';
 
 type Directory = NavigationDirectory & { path: string };
 type ReadOptions = OperationOptions & { includeHidden?: boolean; fields?: string; onRevision?: unknown; encoding?: string };

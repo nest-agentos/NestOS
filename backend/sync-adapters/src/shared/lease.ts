@@ -1,4 +1,4 @@
-import { assertSync, decimal, type CoordinationGuard } from '@itookit/vfs-sync';
+import { assertSync, decimal, type CoordinationGuard } from '@nestos/vfs-sync';
 export const LEASE_PATH = '/var/lib/sync/coordination.seq';
 export interface Lease { owner: string; fence: string; expiresAt: number }
 export function decodeLease(value?: unknown): Lease | undefined {

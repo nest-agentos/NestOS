@@ -1,7 +1,7 @@
-import { t } from '@itookit/common';
-import { resolveModelId, hasConnectionCredentials, type IAgentManagementService } from '@itookit/kernel-adapters/contracts';
-import { type ModelTier, type LLMProvider, type ILLMService, type ConnectionMeta } from '@itookit/driver-llm/contracts';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { t } from '@nestos/common';
+import { resolveModelId, hasConnectionCredentials, type IAgentManagementService } from '@nestos/kernel-adapters/contracts';
+import { type ModelTier, type LLMProvider, type ILLMService, type ConnectionMeta } from '@nestos/driver-llm/contracts';
+import type { IFileSystem } from '@nestos/vfs-core';
 
 export interface OcrSettings { connectionId?: string; systemPromptId: string }
 export interface OcrConnection { connection: ConnectionMeta; modelId?: string; tier?: ModelTier; available: boolean; reason?: string }

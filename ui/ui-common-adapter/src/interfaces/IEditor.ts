@@ -4,8 +4,8 @@
  * @interface
  */
 
-import type { NavigationRequest, Heading } from '@itookit/common';
-import type { FileSystemContext } from '@itookit/vfs-core';
+import type { NavigationRequest, Heading } from '@nestos/common';
+import type { FileSystemContext } from '@nestos/vfs-core';
 
 export type EditorTarget =
     | { kind: 'file'; path: string; namespaceId?: string; sessionId?: string }
@@ -27,7 +27,7 @@ export function editorResourceId(options: EditorOptions): string | undefined {
     return target?.kind === 'file' ? target.path : target?.kind === 'session' ? target.sessionId : target?.id;
 }
 
-export type { Heading } from '@itookit/common';
+export type { Heading } from '@nestos/common';
 
 export type SearchResultSource = 'editor' | 'renderer';
 
@@ -113,7 +113,7 @@ export interface ConfigurationFormControls<T, TDiscovery> {
 
 export interface EditorOptions<TSubmission = unknown, TInitial = unknown> {
     /** Mount the complete host title bar, preserving supplied editor controls. */
-    mountTitleBar?(container: HTMLElement, parts?: import('@itookit/ui-common').ContentTitleBarParts): () => void;
+    mountTitleBar?(container: HTMLElement, parts?: import('@nestos/ui-common').ContentTitleBarParts): () => void;
     /** Execution source shown independently of the editable conversation name. */
     conversationSource?: {kind: string; label?: string};
     /** Mount host navigation in the editor header on narrow screens; return its cleanup. */
@@ -149,7 +149,7 @@ export interface EditorOptions<TSubmission = unknown, TInitial = unknown> {
     target?: EditorTarget;
     files?: FileSystemContext;
     /** Explicit attachment directory; independent of a document owner. */
-    assets?: import('@itookit/vfs-core').IFileSystem;
+    assets?: import('@nestos/vfs-core').IFileSystem;
     /** 初始 Markdown 内容 */
     initialContent?: string;
     /** Optional host-owned settings; the editor coordinates their save and disposal. */

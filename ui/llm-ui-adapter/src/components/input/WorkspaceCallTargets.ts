@@ -1,7 +1,7 @@
-import {isTargetRef, sameTargetRef, type TargetRef} from '@itookit/llm-flow/contracts';
-import type {RootCallTarget, RootTargetCatalog} from '@itookit/llm-session/contracts';
-import {ENTITY_ICONS, createModuleLogger, randomUUID, t} from '@itookit/common';
-import type {PopupItem} from '@itookit/llm-ui';
+import {isTargetRef, sameTargetRef, type TargetRef} from '@nestos/llm-flow/contracts';
+import type {RootCallTarget, RootTargetCatalog} from '@nestos/llm-session/contracts';
+import {ENTITY_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
+import type {PopupItem} from '@nestos/llm-ui';
 
 const log = createModuleLogger('workspace-call-targets');
 

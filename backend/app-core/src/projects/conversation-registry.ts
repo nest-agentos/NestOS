@@ -1,5 +1,5 @@
-import {FSError} from '@itookit/vfs-core';
-import type {ProjectConversationPort} from '@itookit/app-contracts/services';
+import {FSError} from '@nestos/vfs-core';
+import type {ProjectConversationPort} from '@nestos/app-contracts/services';
 
 interface Entry {source: ProjectConversationPort; references: number; release: () => void; closing: boolean}
 /** Native execution and queued work belong to the host, across individual view leases. */

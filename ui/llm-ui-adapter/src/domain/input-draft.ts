@@ -1,6 +1,6 @@
-import type {ComposerArgumentDraft} from '@itookit/llm-ui';
-import {isTargetRef, sameTargetRef, type TargetRef} from '@itookit/llm-flow/contracts';
-import {t} from '@itookit/common';
+import type {ComposerArgumentDraft} from '@nestos/llm-ui';
+import {isTargetRef, sameTargetRef, type TargetRef} from '@nestos/llm-flow/contracts';
+import {t} from '@nestos/common';
 
 /** JSON remains the sole parameter draft; composerText records the basis used to prefill it. */
 export interface WorkspaceArgumentDraft extends ComposerArgumentDraft {readonly target?: TargetRef; readonly composerText?: string;}

@@ -1,9 +1,9 @@
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 import type {ContinueWorkOptions} from '../kanban/continued-work';
 import type {ResourceExecutionOptions} from './kanban-work-resource-execution';
 import {workResourceExecution} from './kanban-work-resource-execution';
 import type {RemoteFileSourceProvider} from '../projects/remote-mounts';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import type {ProjectService} from '@nestos/app-contracts/services';
 import type {PreparedWorktree} from '../projects/worktree-preparation';
 import {inspectWorktree} from '../projects/worktree-status';
 import {developmentWorkspace} from './kanban-development-workspace';

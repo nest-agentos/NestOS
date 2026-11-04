@@ -1,8 +1,8 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import { sha256HexSync } from '@itookit/llm-context';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import { sha256HexSync } from '@nestos/llm-context';
 import { DigitalTwinService, type TwinDiscoveredSource, type TwinSelectionTarget } from '../src';
 import { extractionPrompt } from '../src/digital-twin/extraction';
 import { selectionPattern } from '../src/digital-twin/selection';

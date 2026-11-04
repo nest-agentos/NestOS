@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/app-settings",
+  "name": "@nestos/app-settings",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -33,33 +33,42 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@itookit/common": "workspace:*",
-    "@itookit/mdxeditor": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
-    "@itookit/vfs-ui": "workspace:*",
-    "@itookit/ui-common-adapter": "workspace:*",
-    "@itookit/mdx-adapter": "workspace:*"
+    "@nestos/common": "workspace:*",
+    "@nestos/mdxeditor": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
+    "@nestos/vfs-ui": "workspace:*",
+    "@nestos/ui-common-adapter": "workspace:*",
+    "@nestos/mdx-adapter": "workspace:*"
   },
   "devDependencies": {
-    "@itookit/common": "workspace:*",
-    "@itookit/mdxeditor": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
-    "@itookit/vfs-ui": "workspace:*",
+    "@nestos/common": "workspace:*",
+    "@nestos/mdxeditor": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
+    "@nestos/vfs-ui": "workspace:*",
     "@types/node": "^20.19.25",
     "typescript": "^5.9.3",
     "vite": "^5.4.21",
     "vite-plugin-dts": "^4.5.4",
-    "@itookit/ui-common-adapter": "workspace:*",
-    "@itookit/mdx-adapter": "workspace:*",
-    "@itookit/driver-llm": "workspace:*",
-    "@itookit/tools": "workspace:*",
-    "@itookit/kernel-adapters": "workspace:*"
+    "@nestos/ui-common-adapter": "workspace:*",
+    "@nestos/mdx-adapter": "workspace:*",
+    "@nestos/driver-llm": "workspace:*",
+    "@nestos/tools": "workspace:*",
+    "@nestos/kernel-adapters": "workspace:*"
   },
   "dependencies": {
-    "@itookit/app-contracts": "workspace:*",
+    "@nestos/app-contracts": "workspace:*",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
-    "@itookit/ui-common": "workspace:*",
-    "@itookit/llm-ui": "workspace:*"
-  }
+    "@nestos/ui-common": "workspace:*",
+    "@nestos/llm-ui": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "ui/app-settings"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

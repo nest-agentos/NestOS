@@ -4,10 +4,10 @@ import { parseLoadedSkillIds } from './loaded-state';
 // host or a new run in the same Session) and its content is re-injected even when the user
 // message no longer matches. An explicit unload is not resurrected by that restore.
 import { expect, it } from 'vitest';
-import type { IDeviceDriver } from '@itookit/vfs-core';
-import type { SkillDefinition } from '@itookit/tools/contracts';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import type { IDeviceDriver } from '@nestos/vfs-core';
+import type { SkillDefinition } from '@nestos/tools/contracts';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { createKernelAdaptersRuntime } from '../runtime/create-kernel-adapters-runtime';
 import { resolveSessionSkillContext } from './session-prompt-context';
 import { createSessionSkillControls } from './session-skill-controls';

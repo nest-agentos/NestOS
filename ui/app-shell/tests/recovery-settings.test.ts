@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { RecoverySettingsEditor } from '../../app-settings/src/editors/RecoverySettingsEditor';
 import type { InitialFilesPort } from '../../app-settings/src/editors/initial-files';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 
 const editors: RecoverySettingsEditor[] = [];
 afterEach(async () => { for (const editor of editors.splice(0)) await editor.destroy(); document.body.replaceChildren(); vi.restoreAllMocks(); });

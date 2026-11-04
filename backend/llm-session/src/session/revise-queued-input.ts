@@ -1,4 +1,4 @@
-import type {DagPluginCatalog} from '@itookit/llm-flow/contracts';
+import type {DagPluginCatalog} from '@nestos/llm-flow/contracts';
 import type {SessionInstruction} from '../contracts/instruction-queue';
 import type {SessionHost} from '../utils/host-ports';
 import type {FlowIdentityResolver} from './flow-node-binder';

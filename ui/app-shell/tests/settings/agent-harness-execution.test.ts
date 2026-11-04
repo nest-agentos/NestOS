@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import { renderAgentExecution, bindAgentExecution, readAgentExecution } from '@itookit/llm-ui-adapter/settings';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import { renderAgentExecution, bindAgentExecution, readAgentExecution } from '@nestos/llm-ui-adapter/settings';
 
 const agent: AgentDefinition = { id: 'a', name: 'Remote reviewer', type: 'agent', config: {},
     execution: { kind: 'harness', connectionId: 'remote' } };

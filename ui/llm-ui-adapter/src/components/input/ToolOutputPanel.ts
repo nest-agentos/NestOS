@@ -2,7 +2,7 @@
 // 内联工具输出面板：展示 /read /grep /glob、`!` 与 /exec 等直接调用的结果。
 // 从 ChatInputView 抽出，自包含（创建/渲染/清除），不持有 ChatInput 状态。
 
-import { FEEDBACK_ICONS, t } from '@itookit/common';
+import { FEEDBACK_ICONS, t } from '@nestos/common';
 
 const escapeHtml = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

@@ -6,7 +6,7 @@ import { readWorkbenchSnapshot, type WorkbenchStatePort } from '../workbench/sta
  * Browsers restore synchronously while they are being constructed, so a scope is
  * read once up front and the port then answers from cache.
  */
-import { readUISnapshot, type RestoredUISnapshot, type UIPersistencePort } from '@itookit/vfs-ui';
+import { readUISnapshot, type RestoredUISnapshot, type UIPersistencePort } from '@nestos/vfs-ui';
 import type { VfsJsonStore } from './vfs-json-store';
 
 /** Document name for a browser scope; the file is `<sanitized-scope>.ui.json`. */

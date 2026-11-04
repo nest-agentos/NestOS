@@ -1,8 +1,8 @@
 import {randomUUID} from 'node:crypto';
 import {homedir} from 'node:os';
-import {createModuleLogger} from '@itookit/common';
-import {FSError} from '@itookit/vfs-core';
-import type {ServerTerminal, ServerTerminals} from '@itookit/app-contracts/services';
+import {createModuleLogger} from '@nestos/common';
+import {FSError} from '@nestos/vfs-core';
+import type {ServerTerminal, ServerTerminals} from '@nestos/app-contracts/services';
 import type {IPty} from 'node-pty';
 
 const logger = createModuleLogger('server-terminal');

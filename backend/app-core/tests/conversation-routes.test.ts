@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { conversationResourcePath, projectConversationEntryPath, projectConversationsPath, remoteSessionPath, resolveBrowserTarget } from '@itookit/app-contracts';
+import { conversationResourcePath, projectConversationEntryPath, projectConversationsPath, remoteSessionPath, resolveBrowserTarget } from '@nestos/app-contracts';
 
 it('keeps canonical identities for namesakes from different harnesses and round-trips source cursors', () => {
     const folder = '/项目', recent = projectConversationsPath(folder, {recent: true});

@@ -1,8 +1,8 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { bindingToken, sha256, type SyncState, type FileAction } from '@itookit/vfs-sync';
+import { bindingToken, sha256, type SyncState, type FileAction } from '@nestos/vfs-sync';
 import { makeSyncEdit, IndexedDBFileLocal, IndexedDBSyncStore } from '../src';
 import { freshIDB } from './helpers/indexeddb';
-import { ALL_STORES, IDBRecordStore, STORE_RECORDS, txDone } from '@itookit/vfsdriver-indexeddb';
+import { ALL_STORES, IDBRecordStore, STORE_RECORDS, txDone } from '@nestos/vfsdriver-indexeddb';
 const encoder = new TextEncoder();
 const backends: ReturnType<typeof freshIDB>[] = [];
 afterEach(async () => { await Promise.all(backends.splice(0).map(b => b.close())); });

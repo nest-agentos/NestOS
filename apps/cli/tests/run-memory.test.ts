@@ -4,13 +4,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { stringify } from 'yaml';
 import { expect, it } from 'vitest';
-import { SeqFileKernelStore } from '@itookit/durable-kernel';
+import { SeqFileKernelStore } from '@nestos/durable-kernel';
 import { runCommand } from '../src/commands';
 import { loadWorkflow } from '../src/config';
 import { compileRunDefinition } from '../src/run-definition';
 import { CliStorageResolver, cliStorage, openProfileInspectionFs } from '../src/runtime';
 import { listenForTest } from './listen';
-import { SharedMemoryStore, SessionMemoryProvider } from '@itookit/llm-session';
+import { SharedMemoryStore, SessionMemoryProvider } from '@nestos/llm-session';
 import { sharedMemoryCommand } from '../src/shared-memory-command';
 
 it.each([false, true])('runs a configured CLI memory tool through HTTP model calls and persists the result (shared: %s)', async shared => {

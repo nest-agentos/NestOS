@@ -1,5 +1,5 @@
 import type {ConversationControls} from '../contracts';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 
 type Attachment = NonNullable<Parameters<ConversationControls['send']>[1]>[number];
 

@@ -3,7 +3,7 @@ import type {
     DurableTaskProgram,
     JsonValue,
     TaskInputEvent,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 import {
     CAPABILITY_SIGNAL,
     applyDependencyMessages,

@@ -1,10 +1,10 @@
-import {InputSourceCommand, type ExecutableInputSource} from '@itookit/app-contracts';
-import {FlowCommand, type FlowRevision} from '@itookit/llm-flow/contracts';
-import {SessionCommand, type ICommandBus, type RootTargetCatalog, type ToolCommandOption} from '@itookit/llm-session/contracts';
+import {InputSourceCommand, type ExecutableInputSource} from '@nestos/app-contracts';
+import {FlowCommand, type FlowRevision} from '@nestos/llm-flow/contracts';
+import {SessionCommand, type ICommandBus, type RootTargetCatalog, type ToolCommandOption} from '@nestos/llm-session/contracts';
 import {promptToolCall} from './tool-call-form';
 import {promptFlowParameters} from '../components/FlowParameterForm';
 import {flowConnectionSelection} from './connection-selection';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 export async function sourceExecutionForm(commands: ICommandBus, kind: 'tool' | 'mcp' | 'flow', signal: AbortSignal): Promise<ExecutableInputSource | null> {
     if (kind !== 'flow') {

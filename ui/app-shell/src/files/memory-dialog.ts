@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { MemoryEntry, SessionMemoryControls } from '@itookit/llm-session/contracts';
+import { t } from '@nestos/common';
+import type { MemoryEntry, SessionMemoryControls } from '@nestos/llm-session/contracts';
 import { showMemorySharingDialog } from './memory-sharing-dialog';
 
 /** The caller supplies controls pinned to the Session being displayed. */

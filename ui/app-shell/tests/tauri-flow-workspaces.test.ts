@@ -1,7 +1,7 @@
-import type { FlowWorkspacePolicy, SchedulerCheckpoint } from '@itookit/llm-flow';
+import type { FlowWorkspacePolicy, SchedulerCheckpoint } from '@nestos/llm-flow';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionFilesService, type ApplicationPlatformServices, type HeadlessKernelRuntime } from '@itookit/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionFilesService, type ApplicationPlatformServices, type HeadlessKernelRuntime } from '@nestos/app-core';
 import { TauriFlowWorkspaces } from '../../../apps/tauri-app/src/shell/flow-workspaces';
 import { TauriSessionDirectories } from '../../../apps/tauri-app/src/services/session-directories';
 

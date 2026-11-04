@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {RpcPeer} from '@itookit/app-transport/rpc';
-import {CAPABILITIES} from '@itookit/app-transport/application';
+import {RpcPeer} from '@nestos/app-transport/rpc';
+import {CAPABILITIES} from '@nestos/app-transport/application';
 import {observeConversation} from '../../../backend/app-core/src/projects/conversation-view';
 
 it('accepts and edits a native queue through RPC while the original send reply is pending', async () => {

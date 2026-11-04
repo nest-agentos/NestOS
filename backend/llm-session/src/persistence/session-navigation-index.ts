@@ -1,4 +1,4 @@
-import type { ISeqFileTransaction } from '@itookit/vfs-core';
+import type { ISeqFileTransaction } from '@nestos/vfs-core';
 import type { SessionSummary } from './types';
 
 export const NAVIGATION_PATH = '/var/lib/sessions/folders.seq';

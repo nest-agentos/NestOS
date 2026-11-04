@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { AssetService } from '../../llm-ui-adapter/src/services/AssetService';
 
 it('keeps same-name attachments from different submissions immutable while the queue waits', async () => {

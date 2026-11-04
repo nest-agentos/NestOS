@@ -1,4 +1,4 @@
-import type {IndependentCallDescendantPage} from '@itookit/llm-session/contracts';
+import type {IndependentCallDescendantPage} from '@nestos/llm-session/contracts';
 
 /** Reject mismatched identities and non-advancing cursors before mounting controls. */
 export function assertDescendantPage(page: IndependentCallDescendantPage, rootId: string | undefined, afterTaskId?: string): void {

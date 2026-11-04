@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { mountMediaProbe } from '@itookit/llm-ui-adapter/settings';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
-import type { MediaProbeExamples } from '@itookit/kernel-adapters/contracts';
+import { mountMediaProbe } from '@nestos/llm-ui-adapter/settings';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
+import type { MediaProbeExamples } from '@nestos/kernel-adapters/contracts';
 
 const stops: Array<() => void> = [];
 afterEach(() => { stops.splice(0).forEach(stop => stop()); document.body.replaceChildren(); vi.restoreAllMocks(); });

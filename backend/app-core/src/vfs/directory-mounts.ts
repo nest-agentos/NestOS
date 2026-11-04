@@ -1,8 +1,8 @@
 import { WORKSPACE_PATH } from './workspace-namespace';
-import { FSError, createFileSystemView, normalizeVirtualPath, type IFileSystem, type FileSystemSourceOwner } from '@itookit/vfs-core';
-import { t } from '@itookit/common';
+import { FSError, createFileSystemView, normalizeVirtualPath, type IFileSystem, type FileSystemSourceOwner } from '@nestos/vfs-core';
+import { t } from '@nestos/common';
 import type { SessionFilesService, SessionMountRecord } from './session-files';
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 
 export interface DirectorySourceProvider {
     selectDirectory(): Promise<string | null>;

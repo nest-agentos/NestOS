@@ -5,26 +5,26 @@
 
 // --- 类型定义，用于 JSDoc 和智能提示 ---
 /** 
- * @typedef {import('@itookit/common').IEditor} IEditor
- * @typedef {import('@itookit/common').EditorOptions} EditorOptions
- * @typedef {import('@itookit/common').ISessionUI} ISessionUI
- * @typedef {import('@itookit/vfs-ui').VFSNodeUI} VFSNodeUI 
- * @typedef {import('@itookit/vfs-ui').VFSService} VFSService
- * @typedef {import('@itookit/vfs').VFSCore} VFSCore
+ * @typedef {import('@nestos/common').IEditor} IEditor
+ * @typedef {import('@nestos/common').EditorOptions} EditorOptions
+ * @typedef {import('@nestos/common').ISessionUI} ISessionUI
+ * @typedef {import('@nestos/vfs-ui').VFSNodeUI} VFSNodeUI 
+ * @typedef {import('@nestos/vfs-ui').VFSService} VFSService
+ * @typedef {import('@nestos/vfs').VFSCore} VFSCore
  */
 
 // --- 导入 VFS-UI 库 ---
 // [修正] createVFSUI 应该从 vfs-ui 导入，而不是 memory-manager
-import { connectEditorLifecycle, createVFSUI } from '@itookit/vfs-ui';
-import '@itookit/vfs-ui/style.css';
+import { connectEditorLifecycle, createVFSUI } from '@nestos/vfs-ui';
+import '@nestos/vfs-ui/style.css';
 
 // --- 导入 MDxEditor 及其插件 ---
 // ✨ [最终] 应用层是唯一需要知道具体编辑器实现的地方
-import { createMDxEditor } from '@itookit/mdxeditor';
-import '@itookit/mdxeditor/style.css';
+import { createMDxEditor } from '@nestos/mdxeditor';
+import '@nestos/mdxeditor/style.css';
 
 // --- 导入 vfs 的便利函数 ---
-import { createVFSCore,VFSModuleEngine } from '@itookit/vfs';
+import { createVFSCore,VFSModuleEngine } from '@nestos/vfs';
 
 //-----------------------------------------------------------------
 

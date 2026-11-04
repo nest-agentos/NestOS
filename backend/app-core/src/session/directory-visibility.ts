@@ -1,4 +1,4 @@
-import { FileIgnoreFilter, createVFSFileDiscoverySource, type FSNode, type IFileSystem } from '@itookit/vfs-core';
+import { FileIgnoreFilter, createVFSFileDiscoverySource, type FSNode, type IFileSystem } from '@nestos/vfs-core';
 
 /** Per-read rules: parallel ancestors, no stale cache after external edits. */
 export async function filterDirectoryFiles(fs: IFileSystem, nodes: FSNode[], signal?: AbortSignal): Promise<FSNode[]> {

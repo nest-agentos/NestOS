@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend, type IVFSManager } from '@itookit/vfs-core';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
-import type { ILLMService, LLMProvider } from '@itookit/driver-llm/contracts';
+import { createVFS, MemoryBackend, type IVFSManager } from '@nestos/vfs-core';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
+import type { ILLMService, LLMProvider } from '@nestos/driver-llm/contracts';
 import { LlmMediaEffectAdapter, type LlmMediaEffectRequest } from './llm-media-effect';
 import { createMediaResultStore, readMediaAsset } from './media-result-store';
 import { mediaEndpointIdentity } from '../llm-management/contracts/model-requirements';

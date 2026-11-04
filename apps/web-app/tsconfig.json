@@ -13,11 +13,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@itookit/common": ["../../shared/common/src/index.ts"],
-      "@itookit/common/*": ["../../shared/common/src/*"],
-      "@itookit/llm-session": ["../../backend/llm-session/src/index.ts"],
-      "@itookit/llm-ui-adapter": ["../../ui/llm-ui-adapter/src/index.ts"],
-      "@itookit/app-settings": ["../../ui/app-settings/src/index.ts"]
+      "@nestos/common": ["../../shared/common/src/index.ts"],
+      "@nestos/common/*": ["../../shared/common/src/*"],
+      "@nestos/llm-session": ["../../backend/llm-session/src/index.ts"],
+      "@nestos/llm-ui-adapter": ["../../ui/llm-ui-adapter/src/index.ts"],
+      "@nestos/app-settings": ["../../ui/app-settings/src/index.ts"]
     }
   },
   "include": ["src"],

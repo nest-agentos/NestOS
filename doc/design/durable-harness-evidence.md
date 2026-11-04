@@ -19,16 +19,16 @@
 
 | 证据 | 范围 | 命令 |
 |---|---|---|
-| `libraries/durable-kernel/src/kernel.test.ts` | Kernel 状态机、租约、wait、spawn、shared CAS、消息、资源授权 | `pnpm --filter @itookit/durable-kernel test` |
+| `libraries/durable-kernel/src/kernel.test.ts` | Kernel 状态机、租约、wait、spawn、shared CAS、消息、资源授权 | `pnpm --filter @nestos/durable-kernel test` |
 | `libraries/durable-kernel/src/protocol.test.ts` | 协议不变量与 §15 矩阵中的内核侧行（分页、重试、fencing、cache 回执、outbox） | 同上 |
 | `libraries/durable-kernel/src/resources.test.ts` | 资源分配/授权/预算/物理清理/迁移 | 同上 |
-| `libraries/durable-kernel/tests/ipc.test.ts` | 真实 LocalFS + SQLite 上的 SIGKILL/多进程：接管、竞争、单次消费、清理恢复 | `pnpm --filter @itookit/vfsdriver-local test` |
-| `backend/llm-flow/__tests__/durable-flow-executor.test.ts` | Flow 调度：根任务、检查点恢复、任务去重、工作区租约、detached 计时器、调度所有权 fencing | `pnpm --filter @itookit/llm-flow test` |
+| `libraries/durable-kernel/tests/ipc.test.ts` | 真实 LocalFS + SQLite 上的 SIGKILL/多进程：接管、竞争、单次消费、清理恢复 | `pnpm --filter @nestos/vfsdriver-local test` |
+| `backend/llm-flow/__tests__/durable-flow-executor.test.ts` | Flow 调度：根任务、检查点恢复、任务去重、工作区租约、detached 计时器、调度所有权 fencing | `pnpm --filter @nestos/llm-flow test` |
 | `backend/llm-flow/__tests__/scheduler-lease.test.ts` | Run 级调度租约：记录、拒绝活拥有者、到期接管、心跳、释放 | 同上 |
 | `backend/llm-flow/__tests__/{git-worktree-manager,transcript-budget,port-contract}.test.ts` | 隔离工作区恢复、transcript 字节预算、端口结构兼容 | 同上 |
-| `apps/cli/tests/crash-matrix.test.ts` | 真实 CLI 进程 + 真实 HTTP 模型服务的 SIGKILL 崩溃矩阵 | `pnpm --filter @itookit/cli test` |
+| `apps/cli/tests/crash-matrix.test.ts` | 真实 CLI 进程 + 真实 HTTP 模型服务的 SIGKILL 崩溃矩阵 | `pnpm --filter @nestos/cli test` |
 | `apps/cli/tests/{run.integration.test.ts,nested-harness.test.ts,hitl.test.ts,session-lease.test.ts,run-scheduler-lock.test.ts,run-scheduler-lease-delete.test.ts,worktree-run.test.ts}` | 端到端 Run、嵌套 harness、人工交互、Session 租约、本机调度锁、跨主机调度租约删除保护、隔离工作区宿主装配 | 同上 |
-| `backend/llm-session/__tests__/*` | 会话/回合投影与失败回合可继续性 | `pnpm --filter @itookit/llm-session test` |
+| `backend/llm-session/__tests__/*` | 会话/回合投影与失败回合可继续性 | `pnpm --filter @nestos/llm-session test` |
 
 ## 1. Protocol §2 不变量
 
@@ -43,7 +43,7 @@
 | 7 | 控制意图与传播工作持久保存，崩溃不遗忘暂停/取消/关闭/投递 | `kernel.ts` control、`store.ts` cleanupPending、outbox | `task.seq` `control`、`cleanupPending`、`messages.seq` `outbox/inbox` | [独立库进程矩阵](../../libraries/durable-kernel/tests/ipc.test.ts)「retains Effect cleanup across missing, unsupported and failed adapters after SIGKILL」「recovers a cancelled tree after SIGKILL between parent commit and descendant cleanup」 |
 | 8 | Session 内共享操作可事务原子；跨 Session 不承诺原子/全局顺序 | `shared.seq` + `messages.seq` | `shared.seq` `value/head/history` | `kernel.test.ts`「persists versioned session shared state with CAS」「delivers cross-session messages through a durable outbox」 |
 | 9 | 无 notifier、worker 换进程、首次恢复早于旧租约到期，仍最终推进 | `kernel.ts` sweeper/timer service、`store.ts` recover | `task.seq` `attempt/`、`graph.seq` | [独立库进程矩阵](../../libraries/durable-kernel/tests/ipc.test.ts)「resumes an unexpired task through Kernel after SIGKILL without periodic polling」「waits for the dead worker lease deadline and resumes without forced takeover」；`protocol.test.ts`「uses a deadline timer without polling and leaves idle sessions idle」 |
-| 10 | 观察者能区分“请求已接受/逻辑状态已变化/外部是否停止” | `domain/status.ts`、事件流 `task.*`/`effect.*` | `events.seq` | `protocol.test.ts`「pages a Task event index without scanning unrelated events and pins the upper bound」；`app-core/src/session/session-browser.ts` 投影。**三态投影与 UI 可见性已于 2026-09-11（第五十五轮）补证**：`kernel.test.ts`「distinguishes an accepted cancel request from a confirmed external stop」——取消在途 Effect 未确认时 `task.stat()` 为 `{ phase: 'done', control: { requested: 'cancel', acknowledged: false }, activeOperations: 1 }`，确认后 `{ acknowledged: true, activeOperations: 0 }`；`taskStat`/`taskStats`/`sessionStat` 由 `@itookit/durable-kernel` 公开导出，`taskSummary` 增加 `control`/`activeOperations`（app-core `session-browser.test.ts`「exposes whether an accepted cancel is still waiting for the external stop」），`SessionWorkbench` 任务视图渲染 `[data-stop-state]`（`none`/`pending`/`stopped`，copy 为 `session.tasks.stopPending|stopStopped`），jsdom 回归 `app-shell/tests/session-browser-ui.test.ts`。缺口：真实窗口下的可见性验收仍未做（本轮为 jsdom） |
+| 10 | 观察者能区分“请求已接受/逻辑状态已变化/外部是否停止” | `domain/status.ts`、事件流 `task.*`/`effect.*` | `events.seq` | `protocol.test.ts`「pages a Task event index without scanning unrelated events and pins the upper bound」；`app-core/src/session/session-browser.ts` 投影。**三态投影与 UI 可见性已于 2026-09-11（第五十五轮）补证**：`kernel.test.ts`「distinguishes an accepted cancel request from a confirmed external stop」——取消在途 Effect 未确认时 `task.stat()` 为 `{ phase: 'done', control: { requested: 'cancel', acknowledged: false }, activeOperations: 1 }`，确认后 `{ acknowledged: true, activeOperations: 0 }`；`taskStat`/`taskStats`/`sessionStat` 由 `@nestos/durable-kernel` 公开导出，`taskSummary` 增加 `control`/`activeOperations`（app-core `session-browser.test.ts`「exposes whether an accepted cancel is still waiting for the external stop」），`SessionWorkbench` 任务视图渲染 `[data-stop-state]`（`none`/`pending`/`stopped`，copy 为 `session.tasks.stopPending|stopStopped`），jsdom 回归 `app-shell/tests/session-browser-ui.test.ts`。缺口：真实窗口下的可见性验收仍未做（本轮为 jsdom） |
 
 ## 2. Protocol §15 kill / 故障矩阵
 
@@ -151,7 +151,7 @@
 
 ## 2026-10-21 独立内核验收入口
 
-`libraries/durable-kernel/src/independent-contracts.test.ts` 覆盖多 Session 并发上限、Session 消息幂等与消费确认、接收游标、Task 定向消息、停止确认和 core 入口恢复裁决。`libraries/durable-kernel/tests/ipc.test.ts` 现在由库自身运行，包含超时失败后清理意图的 SIGKILL 恢复；无需 CLI。仓库外制品消费使用 `pnpm --filter @itookit/durable-kernel test:package`，验证 ESM/CJS、三个入口、NodeNext 声明、任务/消息/停机。跨主机传输和物理设备结果核对仍由宿主与适配器提供。
+`libraries/durable-kernel/src/independent-contracts.test.ts` 覆盖多 Session 并发上限、Session 消息幂等与消费确认、接收游标、Task 定向消息、停止确认和 core 入口恢复裁决。`libraries/durable-kernel/tests/ipc.test.ts` 现在由库自身运行，包含超时失败后清理意图的 SIGKILL 恢复；无需 CLI。仓库外制品消费使用 `pnpm --filter @nestos/durable-kernel test:package`，验证 ESM/CJS、三个入口、NodeNext 声明、任务/消息/停机。跨主机传输和物理设备结果核对仍由宿主与适配器提供。
 
 
 ## 2026-10-21 活动汇总与 Harness 组合补证

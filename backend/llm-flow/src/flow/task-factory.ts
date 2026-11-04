@@ -1,6 +1,6 @@
-import type { TaskSpec } from '@itookit/durable-kernel';
-import type { SkillContext } from '@itookit/llm-tasks';
-import type { ToolDefinition } from '@itookit/llm-context';
+import type { TaskSpec } from '@nestos/durable-kernel';
+import type { SkillContext } from '@nestos/llm-tasks';
+import type { ToolDefinition } from '@nestos/llm-context';
 import type { DagNodeDefinition, DagPluginCatalog, DagTaskDefinition, DagTaskDependencyBinding, JsonValue, InvocationIdentity } from '../contracts';
 import {invocationLabels} from '../contracts/flow';
 import type { DispatchInput } from './structured/types';

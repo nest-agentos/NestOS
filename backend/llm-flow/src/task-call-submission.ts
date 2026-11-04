@@ -1,4 +1,4 @@
-import {KernelError, KernelErrorCode, snapshotTaskCallPlan, type Kernel, type KernelDiagnostic, type TaskCallPlan, type TaskCallResult, type TaskHandle, type TaskSpec, type TaskRef, type TaskSubmissionReceipt} from '@itookit/durable-kernel';
+import {KernelError, KernelErrorCode, snapshotTaskCallPlan, type Kernel, type KernelDiagnostic, type TaskCallPlan, type TaskCallResult, type TaskHandle, type TaskSpec, type TaskRef, type TaskSubmissionReceipt} from '@nestos/durable-kernel';
 import type {RunExecution, TaskRunDefinition} from './run-submission';
 
 export interface TaskCallSubmitOptions {

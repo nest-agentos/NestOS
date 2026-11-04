@@ -1,7 +1,7 @@
 import {traceHarnessConnection} from './harness-connection-diagnostics';
-import {sha256Hex} from '@itookit/common';
-import {FSError} from '@itookit/vfs-core';
-import type {HarnessExecutionConnection} from '@itookit/kernel-adapters/contracts';
+import {sha256Hex} from '@nestos/common';
+import {FSError} from '@nestos/vfs-core';
+import type {HarnessExecutionConnection} from '@nestos/kernel-adapters/contracts';
 import type {HarnessConnectionService} from './harness-connections';
 import type {ProjectRemoteMountService} from './remote-mounts';
 

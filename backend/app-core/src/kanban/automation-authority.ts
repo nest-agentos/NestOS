@@ -1,6 +1,6 @@
-import type {KanbanActor, KanbanBoard, KanbanCommand} from '@itookit/kanban/contracts';
-import {sameAutomationBinding} from '@itookit/kanban/contracts';
-import type {RootTargetCatalog} from '@itookit/llm-session/contracts';
+import type {KanbanActor, KanbanBoard, KanbanCommand} from '@nestos/kanban/contracts';
+import {sameAutomationBinding} from '@nestos/kanban/contracts';
+import type {RootTargetCatalog} from '@nestos/llm-session/contracts';
 import {automationTarget, assertAutomationPrincipals} from './automation-targets';
 import {requireValue} from './validation';
 

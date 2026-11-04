@@ -1,6 +1,6 @@
-import type { ISkillService, SkillDefinition, SkillLoadResult, SkillScopeLevel, SkillToolBinding } from '@itookit/tools/contracts';
-import type { ToolHandler } from '@itookit/tools/contracts';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
+import type { ISkillService, SkillDefinition, SkillLoadResult, SkillScopeLevel, SkillToolBinding } from '@nestos/tools/contracts';
+import type { ToolHandler } from '@nestos/tools/contracts';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
 
 export type CapabilityResolver<T> = (
     context: EffectExecutionContext,
@@ -30,7 +30,7 @@ export interface SkillToolHandlerFactory {
 export interface SessionCapabilityScope {
     resolveMCPToolIds?(profiles: string[]): Promise<string[]>;
     prepareTools?(ids: string[]): Promise<void>;
-    readonly toolService: import('@itookit/tools/contracts').IToolService;
+    readonly toolService: import('@nestos/tools/contracts').IToolService;
     readonly skillService: ISkillService;
     dispose(): Promise<void>;
 }

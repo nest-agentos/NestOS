@@ -6,7 +6,7 @@
 git submodule update --init --recursive -- libraries
 pnpm install --frozen-lockfile
 pnpm workspace:check --installed
-pnpm --filter @itookit/vfs-core test
+pnpm --filter @nestos/vfs-core test
 ```
 
 开发通过各库的公开 exports 消费源码；发布使用 publishConfig 的 dist 入口。主仓库对库间依赖统一应用 workspace 覆盖，各库独立开发和 npm 发布能力继续保留。

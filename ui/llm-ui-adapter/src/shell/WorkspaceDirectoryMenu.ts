@@ -1,6 +1,6 @@
-import { t } from '@itookit/common';
-import { Toast, type EditorHostContext } from '@itookit/ui-common-adapter';
-import {EventCleanup} from '@itookit/llm-ui';
+import { t } from '@nestos/common';
+import { Toast, type EditorHostContext } from '@nestos/ui-common-adapter';
+import {EventCleanup} from '@nestos/llm-ui';
 
 /** Configuration crosses only the host port, with the current Session captured by the host. */
 export class WorkspaceDirectoryMenu {

@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { createFileSystemSource, FSError, MemoryBackend } from '@itookit/vfs-core';
+import { createFileSystemSource, FSError, MemoryBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { CELLS_EXTENSION } from '../src/projects/mcp-remote-connections';
 import { canReaddressConnection, type RemoteFileSystemConfig } from '../src/projects/remote-connections';

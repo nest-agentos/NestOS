@@ -4,8 +4,8 @@
 // assets under that file. Mirrors SessionRepository's VFS CRUD + asset conventions.
 
 import { FileBackedService } from '../utils/file-backed-service';
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { FlowFileRef, FlowStore } from '@itookit/llm-flow';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { FlowFileRef, FlowStore } from '@nestos/llm-flow';
 
 export const FLOW_MODULE_NAME = 'flows';
 const FLOW_EXTENSION = '.flow';

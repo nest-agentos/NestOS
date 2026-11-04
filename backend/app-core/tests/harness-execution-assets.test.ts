@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {sha256Hex} from '@itookit/llm-context/digest';
-import type {HarnessAssetAttachment, HarnessExecutionRequest} from '@itookit/kernel-adapters/contracts';
+import {sha256Hex} from '@nestos/llm-context/digest';
+import type {HarnessAssetAttachment, HarnessExecutionRequest} from '@nestos/kernel-adapters/contracts';
 import {createHarnessExecutionProvider} from '../src/projects/harness-execution';
 import {complete, fixture, request} from './harness-execution-fixture';
 

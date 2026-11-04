@@ -1,7 +1,7 @@
 import { archivePath, decodeArchiveBytes } from './file-archive';
-import { FSError } from '@itookit/vfs-core';
-import type { ChatSessionSettings, ConversationManifest, ISessionRepository } from '@itookit/llm-session';
-import { isContentTransfer } from '@itookit/llm-session/contracts';
+import { FSError } from '@nestos/vfs-core';
+import type { ChatSessionSettings, ConversationManifest, ISessionRepository } from '@nestos/llm-session';
+import { isContentTransfer } from '@nestos/llm-session/contracts';
 
 /** Durable Session bundle shared by the browser projection and the workbench export action. */
 export const SESSION_BUNDLE_FORMAT = 'itookit.session';

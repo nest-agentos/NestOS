@@ -1,9 +1,9 @@
-import type { LLMLogSink } from '@itookit/driver-llm/contracts';
+import type { LLMLogSink } from '@nestos/driver-llm/contracts';
 import { silentAdapterLog } from '../ports/diagnostics';
-import { assertEffectGrant } from '@itookit/durable-kernel';
-import type { ISkillService } from '@itookit/tools/contracts';
-import type { IToolService, ToolInvokeResult } from '@itookit/tools/contracts';
-import type { EffectAdapter, EffectExecutionContext, EffectReconcileResult } from '@itookit/durable-kernel';
+import { assertEffectGrant } from '@nestos/durable-kernel';
+import type { ISkillService } from '@nestos/tools/contracts';
+import type { IToolService, ToolInvokeResult } from '@nestos/tools/contracts';
+import type { EffectAdapter, EffectExecutionContext, EffectReconcileResult } from '@nestos/durable-kernel';
 import { forgetLoadedSkill, rollbackFailedLoad } from '../skill/loaded-state';
 import { InFlightEffects } from './in-flight';
 
@@ -13,8 +13,8 @@ export type SkillLoadTracker = Pick<ISkillService, 'getLoadedSkills' | 'unloadSk
 
 /** Host tools requiring Kernel-owned execution identity rather than model arguments. */
 export interface EffectToolBinding {
-    meta: import('@itookit/tools/contracts').ToolMeta;
-    definition: import('@itookit/tools/contracts').ToolDefinition;
+    meta: import('@nestos/tools/contracts').ToolMeta;
+    definition: import('@nestos/tools/contracts').ToolDefinition;
     invoke(args: Record<string, unknown>, context: EffectExecutionContext): Promise<string>;
 }
 
@@ -47,7 +47,7 @@ export class ToolCallEffectAdapter implements EffectAdapter<ToolCallEffectReques
     }
 
     executeWithOutputAdmission(request: ToolCallEffectRequest, context: EffectExecutionContext,
-        admit: import('@itookit/tools/contracts').ToolInvokeRequest['admitOutput']): Promise<ToolInvokeResult> {
+        admit: import('@nestos/tools/contracts').ToolInvokeRequest['admitOutput']): Promise<ToolInvokeResult> {
         return this.inFlight.track(context, this.run(request, context, admit));
     }
 
@@ -57,7 +57,7 @@ export class ToolCallEffectAdapter implements EffectAdapter<ToolCallEffectReques
     }
 
     private async run(request: ToolCallEffectRequest, context: EffectExecutionContext,
-        admitOutput?: import('@itookit/tools/contracts').ToolInvokeRequest['admitOutput']): Promise<ToolInvokeResult> {
+        admitOutput?: import('@nestos/tools/contracts').ToolInvokeRequest['admitOutput']): Promise<ToolInvokeResult> {
         const started = Date.now();
         try {
             const result = await this.invoke(request, context, admitOutput);
@@ -80,7 +80,7 @@ export class ToolCallEffectAdapter implements EffectAdapter<ToolCallEffectReques
     }
 
     private async invoke(request: ToolCallEffectRequest, context: EffectExecutionContext,
-        admitOutput?: import('@itookit/tools/contracts').ToolInvokeRequest['admitOutput']): Promise<ToolInvokeResult> {
+        admitOutput?: import('@nestos/tools/contracts').ToolInvokeRequest['admitOutput']): Promise<ToolInvokeResult> {
         assertEffectGrant(context, request.resourceHandleId, 'tool');
         const service = await (typeof this.service === 'function' ? this.service(context, request) : this.service);
         const bound = this.effectTools.find(tool => tool.meta.id === request.toolId);
@@ -106,7 +106,7 @@ export class ToolCallEffectAdapter implements EffectAdapter<ToolCallEffectReques
         // introduced may be undone when identity persistence fails.
         const tracker = loadsSkill ? await this.resolveSkillTracker?.(context) : undefined;
         const wasLoaded = tracker ? tracker.getLoadedSkills().some(item => item.id === skillId) : true;
-        const onProgress: import('@itookit/tools/contracts').ToolInvokeRequest['onProgress'] = request.callId ? async progress => {
+        const onProgress: import('@nestos/tools/contracts').ToolInvokeRequest['onProgress'] = request.callId ? async progress => {
             context.abortSignal.throwIfAborted();
             await context.emit?.({ type: 'agent.event', payload: { type: 'tool:progress', call: {
                 toolId: request.callId!, name: request.toolId, input: request.args,

@@ -1,5 +1,5 @@
-import type {TwinScannerTool} from '@itookit/app-contracts';
-import type {FormParameter, JsonValue} from '@itookit/llm-ui/forms';
+import type {TwinScannerTool} from '@nestos/app-contracts';
+import type {FormParameter, JsonValue} from '@nestos/llm-ui/forms';
 
 interface Schema {
     type?: string; title?: string; description?: string; default?: JsonValue; const?: JsonValue; enum?: JsonValue[];

@@ -1,9 +1,9 @@
-import type { ProjectService } from '@itookit/app-contracts/services';
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { Kernel } from '@itookit/durable-kernel';
-import type { SessionRepository } from '@itookit/llm-session';
-import type { ConnectionMeta, LLMProvider } from '@itookit/driver-llm/contracts';
-import { sha256HexSync } from '@itookit/llm-context';
+import type { ProjectService } from '@nestos/app-contracts/services';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { Kernel } from '@nestos/durable-kernel';
+import type { SessionRepository } from '@nestos/llm-session';
+import type { ConnectionMeta, LLMProvider } from '@nestos/driver-llm/contracts';
+import { sha256HexSync } from '@nestos/llm-context';
 import { SessionLifecycleService } from '../session/session-lifecycle';
 import { DigitalTwinService, type TwinWorkspaceBinding } from './service';
 import { NestosTwinSourceReader } from './source-reader';

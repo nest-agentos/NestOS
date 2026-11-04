@@ -1,4 +1,4 @@
-import {assertConversationSelection} from '@itookit/kernel-adapters/contracts';
+import {assertConversationSelection} from '@nestos/kernel-adapters/contracts';
 import type {ExecutionOverrides, ExecutorConfig, TaskInput} from '../core/types';
 
 /** A native selection must never be silently ignored by a model or Flow execution. */

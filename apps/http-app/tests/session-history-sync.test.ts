@@ -1,6 +1,6 @@
 import {afterEach, expect, it} from 'vitest';
-import {RpcPeer} from '@itookit/app-transport/application';
-import type {DescriptorPatch, WireValue} from '@itookit/app-transport/rpc';
+import {RpcPeer} from '@nestos/app-transport/application';
+import type {DescriptorPatch, WireValue} from '@nestos/app-transport/rpc';
 
 const peers: RpcPeer[] = [];
 afterEach(async () => {await Promise.all(peers.splice(0).map(peer => peer.close()));});

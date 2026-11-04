@@ -5,8 +5,8 @@ import { mcpAuthenticatedFetch } from './mcp-auth';
 // Manages connections to multiple MCP servers via stdio / Streamable HTTP transports.
 
 import { snapshotMCPConnectionOptions, type MCPConnectionOptions } from '../contracts/mcp-transport';
-import { MCP_PROTOCOL_VERSION, type MCPDiscovery } from '@itookit/tools/mcp-contracts';
-import { type ToolDefinition } from '@itookit/llm-context';
+import { MCP_PROTOCOL_VERSION, type MCPDiscovery } from '@nestos/tools/mcp-contracts';
+import { type ToolDefinition } from '@nestos/llm-context';
 import type { MCPConfig, MCPServerConfig } from './types';
 
 const noopLog = { debug() {}, info() {}, warn() {}, error() {} };

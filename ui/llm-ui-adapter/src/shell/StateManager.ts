@@ -1,11 +1,11 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type { SessionViewPort } from '@itookit/llm-session/contracts';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type { SessionViewPort } from '@nestos/llm-session/contracts';
 // @file: llm-ui/shell/StateManager.ts
 
 import type { UIState, CollapseStateMap } from '../domain/types';
 import type { IChatInputPresenter, IChatInputConfig, ChatInputSettings } from '../domain/ports/IChatInputPresenter';
 import { fromConversationState, type StateService } from '../services/StateService';
-import type { ConversationManifest } from '@itookit/llm-session/contracts';
+import type { ConversationManifest } from '@nestos/llm-session/contracts';
 import { createDebouncedSave, DebouncedFn } from '../utils/debounce';
 import { ErrorHandler } from '../utils/errorHandler';
 import {draftSettings} from '../domain/submission-draft';
@@ -16,7 +16,7 @@ import {DraftFilesCodec} from '../services/DraftFilesCodec';
 interface PendingInput {config: IChatInputConfig; files?: File[]; branch: string; verify?: boolean; replaceId?: string; resolution?: number}
 interface InputRestoreOptions {
     initialInputState?: {text?: string; agentId?: string}; savedState?: UIState | null; sessionSettings?: ChatInputSettings;
-    historyTarget?: import('@itookit/llm-flow/contracts').TargetRef;
+    historyTarget?: import('@nestos/llm-flow/contracts').TargetRef;
 }
 /**
  * 状态管理器

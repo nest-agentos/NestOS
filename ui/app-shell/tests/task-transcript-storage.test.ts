@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { Kernel, type DurableTaskProgram } from '@itookit/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { Kernel, type DurableTaskProgram } from '@nestos/durable-kernel';
 import { DagCommandService, createBuiltinDagPluginRegistry } from '../../../backend/llm-flow/src/index';
 import { openTaskTranscript } from '../../llm-ui-adapter/src/components/dag/TaskTranscriptDialog';
 

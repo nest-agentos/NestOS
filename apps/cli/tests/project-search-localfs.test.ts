@@ -2,10 +2,10 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { createFileSystemSource } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { ProjectSearch } from '@itookit/app-core';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { createFileSystemSource } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { ProjectSearch } from '@nestos/app-core';
+import type { ProjectService } from '@nestos/app-contracts/services';
 
 it('searches unopened on-disk files through the existing local driver without a new driver API', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nestos-local-search-')), root = join(directory, 'files');

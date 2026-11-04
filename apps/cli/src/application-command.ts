@@ -1,10 +1,10 @@
 import {flowControlCommand} from './application-flow-control';
 import {kanbanCommand} from './application-kanban';
 import {agentCommand} from './application-agent';
-import { getLogger, LogLevel, randomUUID } from '@itookit/common';
+import { getLogger, LogLevel, randomUUID } from '@nestos/common';
 import { recordRuntimeDiagnostic } from './diagnostics';
-import type { ApplicationClient, ProjectConversationPort } from '@itookit/app-contracts/services';
-import type { SessionSnapshot } from '@itookit/llm-session/contracts';
+import type { ApplicationClient, ProjectConversationPort } from '@nestos/app-contracts/services';
+import type { SessionSnapshot } from '@nestos/llm-session/contracts';
 import {sessionCommand} from './application-session';
 import type { CommandOptions } from './commands';
 import { openCliApplication } from './application-host';

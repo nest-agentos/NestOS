@@ -1,5 +1,5 @@
-import {formatDefaultFileTitle} from '@itookit/common';
-import {FSError} from '@itookit/vfs-core';
+import {formatDefaultFileTitle} from '@nestos/common';
+import {FSError} from '@nestos/vfs-core';
 
 export function preparedTitle(value?: string): string {
     if (value === undefined || value === '') return formatDefaultFileTitle();

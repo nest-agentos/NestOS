@@ -1,7 +1,7 @@
 import {expect, it, vi} from 'vitest';
 import {materializeAssetMessages} from './asset-messages';
-import type {ChatCompletionParams} from '@itookit/driver-llm/contracts';
-import type {EffectExecutionContext} from '@itookit/durable-kernel';
+import type {ChatCompletionParams} from '@nestos/driver-llm/contracts';
+import type {EffectExecutionContext} from '@nestos/durable-kernel';
 const asset={sessionId:'s',taskId:'source',owner:'tasks/source',name:'hash.bin',mimeType:'image/png',bytes:3,sha256:'hash'};
 const request=()=>({model:'vision',messages:[{role:'user',content:[{type:'image',source:{type:'asset',asset}}]}]}) as unknown as ChatCompletionParams;
 const context={sessionId:'s',taskId:'consumer',effectId:'llm',abortSignal:new AbortController().signal} as EffectExecutionContext;

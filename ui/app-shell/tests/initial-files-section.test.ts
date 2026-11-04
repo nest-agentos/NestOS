@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { InitialFilesSection, type InitialFilesPort } from '../../app-settings/src/editors/initial-files';
 
 it('shows a collapsed, unselected file catalog and restores only checked files', async () => {

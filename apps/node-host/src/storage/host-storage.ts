@@ -1,4 +1,4 @@
-import { type IStorageBackend } from '@itookit/vfs-core';
+import { type IStorageBackend } from '@nestos/vfs-core';
 import { PathGuard } from './path-guard';
 
 /** Keep filesystem checks inside the daemon, beneath every domain service. */

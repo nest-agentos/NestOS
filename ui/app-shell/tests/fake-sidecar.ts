@@ -6,7 +6,7 @@
  * Mirrors BetterSqliteSidecarDb semantics: upsert semantics, tag FK on meta_ext.
  */
 
-import type { ISidecarDb, MetaExtRow } from '@itookit/vfsdriver-local';
+import type { ISidecarDb, MetaExtRow } from '@nestos/vfsdriver-local';
 
 type MetaMap = Map<string, MetaExtRow>;
 type TagMap = Map<string, Set<string>>;

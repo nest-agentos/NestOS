@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { extractNodeOutput } from '@itookit/llm-tasks';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { extractNodeOutput } from '@nestos/llm-tasks';
 import { createBuiltinDagPluginRegistry, DurableFlowExecutor, flowToDag, registerDurablePrograms } from '../src/flow';
 import { createFlowRevision } from '../src/flow-definition-store';
 import { checkFlowSource, checkFlowSyntax } from '../src/flow/syntax-check';

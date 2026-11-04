@@ -1,5 +1,5 @@
-import type { MCPDiscovery, MCPServer } from '@itookit/tools/mcp-contracts';
-import type { ConfigurationFormControls } from '@itookit/ui-common-adapter';
+import type { MCPDiscovery, MCPServer } from '@nestos/tools/mcp-contracts';
+import type { ConfigurationFormControls } from '@nestos/ui-common-adapter';
 
 type Controls = ConfigurationFormControls<MCPServer,MCPDiscovery>;
 interface Entry { key: string; controls: Controls; matches(server: MCPServer): boolean }

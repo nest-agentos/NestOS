@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { SessionRunCoordinator } from '../src/session/session-run-coordinator';
 
 it('admits an explicit Flow rerun after close without resuming the previous Task', async () => {

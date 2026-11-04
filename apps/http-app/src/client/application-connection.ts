@@ -1,7 +1,7 @@
-import { randomUUID } from '@itookit/common';
-import {HttpViewClient, SnapshotCache, ViewExpiredError} from '@itookit/app-transport/http';
-import {RPC_VERSION} from '@itookit/app-transport/rpc';
-import {setFileRecoveryOwner} from '@itookit/app-shell/startup';
+import { randomUUID } from '@nestos/common';
+import {HttpViewClient, SnapshotCache, ViewExpiredError} from '@nestos/app-transport/http';
+import {RPC_VERSION} from '@nestos/app-transport/rpc';
+import {setFileRecoveryOwner} from '@nestos/app-shell/startup';
 import {initialView} from './initial-view';
 
 let pageUser: string | undefined;

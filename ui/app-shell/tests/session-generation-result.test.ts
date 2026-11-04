@@ -1,6 +1,6 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {sessionGenerationResult} from '../src/browser/session-generation-result';
-import type {ApplicationBackend} from '@itookit/app-contracts/services';
+import type {ApplicationBackend} from '@nestos/app-contracts/services';
 afterEach(()=>vi.useRealTimers());
 const request={sessionId:'session',operationId:'op',prompt:'Prompt',source:'Source',previousDraft:''};
 it('finishes from the durable result while the original generation reply remains pending',async()=>{

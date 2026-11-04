@@ -8,8 +8,8 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { SeqFileKernelStore } from '@itookit/durable-kernel';
-import { parseLoadedSkillIds } from '@itookit/kernel-adapters';
+import { SeqFileKernelStore } from '@nestos/durable-kernel';
+import { parseLoadedSkillIds } from '@nestos/kernel-adapters';
 import { listenForTest } from './listen';
 import { runCommand } from '../src/commands';
 import { CliStorageResolver, cliStorage, openProfileInspectionFs } from '../src/runtime';

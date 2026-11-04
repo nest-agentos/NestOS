@@ -1,12 +1,12 @@
-import {type OcrSettingsState,type OcrControls} from '@itookit/app-contracts/services';
-import {renderOcrSettings, readOcrSettings} from '@itookit/llm-ui-adapter/settings';
+import {type OcrSettingsState,type OcrControls} from '@nestos/app-contracts/services';
+import {renderOcrSettings, readOcrSettings} from '@nestos/llm-ui-adapter/settings';
 
 import { OcrAccess } from './ocr-access';
 import { editOcrPrompt } from './ocr-prompt-dialog';
-import type { OcrService } from '@itookit/app-contracts/services';
-import { escapeHTML, randomUUID, t, type NavigationRequest } from '@itookit/common';
-import { type IAgentManagementService } from '@itookit/kernel-adapters/contracts';
-import {Modal, Toast, type EditorTarget} from '@itookit/ui-common-adapter';
+import type { OcrService } from '@nestos/app-contracts/services';
+import { escapeHTML, randomUUID, t, type NavigationRequest } from '@nestos/common';
+import { type IAgentManagementService } from '@nestos/kernel-adapters/contracts';
+import {Modal, Toast, type EditorTarget} from '@nestos/ui-common-adapter';
 
 export interface OcrConfigurationControls extends OcrControls {
     dispose(): Promise<void>;

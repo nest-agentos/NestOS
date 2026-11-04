@@ -1,5 +1,5 @@
 import { resolvePricingEntry, type ModelPricingConfig, type PricingBasis } from './pricing';
-import type { MeteredTokens } from '@itookit/driver-llm/contracts';
+import type { MeteredTokens } from '@nestos/driver-llm/contracts';
 
 /** Bucket shape is owned by driver-llm metering so the meter and the rate table cannot drift. */
 export type { MeteredTokens };

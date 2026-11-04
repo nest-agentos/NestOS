@@ -1,6 +1,6 @@
 import { retry } from './scan-store';
-import { randomUUID } from '@itookit/common';
-import { sha256HexSync } from '@itookit/llm-context';
+import { randomUUID } from '@nestos/common';
+import { sha256HexSync } from '@nestos/llm-context';
 import type { TwinSettings, TwinSourceData, TwinSourceCatalog, TwinDiscoveredSource } from './domain';
 import type { TwinScanPlan } from './scan-domain';
 import { matchesRules, matchesLine } from './scan-rules';

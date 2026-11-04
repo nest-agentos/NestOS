@@ -1,6 +1,6 @@
-import {createModuleLogger} from '@itookit/common';
-import type {OperationLedger, OperationReceipt, OperationRecord} from '@itookit/llm-ui';
-import {FlowInvocationCommand, type FlowInvocationInput, type FlowInvocationRecord, type ICommandBus} from '@itookit/llm-session/contracts';
+import {createModuleLogger} from '@nestos/common';
+import type {OperationLedger, OperationReceipt, OperationRecord} from '@nestos/llm-ui';
+import {FlowInvocationCommand, type FlowInvocationInput, type FlowInvocationRecord, type ICommandBus} from '@nestos/llm-session/contracts';
 import {canonicalJson} from '../utils/canonical-json';
 
 const log = createModuleLogger('flow-invocation-submission');

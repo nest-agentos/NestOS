@@ -32,7 +32,7 @@ test('runs every stage from the repository and isolates CLI crashes', t => {
     assert.equal(calls.length, 4);
     assert.ok(calls.every(call => call.cwd === root.replace(/\/$/, '')));
     assert.ok(calls[0].args.includes('--workspace-concurrency=1'));
-    assert.ok(calls[0].args.includes('!@itookit/cli'));
+    assert.ok(calls[0].args.includes('!@nestos/cli'));
     assert.ok(calls[1].args.includes('--exclude'));
     assert.ok(calls[1].args.includes('--fileParallelism=false'));
     assert.equal(calls[1].args.at(-1), 'tests/crash-matrix.test.ts');

@@ -1,5 +1,5 @@
-import {sha256HexSync} from '@itookit/common';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {sha256HexSync} from '@nestos/common';
+import type {IFileSystem} from '@nestos/vfs-core';
 import {requireValue} from '../kanban/validation';
 
 /** Retain the frozen prompts, protocol, messages and artifacts before removing a clean worktree. */

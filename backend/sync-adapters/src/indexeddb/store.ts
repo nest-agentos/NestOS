@@ -3,10 +3,10 @@ import { validRoot, validateState } from '../shared/records';
 import { ensurePrivateParents, makeNode, type StoredNode } from './nodes';
 import { IndexedDBLeaseGuard } from './lease';
 import { assertBinding, assertSync, applyBaseline, sha256, validId, validPath,
-    type CoordinationGuard, type FileAction, type Snapshot, type StateStore, type SyncState } from '@itookit/vfs-sync';
-import { IDBRecordStore } from '@itookit/vfsdriver-indexeddb';
-import type { IndexedDBStorageAccess } from '@itookit/vfsdriver-indexeddb';
-import { req, txDone, STORE_NODES, STORE_RECORDS, STORE_TAGS } from '@itookit/vfsdriver-indexeddb';
+    type CoordinationGuard, type FileAction, type Snapshot, type StateStore, type SyncState } from '@nestos/vfs-sync';
+import { IDBRecordStore } from '@nestos/vfsdriver-indexeddb';
+import type { IndexedDBStorageAccess } from '@nestos/vfsdriver-indexeddb';
+import { req, txDone, STORE_NODES, STORE_RECORDS, STORE_TAGS } from '@nestos/vfsdriver-indexeddb';
 
 export interface IndexedDBSyncSnapshot {
     scan: Snapshot;

@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { WorkspaceDirectoryMenu } from '../../llm-ui-adapter/src/shell/WorkspaceDirectoryMenu';
 import { showMountDialog } from '../src/files/mount-dialog';
-import type { DirectoryMountService, SessionFilesService } from '@itookit/app-core';
+import type { DirectoryMountService, SessionFilesService } from '@nestos/app-core';
 
 const cleanup: Array<() => void> = [];
 afterEach(() => { cleanup.splice(0).forEach(close => close()); document.body.replaceChildren(); vi.restoreAllMocks(); });

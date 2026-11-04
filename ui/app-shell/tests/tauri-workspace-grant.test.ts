@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { ApplicationPlatformServices, FilesRecord } from '@itookit/app-core';
+import type { ApplicationPlatformServices, FilesRecord } from '@nestos/app-core';
 import { resolveTauriWorkspaceGrant } from '../../../apps/tauri-app/src/shell/workspace-grant';
 
 function setup(sourceId = 'admin-home') {

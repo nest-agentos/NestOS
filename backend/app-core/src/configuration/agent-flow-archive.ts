@@ -1,10 +1,10 @@
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import { FlowCommand, mapFlowAgentReferences, type FlowDraft, type FlowRevision } from '@itookit/llm-flow/contracts';
-import { externalFlowReferences, flowRevisionToDraft, visitFlowCalls, type FlowReference } from '@itookit/llm-flow';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import { createModuleLogger, randomUUID } from '@itookit/common';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import { FlowCommand, mapFlowAgentReferences, type FlowDraft, type FlowRevision } from '@nestos/llm-flow/contracts';
+import { externalFlowReferences, flowRevisionToDraft, visitFlowCalls, type FlowReference } from '@nestos/llm-flow';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import { createModuleLogger, randomUUID } from '@nestos/common';
 
-export { externalFlowReferences } from '@itookit/llm-flow';
+export { externalFlowReferences } from '@nestos/llm-flow';
 export interface ArchivePlanEntry { kind: string; id: string; data: unknown }
 const log = createModuleLogger('toolbox-flow-export');
 

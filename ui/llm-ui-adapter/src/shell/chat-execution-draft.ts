@@ -1,6 +1,6 @@
 import type {EditorOptions} from '../contracts';
-import {t} from '@itookit/common';
-import type {ChatView, ComposerDraft} from '@itookit/llm-ui';
+import {t} from '@nestos/common';
+import type {ChatView, ComposerDraft} from '@nestos/llm-ui';
 
 
 /** The host owns cross-executor navigation; input is copied without consuming the current draft. */

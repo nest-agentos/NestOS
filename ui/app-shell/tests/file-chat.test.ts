@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createApplicationRuntime, ProjectService, type ApplicationRuntime } from '@itookit/app-core';
-import { bindApplicationBackend, bindLocalApplicationServices } from '@itookit/app-core/host';
-import { MemoryBackend } from '@itookit/vfs-core';
+import { createApplicationRuntime, ProjectService, type ApplicationRuntime } from '@nestos/app-core';
+import { bindApplicationBackend, bindLocalApplicationServices } from '@nestos/app-core/host';
+import { MemoryBackend } from '@nestos/vfs-core';
 import { createFileChatHandler } from '../src/projects/file-chat';
 
 let runtime: ApplicationRuntime | undefined;

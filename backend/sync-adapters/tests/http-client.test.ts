@@ -1,6 +1,6 @@
 import { it, expect } from 'vitest';
 import { HttpSyncClient } from '../src';
-import { sha256 } from '@itookit/vfs-sync';
+import { sha256 } from '@nestos/vfs-sync';
 const command = { target: 'projects/p/datasets/files/publish', body: { authorityId: 'a', historyEpoch: 'e', operationId: 'op', replicaId: 'r', opSeq: '1' } };
 it('retains durable rejection receipt on HTTP 412 and supplies epoch', async () => {
     const client = new HttpSyncClient({ endpoint: 'http://localhost', credential: () => 'secret', fetch: async (_, init) => {

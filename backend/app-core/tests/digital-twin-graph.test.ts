@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { DigitalTwinService } from '../src/digital-twin/service';
 import { knowledgeGraph, relatedMemories } from '../src/digital-twin/graph';
 import { memoryData, type TwinAnalysisJob } from '../src/digital-twin/domain';

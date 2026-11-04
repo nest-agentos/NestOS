@@ -4,10 +4,10 @@ import { PromptNavigator } from '../../llm-ui-adapter/src/components/PromptNavig
 import { LayoutTemplates } from '../../llm-ui-adapter/src/components/templates/LayoutTemplates';
 import { remotePrompts, remoteRounds } from '../../llm-ui-adapter/src/shell/remote-rounds';
 import { NavigationHelper } from '../../llm-ui-adapter/src/shell/NavigationHelper';
-import {DOMCache, TimerManager} from '@itookit/llm-ui';
-import {ScrollController} from '@itookit/llm-ui';
-import { SessionCommand } from '@itookit/llm-session/contracts';
-import { t } from '@itookit/common';
+import {DOMCache, TimerManager} from '@nestos/llm-ui';
+import {ScrollController} from '@nestos/llm-ui';
+import { SessionCommand } from '@nestos/llm-session/contracts';
+import { t } from '@nestos/common';
 
 const views: Array<{destroy(): void}> = [];
 beforeEach(() => {

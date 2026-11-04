@@ -1,9 +1,9 @@
 import type {ConversationSlashCommand} from '../../../contracts';
-import {getLocale} from '@itookit/common';
-import {t} from '@itookit/common';
+import {getLocale} from '@nestos/common';
+import {t} from '@nestos/common';
 
 import type {InputPlugin, InputPluginContext} from './InputPlugin';
-import {PopupPanel} from '@itookit/llm-ui';
+import {PopupPanel} from '@nestos/llm-ui';
 
 type CommandSuggestion = Pick<ConversationSlashCommand, 'name' | 'description' | 'argumentHint' | 'disabled'>;
 

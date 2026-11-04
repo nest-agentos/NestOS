@@ -1,1 +1,1 @@
-export { type ModelPricingEntry, type ModelPricingConfig, type CostRecord, lookupPricingEntry, extractPrices, aggregateCostRecords } from '@itookit/kernel-adapters/contracts';
+export { type ModelPricingEntry, type ModelPricingConfig, type CostRecord, lookupPricingEntry, extractPrices, aggregateCostRecords } from '@nestos/kernel-adapters/contracts';

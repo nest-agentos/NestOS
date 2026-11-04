@@ -1,5 +1,5 @@
-import { FSError } from '@itookit/vfs-core';
-import type { ConnectionObservation, ProjectRemoteMountPort } from '@itookit/app-contracts/services';
+import { FSError } from '@nestos/vfs-core';
+import type { ConnectionObservation, ProjectRemoteMountPort } from '@nestos/app-contracts/services';
 
 const monitors = new WeakMap<ProjectRemoteMountPort, ConnectionMonitor>();
 

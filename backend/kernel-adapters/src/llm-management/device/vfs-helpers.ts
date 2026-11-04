@@ -2,7 +2,7 @@
 //
 // VFSHelpers — low-level VFS read/write utilities shared across manager classes.
 
-import type { IFileSystem, CreateFileOptions } from '@itookit/vfs-core';
+import type { IFileSystem, CreateFileOptions } from '@nestos/vfs-core';
 import yaml from 'js-yaml';
 
 type ConfigValidator<T> = (value: unknown, path: string) => value is T;

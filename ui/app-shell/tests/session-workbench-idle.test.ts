@@ -4,10 +4,10 @@ import { createTestWorkbench } from './helpers/application';
 // workbench must not poll the backend while nothing changes. VFS operation counts
 // describe logical work, not desktop transport requests.
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { SessionFilesService } from '@itookit/app-core';
-import { createSessionAttachmentMounts } from '@itookit/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { SessionFilesService } from '@nestos/app-core';
+import { createSessionAttachmentMounts } from '@nestos/app-core';
 
 it('issues no VFS operations while the Session workbench is idle', async () => {
     const storage = new Map<string, string>();

@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend, type IFileSystem, type ISeqFileTransaction } from '@itookit/vfs-core';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
+import { createVFS, MemoryBackend, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
 import { SeqTwinStore } from '../src/digital-twin/seq-twin-store';
 import type { TwinCommit } from '../src/digital-twin/contracts';
 

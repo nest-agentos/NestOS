@@ -1,6 +1,6 @@
-import {createModuleLogger, t} from '@itookit/common';
-import {FlowCommand, formatFlowOutput, type DurableFlowSnapshot} from '@itookit/llm-flow/contracts';
-import type {ICommandBus, IndependentCallView} from '@itookit/llm-session/contracts';
+import {createModuleLogger, t} from '@nestos/common';
+import {FlowCommand, formatFlowOutput, type DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
+import type {ICommandBus, IndependentCallView} from '@nestos/llm-session/contracts';
 import {FlowDocuments, flowRequestMarkdown} from './FlowDocuments';
 import {openSessionFlowOutputs} from '../../flows/session-output';
 

@@ -1,4 +1,4 @@
-import type {FSFileNode, IFileSystem} from '@itookit/vfs-core';
+import type {FSFileNode, IFileSystem} from '@nestos/vfs-core';
 import type {MailSource} from './contracts';
 import {normalizeSearch, parseMail, parseMailSource, safeCode, threadId} from './model';
 import type {IndexedMail, MailIndex} from './storage';

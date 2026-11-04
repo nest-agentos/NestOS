@@ -1,6 +1,6 @@
-import { t } from '@itookit/common';
-import type { ProjectSyncService } from '@itookit/app-contracts/services';
-import type { StoredFilePlan, FileConflict } from '@itookit/vfs-sync';
+import { t } from '@nestos/common';
+import type { ProjectSyncService } from '@nestos/app-contracts/services';
+import type { StoredFilePlan, FileConflict } from '@nestos/vfs-sync';
 import { SyncDialog, paragraph } from './dialog';
 import { directionSelect, renderChanges, conflictReason, resolutionToolbar, type SyncDirection } from './controls';
 import { conflictMetadata, renderComparison } from './comparison';

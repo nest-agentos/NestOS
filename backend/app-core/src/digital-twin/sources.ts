@@ -1,8 +1,8 @@
 import { matchesRules, matchesLine } from './scan-rules';
 import type { TwinScanPlan } from './scan-domain';
 import type { TwinSettings } from './domain';
-import { randomUUID } from '@itookit/common';
-import { FSError } from '@itookit/vfs-core';
+import { randomUUID } from '@nestos/common';
+import { FSError } from '@nestos/vfs-core';
 import type { TwinSourceContent, TwinSourceData, TwinSourceReader, TwinSourceSpec } from './domain';
 import { TwinRecords, type TwinDataRecord } from './records';
 

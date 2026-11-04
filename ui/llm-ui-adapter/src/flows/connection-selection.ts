@@ -1,13 +1,13 @@
-import { isModelOperation } from '@itookit/kernel-adapters/contracts';
+import { isModelOperation } from '@nestos/kernel-adapters/contracts';
 import {flowInputAssets} from './input-assets';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import { SessionCommand, inferFlowConnectionRequirements } from '@itookit/llm-session/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import { SessionCommand, inferFlowConnectionRequirements } from '@nestos/llm-session/contracts';
 import type { FlowConnectionSelection } from '../components/FlowParameterForm';
 
 /** Keep run settings separate from the Flow's parameter namespace. */
-export async function flowConnectionSelection(commands: ICommandBus, selected?: string, slots?: import('@itookit/llm-flow/contracts').FlowConnection[], bindings?: Record<string, string>, flow?: import('@itookit/llm-flow/contracts').FlowDraft | import('@itookit/llm-flow/contracts').FlowRevision,
-    agent?: {id: string; modelDefaults?: import('@itookit/kernel-adapters/contracts').ModelDefaults}): Promise<FlowConnectionSelection> {
-    const { connections, modelDefaults } = await commands.execute<{ connections: FlowConnectionSelection['connections']; modelDefaults?: import('@itookit/kernel-adapters/contracts').ModelDefaults }>(SessionCommand.GetConnections);
+export async function flowConnectionSelection(commands: ICommandBus, selected?: string, slots?: import('@nestos/llm-flow/contracts').FlowConnection[], bindings?: Record<string, string>, flow?: import('@nestos/llm-flow/contracts').FlowDraft | import('@nestos/llm-flow/contracts').FlowRevision,
+    agent?: {id: string; modelDefaults?: import('@nestos/kernel-adapters/contracts').ModelDefaults}): Promise<FlowConnectionSelection> {
+    const { connections, modelDefaults } = await commands.execute<{ connections: FlowConnectionSelection['connections']; modelDefaults?: import('@nestos/kernel-adapters/contracts').ModelDefaults }>(SessionCommand.GetConnections);
     slots = inferFlowConnectionRequirements({nodes: flow?.nodes ?? [], connections: slots ?? flow?.connections,
         parameters: flow?.parameters, inputGroups: flow?.inputGroups});
     const defaults = { ...bindings };

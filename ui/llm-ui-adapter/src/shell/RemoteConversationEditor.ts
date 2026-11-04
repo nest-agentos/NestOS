@@ -1,4 +1,4 @@
-import {conversationStatus} from '@itookit/llm-ui-adapter/presentation';
+import {conversationStatus} from '@nestos/llm-ui-adapter/presentation';
 import {type ConversationControls, type ConversationSnapshot, type EditorOptions} from '../contracts';
 import {nativeCatalogNotice} from '../independent/native-catalog';
 import {awaitNativeAdmission} from '../independent/native-admission';
@@ -6,8 +6,8 @@ import {NativeInstructionQueuePanel} from '../components/NativeInstructionQueueP
 import {ConversationComposer} from './drafts/conversation-composer';
 import type {IChatInputConfig} from '../domain/ports/IChatInputPresenter';
 interface SubmittedInput {text: string; files: File[]; revision: number; config: IChatInputConfig}
-import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventCallback, type EditorEventMap} from '@itookit/ui-common-adapter';
-import { createModuleLogger, escapeHTML, randomUUID, t } from '@itookit/common';
+import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventCallback, type EditorEventMap} from '@nestos/ui-common-adapter';
+import { createModuleLogger, escapeHTML, randomUUID, t } from '@nestos/common';
 import {renderConversationRequests, clearConversationRequests} from './remote-interactions';
 import { ConversationWorkspaceView } from './ConversationWorkspaceView';
 import { RemoteBranches } from './remote-branches';
@@ -16,7 +16,7 @@ import { remoteRounds, remotePrompts } from './remote-rounds';
 import { prepareRemoteAttachments, restoreRemoteAttachments } from './remote-attachments';
 import type { ChatSubmission } from '../domain/submission';
 import type { WorkspaceHandoff } from './drafts/workspace-handoff';
-import {isCommandInput} from '@itookit/llm-ui';
+import {isCommandInput} from '@nestos/llm-ui';
 import {resolveNativeCommand, submitNativeCommand} from '../independent/native-command';
 import {nativeBranchCommand, withNativeBranchCommands} from '../commands/native-branch-command';
 import {NativeExecutionNotice} from '../components/NativeExecutionNotice';
@@ -133,7 +133,7 @@ export class RemoteConversationEditor extends BaseSettingsEditor<ConversationCon
     private canSubmit(text = this.view.input.getConfig().text): boolean {
         return !!(this.service.enqueue && this.snapshot?.canQueue || this.snapshot?.canSend || this.snapshot?.canCommand && isCommandInput(text));
     }
-    private persistImages(files: File[], resize: import('@itookit/image-parser').ImageResizePolicy): Promise<void> {
+    private persistImages(files: File[], resize: import('@nestos/image-parser').ImageResizePolicy): Promise<void> {
         const config = this.view.input.getConfig();
         return this.composer!.save({...config, settings: {...config.settings, imageResize: resize}}, files);
     }

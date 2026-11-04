@@ -1,8 +1,8 @@
-# @itookit/llm-tasks — API 参考
+# @nestos/llm-tasks — API 参考
 
-> 平台无关的 LLM Durable Program 层：把"一项 LLM 工作如何向前运行"表达为 Kernel `DurableTaskProgram`（init/reduce 状态机）。提供 `llm.chat` / `llm.agent` / `llm.plan` 三个程序、上下文组装与 Provider 消息适配。所有 API 从 `@itookit/llm-tasks` 根导出。
+> 平台无关的 LLM Durable Program 层：把"一项 LLM 工作如何向前运行"表达为 Kernel `DurableTaskProgram`（init/reduce 状态机）。提供 `llm.chat` / `llm.agent` / `llm.plan` 三个程序、上下文组装与 Provider 消息适配。所有 API 从 `@nestos/llm-tasks` 根导出。
 
-**依赖方向**：包依赖为 `@itookit/durable-kernel`、`@itookit/llm-context`、`@itookit/driver-llm` 和 `@itookit/tools`；消息与上下文类型直接来自 llm-context，通信类型直接来自 driver-llm/contracts，Prompt/Tool 契约来自 tools/contracts。不依赖 `llm-session`、`llm-flow`、UI、DOM 或具体设备；所有外部能力（LLM/Tool）经 Kernel Effect 使用。
+**依赖方向**：包依赖为 `@nestos/durable-kernel`、`@nestos/llm-context`、`@nestos/driver-llm` 和 `@nestos/tools`；消息与上下文类型直接来自 llm-context，通信类型直接来自 driver-llm/contracts，Prompt/Tool 契约来自 tools/contracts。不依赖 `llm-session`、`llm-flow`、UI、DOM 或具体设备；所有外部能力（LLM/Tool）经 Kernel Effect 使用。
 
 ## 目录
 
@@ -29,7 +29,7 @@
 | `DurablePlanProgram` | `llm.plan@1` | 结构化计划生成 → 审批交互 → 输出 `DurablePlanOutput` |
 
 ```ts
-import { DurableChatProgram, DurableAgentProgram, DurablePlanProgram } from '@itookit/llm-tasks';
+import { DurableChatProgram, DurableAgentProgram, DurablePlanProgram } from '@nestos/llm-tasks';
 kernel.registerProgram(new DurableChatProgram());
 kernel.registerProgram(new DurableAgentProgram());
 kernel.registerProgram(new DurablePlanProgram());
@@ -119,7 +119,7 @@ interface DurableCapabilitySignal {
 
 ## ContextAssembler
 
-此入口为兼容转发，实现归 `@itookit/llm-context`。新代码消费 `IContextAssembler`/`createContextAssembler`；v2 Agent/Chat 使用 `ContextTaskProgram` 经 Effect 接入持久窗口，见 [Context API](context-api.md)。
+此入口为兼容转发，实现归 `@nestos/llm-context`。新代码消费 `IContextAssembler`/`createContextAssembler`；v2 Agent/Chat 使用 `ContextTaskProgram` 经 Effect 接入持久窗口，见 [Context API](context-api.md)。
 
 构建 LLM 调用的上下文（system + history + 压缩摘要 + 记忆）。
 
@@ -259,7 +259,7 @@ buildLlmTaskInput(options: LlmTaskInputOptions): DurableAgentInput;
 
 ## 源码结构：文件与路径
 
-`@itookit/llm-tasks` 的公共 API 全部从 `backend/llm-tasks/src/index.ts` 根导出。包内按 **core / durable** 两层组织：
+`@nestos/llm-tasks` 的公共 API 全部从 `backend/llm-tasks/src/index.ts` 根导出。包内按 **core / durable** 两层组织：
 
 ```
 backend/llm-tasks/src/

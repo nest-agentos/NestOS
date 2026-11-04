@@ -1,1 +1,1 @@
-export {flowArgumentTokens, resolveFlowArguments, parameterSourceValue} from '@itookit/app-contracts';
+export {flowArgumentTokens, resolveFlowArguments, parameterSourceValue} from '@nestos/app-contracts';

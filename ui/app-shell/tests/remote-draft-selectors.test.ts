@@ -1,9 +1,9 @@
-import type {ConversationModelCatalog} from '@itookit/llm-ui-adapter/contracts';
+import type {ConversationModelCatalog} from '@nestos/llm-ui-adapter/contracts';
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
 import {ChatDraftEditor} from '../../llm-ui-adapter/src/shell/drafts/ChatDraftEditor';
 
-import {getLogger} from '@itookit/common';
+import {getLogger} from '@nestos/common';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0)) await close(); document.body.replaceChildren(); vi.unstubAllGlobals();});

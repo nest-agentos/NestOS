@@ -1,6 +1,6 @@
 import {expect,it} from 'vitest';
 import {z} from 'zod/v4';
-import type {Tool} from '@itookit/tools';
+import type {Tool} from '@nestos/tools';
 import {toolboxParameters} from '../src/runtime/tool-packages/toolbox';
 it('projects schema defaults and offers only matching user connections without guessing among accounts',()=>{
  const tool={inputSchema:z.object({query:z.string().default('recent'),maxItems:z.number().int().default(100),connection:z.string()})} as unknown as Tool;

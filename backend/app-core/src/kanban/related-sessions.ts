@@ -1,7 +1,7 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {IndependentCallService} from '@itookit/llm-session';
-import type {KanbanBoard, KanbanItem, KanbanWorkflowState, KanbanSessionAssociation, KanbanSessionExecution} from '@itookit/kanban/contracts';
-import type {KanbanSessionSource} from '@itookit/kanban/activity';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {IndependentCallService} from '@nestos/llm-session';
+import type {KanbanBoard, KanbanItem, KanbanWorkflowState, KanbanSessionAssociation, KanbanSessionExecution} from '@nestos/kanban/contracts';
+import type {KanbanSessionSource} from '@nestos/kanban/activity';
 import type {KanbanAutomationJournal} from './automation-journal';
 import {analysisHistory, safeCode} from './automation-analysis';
 import {relatedExecutionReader, type SessionExecutionOptions} from './related-session-executions';

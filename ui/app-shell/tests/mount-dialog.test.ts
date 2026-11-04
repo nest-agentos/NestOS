@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { DirectoryMountService, SessionFilesService } from '@itookit/app-core';
+import { t } from '@nestos/common';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { DirectoryMountService, SessionFilesService } from '@nestos/app-core';
 import { showMountDialog } from '../src/files/mount-dialog';
 it('sets a default without granting it, then mounts and unmounts through the shared dialog', async () => {
     const modalDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');

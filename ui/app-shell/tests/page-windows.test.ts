@@ -2,7 +2,7 @@
 import {afterEach, expect, it, vi} from 'vitest';
 import {PageWindows} from '../src/workspaces/page-windows';
 import {WorkbenchWindows} from '../src/workbench/windows';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {CalendarWorkbench} from '../src/calendar';
 
 const cleanup: Array<() => unknown> = [];

@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {consumeWorkspaceMessages, initializeWorkspaceMessages, parseWorkspaceMessage} from '../src/run/workspace-messages';
 

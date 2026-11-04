@@ -1,5 +1,5 @@
 import {belongsToCall, readCallMember} from './independent-call-membership';
-import type {Kernel, TaskRecord} from '@itookit/durable-kernel';
+import type {Kernel, TaskRecord} from '@nestos/durable-kernel';
 import type {IndependentCallInteractions} from '../contracts/independent-calls';
 
 /** Read only the pending index; Session membership alone never grants call membership. */

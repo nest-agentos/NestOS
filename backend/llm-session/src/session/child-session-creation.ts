@@ -1,4 +1,4 @@
-import {KernelError, KernelErrorCode, type Kernel, type SessionHandle, type JsonValue} from '@itookit/durable-kernel';
+import {KernelError, KernelErrorCode, type Kernel, type SessionHandle, type JsonValue} from '@nestos/durable-kernel';
 import type {ISessionRepository} from '../persistence/types';
 import type {CreateChildInput, ChildCreationReceipt, ContentTransfer, TransferReference} from '../contracts/content-transfer';
 import {sessionDirectoryStorage} from '../persistence/session-directory-storage';

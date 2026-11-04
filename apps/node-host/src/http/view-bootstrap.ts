@@ -1,8 +1,8 @@
-import {FSError} from '@itookit/vfs-core';
-import {SnapshotCache} from '@itookit/app-transport/http';
-import type {Reply, WireValue} from '@itookit/app-transport/rpc';
-import type {RpcPeer} from '@itookit/app-transport/application';
-import type {OpenViewRequest} from '@itookit/app-contracts/services';
+import {FSError} from '@nestos/vfs-core';
+import {SnapshotCache} from '@nestos/app-transport/http';
+import type {Reply, WireValue} from '@nestos/app-transport/rpc';
+import type {RpcPeer} from '@nestos/app-transport/application';
+import type {OpenViewRequest} from '@nestos/app-contracts/services';
 import type {HostedView} from './view-services';
 import type {ViewNotifications} from './view-notifications';
 

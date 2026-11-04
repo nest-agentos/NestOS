@@ -1,6 +1,6 @@
-import type {HarnessClient, HarnessSession} from '@itookit/cells-driver/harness';
-import type {KanbanScanSession, KanbanScanText} from '@itookit/kanban/contracts';
-import type {KanbanScanSource} from '@itookit/kanban/discovery';
+import type {HarnessClient, HarnessSession} from '@nestos/cells-driver/harness';
+import type {KanbanScanSession, KanbanScanText} from '@nestos/kanban/contracts';
+import type {KanbanScanSource} from '@nestos/kanban/discovery';
 import {requireValue} from './validation';
 
 /** A client must already be bound to one authorized remote project. */

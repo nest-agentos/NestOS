@@ -1,5 +1,5 @@
 import type {IncomingMessage, ServerResponse} from 'node:http';
-import type {ApplicationRuntime} from '@itookit/app-core';
+import type {ApplicationRuntime} from '@nestos/app-core';
 import {expect, it, vi} from 'vitest';
 import {ViewApi} from '../src/http/view-api';
 

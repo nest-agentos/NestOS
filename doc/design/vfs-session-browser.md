@@ -65,7 +65,7 @@ files 直接代理受限 Session 文件上下文，不使用目录黑名单。�
 
 投影支持 Session/文件夹 CRUD 与 `/files` 下的文件 CRUD。根级创建文件按导入 Session 处理，根级创建目录建立虚拟分组；Session 重命名写 `repository.updateManifest`。`/files` 写操作仍经 Session 文件上下文和授权校验。浏览器节点的 `_readOnly` 合并节点自身标记与 `capabilitiesAt(path).readonly`，tasks 容器和历史条目均标记只读；VFS UI 在打开命名输入框/文件选择器前检查，并在写入前复核。无挂载覆盖的虚拟父目录报告只读。
 
-删除统一走 `SessionLifecycleService`（`@itookit/app-core`，浏览器投影与文件夹递归删除共用）：`kernel.closeSession(id, true)` → 有界等待 `sessionStat(id).phase === 'closed'` → `kernel.removeSession(id)`（解除固定布局、删除 Kernel 存储根、清理 catalog）→ `repository.deleteSession(id)`。`closeTimeoutMs`（默认 30s）同时约束 **`closeSession` 调用本身**（它在途 Effect 确认停止才返回）与随后等待 `closed` 的轮询：设备/进程始终不确认停止时抛 `EBUSY`（`…did not confirm its in-flight work within <n>ms; nothing was deleted`）而不是无限挂起，关闭抛错或超时同样抛 `EBUSY` 并**保留全部数据**，不进入删除，因此确认后可用同一入口重试；文件夹删除逐会话走同一路径，全部成功后才删文件夹记录。回归 `backend/app-core/tests/session-delete-lifecycle.test.ts`（含运行中 Task 取消、以及从不确认停止时的有界失败与重试）。
+删除统一走 `SessionLifecycleService`（`@nestos/app-core`，浏览器投影与文件夹递归删除共用）：`kernel.closeSession(id, true)` → 有界等待 `sessionStat(id).phase === 'closed'` → `kernel.removeSession(id)`（解除固定布局、删除 Kernel 存储根、清理 catalog）→ `repository.deleteSession(id)`。`closeTimeoutMs`（默认 30s）同时约束 **`closeSession` 调用本身**（它在途 Effect 确认停止才返回）与随后等待 `closed` 的轮询：设备/进程始终不确认停止时抛 `EBUSY`（`…did not confirm its in-flight work within <n>ms; nothing was deleted`）而不是无限挂起，关闭抛错或超时同样抛 `EBUSY` 并**保留全部数据**，不进入删除，因此确认后可用同一入口重试；文件夹删除逐会话走同一路径，全部成功后才删文件夹记录。回归 `backend/app-core/tests/session-delete-lifecycle.test.ts`（含运行中 Task 取消、以及从不确认停止时的有界失败与重试）。
 
 Session 的 `/tasks`、`/files` 是展示投影，不是 Session 拥有的物理子树。删除或重命名 Session/分组不遍历挂载目录；访问授权（包括 rw）不赋予 Session 对挂载目录的生命周期所有权。`BrowserBackend.assertMutableSubtree` 把保护责任留给实际 Session lifecycle / 文件变更入口；VFS 保留祖先固定布局检查，存在嵌套引擎挂载时仍回退递归检查。普通物理后端不实现此可选端口，保持原有子树保护。
 
@@ -257,7 +257,7 @@ SessionWorkbench 在一个 vfs-ui 导航列表中按当前项目投影目录、�
 
 ### 工作台选择项归档
 
-项目工具栏使用 `WorkbenchArchiveExporter` / `WorkbenchArchiveImporter`（`@itookit/app-core`）完成选择项 JSON 往返。项目、分组、会话及其独立子会话按树导出，项目文件和嵌套附件使用 `file-archive.ts` 编码。导入生成新的项目/会话 ID，保留内容及相对组织结构；同名副本不覆盖，失败清理仅针对本次创建的对象。具体工具栏和目的目录语义见 [项目抽屉与子会话导航](project-session-navigation.md)。
+项目工具栏使用 `WorkbenchArchiveExporter` / `WorkbenchArchiveImporter`（`@nestos/app-core`）完成选择项 JSON 往返。项目、分组、会话及其独立子会话按树导出，项目文件和嵌套附件使用 `file-archive.ts` 编码。导入生成新的项目/会话 ID，保留内容及相对组织结构；同名副本不覆盖，失败清理仅针对本次创建的对象。具体工具栏和目的目录语义见 [项目抽屉与子会话导航](project-session-navigation.md)。
 
 ### 导航摘要读取
 

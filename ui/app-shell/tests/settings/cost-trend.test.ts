@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import type { CostRecord } from '@itookit/kernel-adapters/contracts';
-import { CostEditor } from '@itookit/llm-ui-adapter/settings';
-import { costTrendBuckets, costTrendRange, renderCostTrend } from '@itookit/llm-ui-adapter/settings';
+import type { CostRecord } from '@nestos/kernel-adapters/contracts';
+import { CostEditor } from '@nestos/llm-ui-adapter/settings';
+import { costTrendBuckets, costTrendRange, renderCostTrend } from '@nestos/llm-ui-adapter/settings';
 
 const editors: CostEditor[] = [];
 afterEach(async () => {

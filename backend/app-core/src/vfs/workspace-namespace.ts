@@ -1,1 +1,1 @@
-export { WORKSPACE_PATH, workspacePath, projectRelativePath } from '@itookit/app-contracts';
+export { WORKSPACE_PATH, workspacePath, projectRelativePath } from '@nestos/app-contracts';

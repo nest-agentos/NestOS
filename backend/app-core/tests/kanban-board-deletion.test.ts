@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {createKanbanModule} from '@itookit/kanban';
-import {SeqKanbanStore} from '@itookit/kanban/storage';
-import type {KanbanClient, KanbanDeletionRequest, KanbanWorkResource} from '@itookit/kanban/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {createKanbanModule} from '@nestos/kanban';
+import {SeqKanbanStore} from '@nestos/kanban/storage';
+import type {KanbanClient, KanbanDeletionRequest, KanbanWorkResource} from '@nestos/kanban/contracts';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {createBoardDeletion, withBoardDeletion} from '../src/kanban/board-deletion';
 const closes: Array<() => Promise<void>> = [];

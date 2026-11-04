@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {ImageProcessor, ImageOutput, ImageResizePolicy, ImageSource} from '@itookit/image-parser';
+import type {ImageProcessor, ImageOutput, ImageResizePolicy, ImageSource} from '@nestos/image-parser';
 import {createImageEditingPort, type ImageAssetMetadata} from './image-editing';
 
 function fixture(process: ImageProcessor['process']) {

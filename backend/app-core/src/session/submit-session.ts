@@ -1,6 +1,6 @@
-import {SessionCommand, type SubmissionRequest, type SubmissionReceipt} from '@itookit/llm-session/contracts';
-import {createModuleLogger} from '@itookit/common';
-import type {LocalApplicationServices} from '@itookit/app-contracts/services';
+import {SessionCommand, type SubmissionRequest, type SubmissionReceipt} from '@nestos/llm-session/contracts';
+import {createModuleLogger} from '@nestos/common';
+import type {LocalApplicationServices} from '@nestos/app-contracts/services';
 
 const log = createModuleLogger('session-submission');
 /** Submit through the host-owned context without rebinding another open editor. */

@@ -1,6 +1,6 @@
 // @file: app-settings/editors/AppearanceSettingsEditor.ts
-import { BaseSettingsEditor } from '@itookit/ui-common-adapter';
-import type { SettingsPort as SettingsService } from '@itookit/app-contracts/settings';
+import { BaseSettingsEditor } from '@nestos/ui-common-adapter';
+import type { SettingsPort as SettingsService } from '@nestos/app-contracts/settings';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 

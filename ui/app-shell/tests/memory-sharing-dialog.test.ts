@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
-import { type IAgentConfigService } from '@itookit/kernel-adapters/contracts';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { Kernel } from '@itookit/durable-kernel';
-import { MemorySharingControls, SessionMemoryProvider, SharedMemoryStore } from '@itookit/llm-session';
+import { t } from '@nestos/common';
+import { type IAgentConfigService } from '@nestos/kernel-adapters/contracts';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { MemorySharingControls, SessionMemoryProvider, SharedMemoryStore } from '@nestos/llm-session';
 import { showMemorySharingDialog } from '../src/files/memory-sharing-dialog';
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });

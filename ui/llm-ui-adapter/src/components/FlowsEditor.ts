@@ -1,18 +1,18 @@
 import {type EditorOptions} from '../contracts';
-import {createOperationLedger} from '@itookit/llm-ui';
+import {createOperationLedger} from '@nestos/llm-ui';
 import {persistOperations} from '../services/OperationPersistence';
-import type {ISessionRepository} from '@itookit/llm-session/contracts';
-import {editorResourceId} from '@itookit/ui-common-adapter';
+import type {ISessionRepository} from '@nestos/llm-session/contracts';
+import {editorResourceId} from '@nestos/ui-common-adapter';
 // @file: llm-ui/components/FlowsEditor.ts
 // Standalone workflow workspace editor: a thin IEditor shell around DagWorkbench.
 // Workflows are first-class resources (flows VFS module); running one creates a
 // new chat session instance with the declared parameters filled in.
 
-import {IEditor, type EditorFactory} from '@itookit/ui-common-adapter';
-import { NAVIGATION_EVENTS, randomUUID, t } from '@itookit/common';
-import { type FlowDraft } from '@itookit/llm-flow/contracts';
-import { type ICommandBus } from '@itookit/llm-session/contracts';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
+import {IEditor, type EditorFactory} from '@nestos/ui-common-adapter';
+import { NAVIGATION_EVENTS, randomUUID, t } from '@nestos/common';
+import { type FlowDraft } from '@nestos/llm-flow/contracts';
+import { type ICommandBus } from '@nestos/llm-session/contracts';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
 import { DagWorkbench } from './DagWorkbench';
 import { FlowLauncher, flowIdFromNodeId, type FlowRunInput } from '../flows/run-flow';
 

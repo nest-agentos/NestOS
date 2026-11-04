@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { DirectoryMountService, ProjectService, SessionFilesService } from '@itookit/app-core';
-import { folderBrowserPath, projectConversationsPath } from '@itookit/app-contracts';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { DirectoryMountService, ProjectService, SessionFilesService } from '@nestos/app-core';
+import { folderBrowserPath, projectConversationsPath } from '@nestos/app-contracts';
 import { createTestWorkbench } from './helpers/application';
 
 it('creates files and conversations with styled icon buttons on fixed directory and empty conversation pages', async () => {

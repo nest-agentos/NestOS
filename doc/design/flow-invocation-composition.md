@@ -391,7 +391,7 @@ Skill 继续表示指令与能力配置；Flow 表示有类型的执行图。sla
 执行：
 
 ```bash
-pnpm --filter @itookit/llm-flow test __tests__/connections.test.ts __tests__/flow-contracts.test.ts __tests__/variables.test.ts __tests__/structured-flow.test.ts
+pnpm --filter @nestos/llm-flow test __tests__/connections.test.ts __tests__/flow-contracts.test.ts __tests__/variables.test.ts __tests__/structured-flow.test.ts
 ```
 
 结果：4 个文件、63 项测试通过，涵盖已有子图展开、单出口引用、参数单次插值和变量隔离。这些测试证明可复用基础，**不证明**本文建议的函数返回、多运行 UI 或 slash Flow 已实现。

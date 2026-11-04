@@ -1,14 +1,14 @@
 import type { ChatAttachment } from './chat';
 import type { ExecutionOverrides, HistoryPolicy, SessionOrigin } from '../core/types';
-import type { SendIntent } from '@itookit/llm-flow/contracts';
+import type { SendIntent } from '@nestos/llm-flow/contracts';
 
 /** A durable user request; execution history is resolved only when it is dispatched. */
 export interface SessionInstructionInput {
     branchFrom?: import('./submission').SubmissionRequest['branchFrom'];
     expectedBranch?: string;
-    target?: import('@itookit/llm-flow/contracts').TargetSelection;
-    expectedTarget?: import('@itookit/llm-flow/contracts').TargetRef;
-    source?: import('@itookit/llm-flow/contracts').FlowCallSource;
+    target?: import('@nestos/llm-flow/contracts').TargetSelection;
+    expectedTarget?: import('@nestos/llm-flow/contracts').TargetRef;
+    source?: import('@nestos/llm-flow/contracts').FlowCallSource;
     text: string;
     files: ChatAttachment[];
     agentId: string;
@@ -20,7 +20,7 @@ export interface SessionInstructionInput {
 
 export interface SessionInstruction extends SessionInstructionInput {
     /** Assigned and persisted in the dispatch claim, before any execution starts. */
-    invocation?: import('@itookit/llm-flow/contracts').InvocationIdentity;
+    invocation?: import('@nestos/llm-flow/contracts').InvocationIdentity;
     /** Digest of the original request, before host-derived bindings or attachment paths. */
     submissionDigest?: string;
     connectionBinding?: {
@@ -29,21 +29,21 @@ export interface SessionInstruction extends SessionInstructionInput {
         /** Frozen ordinary Agent identity; connection credentials remain in the live catalog. */
         agent?: {version: 1; config: import('../core/types').ExecutorConfig; digest: string};
         /** Frozen remote Agent identity and execution target; credentials remain host-owned. */
-        harnessConnection?: import('@itookit/kernel-adapters/contracts').HarnessConnectionSnapshot;
+        harnessConnection?: import('@nestos/kernel-adapters/contracts').HarnessConnectionSnapshot;
         harnessAgent?: import('../core/types').ExecutorConfig;
         connectionId?: string;
         source?: 'run' | 'session' | 'agent' | 'system';
-        defaults: import('@itookit/kernel-adapters/contracts').ModelDefaults;
+        defaults: import('@nestos/kernel-adapters/contracts').ModelDefaults;
         /** Safe connection/model choices captured before queue acceptance. */
         connections?: import('./flow-connection-snapshot').FlowConnectionSnapshot;
     };
     /** Host-resolved source definitions; accepted instructions do not follow later edits. */
     flowBinding?: {
         source?: 'explicit' | 'target';
-        target?: import('@itookit/llm-flow/contracts').TargetRef;
-        inputResolution?: import('@itookit/llm-flow/contracts').FlowResolvedInput;
-        definition: import('@itookit/llm-flow/contracts').FlowRevision;
-        dependencies: import('@itookit/llm-flow/contracts').FlowRevision[];
+        target?: import('@nestos/llm-flow/contracts').TargetRef;
+        inputResolution?: import('@nestos/llm-flow/contracts').FlowResolvedInput;
+        definition: import('@nestos/llm-flow/contracts').FlowRevision;
+        dependencies: import('@nestos/llm-flow/contracts').FlowRevision[];
         agent?: import('../core/types').ExecutorConfig;
         connections: import('./flow-connection-snapshot').FlowConnectionSnapshot;
         /** Absent only for legacy accepted instructions. */
@@ -67,7 +67,7 @@ export interface SessionInstructionQueue {
 /** Every edit is conditional on the projection the caller actually saw. */
 export type InstructionQueueEdit = { expectedRevision: number } & (
     | { action: 'update'; id: string; text: string }
-    | { action: 'update-input'; id: string; source: import('@itookit/llm-flow/contracts').FlowCallSource }
+    | { action: 'update-input'; id: string; source: import('@nestos/llm-flow/contracts').FlowCallSource }
     | { action: 'remove'; id: string }
     | { action: 'reorder'; ids: string[] }
     | { action: 'merge'; ids: string[] }

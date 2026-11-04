@@ -1,6 +1,6 @@
-import { createModuleLogger, randomUUID } from '@itookit/common';
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
-import type { ProjectFolder } from '@itookit/app-contracts/services';
+import { createModuleLogger, randomUUID } from '@nestos/common';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
+import type { ProjectFolder } from '@nestos/app-contracts/services';
 
 const path = '/etc/personal-project.json';
 const log = createModuleLogger('project-default');

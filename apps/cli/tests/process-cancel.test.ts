@@ -6,9 +6,9 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
-import { BashEffectAdapter } from '@itookit/kernel-adapters';
-import { ToolDeviceDriver, createBashTool } from '@itookit/tools';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
+import { BashEffectAdapter } from '@nestos/kernel-adapters';
+import { ToolDeviceDriver, createBashTool } from '@nestos/tools';
 import { NodeNativeShell } from '../src/shell';
 
 const roots: string[] = [];

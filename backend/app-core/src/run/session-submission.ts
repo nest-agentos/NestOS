@@ -1,5 +1,5 @@
-import {SessionCommand, type SubmissionRequest, type Round, type ISessionRepository} from '@itookit/llm-session/contracts';
-import {taskStat, type Kernel} from '@itookit/durable-kernel';
+import {SessionCommand, type SubmissionRequest, type Round, type ISessionRepository} from '@nestos/llm-session/contracts';
+import {taskStat, type Kernel} from '@nestos/durable-kernel';
 import type {ConversationContexts} from '../runtime/conversation-contexts';
 import {failure} from './prompt-bundle';
 

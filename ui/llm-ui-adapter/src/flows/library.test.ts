@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import type { FlowDraft, FlowId } from '@itookit/llm-flow/contracts';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
+import type { FlowDraft, FlowId } from '@nestos/llm-flow/contracts';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
 import { restoreFlowLibrary } from './library';
 
 const template: FlowDraft = { id: 'custom' as FlowId, name: 'Host template', draftVersion: 1, updatedAt: 0, nodes: [], edges: [], layout: { nodes: {} } };

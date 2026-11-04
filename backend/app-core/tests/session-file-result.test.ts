@@ -1,5 +1,5 @@
 import {afterEach,expect,it} from 'vitest';
-import {createVFS,MemoryBackend} from '@itookit/vfs-core';
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {readSessionFileResult} from '../src/run/session-file-result';
 const closes:Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of closes.splice(0))await close();});

@@ -1,6 +1,6 @@
-import type { IFileSystem, FSNode } from '@itookit/vfs-core';
-import type { SessionRepository } from '@itookit/llm-session';
-import type { ProjectService, ProjectFolder } from '@itookit/app-contracts/services';
+import type { IFileSystem, FSNode } from '@nestos/vfs-core';
+import type { SessionRepository } from '@nestos/llm-session';
+import type { ProjectService, ProjectFolder } from '@nestos/app-contracts/services';
 import type { TwinDiscoveredSource, TwinSourceCatalog } from './domain';
 import { discoverHarness } from './harness-reader';
 

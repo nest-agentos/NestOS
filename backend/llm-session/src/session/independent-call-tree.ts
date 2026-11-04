@@ -1,6 +1,6 @@
 import {independentCallTaskState, supportsCallCancellation} from './independent-call-task-state';
 import {summarizeIndependentCallInteractions} from './independent-call-interactions';
-import {taskStat, type Kernel, type TaskRecord} from '@itookit/durable-kernel';
+import {taskStat, type Kernel, type TaskRecord} from '@nestos/durable-kernel';
 import type {IndependentCallExecutionTreeState, IndependentCallInteractions, IndependentCallDescendantPage} from '../contracts/independent-calls';
 
 /** One existing Kernel transaction supplies both root and descendant execution facts. */

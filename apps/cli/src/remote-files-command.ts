@@ -1,4 +1,4 @@
-import { HttpFSBackend } from '@itookit/cells-driver';
+import { HttpFSBackend } from '@nestos/cells-driver';
 import { writeFile } from 'node:fs/promises';
 import type { CommandOptions } from './commands';
 

@@ -16,7 +16,7 @@ ChatInputView
 → Kernel SessionHandle.submit → TaskHandle
 ```
 
-`SlashCommandPlugin` 只负责解析和分发：`onBeforeSend` 命中静态命令或 `/sk-<skillId>` 时返回 `false`，阻止普通消息发送。普通会话修改走 `CommandBus`（`@itookit/llm-session`，`ICommandBus`）；特权命令经 `IPrivilegedCommandService` 提交或控制 Durable Task，不直接依赖具体 Program、Effect 或平台实现。
+`SlashCommandPlugin` 只负责解析和分发：`onBeforeSend` 命中静态命令或 `/sk-<skillId>` 时返回 `false`，阻止普通消息发送。普通会话修改走 `CommandBus`（`@nestos/llm-session`，`ICommandBus`）；特权命令经 `IPrivilegedCommandService` 提交或控制 Durable Task，不直接依赖具体 Program、Effect 或平台实现。
 
 | 命令 | 行为 |
 |---|---|

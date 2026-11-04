@@ -4,7 +4,7 @@
 // compact({ sessionId/roundId/messages/model/... }) 模板。
 
 import { resolveLlmRetryPolicy, resolveToolTimeoutMs } from '../contracts';
-import type { ChatMessage, ToolDefinition } from '@itookit/llm-context';
+import type { ChatMessage, ToolDefinition } from '@nestos/llm-context';
 import type {
     DurableAgentInput,
     DurableDependencyBinding,

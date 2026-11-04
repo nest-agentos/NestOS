@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger, type OperationRecord} from '@itookit/llm-ui';
-import {IndependentCallCommand, type IndependentCallCancelRequest} from '@itookit/llm-session/contracts';
+import {createOperationLedger, type OperationRecord} from '@nestos/llm-ui';
+import {IndependentCallCommand, type IndependentCallCancelRequest} from '@nestos/llm-session/contracts';
 import {CallControlOperations} from './call-control';
 const request: IndependentCallCancelRequest = {sessionId: 'parent', branchId: 'main', callId: 'call', executionSessionId: 'child', taskId: 'task', requestId: 'cancel', expectedEpoch: 3};
 const query = () => {const {expectedEpoch: _epoch, ...rest} = request; return rest;};

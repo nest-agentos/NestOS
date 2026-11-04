@@ -1,6 +1,6 @@
-import {t} from '@itookit/common';
-import {resolveBrowserTarget} from '@itookit/app-contracts';
-import type {DirectoryPreviewOptions, VFSNodeUI} from '@itookit/vfs-ui';
+import {t} from '@nestos/common';
+import {resolveBrowserTarget} from '@nestos/app-contracts';
+import type {DirectoryPreviewOptions, VFSNodeUI} from '@nestos/vfs-ui';
 
 /** Sidebars preview sorted members; complete directory pages keep their canonical routes. */
 export function projectNavigationPreview(node: VFSNodeUI, open: (path: string) => Promise<void>): DirectoryPreviewOptions | undefined {

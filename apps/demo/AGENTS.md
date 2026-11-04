@@ -1,11 +1,11 @@
-# @itookit/demo
+# @nestos/demo
 
-私有**演示沙盒**：一组独立的 HTML + 原生 JS 页面，用于手动试跑 VFS、MDx 编辑器、LLM 驱动、设置编辑器等能力。它不参与产物发布，也不在任何验证矩阵里——`pnpm --filter @itookit/demo dev` 手动打开页面观察。
+私有**演示沙盒**：一组独立的 HTML + 原生 JS 页面，用于手动试跑 VFS、MDx 编辑器、LLM 驱动、设置编辑器等能力。它不参与产物发布，也不在任何验证矩阵里——`pnpm --filter @nestos/demo dev` 手动打开页面观察。
 
 ## 定位
 
 - **纯手工 playground**：没有测试、没有 typecheck 脚本；不要把它当作能力的验收证据（验收以各包测试与 `doc/minimal-system-acceptance.md` 为准）。
-- **legacy 容器**：`src/` 下的脚本跨越多个时代，部分 import 指向已不存在的包名（例如 `@itookit/vfs`、`@itookit/configmanager`），`vite.config.js` 的 alias 也保留历史映射。新增演示请用当前包名（`@itookit/vfs-core`、`@itookit/mdx` 等）；不要为了让旧脚本跑起来而修改正式包。
+- **legacy 容器**：`src/` 下的脚本跨越多个时代，部分 import 指向已不存在的包名（例如 `@nestos/vfs`、`@nestos/configmanager`），`vite.config.js` 的 alias 也保留历史映射。新增演示请用当前包名（`@nestos/vfs-core`、`@nestos/mdx` 等）；不要为了让旧脚本跑起来而修改正式包。
 - `private: true`：不发布、不被其他包依赖。
 
 ## 结构
@@ -27,8 +27,8 @@ apps/demo/
 ## 运行
 
 ```bash
-pnpm --filter @itookit/demo dev        # vite dev，浏览器打开 index.html 的链接
-pnpm --filter @itookit/demo build      # vite build（只打包 index.html 可达入口）
+pnpm --filter @nestos/demo dev        # vite dev，浏览器打开 index.html 的链接
+pnpm --filter @nestos/demo build      # vite build（只打包 index.html 可达入口）
 ```
 
 ## 约定

@@ -1,6 +1,6 @@
 import { expect,it,vi } from 'vitest';
 import { compareSyncConflict } from '../src/shared/comparison';
-import { bindingToken,SyncError,sha256,type StoredFilePlan } from '@itookit/vfs-sync';
+import { bindingToken,SyncError,sha256,type StoredFilePlan } from '@nestos/vfs-sync';
 import { MemoryState } from '../../../tests/helpers/sync';
 
 async function fixture(left: Uint8Array = new TextEncoder().encode('local\n'),right: Uint8Array = new TextEncoder().encode('remote\n')) {

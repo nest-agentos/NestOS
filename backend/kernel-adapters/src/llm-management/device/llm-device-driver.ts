@@ -1,7 +1,7 @@
 import { validateLLMIoctlArgument, isConnection, isStoredProvider, isMCPServer, isChatMessage } from './argument-validation';
 import { snapshotMCPConnectionOptions, type MCPConnectionOptions } from '../contracts/mcp-transport';
-import type { ProviderConnectionTestParams } from '@itookit/driver-llm/contracts';
-import { listProviderModels } from '@itookit/driver-llm';
+import type { ProviderConnectionTestParams } from '@nestos/driver-llm/contracts';
+import { listProviderModels } from '@nestos/driver-llm';
 import {completeModelDeclaration} from '../contracts/model-declarations';
 import { ProviderAuthorization } from './provider-authorization';
 import type { ProviderAuthorizationHost } from '../contracts/provider-authorization';
@@ -18,18 +18,18 @@ import type { ProviderAuthorizationHost } from '../contracts/provider-authorizat
 //  6. 维护 Chat / MCP / Skill Session 生命周期
 //  7. 创建 /dev/llm/connection/<id>、/dev/llm/mcp/<id>、/dev/llm/skills/<id> 设备节点
 
-import type { ILLMManagementService, LLMSkill, InitialAgentDef } from '@itookit/kernel-adapters/contracts';
-import type { LLMConnection, LLMProvider, ConnectionMeta, MediaGenerationRequest, ChatCompletionChunk, ChatCompletionParams, ChatCompletionResponse, TokenUsage, ConnectionTestResult } from '@itookit/driver-llm/contracts';
-import type { ChatMessage } from '@itookit/llm-context';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
-import type { ToolDefinition } from '@itookit/tools/contracts';
+import type { ILLMManagementService, LLMSkill, InitialAgentDef } from '@nestos/kernel-adapters/contracts';
+import type { LLMConnection, LLMProvider, ConnectionMeta, MediaGenerationRequest, ChatCompletionChunk, ChatCompletionParams, ChatCompletionResponse, TokenUsage, ConnectionTestResult } from '@nestos/driver-llm/contracts';
+import type { ChatMessage } from '@nestos/llm-context';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
+import type { ToolDefinition } from '@nestos/tools/contracts';
 import type {
     IDeviceDriver, DeviceContext, IVFSManager, FileContent, IFileSystem,
-} from '@itookit/vfs-core';
+} from '@nestos/vfs-core';
 
-import { LLMDriver } from '@itookit/driver-llm';
-import { testLLMConnection } from '@itookit/driver-llm';
-import type { CodexAppServerTransport, CodexCLIConfig, CodexCommandRunner } from '@itookit/driver-llm';
+import { LLMDriver } from '@nestos/driver-llm';
+import { testLLMConnection } from '@nestos/driver-llm';
+import type { CodexAppServerTransport, CodexCLIConfig, CodexCommandRunner } from '@nestos/driver-llm';
 import { snapshotLlmPresets, type LlmManagementPresets, type ProviderConnectionPolicy } from '../contracts/presets';
 import { CostStore } from '../cost/cost-store';
 import { SystemPromptStore } from './system-prompt-store';
@@ -137,10 +137,10 @@ export interface LLMDeviceDriverOptions {
     configurationFileSystem?: IFileSystem;
     costFileSystem?: IFileSystem;
     /** Diagnostics only; request bodies and credentials never enter this sink. */
-    logger?: import('@itookit/driver-llm/contracts').LLMLogSink;
+    logger?: import('@nestos/driver-llm/contracts').LLMLogSink;
     providerAuthorization?: ProviderAuthorizationHost;
-    providerFactory?: import('@itookit/driver-llm/contracts').ProviderFactory;
-    mediaAdapterFactory?: import('@itookit/driver-llm/contracts').MediaAdapterFactory;
+    providerFactory?: import('@nestos/driver-llm/contracts').ProviderFactory;
+    mediaAdapterFactory?: import('@nestos/driver-llm/contracts').MediaAdapterFactory;
     mcp?: MCPConnectionOptions;
     presets?: Partial<LlmManagementPresets>;
     providerConnectionPolicy?: ProviderConnectionPolicy;
@@ -159,7 +159,7 @@ export interface LLMDeviceDriverOptions {
      * LLM 流量日志记录器（可选）。
      * Web 环境注入 NoopLLMLogger，Tauri 环境注入 FileLogger。
      */
-    llmLogger?: import('@itookit/driver-llm/contracts').ILLMLogger;
+    llmLogger?: import('@nestos/driver-llm/contracts').ILLMLogger;
 }
 
 export class LLMDeviceDriver implements IDeviceDriver, ILLMManagementService {
@@ -184,14 +184,14 @@ export class LLMDeviceDriver implements IDeviceDriver, ILLMManagementService {
     private readonly configurationFileSystem?: IFileSystem;
     private readonly configurationReadonly: boolean;
     private readonly costFileSystem?: IFileSystem;
-    private engine!: import('@itookit/vfs-core').IFileSystem;
+    private engine!: import('@nestos/vfs-core').IFileSystem;
     private readonly shellRunner: IShellRunner | undefined;
     private readonly codexRunner: CodexCommandRunner | undefined;
     private readonly codexTransport: CodexAppServerTransport | undefined;
-    private readonly mediaAdapterFactory?: import('@itookit/driver-llm/contracts').MediaAdapterFactory;
-    private readonly providerFactory?: import('@itookit/driver-llm/contracts').ProviderFactory;
-    private readonly llmLogger: import('@itookit/driver-llm/contracts').ILLMLogger | undefined;
-    private readonly logger?: import('@itookit/driver-llm/contracts').LLMLogSink;
+    private readonly mediaAdapterFactory?: import('@nestos/driver-llm/contracts').MediaAdapterFactory;
+    private readonly providerFactory?: import('@nestos/driver-llm/contracts').ProviderFactory;
+    private readonly llmLogger: import('@nestos/driver-llm/contracts').ILLMLogger | undefined;
+    private readonly logger?: import('@nestos/driver-llm/contracts').LLMLogSink;
 
     // ── Managers (initialised in init()) ──
     private vfsHelpers!: VFSHelpers;
@@ -847,12 +847,12 @@ export class LLMDeviceDriver implements IDeviceDriver, ILLMManagementService {
 
     // ─── ILLMManagementService — Cost tracking ────────────────────────────────
 
-    async recordCost(params: Parameters<import('@itookit/kernel-adapters/contracts').ILLMManagementService['recordCost']>[0]): Promise<void> {
+    async recordCost(params: Parameters<import('@nestos/kernel-adapters/contracts').ILLMManagementService['recordCost']>[0]): Promise<void> {
         await this.ensureReady();
         return this.costManager.recordCost(params);
     }
 
-    async writePricing(config: import('@itookit/kernel-adapters/contracts').ModelPricingConfig): Promise<void> {
+    async writePricing(config: import('@nestos/kernel-adapters/contracts').ModelPricingConfig): Promise<void> {
         await this.ensureReady();
         return this.providerManager.writePricing(config);
     }
@@ -861,16 +861,16 @@ export class LLMDeviceDriver implements IDeviceDriver, ILLMManagementService {
         dateFrom?: string;
         dateTo?: string;
         providerId?: string;
-    }): Promise<import('@itookit/kernel-adapters/contracts').CostRecord[]> {
+    }): Promise<import('@nestos/kernel-adapters/contracts').CostRecord[]> {
         await this.ensureReady();
         return this.costManager.queryCosts(filter);
     }
 
-    getPricingConfig(): import('@itookit/kernel-adapters/contracts').ModelPricingConfig {
+    getPricingConfig(): import('@nestos/kernel-adapters/contracts').ModelPricingConfig {
         return this.providerManager?.getPricingConfig() ?? { model_pricing: [] };
     }
 
-    getPricingDefaults(): import('@itookit/kernel-adapters/contracts').ModelPricingConfig {
+    getPricingDefaults(): import('@nestos/kernel-adapters/contracts').ModelPricingConfig {
         return structuredClone(this.presets.pricing);
     }
 

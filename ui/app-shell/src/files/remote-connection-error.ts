@@ -1,4 +1,4 @@
-import { t, type LocaleKey } from '@itookit/common';
+import { t, type LocaleKey } from '@nestos/common';
 
 /** Fetch hides DNS, TCP, TLS and CORS details; never claim a server is stopped without evidence. */
 export function remoteConnectionError(error: unknown): string {

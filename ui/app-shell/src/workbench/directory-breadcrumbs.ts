@@ -1,6 +1,6 @@
-import { createDirectoryBreadcrumbs as createBreadcrumbs, type DirectoryBreadcrumb } from '@itookit/vfs-ui';
+import { createDirectoryBreadcrumbs as createBreadcrumbs, type DirectoryBreadcrumb } from '@nestos/vfs-ui';
 import { directoryPresentation } from './directory-presentation';
-export type { DirectoryBreadcrumb } from '@itookit/vfs-ui';
+export type { DirectoryBreadcrumb } from '@nestos/vfs-ui';
 
 export function createDirectoryBreadcrumbs(items: DirectoryBreadcrumb[], open: (id: string) => void): HTMLElement {
     return createBreadcrumbs(items, open, directoryPresentation());

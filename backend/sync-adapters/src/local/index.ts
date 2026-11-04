@@ -1,5 +1,5 @@
-import { FileSync, randomId, type Coordinator, type FileRemote, type Scope } from '@itookit/vfs-sync';
-import type { LocalFSBackend } from '@itookit/vfsdriver-local';
+import { FileSync, randomId, type Coordinator, type FileRemote, type Scope } from '@nestos/vfs-sync';
+import type { LocalFSBackend } from '@nestos/vfsdriver-local';
 import { CachedFileLocal } from '../shared/local';
 import { LocalSyncCoordinator } from './coordinator';
 import { LocalSyncStore } from './store';

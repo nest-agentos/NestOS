@@ -1,5 +1,5 @@
-import {sha256HexSync, t} from '@itookit/common';
-import type {KanbanItemOperations, KanbanItemOperation, KanbanItemOperationRequest, KanbanItemOperationBinding, KanbanBoard, KanbanItem, KanbanSessionAssociation} from '@itookit/kanban/contracts';
+import {sha256HexSync, t} from '@nestos/common';
+import type {KanbanItemOperations, KanbanItemOperation, KanbanItemOperationRequest, KanbanItemOperationBinding, KanbanBoard, KanbanItem, KanbanSessionAssociation} from '@nestos/kanban/contracts';
 import {automationTarget, automationCatalog} from './automation-targets';
 import {requireValue} from './validation';
 import {prepareReviewJob, advanceReviewJob} from './item-operation-jobs';

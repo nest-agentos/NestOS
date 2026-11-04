@@ -1,6 +1,6 @@
-import {createModuleLogger, randomUUID, sha256HexSync} from '@itookit/common';
-import type {KanbanClient, KanbanDeletionPreview, KanbanDeletionRequest} from '@itookit/kanban/contracts';
-import {KanbanError} from '@itookit/kanban';
+import {createModuleLogger, randomUUID, sha256HexSync} from '@nestos/common';
+import type {KanbanClient, KanbanDeletionPreview, KanbanDeletionRequest} from '@nestos/kanban/contracts';
+import {KanbanError} from '@nestos/kanban';
 import {requireValue} from './validation';
 import {safeCode} from './automation-analysis';
 import {boardDeletionBlockers, deletionPreview, type Options} from './board-deletion-inspection';

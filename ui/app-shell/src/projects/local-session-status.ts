@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type {SessionActivity} from '@itookit/durable-kernel/contracts';
+import {t} from '@nestos/common';
+import type {SessionActivity} from '@nestos/durable-kernel/contracts';
 
 /** Presentation only: Session lifecycle and individual Task states remain distinct. */
 export function localSessionStatus(raw: unknown): {text: string; attention?: string} | undefined {

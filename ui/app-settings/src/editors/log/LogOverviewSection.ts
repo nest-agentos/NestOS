@@ -3,7 +3,7 @@
  * @description 日志缓冲区概览统计
  */
 
-import { getLogger } from '@itookit/common';
+import { getLogger } from '@nestos/common';
 
 export class LogOverviewSection {
     private container: HTMLElement;

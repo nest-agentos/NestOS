@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest';
-import type {TaskRecord} from '@itookit/durable-kernel';
+import type {TaskRecord} from '@nestos/durable-kernel';
 import {invocationTaskHistory} from '../src/flow/invocation-projection';
 
 function task(id: string, createdAt: number, labels: Record<string, string> = {}, parentTaskId?: string, sessionId = 's'): TaskRecord {

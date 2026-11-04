@@ -1,8 +1,8 @@
-import type { DeleteResult } from '@itookit/vfs-ui';
-import { t, escapeHTML, randomUUID } from '@itookit/common';
-import { Modal, Toast, type EditorTarget } from '@itookit/ui-common-adapter';
-import type { ProviderDeletionImpact, MCPDeletionImpact, ProjectService } from '@itookit/app-contracts/services';
-import type { ModelConfigurationCommands } from '@itookit/app-contracts/services';
+import type { DeleteResult } from '@nestos/vfs-ui';
+import { t, escapeHTML, randomUUID } from '@nestos/common';
+import { Modal, Toast, type EditorTarget } from '@nestos/ui-common-adapter';
+import type { ProviderDeletionImpact, MCPDeletionImpact, ProjectService } from '@nestos/app-contracts/services';
+import type { ModelConfigurationCommands } from '@nestos/app-contracts/services';
 
 /** Confirmation UI consumes domain plans; it never creates an editor to delete. */
 export class ConfigurationDeletionDialog {

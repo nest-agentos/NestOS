@@ -1,36 +1,36 @@
-import { t, createModuleLogger } from '@itookit/common';
-import { Kernel, type KernelDiagnostic, type RecoveryOptions, type SessionStorageResolver } from '@itookit/durable-kernel';
+import { t, createModuleLogger } from '@nestos/common';
+import { Kernel, type KernelDiagnostic, type RecoveryOptions, type SessionStorageResolver } from '@nestos/durable-kernel';
 import {
     createKernelAdaptersRuntime,
     createMediaResultStore,
     type KernelAdaptersRuntime,
     type KernelAdaptersRuntimeOptions,
-} from '@itookit/kernel-adapters';
+} from '@nestos/kernel-adapters';
 import {
     createBuiltinDagPluginRegistry,
     DagPluginRegistry,
     registerDurablePrograms,
     resolveFlowTaskWorkspace,
-} from '@itookit/llm-flow';
-import type { IFileSystem } from '@itookit/vfs-core';
+} from '@nestos/llm-flow';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { createMemoryTools } from './memory-tools';
 import {createTaskAssetStore} from './task-asset-store';
 import { createTaskAssetReader } from './task-assets';
-import { SessionMemoryProvider, SharedMemoryStore } from '@itookit/llm-session';
+import { SessionMemoryProvider, SharedMemoryStore } from '@nestos/llm-session';
 import { createRuntimeContextResolver } from './context-service';
 import { createRuntimeContextGc, type RuntimeContextGc, type RuntimeContextGcOptions } from './context-gc';
 
 export interface CreateKernelRuntimeOptions {
     /** Host Session ownership and policy checks; Kernel still enforces exact plan capabilities. */
-    authorizeTaskCall?: import('@itookit/durable-kernel').TaskCallAuthority;
+    authorizeTaskCall?: import('@nestos/durable-kernel').TaskCallAuthority;
     harnessExecution?: KernelAdaptersRuntimeOptions['harnessExecution'];
     authorizeLlm?: KernelAdaptersRuntimeOptions['authorizeLlm'];
     authorizeMedia?: KernelAdaptersRuntimeOptions['authorizeMedia'];
     authorizeTool?: KernelAdaptersRuntimeOptions['authorizeTool'];
-    contextEngineOptions?: import('@itookit/llm-context').ContextEngineOptions;
+    contextEngineOptions?: import('@nestos/llm-context').ContextEngineOptions;
     contextGc?: RuntimeContextGcOptions | false;
     /** Override the context storage/engine ports at the host composition boundary. */
-    contextService?: import('@itookit/kernel-adapters').ContextServiceResolver;
+    contextService?: import('@nestos/kernel-adapters').ContextServiceResolver;
     /** System VFS view used for the Kernel catalog and storage binding. */
     systemFS: IFileSystem;
     llmDriver: KernelAdaptersRuntimeOptions['llmDriver'];

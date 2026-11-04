@@ -1,7 +1,7 @@
-import { FSError } from '@itookit/vfs-core';
-import { validateAuthorization } from '@itookit/cells-driver/authorization';
-import type { JsonValue } from '@itookit/durable-kernel';
-import type { HarnessExecutionConnection } from '@itookit/kernel-adapters/contracts';
+import { FSError } from '@nestos/vfs-core';
+import { validateAuthorization } from '@nestos/cells-driver/authorization';
+import type { JsonValue } from '@nestos/durable-kernel';
+import type { HarnessExecutionConnection } from '@nestos/kernel-adapters/contracts';
 import type { ProjectRemoteMount } from './remote-mounts';
 import type { RemoteFileSystemConfig } from './remote-connections';
 import { safeId } from './harness-connection-store';

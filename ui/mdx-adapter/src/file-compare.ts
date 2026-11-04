@@ -1,4 +1,4 @@
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 /** Linear comparison: mark the changed interval, preserving every line for inspection. */
 function pane(label: string, text: string, start: number, end: number): HTMLElement {

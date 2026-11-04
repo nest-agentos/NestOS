@@ -1,8 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend, type IDeviceDriver } from '@itookit/vfs-core';
-import { bindCapabilities } from '@itookit/durable-kernel';
-import { createTaskContextStorage } from '@itookit/kernel-adapters';
-import { createContextService } from '@itookit/llm-context';
+import { createVFS, MemoryBackend, type IDeviceDriver } from '@nestos/vfs-core';
+import { bindCapabilities } from '@nestos/durable-kernel';
+import { createTaskContextStorage } from '@nestos/kernel-adapters';
+import { createContextService } from '@nestos/llm-context';
 import { createKernelRuntime, type HeadlessKernelRuntime } from '../src/runtime/create-kernel-runtime';
 
 async function close(runtime: HeadlessKernelRuntime) {

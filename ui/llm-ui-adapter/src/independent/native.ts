@@ -5,11 +5,11 @@ import {nativeObservationDiagnostics} from './native-observation-diagnostics';
 import {nativeComposerIndicators} from './native-composer-indicators';
 import {messageState, toolState} from './message-state';
 import {prepareImageChatOptions, type ImageChatOptions} from './image-chat-view';
-import {createChatView, type ChatOptions, type ChatView} from '@itookit/llm-ui';
+import {createChatView, type ChatOptions, type ChatView} from '@nestos/llm-ui';
 import type {ImageEditingHost} from './image-editing';
 import {prepareRemoteAttachments} from '../shell/remote-attachments';
 import { type ChatMessage, type ConversationActions,
-    type InteractionView, type OperationLedger, type OperationRecord, type CommandSubmission, type OperationContext, type OperationReceipt } from '@itookit/llm-ui';
+    type InteractionView, type OperationLedger, type OperationRecord, type CommandSubmission, type OperationContext, type OperationReceipt } from '@nestos/llm-ui';
 
 import {NativeComposerCapabilities, type NativeCommandProvider} from './native-composer';
 import {submitNativeCommand} from './native-command';
@@ -19,13 +19,13 @@ import {nativeQueueMessages} from './native-queue-messages';
 import {nativeCatalogNotice} from './native-catalog';
 import { ChatProjection } from './projection';
 import {nativeInteraction, nativeResponse} from '../native-interactions';
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {t} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {t} from '@nestos/common';
 import {NativeCommandOutput} from '../components/history/NativeCommandOutput';
 import {NativeExecutionNotice} from '../components/NativeExecutionNotice';
 import {NativeResultRepair} from '../components/history/NativeResultRepair';
 
-import type {ExtensionRenderer, JsonValue} from '@itookit/llm-ui';
+import type {ExtensionRenderer, JsonValue} from '@nestos/llm-ui';
 
 const log = createModuleLogger('native-submission');
 const observationLog = createModuleLogger('native-observation');

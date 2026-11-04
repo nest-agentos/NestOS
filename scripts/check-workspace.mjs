@@ -32,7 +32,7 @@ function dependencyErrors(pkg, packages, installed, snapshot) {
     const require = createRequire(resolve(pkg.directory, 'package.json'));
     return Object.entries({ ...pkg.dependencies, ...pkg.devDependencies, ...pkg.peerDependencies }).flatMap(([name, spec]) => {
         const target = packages.find(candidate => candidate.name === name);
-        if (!name.startsWith('@itookit/')) return [];
+        if (!name.startsWith('@nestos/')) return [];
         const artifact = snapshot?.packages.find(item => item.name === name);
         if (artifact) {
             if (pkg.group !== 'libraries' && spec !== 'workspace:*') return [`${pkg.name}: ${name} must use workspace:*`];
@@ -63,7 +63,7 @@ function peerErrors(packages) {
     const provided = new Set(packages.filter(pkg => pkg.group === 'apps').flatMap(localNames));
     const missing = new Map();
     for (const pkg of packages) for (const peer of Object.keys(pkg.peerDependencies ?? {})) {
-        if (!peer.startsWith('@itookit/') || !names.has(peer) || provided.has(peer)) continue;
+        if (!peer.startsWith('@nestos/') || !names.has(peer) || provided.has(peer)) continue;
         if (pkg.peerDependenciesMeta?.[peer]?.optional) continue;
         missing.set(peer, [...(missing.get(peer) ?? []), pkg.name]);
     }

@@ -1,6 +1,6 @@
 import type {ConversationControls, ConversationSnapshot} from '../contracts';
-import {CHAT_ICONS, getLocale, t} from '@itookit/common';
-import {InstructionQueueView, type InstructionQueueEdit, type InstructionQueueSnapshot} from '@itookit/llm-ui';
+import {CHAT_ICONS, getLocale, t} from '@nestos/common';
+import {InstructionQueueView, type InstructionQueueEdit, type InstructionQueueSnapshot} from '@nestos/llm-ui';
 
 import {instructionQueueLabels} from './instruction-queue-labels';
 

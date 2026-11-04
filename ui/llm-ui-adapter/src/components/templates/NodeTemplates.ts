@@ -1,9 +1,9 @@
 import { renderFlowIdentity } from '../history/FlowIdentity';
 // @file: llm-ui/components/templates/NodeTemplates.ts
 
-import { ExecutionNode, SessionGroup } from '@itookit/llm-session/contracts';
-import { escapeHTML, ACTION_ICONS, CHAT_ICONS, TOOLBOX_ICONS, t } from '@itookit/common';
-import { type Citation } from '@itookit/driver-llm/contracts';
+import { ExecutionNode, SessionGroup } from '@nestos/llm-session/contracts';
+import { escapeHTML, ACTION_ICONS, CHAT_ICONS, TOOLBOX_ICONS, t } from '@nestos/common';
+import { type Citation } from '@nestos/driver-llm/contracts';
 import { LayoutTemplates } from './LayoutTemplates';
 
 export class NodeTemplates {
@@ -139,7 +139,7 @@ export class NodeTemplates {
         </div>`;
     }
 
-    static renderCallArguments(parameters?: Record<string, import('@itookit/llm-flow/contracts').JsonValue>): string {
+    static renderCallArguments(parameters?: Record<string, import('@nestos/llm-flow/contracts').JsonValue>): string {
         return parameters ? `<details class="llm-ui-node__input" data-call-arguments><summary>${escapeHTML(t('callable.input.arguments'))}</summary><pre>${escapeHTML(JSON.stringify(parameters, null, 2))}</pre></details>` : '';
     }
 

@@ -4,11 +4,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
-import { SessionCommand } from '@itookit/llm-session/contracts';
-import { FlowCommand, type FlowDraft, type FlowRevision } from '@itookit/llm-flow/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
+import { FlowCommand, type FlowDraft, type FlowRevision } from '@nestos/llm-flow/contracts';
 import { CliDirectorySourceProvider } from '../src/directories';
 import { NodeNativeShell } from '../src/shell';
 

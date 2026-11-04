@@ -1,6 +1,6 @@
 import {IndependentCallStateControl} from './IndependentCallStateControl';
-import {randomUUID, t} from '@itookit/common';
-import type {IndependentCallView, IndependentCallDescendant} from '@itookit/llm-session/contracts';
+import {randomUUID, t} from '@nestos/common';
+import type {IndependentCallView, IndependentCallDescendant} from '@nestos/llm-session/contracts';
 import {CallControlOperations, callControlErrorCode} from '../independent/call-control';
 
 /** Buttons own view lifecycle only; durable admission remains in the shared operation ledger. */

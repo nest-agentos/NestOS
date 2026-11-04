@@ -1,4 +1,4 @@
-import type {InteractionEditorDraft} from '@itookit/llm-ui';
+import type {InteractionEditorDraft} from '@nestos/llm-ui';
 /** Editing state only; an interaction draft is never an answer admission. */
 export interface InteractionDraftScope {
     sessionId: string; branchId: string; callId: string; executionSessionId: string;

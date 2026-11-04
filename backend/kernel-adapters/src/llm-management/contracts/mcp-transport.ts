@@ -1,5 +1,5 @@
-import type { LLMLogSink } from '@itookit/driver-llm/contracts';
-import type { MCPDiscovery, MCPServer } from '@itookit/tools/mcp-contracts';
+import type { LLMLogSink } from '@nestos/driver-llm/contracts';
+import type { MCPDiscovery, MCPServer } from '@nestos/tools/mcp-contracts';
 import type { Transport } from '@modelcontextprotocol/client';
 import type { MCPServerConfig } from '../skills/types';
 

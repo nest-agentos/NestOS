@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import {DigitalTwinService} from '@itookit/app-core';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {DigitalTwinService} from '@nestos/app-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {TwinWorkbench} from '../src/digital-twin';
 import {scannerHistory} from '../src/digital-twin/scan-history';
 import type {TwinSnapshot} from '../src/digital-twin/view';

@@ -1,5 +1,5 @@
 import {readFile} from 'node:fs/promises';
-import type {ApplicationClient} from '@itookit/app-contracts/services';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
 import type {CommandOptions} from './commands';
 
 type Service = NonNullable<ApplicationClient['services']['kanban']>;

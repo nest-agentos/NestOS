@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { DigitalTwinService, folderBrowserPath, remoteSessionPath, type ProjectService } from '@itookit/app-core';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
-import { sha256HexSync } from '@itookit/llm-context';
-import { t } from '@itookit/common';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { DigitalTwinService, folderBrowserPath, remoteSessionPath, type ProjectService } from '@nestos/app-core';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
+import { sha256HexSync } from '@nestos/llm-context';
+import { t } from '@nestos/common';
 import { showTwinSource } from '../src/digital-twin/source-dialog';
 import { projectTwinTarget } from '../src/digital-twin/source-menu';
 

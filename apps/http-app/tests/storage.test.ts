@@ -2,9 +2,9 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { openLocalFSBackend, type LocalFSBackend } from '@itookit/vfsdriver-local';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
-import { guardHostStorage } from '@itookit/node-host/storage';
+import { openLocalFSBackend, type LocalFSBackend } from '@nestos/vfsdriver-local';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
+import { guardHostStorage } from '@nestos/node-host/storage';
 
 let directory: string, backend: LocalFSBackend;
 beforeEach(async () => {

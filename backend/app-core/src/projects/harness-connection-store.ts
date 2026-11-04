@@ -1,5 +1,5 @@
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
-import type { HarnessExecutionConnection, HarnessExecutionConnectionRecord } from '@itookit/kernel-adapters/contracts';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
+import type { HarnessExecutionConnection, HarnessExecutionConnectionRecord } from '@nestos/kernel-adapters/contracts';
 
 export type HarnessConnectionRecord = HarnessExecutionConnectionRecord;
 const indexPath = '/etc/execution/connections.seq';

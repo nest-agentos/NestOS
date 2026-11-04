@@ -1,6 +1,6 @@
 import type {ConversationSnapshot} from '../contracts';
-import {ExecutionNotice} from '@itookit/llm-ui';
-import {t} from '@itookit/common';
+import {ExecutionNotice} from '@nestos/llm-ui';
+import {t} from '@nestos/common';
 
 
 /** Native policy supplies the message; the shared library owns DOM and clock lifecycle. */

@@ -131,7 +131,7 @@ MCP 的自动连接开关位于详情顶部，使用既有自动保存控制器�
 
 `apps/tauri-app` 与 `apps/web-app` 的 `resolve.alias` 都从 `scripts/workspace-sources.mjs` 取：`workspaceAliases()` 给出「每个 workspace 包 → `src/index.ts` + 包内 CSS 子路径」的数组形式别名，`workspaceExcludes()` 供 `optimizeDeps.exclude` 使用。目的：dev 图里每个包只有一份源码副本（HMR 生效，且不会出现新旧转译结果混用导致的 `x is not a function`）。
 
-- 包根用 `^包名$` 正则精确匹配，因此包内其它 `exports` 子路径（如 `@itookit/durable-kernel/core`）仍按 package.json 解析；CSS 等子路径入口由字符串别名处理，排在包根之前。
+- 包根用 `^包名$` 正则精确匹配，因此包内其它 `exports` 子路径（如 `@nestos/durable-kernel/core`）仍按 package.json 解析；CSS 等子路径入口由字符串别名处理，排在包根之前。
 - **新增/删除 package、或新增包内子路径入口时，必须同步 `scripts/workspace-sources.mjs`**，不要在两份 `vite.config.ts` 里各自加别名。
 - 改了工作区包源码后请**重启 dev server** 再验证，不要只刷新页面：长驻 server 可能保留了部分文件的旧转译结果。
 
@@ -141,7 +141,7 @@ MCP 的自动连接开关位于详情顶部，使用既有自动保存控制器�
 - **接口依赖**: 调用方类型为接口 (`IVFSManager`, `IFileSystem`)，具体实现在 bootstrap 注入
 - **CSS 变量**: 唯一权威来源 `llm-ui-adapter/src/styles/variables.css`
 - **函数 ≤30 行**，圈复杂度 ≤10
-- **i18n 零硬编码**，图标统一从 `@itookit/common` 导入
+- **i18n 零硬编码**，图标统一从 `@nestos/common` 导入
 - **Git commit**: `type(scope): description` (Conventional Commits)
 
 Connection 推理强度按模型 ID 存于 `metadata.modelReasoningEfforts`；同一模型的多个 tier 共用配置，空值使用模型默认。旧统一 `reasoningEffort` 在编辑保存时迁移到当前有效模型，移除旧 `tierThinking`；请求显式推理强度优先于连接的模型配置。

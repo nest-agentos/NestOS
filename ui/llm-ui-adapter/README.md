@@ -1,4 +1,4 @@
-# @itookit/llm-ui-adapter
+# @nestos/llm-ui-adapter
 
 NestOS 对独立 llm-ui 的适配与原产品编辑器兼容入口。通用 Chat + Flow 在 ../../libraries/llm-ui，仅依赖 mdxeditor；本包公开依赖实际领域契约，不宣称单依赖。
 
@@ -7,8 +7,8 @@ NestOS 对独立 llm-ui 的适配与原产品编辑器兼容入口。通用 Chat
 Session 绑定注入 `hasCommittedSubmission`，由宿主调用后端公开函数核对持久提交。仅内存入队时返回 unknown 并保留草稿，后续观察通知重新核对；适配器不直接读取 Round 存储。以下代码位于宿主组合根：
 
 ```ts
-import { hasCommittedSubmission } from '@itookit/llm-session';
-import { createSessionChatBinding } from '@itookit/llm-ui-adapter/independent';
+import { hasCommittedSubmission } from '@nestos/llm-session';
+import { createSessionChatBinding } from '@nestos/llm-ui-adapter/independent';
 
 const sessionId = session.id;
 const binding = createSessionChatBinding({
@@ -23,7 +23,7 @@ const binding = createSessionChatBinding({
 原生 DOM 聊天、历史和 Flow 展示。按需要选择公开入口：
 
 ```ts
-import { createLLMFactory, type SessionViewPort } from '@itookit/llm-ui-adapter/chat';
+import { createLLMFactory, type SessionViewPort } from '@nestos/llm-ui-adapter/chat';
 
 const factory = createLLMFactory(agentService, {
   sessionManager: conversation.sessionManager,
@@ -36,13 +36,13 @@ const factory = createLLMFactory(agentService, {
 
 `agentService` 接受公共 `IAgentConfigService`，无需创建 VFSAgentService；`sessionManager` 接受结构化 `SessionViewPort`（查询、事件与命令通道），可由宿主实现。提示词历史是可选的 `PromptHistoryPort`。仓储、OCR、工具授权、Skill 和特权命令由宿主接入。未传默认工具列表时，UI 不自行假定授权；真实授权由执行层校验。
 
-聊天入口不加载设置编辑器；设置界面由独立 `@itookit/llm-ui/settings` 提供，从 `@itookit/llm-ui-adapter/settings` 导入 `createAgentEditorFactory`、`createSkillsEditorFactory` 或设置编辑器。包根现在等同于 `/chat`；已删除旧 `/legacy` 聚合入口和单例回退。`/startup` 用于启动菜单与 Flow 模板安装接口，`/style.css` 提供聊天样式。
+聊天入口不加载设置编辑器；设置界面由独立 `@nestos/llm-ui/settings` 提供，从 `@nestos/llm-ui-adapter/settings` 导入 `createAgentEditorFactory`、`createSkillsEditorFactory` 或设置编辑器。包根现在等同于 `/chat`；已删除旧 `/legacy` 聚合入口和单例回退。`/startup` 用于启动菜单与 Flow 模板安装接口，`/style.css` 提供聊天样式。
 
 `/chat` 创建正式会话编辑器时必须传入 `sessionManager`，或通过 `resolveSessionView` 延迟获取实例；缺少端口会明确报错。提示词历史通过实例上的可选 `promptHistory` 接入。所有入口均要求显式实例注入。当前 UI 仍消费 Session/Flow 契约和仓储能力，并非只依赖通用 UI 的展示组件包。
 
 仅依赖 mdxeditor 的拆分目标、操作回调和快照订阅方案见 [独立模块设计](../../doc/design/llm-ui-independent-module.md)。
 
-验证：`pnpm --filter @itookit/llm-ui-adapter typecheck`、`build`、`test`。
+验证：`pnpm --filter @nestos/llm-ui-adapter typecheck`、`build`、`test`。
 开发说明见 [AGENTS.md](./AGENTS.md)。
 
 会话正文与输入区共享 `--llm-content-width`（默认 780px）。用户消息为按内容收缩的浅色气泡，智能体回答采用无外框正文；复制、重试、折叠在正文下方，编辑、删除和分支操作收进消息菜单。思考默认折叠；工具以名称和状态摘要呈现，展开查看完整参数和结果，失败自动展开。审批及人工回复仍直接显示在输入区。
@@ -75,7 +75,7 @@ Agent 设置工厂使用 `createAgentEditorFactory(service, { defaultToolIds: ho
 
 SessionViewPort 可通过可选的 getDirectAgentPolicy 返回实际 Agent 策略。聊天编辑器据此显示 maxExchanges，独立 ChatInput 可直接传 maxAgentExchanges；没有该端口时沿用 llm-tasks 的通用默认预算。
 
-迁移：旧根入口的设置编辑器和工厂改从 `/settings` 导入；`VFSAgentService` 改从 `@itookit/llm-session` 导入；使用返回的 SessionManager 实例替换单例调用，并传给 UI。
+迁移：旧根入口的设置编辑器和工厂改从 `/settings` 导入；`VFSAgentService` 改从 `@nestos/llm-session` 导入；使用返回的 SessionManager 实例替换单例调用，并传给 UI。
 
 发布依赖公开包含 Session/Flow、Kernel、配置、工具、VFS 和 UI 公共契约，不通过声明内联隐藏业务依赖；独立性由 llm-ui 自身保证。本包的纯契约入口不加载后端实现。
 
@@ -84,7 +84,7 @@ SessionViewPort 可通过可选的 getDirectAgentPolicy 返回实际 Agent 策�
 `kernel` 参数接受结构化 `EditorTaskControlPlane`，远程客户端也可以实现：
 
 ```ts
-import type { EditorTaskControlPlane } from '@itookit/llm-ui-adapter/chat';
+import type { EditorTaskControlPlane } from '@nestos/llm-ui-adapter/chat';
 const control: EditorTaskControlPlane = {
   openTask: id => remote.openTask(id),
   openSession: id => remote.openSession(id),

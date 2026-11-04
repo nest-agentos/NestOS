@@ -1,4 +1,4 @@
-import type { MCPConnectionState } from '@itookit/tools/mcp-contracts';
+import type { MCPConnectionState } from '@nestos/tools/mcp-contracts';
 
 /** Observations belong to the live manager, independent of saved configuration. */
 export class MCPConnectionStates {

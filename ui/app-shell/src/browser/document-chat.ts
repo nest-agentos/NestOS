@@ -1,9 +1,9 @@
-import {sessionRoute, DOCUMENT_CHAT_META_KEY} from '@itookit/app-contracts';
-import {createModuleLogger, t, type NavigationRequest} from '@itookit/common';
-import {SessionCommand, type RootCallTarget, type RootTargetCatalog, type SubmissionRequest, type SubmissionReceipt} from '@itookit/llm-session/contracts';
-import type {AiChatHost, AiChatSubmitRequest} from '@itookit/mdxeditor';
-import type {ApplicationBackend, ApplicationServices, DocumentChatFile, DocumentChatLink} from '@itookit/app-contracts/services';
-import type {EditorFactory, IEditor} from '@itookit/ui-common-adapter';
+import {sessionRoute, DOCUMENT_CHAT_META_KEY} from '@nestos/app-contracts';
+import {createModuleLogger, t, type NavigationRequest} from '@nestos/common';
+import {SessionCommand, type RootCallTarget, type RootTargetCatalog, type SubmissionRequest, type SubmissionReceipt} from '@nestos/llm-session/contracts';
+import type {AiChatHost, AiChatSubmitRequest} from '@nestos/mdxeditor';
+import type {ApplicationBackend, ApplicationServices, DocumentChatFile, DocumentChatLink} from '@nestos/app-contracts/services';
+import type {EditorFactory, IEditor} from '@nestos/ui-common-adapter';
 import type {AppUI} from '../types';
 
 const log = createModuleLogger('document-chat');
@@ -134,7 +134,7 @@ export function createDocumentChatFactory(factory: EditorFactory, services: Appl
             const reconcile = async (markdown: string) => {
                 const stored = (await options.files!.fs.driver.getNode(documentPath))?.metadata[DOCUMENT_CHAT_META_KEY];
                 if (!links && !stored && !markdown.includes('::@')) return;
-                const {aiChatAnchorIds} = await import('@itookit/mdxeditor');
+                const {aiChatAnchorIds} = await import('@nestos/mdxeditor');
                 const ids = aiChatAnchorIds(markdown);
                 if (links || ids.length || stored) await (await fileLinks()).reconcile(ids);
             };
@@ -205,7 +205,7 @@ function requestOf(input: AiChatSubmitRequest, operation: Pending, choice: RootC
         submission: {id, source: {kind: 'conversation', ownerId: operation.sessionId, id}}};
 }
 async function attachments(input: AiChatSubmitRequest, options: Parameters<EditorFactory>[1]): Promise<File[]> {
-    const {createAssetProvider} = await import('@itookit/mdx-adapter');
+    const {createAssetProvider} = await import('@nestos/mdx-adapter');
     const provider = createAssetProvider(options.files?.fs, () => input.source.documentPath, options.assets), files: File[] = [];
     for (const item of input.attachments) {
         input.signal.throwIfAborted();

@@ -1,5 +1,5 @@
-import { escapeHTML, escapeAttr } from '@itookit/common';
-import type { TwinGraphNode } from '@itookit/app-contracts/services';
+import { escapeHTML, escapeAttr } from '@nestos/common';
+import type { TwinGraphNode } from '@nestos/app-contracts/services';
 import { label, select, type TwinSnapshot } from './view';
 
 export function graphView(snapshot: TwinSnapshot, selectedId = ''): string {

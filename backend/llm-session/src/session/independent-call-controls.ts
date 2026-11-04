@@ -1,6 +1,6 @@
 import {readCallMember} from './independent-call-membership';
-import type {Kernel, TaskRecord, TaskCancellationReceipt, TaskControlReceipt, TaskTreeCancellationReceipt} from '@itookit/durable-kernel';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import type {Kernel, TaskRecord, TaskCancellationReceipt, TaskControlReceipt, TaskTreeCancellationReceipt} from '@nestos/durable-kernel';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {IndependentCallCommand, type IndependentCallTreeCancellationReceipt, type IndependentCallCancelRequest, type IndependentCallCancellationQuery, type IndependentCallControlQuery, type IndependentCallCancellationReceipt, type IndependentCallStateControlQuery, type IndependentCallStateControlRequest, type IndependentCallStateControlReceipt} from '../contracts/independent-calls';
 import type {ICommandBus} from '../contracts/command-bus';
 import type {SessionLogger} from '../utils/host-ports';

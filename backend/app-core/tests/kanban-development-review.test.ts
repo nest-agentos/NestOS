@@ -1,6 +1,6 @@
-import {sha256HexSync} from '@itookit/common';
+import {sha256HexSync} from '@nestos/common';
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {readPrompt} from '../src/run/prompt-bundle';
 import {developmentReviewAdapter} from '../src/presets/kanban-development-review';

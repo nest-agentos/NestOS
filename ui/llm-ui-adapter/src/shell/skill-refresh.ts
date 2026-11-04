@@ -1,4 +1,4 @@
-import type { SessionSkillControls } from '@itookit/tools/contracts';
+import type { SessionSkillControls } from '@nestos/tools/contracts';
 import type { SkillInfo } from '../domain/types';
 
 /** Share one refresh queue between catalog notifications and explicit popup refreshes. */

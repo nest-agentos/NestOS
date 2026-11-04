@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {KanbanError} from '@itookit/kanban';
-import type {KanbanService} from '@itookit/kanban/contracts';
+import {KanbanError} from '@nestos/kanban';
+import type {KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {journalCommand} from '../src/kanban/journal-command';
 

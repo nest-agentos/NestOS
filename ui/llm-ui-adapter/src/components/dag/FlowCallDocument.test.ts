@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {FlowCallDocument} from './FlowCallDocument';
 vi.mock('./FlowDocuments', () => ({FlowDocuments: class {
     mount(root: HTMLElement, _id: string, _title: string, content: string) {root.textContent = content;}

@@ -1,11 +1,11 @@
 import {ControlOperations} from '../flows/control-operations';
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger, type OperationRecord} from '@itookit/llm-ui';
+import {createOperationLedger, type OperationRecord} from '@nestos/llm-ui';
 import {StateService} from './StateService';
-import type {ISessionRepository, ConversationUIState} from '@itookit/llm-session/contracts';
+import type {ISessionRepository, ConversationUIState} from '@nestos/llm-session/contracts';
 const diagnostics = vi.hoisted(() => ({debug: vi.fn(), warn: vi.fn()}));
-vi.mock('@itookit/common', async original => {
-    const actual = await original<typeof import('@itookit/common')>();
+vi.mock('@nestos/common', async original => {
+    const actual = await original<typeof import('@nestos/common')>();
     return {...actual, createModuleLogger: (name: string) => name === 'workspace-operation-store' ? diagnostics : actual.createModuleLogger(name)};
 });
 const operation = (id: string, status: OperationRecord['status'] = 'submitting'): OperationRecord => ({

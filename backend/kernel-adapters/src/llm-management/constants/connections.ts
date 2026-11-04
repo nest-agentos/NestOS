@@ -5,7 +5,7 @@
 //
 // 同一 Provider 可有多个 Connection，每个 Connection 选取不同的模型族作为 tier 策略。
 
-import type { DefaultConnectionDef } from '@itookit/kernel-adapters/contracts';
+import type { DefaultConnectionDef } from '@nestos/kernel-adapters/contracts';
 
 /** 系统默认连接 ID */
 export const LLM_DEFAULT_ID = 'default';

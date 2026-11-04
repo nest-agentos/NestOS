@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { DirectoryMountService, ProjectService, SessionFilesService } from '@itookit/app-core';
-import { conversationResourcePath, folderBrowserPath, projectConversationsPath, resolveBrowserTarget } from '@itookit/app-contracts';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { DirectoryMountService, ProjectService, SessionFilesService } from '@nestos/app-core';
+import { conversationResourcePath, folderBrowserPath, projectConversationsPath, resolveBrowserTarget } from '@nestos/app-contracts';
 import { createTestWorkbench } from './helpers/application';
 
 it('keeps fifteen sidebar sessions and opens a larger paged view when More is clicked', async () => {

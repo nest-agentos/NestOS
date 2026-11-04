@@ -1,4 +1,4 @@
-import type { SessionManagementPort } from '@itookit/llm-session/contracts';
+import type { SessionManagementPort } from '@nestos/llm-session/contracts';
 
 // ── HITL → vfs-ui bridge ───────────────────────────────────────────────────────
 //

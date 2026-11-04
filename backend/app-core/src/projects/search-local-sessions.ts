@@ -1,7 +1,7 @@
-import { checkOperation, FSError, matchesKeywords, searchKeywords, type OperationOptions } from '@itookit/vfs-core';
-import { folderBrowserPath } from '@itookit/app-contracts';
-import type { ProjectSearchQuery, ProjectSearchMatch, ProjectSearchResult } from '@itookit/app-contracts/services';
-import type { ISessionRepository, SessionSummary, SessionFolder, Round, ConversationManifest } from '@itookit/llm-session/contracts';
+import { checkOperation, FSError, matchesKeywords, searchKeywords, type OperationOptions } from '@nestos/vfs-core';
+import { folderBrowserPath } from '@nestos/app-contracts';
+import type { ProjectSearchQuery, ProjectSearchMatch, ProjectSearchResult } from '@nestos/app-contracts/services';
+import type { ISessionRepository, SessionSummary, SessionFolder, Round, ConversationManifest } from '@nestos/llm-session/contracts';
 
 type SearchRound = Round & {_deleted?: boolean};
 interface Budget { matches: ProjectSearchMatch[]; bytes: number; rounds: number; truncated: boolean }

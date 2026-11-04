@@ -1,7 +1,7 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {ApplicationServices} from '@itookit/app-contracts/services';
-import type {StudyCreation} from '@itookit/mdxeditor';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {ApplicationServices} from '@nestos/app-contracts/services';
+import type {StudyCreation} from '@nestos/mdxeditor';
+import type {IFileSystem} from '@nestos/vfs-core';
 const log = createModuleLogger('study-sources');
 const readable = (path: string) => path.startsWith('/') && !path.split('/').some(part => part.startsWith('.') || part === '..')
     && /\.(md|mdx|markdown|mind|txt|csv|json|yaml|yml|rst)$/i.test(path);

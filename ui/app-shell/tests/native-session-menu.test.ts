@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 import {nativeSessionMenu} from '../src/projects/remote-session-management';
 
 it('exposes native archive capability and explains when the current state prevents it', () => {

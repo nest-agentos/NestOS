@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {Kernel, TaskRecord} from '@itookit/durable-kernel';
+import type {Kernel, TaskRecord} from '@nestos/durable-kernel';
 import {IndependentCallDescendants} from '../src/session/independent-call-descendants';
 const query = {sessionId: 'parent', branchId: 'main', callId: 'call', executionSessionId: 'child', taskId: 'root'};
 function fixture() {

@@ -1,12 +1,12 @@
 import { providerIcon } from './resource-icons';
 import { isDefaultConnection } from './model-defaults';
 import { connectionReadiness } from './model-readiness';
-import { TOOLBOX_ICONS, t } from '@itookit/common';
+import { TOOLBOX_ICONS, t } from '@nestos/common';
 import { TOOLBOX_FILTERS } from './routes';
 import { invalidConnectionsDrawer } from './model-orphans';
 import {modelIndicators} from './model-indicators';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
-import type { ToolboxInventory } from '@itookit/app-contracts/services';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
+import type { ToolboxInventory } from '@nestos/app-contracts/services';
 
 const prefix = '/model-groups/';
 export const modelDrawerId = (providerId: string): string => prefix + encodeURIComponent(providerId);

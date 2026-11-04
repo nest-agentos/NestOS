@@ -1,4 +1,4 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import {WorkbenchSidebar} from '../workbench/sidebar';
 import {WorkbenchTabs, type WorkbenchTab} from '../workbench/tabs';
 import type {WorkbenchWindowBinding} from '../workbench/windows';

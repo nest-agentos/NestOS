@@ -1,6 +1,6 @@
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
 import { LocalFileLocal, LocalSyncStore, LocalSyncCoordinator } from '../../src/local';
-import type { FileAction } from '@itookit/vfs-sync';
+import type { FileAction } from '@nestos/vfs-sync';
 const options = JSON.parse(process.argv[2]);
 const backend = await openLocalFSBackend(options), store = new LocalSyncStore(backend.storageAccess(), 'b');
 const saved = (await store.plan<{ token: string; handle: unknown; actions: FileAction[] }>('crash-input'))!;

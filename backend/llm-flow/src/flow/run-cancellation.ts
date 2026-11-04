@@ -1,4 +1,4 @@
-import type {Kernel} from '@itookit/durable-kernel';
+import type {Kernel} from '@nestos/durable-kernel';
 import type {FlowCancellationQuery, FlowCancellationRequest} from '../contracts/flow-control';
 import {withFlowControl} from './control-session';
 import {assertFlowRoot} from './run-control';

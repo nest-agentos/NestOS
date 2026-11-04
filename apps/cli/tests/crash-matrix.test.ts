@@ -1,4 +1,4 @@
-import { readFlowSchedulerCheckpoint } from '@itookit/llm-flow';
+import { readFlowSchedulerCheckpoint } from '@nestos/llm-flow';
 // @file: apps/cli/tests/crash-matrix.test.ts
 // Program-level crashpoints: kill the real CLI process at a chosen point of the
 // flow lifecycle (effect in flight, reply delivered but uncommitted, mid-loop,
@@ -18,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
-import { SeqFileKernelStore } from '@itookit/durable-kernel';
+import { SeqFileKernelStore } from '@nestos/durable-kernel';
 import { CliStorageResolver, cliStorage, openProfileInspectionFs } from '../src/runtime';
 import { listenForTest } from './listen';
 import { cancelCommand, exportCommand, resumeCommand } from '../src/commands';

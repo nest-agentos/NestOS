@@ -1,9 +1,9 @@
 // @file: llm-ui/components/history/StreamController.ts
 
 import type { SessionRenderer } from './SessionRenderer';
-import type {ScrollController} from '@itookit/llm-ui';
-import {getPreviewText} from '@itookit/llm-ui';
-import type { Citation } from '@itookit/driver-llm/contracts';
+import type {ScrollController} from '@nestos/llm-ui';
+import {getPreviewText} from '@nestos/llm-ui';
+import type { Citation } from '@nestos/driver-llm/contracts';
 import { NodeTemplates } from '../templates/NodeTemplates';
 
 /**
@@ -151,7 +151,7 @@ export class StreamController {
         sidecar.innerHTML = NodeTemplates.renderCitations(citations);
     }
 
-    updateToolProgress(nodeId: string, progress: import('@itookit/tools/contracts').ToolProgress): void {
+    updateToolProgress(nodeId: string, progress: import('@nestos/tools/contracts').ToolProgress): void {
         const el = this.renderer.getNode(nodeId);
         if (!el || !['running', 'queued'].includes(el.dataset.status ?? '')) return;
         const activity = el.querySelector<HTMLElement>('.llm-ui-node__progress');

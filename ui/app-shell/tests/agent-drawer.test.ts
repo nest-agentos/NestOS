@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { AgentDrawer } from '../src/projects/agent-drawer';
 import { WorkbenchSidebar } from '../src/workbench/sidebar';
-import type { ApplicationBackend } from '@itookit/app-contracts/services';
+import type { ApplicationBackend } from '@nestos/app-contracts/services';
 
 const cleanup: Array<() => unknown> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren(); vi.unstubAllGlobals(); vi.restoreAllMocks();});

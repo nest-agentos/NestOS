@@ -27,7 +27,7 @@
 复现（仓库根目录）：
 
 ```bash
-pnpm --filter @itookit/cli exec node --import tsx tests/fixtures/profile-send-cost.ts
+pnpm --filter @nestos/cli exec node --import tsx tests/fixtures/profile-send-cost.ts
 ```
 
 ### 0.1 已实施：合并资源清理候选读取事务

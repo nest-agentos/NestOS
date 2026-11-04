@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import type { ProjectRemoteMountService } from '@itookit/app-core';
-import { CELLS_EXTENSION } from '@itookit/app-core';
+import type { ProjectRemoteMountService } from '@nestos/app-core';
+import { CELLS_EXTENSION } from '@nestos/app-core';
 import { CellsMCPControls } from '../src/toolbox/cells-controls';
 import { MCPConfigurationControlsRegistry } from '../src/toolbox/mcp-controls';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import type { ProjectService } from '@nestos/app-contracts/services';
 
 it('renders verified cells controls without performing network discovery',async () => {
     const restore = vi.fn(), setMCPCredential = vi.fn(() => restore), discoverMCP = vi.fn(async () => ({version:1 as const,

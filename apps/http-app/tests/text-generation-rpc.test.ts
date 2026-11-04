@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest';
-import {RpcPeer, installViewProjections} from '@itookit/app-transport/application';
+import {RpcPeer, installViewProjections} from '@nestos/app-transport/application';
 import {textRuntime} from '../../../backend/app-core/tests/helpers/text-runtime';
 it('creates durable generation history through actual application RPC',async()=>{
  const f=await textRuntime();let server!:RpcPeer;

@@ -1,5 +1,5 @@
 import type { ProjectFavoriteTarget, ProjectFolder, ProjectService } from '../ports/projects';
-import type { SessionFolder } from '@itookit/llm-session/contracts';
+import type { SessionFolder } from '@nestos/llm-session/contracts';
 
 export const favoriteKey = (target: ProjectFavoriteTarget): string => target.kind === 'session' ? `session:${target.sessionId}`
     : target.kind === 'remote-session' ? 'remote:' + JSON.stringify([target.connectionId, target.serverId, target.serverProjectId, target.profileId, target.sessionId]) : `file:${target.path}`;

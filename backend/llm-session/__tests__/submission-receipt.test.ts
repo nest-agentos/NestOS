@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { SessionSubmission } from '@itookit/llm-flow/contracts';
+import type { SessionSubmission } from '@nestos/llm-flow/contracts';
 import type { ConversationManifest } from '../src/contracts';
 import { hasCommittedSubmission } from '../src/persistence/submission-receipt';
 

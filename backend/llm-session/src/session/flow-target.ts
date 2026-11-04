@@ -1,4 +1,4 @@
-import type {FlowRevision, TargetRef} from '@itookit/llm-flow/contracts';
+import type {FlowRevision, TargetRef} from '@nestos/llm-flow/contracts';
 import type {ExecutorConfig} from '../core/types';
 import type {SessionInstruction} from '../contracts/instruction-queue';
 

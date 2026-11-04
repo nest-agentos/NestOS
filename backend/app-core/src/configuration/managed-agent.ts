@@ -1,8 +1,8 @@
 import {canonical} from '../projects/harness-connection-policy';
-import {sha256HexSync} from '@itookit/common';
-import type {AgentDefinition, AgentPublishRequest, IAgentManagementService} from '@itookit/kernel-adapters/contracts';
-import type {TargetRef} from '@itookit/llm-flow/contracts';
-import {FSError} from '@itookit/vfs-core';
+import {sha256HexSync} from '@nestos/common';
+import type {AgentDefinition, AgentPublishRequest, IAgentManagementService} from '@nestos/kernel-adapters/contracts';
+import type {TargetRef} from '@nestos/llm-flow/contracts';
+import {FSError} from '@nestos/vfs-core';
 
 interface Journal {get<T>(key: string): Promise<T | undefined>; update<T>(key: string, change: (old: T | undefined) => T): Promise<T>}
 interface ManagedAgent {definition: AgentDefinition; digest: string; publication?: AgentPublishRequest; target?: TargetRef}

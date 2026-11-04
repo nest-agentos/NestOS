@@ -1,10 +1,10 @@
 import { mkdir, readFile, writeFile, rename, readdir, rm, realpath } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
-import { createVFS, type IDeviceDriver } from '@itookit/vfs-core';
-import { SessionFilesService, createKernelRuntime, type ApplicationPlatformServices } from '@itookit/app-core';
+import { createVFS, type IDeviceDriver } from '@nestos/vfs-core';
+import { SessionFilesService, createKernelRuntime, type ApplicationPlatformServices } from '@nestos/app-core';
 import { withWorkspaceScopeCleanup } from '../../../../backend/app-core/src/runtime/workspace-scope-cleanup';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 import { DurableFlowExecutor, type FlowExecutionHandle } from '../../../../backend/llm-flow/src/index';
 import { TauriFlowWorkspaces } from '../../../../apps/tauri-app/src/shell/flow-workspaces';
 

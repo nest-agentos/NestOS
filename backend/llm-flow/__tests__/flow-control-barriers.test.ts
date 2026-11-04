@@ -1,8 +1,8 @@
 import {rememberSchedulerLease, withFlowControl} from '../src/flow/control-session';
 import {acquireSchedulerLease, schedulerOwnerKey} from '../src/flow/scheduler-lease';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {Kernel, type SessionHandle, type TaskHandle} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend, type IFileSystem, type IVFSManager} from '@itookit/vfs-core';
+import {Kernel, type SessionHandle, type TaskHandle} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend, type IFileSystem, type IVFSManager} from '@nestos/vfs-core';
 import type {DagRunSpec, HarnessHookRunner} from '../src/contracts';
 import {createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms} from '../src/flow';
 import {DagCommandService} from '../src/flow/commands';

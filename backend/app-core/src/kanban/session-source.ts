@@ -1,9 +1,9 @@
-import type {Kernel} from '@itookit/durable-kernel';
-import type {SessionActivity} from '@itookit/durable-kernel/contracts';
-import type {ISessionRepository} from '@itookit/llm-session';
-import type {KanbanSessionPhase} from '@itookit/kanban/contracts';
-import {KanbanError} from '@itookit/kanban';
-import type {KanbanSessionSource} from '@itookit/kanban/activity';
+import type {Kernel} from '@nestos/durable-kernel';
+import type {SessionActivity} from '@nestos/durable-kernel/contracts';
+import type {ISessionRepository} from '@nestos/llm-session';
+import type {KanbanSessionPhase} from '@nestos/kanban/contracts';
+import {KanbanError} from '@nestos/kanban';
+import type {KanbanSessionSource} from '@nestos/kanban/activity';
 /** Cold Session metadata only; never resumes, attaches, or exposes Task records. */
 export function createLocalKanbanSessionSource(repository: Pick<ISessionRepository,'getManifest'>, kernel: Pick<Kernel,'sessionActivity'>,resource?:(sessionId:string,branch:string)=>Promise<string|undefined>): KanbanSessionSource {
     return {async authorizeBinding(_board,sessionId) {await sessionManifest(repository,sessionId);},async inspect(_board,sessionId) {

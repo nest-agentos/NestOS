@@ -13,7 +13,7 @@ const snapshot = state.readSelection(root);
 function entry(name, subpath = '') {
     const library = ['vfs-ui', 'mdxeditor', 'llm-ui', 'kanban', 'mail', 'ui-common'].includes(name);
     if (library && snapshot) {
-        const specifier = `@itookit/${name}`;
+        const specifier = `@nestos/${name}`;
         const consumer = workspacePackages(root).find(pkg => pkg.group !== 'libraries' && pkg.dependencies?.[specifier]);
         if (!consumer) throw new Error(`No frontend consumer declares ${specifier}`);
         const directory = resolve(consumer.directory, 'node_modules', specifier);

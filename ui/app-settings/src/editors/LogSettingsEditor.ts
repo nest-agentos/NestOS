@@ -1,14 +1,14 @@
-import {t} from '@itookit/common';
-import type {ApplicationDiagnostics} from '@itookit/app-contracts/services';
-import type {EditorOptions} from '@itookit/ui-common-adapter';
+import {t} from '@nestos/common';
+import type {ApplicationDiagnostics} from '@nestos/app-contracts/services';
+import type {EditorOptions} from '@nestos/ui-common-adapter';
 import {DiagnosticLogView} from './log/DiagnosticLogView';
 /**
  * @file app-settings/editors/LogSettingsEditor.ts
  * @description 日志管理设置页面
  */
 
-import { BaseSettingsEditor } from '@itookit/ui-common-adapter';
-import type { SettingsPort as SettingsService } from '@itookit/app-contracts/settings';
+import { BaseSettingsEditor } from '@nestos/ui-common-adapter';
+import type { SettingsPort as SettingsService } from '@nestos/app-contracts/settings';
 import { LogOverviewSection } from './log/LogOverviewSection';
 import { LogLevelConfigSection } from './log/LogLevelConfigSection';
 import { LogViewerSection } from './log/LogViewerSection';

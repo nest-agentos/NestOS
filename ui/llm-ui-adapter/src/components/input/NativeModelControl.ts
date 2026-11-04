@@ -1,8 +1,8 @@
 import type {ConversationModelCatalog, ConversationModelSelection} from '../../contracts';
-import {getLocale} from '@itookit/common';
-import {t, FEEDBACK_ICONS} from '@itookit/common';
+import {getLocale} from '@nestos/common';
+import {t, FEEDBACK_ICONS} from '@nestos/common';
 
-import {PopupPanel, type PopupItem} from '@itookit/llm-ui';
+import {PopupPanel, type PopupItem} from '@nestos/llm-ui';
 
 /** A native selection belongs to the next submission, independent of local connections. */
 export class NativeModelControl {

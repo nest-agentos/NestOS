@@ -1,7 +1,7 @@
-import { createModuleLogger, escapeHTML, randomUUID, t } from '@itookit/common';
-import { type ICommandBus } from '@itookit/llm-session/contracts';
-import { SessionCommand } from '@itookit/llm-session/contracts';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
+import { createModuleLogger, escapeHTML, randomUUID, t } from '@nestos/common';
+import { type ICommandBus } from '@nestos/llm-session/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
 import { DagWorkbench } from '../components/DagWorkbench';
 import {runLabel} from './run-presentation';
 

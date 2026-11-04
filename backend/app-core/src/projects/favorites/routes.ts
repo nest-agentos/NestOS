@@ -1,8 +1,8 @@
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 import { folderBrowserPath, remoteSessionPath } from '../../session/browser-routes';
 import { projectRelativePath } from '../../vfs/workspace-namespace';
-import type { ISessionRepository } from '@itookit/llm-session';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import type { ISessionRepository } from '@nestos/llm-session';
+import type { ProjectService } from '@nestos/app-contracts/services';
 
 export interface ResolvedProjectFavorite { path: string; kind: 'file' | 'directory' | 'session' }
 

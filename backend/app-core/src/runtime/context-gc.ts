@@ -1,8 +1,8 @@
 import { createContextGc, scheduleContextGc, validateContextGcSchedule, type ContextGcOptions, type ContextGcPolicy,
-    type ContextGcResult, type ContextGcScheduleOptions } from '@itookit/llm-context';
-import { createTaskContextStorage } from '@itookit/kernel-adapters';
-import { KernelError, KernelErrorCode } from '@itookit/durable-kernel';
-import type { Kernel, ResolvedStorageBinding, StorageBindingRef, TaskListQuery } from '@itookit/durable-kernel';
+    type ContextGcResult, type ContextGcScheduleOptions } from '@nestos/llm-context';
+import { createTaskContextStorage } from '@nestos/kernel-adapters';
+import { KernelError, KernelErrorCode } from '@nestos/durable-kernel';
+import type { Kernel, ResolvedStorageBinding, StorageBindingRef, TaskListQuery } from '@nestos/durable-kernel';
 
 export interface RuntimeContextGcOptions extends ContextGcScheduleOptions {
     policy?: ContextGcPolicy;

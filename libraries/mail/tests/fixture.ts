@@ -1,4 +1,4 @@
-import {createVFS, MemoryBackend, type IFileSystem} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend, type IFileSystem} from '@nestos/vfs-core';
 import {MailArchive} from '../src';
 import type {MailDiagnostic} from '../src/contracts';
 export async function write(files: IFileSystem, path: string, content: string) {

@@ -1,5 +1,5 @@
 import { readFlowSchedulerCheckpoint } from './checkpoint-store';
-import type { JsonValue, SessionHandle, TaskHandle } from '@itookit/durable-kernel';
+import type { JsonValue, SessionHandle, TaskHandle } from '@nestos/durable-kernel';
 import type { FlowWorkspacePolicy } from '../contracts';
 import type { SchedulerLease } from './scheduler-lease';
 import { beginWorkspaceFinalization, workspaceFinalizationKey, type WorkspaceFinalization } from './workspace-finalization';

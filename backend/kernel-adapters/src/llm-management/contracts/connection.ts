@@ -1,9 +1,9 @@
 // Compatibility exports; communication contracts are owned by the client.
-import type { DailyCost, ModelTier, ApiProtocol, LLMModel, LLMProvider, LLMConnection, ConnectionMeta } from '@itookit/driver-llm/contracts';
-export type { ModelCategory, LLMModel, DailyCost, ModelTier, ApiProtocol, LLMProviderImplementation, LLMProvider, LLMConnection, ConnectionMeta, ConnectionTestResult, ProviderConnectionTestParams } from '@itookit/driver-llm/contracts';
+import type { DailyCost, ModelTier, ApiProtocol, LLMModel, LLMProvider, LLMConnection, ConnectionMeta } from '@nestos/driver-llm/contracts';
+export type { ModelCategory, LLMModel, DailyCost, ModelTier, ApiProtocol, LLMProviderImplementation, LLMProvider, LLMConnection, ConnectionMeta, ConnectionTestResult, ProviderConnectionTestParams } from '@nestos/driver-llm/contracts';
 
 /** Host-supplied examples are separate from provider capabilities and user credentials. */
-export type MediaProbeExamples = Readonly<Partial<Record<import('@itookit/driver-llm/contracts').MediaOperation, Readonly<{input: string}>>>>;
+export type MediaProbeExamples = Readonly<Partial<Record<import('@nestos/driver-llm/contracts').MediaOperation, Readonly<{input: string}>>>>;
 
 export function hasConnectionCredentials(connection: Pick<ConnectionMeta, 'credentialsReady' | 'hasApiKey' | 'providerId'>): boolean {
     return connection.credentialsReady ?? (connection.hasApiKey || connection.providerId === 'codex');

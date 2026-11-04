@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createOperationLedger, type ComposerDraft} from '@itookit/llm-ui';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {createOperationLedger, type ComposerDraft} from '@nestos/llm-ui';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import {createSessionChatBinding, createSessionChatView} from '../../llm-ui-adapter/src/independent/session';
 const cleanup: Array<() => unknown> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren();});

@@ -1,14 +1,14 @@
 import {type EditorOptions} from '../contracts';
 import type {ConversationSnapshot} from '../contracts';
-import { ENTITY_ICONS, escapeHTML, getLocale, t } from '@itookit/common';
-import {copyText, Modal} from '@itookit/ui-common-adapter';
-import { LLMPrintService } from '@itookit/mdx-adapter';
-import { MDxRenderer } from '@itookit/mdxeditor';
+import { ENTITY_ICONS, escapeHTML, getLocale, t } from '@nestos/common';
+import {copyText, Modal} from '@nestos/ui-common-adapter';
+import { LLMPrintService } from '@nestos/mdx-adapter';
+import { MDxRenderer } from '@nestos/mdxeditor';
 import { ChatInput } from '../components/input/ChatInputView';
 import { LayoutTemplates } from '../components/templates/LayoutTemplates';
 import { updateCollapseAction } from '../components/history/HistoryToolbar';
 import { EventBinder } from './EventBinder';
-import {DOMCache} from '@itookit/llm-ui';
+import {DOMCache} from '@nestos/llm-ui';
 import { StatusIndicatorView } from '../components/indicators/StatusIndicatorView';
 import { RemoteHistory } from './remote-history';
 import {NativeSlashCommandPlugin} from '../components/input/plugins/NativeSlashCommandPlugin';
@@ -22,7 +22,7 @@ interface Actions {
     commandOutputs?: Pick<import('../contracts').ConversationControls, 'readCommandOutput' | 'loadCommandOutput'>;
     instructionQueue?: boolean;
     flushDraft?(): Promise<void>;
-    persistImageFiles?(files: File[], resize: import('@itookit/image-parser').ImageResizePolicy): Promise<void>;
+    persistImageFiles?(files: File[], resize: import('@nestos/image-parser').ImageResizePolicy): Promise<void>;
     models?(): Promise<import('../contracts').ConversationModelCatalog>;
     commands?(): Promise<import('../contracts').ConversationSlashCommand[]>;
     attachments?: Array<'text' | 'image'>;

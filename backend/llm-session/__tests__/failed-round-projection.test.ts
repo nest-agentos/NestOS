@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatMessage } from '@itookit/llm-context';
+import type { ChatMessage } from '@nestos/llm-context';
 import type { PersistedRound } from '../src/persistence/round-types';
 import { roundToProjection } from '../src/persistence/round-log';
 import { SessionState } from '../src/session/session-state';

@@ -18,7 +18,7 @@
 import type { InputPlugin, InputPluginContext } from './InputPlugin';
 import type { TokenStats } from '../../../domain/types';
 import { injectStyle } from '../../../utils/styleInjector';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 
 const BAR_BLOCKS = 10;
 

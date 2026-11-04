@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { FSNode } from '@itookit/vfs-core';
+import type { FSNode } from '@nestos/vfs-core';
 import { localConversationSource, readConversationPage, type ConversationSource } from '../src/projects/conversation-page';
 
 const node = (id: string, modifiedAt: number) => ({path: '/' + id, modifiedAt}) as FSNode;

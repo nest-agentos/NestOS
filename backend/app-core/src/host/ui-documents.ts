@@ -1,4 +1,4 @@
-import { FSError, type IVFSManager } from '@itookit/vfs-core';
+import { FSError, type IVFSManager } from '@nestos/vfs-core';
 
 const queues = new WeakMap<IVFSManager, Promise<void>>();
 function fileName(name: string): string {

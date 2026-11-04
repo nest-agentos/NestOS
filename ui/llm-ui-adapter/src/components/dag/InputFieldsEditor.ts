@@ -1,4 +1,4 @@
-import { escapeHTML, t } from '@itookit/common';
+import { escapeHTML, t } from '@nestos/common';
 
 type Fields = Record<string, Record<string, unknown>>;
 

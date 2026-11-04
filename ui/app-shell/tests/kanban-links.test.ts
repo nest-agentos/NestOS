@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import type {ProjectService} from '@nestos/app-contracts/services';
 import {sessionUrl, kanbanReferenceLink} from '../src/kanban/links';
 it('uses stable execution and native Session routes and resolves the bound project instead of the current selection', async () => {
     const get = vi.fn(async () => ({path: '/x1'})), resolve = kanbanReferenceLink({get} as unknown as Pick<ProjectService, 'get'>);

@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { FlowAggregateProgram, FlowHumanProgram, FlowValueProgram, createBuiltinDagPluginRegistry } from '@itookit/llm-flow';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { FlowAggregateProgram, FlowHumanProgram, FlowValueProgram, createBuiltinDagPluginRegistry } from '@nestos/llm-flow';
 import { ConversationRunCoordinator } from '../src/session/conversation-run-coordinator';
 
 async function setup() {

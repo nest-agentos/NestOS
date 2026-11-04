@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import type {EffectExecutionContext} from '@itookit/durable-kernel';
-import type {LLMLogSink} from '@itookit/driver-llm/contracts';
+import type {EffectExecutionContext} from '@nestos/durable-kernel';
+import type {LLMLogSink} from '@nestos/driver-llm/contracts';
 import type {HarnessExecutionProvider, HarnessExecutionRequest} from '../llm-management/contracts/harness-execution';
 import {HarnessExecutionEffect} from './harness-execution-effect';
 

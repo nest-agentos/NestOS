@@ -1,1 +1,1 @@
-export { SessionUnfinishedTasksError, DirectorySourceUnavailableError } from '@itookit/app-contracts';
+export { SessionUnfinishedTasksError, DirectorySourceUnavailableError } from '@nestos/app-contracts';

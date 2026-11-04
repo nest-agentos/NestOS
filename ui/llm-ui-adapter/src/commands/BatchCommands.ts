@@ -1,9 +1,9 @@
 // @file: llm-ui/commands/BatchCommands.ts
 
 
-import { SessionCommand, type SessionGroup } from '@itookit/llm-session/contracts';
+import { SessionCommand, type SessionGroup } from '@nestos/llm-session/contracts';
 import { Command } from './Command';
-import { copyText, Toast } from '@itookit/ui-common-adapter';
+import { copyText, Toast } from '@nestos/ui-common-adapter';
 import { extractExecutionOutput } from '../utils/textUtils';
 
 

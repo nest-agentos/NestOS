@@ -1,4 +1,4 @@
-import { RECORD_PAGE_SQL, recordPageValues, decodeRecordPage, type RecordPageRow } from '@itookit/vfsdriver-local';
+import { RECORD_PAGE_SQL, recordPageValues, decodeRecordPage, type RecordPageRow } from '@nestos/vfsdriver-local';
 /**
  * @file apps/tauri-app/src/db/tauri-sql-sidecar.ts
  *
@@ -14,8 +14,8 @@ import { RECORD_PAGE_SQL, recordPageValues, decodeRecordPage, type RecordPageRow
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { PATH_DATA_EXISTS, movePathStatements, SCHEMA_VERSION } from '@itookit/vfsdriver-local';
-import type { ISidecarDb, MetaExtRow } from '@itookit/vfsdriver-local';
+import { PATH_DATA_EXISTS, movePathStatements, SCHEMA_VERSION } from '@nestos/vfsdriver-local';
+import type { ISidecarDb, MetaExtRow } from '@nestos/vfsdriver-local';
 
 interface SidecarConnection {
     execute(query: string, values?: unknown[]): Promise<unknown>;

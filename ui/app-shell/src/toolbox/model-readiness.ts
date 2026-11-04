@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { ToolboxInventory } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import type { ToolboxInventory } from '@nestos/app-contracts/services';
 
 export function connectionReadiness(id: string, inventory: ToolboxInventory): {rank: number; label: string} {
     const connection = inventory.connections.get(id), provider = connection && inventory.providers.get(connection.providerId);

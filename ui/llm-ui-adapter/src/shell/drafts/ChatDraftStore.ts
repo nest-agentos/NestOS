@@ -2,8 +2,8 @@ import type {SessionDraftControls} from '../../contracts';
 import {StoredChatImages} from '../../independent/stored-chat-images';
 import {chatSettings} from '../chat-settings';
 import {readInputDraft} from '../../domain/input-draft';
-import {randomUUID} from '@itookit/common';
-import type {AttachmentRef, ComposerDraft} from '@itookit/llm-ui';
+import {randomUUID} from '@nestos/common';
+import type {AttachmentRef, ComposerDraft} from '@nestos/llm-ui';
 
 import {DraftDataCodec} from './session-draft-data';
 import {DraftFilesCodec, type DraftFilePort} from '../../services/DraftFilesCodec';

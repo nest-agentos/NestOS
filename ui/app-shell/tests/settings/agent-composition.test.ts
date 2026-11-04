@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import { AgentConfigEditor } from '@itookit/llm-ui-adapter/settings';
-import { renderAgentComposition, readAgentComposition, bindAgentComposition } from '@itookit/llm-ui-adapter/settings';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import { AgentConfigEditor } from '@nestos/llm-ui-adapter/settings';
+import { renderAgentComposition, readAgentComposition, bindAgentComposition } from '@nestos/llm-ui-adapter/settings';
 
 const definition = (id: string, extra = {}): AgentDefinition => ({ id, name: id, type: 'agent', config: {}, ...extra });
 const candidates = [definition('self'), definition('host'), definition('member'), definition('flow', {execution: {kind: 'flow', flowId: 'flow'}})];

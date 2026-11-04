@@ -1,8 +1,8 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
-import { FlowCommand, type FlowDraft } from '@itookit/llm-flow/contracts';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import type { CommandBus } from '@itookit/llm-session';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
+import { FlowCommand, type FlowDraft } from '@nestos/llm-flow/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import type { CommandBus } from '@nestos/llm-session';
 
 /** Product recovery explicitly publishes newly restored templates, optionally replacing the selected template draft. */
 export async function restoreAndPublishFlow(commands: ICommandBus, template: FlowDraft, overwrite = false): Promise<FlowDraft | null> {

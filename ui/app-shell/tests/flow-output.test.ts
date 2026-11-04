@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import { FlowCommand, SessionCommand } from '@itookit/llm-session';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import { FlowCommand, SessionCommand } from '@nestos/llm-session';
 import { DagWorkbench } from '../../llm-ui-adapter/src/components/DagWorkbench';
 import { openSessionFlowOutputs } from '../../llm-ui-adapter/src/flows/session-output';
 import {SessionRunsPanel} from '../../llm-ui-adapter/src/flows/SessionRunsPanel';

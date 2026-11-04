@@ -1,7 +1,7 @@
 export const DOCUMENT_CHAT_META_KEY = '_mindos_document_chat';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {SubmissionRequest} from '@itookit/llm-session/contracts';
-import type {TargetRef} from '@itookit/llm-flow/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
+import type {TargetRef} from '@nestos/llm-flow/contracts';
 
 export interface DocumentChatSource {
     namespaceId: string;

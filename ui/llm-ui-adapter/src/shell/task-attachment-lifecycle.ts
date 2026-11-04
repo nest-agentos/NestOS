@@ -1,5 +1,5 @@
-import type { JsonValue } from '@itookit/durable-kernel/contracts';
-import type { EditorTaskControlPlane, ReadTaskAttachment, TaskRecord } from '@itookit/durable-kernel/contracts';
+import type { JsonValue } from '@nestos/durable-kernel/contracts';
+import type { EditorTaskControlPlane, ReadTaskAttachment, TaskRecord } from '@nestos/durable-kernel/contracts';
 import type { RunAttachmentController } from './RunAttachmentController';
 import { pendingInteractionTask, restoreWaitingAttachment } from './pending-interaction';
 

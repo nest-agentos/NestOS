@@ -1,5 +1,5 @@
-import {ACTION_ICONS, CHAT_ICONS, FILE_ICONS, t} from '@itookit/common';
-import type {ChatOptions} from '@itookit/llm-ui';
+import {ACTION_ICONS, CHAT_ICONS, FILE_ICONS, t} from '@nestos/common';
+import type {ChatOptions} from '@nestos/llm-ui';
 
 /** Product source choices use the library-owned picker and upload lifecycle. */
 export function chatAttachmentMenu(references = false): NonNullable<ChatOptions['attachmentMenu']> {

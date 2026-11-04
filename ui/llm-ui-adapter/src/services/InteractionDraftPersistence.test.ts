@@ -1,9 +1,9 @@
 import {expect, it, vi} from 'vitest';
-import type {ConversationUIState} from '@itookit/llm-session/contracts';
+import type {ConversationUIState} from '@nestos/llm-session/contracts';
 import {InteractionDraftPersistence} from './InteractionDraftPersistence';
 import type {InteractionDraftScope, InteractionDraftContent} from '../domain/interaction-draft';
 const diagnostics = vi.hoisted(() => ({debug: vi.fn(), warn: vi.fn()}));
-vi.mock('@itookit/common', async original => ({...await original<typeof import('@itookit/common')>(), createModuleLogger: () => diagnostics}));
+vi.mock('@nestos/common', async original => ({...await original<typeof import('@nestos/common')>(), createModuleLogger: () => diagnostics}));
 const scope: InteractionDraftScope = {sessionId: 'parent', branchId: 'main', callId: 'call', executionSessionId: 'child', taskId: 'root', targetTaskId: 'worker', interactionId: 'ask', requestedAt: 1};
 const content = (text: string): InteractionDraftContent => ({format: 'text', values: {answer: text}});
 function fixture() {

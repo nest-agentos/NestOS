@@ -1,7 +1,7 @@
-import type {KanbanClient} from '@itookit/kanban/contracts';
+import type {KanbanClient} from '@nestos/kanban/contracts';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import type {KanbanAutomationJournal} from './automation-journal';
-import type {TargetRef} from '@itookit/llm-flow/contracts';
+import type {TargetRef} from '@nestos/llm-flow/contracts';
 import {publishFile} from '../run/prompt-bundle';
 import {requireValue} from './validation';
 

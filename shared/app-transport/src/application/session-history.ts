@@ -1,4 +1,4 @@
-import {FSError} from '@itookit/vfs-core';
+import {FSError} from '@nestos/vfs-core';
 import {SnapshotCodec, wireSize} from '../rpc/snapshot-codec';
 
 type Snapshot = Record<string, any>;

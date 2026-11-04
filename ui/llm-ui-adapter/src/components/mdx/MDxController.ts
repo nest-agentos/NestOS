@@ -1,8 +1,8 @@
 // @file llm-ui/views/mdx/MDxController.ts
-import { createMDxEditor } from '@itookit/mdx-adapter';
-import type { MDxEditor, MDxPlugin, HtmlPolicy } from '@itookit/mdxeditor';
-import type { CollapseExpandResult } from '@itookit/ui-common-adapter';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { createMDxEditor } from '@nestos/mdx-adapter';
+import type { MDxEditor, MDxPlugin, HtmlPolicy } from '@nestos/mdxeditor';
+import type { CollapseExpandResult } from '@nestos/ui-common-adapter';
+import type { IFileSystem } from '@nestos/vfs-core';
 import type { IStreamableEditor } from '../../domain/ports/IStreamableEditor';
 
 export interface MDxControllerOptions {

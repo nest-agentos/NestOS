@@ -1,7 +1,7 @@
 import {updateFlowPresentationGroups} from './FlowParameterPresentation';
-import {escapeHTML, t} from '@itookit/common';
-import {flowConnectionRequired, type JsonValue} from '@itookit/llm-flow/contracts';
-import type {ConnectionMeta} from '@itookit/driver-llm/contracts';
+import {escapeHTML, t} from '@nestos/common';
+import {flowConnectionRequired, type JsonValue} from '@nestos/llm-flow/contracts';
+import type {ConnectionMeta} from '@nestos/driver-llm/contracts';
 import type {FlowConnectionSelection} from './FlowParameterForm';
 import {fieldFailure} from './FlowParameterState';
 
@@ -25,7 +25,7 @@ function slotFields(selection: FlowConnectionSelection): string {
         const selected = selection.bindings?.[slot.name] ?? slot.connectionId;
         const missing = selected && !selection.connections.some(item => item.id === selected)
             ? `<option value="${escapeHTML(selected)}" selected>${escapeHTML(t('connection.unavailable', {id: selected}))}</option>` : '';
-        const operation = slot.requirements?.operation as import('@itookit/kernel-adapters/contracts').ModelOperation | undefined;
+        const operation = slot.requirements?.operation as import('@nestos/kernel-adapters/contracts').ModelOperation | undefined;
         const compatible = selection.connections.filter(item => !operation || !item.operationModels || item.operationModels[operation] || item.id === selected);
         const options = compatible.map(item => {
             const model = operation && item.operationModels ? item.operationModels[operation] : item.tiers?.[slot.tier ?? 'optimal'] ?? item.model;

@@ -1,4 +1,4 @@
-import { createModuleLogger, randomUUID } from '@itookit/common';
+import { createModuleLogger, randomUUID } from '@nestos/common';
 
 const log = createModuleLogger('toolbox-import');
 const errorCode = (error: unknown): string => {

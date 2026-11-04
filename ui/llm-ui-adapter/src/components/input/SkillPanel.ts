@@ -2,7 +2,7 @@
 // Skill 选择面板：列表渲染 + Load/Unload 切换 + 刷新。
 // 从 ChatInputView 抽出，自包含，只依赖注入的 onRequestSkills/onLoadSkill/onUnloadSkill。
 
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import type { SkillInfo } from '../../domain/types';
 import { ChatInputTemplates } from '../templates/ChatInputTemplates';
 

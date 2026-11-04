@@ -1,4 +1,4 @@
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
 
 const log = createModuleLogger('draft-loading');
 type Stage = 'attachments' | 'configuration' | 'targets';

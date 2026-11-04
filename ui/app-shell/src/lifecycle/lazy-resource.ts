@@ -1,4 +1,4 @@
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 /** Share construction, retry failures, and release a value even if closure races creation. */
 export function lazyResource<T>(create: () => Promise<T>, dispose: (value: T) => void | Promise<void>) {

@@ -1,6 +1,6 @@
-import {createModuleLogger, escapeAttr, escapeHTML, randomUUID, t} from '@itookit/common';
-import type {ToolPackageInfo, ToolPackages} from '@itookit/app-contracts/services';
-import type {TwinScannerTool} from '@itookit/app-contracts';
+import {createModuleLogger, escapeAttr, escapeHTML, randomUUID, t} from '@nestos/common';
+import type {ToolPackageInfo, ToolPackages} from '@nestos/app-contracts/services';
+import type {TwinScannerTool} from '@nestos/app-contracts';
 import {runningVersions} from '../toolbox/package-versions';
 const log = createModuleLogger('scanner-packages');
 

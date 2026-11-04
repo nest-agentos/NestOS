@@ -5,12 +5,12 @@ import {mountEditorTitleBar} from './content-titlebar';
 import {mountExecutionDraftAction} from './chat-execution-draft';
 import {chatOcrPort} from './ocr-port';
 
-import {CHAT_SLOT_CLASSES} from '@itookit/llm-ui';
+import {CHAT_SLOT_CLASSES} from '@nestos/llm-ui';
 import {presentHostControl} from '../independent/button-presentation';
 import {messageMarkdown} from '../independent/message-markdown';
-import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, escapeHTML, getLocale, t} from '@itookit/common';
-import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventCallback, type EditorEventMap} from '@itookit/ui-common-adapter';
-import type {ChatView, OperationReceipt} from '@itookit/llm-ui';
+import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, escapeHTML, getLocale, t} from '@nestos/common';
+import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventCallback, type EditorEventMap} from '@nestos/ui-common-adapter';
+import type {ChatView, OperationReceipt} from '@nestos/llm-ui';
 import {createNativeChatBinding, createNativeChatView} from '../independent/native';
 import type {RetainedWorkspaceHandoff} from './drafts/workspace-handoff';
 import {adoptNativeChatView} from '../independent/native';
@@ -40,7 +40,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
     private branches?: RemoteBranches;
     private historyBranches?: RemoteHistoryBranches;
     private readonly events = new Map<EditorEvent, Set<(payload: unknown) => void>>();
-    constructor(container: HTMLElement, controls: ConversationControls, options: EditorOptions, private store: NativeChatStore, private handoff?: RetainedWorkspaceHandoff, private ocrControls?: import('@itookit/app-contracts/services').OcrControls) {
+    constructor(container: HTMLElement, controls: ConversationControls, options: EditorOptions, private store: NativeChatStore, private handoff?: RetainedWorkspaceHandoff, private ocrControls?: import('@nestos/app-contracts/services').OcrControls) {
         super(container, controls, options); this.owned = !handoff; this.operations = store.ledger();
     }
     async init(container: HTMLElement): Promise<void> {this.container = container; await this.render();}
@@ -109,7 +109,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
         if (!this.active || this.closed) return;
         const state = await action(); if (state.sessionId && !this.closed) this.options.onConversationSession?.(state.sessionId);
     }
-    private toolbar(root: HTMLElement, context: import('@itookit/llm-ui').ToolbarContext) {
+    private toolbar(root: HTMLElement, context: import('@nestos/llm-ui').ToolbarContext) {
         const menuHost = context.headerMenu;
         const cleanups: (() => void)[] = [];
         let information: ConversationInformation | undefined;

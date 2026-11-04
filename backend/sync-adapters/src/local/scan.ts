@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { assertSync, sha256, type Snapshot } from '@itookit/vfs-sync';
-import type { ISidecarDb, LocalStorageAccess } from '@itookit/vfsdriver-local';
+import { assertSync, sha256, type Snapshot } from '@nestos/vfs-sync';
+import type { ISidecarDb, LocalStorageAccess } from '@nestos/vfsdriver-local';
 import { nativePath, stat } from './files';
 export interface LocalNode { kind: 'file' | 'directory'; dev: string; ino: string; mtime: number; mode: number; hash?: string; size?: number; metadata: string }
 export interface LocalSnapshot { root: { dev: string; ino: string }; scan: Snapshot; nodes: Record<string, LocalNode>; objects: Record<string, Uint8Array<ArrayBuffer>> }

@@ -1,5 +1,5 @@
-import {FSError} from '@itookit/vfs-core';
-import type {ApplicationViewEvent, ApplicationViewSources, ApplicationViewObservation, LocalApplicationServices, WorkbenchView} from '@itookit/app-contracts/services';
+import {FSError} from '@nestos/vfs-core';
+import type {ApplicationViewEvent, ApplicationViewSources, ApplicationViewObservation, LocalApplicationServices, WorkbenchView} from '@nestos/app-contracts/services';
 
 /** One browser owns this bounded journal; source subscriptions precede initial reads. */
 export class ViewObservation implements ApplicationViewObservation {

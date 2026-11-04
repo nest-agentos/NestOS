@@ -1,4 +1,4 @@
-import type {FlowCallSource, SessionSubmission, TargetSelection} from '@itookit/llm-flow/contracts';
+import type {FlowCallSource, SessionSubmission, TargetSelection} from '@nestos/llm-flow/contracts';
 import type {ChatAttachment} from './chat';
 import type {ExecutionOverrides, HistoryPolicy, SessionOrigin} from '../core/types';
 
@@ -12,7 +12,7 @@ export interface SubmissionRequest {
     expectedSessionId?: string;
     expectedBranch?: string;
     target: TargetSelection;
-    expectedTarget?: import('@itookit/llm-flow/contracts').TargetRef;
+    expectedTarget?: import('@nestos/llm-flow/contracts').TargetRef;
     source: FlowCallSource;
     /** Original editor text for history; arguments remain the sole executable input after form confirmation. */
     presentation?: {text: string};
@@ -31,11 +31,11 @@ export interface SubmissionReceipt {
 }
 
 export interface RootCallTarget {
-    target: import('@itookit/llm-flow/contracts').TargetRef;
+    target: import('@nestos/llm-flow/contracts').TargetRef;
     name: string;
     icon?: string;
     description?: string;
-    input?: {flowId: string; revision: number; digest: string; parameters: import('@itookit/llm-flow/contracts').FlowParameter[]};
+    input?: {flowId: string; revision: number; digest: string; parameters: import('@nestos/llm-flow/contracts').FlowParameter[]};
 }
 export interface RootTargetCatalog {
     entries: RootCallTarget[];

@@ -1,6 +1,6 @@
-import { folderBrowserPath } from '@itookit/app-contracts';
-import type { ProjectService } from '@itookit/app-contracts/services';
-import { t } from '@itookit/common';
+import { folderBrowserPath } from '@nestos/app-contracts';
+import type { ProjectService } from '@nestos/app-contracts/services';
+import { t } from '@nestos/common';
 
 /** Decode the shell envelope once; folder segments keep their own URI encoding. */
 export function parseWorkspaceHash(hash: string, fallback: string): { slug: string; resource?: string } {

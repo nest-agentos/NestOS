@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { acquireHostLock } from '@itookit/node-host/storage';
+import { acquireHostLock } from '@nestos/node-host/storage';
 
 it.each(['SIGTERM', 'SIGKILL'] as const)('releases the OS lock after its owning process exits through %s', async signal => {
     const directory = await mkdtemp(path.join(tmpdir(), 'httpd-process-lock-'));

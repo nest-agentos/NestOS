@@ -1,4 +1,4 @@
-import { FSError, transferFileSystemEntry, type IFileSystem, type ISeqFileTransaction } from '@itookit/vfs-core';
+import { FSError, transferFileSystemEntry, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
 import { relocateCentralSession } from './session-storage-relocation';
 import { sessionStorageRoot, storageIdentityConflict } from './session-storage-layout';
 import { SessionStorageTrace } from './session-storage-trace';

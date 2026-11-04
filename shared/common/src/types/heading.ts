@@ -1,4 +1,4 @@
-// @itookit/common/types/heading.ts — markdown heading structure (pure type).
+// @nestos/common/types/heading.ts — markdown heading structure (pure type).
 
 export interface Heading {
     /** 标题层级 1-6 */

@@ -1,8 +1,8 @@
 import {taskInputParameters} from '../flows/task-input-parameters';
-import {createModuleLogger, t} from '@itookit/common';
-import type {EditorTaskControlPlane, InteractionRecord, JsonValue, TaskRecord} from '@itookit/durable-kernel/contracts';
-import type {ConversationActions, InteractionView, OperationContext, OperationLedger, OperationReceipt} from '@itookit/llm-ui';
-import type {SessionGroup} from '@itookit/llm-session/contracts';
+import {createModuleLogger, t} from '@nestos/common';
+import type {EditorTaskControlPlane, InteractionRecord, JsonValue, TaskRecord} from '@nestos/durable-kernel/contracts';
+import type {ConversationActions, InteractionView, OperationContext, OperationLedger, OperationReceipt} from '@nestos/llm-ui';
+import type {SessionGroup} from '@nestos/llm-session/contracts';
 import {agentQuestionAnswer, agentQuestionFields} from '../components/input/agent-questions';
 
 const terminal = (task: TaskRecord) => ['succeeded', 'failed', 'cancelled'].includes(task.status);
@@ -103,7 +103,7 @@ function projectInteraction(taskId: string, request: InteractionRecord<JsonValue
 
     return {...base, kind: 'input', fields: fields.length ? fields : [{id: 'answer', kind: 'text', multiline: true, label: payload.fields ? t('callable.independent.answer.json') : t('chatInput.interaction.answer'), required: true}]};
 }
-function plainAnswer(response: Extract<import('@itookit/llm-ui').InteractionResponse, {kind: 'input'}>, payload: Record<string, JsonValue>): JsonValue {
+function plainAnswer(response: Extract<import('@nestos/llm-ui').InteractionResponse, {kind: 'input'}>, payload: Record<string, JsonValue>): JsonValue {
     const text = String(response.values.answer ?? '');
     if (!payload.fields) return text;
     try {const value = JSON.parse(text); if (value && typeof value === 'object' && !Array.isArray(value)) return value;}

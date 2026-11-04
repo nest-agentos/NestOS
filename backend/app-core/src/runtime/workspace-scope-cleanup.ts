@@ -1,4 +1,4 @@
-import { waitForFlowRunTasks, type FlowWorkspaceLease, type FlowWorkspaceManager } from '@itookit/llm-flow';
+import { waitForFlowRunTasks, type FlowWorkspaceLease, type FlowWorkspaceManager } from '@nestos/llm-flow';
 import type { HeadlessKernelRuntime } from './create-kernel-runtime';
 import {managedWorkspaceLease, registerWorkspaceResource} from './workspace-resource';
 

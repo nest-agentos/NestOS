@@ -3,9 +3,9 @@ import {mkdtemp, mkdir, writeFile, readFile, rm, cp} from 'node:fs/promises';
 import {X509Certificate} from 'node:crypto';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
-import {createCertificates, createUserCertificate, loadCertificates, startHost} from '@itookit/node-host/http';
-import {HttpViewClient} from '@itookit/app-transport/http';
-import type {ToolConnections} from '@itookit/app-contracts/services';
+import {createCertificates, createUserCertificate, loadCertificates, startHost} from '@nestos/node-host/http';
+import {HttpViewClient} from '@nestos/app-transport/http';
+import type {ToolConnections} from '@nestos/app-contracts/services';
 import {authenticatedFetch} from './tls-fixture';
 
 it('shares administrator application setup over mTLS while isolating user tokens, callbacks and management privileges', async () => {

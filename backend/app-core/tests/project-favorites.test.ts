@@ -1,6 +1,6 @@
 import { resolveBrowserTarget } from '../src/session/session-browser';
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { ProjectFavorites, SeqProjectFavoriteStore } from '../src/projects/favorites';
 it('persists project-scoped shortcuts and removes only the shortcut', async () => {
     const { manager } = await createVFS({ rootBackend: new MemoryBackend() });

@@ -1,9 +1,9 @@
 import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath } from '@itookit/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath } from '@nestos/app-core';
 
 it('follows a renamed project by identity without expanding its obsolete path', async () => {
     const { manager } = await createVFS({ rootBackend: new MemoryBackend() });

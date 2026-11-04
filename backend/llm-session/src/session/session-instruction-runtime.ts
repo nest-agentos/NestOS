@@ -1,4 +1,4 @@
-import type { Kernel } from '@itookit/durable-kernel';
+import type { Kernel } from '@nestos/durable-kernel';
 import type { SessionInstructionQueue } from '../contracts/instruction-queue';
 import type { InstructionQueueSessions } from '../persistence/instruction-queue-sessions';
 import { InstructionQueueStore } from '../persistence/instruction-queue-store';

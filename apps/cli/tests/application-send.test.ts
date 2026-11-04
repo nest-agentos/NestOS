@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import type {ApplicationClient} from '@itookit/app-contracts/services';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import {executeApplicationCommand} from '../src/application-command';
 
 it('uses the shared query and report recovery ports with stable identities and never sends a native input', async () => {

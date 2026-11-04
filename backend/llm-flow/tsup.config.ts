@@ -7,8 +7,8 @@ export default defineConfig({
     clean: true,
     sourcemap: true,
     external: [
-        '@itookit/llm-context',
-        '@itookit/durable-kernel',
-        '@itookit/llm-tasks',
+        '@nestos/llm-context',
+        '@nestos/durable-kernel',
+        '@nestos/llm-tasks',
     ],
 });

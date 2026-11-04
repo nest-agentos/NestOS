@@ -1,7 +1,7 @@
 import type {ConversationRequest} from '../contracts';
 
-import {createInteractionCard, type InteractionCard} from '@itookit/llm-ui';
-import {getLocale} from '@itookit/common';
+import {createInteractionCard, type InteractionCard} from '@nestos/llm-ui';
+import {getLocale} from '@nestos/common';
 import {nativeInteraction, nativeResponse} from '../native-interactions';
 
 type Respond = (id: string | number, response: Record<string, unknown>) => Promise<void>;

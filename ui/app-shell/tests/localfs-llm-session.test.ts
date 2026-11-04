@@ -19,8 +19,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { promises as fsp } from 'node:fs';
 import { join } from 'node:path';
-import { LLMDriver } from '@itookit/driver-llm';
-import type { ChatMessage } from '@itookit/llm-context';
+import { LLMDriver } from '@nestos/driver-llm';
+import type { ChatMessage } from '@nestos/llm-context';
 import {
     setupLocalVFS, type LocalTestVFS,
 } from './helpers-localfs';

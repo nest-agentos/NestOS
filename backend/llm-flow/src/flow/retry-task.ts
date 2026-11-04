@@ -1,5 +1,5 @@
 import { isSchedulerOwnershipLost } from './scheduler-lease';
-import type { SessionHandle, TaskHandle } from '@itookit/durable-kernel';
+import type { SessionHandle, TaskHandle } from '@nestos/durable-kernel';
 import { prepareFlowTaskRetry, readFlowRunMembers } from './run-members';
 import { startFlowTask } from './task-capabilities';
 

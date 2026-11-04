@@ -1,6 +1,6 @@
 import {packageConfiguration, readPackageSettings} from './package-configuration';
-import {createModuleLogger, escapeHTML, randomUUID, t, type LocaleKey} from '@itookit/common';
-import type {ToolPackageInfo, ToolPackages, ToolRunRecord} from '@itookit/app-contracts/services';
+import {createModuleLogger, escapeHTML, randomUUID, t, type LocaleKey} from '@nestos/common';
+import type {ToolPackageInfo, ToolPackages, ToolRunRecord} from '@nestos/app-contracts/services';
 import {packageGuide} from './package-guide';
 import {packageFlows, packageFlowKey} from './package-flows';
 import {versionAction, packageVersions} from './package-versions';

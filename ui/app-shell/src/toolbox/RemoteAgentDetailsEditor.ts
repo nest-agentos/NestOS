@@ -1,7 +1,7 @@
-import { BaseSettingsEditor, editorFilePath, type EditorOptions } from '@itookit/ui-common-adapter';
-import { remoteSessionPath } from '@itookit/app-contracts';
-import type { ProjectService, ToolboxInventory } from '@itookit/app-contracts/services';
-import { t } from '@itookit/common';
+import { BaseSettingsEditor, editorFilePath, type EditorOptions } from '@nestos/ui-common-adapter';
+import { remoteSessionPath } from '@nestos/app-contracts';
+import type { ProjectService, ToolboxInventory } from '@nestos/app-contracts/services';
+import { t } from '@nestos/common';
 export class RemoteAgentDetailsEditor extends BaseSettingsEditor<ToolboxInventory> {
     private projectSettings?: Awaited<ReturnType<NonNullable<EditorOptions['mountSettings']>>>;
     constructor(container: HTMLElement, inventory: ToolboxInventory, options: EditorOptions, private readonly projects?: ProjectService) { super(container, inventory, options); }

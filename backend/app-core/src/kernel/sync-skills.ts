@@ -1,4 +1,4 @@
-import type { SkillDefinition } from '@itookit/tools/contracts';
+import type { SkillDefinition } from '@nestos/tools/contracts';
 
 export interface SkillSourceDriver {
     getSkills(): Promise<readonly SkillDefinition[]>;

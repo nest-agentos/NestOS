@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { DigitalTwinService } from '@itookit/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { DigitalTwinService } from '@nestos/app-core';
 import { TwinWorkbench } from '../src/digital-twin';
 
 const cleanup: Array<() => Promise<void>> = [];

@@ -1,7 +1,7 @@
-import { escapeHTML, randomUUID, t } from '@itookit/common';
-import type { OcrService } from '@itookit/app-contracts/services';
-import type { IAgentManagementService } from '@itookit/kernel-adapters/contracts';
-import { Modal } from '@itookit/ui-common-adapter';
+import { escapeHTML, randomUUID, t } from '@nestos/common';
+import type { OcrService } from '@nestos/app-contracts/services';
+import type { IAgentManagementService } from '@nestos/kernel-adapters/contracts';
+import { Modal } from '@nestos/ui-common-adapter';
 
 /** Edit the referenced shared prompt without leaving the defaults page. */
 export async function editOcrPrompt(service: OcrService, agents: IAgentManagementService): Promise<void> {

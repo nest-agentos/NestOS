@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { requireMediaCapabilities } from '@itookit/driver-llm/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { requireMediaCapabilities } from '@nestos/driver-llm/contracts';
 import { createApplicationRuntime, type ApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { modelCapabilities } from '../src/configuration/model-capabilities';
 

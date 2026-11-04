@@ -1,5 +1,5 @@
 import {expect,it,vi} from 'vitest';
-import type {SessionActivity,EventEnvelope} from '@itookit/durable-kernel/contracts';
+import type {SessionActivity,EventEnvelope} from '@nestos/durable-kernel/contracts';
 import {createLocalKanbanSessionSource,sessionPhase} from '../src/kanban/session-source';
 function activity():SessionActivity {
     return {sessionId:'execution',sessionStatus:'open',revision:1,asOfSequence:3,counts:{running:0,queued:0,created:0,waiting:0,paused:0,blocked:0,succeeded:0,failed:0,cancelled:0},pending:{approval:0,input:0,cleanup:0}};

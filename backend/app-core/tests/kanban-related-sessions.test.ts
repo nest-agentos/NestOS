@@ -1,7 +1,7 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {sha256HexSync} from '@itookit/common';
-import type {KanbanItem, KanbanBoard, KanbanWorkflowState} from '@itookit/kanban/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {sha256HexSync} from '@nestos/common';
+import type {KanbanItem, KanbanBoard, KanbanWorkflowState} from '@nestos/kanban/contracts';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {relatedKanbanSessions} from '../src/kanban/related-sessions';
 import {analysisHistory} from '../src/kanban/automation-analysis';

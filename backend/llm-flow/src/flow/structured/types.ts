@@ -1,5 +1,5 @@
 import type { DispatchBranch, DispatchConfig, JsonValue } from '../../contracts';
-import type { TaskSpec } from '@itookit/durable-kernel';
+import type { TaskSpec } from '@nestos/durable-kernel';
 import type { FlowDependencyBinding } from '../programs';
 
 export interface PreparedBranch extends DispatchBranch {

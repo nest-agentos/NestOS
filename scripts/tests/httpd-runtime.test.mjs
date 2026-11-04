@@ -137,11 +137,11 @@ test('freezes workspace links to the deployment copy rather than the development
     try {
         const source = path.join(directory, 'source'), snapshot = path.join(directory, 'snapshot');
         const nested = path.join(snapshot, 'node_modules/.pnpm/parent/node_modules/@itookit');
-        const copied = path.join(snapshot, 'node_modules/.pnpm/pkg/node_modules/@itookit/core');
+        const copied = path.join(snapshot, 'node_modules/.pnpm/pkg/node_modules/@nestos/core');
         mkdirSync(source, { recursive: true }); mkdirSync(nested, { recursive: true }); mkdirSync(copied, { recursive: true });
-        writeFileSync(path.join(snapshot, 'package.json'), JSON.stringify({ name: '@itookit/http-app', version: '1' }));
+        writeFileSync(path.join(snapshot, 'package.json'), JSON.stringify({ name: '@nestos/http-app', version: '1' }));
         for (const where of [source, copied]) {
-            writeFileSync(path.join(where, 'package.json'), JSON.stringify({ name: '@itookit/core', version: '1' }));
+            writeFileSync(path.join(where, 'package.json'), JSON.stringify({ name: '@nestos/core', version: '1' }));
             writeFileSync(path.join(where, 'index.js'), 'snapshot');
         }
         const link = path.join(nested, 'core'); symlinkSync(source, link, 'dir'); freezeWorkspaceDependencies(snapshot);

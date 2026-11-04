@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { SessionCommand } from '@itookit/llm-session/contracts';
-import { t } from '@itookit/common';
+import { SessionCommand } from '@nestos/llm-session/contracts';
+import { t } from '@nestos/common';
 import { LayoutTemplates } from '../../llm-ui-adapter/src/components/templates/LayoutTemplates';
 import { EventBinder } from '../../llm-ui-adapter/src/shell/EventBinder';
 import { LLMWorkspaceEditor } from '../../llm-ui-adapter/src/shell/LLMWorkspaceEditor';

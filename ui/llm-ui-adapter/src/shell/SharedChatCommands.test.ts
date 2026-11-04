@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
+import {createOperationLedger} from '@nestos/llm-ui';
 import {SharedChatCommands} from './SharedChatCommands';
 
 function fixture() {

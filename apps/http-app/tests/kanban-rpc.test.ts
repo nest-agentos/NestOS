@@ -1,9 +1,9 @@
 import {expect, it, vi} from 'vitest';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {openApplicationView} from '@itookit/app-core/host';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {RpcPeer, installViewProjections} from '@itookit/app-transport/application';
-import {executionSessionReference} from '@itookit/app-contracts';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {openApplicationView} from '@nestos/app-core/host';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {RpcPeer, installViewProjections} from '@nestos/app-transport/application';
+import {executionSessionReference} from '@nestos/app-contracts';
 
 it('exposes user-bound Kanban commands, queries and system notifications through real RPC', async () => {
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'web', startupMode: 'interactive', digitalTwinAutoStart: false});

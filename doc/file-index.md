@@ -1,6 +1,6 @@
 # 文件索引 — 场景 → 关键文件
 
-## Kernel 执行内核（@itookit/durable-kernel）
+## Kernel 执行内核（@nestos/durable-kernel）
 
 | 场景 | 文件 |
 |---|---|
@@ -12,7 +12,7 @@
 | seqfile 存储（session/task/effect/resource/budget） | `durable-kernel/src/infrastructure/seqfile/store.ts`、`store-helpers.ts` |
 | 注册表（Program/Effect/Storage/Workspace） | `durable-kernel/src/ports/registry.ts` |
 
-## LLM 任务单元（@itookit/llm-tasks）
+## LLM 任务单元（@nestos/llm-tasks）
 
 | 场景 | 文件 |
 |---|---|
@@ -26,7 +26,7 @@
 | 上下文装配（ContextAssembler） | `llm-context/src/assembly/context-assembler.ts` |
 | provider 消息适配 | `llm-context/src/assembly/provider-message-adapter.ts` |
 
-## DAG 编排（@itookit/llm-flow）
+## DAG 编排（@nestos/llm-flow）
 
 | 场景 | 文件 |
 |---|---|
@@ -40,7 +40,7 @@
 | DAG 控制面命令（DagCommandService） | `llm-flow/src/flow/commands.ts` |
 | Flow 定义持久化（FlowDefinitionStore/FlowStore） | `llm-flow/src/flow-definition-store.ts` |
 
-## 会话语义 + 持久化（@itookit/llm-session）
+## 会话语义 + 持久化（@nestos/llm-session）
 
 | 场景 | 文件 |
 |---|---|
@@ -60,7 +60,7 @@
 | 控制面（CommandBus/ExtensionRegistry/插件） | `llm-session/src/core/`、`plugins/` |
 | PromptHistoryService / VFSAgentService | `llm-session/src/services/` |
 
-## 能力实现（@itookit/kernel-adapters）
+## 能力实现（@nestos/kernel-adapters）
 
 | 场景 | 文件 |
 |---|---|
@@ -72,7 +72,7 @@
 | 工具定义（human-input/shell-session/tty-write） | `kernel-adapters/src/tool/`、`kernel-adapters/src/tty/` |
 | Kernel 插件注册 | `kernel-adapters/src/plugin/kernel-adapters-plugin.ts` |
 
-## LLM 设备（@itookit/driver-llm）
+## LLM 设备（@nestos/driver-llm）
 
 | 场景 | 文件 |
 |---|---|
@@ -83,7 +83,7 @@
 | MCP 客户端 | `kernel-adapters/src/llm-management/skills/mcp-client.ts` |
 | LLM 错误族 | `https://github.com/nest-agentos/driver-llm/blob/main/src/errors.ts` |
 
-## VFS（@itookit/vfs-core）
+## VFS（@nestos/vfs-core）
 
 | 场景 | 文件 |
 |---|---|
@@ -97,7 +97,7 @@
 | 远程连接与项目 | `app-core/src/projects/remote-mounts.ts`、`app-core/src/projects/remote-mount-store.ts`、`app-core/src/projects/remote-connections.ts`、`app-core/src/projects/mcp-remote-connections.ts`、`app-shell/src/toolbox/cells-controls.ts`、`app-shell/src/files/remote-project-fields.ts` |
 | LocalFS 后端 | `https://github.com/nest-agentos/vfsdriver-local/blob/main/src/localfs-backend.ts` |
 
-## CLI（@itookit/cli）
+## CLI（@nestos/cli）
 
 | 场景 | 文件 |
 |---|---|

@@ -1,26 +1,26 @@
-import {withProjectEnvironment} from '@itookit/app-core';
-import {stageInputAssets} from '@itookit/app-core';
-import { prepareFlowConnections } from '@itookit/llm-session';
-import { createCellsDriver } from '@itookit/cells-driver';
+import {withProjectEnvironment} from '@nestos/app-core';
+import {stageInputAssets} from '@nestos/app-core';
+import { prepareFlowConnections } from '@nestos/llm-session';
+import { createCellsDriver } from '@nestos/cells-driver';
 import { selectFinalResult } from './run-store';
 import { recordRuntimeDiagnostic, traceRuntimeStage } from './diagnostics';
 import { leaseSkewConfig } from './lease-config';
 import { mkdir } from 'node:fs/promises';
 import { memoryPolicyForAgent, grantRunMemory } from './memory-policy';
 import path from 'node:path';
-import type { DagRunSpec } from '@itookit/llm-flow/contracts';
-import type { LLMConnection, LLMProvider } from '@itookit/driver-llm/contracts';
+import type { DagRunSpec } from '@nestos/llm-flow/contracts';
+import type { LLMConnection, LLMProvider } from '@nestos/driver-llm/contracts';
 import { parse } from 'yaml';
-import { SessionFileSkillSource, resolveSessionSkillContext } from '@itookit/kernel-adapters';
-import { LLMDeviceDriver } from '@itookit/kernel-adapters/llm/core';
-import { createNestosLlmPresets, firstChatModelConnection } from '@itookit/kernel-adapters/llm/presets';
-import { NodePtyDriver } from '@itookit/device-tty';
+import { SessionFileSkillSource, resolveSessionSkillContext } from '@nestos/kernel-adapters';
+import { LLMDeviceDriver } from '@nestos/kernel-adapters/llm/core';
+import { createNestosLlmPresets, firstChatModelConnection } from '@nestos/kernel-adapters/llm/presets';
+import { NodePtyDriver } from '@nestos/device-tty';
 import {
     Kernel,
     type ResolvedStorageBinding,
     type SessionStorageResolver,
     type StorageBindingRef,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 import {
     compileWorkflow,
     DurableFlowExecutor,
@@ -28,7 +28,7 @@ import {
     type FlowWorkspaceManager,
     type WorkspaceCommandRunner,
     type WorkflowTaskSpec,
-} from '@itookit/llm-flow';
+} from '@nestos/llm-flow';
 import {
     acquireSessionProcessContext,
     createKernelRuntime,
@@ -51,18 +51,18 @@ import {
     syncSkillsToKernel,
     withWorkspaceScopeCleanup,
     workspaceRoot,
-} from '@itookit/app-core';
-import { AgentResolver, FlowRunProjection, SessionRepository, SessionDirectoryStorageResolver, VFSAgentService } from '@itookit/llm-session';
-import { createVFS, createFileSystemView, MemoryBackend, type IFileSystem, type VFSFactoryOptions } from '@itookit/vfs-core';
-import { createBashTool, type INativeShell } from '@itookit/tools';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
+} from '@nestos/app-core';
+import { AgentResolver, FlowRunProjection, SessionRepository, SessionDirectoryStorageResolver, VFSAgentService } from '@nestos/llm-session';
+import { createVFS, createFileSystemView, MemoryBackend, type IFileSystem, type VFSFactoryOptions } from '@nestos/vfs-core';
+import { createBashTool, type INativeShell } from '@nestos/tools';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
 import { taskOutputReference } from './config';
 import { CliDirectorySourceProvider } from './directories';
 import { createShell, OciTtyDriver, NodeNativeShell } from './shell';
 import type { AgentConfig, CompiledWorkflow, RunManifest, TaskConfig, WorkspaceGrant } from './types';
 import { createWorkspaceAccessTool, WorkspaceGrantRegistry } from './workspace';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
-import { createStandardNodeTools, loadNodeToolModules } from '@itookit/node-host/runtime';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
+import { createStandardNodeTools, loadNodeToolModules } from '@nestos/node-host/runtime';
 
 const STORAGE_KIND = 'cli-run';
 const TOOL_ALIASES: Record<string, string> = {
@@ -78,7 +78,7 @@ const TOOL_ALIASES: Record<string, string> = {
 
 export interface CliRuntime {
     stageInput<T>(value: T): Promise<T>;
-    prepareConnections(flow: import('@itookit/llm-flow/contracts').FlowRevision, bindings?: Record<string, string>, runConnectionId?: string): Promise<import('@itookit/llm-flow/contracts').FlowRevision>;
+    prepareConnections(flow: import('@nestos/llm-flow/contracts').FlowRevision, bindings?: Record<string, string>, runConnectionId?: string): Promise<import('@nestos/llm-flow/contracts').FlowRevision>;
     flowCapabilities: ReturnType<typeof createFlowCapabilities>;
     kernel: Kernel;
     executionConnections: HarnessConnectionService;
@@ -86,7 +86,7 @@ export interface CliRuntime {
     grants: WorkspaceGrantRegistry;
     /** Session workspace the file tools and shell see (the isolated copy in worktree mode). */
     workspaceRoot: string;
-    syncHistory(tasks?: import('@itookit/durable-kernel').TaskRecord[]): Promise<void>;
+    syncHistory(tasks?: import('@nestos/durable-kernel').TaskRecord[]): Promise<void>;
     waitForCheckpoint(taskIds: string[]): Promise<void>;
     dispose(): Promise<void>;
 }
@@ -354,7 +354,7 @@ export async function createCliRuntime(
         resolveNewRunContext: sessionId => resolveSessionSkillContext(kernel, core.sessions, sessionId, workflow.config.goal),
         resolveTools: flowCapabilities.resolveTools,
         resolveSkillContexts: flowCapabilities.resolveSkillContexts,
-        bindPatchNode: (id, node, defaults) => flowCapabilities.bindNode(id, node as import('@itookit/llm-flow/contracts').FlowNodeDefinition, defaults as never),
+        bindPatchNode: (id, node, defaults) => flowCapabilities.bindNode(id, node as import('@nestos/llm-flow/contracts').FlowNodeDefinition, defaults as never),
         // A crashed host keeps the Run's scheduler lease until the TTL expires; tests
         // shorten it the same way they shorten the Session lease. The skew budget is the
         // explicit cross-host clock-error constraint for shared-storage deployments.
@@ -363,11 +363,11 @@ export async function createCliRuntime(
         ...(workspaceManager ? { workspaceManager: withWorkspaceScopeCleanup(workspaceManager, core) } : {}),
     });
     const projection = new FlowRunProjection(sessionRepository, kernel);
-    const syncHistory = async (tasks?: import('@itookit/durable-kernel').TaskRecord[]) => {
+    const syncHistory = async (tasks?: import('@nestos/durable-kernel').TaskRecord[]) => {
         if (!manifest.rootTaskId) return;
         await projection.sync({ sessionId: manifest.sessionId, rootTaskId: manifest.rootTaskId,
             input: `${workflow.config.goal}\n\n${JSON.stringify(manifest.flow?.parameters ?? {}, null, 2)}`,
-            ...(manifest.flow ? { flow: { flowId: manifest.flow.definition.id as import('@itookit/llm-flow/contracts').FlowId,
+            ...(manifest.flow ? { flow: { flowId: manifest.flow.definition.id as import('@nestos/llm-flow/contracts').FlowId,
                 revision: manifest.flow.definition.revision, parameters: manifest.flow.parameters } } : {}),
             selectResult: output => selectFinalResult(output, workflow.config.result.task, workflow.config.result.output),
         }, tasks);

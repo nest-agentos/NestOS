@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {DigitalTwinService} from '../src/digital-twin/service';
 
 it('isolates private workspaces and shares an organization store only through a host-authorized binding', async () => {

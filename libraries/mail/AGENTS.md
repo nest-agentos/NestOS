@@ -1,4 +1,4 @@
-# @itookit/mail
+# @nestos/mail
 
 独立 VFS 邮件归档库。根入口拥有解析、摘要索引、查询与增量核对，contracts/ 仅含纯 DTO，ui/ 仅通过 MailClient 与宿主注入的编辑器、文案、图标和导航工作。
 

@@ -1,5 +1,5 @@
-import {sha256HexSync} from '@itookit/common';
-import {randomUUID} from '@itookit/common';
+import {sha256HexSync} from '@nestos/common';
+import {randomUUID} from '@nestos/common';
 import {failure, type PromptJournal} from '../run/prompt-bundle';
 import type {RemoteProcessHandle} from './remote-mounts';
 import type {PreparedWorktree} from './worktree-preparation';

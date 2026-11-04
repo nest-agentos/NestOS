@@ -1,6 +1,6 @@
 import {readInvocationFrame} from './invocation-projection';
 import {invocationFromLabels} from './invocation-identity';
-import type { Kernel, TaskRecord } from '@itookit/durable-kernel';
+import type { Kernel, TaskRecord } from '@nestos/durable-kernel';
 
 export interface FlowTranscriptQuery {
     version?: number;

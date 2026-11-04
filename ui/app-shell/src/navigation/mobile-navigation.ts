@@ -1,4 +1,4 @@
-import {MOBILE_NAVIGATION_QUERY, navigationItem} from '@itookit/ui-common-adapter';
+import {MOBILE_NAVIGATION_QUERY, navigationItem} from '@nestos/ui-common-adapter';
 
 export function installMobileNavigation(): void {
     document.querySelectorAll<HTMLElement>('.app-nav-btn').forEach(navigationItem);

@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {IPrivilegedCommandService} from '@itookit/llm-session/contracts';
+import type {IPrivilegedCommandService} from '@nestos/llm-session/contracts';
 import {prepareToolInvocation} from './invoke-tool';
 
 it('prepares explicit MCP arguments without executing the tool', async () => {

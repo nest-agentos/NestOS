@@ -1,10 +1,10 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {FlowCommand, type FlowDraft} from '@itookit/llm-flow/contracts';
-import {SessionCommand, type RootTargetCatalog, type SessionInstructionQueue} from '@itookit/llm-session/contracts';
-import type {AgentDefinition, AgentPublishRequest} from '@itookit/kernel-adapters/contracts';
-import {AgentResolver} from '@itookit/llm-session';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {FlowCommand, type FlowDraft} from '@nestos/llm-flow/contracts';
+import {SessionCommand, type RootTargetCatalog, type SessionInstructionQueue} from '@nestos/llm-session/contracts';
+import type {AgentDefinition, AgentPublishRequest} from '@nestos/kernel-adapters/contracts';
+import {AgentResolver} from '@nestos/llm-session';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {createChatConfigurationView} from '../src/configuration/chat-configuration';
 

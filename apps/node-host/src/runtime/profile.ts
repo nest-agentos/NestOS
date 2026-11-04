@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import {existsSync} from 'node:fs';
 import {adoptLegacyEnvironment} from './legacy-environment';
-import { DEFAULT_NESTOS_SETTINGS, NESTOS_CONFIG_FILE, resolveNestOSProfile, type NestOSProfileSettings } from '@itookit/app-core/profile';
+import { DEFAULT_NESTOS_SETTINGS, NESTOS_CONFIG_FILE, resolveNestOSProfile, type NestOSProfileSettings } from '@nestos/app-core/profile';
 
 adoptLegacyEnvironment();
 export function configDirectory(): string {

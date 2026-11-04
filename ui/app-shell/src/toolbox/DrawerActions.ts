@@ -1,10 +1,10 @@
-import { t } from '@itookit/common';
-import type { MenuItem } from '@itookit/ui-common-adapter';
-import { createMoveOperation, type VFSNodeUI } from '@itookit/vfs-ui';
+import { t } from '@nestos/common';
+import type { MenuItem } from '@nestos/ui-common-adapter';
+import { createMoveOperation, type VFSNodeUI } from '@nestos/vfs-ui';
 import { showNameDialog } from '../files/project-dialog';
 import { drawerField } from './drawer-field';
-import { DRAWER_KINDS, drawerKind, ungroupedId, type Drawer, type DrawerKind } from '@itookit/app-contracts';
-import type { ToolboxDrawers } from '@itookit/app-contracts/services';
+import { DRAWER_KINDS, drawerKind, ungroupedId, type Drawer, type DrawerKind } from '@nestos/app-contracts';
+import type { ToolboxDrawers } from '@nestos/app-contracts/services';
 import { toolboxKind } from './routes';
 import {OrganizeItems} from './organize-items';
 
@@ -12,7 +12,7 @@ interface Options {
     groups: ToolboxDrawers; signal: AbortSignal; refresh(): void;
     create(group: Drawer): Promise<unknown>; title(path: string): string;
     kinds?: readonly DrawerKind[];
-    remove?(paths: string[], signal: AbortSignal): Promise<import('@itookit/vfs-ui').DeleteResult>;
+    remove?(paths: string[], signal: AbortSignal): Promise<import('@nestos/vfs-ui').DeleteResult>;
     canRemove?(paths: string[]): boolean;
 }
 export class DrawerActions {

@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {Kernel, type SessionHandle} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend, type IFileSystem, type IVFSManager} from '@itookit/vfs-core';
+import {Kernel, type SessionHandle} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend, type IFileSystem, type IVFSManager} from '@nestos/vfs-core';
 import type {DagRunSpec} from '../src/contracts';
 import {createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms} from '../src/flow';
 

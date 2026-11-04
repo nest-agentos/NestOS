@@ -1,6 +1,6 @@
-import {randomUUID} from '@itookit/common';
-import {resolveResize, validateSpec, type ImageResizePolicy} from '@itookit/image-parser';
-import type {AttachmentRef} from '@itookit/llm-ui';
+import {randomUUID} from '@nestos/common';
+import {resolveResize, validateSpec, type ImageResizePolicy} from '@nestos/image-parser';
+import type {AttachmentRef} from '@nestos/llm-ui';
 import type {DraftFileRecord} from '../services/DraftFilesCodec';
 import type {ImageAssetMetadata, ImageEditingHost} from './image-editing';
 

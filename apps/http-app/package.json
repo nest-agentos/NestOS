@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/http-app",
+  "name": "@nestos/http-app",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -15,24 +15,24 @@
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "node-pty": "^1.1.0",
-    "@itookit/common": "workspace:*",
-    "@itookit/app-core": "workspace:*",
-    "@itookit/app-shell": "workspace:*",
-    "@itookit/llm-ui-adapter": "workspace:*",
-    "@itookit/mdxeditor": "workspace:*",
-    "@itookit/ui-common-adapter": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
-    "@itookit/cells-driver": "workspace:*",
-    "@itookit/vfsdriver-local": "workspace:*",
+    "@nestos/common": "workspace:*",
+    "@nestos/app-core": "workspace:*",
+    "@nestos/app-shell": "workspace:*",
+    "@nestos/llm-ui-adapter": "workspace:*",
+    "@nestos/mdxeditor": "workspace:*",
+    "@nestos/ui-common-adapter": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
+    "@nestos/cells-driver": "workspace:*",
+    "@nestos/vfsdriver-local": "workspace:*",
     "nestos-web": "workspace:*",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.8",
-    "@itookit/mdx-adapter": "workspace:*",
-    "@itookit/app-contracts": "workspace:*",
-    "@itookit/kernel-adapters": "workspace:*",
-    "@itookit/llm-flow": "workspace:*",
-    "@itookit/node-host": "workspace:*",
-    "@itookit/app-transport": "workspace:*",
+    "@nestos/mdx-adapter": "workspace:*",
+    "@nestos/app-contracts": "workspace:*",
+    "@nestos/kernel-adapters": "workspace:*",
+    "@nestos/llm-flow": "workspace:*",
+    "@nestos/node-host": "workspace:*",
+    "@nestos/app-transport": "workspace:*",
     "sharp": "0.35.5"
   },
   "devDependencies": {
@@ -45,5 +45,14 @@
   },
   "engines": {
     "node": ">=22.13.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "apps/http-app"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

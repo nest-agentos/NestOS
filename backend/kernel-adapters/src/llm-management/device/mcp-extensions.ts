@@ -1,4 +1,4 @@
-import type { MCPDiscovery, MCPServer } from '@itookit/tools/mcp-contracts';
+import type { MCPDiscovery, MCPServer } from '@nestos/tools/mcp-contracts';
 import type { MCPConfigurationExtension, MCPConfigurationExtensionContext } from '../contracts/mcp-transport';
 
 type Proof = { identity: string; extensions: Record<string, unknown> };

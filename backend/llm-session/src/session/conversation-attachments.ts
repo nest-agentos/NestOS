@@ -1,6 +1,6 @@
-import {attachmentToContentPart, expandMessageAttachments, isSupportedTextContent} from '@itookit/driver-llm';
-import {guessMimeType} from '@itookit/vfs-core';
-import type {ChatMessage, Attachment} from '@itookit/llm-context';
+import {attachmentToContentPart, expandMessageAttachments, isSupportedTextContent} from '@nestos/driver-llm';
+import {guessMimeType} from '@nestos/vfs-core';
+import type {ChatMessage, Attachment} from '@nestos/llm-context';
 import {historyAttachment, type ChatAttachment} from '../contracts/chat';
 import type {ISessionRepository} from '../persistence/types';
 import {attachmentError, readVerifiedAttachment} from './attachment-integrity';

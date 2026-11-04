@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { language } from '@codemirror/language';
 import { EditorView } from '@codemirror/view';
 import { defaultEditorFactory } from '../src/factory';
-import { MDxEditor, MDxRenderer } from '@itookit/mdxeditor';
+import { MDxEditor, MDxRenderer } from '@nestos/mdxeditor';
 
 beforeEach(() => vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} })));
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); document.body.replaceChildren(); });

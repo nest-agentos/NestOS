@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {projectConversationsPath, resolveBrowserTarget} from '@itookit/app-contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {projectConversationsPath, resolveBrowserTarget} from '@nestos/app-contracts';
 import {createApplicationRuntime, type ApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {createSessionBrowser} from '../src/session/session-browser';
 

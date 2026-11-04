@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it} from 'vitest';
-import {t} from '@itookit/common';
-import {ConnectionSettingsEditor} from '@itookit/llm-ui-adapter/settings';
+import {t} from '@nestos/common';
+import {ConnectionSettingsEditor} from '@nestos/llm-ui-adapter/settings';
 
 afterEach(() => {document.body.replaceChildren();});
 

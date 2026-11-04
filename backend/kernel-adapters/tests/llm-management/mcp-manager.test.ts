@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { MCPManager } from '../../src/llm-management/device/mcp-manager';
 import { MCPServerConnection } from '../../src/llm-management/skills/mcp-client';
-import { mcpTimeoutMs, type MCPServer } from '@itookit/tools/mcp-contracts';
+import { mcpTimeoutMs, type MCPServer } from '@nestos/tools/mcp-contracts';
 import type { MCPConnectionOptions } from '../../src/llm-management/core';
 
 afterEach(() => vi.restoreAllMocks());

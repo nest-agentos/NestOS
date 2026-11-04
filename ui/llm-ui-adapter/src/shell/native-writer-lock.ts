@@ -1,5 +1,5 @@
 import type {ConversationSnapshot} from '../contracts';
-import {getLocale, t} from '@itookit/common';
+import {getLocale, t} from '@nestos/common';
 
 
 /** Current host evidence is independent of the persisted submission error. */

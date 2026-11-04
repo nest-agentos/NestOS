@@ -1,6 +1,6 @@
-import { escapeHTML, t } from '@itookit/common';
-import { type FlowActor } from '@itookit/llm-session/contracts';
-import type { ExecutionNode } from '@itookit/llm-session/contracts';
+import { escapeHTML, t } from '@nestos/common';
+import { type FlowActor } from '@nestos/llm-session/contracts';
+import type { ExecutionNode } from '@nestos/llm-session/contracts';
 
 /** Role is presentation; provenance identifies the actual executor or tool owner. */
 export function renderFlowIdentity(node: ExecutionNode): string {

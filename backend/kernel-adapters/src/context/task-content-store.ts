@@ -1,6 +1,6 @@
-import { contextKey, createContextContentStore, type ContextGcView, type IContextGcStore } from '@itookit/llm-context';
-import { taskStoragePath, type TaskRecord } from '@itookit/durable-kernel';
-import type { IFileSystem, ISeqFileTransaction } from '@itookit/vfs-core';
+import { contextKey, createContextContentStore, type ContextGcView, type IContextGcStore } from '@nestos/llm-context';
+import { taskStoragePath, type TaskRecord } from '@nestos/durable-kernel';
+import type { IFileSystem, ISeqFileTransaction } from '@nestos/vfs-core';
 import { createFileContextContentStore } from './file-content-store';
 
 /** SeqFile bodies can be reclaimed without unpinning the Kernel's fixed directory layout. */
@@ -54,7 +54,7 @@ function gcView(tx: ISeqFileTransaction, path: string, taskPath: string, sharedP
     const checked = createContextContentStore({ get: id => tx.getEntry(path, `context-content/blob/${id}`),
         putIfAbsent: async () => { throw new Error('Read-only GC view'); } });
     return {
-        async *entries() { yield* rows<import('@itookit/llm-context').ContextGcEntry>(tx, path, 'context-content/meta/'); },
+        async *entries() { yield* rows<import('@nestos/llm-context').ContextGcEntry>(tx, path, 'context-content/meta/'); },
         async *roots() {
             yield* rows(tx, taskPath, '', 'context-content/');
             const prefix = encodeURIComponent(contextKey(taskId, ''));

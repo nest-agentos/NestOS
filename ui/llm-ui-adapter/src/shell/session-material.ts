@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { ConversationManifest } from '@itookit/llm-session/contracts';
+import { t } from '@nestos/common';
+import type { ConversationManifest } from '@nestos/llm-session/contracts';
 
 /** Initial material is visible context, never a fabricated user message. */
 export function sessionMaterialHeader(manifest: ConversationManifest): HTMLElement | undefined {

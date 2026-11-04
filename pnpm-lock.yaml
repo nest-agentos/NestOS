@@ -32,17 +32,17 @@ overrides:
   semver: ^7.8.5
   vscode-uri: ^3.1.0
   '@types/estree': ^1.0.9
-  '@itookit/driver-llm': workspace:*
-  '@itookit/mdxeditor': workspace:*
-  '@itookit/image-parser': workspace:*
-  '@itookit/cells-driver': workspace:*
-  '@itookit/vfs-core': workspace:*
-  '@itookit/vfs-sync': workspace:*
-  '@itookit/vfs-ui': workspace:*
-  '@itookit/vfsdriver-indexeddb': workspace:*
-  '@itookit/vfsdriver-local': workspace:*
-  '@itookit/durable-kernel': workspace:*
-  '@itookit/ui-common': workspace:*
+  '@nestos/driver-llm': workspace:*
+  '@nestos/mdxeditor': workspace:*
+  '@nestos/image-parser': workspace:*
+  '@nestos/cells-driver': workspace:*
+  '@nestos/vfs-core': workspace:*
+  '@nestos/vfs-sync': workspace:*
+  '@nestos/vfs-ui': workspace:*
+  '@nestos/vfsdriver-indexeddb': workspace:*
+  '@nestos/vfsdriver-local': workspace:*
+  '@nestos/durable-kernel': workspace:*
+  '@nestos/ui-common': workspace:*
 
 pnpmfileChecksum: sha256-uQ0d3PQ0+pbddyWXfxfVRlNdIWzrxNYCQkNeykIDrrU=
 
@@ -57,25 +57,25 @@ importers:
         specifier: ^7.2.4
         version: 7.2.4(@types/node@25.2.3)(jiti@1.21.7)(tsx@4.20.6)(yaml@2.8.2)
     devDependencies:
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:libraries/driver-llm
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:libraries/mdxeditor
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:libraries/vfs-core
-      '@itookit/vfs-sync':
+      '@nestos/vfs-sync':
         specifier: workspace:*
         version: link:libraries/vfs-sync
-      '@itookit/vfs-ui':
+      '@nestos/vfs-ui':
         specifier: workspace:*
         version: link:libraries/vfs-ui
-      '@itookit/vfsdriver-indexeddb':
+      '@nestos/vfsdriver-indexeddb':
         specifier: workspace:*
         version: link:libraries/vfsdriver-indexeddb
-      '@itookit/vfsdriver-local':
+      '@nestos/vfsdriver-local':
         specifier: workspace:*
         version: link:libraries/vfsdriver-local
       jsdoc:
@@ -93,52 +93,52 @@ importers:
 
   apps/cli:
     dependencies:
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/app-core':
+      '@nestos/app-core':
         specifier: workspace:*
         version: link:../../backend/app-core
-      '@itookit/app-transport':
+      '@nestos/app-transport':
         specifier: workspace:*
         version: link:../../shared/app-transport
-      '@itookit/cells-driver':
+      '@nestos/cells-driver':
         specifier: workspace:*
         version: link:../../libraries/cells-driver
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/device-tty':
+      '@nestos/device-tty':
         specifier: workspace:*
         version: link:../../libraries/device-tty
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/durable-kernel':
+      '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
-      '@itookit/llm-flow':
+      '@nestos/llm-flow':
         specifier: workspace:*
         version: link:../../backend/llm-flow
-      '@itookit/llm-session':
+      '@nestos/llm-session':
         specifier: workspace:*
         version: link:../../backend/llm-session
-      '@itookit/llm-tasks':
+      '@nestos/llm-tasks':
         specifier: workspace:*
         version: link:../../backend/llm-tasks
-      '@itookit/node-host':
+      '@nestos/node-host':
         specifier: workspace:*
         version: link:../node-host
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../../backend/tools
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
-      '@itookit/vfsdriver-local':
+      '@nestos/vfsdriver-local':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-local
       better-sqlite3:
@@ -193,28 +193,28 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.5
         version: 6.43.5
-      '@itookit/app-settings':
+      '@nestos/app-settings':
         specifier: workspace:*
         version: link:../../ui/app-settings
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/llm-ui-adapter':
+      '@nestos/llm-ui-adapter':
         specifier: workspace:*
         version: link:../../ui/llm-ui-adapter
-      '@itookit/mdx-adapter':
+      '@nestos/mdx-adapter':
         specifier: workspace:*
         version: link:../../ui/mdx-adapter
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:../../libraries/mdxeditor
-      '@itookit/ui-common-adapter':
+      '@nestos/ui-common-adapter':
         specifier: workspace:*
         version: link:../../ui/ui-common-adapter
-      '@itookit/vfs-ui':
+      '@nestos/vfs-ui':
         specifier: workspace:*
         version: link:../../libraries/vfs-ui
       dexie:
@@ -248,49 +248,49 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.5
         version: 6.43.5
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/app-core':
+      '@nestos/app-core':
         specifier: workspace:*
         version: link:../../backend/app-core
-      '@itookit/app-shell':
+      '@nestos/app-shell':
         specifier: workspace:*
         version: link:../../ui/app-shell
-      '@itookit/app-transport':
+      '@nestos/app-transport':
         specifier: workspace:*
         version: link:../../shared/app-transport
-      '@itookit/cells-driver':
+      '@nestos/cells-driver':
         specifier: workspace:*
         version: link:../../libraries/cells-driver
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
-      '@itookit/llm-flow':
+      '@nestos/llm-flow':
         specifier: workspace:*
         version: link:../../backend/llm-flow
-      '@itookit/llm-ui-adapter':
+      '@nestos/llm-ui-adapter':
         specifier: workspace:*
         version: link:../../ui/llm-ui-adapter
-      '@itookit/mdx-adapter':
+      '@nestos/mdx-adapter':
         specifier: workspace:*
         version: link:../../ui/mdx-adapter
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:../../libraries/mdxeditor
-      '@itookit/node-host':
+      '@nestos/node-host':
         specifier: workspace:*
         version: link:../node-host
-      '@itookit/ui-common-adapter':
+      '@nestos/ui-common-adapter':
         specifier: workspace:*
         version: link:../../ui/ui-common-adapter
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
-      '@itookit/vfsdriver-local':
+      '@nestos/vfsdriver-local':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-local
       better-sqlite3:
@@ -327,37 +327,37 @@ importers:
 
   apps/node-host:
     dependencies:
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/app-core':
+      '@nestos/app-core':
         specifier: workspace:*
         version: link:../../backend/app-core
-      '@itookit/app-transport':
+      '@nestos/app-transport':
         specifier: workspace:*
         version: link:../../shared/app-transport
-      '@itookit/cells-driver':
+      '@nestos/cells-driver':
         specifier: workspace:*
         version: link:../../libraries/cells-driver
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/image-tools':
+      '@nestos/image-tools':
         specifier: workspace:*
         version: link:../../tools/image-tools
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../../backend/tools
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
-      '@itookit/vfsdriver-local':
+      '@nestos/vfsdriver-local':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-local
       js-yaml:
@@ -385,64 +385,64 @@ importers:
       '@fortawesome/fontawesome-free':
         specifier: ^7.1.0
         version: 7.1.0
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/app-core':
+      '@nestos/app-core':
         specifier: workspace:*
         version: link:../../backend/app-core
-      '@itookit/app-settings':
+      '@nestos/app-settings':
         specifier: workspace:*
         version: link:../../ui/app-settings
-      '@itookit/app-shell':
+      '@nestos/app-shell':
         specifier: workspace:*
         version: link:../../ui/app-shell
-      '@itookit/cells-driver':
+      '@nestos/cells-driver':
         specifier: workspace:*
         version: link:../../libraries/cells-driver
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/image-tools':
+      '@nestos/image-tools':
         specifier: workspace:*
         version: link:../../tools/image-tools
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
-      '@itookit/llm-flow':
+      '@nestos/llm-flow':
         specifier: workspace:*
         version: link:../../backend/llm-flow
-      '@itookit/llm-session':
+      '@nestos/llm-session':
         specifier: workspace:*
         version: link:../../backend/llm-session
-      '@itookit/llm-ui-adapter':
+      '@nestos/llm-ui-adapter':
         specifier: workspace:*
         version: link:../../ui/llm-ui-adapter
-      '@itookit/mdx-adapter':
+      '@nestos/mdx-adapter':
         specifier: workspace:*
         version: link:../../ui/mdx-adapter
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:../../libraries/mdxeditor
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../../backend/tools
-      '@itookit/ui-common-adapter':
+      '@nestos/ui-common-adapter':
         specifier: workspace:*
         version: link:../../ui/ui-common-adapter
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
-      '@itookit/vfs-ui':
+      '@nestos/vfs-ui':
         specifier: workspace:*
         version: link:../../libraries/vfs-ui
-      '@itookit/vfsdriver-indexeddb':
+      '@nestos/vfsdriver-indexeddb':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-indexeddb
-      '@itookit/vfsdriver-local':
+      '@nestos/vfsdriver-local':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-local
       '@tauri-apps/api':
@@ -506,64 +506,64 @@ importers:
       '@fortawesome/fontawesome-free':
         specifier: ^7.1.0
         version: 7.1.0
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/app-core':
+      '@nestos/app-core':
         specifier: workspace:*
         version: link:../../backend/app-core
-      '@itookit/app-settings':
+      '@nestos/app-settings':
         specifier: workspace:*
         version: link:../../ui/app-settings
-      '@itookit/app-shell':
+      '@nestos/app-shell':
         specifier: workspace:*
         version: link:../../ui/app-shell
-      '@itookit/cells-driver':
+      '@nestos/cells-driver':
         specifier: workspace:*
         version: link:../../libraries/cells-driver
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/image-tools':
+      '@nestos/image-tools':
         specifier: workspace:*
         version: link:../../tools/image-tools
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
-      '@itookit/llm-session':
+      '@nestos/llm-session':
         specifier: workspace:*
         version: link:../../backend/llm-session
-      '@itookit/llm-ui-adapter':
+      '@nestos/llm-ui-adapter':
         specifier: workspace:*
         version: link:../../ui/llm-ui-adapter
-      '@itookit/mdx-adapter':
+      '@nestos/mdx-adapter':
         specifier: workspace:*
         version: link:../../ui/mdx-adapter
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:../../libraries/mdxeditor
-      '@itookit/sync-adapters':
+      '@nestos/sync-adapters':
         specifier: workspace:*
         version: link:../../backend/sync-adapters
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../../backend/tools
-      '@itookit/ui-common-adapter':
+      '@nestos/ui-common-adapter':
         specifier: workspace:*
         version: link:../../ui/ui-common-adapter
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
-      '@itookit/vfs-sync':
+      '@nestos/vfs-sync':
         specifier: workspace:*
         version: link:../../libraries/vfs-sync
-      '@itookit/vfs-ui':
+      '@nestos/vfs-ui':
         specifier: workspace:*
         version: link:../../libraries/vfs-ui
-      '@itookit/vfsdriver-indexeddb':
+      '@nestos/vfsdriver-indexeddb':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-indexeddb
       codemirror:
@@ -594,59 +594,59 @@ importers:
 
   backend/app-core:
     dependencies:
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/cells-driver':
+      '@nestos/cells-driver':
         specifier: workspace:*
         version: link:../../libraries/cells-driver
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/durable-kernel':
+      '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
-      '@itookit/kanban':
+      '@nestos/kanban':
         specifier: workspace:*
         version: link:../../libraries/kanban
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../kernel-adapters
-      '@itookit/llm-context':
+      '@nestos/llm-context':
         specifier: workspace:*
         version: link:../llm-context
-      '@itookit/llm-flow':
+      '@nestos/llm-flow':
         specifier: workspace:*
         version: link:../llm-flow
-      '@itookit/llm-session':
+      '@nestos/llm-session':
         specifier: workspace:*
         version: link:../llm-session
-      '@itookit/llm-tasks':
+      '@nestos/llm-tasks':
         specifier: workspace:*
         version: link:../llm-tasks
-      '@itookit/mail':
+      '@nestos/mail':
         specifier: workspace:*
         version: link:../../libraries/mail
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../tools
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
-      '@itookit/vfs-sync':
+      '@nestos/vfs-sync':
         specifier: workspace:*
         version: link:../../libraries/vfs-sync
       js-yaml:
         specifier: ^4.1.1
         version: 4.3.2
     devDependencies:
-      '@itookit/vfs-ui':
+      '@nestos/vfs-ui':
         specifier: workspace:*
         version: link:../../libraries/vfs-ui
-      '@itookit/vfsdriver-indexeddb':
+      '@nestos/vfsdriver-indexeddb':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-indexeddb
       '@types/js-yaml':
@@ -667,19 +667,19 @@ importers:
 
   backend/kernel-adapters:
     dependencies:
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/durable-kernel':
+      '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
-      '@itookit/llm-context':
+      '@nestos/llm-context':
         specifier: workspace:*
         version: link:../llm-context
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../tools
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
       '@modelcontextprotocol/client':
@@ -692,7 +692,7 @@ importers:
         specifier: ^4.1.1
         version: 4.3.2
     devDependencies:
-      '@itookit/vfsdriver-indexeddb':
+      '@nestos/vfsdriver-indexeddb':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-indexeddb
       '@types/js-yaml':
@@ -731,23 +731,23 @@ importers:
 
   backend/llm-flow:
     dependencies:
-      '@itookit/durable-kernel':
+      '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
-      '@itookit/llm-context':
+      '@nestos/llm-context':
         specifier: workspace:*
         version: link:../llm-context
-      '@itookit/llm-tasks':
+      '@nestos/llm-tasks':
         specifier: workspace:*
         version: link:../llm-tasks
       jsonc-parser:
         specifier: 3.3.1
         version: 3.3.1
     devDependencies:
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
       '@types/node':
@@ -765,32 +765,32 @@ importers:
 
   backend/llm-session:
     dependencies:
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/durable-kernel':
+      '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
-      '@itookit/llm-context':
+      '@nestos/llm-context':
         specifier: workspace:*
         version: link:../llm-context
-      '@itookit/llm-flow':
+      '@nestos/llm-flow':
         specifier: workspace:*
         version: link:../llm-flow
-      '@itookit/llm-tasks':
+      '@nestos/llm-tasks':
         specifier: workspace:*
         version: link:../llm-tasks
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../tools
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
       yaml:
         specifier: ^2.8.2
         version: 2.8.2
     devDependencies:
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../kernel-adapters
       '@types/node':
@@ -808,16 +808,16 @@ importers:
 
   backend/llm-tasks:
     dependencies:
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/durable-kernel':
+      '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
-      '@itookit/llm-context':
+      '@nestos/llm-context':
         specifier: workspace:*
         version: link:../llm-context
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../tools
     devDependencies:
@@ -860,23 +860,23 @@ importers:
 
   backend/sync-adapters:
     dependencies:
-      '@itookit/cells-driver':
+      '@nestos/cells-driver':
         specifier: workspace:*
         version: link:../../libraries/cells-driver
-      '@itookit/vfs-sync':
+      '@nestos/vfs-sync':
         specifier: workspace:*
         version: link:../../libraries/vfs-sync
-      '@itookit/vfsdriver-indexeddb':
+      '@nestos/vfsdriver-indexeddb':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-indexeddb
-      '@itookit/vfsdriver-local':
+      '@nestos/vfsdriver-local':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-local
     devDependencies:
-      '@itookit/app-core':
+      '@nestos/app-core':
         specifier: workspace:*
         version: link:../app-core
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
       '@types/node':
@@ -897,16 +897,16 @@ importers:
 
   backend/tools:
     dependencies:
-      '@itookit/device-tty':
+      '@nestos/device-tty':
         specifier: workspace:*
         version: link:../../libraries/device-tty
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/llm-context':
+      '@nestos/llm-context':
         specifier: workspace:*
         version: link:../llm-context
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
       zod:
@@ -931,10 +931,10 @@ importers:
 
   libraries/cells-driver:
     dependencies:
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../vfs-core
-      '@itookit/vfs-sync':
+      '@nestos/vfs-sync':
         specifier: workspace:*
         version: link:../vfs-sync
       '@modelcontextprotocol/client':
@@ -990,11 +990,11 @@ importers:
 
   libraries/durable-kernel:
     dependencies:
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../vfs-core
     devDependencies:
-      '@itookit/vfsdriver-local':
+      '@nestos/vfsdriver-local':
         specifier: workspace:*
         version: link:../vfsdriver-local
       '@types/node':
@@ -1019,7 +1019,7 @@ importers:
         specifier: 1.7.1
         version: 1.7.1
     devDependencies:
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../vfs-core
       '@types/node':
@@ -1043,11 +1043,11 @@ importers:
 
   libraries/kanban:
     dependencies:
-      '@itookit/ui-common':
+      '@nestos/ui-common':
         specifier: workspace:*
         version: link:../ui-common
     devDependencies:
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../vfs-core
       jsdom:
@@ -1068,10 +1068,10 @@ importers:
 
   libraries/llm-ui:
     dependencies:
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:../mdxeditor
-      '@itookit/ui-common':
+      '@nestos/ui-common':
         specifier: workspace:*
         version: link:../ui-common
     devDependencies:
@@ -1096,11 +1096,11 @@ importers:
 
   libraries/mail:
     dependencies:
-      '@itookit/ui-common':
+      '@nestos/ui-common':
         specifier: workspace:*
         version: link:../ui-common
     devDependencies:
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../vfs-core
       jsdom:
@@ -1145,7 +1145,7 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.5
         version: 6.43.5
-      '@itookit/ui-common':
+      '@nestos/ui-common':
         specifier: workspace:*
         version: link:../ui-common
       '@types/turndown':
@@ -1246,7 +1246,7 @@ importers:
 
   libraries/vfs-ui:
     dependencies:
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../vfs-core
     devDependencies:
@@ -1274,7 +1274,7 @@ importers:
 
   libraries/vfsdriver-indexeddb:
     dependencies:
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../vfs-core
     devDependencies:
@@ -1293,7 +1293,7 @@ importers:
 
   libraries/vfsdriver-local:
     dependencies:
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../vfs-core
       better-sqlite3:
@@ -1318,47 +1318,47 @@ importers:
 
   shared/app-contracts:
     dependencies:
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../common
-      '@itookit/kanban':
+      '@nestos/kanban':
         specifier: workspace:*
         version: link:../../libraries/kanban
-      '@itookit/mail':
+      '@nestos/mail':
         specifier: workspace:*
         version: link:../../libraries/mail
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
     devDependencies:
-      '@itookit/cells-driver':
+      '@nestos/cells-driver':
         specifier: workspace:*
         version: link:../../libraries/cells-driver
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/durable-kernel':
+      '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
-      '@itookit/llm-context':
+      '@nestos/llm-context':
         specifier: workspace:*
         version: link:../../backend/llm-context
-      '@itookit/llm-flow':
+      '@nestos/llm-flow':
         specifier: workspace:*
         version: link:../../backend/llm-flow
-      '@itookit/llm-session':
+      '@nestos/llm-session':
         specifier: workspace:*
         version: link:../../backend/llm-session
-      '@itookit/llm-tasks':
+      '@nestos/llm-tasks':
         specifier: workspace:*
         version: link:../../backend/llm-tasks
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../../backend/tools
-      '@itookit/vfs-sync':
+      '@nestos/vfs-sync':
         specifier: workspace:*
         version: link:../../libraries/vfs-sync
       typescript:
@@ -1367,10 +1367,10 @@ importers:
 
   shared/app-transport:
     dependencies:
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../app-contracts
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
     devDependencies:
@@ -1389,13 +1389,13 @@ importers:
 
   tools/image-tools:
     dependencies:
-      '@itookit/image-parser':
+      '@nestos/image-parser':
         specifier: workspace:*
         version: link:../../libraries/image-parser
-      '@itookit/llm-context':
+      '@nestos/llm-context':
         specifier: workspace:*
         version: link:../../backend/llm-context
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../../backend/tools
       sharp:
@@ -1417,13 +1417,13 @@ importers:
 
   ui/app-settings:
     dependencies:
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/llm-ui':
+      '@nestos/llm-ui':
         specifier: workspace:*
         version: link:../../libraries/llm-ui
-      '@itookit/ui-common':
+      '@nestos/ui-common':
         specifier: workspace:*
         version: link:../../libraries/ui-common
       '@xterm/addon-fit':
@@ -1433,31 +1433,31 @@ importers:
         specifier: ^5.5.0
         version: 5.5.0
     devDependencies:
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
-      '@itookit/mdx-adapter':
+      '@nestos/mdx-adapter':
         specifier: workspace:*
         version: link:../mdx-adapter
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:../../libraries/mdxeditor
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../../backend/tools
-      '@itookit/ui-common-adapter':
+      '@nestos/ui-common-adapter':
         specifier: workspace:*
         version: link:../ui-common-adapter
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
-      '@itookit/vfs-ui':
+      '@nestos/vfs-ui':
         specifier: workspace:*
         version: link:../../libraries/vfs-ui
       '@types/node':
@@ -1475,92 +1475,92 @@ importers:
 
   ui/app-shell:
     dependencies:
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/app-transport':
+      '@nestos/app-transport':
         specifier: workspace:*
         version: link:../../shared/app-transport
-      '@itookit/kanban':
+      '@nestos/kanban':
         specifier: workspace:*
         version: link:../../libraries/kanban
-      '@itookit/llm-ui-adapter':
+      '@nestos/llm-ui-adapter':
         specifier: workspace:*
         version: link:../llm-ui-adapter
-      '@itookit/mail':
+      '@nestos/mail':
         specifier: workspace:*
         version: link:../../libraries/mail
-      '@itookit/ui-common':
+      '@nestos/ui-common':
         specifier: workspace:*
         version: link:../../libraries/ui-common
     devDependencies:
-      '@itookit/app-core':
+      '@nestos/app-core':
         specifier: workspace:*
         version: link:../../backend/app-core
-      '@itookit/app-settings':
+      '@nestos/app-settings':
         specifier: workspace:*
         version: link:../app-settings
-      '@itookit/cells-driver':
+      '@nestos/cells-driver':
         specifier: workspace:*
         version: link:../../libraries/cells-driver
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/durable-kernel':
+      '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
-      '@itookit/llm-context':
+      '@nestos/llm-context':
         specifier: workspace:*
         version: link:../../backend/llm-context
-      '@itookit/llm-flow':
+      '@nestos/llm-flow':
         specifier: workspace:*
         version: link:../../backend/llm-flow
-      '@itookit/llm-session':
+      '@nestos/llm-session':
         specifier: workspace:*
         version: link:../../backend/llm-session
-      '@itookit/llm-tasks':
+      '@nestos/llm-tasks':
         specifier: workspace:*
         version: link:../../backend/llm-tasks
-      '@itookit/llm-ui':
+      '@nestos/llm-ui':
         specifier: workspace:*
         version: link:../../libraries/llm-ui
-      '@itookit/mdx-adapter':
+      '@nestos/mdx-adapter':
         specifier: workspace:*
         version: link:../mdx-adapter
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:../../libraries/mdxeditor
-      '@itookit/node-host':
+      '@nestos/node-host':
         specifier: workspace:*
         version: link:../../apps/node-host
-      '@itookit/sync-adapters':
+      '@nestos/sync-adapters':
         specifier: workspace:*
         version: link:../../backend/sync-adapters
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../../backend/tools
-      '@itookit/ui-common-adapter':
+      '@nestos/ui-common-adapter':
         specifier: workspace:*
         version: link:../ui-common-adapter
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
-      '@itookit/vfs-sync':
+      '@nestos/vfs-sync':
         specifier: workspace:*
         version: link:../../libraries/vfs-sync
-      '@itookit/vfs-ui':
+      '@nestos/vfs-ui':
         specifier: workspace:*
         version: link:../../libraries/vfs-ui
-      '@itookit/vfsdriver-indexeddb':
+      '@nestos/vfsdriver-indexeddb':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-indexeddb
-      '@itookit/vfsdriver-local':
+      '@nestos/vfsdriver-local':
         specifier: workspace:*
         version: link:../../libraries/vfsdriver-local
       '@types/js-yaml':
@@ -1590,43 +1590,43 @@ importers:
 
   ui/llm-ui-adapter:
     dependencies:
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/driver-llm':
+      '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
-      '@itookit/durable-kernel':
+      '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
-      '@itookit/image-parser':
+      '@nestos/image-parser':
         specifier: workspace:*
         version: link:../../libraries/image-parser
-      '@itookit/kernel-adapters':
+      '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
-      '@itookit/llm-flow':
+      '@nestos/llm-flow':
         specifier: workspace:*
         version: link:../../backend/llm-flow
-      '@itookit/llm-session':
+      '@nestos/llm-session':
         specifier: workspace:*
         version: link:../../backend/llm-session
-      '@itookit/llm-tasks':
+      '@nestos/llm-tasks':
         specifier: workspace:*
         version: link:../../backend/llm-tasks
-      '@itookit/llm-ui':
+      '@nestos/llm-ui':
         specifier: workspace:*
         version: link:../../libraries/llm-ui
-      '@itookit/tools':
+      '@nestos/tools':
         specifier: workspace:*
         version: link:../../backend/tools
-      '@itookit/ui-common-adapter':
+      '@nestos/ui-common-adapter':
         specifier: workspace:*
         version: link:../ui-common-adapter
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
       js-yaml:
@@ -1636,10 +1636,10 @@ importers:
         specifier: ^16.4.2
         version: 16.4.2
     devDependencies:
-      '@itookit/mdx-adapter':
+      '@nestos/mdx-adapter':
         specifier: workspace:*
         version: link:../mdx-adapter
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:../../libraries/mdxeditor
       '@types/js-yaml':
@@ -1666,16 +1666,16 @@ importers:
 
   ui/mdx-adapter:
     dependencies:
-      '@itookit/app-contracts':
+      '@nestos/app-contracts':
         specifier: workspace:*
         version: link:../../shared/app-contracts
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/ui-common-adapter':
+      '@nestos/ui-common-adapter':
         specifier: workspace:*
         version: link:../ui-common-adapter
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
       js-yaml:
@@ -1688,7 +1688,7 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.5
         version: 6.43.5
-      '@itookit/mdxeditor':
+      '@nestos/mdxeditor':
         specifier: workspace:*
         version: link:../../libraries/mdxeditor
       '@types/js-yaml':
@@ -1712,13 +1712,13 @@ importers:
 
   ui/ui-common-adapter:
     dependencies:
-      '@itookit/common':
+      '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
-      '@itookit/ui-common':
+      '@nestos/ui-common':
         specifier: workspace:*
         version: link:../../libraries/ui-common
-      '@itookit/vfs-core':
+      '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
     devDependencies:

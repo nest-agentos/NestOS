@@ -1,7 +1,7 @@
-import {buildTool, type ToolUseContext} from '@itookit/tools';
-import type {BinaryAssetReference, TaskAssetReference} from '@itookit/tools/contracts';
-import {sha256Hex} from '@itookit/llm-context';
-import {validateImageRecipe} from '@itookit/image-parser/processing';
+import {buildTool, type ToolUseContext} from '@nestos/tools';
+import type {BinaryAssetReference, TaskAssetReference} from '@nestos/tools/contracts';
+import {sha256Hex} from '@nestos/llm-context';
+import {validateImageRecipe} from '@nestos/image-parser/processing';
 import {imageInputSchema, type ImageEngine, type ImageInput} from './contract';
 export interface Item {source: TaskAssetReference; output: TaskAssetReference; width: number; height: number; engine: {id: string; version: string}; recipe: ImageInput['recipe']}
 export interface ImagePart {type: 'image'; source: {type: 'asset'; asset: TaskAssetReference}}

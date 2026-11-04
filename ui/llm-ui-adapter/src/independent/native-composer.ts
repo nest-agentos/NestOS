@@ -1,8 +1,8 @@
 import type {ConversationControls, ConversationModelCatalog, ConversationModelSelection, ConversationSnapshot, ConversationSlashCommand} from '../contracts';
 import {composeCommandCatalogs, type CommandCatalog, type CommandDefinition, type CommandSource, type CommandSubmission,
-    type ComposerCommand, type SelectorView, type OperationContext, type OperationReceipt} from '@itookit/llm-ui';
+    type ComposerCommand, type SelectorView, type OperationContext, type OperationReceipt} from '@nestos/llm-ui';
 
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 /** Hosts register UI, project, Flow or Agent contributions without exposing their services. */
 export interface NativeCommandProvider {

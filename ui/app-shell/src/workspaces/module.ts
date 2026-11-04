@@ -1,5 +1,5 @@
 import type {RecoveryParticipant} from '../workbench/recovery';
-import type { WorkspaceController, WorkspaceCreation, WorkspaceOpenOptions } from '@itookit/app-contracts';
+import type { WorkspaceController, WorkspaceCreation, WorkspaceOpenOptions } from '@nestos/app-contracts';
 
 /** Route recovery is a shell capability; ordinary resource operations remain strict. */
 export type WorkspaceHandle = WorkspaceController & Partial<WorkspaceCreation> & RecoveryParticipant & {

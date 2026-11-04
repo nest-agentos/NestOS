@@ -1,8 +1,8 @@
 import {afterEach, expect, it} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {FlowCommand, flowConnectionRequired, flowParameterValues, type FlowDraft, type FlowRevision, type JsonValue} from '@itookit/llm-flow/contracts';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {FlowCommand, flowConnectionRequired, flowParameterValues, type FlowDraft, type FlowRevision, type JsonValue} from '@nestos/llm-flow/contracts';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {createNestosFlowLibrary} from '../src/presets/flow-library';
 

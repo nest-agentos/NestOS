@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { installHttpStatus } from '../src/client/status-banner';
 
 let dispose: (() => void) | undefined;

@@ -5,10 +5,10 @@ import { formatTime } from '../utils/timeUtils';
 import { IconTemplates } from './templates/IconTemplates';
 import type { IEditorEventBus } from '../domain/events';
 import type { BranchItem } from '../domain/types';
-import {EventCleanup, TimerManager} from '@itookit/llm-ui';
+import {EventCleanup, TimerManager} from '@nestos/llm-ui';
 import { FloatingNavPanelTemplates } from './templates/FloatingNavPanelTemplates';
-import { Toast } from '@itookit/ui-common-adapter';
-import { showConfirmDialog } from '@itookit/ui-common-adapter';
+import { Toast } from '@nestos/ui-common-adapter';
+import { showConfirmDialog } from '@nestos/ui-common-adapter';
 
 export interface FloatingNavWorkspaceActions {
     onSetContext: (roundIds: string[], mode: 'include' | 'exclude') => Promise<void>;

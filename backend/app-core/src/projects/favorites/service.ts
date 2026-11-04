@@ -1,4 +1,4 @@
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 import type { ProjectFavorite, ProjectFavoriteTarget, ProjectFavoriteStore, SessionFavoriteTitles, FavoriteMove, FavoriteUpdate } from './contracts';
 import { validateTarget } from './codec';
 import { favoriteKey, withoutDeletedFiles, moveFavorites, reconcileSessions } from './policy';

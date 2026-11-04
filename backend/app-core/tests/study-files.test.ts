@@ -1,6 +1,6 @@
 import yaml from 'js-yaml';
 import {expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {seedStudyFiles} from '../src/presets/study-files';
 it('retains legacy prompts when initializing the named collection',async()=>{
  const {manager}=await createVFS({rootBackend:new MemoryBackend()}),fs=await manager.openFileSystem('/');

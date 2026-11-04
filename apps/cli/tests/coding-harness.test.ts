@@ -2,10 +2,10 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { DurableAgentProgram } from '@itookit/llm-tasks';
-import { ToolCallEffectAdapter, type ToolCallEffectRequest } from '@itookit/kernel-adapters';
-import { BUILTIN_TOOLS, ToolDeviceDriver } from '@itookit/tools';
-import type { EffectExecutionContext, TaskInputEvent } from '@itookit/durable-kernel';
+import { DurableAgentProgram } from '@nestos/llm-tasks';
+import { ToolCallEffectAdapter, type ToolCallEffectRequest } from '@nestos/kernel-adapters';
+import { BUILTIN_TOOLS, ToolDeviceDriver } from '@nestos/tools';
+import type { EffectExecutionContext, TaskInputEvent } from '@nestos/durable-kernel';
 import { NodeNativeShell } from '../src/shell';
 
 type Step = ReturnType<DurableAgentProgram['init']>;

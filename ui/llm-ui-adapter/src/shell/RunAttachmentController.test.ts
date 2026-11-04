@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { EventEnvelope } from '@itookit/durable-kernel/contracts';
+import type { EventEnvelope } from '@nestos/durable-kernel/contracts';
 import { RunAttachmentController, type TaskControlPlane, type AttachedTask } from './RunAttachmentController';
 
 describe('RunAttachmentController', () => {
@@ -193,9 +193,9 @@ function callbacks() {
 }
 
 function taskRecord(
-    interactions: import('@itookit/durable-kernel/contracts').TaskRecord['interactions'],
-    status: import('@itookit/durable-kernel/contracts').TaskStatus = 'waiting',
-): import('@itookit/durable-kernel/contracts').TaskRecord {
+    interactions: import('@nestos/durable-kernel/contracts').TaskRecord['interactions'],
+    status: import('@nestos/durable-kernel/contracts').TaskStatus = 'waiting',
+): import('@nestos/durable-kernel/contracts').TaskRecord {
     return {
         id: 'task-1', sessionId: 'session-1', rootTaskId: 'task-1',
         program: { kind: 'test', version: '1' }, status, input: null,

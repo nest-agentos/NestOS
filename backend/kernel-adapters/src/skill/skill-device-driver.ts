@@ -1,12 +1,12 @@
 // @file: kernel-adapters/src/skill/skill-device-driver.ts
 // Skill 设备驱动：包装 ISkillService，实现 IDeviceDriver。
 
-import type { ISkillService, SkillDefinition, SkillToolBinding, SkillLoadResult, SkillRouteLayer, SkillMatchContext, SkillScopeLevel, ParsedCompactInstructions, SkillVersionSnapshot, SkillVersionDrift } from '@itookit/tools/contracts';
-import type { IToolService } from '@itookit/tools/contracts';
+import type { ISkillService, SkillDefinition, SkillToolBinding, SkillLoadResult, SkillRouteLayer, SkillMatchContext, SkillScopeLevel, ParsedCompactInstructions, SkillVersionSnapshot, SkillVersionDrift } from '@nestos/tools/contracts';
+import type { IToolService } from '@nestos/tools/contracts';
 import type {
     IDeviceDriver,
     DeviceContext,
-} from '@itookit/vfs-core';
+} from '@nestos/vfs-core';
 import { aggregateCompactInstructions } from './compact-extractor';
 import { matchGlob } from './glob-matcher';
 import { skillSupportPrompt } from './support-files';
@@ -470,7 +470,7 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
     }
 }
 
-function toolMeta(skill: SkillDefinition, binding: SkillToolBinding): import('@itookit/tools/contracts').ToolMeta {
+function toolMeta(skill: SkillDefinition, binding: SkillToolBinding): import('@nestos/tools/contracts').ToolMeta {
     return {
         id: binding.toolId,
         name: binding.definition.function?.name ?? binding.definition.name ?? binding.toolId,

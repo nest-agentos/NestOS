@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ProjectService, ProjectSearchResult } from '@itookit/app-contracts/services';
-import { folderBrowserPath, projectConversationsPath } from '@itookit/app-contracts';
+import type { ProjectService, ProjectSearchResult } from '@nestos/app-contracts/services';
+import { folderBrowserPath, projectConversationsPath } from '@nestos/app-contracts';
 import { createProjectDirectorySearch } from '../src/projects/project-directory-search';
 import { createDirectoryList, refreshDirectoryList } from '../src/workbench/directory-list';
 const project = {path: '/P', name: 'P', project: {id: 'p'}};

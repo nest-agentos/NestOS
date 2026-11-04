@@ -1,4 +1,4 @@
-import type { Kernel } from '@itookit/durable-kernel';
+import type { Kernel } from '@nestos/durable-kernel';
 import type { SessionCapabilityRegistry } from '../ports/capabilities';
 import { buildSkillPromptContext } from './prompt-context';
 import { rememberLoadedSkill, withSkillDriftPersistence, requireLoadedSkillVersions, rollbackFailedLoad } from './loaded-state';
@@ -9,7 +9,7 @@ export function resolveSessionSkillContext(kernel: Kernel, registry: SessionCapa
     sessionId: string, userMessage: string) {
     return runSessionSkillOperation(registry, sessionId, async () => {
         const session = await kernel.openSession(sessionId);
-        const state: NonNullable<import('@itookit/durable-kernel').EffectExecutionContext['sessionState']> = {
+        const state: NonNullable<import('@nestos/durable-kernel').EffectExecutionContext['sessionState']> = {
             get: key => session.getShared(key), set: (key, value, expectedVersion) => session.setShared(key, value, { expectedVersion }) };
         const loaded = await session.getShared('kernel-adapters.skills.loaded');
         requireLoadedSkillVersions(loaded?.value);
@@ -26,13 +26,13 @@ export function resolveSessionSkillContext(kernel: Kernel, registry: SessionCapa
 export function resolveSessionSelectedSkills(kernel: Kernel, registry: SessionCapabilityRegistry, sessionId: string, ids: string[]) {
     return runSessionSkillOperation(registry, sessionId, async () => {
         const session = await kernel.openSession(sessionId);
-        const state: NonNullable<import('@itookit/durable-kernel').EffectExecutionContext['sessionState']> = {
+        const state: NonNullable<import('@nestos/durable-kernel').EffectExecutionContext['sessionState']> = {
             get: key => session.getShared(key), set: (key, value, expectedVersion) => session.setShared(key, value, { expectedVersion }) };
         const loaded = await state.get('kernel-adapters.skills.loaded'); requireLoadedSkillVersions(loaded?.value);
         const service = (await registry.get(sessionId)).skillService;
         return withSkillDriftPersistence(service, state, async () => {
             await registry.restore(sessionId, loaded?.value);
-            const skills: import('@itookit/kernel-adapters/contracts').LLMSkill[] = [];
+            const skills: import('@nestos/kernel-adapters/contracts').LLMSkill[] = [];
             for (const id of new Set(ids)) {
                 const definition = service.getSkill(id);
                 if (!definition?.enabled || definition.disableModelInvocation || definition.triggerStrategy === 'action') {

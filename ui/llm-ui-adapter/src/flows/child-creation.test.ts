@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {ContentTransferCommand, type CreateChildInput} from '@itookit/llm-session/contracts';
+import {ContentTransferCommand, type CreateChildInput} from '@nestos/llm-session/contracts';
 import {createChildWithReceipt} from './child-creation';
 const logs = vi.hoisted(() => ({info: vi.fn(), warn: vi.fn()}));
-vi.mock('@itookit/common', () => ({createModuleLogger: () => logs}));
+vi.mock('@nestos/common', () => ({createModuleLogger: () => logs}));
 afterEach(() => {vi.clearAllMocks();});
 const input: CreateChildInput = {sessionId: 'parent', requestId: 'original', title: 'PRIVATE_TITLE', transfer: {sessionId: 'parent', id: 'material'}};
 const created = {parentSessionId: 'parent', requestId: 'original', sessionId: 'child', status: 'created'};

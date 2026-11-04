@@ -1,6 +1,6 @@
 import {load, JSON_SCHEMA} from 'js-yaml';
-import {sha256HexSync} from '@itookit/common';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {sha256HexSync} from '@nestos/common';
+import type {IFileSystem} from '@nestos/vfs-core';
 import {failure, readPrompt, type PromptJournal} from './prompt-bundle';
 
 /** Session text carries instructions; immutable files carry application results. */

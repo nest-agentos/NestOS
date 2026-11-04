@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import type {ToolPackageInfo, ToolPackages} from '@itookit/app-contracts/services';
-import type {TwinScannerTool} from '@itookit/app-contracts';
+import type {ToolPackageInfo, ToolPackages} from '@nestos/app-contracts/services';
+import type {TwinScannerTool} from '@nestos/app-contracts';
 import {scannerPackages, upgradeScannerPackage} from '../src/digital-twin/package-upgrades';
 const tool = {target: {id: 'fixture.collect'}} as TwinScannerTool;
 const active: ToolPackageInfo = {id: 'fixture', name: 'Fixture', version: '1.0.0', status: 'registered', tools: [{id: 'fixture.collect', version: '1'}]};

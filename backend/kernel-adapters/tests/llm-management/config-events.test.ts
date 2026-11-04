@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { LLMDeviceDriver } from '../../src/llm-management/core';
 
 it('ignores UI persistence writes but reloads committed LLM changes including renames', async () => {

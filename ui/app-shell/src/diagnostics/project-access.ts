@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type {RemoteProjectStatus} from '@itookit/app-contracts/services';
+import {t} from '@nestos/common';
+import type {RemoteProjectStatus} from '@nestos/app-contracts/services';
 
 type Mount = RemoteProjectStatus['mounts'][number];
 export interface ProjectAccessDraft {mode?: 'ro' | 'rw'; execute?: boolean; config?: string; open?: boolean}

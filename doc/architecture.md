@@ -34,11 +34,11 @@
 
 依赖铁律：**上层可依赖下层，下层永不知上层**。跨层通过接口注入：装配下沉在 `app-core/src/runtime/create-application-runtime.ts`（`createApplicationRuntime()`），`app-shell/src/bootstrap.ts` 只是调用方。
 
-上下文实现独立于执行内核，位于零运行时依赖的 `@itookit/llm-context`。接口与 v2 持久执行见 [Context API](context-api.md)，设计依据与扩展边界见 [Context 模块设计](design/context-module.md)。
+上下文实现独立于执行内核，位于零运行时依赖的 `@nestos/llm-context`。接口与 v2 持久执行见 [Context API](context-api.md)，设计依据与扩展边界见 [Context 模块设计](design/context-module.md)。
 
 ## 2. Kernel — 持久化执行内核
 
-`@itookit/durable-kernel` 是唯一的执行引擎：一个 Task 一个持久化状态机。
+`@nestos/durable-kernel` 是唯一的执行引擎：一个 Task 一个持久化状态机。
 
 **核心抽象：**
 
@@ -101,7 +101,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 - **输入**：`DurableAgentInput`（sessionId/roundId/messages/connectionId/model/approval/tools/…），统一由 `buildLlmTaskInput` 装配。
 - **依赖收集**：`collectDependency`/`dependenciesReady`/`dependencyWait` — 等待上游 task-exited → 提取输出（`extractNodeOutput`）→ 注入消息。
 - **能力**：LLM/tool 通过 `capabilities` signal 获得 handle，走 `llm.chat`/`tool.call` effect。
-- **上下文**：`@itookit/llm-context` 的 `IContextAssembler`（历史/记忆装配）与 `IContextService`（窗口、Notes、原文检索、持久请求）；llm-tasks 仅保留兼容导出与 Program bridge。
+- **上下文**：`@nestos/llm-context` 的 `IContextAssembler`（历史/记忆装配）与 `IContextService`（窗口、Notes、原文检索、持久请求）；llm-tasks 仅保留兼容导出与 Program bridge。
 
 ### 3.2 llm-flow — DAG 编排
 
@@ -151,7 +151,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 
 **LLM 调用链**：`LlmChatEffectAdapter` → `ILLMService.chatStream` → `LLMServiceAdapter` → `LLMDeviceDriver.ioctl(CHAT)` → provider（OpenAI/Anthropic/…）→ SSE 流式返回。
 
-## 5. VFS 子系统（@itookit/vfs-core）
+## 5. VFS 子系统（@nestos/vfs-core）
 
 - **协议层**：`IFileSystem`/`IFileSystemDriver`/`IFSDriver`/`IVFSManager`/`IStorageBackend`/`FSNode`/`IDeviceDriver`（`https://github.com/nest-agentos/vfs-core/blob/main/src/protocol.ts`）。
 - **引擎层**：`VFSEngine`/`VFSManager`/`FileSystemView`/`createVFS`（唯一初始化入口）。
@@ -169,7 +169,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 ## 7. 入口
 
 - **`nestos-web`（apps/web-app）**：浏览器 SPA（IndexedDB 后端）。
-- **`@itookit/cli`（apps/cli）**：NestOS profile + Session VFS 挂载 → YAML/.flow 编译为 RunDefinition/DagRunSpec → `app-core/createKernelRuntime` 装配 Kernel/Flow → 运行 → 结果落盘（RunStore 投影）。
+- **`@nestos/cli`（apps/cli）**：NestOS profile + Session VFS 挂载 → YAML/.flow 编译为 RunDefinition/DagRunSpec → `app-core/createKernelRuntime` 装配 Kernel/Flow → 运行 → 结果落盘（RunStore 投影）。
 - **`tauri-app`**：桌面壳。
 
 ## 8. 核心数据流

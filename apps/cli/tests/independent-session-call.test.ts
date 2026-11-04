@@ -3,12 +3,12 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {mkdtemp, readFile, writeFile, rm, stat} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {bindLocalApplicationServices, createApplicationClient} from '@itookit/app-core/host';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {IndependentCallCommand, type IndependentCallInput, type IndependentCallReceipt, type IndependentCallView} from '@itookit/llm-session/contracts';
-import {RpcPeer} from '@itookit/app-transport/application';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {bindLocalApplicationServices, createApplicationClient} from '@nestos/app-core/host';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {IndependentCallCommand, type IndependentCallInput, type IndependentCallReceipt, type IndependentCallView} from '@nestos/llm-session/contracts';
+import {RpcPeer} from '@nestos/app-transport/application';
 import {executeApplicationCommand} from '../src/application-command';
 import {parseArgs} from '../src/cli';
 

@@ -1,6 +1,6 @@
 import {expect, it} from 'vitest';
 import {ToolProgram, type ToolProgramInput} from './tool-program';
-import type {TaskInputEvent} from '@itookit/durable-kernel';
+import type {TaskInputEvent} from '@nestos/durable-kernel';
 
 const input = (): ToolProgramInput => ({toolId: 'fixture.save', toolVersion: '1', args: {format: 'json'},
     allowedToolIds: ['fixture.save'], approval: 'none',

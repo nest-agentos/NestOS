@@ -2,7 +2,7 @@ import {it, expect} from 'vitest';
 import {mkdtemp, rm, readFile, stat} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
-import type {Tool} from '@itookit/tools';
+import type {Tool} from '@nestos/tools';
 import {ToolHistory} from '../src/runtime/tool-packages/history';
 it('persists bounded private metadata, running state and sanitized failures across restarts', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'tool-history-')), file = path.join(root, 'private/history.json');

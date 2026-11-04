@@ -1,4 +1,4 @@
-import type {StudyCreation, StudyCreationState} from '@itookit/mdxeditor';
+import type {StudyCreation, StudyCreationState} from '@nestos/mdxeditor';
 import {FileRecoveryStore} from './file-recovery-store';
 
 /** Reuse authenticated per-user, per-tab recovery storage; no shared browser draft key. */

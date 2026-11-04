@@ -3,7 +3,7 @@
 // so the editor must say where it lands and how child processes obtain credentials instead of
 // silently implying a secret store.
 import { expect, it } from 'vitest';
-import { ProviderSettingsEditor } from '@itookit/llm-ui-adapter/settings';
+import { ProviderSettingsEditor } from '@nestos/llm-ui-adapter/settings';
 
 const provider = { id: 'mock', name: 'Mock', implementation: 'openai-compatible', enabled: true,
     baseURL: 'http://127.0.0.1:8399', models: [] };

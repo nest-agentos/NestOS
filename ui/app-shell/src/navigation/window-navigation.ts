@@ -1,4 +1,4 @@
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 const navigationLeases = new WeakMap<HTMLElement, () => void>();
 
 /** Borrow the real program navigation, preserving its nodes, listeners and live state. */

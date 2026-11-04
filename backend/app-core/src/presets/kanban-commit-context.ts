@@ -1,4 +1,4 @@
-import {randomUUID, sha256HexSync} from '@itookit/common';
+import {randomUUID, sha256HexSync} from '@nestos/common';
 import type {PromptJournal} from '../run/prompt-bundle';
 import {failure} from '../run/prompt-bundle';
 import {gitWorkspace, type RepositoryEvidence} from '../projects/worktree-modules';

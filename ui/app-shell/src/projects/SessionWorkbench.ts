@@ -1,7 +1,7 @@
-import type {ChatEditorFactory as EditorFactory, ChatEditorOptions as EditorOptions} from '@itookit/llm-ui-adapter/contracts';
+import type {ChatEditorFactory as EditorFactory, ChatEditorOptions as EditorOptions} from '@nestos/llm-ui-adapter/contracts';
 import {confirmRemoteRemoval, remoteRemovalItems} from './remote-session-removal';
-import { PROJECT_ACTION_ICONS } from '@itookit/common';
-import {projectFileSource} from '@itookit/app-contracts';
+import { PROJECT_ACTION_ICONS } from '@nestos/common';
+import {projectFileSource} from '@nestos/app-contracts';
 import {showProjectSettings} from './project-settings';
 import {showDiagnostics} from '../diagnostics/dialog';
 import {withAssistantShortcut} from '../navigation/assistant-actions';
@@ -9,14 +9,14 @@ import {projectAssistantShortcut} from './project-assistant-shortcut';
 import {navigateWorkspaceBack} from '../navigation/page-history';
 import { SessionTaskView } from './SessionTaskView';
 import { AgentDrawer } from './agent-drawer';
-import type {ProjectDraftPromotion} from '@itookit/app-contracts/services';
+import type {ProjectDraftPromotion} from '@nestos/app-contracts/services';
 import { AgentProjectPreferences } from './agent-project-preferences';
 import { mountAgentProjectSettings } from './agent-project-settings';
 import { lazyResource } from '../lifecycle/lazy-resource';
 import { RemoteAgentDetailsEditor } from '../toolbox/RemoteAgentDetailsEditor';
 import { ViewRefresh } from '../lifecycle/view-refresh';
 import {createRecoverableFileEditor} from '../browser/file-recovery';
-import { harnessObservation, remoteSessionSources } from '@itookit/app-contracts';
+import { harnessObservation, remoteSessionSources } from '@nestos/app-contracts';
 import { projectTwinTarget, twinSourceMenu } from '../digital-twin/source-menu';
 import {directorySnapshot} from '../browser/directory-snapshot';
 import { presentationPersistence } from '../persistence/initial-navigation';
@@ -32,8 +32,8 @@ import { NavigationFilters } from '../workbench/navigation-filters';
 import { createProjectDirectorySearch } from './project-directory-search';
 import { showRemoteSessionFamily } from './remote-session-family';
 import { nativeSessionMenu } from './remote-session-management';
-import type { ProjectSearchMatch } from '@itookit/app-contracts/services';
-import type { ApplicationBackend } from '@itookit/app-contracts/services';
+import type { ProjectSearchMatch } from '@nestos/app-contracts/services';
+import type { ApplicationBackend } from '@nestos/app-contracts/services';
 import { projectTransferTargets } from './transfer-targets';
 import { ProjectSyncMenu } from './sync/menu';
 import { createNestOSVFSUI as createVFSUI } from '../browser/vfs-presentation';
@@ -42,7 +42,7 @@ import { WorkbenchSidebar } from '../workbench/sidebar';
 import { createDirectoryList, refreshDirectoryList, watchDirectorySelection, type DirectoryEntry } from '../workbench/directory-list';
 import { createDirectoryBreadcrumbs } from '../workbench/directory-breadcrumbs';
 import { directoryBulkActions } from '../workbench/vfs-actions';
-import { ENTITY_ICONS, FILE_BROWSER_ICONS, FILE_ICONS, harnessPresentation } from '@itookit/common';
+import { ENTITY_ICONS, FILE_BROWSER_ICONS, FILE_ICONS, harnessPresentation } from '@nestos/common';
 import { watchDirectoryList } from '../workbench/directory-watch';
 import type { WorkbenchStatePort } from '../workbench/state';
 import { directoryFavoriteAction, projectFavoriteAction } from './project-favorites';
@@ -50,12 +50,12 @@ import { directoryBreadcrumbs, directoryEntryName } from './directory-label';
 import {localSessionStatus} from './local-session-status';
 import {LocalSessionActivityView} from './local-session-activity';
 import { projectDirectoryNodes } from './project-directory';
-import { conversationResourcePath, projectConversationsPath } from '@itookit/app-contracts';
-import { WORKSPACE_PATH, projectRelativePath, reportRemoteFailure } from '@itookit/app-contracts';
+import { conversationResourcePath, projectConversationsPath } from '@nestos/app-contracts';
+import { WORKSPACE_PATH, projectRelativePath, reportRemoteFailure } from '@nestos/app-contracts';
 import { createProjectDraftControls } from './project-draft-editor';
 import {remoteDraftCatalog} from './remote-draft-catalog';
-import type { SessionOpenView, WorkbenchChatControls, ProjectFolder, ProjectNavigationView, SessionDirectoryView } from '@itookit/app-contracts/services';
-import type { ConversationManifest } from '@itookit/llm-session/contracts';
+import type { SessionOpenView, WorkbenchChatControls, ProjectFolder, ProjectNavigationView, SessionDirectoryView } from '@nestos/app-contracts/services';
+import type { ConversationManifest } from '@nestos/llm-session/contracts';
 import { EditorLease } from '../browser/editor-lease';
 import { openProjectFileEditor, localizeRemoteWriteError } from './project-file-editor';
 import { fileContentFormat } from '../browser/file-format';
@@ -64,25 +64,25 @@ import { SubscriptionScope } from '../lifecycle/subscription-scope';
 import { archiveTarget } from './archive-targets';
 import { chooseArchive, downloadArchive } from '../files/archive-transfer';
 import { SessionFamilyActions } from './SessionFamilyActions';
-import { buildRenamedFilename, createModuleLogger, formatDefaultFileTitle, randomUUID, t, traceBoot } from '@itookit/common';
-import { type SessionSkillControls } from '@itookit/tools/contracts';
+import { buildRenamedFilename, createModuleLogger, formatDefaultFileTitle, randomUUID, t, traceBoot } from '@nestos/common';
+import { type SessionSkillControls } from '@nestos/tools/contracts';
 import { ProjectNavigation, type ProjectFileView, type ProjectNavigationOptions } from './ProjectNavigation';
 import { remapProjectPath } from './project-paths';
 import { showNameDialog, showProjectDialog } from '../files/project-dialog';
 import { showMountDialog } from '../files/mount-dialog';
 import { localizeMountError } from '../files/localize-mount-error';
 
-import type {IEditor, EditorHostContext, ContextMenuConfig, MenuItem} from '@itookit/ui-common-adapter';
-import type { ISessionRepository } from '@itookit/llm-session/contracts';
-import type { KernelViewPort as Kernel } from '@itookit/durable-kernel/contracts';
-import { describeErrorReason, describeCauseChain, type VFSToolbarContext, type VFSUIShell, type VFSNodeUI, type UIPersistencePort } from '@itookit/vfs-ui';
-import { FSError, createFileSystemView, searchKeywords, type FSNode, type IFileSystem, type FileSystemContextOwner, type FileSystemView } from '@itookit/vfs-core';
+import type {IEditor, EditorHostContext, ContextMenuConfig, MenuItem} from '@nestos/ui-common-adapter';
+import type { ISessionRepository } from '@nestos/llm-session/contracts';
+import type { KernelViewPort as Kernel } from '@nestos/durable-kernel/contracts';
+import { describeErrorReason, describeCauseChain, type VFSToolbarContext, type VFSUIShell, type VFSNodeUI, type UIPersistencePort } from '@nestos/vfs-ui';
+import { FSError, createFileSystemView, searchKeywords, type FSNode, type IFileSystem, type FileSystemContextOwner, type FileSystemView } from '@nestos/vfs-core';
 
 
 
-import { parentBrowserPath, remoteSessionPath, browserTargetFolder, folderBrowserPath, folderPathFromBrowserPath, parseSessionRoute, resolveBrowserTarget, sessionRoute, type WorkspaceController } from '@itookit/app-contracts';
-import type { ProjectService, DirectoryMountPort, SessionFilesPort } from '@itookit/app-contracts/services';
-import type { SessionLifecycleService, ProjectSessions } from '@itookit/app-contracts/services';
+import { parentBrowserPath, remoteSessionPath, browserTargetFolder, folderBrowserPath, folderPathFromBrowserPath, parseSessionRoute, resolveBrowserTarget, sessionRoute, type WorkspaceController } from '@nestos/app-contracts';
+import type { ProjectService, DirectoryMountPort, SessionFilesPort } from '@nestos/app-contracts/services';
+import type { SessionLifecycleService, ProjectSessions } from '@nestos/app-contracts/services';
 
 /** Sidebar refresh tracing — enable with localStorage['vfs:debug']='1' (same flag as vfs-ui). */
 function debugEnabled(): boolean {
@@ -147,12 +147,12 @@ export interface SessionWorkbenchOptions {
     fileFactory: EditorFactory;
     directoryMounts?: DirectoryMountPort;
     sessionSkills?: SessionSkillControls;
-    digitalTwin?: import('@itookit/app-contracts/services').DigitalTwinService;
+    digitalTwin?: import('@nestos/app-contracts/services').DigitalTwinService;
     manageTwin?: (sessionId: string) => Promise<void>;
     manageMemory?: (sessionId: string, signal: AbortSignal) => Promise<void>;
     flows?: { fs: IFileSystem; menu: ContextMenuConfig<VFSNodeUI> };
     projects?: ProjectService;
-    projectSync?: import('@itookit/app-contracts/services').ProjectSyncService;
+    projectSync?: import('@nestos/app-contracts/services').ProjectSyncService;
     projectSyncSetup?(projectId: string, signal: AbortSignal): Promise<void>;
     projectSyncDirectory?(projectId: string, signal: AbortSignal): Promise<void>;
     onSidebarReady?: () => boolean;
@@ -163,7 +163,7 @@ export interface SessionWorkbenchOptions {
     workbenchState?: WorkbenchStatePort;
     windows?: import('../workbench/windows').WorkbenchWindowBinding;
     agents?: {resourceId(id: string): string | undefined; usage?: EditorOptions['executorUsage'];
-        read(id: string): Promise<import('@itookit/kernel-adapters/contracts').AgentDefinition | null>; createEditor: EditorFactory;
+        read(id: string): Promise<import('@nestos/kernel-adapters/contracts').AgentDefinition | null>; createEditor: EditorFactory;
         rename?(id: string, name: string): Promise<void>; remove?(id: string): Promise<void>};
 }
 
@@ -189,7 +189,7 @@ interface RetainedEditor {
     previewCleanup?: () => void; renameCleanup?: () => void;
     active: string | null; branch?: string; cancel?: () => void; lease?: EditorLease;
     skills?: { sessionId: string; path: string };
-    draft?: {id: string; projectId: string; remote?: import('@itookit/llm-ui-adapter/contracts').ConversationControls};
+    draft?: {id: string; projectId: string; remote?: import('@nestos/llm-ui-adapter/contracts').ConversationControls};
 }
 
 /** vfs-ui owns the sidebar; this host owns business views and their file leases. */
@@ -197,7 +197,7 @@ export class SessionWorkbench implements WorkspaceController {
     private remoteStatus!: RemoteSessionStatusView;
     private searchPanel?: ProjectSearchPanel;
     private readonly navigationFilters = new NavigationFilters();
-    private search?: import('@itookit/app-contracts/services').ProjectSearch;
+    private search?: import('@nestos/app-contracts/services').ProjectSearch;
     private readonly dialogs = new AbortController();
     private readonly tabs: WorkbenchTabs<RetainedEditor>;
     private readonly sidebarLayout: WorkbenchSidebar;
@@ -258,7 +258,7 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly createFactory: SessionWorkbenchOptions['createFactory'];
     private readonly onSelect: SessionWorkbenchOptions['onSelect'];
     private readonly onBeforeNavigate: SessionWorkbenchOptions['onBeforeNavigate'];
-    private readonly digitalTwin?: import('@itookit/app-contracts/services').DigitalTwinService;
+    private readonly digitalTwin?: import('@nestos/app-contracts/services').DigitalTwinService;
     private readonly hostContext: SessionWorkbenchOptions['hostContext'];
     private readonly kernel: SessionWorkbenchOptions['kernel'];
     private readonly fileFactory: SessionWorkbenchOptions['fileFactory'];
@@ -276,7 +276,7 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly backend: ApplicationBackend;
     private readonly initialResource?: string;
     private initialSession?: SessionOpenView;
-    private initialData?: import('@itookit/app-contracts/services').SessionEditorInitialData;
+    private initialData?: import('@nestos/app-contracts/services').SessionEditorInitialData;
     private chatConfiguration?: WorkbenchChatControls['configuration'];
     constructor(options: SessionWorkbenchOptions) {
         this.backend = options.backend;
@@ -1794,7 +1794,7 @@ export class SessionWorkbench implements WorkspaceController {
         this.fileRenameCleanup = () => stops.forEach(stop => stop());
     }
 
-    private remoteAgentControls(folder?: string | null, initialProject?: SessionOpenView['project']): import('@itookit/llm-ui-adapter/contracts').RemoteAgentControls | undefined {
+    private remoteAgentControls(folder?: string | null, initialProject?: SessionOpenView['project']): import('@nestos/llm-ui-adapter/contracts').RemoteAgentControls | undefined {
         if (!folder || !this.projects?.remoteMounts) return;
         const projects = this.projects;
         const catalog = remoteDraftCatalog(projects, folder, initialProject);
@@ -1916,7 +1916,7 @@ export class SessionWorkbench implements WorkspaceController {
         await this.restoreNavigationScope(scope);
         this.onSelect(origin.id, 'replace');
     }
-    private draftPresentation(project: ProjectFolder): Pick<import('@itookit/llm-ui-adapter/contracts').SessionDraftControls, 'scope' | 'executorScope' | 'promptHarness'> {
+    private draftPresentation(project: ProjectFolder): Pick<import('@nestos/llm-ui-adapter/contracts').SessionDraftControls, 'scope' | 'executorScope' | 'promptHarness'> {
         return {promptHarness: this.isRemoteProject(project), executorScope: this.isRemoteProject(project) ? 'remote' : 'local', scope: {
             id: project.project.id, label: project.displayName ?? project.name,
             choices: async () => (await this.projects!.list()).map(item => ({id: item.project.id, label: item.displayName ?? item.name,
@@ -1976,7 +1976,7 @@ export class SessionWorkbench implements WorkspaceController {
         }
     }
     private async prepareRemoteDraft(tab: WorkbenchTab<RetainedEditor>, project: ProjectFolder, draftId: string,
-        request: import('@itookit/llm-ui-adapter/contracts').SessionDraftMaterialization, signal: AbortSignal, nativeId?: string): Promise<IEditor> {
+        request: import('@nestos/llm-ui-adapter/contracts').SessionDraftMaterialization, signal: AbortSignal, nativeId?: string): Promise<IEditor> {
         const choices = await this.remoteAgentControls(project.path)!.list();
         if (!choices.some(choice => choice.id === request.agentId)) throw new Error(t('toolbox.unavailable'));
         const [connectionId, serverProjectId, profileId] = JSON.parse(decodeURIComponent(request.agentId!.slice(7))) as string[];
@@ -2024,7 +2024,7 @@ export class SessionWorkbench implements WorkspaceController {
         if (replaceActive) {this.tabs.activate(path); await this.restoreEditor(value); this.onSelect(this.getActiveResourceId()!, 'replace');}
     }
     async startSessionDraft(parent?: string, input?: {text: string; files: File[]}, agentId?: string,
-        preferences?: import('@itookit/llm-ui-adapter/contracts').SessionDraftPreferences, navigationCurrent?: () => boolean): Promise<void> {
+        preferences?: import('@nestos/llm-ui-adapter/contracts').SessionDraftPreferences, navigationCurrent?: () => boolean): Promise<void> {
         const folder = await this.creationFolder(parent);
         if (navigationCurrent && !navigationCurrent()) return;
         this.cancelViewLoad(); const load = this.viewLoads.begin();

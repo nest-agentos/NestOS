@@ -1,5 +1,5 @@
-import type { ResolvedStorageBinding, SessionStorageResolver, StorageBindingRef } from '@itookit/durable-kernel';
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { ResolvedStorageBinding, SessionStorageResolver, StorageBindingRef } from '@nestos/durable-kernel';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { sessionExecutionRoot } from './session-storage-layout';
 
 export const SESSION_DIRECTORY_STORAGE_KIND = 'session-directory';

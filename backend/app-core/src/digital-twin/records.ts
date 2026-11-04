@@ -1,4 +1,4 @@
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 import { validateData } from './validation';
 import type { TwinRecord, TwinRecordFamily, TwinRecordWrite, TwinStore } from './contracts';
 

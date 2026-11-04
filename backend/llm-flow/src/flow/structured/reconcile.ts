@@ -1,4 +1,4 @@
-import type { SessionHandle, TaskHandle } from '@itookit/durable-kernel';
+import type { SessionHandle, TaskHandle } from '@nestos/durable-kernel';
 import { startFlowTask } from '../task-capabilities';
 import type { DispatchInput } from './types';
 import {flowTaskHeld} from '../control-tree';

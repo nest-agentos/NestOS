@@ -1,7 +1,7 @@
-import { createContextEngine, measureContext } from '@itookit/llm-context';
-import { resolveChatModelForTier } from '@itookit/kernel-adapters/contracts';
-import type { ILLMService } from '@itookit/driver-llm/contracts';
-import type { ISessionRepository, IAgentConfigService } from '@itookit/llm-session';
+import { createContextEngine, measureContext } from '@nestos/llm-context';
+import { resolveChatModelForTier } from '@nestos/kernel-adapters/contracts';
+import type { ILLMService } from '@nestos/driver-llm/contracts';
+import type { ISessionRepository, IAgentConfigService } from '@nestos/llm-session';
 
 /** Explicit transfer summaries use the source Session's configured chat connection. */
 export function createTransferSummarizer(repository: ISessionRepository, agents: IAgentConfigService, llm: ILLMService) {

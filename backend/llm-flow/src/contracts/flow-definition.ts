@@ -1,5 +1,5 @@
 import type { FlowNodeId } from './flow';
-import type { LlmNodeConfig } from '@itookit/llm-tasks/contracts';
+import type { LlmNodeConfig } from '@nestos/llm-tasks/contracts';
 import type { FlowImageConstraints } from './flow-images';
 import type {FlowFileConstraints} from './flow-files';
 

@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 
 describe('NodeSqliteSidecarDb', () => {
     it('persists records and rolls back transactions', async () => {

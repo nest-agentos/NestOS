@@ -1,4 +1,4 @@
-import {createModuleLogger} from '@itookit/common';
+import {createModuleLogger} from '@nestos/common';
 const log = createModuleLogger('KanbanDevelopment');
 export async function developmentStage<T>(operationId: string, stage: string, work: () => Promise<T>): Promise<T> {
     const started = Date.now();

@@ -1,5 +1,5 @@
-import {DEFAULT_KANBAN_WORK_TYPES, type KanbanBoard, type KanbanCommand, type KanbanExternalReference} from '@itookit/kanban/contracts';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import {DEFAULT_KANBAN_WORK_TYPES, type KanbanBoard, type KanbanCommand, type KanbanExternalReference} from '@nestos/kanban/contracts';
+import type {ProjectService} from '@nestos/app-contracts/services';
 import {REMOTE_PROJECT_REFERENCE, validateRemoteReferences} from './record-execution';
 import {requireValue} from './validation';
 

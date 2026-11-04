@@ -1,13 +1,13 @@
 import {promptInvocation} from '../../llm-ui-adapter/src/flows/prompt-invocation';
-import {Toast} from '@itookit/ui-common-adapter';
+import {Toast} from '@nestos/ui-common-adapter';
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ContentTransferCommand, FlowInvocationCommand, type ContentCapture, type ContentTransfer, type ICommandBus } from '@itookit/llm-session/contracts';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
-import { SessionCommand } from '@itookit/llm-session/contracts';
+import { ContentTransferCommand, FlowInvocationCommand, type ContentCapture, type ContentTransfer, type ICommandBus } from '@nestos/llm-session/contracts';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
 import { invokeFlowText } from '../../llm-ui-adapter/src/flows/invoke-flow';
 import { promptChildConversation } from '../../llm-ui-adapter/src/flows/create-child';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 
 const source: ContentCapture = {id: 'capture', sessionId: 's', branch: 'main', head: 'round-1', createdAt: 1,
     messages: [{id: 'm1', roundId: 'round-1', role: 'user', text: 'Question'}, {id: 'm2', roundId: 'round-1', role: 'assistant', text: 'Reply'}], outputs: []};

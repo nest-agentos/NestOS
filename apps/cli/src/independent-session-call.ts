@@ -1,5 +1,5 @@
-import type {ApplicationClient} from '@itookit/app-contracts/services';
-import {IndependentCallCommand, type IndependentCallInput, type IndependentCallReceipt} from '@itookit/llm-session/contracts';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
+import {IndependentCallCommand, type IndependentCallInput, type IndependentCallReceipt} from '@nestos/llm-session/contracts';
 import type {CommandOptions} from './commands';
 import {assertFrozenCallOptions, prepareSessionSubmission, readCallJson, validateSubmissionFile, writeCallJson} from './application-submission';
 import {waitIndependentCall} from './independent-call-execution';

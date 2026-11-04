@@ -1,8 +1,8 @@
 import {type ConversationControls, type ConversationSnapshot, type EditorOptions} from '../contracts';
-import { t } from '@itookit/common';
-import {showConfirmDialog} from '@itookit/ui-common-adapter';
+import { t } from '@nestos/common';
+import {showConfirmDialog} from '@nestos/ui-common-adapter';
 import { BranchIndicatorTemplates } from '../components/templates/BranchIndicatorTemplates';
-import {EventCleanup} from '@itookit/llm-ui';
+import {EventCleanup} from '@nestos/llm-ui';
 import type { BranchItem } from '../domain/types';
 
 /** Native identities use the shared branch presentation, without local VCS commands. */

@@ -1,5 +1,5 @@
-import {createModuleLogger, sha256Hex, t} from '@itookit/common';
-import {validateSpec, type ImageSpec} from '@itookit/image-parser';
+import {createModuleLogger, sha256Hex, t} from '@nestos/common';
+import {validateSpec, type ImageSpec} from '@nestos/image-parser';
 import {knownImageFileState, setImageFileState} from '../components/input/image-file-state';
 import {draftFileId, restoreDraftFileId, validDraftToken} from '../domain/draft-file-identity';
 import {fileBytes} from '../utils/file-bytes';

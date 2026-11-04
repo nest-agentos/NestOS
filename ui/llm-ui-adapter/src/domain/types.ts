@@ -1,12 +1,12 @@
 // @file: llm-ui/domain/types.ts
 
-import type { JsonValue } from '@itookit/llm-flow/contracts';
-import type { ModelTier } from '@itookit/driver-llm/contracts';
-import type { PromptPreset } from '@itookit/llm-tasks/contracts';
-import type { SessionTokenUsage } from '@itookit/llm-session/contracts';
-import type { ChatExecutionMode } from '@itookit/llm-tasks/contracts';
+import type { JsonValue } from '@nestos/llm-flow/contracts';
+import type { ModelTier } from '@nestos/driver-llm/contracts';
+import type { PromptPreset } from '@nestos/llm-tasks/contracts';
+import type { SessionTokenUsage } from '@nestos/llm-session/contracts';
+import type { ChatExecutionMode } from '@nestos/llm-tasks/contracts';
 
-export type { PromptPreset } from '@itookit/llm-tasks/contracts';
+export type { PromptPreset } from '@nestos/llm-tasks/contracts';
 
 // ============================================================
 // 节点操作
@@ -49,13 +49,13 @@ export type BranchAction = 'create' | 'rename' | 'delete' | 'select';
 // ============================================================
 
 export interface UIState {
-    operations?: readonly import('@itookit/llm-ui').OperationRecord[];
+    operations?: readonly import('@nestos/llm-ui').OperationRecord[];
     collapse_states: CollapseStateMap;
     input_text?: string;
     input_token?: string;
     input_files?: import('../services/DraftFilesCodec').DraftFileRecord[];
     input_agent_id?: string;
-    input_target?: import('@itookit/llm-flow/contracts').TargetRef;
+    input_target?: import('@nestos/llm-flow/contracts').TargetRef;
     input_arguments?: import('./input-draft').WorkspaceArgumentDraft;
     input_context?: import('./context-draft').InputContextDraft;
     /** Pure workspace preference; never changes the model context. */
@@ -67,12 +67,12 @@ export interface UIState {
 // ============================================================
 
 export interface ExecutorOption {
-    composition?: import('@itookit/kernel-adapters/contracts').AgentDefinition['composition'];
-    modelDefaults?: import('@itookit/kernel-adapters/contracts').AgentDefinition['modelDefaults'];
-    execution?: import('@itookit/kernel-adapters/contracts').AgentDefinition['execution'];
-    availability?: import('@itookit/kernel-adapters/contracts').AgentDefinition['availability'];
+    composition?: import('@nestos/kernel-adapters/contracts').AgentDefinition['composition'];
+    modelDefaults?: import('@nestos/kernel-adapters/contracts').AgentDefinition['modelDefaults'];
+    execution?: import('@nestos/kernel-adapters/contracts').AgentDefinition['execution'];
+    availability?: import('@nestos/kernel-adapters/contracts').AgentDefinition['availability'];
     attachmentKinds?: Array<'text' | 'image'>;
-    imageProcessing?: import('@itookit/kernel-adapters/contracts').ImageProcessingPreference;
+    imageProcessing?: import('@nestos/kernel-adapters/contracts').ImageProcessingPreference;
     supportsModels?: boolean;
     id: string;
     name: string;
@@ -93,7 +93,7 @@ export interface ModelOption {
 
 /** 连接选项（用于 ChatInput 连接选择器，不含 apiKey） */
 export interface ConnectionOption {
-    reasoningByTier?: Partial<Record<ModelTier, import('@itookit/driver-llm/contracts').ReasoningCapabilities>>;
+    reasoningByTier?: Partial<Record<ModelTier, import('@nestos/driver-llm/contracts').ReasoningCapabilities>>;
     /** Actual chat resolution for each tier; null preserves an explicitly invalid model across JSON. */
     resolvedTiers?: Partial<Record<ModelTier, string | null>>;
     enabled?: boolean;
@@ -117,7 +117,7 @@ export interface ConnectionOption {
 
 export interface ChatSessionSettings {
     harnessConnectionId?: string;
-    imageResize?: import('@itookit/kernel-adapters/contracts').ImageResizePolicy;
+    imageResize?: import('@nestos/kernel-adapters/contracts').ImageResizePolicy;
     executionMode?: ChatExecutionMode;
     /** Fixed after the first accepted direct run. */
     executionModeLocked?: boolean;
@@ -158,7 +158,7 @@ export const DEFAULT_SESSION_SETTINGS: ChatSessionSettings = {
 };
 
 export interface ChatOverrides {
-    harnessConversation?: import('@itookit/kernel-adapters/contracts').ConversationSelection;
+    harnessConversation?: import('@nestos/kernel-adapters/contracts').ConversationSelection;
     executionMode?: ChatExecutionMode;
     /** Explicit Session connection; absent means follow the global default. */
     connectionId?: string;
@@ -179,7 +179,7 @@ export interface ChatOverrides {
     flowRevision?: number;
     /** Workflow runtime parameters (matched against FlowRevision.parameters). */
     flowParameters?: Record<string, JsonValue>;
-    flowExpectedSignature?: Pick<import('@itookit/llm-flow/contracts').FlowRevision, 'id' | 'revision' | 'digest'>;
+    flowExpectedSignature?: Pick<import('@nestos/llm-flow/contracts').FlowRevision, 'id' | 'revision' | 'digest'>;
     flowConnectionBindings?: Record<string, string>;
     branchMode?: 'continue' | 'fork';
     baseRoundId?: string;
@@ -247,8 +247,8 @@ export interface SkillInvocation {
 export interface SkillInfo {
     versionDigest?: string;
     unversioned?: boolean;
-    versionPolicy?: import('@itookit/tools/contracts').SkillVersionPolicy;
-    drift?: import('@itookit/tools/contracts').SkillVersionDrift;
+    versionPolicy?: import('@nestos/tools/contracts').SkillVersionPolicy;
+    drift?: import('@nestos/tools/contracts').SkillVersionDrift;
     id: string;
     name: string;
     description: string;

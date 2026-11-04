@@ -1,4 +1,4 @@
-import {type OcrControls} from '@itookit/app-contracts/services';
+import {type OcrControls} from '@nestos/app-contracts/services';
 import {type EditorOptions} from '../../contracts';
 import type {SessionDraftPreferences} from '../../contracts';
 import {resourceSuggestions} from '../../flows/resource-suggestions';
@@ -7,22 +7,22 @@ import { DraftSaveQueue } from './draft-save-queue';
 import { LayoutTemplates } from '../../components/templates/LayoutTemplates';
 import { DraftDataCodec } from './session-draft-data';
 import type { IChatInputConfig } from '../../domain/ports/IChatInputPresenter';
-import {IEditor, Toast} from '@itookit/ui-common-adapter';
-import { randomUUID, t } from '@itookit/common';
+import {IEditor, Toast} from '@nestos/ui-common-adapter';
+import { randomUUID, t } from '@nestos/common';
 import { ChatInput } from '../../components/input/ChatInputView';
 import { EventBinder } from '../EventBinder';
 import { buildExecutorOptions, buildConnectionOptions } from '../AgentProvider';
 import {prepareAgentFlow, prepareCallTarget} from '../../flows/agent-flow';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import type { SendMessageParams } from '../../commands/SendMessageCommand';
 import {SubmissionFeedback} from '../../components/history/SubmissionFeedback';
 import type {WorkspaceHandoff} from './workspace-handoff';
 import type {ChatInputOptions} from '../../components/input/ChatInputView';
-import {EventBus} from '@itookit/vfs-core';
+import {EventBus} from '@nestos/vfs-core';
 import {disposeEditorResources} from '../editor-disposal';
 import {inheritDraftPreferences} from './draft-preferences';
-import type {EditorFactory} from '@itookit/ui-common-adapter';
-import type {EditorEvent, EditorEventMap, EditorEventCallback} from '@itookit/ui-common-adapter';
+import type {EditorFactory} from '@nestos/ui-common-adapter';
+import type {EditorEvent, EditorEventMap, EditorEventCallback} from '@nestos/ui-common-adapter';
 
 /** Reuse the chat composer while persisting project drafts independently from Session history. */
 export class SessionDraftEditor extends IEditor {
@@ -60,10 +60,10 @@ export class SessionDraftEditor extends IEditor {
         if (this.confirmed || !this.saves.dirty) return;
         event.preventDefault(); event.returnValue = '';
     };
-    constructor(private container: HTMLElement, private service: Parameters<typeof buildExecutorOptions>[0], private options: EditorOptions<import('@itookit/llm-flow/contracts').SessionSubmission>,
+    constructor(private container: HTMLElement, private service: Parameters<typeof buildExecutorOptions>[0], private options: EditorOptions<import('@nestos/llm-flow/contracts').SessionSubmission>,
         private readonly ocr?: OcrControls,
         private readonly createConversation?: (container: HTMLElement, options: EditorOptions, workspace: WorkspaceHandoff) => Promise<IEditor>,
-        private readonly flowControls?: { commands?: import('@itookit/llm-session/contracts').ICommandBus; configuration?: import('@itookit/kernel-adapters/contracts').ChatConfigurationView }) {
+        private readonly flowControls?: { commands?: import('@nestos/llm-session/contracts').ICommandBus; configuration?: import('@nestos/kernel-adapters/contracts').ChatConfigurationView }) {
         super(); this.initialData = options.sessionDraft?.initialData; this.codec = new DraftDataCodec(options.sessionDraft?.attachments);
     }
     async init(container: HTMLElement): Promise<void> { this.container = container; await this.render(); }
@@ -114,8 +114,8 @@ export class SessionDraftEditor extends IEditor {
                     {navigation: 'projects', projectId: this.options.sessionDraft?.scope?.id}, query, true, options),
                 onRequestFiles: (query: string, options?: {includeIgnored?: boolean}) => resourceSuggestions(this.flowControls!.commands!,
                     {navigation: 'projects', projectId: this.options.sessionDraft?.scope?.id}, query, false, options),
-                requestCallTargets: () => this.flowControls!.commands!.execute<import('@itookit/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets),
-                prepareCallTarget: (target: import('@itookit/llm-session/contracts').RootCallTarget, signal: AbortSignal,
+                requestCallTargets: () => this.flowControls!.commands!.execute<import('@nestos/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets),
+                prepareCallTarget: (target: import('@nestos/llm-session/contracts').RootCallTarget, signal: AbortSignal,
                     draft: import('../../flows/agent-flow').AgentFlowDraftInput) => prepareCallTarget(this.flowControls!.commands!, target, signal, {...draft, sourceScope: {navigation: 'projects', projectId: this.options.sessionDraft?.scope?.id}}),
             } : {}),
             onSend: (text, files, agentId, overrides, target) => this.send({text, files, agentId, overrides, ...(target ? {target} : {})}),

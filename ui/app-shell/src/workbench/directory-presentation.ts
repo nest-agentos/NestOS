@@ -1,5 +1,5 @@
-import { t, getLocale, ACTION_ICONS, FILE_BROWSER_ICONS, FILE_ICONS, VFS_TOOLBAR_ICONS, fileTypeIcon, createModuleLogger, randomUUID } from '@itookit/common';
-import type { DirectoryPresentationOptions } from '@itookit/vfs-ui';
+import { t, getLocale, ACTION_ICONS, FILE_BROWSER_ICONS, FILE_ICONS, VFS_TOOLBAR_ICONS, fileTypeIcon, createModuleLogger, randomUUID } from '@nestos/common';
+import type { DirectoryPresentationOptions } from '@nestos/vfs-ui';
 
 /** Translate and classify business resources without adding application dependencies to vfs-ui. */
 export function directoryPresentation(): DirectoryPresentationOptions {

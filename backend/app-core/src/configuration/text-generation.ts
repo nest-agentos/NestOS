@@ -1,8 +1,8 @@
-import {createModuleLogger} from '@itookit/common';
-import {hasConnectionCredentials, resolveChatModelForTier, type IConnectionReader} from '@itookit/kernel-adapters/contracts';
+import {createModuleLogger} from '@nestos/common';
+import {hasConnectionCredentials, resolveChatModelForTier, type IConnectionReader} from '@nestos/kernel-adapters/contracts';
 import {generateInSession} from './text-session';
-import type {LocalApplicationServices} from '@itookit/app-contracts/services';
-import type {ApplicationBackend} from '@itookit/app-contracts/services';
+import type {LocalApplicationServices} from '@nestos/app-contracts/services';
+import type {ApplicationBackend} from '@nestos/app-contracts/services';
 const log = createModuleLogger('text-generation');
 function fail(code: string): never {throw Object.assign(new Error(code), {code});}
 /** Draft generation is recorded in the caller-owned durable Session. */

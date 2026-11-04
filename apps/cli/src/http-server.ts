@@ -10,7 +10,7 @@ export function parseHttpAddress(value: string): {host: string; port: number} {
 }
 /** The legacy daemon flag delegates to the same authenticated host as httpd. */
 export async function startHttpServer(address: string, options: CommandOptions): Promise<void> {
-    const {runHttpHost} = await import('@itookit/node-host/http');
+    const {runHttpHost} = await import('@nestos/node-host/http');
     const {host, port} = parseHttpAddress(address);
     const args = ['--root', resolveProfileRoot(options.profile), '--host', host, '--port', String(port)];
     for (const [flag, value] of [['--auth-dir', options.authDir], ['--cert-dir', options.certDir], ['--audit-file', options.auditFile], ['--static', options.staticDir]])

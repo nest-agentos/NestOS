@@ -1,4 +1,4 @@
-import type { ISkillService } from '@itookit/tools/contracts';
+import type { ISkillService } from '@nestos/tools/contracts';
 import { parseLoadedSkillIds, parseLoadedSkillVersions } from './loaded-state';
 
 /** Roll back only activations introduced by this restoration attempt. */

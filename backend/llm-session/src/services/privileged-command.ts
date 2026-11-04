@@ -20,7 +20,7 @@ export interface ToolCommandRequest {
     requestId: string;
     toolId: string;
     toolVersion: string;
-    args: Record<string, import('@itookit/llm-flow/contracts').JsonValue>;
+    args: Record<string, import('@nestos/llm-flow/contracts').JsonValue>;
 }
 export interface ToolCommandOption {
     id: string; name: string; description?: string; version?: string; parameters?: Record<string, unknown>;

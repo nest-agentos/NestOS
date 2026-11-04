@@ -1,4 +1,4 @@
-import type { DigitalTwinService, TwinMemoryData, TwinSourceSpec } from '@itookit/app-core';
+import type { DigitalTwinService, TwinMemoryData, TwinSourceSpec } from '@nestos/app-core';
 import { openLocalApplication } from './application-host';
 import type { CommandOptions } from './commands';
 import { scanCommand, SCAN_COMMANDS } from './digital-twin-scans-command';

@@ -1,8 +1,8 @@
 import {KanbanSidebarControls, controlLabel, controlIcon} from './sidebar-controls';
 import {kanbanSidebarDeletion} from './sidebar-deletion';
-import {ACTION_ICONS, FILE_BROWSER_ICONS, TOOLBOX_ICONS, createModuleLogger, randomUUID, t} from '@itookit/common';
-import {kanbanReference, type KanbanBoardSummary, type KanbanClient} from '@itookit/kanban/contracts';
-import {createVFSBrowser, type BrowserNode, type VFSBrowser, type WindowManagementOptions} from '@itookit/vfs-ui';
+import {ACTION_ICONS, FILE_BROWSER_ICONS, TOOLBOX_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
+import {kanbanReference, type KanbanBoardSummary, type KanbanClient} from '@nestos/kanban/contracts';
+import {createVFSBrowser, type BrowserNode, type VFSBrowser, type WindowManagementOptions} from '@nestos/vfs-ui';
 import {nestOSVFSPresentation} from '../browser/vfs-presentation';
 import {ViewRefresh} from '../lifecycle/view-refresh';
 
@@ -66,7 +66,7 @@ export class KanbanSidebar {
         const path = node?.id ?? this.selected;
         return this.boards.find(board => `/board/${encodeURIComponent(board.id)}` === path);
     }
-    private executionActions(): import('@itookit/vfs-ui').BrowserAction[] {
+    private executionActions(): import('@nestos/vfs-ui').BrowserAction[] {
         return (['pause', 'resume'] as const).map(action => ({id: 'execution-' + action, label: controlLabel(action), iconHTML: action === 'pause' ? ACTION_ICONS.pause : ACTION_ICONS.run, placements: ['toolbar', 'menu'],
             state: context => {const board = this.targetBoard(context.target); return {visible: !!this.controls && !!board && !!board.executionControl?.paused === (action === 'resume'), enabled: !!board && !['pausing', 'resuming'].includes(board.executionPhase ?? '')};},
             run: async context => {const board = this.targetBoard(context.target); if (board) await this.controls?.toggle(board);}}));

@@ -1,5 +1,5 @@
-import { sha256HexSync } from '@itookit/common';
-import { FSError } from '@itookit/vfs-core';
+import { sha256HexSync } from '@nestos/common';
+import { FSError } from '@nestos/vfs-core';
 import { WORKSPACE_PATH } from '../../vfs/workspace-namespace';
 import type { ProjectRemoteMount } from '../remote-mounts';
 import type { ExecutionCapabilities, ProjectExecutionBinding } from './contracts';

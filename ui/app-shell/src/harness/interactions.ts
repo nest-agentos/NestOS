@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { HarnessEvent } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import type { HarnessEvent } from '@nestos/app-contracts/services';
 
 type NativeRequest = HarnessEvent['message'];
 export function renderInteraction(request: NativeRequest, respond: (response: Record<string, unknown>) => Promise<void>): HTMLElement {

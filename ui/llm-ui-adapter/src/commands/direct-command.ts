@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 
 /** Input policy shared by send, resend and edit-and-run; no I/O. */
 export function isDirectCommandInput(text: string): boolean { return text.trimStart().startsWith('!'); }

@@ -8,18 +8,18 @@ import {createRecordExecution, validateRemoteReferences} from './record-executio
 import {createPersonalKanbanAutomation, type PersonalKanbanAutomationOptions} from './personal-automation';
 import {authorizeAutomation} from './automation-authority';
 import {reportKanbanHealth} from './health-events';
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 import type {UserEventService} from '../events/service';
 import type {DiagnosticJournal} from '../diagnostics/journal';
 import {createNestOSKanban} from './module';
 import {openPersonalKanbanStore} from './store';
 import {KanbanExamples} from '../presets/kanban-examples';
-import {KanbanError} from '@itookit/kanban';
+import {KanbanError} from '@nestos/kanban';
 import {createLocalKanbanSessionSource} from './session-source';
 import {relatedKanbanSessions} from './related-sessions';
 
 /** The authenticated runtime owns this user store; project boards require their own binding. */
-export async function createPersonalKanban(fs: IFileSystem, events: UserEventService, diagnostics: DiagnosticJournal, sessions?: Pick<import('@itookit/llm-session/contracts').ISessionRepository, 'listSummaries'|'getManifest'>, kernel?: Pick<import('@itookit/durable-kernel').Kernel,'sessionActivity'>, automationOptions?: PersonalKanbanAutomationOptions) {
+export async function createPersonalKanban(fs: IFileSystem, events: UserEventService, diagnostics: DiagnosticJournal, sessions?: Pick<import('@nestos/llm-session/contracts').ISessionRepository, 'listSummaries'|'getManifest'>, kernel?: Pick<import('@nestos/durable-kernel').Kernel,'sessionActivity'>, automationOptions?: PersonalKanbanAutomationOptions) {
     const store = await openPersonalKanbanStore(fs);
     await new KanbanExamples(store).seed();
     const journal = new KanbanAutomationJournal(fs); await journal.open();
@@ -28,7 +28,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
         relatedSessions: async (board, item) => [...await automationOptions.relatedSessions?.(board, item) ?? [], ...await operations?.sessions(board, item) ?? []]} : undefined});
     const workLog = new KanbanWorkLog(fs, events, base.log); await workLog.open();
     let verifyDeletion: (id: string) => Promise<void> = async () => {throw new KanbanError('BOARD_DELETE_UNAVAILABLE');};
-    const withLogs = {...base, verifyDeletion: (board: import('@itookit/kanban/contracts').KanbanBoard) => verifyDeletion(board.id), onCommitted: (boardId: string, source: import('@itookit/kanban/contracts').KanbanService) => workLog.synchronize(boardId, source)};
+    const withLogs = {...base, verifyDeletion: (board: import('@nestos/kanban/contracts').KanbanBoard) => verifyDeletion(board.id), onCommitted: (boardId: string, source: import('@nestos/kanban/contracts').KanbanService) => workLog.synchronize(boardId, source)};
     const service = createNestOSKanban({...withLogs, actor: {kind: 'human', id: 'admin'}});
     operations = automationOptions?.itemOperations?.({service, journal, workLog, log: base.log});
     const resources = automationOptions?.workResources?.({service, workLog, journal});
@@ -47,18 +47,18 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
     verifyDeletion = deletion.assertSettled;
     return withBoardDeletion({...service,
         ...(operations ? {itemOperations: operations.itemOperations, runItemOperation: operations.runItemOperation, bindItemOperation: operations.bindItemOperation} : {}),
-        ...(automationOptions?.continuation && service.executionSession ? {executionSession: async (boardId: string, itemId: string, query?: import('@itookit/kanban/contracts').KanbanSessionDetailQuery) => {
+        ...(automationOptions?.continuation && service.executionSession ? {executionSession: async (boardId: string, itemId: string, query?: import('@nestos/kanban/contracts').KanbanSessionDetailQuery) => {
             const detail = await service.executionSession!(boardId, itemId, query), {item} = await service.item(boardId, itemId);
             const previous = Object.values((await service.workflow(boardId)).dispatches).filter(row => row.itemId === itemId).sort((a, b) => b.attempt - a.attempt)[0];
             return {...detail, ...(['backlog', 'open'].includes(item.status) && previous && ['failed', 'cancelled'].includes(previous.outcome)
                 ? {continuation: {previousDispatchId: previous.id}} : {})};
         }} : {}),
         ...resources,
-        ...(resources?.cleanupWorkResource && operations ? {cleanupWorkResource: (board: string, request: import('@itookit/kanban/contracts').KanbanWorkResourceCleanup) =>
+        ...(resources?.cleanupWorkResource && operations ? {cleanupWorkResource: (board: string, request: import('@nestos/kanban/contracts').KanbanWorkResourceCleanup) =>
             operations!.guardResource(board, request.itemId, () => resources.cleanupWorkResource!(board, request))} : {}),
         ...(fixes?{fixTask:fixes.fixTask}:{}),
         ...(replies?{replyTask:replies}:{}),
-        records: (boardId: string, query?: import('@itookit/kanban/contracts').KanbanRecordQuery) => workLog.records(service, boardId, query),
+        records: (boardId: string, query?: import('@nestos/kanban/contracts').KanbanRecordQuery) => workLog.records(service, boardId, query),
         record: (boardId: string, recordId: string) => workLog.record(service, boardId, recordId),
         ...(records ? {itemResources: records.itemResources, recordResources: records.recordResources, runRecord: records.runRecord, recordExecutions: async (boardId: string, recordId: string) => (await workLog.record(service, boardId, recordId)).kind === 'decision' ? records.recordExecutions(boardId, recordId) : []} : {}),
         ...(automation ? {automationCatalog: automation.automationCatalog, analysisStatus: automation.analysisStatus} : {}),
@@ -76,8 +76,8 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
 type PersonalOptions = {
     store: Awaited<ReturnType<typeof openPersonalKanbanStore>>; journal: KanbanAutomationJournal;
     events: UserEventService; diagnostics: DiagnosticJournal;
-    sessions?: Pick<import('@itookit/llm-session/contracts').ISessionRepository, 'listSummaries' | 'getManifest'>;
-    kernel?: Pick<import('@itookit/durable-kernel').Kernel, 'sessionActivity'>; automationOptions?: PersonalKanbanAutomationOptions;
+    sessions?: Pick<import('@nestos/llm-session/contracts').ISessionRepository, 'listSummaries' | 'getManifest'>;
+    kernel?: Pick<import('@nestos/durable-kernel').Kernel, 'sessionActivity'>; automationOptions?: PersonalKanbanAutomationOptions;
 };
 function personalOptions({store, journal, events, diagnostics, sessions, kernel, automationOptions}: PersonalOptions) {
     return {

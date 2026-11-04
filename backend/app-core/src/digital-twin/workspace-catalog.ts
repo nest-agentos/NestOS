@@ -1,4 +1,4 @@
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
 import type { TwinSourceCatalog } from './domain';
 import { documentPath } from './project-catalog';
 

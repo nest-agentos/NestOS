@@ -1,5 +1,5 @@
-import { FSError } from '@itookit/vfs-core';
-import type { EffectExecutionContext, EffectSessionState, Kernel, SessionHandle } from '@itookit/durable-kernel';
+import { FSError } from '@nestos/vfs-core';
+import type { EffectExecutionContext, EffectSessionState, Kernel, SessionHandle } from '@nestos/durable-kernel';
 import { harnessExecutionJournalKey } from './harness-execution-journal';
 /** Cleanup may access only its own receipt journal, even when it has no live Effect state port. */
 export function createHarnessCleanupState(kernel: () => Pick<Kernel, 'openSession'>,

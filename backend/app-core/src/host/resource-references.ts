@@ -1,8 +1,8 @@
-import {createModuleLogger, randomUUID, sha256Hex} from '@itookit/common';
-import {INPUT_ASSET_MAX_BYTES, ResourceCommand, parseResourceReference, formatResourceReference, type ResourceScope, type ResourceReference, type ResourceReadInput, type ResourceContent, type ResourceMediaContent} from '@itookit/app-contracts';
-import type {ProjectService} from '@itookit/app-contracts/services';
-import {createVFSFileDiscoverySource, discoverFiles, FileIgnoreFilter, FSError, type IVFSManager} from '@itookit/vfs-core';
-import type {CommandBus, ISessionRepository} from '@itookit/llm-session';
+import {createModuleLogger, randomUUID, sha256Hex} from '@nestos/common';
+import {INPUT_ASSET_MAX_BYTES, ResourceCommand, parseResourceReference, formatResourceReference, type ResourceScope, type ResourceReference, type ResourceReadInput, type ResourceContent, type ResourceMediaContent} from '@nestos/app-contracts';
+import type {ProjectService} from '@nestos/app-contracts/services';
+import {createVFSFileDiscoverySource, discoverFiles, FileIgnoreFilter, FSError, type IVFSManager} from '@nestos/vfs-core';
+import type {CommandBus, ISessionRepository} from '@nestos/llm-session';
 import {classifyResourceBytes, decodeResourceText} from './resource-media';
 interface Options {vfs: IVFSManager; projects?: ProjectService; repository: ISessionRepository}
 interface ResourceSearchInput {query: string; scope: ResourceScope; includeIgnored?: boolean}

@@ -1,10 +1,10 @@
-import { checkOperation, operationScope, FSError, type OperationOptions } from '@itookit/vfs-core';
-import type { ISessionRepository } from '@itookit/llm-session/contracts';
-import type { ProjectService, ProjectSearchQuery, ProjectSearchResult } from '@itookit/app-contracts/services';
+import { checkOperation, operationScope, FSError, type OperationOptions } from '@nestos/vfs-core';
+import type { ISessionRepository } from '@nestos/llm-session/contracts';
+import type { ProjectService, ProjectSearchQuery, ProjectSearchResult } from '@nestos/app-contracts/services';
 import { searchLocalFiles } from './search-local-files';
 import { searchLocalSessions } from './search-local-sessions';
 import { searchNativeSessions } from './search-native-sessions';
-export type { ProjectSearchQuery, ProjectSearchMatch, ProjectSearchResult } from '@itookit/app-contracts/services';
+export type { ProjectSearchQuery, ProjectSearchMatch, ProjectSearchResult } from '@nestos/app-contracts/services';
 
 /** Explicit source queries; synchronous navigation filtering remains free of I/O. */
 export class ProjectSearch {

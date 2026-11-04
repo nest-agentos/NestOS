@@ -1,6 +1,6 @@
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {expect, it, vi} from 'vitest';
-import type {Kernel, TaskRecord} from '@itookit/durable-kernel';
+import type {Kernel, TaskRecord} from '@nestos/durable-kernel';
 import type {ICommandBus} from '../src/contracts/command-bus';
 import {IndependentCallCommand} from '../src/contracts/independent-calls';
 import {IndependentCallControls} from '../src/session/independent-call-controls';

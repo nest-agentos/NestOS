@@ -1,5 +1,5 @@
-import type {TaskCallAuthority} from '@itookit/durable-kernel';
-import {createModuleLogger} from '@itookit/common';
+import type {TaskCallAuthority} from '@nestos/durable-kernel';
+import {createModuleLogger} from '@nestos/common';
 
 interface Ports {
     assertOwned(sessionId: string): Promise<void>;

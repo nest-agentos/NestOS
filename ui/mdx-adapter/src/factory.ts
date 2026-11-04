@@ -2,9 +2,9 @@ import {mountFileMenu} from './file-menu';
 import {StudyTrackingPlugin} from './study-tracking';
 import {studyIndex} from './study-index';
 import { createMDxEditor as createEditor, defaultEditorFactory as createDefaultEditor, fileReference,
-    type MDxEditor, type PluginConfig, type MDxEditorFactoryConfig } from '@itookit/mdxeditor';
-import { t, createModuleLogger, randomUUID } from '@itookit/common';
-import { installNavigationButtonPresentation, editorFilePath, normalizeEditorOptions, type EditorOptions } from '@itookit/ui-common-adapter';
+    type MDxEditor, type PluginConfig, type MDxEditorFactoryConfig } from '@nestos/mdxeditor';
+import { t, createModuleLogger, randomUUID } from '@nestos/common';
+import { installNavigationButtonPresentation, editorFilePath, normalizeEditorOptions, type EditorOptions } from '@nestos/ui-common-adapter';
 import { createAdapterStore } from './srs-store';
 import { createAssetProvider } from './assets';
 import { createDocumentHost } from './document-host';

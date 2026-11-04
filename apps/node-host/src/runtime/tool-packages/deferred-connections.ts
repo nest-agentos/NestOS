@@ -1,4 +1,4 @@
-import type {ToolConnectionAccess, ToolConnectionType} from '@itookit/app-contracts/services';
+import type {ToolConnectionAccess, ToolConnectionType} from '@nestos/app-contracts/services';
 import {validateToolConnectionDefinition} from '../tool-connections';
 import {packageError} from './manifest';
 

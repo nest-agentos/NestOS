@@ -1,9 +1,9 @@
 import type {ConversationControls} from '../contracts';
 import {expect, it, vi} from 'vitest';
-import {randomUUID} from '@itookit/common';
+import {randomUUID} from '@nestos/common';
 import {NativeChatStore} from './native-store';
 
-import {DEFAULT_IMAGE_SPEC} from '@itookit/image-parser';
+import {DEFAULT_IMAGE_SPEC} from '@nestos/image-parser';
 function fixture(document: object = {}) {
     let state = {revision: '0', data: Object.keys(document).length ? JSON.stringify(document) : '', acceptedOperationIds: [] as string[]};
     const binaries = new Map<string, ArrayBuffer>(), send = vi.fn(), command = vi.fn();

@@ -1,8 +1,8 @@
-import { buildRenamedFilename } from '@itookit/common';
+import { buildRenamedFilename } from '@nestos/common';
 import type { ProjectFavorite, FavoriteMove } from './contracts';
 
-import { favoriteKey } from '@itookit/app-contracts';
-export { favoriteKey } from '@itookit/app-contracts';
+import { favoriteKey } from '@nestos/app-contracts';
+export { favoriteKey } from '@nestos/app-contracts';
 const contains = (parent: string, path: string): boolean => parent === path || path.startsWith(parent + '/');
 
 export function withoutDeletedFiles(items: ProjectFavorite[], paths: readonly string[]): ProjectFavorite[] {

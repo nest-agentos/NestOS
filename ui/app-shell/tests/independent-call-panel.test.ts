@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import {ArtifactCommand} from '@itookit/app-contracts';
-import {sha256Hex} from '@itookit/common';
+import {ArtifactCommand} from '@nestos/app-contracts';
+import {sha256Hex} from '@nestos/common';
 import {afterEach, expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
-import {IndependentCallCommand, type IndependentCallView, type ICommandBus, type SubmissionRequest} from '@itookit/llm-session/contracts';
+import {createOperationLedger} from '@nestos/llm-ui';
+import {IndependentCallCommand, type IndependentCallView, type ICommandBus, type SubmissionRequest} from '@nestos/llm-session/contracts';
 import {IndependentCallPanel} from '../../llm-ui-adapter/src/components/IndependentCallPanel';
 import {submitSessionCall} from '../../llm-ui-adapter/src/commands/submit-session-call';
 import type {CommandContext} from '../../llm-ui-adapter/src/commands/CommandContext';

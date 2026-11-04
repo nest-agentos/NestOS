@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest';
-import {randomUUID} from '@itookit/common';
+import {randomUUID} from '@nestos/common';
 import {ChatDraftStore} from './ChatDraftStore';
 it('round-trips shared attachment identities through the existing project draft format', async () => {
     const binaries = new Map<string, ArrayBuffer>(); let data = '';

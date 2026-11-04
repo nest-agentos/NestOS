@@ -1,6 +1,6 @@
 import { knowledgeGraph, relatedMemories, type TwinEntityAlias } from './graph';
-import { sha256HexSync, type ContextPlan, type RetrievedMemoryEntry } from '@itookit/llm-context';
-import type { KernelAdaptersRuntimeOptions } from '@itookit/kernel-adapters';
+import { sha256HexSync, type ContextPlan, type RetrievedMemoryEntry } from '@nestos/llm-context';
+import type { KernelAdaptersRuntimeOptions } from '@nestos/kernel-adapters';
 import type { TwinMemoryData, TwinSettings, TwinSourceData } from './domain';
 import { supported } from './knowledge';
 import { TwinRecords } from './records';

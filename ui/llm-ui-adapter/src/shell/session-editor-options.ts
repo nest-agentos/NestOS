@@ -1,16 +1,16 @@
 import type {EditorOptions} from '../contracts';
 
-import type {ISessionRepository, SessionViewPort, ICommandBus} from '@itookit/llm-session/contracts';
-import type {IAgentConfigService} from '@itookit/kernel-adapters/contracts';
-import type {EditorTaskControlPlane} from '@itookit/durable-kernel/contracts';
+import type {ISessionRepository, SessionViewPort, ICommandBus} from '@nestos/llm-session/contracts';
+import type {IAgentConfigService} from '@nestos/kernel-adapters/contracts';
+import type {EditorTaskControlPlane} from '@nestos/durable-kernel/contracts';
 import type {IPrivilegedCommandService} from '../domain/ports/IPrivilegedCommandService';
 import type {WorkspaceHandoff} from './drafts/workspace-handoff';
 import type {SessionLoadMetrics} from './load-metrics';
 
-export interface LLMEditorOptions extends EditorOptions<import('@itookit/llm-flow/contracts').SessionSubmission, import('../services/SessionService').SessionLoadResult> {
+export interface LLMEditorOptions extends EditorOptions<import('@nestos/llm-flow/contracts').SessionSubmission, import('../services/SessionService').SessionLoadResult> {
     handoff?: WorkspaceHandoff;
-    readTaskAttachment?: import('@itookit/durable-kernel/contracts').ReadTaskAttachment;
-    configuration?: import('@itookit/kernel-adapters/contracts').ChatConfigurationView;
+    readTaskAttachment?: import('@nestos/durable-kernel/contracts').ReadTaskAttachment;
+    configuration?: import('@nestos/kernel-adapters/contracts').ChatConfigurationView;
     sessionId: string;
     sessionRepository: ISessionRepository;
     sessionManager: SessionViewPort;
@@ -18,7 +18,7 @@ export interface LLMEditorOptions extends EditorOptions<import('@itookit/llm-flo
     agentService: IAgentConfigService;
     initialInputState?: { text?: string; agentId?: string };
     /** Host-owned OCR capability and configuration. */
-    ocr?: import('@itookit/app-contracts/services').OcrControls;
+    ocr?: import('@nestos/app-contracts/services').OcrControls;
     /**
      * Conversation command bus returned by initializeConversationSystem().
      * High-level operations use the injected Session and VCS commands.
@@ -28,6 +28,6 @@ export interface LLMEditorOptions extends EditorOptions<import('@itookit/llm-flo
     kernel?: EditorTaskControlPlane;
     /** Application service for durable privileged slash commands. */
     privilegedCommands?: IPrivilegedCommandService;
-    sessionSkills?: import('@itookit/tools/contracts').SessionSkillControls;
+    sessionSkills?: import('@nestos/tools/contracts').SessionSkillControls;
     onLoadMetrics?: (metrics: SessionLoadMetrics) => void;
 }

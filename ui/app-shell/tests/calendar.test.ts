@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {parseCalendarEvent, onDay, monthDays} from '../src/calendar/model';
 import {readCalendar} from '../src/calendar/read';
 import {CalendarWorkbench} from '../src/calendar';

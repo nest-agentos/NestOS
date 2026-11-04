@@ -2,10 +2,10 @@ import {mkdir, realpath} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {openApplicationView} from '@itookit/app-core/host';
-import {openLocalFSBackend} from '@itookit/vfsdriver-local';
-import {NodeSqliteSidecarDb} from '@itookit/node-host/storage';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {openApplicationView} from '@nestos/app-core/host';
+import {openLocalFSBackend} from '@nestos/vfsdriver-local';
+import {NodeSqliteSidecarDb} from '@nestos/node-host/storage';
 import {SessionProfileRecorder} from './session-profile-recorder';
 
 const {values} = parseArgs({options: {fixture: {type: 'string'}, out: {type: 'string'}}});

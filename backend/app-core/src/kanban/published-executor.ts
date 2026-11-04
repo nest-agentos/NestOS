@@ -1,13 +1,13 @@
-import type {IndependentCallService} from '@itookit/llm-session';
-import type {IndependentCallInput} from '@itookit/llm-session/contracts';
-import type {TargetRef, DagRunSpec} from '@itookit/llm-flow/contracts';
-import {nodeOutputEntries} from '@itookit/llm-flow/contracts';
-import type {Kernel, TaskCallResult} from '@itookit/durable-kernel';
-import type {KanbanDiscoveryChange, KanbanScanConnection, KanbanScanInput} from '@itookit/kanban/contracts';
-import type {KanbanScanExecutor} from '@itookit/kanban/discovery';
+import type {IndependentCallService} from '@nestos/llm-session';
+import type {IndependentCallInput} from '@nestos/llm-session/contracts';
+import type {TargetRef, DagRunSpec} from '@nestos/llm-flow/contracts';
+import {nodeOutputEntries} from '@nestos/llm-flow/contracts';
+import type {Kernel, TaskCallResult} from '@nestos/durable-kernel';
+import type {KanbanDiscoveryChange, KanbanScanConnection, KanbanScanInput} from '@nestos/kanban/contracts';
+import type {KanbanScanExecutor} from '@nestos/kanban/discovery';
 import {requireValue} from './validation';
-import {KanbanError} from '@itookit/kanban';
-import {KanbanScanNotStartedError} from '@itookit/kanban/discovery';
+import {KanbanError} from '@nestos/kanban';
+import {KanbanScanNotStartedError} from '@nestos/kanban/discovery';
 
 interface PublishedOptions {
     calls: IndependentCallService; kernel: Kernel; target: TargetRef;
@@ -38,7 +38,7 @@ export function createPublishedKanbanExecutor(options: PublishedOptions): Kanban
         return parseOutput(result.exit.output);
     }};
 }
-function parseOutput(output: unknown): KanbanDiscoveryChange[] | import('@itookit/kanban/contracts').KanbanDiscoveryResult {
+function parseOutput(output: unknown): KanbanDiscoveryChange[] | import('@nestos/kanban/contracts').KanbanDiscoveryResult {
     const returned = (output as {nodes?: Record<string, unknown>})?.nodes?.__flow_return;
     requireValue(returned, 'SCANNER_RETURN_MISSING');
     const entries = nodeOutputEntries(returned);
@@ -50,7 +50,7 @@ function parseOutput(output: unknown): KanbanDiscoveryChange[] | import('@itooki
     requireValue(Array.isArray(changes), 'INVALID_SCAN_OUTPUT');
     const records = (decoded as {records?: unknown})?.records;
     requireValue(records === undefined || Array.isArray(records), 'INVALID_SCAN_OUTPUT');
-    return records === undefined ? changes as KanbanDiscoveryChange[] : {changes: changes as KanbanDiscoveryChange[], records: records as import('@itookit/kanban/contracts').KanbanRecordInput[]};
+    return records === undefined ? changes as KanbanDiscoveryChange[] : {changes: changes as KanbanDiscoveryChange[], records: records as import('@nestos/kanban/contracts').KanbanRecordInput[]};
 }
 
 function verifyScanPlan(value: unknown, connection: KanbanScanConnection): void {

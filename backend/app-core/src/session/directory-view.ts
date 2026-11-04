@@ -1,7 +1,7 @@
-import {FSError, type FSNode, type IFileSystem} from '@itookit/vfs-core';
-import {browserTargetFolder, resolveBrowserTarget} from '@itookit/app-contracts';
-import type {ProjectService, SessionDirectoryView, NavigationDirectory} from '@itookit/app-contracts/services';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {FSError, type FSNode, type IFileSystem} from '@nestos/vfs-core';
+import {browserTargetFolder, resolveBrowserTarget} from '@nestos/app-contracts';
+import type {ProjectService, SessionDirectoryView, NavigationDirectory} from '@nestos/app-contracts/services';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 
 const log = createModuleLogger('directory-view');
 /** Flatten virtual containers locally; no browser round trip is needed for each group. */

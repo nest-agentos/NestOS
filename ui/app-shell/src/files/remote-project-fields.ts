@@ -1,7 +1,7 @@
 import { remoteConnectionOptions } from './remote-connection-options';
 import { remoteDirectoryPicker } from './remote-directory-picker';
-import { t } from '@itookit/common';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import type { ProjectService } from '@nestos/app-contracts/services';
 
 /** Project inputs reference connection IDs; display names can change independently. */
 export function remoteProjectFields(projects: ProjectService, parent: HTMLElement, local: HTMLElement, signal: AbortSignal) {

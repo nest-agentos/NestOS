@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { RpcPeer, installViewProjections } from '@itookit/app-transport/application';
-import { createHostedView } from '@itookit/node-host/http';
-import { TOOLBOX_KINDS } from '@itookit/app-contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { RpcPeer, installViewProjections } from '@nestos/app-transport/application';
+import { createHostedView } from '@nestos/node-host/http';
+import { TOOLBOX_KINDS } from '@nestos/app-contracts';
 import { ToolboxWorkbench } from '../src/toolbox/ToolboxWorkbench';
 
 it('renders and refreshes prepared toolbox data without frontend filesystem callbacks or directory probes', async () => {

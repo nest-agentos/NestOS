@@ -1,4 +1,4 @@
-import {collectionExecutor, scannerExecutor} from '@itookit/app-contracts';
+import {collectionExecutor, scannerExecutor} from '@nestos/app-contracts';
 import { userIdentity } from './identity';
 import { ruleLines, scanRules } from './scan-rules';
 import type { TwinRecordFamily } from './contracts';
@@ -50,7 +50,7 @@ function validateSettings(data: Data): void {
 }
 function validateJob(data: Data): void {
     validateOutputLimit(data);
-    scannerExecutor(data.executor as import('@itookit/app-contracts').TwinScannerExecutor | undefined);
+    scannerExecutor(data.executor as import('@nestos/app-contracts').TwinScannerExecutor | undefined);
     if (data.meterPeriod !== undefined && (typeof data.meterPeriod !== 'string' || !/^\d{4}-\d{2}$/.test(data.meterPeriod))) invalid();
     for (const key of ['createdAt', 'startedAt', 'finishedAt', 'actualTokens', 'requestStartedAt', 'responseReceivedAt', 'responseCompletedAt']) if (data[key] !== undefined) integers(data, [key]);
     if (data.errorDetail !== undefined) strings(data, ['errorDetail']);
@@ -67,8 +67,8 @@ function validateUsage(data: Data): void {
 }
 function validateScanRun(data: Data): void {
     validateOutputLimit(data);
-    collectionExecutor(data.collection as import('@itookit/app-contracts').TwinCollectionExecutor | undefined);
-    scannerExecutor(data.executor as import('@itookit/app-contracts').TwinScannerExecutor | undefined);
+    collectionExecutor(data.collection as import('@nestos/app-contracts').TwinCollectionExecutor | undefined);
+    scannerExecutor(data.executor as import('@nestos/app-contracts').TwinScannerExecutor | undefined);
     if (data.runTokenLimit !== undefined) integers(data, ['runTokenLimit']);
     if (data.budgetUnlimited !== undefined) booleans(data, ['budgetUnlimited']);
     if (data.errorDetail !== undefined) strings(data, ['errorDetail']);

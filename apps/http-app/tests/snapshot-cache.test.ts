@@ -1,6 +1,6 @@
 import {expect, it} from 'vitest';
-import {SnapshotCache} from '@itookit/app-transport/http';
-import type {WireValue} from '@itookit/app-transport/rpc';
+import {SnapshotCache} from '@nestos/app-transport/http';
+import type {WireValue} from '@nestos/app-transport/rpc';
 
 const data = (name = 'Before'): WireValue => ({$object: {catalog: {$object: {name, models: Array.from({length: 100}, (_, id) => ({$object: {id, label: 'Model'}}))}},
     current: {$capability: {id: 'server:current:1', kind: 'View', fields: {}, snapshots: {}}}}});

@@ -1,4 +1,4 @@
-import type { SkillDefinition } from '@itookit/tools/contracts';
+import type { SkillDefinition } from '@nestos/tools/contracts';
 
 /** Read explicitly declared supporting material through the Session's authorized file port. */
 export async function skillSupportPrompt(skill: SkillDefinition, read?: (path: string) => Promise<string>): Promise<string> {

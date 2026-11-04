@@ -1,5 +1,5 @@
-import {sha256HexSync} from '@itookit/common';
-import {DEFAULT_KANBAN_WORK_TYPES, type KanbanBoard, type KanbanItem, type KanbanService, type KanbanWorkDefinition, type KanbanEstimate} from '@itookit/kanban/contracts';
+import {sha256HexSync} from '@nestos/common';
+import {DEFAULT_KANBAN_WORK_TYPES, type KanbanBoard, type KanbanItem, type KanbanService, type KanbanWorkDefinition, type KanbanEstimate} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 import {requireValue} from './validation';
 

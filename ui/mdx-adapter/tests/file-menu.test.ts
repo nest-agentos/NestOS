@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import type {MDxEditor} from '@itookit/mdxeditor';
+import type {MDxEditor} from '@nestos/mdxeditor';
 import {mountFileMenu} from '../src/file-menu';
 
 const cleanups: Array<() => void> = [];

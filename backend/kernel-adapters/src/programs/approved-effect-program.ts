@@ -1,4 +1,4 @@
-import { interactionApproved } from '@itookit/durable-kernel';
+import { interactionApproved } from '@nestos/durable-kernel';
 import type {
     Decision,
     DurableTaskProgram,
@@ -6,7 +6,7 @@ import type {
     JsonValue,
     SerializableError,
     TaskInputEvent,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 
 export interface ApprovedEffectInput {
     effect: EffectRequest & { id: string };

@@ -1,6 +1,6 @@
-import type { KernelViewPort } from '@itookit/durable-kernel/contracts';
-import type { FSNode } from '@itookit/vfs-core';
-import {randomUUID} from '@itookit/common';
+import type { KernelViewPort } from '@nestos/durable-kernel/contracts';
+import type { FSNode } from '@nestos/vfs-core';
+import {randomUUID} from '@nestos/common';
 import { resolveBrowserTarget } from './browser-routes';
 
 /** Cache only small derived summaries; Task bodies and conversation history stay cold. */

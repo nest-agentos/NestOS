@@ -1,7 +1,7 @@
-import {flowToolDependencyIssues} from '@itookit/llm-flow/contracts';
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {FlowToolDependency, ToolDependencyResolver, ToolDependencyResult, ToolDependencyState, ToolPackages, ToolConnections, ToolPackageSettings, ToolPackageInfo} from '@itookit/app-contracts/services';
-import type {IToolService} from '@itookit/tools/contracts';
+import {flowToolDependencyIssues} from '@nestos/llm-flow/contracts';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {FlowToolDependency, ToolDependencyResolver, ToolDependencyResult, ToolDependencyState, ToolPackages, ToolConnections, ToolPackageSettings, ToolPackageInfo} from '@nestos/app-contracts/services';
+import type {IToolService} from '@nestos/tools/contracts';
 
 type Catalog = Pick<IToolService, 'getToolMeta'>;
 const log = createModuleLogger('tool-package-flows');
@@ -11,7 +11,7 @@ const errorCode = (error: unknown): string => typeof (error as {code?: unknown})
 /** Application adapters accept identities; only the host knows module and executable locations. */
 export class FlowToolPackages implements ToolPackages {
     constructor(private readonly catalog: Catalog, private readonly resolver?: ToolDependencyResolver, readonly connections?: ToolConnections,
-        private readonly restoreFlows?: (templates: import('@itookit/llm-flow/contracts').FlowDraft[]) => Promise<number>) {}
+        private readonly restoreFlows?: (templates: import('@nestos/llm-flow/contracts').FlowDraft[]) => Promise<number>) {}
     assertRemovable?: (tools: string[]) => Promise<void>;
     existingFlowIds?: () => Promise<Set<string>>;
     onChange(listener: () => void): () => void {return this.resolver?.onChange?.(listener) ?? (() => {});}

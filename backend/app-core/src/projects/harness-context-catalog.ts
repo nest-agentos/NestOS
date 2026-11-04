@@ -1,8 +1,8 @@
-import {createModuleLogger, randomUUID, sha256HexSync} from '@itookit/common';
-import {KernelError, KernelErrorCode, type Kernel, type JsonValue} from '@itookit/durable-kernel';
-import type {ContextBinding, ContextCheckpoint} from '@itookit/kernel-adapters/contracts';
+import {createModuleLogger, randomUUID, sha256HexSync} from '@nestos/common';
+import {KernelError, KernelErrorCode, type Kernel, type JsonValue} from '@nestos/durable-kernel';
+import type {ContextBinding, ContextCheckpoint} from '@nestos/kernel-adapters/contracts';
 import {assertContextBindingQuery, type ContextBindingPage, type ContextBindingQuery, type ContextBindingReader,
-    type ContextBindingSummary, type ContextCheckpointSummary} from '@itookit/llm-session/contracts';
+    type ContextBindingSummary, type ContextCheckpointSummary} from '@nestos/llm-session/contracts';
 import {readContextBindingCollection} from './harness-context-bindings';
 import {executionError} from './harness-execution-journal';
 

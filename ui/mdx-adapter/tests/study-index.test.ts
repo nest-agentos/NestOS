@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {CLOZE_SRS_PATH, CLOZE_DOCUMENT_KEY, clozeDocumentPrefix} from '@itookit/app-contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {CLOZE_SRS_PATH, CLOZE_DOCUMENT_KEY, clozeDocumentPrefix} from '@nestos/app-contracts';
 import {studyIndex, STUDY_REFRESH_MS} from '../src/study-index';
 import {createStudyHost} from '../src/study';
 import {SeqFileStore} from '../src/srs-store';

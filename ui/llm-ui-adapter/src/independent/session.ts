@@ -4,23 +4,23 @@ import {SessionExecution} from './session-execution';
 import {messageState, toolState} from './message-state';
 import {verifyInputContext} from '../services/verify-input-context';
 import {prepareInputContextDraft} from '../domain/context-draft';
-import type {ContextOptionsQuery, ContextOptionsPage} from '@itookit/llm-session/contracts';
+import type {ContextOptionsQuery, ContextOptionsPage} from '@nestos/llm-session/contracts';
 import type {InteractionDraftStorage} from '../domain/interaction-draft';
 import {CallControlOperations} from './call-control';
 import {SessionCallPresentation} from './session-calls';
-import {createModuleLogger, t} from '@itookit/common';
-import {IndependentCallCommand, type IndependentCallReceipt} from '@itookit/llm-session/contracts';
+import {createModuleLogger, t} from '@nestos/common';
+import {IndependentCallCommand, type IndependentCallReceipt} from '@nestos/llm-session/contracts';
 import {InvocationOperations} from '../flows/invocation-operations';
 import {ControlOperations} from '../flows/control-operations';
 import type {ImageEditingHost} from './image-editing';
 import { type ConversationActions, type MessagePart,
-    type OperationContext, type OperationLedger, type OperationReceipt, type SelectorView, type ComposerCommand, type CommandSubmission } from '@itookit/llm-ui';
-import {getOperationCallInput, type ComposerInputContract, type ChatSubmission} from '@itookit/llm-ui';
-import { createAgentSendIntent, type SessionSubmission } from '@itookit/llm-flow/contracts';
-import {isTargetRef, type FlowCallSource} from '@itookit/llm-flow/contracts';
+    type OperationContext, type OperationLedger, type OperationReceipt, type SelectorView, type ComposerCommand, type CommandSubmission } from '@nestos/llm-ui';
+import {getOperationCallInput, type ComposerInputContract, type ChatSubmission} from '@nestos/llm-ui';
+import { createAgentSendIntent, type SessionSubmission } from '@nestos/llm-flow/contracts';
+import {isTargetRef, type FlowCallSource} from '@nestos/llm-flow/contracts';
 import {SessionCallTargets} from './session-targets';
 import { SessionCommand, type ExecutionNode, type ICommandBus, type SubmissionRequest,
-    type SessionGroup, type SessionViewPort } from '@itookit/llm-session/contracts';
+    type SessionGroup, type SessionViewPort } from '@nestos/llm-session/contracts';
 import { ChatProjection } from './projection';
 
 const independentLog = createModuleLogger('independent-chat-admission');
@@ -32,8 +32,8 @@ export interface SessionChatBindingOptions {
     readonly openOutputs?: (taskId: string) => void | Promise<void>;
     readonly prepareRequest?: (request: SubmissionRequest, input: ChatSubmission) => Promise<SubmissionRequest>;
     readonly prepareAttachments?: (input: ChatSubmission, operationId: string) => Promise<NonNullable<SubmissionRequest['attachments']>>;
-    readonly executionOverrides?: (input: ChatSubmission, draft?: import('@itookit/llm-ui').ComposerDraft) => SubmissionRequest['overrides'];
-    readonly kernel?: import('@itookit/durable-kernel/contracts').EditorTaskControlPlane;
+    readonly executionOverrides?: (input: ChatSubmission, draft?: import('@nestos/llm-ui').ComposerDraft) => SubmissionRequest['overrides'];
+    readonly kernel?: import('@nestos/durable-kernel/contracts').EditorTaskControlPlane;
     readonly readOnly?: boolean;
     readonly instructionQueue?: boolean;
     readonly structuredInputDialog?: boolean;
@@ -52,7 +52,7 @@ export interface SessionChatBindingOptions {
     /** Enable the published Agent/Flow selector through the existing Session command port. */
     readonly targetSelection?: boolean;
     readonly autoSelectFirstTarget?: boolean;
-    readonly onTargetsChanged?: (catalog: import('@itookit/llm-ui').CallTargetCatalog) => void;
+    readonly onTargetsChanged?: (catalog: import('@nestos/llm-ui').CallTargetCatalog) => void;
     /** Offer independent calls for published targets; the host keeps all execution state. */
     readonly independentCalls?: boolean;
     readonly openChild?: (sessionId: string) => void | Promise<void>;
@@ -182,7 +182,7 @@ class SessionChatBinding {
             void this.check(message.submissionId).then(accepted => { if (accepted) this.publish(); }).catch(error => this.options.onError?.(error));
         }
     }
-    private observeQueue(queue?: import('@itookit/llm-session/contracts').SessionInstructionQueue): void {
+    private observeQueue(queue?: import('@nestos/llm-session/contracts').SessionInstructionQueue): void {
         if (queue?.sessionId !== this.sessionId) return;
         for (const item of queue.items) {
             const submission = item.sendIntent?.submission, expected = this.submission(item.id);
@@ -203,7 +203,7 @@ class SessionChatBinding {
         if (!input?.target && !(input as {request?: SubmissionRequest} | undefined)?.request?.target) return Promise.resolve(false);
         const request = this.frozenRequest(operationId);
         const title = this.independentTitle(operationId), started = Date.now();
-        const pending = this.options.commands.execute<import('@itookit/llm-session/contracts').SubmissionReceipt>(
+        const pending = this.options.commands.execute<import('@nestos/llm-session/contracts').SubmissionReceipt>(
             title ? IndependentCallCommand.Inspect : SessionCommand.InspectSubmissionReceipt,
             title ? {request, title} : request).then(receipt => {
                 if (title) assertIndependentReceipt(receipt as IndependentCallReceipt, this.sessionId);
@@ -302,7 +302,7 @@ class SessionChatBinding {
             throw Object.assign(new Error('Frozen submission context is unavailable'), {code: 'SUBMISSION_CONTEXT_MISSING'});
         return structuredClone(request);
     }
-    private targetRequest(input: ChatSubmission, operationId: string, draft?: import('@itookit/llm-ui').ComposerDraft): import('@itookit/llm-session/contracts').SubmissionRequest {
+    private targetRequest(input: ChatSubmission, operationId: string, draft?: import('@nestos/llm-ui').ComposerDraft): import('@nestos/llm-session/contracts').SubmissionRequest {
         const target = input.target!;
         if (!isTargetRef(target)) throw Object.assign(new Error('Invalid frozen call target'), {code: 'SUBMISSION_TARGET_INVALID'});
         const context = prepareInputContextDraft(input.context, {sessionId: this.sessionId, branchId: this.branch, target});
@@ -312,7 +312,7 @@ class SessionChatBinding {
             attachments: input.attachments.map(file => ({name: file.name, type: file.mimeType ?? '', path: file.id})),
             ...(input.input || context || this.options.executionOverrides ? {overrides: {...this.options.executionOverrides?.(input, draft), ...(context ? {harnessConversation: context.selection} : {}),
                 ...(input.input ? {flowExpectedSignature: {...input.input.signature,
-                    id: input.input.signature.id as import('@itookit/llm-flow/contracts').FlowId}} : {})}} : {}), submission: this.submission(operationId)};
+                    id: input.input.signature.id as import('@nestos/llm-flow/contracts').FlowId}} : {})}} : {}), submission: this.submission(operationId)};
     }
     private command(input: CommandSubmission, context: OperationContext): Promise<OperationReceipt> {
         if (this.options.readOnly) return Promise.resolve(rejected(context, 'READ_ONLY', 'Conversation is read-only'));
@@ -390,7 +390,7 @@ function validInputContract(input: ChatSubmission, contract?: ComposerInputContr
 export {createRetainedSessionChatView as createSessionChatView} from './session-view';
 export type {SessionChatView} from './session-view';
 
-function splitUserMessages(group: SessionGroup, message: import('@itookit/llm-ui').ChatMessage): import('@itookit/llm-ui').ChatMessage[] {
+function splitUserMessages(group: SessionGroup, message: import('@nestos/llm-ui').ChatMessage): import('@nestos/llm-ui').ChatMessage[] {
     if (group.role !== 'user' || !group.inputMessages || group.inputMessages.length < 2) return [message];
     return group.inputMessages.map((input, index, inputs) => ({...message, id: `${group.id}:input:${index}`,
         ...(index === inputs.length - 1 ? {} : {submissionId: undefined}),

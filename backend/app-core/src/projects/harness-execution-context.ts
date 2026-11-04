@@ -1,5 +1,5 @@
-import type {ContextBinding, ContextBindingRef, HarnessExecutionRequest} from '@itookit/kernel-adapters/contracts';
-import {assertHarnessContextRequest} from '@itookit/kernel-adapters/contracts';
+import type {ContextBinding, ContextBindingRef, HarnessExecutionRequest} from '@nestos/kernel-adapters/contracts';
+import {assertHarnessContextRequest} from '@nestos/kernel-adapters/contracts';
 import {HarnessContextBindings} from './harness-context-bindings';
 import {executionError, nativeOperationId, type ExecutionJournal} from './harness-execution-journal';
 import type {NativeExecution} from './harness-execution-operations';

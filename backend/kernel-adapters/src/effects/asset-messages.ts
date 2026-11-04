@@ -1,6 +1,6 @@
-import type {ChatCompletionParams} from '@itookit/driver-llm/contracts';
-import type {EffectExecutionContext} from '@itookit/durable-kernel';
-import type {TaskAssetReader, BinaryAssetReference} from '@itookit/tools/contracts';
+import type {ChatCompletionParams} from '@nestos/driver-llm/contracts';
+import type {EffectExecutionContext} from '@nestos/durable-kernel';
+import type {TaskAssetReader, BinaryAssetReference} from '@nestos/tools/contracts';
 
 /** Expand only at provider dispatch; persisted requests and diagnostics retain references. */
 export async function materializeAssetMessages(request: ChatCompletionParams, context: EffectExecutionContext,

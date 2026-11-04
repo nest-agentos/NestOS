@@ -1,7 +1,7 @@
 import {ASSISTANT_ADD_EVENT, type ShortcutRequest} from './assistant-actions';
-import {setTimePresentation, navigationItem} from '@itookit/ui-common-adapter';
-import {ACTION_ICONS, createModuleLogger, escapeHTML, randomUUID, t} from '@itookit/common';
-import type {ApplicationBackend, ApplicationServices, AssistantEvent, AssistantOverview} from '@itookit/app-contracts/services';
+import {setTimePresentation, navigationItem} from '@nestos/ui-common-adapter';
+import {ACTION_ICONS, createModuleLogger, escapeHTML, randomUUID, t} from '@nestos/common';
+import type {ApplicationBackend, ApplicationServices, AssistantEvent, AssistantOverview} from '@nestos/app-contracts/services';
 import type {VfsJsonStore} from '../persistence/vfs-json-store';
 import {assistantLabel as label, shortcutEditor, readShortcutForm, updateShortcutFields, filterTargetChoices, filterSessionChoices, type AssistantChoices} from './assistant-editor';
 import {matchesShortcutQuery, shortcutSearchValues, validShortcutTarget, ASSISTANT_MENU_DOCUMENT, emptyAssistantState, readAssistantState, shortcutNavigation, type AssistantShortcut, type AssistantMenuState} from './assistant-shortcuts';

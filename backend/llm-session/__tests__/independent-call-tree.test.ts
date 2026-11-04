@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import {taskStat, type Kernel, type TaskRecord} from '@itookit/durable-kernel';
+import {taskStat, type Kernel, type TaskRecord} from '@nestos/durable-kernel';
 import {readIndependentCallTree} from '../src/session/independent-call-tree';
 function task(id: string, parentTaskId?: string, rootTaskId = 'root'): TaskRecord {
     return {id, sessionId: 'child', parentTaskId, rootTaskId, version: 1, status: 'succeeded', exit: {kind: 'succeeded'}, effects: {},

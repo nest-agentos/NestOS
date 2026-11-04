@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {getLogger} from '@itookit/common';
-import type {SessionActivity} from '@itookit/durable-kernel/contracts';
+import {getLogger} from '@nestos/common';
+import type {SessionActivity} from '@nestos/durable-kernel/contracts';
 import {assistantOverview, sessionEvent} from '../src/assistant/overview';
 const activity = (patch: Partial<SessionActivity> = {}): SessionActivity => ({sessionId: 'session', sessionStatus: 'open', revision: 1, asOfSequence: 1,
     counts: {running: 0, queued: 0, created: 0, waiting: 0, paused: 0, blocked: 0, succeeded: 0, failed: 0, cancelled: 0}, pending: {approval: 0, input: 0, cleanup: 0}, ...patch});

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { SessionDirectoryStorageResolver } from '../src/persistence/session-directory-storage';
 import { SessionRepository } from '../src/persistence/session-repository';
 import { SessionManager } from '../src/session/session-manager';

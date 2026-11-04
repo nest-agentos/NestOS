@@ -1,6 +1,6 @@
-# @itookit/durable-kernel — API 参考
+# @nestos/durable-kernel — API 参考
 
-> 持久化执行内核：`DurableTaskProgram`（init/reduce 状态机）+ `EffectAdapter`（副作用）+ Task/Resource/Budget/Interaction 的调度与恢复。所有 API 从 `@itookit/durable-kernel` 根导出。
+> 持久化执行内核：`DurableTaskProgram`（init/reduce 状态机）+ `EffectAdapter`（副作用）+ Task/Resource/Budget/Interaction 的调度与恢复。所有 API 从 `@nestos/durable-kernel` 根导出。
 
 独立包使用者请先读随包提供的[接口参考](../libraries/durable-kernel/docs/api.md)和[事件契约](../libraries/durable-kernel/docs/events.md)。本文保留根入口及宿主集成扩展；[接口审查](./design/durable-kernel-interface-review.md)区分当前行为与建议修订。
 
@@ -627,7 +627,7 @@ catch (e) {
 
 ## 源码结构：文件与路径
 
-`@itookit/durable-kernel` 的公共 API 全部从 `libraries/durable-kernel/src/index.ts` 根导出（`exports['.']` 指向 `src/index.ts`）。包内按 **六层** 组织，依赖单向向下：
+`@nestos/durable-kernel` 的公共 API 全部从 `libraries/durable-kernel/src/index.ts` 根导出（`exports['.']` 指向 `src/index.ts`）。包内按 **六层** 组织，依赖单向向下：
 
 ```
 libraries/durable-kernel/src/
@@ -710,7 +710,7 @@ libraries/durable-kernel/src/
                        cache-operation/<operationId>
 ```
 
-**观察投影的取消三态**：`taskStat(task)` 的 `control.requested` 在取消请求被接受后即为 `'cancel'`，而 `control.acknowledged` 只有在**没有任何在途/待清理操作**（`activeOperations === 0`，含 `cleanupPending` 的 Effect）时才为 true——即“请求已接受/逻辑状态已变化”与“外部确已停止”可区分；`taskStat`/`taskStats`/`sessionStat` 现由包入口公开导出，`@itookit/app-core` 的 `taskSummary` 透传 `control`/`activeOperations` 供宿主渲染。回归 `libraries/durable-kernel/src/kernel.test.ts`「distinguishes an accepted cancel request from a confirmed external stop」。
+**观察投影的取消三态**：`taskStat(task)` 的 `control.requested` 在取消请求被接受后即为 `'cancel'`，而 `control.acknowledged` 只有在**没有任何在途/待清理操作**（`activeOperations === 0`，含 `cleanupPending` 的 Effect）时才为 true——即“请求已接受/逻辑状态已变化”与“外部确已停止”可区分；`taskStat`/`taskStats`/`sessionStat` 现由包入口公开导出，`@nestos/app-core` 的 `taskSummary` 透传 `control`/`activeOperations` 供宿主渲染。回归 `libraries/durable-kernel/src/kernel.test.ts`「distinguishes an accepted cancel request from a confirmed external stop」。
 
 **预算结算幂等**：`chargeBudget` 可选 `usageId`——扣费与 `usage/<usageId>` 回执在同一事务写入，同 id 重放返回记录的回执（不再扣费），同 id 不同金额/资源/维度抛冲突；Effect 路径由内核默认按逻辑 Effect 结算（`effect:<taskId>:<effectId>:<handleId>:<dimension>`），未提供 `usageId` 的宿主直调保持每次调用都扣。回归 `libraries/durable-kernel/src/kernel.test.ts`。
 

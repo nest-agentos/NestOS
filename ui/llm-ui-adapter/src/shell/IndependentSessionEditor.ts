@@ -12,15 +12,15 @@ import {SharedChatTaskPanel} from './SharedChatTaskPanel';
 import {chatSettings, chatSelectors, mountChatSettings} from './chat-settings';
 import {measureSessionLoad} from './load-metrics';
 import {SessionHistoryActions} from '../independent/session-history-actions';
-import {CHAT_SLOT_CLASSES} from '@itookit/llm-ui';
+import {CHAT_SLOT_CLASSES} from '@nestos/llm-ui';
 import {SessionRunsPanel} from '../flows/SessionRunsPanel';
 import {presentHostControl} from '../independent/button-presentation';
 import {messageMarkdown} from '../independent/message-markdown';
-import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, escapeHTML, getLocale, randomUUID, t} from '@itookit/common';
-import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventMap, type EditorEventCallback} from '@itookit/ui-common-adapter';
-import type {ChatView, ChatSubmission, ComposerDraft} from '@itookit/llm-ui';
-import {SessionCommand, type RootTargetCatalog, type SubmissionRequest} from '@itookit/llm-session/contracts';
-import {createAssetProvider} from '@itookit/mdx-adapter';
+import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, escapeHTML, getLocale, randomUUID, t} from '@nestos/common';
+import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventMap, type EditorEventCallback} from '@nestos/ui-common-adapter';
+import type {ChatView, ChatSubmission, ComposerDraft} from '@nestos/llm-ui';
+import {SessionCommand, type RootTargetCatalog, type SubmissionRequest} from '@nestos/llm-session/contracts';
+import {createAssetProvider} from '@nestos/mdx-adapter';
 import {createSessionChatBinding, createSessionChatView} from '../independent/session';
 import {SessionChatStore} from '../independent/session-store';
 import type {SessionChatView} from '../independent/session-view';
@@ -34,7 +34,7 @@ import {openSessionFlowOutputs} from '../flows/session-output';
 import type {LLMEditorOptions} from './session-editor-options';
 import type {RetainedWorkspaceHandoff} from './drafts/workspace-handoff';
 import {adoptSessionChatView, replaceSessionChatBinding} from '../independent/session-view';
-import type {SessionSubmission} from '@itookit/llm-flow/contracts';
+import type {SessionSubmission} from '@nestos/llm-flow/contracts';
 
 const log = createModuleLogger('session-chat-editor');
 type Binding = ReturnType<typeof createSessionChatBinding>;
@@ -49,7 +49,7 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
     private inputCommands?: SharedChatCommands;
     private taskPanel?: SharedChatTaskPanel;
     private branch = 'main';
-    private initialManifest?: import('@itookit/llm-session/contracts').ConversationManifest;
+    private initialManifest?: import('@nestos/llm-session/contracts').ConversationManifest;
     private active = true;
     private offConfiguration?: () => void;
     private configurationGeneration = 0;
@@ -85,7 +85,7 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
         if (this.config.initialInputState?.text) this.view!.setText(this.config.initialInputState.text);
         measurement.mark('restoreAndRender'); measurement.finish(); this.emit('ready', undefined);
     }
-    private async mount(branch: string, initial?: {uiState?: import('@itookit/llm-session/contracts').ConversationUIState}): Promise<void> {
+    private async mount(branch: string, initial?: {uiState?: import('@nestos/llm-session/contracts').ConversationUIState}): Promise<void> {
         this.checkAlive();
         const previous = this.mountSnapshot();
         const store = await SessionChatStore.open(this.service, this.config.sessionId, branch, new AssetService(this.config.assets), initial);
@@ -222,7 +222,7 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
                 return {update: () => menu.update?.(context), destroy: () => {release(); releaseTransfer(); menu.destroy(); owned.forEach(node => node.remove());}};
             }, mountHeader: (root, context) => this.toolbar(root, taskPanel, context)};
     }
-    private trackUsage(operations: import('@itookit/llm-ui').OperationLedger): () => void {
+    private trackUsage(operations: import('@nestos/llm-ui').OperationLedger): () => void {
         const accepted = new Set(operations.getSnapshot().filter(item => item.status === 'accepted').map(item => item.context.operationId));
         return operations.subscribe(() => {
             for (const record of operations.getSnapshot()) {
@@ -281,7 +281,7 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
         const connections = preferred ? this.connections.map(item => ({...item, isDefault: item.id === preferred})) : this.connections;
         return chatSelectors(connections, chatSettings(this.view?.getDraft().selection, this.settings));
     }
-    private toolbar(root: HTMLElement, taskPanel: SharedChatTaskPanel | undefined, context: import('@itookit/llm-ui').ToolbarContext) {
+    private toolbar(root: HTMLElement, taskPanel: SharedChatTaskPanel | undefined, context: import('@nestos/llm-ui').ToolbarContext) {
         const menuHost = context.headerMenu;
         const releases: (() => void)[] = [], previous = new Set(root.childNodes);
         if (taskPanel) root.append(taskPanel.element);
@@ -353,7 +353,7 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
     cancelPendingRender(): void {this.active = false; this.sessionRunsPanel?.setVisible(false); this.view?.setActive(false);}
     async activate(): Promise<void> {
         if (this.closed) return;
-        const snapshot = await this.config.commandBus!.execute<import('@itookit/llm-session/contracts').SessionSnapshot>(SessionCommand.Bind, {sessionId: this.config.sessionId});
+        const snapshot = await this.config.commandBus!.execute<import('@nestos/llm-session/contracts').SessionSnapshot>(SessionCommand.Bind, {sessionId: this.config.sessionId});
         const branch = snapshot.view?.manifest.currentBranch ?? (await this.service.getManifest(this.config.sessionId)).currentBranch;
         if (branch !== this.branch) {
             await this.flushPendingSave(); this.settings = snapshot.view?.settings ?? await this.sessions.getSessionSettings(); await this.mount(branch);
@@ -372,7 +372,7 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
     get commands() {return {prepareChatInput: (input: ChatSubmission, draft: ComposerDraft) => this.inputCommands?.direct(input, draft), getInputConfig: () => ({text: this.view?.getDraft().text ?? '',
         agentId: this.view?.getDraft().target?.id ?? 'default', settings: chatSettings(this.view?.getDraft().selection, this.settings)}), chatBindingIdentity: () => this.binding?.source.getSnapshot(), takeViewOwnership: () => {this.ownsView = true; this.handoff = undefined;},
         preparedSubmission: () => this.resolveSubmission(),
-        sendMessage: async (input: {text: string; files?: File[]; target?: import('@itookit/llm-flow/contracts').TargetRef}) => {
+        sendMessage: async (input: {text: string; files?: File[]; target?: import('@nestos/llm-flow/contracts').TargetRef}) => {
         if (!this.active || this.closed || this.config.readOnly) throw new Error('Session input unavailable');
         this.view!.setText(input.text); if (input.files?.length) await this.view!.addFiles(input.files); await this.view!.submit();
     }};}

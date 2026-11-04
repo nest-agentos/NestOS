@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { RpcPeer } from '@itookit/app-transport/application';
-import { HttpViewClient } from '@itookit/app-transport/http';
-import { bindApplicationBackend } from '@itookit/app-core/host';
-import type { LocalApplicationServices } from '@itookit/app-contracts/services';
+import { RpcPeer } from '@nestos/app-transport/application';
+import { HttpViewClient } from '@nestos/app-transport/http';
+import { bindApplicationBackend } from '@nestos/app-core/host';
+import type { LocalApplicationServices } from '@nestos/app-contracts/services';
 import { ProjectFavorites } from '../../../backend/app-core/src/projects/favorites/service';
-import type { ProjectFavorite, ProjectFavoriteTarget } from '@itookit/app-contracts/services';
+import type { ProjectFavorite, ProjectFavoriteTarget } from '@nestos/app-contracts/services';
 
 const releases: Array<() => Promise<void>> = [];
 afterEach(async () => { await Promise.all(releases.splice(0).reverse().map(release => release())); });

@@ -1,9 +1,9 @@
 import { afterEach, expect, it } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import type {KanbanActor, KanbanBoard, KanbanCommand} from '@itookit/kanban/contracts';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import type {KanbanActor, KanbanBoard, KanbanCommand} from '@nestos/kanban/contracts';
 import {createNestOSKanban} from '../src/kanban';
-import {KanbanError} from '@itookit/kanban';
-import {SeqKanbanStore} from '@itookit/kanban/storage';
+import {KanbanError} from '@nestos/kanban';
+import {SeqKanbanStore} from '@nestos/kanban/storage';
 
 const disposers: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const dispose of disposers.splice(0)) await dispose(); });
@@ -135,7 +135,7 @@ it('pages events with stable sequence and validates cursors', async () => {
     await expect(f.service.events('board', -1)).rejects.toThrow('INVALID_CURSOR');
 });
 it('coalesces monitor ticks and waits for in-flight scanning on disposal', async () => {
-    const { startKanbanMonitor } = await import('@itookit/kanban/execution');
+    const { startKanbanMonitor } = await import('@nestos/kanban/execution');
     let tick = () => {}, scans = 0, released = false, unsubscribed = false;
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });

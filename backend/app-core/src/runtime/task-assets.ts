@@ -1,9 +1,9 @@
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 import {readInputAsset} from './input-assets';
-import type { Kernel, TaskRecord } from '@itookit/durable-kernel';
-import type { TaskAssetReader } from '@itookit/tools/contracts';
-import { readMediaAsset } from '@itookit/kernel-adapters';
-import { resolveFlowRunForTask } from '@itookit/llm-flow';
+import type { Kernel, TaskRecord } from '@nestos/durable-kernel';
+import type { TaskAssetReader } from '@nestos/tools/contracts';
+import { readMediaAsset } from '@nestos/kernel-adapters';
+import { resolveFlowRunForTask } from '@nestos/llm-flow';
 
 /** Task assets may cross node boundaries only inside the same authoritative Flow run. */
 export function createTaskAssetReader(getKernel: () => Kernel, inputFS?: IFileSystem): TaskAssetReader {

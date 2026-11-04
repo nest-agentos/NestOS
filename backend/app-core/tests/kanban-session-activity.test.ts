@@ -1,7 +1,7 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {executionSessionReference} from '@itookit/app-contracts';
-import type {KanbanCommand} from '@itookit/kanban/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {executionSessionReference} from '@nestos/app-contracts';
+import type {KanbanCommand} from '@nestos/kanban/contracts';
 import {createApplicationRuntime, type ApplicationRuntime} from '../src/runtime/create-application-runtime';
 
 let runtime: ApplicationRuntime | undefined;

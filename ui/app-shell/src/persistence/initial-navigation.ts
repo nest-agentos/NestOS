@@ -1,4 +1,4 @@
-import type { UIPersistencePort } from '@itookit/vfs-ui';
+import type { UIPersistencePort } from '@nestos/vfs-ui';
 
 /** Restore presentation preferences without turning a saved selection into navigation. */
 export function presentationPersistence(port?: UIPersistencePort): UIPersistencePort | undefined {

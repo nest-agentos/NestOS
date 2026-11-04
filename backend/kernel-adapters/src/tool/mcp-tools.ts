@@ -1,9 +1,9 @@
-import type { MCPDiscovery } from '@itookit/tools/mcp-contracts';
-import { mcpToolId } from '@itookit/tools/mcp-contracts';
-export { mcpToolId } from '@itookit/tools/mcp-contracts';
-import type { IToolService, ToolDefinition, ToolExecutionContext } from '@itookit/tools/contracts';
-import type { DeviceContext, IDeviceDriver } from '@itookit/vfs-core';
-import { createToolProgressReporter } from '@itookit/tools';
+import type { MCPDiscovery } from '@nestos/tools/mcp-contracts';
+import { mcpToolId } from '@nestos/tools/mcp-contracts';
+export { mcpToolId } from '@nestos/tools/mcp-contracts';
+import type { IToolService, ToolDefinition, ToolExecutionContext } from '@nestos/tools/contracts';
+import type { DeviceContext, IDeviceDriver } from '@nestos/vfs-core';
+import { createToolProgressReporter } from '@nestos/tools';
 import { LLM_IOCTL } from '../llm-management/contracts/device';
 
 const encode = (value: string) => encodeURIComponent(value).replace(/_/g, '%5F').replace(/%/g, '_');

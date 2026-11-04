@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {sha256Hex} from '@itookit/common';
-import {ArtifactCommand, type ExecutionArtifactDescriptor, type ReadExecutionArtifact} from '@itookit/app-contracts';
+import {sha256Hex} from '@nestos/common';
+import {ArtifactCommand, type ExecutionArtifactDescriptor, type ReadExecutionArtifact} from '@nestos/app-contracts';
 import {TaskArtifactBrowser} from '../../llm-ui-adapter/src/components/dag/TaskArtifactBrowser';
 import {readArtifactContent} from '../../llm-ui-adapter/src/components/dag/artifact-content';
 

@@ -1,1 +1,1 @@
-export {copyText} from '@itookit/ui-common';
+export {copyText} from '@nestos/ui-common';

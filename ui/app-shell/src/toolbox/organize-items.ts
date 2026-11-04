@@ -1,6 +1,6 @@
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import {describeErrorReason, type DeleteResult} from '@itookit/vfs-ui';
-import type {DrawerKind} from '@itookit/app-contracts';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import {describeErrorReason, type DeleteResult} from '@nestos/vfs-ui';
+import type {DrawerKind} from '@nestos/app-contracts';
 
 interface Options {
     signal: AbortSignal;

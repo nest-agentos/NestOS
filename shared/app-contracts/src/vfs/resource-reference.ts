@@ -28,7 +28,7 @@ export function formatResourceReference(reference: ResourceReference): string {
 }
 export const InputSourceCommand = {Catalog: 'app.input-source.catalog', Execute: 'app.input-source.execute', Inspect: 'app.input-source.inspect'} as const;
 export type ExecutableInputSource =
-    | {kind: 'tool'; toolId: string; toolVersion: string; args: Record<string, import('@itookit/llm-flow/contracts').JsonValue>}
-    | {kind: 'flow'; flowId: string; revision: number; digest: string; parameters: Record<string, import('@itookit/llm-flow/contracts').JsonValue>; connectionId?: string; connectionBindings?: Record<string, string>};
+    | {kind: 'tool'; toolId: string; toolVersion: string; args: Record<string, import('@nestos/llm-flow/contracts').JsonValue>}
+    | {kind: 'flow'; flowId: string; revision: number; digest: string; parameters: Record<string, import('@nestos/llm-flow/contracts').JsonValue>; connectionId?: string; connectionBindings?: Record<string, string>};
 export interface InputSourceExecution {requestId: string; scope: ResourceScope; source: ExecutableInputSource}
 export interface InputSourceReceipt {sessionId: string; taskId?: string}

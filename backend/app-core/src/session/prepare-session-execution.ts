@@ -1,6 +1,6 @@
-import {KernelError, KernelErrorCode, type Kernel} from '@itookit/durable-kernel';
-import {sessionDirectoryStorage} from '@itookit/llm-session';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {KernelError, KernelErrorCode, type Kernel} from '@nestos/durable-kernel';
+import {sessionDirectoryStorage} from '@nestos/llm-session';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 
 const log = createModuleLogger('session-execution');
 

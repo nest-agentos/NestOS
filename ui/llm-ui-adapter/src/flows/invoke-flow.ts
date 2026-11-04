@@ -1,10 +1,10 @@
 import {resolveFlowArguments} from './flow-arguments';
-import type {OperationLedger} from '@itookit/llm-ui';
+import type {OperationLedger} from '@nestos/llm-ui';
 import { flowConnectionSelection } from './connection-selection';
-import { escapeHTML, t } from '@itookit/common';
-import { type FlowRevision } from '@itookit/llm-flow/contracts';
-import {SessionCommand, type RootCallTarget, type RootTargetCatalog, type ICommandBus } from '@itookit/llm-session/contracts';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
+import { escapeHTML, t } from '@nestos/common';
+import { type FlowRevision } from '@nestos/llm-flow/contracts';
+import {SessionCommand, type RootCallTarget, type RootTargetCatalog, type ICommandBus } from '@nestos/llm-session/contracts';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
 import { promptInvocation } from './prompt-invocation';
 
 /** Slash calls leave the Session's ordinary chat execution mode untouched. */

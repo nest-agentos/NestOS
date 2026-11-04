@@ -1,7 +1,7 @@
-import type {Tool, ToolUseContext} from '@itookit/tools';
+import type {Tool, ToolUseContext} from '@nestos/tools';
 import {pinImplementation, type ImplementationRef} from './execution-records';
 import type {RegisteredToolPackage} from './store';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 const log = createModuleLogger('tool-package-execution');
 
 /** Driver identities remain stable while each admitted call owns an immutable implementation. */

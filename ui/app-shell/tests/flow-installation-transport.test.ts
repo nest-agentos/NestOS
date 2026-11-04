@@ -1,9 +1,9 @@
 import {expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {RpcPeer, installViewProjections} from '@itookit/app-transport/application';
-import {SessionCommand} from '@itookit/llm-session/contracts';
-import {createHostedView} from '@itookit/node-host/http';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {RpcPeer, installViewProjections} from '@nestos/app-transport/application';
+import {SessionCommand} from '@nestos/llm-session/contracts';
+import {createHostedView} from '@nestos/node-host/http';
 
 it('carries package management, installation reports, import results and recovery retries over real RPC capabilities', async () => {
     const packages = [{id: 'external', version: '1', tools: [{id: 'external.read'}], status: 'registered' as const, configuration: {enabled: false, defaults: {}, tools: []}, guide: {version: 1 as const, title: 'Setup', steps: [{title: 'Register', description: 'Always available', command: 'example --help'}]}}];

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createChatView, createOperationLedger, type ChatView, type ConversationSnapshot} from '@itookit/llm-ui';
+import {createChatView, createOperationLedger, type ChatView, type ConversationSnapshot} from '@nestos/llm-ui';
 import {mountChatInputMenu} from './chat-input-menu';
 import {chatAttachmentMenu} from './chat-attachment-menu';
 import {prepareImageChatOptions} from '../independent/image-chat-view';

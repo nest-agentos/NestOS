@@ -9,8 +9,8 @@ import { LatestViewLoad } from '../src/lifecycle/view-load';
 import {compactNavigation} from '../src/workbench/compact-navigation';
 import { Workbench } from '../src/core/Workbench';
 import { createDirectoryBreadcrumbs } from '../src/workbench/directory-breadcrumbs';
-import { FILE_ICONS } from '@itookit/common';
-import { createVFS, MemoryBackend, FSError } from '@itookit/vfs-core';
+import { FILE_ICONS } from '@nestos/common';
+import { createVFS, MemoryBackend, FSError } from '@nestos/vfs-core';
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 

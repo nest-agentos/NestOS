@@ -1,5 +1,5 @@
 import { Channel } from '@tauri-apps/api/core';
-import type { NativeShellOptions } from '@itookit/tools';
+import type { NativeShellOptions } from '@nestos/tools';
 
 export function shellOutputChannel(onOutput?: NativeShellOptions['onOutput']) {
     if (!onOutput) return { channel: undefined, close() {} };

@@ -1,12 +1,12 @@
-import { validateAuthorization } from '@itookit/cells-driver/authorization';
-import type { MCPDiscovery, MCPServer } from '@itookit/tools/mcp-contracts';
-import { FSError, checkOperation, type OperationOptions } from '@itookit/vfs-core';
+import { validateAuthorization } from '@nestos/cells-driver/authorization';
+import type { MCPDiscovery, MCPServer } from '@nestos/tools/mcp-contracts';
+import { FSError, checkOperation, type OperationOptions } from '@nestos/vfs-core';
 import { remoteLog, type MCPConnectionDiagnostic, type MCPConnectionReason } from './remote-diagnostics';
 import { normalizeConnection, type RemoteFileSystemConfig, type RemoteFileSystemInput } from './remote-connections';
 import type { RemoteFileSourceProvider } from './remote-mounts';
 
-import { CELLS_EXTENSION, cellsConfiguration, type CellsConfiguration } from '@itookit/app-contracts';
-export { CELLS_EXTENSION, cellsConfiguration, isCellsTool, type CellsConfiguration } from '@itookit/app-contracts';
+import { CELLS_EXTENSION, cellsConfiguration, type CellsConfiguration } from '@nestos/app-contracts';
+export { CELLS_EXTENSION, cellsConfiguration, isCellsTool, type CellsConfiguration } from '@nestos/app-contracts';
 export interface MCPConfigurationStore {
     getMCPServers(): Promise<MCPServer[]>;
     saveMCPServer(server: MCPServer): Promise<void>;
@@ -17,7 +17,7 @@ export interface MCPConfigurationStore {
 /** A synchronous projection of the MCP catalog, never a second connection store. */
 export class MCPRemoteConnections {
     private entries: RemoteFileSystemConfig[] = [];
-    private protocol = new Map<string, Pick<import('@itookit/app-contracts/services').RemoteProjectStatus['mounts'][number], 'protocol' | 'protocolVersion' | 'fileProtocol' | 'projectProtocol'>>();
+    private protocol = new Map<string, Pick<import('@nestos/app-contracts/services').RemoteProjectStatus['mounts'][number], 'protocol' | 'protocolVersion' | 'fileProtocol' | 'projectProtocol'>>();
     private refreshRevision = 0;
     private loadedRevision = 0;
     private configured: MCPConnectionDiagnostic['configured'] = [];

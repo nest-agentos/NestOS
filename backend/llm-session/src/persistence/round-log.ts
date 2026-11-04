@@ -1,5 +1,5 @@
 import {historyAttachment} from '../contracts/chat';
-import { foldContextHistory } from '@itookit/llm-context';
+import { foldContextHistory } from '@nestos/llm-context';
 // @file: llm-conversation/src/persistence/round-log.ts
 // RoundLog — native Round DAG ILog implementation.
 //
@@ -11,7 +11,7 @@ import { foldContextHistory } from '@itookit/llm-context';
 // except for explicit lifecycle and assistant-output updates.
 
 import type { ILog, Round, RoundId, Ref, RefStore, AssemblyStrategy, RoundResult } from '../contracts';
-import type { ChatMessage, ContextRule } from '@itookit/llm-context';
+import type { ChatMessage, ContextRule } from '@nestos/llm-context';
 import type { ISessionRepository } from './types';
 import type { RoundManifest, PersistedRound, RoundProjection } from './round-types';
 import type { RoundLogEvent } from './round-events';

@@ -1,10 +1,10 @@
-import {resolveChatModelTiers} from '@itookit/kernel-adapters/contracts';
+import {resolveChatModelTiers} from '@nestos/kernel-adapters/contracts';
 import {chatFollowups} from './chat-followups';
-import {createAgentSendIntent} from '@itookit/llm-flow/contracts';
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import {Toast, showConfirmDialog} from '@itookit/ui-common-adapter';
-import {composeCommandCatalogs, type ChatView, type CommandSubmission, type OperationContext, type OperationReceipt, type OperationLedger, type ConversationSnapshot, type ComposerDraft, type ChatSubmission} from '@itookit/llm-ui';
-import {SessionCommand, type SessionViewPort} from '@itookit/llm-session/contracts';
+import {createAgentSendIntent} from '@nestos/llm-flow/contracts';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import {Toast, showConfirmDialog} from '@nestos/ui-common-adapter';
+import {composeCommandCatalogs, type ChatView, type CommandSubmission, type OperationContext, type OperationReceipt, type OperationLedger, type ConversationSnapshot, type ComposerDraft, type ChatSubmission} from '@nestos/llm-ui';
+import {SessionCommand, type SessionViewPort} from '@nestos/llm-session/contracts';
 import type {LLMEditorOptions} from './session-editor-options';
 import {createSlashCommandCatalog} from '../components/input/plugins/slash-command-catalog';
 import type {SlashCommandCallbacks, SlashCommandDef} from '../components/input/plugins/SlashCommandPlugin';

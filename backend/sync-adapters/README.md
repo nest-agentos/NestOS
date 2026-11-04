@@ -1,6 +1,6 @@
 # 同步宿主适配
 
-同步核心仍是独立的 `@itookit/vfs-sync`。本包实现平台存储与 cells 协议，不把同步策略放进 VFS 驱动。
+同步核心仍是独立的 `@nestos/vfs-sync`。本包实现平台存储与 cells 协议，不把同步策略放进 VFS 驱动。
 
 | 共用实现 | 职责 |
 | --- | --- |
@@ -10,11 +10,11 @@
 | `src/shared/local.ts` | 快照缓存、对象、计划及 FileLocal 端口 |
 | `vfs-sync`、`http/client.ts` | 三方规划、发布／回执恢复、远端协议 |
 
-浏览器入口 `@itookit/sync-adapters` 提供 IndexedDB 实现，不加载 Node 模块。Node/POSIX 本地目录入口单独放在 `@itookit/sync-adapters/local`；Tauri 的 IPC 文件端口尚未接入此 Node 入口。
+浏览器入口 `@nestos/sync-adapters` 提供 IndexedDB 实现，不加载 Node 模块。Node/POSIX 本地目录入口单独放在 `@nestos/sync-adapters/local`；Tauri 的 IPC 文件端口尚未接入此 Node 入口。
 
 ```ts
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { LocalSyncStore, createLocalSyncSession } from '@itookit/sync-adapters/local';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { LocalSyncStore, createLocalSyncSession } from '@nestos/sync-adapters/local';
 
 const backend = await openLocalFSBackend({
     rootDir: '/absolute/storage',
@@ -41,4 +41,4 @@ IndexedDB 在一个原生事务中提交文件、基线和应用证据。local �
 
 Native 文件与 SQLite 事务由同一个 sidecar 写锁协调，事务中检查全部租约守卫；跨进程接管不能绕过仍由活进程持有的 SQLite 写锁。FULL 模式的忙锁等待通过异步重试进行，避免同一 Node 进程的第二个连接阻塞第一个连接的异步提交。
 
-验证：`pnpm --filter @itookit/sync-adapters test`，含 IndexedDB/local 的真实 cells 互通、SIGKILL 恢复及租约接管。进程故障测试不等同于实际断电或硬件故障验收。
+验证：`pnpm --filter @nestos/sync-adapters test`，含 IndexedDB/local 的真实 cells 互通、SIGKILL 恢复及租约接管。进程故障测试不等同于实际断电或硬件故障验收。

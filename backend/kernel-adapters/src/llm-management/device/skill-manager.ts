@@ -2,9 +2,9 @@
 //
 // SkillManager — SkillDefinition CRUD, HTTP/Shell/MCP invocation.
 
-import type { LLMSkill } from '@itookit/kernel-adapters/contracts';
-import type { SkillToolBinding } from '@itookit/tools/contracts';
-import type { IVFSManager, IFileSystem } from '@itookit/vfs-core';
+import type { LLMSkill } from '@nestos/kernel-adapters/contracts';
+import type { SkillToolBinding } from '@nestos/tools/contracts';
+import type { IVFSManager, IFileSystem } from '@nestos/vfs-core';
 import yaml from 'js-yaml';
 import { VFSHelpers } from './vfs-helpers';
 import type { MCPManager } from './mcp-manager';

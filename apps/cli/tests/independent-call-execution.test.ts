@@ -1,7 +1,7 @@
 import {expect, it, vi} from 'vitest';
-import type {ApplicationClient} from '@itookit/app-contracts/services';
-import type {IndependentCallInput, IndependentCallReceipt, IndependentCallView} from '@itookit/llm-session/contracts';
-import {IndependentCallCommand} from '@itookit/llm-session/contracts';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
+import type {IndependentCallInput, IndependentCallReceipt, IndependentCallView} from '@nestos/llm-session/contracts';
+import {IndependentCallCommand} from '@nestos/llm-session/contracts';
 import {waitIndependentCall} from '../src/independent-call-execution';
 const input = {request: {expectedBranch: 'main'}} as IndependentCallInput;
 const receipt: IndependentCallReceipt = {operationId: 'call', callerSessionId: 'parent', executionSessionId: 'child', status: 'accepted'};

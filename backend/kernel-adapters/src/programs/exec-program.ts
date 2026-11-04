@@ -5,7 +5,7 @@ import {
     type JsonValue,
     type SerializableError,
     type TaskInputEvent,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 
 export interface ExecProgramInput {
     command: string;

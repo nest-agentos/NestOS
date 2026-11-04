@@ -1,7 +1,7 @@
 import {expect, it, vi} from 'vitest';
-import {createFlowRevision} from '@itookit/llm-flow';
-import type {FlowDraft} from '@itookit/llm-flow/contracts';
-import type {HarnessConnectionSnapshot} from '@itookit/kernel-adapters/contracts';
+import {createFlowRevision} from '@nestos/llm-flow';
+import type {FlowDraft} from '@nestos/llm-flow/contracts';
+import type {HarnessConnectionSnapshot} from '@nestos/kernel-adapters/contracts';
 import {AgentResolver} from '../src/session/agent-resolver';
 import {SessionRunCoordinator} from '../src/session/session-run-coordinator';
 import {prepareDirectConversation, directTaskSpec} from '../src/session/direct-conversation';

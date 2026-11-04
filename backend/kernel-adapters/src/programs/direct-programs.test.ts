@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import type { TaskInputEvent } from '@itookit/durable-kernel';
+import type { TaskInputEvent } from '@nestos/durable-kernel';
 import { ToolProgram } from './tool-program';
 import { MediaProgram } from './media-program';
 

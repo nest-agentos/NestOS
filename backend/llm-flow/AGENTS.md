@@ -48,7 +48,7 @@ src/
 
 ## 公共契约
 
-`@itookit/llm-flow/contracts` 拥有 Flow/DAG、委派、派发、Hook、控制流与模板契约及纯函数；入口不加载执行器或存储实现。实现只依赖 durable-kernel、llm-tasks 和 llm-context，不再依赖 common/llm-common。命令接入经最小 `FlowCommandRegistrar.register` 端口，宿主可直接传入现有 CommandBus。
+`@nestos/llm-flow/contracts` 拥有 Flow/DAG、委派、派发、Hook、控制流与模板契约及纯函数；入口不加载执行器或存储实现。实现只依赖 durable-kernel、llm-tasks 和 llm-context，不再依赖 common/llm-common。命令接入经最小 `FlowCommandRegistrar.register` 端口，宿主可直接传入现有 CommandBus。
 
 ## 约束
 
@@ -59,8 +59,8 @@ src/
 运行：
 
 ```bash
-pnpm --filter @itookit/llm-flow typecheck
-pnpm --filter @itookit/llm-flow test
+pnpm --filter @nestos/llm-flow typecheck
+pnpm --filter @nestos/llm-flow test
 ```
 
 结构化派发配置与边界见 [作文评审实现](../../doc/design/essay-review-flow.md)，可运行定义见 [essay-review.flow](../app-core/src/presets/essay-review.json)。紧凑派发使用 route@2；可视分节点使用 route@3 → check@1 → aggregate@2 → judge@1，`structured/graph.ts` 编译为持久作用域，`expand.ts` 展开旧草稿；业务轮数在判断节点配置 `maxRounds`。

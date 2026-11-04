@@ -1,9 +1,9 @@
-import {conversationStatus} from '@itookit/llm-ui-adapter/presentation';
-import { harnessObservation as observeHarness } from '@itookit/app-contracts';
+import {conversationStatus} from '@nestos/llm-ui-adapter/presentation';
+import { harnessObservation as observeHarness } from '@nestos/app-contracts';
 
-import { resolveBrowserTarget } from '@itookit/app-contracts';
-import type { ProjectService } from '@itookit/app-contracts/services';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
+import { resolveBrowserTarget } from '@nestos/app-contracts';
+import type { ProjectService } from '@nestos/app-contracts/services';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
 import {localSessionStatus} from './local-session-status';
 
 /** Host presentation over public tree ports; no access to the library's internal DOM. */
@@ -22,7 +22,7 @@ export class RemoteSessionStatusView {
     constructor(private readonly harnessObservation: typeof observeHarness, private readonly projects: ProjectService | undefined, private readonly changed: () => void,
         private readonly tabStatus: (id: string, icon: string, tooltip: string) => void,
         private readonly tabTitle?: (id: string, title: string) => void,
-        private readonly connections?: import('@itookit/app-contracts/services').ConnectionObservation) {}
+        private readonly connections?: import('@nestos/app-contracts/services').ConnectionObservation) {}
     project(id?: string) { this.current = id; this.sync(); }
     attach(tab: string, project: string) { this.tabs.set(tab, project); this.activeTab = tab; this.sync(); }
     activate(tab?: string) { this.activeTab = tab; this.sync(); }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import type { DigitalTwinService } from '@itookit/app-core';
+import type { DigitalTwinService } from '@nestos/app-core';
 import { showTwinSource } from '../src/digital-twin/source-dialog';
 
 it('preserves completed progress nodes through timer ticks and unchanged notifications', async () => {

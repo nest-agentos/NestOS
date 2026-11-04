@@ -1,7 +1,7 @@
 import {expect,it,vi} from 'vitest';
-import {createVFS,MemoryBackend} from '@itookit/vfs-core';
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {studySources} from '../src/browser/study-sources';
-import type {ApplicationServices} from '@itookit/app-contracts/services';
+import type {ApplicationServices} from '@nestos/app-contracts/services';
 it('finds documents across workspaces and projects by all keywords and reads only allowed sources',async()=>{
  const {manager}=await createVFS({rootBackend:new MemoryBackend()});
  try {

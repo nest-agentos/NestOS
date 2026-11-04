@@ -1,4 +1,4 @@
-import { traceBoot } from '@itookit/common';
+import { traceBoot } from '@nestos/common';
 import { mapConcurrent } from '../utils/map-concurrent';
 import type { InitializationPhase } from './startup-policy';
 

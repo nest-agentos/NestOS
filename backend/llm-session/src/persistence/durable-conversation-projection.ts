@@ -1,4 +1,4 @@
-import type { JsonValue, SessionHandle, SharedStateEntry } from '@itookit/durable-kernel';
+import type { JsonValue, SessionHandle, SharedStateEntry } from '@nestos/durable-kernel';
 import type { SessionRuntime } from '../core/types';
 import type { ConversationManifest, ISessionRepository } from './types';
 

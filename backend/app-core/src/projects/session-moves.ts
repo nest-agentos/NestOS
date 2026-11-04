@@ -1,9 +1,9 @@
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
-import type { ISessionRepository } from '@itookit/llm-session';
-import type { DirectoryMountService } from '@itookit/app-contracts/services';
-import type { SessionFilesService } from '@itookit/app-contracts/services';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
+import type { ISessionRepository } from '@nestos/llm-session';
+import type { DirectoryMountService } from '@nestos/app-contracts/services';
+import type { SessionFilesService } from '@nestos/app-contracts/services';
 import type { ProjectFavorite } from './favorites/contracts';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import type { ProjectService } from '@nestos/app-contracts/services';
 
 const PATH = '/var/lib/projects/session-moves.seq';
 interface MoveRecord { version: 1; from?: string; to: string; favorite?: ProjectFavorite; access: 'ro' | 'rw' }

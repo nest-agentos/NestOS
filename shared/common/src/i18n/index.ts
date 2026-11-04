@@ -2,7 +2,7 @@
 // Lightweight i18n — no runtime dependencies, tree-shakeable.
 //
 // Usage:
-//   import { t, setLocale } from '@itookit/common';
+//   import { t, setLocale } from '@nestos/common';
 //
 //   t('skill.toast.saved')               // '已保存'
 //   t('skill.toast.imported', { count: 3 }) // '已导入 3 个 Skill'

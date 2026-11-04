@@ -1,6 +1,6 @@
-import {randomUUID, createModuleLogger} from '@itookit/common';
-import type {OperationLedger, OperationRecord} from '@itookit/llm-ui';
-import type {IPrivilegedCommandService, ToolCommandRequest} from '@itookit/llm-session/contracts';
+import {randomUUID, createModuleLogger} from '@nestos/common';
+import type {OperationLedger, OperationRecord} from '@nestos/llm-ui';
+import type {IPrivilegedCommandService, ToolCommandRequest} from '@nestos/llm-session/contracts';
 import {canonicalJson} from '../utils/canonical-json';
 
 interface Frozen {protocol: 'tool-command-v1'; request: ToolCommandRequest}

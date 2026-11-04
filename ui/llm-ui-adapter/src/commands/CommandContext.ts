@@ -1,7 +1,7 @@
 // @file: llm-ui/commands/CommandContext.ts
 
-import type { ICommandBus, ISession } from '@itookit/llm-session/contracts';
-import type { SessionGroup } from '@itookit/llm-session/contracts';
+import type { ICommandBus, ISession } from '@nestos/llm-session/contracts';
+import type { SessionGroup } from '@nestos/llm-session/contracts';
 import type { IHistoryPresenter } from '../domain/ports/IHistoryPresenter';
 import type { IChatInputPresenter } from '../domain/ports/IChatInputPresenter';
 import type { IEditorEventBus } from '../domain/events';
@@ -25,10 +25,10 @@ import type { BranchService } from '../services/BranchService';
  * Command 完全不知道 UI 实现细节。
  */
 export interface CommandContext {
-    reconcileSubmission?(request: import('@itookit/llm-session/contracts').SubmissionRequest): Promise<import('@itookit/llm-session/contracts').SubmissionReceipt>;
+    reconcileSubmission?(request: import('@nestos/llm-session/contracts').SubmissionRequest): Promise<import('@nestos/llm-session/contracts').SubmissionReceipt>;
     getBranch?(): string;
-    operations?: import('@itookit/llm-ui').OperationLedger;
-    observeInstructions?(listener: (queue: import('@itookit/llm-session/contracts').SessionInstructionQueue) => void): () => void;
+    operations?: import('@nestos/llm-ui').OperationLedger;
+    observeInstructions?(listener: (queue: import('@nestos/llm-session/contracts').SessionInstructionQueue) => void): () => void;
     // 数据层
     /** 获取当前会话的所有消息投影 */
     getSessions: () => SessionGroup[];
@@ -53,5 +53,5 @@ export interface CommandContext {
     isGenerating?: () => boolean;
     /** Execute explicit user shell input through the host's existing process policy. */
     executeDirectCommand?: (command: string) => Promise<void>;
-    resolveSubmission?: () => Promise<import('@itookit/llm-flow/contracts').SendIntent['submission']>;
+    resolveSubmission?: () => Promise<import('@nestos/llm-flow/contracts').SendIntent['submission']>;
 }

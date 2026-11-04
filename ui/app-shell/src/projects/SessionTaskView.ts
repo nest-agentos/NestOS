@@ -1,6 +1,6 @@
-import { t } from '@itookit/common';
-import { resolveBrowserTarget } from '@itookit/app-contracts';
-import type { ApplicationBackend, SessionTaskPage, TaskDetail, TaskEventView } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import { resolveBrowserTarget } from '@nestos/app-contracts';
+import type { ApplicationBackend, SessionTaskPage, TaskDetail, TaskEventView } from '@nestos/app-contracts/services';
 
 type TaskBackend = Pick<ApplicationBackend, 'sessionTasks' | 'taskDetails' | 'taskEvents'>;
 interface TaskViewHost {

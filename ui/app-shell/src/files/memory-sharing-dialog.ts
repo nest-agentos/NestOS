@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { MemorySharingControls } from '@itookit/llm-session/contracts';
+import { t } from '@nestos/common';
+import type { MemorySharingControls } from '@nestos/llm-session/contracts';
 
 export function showMemorySharingDialog(controls: MemorySharingControls, agentId: string, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) return Promise.resolve();

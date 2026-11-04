@@ -1,5 +1,5 @@
-import { contextToolDefinitions, validateContextCompaction, type ChatMessage, type ContextCursor, type ContextCompactionPolicy, type PreparedContext, type WorkingNotes } from '@itookit/llm-context';
-import type { Decision, DurableTaskProgram, EffectRequest, JsonValue, KernelAction, TaskInputEvent } from '@itookit/durable-kernel';
+import { contextToolDefinitions, validateContextCompaction, type ChatMessage, type ContextCursor, type ContextCompactionPolicy, type PreparedContext, type WorkingNotes } from '@nestos/llm-context';
+import type { Decision, DurableTaskProgram, EffectRequest, JsonValue, KernelAction, TaskInputEvent } from '@nestos/durable-kernel';
 import type { DurableAgentInput } from './types';
 
 interface ContextProgramState<S> {
@@ -110,7 +110,7 @@ function checkpointFromEvent(state: unknown, event: TaskInputEvent): WorkingNote
 
 function addContextTools(effect: EffectRequest, state: unknown): void {
     if (!(state as { capabilities?: { toolHandleId?: string } }).capabilities?.toolHandleId) return;
-    const request = effect.request as { request: { tools?: import('@itookit/llm-context').ToolDefinition[]; toolChoice?: string } };
+    const request = effect.request as { request: { tools?: import('@nestos/llm-context').ToolDefinition[]; toolChoice?: string } };
     const definitions = contextToolDefinitions();
     const names = new Set(definitions.map(tool => tool.function?.name));
     request.request.tools = [...(request.request.tools ?? []).filter(tool => !names.has(tool.function?.name)), ...definitions];

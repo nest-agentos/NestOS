@@ -1,5 +1,5 @@
-import { taskStat, KernelError, KernelErrorCode } from '@itookit/durable-kernel';
-import type { KernelViewPort } from '@itookit/durable-kernel/contracts';
+import { taskStat, KernelError, KernelErrorCode } from '@nestos/durable-kernel';
+import type { KernelViewPort } from '@nestos/durable-kernel/contracts';
 
 /** Terminal scheduler state alone does not prove external effects have stopped. */
 export async function conversationIdle(kernel: Pick<KernelViewPort, 'listSessionTasks'>, sessionId: string): Promise<boolean> {

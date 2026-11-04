@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import yaml from 'js-yaml';
-import type { IFileSystem, IVFSManager } from '@itookit/vfs-core';
-import type { LLMSkill } from '@itookit/kernel-adapters/contracts';
+import type { IFileSystem, IVFSManager } from '@nestos/vfs-core';
+import type { LLMSkill } from '@nestos/kernel-adapters/contracts';
 import { SkillManager } from '../../src/llm-management/device/skill-manager';
 import { VFSHelpers } from '../../src/llm-management/device/vfs-helpers';
 import type { MCPManager } from '../../src/llm-management/device/mcp-manager';

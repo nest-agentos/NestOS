@@ -1,7 +1,7 @@
-import type {IndependentCallService} from '@itookit/llm-session';
-import type {IndependentCallInput} from '@itookit/llm-session/contracts';
-import type {Kernel, TaskCallResult} from '@itookit/durable-kernel';
-import {nodeOutputEntries} from '@itookit/llm-flow/contracts';
+import type {IndependentCallService} from '@nestos/llm-session';
+import type {IndependentCallInput} from '@nestos/llm-session/contracts';
+import type {Kernel, TaskCallResult} from '@nestos/durable-kernel';
+import {nodeOutputEntries} from '@nestos/llm-flow/contracts';
 import {requireValue} from '../kanban/validation';
 
 export interface PublishedOperationOptions {

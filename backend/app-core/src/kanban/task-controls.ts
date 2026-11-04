@@ -1,6 +1,6 @@
-import {IndependentCallCommand,type IndependentCallStateControlRequest,type IndependentCallStateControlReceipt} from '@itookit/llm-session/contracts';
-import type {IndependentCallService} from '@itookit/llm-session';
-import type {KanbanBoard,KanbanService,KanbanTaskControl} from '@itookit/kanban/contracts';
+import {IndependentCallCommand,type IndependentCallStateControlRequest,type IndependentCallStateControlReceipt} from '@nestos/llm-session/contracts';
+import type {IndependentCallService} from '@nestos/llm-session';
+import type {KanbanBoard,KanbanService,KanbanTaskControl} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 import {journalCommand} from './journal-command';
 import {requireValue} from './validation';

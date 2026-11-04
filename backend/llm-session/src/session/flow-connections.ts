@@ -1,11 +1,11 @@
-import { resolveModelProtocol, validateMediaRequest, type MediaGenerationRequest } from '@itookit/driver-llm/contracts';
-import type { FlowRevision, FlowConnection, JsonValue } from '@itookit/llm-flow/contracts';
-import { assertModelConnection, isModelOperation, modelForOperation, mediaEndpointIdentity, type ModelRequirements, type ModelOperation } from '@itookit/kernel-adapters/contracts';
-import type { ConnectionMeta, LLMProvider } from '@itookit/driver-llm/contracts';
+import { resolveModelProtocol, validateMediaRequest, type MediaGenerationRequest } from '@nestos/driver-llm/contracts';
+import type { FlowRevision, FlowConnection, JsonValue } from '@nestos/llm-flow/contracts';
+import { assertModelConnection, isModelOperation, modelForOperation, mediaEndpointIdentity, type ModelRequirements, type ModelOperation } from '@nestos/kernel-adapters/contracts';
+import type { ConnectionMeta, LLMProvider } from '@nestos/driver-llm/contracts';
 import type { IAgentConfigService } from '../contracts';
 import { inferFlowConnectionRequirements, nodeRequirements, nodeSlot } from '../contracts/flow-connection-policy';
-import { resolveNodeConnection as resolveFlowNodeConnection } from '@itookit/llm-flow';
-import { DELEGATION_LIMITS } from '@itookit/llm-flow/contracts';
+import { resolveNodeConnection as resolveFlowNodeConnection } from '@nestos/llm-flow';
+import { DELEGATION_LIMITS } from '@nestos/llm-flow/contracts';
 import { admitHarnessConnection, type HarnessConnectionCatalog } from './harness-binding';
 export type FlowConnectionCatalog = Pick<IAgentConfigService, 'getConnection' | 'getProvider'> & Partial<Pick<IAgentConfigService, 'getDefaultConnection' | 'getModelDefaults'>> & HarnessConnectionCatalog & {
     operationModelId?(connectionId: string, operation: ModelOperation): string | undefined;
@@ -13,7 +13,7 @@ export type FlowConnectionCatalog = Pick<IAgentConfigService, 'getConnection' | 
 };
 /** Resolve each named slot independently; snapshots never contain credentials. */
 export async function prepareFlowConnections(flow: FlowRevision, bindings: Record<string, string> = {}, agents: FlowConnectionCatalog,
-    frozenDefaults?: import('@itookit/kernel-adapters/contracts').ModelDefaults, runConnectionId?: string, parameters?: Record<string, JsonValue>): Promise<FlowRevision> {
+    frozenDefaults?: import('@nestos/kernel-adapters/contracts').ModelDefaults, runConnectionId?: string, parameters?: Record<string, JsonValue>): Promise<FlowRevision> {
     if (!bindings || typeof bindings !== 'object' || Array.isArray(bindings)) throw new Error('Invalid connection bindings');
     const defaults = frozenDefaults ?? await agents.getModelDefaults?.() ?? {};
     const catalog = agents;
@@ -73,7 +73,7 @@ async function prepareHarnessConnection(config: Record<string, JsonValue>, agent
     const execution = record(config.execution);
     if (typeof execution.connectionId !== 'string' || !execution.connectionId) throw new Error('Harness connection identity is required');
     const snapshot = await admitHarnessConnection(agents, execution.connectionId,
-        config.harnessConnection as unknown as import('@itookit/kernel-adapters/contracts').HarnessConnectionSnapshot | undefined);
+        config.harnessConnection as unknown as import('@nestos/kernel-adapters/contracts').HarnessConnectionSnapshot | undefined);
     return { ...config, harnessConnection: JSON.parse(JSON.stringify(snapshot)) as JsonValue };
 }
 export async function admitFlowConnectionSlot(slot: FlowConnection, connectionId: string | undefined, agents: FlowConnectionCatalog): Promise<FlowConnection> {

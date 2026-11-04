@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { FSError } from '@itookit/vfs-core';
-import { RemoteConnectionUnavailableError } from '@itookit/app-core';
+import { FSError } from '@nestos/vfs-core';
+import { RemoteConnectionUnavailableError } from '@nestos/app-core';
 import { localizeMountError } from '../src/files/localize-mount-error';
 
 it('shows a named, actionable cause even when a missing connection is wrapped by VFS', () => {

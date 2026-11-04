@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { LayoutTemplates } from '../templates/LayoutTemplates';
 
 export function updateCollapseAction(button: HTMLElement, collapsed: boolean): void {

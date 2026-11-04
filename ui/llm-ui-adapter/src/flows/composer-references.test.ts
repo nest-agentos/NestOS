@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import {ResourceCommand} from '@itookit/app-contracts';
+import {ResourceCommand} from '@nestos/app-contracts';
 import {expandComposerReferences} from './composer-references';
 const scope = {navigation: 'projects', projectId: 'project'};
 it('fills declared text with referenced file contents, preserves prose and reads repeated references once', async () => {

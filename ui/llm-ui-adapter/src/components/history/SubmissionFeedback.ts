@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import type { ChatSubmission } from '../../domain/submission';
 import { SessionRenderer, type RendererContext } from './SessionRenderer';
 

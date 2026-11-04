@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { createApplicationRuntime, createSessionBrowser, folderBrowserPath } from '@itookit/app-core';
-import { FSError, MemoryBackend } from '@itookit/vfs-core';
+import { createApplicationRuntime, createSessionBrowser, folderBrowserPath } from '@nestos/app-core';
+import { FSError, MemoryBackend } from '@nestos/vfs-core';
 import { projectTransferTargets } from '../src/projects/transfer-targets';
 
 it('reports the mapped directory and cause for an unavailable local destination', async () => {

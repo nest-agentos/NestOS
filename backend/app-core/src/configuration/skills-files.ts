@@ -34,10 +34,10 @@ import type {
     FSEventPayloadMap,
     IAssetOperations,
     ITagOperations,
-} from '@itookit/vfs-core';
-import type { LLMSkill, IAgentManagementService } from '@itookit/kernel-adapters/contracts';
-import { FSCapabilityError } from '@itookit/vfs-core';
-import { EventBus } from '@itookit/vfs-core';
+} from '@nestos/vfs-core';
+import type { LLMSkill, IAgentManagementService } from '@nestos/kernel-adapters/contracts';
+import { FSCapabilityError } from '@nestos/vfs-core';
+import { EventBus } from '@nestos/vfs-core';
 import yaml from 'js-yaml';
 
 /** Strip common skill file extensions from a user-typed or imported filename. */
@@ -127,7 +127,7 @@ export class SkillsEngine implements IFileSystem {
     readonly viewId = 'skills';
     readonly capabilities: FSCapabilities = SKILLS_CAPS;
     readonly driver: IFSDriver;
-    readonly meta: import('@itookit/vfs-core').IFSMetaDriver;
+    readonly meta: import('@nestos/vfs-core').IFSMetaDriver;
     readonly tags: ITagOperations;
 
     private unsubscribe: (() => void) | null = null;

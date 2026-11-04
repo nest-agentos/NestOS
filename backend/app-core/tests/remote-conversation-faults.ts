@@ -1,5 +1,5 @@
 import {vi} from 'vitest';
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 
 /** Inject failures before or after the real transaction commits. */
 export function interceptConversationTransactions(source: IFileSystem) {

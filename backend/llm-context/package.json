@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/llm-context",
+  "name": "@nestos/llm-context",
   "version": "0.1.0",
   "description": "Independent context assembly, history, windows and durable context contracts",
   "type": "module",
@@ -60,5 +60,14 @@
         }
       }
     }
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "backend/llm-context"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

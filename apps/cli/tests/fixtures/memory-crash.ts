@@ -1,4 +1,4 @@
-import { TaskMemoryService } from '@itookit/llm-session';
+import { TaskMemoryService } from '@nestos/llm-session';
 
 // Test-only process entry: stop at the service boundary without changing production code.
 const invoke = TaskMemoryService.prototype.invoke;

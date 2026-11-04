@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import type { OcrService } from '@itookit/app-contracts/services';
-import type { IAgentManagementService } from '@itookit/kernel-adapters/contracts';
+import type { OcrService } from '@nestos/app-contracts/services';
+import type { IAgentManagementService } from '@nestos/kernel-adapters/contracts';
 import { OcrAccess } from '../src/configuration/ocr-access';
 
 function fixture(load?: () => Promise<OcrService>) {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {beforeEach, expect, it, vi} from 'vitest';
-import {ResourceCommand} from '@itookit/app-contracts';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {ResourceCommand} from '@nestos/app-contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {promptFlowParameters} from '../components/FlowParameterForm';
 import {prepareAgentFlow} from './agent-flow';
 

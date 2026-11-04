@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { JsonRpcLineTransport } from '@itookit/driver-llm';
+import { JsonRpcLineTransport } from '@nestos/driver-llm';
 
 /** Persistent Codex app-server transport backed by Tauri Rust commands. */
 export class TauriCodexTransport extends JsonRpcLineTransport {

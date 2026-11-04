@@ -1,7 +1,7 @@
-import {createModuleLogger} from '@itookit/common';
-import {waitForFlowRunTasks, type FlowWorkspaceLease, type FlowWorkspaceManager} from '@itookit/llm-flow';
-import type {FlowWorkspacePolicy} from '@itookit/llm-flow/contracts';
-import type {JsonValue, Kernel, ResourceClaim, ResourceCleanupContext, ResourceCleanupReceipt} from '@itookit/durable-kernel';
+import {createModuleLogger} from '@nestos/common';
+import {waitForFlowRunTasks, type FlowWorkspaceLease, type FlowWorkspaceManager} from '@nestos/llm-flow';
+import type {FlowWorkspacePolicy} from '@nestos/llm-flow/contracts';
+import type {JsonValue, Kernel, ResourceClaim, ResourceCleanupContext, ResourceCleanupReceipt} from '@nestos/durable-kernel';
 import type {HeadlessKernelRuntime} from './create-kernel-runtime';
 
 const kind = 'mindos.flow-workspace', log = createModuleLogger('flow-workspace');

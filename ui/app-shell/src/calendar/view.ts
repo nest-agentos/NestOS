@@ -1,4 +1,4 @@
-import {escapeAttr, escapeHTML, getLocale, t} from '@itookit/common';
+import {escapeAttr, escapeHTML, getLocale, t} from '@nestos/common';
 import {dateKey, monthDays, onDay, type CalendarEvent, type CalendarSource} from './model';
 const esc = escapeHTML;
 export const label = (key: string) => t(`calendar.${key}` as Parameters<typeof t>[0]);

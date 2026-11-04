@@ -1,5 +1,5 @@
-import type { DagRunSpec } from '@itookit/llm-flow/contracts';
-import type { SystemPromptDefinition } from '@itookit/llm-tasks/contracts';
+import type { DagRunSpec } from '@nestos/llm-flow/contracts';
+import type { SystemPromptDefinition } from '@nestos/llm-tasks/contracts';
 import type { LLMSkill } from './agent';
 import type { ExecutorConfig } from '../core/types';
 

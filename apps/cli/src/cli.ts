@@ -1,7 +1,7 @@
 import { remoteFilesCommand } from './remote-files-command';
 import { startHttpServer } from './http-server';
 import { installRuntimeDiagnostics, recordRuntimeDiagnostic, traceRuntimeStage } from './diagnostics';
-import { errorDetails } from '@itookit/common';
+import { errorDetails } from '@nestos/common';
 import { digitalTwinCommand } from './digital-twin-command';
 import { sharedMemoryCommand } from './shared-memory-command';
 import {

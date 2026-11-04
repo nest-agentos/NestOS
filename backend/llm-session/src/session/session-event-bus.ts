@@ -1,6 +1,6 @@
 // @file: llm-conversation/session/session-event-bus.ts
 
-import { EventBus } from '@itookit/vfs-core';
+import { EventBus } from '@nestos/vfs-core';
 import { SessionEvent, SessionEventEnvelope, RegistryEvent } from '../core/types';
 import { createSessionHost, type SessionHost } from '../utils/host-ports';
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { it, expect, vi } from 'vitest';
-import type { ProjectService } from '@itookit/app-core';
-import { t } from '@itookit/common';
+import type { ProjectService } from '@nestos/app-core';
+import { t } from '@nestos/common';
 import { remoteDirectoryPicker } from '../src/files/remote-directory-picker';
 import { remoteProjectFields } from '../src/files/remote-project-fields';
 

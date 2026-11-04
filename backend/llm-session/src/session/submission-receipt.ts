@@ -1,4 +1,4 @@
-import {KernelError, KernelErrorCode, type Kernel} from '@itookit/durable-kernel';
+import {KernelError, KernelErrorCode, type Kernel} from '@nestos/durable-kernel';
 import type {ISessionRepository} from '../persistence/types';
 import {InstructionQueueStore} from '../persistence/instruction-queue-store';
 import {hasMatchingCommittedSubmission} from '../persistence/submission-receipt';

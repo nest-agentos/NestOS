@@ -1,6 +1,6 @@
-import {MODEL_CAPABILITY_META, MODEL_CATEGORY_META, t} from '@itookit/common';
+import {MODEL_CAPABILITY_META, MODEL_CATEGORY_META, t} from '@nestos/common';
 import {capabilityLabel} from './capability-filters';
-import type {NodePresentation} from '@itookit/vfs-ui';
+import type {NodePresentation} from '@nestos/vfs-ui';
 
 /** Each connection exposes only the capabilities of its configured models. */
 export function modelIndicators(tags: string[] = []): NodePresentation['indicators'] {

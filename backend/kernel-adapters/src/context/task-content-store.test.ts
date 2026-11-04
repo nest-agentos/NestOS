@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'vitest';
-import { createVFS, MemoryBackend, type IVFSManager } from '@itookit/vfs-core';
-import { contextKey, createContextGc, createContextService, type IContextGcStore } from '@itookit/llm-context';
+import { createVFS, MemoryBackend, type IVFSManager } from '@nestos/vfs-core';
+import { contextKey, createContextGc, createContextService, type IContextGcStore } from '@nestos/llm-context';
 import { createTaskContextStorage } from './task-content-store';
 
 const managers: IVFSManager[] = [];

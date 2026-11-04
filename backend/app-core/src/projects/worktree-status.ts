@@ -1,4 +1,4 @@
-import {sha256HexSync} from '@itookit/common';
+import {sha256HexSync} from '@nestos/common';
 import {gitWorkspace} from './worktree-modules';
 import type {RemoteProcessHandle} from './remote-mounts';
 import type {PreparedWorktree} from './worktree-preparation';

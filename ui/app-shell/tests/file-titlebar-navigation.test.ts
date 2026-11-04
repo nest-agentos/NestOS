@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {defaultEditorFactory} from '@itookit/mdx-adapter';
-import type {MDxEditor} from '@itookit/mdxeditor';
+import {defaultEditorFactory} from '@nestos/mdx-adapter';
+import type {MDxEditor} from '@nestos/mdxeditor';
 import {WorkbenchTabs} from '../src/workbench/tabs';
 import {setupMobileWorkspaceView} from '../src/navigation/mobile-workspace-view';
 

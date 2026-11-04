@@ -1,10 +1,10 @@
 import {expect, it, vi} from 'vitest';
-import {Kernel} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {DurableFlowExecutor, createBuiltinDagPluginRegistry, registerDurablePrograms} from '@itookit/llm-flow';
-import {ToolProgram, HarnessProgram, HarnessExecutionEffect, ToolCallEffectAdapter} from '@itookit/kernel-adapters';
-import {ToolDeviceDriver} from '@itookit/tools';
-import type {HarnessConnectionSnapshot} from '@itookit/kernel-adapters/contracts';
+import {Kernel} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {DurableFlowExecutor, createBuiltinDagPluginRegistry, registerDurablePrograms} from '@nestos/llm-flow';
+import {ToolProgram, HarnessProgram, HarnessExecutionEffect, ToolCallEffectAdapter} from '@nestos/kernel-adapters';
+import {ToolDeviceDriver} from '@nestos/tools';
+import type {HarnessConnectionSnapshot} from '@nestos/kernel-adapters/contracts';
 
 it('passes tool material through a Harness and into a final save tool without a local model', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()});

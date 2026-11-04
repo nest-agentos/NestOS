@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { HistoryView } from '../../llm-ui-adapter/src/components/HistoryView';
-import type { SessionGroup } from '@itookit/llm-session/contracts';
+import type { SessionGroup } from '@nestos/llm-session/contracts';
 
 beforeEach(() => {
     vi.stubGlobal('ResizeObserver', class {observe() {} disconnect() {} unobserve() {}});

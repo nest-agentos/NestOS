@@ -1,4 +1,4 @@
-import type {FSEvent} from '@itookit/vfs-core';
+import type {FSEvent} from '@nestos/vfs-core';
 
 type Listener = (event: FSEvent) => void;
 type Stop = (() => void) & {ready?: Promise<unknown>};

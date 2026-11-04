@@ -1,8 +1,8 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {Session} from 'node:inspector';
 import {writeFile} from 'node:fs/promises';
-import type {ISidecarDb} from '@itookit/vfsdriver-local';
-import type {IRecordStore} from '@itookit/vfs-core';
+import type {ISidecarDb} from '@nestos/vfsdriver-local';
+import type {IRecordStore} from '@nestos/vfs-core';
 
 interface Span {name: string; scenario: string; api?: string; start: number; duration: number}
 interface TransactionShape {count: number; scenario: string; api?: string; outcome: string; accesses: string[]}

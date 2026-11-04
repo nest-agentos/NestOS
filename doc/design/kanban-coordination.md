@@ -2,9 +2,9 @@
 
 ## 定位与模块边界
 
-`@itookit/kanban` 是独立协调库（`libraries/kanban/`），唯一运行依赖为 vfs-core，支持个人事务、研究、运营、支持工单和软件开发。核心管理工作项、责任、依赖、在制额度、交付验收、持久派发意图和历史；具体业务规则与工具副作用由外部 Tool / Flow 负责。
+`@nestos/kanban` 是独立协调库（`libraries/kanban/`），唯一运行依赖为 vfs-core，支持个人事务、研究、运营、支持工单和软件开发。核心管理工作项、责任、依赖、在制额度、交付验收、持久派发意图和历史；具体业务规则与工具副作用由外部 Tool / Flow 负责。
 
-纯契约在 `libraries/kanban/src/contracts/`；应用端口直接引用库的 KanbanClient。`@itookit/app-core/kanban` 的 createNestOSKanban 负责 NestOS 的 Session、Flow、Kernel、远程连接、调度与系统事件接线，不代转出库 API。扫描状态机、条件事务存储、执行桥、可选活动投影及 DOM UI 均位于独立库；NestOS UI 只注入文案、图标、资源路由和激活事件。核心不依赖这些实现、不调用模型、不启动 Session。历史 sessionId/messageId 仅为不透明来源字段；来源扫描 DTO、状态解释及检查点提交归独立库；实际会话内容读取与正式模型执行归应用适配层。
+纯契约在 `libraries/kanban/src/contracts/`；应用端口直接引用库的 KanbanClient。`@nestos/app-core/kanban` 的 createNestOSKanban 负责 NestOS 的 Session、Flow、Kernel、远程连接、调度与系统事件接线，不代转出库 API。扫描状态机、条件事务存储、执行桥、可选活动投影及 DOM UI 均位于独立库；NestOS UI 只注入文案、图标、资源路由和激活事件。核心不依赖这些实现、不调用模型、不启动 Session。历史 sessionId/messageId 仅为不透明来源字段；来源扫描 DTO、状态解释及检查点提交归独立库；实际会话内容读取与正式模型执行归应用适配层。
 
 ```mermaid
 flowchart TD

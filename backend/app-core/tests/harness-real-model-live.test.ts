@@ -1,12 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { createCellsDriver, type CellsDriver } from '@itookit/cells-driver';
-import { SessionCommand } from '@itookit/llm-session/contracts';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
-import type { FlowDraft } from '@itookit/llm-flow/contracts';
-import type { HarnessExecutionResult } from '@itookit/kernel-adapters/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { createCellsDriver, type CellsDriver } from '@nestos/cells-driver';
+import { SessionCommand } from '@nestos/llm-session/contracts';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
+import type { FlowDraft } from '@nestos/llm-flow/contracts';
+import type { HarnessExecutionResult } from '@nestos/kernel-adapters/contracts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { harnessExecutionJournalKey } from '../src/projects/harness-execution';
 import { coordinatorConfiguration, fixtureHashes, nativeEvidence, realMetadata, reviewInstruction,

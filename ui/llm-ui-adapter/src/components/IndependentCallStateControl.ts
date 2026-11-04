@@ -1,5 +1,5 @@
-import {randomUUID, t} from '@itookit/common';
-import type {IndependentCallView, IndependentCallControlAction, IndependentCallStateControlRequest} from '@itookit/llm-session/contracts';
+import {randomUUID, t} from '@nestos/common';
+import type {IndependentCallView, IndependentCallControlAction, IndependentCallStateControlRequest} from '@nestos/llm-session/contracts';
 import {CallControlOperations, callControlErrorCode} from '../independent/call-control';
 
 /** State controls never share the cancellation channel's pending lock. */

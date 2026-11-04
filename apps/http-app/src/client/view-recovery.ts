@@ -1,4 +1,4 @@
-import {randomUUID} from '@itookit/common';
+import {randomUUID} from '@nestos/common';
 
 export interface RecoverableView<T> {
     captureRecovery(): T;

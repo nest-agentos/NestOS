@@ -1,6 +1,6 @@
-import type { ChatMessage } from '@itookit/llm-context';
-import type { JsonValue, DurableFlowSnapshot } from '@itookit/llm-flow';
-import { FlowCommand } from '@itookit/llm-flow';
+import type { ChatMessage } from '@nestos/llm-context';
+import type { JsonValue, DurableFlowSnapshot } from '@nestos/llm-flow';
+import { FlowCommand } from '@nestos/llm-flow';
 import type { ContentCapture, TransferMessage, TransferOutput, TransferSelection } from '../contracts/content-transfer';
 import type { ICommandBus } from '../contracts';
 import type { ISessionRepository } from '../persistence/types';
@@ -10,7 +10,7 @@ import { FlowInvocationCommand, type FlowInvocationRecord } from '../contracts/f
 import { ulid } from '../persistence/ulid';
 
 export async function captureContent(repository: ISessionRepository, commands: ICommandBus, sessionId: string,
-    kernel?: Pick<import('@itookit/durable-kernel').Kernel, 'listSessionTaskPage'>): Promise<ContentCapture> {
+    kernel?: Pick<import('@nestos/durable-kernel').Kernel, 'listSessionTaskPage'>): Promise<ContentCapture> {
     const log = new RoundLog(repository, sessionId), manifest = await log.loadManifest();
     const history = repository.readHistoryChain ? await repository.readHistoryChain(sessionId)
         : await collectHistoryChain(manifest, id => log.readRound(id, manifest.currentBranch, manifest));
@@ -23,7 +23,7 @@ export async function captureContent(repository: ISessionRepository, commands: I
 }
 
 /** Only explicit completed tool commands are selectable; live effects are never input evidence. */
-async function toolOutputs(kernel: Pick<import('@itookit/durable-kernel').Kernel, 'listSessionTaskPage'> | undefined, sessionId: string): Promise<TransferOutput[]> {
+async function toolOutputs(kernel: Pick<import('@nestos/durable-kernel').Kernel, 'listSessionTaskPage'> | undefined, sessionId: string): Promise<TransferOutput[]> {
     if (!kernel) return [];
     const outputs: TransferOutput[] = [];
     let afterIndex: number | undefined, throughIndex: number | undefined;

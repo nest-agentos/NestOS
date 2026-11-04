@@ -1,6 +1,6 @@
-import { ACTION_ICONS, FILE_BROWSER_ICONS, FILE_ICONS, VFS_TOOLBAR_ICONS, fileTypeIcon, t, traceBoot, type LocaleKey } from '@itookit/common';
-import { createVFSUI, type VFSUIOptions, type VFSPresentationOptions } from '@itookit/vfs-ui';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { ACTION_ICONS, FILE_BROWSER_ICONS, FILE_ICONS, VFS_TOOLBAR_ICONS, fileTypeIcon, t, traceBoot, type LocaleKey } from '@nestos/common';
+import { createVFSUI, type VFSUIOptions, type VFSPresentationOptions } from '@nestos/vfs-ui';
+import type { IFileSystem } from '@nestos/vfs-core';
 
 /** Keep NestOS presentation policies outside the independently usable browser. */
 export const nestOSVFSPresentation: VFSPresentationOptions = {

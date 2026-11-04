@@ -1,4 +1,4 @@
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 import {isModuleLoadFailure, startupModuleRecovery} from './startup-module-recovery';
 
 /** Observe results recorded by the HTML handlers, including failures before module loading. */

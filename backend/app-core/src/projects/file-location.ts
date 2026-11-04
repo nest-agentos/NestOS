@@ -1,4 +1,4 @@
-import { normalizeVirtualPath } from '@itookit/vfs-core';
+import { normalizeVirtualPath } from '@nestos/vfs-core';
 import { remoteCredentialIdentity } from './remote-connections';
 import type { ProjectFolder } from './project-service';
 import type { ProjectRemoteMount } from './remote-mounts';

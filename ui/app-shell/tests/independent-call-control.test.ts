@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {t} from '@itookit/common';
-import {createOperationLedger, type OperationRecord} from '@itookit/llm-ui';
-import {IndependentCallCommand, type IndependentCallView, type IndependentCallCancelRequest} from '@itookit/llm-session/contracts';
+import {t} from '@nestos/common';
+import {createOperationLedger, type OperationRecord} from '@nestos/llm-ui';
+import {IndependentCallCommand, type IndependentCallView, type IndependentCallCancelRequest} from '@nestos/llm-session/contracts';
 import {IndependentCallPanel} from '../../llm-ui-adapter/src/components/IndependentCallPanel';
 
 let panel: IndependentCallPanel | undefined;

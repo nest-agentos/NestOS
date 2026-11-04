@@ -1,6 +1,6 @@
-import { escapeHTML, t } from '@itookit/common';
-import type { FlowDraft } from '@itookit/llm-flow/contracts';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
+import { escapeHTML, t } from '@nestos/common';
+import type { FlowDraft } from '@nestos/llm-flow/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
 import { flowConnectionSelection } from '../../flows/connection-selection';
 import type { FlowRunInput } from '../../flows/run-flow';
 import { bindFlowImageFields } from '../FlowImageFields';

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { sha256Bytes, sha256Hex, sha256HexSync, simpleHash } from '@itookit/common';
-import { sha256HexSync as contextDigest, simpleHash as contextFingerprint } from '@itookit/llm-context';
+import { sha256Bytes, sha256Hex, sha256HexSync, simpleHash } from '@nestos/common';
+import { sha256HexSync as contextDigest, simpleHash as contextFingerprint } from '@nestos/llm-context';
 
 describe('independent common primitives', () => {
     it('keeps persisted digests stable across common, context and standard SHA-256', () => {

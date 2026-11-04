@@ -1,5 +1,5 @@
-import { randomUUID } from '@itookit/common';
-import { FSError } from '@itookit/vfs-core';
+import { randomUUID } from '@nestos/common';
+import { FSError } from '@nestos/vfs-core';
 import type { ProjectDraftRecord, RemoteDraftTarget } from './contracts';
 
 export const emptyDraft = (): ProjectDraftRecord => ({ version: 1, id: randomUUID(), state: 'draft', data: '' });

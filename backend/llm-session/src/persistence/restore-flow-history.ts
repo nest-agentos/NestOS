@@ -1,6 +1,6 @@
 import { createSessionHost, type SessionHost } from '../utils/host-ports';
-import type { EventEnvelope, Kernel } from '@itookit/durable-kernel';
-import { readFlowRunMembers } from '@itookit/llm-flow';
+import type { EventEnvelope, Kernel } from '@nestos/durable-kernel';
+import { readFlowRunMembers } from '@nestos/llm-flow';
 import type { PersistedRound } from './round-types';
 import { projectTaskInteractions, runTasks } from './flow-run-projection';
 

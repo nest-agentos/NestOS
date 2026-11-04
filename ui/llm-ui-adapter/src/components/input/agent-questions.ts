@@ -1,6 +1,6 @@
-import { t } from '@itookit/common';
-import type { Choice, InputField, InteractionResponse } from '@itookit/llm-ui';
-import type { JsonValue } from '@itookit/durable-kernel/contracts';
+import { t } from '@nestos/common';
+import type { Choice, InputField, InteractionResponse } from '@nestos/llm-ui';
+import type { JsonValue } from '@nestos/durable-kernel/contracts';
 
 /** Invalid question sets retain the existing plain-text fallback as a whole. */
 export function agentQuestionFields(value: JsonValue | undefined): InputField[] {

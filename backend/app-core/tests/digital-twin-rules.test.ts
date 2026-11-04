@@ -1,14 +1,14 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import { randomUUID } from '@itookit/common';
-import { sha256HexSync } from '@itookit/llm-context';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import { randomUUID } from '@nestos/common';
+import { sha256HexSync } from '@nestos/llm-context';
 import { DigitalTwinService, type TwinDiscoveredSource, type TwinSourceCatalog } from '../src';
 import { matchesRules, ruleLines } from '../src/digital-twin/scan-rules';
 import { publicHarnessText, readHarness, discoverHarness } from '../src/digital-twin/harness-reader';
 import type { ProjectService, ProjectFolder } from '../src/projects/project-service';
-import type { HarnessClient } from '@itookit/cells-driver';
+import type { HarnessClient } from '@nestos/cells-driver';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
@@ -184,7 +184,7 @@ it('enumerates and reads actual project directories and native sessions through 
         await source.fs.driver.createFile({ parentPath: '/node_modules', name: 'hidden.md', content: 'Dependency', recursive: true });
         await source.fs.driver.createFile({ parentPath: '/docs', name: 'binary.png', content: 'Binary', recursive: true });
         const id = await runtime.sessionRepository.createSession('Project conversation', project.path + '/@sessions');
-        const { RoundLog } = await import('@itookit/llm-session');
+        const { RoundLog } = await import('@nestos/llm-session');
         await new RoundLog(runtime.sessionRepository, id).append('main', { id: 'r', kind: 'chat', historyParentIds: [], origin: 'user', status: 'completed', createdAt: 1,
             input: [{ role: 'user', content: 'Native project fact' }], output: [{ role: 'assistant', content: 'Visible suggestion' }] });
         const { NestosTwinSourceReader } = await import('../src/digital-twin/source-reader');

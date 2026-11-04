@@ -1,4 +1,4 @@
-import type {SessionHandle, TaskHandle, TaskRecord} from '@itookit/durable-kernel';
+import type {SessionHandle, TaskHandle, TaskRecord} from '@nestos/durable-kernel';
 import {readFlowRunMembers} from './run-members';
 import {assertCurrentFlowControl, flowControlError} from './control-tree';
 

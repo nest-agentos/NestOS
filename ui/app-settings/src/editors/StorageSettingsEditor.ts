@@ -1,6 +1,6 @@
-import { BaseSettingsEditor } from '@itookit/ui-common-adapter';
-import { escapeHTML, t } from '@itookit/common';
-import type { SettingsPort as SettingsService } from '@itookit/app-contracts/settings';
+import { BaseSettingsEditor } from '@nestos/ui-common-adapter';
+import { escapeHTML, t } from '@nestos/common';
+import type { SettingsPort as SettingsService } from '@nestos/app-contracts/settings';
 import { StorageOverviewSection } from './storage/StorageOverviewSection';
 import { SnapshotSection } from './storage/SnapshotSection';
 import { MigrationSection } from './storage/MigrationSection';

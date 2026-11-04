@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { FlowCommand, type FlowConnection, type FlowInputGroup, type FlowParameter } from '@itookit/llm-flow/contracts';
-import { SessionCommand } from '@itookit/llm-session/contracts';
+import { FlowCommand, type FlowConnection, type FlowInputGroup, type FlowParameter } from '@nestos/llm-flow/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
 import { FlowsEditor } from '../../llm-ui-adapter/src/components/FlowsEditor';
 import { DagWorkbench } from '../../llm-ui-adapter/src/components/DagWorkbench';
-import { NAVIGATION_EVENTS } from '@itookit/common';
-import { InputAssetCommand } from '@itookit/app-contracts';
+import { NAVIGATION_EVENTS } from '@nestos/common';
+import { InputAssetCommand } from '@nestos/app-contracts';
 import { FlowRunParameters } from '../../llm-ui-adapter/src/components/dag/FlowRunParameters';
 import {promptFlowParameters, type FlowConnectionSelection} from '../../llm-ui-adapter/src/components/FlowParameterForm';
 

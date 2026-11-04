@@ -1,5 +1,5 @@
-import type { DigitalTwinService } from '@itookit/app-contracts/services';
-import { FSError } from '@itookit/vfs-core';
+import type { DigitalTwinService } from '@nestos/app-contracts/services';
+import { FSError } from '@nestos/vfs-core';
 
 type Patch = Parameters<DigitalTwinService['configure']>[0];
 export type SaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'failed';

@@ -1,9 +1,9 @@
 import { createServer, type Server } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
-import { createChatGPTAuthSession, ChatGPTError } from '@itookit/driver-llm';
-import type { ChatGPTConfig } from '@itookit/driver-llm/contracts';
-import type { ProviderAuthorizationHost } from '@itookit/kernel-adapters/llm/core';
-import type { ProviderAuthorizationState } from '@itookit/kernel-adapters/contracts';
+import { createChatGPTAuthSession, ChatGPTError } from '@nestos/driver-llm';
+import type { ChatGPTConfig } from '@nestos/driver-llm/contracts';
+import type { ProviderAuthorizationHost } from '@nestos/kernel-adapters/llm/core';
+import type { ProviderAuthorizationState } from '@nestos/kernel-adapters/contracts';
 import { PrivateAuthStore, type Registration } from './private-store';
 import { OpenAIOidc, OpenAIAuthorizationError, type OAuthTokens } from './openai-oidc';
 import type { AuditPort } from '../logging/audit-log';

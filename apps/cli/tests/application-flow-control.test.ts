@@ -1,12 +1,12 @@
 import {executeApplicationCommand} from '../src/application-command';
 import {afterEach, expect, it, vi} from 'vitest';
-import {Kernel} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {DurableFlowExecutor, createBuiltinDagPluginRegistry, registerDurablePrograms} from '@itookit/llm-flow';
+import {Kernel} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {DurableFlowExecutor, createBuiltinDagPluginRegistry, registerDurablePrograms} from '@nestos/llm-flow';
 import {DagCommandService} from '../../../backend/llm-flow/src/flow/commands';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {flowControlCommand} from '../src/application-flow-control';
-import type {ApplicationClient} from '@itookit/app-contracts/services';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
 
 const close: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const cleanup of close.splice(0).reverse()) await cleanup(); vi.restoreAllMocks();});

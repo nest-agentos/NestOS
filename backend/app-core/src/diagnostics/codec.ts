@@ -1,5 +1,5 @@
-import {FSError} from '@itookit/vfs-core';
-import type {DiagnosticEvent, DiagnosticSeries} from '@itookit/app-contracts/services';
+import {FSError} from '@nestos/vfs-core';
+import type {DiagnosticEvent, DiagnosticSeries} from '@nestos/app-contracts/services';
 import {initial} from './series';
 const identity = /^[a-zA-Z0-9_.:-]{1,200}$/;
 const label = /^[a-zA-Z0-9_.:-]{1,100}$/;

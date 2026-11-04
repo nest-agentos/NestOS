@@ -1,5 +1,5 @@
-import type { EditorFactory } from '@itookit/ui-common-adapter';
+import type { EditorFactory } from '@nestos/ui-common-adapter';
 
 /** The file editor is only needed when a document opens, after the VFS sidebar paints. */
 export const lazyMdxEditorFactory: EditorFactory = async (container, options) =>
-    (await import('@itookit/mdx-adapter')).defaultEditorFactory(container, options);
+    (await import('@nestos/mdx-adapter')).defaultEditorFactory(container, options);

@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import type { IDeviceDriver } from '@itookit/vfs-core';
-import { createKernelAdaptersRuntime } from '@itookit/kernel-adapters';
+import type { IDeviceDriver } from '@nestos/vfs-core';
+import { createKernelAdaptersRuntime } from '@nestos/kernel-adapters';
 import { acquireSessionProcessContext } from '../src/vfs/session-process-context';
 
 function files() {

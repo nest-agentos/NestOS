@@ -1,4 +1,4 @@
-import type { Kernel, JsonValue } from '@itookit/durable-kernel';
+import type { Kernel, JsonValue } from '@nestos/durable-kernel';
 import type { ICommandBus } from '../contracts';
 import { ContentTransferCommand, isTransferSelection, type ContentCapture, type ContentTransfer, type CreateChildInput, type ChildCreationReceipt, type ResolveTransferInput, type TransferReference } from '../contracts/content-transfer';
 import type { ISessionRepository } from '../persistence/types';

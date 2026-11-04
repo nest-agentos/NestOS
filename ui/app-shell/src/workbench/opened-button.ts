@@ -1,5 +1,5 @@
-import {ACTION_ICONS, t} from '@itookit/common';
-import {createWindowManagement} from '@itookit/vfs-ui';
+import {ACTION_ICONS, t} from '@nestos/common';
+import {createWindowManagement} from '@nestos/vfs-ui';
 
 /** A host-owned window switcher can join an editor's existing title bar. */
 export function openedButton(open: (origin: HTMLButtonElement) => void) {

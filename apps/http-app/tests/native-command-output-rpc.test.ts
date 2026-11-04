@@ -1,8 +1,8 @@
 import {createHash} from 'node:crypto';
 import {expect, it, vi} from 'vitest';
-import {RpcPeer} from '@itookit/app-transport/application';
+import {RpcPeer} from '@nestos/app-transport/application';
 import {observeConversation} from '../../../backend/app-core/src/projects/conversation-view';
-import type {HarnessConversationPort} from '@itookit/cells-driver';
+import type {HarnessConversationPort} from '@nestos/cells-driver';
 
 it('reads command output independently through the real application RPC while a send reply is suspended', async () => {
     let server!: RpcPeer, release!: (value: unknown) => void;

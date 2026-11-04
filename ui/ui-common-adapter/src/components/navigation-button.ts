@@ -1,5 +1,5 @@
-import {ACTION_ICONS, t} from '@itookit/common';
-import {MOBILE_NAVIGATION_QUERY} from '@itookit/ui-common';
+import {ACTION_ICONS, t} from '@nestos/common';
+import {MOBILE_NAVIGATION_QUERY} from '@nestos/ui-common';
 
 /** Responsive presentation leaves navigation and persistence with the host. */
 export function installNavigationButtonPresentation(button: HTMLButtonElement): () => void {

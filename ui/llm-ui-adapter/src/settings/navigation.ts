@@ -1,6 +1,6 @@
-import {t} from '@itookit/common';
-import type {SettingsEditorOptions} from '@itookit/llm-ui/settings';
-import type {EditorOptions} from '@itookit/ui-common-adapter';
+import {t} from '@nestos/common';
+import type {SettingsEditorOptions} from '@nestos/llm-ui/settings';
+import type {EditorOptions} from '@nestos/ui-common-adapter';
 
 export function settingsNavigation(options:EditorOptions):Pick<SettingsEditorOptions,'navigation'|'consumeAnchor'|'relatedConfiguration'> {
     const host=options.hostContext;

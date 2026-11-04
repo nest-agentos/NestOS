@@ -1,7 +1,7 @@
-import {RoundLog} from '@itookit/llm-session';
-import {assistantResponseText, type ISessionRepository, type Round} from '@itookit/llm-session/contracts';
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {SessionResponse, SessionResponseQuery} from '@itookit/app-contracts/services';
+import {RoundLog} from '@nestos/llm-session';
+import {assistantResponseText, type ISessionRepository, type Round} from '@nestos/llm-session/contracts';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {SessionResponse, SessionResponseQuery} from '@nestos/app-contracts/services';
 
 /** A cold read of the selected response; it never binds, switches branches or executes. */
 export async function sessionResponse(repository: ISessionRepository, sessionId: string, query: SessionResponseQuery = {}): Promise<SessionResponse | undefined> {

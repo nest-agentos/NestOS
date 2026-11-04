@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { AgentConfigEditor } from '@itookit/llm-ui-adapter/settings';
+import { AgentConfigEditor } from '@nestos/llm-ui-adapter/settings';
 
 const editors: AgentConfigEditor[] = [];
 afterEach(async () => { await Promise.all(editors.splice(0).map(editor => editor.destroy())); document.body.replaceChildren(); vi.restoreAllMocks(); });

@@ -1,6 +1,6 @@
-import {randomUUID, sha256HexSync, t, createModuleLogger} from '@itookit/common';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {KanbanService, KanbanWorkResource, KanbanWorkResourceCleanup, KanbanExternalReference} from '@itookit/kanban/contracts';
+import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {KanbanService, KanbanWorkResource, KanbanWorkResourceCleanup, KanbanExternalReference} from '@nestos/kanban/contracts';
 import type {KanbanWorkLog} from '../kanban/work-log';
 import {requireValue} from '../kanban/validation';
 import {developmentWorkspace} from './kanban-development-workspace';
@@ -23,13 +23,13 @@ export async function developmentSessionResources(journal: import('../kanban/aut
 }
 interface Options extends ResourceExecutionOptions {
     fs: IFileSystem; provider: RemoteFileSourceProvider; service: KanbanService; workLog: KanbanWorkLog;
-    projects: Pick<import('@itookit/app-contracts/services').ProjectService, 'get' | 'openWorkspace'>;
+    projects: Pick<import('@nestos/app-contracts/services').ProjectService, 'get' | 'openWorkspace'>;
 }
 interface Cleanup {operationId: string; boardId: string; itemId: string; version: string; phase: 'prepared' | 'removing' | 'cleaned'; archive?: string}
 interface ResourceScope {id: string; item: Awaited<ReturnType<KanbanService['item']>>['item']; record: DevelopmentWorkspaceRecord; tree: PreparedWorktree}
 
 export function developmentWorkResources(options: Options) {
-    return {workResources: async (boardId: string, itemId: string, query?: import('@itookit/kanban/contracts').KanbanWorkResourceQuery) => {
+    return {workResources: async (boardId: string, itemId: string, query?: import('@nestos/kanban/contracts').KanbanWorkResourceQuery) => {
         const started = Date.now(), operationId = randomUUID(), stage = query?.inspect === false ? 'associations' : 'inspect';
         try {
             requireValue(query === undefined || !!query && typeof query === 'object' && !Array.isArray(query) && Object.keys(query).every(key => key === 'inspect')

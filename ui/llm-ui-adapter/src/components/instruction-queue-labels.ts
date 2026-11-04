@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type {InstructionQueueViewOptions} from '@itookit/llm-ui';
+import {t} from '@nestos/common';
+import type {InstructionQueueViewOptions} from '@nestos/llm-ui';
 
 export function instructionQueueLabels(): InstructionQueueViewOptions['labels'] {
     return {

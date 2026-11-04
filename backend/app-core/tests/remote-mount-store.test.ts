@@ -1,5 +1,5 @@
 import { it, expect, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { RemoteMountStore, type RemoteMountCatalog } from '../src/projects/remote-mount-store';
 import { ProjectRemoteMountService } from '../src/projects/remote-mounts';
 

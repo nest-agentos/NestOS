@@ -1,8 +1,8 @@
 import {createHash} from 'node:crypto';
 import {mkdir, open, readFile, lstat, rename, rm} from 'node:fs/promises';
 import path from 'node:path';
-import type {Tool, ToolUseContext} from '@itookit/tools';
-import {sha256HexSync, randomUUID} from '@itookit/common';
+import type {Tool, ToolUseContext} from '@nestos/tools';
+import {sha256HexSync, randomUUID} from '@nestos/common';
 import {packageError, packageIdentity} from './manifest';
 import type {RegisteredToolPackage} from './store';
 

@@ -212,7 +212,7 @@ llm-ui/
     ├── dag.css / floating-nav.css / tty-panel.css / ai-context-menu.css
 ```
 
-LLM 设置类编辑器（AgentConfig / Connection / Provider / MCP / Cost / SystemPrompt / Skill 表单）不在本包，已迁至 `@itookit/llm-ui/settings`，由 `src/settings.ts` 接线并导出。
+LLM 设置类编辑器（AgentConfig / Connection / Provider / MCP / Cost / SystemPrompt / Skill 表单）不在本包，已迁至 `@nestos/llm-ui/settings`，由 `src/settings.ts` 接线并导出。
 
 ### 2.4 基础设施层说明
 
@@ -372,7 +372,7 @@ interface IEditorEventBus {
 | `IBranchStore` | `BranchStore`(services 层) |
 | `IStreamableEditor` | `MDxController` |
 | `IEditorEventBus` | `EditorEventBus`(shell 层) |
-| `IEditor`(外部 `@itookit/ui-common-adapter`) | `LLMWorkspaceEditor` + `@itookit/llm-ui/settings` 的编辑器 |
+| `IEditor`(外部 `@nestos/ui-common-adapter`) | `LLMWorkspaceEditor` + `@nestos/llm-ui/settings` 的编辑器 |
 
 ---
 
@@ -1029,7 +1029,7 @@ Guard: sessionManager.isGenerating() 时跳过保存
 | **添加新快捷键** | `shell/EventBinder.ts` → `bindGlobalShortcuts()` 添加映射 |
 | **新增会话命令** | `llm-session` 注册 `session.*` → UI 侧通过 `ctx.commands.execute()` 调用 |
 | **新增聊天输入插件** | 实现 `InputPlugin` 接口 → `ChatInput.registerPlugin()` |
-| **新增技能表单编辑器** | `@itookit/llm-ui/settings` 继承 IEditor → bootstrap 注册 editorFactory |
+| **新增技能表单编辑器** | `@nestos/llm-ui/settings` 继承 IEditor → bootstrap 注册 editorFactory |
 
 ---
 
@@ -1108,8 +1108,8 @@ data 属性: kebab-case
 
 ```typescript
 // 1. 外部包(按字母序)
-import { Toast } from '@itookit/common';
-import { SessionManager } from '@itookit/llm-session';
+import { Toast } from '@nestos/common';
+import { SessionManager } from '@nestos/llm-session';
 
 // 2. domain 层(类型优先)
 import type { CollapseStateMap, BranchItem } from '../domain/types';
@@ -1148,7 +1148,7 @@ export class MyCommand extends Command<Params> {
 ### 15.1 工厂函数
 
 ```typescript
-import { createLLMFactory, createAgentEditorFactory, createSkillsEditorFactory } from '@itookit/llm-ui-adapter';
+import { createLLMFactory, createAgentEditorFactory, createSkillsEditorFactory } from '@nestos/llm-ui-adapter';
 
 // 会话工作区编辑器(vfs-ui 选中 session 目标时创建)
 const llmFactory = createLLMFactory(agentService, {
@@ -1175,23 +1175,23 @@ const skillsFactory = createSkillsEditorFactory(agentService);
 
 ```typescript
 // 本包实现
-export { DagWorkbench, FlowsEditor, createFlowsEditorFactory } from '@itookit/llm-ui-adapter';
-export { createAIContextMenuConfig } from '@itookit/llm-ui-adapter';   // AI 右键菜单
-export { VFSAgentService } from '@itookit/llm-ui-adapter';
-export type { LLMEditorOptions, DagWorkbenchOptions, FlowsEditorDeps } from '@itookit/llm-ui-adapter';
-export type { IPrivilegedCommandService } from '@itookit/llm-ui-adapter';
+export { DagWorkbench, FlowsEditor, createFlowsEditorFactory } from '@nestos/llm-ui-adapter';
+export { createAIContextMenuConfig } from '@nestos/llm-ui-adapter';   // AI 右键菜单
+export { VFSAgentService } from '@nestos/llm-ui-adapter';
+export type { LLMEditorOptions, DagWorkbenchOptions, FlowsEditorDeps } from '@nestos/llm-ui-adapter';
+export type { IPrivilegedCommandService } from '@nestos/llm-ui-adapter';
 
-// 自 @itookit/llm-ui/settings 再导出
+// 自 @nestos/llm-ui/settings 再导出
 export {
     ConnectionSettingsEditor, ProviderSettingsEditor, MCPSettingsEditor,
     SkillSettingsEditor, CostEditor, SystemPromptSettingsEditor,
     AgentConfigEditor,
-} from '@itookit/llm-ui-adapter';
+} from '@nestos/llm-ui-adapter';
 ```
 
 ### 15.3 IEditor 契约实现
 
-`LLMWorkspaceEditor` implements `IEditor`(来自 `@itookit/ui-common-adapter`)。关键方法:
+`LLMWorkspaceEditor` implements `IEditor`(来自 `@nestos/ui-common-adapter`)。关键方法:
 
 ```
 init / destroy / waitUntilReady / getText / setText / setTextAsync
@@ -1319,8 +1319,8 @@ Phase 9: DOM 清理
 运行:
 
 ```bash
-pnpm --filter @itookit/llm-ui-adapter typecheck
-pnpm --filter @itookit/llm-ui-adapter exec vitest run
+pnpm --filter @nestos/llm-ui-adapter typecheck
+pnpm --filter @nestos/llm-ui-adapter exec vitest run
 ```
 
 ---

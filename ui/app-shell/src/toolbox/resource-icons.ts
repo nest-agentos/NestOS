@@ -1,4 +1,4 @@
-import { escapeHTML, TOOLBOX_ICONS, TOOLBOX_PROVIDER_ICONS, t } from '@itookit/common';
+import { escapeHTML, TOOLBOX_ICONS, TOOLBOX_PROVIDER_ICONS, t } from '@nestos/common';
 import type { ToolboxKind } from './routes';
 
 /** Configured icons are text, never executable markup. */

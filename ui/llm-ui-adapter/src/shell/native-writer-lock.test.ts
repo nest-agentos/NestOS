@@ -1,7 +1,7 @@
 import type {ConversationSnapshot} from '../contracts';
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 import {nativeWriterLockText} from './native-writer-lock';
 import {NativeInstructionQueuePanel} from '../components/NativeInstructionQueuePanel';

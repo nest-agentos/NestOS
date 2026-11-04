@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {bindApplicationBackend, bindLocalApplicationServices, createApplicationClient} from '@itookit/app-core/host';
-import {RpcPeer, installViewProjections} from '@itookit/app-transport/application';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {bindApplicationBackend, bindLocalApplicationServices, createApplicationClient} from '@nestos/app-core/host';
+import {RpcPeer, installViewProjections} from '@nestos/app-transport/application';
 import {OpenedViewProjection} from '../src/lifecycle/opened-view';
-import {folderBrowserPath} from '@itookit/app-contracts';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {folderBrowserPath} from '@nestos/app-contracts';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import {IndependentSessionEditor} from '../../llm-ui-adapter/src/shell/IndependentSessionEditor';
 import {createLLMFactory} from '../../llm-ui-adapter/src/chat';
 import {SessionWorkbench} from '../src/projects/SessionWorkbench';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import type {FlowDraft} from '@itookit/llm-flow/contracts';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import type {FlowDraft} from '@nestos/llm-flow/contracts';
 
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals();

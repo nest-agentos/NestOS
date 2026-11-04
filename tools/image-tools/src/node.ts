@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import {encodingQualities, validateImageRecipe, type ImageRecipe} from '@itookit/image-parser/processing';
+import {encodingQualities, validateImageRecipe, type ImageRecipe} from '@nestos/image-parser/processing';
 import {createImageTools} from './core';
 import type {ImageEngine} from './contract';
 export const sharpEngine: ImageEngine = {id: 'sharp', version: `1/${sharp.versions.sharp}/${sharp.versions.vips}`, process: processImage};

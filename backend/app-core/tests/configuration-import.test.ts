@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { IConnectionService } from '@itookit/kernel-adapters/contracts';
-import type { LLMConfigFile } from '@itookit/kernel-adapters/llm/config';
+import type { IConnectionService } from '@nestos/kernel-adapters/contracts';
+import type { LLMConfigFile } from '@nestos/kernel-adapters/llm/config';
 import { executeImport, withConfigurationImport } from '../src/configuration/configuration-import';
 
 const config: LLMConfigFile = {

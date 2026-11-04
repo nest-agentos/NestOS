@@ -1,4 +1,4 @@
-import {escapeAttr, escapeHTML, t} from '@itookit/common';
+import {escapeAttr, escapeHTML, t} from '@nestos/common';
 import {collectionDestinationSummary} from './collection-destination';
 import {twinError} from './error-view';
 import {button, label, type TwinSnapshot} from './view';

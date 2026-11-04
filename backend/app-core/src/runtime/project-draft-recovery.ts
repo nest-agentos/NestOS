@@ -1,5 +1,5 @@
-import { traceBoot } from '@itookit/common';
-import type { SessionManager } from '@itookit/llm-session';
+import { traceBoot } from '@nestos/common';
+import type { SessionManager } from '@nestos/llm-session';
 import type { ProjectDraftService } from '../projects/drafts/service';
 
 /** Wire notifications and drain in-flight recovery before runtime storage is released. */

@@ -1,10 +1,10 @@
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {Kernel} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend, type IVFSManager} from '@itookit/vfs-core';
-import {sha256HexSync, type ContextSnapshot} from '@itookit/llm-context';
-import {registerDurablePrograms, submitRun, submitTaskCall} from '@itookit/llm-flow';
-import {invocationLabels, targetLabels} from '@itookit/llm-flow/contracts';
-import {HarnessProgram, HarnessExecutionEffect} from '@itookit/kernel-adapters';
+import {Kernel} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend, type IVFSManager} from '@nestos/vfs-core';
+import {sha256HexSync, type ContextSnapshot} from '@nestos/llm-context';
+import {registerDurablePrograms, submitRun, submitTaskCall} from '@nestos/llm-flow';
+import {invocationLabels, targetLabels} from '@nestos/llm-flow/contracts';
+import {HarnessProgram, HarnessExecutionEffect} from '@nestos/kernel-adapters';
 import {prepareDirectRun, type DirectRunPreparation, type DirectConversationInput} from '../src';
 import {directTaskSpec} from '../src/session/direct-conversation';
 import {snapshotDirectAgentPolicy} from '../src/contracts/direct-agent-policy';

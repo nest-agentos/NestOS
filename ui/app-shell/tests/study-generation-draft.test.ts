@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach,expect,it,vi} from 'vitest';
-import {StudyView} from '@itookit/mdxeditor';
-import type {ApplicationBackend} from '@itookit/app-contracts/services';
+import {StudyView} from '@nestos/mdxeditor';
+import type {ApplicationBackend} from '@nestos/app-contracts/services';
 import {studyGeneration} from '../src/browser/study-generation';
 const modal=Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype,'showModal'),close=Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype,'close');
 afterEach(()=>{vi.restoreAllMocks();document.body.replaceChildren();for(const [key,value] of [['showModal',modal],['close',close]] as const){if(value)Object.defineProperty(HTMLDialogElement.prototype,key,value);else delete (HTMLDialogElement.prototype as any)[key];}});

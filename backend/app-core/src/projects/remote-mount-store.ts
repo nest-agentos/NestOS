@@ -1,4 +1,4 @@
-import { FSError, type IFileSystem, type ISeqFileTransaction } from '@itookit/vfs-core';
+import { FSError, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
 import type { ProjectRemoteMount } from './remote-mounts';
 import type { RemoteFileSystemConfig } from './remote-connections';
 

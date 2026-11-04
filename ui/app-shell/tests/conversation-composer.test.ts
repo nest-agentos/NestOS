@@ -1,4 +1,4 @@
-import type {ConversationControls} from '@itookit/llm-ui-adapter/contracts';
+import type {ConversationControls} from '@nestos/llm-ui-adapter/contracts';
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
 

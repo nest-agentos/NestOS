@@ -1,5 +1,5 @@
-import { assertEffectGrant, type EffectAdapter, type EffectExecutionContext, type EffectReconcileResult } from '@itookit/durable-kernel';
-import type { LLMLogSink } from '@itookit/driver-llm/contracts';
+import { assertEffectGrant, type EffectAdapter, type EffectExecutionContext, type EffectReconcileResult } from '@nestos/durable-kernel';
+import type { LLMLogSink } from '@nestos/driver-llm/contracts';
 import type { HarnessExecutionProvider, HarnessExecutionRequest, HarnessExecutionResult } from '../llm-management/contracts/harness-execution';
 import { InFlightEffects } from './in-flight';
 import { silentAdapterLog } from '../ports/diagnostics';

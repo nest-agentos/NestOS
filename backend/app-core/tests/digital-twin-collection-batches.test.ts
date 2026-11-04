@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {DigitalTwinService} from '../src/digital-twin/service';
 import {collectionProgress} from '../src/digital-twin/collection-progress';
 const cleanup: Array<() => Promise<void>> = [];

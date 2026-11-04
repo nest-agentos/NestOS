@@ -1,4 +1,4 @@
-import type {ClientDiagnostic} from '@itookit/app-contracts/services';
+import type {ClientDiagnostic} from '@nestos/app-contracts/services';
 
 const identity = /^[a-zA-Z0-9_-]{1,160}$/;
 const label = /^[a-z][a-z0-9.-]{0,63}$/;

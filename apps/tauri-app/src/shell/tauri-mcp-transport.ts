@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { createMCPStdioTransportFactory, type MCPProcessBatch } from '@itookit/kernel-adapters/llm/mcp-host';
+import { createMCPStdioTransportFactory, type MCPProcessBatch } from '@nestos/kernel-adapters/llm/mcp-host';
 
 /** One native process per MCP connection, with explicit lifetime and bounded output. */
 export function createTauriMCPTransport() {

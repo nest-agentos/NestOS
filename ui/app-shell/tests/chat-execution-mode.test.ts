@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { ChatInput } from '../../llm-ui-adapter/src/components/input/ChatInputView';
 import { SendMessageCommand } from '../../llm-ui-adapter/src/commands/SendMessageCommand';
 import { RegenerateCommand } from '../../llm-ui-adapter/src/commands/NodeCommands';
-import { SessionCommand } from '@itookit/llm-session';
+import { SessionCommand } from '@nestos/llm-session';
 import type { ChatOverrides } from '../../llm-ui-adapter/src/domain/types';
 
 const views: ChatInput[] = [];

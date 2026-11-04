@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { bindApplicationBackend } from '../../src/host/application-client';
 import { restrictApplicationFiles } from '../../src/host/application-access';
-import type { LocalApplicationServices } from '@itookit/app-contracts/services';
+import type { LocalApplicationServices } from '@nestos/app-contracts/services';
 
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); vi.restoreAllMocks(); });

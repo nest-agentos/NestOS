@@ -1,5 +1,5 @@
 import type {ChatInput, ChatInputOptions} from '../../components/input/ChatInputView';
-import type {ChatView} from '@itookit/llm-ui';
+import type {ChatView} from '@nestos/llm-ui';
 import type {DraftFilePort} from '../../services/DraftFilesCodec';
 
 /** The project retains ownership until the host has accepted the prepared editor. */

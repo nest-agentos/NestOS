@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { createCellsDriver, type RemoteProject } from '@itookit/cells-driver';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { createCellsDriver, type RemoteProject } from '@nestos/cells-driver';
+import type { ProjectService } from '@nestos/app-contracts/services';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { ProjectSearch } from '../src/projects/project-search';
 import { RemoteMountStore } from '../src/projects/remote-mount-store';

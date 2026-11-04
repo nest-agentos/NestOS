@@ -5,7 +5,7 @@
  * No mocking — requires a valid OPENAI_API_KEY in the environment.
  *
  * Run:
- *   OPENAI_API_KEY=sk-... pnpm --filter @itookit/app-shell test --reporter=verbose
+ *   OPENAI_API_KEY=sk-... pnpm --filter @nestos/app-shell test --reporter=verbose
  *
  * Optional overrides:
  *   LLM_MODEL=gpt-4o   (default: gpt-4o-mini)
@@ -13,9 +13,9 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { LLMDriver } from '@itookit/driver-llm';
-import { createNestosLlmPresets } from '@itookit/kernel-adapters/llm/presets';
-import type { ChatMessage, Attachment } from '@itookit/llm-context';
+import { LLMDriver } from '@nestos/driver-llm';
+import { createNestosLlmPresets } from '@nestos/kernel-adapters/llm/presets';
+import type { ChatMessage, Attachment } from '@nestos/llm-context';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

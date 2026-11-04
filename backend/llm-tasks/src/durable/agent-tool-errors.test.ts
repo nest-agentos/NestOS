@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import type { ToolInvokeResult } from '@itookit/tools/contracts';
+import type { ToolInvokeResult } from '@nestos/tools/contracts';
 import { DurableAgentProgram } from './agent-program';
 
 function pending(maxExchanges = 4, toolTimeoutMs?: number) {

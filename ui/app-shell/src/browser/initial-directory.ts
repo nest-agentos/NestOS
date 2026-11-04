@@ -1,5 +1,5 @@
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { NavigationDirectory } from '@itookit/app-contracts/services';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { NavigationDirectory } from '@nestos/app-contracts/services';
 import { directorySnapshot } from './directory-snapshot';
 
 /** Root-navigation convenience over the shared, single-use metadata seed. */

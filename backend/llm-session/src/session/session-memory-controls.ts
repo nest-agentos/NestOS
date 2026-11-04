@@ -1,4 +1,4 @@
-import type { MemoryPolicy } from '@itookit/llm-tasks/contracts';
+import type { MemoryPolicy } from '@nestos/llm-tasks/contracts';
 import type { IAgentConfigService } from '../services/agent-service';
 import { SessionMemoryProvider, type MemoryWrite, type MemoryMutationOptions } from './session-memory-provider';
 import { MemorySharingControls } from './memory-sharing-controls';

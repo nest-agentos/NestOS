@@ -1,9 +1,9 @@
-import { FlowLibraryCommand } from '@itookit/app-contracts';
-import { createNestosFlowLibrary } from '@itookit/app-core';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
+import { createNestosFlowLibrary } from '@nestos/app-core';
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import { FlowCommand, SessionCommand } from '@itookit/llm-session';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import { FlowCommand, SessionCommand } from '@nestos/llm-session';
 import { FlowLauncher } from '../../llm-ui-adapter/src/flows/run-flow';
 import { createFlowContextMenuConfig } from '../../llm-ui-adapter/src/flows/context-menu';
 import { promptFlowParameters } from '../../llm-ui-adapter/src/components/FlowParameterForm';
@@ -249,7 +249,7 @@ it('retains slot requirements but clears obsolete snapshots and descriptions whe
 
 it('restores the builtin library from System Recovery without duplicate requests', async () => {
     const { RecoverySettingsEditor } = await import('../../app-settings/src/editors/RecoverySettingsEditor');
-    const { Toast } = await import('@itookit/ui-common-adapter');
+    const { Toast } = await import('@nestos/ui-common-adapter');
     const notice = vi.spyOn(Toast, 'success').mockImplementation(() => undefined);
     let finish!: (count: number) => void;
     const restore = vi.fn(() => new Promise<number>(resolve => { finish = resolve; }));

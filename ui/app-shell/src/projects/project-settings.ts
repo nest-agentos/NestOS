@@ -1,6 +1,6 @@
-import {t,createModuleLogger,randomUUID} from '@itookit/common';
-import {projectFileSource} from '@itookit/app-contracts';
-import type {ProjectFolder, ProjectService} from '@itookit/app-contracts/services';
+import {t,createModuleLogger,randomUUID} from '@nestos/common';
+import {projectFileSource} from '@nestos/app-contracts';
+import type {ProjectFolder, ProjectService} from '@nestos/app-contracts/services';
 import {showNameDialog} from '../files/project-dialog';
 import {environmentFields, parseEnvironment, projectExecutionSettings} from './project-execution-settings';
 

@@ -1,7 +1,7 @@
 import { withWorkspaceScopeCleanup } from '../src/runtime/workspace-scope-cleanup';
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend, type IDeviceDriver } from '@itookit/vfs-core';
-import { DurableFlowExecutor } from '@itookit/llm-flow';
+import { createVFS, MemoryBackend, type IDeviceDriver } from '@nestos/vfs-core';
+import { DurableFlowExecutor } from '@nestos/llm-flow';
 import { createKernelRuntime } from '../src/runtime/create-kernel-runtime';
 
 it('selects the persisted Flow workspace in the shared runtime without a host-provided selector', async () => {

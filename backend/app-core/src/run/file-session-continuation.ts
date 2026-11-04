@@ -1,5 +1,5 @@
-import type {SubmissionRequest} from '@itookit/llm-session/contracts';
-import type {Kernel} from '@itookit/durable-kernel';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
+import type {Kernel} from '@nestos/durable-kernel';
 import {readContextCatalog} from '../projects/harness-context-catalog';
 import type {FileReply} from './file-exchange-protocol';
 import {failure} from './prompt-bundle';

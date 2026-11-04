@@ -1,8 +1,8 @@
-import {buildTool, TaskListTool, type Tool} from '@itookit/tools';
+import {buildTool, TaskListTool, type Tool} from '@nestos/tools';
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import type {FlowDraft} from '@itookit/llm-flow/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import type {FlowDraft} from '@nestos/llm-flow/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); vi.unstubAllGlobals();});

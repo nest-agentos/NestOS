@@ -97,8 +97,8 @@ History 区分展示角色与执行身份：用户输入/批准为 user，节点
 本轮 9 项真实 CLI / PTY 检查全部通过；HITL 4 项、历史投影 6 项、CLI Flow 能力与运行集成 20 项回归全部通过。CLI 和 llm-session 类型检查通过，活文档检查通过（保留 7 条既有告警）。
 
 ```bash
-pnpm --filter @itookit/cli exec vitest run tests/hitl.test.ts --fileParallelism=false
-pnpm --filter @itookit/llm-session exec vitest run __tests__/flow-history.test.ts
+pnpm --filter @nestos/cli exec vitest run tests/hitl.test.ts --fileParallelism=false
+pnpm --filter @nestos/llm-session exec vitest run __tests__/flow-history.test.ts
 ```
 
 当前重显示由 CLI resume 和既有待回答记录驱动；尚无通用设备 attach / wake / refresh 协议。若增加此协议，应由宿主在设备接入时通知，设备读取权威 snapshot 并从 asOfSequence 继续观察。刷新可以重复或合并，不能重新登记同一问题；已回答的问题以持久状态为准关闭。设备离线不等于取消 Task，onChanged 也不能单独承担断线期间的可靠投递。

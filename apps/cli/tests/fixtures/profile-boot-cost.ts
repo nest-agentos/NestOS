@@ -1,14 +1,14 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { createApplicationRuntime, type ApplicationRuntime } from '@itookit/app-core';
-import { openLocalFSBackend, type ISidecarDb } from '@itookit/vfsdriver-local';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
+import { createApplicationRuntime, type ApplicationRuntime } from '@nestos/app-core';
+import { openLocalFSBackend, type ISidecarDb } from '@nestos/vfsdriver-local';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 
 /**
  * Boot-cost profile: counts logical sidecar (SQLite) calls and VFS engine operations per boot stage.
  *
- * Run with: `pnpm --filter @itookit/cli exec tsx tests/fixtures/profile-boot-cost.ts`
+ * Run with: `pnpm --filter @nestos/cli exec tsx tests/fixtures/profile-boot-cost.ts`
  *
  * Both counters are logical operations, not transport round trips. On the desktop every engine
  * operation and every sidecar call costs at least one host invocation, so the counts are the part

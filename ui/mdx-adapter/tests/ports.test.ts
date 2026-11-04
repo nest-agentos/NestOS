@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import type {EditorOptions} from '@itookit/ui-common-adapter';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import type {EditorOptions} from '@nestos/ui-common-adapter';
 import { adaptEditorOptions } from '../src/factory';
 import { createAssetProvider } from '../src/assets';
 

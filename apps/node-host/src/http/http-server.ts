@@ -1,7 +1,7 @@
 import { createServer, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { TLSSocket } from 'node:tls';
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 import type { CertificateAuth } from './certificates';
 import { auditRequest, type AuditPort } from '../logging/audit-log';
 import { sendError } from './http-response';

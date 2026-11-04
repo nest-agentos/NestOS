@@ -5,7 +5,7 @@
 // Session history record store. The session manifest (RoundManifest) holds the DAG index.
 
 import type { Round, RoundId, Ref } from '../contracts';
-import type { ContextProfileId } from '@itookit/llm-context';
+import type { ContextProfileId } from '@nestos/llm-context';
 
 // ─── Re-export for consumers ──────────────────────────────────────────────
 export type { Round, RoundId, Ref };
@@ -88,7 +88,7 @@ export interface ToolCallProjection {
 
 export interface RoundProjection {
     callInput?: import('../contracts/conversation').Round['callInput'];
-    target?: import('@itookit/llm-flow/contracts').TargetRef;
+    target?: import('@nestos/llm-flow/contracts').TargetRef;
     roundId: RoundId;
     execution?: import('../contracts').ExecutionRef;
     historyParentIds: RoundId[];
@@ -97,7 +97,7 @@ export interface RoundProjection {
     kind: 'system' | 'chat' | 'merge';
 
     userMessage?: {
-        messages?: import('@itookit/llm-context').ChatMessage[];
+        messages?: import('@nestos/llm-context').ChatMessage[];
         content: string;
         files?: import('../contracts').ChatAttachment[];
         persistedNodeId: string;

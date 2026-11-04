@@ -2,8 +2,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { installMobileViewport } from '../src/navigation/mobile-viewport';
 import { setupMobileWorkspaceView } from '../src/navigation/mobile-workspace-view';
-import { ACTION_ICONS, t } from '@itookit/common';
-import { VFS_DOM_EVENTS } from '@itookit/vfs-ui';
+import { ACTION_ICONS, t } from '@nestos/common';
+import { VFS_DOM_EVENTS } from '@nestos/vfs-ui';
 import { WorkbenchTabs } from '../src/workbench/tabs';
 
 afterEach(() => { document.body.innerHTML = ''; vi.unstubAllGlobals(); });

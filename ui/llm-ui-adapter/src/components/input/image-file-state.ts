@@ -1,5 +1,5 @@
-import {randomUUID} from '@itookit/common';
-import {DEFAULT_IMAGE_SPEC, validateSpec, type ImageSpec} from '@itookit/image-parser';
+import {randomUUID} from '@nestos/common';
+import {DEFAULT_IMAGE_SPEC, validateSpec, type ImageSpec} from '@nestos/image-parser';
 
 export interface ImageFileState {id: string; revision: number; original: File; spec: ImageSpec; resizeKey?: string}
 const states = new WeakMap<File, ImageFileState>();

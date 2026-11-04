@@ -1,9 +1,9 @@
 import { TwinSafeLlmLogger } from '../digital-twin/llm-logger';
-import { createNestosLlmPresets, firstChatModelConnection } from '@itookit/kernel-adapters/llm/presets';
-import { createVFS, createFileSystemView, MemoryBackend, type IFileSystem, type IStorageBackend, type IVFSManager, type MountOptions } from '@itookit/vfs-core';
-import { LLMDeviceDriver, type CodexAppServerTransport } from '@itookit/kernel-adapters/llm/core';
-import { t, traceBoot, createModuleLogger } from '@itookit/common';
-import { type ILLMLogger } from '@itookit/driver-llm/contracts';
+import { createNestosLlmPresets, firstChatModelConnection } from '@nestos/kernel-adapters/llm/presets';
+import { createVFS, createFileSystemView, MemoryBackend, type IFileSystem, type IStorageBackend, type IVFSManager, type MountOptions } from '@nestos/vfs-core';
+import { LLMDeviceDriver, type CodexAppServerTransport } from '@nestos/kernel-adapters/llm/core';
+import { t, traceBoot, createModuleLogger } from '@nestos/common';
+import { type ILLMLogger } from '@nestos/driver-llm/contracts';
 
 export interface ApplicationInfrastructureOptions {
     backend: IStorageBackend;
@@ -15,9 +15,9 @@ export interface ApplicationInfrastructureOptions {
     preloadDirectories?: readonly string[];
     additionalMounts?: Array<{ path: string; backend: IStorageBackend; options?: MountOptions }>;
     llmLogger?: ILLMLogger;
-    mcp?: import('@itookit/kernel-adapters/llm/core').MCPConnectionOptions;
+    mcp?: import('@nestos/kernel-adapters/llm/core').MCPConnectionOptions;
     codexTransport?: CodexAppServerTransport;
-    providerAuthorization?: import('@itookit/kernel-adapters/llm/core').ProviderAuthorizationHost;
+    providerAuthorization?: import('@nestos/kernel-adapters/llm/core').ProviderAuthorizationHost;
     onProgress?(message: string): void;
 }
 

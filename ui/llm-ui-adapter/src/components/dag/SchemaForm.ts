@@ -1,5 +1,5 @@
-import {SchemaForm as SharedSchemaForm, validateSchema as validateSharedSchema, type JsonSchema} from '@itookit/llm-ui/forms';
-import type {FormLayout, JsonValue} from '@itookit/llm-flow/contracts';
+import {SchemaForm as SharedSchemaForm, validateSchema as validateSharedSchema, type JsonSchema} from '@nestos/llm-ui/forms';
+import type {FormLayout, JsonValue} from '@nestos/llm-flow/contracts';
 
 /** Flow expression acceptance is host policy; field rendering and parsing are shared. */
 const expression = (value: JsonValue) => typeof value === 'string' && /^\$\{(?:param|params|nodes|state|iteration|vars)\.([A-Za-z0-9_./-]+)\}$/.test(value.trim());

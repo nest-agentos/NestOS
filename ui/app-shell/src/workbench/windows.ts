@@ -1,4 +1,4 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 
 const log = createModuleLogger('workbench-windows');
 /** Application-owned window metadata; editor instances remain in their workspace. */

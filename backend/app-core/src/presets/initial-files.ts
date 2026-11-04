@@ -1,10 +1,10 @@
-import {t, createModuleLogger, randomUUID} from '@itookit/common';
+import {t, createModuleLogger, randomUUID} from '@nestos/common';
 const log = createModuleLogger('initial-files');
 import {studyFiles, writeMissingStudyFile} from './study-files';
-import type { IFileSystem } from '@itookit/vfs-core';
-import type {FlowInstallations, FlowInstallationReport} from '@itookit/app-contracts/services';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type {FlowInstallations, FlowInstallationReport} from '@nestos/app-contracts/services';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
 import demo from './digital-twin-demo.json';
 import readme from './notes-readme.json';
 import flowGuide from './flow-format-guide.json';

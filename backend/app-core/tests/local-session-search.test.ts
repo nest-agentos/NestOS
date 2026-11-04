@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { RoundLog, SessionRepository } from '@itookit/llm-session';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { RoundLog, SessionRepository } from '@nestos/llm-session';
+import type { ProjectService } from '@nestos/app-contracts/services';
 import { ProjectSearch } from '../src/projects/project-search';
 
 it('searches distinct ancestor payloads even when branches share the same logical head', async () => {

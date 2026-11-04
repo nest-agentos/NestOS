@@ -1,13 +1,13 @@
 import {navigateWorkspaceBack} from '../navigation/page-history';
 import {createRecoverableFileEditor} from './file-recovery';
 import { showNameDialog } from '../files/project-dialog';
-import { t, FILE_BROWSER_ICONS, FILE_ICONS, randomUUID, type NavigationRequest } from '@itookit/common';
+import { t, FILE_BROWSER_ICONS, FILE_ICONS, randomUUID, type NavigationRequest } from '@nestos/common';
 import { directoryBulkActions } from '../workbench/vfs-actions';
 import { watchDirectoryList } from '../workbench/directory-watch';
-import type { EditorFactory, IEditor, EditorHostContext } from '@itookit/ui-common-adapter';
-import type { IFileSystem, FileSystemContext } from '@itookit/vfs-core';
-import { FSError, guessMimeType } from '@itookit/vfs-core';
-import { allowsRowAction, filterGitignoredFiles, type VFSUIShell, type VFSNodeUI } from '@itookit/vfs-ui';
+import type { EditorFactory, IEditor, EditorHostContext } from '@nestos/ui-common-adapter';
+import type { IFileSystem, FileSystemContext } from '@nestos/vfs-core';
+import { FSError, guessMimeType } from '@nestos/vfs-core';
+import { allowsRowAction, filterGitignoredFiles, type VFSUIShell, type VFSNodeUI } from '@nestos/vfs-ui';
 import { EditorLease } from './editor-lease';
 import { fileContentFormat } from './file-format';
 import { parseFileInfo, extractTaskCounts } from './parser';

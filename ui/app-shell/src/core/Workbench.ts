@@ -9,14 +9,14 @@ import { createVFSMentionProviders } from '../browser/mention/createVFSMentionPr
  * 工作区装配器 — 粘合 VFS-UI (侧边栏) + Editor (编辑器)。
  * 不创建 DOM，不拥有布局。消费方负责创建 sidebar/editor 容器并传入。
  */
-import { VFSUIShell } from '@itookit/vfs-ui';
+import { VFSUIShell } from '@nestos/vfs-ui';
 import { lazyMdxEditorFactory as defaultEditorFactory } from '../browser/lazy-mdx';
 import type { WorkbenchConfig } from '../types';
-import { t, ACTION_ICONS, createModuleLogger, randomUUID, NavigationRequest} from '@itookit/common';
-import { EditorOptions, IEditor, EditorHostContext } from '@itookit/ui-common-adapter';
-import {FSError} from '@itookit/vfs-core';
-import type {StudyDraft} from '@itookit/mdxeditor';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { t, ACTION_ICONS, createModuleLogger, randomUUID, NavigationRequest} from '@nestos/common';
+import { EditorOptions, IEditor, EditorHostContext } from '@nestos/ui-common-adapter';
+import {FSError} from '@nestos/vfs-core';
+import type {StudyDraft} from '@nestos/mdxeditor';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { showNameDialog } from '../files/project-dialog';
 import { presentationPersistence } from '../persistence/initial-navigation';
 import {ViewRefresh} from '../lifecycle/view-refresh';
@@ -114,7 +114,7 @@ export class Workbench {
             {
                 directoryActions: study ? [{id: 'study', label: t('editor.study'), icon: ACTION_ICONS.anki, run: () => this.openStudy()}] : [],
                 virtualViews: study ? [{ id: '@study', title: t('editor.study'), icon: ACTION_ICONS.anki, preview: false,
-                    create: async container => (await import('@itookit/mdx-adapter')).createStudyEditor(container, this.engine,
+                    create: async container => (await import('@nestos/mdx-adapter')).createStudyEditor(container, this.engine,
                         path => this.openFileInternal(path), config.uiOptions?.readOnly || config.editorConfig?.readOnly || config.editorConfig?.canCreateEntries === false ? {} : {
                             creation: {generation: config.studyGeneration?.generation, prompts: config.studyGeneration?.prompts, sources: config.studyGeneration?.sources, recovery: config.studyGeneration?.recovery,
                                 label: t('editor.studyCreate'), documents: {save: draft => this.createStudyFile(draft)}},
@@ -147,7 +147,7 @@ export class Workbench {
 
         const mentionScope = editorConfig?.mentionScope;
         const mentionPlugin = mentionScope !== undefined
-            ? new (await import('@itookit/mdxeditor')).MentionPlugin({
+            ? new (await import('@nestos/mdxeditor')).MentionPlugin({
                 providers: createVFSMentionProviders(this.engine, mentionScope),
                 onMentionClick: (_providerKey: string, nodeId: string) => {
                     this.config.onNavigate?.({ target: 'self', action: 'open', resourceId: nodeId });

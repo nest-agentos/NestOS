@@ -1,8 +1,8 @@
-import type {ConversationControls, ConversationSnapshot} from '@itookit/llm-ui-adapter/contracts';
+import type {ConversationControls, ConversationSnapshot} from '@nestos/llm-ui-adapter/contracts';
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
-import {getLogger} from '@itookit/common';
+import {createOperationLedger} from '@nestos/llm-ui';
+import {getLogger} from '@nestos/common';
 
 import {createNativeChatBinding, createNativeChatView} from '../../llm-ui-adapter/src/independent/native';
 

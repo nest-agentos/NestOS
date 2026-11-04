@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { openTaskTranscript } from '../../llm-ui-adapter/src/components/dag/TaskTranscriptDialog';
 
 beforeEach(() => {

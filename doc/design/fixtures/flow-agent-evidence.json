@@ -92,17 +92,17 @@
   ],
   "validation": [
     {
-      "command": "pnpm --filter @itookit/llm-flow exec vitest run --maxWorkers=4 --minWorkers=1",
+      "command": "pnpm --filter @nestos/llm-flow exec vitest run --maxWorkers=4 --minWorkers=1",
       "files": 43,
       "passed": 543
     },
     {
-      "command": "pnpm --filter @itookit/llm-session exec vitest run --maxWorkers=3 --minWorkers=1",
+      "command": "pnpm --filter @nestos/llm-session exec vitest run --maxWorkers=3 --minWorkers=1",
       "files": 41,
       "passed": 326
     },
     {
-      "command": "pnpm --filter @itookit/app-core exec vitest run --maxWorkers=2 --silent=true",
+      "command": "pnpm --filter @nestos/app-core exec vitest run --maxWorkers=2 --silent=true",
       "files": 117,
       "passed": 731
     },

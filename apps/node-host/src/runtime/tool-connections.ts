@@ -1,7 +1,7 @@
 import {mkdir, lstat, readFile, open, rename, unlink} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import path from 'node:path';
-import type {ToolConnectionAccess, ToolConnectionInput, ToolConnectionType, ToolOAuthApplicationInput, ToolConnectionVerification} from '@itookit/app-contracts/services';
+import type {ToolConnectionAccess, ToolConnectionInput, ToolConnectionType, ToolOAuthApplicationInput, ToolConnectionVerification} from '@nestos/app-contracts/services';
 import {ToolAuthorization, type PrivateConnection} from './tool-authorization';
 import {validateOAuth} from './tool-oauth-client';
 import {ToolOAuthApplications} from './tool-oauth-applications';

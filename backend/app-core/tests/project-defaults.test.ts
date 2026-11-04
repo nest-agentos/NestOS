@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend, FSError, type IFileSystem, type IVFSManager } from '@itookit/vfs-core';
-import type { ProjectFolder } from '@itookit/app-contracts/services';
+import { createVFS, MemoryBackend, FSError, type IFileSystem, type IVFSManager } from '@nestos/vfs-core';
+import type { ProjectFolder } from '@nestos/app-contracts/services';
 import { ProjectDefaults } from '../src/projects/project-defaults';
 
 let manager: IVFSManager, root: IFileSystem;

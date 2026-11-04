@@ -2,7 +2,7 @@ import type {ConversationControls, ConversationQueueEdit, ConversationSnapshot} 
 
 import {NativeInstructionQueuePanel} from '../components/NativeInstructionQueuePanel';
 import type {ImageChatOptions} from './image-chat-view';
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
 
 const log = createModuleLogger('native-instruction-queue');
 

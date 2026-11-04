@@ -1,8 +1,8 @@
-import { FSError } from '@itookit/vfs-core';
-import type { IFileSystem, IVFSManager } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
+import type { IFileSystem, IVFSManager } from '@nestos/vfs-core';
 
-import type { SettingsWorkspaceSource, WorkspaceFileSource } from '@itookit/app-contracts/settings';
-export type { WorkspaceFileSource } from '@itookit/app-contracts/settings';
+import type { SettingsWorkspaceSource, WorkspaceFileSource } from '@nestos/app-contracts/settings';
+export type { WorkspaceFileSource } from '@nestos/app-contracts/settings';
 
 /** Resolve workspace files only for operations that actually consume them. */
 export class SettingsFiles {
@@ -32,7 +32,7 @@ export class SettingsFiles {
         return rows.filter(source => source.fs.external !== true && source.fs.capabilities.tags);
     }
 }
-export async function writeWorkspaceFile(fs: IFileSystem, path: string, content: import('@itookit/vfs-core').FileContent): Promise<void> {
+export async function writeWorkspaceFile(fs: IFileSystem, path: string, content: import('@nestos/vfs-core').FileContent): Promise<void> {
     if (await fs.driver.exists(path)) await fs.driver.writeContent(path, content);
     else {
         const index = path.lastIndexOf('/');

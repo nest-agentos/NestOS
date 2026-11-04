@@ -1,4 +1,4 @@
-import type {Kernel, TaskRecord} from '@itookit/durable-kernel';
+import type {Kernel, TaskRecord} from '@nestos/durable-kernel';
 import {IndependentCallCommand, type IndependentCallDescendantsQuery, type IndependentCallDescendantsResult, type IndependentCallExecutionQuery} from '../contracts/independent-calls';
 import type {ICommandBus} from '../contracts/command-bus';
 import type {SessionLogger} from '../utils/host-ports';

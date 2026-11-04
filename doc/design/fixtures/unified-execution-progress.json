@@ -1847,19 +1847,19 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-context",
+              "@nestos/llm-context",
               "test"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-context",
+              "@nestos/llm-context",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-context",
+              "@nestos/llm-context",
               "build"
             ]
           ],
@@ -1874,7 +1874,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "exec",
               "vitest",
               "run",
@@ -1885,7 +1885,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ]
           ],
@@ -1900,7 +1900,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "exec",
               "vitest",
               "run",
@@ -1912,7 +1912,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ]
           ],
@@ -1927,7 +1927,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "exec",
               "vitest",
               "run",
@@ -1939,7 +1939,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-session",
+              "@nestos/llm-session",
               "exec",
               "vitest",
               "run",
@@ -1950,13 +1950,13 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-session",
+              "@nestos/llm-session",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ]
           ],
@@ -1980,19 +1980,19 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/durable-kernel",
+              "@nestos/durable-kernel",
               "test"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/durable-kernel",
+              "@nestos/durable-kernel",
               "build"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-flow",
+              "@nestos/llm-flow",
               "exec",
               "vitest",
               "run",
@@ -2004,7 +2004,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "exec",
               "vitest",
               "run",
@@ -2014,31 +2014,31 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-flow",
+              "@nestos/llm-flow",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-session",
+              "@nestos/llm-session",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/kernel-adapters",
+              "@nestos/kernel-adapters",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "typecheck"
             ]
           ],
@@ -2053,7 +2053,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "exec",
               "vitest",
               "run",
@@ -2065,7 +2065,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ]
           ],
@@ -2080,7 +2080,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-flow",
+              "@nestos/llm-flow",
               "exec",
               "vitest",
               "run",
@@ -2090,19 +2090,19 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-flow",
+              "@nestos/llm-flow",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-session",
+              "@nestos/llm-session",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ]
           ],
@@ -2126,19 +2126,19 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/cells-driver",
+              "@nestos/cells-driver",
               "build"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/cells-driver",
+              "@nestos/cells-driver",
               "test"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "exec",
               "vitest",
               "run",
@@ -2149,13 +2149,13 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "typecheck"
             ]
           ],
@@ -2186,7 +2186,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "exec",
               "vitest",
               "run",
@@ -2195,7 +2195,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "exec",
               "vitest",
               "run",
@@ -2205,19 +2205,19 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/ui-common-adapter",
+              "@nestos/ui-common-adapter",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "typecheck"
             ]
           ],
@@ -2240,7 +2240,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "exec",
               "vitest",
               "run",
@@ -2250,7 +2250,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "exec",
               "vitest",
               "run",
@@ -2261,13 +2261,13 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "typecheck"
             ]
           ],
@@ -2283,7 +2283,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "exec",
               "vitest",
               "run",
@@ -2293,7 +2293,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "exec",
               "vitest",
               "run",
@@ -2304,13 +2304,13 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "typecheck"
             ]
           ],
@@ -2326,13 +2326,13 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-contracts",
+              "@nestos/app-contracts",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/http-app",
+              "@nestos/http-app",
               "exec",
               "vitest",
               "run",
@@ -2341,25 +2341,25 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/http-app",
+              "@nestos/http-app",
               "typecheck"
             ]
           ],
@@ -2390,7 +2390,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-flow",
+              "@nestos/llm-flow",
               "exec",
               "vitest",
               "run",
@@ -2400,31 +2400,31 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-flow",
+              "@nestos/llm-flow",
               "build"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-flow",
+              "@nestos/llm-flow",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-session",
+              "@nestos/llm-session",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "typecheck"
             ]
           ],
@@ -2452,43 +2452,43 @@
               [
                 "pnpm",
                 "--filter",
-                "@itookit/kernel-adapters",
+                "@nestos/kernel-adapters",
                 "typecheck"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-flow",
+                "@nestos/llm-flow",
                 "typecheck"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-session",
+                "@nestos/llm-session",
                 "typecheck"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/app-core",
+                "@nestos/app-core",
                 "typecheck"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-settings-ui",
+                "@nestos/llm-settings-ui",
                 "typecheck"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-ui-adapter",
+                "@nestos/llm-ui-adapter",
                 "typecheck"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-session",
+                "@nestos/llm-session",
                 "exec",
                 "vitest",
                 "run",
@@ -2498,13 +2498,13 @@
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-settings-ui",
+                "@nestos/llm-settings-ui",
                 "test"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/app-core",
+                "@nestos/app-core",
                 "exec",
                 "vitest",
                 "run",
@@ -2518,7 +2518,7 @@
               [
                 "pnpm",
                 "--filter",
-                "@itookit/http-app",
+                "@nestos/http-app",
                 "exec",
                 "vitest",
                 "run",
@@ -2530,13 +2530,13 @@
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-session",
+                "@nestos/llm-session",
                 "build"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-settings-ui",
+                "@nestos/llm-settings-ui",
                 "build"
               ]
             ],
@@ -2556,13 +2556,13 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-context",
+              "@nestos/llm-context",
               "test"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-flow",
+              "@nestos/llm-flow",
               "exec",
               "vitest",
               "run",
@@ -2572,7 +2572,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-session",
+              "@nestos/llm-session",
               "exec",
               "vitest",
               "run",
@@ -2582,7 +2582,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/cli",
+              "@nestos/cli",
               "exec",
               "vitest",
               "run",
@@ -2596,19 +2596,19 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/cli",
+              "@nestos/cli",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-session",
+              "@nestos/llm-session",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-core",
+              "@nestos/app-core",
               "typecheck"
             ]
           ],
@@ -2618,19 +2618,19 @@
               [
                 "pnpm",
                 "--filter",
-                "@itookit/app-shell",
+                "@nestos/app-shell",
                 "typecheck"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-ui-adapter",
+                "@nestos/llm-ui-adapter",
                 "typecheck"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/app-shell",
+                "@nestos/app-shell",
                 "exec",
                 "vitest",
                 "run",
@@ -2642,7 +2642,7 @@
               [
                 "pnpm",
                 "--filter",
-                "@itookit/app-core",
+                "@nestos/app-core",
                 "exec",
                 "vitest",
                 "run",
@@ -2652,7 +2652,7 @@
               [
                 "pnpm",
                 "--filter",
-                "@itookit/app-shell",
+                "@nestos/app-shell",
                 "exec",
                 "vitest",
                 "run",
@@ -2663,13 +2663,13 @@
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-context",
+                "@nestos/llm-context",
                 "build"
               ],
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-session",
+                "@nestos/llm-session",
                 "build"
               ],
               [
@@ -2703,7 +2703,7 @@
               [
                 "pnpm",
                 "--filter",
-                "@itookit/llm-ui-adapter",
+                "@nestos/llm-ui-adapter",
                 "build"
               ],
               [
@@ -2731,19 +2731,19 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "typecheck"
             ],
             [
               "pnpm",
               "--filter",
-              "@itookit/app-shell",
+              "@nestos/app-shell",
               "exec",
               "vitest",
               "run",
@@ -2761,7 +2761,7 @@
             [
               "pnpm",
               "--filter",
-              "@itookit/llm-ui-adapter",
+              "@nestos/llm-ui-adapter",
               "build"
             ],
             [

@@ -10,7 +10,7 @@
 // The agent calls shell_session once, uses tty_write to interact,
 // and tty_close to terminate. The session ID links the calls.
 
-import type { ToolMeta, ToolDefinition, ToolHandler, ITTYDriver, ITTYSessionManager } from '@itookit/tools/contracts';
+import type { ToolMeta, ToolDefinition, ToolHandler, ITTYDriver, ITTYSessionManager } from '@nestos/tools/contracts';
 import { collectOutput } from './session-manager';
 
 export const shellSessionMeta: ToolMeta = {

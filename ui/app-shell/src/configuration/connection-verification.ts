@@ -1,5 +1,5 @@
-import {escapeAttr, escapeHTML, t, type LocaleKey} from '@itookit/common';
-import type {ToolConnectionVerification, ToolConnectionView} from '@itookit/app-contracts/services';
+import {escapeAttr, escapeHTML, t, type LocaleKey} from '@nestos/common';
+import type {ToolConnectionVerification, ToolConnectionView} from '@nestos/app-contracts/services';
 const label = (key: string) => t(`toolbox.connections.${key}` as LocaleKey);
 
 export function connectionStatus(connection: ToolConnectionView): string {

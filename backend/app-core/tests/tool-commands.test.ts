@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {Kernel} from '@itookit/durable-kernel';
+import type {Kernel} from '@nestos/durable-kernel';
 import {configuredToolCatalog, submitToolCommand, type ToolCommandPorts} from '../src/kernel/tool-commands';
 
 it('submits one stable, approved tool task with only the selected tool grant', async () => {

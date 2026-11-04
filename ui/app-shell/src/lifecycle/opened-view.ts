@@ -1,5 +1,5 @@
-import {FlowInvocationCommand} from '@itookit/llm-session/contracts';
-import type {SessionPresentationState, ApplicationBackend, ApplicationServices, ApplicationViewEvent, ApplicationViewSources, OpenedApplicationView, WorkbenchView} from '@itookit/app-contracts/services';
+import {FlowInvocationCommand} from '@nestos/llm-session/contracts';
+import type {SessionPresentationState, ApplicationBackend, ApplicationServices, ApplicationViewEvent, ApplicationViewSources, OpenedApplicationView, WorkbenchView} from '@nestos/app-contracts/services';
 
 function overlay<T extends object>(target: T, overrides: Partial<T>): T {
     return new Proxy(target, {get(value, key) {

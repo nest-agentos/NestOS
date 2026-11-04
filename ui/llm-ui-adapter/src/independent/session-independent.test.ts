@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createOperationLedger, type ChatSubmission} from '@itookit/llm-ui';
-import {IndependentCallCommand, SessionCommand} from '@itookit/llm-session/contracts';
+import {createOperationLedger, type ChatSubmission} from '@nestos/llm-ui';
+import {IndependentCallCommand, SessionCommand} from '@nestos/llm-session/contracts';
 import {createSessionChatBinding} from './session';
 
 const bindings: ReturnType<typeof createSessionChatBinding>[] = [];

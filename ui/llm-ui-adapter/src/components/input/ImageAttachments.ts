@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import {createBlobSource, type ImageProcessor, DEFAULT_IMAGE_SPEC, type ImageResizePolicy} from '@itookit/image-parser';
+import {t} from '@nestos/common';
+import {createBlobSource, type ImageProcessor, DEFAULT_IMAGE_SPEC, type ImageResizePolicy} from '@nestos/image-parser';
 import {ImageProcessingSession} from './image-processing-session';
 import {imageFileState, setImageFileState} from './image-file-state';
 import {editImageFiles} from './file-image-editing';

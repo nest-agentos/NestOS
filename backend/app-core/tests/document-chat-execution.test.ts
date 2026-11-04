@@ -1,8 +1,8 @@
 import {expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {SessionCommand, type RootTargetCatalog, type SubmissionRequest} from '@itookit/llm-session/contracts';
-import type {FlowDraft} from '@itookit/llm-flow/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {SessionCommand, type RootTargetCatalog, type SubmissionRequest} from '@nestos/llm-session/contracts';
+import type {FlowDraft} from '@nestos/llm-flow/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {openApplicationView} from '../src/host/application-view';
 

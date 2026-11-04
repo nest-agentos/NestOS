@@ -1,5 +1,5 @@
-import {type OcrControls} from '@itookit/app-contracts/services';
-import {OcrSettingsForm} from '@itookit/llm-ui-adapter/settings';
+import {type OcrControls} from '@nestos/app-contracts/services';
+import {OcrSettingsForm} from '@nestos/llm-ui-adapter/settings';
 
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';

@@ -1,7 +1,7 @@
-import { buildRenamedFilename } from '@itookit/common';
-import { Toast, type EditorOptions } from '@itookit/ui-common-adapter';
-import type { EditorHost } from '@itookit/mdxeditor';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { buildRenamedFilename } from '@nestos/common';
+import { Toast, type EditorOptions } from '@nestos/ui-common-adapter';
+import type { EditorHost } from '@nestos/mdxeditor';
+import type { IFileSystem } from '@nestos/vfs-core';
 
 /** Keep filename suffix and stored-title semantics in the VFS integration. */
 export async function renameDocument(fs: IFileSystem, path: string, requested: string): Promise<{ path: string; title: string }> {

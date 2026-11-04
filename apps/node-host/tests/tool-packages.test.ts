@@ -5,9 +5,9 @@ import {spawn} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {ToolDeviceDriver} from '@itookit/tools';
-import type {IDeviceDriver} from '@itookit/vfs-core';
-import {createKernelAdaptersRuntime} from '@itookit/kernel-adapters';
+import {ToolDeviceDriver} from '@nestos/tools';
+import type {IDeviceDriver} from '@nestos/vfs-core';
+import {createKernelAdaptersRuntime} from '@nestos/kernel-adapters';
 import {NodeToolPackages} from '../src/runtime/tool-packages';
 import {loadNodeToolModules, mergeNodePackageTools} from '../src/runtime/tool-modules';
 import {readPackageGuide} from '../src/runtime/tool-packages/guide';
@@ -55,7 +55,7 @@ it('imports only registered fingerprinted Flow resources and keeps business defi
     const restarted = f.manager(); await restarted.initialize();
     expect(await restarted.flowTemplates('fixture', '0.1.0')).toEqual([{...template, layout: {}}]);
 });
-async function runtime(tools: import('@itookit/tools').Tool[] = []) {
+async function runtime(tools: import('@nestos/tools').Tool[] = []) {
     const instance = await createKernelAdaptersRuntime({llmDriver: {} as IDeviceDriver, additionalTools: tools});
     cleanups.push(() => instance.dispose()); return instance;
 }

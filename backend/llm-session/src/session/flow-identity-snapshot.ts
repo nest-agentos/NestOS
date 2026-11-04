@@ -1,6 +1,6 @@
 import type { ExecutorConfig } from '../core/types';
 import type { LLMSkill } from '../contracts/agent';
-import type { SystemPromptDefinition } from '@itookit/llm-tasks/contracts';
+import type { SystemPromptDefinition } from '@nestos/llm-tasks/contracts';
 import type { FlowIdentityResolver } from './flow-node-binder';
 import type { FlowIdentitySnapshot } from '../contracts/flow-run-plan';
 

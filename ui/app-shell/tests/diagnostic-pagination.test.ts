@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {getLogger, t} from '@itookit/common';
-import type {ApplicationDiagnostics, DiagnosticEvent, DiagnosticQuery} from '@itookit/app-contracts/services';
+import {getLogger, t} from '@nestos/common';
+import type {ApplicationDiagnostics, DiagnosticEvent, DiagnosticQuery} from '@nestos/app-contracts/services';
 import {DiagnosticLogView} from '../../app-settings/src/editors/log/DiagnosticLogView';
 
 const cleanup: Array<() => void> = [];

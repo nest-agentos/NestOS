@@ -2,7 +2,7 @@ import { randomUUID } from '../utils/random';
 // @file: kernel-adapters/src/tool/tool-call.ts
 // Shared helpers for normalising ToolCall across Anthropic and OpenAI formats.
 
-import type { ToolCall } from '@itookit/llm-context';
+import type { ToolCall } from '@nestos/llm-context';
 
 /** Extract tool name (handles both Anthropic `name` and OpenAI `function.name`). */
 export function getToolName(call: ToolCall): string {

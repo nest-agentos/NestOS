@@ -1,6 +1,6 @@
-import { isApplicationReadCommand } from '@itookit/app-contracts';
+import { isApplicationReadCommand } from '@nestos/app-contracts';
 import { applicationSnapshot, observeApplication, observeSession, sessionSnapshot } from './session-snapshots';
-import type { ApplicationBackend } from '@itookit/app-contracts/services';
+import type { ApplicationBackend } from '@nestos/app-contracts/services';
 import type { CapabilitySchema, MethodMode } from '../rpc/capabilities';
 export type { ViewDomain } from '../rpc/capabilities';
 

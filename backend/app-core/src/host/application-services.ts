@@ -1,4 +1,4 @@
-import type { LocalApplicationServices } from '@itookit/app-contracts/services';
+import type { LocalApplicationServices } from '@nestos/app-contracts/services';
 import type { ApplicationRuntime } from '../runtime/create-application-runtime';
 
 /** Only the host owns dispose(), recovery and client execution contexts. */

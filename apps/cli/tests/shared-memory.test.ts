@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { SessionMemoryProvider, SharedMemoryStore } from '@itookit/llm-session';
+import { Kernel } from '@nestos/durable-kernel';
+import { SessionMemoryProvider, SharedMemoryStore } from '@nestos/llm-session';
 import { openProfileInspectionFs } from '../src/runtime';
 
 async function open(root: string) {

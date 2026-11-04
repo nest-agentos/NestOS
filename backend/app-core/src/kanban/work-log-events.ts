@@ -1,6 +1,6 @@
-import {sha256HexSync, t} from '@itookit/common';
-import type {KanbanBoard, KanbanEvent, KanbanItemSummary, KanbanProjectRecord, KanbanRecordActivity, KanbanExternalReference} from '@itookit/kanban/contracts';
-import {KANBAN_EXECUTION_SESSION} from '@itookit/app-contracts';
+import {sha256HexSync, t} from '@nestos/common';
+import type {KanbanBoard, KanbanEvent, KanbanItemSummary, KanbanProjectRecord, KanbanRecordActivity, KanbanExternalReference} from '@nestos/kanban/contracts';
+import {KANBAN_EXECUTION_SESSION} from '@nestos/app-contracts';
 
 export function eventActivity(event: KanbanEvent): KanbanRecordActivity | undefined {
     const base = {actor: {kind: event.actor.kind ?? 'agent' as const, id: event.actor.id ?? event.actor.agentId ?? 'unknown'}, result: 'success' as const, ...(event.data.dispatchId ? {dispatchId: event.data.dispatchId} : {})};

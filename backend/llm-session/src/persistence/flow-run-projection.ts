@@ -1,10 +1,10 @@
 import { t, type SessionTextKey } from '../utils/host-ports';
 import { flowLogicInteraction } from '../session/flow-logic-history';
-import { readFlowRunMembers } from '@itookit/llm-flow';
-import { formatFlowOutput, outputText } from '@itookit/llm-flow/contracts';
-import { type AgentEvent } from '@itookit/llm-tasks/contracts';
+import { readFlowRunMembers } from '@nestos/llm-flow';
+import { formatFlowOutput, outputText } from '@nestos/llm-flow/contracts';
+import { type AgentEvent } from '@nestos/llm-tasks/contracts';
 import { type FlowInteraction, type Round } from '../contracts';
-import type { EventEnvelope, Kernel, TaskRecord } from '@itookit/durable-kernel';
+import type { EventEnvelope, Kernel, TaskRecord } from '@nestos/durable-kernel';
 import type { ISessionRepository } from './types';
 import { RoundLog } from './round-log';
 import { flowActor, flowTaskStatus, flowToolInteraction, flowRequestId, record } from '../session/flow-identity';

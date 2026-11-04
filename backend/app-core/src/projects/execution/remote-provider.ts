@@ -1,5 +1,5 @@
-import { FSError } from '@itookit/vfs-core';
-import type { SessionFilesService } from '@itookit/app-contracts/services';
+import { FSError } from '@nestos/vfs-core';
+import type { SessionFilesService } from '@nestos/app-contracts/services';
 import { workspacePath } from '../../vfs/workspace-namespace';
 import type { ProjectRemoteMount, RemoteFileSourceProvider, RemoteProcessMount } from '../remote-mounts';
 import { requireRemoteProcessGrant } from './policy';
@@ -23,7 +23,7 @@ export function createRemoteExecutionProvider(files: Pick<SessionFilesService, '
             if (JSON.stringify(await files.inspect(sessionId)) !== JSON.stringify(record))
                 throw new FSError('ECONFLICT', 'Session directory authorization changed');
             const root=mounts.find(mount => mount.at==='/');
-            let remoteProject: import('@itookit/cells-driver').RemoteProject | undefined;
+            let remoteProject: import('@nestos/cells-driver').RemoteProject | undefined;
             if (root?.serverProjectId && (!provider.projects || !provider.projectProcess)) throw new FSError('ECAPABILITY','Project-scoped remote execution unavailable');
             if (root?.serverProjectId && provider.projects) {
                 const client=provider.projects(connection);

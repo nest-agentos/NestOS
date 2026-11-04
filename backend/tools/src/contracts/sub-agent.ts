@@ -1,7 +1,7 @@
 // @file: common/interfaces/agent/sub-agent.ts
 // 子代理路由器接口定义。
 
-import type { ModelTier } from '@itookit/driver-llm/contracts';
+import type { ModelTier } from '@nestos/driver-llm/contracts';
 
 /**
  * 子代理路由器接口。

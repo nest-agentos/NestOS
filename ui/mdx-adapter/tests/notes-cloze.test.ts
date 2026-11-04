@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { defaultEditorFactory } from '../src/factory';
-import { CLOZE_SRS_PATH, clozeDocumentPrefix } from '@itookit/app-contracts';
-import {StudyView} from '@itookit/mdxeditor';
+import { CLOZE_SRS_PATH, clozeDocumentPrefix } from '@nestos/app-contracts';
+import {StudyView} from '@nestos/mdxeditor';
 import {createStudyHost} from '../src/study';
 import {SeqFileStore} from '../src/srs-store';
 
@@ -89,7 +89,7 @@ it('refreshes from committed progress events without rereading Markdown and rein
     const mount=document.createElement('div');document.body.append(mount);
     const host=createStudyHost(fs,async()=>{}),read=vi.spyOn(host,'read'),view=new StudyView(mount,host);
     const {SeqFileStore}=await import('../src/srs-store');
-    const {extractStudyCards,nextReview}=await import('@itookit/mdxeditor');
+    const {extractStudyCards,nextReview}=await import('@nestos/mdxeditor');
     const store=new SeqFileStore(fs,'/a.mind');
     try {
         await view.flush();

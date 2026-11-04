@@ -1,12 +1,12 @@
 // @file: llm-ui/commands/WorkspaceCommands.ts
 
 
-import { SessionCommand } from '@itookit/llm-session/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
 import { Command } from './Command';
-import { LLMPrintService, type PrintService } from '@itookit/mdx-adapter';
+import { LLMPrintService, type PrintService } from '@nestos/mdx-adapter';
 import type { ErrorSeverity } from '../utils/errorHandler';
-import type { IFileSystem } from '@itookit/vfs-core';
-import { copyText } from '@itookit/ui-common-adapter';
+import type { IFileSystem } from '@nestos/vfs-core';
+import { copyText } from '@nestos/ui-common-adapter';
 
 /**
  * 复制整个会话为 Markdown

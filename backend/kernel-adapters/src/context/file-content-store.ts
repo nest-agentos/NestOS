@@ -1,5 +1,5 @@
-import { createContextContentStore, type IContextContentStore } from '@itookit/llm-context';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { createContextContentStore, type IContextContentStore } from '@nestos/llm-context';
+import type { IFileSystem } from '@nestos/vfs-core';
 
 /** Content is immutable and scoped to the owning Task's Session storage. */
 export function createFileContextContentStore(fs: IFileSystem, root: string, readRecords = true): IContextContentStore {

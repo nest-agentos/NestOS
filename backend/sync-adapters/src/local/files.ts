@@ -1,7 +1,7 @@
 import { lstat, mkdir, open, link, unlink, readFile, realpath } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
-import { assertSync, randomId, sha256, validPath } from '@itookit/vfs-sync';
-import type { LocalStorageAccess } from '@itookit/vfsdriver-local';
+import { assertSync, randomId, sha256, validPath } from '@nestos/vfs-sync';
+import type { LocalStorageAccess } from '@nestos/vfsdriver-local';
 export async function stat(path: string) {
     try { return await lstat(path); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
 }

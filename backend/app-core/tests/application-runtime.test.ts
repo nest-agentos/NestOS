@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { Kernel } from '@itookit/durable-kernel';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
 import { DirectoryMountService } from '../src/vfs/directory-mounts';
-import { SessionRepository, VFSAgentService } from '@itookit/llm-session';
+import { SessionRepository, VFSAgentService } from '@nestos/llm-session';
 import { ProjectRemoteMountService } from '../src/projects/remote-mounts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { createInfrastructure } from '../src/runtime/infrastructure';

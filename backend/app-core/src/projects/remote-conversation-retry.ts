@@ -1,6 +1,6 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {ProjectConversationPort} from '@itookit/app-contracts/services';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {ProjectConversationPort} from '@nestos/app-contracts/services';
 import {recoverRemoteConversationQueues, type RemoteConversationRecoveryTarget, type RemoteRecoveryDiagnostic} from './remote-conversation-recovery';
 
 const log = createModuleLogger('remote-conversation-recovery');

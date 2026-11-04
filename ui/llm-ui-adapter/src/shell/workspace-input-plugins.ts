@@ -1,10 +1,10 @@
-import type {ComposerDraft, InputPlugin, InputPluginContext} from '@itookit/llm-ui';
+import type {ComposerDraft, InputPlugin, InputPluginContext} from '@nestos/llm-ui';
 import type {InputPlugin as WorkspacePlugin} from '../components/input/plugins/InputPlugin';
 import {HistoryPlugin} from '../components/input/plugins/HistoryPlugin';
 import {MentionPlugin} from '../components/input/plugins/MentionPlugin';
 import {resourceSuggestions} from '../flows/resource-suggestions';
-import type {ICommandBus, PromptHistoryPort} from '@itookit/llm-session/contracts';
-import type {ResourceScope} from '@itookit/app-contracts';
+import type {ICommandBus, PromptHistoryPort} from '@nestos/llm-session/contracts';
+import type {ResourceScope} from '@nestos/app-contracts';
 
 /** Existing host plugins consume the shared editing context without owning another input view. */
 export function workspaceInputPlugins(commands: ICommandBus | undefined, scope: ResourceScope, agent: () => string,

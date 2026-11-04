@@ -1,5 +1,5 @@
 import type {ConversationControls, ConversationSnapshot} from '../contracts';
-import {createModuleLogger} from '@itookit/common';
+import {createModuleLogger} from '@nestos/common';
 
 
 const log = createModuleLogger('native-submission');

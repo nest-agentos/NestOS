@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { checkFlowSource, createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms, flowToDag } from '../src/flow';
 import { lockFlowDependencies } from '../src/flow/dependency-locks';
 import { scopeSpawn } from '../src/flow/spawn-scope';

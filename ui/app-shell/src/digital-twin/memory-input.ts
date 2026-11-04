@@ -1,4 +1,4 @@
-import type { TwinMemoryData } from '@itookit/app-contracts';
+import type { TwinMemoryData } from '@nestos/app-contracts';
 const field = (data: FormData, key: string) => String(data.get(key) ?? '').trim();
 export function memoryInput(data: FormData): Partial<TwinMemoryData> {
     const predicate = field(data, 'relationPredicate'), target = field(data, 'relationTarget');

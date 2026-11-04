@@ -1,9 +1,9 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {sha256Hex} from '@itookit/llm-context/digest';
-import {FlowLibraryCommand, InputAssetCommand} from '@itookit/app-contracts';
-import {FlowCommand, type FlowDraft} from '@itookit/llm-flow/contracts';
-import {FlowInvocationCommand, SessionCommand, type SessionInstructionQueue} from '@itookit/llm-session/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {sha256Hex} from '@nestos/llm-context/digest';
+import {FlowLibraryCommand, InputAssetCommand} from '@nestos/app-contracts';
+import {FlowCommand, type FlowDraft} from '@nestos/llm-flow/contracts';
+import {FlowInvocationCommand, SessionCommand, type SessionInstructionQueue} from '@nestos/llm-session/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {INPUT_ASSET_OWNER} from '../src/runtime/input-asset-store';
 

@@ -1,5 +1,5 @@
 import {afterEach,expect,it,vi} from 'vitest';
-import {assistantResponseText} from '@itookit/llm-session/contracts';
+import {assistantResponseText} from '@nestos/llm-session/contracts';
 import {textRuntime} from './helpers/text-runtime';
 const cleanup:Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of cleanup.splice(0).reverse())await close();vi.restoreAllMocks();});

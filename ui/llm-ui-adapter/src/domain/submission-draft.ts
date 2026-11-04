@@ -1,4 +1,4 @@
-import {sha256Hex} from '@itookit/common';
+import {sha256Hex} from '@nestos/common';
 import type {ChatInputSettings, IChatInputConfig} from './ports/IChatInputPresenter';
 import {draftFileId, validDraftToken} from './draft-file-identity';
 import {fileBytes} from '../utils/file-bytes';

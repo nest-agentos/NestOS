@@ -1,9 +1,9 @@
-import {bindCapabilities, type Kernel, type TaskHandle} from '@itookit/durable-kernel';
-import type {ToolCommandOption, ToolCommandRequest} from '@itookit/llm-session/contracts';
-import type {SessionCapabilityRegistry} from '@itookit/kernel-adapters/contracts';
-import type {MCPServer} from '@itookit/tools/mcp-contracts';
-import {mcpToolId} from '@itookit/tools/mcp-contracts';
-import {createModuleLogger} from '@itookit/common';
+import {bindCapabilities, type Kernel, type TaskHandle} from '@nestos/durable-kernel';
+import type {ToolCommandOption, ToolCommandRequest} from '@nestos/llm-session/contracts';
+import type {SessionCapabilityRegistry} from '@nestos/kernel-adapters/contracts';
+import type {MCPServer} from '@nestos/tools/mcp-contracts';
+import {mcpToolId} from '@nestos/tools/mcp-contracts';
+import {createModuleLogger} from '@nestos/common';
 
 export interface ToolCommandPorts {
     sessions: Pick<SessionCapabilityRegistry, 'get'>;
@@ -16,7 +16,7 @@ export async function toolCommandCatalog(ports: ToolCommandPorts, sessionId: str
     const scope = await ports.sessions.get(sessionId), service = scope.toolService;
     return configuredToolCatalog(service, await ports.mcpServers());
 }
-export function configuredToolCatalog(service: Pick<import('@itookit/tools/contracts').IToolService, 'getToolDefinitions' | 'getToolMeta'>,
+export function configuredToolCatalog(service: Pick<import('@nestos/tools/contracts').IToolService, 'getToolDefinitions' | 'getToolMeta'>,
     servers: MCPServer[]): ToolCommandOption[] {
     const options = service.getToolDefinitions().flatMap(definition => {
         const id = definition.function?.name ?? definition.name;

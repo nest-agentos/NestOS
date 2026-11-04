@@ -1,5 +1,5 @@
 import {settleMeter} from './metering';
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 import { diagnosticDetail, TwinDiagnosticError } from './diagnostics';
 import type { TwinAnalysisJob, TwinSettings } from './domain';
 import type { TwinScanRun } from './scan-domain';

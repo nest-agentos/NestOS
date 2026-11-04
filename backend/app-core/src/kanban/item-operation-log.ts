@@ -1,5 +1,5 @@
 import type {ReviewJob} from './item-operation-types';
-import type {KanbanService} from '@itookit/kanban/contracts';
+import type {KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 import type {KanbanWorkLog} from './work-log';
 /** Work-log identities include the operation and changed state; healthy inspections produce no rows. */

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {t} from '@itookit/common';
-import type {RemoteProjectStatus} from '@itookit/app-contracts/services';
+import {t} from '@nestos/common';
+import type {RemoteProjectStatus} from '@nestos/app-contracts/services';
 import {ProjectNavigation} from '../src/projects/ProjectNavigation';
 
 afterEach(() => {document.body.replaceChildren(); vi.restoreAllMocks();});

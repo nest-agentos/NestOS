@@ -1,4 +1,4 @@
-import {getLocale} from '@itookit/common';
+import {getLocale} from '@nestos/common';
 // @file: llm-ui/components/input/plugins/MentionPlugin.ts
 //
 // MentionPlugin — `@` 触发的文件引用选择器。
@@ -21,8 +21,8 @@ import {getLocale} from '@itookit/common';
 //   - ↑/↓/Enter/Tab → 委托给 PopupPanel.handleKeyDown
 
 import type { InputPlugin, InputPluginContext } from './InputPlugin';
-import { PopupPanel } from '@itookit/llm-ui';
-import { t, createModuleLogger, randomUUID } from '@itookit/common';
+import { PopupPanel } from '@nestos/llm-ui';
+import { t, createModuleLogger, randomUUID } from '@nestos/common';
 import type { FileSuggestion } from '../../../domain/types';
 
 const log = createModuleLogger('file-suggestions');

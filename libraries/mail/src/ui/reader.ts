@@ -1,4 +1,4 @@
-import {copyText} from '@itookit/ui-common';
+import {copyText} from '@nestos/ui-common';
 import type {MailThreadPage} from '../contracts';
 import {element, button, type MailUIOptions, type ReaderEditor} from './ports';
 interface View {

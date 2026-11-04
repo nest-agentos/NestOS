@@ -4,7 +4,7 @@ import {createLlmDeviceCatalog} from '../../src/llm-management/catalogs';
 const {providers: LLM_PROVIDERS} = createLlmDeviceCatalog();
 import { fromLLMProvider, toLLMProvider, fromConnectionDef, toRuntimeConnection } from '../../src/llm-management/constants/llm-loader';
 import { isProvider } from '../../src/llm-management/device/argument-validation';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
 import { ProviderManager } from '../../src/llm-management/device/provider-manager';
 
 afterEach(() => vi.unstubAllGlobals());

@@ -127,7 +127,7 @@ function freezeLinks(directory, snapshot, packages) {
         const manifest = path.join(target, 'package.json');
         const pkg = existsSync(manifest) ? JSON.parse(readFileSync(manifest, 'utf8')) : {};
         const local = packages.get(pkg.name + '@' + pkg.version);
-        if (!local || !(pkg.name?.startsWith('@itookit/') || pkg.name === 'nestos-web')) throw new Error(`External release dependency: ${file}`);
+        if (!local || !(pkg.name?.startsWith('@nestos/') || pkg.name === 'nestos-web')) throw new Error(`External release dependency: ${file}`);
         rmSync(file); symlinkSync(path.relative(path.dirname(file), local), file, 'dir');
     }
 }

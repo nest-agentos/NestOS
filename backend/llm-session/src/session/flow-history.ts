@@ -1,10 +1,10 @@
 import { createSessionHost, type SessionHost } from '../utils/host-ports';
 import { flowLogicInteraction } from './flow-logic-history';
 import { flowActor, flowToolInteraction, flowToolId, flowRequestId } from './flow-identity';
-import { formatFlowOutput } from '@itookit/llm-flow/contracts';
-import { type AgentEvent } from '@itookit/llm-tasks/contracts';
+import { formatFlowOutput } from '@nestos/llm-flow/contracts';
+import { type AgentEvent } from '@nestos/llm-tasks/contracts';
 import { type FlowInteraction } from '../contracts';
-import type { EventEnvelope, TaskHandle, TaskRecord } from '@itookit/durable-kernel';
+import type { EventEnvelope, TaskHandle, TaskRecord } from '@nestos/durable-kernel';
 import type { ConversationExecution } from './conversation-run-coordinator';
 import type { SessionEventBus } from './session-event-bus';
 import { flowInteractionNode } from '../persistence/projection';

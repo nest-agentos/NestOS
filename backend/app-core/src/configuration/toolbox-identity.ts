@@ -1,2 +1,2 @@
-export { TOOLBOX_KINDS, toolboxKind, toolboxSourcePath, toolboxPath } from '@itookit/app-contracts';
-export type { ToolboxKind } from '@itookit/app-contracts';
+export { TOOLBOX_KINDS, toolboxKind, toolboxSourcePath, toolboxPath } from '@nestos/app-contracts';
+export type { ToolboxKind } from '@nestos/app-contracts';

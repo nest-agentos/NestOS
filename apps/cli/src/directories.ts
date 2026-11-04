@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import type { DirectorySourceProvider } from '@itookit/app-core';
-import { FSError, createFileSystemSource, type FileSystemSourceOwner, type IFileSystem } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
+import type { DirectorySourceProvider } from '@nestos/app-core';
+import { FSError, createFileSystemSource, type FileSystemSourceOwner, type IFileSystem } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 
 /** Node-host directory sources used by CLI --set-home / --add-dir / RequestWorkspaceAccess. */
 export class CliDirectorySourceProvider implements DirectorySourceProvider {

@@ -1,6 +1,6 @@
-import {sha256HexSync} from '@itookit/llm-context/digest';
-import type {AgentDefinition, AgentRevisionContent} from '@itookit/kernel-adapters/contracts';
-export {publishedAgentDefinition} from '@itookit/kernel-adapters/contracts';
+import {sha256HexSync} from '@nestos/llm-context/digest';
+import type {AgentDefinition, AgentRevisionContent} from '@nestos/kernel-adapters/contracts';
+export {publishedAgentDefinition} from '@nestos/kernel-adapters/contracts';
 
 /** Preserve the pre-publication TargetRef digest for legacy mutable definitions. */
 export function agentDefinitionDigest(definition: AgentDefinition): string {

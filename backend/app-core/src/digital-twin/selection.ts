@@ -1,8 +1,8 @@
 import { matchesRules, resourceKey, type TwinScanRules } from './scan-rules';
 import type { TwinDiscoveredSource } from './domain';
 
-import type { TwinSelectionTarget } from '@itookit/app-contracts';
-export { TWIN_SELECTION_TYPES, selectionKinds, type TwinSelectionTarget, type TwinSelectionType } from '@itookit/app-contracts';
+import type { TwinSelectionTarget } from '@nestos/app-contracts';
+export { TWIN_SELECTION_TYPES, selectionKinds, type TwinSelectionTarget, type TwinSelectionType } from '@nestos/app-contracts';
 /** Encode literals before adding our own directory wildcard, so names cannot become patterns. */
 export function selectionPattern(target: TwinSelectionTarget): string {
     if (!['file', 'session', 'harness-session'].includes(target.kind) || !target.target || (target.directory && target.kind !== 'file')) throw new Error('TWIN_INVALID_SOURCE');

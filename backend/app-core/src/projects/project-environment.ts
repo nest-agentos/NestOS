@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {FSError, type IFileSystem} from '@itookit/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {FSError, type IFileSystem} from '@nestos/vfs-core';
 import type {ProjectExecutionContext} from './execution/contracts';
 export interface LocalProjectEnvironment {revision: number; variables: Record<string,string>}
 export function validateProjectVariables(variables: Record<string,string>): void {

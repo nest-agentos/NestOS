@@ -1,4 +1,4 @@
-import type {LLMModel} from '@itookit/driver-llm/contracts';
+import type {LLMModel} from '@nestos/driver-llm/contracts';
 
 // Exact model IDs and output constraints from the official Ark image-generation docs.
 // https://docs.volcengine.com/docs/ark/seedream-4-0-5-0

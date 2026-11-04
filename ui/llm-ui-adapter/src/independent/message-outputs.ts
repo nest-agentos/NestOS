@@ -1,6 +1,6 @@
-import {t} from '@itookit/common';
-import type {ExtensionRenderer, MessagePart} from '@itookit/llm-ui';
-import type {SessionGroup} from '@itookit/llm-session/contracts';
+import {t} from '@nestos/common';
+import type {ExtensionRenderer, MessagePart} from '@nestos/llm-ui';
+import type {SessionGroup} from '@nestos/llm-session/contracts';
 
 export const messageOutputsPart = 'mindos.execution-outputs';
 /** Only host-projected Flow executions receive the optional details action. */

@@ -1,9 +1,9 @@
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend, type IVFSManager} from '@itookit/vfs-core';
-import {Kernel} from '@itookit/durable-kernel';
-import {registerDurablePrograms, submitTaskCall} from '@itookit/llm-flow';
-import {HarnessProgram, HarnessExecutionEffect} from '@itookit/kernel-adapters';
-import {sha256HexSync} from '@itookit/llm-context';
+import {createVFS, MemoryBackend, type IVFSManager} from '@nestos/vfs-core';
+import {Kernel} from '@nestos/durable-kernel';
+import {registerDurablePrograms, submitTaskCall} from '@nestos/llm-flow';
+import {HarnessProgram, HarnessExecutionEffect} from '@nestos/kernel-adapters';
+import {sha256HexSync} from '@nestos/llm-context';
 import {prepareDirectConversationRun, type DirectConversationPreparationInput, type DirectConversationPreparationOptions} from '../src';
 import {SessionRepository} from '../src/persistence/session-repository';
 import {RoundLog} from '../src/persistence/round-log';

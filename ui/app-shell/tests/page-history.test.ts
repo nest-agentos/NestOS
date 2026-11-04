@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
 import {backToPreviousPage, navigateWorkspaceBack, rememberPagePresentation, writePageHistory} from '../src/navigation/page-history';
-import {installNavigationButtonPresentation} from '@itookit/ui-common-adapter';
-import {ACTION_ICONS, t} from '@itookit/common';
+import {installNavigationButtonPresentation} from '@nestos/ui-common-adapter';
+import {ACTION_ICONS, t} from '@nestos/common';
 
 afterEach(() => {history.replaceState(null, '', '/'); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 it('returns through prior resources and keeps the initial deep link within the application', async () => {

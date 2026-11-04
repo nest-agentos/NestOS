@@ -1,4 +1,4 @@
-import type { AgentAvailability, AgentDefinition, AgentExecution } from '@itookit/kernel-adapters/contracts';
+import type { AgentAvailability, AgentDefinition, AgentExecution } from '@nestos/kernel-adapters/contracts';
 import type { SessionLogger } from '../utils/host-ports';
 import { ulid } from '../persistence/ulid';
 

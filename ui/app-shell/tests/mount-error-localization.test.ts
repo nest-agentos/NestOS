@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { t } from '@itookit/common';
-import { DirectorySourceUnavailableError, SessionUnfinishedTasksError } from '@itookit/app-core';
+import { t } from '@nestos/common';
+import { DirectorySourceUnavailableError, SessionUnfinishedTasksError } from '@nestos/app-core';
 import { localizeMountError } from '../src/files/localize-mount-error';
 
 describe('mount error localization', () => {

@@ -2,7 +2,7 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {NodeServerTerminals} from '../../node-host/src/terminal/server-terminals';
 const state = vi.hoisted(() => ({spawn: vi.fn(), info: vi.fn(), error: vi.fn()}));
 vi.mock('../../node-host/node_modules/node-pty/lib/index.js', () => ({spawn: state.spawn}));
-vi.mock('@itookit/common', async original => ({...await original<object>(), createModuleLogger: () => ({info: state.info, error: state.error})}));
+vi.mock('@nestos/common', async original => ({...await original<object>(), createModuleLogger: () => ({info: state.info, error: state.error})}));
 afterEach(() => vi.resetAllMocks());
 it('reports the spawn stage and keeps native details out of errors and diagnostics', async () => {
     state.spawn.mockImplementation(() => {throw new Error('PRIVATE_TERMINAL_NATIVE_DETAILS');});

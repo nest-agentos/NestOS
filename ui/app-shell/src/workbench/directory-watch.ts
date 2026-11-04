@@ -1,4 +1,4 @@
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { refreshDirectoryList } from './directory-list';
 
 /** Refresh after committed mutations, including moves completed in the shared picker. */

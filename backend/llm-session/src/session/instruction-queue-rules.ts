@@ -1,8 +1,8 @@
 import {attachmentMetadata} from '../contracts/chat';
 import type { InstructionQueueEdit, SessionInstruction, SessionInstructionInput, SessionInstructionQueue } from '../contracts/instruction-queue';
 import { ulid } from '../persistence/ulid';
-import { sha256Hex } from '@itookit/llm-context';
-import {assertTargetSelection, assertFlowCallSource} from '@itookit/llm-flow/contracts';
+import { sha256Hex } from '@nestos/llm-context';
+import {assertTargetSelection, assertFlowCallSource} from '@nestos/llm-flow/contracts';
 
 export function queueError(code: string, message: string): Error & { code: string } {
     return Object.assign(new Error(message), { code });

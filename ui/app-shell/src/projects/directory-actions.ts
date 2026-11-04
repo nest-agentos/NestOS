@@ -1,7 +1,7 @@
-import { folderBrowserPath, folderPathFromBrowserPath, resolveBrowserTarget } from '@itookit/app-contracts';
-import type { ProjectFolder, ProjectService } from '@itookit/app-contracts/services';
-import { FILE_BROWSER_ICONS, t } from '@itookit/common';
-import type { FSNode } from '@itookit/vfs-core';
+import { folderBrowserPath, folderPathFromBrowserPath, resolveBrowserTarget } from '@nestos/app-contracts';
+import type { ProjectFolder, ProjectService } from '@nestos/app-contracts/services';
+import { FILE_BROWSER_ICONS, t } from '@nestos/common';
+import type { FSNode } from '@nestos/vfs-core';
 import { sessionCreationReason } from './session-creation-policy';
 import type { DirectoryListOptions } from '../workbench/directory-list';
 

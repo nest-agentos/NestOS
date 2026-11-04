@@ -1,4 +1,4 @@
-import type {FlowDraft, JsonValue} from '@itookit/llm-flow/contracts';
+import type {FlowDraft, JsonValue} from '@nestos/llm-flow/contracts';
 import template from '../presets/kanban-discovery.json';
 import {requireValue} from './validation';
 

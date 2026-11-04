@@ -1,4 +1,4 @@
-import {initApp, installMobileNavigation, type AppHandle, type AppRecoveryState} from '@itookit/app-shell';
+import {initApp, installMobileNavigation, type AppHandle, type AppRecoveryState} from '@nestos/app-shell';
 import {WORKSPACES, ROUTE_ALIASES} from 'nestos-web/workspaces';
 import {createBrowserUI} from 'nestos-web/ui';
 import {installHttpStatus} from './status-banner';

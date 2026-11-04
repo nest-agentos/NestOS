@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import { FlowCommand, FlowInvocationCommand } from '@itookit/llm-session';
-import { t } from '@itookit/common';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import { FlowCommand, FlowInvocationCommand } from '@nestos/llm-session';
+import { t } from '@nestos/common';
 import { InvocationPanel } from '../../llm-ui-adapter/src/flows/InvocationPanel';
 
 vi.mock('../../llm-ui-adapter/src/components/mdx/MDxController', () => ({

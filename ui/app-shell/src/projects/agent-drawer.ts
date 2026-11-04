@@ -1,9 +1,9 @@
 import {requestAssistantShortcut} from '../navigation/assistant-actions';
-import { Drawer, createVFSBrowser, createDeleteOperation, describeErrorReason, type VFSBrowser, type BrowserNode, type BrowserAction } from '@itookit/vfs-ui';
-import { FILE_BROWSER_ICONS, TOOLBOX_ICONS, createModuleLogger, randomUUID, t, type NavigationRequest } from '@itookit/common';
-import { toolboxPath, ungroupedId } from '@itookit/app-contracts';
-import type { ApplicationBackend } from '@itookit/app-contracts/services';
-import type { EditorOptions } from '@itookit/ui-common-adapter';
+import { Drawer, createVFSBrowser, createDeleteOperation, describeErrorReason, type VFSBrowser, type BrowserNode, type BrowserAction } from '@nestos/vfs-ui';
+import { FILE_BROWSER_ICONS, TOOLBOX_ICONS, createModuleLogger, randomUUID, t, type NavigationRequest } from '@nestos/common';
+import { toolboxPath, ungroupedId } from '@nestos/app-contracts';
+import type { ApplicationBackend } from '@nestos/app-contracts/services';
+import type { EditorOptions } from '@nestos/ui-common-adapter';
 import { lazyResource } from '../lifecycle/lazy-resource';
 import { showNameDialog } from '../files/project-dialog';
 import { nestOSVFSPresentation } from '../browser/vfs-presentation';

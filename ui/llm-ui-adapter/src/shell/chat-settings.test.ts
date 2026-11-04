@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import type {ChatView} from '@itookit/llm-ui';
+import type {ChatView} from '@nestos/llm-ui';
 import type {ChatInputSettings} from '../domain/ports/IChatInputPresenter';
 import {chatSelectors, mountChatSettings} from './chat-settings';
 import {resolveChatImageResize} from '../components/input/image-processing-session';

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {getLogger} from '@itookit/common';
-import {AgentPublicationController} from '@itookit/llm-ui-adapter/settings';
-import {AgentConfigEditor} from '@itookit/llm-ui-adapter/settings';
-import type {AgentPublishedRevision, AgentPublicationStatus} from '@itookit/kernel-adapters/contracts';
+import {getLogger} from '@nestos/common';
+import {AgentPublicationController} from '@nestos/llm-ui-adapter/settings';
+import {AgentConfigEditor} from '@nestos/llm-ui-adapter/settings';
+import type {AgentPublishedRevision, AgentPublicationStatus} from '@nestos/kernel-adapters/contracts';
 
 const cleanups: Array<() => unknown | Promise<unknown>> = [];
 afterEach(async () => {for (const close of cleanups.splice(0)) await close(); document.body.replaceChildren(); vi.restoreAllMocks(); getLogger().clear();});

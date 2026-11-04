@@ -1,5 +1,5 @@
-import {escapeHTML, t} from '@itookit/common';
-import type {JsonValue} from '@itookit/llm-flow/contracts';
+import {escapeHTML, t} from '@nestos/common';
+import type {JsonValue} from '@nestos/llm-flow/contracts';
 import type {EntityOption} from '../components/dag/FlowSettingsDialog';
 import {SchemaForm} from '../components/dag/SchemaForm';
 

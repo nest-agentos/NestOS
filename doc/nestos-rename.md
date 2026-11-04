@@ -9,7 +9,7 @@
 | `mushuanli/mindos-node-driver` | `mushuanli/cells-driver` |
 | `tools/mindos-node` | `tools/cells` |
 | `libraries/mindos-node-driver` | `libraries/cells-driver` |
-| `@itookit/mindos-node-driver` | `@itookit/cells-driver` |
+| `@nestos/mindos-node-driver` | `@nestos/cells-driver` |
 | Web 工作区 `mind-os` | `nestos-web` |
 | 主仓库私有工作区 `itookit` | `nestos-workspace` |
 | Node Rust crate `mindos_node` | `cells` |
@@ -42,7 +42,7 @@ Node CLI/httpd 与桌面端采用相同选择规则：有新配置时使用新�
 已生成的 CA、浏览器身份和允许指纹不重新生成；旧证书的 CN 显示旧名不会使证书失效。
 
 驱动主入口为 `createCellsDriver` / `CellsDriver` / `CellsDescriptor`，旧 MindOS 工厂和类型名保留为弃用别名。
-cells 的 MCP 发现名为 `itookit/cells`，能力工具为 `cells_capabilities`；驱动为 `@itookit/cells-driver`，环境变量使用 `CELLS_*`，不兼容旧节点名称。
+cells 的 MCP 发现名为 `itookit/cells`，能力工具为 `cells_capabilities`；驱动为 `@nestos/cells-driver`，环境变量使用 `CELLS_*`，不兼容旧节点名称。
 HTTP View 的新响应头使用 NestOS 名称，同时兼容旧头名。
 
 远程 export 新 metadata 使用 `.nestos/meta.sqlite`；已有 `.mindos` 继续原地使用，不自动产生第二份库。

@@ -1,4 +1,4 @@
-# @itookit/app-contracts
+# @nestos/app-contracts
 
 共享应用契约与纯变换。前后端均可使用，不依赖 UI 或后端执行实现。
 

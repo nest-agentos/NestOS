@@ -1,6 +1,6 @@
 # llm-session 开发说明
 
-本包管理用户可见的对话语义与运行协调，不实现执行内核（Task 执行由 `@itookit/durable-kernel` 负责）；DAG 编排由 `@itookit/llm-flow` 负责。详见 [llm-session API](../../doc/llm-session-api.md)。
+本包管理用户可见的对话语义与运行协调，不实现执行内核（Task 执行由 `@nestos/durable-kernel` 负责）；DAG 编排由 `@nestos/llm-flow` 负责。详见 [llm-session API](../../doc/llm-session-api.md)。
 
 ## 目录
 
@@ -26,15 +26,15 @@ src/
 
 - Round 只表达对话历史，使用 `historyParentIds`。
 - Run 引用通过 `executions` 附着到 Round。
-- Branch/merge 拓扑归本包；Context 历史选择、Profile 规则和装配经 `@itookit/llm-context` 接口执行，`RoundLog` 只提供存储和缓存。
+- Branch/merge 拓扑归本包；Context 历史选择、Profile 规则和装配经 `@nestos/llm-context` 接口执行，`RoundLog` 只提供存储和缓存。
 - 共享 Round 的修改通过 branchMeta.roundOverrides 写时复制内容文档，逻辑 ID 与父子拓扑保持稳定；快照、Context 与分支读取必须按目标 ref 解析内容，不能直接修改其他分支共享的文档。
 - Chat/Agent 与 Flow 的提交统一经过 llm-flow 的 `submitRun(CompiledRunDefinition)`；上下文组装和结果解析保留各自策略，运行成员使用 `RunExecution.tasks()` 实时读取。
 - 普通 Chat 走 `ConversationRunCoordinator` 的直接任务路径（`directTaskSpec`），不包装成单节点 DAG。
 - 首次显式模式的直接运行通过准入后，将 executionMode 与 executionModeLocked 在设置事务中一并保存；后续发送/重新生成校验固定模式，省略模式时继承。持久化层拒绝改模式并忽略解锁补丁；旧有历史会话保留已保存模式。Flow 不参与该锁。
 - `session/execution-mode-policy.ts` 统一模式校验和合并规则；`session/session-execution-mode.ts` 通过最小仓储端口解析任务模式；`persistence/session-settings.ts` 负责旧数据解码和设置合并。事务与时间戳留在持久化侧，工具选择留在 `direct-execution-mode.ts`。
 - `SendIntent.execution.mode` 优先于 `ExecutionOverrides.executionMode`；提交前复制并固定。chat 只保留已授权 WebSearch；agent 在未配置 `capabilityPolicy.toolIds` 时经宿主 `resolveHarnessToolIds` 获取默认工具，显式白名单（包括空数组）优先。执行模式无可用工具时拒绝提交，保持 external 审批及 Session 挂载边界；Flow 不消费该偏好，无 mode 的旧 API 调用保持兼容。
-- DAG/Flow 依赖 `@itookit/llm-flow`（本包通过它编排，不直接持有动态图语义）。
-- 只通过 `@itookit/durable-kernel` 公开类型（`Kernel` / `SessionHandle` 等）与 Effect 访问内核，不触碰内核内部实现。
+- DAG/Flow 依赖 `@nestos/llm-flow`（本包通过它编排，不直接持有动态图语义）。
+- 只通过 `@nestos/durable-kernel` 公开类型（`Kernel` / `SessionHandle` 等）与 Effect 访问内核，不触碰内核内部实现。
 
 Flow 重新运行通过 `FlowRerunService` 校验参数并创建替代分支，调用参数固定在 `Round.flow`。`FlowHistory` 将 Task 事件投影为 History 交互并存入 `RoundResult.flowInteractions`，与模型 history 独立；编译到路由内的汇总/判断通过 `flow.logic.completed` 逐轮展示条件与结果，流式内容按 Task 隔离。见 [Flow 能力与输出](../../doc/design/flow-capabilities-and-output.md)。
 
@@ -67,8 +67,8 @@ SessionViewPort.onEvent 允许绑定前登记，多个观察者独立拥有 disp
 运行：
 
 ```bash
-pnpm --filter @itookit/llm-session typecheck
-pnpm --filter @itookit/llm-session test
+pnpm --filter @nestos/llm-session typecheck
+pnpm --filter @nestos/llm-session test
 ```
 
 Memory 默认使用 Session shared；显式 sharedMemory 引用经 SharedMemoryStore 的独立 SeqFile 与 Session/scope grants 授权。数据、操作回执、审计在同一事务写入；管理权限不暴露为模型工具。memory_compact 复验源版本与读写授权，保留原文和来源引用。语义检索仍延期。

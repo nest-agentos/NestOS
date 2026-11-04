@@ -1,9 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { LLMDeviceDriver } from '../../src/llm-management/core';
 import { MCPManager } from '../../src/llm-management/device/mcp-manager';
 import { MCPServerConnection } from '../../src/llm-management/skills/mcp-client';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
 
 afterEach(() => vi.restoreAllMocks());
 async function fixture(servers: MCPServer[]) {

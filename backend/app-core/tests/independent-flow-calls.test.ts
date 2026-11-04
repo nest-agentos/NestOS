@@ -1,8 +1,8 @@
 import {expect, it} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {FlowCommand, type FlowDraft, type FlowRevision} from '@itookit/llm-flow/contracts';
-import {FlowInvocationCommand, SessionCommand, type FlowInvocationRecord} from '@itookit/llm-session/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {FlowCommand, type FlowDraft, type FlowRevision} from '@nestos/llm-flow/contracts';
+import {FlowInvocationCommand, SessionCommand, type FlowInvocationRecord} from '@nestos/llm-session/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 
 it('prepares child storage and host ownership before admitting one independent execution per request', async () => {

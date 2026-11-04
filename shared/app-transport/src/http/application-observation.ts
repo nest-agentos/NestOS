@@ -1,5 +1,5 @@
-import {FSError} from '@itookit/vfs-core';
-import type {ApplicationViewEvent} from '@itookit/app-contracts/services';
+import {FSError} from '@nestos/vfs-core';
+import type {ApplicationViewEvent} from '@nestos/app-contracts/services';
 
 /** The handshake installs the remote observer; components subscribe locally after hydration. */
 export class ApplicationObservation {

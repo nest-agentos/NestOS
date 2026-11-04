@@ -1,7 +1,7 @@
 // @file: llm-ui/components/history/NodeRenderer.ts
 
-import { escapeHTML, FEEDBACK_ICONS, t } from '@itookit/common';
-import { ExecutionNode } from '@itookit/llm-session/contracts';
+import { escapeHTML, FEEDBACK_ICONS, t } from '@nestos/common';
+import { ExecutionNode } from '@nestos/llm-session/contracts';
 import { NodeTemplates } from '../templates/NodeTemplates';
 import { IconResolver } from '../../utils/iconResolver';
 

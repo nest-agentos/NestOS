@@ -1,6 +1,6 @@
-import {sha256Hex} from '@itookit/llm-context/digest';
-import type {InputAssetReference} from '@itookit/tools/contracts';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {sha256Hex} from '@nestos/llm-context/digest';
+import type {InputAssetReference} from '@nestos/tools/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
 
 export const INPUT_ASSET_OWNER = '/var/lib/inputs.seq';
 export interface InputAssetRecord extends InputAssetReference {version?: 2; name?: string}

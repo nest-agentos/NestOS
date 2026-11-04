@@ -1,7 +1,7 @@
-import {LEGACY_LOCAL_PROJECT_NAMES} from '@itookit/app-contracts';
+import {LEGACY_LOCAL_PROJECT_NAMES} from '@nestos/app-contracts';
 import {ProjectEnvironmentStore} from './project-environment';
 import {PersonalProject} from './personal-project';
-import { projectFileSource, projectWorkspaceAccess, projectNavigation } from '@itookit/app-contracts';
+import { projectFileSource, projectWorkspaceAccess, projectNavigation } from '@nestos/app-contracts';
 import { trackFavoriteFiles } from './favorites/lifecycle';
 import type { MCPDeletedProject } from '../configuration/model-commands';
 import { overlappingProjectRoots, projectFileLocation, type ProjectFileRoot } from './file-location';
@@ -15,21 +15,21 @@ import type { ProjectExecutionService } from './execution/service';
 import { ProjectDraftStore } from './drafts/store';
 import { ProjectDraftService } from './drafts/service';
 import {RemoteDraftRecovery} from './drafts/remote-submission';
-import type { ProjectRemoteMountService } from '@itookit/app-contracts/services';
+import type { ProjectRemoteMountService } from '@nestos/app-contracts/services';
 import { ProjectSessions } from './project-sessions';
 import { readProjectNavigation } from './navigation-view';
-import { randomUUID, t } from '@itookit/common';
-import { FSError, createFileSystemView, normalizeVirtualPath, type IFileSystem, type OperationOptions } from '@itookit/vfs-core';
-import type { ISessionRepository, SessionFolder } from '@itookit/llm-session';
-import type { DirectoryMountService } from '@itookit/app-contracts/services';
-import type { SessionFilesService } from '@itookit/app-contracts/services';
+import { randomUUID, t } from '@nestos/common';
+import { FSError, createFileSystemView, normalizeVirtualPath, type IFileSystem, type OperationOptions } from '@nestos/vfs-core';
+import type { ISessionRepository, SessionFolder } from '@nestos/llm-session';
+import type { DirectoryMountService } from '@nestos/app-contracts/services';
+import type { SessionFilesService } from '@nestos/app-contracts/services';
 
 export type ProjectFolder = SessionFolder & { displayName?: string; protected?: boolean } & { project: NonNullable<SessionFolder['project']> };
 export type ProjectFileSource = { kind: 'local'; directory: string } | { kind: 'remote'; reference: string };
 
 /** Project identity and file roots survive navigation-folder renames and moves. */
 export class ProjectService {
-    async navigation(request: import('@itookit/app-contracts/services').ProjectNavigationRequest) {
+    async navigation(request: import('@nestos/app-contracts/services').ProjectNavigationRequest) {
         return readProjectNavigation(this, this.repository, request, await this.defaultProjects.getId());
     }
     harnessDraftConnection?: (projectId: string, target: import('./harness-draft-connection').DraftHarnessTarget) => Promise<string>;
@@ -497,7 +497,7 @@ export class ProjectService {
             const fs = createFileSystemView({ viewId: `project-workspace:${source.fs.viewId}`, mounts: [
                 { mountId: 'workspace', at: WORKSPACE_PATH, fs: source.fs, access: 'rw' },
             ] });
-            let initialFile: {node: import('@itookit/vfs-core').FSNode | null; readonly: boolean} | undefined;
+            let initialFile: {node: import('@nestos/vfs-core').FSNode | null; readonly: boolean} | undefined;
             try {
                 if (options?.initialPath !== undefined) {
                     const [node, access] = await Promise.all([fs.driver.getNode(options.initialPath), fs.capabilitiesAt(options.initialPath)]);

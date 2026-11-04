@@ -1,6 +1,6 @@
-import type { MCPConfigurationExtension, MCPConfigurationExtensionContext } from '@itookit/kernel-adapters/llm/core';
-import type { MCPDiscovery, MCPServer } from '@itookit/tools/mcp-contracts';
-import { FSError } from '@itookit/vfs-core';
+import type { MCPConfigurationExtension, MCPConfigurationExtensionContext } from '@nestos/kernel-adapters/llm/core';
+import type { MCPDiscovery, MCPServer } from '@nestos/tools/mcp-contracts';
+import { FSError } from '@nestos/vfs-core';
 import { CELLS_EXTENSION, isCellsTool, remoteMCPConnection, type CellsConfiguration } from './mcp-remote-connections';
 
 /** cells is one registered extension of standard MCP discovery. */

@@ -1,4 +1,4 @@
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 import {MAIL_PAGE_SIZE, type MailThreadPage, type MailThreadQuery} from './contracts';
 import {parseMail} from './model';
 import {newest, validateThreadQuery} from './query';

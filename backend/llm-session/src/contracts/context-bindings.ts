@@ -1,4 +1,4 @@
-import type {ContextBindingRef} from '@itookit/kernel-adapters/contracts';
+import type {ContextBindingRef} from '@nestos/kernel-adapters/contracts';
 
 /** UI and CLI receive references, never raw native control identities or operation fingerprints. */
 export interface ContextBindingQuery {

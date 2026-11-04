@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { SessionFilesService } from '../src/vfs/session-files';
 import { acquireWorkspaceProcessContext } from '../src/vfs/workspace-process-context';
 import type { SessionProcessFactory } from '../src/vfs/session-process-context';

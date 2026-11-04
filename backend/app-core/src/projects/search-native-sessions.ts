@@ -1,5 +1,5 @@
-import { checkOperation, operationScope, FSError, type OperationOptions } from '@itookit/vfs-core';
-import type { ProjectService, ProjectSearchQuery, ProjectSearchResult, ProjectSearchMatch } from '@itookit/app-contracts/services';
+import { checkOperation, operationScope, FSError, type OperationOptions } from '@nestos/vfs-core';
+import type { ProjectService, ProjectSearchQuery, ProjectSearchResult, ProjectSearchMatch } from '@nestos/app-contracts/services';
 import { mapConcurrent } from '../utils/map-concurrent';
 
 /** Delegate parsed native history search to the authorized source, never a host shell. */

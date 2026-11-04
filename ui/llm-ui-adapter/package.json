@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/llm-ui-adapter",
+  "name": "@nestos/llm-ui-adapter",
   "version": "0.1.0",
   "description": "NestOS conversation, settings and execution adapters for llm-ui",
   "type": "module",
@@ -115,40 +115,40 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nest-agentos/NestOS.git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
     "directory": "ui/llm-ui-adapter"
   },
   "bugs": {
     "url": "https://github.com/nest-agentos/NestOS/issues"
   },
-  "homepage": "https://github.com/nest-agentos/NestOS/tree/main/ui/llm-ui#readme",
+  "homepage": "https://github.com/nest-agentos/NestOS#readme",
   "engines": {
     "node": ">=16.0.0"
   },
   "dependencies": {
-    "@itookit/app-contracts": "workspace:*",
-    "@itookit/common": "workspace:*",
-    "@itookit/durable-kernel": "workspace:*",
-    "@itookit/llm-flow": "workspace:*",
-    "@itookit/llm-session": "workspace:*",
-    "@itookit/ui-common-adapter": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
+    "@nestos/app-contracts": "workspace:*",
+    "@nestos/common": "workspace:*",
+    "@nestos/durable-kernel": "workspace:*",
+    "@nestos/llm-flow": "workspace:*",
+    "@nestos/llm-session": "workspace:*",
+    "@nestos/ui-common-adapter": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
     "js-yaml": "^4.1.1",
     "marked": "^16.4.2",
-    "@itookit/llm-ui": "workspace:*",
-    "@itookit/driver-llm": "workspace:*",
-    "@itookit/kernel-adapters": "workspace:*",
-    "@itookit/llm-tasks": "workspace:*",
-    "@itookit/tools": "workspace:*",
-    "@itookit/image-parser": "workspace:*"
+    "@nestos/llm-ui": "workspace:*",
+    "@nestos/driver-llm": "workspace:*",
+    "@nestos/kernel-adapters": "workspace:*",
+    "@nestos/llm-tasks": "workspace:*",
+    "@nestos/tools": "workspace:*",
+    "@nestos/image-parser": "workspace:*"
   },
   "peerDependencies": {
-    "@itookit/mdx-adapter": "workspace:*",
-    "@itookit/mdxeditor": "workspace:*"
+    "@nestos/mdx-adapter": "workspace:*",
+    "@nestos/mdxeditor": "workspace:*"
   },
   "devDependencies": {
-    "@itookit/mdx-adapter": "workspace:*",
-    "@itookit/mdxeditor": "workspace:*",
+    "@nestos/mdx-adapter": "workspace:*",
+    "@nestos/mdxeditor": "workspace:*",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.19.25",
     "@vitest/coverage-v8": "^4.1.12",

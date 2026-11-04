@@ -4,11 +4,11 @@ import { createServer } from 'node:http';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { expect, it } from 'vitest';
-import { Kernel, bindCapabilities, type DurableTaskProgram } from '@itookit/durable-kernel';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { createVFS } from '@itookit/vfs-core';
-import type { IDeviceDriver } from '@itookit/vfs-core';
-import { createKernelAdaptersRuntime } from '@itookit/kernel-adapters';
+import { Kernel, bindCapabilities, type DurableTaskProgram } from '@nestos/durable-kernel';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { createVFS } from '@nestos/vfs-core';
+import type { IDeviceDriver } from '@nestos/vfs-core';
+import { createKernelAdaptersRuntime } from '@nestos/kernel-adapters';
 import { listenForTest } from './listen';
 import { compileSessionBashFixture, repo } from './rust-fixture';
 
@@ -38,7 +38,7 @@ it.skipIf(process.platform !== 'linux').each([false, true])('Bash starts a child
     });
     try {
         const port = await listenForTest(server);
-        await execute('pnpm', ['--filter', '@itookit/cli', 'build'], { cwd: repo });
+        await execute('pnpm', ['--filter', '@nestos/cli', 'build'], { cwd: repo });
         await compileSessionBashFixture(`${directory}/runner`);
         const example = await readFile(`${repo}/apps/cli/examples/minimal-dag.yml`, 'utf8');
         await writeFile(`${directory}/child.yml`, example.replace('http://127.0.0.1:8080', `http://127.0.0.1:${port}`));

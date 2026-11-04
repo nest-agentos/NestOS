@@ -1,6 +1,6 @@
-import { readSessionInstructionQueue, type InstructionQueueSessions } from '@itookit/llm-session';
-import type { Kernel } from '@itookit/durable-kernel';
-import { createModuleLogger } from '@itookit/common';
+import { readSessionInstructionQueue, type InstructionQueueSessions } from '@nestos/llm-session';
+import type { Kernel } from '@nestos/durable-kernel';
+import { createModuleLogger } from '@nestos/common';
 
 /** Open only marked Sessions; the host retains their execution contexts after this lease ends. */
 export async function recoverInstructionQueues(index: InstructionQueueSessions, kernel: Kernel,

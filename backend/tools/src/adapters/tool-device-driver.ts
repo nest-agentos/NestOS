@@ -16,7 +16,7 @@ import type {
 import type {
   DeviceContext,
   IDeviceDriver,
-} from '@itookit/vfs-core';
+} from '@nestos/vfs-core';
 import type { Tool } from '../core/Tool';
 import type { INativeShell, ToolUseContext } from '../core/types';
 import { ToolInputError } from '../core/tool-error';

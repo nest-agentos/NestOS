@@ -1,8 +1,8 @@
-import {createModuleLogger} from '@itookit/common';
-import {INPUT_ASSET_MAX_BYTES, type InputFileIdentity, type InputFileInspection, type InputFileUpload} from '@itookit/app-contracts';
-import {sha256Hex} from '@itookit/llm-context/digest';
-import type {InputAssetReference} from '@itookit/tools/contracts';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {createModuleLogger} from '@nestos/common';
+import {INPUT_ASSET_MAX_BYTES, type InputFileIdentity, type InputFileInspection, type InputFileUpload} from '@nestos/app-contracts';
+import {sha256Hex} from '@nestos/llm-context/digest';
+import type {InputAssetReference} from '@nestos/tools/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
 import {ensureInputAssetStore, inputAssetError, INPUT_ASSET_OWNER, readInputAssetBody, type InputAssetRecord} from './input-asset-store';
 
 const log = createModuleLogger('input-file-assets');

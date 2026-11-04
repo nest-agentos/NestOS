@@ -1,4 +1,4 @@
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 /**
  * @file app-shell/session-owner.ts
  * @desc 当前窗口/标签页的 Session 写租约身份。

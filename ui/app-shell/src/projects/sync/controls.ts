@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { paragraph } from './dialog';
 export type SyncDirection = 'both' | 'upload' | 'download';
 export function directionSelect(parent: HTMLElement, value: SyncDirection, directory = false): HTMLSelectElement {

@@ -1,5 +1,5 @@
 import {expect,it,vi} from 'vitest';
-import {createVFS,MemoryBackend} from '@itookit/vfs-core';
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {createStudyHost} from '../src/study';
 it('provides empty and nested save directories independently of the sparse learning index',async()=>{
  const {manager}=await createVFS({rootBackend:new MemoryBackend()}),fs=await manager.openFileSystem('/');

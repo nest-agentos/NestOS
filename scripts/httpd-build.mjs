@@ -132,7 +132,7 @@ function assertDependencies(directory, snapshot, visited = new Set()) {
 }
 function deployment(context, source, staging) {
     context.stage('deploy', () => {
-        run('pnpm', ['--config.package-import-method=copy', '--config.prefer-offline=true', '--ignore-scripts', '--filter', '@itookit/http-app', 'deploy', '--prod', '--legacy', staging], source, context.env);
+        run('pnpm', ['--config.package-import-method=copy', '--config.prefer-offline=true', '--ignore-scripts', '--filter', '@nestos/http-app', 'deploy', '--prod', '--legacy', staging], source, context.env);
         freezeWorkspaceDependencies(staging); copyNativeRuntimes(path.join(context.root, 'apps/http-app'), staging);
         run(process.execPath, [path.join(context.root, 'scripts/check-node-native-runtime.mjs'), staging], staging);
         for (const entry of readdirSync(staging)) if (!['package.json', 'node_modules'].includes(entry)) rmSync(path.join(staging, entry), {recursive: true, force: true});

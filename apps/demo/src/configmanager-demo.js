@@ -1,6 +1,6 @@
 // demo.js - ConfigManager 使用示例
 
-import { getConfigManager } from '@itookit/configmanager';
+import { getConfigManager } from '@nestos/configmanager';
 
 // [MODIFIED] 导入应用程序的默认配置数据
 // 在实际项目中，这个文件可能位于你的 src/config 或 src/common 目录下

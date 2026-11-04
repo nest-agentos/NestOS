@@ -5,7 +5,7 @@
 // executor.ts owns scheduling, checkpoints, leases, and workspace finalization.
 
 import type { DagEdgeDefinition, DagNodeDefinition, JsonValue } from '../contracts';
-import type { ToolDefinition } from '@itookit/llm-context';
+import type { ToolDefinition } from '@nestos/llm-context';
 import { DELEGATION_DEFAULTS, DELEGATION_LIMITS } from '../contracts';
 
 export type EdgeState = 'active' | 'inactive' | 'pending';

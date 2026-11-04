@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {createOperationLedger} from '@nestos/llm-ui';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {ControlOperations} from './control-operations';
 import {FlowRunControl} from './run-control';
 

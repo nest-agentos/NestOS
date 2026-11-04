@@ -5,10 +5,10 @@ import { createNestOSVFSUI as createVFSUI, nestOSVFSPresentation } from '../brow
 import { ToolboxDeletion, toolboxSelectionPaths } from './ToolboxDeletion';
 import { directorySnapshot } from '../browser/directory-snapshot';
 import { ConfigurationDeletionDialog } from '../configuration/delete-dialog';
-import type { ModelConfigurationCommands } from '@itookit/app-contracts/services';
+import type { ModelConfigurationCommands } from '@nestos/app-contracts/services';
 import { connectEditorLifecycle } from '../browser/editor-connector';
 import { DrawerActions } from './DrawerActions';
-import { DRAWER_KINDS, drawerKind, ungroupedId, type Drawer } from '@itookit/app-contracts';
+import { DRAWER_KINDS, drawerKind, ungroupedId, type Drawer } from '@nestos/app-contracts';
 import { resourceDrawers } from './resource-drawers';
 import { resourceIcon } from './resource-icons';
 import { mcpStatusIcon } from './mcp-status';
@@ -17,20 +17,20 @@ import { invalidConnectionsId, invalidConnectionPaths } from './model-orphans';
 import { CapabilityFilters, capabilityLabel, capabilityLabels } from './capability-filters';
 import { CategoryFilters } from './category-filters';
 import { NavigationFilters } from '../workbench/navigation-filters';
-import { type VFSUIShell, type VFSNodeUI, type VFSToolbarContext, type UIPersistencePort } from '@itookit/vfs-ui';
-import type { IFileSystem } from '@itookit/vfs-core';
-import { createModuleLogger, ENTITY_ICONS, t, type NavigationRequest } from '@itookit/common';
-import { editorResourceId, type EditorFactory, type MenuItem, type ContextMenuConfig } from '@itookit/ui-common-adapter';
-import type { WorkspaceController } from '@itookit/app-contracts';
+import { type VFSUIShell, type VFSNodeUI, type VFSToolbarContext, type UIPersistencePort } from '@nestos/vfs-ui';
+import type { IFileSystem } from '@nestos/vfs-core';
+import { createModuleLogger, ENTITY_ICONS, t, type NavigationRequest } from '@nestos/common';
+import { editorResourceId, type EditorFactory, type MenuItem, type ContextMenuConfig } from '@nestos/ui-common-adapter';
+import type { WorkspaceController } from '@nestos/app-contracts';
 import { showToolboxCreationDialog } from './create-resource-dialog';
 import { configureCreatedModel } from './creation-model-setup';
 import {showToolPackages} from './ToolPackagesDialog';
 import {showFlowDependencies} from '../configuration/flow-dependencies-dialog';
 import { chooseArchive, downloadArchive } from '../files/archive-transfer';
-import type { ToolboxResources } from '@itookit/app-contracts/services';
+import type { ToolboxResources } from '@nestos/app-contracts/services';
 import { TOOLBOX_KINDS, TOOLBOX_FILTERS, toolboxFilter, toolboxKind, toolboxSourcePath, type ToolboxKind, type ToolboxFilter } from './routes';
-import type { ToolboxInventory } from '@itookit/app-contracts/services';
-import type { ToolboxNavigation } from '@itookit/app-contracts/services';
+import type { ToolboxInventory } from '@nestos/app-contracts/services';
+import type { ToolboxNavigation } from '@nestos/app-contracts/services';
 
 interface Options {
     ocr?: import('../configuration/ocr-controls').OcrConfigurationControls;
@@ -38,14 +38,14 @@ interface Options {
     files: IFileSystem;
     initial?: ToolboxNavigation;
     configuration: ModelConfigurationCommands;
-    projects?: Pick<import('@itookit/app-contracts/services').ProjectService,'list'>;
+    projects?: Pick<import('@nestos/app-contracts/services').ProjectService,'list'>;
     factories: Record<ToolboxKind, EditorFactory>; flowMenu: ContextMenuConfig<VFSNodeUI>;
     navigate(request: NavigationRequest): Promise<void>; selected(path: string | null): void; onBeforeNavigate?(): void;
     /** Host-owned snapshot storage; omitted means the toolbox restores nothing. */
     uiPersistence?: UIPersistencePort;
     /** Host-owned preference storage; omitted means the toolbox starts from defaults. */
     uiPreferences?: ToolboxPreferencesPort;
-    executorUsage?: import('@itookit/ui-common-adapter').EditorOptions['executorUsage'];
+    executorUsage?: import('@nestos/ui-common-adapter').EditorOptions['executorUsage'];
     agentsInWorkbench?: boolean;
     workbenchState?: import('../workbench/state').WorkbenchStatePort;
     windows?: import('../workbench/windows').WorkbenchWindowBinding;
@@ -150,7 +150,7 @@ export class ToolboxWorkbench implements WorkspaceController {
             const changed = (event: { payload: { nodes: Array<{ oldPath: string; newPath: string }> } }) => {
                 const moved = event.payload.nodes.filter(node => node.oldPath && node.newPath && node.oldPath !== node.newPath);
                 if (!moved.length) return;
-                void resources.drawers.relocate(kind as import('@itookit/app-contracts').DrawerKind, moved)
+                void resources.drawers.relocate(kind as import('@nestos/app-contracts').DrawerKind, moved)
                     .then(() => this.scheduleRefresh()).catch(error => alert(String(error)));
             };
             this.cleanups.push(source.on('node:renamed', changed), source.on('node:moved', changed));
@@ -197,7 +197,7 @@ export class ToolboxWorkbench implements WorkspaceController {
             secondary: this.prefs.filter === 'tools' && this.options.resources.toolPackages
                 ? {label: t('toolbox.packages.title'), run: () => {void showToolPackages(this.options.resources, this.abort.signal, () => this.refresh());}}
                 : this.prefs.filter === 'models' ? { label: t('modelDefaults.button'), run: () => { void this.options.navigate({ target: 'settings', resourceId: 'model-defaults' }); } } : { label: t('toolbox.organize'), run: () => { const group = this.selectedDrawer();
-                const kind = group?.kind ?? (drawerKind(this.prefs.filter as ToolboxKind) ? this.prefs.filter as import('@itookit/app-contracts').DrawerKind : 'flows');
+                const kind = group?.kind ?? (drawerKind(this.prefs.filter as ToolboxKind) ? this.prefs.filter as import('@nestos/app-contracts').DrawerKind : 'flows');
                 void this.drawerActions.move(kind, group?.paths).catch(error => alert(String(error))); } },
             hiddenActions: this.prefs.filter === 'tools' ? ['create-file', 'create-directory']
                 : ['create-directory'],
@@ -318,7 +318,7 @@ export class ToolboxWorkbench implements WorkspaceController {
         const group = this.options.resources.drawers.get(path) ?? this.options.resources.drawers.forPath(path);
         return group && (this.prefs.filter === 'all' || this.prefs.filter === group.kind) ? group : undefined;
     }
-    private async removeOrganized(paths: string[], signal: AbortSignal): Promise<import('@itookit/vfs-ui').DeleteResult> {
+    private async removeOrganized(paths: string[], signal: AbortSignal): Promise<import('@nestos/vfs-ui').DeleteResult> {
         const nodes = paths.flatMap(path => this.ui.getNode(path) ?? []);
         if (nodes.length !== paths.length || !this.selectionDeletion.allows(nodes))
             throw Object.assign(new Error(t('toolbox.selectionChanged')), {code: 'TOOLBOX_SELECTION_UNAVAILABLE'});

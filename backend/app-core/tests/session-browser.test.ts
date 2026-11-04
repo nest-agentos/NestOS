@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
 import { createSessionBrowser, resolveBrowserTarget } from '../src/session/session-browser';
 import { SessionLifecycleService } from '../src/session/session-lifecycle';
 import { SessionFilesService } from '../src/vfs/session-files';

@@ -1,6 +1,6 @@
-import {escapeHTML, randomUUID, t} from '@itookit/common';
-import {ArtifactCommand, type ExecutionArtifactDescriptor, type ExecutionArtifactPage, type ExecutionArtifactScope} from '@itookit/app-contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {escapeHTML, randomUUID, t} from '@nestos/common';
+import {ArtifactCommand, type ExecutionArtifactDescriptor, type ExecutionArtifactPage, type ExecutionArtifactScope} from '@nestos/app-contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 import {readArtifactContent} from './artifact-content';
 
 interface ItemState {artifact: ExecutionArtifactDescriptor; pending?: boolean; error?: string; text?: string; url?: string; truncated?: boolean;}

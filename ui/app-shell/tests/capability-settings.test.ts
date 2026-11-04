@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { AgentConfigEditor } from '@itookit/llm-ui-adapter/settings';
-import { MCPSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import {Toast} from '@itookit/ui-common-adapter';
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
+import { AgentConfigEditor } from '@nestos/llm-ui-adapter/settings';
+import { MCPSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import {Toast} from '@nestos/ui-common-adapter';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
 
 const service = () => ({ getConnections: async () => [], getProviders: () => [],
     listSystemPrompts: async () => [], getMCPServers: async () => [], getSkills: async () => [], saveAgent: vi.fn(async () => {}) });

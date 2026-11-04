@@ -1,11 +1,11 @@
-import {collectionExecutor, scannerExecutor} from '@itookit/app-contracts';
+import {collectionExecutor, scannerExecutor} from '@nestos/app-contracts';
 import { scanRules, type TwinScanRules } from './scan-rules';
 import { TWIN_KINDS, type TwinMemoryKind } from './domain';
 import type { TwinRecordFamily, TwinRecordWrite } from './contracts';
 
 export interface TwinScanPlanInput {
-    executor?: import('@itookit/app-contracts').TwinScannerExecutor;
-    collection?: import('@itookit/app-contracts').TwinCollectionExecutor;
+    executor?: import('@nestos/app-contracts').TwinScannerExecutor;
+    collection?: import('@nestos/app-contracts').TwinCollectionExecutor;
     maxOutputTokens?: number;
     runTokenLimit?: number;
     rules?: TwinScanRules; autoConfirm?: boolean; focus?: string;
@@ -16,9 +16,9 @@ export interface TwinScanPlanInput {
 export interface TwinScanPlan extends TwinScanPlanInput { connectionFingerprint: string; createdAt: number; updatedAt: number; }
 export type TwinScanState = 'queued' | 'running' | 'succeeded' | 'paused' | 'failed' | 'cancelled' | 'interrupted';
 export interface TwinScanRun {
-    collectionProgress?: import('@itookit/app-contracts').TwinCollectionProgress;
-    executor?: import('@itookit/app-contracts').TwinScannerExecutor;
-    collection?: import('@itookit/app-contracts').TwinCollectionExecutor;
+    collectionProgress?: import('@nestos/app-contracts').TwinCollectionProgress;
+    executor?: import('@nestos/app-contracts').TwinScannerExecutor;
+    collection?: import('@nestos/app-contracts').TwinCollectionExecutor;
     maxOutputTokens?: number;
     runTokenLimit?: number;
     budgetUnlimited?: boolean;
@@ -31,8 +31,8 @@ export interface TwinScanRun {
     createdAt: number; startedAt: number; finishedAt: number; owner: string; fence: number; error: string;
 }
 export interface TwinScanCheckpoint { sourceId: string; sourceHash: string; incarnation: string; offset: number; complete: boolean; }
-import type { TwinScanScope } from '@itookit/app-contracts';
-export type { TwinScanScope } from '@itookit/app-contracts';
+import type { TwinScanScope } from '@nestos/app-contracts';
+export type { TwinScanScope } from '@nestos/app-contracts';
 export interface TwinScanGuard {
     conditions: Array<{ family: TwinRecordFamily; id: string; expectedRevision: string | null }>;
     writes: TwinRecordWrite[];

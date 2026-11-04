@@ -1,12 +1,12 @@
 import type {ConversationControls, EditorOptions} from './contracts';
 import {IndependentConversationEditor} from './shell/IndependentConversationEditor';
 import {NativeChatStore} from './independent/native-store';
-import {createModuleLogger} from '@itookit/common';
-import type {IEditor} from '@itookit/ui-common-adapter';
+import {createModuleLogger} from '@nestos/common';
+import type {IEditor} from '@nestos/ui-common-adapter';
 import type {WorkspaceHandoff, RetainedWorkspaceHandoff} from './shell/drafts/workspace-handoff';
 
 /** A presentation factory independent of the execution location. */
-export async function createConversationEditor(container: HTMLElement, controls: ConversationControls, options: EditorOptions, handoff?: WorkspaceHandoff | RetainedWorkspaceHandoff, ocr?: import('@itookit/app-contracts/services').OcrControls): Promise<IEditor> {
+export async function createConversationEditor(container: HTMLElement, controls: ConversationControls, options: EditorOptions, handoff?: WorkspaceHandoff | RetainedWorkspaceHandoff, ocr?: import('@nestos/app-contracts/services').OcrControls): Promise<IEditor> {
     let editor: IEditor | undefined;
     try {
         const retained = handoff && 'kind' in handoff ? handoff : undefined;

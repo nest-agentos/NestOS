@@ -1,12 +1,12 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {sha256Hex} from '@itookit/llm-context/digest';
-import type {InputFileUpload} from '@itookit/app-contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {sha256Hex} from '@nestos/llm-context/digest';
+import type {InputFileUpload} from '@nestos/app-contracts';
 import {importInputFile, inspectInputFile} from '../src/runtime/input-file-assets';
 import {readInputAsset, INPUT_ASSET_OWNER} from '../src/runtime/input-asset-store';
 
 const logs = vi.hoisted(() => ({info: vi.fn(), warn: vi.fn()}));
-vi.mock('@itookit/common', async original => ({...await original<typeof import('@itookit/common')>(), createModuleLogger: () => logs}));
+vi.mock('@nestos/common', async original => ({...await original<typeof import('@nestos/common')>(), createModuleLogger: () => logs}));
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0)) await close(); vi.restoreAllMocks(); vi.clearAllMocks();});
 async function setup(text = '\ufeffPrivate document') {

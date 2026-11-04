@@ -1,6 +1,6 @@
-import type { SkillDefinition, SkillToolBinding } from '@itookit/tools/contracts';
-import type { ToolExecutionContext } from '@itookit/tools/contracts';
-import type { INativeShell } from '@itookit/tools';
+import type { SkillDefinition, SkillToolBinding } from '@nestos/tools/contracts';
+import type { ToolExecutionContext } from '@nestos/tools/contracts';
+import type { INativeShell } from '@nestos/tools';
 import type { SkillToolHandlerFactory } from '../ports/capabilities';
 import type { MCPToolAdapter } from '../tool/mcp-tools';
 

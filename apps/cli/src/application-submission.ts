@@ -1,12 +1,12 @@
-import {resolveFlowArguments} from '@itookit/app-contracts';
-import {FlowCommand, type FlowRevision} from '@itookit/llm-flow/contracts';
+import {resolveFlowArguments} from '@nestos/app-contracts';
+import {FlowCommand, type FlowRevision} from '@nestos/llm-flow/contracts';
 import {open} from 'node:fs/promises';
 import {dirname, resolve} from 'node:path';
-import {randomUUID} from '@itookit/common';
-import type {ApplicationClient} from '@itookit/app-contracts/services';
-import {SessionCommand, type RootCallTarget, type RootTargetCatalog, type SubmissionRequest, type SubmissionReceipt} from '@itookit/llm-session/contracts';
-import {assertConversationSelection, type ConversationSelection} from '@itookit/kernel-adapters/contracts';
-import {assertFlowCallSource, assertTargetSelection, type FlowId, type JsonValue} from '@itookit/llm-flow/contracts';
+import {randomUUID} from '@nestos/common';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
+import {SessionCommand, type RootCallTarget, type RootTargetCatalog, type SubmissionRequest, type SubmissionReceipt} from '@nestos/llm-session/contracts';
+import {assertConversationSelection, type ConversationSelection} from '@nestos/kernel-adapters/contracts';
+import {assertFlowCallSource, assertTargetSelection, type FlowId, type JsonValue} from '@nestos/llm-flow/contracts';
 import type {CommandOptions} from './commands';
 import {recordRuntimeDiagnostic} from './diagnostics';
 

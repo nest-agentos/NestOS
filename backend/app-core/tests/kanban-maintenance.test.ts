@@ -1,5 +1,5 @@
 import {afterEach, expect, it} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {maintenanceResources, maintenancePrompts} from '../src/presets/kanban-maintenance';
 import {readPrompt} from '../src/run/prompt-bundle';
 const closes: Array<() => Promise<void>> = [];

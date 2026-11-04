@@ -1,6 +1,6 @@
-import type {AttachmentRef, DraftAttachment, ImageEditingPort} from '@itookit/llm-ui';
-import type {ImageProcessor, ImageResizePolicy} from '@itookit/image-parser';
-import {randomUUID, t} from '@itookit/common';
+import type {AttachmentRef, DraftAttachment, ImageEditingPort} from '@nestos/llm-ui';
+import type {ImageProcessor, ImageResizePolicy} from '@nestos/image-parser';
+import {randomUUID, t} from '@nestos/common';
 import {createImageEditingPort, type ImageAssetMetadata} from '../../independent/image-editing';
 import {imageFileState, setImageFileState} from './image-file-state';
 import type {ImageAttachmentOptions} from './ImageAttachments';

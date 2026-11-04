@@ -1,7 +1,7 @@
 import {promptHarnessNode} from './prompt-harness';
-import type {HarnessConnectionSnapshot} from '@itookit/kernel-adapters/contracts';
-import { mergeAgentConfig } from '@itookit/llm-flow';
-import type { FlowNodeDefinition } from '@itookit/llm-flow/contracts';
+import type {HarnessConnectionSnapshot} from '@nestos/kernel-adapters/contracts';
+import { mergeAgentConfig } from '@nestos/llm-flow';
+import type { FlowNodeDefinition } from '@nestos/llm-flow/contracts';
 import type { ExecutorConfig, TaskInput } from '../core/types';
 import type { FlowIdentityResolver } from './flow-node-binder';
 

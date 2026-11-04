@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {expect, it} from 'vitest';
-import {DigitalTwinService} from '@itookit/app-core';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {DigitalTwinService} from '@nestos/app-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {bindTwinWorkspaces} from '../../../backend/app-core/src/digital-twin/workspaces';
 import {TwinWorkbench} from '../src/digital-twin';
 it('switches only the current view to an authorized organization handle and makes viewers read-only', async () => {

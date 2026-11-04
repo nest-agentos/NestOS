@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import {parseResourceReference} from '@itookit/app-contracts';
+import {parseResourceReference} from '@nestos/app-contracts';
 import {resolveFlowArguments} from './flow-arguments';
 const fields = [{name: 'requirements', type: 'string' as const}, {name: 'essay', type: 'string' as const}, {name: 'rounds', type: 'number' as const}];
 it('binds ordered and named file references without evaluating source content', async () => {

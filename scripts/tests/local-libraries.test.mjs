@@ -13,7 +13,7 @@ import { workspaceAliases } from '../workspace-sources.mjs';
 import { copyLibrarySnapshot, pinSnapshotDependencies, freezeWorkspaceDependencies, sourceFiles, sourceFingerprint } from '../httpd-runtime.mjs';
 
 const repository = fileURLToPath(new URL('../..', import.meta.url));
-const catalog = ['core', 'parent'].map(directory => ({ name: `@itookit/${directory}`, directory, version: '1.0.0' }));
+const catalog = ['core', 'parent'].map(directory => ({ name: `@nestos/${directory}`, directory, version: '1.0.0' }));
 function write(file, value) {
     mkdirSync(join(file, '..'), { recursive: true });
     writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value));
@@ -27,15 +27,15 @@ function fixture(t) {
     symlinkSync(join(repository, 'node_modules/yaml'), join(root, 'node_modules/yaml'));
     write(join(root, 'scripts/npm-libraries.json'), catalog);
     write(join(root, 'package.json'), { name: 'fixture', private: true });
-    write(join(root, 'pnpm-workspace.yaml'), 'packages:\n  - libraries/*\n  - ui/*\noverrides:\n  "@itookit/core": "workspace:*"\n  "@itookit/parent": "workspace:*"\n');
+    write(join(root, 'pnpm-workspace.yaml'), 'packages:\n  - libraries/*\n  - ui/*\noverrides:\n  "@nestos/core": "workspace:*"\n  "@nestos/parent": "workspace:*"\n');
     for (const item of catalog) {
         const directory = join(root, 'libraries', item.directory);
         write(join(directory, 'package.json'), { name: item.name, version: item.version, exports: { '.': './src/index.cjs' } });
         write(join(directory, 'src/index.cjs'), 'module.exports = {value:"live source"};');
     }
-    write(join(root, 'ui/consumer/package.json'), { name: '@itookit/consumer', exports: { '.': './src/index.cjs' },
-        dependencies: { '@itookit/core': 'workspace:*', '@itookit/parent': 'workspace:*' } });
-    write(join(root, 'ui/consumer/src/index.cjs'), 'module.exports = require("@itookit/core");');
+    write(join(root, 'ui/consumer/package.json'), { name: '@nestos/consumer', exports: { '.': './src/index.cjs' },
+        dependencies: { '@nestos/core': 'workspace:*', '@nestos/parent': 'workspace:*' } });
+    write(join(root, 'ui/consumer/src/index.cjs'), 'module.exports = require("@nestos/core");');
     return root;
 }
 function snapshotAt(root, value = 'snapshot') {
@@ -43,8 +43,8 @@ function snapshotAt(root, value = 'snapshot') {
     const packages = catalog.map(item => {
         const staging = join(output, item.directory); mkdirSync(join(staging, 'dist'), { recursive: true });
         write(join(staging, 'package.json'), { name: item.name, version: item.version, exports: { '.': './dist/index.cjs', './style.css': './dist/style.css' },
-            ...(item.directory === 'parent' && { dependencies: { '@itookit/core': '1.0.0' }, peerDependencies: { '@itookit/core': '^1.0.0' } }) });
-        write(join(staging, 'dist/index.cjs'), item.directory === 'core' ? `module.exports = {value:${JSON.stringify(value)}};` : 'module.exports = require("@itookit/core");');
+            ...(item.directory === 'parent' && { dependencies: { '@nestos/core': '1.0.0' }, peerDependencies: { '@nestos/core': '^1.0.0' } }) });
+        write(join(staging, 'dist/index.cjs'), item.directory === 'core' ? `module.exports = {value:${JSON.stringify(value)}};` : 'module.exports = require("@nestos/core");');
         write(join(staging, 'dist/style.css'), 'body {}');
         execFileSync('npm', ['pack', '--ignore-scripts', '--pack-destination', output], { cwd: staging, stdio: 'pipe' });
         const tarball = readFileSync(join(output, `itookit-${item.directory}-1.0.0.tgz`));
@@ -64,7 +64,7 @@ function install(root, choice) {
     });
 }
 function runConsumer(root) {
-    return JSON.parse(execFileSync(process.execPath, ['-e', 'const a=require("@itookit/core"),b=require("@itookit/parent");console.log(JSON.stringify({value:a.value,same:a===b,css:require.resolve("@itookit/core/style.css"),path:require.resolve("@itookit/core")}));'], {
+    return JSON.parse(execFileSync(process.execPath, ['-e', 'const a=require("@nestos/core"),b=require("@nestos/parent");console.log(JSON.stringify({value:a.value,same:a===b,css:require.resolve("@nestos/core/style.css"),path:require.resolve("@nestos/core")}));'], {
         cwd: join(root, 'ui/consumer'), encoding: 'utf8',
     }));
 }
@@ -99,8 +99,8 @@ test('real pnpm installs immutable artifacts for direct, transitive and peer dep
     assert.deepEqual(checkWorkspace(root, {catalog, installed: true}), []);
     result = install(root, first.id);
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    assert.ok(workspaceAliases(join(root, 'apps/web-app')).every(alias => !alias.find.test('@itookit/core')));
-    assert.ok(workspaceAliases(join(root, 'apps/web-app')).some(alias => alias.find.test('@itookit/consumer')));
+    assert.ok(workspaceAliases(join(root, 'apps/web-app')).every(alias => !alias.find.test('@nestos/core')));
+    assert.ok(workspaceAliases(join(root, 'apps/web-app')).some(alias => alias.find.test('@nestos/consumer')));
     const second = snapshotAt(root, 'updated snapshot');
     assert.notEqual(first.id, second.id);
     assert.equal(state.readSelection(root).id, first.id, 'preparation never activates');
@@ -124,7 +124,7 @@ test('explicit source restoration returns to workspace links and preserves the s
     assert.equal(readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8'), lock);
     const restored = execute(['source']); assert.equal(restored.status, 0, restored.stdout + restored.stderr);
     assert.equal(state.readSelection(root), null);
-    assert.equal(realpathSync(join(root, 'ui/consumer/node_modules/@itookit/core')), join(root, 'libraries/core'));
+    assert.equal(realpathSync(join(root, 'ui/consumer/node_modules/@nestos/core')), join(root, 'libraries/core'));
     assert.equal(readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8'), lock);
 });
 
@@ -148,9 +148,9 @@ test('failed activation restores the previous installation and never publishes t
 
 test('production deployment resolves peer-only libraries from local artifacts without registry access', t => {
     const root = fixture(t), snapshot = snapshotAt(root), destination = join(root, 'deployment');
-    write(join(root, 'ui/peer/package.json'), {name: '@itookit/peer', version: '1.0.0', exports: {'.': './src/index.cjs'}, peerDependencies: {'@itookit/parent': 'workspace:*'}});
-    write(join(root, 'ui/peer/src/index.cjs'), 'module.exports = require("@itookit/parent");');
-    write(join(root, 'ui/consumer/package.json'), {name: '@itookit/consumer', version: '1.0.0', exports: {'.': './src/index.cjs'}, dependencies: {'@itookit/peer': 'workspace:*', '@itookit/core': 'workspace:*'}});
+    write(join(root, 'ui/peer/package.json'), {name: '@nestos/peer', version: '1.0.0', exports: {'.': './src/index.cjs'}, peerDependencies: {'@nestos/parent': 'workspace:*'}});
+    write(join(root, 'ui/peer/src/index.cjs'), 'module.exports = require("@nestos/parent");');
+    write(join(root, 'ui/consumer/package.json'), {name: '@nestos/consumer', version: '1.0.0', exports: {'.': './src/index.cjs'}, dependencies: {'@nestos/peer': 'workspace:*', '@nestos/core': 'workspace:*'}});
     pinSnapshotDependencies(join(root, 'ui/consumer/package.json'), snapshot);
     write(state.activeFile(root), {format: 1, mode: 'snapshot', id: snapshot.id});
     rmSync(join(root, 'libraries'), {recursive: true});
@@ -158,14 +158,14 @@ test('production deployment resolves peer-only libraries from local artifacts wi
         cwd: root, encoding: 'utf8', env: {...process.env, CI: 'true', NESTOS_LIBRARY_SNAPSHOT: snapshot.id, NESTOS_LIBRARY_DEPLOYMENT: '1'}, timeout: 30_000,
     });
     assert.equal(installed.status, 0, installed.stdout + installed.stderr);
-    const deployed = spawnSync('pnpm', ['--config.offline=true', '--ignore-scripts', '--filter', '@itookit/consumer', 'deploy', '--prod', '--legacy', destination], {
+    const deployed = spawnSync('pnpm', ['--config.offline=true', '--ignore-scripts', '--filter', '@nestos/consumer', 'deploy', '--prod', '--legacy', destination], {
         cwd: root, encoding: 'utf8', env: {...process.env, CI: 'true', NESTOS_LIBRARY_SNAPSHOT: snapshot.id, NESTOS_LIBRARY_DEPLOYMENT: '1'}, timeout: 30_000,
     });
     assert.equal(deployed.status, 0, deployed.stdout + deployed.stderr);
     freezeWorkspaceDependencies(destination);
     rmSync(join(root, 'ui'), {recursive: true});
     rmSync(join(state.localRoot(root), 'snapshots'), {recursive: true});
-    const result = execFileSync(process.execPath, ['-e', 'console.log(require("@itookit/peer").value)'], {cwd: destination, encoding: 'utf8'});
+    const result = execFileSync(process.execPath, ['-e', 'console.log(require("@nestos/peer").value)'], {cwd: destination, encoding: 'utf8'});
     assert.equal(result.trim(), 'snapshot');
 });
 

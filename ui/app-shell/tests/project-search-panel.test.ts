@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ProjectSearch, ProjectSearchResult } from '@itookit/app-core';
+import type { ProjectSearch, ProjectSearchResult } from '@nestos/app-core';
 import { ProjectSearchPanel } from '../src/projects/project-search-panel';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 afterEach(() => { vi.useRealTimers(); document.body.replaceChildren(); });
 it('discards stale responses, cancels project changes and uses structured result navigation', async () => {
     vi.useFakeTimers(); const resolvers: Array<(result: ProjectSearchResult) => void> = [];

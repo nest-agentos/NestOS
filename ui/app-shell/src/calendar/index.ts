@@ -1,5 +1,5 @@
-import type {IFileSystem} from '@itookit/vfs-core';
-import {VFS_DOM_EVENTS} from '@itookit/vfs-ui';
+import type {IFileSystem} from '@nestos/vfs-core';
+import {VFS_DOM_EVENTS} from '@nestos/vfs-ui';
 import {createWorkspaceModule} from '../workspaces/module';
 import {dateKey, type CalendarEvent} from './model';
 import {readCalendar, type CalendarSnapshot} from './read';

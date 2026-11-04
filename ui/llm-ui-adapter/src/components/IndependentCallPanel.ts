@@ -6,9 +6,9 @@ import {IndependentCallInteractions} from './IndependentCallInteractions';
 import {IndependentCallControl} from './IndependentCallControl';
 import {CallControlOperations, callCancellationProtocol, callTreeCancellationProtocol, callStateControlProtocol, callResponseProtocol} from '../independent/call-control';
 import {TaskArtifactBrowser} from './dag/TaskArtifactBrowser';
-import {createModuleLogger, t} from '@itookit/common';
-import type {OperationLedger} from '@itookit/llm-ui';
-import {IndependentCallCommand, type IndependentCallView, type ICommandBus} from '@itookit/llm-session/contracts';
+import {createModuleLogger, t} from '@nestos/common';
+import type {OperationLedger} from '@nestos/llm-ui';
+import {IndependentCallCommand, type IndependentCallView, type ICommandBus} from '@nestos/llm-session/contracts';
 import {canonicalJson} from '../utils/canonical-json';
 
 const log = createModuleLogger('independent-calls');

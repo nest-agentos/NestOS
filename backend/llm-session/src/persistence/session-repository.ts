@@ -2,7 +2,7 @@ import { serializeSessionSummary, indexSessionSummary, navigationPrefix, NAVIGAT
 import { sessionSettings, mergeSessionSettings } from './session-settings';
 import { SessionRelations, assertSessionAvailable, readSessionMetadata, touchSessionRelations } from './session-relations';
 import { ulid } from './ulid';
-import { createFileSystemView, FSError, type IFileSystem, type ISeqFileTransaction } from '@itookit/vfs-core';
+import { createFileSystemView, FSError, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
 import { DEFAULT_SESSION_SETTINGS, type ChatSessionSettings, type ConversationManifest, type SessionSummary, type ConversationUIState, type ISessionRepository, type SessionFolder, type SessionOrigin, type SessionLoadState, type SessionView, type SessionRepositoryChange } from './types';
 import { sessionStorageRoot } from './session-storage-layout';
 import { resolveSessionStorageRoot, recoverSessionDataMoves, moveSessionDataDirectory } from './session-storage-locations';

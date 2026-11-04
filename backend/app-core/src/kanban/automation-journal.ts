@@ -1,6 +1,6 @@
-import type {IFileSystem} from '@itookit/vfs-core';
-import {sha256HexSync} from '@itookit/common';
-import type {KanbanArtifactRef} from '@itookit/kanban/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
+import {sha256HexSync} from '@nestos/common';
+import type {KanbanArtifactRef} from '@nestos/kanban/contracts';
 import {requireValue} from './validation';
 
 const path = '/var/lib/kanban/automation.seq';

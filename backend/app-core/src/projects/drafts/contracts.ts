@@ -1,5 +1,5 @@
-import type { ProjectDraftPromotion } from '@itookit/app-contracts/services';
-export type { ProjectDraftComposer, ProjectDraftPromotion } from '@itookit/app-contracts/services';
+import type { ProjectDraftPromotion } from '@nestos/app-contracts/services';
+export type { ProjectDraftComposer, ProjectDraftPromotion } from '@nestos/app-contracts/services';
 
 export type RemoteDraftTarget = Omit<NonNullable<ProjectDraftPromotion['remote']>, 'nativeSessionId' | 'turnId'>;
 

@@ -1,4 +1,4 @@
-import type {ICommandBus, SessionInstructionQueue} from '@itookit/llm-session/contracts';
+import type {ICommandBus, SessionInstructionQueue} from '@nestos/llm-session/contracts';
 import {InstructionQueuePanel} from '../components/InstructionQueuePanel';
 import type {ImageChatOptions} from './image-chat-view';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/kernel-adapters",
+  "name": "@nestos/kernel-adapters",
   "version": "0.1.0",
   "description": "Kernel capability adapters for LLM, tools, skills, Bash, and TTY",
   "type": "module",
@@ -93,11 +93,11 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@itookit/driver-llm": "workspace:*",
-    "@itookit/durable-kernel": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
-    "@itookit/tools": "workspace:*",
-    "@itookit/llm-context": "workspace:*",
+    "@nestos/driver-llm": "workspace:*",
+    "@nestos/durable-kernel": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
+    "@nestos/tools": "workspace:*",
+    "@nestos/llm-context": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/core": "2.0.0",
     "js-yaml": "^4.1.1"
@@ -109,12 +109,21 @@
     "typescript": "^5.9.3",
     "vitest": "^1.6.0",
     "@types/js-yaml": "^4.0.9",
-    "@itookit/vfsdriver-indexeddb": "workspace:*"
+    "@nestos/vfsdriver-indexeddb": "workspace:*"
   },
   "imports": {
     "#mcp-stdio": {
       "browser": "./src/llm-management/skills/mcp-stdio-browser.ts",
       "default": "./src/llm-management/skills/mcp-stdio.ts"
     }
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "backend/kernel-adapters"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

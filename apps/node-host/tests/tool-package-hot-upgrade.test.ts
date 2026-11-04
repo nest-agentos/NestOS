@@ -2,12 +2,12 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {mkdtemp, mkdir, writeFile, readFile, rm, chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {createKernelAdaptersRuntime} from '@itookit/kernel-adapters';
-import {createVFS, MemoryBackend, type IDeviceDriver} from '@itookit/vfs-core';
+import {createKernelAdaptersRuntime} from '@nestos/kernel-adapters';
+import {createVFS, MemoryBackend, type IDeviceDriver} from '@nestos/vfs-core';
 import {Kernel} from '../../../libraries/durable-kernel/src/index';
 import {createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms} from '../../../backend/llm-flow/src/index';
 import {createTaskAssetStore} from '../../../backend/app-core/src/runtime/task-asset-store';
-import type {TaskAssetStore, ToolExecutionIdentity} from '@itookit/tools/contracts';
+import type {TaskAssetStore, ToolExecutionIdentity} from '@nestos/tools/contracts';
 import {NodeToolPackages} from '../src/runtime/tool-packages';
 import * as registry from '../src/runtime/tool-packages/store';
 

@@ -1,5 +1,5 @@
-import { escapeHTML, t } from '@itookit/common';
-import { flowOutputEntries, nodeOutputEntries, outputText } from '@itookit/llm-flow/contracts';
+import { escapeHTML, t } from '@nestos/common';
+import { flowOutputEntries, nodeOutputEntries, outputText } from '@nestos/llm-flow/contracts';
 
 export function renderFlowOutput(output: unknown, root = false): string {
     const entries = root ? flowOutputEntries(output) : nodeOutputEntries(output);

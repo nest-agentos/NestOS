@@ -1,4 +1,4 @@
-# @itookit/llm-flow — API 参考
+# @nestos/llm-flow — API 参考
 
 `spawn.scope=local` 与函数调用共用节点、边和控制身份映射；除模板引用外，路由规则、默认边、分组成员、join 身份及公开结果键均保持正确作用域。`builtin.agent.config.reasoningEffort` 接受 1–64 字符的字母、数字、下划线或连字符；合法等级由实际模型声明在通信前校验，不固定为跨厂商枚举。
 
@@ -12,7 +12,7 @@ Flow 函数调用使用 `builtin.flow@2.0.0`：`config.flowId/revision/parameter
 
 `DagRunSpec.input?: FlowRuntimeInput` 保存只读 `{prompt: string}`，缺省为空提示词。模板通过 `${input.prompt}` 读取，变量初值可引用它；参数名 `param.prompt` 和可写 `vars.prompt` 保持独立。输入在提交时复制，随检查点恢复；嵌套调用及结构化派发沿用同一个快照，不属于定义 digest。Agent 的 Flow 执行绑定和运行表单见[内部 Flow Agent](design/flow-invocation-composition.md#agent-引用内部-flow)。
 
-> DAG 编排层：把 `llm-tasks` 的 LLM 任务单元连成动态图（route/loop/spawn/compensate/on_failure/budget），并持久化 Flow 定义。提供 `DurableFlowExecutor`（动态图调度）、`DagCommandService`（命令面）、内置 Flow Programs 与插件。公共 API 从 `@itookit/llm-flow` 根导出；`flow/operations.ts` 的纯操作、`flow/programs.ts` 的输入类型（`FlowDependencyBinding` / `FlowValueInput` / `FlowHumanInput` / `FlowAggregateInput`）与 `flow/executor.ts` 的 `upstreamOf` 未从根导出，需按源码路径导入。
+> DAG 编排层：把 `llm-tasks` 的 LLM 任务单元连成动态图（route/loop/spawn/compensate/on_failure/budget），并持久化 Flow 定义。提供 `DurableFlowExecutor`（动态图调度）、`DagCommandService`（命令面）、内置 Flow Programs 与插件。公共 API 从 `@nestos/llm-flow` 根导出；`flow/operations.ts` 的纯操作、`flow/programs.ts` 的输入类型（`FlowDependencyBinding` / `FlowValueInput` / `FlowHumanInput` / `FlowAggregateInput`）与 `flow/executor.ts` 的 `upstreamOf` 未从根导出，需按源码路径导入。
 
 **依赖方向**：`llm-flow → durable-kernel + llm-tasks`（`llm-session` 依赖本包）。不持有会话语义（Round/Branch 属于 `llm-session`）；能力经 Kernel Effect 使用。
 
@@ -299,7 +299,7 @@ createBuiltinDagPluginRegistry(): DagPluginRegistry;            // 内置插件
 
 ## 源码结构：文件与路径
 
-`@itookit/llm-flow` 的公共 API 从 `backend/llm-flow/src/index.ts` 根导出（barrel 转发 `flow/index.ts`）。包内结构：
+`@nestos/llm-flow` 的公共 API 从 `backend/llm-flow/src/index.ts` 根导出（barrel 转发 `flow/index.ts`）。包内结构：
 
 ```
 backend/llm-flow/src/

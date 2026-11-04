@@ -2,7 +2,7 @@ import { assertInlineFunctionTree } from './inline-functions';
 import { createRunCatalog } from './run-catalog';
 import type { DagPluginCatalog, FlowRevision, FlowConnection, JsonValue, FlowEdgeDefinition, FlowNodeDefinition } from '../contracts';
 import { DELEGATION_LIMITS, flowInputDeclarationIssues, flowToolDependencyIssues, collectFlowToolDependencies } from '../contracts';
-import { simpleHash } from '@itookit/llm-context';
+import { simpleHash } from '@nestos/llm-context';
 import { callableExposure } from '../contracts/callable-exposure';
 import { findCycles } from './graph';
 import { validateDispatch } from './structured/validation';

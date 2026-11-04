@@ -1,8 +1,8 @@
-import { t } from '@itookit/common';
-import { ungroupedId } from '@itookit/app-contracts';
-import type { ToolboxResources, ToolboxInventory } from '@itookit/app-contracts/services';
-import { createDeleteOperation, type DeleteBatch, type DeletePlan, type VFSNodeUI } from '@itookit/vfs-ui';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { t } from '@nestos/common';
+import { ungroupedId } from '@nestos/app-contracts';
+import type { ToolboxResources, ToolboxInventory } from '@nestos/app-contracts/services';
+import { createDeleteOperation, type DeleteBatch, type DeletePlan, type VFSNodeUI } from '@nestos/vfs-ui';
+import type { IFileSystem } from '@nestos/vfs-core';
 import type { ConfigurationDeletionDialog } from '../configuration/delete-dialog';
 import { modelDrawerProvider } from './model-drawers';
 import { invalidConnectionsId, invalidConnectionPaths } from './model-orphans';

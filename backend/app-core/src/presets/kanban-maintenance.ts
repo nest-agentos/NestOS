@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {t} from '@nestos/common';
+import type {IFileSystem} from '@nestos/vfs-core';
 import type {InitialResourceProvider} from './initial-files';
 import type {ReviewAction, ReviewSnapshot} from '../kanban/item-operation-types';
 import {sessionFileResultPrompt} from '../run/session-file-result';

@@ -1,8 +1,8 @@
-import {createTools as createImageTools} from '@itookit/image-tools';
+import {createTools as createImageTools} from '@nestos/image-tools';
 import { pathToFileURL } from 'node:url';
 import { isAbsolute } from 'node:path';
-import { buildTool, type Tool } from '@itookit/tools';
-import type {ToolConnectionAccess} from '@itookit/app-contracts/services';
+import { buildTool, type Tool } from '@nestos/tools';
+import type {ToolConnectionAccess} from '@nestos/app-contracts/services';
 import { z } from 'zod/v4';
 
 export interface ToolModuleAPI { buildTool: typeof buildTool; z: typeof z; connections?: ToolConnectionAccess; executables?: Readonly<Record<string, string>>; }

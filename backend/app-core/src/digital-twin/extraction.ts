@@ -2,9 +2,9 @@ import { TwinDiagnosticError, diagnosticDetail, traceAnalysis } from './diagnost
 import { userIdentity } from './identity';
 import { TWIN_EXTRACTION_OUTPUT_LIMIT } from './extraction-estimates';
 import { observeExtraction, type TwinRequestProgress } from './extraction-progress';
-import { bindCapabilities, KernelError, KernelErrorCode, type Kernel, type ExitRecord } from '@itookit/durable-kernel';
-import { sessionDirectoryStorage } from '@itookit/llm-session';
-import type { DurableChatOutput } from '@itookit/llm-tasks';
+import { bindCapabilities, KernelError, KernelErrorCode, type Kernel, type ExitRecord } from '@nestos/durable-kernel';
+import { sessionDirectoryStorage } from '@nestos/llm-session';
+import type { DurableChatOutput } from '@nestos/llm-tasks';
 import { validateRelation, TWIN_KINDS, type TwinAnalysisJob, type TwinCandidate } from './domain';
 
 export interface TwinExtractionPort {

@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {IFileSystem, FSNode} from '@itookit/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {IFileSystem, FSNode} from '@nestos/vfs-core';
 import {parseCalendarEvent, type CalendarEvent, type CalendarSource} from './model';
 const log = createModuleLogger('calendar');
 export interface CalendarSnapshot {events: CalendarEvent[]; sources: CalendarSource[]; warnings: string[]}

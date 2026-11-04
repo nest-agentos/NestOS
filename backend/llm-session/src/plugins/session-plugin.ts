@@ -37,7 +37,7 @@ export function createSessionPlugin(sessionManager: SessionManager): ILLMPlugin 
                 const created = await sm.createSessionFromFlow(
                     flowId,
                     revision,
-                    parameters as Record<string, import('@itookit/llm-flow/contracts').JsonValue> | undefined,
+                    parameters as Record<string, import('@nestos/llm-flow/contracts').JsonValue> | undefined,
                     title ?? 'Workflow',
                     invocation,
                     connectionId, connectionBindings,
@@ -52,7 +52,7 @@ export function createSessionPlugin(sessionManager: SessionManager): ILLMPlugin 
             ctx.commands.register(SessionCommand.FlowBranchExecutions, args => sm.getFlowBranchExecutions((args as { sessionId: string }).sessionId));
             ctx.commands.register(SessionCommand.FlowRerunContext, args => sm.getFlowRerunContext((args as {sourceRoundId?: string} | undefined)?.sourceRoundId));
             ctx.commands.register(SessionCommand.FlowRerun, args => {
-                const { parameters, sourceRoundId, sessionId, definitionKey, connectionId, connectionBindings, sourceSelection } = args as {sourceSelection?: 'selected'; connectionBindings?: Record<string, string>; connectionId?: string; parameters: Record<string, import('@itookit/llm-flow/contracts').JsonValue>; sourceRoundId: string | null; sessionId?: string; definitionKey?: string };
+                const { parameters, sourceRoundId, sessionId, definitionKey, connectionId, connectionBindings, sourceSelection } = args as {sourceSelection?: 'selected'; connectionBindings?: Record<string, string>; connectionId?: string; parameters: Record<string, import('@nestos/llm-flow/contracts').JsonValue>; sourceRoundId: string | null; sessionId?: string; definitionKey?: string };
                 return sm.rerunFlow(parameters, sourceRoundId, sessionId, definitionKey, connectionId, connectionBindings, sourceSelection);
             });
 
@@ -104,7 +104,7 @@ export function createSessionPlugin(sessionManager: SessionManager): ILLMPlugin 
             ctx.commands.register(SessionCommand.GetSubmissionReceipt, args => sm.getSubmissionReceipt(args as import('../contracts/submission').SubmissionRequest));
             ctx.commands.register(SessionCommand.InspectSubmissionReceipt, args => sm.inspectSubmissionReceipt(args as import('../contracts/submission').SubmissionRequest));
             ctx.commands.register(SessionCommand.HasCommittedSubmission, args => sm.hasCommittedSubmission(args as {
-                sessionId: string; submission: import('@itookit/llm-flow/contracts').SessionSubmission}));
+                sessionId: string; submission: import('@nestos/llm-flow/contracts').SessionSubmission}));
             ctx.commands.register(SessionCommand.Abort, async () => sm.abort());
             ctx.commands.register(SessionCommand.ContextSet, async (args) => {
                 const { roundIds, mode, scope } = args as {

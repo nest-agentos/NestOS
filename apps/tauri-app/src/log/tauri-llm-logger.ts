@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { ILLMLogger, LLMRequestLog, LLMResponseLog } from '@itookit/driver-llm/contracts';
+import type { ILLMLogger, LLMRequestLog, LLMResponseLog } from '@nestos/driver-llm/contracts';
 
 interface LogRecord {
     startedAt: number; provider?: string; model?: string; messageCount?: number;

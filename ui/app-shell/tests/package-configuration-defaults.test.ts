@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {expect,it} from 'vitest';
 import {packageConfiguration,readPackageSettings} from '../src/toolbox/package-configuration';
-import type {ToolPackageInfo} from '@itookit/app-contracts/services';
+import type {ToolPackageInfo} from '@nestos/app-contracts/services';
 it('shows real inherited defaults and preselects a sole account while retaining saved overrides',()=>{
  const item={id:'package',version:'1',status:'registered',configuration:{enabled:false,defaults:{},tools:[{id:'collect',parameters:[{name:'connection',type:'string',widget:'select',options:['personal'],default:'personal'},{name:'maxItems',type:'number',default:100}]}]}} as ToolPackageInfo;
  const root=document.createElement('div');root.innerHTML=packageConfiguration(item,false);

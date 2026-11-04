@@ -1,8 +1,8 @@
-import { randomUUID } from '@itookit/common';
-import { type ConnectionMeta, type LLMProvider } from '@itookit/driver-llm/contracts';
-import { type IConnectionService } from '@itookit/kernel-adapters/contracts';
-import { FSError } from '@itookit/vfs-core';
-import { mcpConfiguration, type MCPServer } from '@itookit/tools/mcp-contracts';
+import { randomUUID } from '@nestos/common';
+import { type ConnectionMeta, type LLMProvider } from '@nestos/driver-llm/contracts';
+import { type IConnectionService } from '@nestos/kernel-adapters/contracts';
+import { FSError } from '@nestos/vfs-core';
+import { mcpConfiguration, type MCPServer } from '@nestos/tools/mcp-contracts';
 
 export interface ConfigurationStore extends Pick<IConnectionService, 'getProviders' | 'getConnections' | 'deleteProvider' | 'deleteConnection'> {
     deleteSystemPrompt(id: string): Promise<void>;

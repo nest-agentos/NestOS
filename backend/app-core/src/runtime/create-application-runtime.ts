@@ -19,13 +19,13 @@ import {withProjectEnvironment} from '../projects/project-environment';
 import {createPersonalKanban} from '../kanban/personal';
 import {developmentPreparation} from '../presets/kanban-development';
 import {developmentObserver} from '../presets/kanban-development-observer';
-import {startKanbanMonitor} from '@itookit/kanban/execution';
+import {startKanbanMonitor} from '@nestos/kanban/execution';
 import {UserEventService} from '../events/service';
 import {attachRuntimeEvents} from '../events/runtime-events';
 import {DiagnosticJournal} from '../diagnostics/journal';
 import {seedStudyFiles} from '../presets/study-files';
 import {PublishedScannerCollector} from '../digital-twin/scanner-collector';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
 import {recoverFlowSchedulers} from './flow-scheduler-recovery';
 import {bindTwinWorkspaces} from '../digital-twin/workspaces';
 import {PublishedScannerExecutor} from '../digital-twin/scanner-executor';
@@ -47,7 +47,7 @@ import { SessionLifecycleService } from '../session/session-lifecycle';
 import { MCPRemoteConnections } from '../projects/mcp-remote-connections';
 import { createCellsMCPExtension } from '../projects/cells-mcp-extension';
 import { ProjectSyncService, type ProjectSyncProvider } from '../projects/sync/service';
-import type { Coordinator } from '@itookit/vfs-sync';
+import type { Coordinator } from '@nestos/vfs-sync';
 import { seedDefaultFlows } from '../presets/default-flows';
 import { createAgentFlowAvailability } from '../configuration/agent-flow-availability';
 import {createAgentPublicationDependencies} from '../configuration/agent-publications';
@@ -62,17 +62,17 @@ import { createHarnessExecutionProvider } from '../projects/harness-execution';
 import {createTaskAssetReader} from './task-assets';
 import { createHarnessCleanupState } from '../projects/harness-cleanup-state';
 import {createHarnessContextCleanup} from '../projects/harness-context-cleanup';
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 import { ModelConfigurationCommands } from '../configuration/model-commands';
 import { resumeSessionDeletions } from './resume-session-deletions';
-import type { IStorageBackend, MountOptions } from '@itookit/vfs-core';
-import type { LLMDeviceDriver, CodexAppServerTransport } from '@itookit/kernel-adapters/llm/core';
-import { t, traceBoot, createModuleLogger, randomUUID } from '@itookit/common';
-import { type ILLMLogger } from '@itookit/driver-llm/contracts';
+import type { IStorageBackend, MountOptions } from '@nestos/vfs-core';
+import type { LLMDeviceDriver, CodexAppServerTransport } from '@nestos/kernel-adapters/llm/core';
+import { t, traceBoot, createModuleLogger, randomUUID } from '@nestos/common';
+import { type ILLMLogger } from '@nestos/driver-llm/contracts';
 import {
     SessionRepository, SessionDirectoryStorageResolver, createInstructionQueueSessions, SessionExecutionActivity,
     VFSAgentService, FlowEngine, FlowDefinitionStore,
-} from '@itookit/llm-session';
+} from '@nestos/llm-session';
 import { createKernelRuntime, type HeadlessKernelRuntime, type CreateKernelRuntimeOptions } from './create-kernel-runtime';
 import { ProjectService } from '../projects/project-service';
 import { RunCatalog } from '../run/run-catalog';
@@ -115,22 +115,22 @@ export interface ApplicationKernelPlatform {
      * is absent the executor fails closed with `requires a configured workspace manager` (the
      * Web host has no workspace channel). See doc/design/flow-execution-model.md.
      */
-    flowWorkspaceManager?: import('@itookit/llm-flow').FlowWorkspaceManager;
+    flowWorkspaceManager?: import('@nestos/llm-flow').FlowWorkspaceManager;
 }
 
 export interface ApplicationRuntime {
     events: UserEventService;
     diagnostics: DiagnosticJournal;
     /** Host-only callback/token capability; it is never part of the frontend services graph. */
-    toolConnections?: import('@itookit/app-contracts/services').ToolConnectionAccess;
-    editorSwapStore?: import('@itookit/app-contracts/services').EditorSwapStore;
+    toolConnections?: import('@nestos/app-contracts/services').ToolConnectionAccess;
+    editorSwapStore?: import('@nestos/app-contracts/services').EditorSwapStore;
     /** Trusted host preparation and dispatch; this service is not an RPC contract. */
-    independentCalls?: import('@itookit/llm-session').IndependentCallService;
-    flowInstallations: import('@itookit/app-contracts/services').FlowInstallations;
-    toolPackages: import('@itookit/app-contracts/services').ToolPackages;
+    independentCalls?: import('@nestos/llm-session').IndependentCallService;
+    flowInstallations: import('@nestos/app-contracts/services').FlowInstallations;
+    toolPackages: import('@nestos/app-contracts/services').ToolPackages;
     digitalTwin?: DigitalTwinService;
-    kanban?: import('@itookit/kanban/contracts').KanbanClient;
-    vfs: import('@itookit/vfs-core').IVFSManager;
+    kanban?: import('@nestos/kanban/contracts').KanbanClient;
+    vfs: import('@nestos/vfs-core').IVFSManager;
     llmDriver: LLMDeviceDriver;
     agentService: VFSAgentService;
     configuration: ModelConfigurationCommands;
@@ -142,8 +142,8 @@ export interface ApplicationRuntime {
     executionConnections: HarnessConnectionService;
     projectSync?: ProjectSyncService;
     kernel: HeadlessKernelRuntime;
-    sessionManager: import('@itookit/llm-session').SessionManager;
-    commandBus: import('@itookit/llm-session').CommandBus;
+    sessionManager: import('@nestos/llm-session').SessionManager;
+    commandBus: import('@nestos/llm-session').CommandBus;
     runCatalog: RunCatalog;
     createView(): Promise<import('./conversation-system').OwnedConversationView>;
     openConversation(sessionId: string): Promise<import('./conversation-contexts').ConversationLease>;
@@ -157,18 +157,18 @@ export interface ApplicationRuntimeOptions {
     /** Trusted build identity of the running host, independent of a next-start release pointer. */
     runningVersion?: string;
     /** Optional host integrations own bindings and execution, never the portable board library. */
-    configureKanban?(context: {fs: import('@itookit/vfs-core').IFileSystem; service: import('@itookit/kanban').KanbanModuleHandle;
-        kernel: import('@itookit/durable-kernel').Kernel; calls?: import('@itookit/llm-session').IndependentCallService;
+    configureKanban?(context: {fs: import('@nestos/vfs-core').IFileSystem; service: import('@nestos/kanban').KanbanModuleHandle;
+        kernel: import('@nestos/durable-kernel').Kernel; calls?: import('@nestos/llm-session').IndependentCallService;
         sessions: SessionRepository; prepareSession(id: string): Promise<boolean>}): Promise<Array<{scan(): Promise<void>; quiesce(): Promise<void>}>>;
-    toolConnections?: import('@itookit/app-contracts/services').ToolConnectionAccess;
+    toolConnections?: import('@nestos/app-contracts/services').ToolConnectionAccess;
     /** The host resolves only trusted, locally available tool packages. */
-    toolDependencies?: import('@itookit/app-contracts/services').ToolDependencyResolver;
+    toolDependencies?: import('@nestos/app-contracts/services').ToolDependencyResolver;
     /** Interactive hosts activate background tasks after their first workspace is ready. */
     startupMode?: ApplicationStartupMode;
     sync?: { provider: ProjectSyncProvider; coordinator: Coordinator };
-    directAgentPolicy?: import('@itookit/llm-session/contracts').DirectAgentPolicy;
+    directAgentPolicy?: import('@nestos/llm-session/contracts').DirectAgentPolicy;
     contextEngineOptions?: CreateKernelRuntimeOptions['contextEngineOptions'];
-    agentResolution?: import('@itookit/llm-session').AgentResolutionPolicy;
+    agentResolution?: import('@nestos/llm-session').AgentResolutionPolicy;
     backend: IStorageBackend;
     /** Host-owned shared configuration and per-user accounting storage. */
     configurationReadonly?: boolean;
@@ -183,9 +183,9 @@ export interface ApplicationRuntimeOptions {
     configureSessionFiles?(files: SessionFilesService): void | Promise<void>;
     kernelPlatform?: ApplicationKernelPlatform;
     llmLogger?: ILLMLogger;
-    mcp?: import('@itookit/kernel-adapters/llm/core').MCPConnectionOptions;
+    mcp?: import('@nestos/kernel-adapters/llm/core').MCPConnectionOptions;
     codexTransport?: CodexAppServerTransport;
-    providerAuthorization?: import('@itookit/kernel-adapters/llm/core').ProviderAuthorizationHost;
+    providerAuthorization?: import('@nestos/kernel-adapters/llm/core').ProviderAuthorizationHost;
     ownerKind?: SessionOwnerKind;
     digitalTwinAutoStart?: boolean;
     /** Server-owned workspace binding with a membership/authority check on each access. */

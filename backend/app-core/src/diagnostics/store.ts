@@ -1,5 +1,5 @@
-import {FSError, type IFileSystem} from '@itookit/vfs-core';
-import type {DiagnosticEvent} from '@itookit/app-contracts/services';
+import {FSError, type IFileSystem} from '@nestos/vfs-core';
+import type {DiagnosticEvent} from '@nestos/app-contracts/services';
 import {clean} from './codec';
 
 const path = '/var/log/application-diagnostics.seq';

@@ -1,14 +1,14 @@
 import {materializeAssetMessages} from './asset-messages';
 import { assertModelConnection, type ModelConnectionSnapshot } from '../llm-management/contracts/model-requirements';
-import { assertEffectGrant } from '@itookit/durable-kernel';
-import type { LLMLogSink } from '@itookit/driver-llm/contracts';
-import { resolveModelProtocol } from '@itookit/driver-llm/contracts';
+import { assertEffectGrant } from '@nestos/durable-kernel';
+import type { LLMLogSink } from '@nestos/driver-llm/contracts';
+import { resolveModelProtocol } from '@nestos/driver-llm/contracts';
 import { silentAdapterLog } from '../ports/diagnostics';
-import type { LlmCommunicationEvent } from '@itookit/driver-llm/contracts';
-import type { AssistantMessage, ChatCompletionChunk, ChatCompletionParams, ChatCompletionResponse, Citation, FinishReason, TokenUsage } from '@itookit/driver-llm/contracts';
-import type { ToolCall } from '@itookit/llm-context';
-import type { ILLMService } from '@itookit/driver-llm/contracts';
-import type { EffectAdapter, EffectExecutionContext, EffectReconcileResult } from '@itookit/durable-kernel';
+import type { LlmCommunicationEvent } from '@nestos/driver-llm/contracts';
+import type { AssistantMessage, ChatCompletionChunk, ChatCompletionParams, ChatCompletionResponse, Citation, FinishReason, TokenUsage } from '@nestos/driver-llm/contracts';
+import type { ToolCall } from '@nestos/llm-context';
+import type { ILLMService } from '@nestos/driver-llm/contracts';
+import type { EffectAdapter, EffectExecutionContext, EffectReconcileResult } from '@nestos/durable-kernel';
 import { resolveCapability, type CapabilitySource } from '../ports/capabilities';
 import { InFlightEffects } from './in-flight';
 import type { KernelAdapterDiagnostics } from '../ports/diagnostics';
@@ -30,7 +30,7 @@ export class LlmChatEffectAdapter implements EffectAdapter<LlmChatEffectRequest,
 
     constructor(private readonly service: CapabilitySource<ILLMService>, private readonly log: LLMLogSink = silentAdapterLog,
         private readonly authorize?: KernelAdapterDiagnostics['authorizeLlm'],
-        private readonly readAsset?: import('@itookit/tools/contracts').TaskAssetReader) {}
+        private readonly readAsset?: import('@nestos/tools/contracts').TaskAssetReader) {}
 
     async execute(
         request: LlmChatEffectRequest,

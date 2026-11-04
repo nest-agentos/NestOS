@@ -1,5 +1,5 @@
-import type {ApplicationEvents, ApplicationEventFact} from '@itookit/app-contracts/services';
-import type {EventCursor, JournalEvent} from '@itookit/vfs-core';
+import type {ApplicationEvents, ApplicationEventFact} from '@nestos/app-contracts/services';
+import type {EventCursor, JournalEvent} from '@nestos/vfs-core';
 
 export interface EventFeedHandlers {
     receive(event: JournalEvent<ApplicationEventFact>): void | Promise<void>;

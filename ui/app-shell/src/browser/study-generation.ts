@@ -1,8 +1,8 @@
-import {sessionRoute} from '@itookit/app-contracts';
-import {t, createModuleLogger} from '@itookit/common';
-import type {ISessionRepository} from '@itookit/llm-session';
-import type {ApplicationBackend} from '@itookit/app-contracts/services';
-import type {StudyCreation, StudyDraft, StudyGeneration} from '@itookit/mdxeditor';
+import {sessionRoute} from '@nestos/app-contracts';
+import {t, createModuleLogger} from '@nestos/common';
+import type {ISessionRepository} from '@nestos/llm-session';
+import type {ApplicationBackend} from '@nestos/app-contracts/services';
+import type {StudyCreation, StudyDraft, StudyGeneration} from '@nestos/mdxeditor';
 import {recoverGenerationResult} from './generation-result-recovery';
 import {sessionGenerationResult} from './session-generation-result';
 /** Cancellation is an explicit remote operation; AbortSignal itself is never serialized. */

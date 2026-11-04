@@ -1,4 +1,4 @@
-import type { SessionBrowserDependencies, SessionOpenView, WorkbenchView } from '@itookit/app-contracts/services';
+import type { SessionBrowserDependencies, SessionOpenView, WorkbenchView } from '@nestos/app-contracts/services';
 import { createSessionBrowser } from '../session/session-browser';
 import { SessionLifecycleService } from '../session/session-lifecycle';
 import { ProjectSearch } from '../projects/project-search';

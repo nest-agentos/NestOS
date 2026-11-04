@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { openApplicationView } from '@itookit/app-core/host';
-import { CLOZE_SRS_PATH, clozeDocumentPrefix } from '@itookit/app-contracts';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { RpcPeer, installViewProjections } from '@itookit/app-transport/application';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { openApplicationView } from '@nestos/app-core/host';
+import { CLOZE_SRS_PATH, clozeDocumentPrefix } from '@nestos/app-contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { RpcPeer, installViewProjections } from '@nestos/app-transport/application';
 
 it('writes shared notes state through real RPC and tracks unopened file rename and deletion', async () => {
     const runtime = await createApplicationRuntime({ backend: new MemoryBackend(), ownerKind: 'web',

@@ -1,4 +1,4 @@
-import type { VFSNodeUI } from '@itookit/vfs-ui';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
 
 /** Application metadata becomes generic presentation before reaching the browser. */
 export function decorateFileNodes(nodes: VFSNodeUI[]): VFSNodeUI[] {

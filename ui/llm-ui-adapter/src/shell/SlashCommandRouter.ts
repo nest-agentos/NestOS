@@ -1,26 +1,26 @@
 import {chatFollowups} from './chat-followups';
 import { parseDirectoryCommand } from './directory-command';
-import { isRootCallable } from '@itookit/llm-flow/contracts';
+import { isRootCallable } from '@nestos/llm-flow/contracts';
 // @file: llm-ui/shell/SlashCommandRouter.ts
 // Slash command callbacks — extracted from LLMWorkspaceEditor.
 // Builds the SlashCommandCallbacks object used by SlashCommandPlugin.
 // Frequently modified: each new slash command or behavior change touches this file.
-import { SessionCommand, type SessionGroup, type ISessionRepository } from '@itookit/llm-session/contracts';
-import { formatDefaultFileTitle, t } from '@itookit/common';
-import { showConfirmDialog } from '@itookit/ui-common-adapter';
+import { SessionCommand, type SessionGroup, type ISessionRepository } from '@nestos/llm-session/contracts';
+import { formatDefaultFileTitle, t } from '@nestos/common';
+import { showConfirmDialog } from '@nestos/ui-common-adapter';
 import type { IChatInputPresenter } from '../domain/ports/IChatInputPresenter';
 import type { IHistoryPresenter } from '../domain/ports/IHistoryPresenter';
 import type { IEditorEventBus } from '../domain/events';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import { Toast } from '@itookit/ui-common-adapter';
-import type { IAgentConfigService } from '@itookit/kernel-adapters/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import { Toast } from '@nestos/ui-common-adapter';
+import type { IAgentConfigService } from '@nestos/kernel-adapters/contracts';
 import type { IBranchStore } from '../domain/ports/IBranchStore';
 import type { BranchService } from '../services/BranchService';
-import type {DOMCache} from '@itookit/llm-ui';
+import type {DOMCache} from '@nestos/llm-ui';
 import type { Command } from '../commands/Command';
 import type { SendMessageCommand } from '../commands/SendMessageCommand';
 import type { SwitchBranchByOffsetCommand } from '../commands/BranchCommands';
-import type { EditorHostContext } from '@itookit/ui-common-adapter';
+import type { EditorHostContext } from '@nestos/ui-common-adapter';
 import type { SlashCommandCallbacks } from '../components/input/plugins/SlashCommandPlugin';
 import { buildActionSkillMessage, buildSkillPrompt } from '../components/input/SkillInvocationParser';
 import type { SkillInfo, SkillInvocation } from '../domain/types';

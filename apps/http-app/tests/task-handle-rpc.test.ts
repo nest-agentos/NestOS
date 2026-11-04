@@ -1,10 +1,10 @@
 import {EventEmitter} from 'node:events';
 import type {ServerResponse} from 'node:http';
 import {expect, it, vi} from 'vitest';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {MemoryBackend} from '@itookit/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {MemoryBackend} from '@nestos/vfs-core';
 import {SessionCommand} from '../../../backend/llm-session/src/contracts';
-import {RpcPeer} from '@itookit/app-transport/application';
+import {RpcPeer} from '@nestos/app-transport/application';
 import {ViewEventStream} from '../../node-host/src/http/view-event-stream';
 import {ViewNotifications} from '../../node-host/src/http/view-notifications';
 

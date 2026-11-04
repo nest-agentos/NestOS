@@ -1,8 +1,8 @@
 import { runProcess } from './process-run';
 import path from 'node:path';
-import type { ITTYDriver, ITTYSession, ITTYSpawnOptions } from '@itookit/tools/contracts';
-import { NodeTTYDriver } from '@itookit/device-tty';
-import type { INativeShell, NativeShellResult, NativeShellOptions } from '@itookit/tools';
+import type { ITTYDriver, ITTYSession, ITTYSpawnOptions } from '@nestos/tools/contracts';
+import { NodeTTYDriver } from '@nestos/device-tty';
+import type { INativeShell, NativeShellResult, NativeShellOptions } from '@nestos/tools';
 import type { CompiledWorkflow, SandboxConfig, WorkspaceGrant } from './types';
 
 export interface SandboxDoctorResult {

@@ -1,4 +1,4 @@
-import type { RunAgentConfig, RunConnectionConfig, RunDefinition, RunProviderConfig, RunSandboxConfig } from '@itookit/app-core';
+import type { RunAgentConfig, RunConnectionConfig, RunDefinition, RunProviderConfig, RunSandboxConfig } from '@nestos/app-core';
 import { compileDag } from './runtime';
 import { memoryPolicyForAgent } from './memory-policy';
 import type { CompiledWorkflow } from './types';

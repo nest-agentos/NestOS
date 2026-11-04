@@ -1,4 +1,4 @@
-import { parseLoadedSkillIds } from '@itookit/kernel-adapters';
+import { parseLoadedSkillIds } from '@nestos/kernel-adapters';
 /**
  * P0-00 应用宿主半边：按**桌面宿主（Tauri）的装配方式**（`createApplicationRuntime` +
  * `TauriSkillSource`）发起一次真实聊天运行，核对落盘的运行输入里同时出现项目规则与
@@ -11,13 +11,13 @@ import { expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
 import { FakeSidecarDb } from './fake-sidecar';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { SessionCommand } from '@itookit/llm-session';
-import { createAgentSendIntent } from '@itookit/llm-flow/contracts';
-import { createSessionSkillControls, resolveSessionSkillContext } from '@itookit/kernel-adapters';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { SessionCommand } from '@nestos/llm-session';
+import { createAgentSendIntent } from '@nestos/llm-flow/contracts';
+import { createSessionSkillControls, resolveSessionSkillContext } from '@nestos/kernel-adapters';
 import { TauriSkillSource } from '../../../apps/tauri-app/src/kernel/tauri-skill-source';
 
 const SKILL = [

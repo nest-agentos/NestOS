@@ -1,4 +1,4 @@
-import type {DiagnosticEvent, DiagnosticSeries} from '@itookit/app-contracts/services';
+import type {DiagnosticEvent, DiagnosticSeries} from '@nestos/app-contracts/services';
 
 const maxGapMs = 5 * 60 * 1000;
 const scope = (v: DiagnosticEvent) => JSON.stringify([v.module, v.stage, v.projectId, v.connectionId, v.mountId, v.profileId, v.sessionId]);

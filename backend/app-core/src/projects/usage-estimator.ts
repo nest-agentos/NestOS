@@ -1,5 +1,5 @@
-import { estimateUsageCost, type MeteredTokens, type MeteredUsage, type ModelPricingConfig, type UsageCostEstimate } from '@itookit/kernel-adapters/contracts';
-import type { HarnessTokens, HarnessUsage } from '@itookit/cells-driver';
+import { estimateUsageCost, type MeteredTokens, type MeteredUsage, type ModelPricingConfig, type UsageCostEstimate } from '@nestos/kernel-adapters/contracts';
+import type { HarnessTokens, HarnessUsage } from '@nestos/cells-driver';
 
 /** Remote wire buckets → local billing buckets, mapped field by field. */
 function meter(tokens: HarnessTokens): MeteredTokens {

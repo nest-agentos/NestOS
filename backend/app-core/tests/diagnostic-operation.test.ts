@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend, createVFS} from '@itookit/vfs-core';
+import {MemoryBackend, createVFS} from '@nestos/vfs-core';
 import {DiagnosticJournal} from '../src/diagnostics/journal';
 import {initial} from '../src/diagnostics/series';
 import {DiagnosticStore} from '../src/diagnostics/store';

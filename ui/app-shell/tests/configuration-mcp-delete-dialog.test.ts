@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { ModelConfigurationCommands, type ProjectService } from '@itookit/app-core';
+import { ModelConfigurationCommands, type ProjectService } from '@nestos/app-core';
 import { ConfigurationDeletionDialog } from '../src/configuration/delete-dialog';
 
 afterEach(() => { document.body.innerHTML = ''; });

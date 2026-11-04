@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {FSError, type FSNode, type IFileSystem} from '@itookit/vfs-core';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import {FSError, type FSNode, type IFileSystem} from '@nestos/vfs-core';
+import type {ProjectService} from '@nestos/app-contracts/services';
 import {readDirectoryView} from '../src/session/directory-view';
 
 function fixture() {

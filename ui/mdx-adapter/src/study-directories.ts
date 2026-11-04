@@ -1,6 +1,6 @@
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {StudyDocuments} from '@itookit/mdxeditor';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {StudyDocuments} from '@nestos/mdxeditor';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 
 /** Enumerate visible directory metadata only when the destination picker asks for it. */
 export function createStudyDirectories(fs: IFileSystem): NonNullable<StudyDocuments['directories']> {

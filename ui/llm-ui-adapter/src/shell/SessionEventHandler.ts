@@ -2,10 +2,10 @@
 
 
 
-import { SessionCommand, type SessionEventEnvelope, type RegistryEvent, type SessionGroup } from '@itookit/llm-session/contracts';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import {t} from '@itookit/common';
-import { Toast } from '@itookit/ui-common-adapter';
+import { SessionCommand, type SessionEventEnvelope, type RegistryEvent, type SessionGroup } from '@nestos/llm-session/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import {t} from '@nestos/common';
+import { Toast } from '@nestos/ui-common-adapter';
 
 import type { IHistoryPresenter } from '../domain/ports/IHistoryPresenter';
 import type { IStatusPresenter } from '../domain/ports/IStatusPresenter';

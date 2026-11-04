@@ -1,4 +1,4 @@
-import type { SessionHandle, TaskHandle } from '@itookit/durable-kernel';
+import type { SessionHandle, TaskHandle } from '@nestos/durable-kernel';
 import type { DagEdgeDefinition, DagNodeDefinition, DagRunSpec } from '../contracts';
 import type { DelegationGroup, EdgeState } from './delegation-runtime';
 import type { FlowVariableStore } from './variables';

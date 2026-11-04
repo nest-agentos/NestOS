@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import {readFile} from 'node:fs/promises';
-import {openIndexedDBBackend} from '@itookit/vfsdriver-indexeddb';
-import {createApplicationRuntime} from '@itookit/app-core';
+import {openIndexedDBBackend} from '@nestos/vfsdriver-indexeddb';
+import {createApplicationRuntime} from '@nestos/app-core';
 
-vi.mock('@itookit/vfsdriver-indexeddb', async original => ({...await original<object>(), openIndexedDBBackend: vi.fn()}));
-vi.mock('@itookit/app-core', async original => ({...await original<object>(), createApplicationRuntime: vi.fn()}));
+vi.mock('@nestos/vfsdriver-indexeddb', async original => ({...await original<object>(), openIndexedDBBackend: vi.fn()}));
+vi.mock('@nestos/app-core', async original => ({...await original<object>(), createApplicationRuntime: vi.fn()}));
 
 beforeEach(async () => {
     vi.resetModules(); vi.spyOn(console, 'error').mockImplementation(() => {});

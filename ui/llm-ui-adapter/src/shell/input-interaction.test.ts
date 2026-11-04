@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { inputInteraction } from './input-interaction';
 import { agentQuestionAnswer } from '../components/input/agent-questions';
-import type { JsonValue } from '@itookit/durable-kernel/contracts';
+import type { JsonValue } from '@nestos/durable-kernel/contracts';
 
 const question = { question: 'Choose a destination?', header: 'Destination', options: [
     { label: 'Local', description: 'Keep data here' }, { label: 'Remote', description: 'Send to another host' },

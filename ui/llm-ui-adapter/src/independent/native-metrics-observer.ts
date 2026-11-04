@@ -1,5 +1,5 @@
 import type {ConversationControls, ConversationSnapshot} from '../contracts';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 
 const log = createModuleLogger('native-metrics');
 /** Refresh at session/turn boundaries, never on token deltas or an independent timer. */

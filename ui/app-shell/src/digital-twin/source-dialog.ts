@@ -1,6 +1,6 @@
-import { escapeHTML, t } from '@itookit/common';
-import { TWIN_SELECTION_TYPES, selectionKinds, type TwinSelectionTarget, type TwinSelectionType } from '@itookit/app-contracts';
-import type { DigitalTwinService } from '@itookit/app-contracts/services';
+import { escapeHTML, t } from '@nestos/common';
+import { TWIN_SELECTION_TYPES, selectionKinds, type TwinSelectionTarget, type TwinSelectionType } from '@nestos/app-contracts';
+import type { DigitalTwinService } from '@nestos/app-contracts/services';
 import { label, memoryFields } from './view';
 import { memoryInput } from './memory-input';
 import { analysisHTML, analysisProgress, analysisStatusHTML, type SourceInfo } from './source-results';

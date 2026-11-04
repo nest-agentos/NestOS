@@ -2,10 +2,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { TauriSessionDirectories } from '../../../apps/tauri-app/src/services/session-directories';
 
 const mocks = vi.hoisted(() => ({ dispose: vi.fn(), invoke: vi.fn() }));
-vi.mock('@itookit/vfs-core', async importOriginal => ({ ...await importOriginal<object>(),
+vi.mock('@nestos/vfs-core', async importOriginal => ({ ...await importOriginal<object>(),
     createFileSystemSource: async () => ({ fs: {}, dispose: mocks.dispose }),
 }));
-vi.mock('@itookit/vfsdriver-local', async importOriginal => ({ ...await importOriginal<object>(),
+vi.mock('@nestos/vfsdriver-local', async importOriginal => ({ ...await importOriginal<object>(),
     openLocalFSBackend: async () => ({ close: async () => {} }),
 }));
 beforeEach(() => {

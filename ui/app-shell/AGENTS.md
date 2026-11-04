@@ -1,6 +1,6 @@
-# @itookit/app-shell
+# @nestos/app-shell
 
-Kanban UI、模板与样式位于独立库 `@itookit/kanban/ui`、`/ui.css`；本包 kanban/ 装配共享 vfs-ui 侧栏，并注入文案、公共图标、日志、路由和激活事件。配置按实例传入，不使用全局宿主配置。Kanban 执行展示以工作项绑定的 Session 为单位，通过应用 queryActivity/executionSession 读取；界面不枚举内部 Task，也不以已认领、普通关联会话或最近活动代替真实运行状态。卡片显示会话摘要，详情提供绑定、历史与跳转；执行筛选由后端先过滤后分页。可见且无草稿时每 15 秒补读，隐藏/操作中暂停，销毁注销；失败保留绑定及具体安全错误码。
+Kanban UI、模板与样式位于独立库 `@nestos/kanban/ui`、`/ui.css`；本包 kanban/ 装配共享 vfs-ui 侧栏，并注入文案、公共图标、日志、路由和激活事件。配置按实例传入，不使用全局宿主配置。Kanban 执行展示以工作项绑定的 Session 为单位，通过应用 queryActivity/executionSession 读取；界面不枚举内部 Task，也不以已认领、普通关联会话或最近活动代替真实运行状态。卡片显示会话摘要，详情提供绑定、历史与跳转；执行筛选由后端先过滤后分页。可见且无草稿时每 15 秒补读，隐藏/操作中暂停，销毁注销；失败保留绑定及具体安全错误码。
 
 看板通过独立 UI 的 mountTitleBar 插槽复用 WorkbenchTabs：手机返回列表按钮、向上和窗口清单与会话使用相同实现；标记 embedded 隐藏重复的宿主返回行。工作区通过 vfs-ui BrowserSource 共享一份看板侧栏，通过 catalog 投影逻辑文件，不创建重复的文件正文；删除经 vfs-ui 的预检和单次确认进入后端生命周期，不直接删除存储文件。每个已打开资源独立持有正文 UI、筛选、滚动和未保存表单；隐藏页暂停活动读取，关闭脏页拒绝丢弃。向上从事项/记录回到所属看板，从看板回到看板目录，目录隐藏向上。原生独立 Kanban UI 不依赖宿主窗口模型。
 
@@ -31,7 +31,7 @@ SessionWorkbench 统一项目草稿、智能体快捷入口和原生新会话入
 项目会话通过 `onStartConversationDraft` 请求切换执行方式；宿主定位同一项目的草稿，将输入和附件交给 appendDraft。已有草稿追加内容，接收编辑器身份变化后不再写入；不迁移原生历史、不发送输入、不取消原任务。模型和助手的下一轮选择仍由原会话编辑器管理。
 平台无关的 Session/Kernel 组合位于 backend/app-core；app-shell 只通过 shared/app-contracts 接收服务，不导入 app-core。UI 仅消费 ApplicationServices/ApplicationBackend；应用操作异步，宿主内部构造契约不进入 UI。本地与 HTTP 宿主共用 initApp。
 
-peerDependencies: `@itookit/{app-settings,common,driver-llm,llm-session,durable-kernel,kernel-adapters,mdxeditor,vfs-ui,vfs-core,ui-common}`
+peerDependencies: `@nestos/{app-settings,common,driver-llm,llm-session,durable-kernel,kernel-adapters,mdxeditor,vfs-ui,vfs-core,ui-common}`
 
 项目目录页搜索默认文件名、会话页默认会话名，复用 ProjectSearchPanel 的异步查询与生命周期；内容和仅用户提问显式切换。目录分页游标不能限制搜索，通用 DirectoryList 通过插槽接入，不包含后端或 harness 分支。
 
@@ -116,7 +116,7 @@ const factory = factories[strategyType] ?? defaultEditorFactory;
 - 路由基于 hash URL (`#/<slug>/<resourceId>`)，由 `history.pushState/replaceState` 写入，监听 `popstate` + `NAVIGATION_EVENTS.NAVIGATE`
 - `ThemeService` 管理 `<html>` 的 `data-theme` attribute，监听 `app:theme-change` 事件，偏好持久化到 `etc:/ui/theme.json`；`AppHandle.setTheme(mode)` 切换主题
 
-运行: `pnpm --filter @itookit/app-shell test`（vitest，另有 `test:watch`）
+运行: `pnpm --filter @nestos/app-shell test`（vitest，另有 `test:watch`）
 
 Files 页 Memory 管理使用固定 Session controls；冲突保留草稿并支持比较最新版本后显式重提。memory-sharing-dialog 经宿主 controls 管理资源、授权与审计，不从 UI 直接修改 SeqFile。
 

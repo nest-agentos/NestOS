@@ -2,7 +2,7 @@
 
 import YAML from 'yaml';
 import { FileBackedService } from '../utils/file-backed-service';
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { createSessionHost, type SessionHost } from '../utils/host-ports';
 
 // ============================================

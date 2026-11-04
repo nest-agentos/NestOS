@@ -1,4 +1,4 @@
-import type { ApplicationPlatformServices } from '@itookit/app-core';
+import type { ApplicationPlatformServices } from '@nestos/app-core';
 
 export interface TauriWorkspaceGrant {
     sessionId: string;

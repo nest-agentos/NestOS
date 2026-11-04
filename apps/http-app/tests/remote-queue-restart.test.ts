@@ -2,9 +2,9 @@ import {expect, it, vi} from 'vitest';
 import {mkdtemp, rm} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
-import {createVFS} from '@itookit/vfs-core';
-import {openLocalFSBackend} from '@itookit/vfsdriver-local';
-import {NodeSqliteSidecarDb} from '@itookit/node-host/storage';
+import {createVFS} from '@nestos/vfs-core';
+import {openLocalFSBackend} from '@nestos/vfsdriver-local';
+import {NodeSqliteSidecarDb} from '@nestos/node-host/storage';
 import {RemoteConversationStore} from '../../../backend/app-core/src/projects/remote-conversation-store';
 import {recoverRemoteConversationQueues} from '../../../backend/app-core/src/projects/remote-conversation-recovery';
 

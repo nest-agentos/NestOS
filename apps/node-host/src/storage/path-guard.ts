@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { lstat } from 'node:fs/promises';
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 export class PathGuard {
     constructor(private readonly root: string) {}

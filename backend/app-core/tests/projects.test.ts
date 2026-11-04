@@ -1,9 +1,9 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { afterEach, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import { SessionRepository, sessionDirectoryStorage } from '@itookit/llm-session';
-import { FSError, MemoryBackend, transferFileSystemEntry, type IStorageBackend } from '@itookit/vfs-core';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import { SessionRepository, sessionDirectoryStorage } from '@nestos/llm-session';
+import { FSError, MemoryBackend, transferFileSystemEntry, type IStorageBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime, type ApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { createSessionBrowser, folderBrowserPath } from '../src/session/session-browser';
 import { ProjectRepository } from '../src/projects/project-repository';

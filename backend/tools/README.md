@@ -1,12 +1,12 @@
-# @itookit/tools
+# @nestos/tools
 
 原生 TypeScript 工具执行模块，包含文件、搜索、Shell、Skill 和子代理工具。文件系统、命令执行及外部服务由宿主注入。
 
 ## 最小接入
 
 ```ts
-import { createSkillTool, ToolDeviceDriver } from '@itookit/tools';
-import type { SkillLoaderPort } from '@itookit/tools/contracts';
+import { createSkillTool, ToolDeviceDriver } from '@nestos/tools';
+import type { SkillLoaderPort } from '@nestos/tools/contracts';
 
 const loader: SkillLoaderPort = {
   async loadSkill(id) {
@@ -28,14 +28,14 @@ try {
 
 ## 公共接口
 
-`@itookit/tools/contracts` 是纯类型入口，不注册工具、不加载 Zod 或 Node 驱动，提供：
+`@nestos/tools/contracts` 是纯类型入口，不注册工具、不加载 Zod 或 Node 驱动，提供：
 
 - `IToolService`、`ToolMeta`、`ToolInvokeRequest`、`ToolInvokeResult`、`ToolHandler`。
 - `ToolVFSContext`：文件读写、列表和可选的惰性遍历。
 - `ITTYDriver`、`ITTYSession`、`ITTYSessionManager`：平台无关的进程交互接口。
 - `SkillLoaderPort`、`AgentDelegationPort`：外部能力的最小接入接口。
 
-Node TTY 实现位于 `@itookit/device-tty`。其他环境可实现同一接口，无需继承 Node 驱动。
+Node TTY 实现位于 `@nestos/device-tty`。其他环境可实现同一接口，无需继承 Node 驱动。
 
 本包依赖 Zod、vfs-core、llm-context 和 driver-llm，已移除 common/llm-common 依赖。`common` 不再转发 Tool/TTY、Skill 和子代理类型，原 `llm-common` 已删除；新代码使用契约所属模块。
 

@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {Kernel, type KernelDiagnostic} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend, type IVFSManager} from '@itookit/vfs-core';
+import {Kernel, type KernelDiagnostic} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend, type IVFSManager} from '@nestos/vfs-core';
 import {prepareTaskCall, submitTaskCall, submitPreparedTaskCall, readTaskCallSubmission, readTaskCallExecution, registerDurablePrograms, type TaskRunDefinition, type TaskCallRunOptions} from '../src';
 
 let kernel: Kernel, manager: IVFSManager, diagnostics: KernelDiagnostic[];

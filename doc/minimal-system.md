@@ -68,7 +68,7 @@ node /app/apps/cli/dist/cli.js run -f /workspace/workflow.yml --state-dir /works
 从仓库根目录执行，环境需已安装依赖、Node.js ≥22.13、Rust、Bash 和 Linux Bubblewrap：
 
 ```bash
-pnpm --filter @itookit/cli test tests/nested-harness.test.ts
+pnpm --filter @nestos/cli test tests/nested-harness.test.ts
 ```
 
 测试自动启动本地固定模型响应服务，用标准外层 Kernel tool.call 调用 Bash，调用真实 Tauri Rust 进程模块，在只读 `/app` 与可写 `/workspace` 映射内执行 CLI 子 harness。子 DAG 为 `first → second`；成功场景断言第二节点收到第一节点输出、子结果落盘、外层 Task/Effect 成功且存储重开一致。另有第二节点模型拒绝的失败场景：子 Run failed、没有成功 result.txt，外层工具结果保留 `[exit 1]` 并可重开。Bash 非零退出是工具返回数据，不能仅凭 Effect succeeded 判断子 Run 成功。临时文件由测试清理，不要求真实 API key。非 Linux 平台跳过此测试，不代表验收通过。
@@ -76,8 +76,8 @@ pnpm --filter @itookit/cli test tests/nested-harness.test.ts
 测试读取下方同一份公开 YAML 示例，仅替换服务端口。它绕过真实 Tauri IPC，因此不能作为桌面窗口端到端证据。另可运行：
 
 ```bash
-pnpm --filter @itookit/cli test tests/hitl.test.ts tests/run-scheduler-lock.test.ts tests/run-scheduler-lease-delete.test.ts tests/worktree-run.test.ts
-pnpm --filter @itookit/app-shell exec vitest run tests/minimal-skill-dag.test.ts tests/tauri-bash.test.ts
+pnpm --filter @nestos/cli test tests/hitl.test.ts tests/run-scheduler-lock.test.ts tests/run-scheduler-lease-delete.test.ts tests/worktree-run.test.ts
+pnpm --filter @nestos/app-shell exec vitest run tests/minimal-skill-dag.test.ts tests/tauri-bash.test.ts
 ```
 
 分别验证人工暂停的跨进程恢复/调度互斥/删除保护/隔离工作区，以及 Skill→Agent→DAG/平台桥接。沙箱若禁止本地端口或子进程，应在允许这些能力的环境运行。
@@ -87,7 +87,7 @@ pnpm --filter @itookit/app-shell exec vitest run tests/minimal-skill-dag.test.ts
 公开配置：[minimal-dag.yml](../apps/cli/examples/minimal-dag.yml)。该例明确使用 native 模式且 Agent 不配置 Bash/TTY 工具，适合先验证节点传值；不要把 CLI native 当作 Tauri Session 的 Bubblewrap 隔离。
 
 ```bash
-pnpm --filter @itookit/cli build
+pnpm --filter @nestos/cli build
 mkdir -p /tmp/x1-minimal-demo
 cp apps/cli/examples/minimal-dag.yml /tmp/x1-minimal-demo/workflow.yml
 ```

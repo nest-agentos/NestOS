@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {Kernel, TaskRecord} from '@itookit/durable-kernel';
+import type {Kernel, TaskRecord} from '@nestos/durable-kernel';
 import {readIndependentCallInteractions} from '../src/session/independent-call-interactions';
 function task(id: string, parentTaskId?: string, rootTaskId = 'root'): TaskRecord {
     return {id, parentTaskId, rootTaskId, sessionId: 'child', interactions: {ask: {id: 'ask', kind: 'input', status: 'pending',

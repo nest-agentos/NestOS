@@ -6,7 +6,7 @@ export { createDocumentHost, renameDocument } from './document-host';
 export { AssetManagerUI } from './asset-manager.ui';
 export { DefaultPrintService } from './print';
 export { LLMPrintService } from './conversation-print';
-export type { PrintOptions, PrintService } from '@itookit/mdxeditor';
+export type { PrintOptions, PrintService } from '@nestos/mdxeditor';
 export { EngineMetadataStore } from './metadata-store';
 export { SeqFileStore, createAdapterStore } from './srs-store';
 export { AssetManagerPlugin } from './asset-manager.plugin';

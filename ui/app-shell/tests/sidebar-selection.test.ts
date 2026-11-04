@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { Workbench } from '../src/core/Workbench';
 
 it('keeps the shared sidebar file and directory creation actions usable', async () => {

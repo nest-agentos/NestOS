@@ -1,4 +1,4 @@
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
 import { decodeFavorites, MAX_FAVORITES } from './codec';
 import type { FavoriteUpdate, ProjectFavorite, ProjectFavoriteStore } from './contracts';
 

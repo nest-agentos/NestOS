@@ -7,11 +7,11 @@
  * `SendMessageCommand`，命令总线与展示端口是记录型替身。
  */
 import { expect, it, vi } from 'vitest';
-import {Toast} from '@itookit/ui-common-adapter';
-import { SessionCommand } from '@itookit/llm-session';
+import {Toast} from '@nestos/ui-common-adapter';
+import { SessionCommand } from '@nestos/llm-session';
 import { SendMessageCommand } from '../../llm-ui-adapter/src/commands/SendMessageCommand';
 import type { CommandContext } from '../../llm-ui-adapter/src/commands/CommandContext';
-import {sha256Hex} from '@itookit/llm-context/digest';
+import {sha256Hex} from '@nestos/llm-context/digest';
 
 interface HarnessOptions {
     sendError?: Error;

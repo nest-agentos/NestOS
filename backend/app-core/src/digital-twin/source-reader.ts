@@ -1,8 +1,8 @@
 import { discoverWorkspaces } from './workspace-catalog';
-import { sha256HexSync } from '@itookit/llm-context';
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
-import { RoundLog, type SessionRepository } from '@itookit/llm-session';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { sha256HexSync } from '@nestos/llm-context';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
+import { RoundLog, type SessionRepository } from '@nestos/llm-session';
+import type { ProjectService } from '@nestos/app-contracts/services';
 import { TwinProjectCatalog, documentPath, nodeVersion } from './project-catalog';
 import { readHarness } from './harness-reader';
 import type { TwinSourceContent, TwinSourceReader, TwinSourceSpec } from './domain';

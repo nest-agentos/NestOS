@@ -1,7 +1,7 @@
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {FSError} from '@itookit/vfs-core';
-import {openLocalFSBackend} from '@itookit/vfsdriver-local';
+import {FSError} from '@nestos/vfs-core';
+import {openLocalFSBackend} from '@nestos/vfsdriver-local';
 import {openNodeApplication} from '../runtime/application';
 import {closeHostResources, type HostCleanup} from '../runtime/host-runtime';
 import {canonical, within, privateDirectory} from '../runtime/paths';
@@ -14,7 +14,7 @@ import type {AuditPort} from '../logging/audit-log';
 import {validUserId} from './certificates';
 import {ViewApi} from './view-api';
 import type {HttpHostOptions} from './start-host';
-type HttpRuntimeMounts = import('@itookit/app-core').ApplicationRuntimeOptions['additionalMounts'];
+type HttpRuntimeMounts = import('@nestos/app-core').ApplicationRuntimeOptions['additionalMounts'];
 
 export function userAudit(audit: AuditPort, userId: string): AuditPort {
     return {write: event => audit.write({...event, userId}), close: async () => {}};

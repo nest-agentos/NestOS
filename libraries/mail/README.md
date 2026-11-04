@@ -1,11 +1,11 @@
-# @itookit/mail
+# @nestos/mail
 
 独立、平台中立的 VFS 邮件归档模块；不依赖 NestOS、Session、Flow、Node 或数据库私有接口。
 
 - 根入口：`MailArchive`、`SeqMailIndex`、邮件解析。宿主注入已授权的邮件/索引文件视图、索引位置、操作 ID 与诊断函数。
-- `@itookit/mail/contracts`：`MailClient`、分页摘要与主题正文 DTO，不加载 I/O 或 UI。
-- `@itookit/mail/ui`：`MailWorkbench`，宿主注入 MDXEditor 工厂、文案、图标和导航。
-- `@itookit/mail/ui.css`：可选阅读器样式。
+- `@nestos/mail/contracts`：`MailClient`、分页摘要与主题正文 DTO，不加载 I/O 或 UI。
+- `@nestos/mail/ui`：`MailWorkbench`，宿主注入 MDXEditor 工厂、文案、图标和导航。
+- `@nestos/mail/ui.css`：可选阅读器样式。
 
 ## 查询与搜索
 
@@ -23,4 +23,4 @@
 
 重建与并发查询共用同一在途任务；文件读取使用最多八个连续工作者，避免固定批次屏障。SeqFile 事务原子更新变化行、删除失效行及 manifest，并检查索引修订，竞争失败重新读取后重试。宿主应在同一用户归档的多个视图间共享一个实例，最后一个租约关闭时释放监听。
 
-验证：`pnpm --filter @itookit/mail typecheck`、`test`、`build`。
+验证：`pnpm --filter @nestos/mail typecheck`、`test`、`build`。

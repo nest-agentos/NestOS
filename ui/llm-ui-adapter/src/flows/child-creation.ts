@@ -1,5 +1,5 @@
-import {createModuleLogger} from '@itookit/common';
-import {ContentTransferCommand, type ChildCreationReceipt, type CreateChildInput, type ICommandBus} from '@itookit/llm-session/contracts';
+import {createModuleLogger} from '@nestos/common';
+import {ContentTransferCommand, type ChildCreationReceipt, type CreateChildInput, type ICommandBus} from '@nestos/llm-session/contracts';
 const logger = createModuleLogger('child-creation');
 /** Reconcile only the original creation; a reserved identity cannot stand in for completed preparation. */
 export async function createChildWithReceipt(commands: ICommandBus, supplied: CreateChildInput, signal?: AbortSignal): Promise<{sessionId: string}> {

@@ -1,5 +1,5 @@
-import {taskStat, type TaskRecord} from '@itookit/durable-kernel';
-import {hasFlowControlTree} from '@itookit/llm-flow/contracts';
+import {taskStat, type TaskRecord} from '@nestos/durable-kernel';
+import {hasFlowControlTree} from '@nestos/llm-flow/contracts';
 import type {IndependentCallExecutionState} from '../contracts/independent-calls';
 
 export function independentCallTaskState(task: TaskRecord): IndependentCallExecutionState {

@@ -1,4 +1,4 @@
-import { createFileSystemSource, type FSNode, type IStorageBackend } from '@itookit/vfs-core';
+import { createFileSystemSource, type FSNode, type IStorageBackend } from '@nestos/vfs-core';
 import { DirectorySourceUnavailableError } from './errors';
 
 /** Retains a mount's identity while failing every content operation closed. */

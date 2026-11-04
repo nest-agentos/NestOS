@@ -4,19 +4,19 @@ MindOS 日常开发默认使用源码，HTTP 发布构建单独消费固定本�
 
 | 库 | 源码目录 | npm 构建版本 |
 |---|---|---|
-| @itookit/ui-common | `libraries/ui-common` | 0.1.0（本轮准备发布） |
-| @itookit/durable-kernel | `libraries/durable-kernel` | 0.1.0（目标版本，以 registry 为准） |
-| @itookit/vfs-core | `libraries/vfs-core` | 5.3.3 |
-| @itookit/vfs-ui | `libraries/vfs-ui` | 0.6.0 |
-| @itookit/vfsdriver-indexeddb | `libraries/vfsdriver-indexeddb` | 5.3.4 |
-| @itookit/vfsdriver-local | `libraries/vfsdriver-local` | 5.3.1 |
-| @itookit/mindos-node-driver | `libraries/cells-driver` | 0.3.1 |
-| @itookit/vfs-sync | `libraries/vfs-sync` | 0.1.1 |
-| @itookit/mdxeditor | `libraries/mdxeditor` | 0.6.0（本轮准备发布） |
-| @itookit/driver-llm | `libraries/driver-llm` | 0.4.0 |
-| @itookit/llm-ui | `libraries/llm-ui` | 0.4.0（本轮准备发布） |
-| @itookit/device-tty | `libraries/device-tty` | 0.1.0（目标版本，以 registry 为准） |
-| @itookit/image-parser | `libraries/image-parser` | 0.3.0（待发布） |
+| @nestos/ui-common | `libraries/ui-common` | 0.1.0（本轮准备发布） |
+| @nestos/durable-kernel | `libraries/durable-kernel` | 0.1.0（目标版本，以 registry 为准） |
+| @nestos/vfs-core | `libraries/vfs-core` | 5.3.3 |
+| @nestos/vfs-ui | `libraries/vfs-ui` | 0.6.0 |
+| @nestos/vfsdriver-indexeddb | `libraries/vfsdriver-indexeddb` | 5.3.4 |
+| @nestos/vfsdriver-local | `libraries/vfsdriver-local` | 5.3.1 |
+| @nestos/mindos-node-driver | `libraries/cells-driver` | 0.3.1 |
+| @nestos/vfs-sync | `libraries/vfs-sync` | 0.1.1 |
+| @nestos/mdxeditor | `libraries/mdxeditor` | 0.6.0（本轮准备发布） |
+| @nestos/driver-llm | `libraries/driver-llm` | 0.4.0 |
+| @nestos/llm-ui | `libraries/llm-ui` | 0.4.0（本轮准备发布） |
+| @nestos/device-tty | `libraries/device-tty` | 0.1.0（目标版本，以 registry 为准） |
+| @nestos/image-parser | `libraries/image-parser` | 0.3.0（待发布） |
 
 ## 开发源码与 HTTP 制品
 
@@ -101,7 +101,7 @@ pnpm dev
 
 安装前的 `scripts/check-workspace.mjs` 检查源码是否齐全及消费方协议；`--installed` 进一步检查实际链接。源码缺失会明确失败。目录存在与否不再触发 npm/source 切换，旧自动改写和反向迁移脚本已删除。
 
-同一检查还校验内部 peer 供给：任何包把 `@itookit/*` 声明为 peer（未标记 optional）时，必须至少有一个 `apps/*` 在自己的依赖中以 `workspace:*` 提供它，否则直接报错并指出应补的包与声明形式。这条守卫针对的是 pnpm 的盲区——peer 缺口只在真正执行解析时输出 WARN，锁文件已是最新时 `pnpm install` 会跳过解析而完全不报，缺口会拖到 `httpd:build` 的 `pnpm deploy` 才暴露。
+同一检查还校验内部 peer 供给：任何包把 `@nestos/*` 声明为 peer（未标记 optional）时，必须至少有一个 `apps/*` 在自己的依赖中以 `workspace:*` 提供它，否则直接报错并指出应补的包与声明形式。这条守卫针对的是 pnpm 的盲区——peer 缺口只在真正执行解析时输出 WARN，锁文件已是最新时 `pnpm install` 会跳过解析而完全不报，缺口会拖到 `httpd:build` 的 `pnpm deploy` 才暴露。
 
 ## 可选 npm 构建
 
@@ -109,21 +109,21 @@ pnpm dev
 pnpm build:registry --prepare-only
 pnpm build:registry
 # 也可以选择另一个宿主或检查命令：
-pnpm build:registry --filter @itookit/cli build
+pnpm build:registry --filter @nestos/cli build
 ```
 
 build:registry 先验证 `scripts/npm-libraries.json` 中的版本是否可从注册表取得，再在 `release/registry-*` 创建独立工作区。该目录不包含独立库源码、node_modules、dist 或环境文件；独立库依赖改为明确的 npm 版本，业务包仍使用 workspace。修复随独立库新版本发布，不再复制 patches/ 或生成 patchedDependencies。
 
 默认构建 Web 应用，不部署或发布。日常开发的 package.json、pnpm-lock.yaml 和 node_modules 保持原来的选择模式。首次成功构建保存独立的 `pnpm-lock.registry.yaml`；后续构建冻结此锁文件，升级版本时使用 `--update-lock` 并审查更新。
 
-`--prepare-only` 生成可检查的目录而不查询注册表、安装或构建。缺少已发布版本时，正常 npm 构建明确失败并指出包名；应用依赖新 API 或源码修复时，也必须先发布匹配版本并更新清单。新命名 @itookit/mindos-node-driver@0.3.1 已完成本地制品验证，尚未发布；旧名 mindos-node-client@0.3.0、vfs-ui@0.6.0 与 image-parser@0.2.0 的历史发布与制品核对不变。下方历史发布记录沿用当时的真实包名。
+`--prepare-only` 生成可检查的目录而不查询注册表、安装或构建。缺少已发布版本时，正常 npm 构建明确失败并指出包名；应用依赖新 API 或源码修复时，也必须先发布匹配版本并更新清单。新命名 @nestos/mindos-node-driver@0.3.1 已完成本地制品验证，尚未发布；旧名 mindos-node-client@0.3.0、vfs-ui@0.6.0 与 image-parser@0.2.0 的历史发布与制品核对不变。下方历史发布记录沿用当时的真实包名。
 
 ## 独立库发布
 
 ```bash
 pnpm npm:prepare
 # 可只准备一个库：
-node scripts/release-npm-libraries.mjs prepare ./libraries @itookit/mindos-node-driver
+node scripts/release-npm-libraries.mjs prepare ./libraries @nestos/mindos-node-driver
 # 明确决定对外发布时执行：
 pnpm npm:publish
 ```
@@ -229,8 +229,8 @@ mdxeditor@0.5.4 提供通用的目标祖先展开入口，由代码块控件保�
 
 | 制品 | SHA-256 |
 |---|---|
-| @itookit/mdxeditor@0.5.4 | `f1d4a5cf08fd5917fc10ecf48484d809c195711380a99f45a8a54e6092a2cba8` |
-| @itookit/llm-ui@0.2.0 | `773b6a6987734de6400534f41d216375d75555444317ab3102d8774ec572881f` |
+| @nestos/mdxeditor@0.5.4 | `f1d4a5cf08fd5917fc10ecf48484d809c195711380a99f45a8a54e6092a2cba8` |
+| @nestos/llm-ui@0.2.0 | `773b6a6987734de6400534f41d216375d75555444317ab3102d8774ec572881f` |
 
 ### 2026-10-18 项目导航刷新修复
 
@@ -264,7 +264,7 @@ vfs-ui@0.5.10 将 `navigationChildren` 开放到单栏入口，并在恢复展�
 
 ### mindos-node 命名迁移
 
-服务源码工作区由 `tools/pi-agent` 更名为 `tools/cells`，服务仓库为 <https://github.com/nest-agentos/cells>。客户端工作区由 `libraries/piagent-driver` 更名为 `libraries/mindos-node-client`，包名为 `@itookit/mindos-node-client`，工厂为 `createMindOSNodeClient()`；源码仓库暂沿用 `mushuanli/piagent-driver`。源码、构建与 npm 制品目录配置均已更新，新包首次发布与消费验证见下一节。
+服务源码工作区由 `tools/pi-agent` 更名为 `tools/cells`，服务仓库为 <https://github.com/nest-agentos/cells>。客户端工作区由 `libraries/piagent-driver` 更名为 `libraries/mindos-node-client`，包名为 `@nestos/mindos-node-client`，工厂为 `createMindOSNodeClient()`；源码仓库暂沿用 `mushuanli/piagent-driver`。源码、构建与 npm 制品目录配置均已更新，新包首次发布与消费验证见下一节。
 
 现有 MCP 配置、serverId、项目和会话 UUID、数据根与协议编码不迁移。节点增加 `itookit/mindos-node` 发现描述及 `mindos_node_capabilities` 工具，保留旧描述、能力工具与 HTTP 授权头；客户端同时接受新旧名称。持久配置仍使用原扩展键，已有凭据和项目绑定无需重建。
 
@@ -279,20 +279,20 @@ vfs-ui@0.5.10 将 `navigationChildren` 开放到单栏入口，并在恢复展�
 
 | npm 制品 | SHA-256 |
 |---|---|
-| @itookit/mindos-node-client@0.3.0 | `9f0d33a7f6c4e1de567746fe51d1e75ceef3ae0e0caa1771d2a70378fa5f0a32` |
-| @itookit/vfs-ui@0.6.0 | `ff919033c11bd9432e9d95c6d861826a0adbb213da0518018282ead19d052761` |
-| @itookit/image-parser@0.2.0 | `831da8756ab66c7bded83e96a0304a6e481b25827556441b425065fa86ce7fea` |
+| @nestos/mindos-node-client@0.3.0 | `9f0d33a7f6c4e1de567746fe51d1e75ceef3ae0e0caa1771d2a70378fa5f0a32` |
+| @nestos/vfs-ui@0.6.0 | `ff919033c11bd9432e9d95c6d861826a0adbb213da0518018282ead19d052761` |
+| @nestos/image-parser@0.2.0 | `831da8756ab66c7bded83e96a0304a6e481b25827556441b425065fa86ce7fea` |
 
 发布状态：三个 npm 包均已公开发布，重新下载的 SHA-256 与上表一致，v0.3.0 / v0.6.0 / v0.2.0 标签已推送到各自独立仓库。仓库外使用公开注册表安装三个固定版本，锁文件均解析到 registry.npmjs.org；ESM/CommonJS、所有公开子路径、CSS 入口、旧工厂别名、15 条目录预览与 bundler/NodeNext 类型检查通过。image-parser 首次返回 HTTP 202 后经历处理与下载短暂不可用，最终以公开文件下载成功和摘要一致确认完成。节点 v0.3.8 标签也已推送，Linux release 制品已生成，不自动替换运行实例。
 
 
 ### 2026-10-19 mindos-node-driver 名称统一
 
-源码工作区改为 `libraries/cells-driver`，npm 包为 `@itookit/mindos-node-driver@0.3.1`，主工厂与类型为 `createMindOSNodeDriver()` / `MindOSNodeDriver`。GitHub 目标为 <https://github.com/nest-agentos/cells-driver>；旧独立仓库 piagent-driver 已包含客户端此前的全部提交。旧 Client 与 PiAgent 工厂/类型保留为弃用别名，原协议、配置键、serverId 和会话 UUID 不变。
+源码工作区改为 `libraries/cells-driver`，npm 包为 `@nestos/mindos-node-driver@0.3.1`，主工厂与类型为 `createMindOSNodeDriver()` / `MindOSNodeDriver`。GitHub 目标为 <https://github.com/nest-agentos/cells-driver>；旧独立仓库 piagent-driver 已包含客户端此前的全部提交。旧 Client 与 PiAgent 工厂/类型保留为弃用别名，原协议、配置键、serverId 和会话 UUID 不变。
 
 当前状态：本地改名、204 项测试、全仓类型/架构/文档检查已完成；正式 tarball 的仓库外 ESM/CommonJS、公开子路径、旧工厂别名与 bundler/NodeNext 声明解析通过。新 GitHub 地址仍返回 404，推送及 npm 发布等待仓库地址可访问。上文的 mindos-node-client@0.3.0 是真实历史发布名，不改写其制品身份或摘要。
 
-待发布制品 `@itookit/mindos-node-driver@0.3.1` 的 SHA-256：`1af9a23b40506ff27cc7738c3455064775fd96d208816a1455469d60e10ddaca`。本地制品验证不代表新版本已公开发布。
+待发布制品 `@nestos/mindos-node-driver@0.3.1` 的 SHA-256：`1af9a23b40506ff27cc7738c3455064775fd96d208816a1455469d60e10ddaca`。本地制品验证不代表新版本已公开发布。
 
 图片处理新增纯 processing 入口，源码工作区使用 image-parser 0.3.0；npm 构建清单同步要求 0.3.0，需另行发布该版本后才能运行 registry 构建。本轮没有执行 npm 发布。工具工作区 tools/image-tools 也进入源码扫描、边界检查和隔离构建目录。
 
@@ -312,8 +312,8 @@ HTTP 构建使用 `release/httpd/.build-cache/` 复用隔离安装环境及前�
 
 ### 2026-10-27 文档 AI 与 NestOS HTTP 发行
 
-已推送并合并相关仓库 main，发布 @itookit/vfs-core@5.3.4、@itookit/mdxeditor@0.5.9、
-@itookit/mindos-node-driver@0.4.3；三个版本均已可从公开注册表查询，独立仓库版本标签已推送。
+已推送并合并相关仓库 main，发布 @nestos/vfs-core@5.3.4、@nestos/mdxeditor@0.5.9、
+@nestos/mindos-node-driver@0.4.3；三个版本均已可从公开注册表查询，独立仓库版本标签已推送。
 HTTP 工作台首次以 nestos@0.1.0 分发，产品发行名 NestOS，命令为 `nestos httpd`；
 初始化命令为 `nestos init-certs`，首次交互终端缺少证书目录时也可确认生成，非交互缺少证书时明确退出。
 原 MindOS 用户配置和数据根路径保持兼容，详见 [npm 使用说明](../../apps/http-app/npm/README.md)。

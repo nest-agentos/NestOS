@@ -1,10 +1,10 @@
-import {getLocale} from '@itookit/common';
-import type { PromptHistoryPort } from '@itookit/llm-session/contracts';
+import {getLocale} from '@nestos/common';
+import type { PromptHistoryPort } from '@nestos/llm-session/contracts';
 // @file: llm-ui/components/input/plugins/HistoryPlugin.ts
 
 import type { InputPlugin, InputPluginContext } from './InputPlugin';
-import { PopupPanel, PopupItem } from '@itookit/llm-ui';
-import type { PromptHistoryEntry } from '@itookit/llm-session/contracts';
+import { PopupPanel, PopupItem } from '@nestos/llm-ui';
+import type { PromptHistoryEntry } from '@nestos/llm-session/contracts';
 import { truncateText } from '../../../utils/textUtils';
 import { formatTimeAgo } from '../../../utils/timeUtils';
 

@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { DirectoryMountService, ProjectService, SessionFilesService, folderBrowserPath } from '@itookit/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { DirectoryMountService, ProjectService, SessionFilesService, folderBrowserPath } from '@nestos/app-core';
 import { ProjectNavigation } from '../src/projects/ProjectNavigation';
-import { t } from '@itookit/common';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
+import { t } from '@nestos/common';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
 
 const cleanup: Array<() => unknown> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren(); vi.restoreAllMocks(); });

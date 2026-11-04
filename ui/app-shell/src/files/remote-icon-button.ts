@@ -1,4 +1,4 @@
-import { FILE_BROWSER_ICONS, t, type LocaleKey } from '@itookit/common';
+import { FILE_BROWSER_ICONS, t, type LocaleKey } from '@nestos/common';
 
 /** Icons stay decorative; translated names serve hover and assistive technology. */
 export function remoteIconButton(icon: keyof typeof FILE_BROWSER_ICONS, key: LocaleKey): HTMLButtonElement {

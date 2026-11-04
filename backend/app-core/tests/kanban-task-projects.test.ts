@@ -1,6 +1,6 @@
 import {expect,it,vi} from 'vitest';
-import type {KanbanBoard,KanbanCommand} from '@itookit/kanban/contracts';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import type {KanbanBoard,KanbanCommand} from '@nestos/kanban/contracts';
+import type {ProjectService} from '@nestos/app-contracts/services';
 import {validateWorkProjects} from '../src/kanban/task-projects';
 const reference=(id:string)=>({system:'nestos-remote-project',id});
 const projects={get:vi.fn(async(id:string)=>({project:{id,source:{kind:id==='local'?'local':'remote'}}}))} as unknown as Pick<ProjectService,'get'>;

@@ -1,6 +1,6 @@
-import type { HarnessEvents, HarnessHistory } from '@itookit/cells-driver';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
-import type { HarnessExecutionResult } from '@itookit/kernel-adapters/contracts';
+import type { HarnessEvents, HarnessHistory } from '@nestos/cells-driver';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
+import type { HarnessExecutionResult } from '@nestos/kernel-adapters/contracts';
 import { canonical } from './harness-connection-policy';
 import { executionError, type ExecutionJournalData, type NativeText } from './harness-execution-journal';
 import { nativeOptions, type NativeExecution } from './harness-execution-operations';

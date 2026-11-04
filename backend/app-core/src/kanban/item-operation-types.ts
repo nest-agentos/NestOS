@@ -1,5 +1,5 @@
-import type {IndependentCallInput, SubmissionRequest} from '@itookit/llm-session/contracts';
-import type {KanbanExternalReference, KanbanItem, KanbanBoard, KanbanService} from '@itookit/kanban/contracts';
+import type {IndependentCallInput, SubmissionRequest} from '@nestos/llm-session/contracts';
+import type {KanbanExternalReference, KanbanItem, KanbanBoard, KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 import type {publishedOperation, OperationObservation} from '../run/published-operation';
 import type {sessionSubmission} from '../run/session-submission';
@@ -13,7 +13,7 @@ export interface ReviewJob {
     id: string; boardId: string; itemId: string; action: ReviewAction; fingerprint: string; snapshot: ReviewSnapshot;
     phase: 'prepared' | 'submitting' | 'settled'; state: OperationObservation['state']; code?: string; sessionId?: string;
     operationContext?: unknown; input?: IndependentCallInput; request?: SubmissionRequest; result?: unknown; createdAt: number;
-    command?: import('@itookit/kanban/contracts').KanbanCommand; acceptanceVersion?: string;
+    command?: import('@nestos/kanban/contracts').KanbanCommand; acceptanceVersion?: string;
 }
 export interface ReviewSettings {revision: number; bindings: Partial<Record<ReviewAction, KanbanExternalReference>>; jobs: string[]; receipts: Record<string, string>}
 export interface ReviewAdapter {
@@ -31,7 +31,7 @@ export interface ReviewOperationsOptions {
     report?(job: ReviewJob): Promise<void>;
     sessionResource?(sessionId: string): Promise<string | undefined>;
     service: KanbanService; journal: KanbanAutomationJournal;
-    catalog(): Promise<import('@itookit/llm-session/contracts').RootTargetCatalog>;
+    catalog(): Promise<import('@nestos/llm-session/contracts').RootTargetCatalog>;
     published: ReturnType<typeof publishedOperation>; submission: ReturnType<typeof sessionSubmission>; adapter: ReviewAdapter;
     log(event: {operationId: string; stage: string; result: 'success' | 'failure'; code?: string; durationMs: number}): void;
 }

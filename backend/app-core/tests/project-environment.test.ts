@@ -1,5 +1,5 @@
 import {expect,it,vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {ProjectEnvironmentStore,withProjectEnvironment} from '../src/projects/project-environment';
 it('persists project-isolated environments and rejects stale writes and invalid values',async () => {
     const {manager} = await createVFS({rootBackend:new MemoryBackend()});

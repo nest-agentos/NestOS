@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { ProviderSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import type { LLMModel, LLMProvider } from '@itookit/driver-llm/contracts';
+import { ProviderSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import type { LLMModel, LLMProvider } from '@nestos/driver-llm/contracts';
 
 afterEach(() => { vi.unstubAllGlobals(); document.body.innerHTML = ''; });
 

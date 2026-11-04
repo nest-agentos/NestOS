@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {recoverFlowSchedulers} from '../src/runtime/flow-scheduler-recovery';
 
 afterEach(() => vi.useRealTimers());

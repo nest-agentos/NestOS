@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {contentTitleBar, MOBILE_NAVIGATION_QUERY, navigationButton} from '@itookit/ui-common-adapter';
+import {contentTitleBar, MOBILE_NAVIGATION_QUERY, navigationButton} from '@nestos/ui-common-adapter';
 import {mountContentTitleBar} from '../src/workbench/content-titlebar';
 import {mountEditorTitleBar} from '../../llm-ui-adapter/src/shell/content-titlebar';
 

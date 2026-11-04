@@ -1,9 +1,9 @@
-import type { IFileSystem, OperationOptions } from '@itookit/vfs-core';
-import type { ConfigurationImportPort, IConnectionService, IAgentManagementService } from '@itookit/kernel-adapters/contracts';
-import type { ISessionRepository, SessionManagementPort, ICommandBus } from '@itookit/llm-session/contracts';
-import type { KernelViewPort } from '@itookit/durable-kernel/contracts';
-import type { IToolService } from '@itookit/tools/contracts';
-import type { HarnessSession, HarnessConversationSnapshot } from '@itookit/cells-driver/harness';
+import type { IFileSystem, OperationOptions } from '@nestos/vfs-core';
+import type { ConfigurationImportPort, IConnectionService, IAgentManagementService } from '@nestos/kernel-adapters/contracts';
+import type { ISessionRepository, SessionManagementPort, ICommandBus } from '@nestos/llm-session/contracts';
+import type { KernelViewPort } from '@nestos/durable-kernel/contracts';
+import type { IToolService } from '@nestos/tools/contracts';
+import type { HarnessSession, HarnessConversationSnapshot } from '@nestos/cells-driver/harness';
 import type { SessionFilesPort, DirectoryMountPort, FileSystemsPort } from './files';
 import type { ProjectService, ProjectSessions, NativeSessionCommand, ResolvedProjectFavorite } from './projects';
 import type { SessionExport, WorkbenchView, SessionOpenView, WorkbenchArchiveExporter, WorkbenchArchiveImporter, NestosInitialFiles } from './session';
@@ -25,13 +25,13 @@ export interface ApplicationServices {
     projects: ProjectService;
     flowEngine: { engine: IFileSystem };
     kernel: { kernel: KernelViewPort; toolCatalog: Pick<IToolService, 'getToolDefinitions' | 'listTools'> & {
-        describeTools?(): Promise<import('@itookit/llm-session/contracts').ToolCommandOption[]>;
+        describeTools?(): Promise<import('@nestos/llm-session/contracts').ToolCommandOption[]>;
     } };
     sessionManager: Omit<SessionManagementPort, 'getSessionRuntime'>;
     commandBus: ICommandBus;
     projectSync?: ProjectSyncService;
     digitalTwin?: DigitalTwinService;
-    kanban?: import('@itookit/kanban/contracts').KanbanClient;
+    kanban?: import('@nestos/kanban/contracts').KanbanClient;
     startBackground?(): void;
     prepareSession?(sessionId: string): Promise<boolean>;
 }
@@ -59,10 +59,10 @@ export interface ApplicationBackend {
     documentChatFile(request: import('./document-chat').DocumentChatFileRequest): Promise<import('./document-chat').DocumentChatFile>;
     documentChatBacklinks(sessionId: string, branch: string): Promise<import('./document-chat').DocumentChatLink[]>;
     openView(request: import('./open-view').OpenViewRequest): Promise<import('./open-view').OpenedApplicationView>;
-    prepareSessionBranch(request: import('@itookit/llm-session/contracts').SubmissionRequest): Promise<import('@itookit/llm-session/contracts').SubmissionRequest>;
-    submitSession(request: import('@itookit/llm-session/contracts').SubmissionRequest): Promise<import('@itookit/llm-session/contracts').SubmissionReceipt>;
+    prepareSessionBranch(request: import('@nestos/llm-session/contracts').SubmissionRequest): Promise<import('@nestos/llm-session/contracts').SubmissionRequest>;
+    submitSession(request: import('@nestos/llm-session/contracts').SubmissionRequest): Promise<import('@nestos/llm-session/contracts').SubmissionReceipt>;
     createSessionDraft(request: SessionDraftRequest): Promise<string>;
-    mailView(): Promise<import('@itookit/mail/contracts').MailClient>;
+    mailView(): Promise<import('@nestos/mail/contracts').MailClient>;
     navigationView(options: { root: string; scope: string }): Promise<import('./navigation').NavigationView>;
     warmNavigation(roots: string[]): Promise<void>;
     workbenchView(options?: { displayedFilesPolicy?: 'gitignore' | 'all'; chatControls?: boolean; initialNavigation?: boolean; initialSessionId?: string }): Promise<WorkbenchView>;
@@ -84,7 +84,7 @@ export interface ApplicationBackend {
     unmountProject(projectId: string): Promise<void>;
     conversationBranches(folder: string, profileId: string, sessionId: string, options?: OperationOptions): Promise<HarnessSession[]>;
     taskDetails(sessionId: string, taskId: string): Promise<TaskDetail>;
-    taskAttachment: import('@itookit/durable-kernel/contracts').ReadTaskAttachment;
+    taskAttachment: import('@nestos/durable-kernel/contracts').ReadTaskAttachment;
     sessionTasks(sessionId: string, options?: SessionTaskQuery): Promise<SessionTaskPage>;
     taskEvents(sessionId: string, taskId: string, options?: TaskEventQuery): Promise<TaskEventView>;
 }
@@ -100,14 +100,14 @@ export interface SessionResponseQuery {branch?: string; operationId?: string; ro
 export interface SessionResponse {
     roundId: string;
     operationId?: string;
-    status: import('@itookit/llm-session/contracts').Round['status'];
+    status: import('@nestos/llm-session/contracts').Round['status'];
     text: string;
     finishReason?: string;
 }
 export interface SessionDraftRequest {
     sessionId?: string;
     branchName?: string;
-    inputTarget?: import('@itookit/llm-flow/contracts').TargetRef;
+    inputTarget?: import('@nestos/llm-flow/contracts').TargetRef;
     title: string;
     inputText: string;
     source?: { projectFolder?: string; sessionId?: string };

@@ -1,6 +1,6 @@
 import type {ConversationSlashCommand} from '../contracts';
-import {parseCommand} from '@itookit/llm-ui';
-import {t} from '@itookit/common';
+import {parseCommand} from '@nestos/llm-ui';
+import {t} from '@nestos/common';
 
 
 /** Host branch commands take precedence over native command names. */

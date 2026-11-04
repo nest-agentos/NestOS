@@ -1,5 +1,5 @@
 import {z} from 'zod/v4';
-import type {ImageRecipe} from '@itookit/image-parser/processing';
+import type {ImageRecipe} from '@nestos/image-parser/processing';
 export interface ProcessedImage {data: Uint8Array; mimeType: string; width: number; height: number}
 export interface ImageEngine {id: string; version: string; process(data: Uint8Array, recipe: ImageRecipe, signal: AbortSignal): Promise<ProcessedImage>}
 const resize = z.discriminatedUnion('mode', [z.object({mode: z.literal('original')}).strict(), z.object({mode: z.literal('max-edge'), maxEdge: z.number().int().min(1).max(8192)}).strict()]);

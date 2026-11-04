@@ -1,4 +1,4 @@
-import { sha256HexSync } from '@itookit/llm-context';
+import { sha256HexSync } from '@nestos/llm-context';
 import type { TwinMemoryData } from './domain';
 
 export type TwinEntityKind = 'person' | 'organization' | 'project' | 'event' | 'goal';

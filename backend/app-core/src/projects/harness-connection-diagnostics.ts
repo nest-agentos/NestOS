@@ -1,5 +1,5 @@
-import { createModuleLogger, randomUUID } from '@itookit/common';
-import { FSError } from '@itookit/vfs-core';
+import { createModuleLogger, randomUUID } from '@nestos/common';
+import { FSError } from '@nestos/vfs-core';
 
 const logger = createModuleLogger('harness-connections');
 /** Configuration and acquisition logs contain identities and classifications, never target parameters or credentials. */

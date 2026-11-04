@@ -5,7 +5,7 @@
  *
  * Usage:
  * ```ts
- * import { createAIContextMenuConfig } from '@itookit/llm-ui-adapter';
+ * import { createAIContextMenuConfig } from '@nestos/llm-ui-adapter';
  *
  * // Pass to VFSUIShell via MemoryManagerConfig.uiOptions
  * uiOptions: {
@@ -13,13 +13,13 @@
  * }
  * ```
  */
-import type { IAgentConfigService, AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import type { ContextMenuConfig, MenuItem } from '@itookit/ui-common-adapter';
-import type { IFileSystem } from '@itookit/vfs-core';
-import { escapeHTML, escapeAttr, t } from '@itookit/common';
+import type { IAgentConfigService, AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import type { ContextMenuConfig, MenuItem } from '@nestos/ui-common-adapter';
+import type { IFileSystem } from '@nestos/vfs-core';
+import { escapeHTML, escapeAttr, t } from '@nestos/common';
 
 // Matches the shape of VFSNodeUI exposed via the ContextMenuBuilder callback.
-// Avoids a hard dependency on @itookit/vfs-ui.
+// Avoids a hard dependency on @nestos/vfs-ui.
 interface NodeItem {
     id: string;
     type: 'file' | 'directory';

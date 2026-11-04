@@ -1,5 +1,5 @@
-import type {ApplicationClient} from '@itookit/app-contracts/services';
-import {IndependentCallCommand, type IndependentCallInput, type IndependentCallReceipt, type IndependentCallView} from '@itookit/llm-session/contracts';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
+import {IndependentCallCommand, type IndependentCallInput, type IndependentCallReceipt, type IndependentCallView} from '@nestos/llm-session/contracts';
 
 /** Observe the same durable projection as the Web call panel, independently of view binding. */
 export async function waitIndependentCall(client: ApplicationClient, input: IndependentCallInput, receipt: IndependentCallReceipt, follow = false) {

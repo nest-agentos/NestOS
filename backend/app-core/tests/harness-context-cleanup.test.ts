@@ -1,12 +1,12 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import type {Kernel, SessionHandle} from '@itookit/durable-kernel';
+import type {Kernel, SessionHandle} from '@nestos/durable-kernel';
 import {createHarnessContextCleanup} from '../src/projects/harness-context-cleanup';
 import {CONTEXT_BINDINGS_KEY, HarnessContextBindings} from '../src/projects/harness-context-bindings';
 import {ExecutionJournal, type ExecutionJournalData} from '../src/projects/harness-execution-journal';
 import {fixture as executionFixture, request} from './harness-execution-fixture';
 import {context} from './harness-context-fixture';
 import {createHarnessExecutionProvider} from '../src/projects/harness-execution';
-import {getLogger} from '@itookit/common';
+import {getLogger} from '@nestos/common';
 
 afterEach(() => vi.restoreAllMocks());
 

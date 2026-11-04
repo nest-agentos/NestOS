@@ -1,8 +1,8 @@
-import { createDirectoryList as createList, type DirectoryListOptions, type VFSUIShell } from '@itookit/vfs-ui';
+import { createDirectoryList as createList, type DirectoryListOptions, type VFSUIShell } from '@nestos/vfs-ui';
 import { directoryPresentation, directoryBulkIcon } from './directory-presentation';
-import { refreshDirectorySelection } from '@itookit/vfs-ui';
-export { refreshDirectoryList, refreshDirectorySelection, relocateDirectoryList } from '@itookit/vfs-ui';
-export type { DirectoryEntry, DirectoryListOptions } from '@itookit/vfs-ui';
+import { refreshDirectorySelection } from '@nestos/vfs-ui';
+export { refreshDirectoryList, refreshDirectorySelection, relocateDirectoryList } from '@nestos/vfs-ui';
+export type { DirectoryEntry, DirectoryListOptions } from '@nestos/vfs-ui';
 
 /** Business services stay in the host; the library owns directory rendering. */
 export function createDirectoryList(options: DirectoryListOptions): HTMLElement {

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import { SessionCommand, type ISessionRepository, type SessionRepositoryChange } from '@itookit/llm-session/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import { SessionCommand, type ISessionRepository, type SessionRepositoryChange } from '@nestos/llm-session/contracts';
 import { SessionService } from './SessionService';
 
 afterEach(() => { vi.useRealTimers(); });

@@ -1,6 +1,6 @@
-import { t } from '@itookit/common';
-import type { MCPConnectionDiagnostic } from '@itookit/app-contracts';
-import type { SyncState } from '@itookit/vfs-sync';
+import { t } from '@nestos/common';
+import type { MCPConnectionDiagnostic } from '@nestos/app-contracts';
+import type { SyncState } from '@nestos/vfs-sync';
 import { localizeConnectionReason } from '../../files/localize-mount-error';
 
 export interface SyncConnectionStatus extends Pick<MCPConnectionDiagnostic, 'reason' | 'connectionName'> {offline?: boolean}

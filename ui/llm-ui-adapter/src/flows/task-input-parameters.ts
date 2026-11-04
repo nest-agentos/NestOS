@@ -1,5 +1,5 @@
-import type {InteractionRequest, JsonValue} from '@itookit/durable-kernel/contracts';
-import type {FlowInputField, FlowParameter} from '@itookit/llm-flow/contracts';
+import type {InteractionRequest, JsonValue} from '@nestos/durable-kernel/contracts';
+import type {FlowInputField, FlowParameter} from '@nestos/llm-flow/contracts';
 
 export function taskInputParameters(request: Pick<InteractionRequest<JsonValue>, 'kind' | 'payload'>): FlowParameter[] | undefined {
     const payload = request.payload;

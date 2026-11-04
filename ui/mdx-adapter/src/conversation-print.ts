@@ -1,4 +1,4 @@
-import type { PrintOptions } from '@itookit/mdxeditor';
+import type { PrintOptions } from '@nestos/mdxeditor';
 import { DefaultPrintService } from './print';
 
 export class LLMPrintService extends DefaultPrintService {

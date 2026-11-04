@@ -1,12 +1,12 @@
-# @itookit/sanbox
+# @nestos/sanbox
 
 为 Linux Bubblewrap 和 macOS Seatbelt 生成进程启动计划。TypeScript 入口零运行时依赖，默认关闭网络，宿主显式授予目录读取/写入权限；不可用时拒绝执行。
 
-根入口适用于纯策略计算；`@itookit/sanbox/node` 提供真实路径解析、可执行文件检查和实际启动探测。
+根入口适用于纯策略计算；`@nestos/sanbox/node` 提供真实路径解析、可执行文件检查和实际启动探测。
 
 ```ts
 import { spawn } from 'node:child_process';
-import { prepareSandbox, probeSandbox } from '@itookit/sanbox/node';
+import { prepareSandbox, probeSandbox } from '@nestos/sanbox/node';
 
 const sandbox = prepareSandbox({
     readOnlyPaths: ['/absolute/path/to/input'],

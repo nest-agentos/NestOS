@@ -1,7 +1,7 @@
-import { getProviderDefaultProtocol } from '@itookit/driver-llm/contracts';
-import type { ChatConfigurationSnapshot, ChatConfigurationView, IAgentConfigService } from '@itookit/kernel-adapters/contracts';
-import { isRootCallable } from '@itookit/llm-flow/contracts';
-import {publishedAgentDefinition} from '@itookit/kernel-adapters/contracts';
+import { getProviderDefaultProtocol } from '@nestos/driver-llm/contracts';
+import type { ChatConfigurationSnapshot, ChatConfigurationView, IAgentConfigService } from '@nestos/kernel-adapters/contracts';
+import { isRootCallable } from '@nestos/llm-flow/contracts';
+import {publishedAgentDefinition} from '@nestos/kernel-adapters/contracts';
 
 /** One host observation supplies all metadata needed by chat selectors. */
 export async function createChatConfigurationView(service: IAgentConfigService): Promise<ChatConfigurationView> {

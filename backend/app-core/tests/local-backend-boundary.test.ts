@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import type { SnapshotPort } from '@itookit/app-contracts/settings';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import type { SnapshotPort } from '@nestos/app-contracts/settings';
 import type { ApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { bindLocalApplicationServices, bindApplicationBackend } from '../src/host';
 

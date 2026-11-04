@@ -1,9 +1,9 @@
 import { SessionRepository } from '../src/persistence/session-repository';
 import { resolveSessionExecutionMode } from '../src/session/session-execution-mode';
 import { expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { DEFAULT_AGENT_MAX_EXCHANGES, type ChatExecutionMode } from '@itookit/llm-tasks/contracts';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { DEFAULT_AGENT_MAX_EXCHANGES, type ChatExecutionMode } from '@nestos/llm-tasks/contracts';
 import { ConversationRunCoordinator } from '../src/session/conversation-run-coordinator';
 import { SessionRunCoordinator } from '../src/session/session-run-coordinator';
 import type { ExecutionTask, TaskInput } from '../src/core/types';

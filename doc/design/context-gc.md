@@ -1,6 +1,6 @@
 # Context 自动 GC
 
-状态：已实现。策略与调度属于 `@itookit/llm-context`；事务适配属于 `kernel-adapters`；Session 权限和生命周期由 `app-core` 装配。Kernel 不依赖 Context，也不解析 Context 对象。
+状态：已实现。策略与调度属于 `@nestos/llm-context`；事务适配属于 `kernel-adapters`；Session 权限和生命周期由 `app-core` 装配。Kernel 不依赖 Context，也不解析 Context 对象。
 
 ## 参考与取舍
 

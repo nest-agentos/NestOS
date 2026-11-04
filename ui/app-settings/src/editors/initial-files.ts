@@ -1,4 +1,4 @@
-import {createModuleLogger, escapeHTML, escapeAttr, randomUUID, t, type LocaleKey} from '@itookit/common';
+import {createModuleLogger, escapeHTML, escapeAttr, randomUUID, t, type LocaleKey} from '@nestos/common';
 
 interface InitialDependencyIssue {code: string; field?: string; message: string}
 interface InitialDependencyReport {

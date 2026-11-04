@@ -1,6 +1,6 @@
-import type {ChatView, ComposerDraft, JsonValue, MountedToolbar, ToolbarContext} from '@itookit/llm-ui';
-import {isTargetRef} from '@itookit/llm-flow/contracts';
-import {t} from '@itookit/common';
+import type {ChatView, ComposerDraft, JsonValue, MountedToolbar, ToolbarContext} from '@nestos/llm-ui';
+import {isTargetRef} from '@nestos/llm-flow/contracts';
+import {t} from '@nestos/common';
 import {WorkspaceContextPicker, type ContextScope, type ContextOptionsPort} from '../components/input/WorkspaceContextPicker';
 import {readInputContextDraft} from '../domain/context-draft';
 

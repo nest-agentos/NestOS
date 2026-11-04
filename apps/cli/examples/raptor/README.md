@@ -89,7 +89,7 @@ pnpm cli run -f /absolute/path/raptor-review.flow \
 ## 验证
 
 ```bash
-pnpm --filter @itookit/cli test tests/raptor-native-flow.test.ts
+pnpm --filter @nestos/cli test tests/raptor-native-flow.test.ts
 ```
 
 12 项普通回归使用可控扫描器与模型响应，运行真实的 Agent 绑定、发布 Flow、标准文件工具、函数调用、分支与持久 Task；覆盖失败门禁、用户消息、上下文隔离和修复/修订上限。另有 1 项显式 live 验收使用真实 Semgrep 和已有文字连接，默认不发送真实请求。
@@ -107,7 +107,7 @@ RAPTOR_FLOW_LIVE=1 \
 RAPTOR_FLOW_PROFILE=/absolute/path/configured-profile \
 RAPTOR_FLOW_SEMGREP_BIN=/absolute/path/semgrep \
 RAPTOR_FLOW_EVIDENCE=/tmp/raptor-native-evidence.json \
-pnpm --filter @itookit/cli exec vitest run tests/raptor-native-flow.test.ts \
+pnpm --filter @nestos/cli exec vitest run tests/raptor-native-flow.test.ts \
   -t 'executes real RAPTOR rules and real model reviews through the published Flow Agent'
 ```
 

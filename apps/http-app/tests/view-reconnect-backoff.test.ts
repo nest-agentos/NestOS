@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {RpcPeer} from '@itookit/app-transport/application';
-import {HttpViewClient} from '@itookit/app-transport/http';
+import {RpcPeer} from '@nestos/app-transport/application';
+import {HttpViewClient} from '@nestos/app-transport/http';
 
 const releases: Array<() => Promise<void>> = [];
 afterEach(async () => {

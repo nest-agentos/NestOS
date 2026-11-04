@@ -1,4 +1,4 @@
-import type { SessionHandle, TaskHandle } from '@itookit/durable-kernel';
+import type { SessionHandle, TaskHandle } from '@nestos/durable-kernel';
 import type { DagNodeDefinition, DagPluginCatalog, HarnessHookEvent } from '../contracts';
 import type { FlowExecutionHandle } from './executor';
 import type { SchedulerLease } from './scheduler-lease';

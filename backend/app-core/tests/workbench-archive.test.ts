@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
+import { MemoryBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime, type ApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { WorkbenchArchiveExporter, parseWorkbenchArchive } from '../src/projects/workbench-archive';
 import { WorkbenchArchiveImporter } from '../src/projects/workbench-import';

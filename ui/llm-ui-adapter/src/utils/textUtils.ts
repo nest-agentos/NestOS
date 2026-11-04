@@ -1,6 +1,6 @@
 // @file: llm-ui-adapter/utils/textUtils.ts
 
-import type { ExecutionNode } from '@itookit/llm-session/contracts';
+import type { ExecutionNode } from '@nestos/llm-session/contracts';
 
 /**
  * 纯函数文本工具集

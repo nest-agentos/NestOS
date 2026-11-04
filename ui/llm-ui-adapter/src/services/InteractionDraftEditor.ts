@@ -1,4 +1,4 @@
-import {randomUUID} from '@itookit/common';
+import {randomUUID} from '@nestos/common';
 import type {InteractionDraftContent, InteractionDraftRecord, InteractionDraftScope, InteractionDraftStorage, InteractionDraftWrite} from '../domain/interaction-draft';
 import {canonicalJson} from '../utils/canonical-json';
 

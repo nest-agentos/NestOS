@@ -1,4 +1,4 @@
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
 
 type ExecutionIdentity = Pick<EffectExecutionContext, 'sessionId' | 'taskId' | 'effectId'>;
 

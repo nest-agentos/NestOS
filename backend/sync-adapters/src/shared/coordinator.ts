@@ -1,4 +1,4 @@
-import { assertSync, nextDecimal, randomId, SyncError, type CoordinationGuard, type Coordinator } from '@itookit/vfs-sync';
+import { assertSync, nextDecimal, randomId, SyncError, type CoordinationGuard, type Coordinator } from '@nestos/vfs-sync';
 import type { LeaseAccess, Lease } from './lease';
 
 export interface LeaseOptions { leaseMs?: number; heartbeatMs?: number; retryMs?: number; timeoutMs?: number; now?: () => number }

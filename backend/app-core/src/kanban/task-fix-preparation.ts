@@ -1,5 +1,5 @@
-import {sha256HexSync,randomUUID} from '@itookit/common';
-import type {KanbanBoard,KanbanItem,KanbanDispatch} from '@itookit/kanban/contracts';
+import {sha256HexSync,randomUUID} from '@nestos/common';
+import type {KanbanBoard,KanbanItem,KanbanDispatch} from '@nestos/kanban/contracts';
 import type {Options,SavedFix} from './task-fix-contracts';
 import {workContext} from './work-context';
 import {requireValue} from './validation';
@@ -32,7 +32,7 @@ async function newFix(options:Options,id:string,board:KanbanBoard,item:KanbanIte
 
 async function decisionSnapshot(options:Options,identity:Awaited<ReturnType<typeof workContext>>['decision']) {
     if(!identity)return null;
-    const runs=await options.journal.get<Array<{id:string;record:import('@itookit/kanban/contracts').KanbanProjectRecord}>>('record-runs:'+identity.sourceBoardId);
+    const runs=await options.journal.get<Array<{id:string;record:import('@nestos/kanban/contracts').KanbanProjectRecord}>>('record-runs:'+identity.sourceBoardId);
     const record=runs?.find(run=>run.id===identity.runId)?.record??await options.service.record(identity.sourceBoardId,identity.recordId);
     requireValue(record.id===identity.recordId&&record.revision===identity.recordRevision,'FIX_DECISION_REVISION_UNAVAILABLE');
     return {...identity,record};

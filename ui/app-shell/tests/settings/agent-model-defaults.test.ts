@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { renderAgentModelDefaults, readAgentModelDefaults } from '@itookit/llm-ui-adapter/settings';
+import { renderAgentModelDefaults, readAgentModelDefaults } from '@nestos/llm-ui-adapter/settings';
 
 const provider = {id: 'p', name: 'Models', implementation: 'openai-compatible', media: {'image.generate': {adapter: 'openai-images'}, 'speech.synthesize': {adapter: 'openai-speech'}},
     models: [{id: 'chat', name: 'Chat'}, {id: 'image', name: 'Image', category: 'image', operations: {'image.generate': {inputModalities: ['text'], outputModalities: ['image'], formats: ['png']}}},

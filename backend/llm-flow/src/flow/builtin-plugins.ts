@@ -3,7 +3,7 @@ import { harnessAgentTask, isHarnessAgentConfig } from './harness-agent';
 import { mediaPlugin } from './media-plugin';
 import type { DagNodeContext, DagPlugin, DagPluginManifest, JsonValue } from '../contracts';
 import { DELEGATION_DEFAULTS } from '../contracts';
-import { buildLlmTaskInput, type LlmTaskInputOptions } from '@itookit/llm-tasks';
+import { buildLlmTaskInput, type LlmTaskInputOptions } from '@nestos/llm-tasks';
 import { delegationSchema } from './delegation-schema';
 import { DagPluginRegistry } from './plugin-registry';
 import { structuredPlugins } from './structured/plugins';

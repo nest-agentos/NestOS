@@ -2,7 +2,7 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {mkdtemp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {NodeSqliteSidecarDb} from '@itookit/node-host/storage';
+import {NodeSqliteSidecarDb} from '@nestos/node-host/storage';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); vi.restoreAllMocks();});

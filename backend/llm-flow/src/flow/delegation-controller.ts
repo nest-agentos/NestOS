@@ -1,4 +1,4 @@
-import type { TaskHandle } from '@itookit/durable-kernel';
+import type { TaskHandle } from '@nestos/durable-kernel';
 import type { DagRunSpec, FlowWorkspacePolicy, JsonValue } from '../contracts';
 import { delegationPlan, materializeDelegation } from './delegation-runtime';
 import type { DelegationGroup, DelegationPlan, DelegationRuntimeState } from './delegation-runtime';

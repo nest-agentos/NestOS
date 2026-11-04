@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {SeqTwinStore} from '../src/digital-twin/seq-twin-store';
 import {TwinRecords} from '../src/digital-twin/records';
 import {meterPeriod, reserveMeter, settleMeter} from '../src/digital-twin/metering';

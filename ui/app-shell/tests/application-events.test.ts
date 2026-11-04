@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend, SeqEventJournal} from '@itookit/vfs-core';
-import type {ApplicationEvents, ApplicationEventFact} from '@itookit/app-contracts/services';
+import {createVFS, MemoryBackend, SeqEventJournal} from '@nestos/vfs-core';
+import type {ApplicationEvents, ApplicationEventFact} from '@nestos/app-contracts/services';
 import {ShellApplicationEvents, workspaceConsumesEvent} from '../src/lifecycle/application-events';
 
 const cleanup: Array<() => unknown> = [];

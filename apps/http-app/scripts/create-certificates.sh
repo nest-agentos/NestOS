@@ -24,4 +24,4 @@ command -v pnpm >/dev/null || { echo 'pnpm is required.' >&2; exit 1; }
 export INIT_CWD="${INIT_CWD:-$PWD}"
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd -- "$script_dir/../../.."
-exec pnpm --filter @itookit/http-app exec tsx src/server/main.ts --init-certs "$@"
+exec pnpm --filter @nestos/http-app exec tsx src/server/main.ts --init-certs "$@"

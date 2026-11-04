@@ -1,9 +1,9 @@
 import {syncConnectionParameters} from './FlowConnectionParameters';
 import {groupFlowParameterFields} from './FlowParameterPresentation';
-import { escapeHTML, t } from '@itookit/common';
-import { type FlowInputGroup, type FlowParameter, type JsonValue, validFlowImages, validFlowFiles, validateFlowInputGroups } from '@itookit/llm-flow/contracts';
-import { type ConnectionMeta } from '@itookit/driver-llm/contracts';
-import { renderParameterFields, readParameterFields, type ParameterFormOptions } from '@itookit/llm-ui/forms';
+import { escapeHTML, t } from '@nestos/common';
+import { type FlowInputGroup, type FlowParameter, type JsonValue, validFlowImages, validFlowFiles, validateFlowInputGroups } from '@nestos/llm-flow/contracts';
+import { type ConnectionMeta } from '@nestos/driver-llm/contracts';
+import { renderParameterFields, readParameterFields, type ParameterFormOptions } from '@nestos/llm-ui/forms';
 import { bindFlowImageFields, imageParameterField, type FlowInitialFiles } from './FlowImageFields';
 import {bindFlowFileFields, fileParameterField} from './FlowFileFields';
 import {bindFlowParameterState, readSelectedFlowParameters, renderFlowInputGroups, showFlowFieldError} from './FlowParameterState';
@@ -13,8 +13,8 @@ export {bindFlowParameterState, showFlowFieldError, validateFlowConnectionForm};
 
 export interface FlowConnectionSelection {
     assets?: import('./FlowImageFields').FlowImageAssetPort;
-    connections: Array<ConnectionMeta & { voices?: string[]; operationModels?: Partial<Record<import('@itookit/kernel-adapters/contracts').ModelOperation, string>> }>;
-    slots?: import('@itookit/llm-flow/contracts').FlowConnection[];
+    connections: Array<ConnectionMeta & { voices?: string[]; operationModels?: Partial<Record<import('@nestos/kernel-adapters/contracts').ModelOperation, string>> }>;
+    slots?: import('@nestos/llm-flow/contracts').FlowConnection[];
     bindings?: Record<string, string>;
     selected?: string;
     onChange(id: string | undefined): void;

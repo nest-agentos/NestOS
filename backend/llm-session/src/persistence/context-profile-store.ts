@@ -1,4 +1,4 @@
-import { createContextProfiles, type BranchContextProfile, type ContextRule, type IContextProfiles } from '@itookit/llm-context';
+import { createContextProfiles, type BranchContextProfile, type ContextRule, type IContextProfiles } from '@nestos/llm-context';
 import type { ISessionRepository } from './types';
 import { ulid } from './ulid';
 

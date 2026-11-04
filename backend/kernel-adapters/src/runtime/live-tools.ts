@@ -1,4 +1,4 @@
-import {ToolDeviceDriver, type Tool} from '@itookit/tools';
+import {ToolDeviceDriver, type Tool} from '@nestos/tools';
 
 /** Share trusted additions across the catalog and every existing or future scope. */
 export class LiveTools {

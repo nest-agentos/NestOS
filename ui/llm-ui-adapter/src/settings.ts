@@ -1,7 +1,7 @@
 import {AgentConfigEditor,SkillSettingsEditor,type AgentCapabilityOptions} from './settings/bindings';
 export * from './settings/bindings';
-import type { IAgentManagementService } from '@itookit/kernel-adapters/contracts';
-import type { EditorFactory } from '@itookit/ui-common-adapter';
+import type { IAgentManagementService } from '@nestos/kernel-adapters/contracts';
+import type { EditorFactory } from '@nestos/ui-common-adapter';
 
 export function createSkillsEditorFactory(agentService: IAgentManagementService): EditorFactory {
     return async (container, options) => {

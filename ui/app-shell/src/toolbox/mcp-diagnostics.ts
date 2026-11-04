@@ -1,6 +1,6 @@
-import {t} from '@itookit/common';
-import type {MCPServer} from '@itookit/tools/mcp-contracts';
-import type {ApplicationDiagnostics, ProjectRemoteMountPort} from '@itookit/app-contracts/services';
+import {t} from '@nestos/common';
+import type {MCPServer} from '@nestos/tools/mcp-contracts';
+import type {ApplicationDiagnostics, ProjectRemoteMountPort} from '@nestos/app-contracts/services';
 import {showDiagnostics} from '../diagnostics/dialog';
 
 export class MCPDiagnosticsControls {

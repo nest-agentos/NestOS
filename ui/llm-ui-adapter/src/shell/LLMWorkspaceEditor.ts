@@ -5,17 +5,17 @@ import {InteractionDraftPersistence} from '../services/InteractionDraftPersisten
 import {IndependentCallPanel} from '../components/IndependentCallPanel';
 import {flowInputAssets} from '../flows/input-assets';
 import {prepareAgentFlow, prepareCallTarget} from '../flows/agent-flow';
-import {createOperationLedger, type OperationLedger} from '@itookit/llm-ui';
+import {createOperationLedger, type OperationLedger} from '@nestos/llm-ui';
 import {WorkspaceDraftRecovery} from './WorkspaceDraftRecovery';
 import {DraftFilesCodec} from '../services/DraftFilesCodec';
 import {readInputContextDraft} from '../domain/context-draft';
 import { updateCollapseAction } from '../components/history/HistoryToolbar';
 import { disposeEditorResources } from './editor-disposal';
 import { rememberTaskAttachment, restoreTaskAttachment } from './task-attachment-lifecycle';
-import type { SessionViewPort } from '@itookit/llm-session/contracts';
+import type { SessionViewPort } from '@nestos/llm-session/contracts';
 import { acquireConnectionOptions } from './connection-options-cache';
 import { rerunSession } from './rerun-session';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { bindWorkspaceInput } from './drafts/workspace-handoff';
 import { mountConversationSource } from './conversation-source';
 import { openSessionFlowOutputs } from '../flows/session-output';
@@ -29,12 +29,12 @@ import {rerunSessionFlow} from '../flows/rerun-flow';
 import { promptFlowParameters } from '../components/FlowParameterForm';
 // @file: llm-ui/shell/LLMWorkspaceEditor.ts
 
-import { IEditor, EditorHostContext, EditorEvent, EditorEventMap, EditorEventCallback, CollapseExpandResult, Toast } from '@itookit/ui-common-adapter';
-import { EventBus } from '@itookit/vfs-core';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import type { EventEnvelope, InteractionRequest, JsonValue } from '@itookit/durable-kernel/contracts';
+import { IEditor, EditorHostContext, EditorEvent, EditorEventMap, EditorEventCallback, CollapseExpandResult, Toast } from '@nestos/ui-common-adapter';
+import { EventBus } from '@nestos/vfs-core';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import type { EventEnvelope, InteractionRequest, JsonValue } from '@nestos/durable-kernel/contracts';
 
-import { ISessionRepository, IAgentConfigService, type ConversationManifest, type SessionSnapshot, SessionCommand } from '@itookit/llm-session/contracts';
+import { ISessionRepository, IAgentConfigService, type ConversationManifest, type SessionSnapshot, SessionCommand } from '@nestos/llm-session/contracts';
 
 // Domain — 只依赖接口和类型
 import type { IHistoryPresenter } from '../domain/ports/IHistoryPresenter';
@@ -79,7 +79,7 @@ import { measureSessionLoad } from './load-metrics';
 import { buildSlashCallbacks } from './SlashCommandRouter';
 
 // Infrastructure
-import {TimerManager, DOMCache} from '@itookit/llm-ui';
+import {TimerManager, DOMCache} from '@nestos/llm-ui';
 import { ErrorHandler } from '../utils/errorHandler';
 
 // Components — 仅在 init 中用于构造，之后通过接口引用
@@ -92,7 +92,7 @@ import { LayoutTemplates } from '../components/templates/LayoutTemplates';
 
 import { HistoryPlugin } from '../components/input/plugins/HistoryPlugin';
 import { SlashCommandPlugin } from '../components/input/plugins/SlashCommandPlugin';
-import { AssetManagerUI } from '@itookit/mdx-adapter';
+import { AssetManagerUI } from '@nestos/mdx-adapter';
 
 interface InitialSessionData {
     session: Awaited<ReturnType<SessionService['loadSession']>>;
@@ -646,8 +646,8 @@ export class LLMWorkspaceEditor implements IEditor {
         if (this.inputDialogKey === key) return true;
         const values = payload.values && typeof payload.values === 'object' && !Array.isArray(payload.values) ? payload.values : {};
         const parameters = Object.entries(fields).map(([name, field]) => ({
-            ...(field as unknown as import('@itookit/llm-flow/contracts').FlowInputField), name,
-            required: (field as unknown as import('@itookit/llm-flow/contracts').FlowInputField).required !== false,
+            ...(field as unknown as import('@nestos/llm-flow/contracts').FlowInputField), name,
+            required: (field as unknown as import('@nestos/llm-flow/contracts').FlowInputField).required !== false,
             ...(Object.hasOwn(values, name) ? { default: values[name] } : {}),
         }));
         this.inputDialogAbort?.abort();

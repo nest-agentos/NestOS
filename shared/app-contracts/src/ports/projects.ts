@@ -1,18 +1,18 @@
 /** Shared application capabilities; implementations belong to backend/app-core. */
-import type * as ToolContracts from '@itookit/tools/contracts';
-import type * as VfsContracts from '@itookit/vfs-core';
-import type { IFileSystem, FileSystemSourceOwner, OperationOptions } from '@itookit/vfs-core';
-import type * as HarnessContracts from '@itookit/cells-driver';
-import type { HarnessObservation, HarnessStatusRow, HarnessProfile, HarnessConversationPort, HarnessConversationSnapshot } from '@itookit/cells-driver';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
-import type { HarnessClient } from '@itookit/cells-driver/harness';
-import type { ISessionRepository, SessionFolder, SessionSummary, ConversationManifest } from '@itookit/llm-session/contracts';
-import type * as FlowContracts from '@itookit/llm-flow/contracts';
-import type { SessionSubmission } from '@itookit/llm-flow/contracts';
+import type * as ToolContracts from '@nestos/tools/contracts';
+import type * as VfsContracts from '@nestos/vfs-core';
+import type { IFileSystem, FileSystemSourceOwner, OperationOptions } from '@nestos/vfs-core';
+import type * as HarnessContracts from '@nestos/cells-driver';
+import type { HarnessObservation, HarnessStatusRow, HarnessProfile, HarnessConversationPort, HarnessConversationSnapshot } from '@nestos/cells-driver';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
+import type { HarnessClient } from '@nestos/cells-driver/harness';
+import type { ISessionRepository, SessionFolder, SessionSummary, ConversationManifest } from '@nestos/llm-session/contracts';
+import type * as FlowContracts from '@nestos/llm-flow/contracts';
+import type { SessionSubmission } from '@nestos/llm-flow/contracts';
 import type { MCPConnectionDiagnostic } from '../index';
 import type { MCPDeletedProject, MCPDeletionReference } from './configuration';
 
-export type ProjectConversationSnapshot = HarnessConversationSnapshot & {usageEstimate?: import('@itookit/kernel-adapters/contracts').UsageCostEstimate};
+export type ProjectConversationSnapshot = HarnessConversationSnapshot & {usageEstimate?: import('@nestos/kernel-adapters/contracts').UsageCostEstimate};
 export interface ConversationComposerDraft {revision: string; data: string; acceptedOperationIds: readonly string[]}
 export interface ProjectConversationPort extends HarnessConversationPort {
     readComposerDraft?(): Promise<ConversationComposerDraft>;
@@ -164,7 +164,7 @@ export type ProjectFolder = SessionFolder & {
 };
 
 export interface ProjectRemoteMount extends RemoteFileConnection {
-    capabilities?: import('@itookit/cells-driver').RemoteProjectCapabilities;
+    capabilities?: import('@nestos/cells-driver').RemoteProjectCapabilities;
     serverProjectId?: string;
     serverProjectRevision?: number;
     serverId?: string;
@@ -177,7 +177,7 @@ export interface ProjectRemoteMount extends RemoteFileConnection {
 
 export interface RemoteFileConnection {
     anonymous?: boolean;
-    authorization?: import('@itookit/cells-driver').RemoteAuthorization;
+    authorization?: import('@nestos/cells-driver').RemoteAuthorization;
     endpoint: string;
     alias: string;
     credentialRef: string;
@@ -361,7 +361,7 @@ export type RemoteFileSystemInput = Pick<RemoteFileSystemConfig, 'name' | 'endpo
 
 export interface RemoteFileSystemConfig {
     anonymous?: boolean;
-    authorization?: import('@itookit/cells-driver').RemoteAuthorization;
+    authorization?: import('@nestos/cells-driver').RemoteAuthorization;
     id: string;
     name: string;
     endpoint: string;

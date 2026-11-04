@@ -1,5 +1,5 @@
-import type {Kernel, TaskRecord} from '@itookit/durable-kernel';
-import {sameTargetRef} from '@itookit/llm-flow/contracts';
+import type {Kernel, TaskRecord} from '@nestos/durable-kernel';
+import {sameTargetRef} from '@nestos/llm-flow/contracts';
 import {flowInvocationId, type FlowInvocationInput, type FlowInvocationRecord} from '../contracts/flow-invocations';
 
 export const FLOW_INVOCATION_PREFIX = 'flow.invocation.';
@@ -60,7 +60,7 @@ function matchesInvocation(call: NonNullable<ReturnType<typeof metadata>>, recor
 }
 
 function metadata(task: TaskRecord) {
-    return (task.input as {initialScheduler?: {spec?: import('@itookit/llm-flow/contracts').DagRunSpec}})?.initialScheduler?.spec?.invocation;
+    return (task.input as {initialScheduler?: {spec?: import('@nestos/llm-flow/contracts').DagRunSpec}})?.initialScheduler?.spec?.invocation;
 }
 function identity(value: unknown): value is string {return typeof value === 'string' && value.length > 0 && value.length <= 1024;}
 function invocationError(code: string, message: string): Error {return Object.assign(new Error(message), {code});}

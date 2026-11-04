@@ -1,10 +1,10 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import { randomUUID } from '@itookit/common';
-import { sha256HexSync, type ContextPlan } from '@itookit/llm-context';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import { randomUUID } from '@nestos/common';
+import { sha256HexSync, type ContextPlan } from '@nestos/llm-context';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
 import { DigitalTwinService } from '../src/digital-twin/service';
 import { SeqTwinStore } from '../src/digital-twin/seq-twin-store';
 import type { TwinExtractionPort } from '../src/digital-twin/extraction';

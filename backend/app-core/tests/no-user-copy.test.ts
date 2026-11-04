@@ -18,7 +18,7 @@ async function sourceFiles(directory: string): Promise<string[]> {
 
 /**
  * The platform-agnostic layer raises structured errors or uses `t()` keys whose copy
- * lives in `@itookit/common`; it must not hardcode user-facing text.
+ * lives in `@nestos/common`; it must not hardcode user-facing text.
  */
 describe('app-core user-facing copy', () => {
     it('keeps localized text out of the package source', async () => {

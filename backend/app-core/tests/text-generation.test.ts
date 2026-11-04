@@ -1,4 +1,4 @@
-import {SessionCommand, type SessionInstructionQueue} from '@itookit/llm-session/contracts';
+import {SessionCommand, type SessionInstructionQueue} from '@nestos/llm-session/contracts';
 import {afterEach, expect, it, vi} from 'vitest';
 import {textRuntime, response} from './helpers/text-runtime';
 const cleanup: Array<()=>Promise<void>>=[];

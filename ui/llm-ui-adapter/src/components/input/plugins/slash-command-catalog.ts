@@ -1,4 +1,4 @@
-import { SLASH_ICONS, t, type LocaleKey } from '@itookit/common';
+import { SLASH_ICONS, t, type LocaleKey } from '@nestos/common';
 import type { InputPluginContext } from './InputPlugin';
 import type { SlashCommandCallbacks, SlashCommandDef } from './SlashCommandPlugin';
 import { parseToolArgs } from './slash-tool-args';

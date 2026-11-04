@@ -1,4 +1,4 @@
-import { FSError, type IFileSystem, type ISeqFileTransaction } from '@itookit/vfs-core';
+import { FSError, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
 import { sessionStorageRoot, storageIdentityConflict } from './session-storage-layout';
 import { resolveSessionStorageRoot } from './session-storage-locations';
 import type { SessionSummary } from './types';

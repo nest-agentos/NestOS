@@ -1,4 +1,4 @@
-import { FSError, normalizeVirtualPath } from '@itookit/vfs-core';
+import { FSError, normalizeVirtualPath } from '@nestos/vfs-core';
 
 /**
  * Canonical namespace of the project workspace mount. Editors, tools and execution

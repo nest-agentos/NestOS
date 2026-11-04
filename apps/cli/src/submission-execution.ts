@@ -1,7 +1,7 @@
-import type {ApplicationClient} from '@itookit/app-contracts/services';
-import {SessionCommand, type Round, type SessionInstructionQueue, type SubmissionRequest} from '@itookit/llm-session/contracts';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
-import type {DurableFlowSnapshot} from '@itookit/llm-flow/contracts';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
+import {SessionCommand, type Round, type SessionInstructionQueue, type SubmissionRequest} from '@nestos/llm-session/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
+import type {DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
 
 interface SubmissionExecution {
     status: Round['status'] | 'queued' | 'unknown';

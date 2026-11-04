@@ -1,1 +1,1 @@
-export type { WorkspaceController, WorkspaceCreation } from '@itookit/app-contracts';
+export type { WorkspaceController, WorkspaceCreation } from '@nestos/app-contracts';

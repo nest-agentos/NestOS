@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import {createVFS,MemoryBackend} from '@itookit/vfs-core';
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {createStudyPromptStore} from '../src/study-prompt';
 it('keeps reads lazy and persists only the explicitly saved prompt separately from SRS records',async()=>{
  const {manager}=await createVFS({rootBackend:new MemoryBackend()}),fs=await manager.openFileSystem('/');

@@ -1,6 +1,6 @@
 import {z} from 'zod/v4';
-import type {Tool} from '@itookit/tools';
-import type {ToolConnectionView, ToolPackageConfiguration} from '@itookit/app-contracts/services';
+import type {Tool} from '@nestos/tools';
+import type {ToolConnectionView, ToolPackageConfiguration} from '@nestos/app-contracts/services';
 import {packageError, type ToolPackageSource} from './manifest';
 import {readYamlSidecar, writeYamlSidecar} from './yaml-sidecar';
 type FlowParameter = ToolPackageConfiguration['tools'][number]['parameters'][number];

@@ -1,8 +1,8 @@
 import { once } from 'node:events';
-import { createVFS } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { Kernel } from '@itookit/durable-kernel';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
+import { createVFS } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { Kernel } from '@nestos/durable-kernel';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 import { acquireSchedulerLease } from '../../../../backend/llm-flow/src/flow/scheduler-lease';
 
 const [root, role] = process.argv.slice(2);

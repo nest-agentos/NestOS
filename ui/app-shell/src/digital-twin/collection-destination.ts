@@ -1,5 +1,5 @@
-import {escapeAttr, escapeHTML} from '@itookit/common';
-import {TWIN_COLLECTION_WORKSPACES, workspaceRoot, type TwinCollectionExecutor, type TwinCollectionWorkspace} from '@itookit/app-contracts';
+import {escapeAttr, escapeHTML} from '@nestos/common';
+import {TWIN_COLLECTION_WORKSPACES, workspaceRoot, type TwinCollectionExecutor, type TwinCollectionWorkspace} from '@nestos/app-contracts';
 import {label} from './view';
 export interface CollectionProject {id: string; name: string}
 export function collectionDestinationFields(selected?: TwinCollectionExecutor, projects: CollectionProject[] = []): string {

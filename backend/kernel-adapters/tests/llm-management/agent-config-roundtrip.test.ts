@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { fromAgentDef, toRuntimeAgent } from '../../src/llm-management/constants/llm-loader';
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
 
 it('preserves explicit grants, policies and extended config through Agent import/export', () => {
     const agent: AgentDefinition = { id: 'locked', name: 'Locked', type: 'agent', version: 'v1', createdAt: 1, modifiedAt: 2,

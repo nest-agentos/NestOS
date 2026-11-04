@@ -1,5 +1,5 @@
-import {remoteSessionPath} from '@itookit/app-contracts';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import {remoteSessionPath} from '@nestos/app-contracts';
+import type {ProjectService} from '@nestos/app-contracts/services';
 import type {ProjectRemoteMountService} from './remote-mounts';
 import {readContextCatalog,type ContextInspector} from './harness-context-catalog';
 

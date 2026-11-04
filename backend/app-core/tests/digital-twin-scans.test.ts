@@ -4,9 +4,9 @@ import { TwinRecords } from '../src/digital-twin/records';
 import { TwinScanStore } from '../src/digital-twin/scan-store';
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend, FSError } from '@itookit/vfs-core';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import { sha256HexSync } from '@itookit/llm-context';
+import { createVFS, MemoryBackend, FSError } from '@nestos/vfs-core';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import { sha256HexSync } from '@nestos/llm-context';
 import { DigitalTwinService, SeqTwinStore, TWIN_KINDS, type TwinScanPlanInput } from '../src';
 import type { TwinExtractionPort } from '../src/digital-twin/extraction';
 

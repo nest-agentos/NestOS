@@ -219,7 +219,7 @@ delegation.budget.maxTokens/timeoutMs 只是子任务单次请求默认限制；
 
 ## 6. 核验记录
 
-本轮执行 `pnpm --filter @itookit/llm-flow test`：**18 个测试文件、240 个用例通过**。包括 executor 的 116 个用例，以及 scheduler lease、图重试、端口契约、运行目录、工作区收尾和定义存储测试。
+本轮执行 `pnpm --filter @nestos/llm-flow test`：**18 个测试文件、240 个用例通过**。包括 executor 的 116 个用例，以及 scheduler lease、图重试、端口契约、运行目录、工作区收尾和定义存储测试。
 
 主要定位入口：
 

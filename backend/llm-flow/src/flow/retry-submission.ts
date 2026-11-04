@@ -1,4 +1,4 @@
-import type {SessionHandle, TaskHandle, TaskRecord} from '@itookit/durable-kernel';
+import type {SessionHandle, TaskHandle, TaskRecord} from '@nestos/durable-kernel';
 import {flowControlError, flowTaskHeld, hasFlowControlTree, isPausedParentAdmission} from './control-tree';
 
 /** Keep the Kernel retry identity; only versioned Runs add the owning control parent. */

@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { GraphRetryController, type GraphRetryState } from '../src/flow/graph-retry-controller';
 import { createSchedulerCollections, snapshotSchedulerCollections } from '../src/flow/scheduler-state';
 import { decodeSchedulerCheckpoint } from '../src/flow/checkpoint-decoder';
-import type { TaskHandle } from '@itookit/durable-kernel';
+import type { TaskHandle } from '@nestos/durable-kernel';
 
 it('restores the retry receipt after a crash between checkpoint and acknowledgement', async () => {
     const spec = { nodes: [], edges: [] };

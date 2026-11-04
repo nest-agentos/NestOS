@@ -1,11 +1,11 @@
 import {cancelFlowRun, readFlowCancellationReceipt, cancelRemainingFlowRun, readFlowTreeCancellationReceipt} from './run-cancellation';
-import {taskStat} from '@itookit/durable-kernel';
+import {taskStat} from '@nestos/durable-kernel';
 import {checkFlowSource, checkFlowSyntax} from './syntax-check';
 import { hasLocalScheduler, withFlowControl } from './control-session';
 import { workspaceFinalizationKey, type WorkspaceFinalization } from './workspace-finalization';
 import type { DagPluginCatalog, DagPluginPresentation, FlowDraft, FlowNodeDefinition, FlowRevision, FlowCommandRegistrar, JsonValue, FlowRunGoal } from '../contracts';
-import type { ToolDefinition } from '@itookit/llm-context';
-import type { Kernel, SessionHandle, TaskRecord, TaskSnapshot } from '@itookit/durable-kernel';
+import type { ToolDefinition } from '@nestos/llm-context';
+import type { Kernel, SessionHandle, TaskRecord, TaskSnapshot } from '@nestos/durable-kernel';
 import { type FlowDefinitionStore } from '../flow-definition-store';
 import { submitRun, type GraphRunDefinition } from '../run-submission';
 import { expandDispatchDraft } from './structured/expand';
@@ -61,7 +61,7 @@ export interface FlowRunSummary { taskId: string; sessionId: string; name: strin
     failure?: {code?: string; message: string}; invocation?: import('../contracts').InvocationIdentity; }
 
 export interface DurableFlowSnapshot {
-    controlStats?: Record<string, import('@itookit/durable-kernel/contracts').TaskStat>;
+    controlStats?: Record<string, import('@nestos/durable-kernel/contracts').TaskStat>;
     invocationIdentityVersion?: 1;
     controlTaskIds?: string[];
     invocation?: import('../contracts').InvocationIdentity;
@@ -460,6 +460,6 @@ async function createRevision(
     return { revision, version: revision.revision, ...validation };
 }
 
-function jsonValue(value: unknown): import('@itookit/durable-kernel').JsonValue {
+function jsonValue(value: unknown): import('@nestos/durable-kernel').JsonValue {
     return JSON.parse(JSON.stringify(value ?? null));
 }

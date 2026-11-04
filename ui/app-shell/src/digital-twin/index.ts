@@ -2,14 +2,14 @@ import {requestAssistantShortcut} from '../navigation/assistant-actions';
 import {readCollectionExecutor} from './collection-fields';
 import {sourceConnectionSettings, importConnection, type SourceConnections} from '../configuration/tool-connections';
 import {scannerFieldChange, updateExecutorMode, updateInputMode, readScannerExecutor, readScannerFile} from './scanner-fields';
-import type {RootCallTarget} from '@itookit/llm-session/contracts';
+import type {RootCallTarget} from '@nestos/llm-session/contracts';
 import { memoryInput } from './memory-input';
 import { loadOverview } from './load-overview';
 import { graphView } from './graph-view';
-import { escapeHTML, escapeAttr, t } from '@itookit/common';
-import {TWIN_KINDS} from '@itookit/app-contracts';
-import type { TwinSourceSpec } from '@itookit/app-contracts';
-import type { DigitalTwinService, TwinScanRuleInput } from '@itookit/app-contracts/services';
+import { escapeHTML, escapeAttr, t } from '@nestos/common';
+import {TWIN_KINDS} from '@nestos/app-contracts';
+import type { TwinSourceSpec } from '@nestos/app-contracts';
+import type { DigitalTwinService, TwinScanRuleInput } from '@nestos/app-contracts/services';
 import { createWorkspaceModule } from '../workspaces/module';
 import { TWIN_PAGES, label, overview, memories, type TwinSnapshot, type TwinPage } from './view';
 import { scanPage, scanRunPage, type TwinSourcesTab } from './scan-view';
@@ -17,7 +17,7 @@ import { TwinSettingsAutosave } from './settings-autosave';
 import { TwinNavigation } from './navigation';
 import { TwinScanLists } from './scan-list';
 import {scannerPackages, upgradeScannerPackage} from './package-upgrades';
-import type {ToolPackageInfo, ToolPackages} from '@itookit/app-contracts/services';
+import type {ToolPackageInfo, ToolPackages} from '@nestos/app-contracts/services';
 
 export interface TwinWorkbenchOptions {
     service: DigitalTwinService; sidebar: HTMLElement; editor: HTMLElement;
@@ -28,11 +28,11 @@ export interface TwinWorkbenchOptions {
     selected(path: string): void;
 }
 export class TwinWorkbench {
-    private workspaces: import('@itookit/app-contracts').TwinWorkspaceView[] = [];
+    private workspaces: import('@nestos/app-contracts').TwinWorkspaceView[] = [];
     private sourceConnections: SourceConnections = {types: [], connections: []};
     private targets: RootCallTarget[] = [];
     private projects: Array<{id: string; name: string}> = [];
-    private tools: import('@itookit/app-contracts').TwinScannerTool[] = [];
+    private tools: import('@nestos/app-contracts').TwinScannerTool[] = [];
     private packages: ToolPackageInfo[] = [];
     private page: TwinPage = 'overview';
     private selectedSession = '';

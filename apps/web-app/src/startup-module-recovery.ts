@@ -1,4 +1,4 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 
 const log = createModuleLogger('startup-modules');
 export const isModuleLoadFailure = (message: string): boolean =>

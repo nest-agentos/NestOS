@@ -1,4 +1,4 @@
-# @itookit/ui-common-adapter
+# @nestos/ui-common-adapter
 
 NestOS 的通用编辑器宿主契约和设置基础设施。只依赖 common、vfs-core 与独立 ui-common；不得导入聊天、模型设置、执行器或工作台实现。
 
@@ -12,4 +12,4 @@ NestOS 的通用编辑器宿主契约和设置基础设施。只依赖 common、
 - EditorOptions.mountSettings 返回 isDirty/flush/destroy；导航与销毁前保存，失败保留输入。业务读模型经 initialData 泛型传入，不在公共包解释。
 - Session、项目、Agent、Flow 与原生 harness 策略不进入本包。浏览器 UUID 从 common 获取。
 
-验证：`pnpm --filter @itookit/ui-common-adapter typecheck` / `build`；使用方的 jsdom 集成测试覆盖设置恢复与宿主生命周期。
+验证：`pnpm --filter @nestos/ui-common-adapter typecheck` / `build`；使用方的 jsdom 集成测试覆盖设置恢复与宿主生命周期。

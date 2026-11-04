@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IVFSManager, type IFileSystem } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IVFSManager, type IFileSystem } from '@nestos/vfs-core';
 import type { DagNodeDefinition, DagRunSpec } from '../src/contracts';
 import { createBuiltinDagPluginRegistry, DurableFlowExecutor, readFlowSchedulerCheckpoint, registerDurablePrograms } from '../src/flow';
 import { FlowVariableStore, validateVariableGraph } from '../src/flow/variables';

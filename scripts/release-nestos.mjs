@@ -15,7 +15,7 @@ function dependencyVersions(release) {
     for (const specifier of imports) {
         if (isBuiltin(specifier) || specifier.startsWith('.')) continue;
         const name = specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0];
-        if (name.startsWith('@itookit/')) throw new Error(`Unbundled workspace dependency: ${name}`);
+        if (name.startsWith('@nestos/')) throw new Error(`Unbundled workspace dependency: ${name}`);
         let directory = path.dirname(realpathSync(require.resolve(specifier)));
         while (!existsSync(path.join(directory, 'package.json')) || read(path.join(directory, 'package.json')).name !== name) {
             const parent = path.dirname(directory); if (parent === directory) throw new Error(`Missing runtime package: ${name}`); directory = parent;

@@ -1,8 +1,8 @@
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
 /** Canonical cells discovery extension key. */
 export const CELLS_EXTENSION = 'itookit/cells';
 export interface CellsConfiguration {
-    authorization?: import('@itookit/cells-driver').RemoteAuthorization;
+    authorization?: import('@nestos/cells-driver').RemoteAuthorization;
     version: 1; mcpEndpoint: string; httpEndpoint: string; fileProtocol: 'fs-agent-http-v1';
     serverId: string | null; harness: boolean; projects?: boolean; projectProtocol?: string; legacy?: boolean;
 }

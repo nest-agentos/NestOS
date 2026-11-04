@@ -1,6 +1,6 @@
-import type { DagEdgeDefinition, DagNodeDefinition, FlowInputGroup, FlowParameter, FlowRevision, FlowRunPolicy, JsonValue } from '@itookit/llm-flow/contracts';
-import { flowToDag, type FlowNodeBinder } from '@itookit/llm-flow';
-import { assertRootCallable } from '@itookit/llm-flow/contracts';
+import type { DagEdgeDefinition, DagNodeDefinition, FlowInputGroup, FlowParameter, FlowRevision, FlowRunPolicy, JsonValue } from '@nestos/llm-flow/contracts';
+import { flowToDag, type FlowNodeBinder } from '@nestos/llm-flow';
+import { assertRootCallable } from '@nestos/llm-flow/contracts';
 
 export type RunSourceFormat = 'yaml' | 'flow';
 export type RunStatus = 'created' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'cancelled';
@@ -35,7 +35,7 @@ export interface RunConnectionConfig {
 }
 
 export interface RunAgentConfig {
-    memoryPolicy?: import('@itookit/llm-tasks/contracts').MemoryPolicy;
+    memoryPolicy?: import('@nestos/llm-tasks/contracts').MemoryPolicy;
     id: string;
     name?: string;
     connection: string;
@@ -93,12 +93,12 @@ export interface RunDefinition {
         nodeDefaults?: Record<string, Record<string, JsonValue>>;
         nodeConnections?: Record<string, Record<string, JsonValue>>;
         maxNodes?: number;
-        templateVersion?: import('@itookit/llm-flow/contracts').DagRunSpec['templateVersion'];
-        parameterScopes?: import('@itookit/llm-flow/contracts').DagRunSpec['parameterScopes'];
-        functionCalls?: import('@itookit/llm-flow/contracts').DagRunSpec['functionCalls'];
-        input?: import('@itookit/llm-flow/contracts').DagRunSpec['input'];
-        variables?: import('@itookit/llm-flow/contracts').DagRunSpec['variables'];
-        variableScopes?: import('@itookit/llm-flow/contracts').DagRunSpec['variableScopes'];
+        templateVersion?: import('@nestos/llm-flow/contracts').DagRunSpec['templateVersion'];
+        parameterScopes?: import('@nestos/llm-flow/contracts').DagRunSpec['parameterScopes'];
+        functionCalls?: import('@nestos/llm-flow/contracts').DagRunSpec['functionCalls'];
+        input?: import('@nestos/llm-flow/contracts').DagRunSpec['input'];
+        variables?: import('@nestos/llm-flow/contracts').DagRunSpec['variables'];
+        variableScopes?: import('@nestos/llm-flow/contracts').DagRunSpec['variableScopes'];
     };
     parameters?: FlowParameter[];
     inputGroups?: FlowInputGroup[];
@@ -186,7 +186,7 @@ export async function createRunDefinitionFromFlow(flow: FlowRevision, options: {
 
 
 /** Compile the canonical RunDefinition into the executor-facing DagRunSpec. */
-export function toDagRunSpec(definition: RunDefinition): import('@itookit/llm-flow/contracts').DagRunSpec {
+export function toDagRunSpec(definition: RunDefinition): import('@nestos/llm-flow/contracts').DagRunSpec {
     const policy = definition.policy.runPolicy;
     return {
         nodes: structuredClone(definition.graph.nodes),

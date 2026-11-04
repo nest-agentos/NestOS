@@ -4,12 +4,12 @@ import type {
     DurableTaskProgram,
     JsonValue,
     TaskInputEvent,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 import {
     collectDependency,
     dependenciesReady,
     dependencyWait,
-} from '@itookit/llm-tasks';
+} from '@nestos/llm-tasks';
 import { aggregateOutcome, reduceOutcome, routeOutcome, spawnOutcome, transformOutcome } from './operations';
 import { FlowReducerRegistry, projectSummary } from './structured/join';
 import type { FlowJoinConfig } from '../contracts';

@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { LLMMediaClient } from '@itookit/driver-llm';
+import { LLMMediaClient } from '@nestos/driver-llm';
 import {createLlmDeviceCatalog} from '../../src/llm-management/catalogs';
 const createDoubaoSpeechProvider = () => createLlmDeviceCatalog().providers['doubao-speech'];
 const DOUBAO_SPEECH_REFERENCE = createLlmDeviceCatalog().providerReferences['doubao-speech'];

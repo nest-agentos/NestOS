@@ -1,4 +1,4 @@
-import { extractNodeOutput } from '@itookit/llm-tasks';
+import { extractNodeOutput } from '@nestos/llm-tasks';
 import { remapFlowNodeReferences, type DagNodeDefinition, type DagRunSpec, type GraphPatch, type JsonValue } from '../contracts';
 import { RETURN_NODE } from './function-outputs';
 import { namespaceCallConfig } from './function-namespace';

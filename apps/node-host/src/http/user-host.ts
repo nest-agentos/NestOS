@@ -2,7 +2,7 @@ import type {IncomingMessage, ServerResponse} from 'node:http';
 import type {TLSSocket} from 'node:tls';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {FSError} from '@itookit/vfs-core';
+import {FSError} from '@nestos/vfs-core';
 import {AuditLog, type AuditPort} from '../logging/audit-log';
 import {acquireHostLock} from '../storage/host-lock';
 import {closeHostResources, type HostCleanup} from '../runtime/host-runtime';

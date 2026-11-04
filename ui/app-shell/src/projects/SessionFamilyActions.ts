@@ -1,8 +1,8 @@
 import { showNameDialog } from '../files/project-dialog';
-import { t } from '@itookit/common';
-import { setTimePresentation } from '@itookit/ui-common-adapter';
-import type { ProjectSessions } from '@itookit/app-contracts/services';
-import type { ConversationManifest, SessionSummary } from '@itookit/llm-session/contracts';
+import { t } from '@nestos/common';
+import { setTimePresentation } from '@nestos/ui-common-adapter';
+import type { ProjectSessions } from '@nestos/app-contracts/services';
+import type { ConversationManifest, SessionSummary } from '@nestos/llm-session/contracts';
 
 interface Actions {
     open(id: string): Promise<void>; child(id: string): Promise<unknown>; remove(id: string): Promise<void>;

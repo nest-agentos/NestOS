@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { JsonValue, SessionHandle, TaskRecord } from '@itookit/durable-kernel';
+import type { JsonValue, SessionHandle, TaskRecord } from '@nestos/durable-kernel';
 import { createSchedulerCollections, snapshotSchedulerCollections } from '../src/flow/scheduler-state';
 import type { DagRunSpec } from '../src/contracts';
 import { resolveFlowRunForTask, resolveFlowTaskWorkspace } from '../src/flow/task-run';

@@ -1,7 +1,7 @@
-// Conversation log contracts. Runtime execution is owned by @itookit/durable-kernel.
+// Conversation log contracts. Runtime execution is owned by @nestos/durable-kernel.
 
-import type { ChatMessage, Attachment } from '@itookit/llm-context';
-import type { TokenUsage } from '@itookit/driver-llm/contracts';
+import type { ChatMessage, Attachment } from '@nestos/llm-context';
+import type { TokenUsage } from '@nestos/driver-llm/contracts';
 
 // ─── Conversation Round ──────────────────────────────────────────────
 
@@ -12,14 +12,14 @@ export interface ExecutionRef {
     taskId: string;
     role: 'primary' | 'background';
     /** Missing only for execution references written before unified invocation tracing. */
-    invocation?: import('@itookit/llm-flow/contracts').InvocationIdentity;
+    invocation?: import('@nestos/llm-flow/contracts').InvocationIdentity;
 }
 export type ExecutionAdmission = Pick<Round, 'target' | 'callInput' | 'flow' | 'agentId'>;
 
 export interface ConversationRound {
-    target?: import('@itookit/llm-flow/contracts').TargetRef;
-    callInput?: {source: import('@itookit/llm-flow/contracts').FlowCallSource;
-        admitted?: import('@itookit/llm-flow/contracts').FlowResolvedInput};
+    target?: import('@nestos/llm-flow/contracts').TargetRef;
+    callInput?: {source: import('@nestos/llm-flow/contracts').FlowCallSource;
+        admitted?: import('@nestos/llm-flow/contracts').FlowResolvedInput};
     id: RoundId;
     sessionId: string;
     historyParentIds: string[];
@@ -32,10 +32,10 @@ export interface ConversationRound {
 }
 
 export interface Round extends ConversationRound {
-    submission?: import('@itookit/llm-flow/contracts').SessionSubmission;
+    submission?: import('@nestos/llm-flow/contracts').SessionSubmission;
     submissionDigest?: string;
     /** Frozen workflow invocation owned by this branch round. */
-    flow?: { input?: import('@itookit/llm-flow/contracts').FlowRuntimeInput; connectionBindings?: Record<string, string>; flowId: import('@itookit/llm-flow/contracts').FlowId; connectionId?: string; revision: number; parameters?: Record<string, import('@itookit/llm-flow/contracts').JsonValue> };
+    flow?: { input?: import('@nestos/llm-flow/contracts').FlowRuntimeInput; connectionBindings?: Record<string, string>; flowId: import('@nestos/llm-flow/contracts').FlowId; connectionId?: string; revision: number; parameters?: Record<string, import('@nestos/llm-flow/contracts').JsonValue> };
     exposure?: 'public' | 'internal' | 'artifact';
     origin: 'merge' | 'rebase' | 'edit' | 'user';
     agentId?: string;
@@ -97,7 +97,7 @@ export interface FlowActor {
 
 export interface FlowInteraction {
     parallelGroup?: string;
-    requests?: Array<Omit<import('@itookit/llm-tasks/contracts').AgentEventLlmRequest, 'type'>>;
+    requests?: Array<Omit<import('@nestos/llm-tasks/contracts').AgentEventLlmRequest, 'type'>>;
     actor?: FlowActor;
     input?: unknown;
     id: string;

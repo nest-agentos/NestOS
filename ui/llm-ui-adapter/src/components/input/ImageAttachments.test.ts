@@ -1,7 +1,7 @@
 import {expect, it, vi} from 'vitest';
 import {ImageAttachments} from './ImageAttachments';
 import {imageFileState} from './image-file-state';
-import type {ImageOutput, ImageProcessor, ImageResizePolicy, ImageSource, ImageSpec, ProcessOptions} from '@itookit/image-parser';
+import type {ImageOutput, ImageProcessor, ImageResizePolicy, ImageSource, ImageSpec, ProcessOptions} from '@nestos/image-parser';
 
 function fixture(process: (source: ImageSource, spec: ImageSpec, options: ProcessOptions) => Promise<ImageOutput>) {
     let files = [new File(['original'], 'photo.png', {type: 'image/png'})], resize: ImageResizePolicy = {mode: 'max-edge', maxEdge: 1024};

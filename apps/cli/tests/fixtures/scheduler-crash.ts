@@ -1,17 +1,17 @@
-import { Kernel } from '@itookit/durable-kernel';
+import { Kernel } from '@nestos/durable-kernel';
 
 // Inject only at public host boundaries; the killed process never rewrites durable state.
 const submit = Kernel.prototype.submit;
-Kernel.prototype.submit = async function<I, O>(sessionId: string, spec: import('@itookit/durable-kernel').TaskSpec<I>, options?: import('@itookit/durable-kernel').LeaseGuardOptions) {
+Kernel.prototype.submit = async function<I, O>(sessionId: string, spec: import('@nestos/durable-kernel').TaskSpec<I>, options?: import('@nestos/durable-kernel').LeaseGuardOptions) {
     const handle = await submit.call(this, sessionId, spec, options);
     const target = process.env.NESTOS_TEST_SUBMIT_NODE;
     if (target && (spec.labels?.flowNodeId === target || (target === 'root-created' && spec.labels?.kind === 'flow-root'))) process.kill(process.pid, 'SIGKILL');
-    return handle as import('@itookit/durable-kernel').TaskHandle<O>;
+    return handle as import('@nestos/durable-kernel').TaskHandle<O>;
 };
 
 const setShared = Kernel.prototype.setShared;
-Kernel.prototype.setShared = async function<T extends import('@itookit/durable-kernel').JsonValue>(sessionId: string,
-    key: string, value: T, options?: import('@itookit/durable-kernel').SharedStateWriteOptions) {
+Kernel.prototype.setShared = async function<T extends import('@nestos/durable-kernel').JsonValue>(sessionId: string,
+    key: string, value: T, options?: import('@nestos/durable-kernel').SharedStateWriteOptions) {
     const target = process.env.NESTOS_TEST_COMPLETED_INSTANCE;
     const envelope = value as { version?: number; state?: { completed?: string[] }; frozenKey?: string; completed?: string[]; appliedPatches?: unknown[] } | null;
     const completed = (envelope?.version === 2 ? envelope.state : envelope)?.completed;
@@ -21,7 +21,7 @@ Kernel.prototype.setShared = async function<T extends import('@itookit/durable-k
     if (process.env.NESTOS_TEST_SUBMIT_NODE === 'graph-patched' && key.endsWith('.scheduler')
         && appliedPatches?.length) process.kill(process.pid, 'SIGKILL');
     if (target && key.endsWith('.scheduler') && completed?.includes(target)) process.kill(process.pid, 'SIGKILL');
-    return setShared.call(this, sessionId, key, value, options) as Promise<import('@itookit/durable-kernel').SharedStateEntry<T>>;
+    return setShared.call(this, sessionId, key, value, options) as Promise<import('@nestos/durable-kernel').SharedStateEntry<T>>;
 };
 
 const createResource = Kernel.prototype.createResource;

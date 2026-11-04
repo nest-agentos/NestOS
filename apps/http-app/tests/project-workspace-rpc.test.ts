@@ -1,7 +1,7 @@
 import {expect, it, vi} from 'vitest';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {RpcPeer} from '@itookit/app-transport/application';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {RpcPeer} from '@nestos/app-transport/application';
 
 it('transports prepared file metadata with the workspace lease and preserves release ownership', async () => {
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'cli', startupMode: 'interactive', digitalTwinAutoStart: false});

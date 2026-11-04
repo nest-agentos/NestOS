@@ -1,11 +1,11 @@
-import { createSettingsFactory, createSettingsNavigation } from '@itookit/app-settings';
-import type { SettingsFactoryOptions } from '@itookit/app-settings';
-import type { ApplicationBackend } from '@itookit/app-contracts/services';
-import type { SettingsWorkspaceSource } from '@itookit/app-contracts/settings';
-import type { EditorFactory } from '@itookit/ui-common-adapter';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { createSettingsFactory, createSettingsNavigation } from '@nestos/app-settings';
+import type { SettingsFactoryOptions } from '@nestos/app-settings';
+import type { ApplicationBackend } from '@nestos/app-contracts/services';
+import type { SettingsWorkspaceSource } from '@nestos/app-contracts/settings';
+import type { EditorFactory } from '@nestos/ui-common-adapter';
+import type { IFileSystem } from '@nestos/vfs-core';
 import type { WorkspaceConfig } from '../types';
-import { traceBoot } from '@itookit/common';
+import { traceBoot } from '@nestos/common';
 import { lazyResource } from '../lifecycle/lazy-resource';
 import mediaProbeExamples from '../config/media-probe-examples.json';
 

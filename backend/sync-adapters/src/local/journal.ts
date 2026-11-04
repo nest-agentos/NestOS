@@ -1,7 +1,7 @@
 import { link, mkdir, readFile, readdir, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { assertBinding, assertSync, applyBaseline, sha256, type FileAction, type SyncState } from '@itookit/vfs-sync';
-import type { ISidecarDb, LocalStorageAccess } from '@itookit/vfsdriver-local';
+import { assertBinding, assertSync, applyBaseline, sha256, type FileAction, type SyncState } from '@nestos/vfs-sync';
+import type { ISidecarDb, LocalStorageAccess } from '@nestos/vfsdriver-local';
 import { createDurable, ensureDirectory, nativePath, stat, syncDirectory } from './files';
 import { inspectNode, scanLocal, type LocalNode, type LocalSnapshot } from './scan';
 export interface JournalItem { action: FileAction; expected?: LocalNode; stage?: string; backup: string; installed?: { dev: string; ino: string }; done?: boolean }

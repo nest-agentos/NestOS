@@ -1,1 +1,1 @@
-export {downscaleImageForOcr, type DownscaleOptions} from '@itookit/llm-ui';
+export {downscaleImageForOcr, type DownscaleOptions} from '@nestos/llm-ui';

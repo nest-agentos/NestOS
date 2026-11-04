@@ -1,6 +1,6 @@
 import type { FlowInputConfig, FlowInputField, JsonValue } from '../../contracts';
-import type { Decision, DurableTaskProgram, TaskInputEvent } from '@itookit/durable-kernel';
-import { collectDependency, dependenciesReady, dependencyWait } from '@itookit/llm-tasks';
+import type { Decision, DurableTaskProgram, TaskInputEvent } from '@nestos/durable-kernel';
+import { collectDependency, dependenciesReady, dependencyWait } from '@nestos/llm-tasks';
 import type { FlowDependencyBinding } from '../programs';
 import { assertKey, object, outcome } from './value';
 import { validFlowImages, validImageConstraints } from '../../contracts/flow-images';

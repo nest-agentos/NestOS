@@ -1,6 +1,6 @@
-import { t } from '@itookit/common';
-import { SettingsAutoSave } from '@itookit/ui-common-adapter';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import { SettingsAutoSave } from '@nestos/ui-common-adapter';
+import type { ProjectService } from '@nestos/app-contracts/services';
 import { AgentProjectPreferences } from './agent-project-preferences';
 import { sessionCreationReason } from './session-creation-policy';
 

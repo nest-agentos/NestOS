@@ -1,4 +1,4 @@
-import type { JsonValue, SessionHandle, TaskHandle } from '@itookit/durable-kernel';
+import type { JsonValue, SessionHandle, TaskHandle } from '@nestos/durable-kernel';
 import type { FlowWorkspaceLease } from './run-lifecycle';
 
 export interface WorkspaceFinalization { status: 'pending' | 'succeeded' | 'failed'; message?: string; persistenceError?: string; }

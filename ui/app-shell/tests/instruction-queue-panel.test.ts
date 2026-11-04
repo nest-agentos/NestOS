@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { SessionCommand, type SessionInstructionQueue } from '@itookit/llm-session/contracts';
+import { SessionCommand, type SessionInstructionQueue } from '@nestos/llm-session/contracts';
 import { InstructionQueuePanel } from '../../llm-ui-adapter/src/components/InstructionQueuePanel';
-import {InstructionQueueView} from '@itookit/llm-ui';
+import {InstructionQueueView} from '@nestos/llm-ui';
 
 const panels: InstructionQueuePanel[] = [];
 afterEach(() => { panels.splice(0).forEach(panel => panel.destroy()); document.body.replaceChildren(); vi.restoreAllMocks(); });

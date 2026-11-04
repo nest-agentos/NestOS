@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IDeviceDriver } from '@itookit/vfs-core';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IDeviceDriver } from '@nestos/vfs-core';
 import { createKernelRuntime } from '../src/runtime/create-kernel-runtime';
 
 it('locates media receipts by Session identity without enumerating other Sessions', async () => {

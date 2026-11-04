@@ -1,8 +1,8 @@
-import { folderBrowserPath, resolveBrowserTarget } from '@itookit/app-contracts';
-import type { ProjectService, ProjectFolder } from '@itookit/app-contracts/services';
-import type { IFileSystem, FSNode } from '@itookit/vfs-core';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
-import { describeCauseChain } from '@itookit/vfs-ui';
+import { folderBrowserPath, resolveBrowserTarget } from '@nestos/app-contracts';
+import type { ProjectService, ProjectFolder } from '@nestos/app-contracts/services';
+import type { IFileSystem, FSNode } from '@nestos/vfs-core';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
+import { describeCauseChain } from '@nestos/vfs-ui';
 
 /** The destination identity stays canonical while the project title replaces the section label. */
 export async function projectTransferTargets(projects: ProjectService, fs: IFileSystem,

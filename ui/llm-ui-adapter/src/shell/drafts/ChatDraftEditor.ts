@@ -12,12 +12,12 @@ import {chatOcrPort} from '../ocr-port';
 
 import {prepareImageChatOptions} from '../../independent/image-chat-view';
 import type {ImageEditingHost} from '../../independent/image-editing';
-import {createChatView, createOperationLedger, type ChatOptions, type ChatView, type ChatSubmission, type ComposerDraft, type SelectorView, type SendPreparation} from '@itookit/llm-ui';
-import {BaseSettingsEditor, Toast, type EditorFactory, type IEditor, type EditorEvent, type EditorEventMap, type EditorEventCallback} from '@itookit/ui-common-adapter';
-import {createModuleLogger, getLocale, randomUUID, escapeHTML, t} from '@itookit/common';
-import type {IAgentConfigService, ChatConfigurationView} from '@itookit/kernel-adapters/contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
-import type {SessionSubmission} from '@itookit/llm-flow/contracts';
+import {createChatView, createOperationLedger, type ChatOptions, type ChatView, type ChatSubmission, type ComposerDraft, type SelectorView, type SendPreparation} from '@nestos/llm-ui';
+import {BaseSettingsEditor, Toast, type EditorFactory, type IEditor, type EditorEvent, type EditorEventMap, type EditorEventCallback} from '@nestos/ui-common-adapter';
+import {createModuleLogger, getLocale, randomUUID, escapeHTML, t} from '@nestos/common';
+import type {IAgentConfigService, ChatConfigurationView} from '@nestos/kernel-adapters/contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
+import type {SessionSubmission} from '@nestos/llm-flow/contracts';
 import {ChatProjection} from '../../independent/projection';
 import {SessionCallTargets} from '../../independent/session-targets';
 import {chatSelectors, mountChatSettings} from '../chat-settings';
@@ -66,7 +66,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     private executors: Awaited<ReturnType<typeof buildExecutorOptions>> = [];
     constructor(container: HTMLElement, agents: IAgentConfigService, private config: Options,
         private readonly factory: (container: HTMLElement, options: EditorOptions, handoff: RetainedWorkspaceHandoff) => Promise<IEditor>,
-        private readonly controls: {commands?: ICommandBus; configuration?: ChatConfigurationView; ocr?: import('@itookit/app-contracts/services').OcrControls}) {
+        private readonly controls: {commands?: ICommandBus; configuration?: ChatConfigurationView; ocr?: import('@nestos/app-contracts/services').OcrControls}) {
         super(container, agents, config);
         if (!config.sessionDraft) throw new Error('Project draft controls are required');
         this.store = new ChatDraftStore(config.sessionDraft);
@@ -278,7 +278,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         return draftHarnessTarget(executorId, draft?.selection, this.nativeModels.get(executorId ?? ''));
     }
     private draftTitle(): string {return this.view?.getDraft().selection?.draftTitle ?? this.store.draft?.selection?.draftTitle ?? '';}
-    private toolbar(root: HTMLElement, context: import('@itookit/llm-ui').ToolbarContext) {
+    private toolbar(root: HTMLElement, context: import('@nestos/llm-ui').ToolbarContext) {
         const view = context.view;
         const header = mountDraftHeader(root, {controls: this.config.sessionDraft!, title: () => this.draftTitle(),
             busy: () => !!this.config.sessionDraft?.locked || this.submissionStarted || this.transferred || this.rebuilding || this.preparing || view.inputBusy || !!this.prepared,

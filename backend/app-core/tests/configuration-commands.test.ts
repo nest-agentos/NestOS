@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
+import { MemoryBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime, type ApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { ConfigurationMutationError, ModelConfigurationCommands } from '../src/configuration/model-commands';
 import { ToolboxDrawers } from '../src/configuration/toolbox-drawers';

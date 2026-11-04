@@ -1,8 +1,8 @@
-import { ACTION_ICONS, t } from '@itookit/common';
-import { Toast, type ContextMenuConfig } from '@itookit/ui-common-adapter';
+import { ACTION_ICONS, t } from '@nestos/common';
+import { Toast, type ContextMenuConfig } from '@nestos/ui-common-adapter';
 import { FlowLauncher, flowIdFromNodeId, type FlowRunOptions } from './run-flow';
 import { restoreFlowLibrary } from './library';
-import type { FlowDraft } from '@itookit/llm-flow/contracts';
+import type { FlowDraft } from '@nestos/llm-flow/contracts';
 
 export interface FlowContextMenuOptions extends FlowRunOptions { library?: readonly FlowDraft[]; }
 

@@ -12,8 +12,8 @@ import {DocumentChatFileView} from '../document-chat/file';
 import {documentChatBacklinks} from '../document-chat/backlinks';
 import {submitSession, prepareSessionBranch} from '../session/submit-session';
 import { navigationView, warmNavigation } from './navigation-view';
-import { createNestosProviderTemplates } from '@itookit/kernel-adapters/llm/presets';
-import { createFileSystemView, FSError } from '@itookit/vfs-core';
+import { createNestosProviderTemplates } from '@nestos/kernel-adapters/llm/presets';
+import { createFileSystemView, FSError } from '@nestos/vfs-core';
 import { createToolboxFiles } from '../configuration/toolbox-files';
 import { withConfigurationImport } from '../configuration/configuration-import';
 import { SettingsService } from '../settings/SettingsService';
@@ -22,7 +22,7 @@ import { NestosInitialFiles } from '../presets/initial-files';
 import { createNestosFlowDrawers } from '../presets/flow-library';
 import { PrivilegedCommandService } from '../kernel/privileged-command-service';
 import {configuredToolCatalog} from '../kernel/tool-commands';
-import { createSessionSkillControls } from '@itookit/kernel-adapters';
+import { createSessionSkillControls } from '@nestos/kernel-adapters';
 import { ProjectSessions } from '../projects/project-sessions';
 import { SessionLifecycleService } from '../session/session-lifecycle';
 import { WorkbenchArchiveExporter } from '../projects/workbench-archive';
@@ -36,7 +36,7 @@ import { ToolboxInventory } from '../configuration/toolbox-catalog';
 import { SkillsEngine } from '../configuration/skills-files';
 import { ToolboxResources } from '../configuration/toolbox-resources';
 import { listRemoteHarnessAgents } from '../projects/remote-agent-catalog';
-import { conversationBranches } from '@itookit/cells-driver';
+import { conversationBranches } from '@nestos/cells-driver';
 import { prepareWorkbenchView } from './workbench-view';
 import { openSessionView } from './session-view';
 import { observeConnections } from './connection-observation';
@@ -47,7 +47,7 @@ import { createSessionDraft } from '../session/create-session-draft';
 import { createChatConfigurationView } from '../configuration/chat-configuration';
 import { taskAttachment } from './task-attachment';
 import {openView} from './open-view';
-import type { ApplicationClient, ApplicationBackend, LocalApplicationServices, LocalBackendOptions, ToolboxView } from '@itookit/app-contracts/services';
+import type { ApplicationClient, ApplicationBackend, LocalApplicationServices, LocalBackendOptions, ToolboxView } from '@nestos/app-contracts/services';
 
 export interface ApplicationViewOptions extends LocalBackendOptions { preload?: boolean; configurationReadonly?: boolean }
 /** Bind construction dependencies once, inside the host rather than across the UI port. */
@@ -185,7 +185,7 @@ async function toolboxView(services: LocalApplicationServices, scope: ViewScope)
     } catch (error) { await resources.close(); throw error; }
 }
 async function conversationFamily(services: LocalApplicationServices, folder: string, profile: string, session: string,
-    options?: import('@itookit/vfs-core').OperationOptions) {
+    options?: import('@nestos/vfs-core').OperationOptions) {
     const project = await services.projects.forFolder(folder), remote = services.projects.remoteMounts;
     if (!project || !remote) throw new FSError('ENOENT', 'Native project unavailable');
     const client = await remote.projectHarness(project.project.id, options ?? {});
@@ -196,7 +196,7 @@ async function conversationFamily(services: LocalApplicationServices, folder: st
     } finally { await client.close(); }
 }
 
-async function settingsService(services: LocalApplicationServices, sources: readonly import('@itookit/app-contracts/settings').SettingsWorkspaceSource[], options: ApplicationViewOptions, scope: ViewScope) {
+async function settingsService(services: LocalApplicationServices, sources: readonly import('@nestos/app-contracts/settings').SettingsWorkspaceSource[], options: ApplicationViewOptions, scope: ViewScope) {
     const service = new SettingsService(services.vfs, undefined, sources, options.snapshots?.(services.vfs));
     try { await service.init(); return await scope.own(service); }
     catch (error) { await service.dispose(); throw error; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FlowNodeDefinition } from '@itookit/llm-flow/contracts';
+import type { FlowNodeDefinition } from '@nestos/llm-flow/contracts';
 import { bindFlowNode, bindStandaloneFlowNode } from '../src/session/flow-node-binder';
 import type { AgentResolver } from '../src/session/agent-resolver';
 

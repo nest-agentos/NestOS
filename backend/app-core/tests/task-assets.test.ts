@@ -1,10 +1,10 @@
 import {createTaskAssetStore} from '../src/runtime/task-asset-store';
 import {importInputAsset, readInputAsset, stageInputAssets} from '../src/runtime/input-assets';
 import { afterEach, expect, it, vi } from 'vitest';
-import { Kernel, type EffectExecutionContext } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms } from '@itookit/llm-flow';
-import { createMediaResultStore, type LlmMediaEffectRequest } from '@itookit/kernel-adapters';
+import { Kernel, type EffectExecutionContext } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms } from '@nestos/llm-flow';
+import { createMediaResultStore, type LlmMediaEffectRequest } from '@nestos/kernel-adapters';
 import { createTaskAssetReader } from '../src/runtime/task-assets';
 
 const cleanup: Array<() => Promise<void>> = [];

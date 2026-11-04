@@ -3,7 +3,7 @@
 // 供 loadWorkflow 在 Zod 校验之前调用。完整写法（providers/connections/agents/tasks）
 // 与简写写法可混用：简写生成 default 资源，用户显式定义的资源追加合并。
 
-import { mcpToolId } from '@itookit/tools/mcp-contracts';
+import { mcpToolId } from '@nestos/tools/mcp-contracts';
 
 const PROVIDER_PRESETS: Record<string, { implementation: string; base_url: string }> = {
     anthropic: { implementation: 'anthropic', base_url: 'https://api.anthropic.com' },

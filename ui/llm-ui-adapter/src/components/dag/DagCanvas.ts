@@ -1,6 +1,6 @@
-import {GraphCanvas, type GraphNode, type GraphEdge} from '@itookit/llm-ui/flow';
-import type { DagPluginManifest, FlowDraft, FlowNodeId, FlowNodeDefinition } from '@itookit/llm-flow/contracts';
-import { escapeHTML } from '@itookit/common';
+import {GraphCanvas, type GraphNode, type GraphEdge} from '@nestos/llm-ui/flow';
+import type { DagPluginManifest, FlowDraft, FlowNodeId, FlowNodeDefinition } from '@nestos/llm-flow/contracts';
+import { escapeHTML } from '@nestos/common';
 
 export interface DagCanvasOptions {
     onSelectNode: (nodeId: FlowNodeId) => void;

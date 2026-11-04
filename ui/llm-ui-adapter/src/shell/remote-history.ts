@@ -1,6 +1,6 @@
 import type {ConversationMessage} from '../contracts';
 
-import type { SessionGroup } from '@itookit/llm-session/contracts';
+import type { SessionGroup } from '@nestos/llm-session/contracts';
 import { createTranscriptMarkup } from './transcript-markup';
 import { HistoryView } from '../components/HistoryView';
 import { remoteRounds, remotePrompts, remoteCommandOutputs } from './remote-rounds';

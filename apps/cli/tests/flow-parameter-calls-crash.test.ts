@@ -1,11 +1,11 @@
-import { readFlowSchedulerCheckpoint } from '@itookit/llm-flow';
+import { readFlowSchedulerCheckpoint } from '@nestos/llm-flow';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { copyFile, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
-import { SeqFileKernelStore } from '@itookit/durable-kernel';
+import { SeqFileKernelStore } from '@nestos/durable-kernel';
 import { CliStorageResolver, cliStorage, openProfileInspectionFs } from '../src/runtime';
 import type { RunManifest } from '../src/types';
 

@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { getLogger } from '@itookit/common';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
-import type { FlowDraft } from '@itookit/llm-flow/contracts';
-import { SessionCommand, type SessionInstructionQueue } from '@itookit/llm-session/contracts';
-import { readSessionInstructionQueue } from '@itookit/llm-session';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { getLogger } from '@nestos/common';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
+import type { FlowDraft } from '@nestos/llm-flow/contracts';
+import { SessionCommand, type SessionInstructionQueue } from '@nestos/llm-session/contracts';
+import { readSessionInstructionQueue } from '@nestos/llm-session';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 
 type Runtime = Awaited<ReturnType<typeof createApplicationRuntime>>;

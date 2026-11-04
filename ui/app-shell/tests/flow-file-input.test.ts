@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {InputAssetCommand} from '@itookit/app-contracts';
-import {sha256Hex} from '@itookit/llm-context/digest';
-import type {FlowParameter} from '@itookit/llm-flow/contracts';
+import {InputAssetCommand} from '@nestos/app-contracts';
+import {sha256Hex} from '@nestos/llm-context/digest';
+import type {FlowParameter} from '@nestos/llm-flow/contracts';
 import {flowInputAssets} from '../../llm-ui-adapter/src/flows/input-assets';
 import {validateComposerFiles} from '../../llm-ui-adapter/src/flows/composer-file-bindings';
 import {promptFlowParameters} from '../../llm-ui-adapter/src/components/FlowParameterForm';

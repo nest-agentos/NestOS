@@ -1,4 +1,4 @@
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
 
 let sequence = 0;
 export function freshIDB(prefix = 'sync-test'): IndexedDBBackend {

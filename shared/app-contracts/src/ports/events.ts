@@ -1,4 +1,4 @@
-import type { EventCursor, JournalEvent, JournalPage } from '@itookit/vfs-core';
+import type { EventCursor, JournalEvent, JournalPage } from '@nestos/vfs-core';
 
 /** No message bodies, tool parameters or credentials belong in application event payloads. */
 export interface ApplicationEventFact {

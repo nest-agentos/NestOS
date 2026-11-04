@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
-import {SessionCommand, type SubmissionRequest, type SessionInstructionQueue, type SubmissionReceipt} from '@itookit/llm-session/contracts';
+import {createOperationLedger} from '@nestos/llm-ui';
+import {SessionCommand, type SubmissionRequest, type SessionInstructionQueue, type SubmissionReceipt} from '@nestos/llm-session/contracts';
 import type {CommandContext} from './CommandContext';
 import {submitSessionCall, reconcileSessionCall} from './submit-session-call';
 
@@ -75,7 +75,7 @@ it('preserves a concurrent terminal rejection instead of reporting contradictory
 it('persists and delivers the same frozen request and context evidence while ledger storage is suspended', async () => {
     let release!: () => void, entered!: () => void, first = true;
     const waiting = new Promise<void>(resolve => {release = resolve;}), saving = new Promise<void>(resolve => {entered = resolve;});
-    let saved: readonly import('@itookit/llm-ui').OperationRecord[] = [];
+    let saved: readonly import('@nestos/llm-ui').OperationRecord[] = [];
     const operations = createOperationLedger({save: async records => {
         saved = structuredClone(records); if (first) {first = false; entered(); await waiting;}
     }}), f = setup(); f.ctx.operations = operations;

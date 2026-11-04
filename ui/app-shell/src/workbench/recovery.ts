@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type {IEditor} from '@itookit/ui-common-adapter';
+import {t} from '@nestos/common';
+import type {IEditor} from '@nestos/ui-common-adapter';
 
 export interface RecoveryParticipant {
     captureRecovery?(): unknown;

@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import type {ApplicationClient} from '@itookit/app-contracts/services';
-import {SessionCommand, type SubmissionRequest} from '@itookit/llm-session/contracts';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
+import {SessionCommand, type SubmissionRequest} from '@nestos/llm-session/contracts';
 import {watchSubmissionExecution} from '../src/submission-execution';
 
 function setup() {

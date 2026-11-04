@@ -77,7 +77,7 @@ export interface RemoteProjectStatus {
         lastSuccessAt?: number;
         failure?: DiagnosticEvent;
         connectionName?: string;
-        protocol?: import('@itookit/tools/mcp-contracts').MCPConnectionState;
+        protocol?: import('@nestos/tools/mcp-contracts').MCPConnectionState;
         protocolVersion?: string;
         fileProtocol?: string;
         projectProtocol?: string;

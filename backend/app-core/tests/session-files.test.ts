@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createVFS, createFileSystemView, type IFileSystem } from '@itookit/vfs-core';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
+import { createVFS, createFileSystemView, type IFileSystem } from '@nestos/vfs-core';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
 import { SessionFilesService } from '../src/vfs/session-files';
 import { createSessionAttachmentMounts } from '../src/vfs/session-attachments';
 
@@ -179,7 +179,7 @@ describe('Session file contexts', () => {
 });
 
 it('maps granted Session attachments without history and revokes derived maps', async () => {
-    const { SessionRepository } = await import('@itookit/llm-session');
+    const { SessionRepository } = await import('@nestos/llm-session');
     const { manager } = await createVFS({ rootBackend: new IndexedDBBackend({ dbName: crypto.randomUUID() }) });
     cleanup.push(() => manager.dispose());
     const root = await manager.openFileSystem('/');

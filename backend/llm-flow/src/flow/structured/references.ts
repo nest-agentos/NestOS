@@ -2,7 +2,7 @@ import { validateVariableGraph, nodeUsesVariables } from '../variables';
 import { prepareFlowParameters } from '../parameters';
 import { flowTemplateReferences, renderFlowTemplate, renderFlowText, type FlowTemplateContext } from '../../contracts';
 import type { DagNodeDefinition, DagEdgeDefinition, DagRunSpec, JsonValue } from '../../contracts';
-import { extractNodeOutput } from '@itookit/llm-tasks';
+import { extractNodeOutput } from '@nestos/llm-tasks';
 import { findCycles } from '../graph';
 import { object } from './value';
 

@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {ContextAssembler, type ContextPlan} from '@itookit/llm-context';
+import {ContextAssembler, type ContextPlan} from '@nestos/llm-context';
 import {ConversationContextBuilder} from '../src/session/conversation-context';
 import {snapshotDirectAgentPolicy} from '../src/contracts/direct-agent-policy';
 

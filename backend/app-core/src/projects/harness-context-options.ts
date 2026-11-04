@@ -1,10 +1,10 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {ContextBinding} from '@itookit/kernel-adapters/contracts';
-import {publishedAgentDefinition} from '@itookit/kernel-adapters/contracts';
-import {assertRootCallable, sameTargetRef} from '@itookit/llm-flow/contracts';
-import type {SessionRepository, VFSAgentService} from '@itookit/llm-session';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {ContextBinding} from '@nestos/kernel-adapters/contracts';
+import {publishedAgentDefinition} from '@nestos/kernel-adapters/contracts';
+import {assertRootCallable, sameTargetRef} from '@nestos/llm-flow/contracts';
+import type {SessionRepository, VFSAgentService} from '@nestos/llm-session';
 import {assertContextOptionsQuery, directHarnessContextIdentity, type ContextOptionsQuery, type ContextOptionsPage,
-    type ContextOptionsReader, type ContextBindingPage} from '@itookit/llm-session/contracts';
+    type ContextOptionsReader, type ContextBindingPage} from '@nestos/llm-session/contracts';
 import {contextBindingCheckpoints, contextBindingSummary, contextCheckpointSummary, projectContextBindingPage,
     readContextCatalog, type ContextInspector} from './harness-context-catalog';
 import type {HarnessConnectionService, HarnessConnectionInspection} from './harness-connections';

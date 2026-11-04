@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import { DEFAULT_AGENT_MAX_EXCHANGES, type ChatExecutionMode } from '@itookit/llm-tasks/contracts';
+import { t } from '@nestos/common';
+import { DEFAULT_AGENT_MAX_EXCHANGES, type ChatExecutionMode } from '@nestos/llm-tasks/contracts';
 
 export interface ExecutionModeViewState {
     mode?: ChatExecutionMode;

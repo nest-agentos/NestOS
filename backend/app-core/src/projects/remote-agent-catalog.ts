@@ -1,6 +1,6 @@
-import { ENTITY_ICONS, t } from '@itookit/common';
-import type { HarnessProfile } from '@itookit/cells-driver';
-import type { ProjectRemoteMountPort } from '@itookit/app-contracts/services';
+import { ENTITY_ICONS, t } from '@nestos/common';
+import type { HarnessProfile } from '@nestos/cells-driver';
+import type { ProjectRemoteMountPort } from '@nestos/app-contracts/services';
 export interface RemoteHarnessAgent { id: string; name: string; description: string; source: string; icon: string; connectionId: string; profile: HarnessProfile }
 /** Only verified cells connections and server-advertised project harnesses appear. */
 export async function listRemoteHarnessAgents(remote?: ProjectRemoteMountPort): Promise<RemoteHarnessAgent[]> {

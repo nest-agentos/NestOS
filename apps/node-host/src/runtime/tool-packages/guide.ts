@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {ToolPackageGuide, ToolPackageInfo} from '@itookit/app-contracts/services';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {ToolPackageGuide, ToolPackageInfo} from '@nestos/app-contracts/services';
 import {packageError, type ToolPackageSource} from './manifest';
 import {readYamlSidecar, writeYamlSidecar} from './yaml-sidecar';
 const log = createModuleLogger('tool-package-guide');

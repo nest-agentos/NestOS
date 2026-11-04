@@ -1,15 +1,15 @@
-import {getLocale} from '@itookit/common';
+import {getLocale} from '@nestos/common';
 import { createSlashCommandCatalog } from './slash-command-catalog';
 // @file: llm-ui/components/input/plugins/SlashCommandPlugin.ts
 
 import type { InputPlugin, InputPluginContext } from './InputPlugin';
-import { PopupPanel, PopupItem } from '@itookit/llm-ui';
+import { PopupPanel, PopupItem } from '@nestos/llm-ui';
 import type { SkillInfo, SkillInvocation } from '../../../domain/types';
 import { parseSkillArgs } from '../SkillInvocationParser';
 import { injectStyle } from '../../../utils/styleInjector';
 import { insertBeforeWrapper } from '../../../utils/domInsertion';
-import { Toast } from '@itookit/ui-common-adapter';
-import { ENTITY_ICONS, t, type LocaleKey } from '@itookit/common';
+import { Toast } from '@nestos/ui-common-adapter';
+import { ENTITY_ICONS, t, type LocaleKey } from '@nestos/common';
 
 // ── Tool arg parser ──────────────────────────────────────────────────────────
 // Parses slash command args: positionals and --flag value pairs.
@@ -30,7 +30,7 @@ export interface SlashCommandDef {
      * 因此别名不会绕过 `name` 的执行路径。
      */
     aliases?: string[];
-    /** 图标；必须取自 `@itookit/common` 的 SLASH_ICONS */
+    /** 图标；必须取自 `@nestos/common` 的 SLASH_ICONS */
     icon?: string;
     /** 分组 */
     group?: string;

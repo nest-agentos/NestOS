@@ -1,8 +1,8 @@
-import {remoteSessionPath} from '@itookit/app-contracts';
-import type {ProjectService} from '@itookit/app-contracts/services';
-import type {KanbanExternalReference} from '@itookit/kanban/contracts';
-import {KANBAN_EXECUTION_SESSION} from '@itookit/app-contracts';
-import {t} from '@itookit/common';
+import {remoteSessionPath} from '@nestos/app-contracts';
+import type {ProjectService} from '@nestos/app-contracts/services';
+import type {KanbanExternalReference} from '@nestos/kanban/contracts';
+import {KANBAN_EXECUTION_SESSION} from '@nestos/app-contracts';
+import {t} from '@nestos/common';
 
 export const sessionUrl = (id: string): string => workbenchUrl(id);
 export function kanbanReferenceLink(projects: Pick<ProjectService, 'get'>) {

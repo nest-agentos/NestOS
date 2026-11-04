@@ -1,6 +1,6 @@
 # Flow 图片处理与资产引用
 
-平台提供通用资产端口，图片算法由 `tools/image-tools` 提供；Flow 使用现有 `builtin.tool` 节点调用 `image.process@1`。核心没有 Anki 分支，也没有图片处理专用节点。Web 和 Tauri 经 `@itookit/image-tools/browser` 独立宿主入口装配同一 Canvas 引擎，不依赖其他 app；CLI / HTTP 装配 Sharp 引擎，Node 入口不加载 Canvas 或 DOM。
+平台提供通用资产端口，图片算法由 `tools/image-tools` 提供；Flow 使用现有 `builtin.tool` 节点调用 `image.process@1`。核心没有 Anki 分支，也没有图片处理专用节点。Web 和 Tauri 经 `@nestos/image-tools/browser` 独立宿主入口装配同一 Canvas 引擎，不依赖其他 app；CLI / HTTP 装配 Sharp 引擎，Node 入口不加载 Canvas 或 DOM。
 
 ```mermaid
 C4Component
@@ -82,6 +82,6 @@ Tool 返回 `images`、`items` 和 `bytes`。`items` 保存原图 `source`、派
 
 ## 验证
 
-- `pnpm --filter @itookit/image-tools test`：Sharp 真实像素、质量预算、单图恢复、缓存校验。
-- `IMAGE_PARSER_BROWSER_FIXTURE=examples/processing.html pnpm --filter @itookit/image-parser test:browser`：真实 Canvas 缩放、灰度、二值化、编码及原图保留。
+- `pnpm --filter @nestos/image-tools test`：Sharp 真实像素、质量预算、单图恢复、缓存校验。
+- `IMAGE_PARSER_BROWSER_FIXTURE=examples/processing.html pnpm --filter @nestos/image-parser test:browser`：真实 Canvas 缩放、灰度、二值化、编码及原图保留。
 - `node apps/cli/scripts/verify-anki-flow.mjs`：真实图片处理、模型协议桩、人工校对、进程重启及 Rust Anki 打包；不调用付费模型。

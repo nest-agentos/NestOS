@@ -1,5 +1,5 @@
 import type { Call, Reply } from '../rpc/protocol';
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 interface Pending { call: Call; resolve(reply: Reply): void; reject(error: unknown): void }
 /** Only independent read queries share a request; commands retain their own acknowledgement. */

@@ -1,15 +1,15 @@
 import type {CollectionProject} from './collection-destination';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 import {scannerHistory, scanCollectionSummary, scanRunState} from './scan-history';
 import {collectionFields} from './collection-fields';
 import {collectionDestinationSummary} from './collection-destination';
-import type {TwinScannerTool} from '@itookit/app-contracts';
+import type {TwinScannerTool} from '@nestos/app-contracts';
 import {executorFields} from './scanner-fields';
-import type {RootCallTarget} from '@itookit/llm-session/contracts';
+import type {RootCallTarget} from '@nestos/llm-session/contracts';
 import { twinError } from './error-view';
-import { escapeHTML, escapeAttr } from '@itookit/common';
-import { TWIN_KINDS } from '@itookit/app-contracts';
-import type { TwinScanPlan, TwinDataRecord } from '@itookit/app-contracts/services';
+import { escapeHTML, escapeAttr } from '@nestos/common';
+import { TWIN_KINDS } from '@nestos/app-contracts';
+import type { TwinScanPlan, TwinDataRecord } from '@nestos/app-contracts/services';
 import { button, label, select, sources, updateSettings, type TwinSnapshot } from './view';
 import { scanListFilters, scanListPagination } from './scan-list';
 

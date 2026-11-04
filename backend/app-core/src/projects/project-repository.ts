@@ -1,8 +1,8 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import {allocateProjectId} from './project-id';
-import { moveSessionDataDirectory } from '@itookit/llm-session';
-import { FSError, type IFileSystem, type FileSystemSourceOwner } from '@itookit/vfs-core';
-import type { DirectoryMountService } from '@itookit/app-contracts/services';
+import { moveSessionDataDirectory } from '@nestos/llm-session';
+import { FSError, type IFileSystem, type FileSystemSourceOwner } from '@nestos/vfs-core';
+import type { DirectoryMountService } from '@nestos/app-contracts/services';
 import { mapConcurrent } from '../utils/map-concurrent';
 
 const ROOT = '/home/admin/projects';

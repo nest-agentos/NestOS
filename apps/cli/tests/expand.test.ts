@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { expandWorkflow } from '../src/expand';
 import { validateWorkflow } from '../src/config';
 import type { WorkflowConfigV1 } from '../src/types';
-import {compileWorkflow} from '@itookit/llm-flow';
+import {compileWorkflow} from '@nestos/llm-flow';
 
 describe('expandWorkflow', () => {
     it('orders tool dependencies without silently injecting them into arguments', () => {

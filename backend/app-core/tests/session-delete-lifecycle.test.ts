@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { Kernel } from '@itookit/durable-kernel';
-import { SessionDirectoryStorageResolver, SessionRepository, sessionDirectoryStorage } from '@itookit/llm-session';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { SessionDirectoryStorageResolver, SessionRepository, sessionDirectoryStorage } from '@nestos/llm-session';
 import { SessionLifecycleService } from '../src/session/session-lifecycle';
 
 let cleanup: Array<() => Promise<void>> = [];

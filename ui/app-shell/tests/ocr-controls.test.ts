@@ -1,13 +1,13 @@
-import {OcrSettingsForm} from '@itookit/llm-ui-adapter/settings';
-import type {OcrControls} from '@itookit/app-contracts/services';
+import {OcrSettingsForm} from '@nestos/llm-ui-adapter/settings';
+import type {OcrControls} from '@nestos/app-contracts/services';
 
 import { ChatInput } from '../../llm-ui-adapter/src/components/input/ChatInputView';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { OcrService, createApplicationRuntime, type ApplicationRuntime } from '@itookit/app-core';
-import { t } from '@itookit/common';
-import { type ILLMService } from '@itookit/driver-llm/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { OcrService, createApplicationRuntime, type ApplicationRuntime } from '@nestos/app-core';
+import { t } from '@nestos/common';
+import { type ILLMService } from '@nestos/driver-llm/contracts';
 
 import { createOcrControls } from '../src/configuration/ocr-controls';
 import { ConfigurationDeletionDialog } from '../src/configuration/delete-dialog';

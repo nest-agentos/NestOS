@@ -1,4 +1,4 @@
-import type { ChatConfigurationView, IAgentConfigService } from '@itookit/kernel-adapters/contracts';
+import type { ChatConfigurationView, IAgentConfigService } from '@nestos/kernel-adapters/contracts';
 import type { ConnectionOption } from '../domain/types';
 import { buildConnectionOptions } from './AgentProvider';
 

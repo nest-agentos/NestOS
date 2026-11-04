@@ -1,7 +1,7 @@
 import previousDefaults from './fixtures/kanban-default-prompts-v1.json';
 import defaults from '../src/presets/kanban-development-prompts.json';
 import {afterEach, expect, it} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {developmentPolicy} from '../src/presets/kanban-development-policy';
 import {publishPromptBundle, hasMarkdownSection} from '../src/run/prompt-bundle';

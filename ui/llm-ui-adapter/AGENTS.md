@@ -56,7 +56,7 @@ HistoryView 经 `mountHistorySearch` 按展示顺序向独立 llm-ui 投影已�
 
 `remote-rounds` 将系统/工具事件编码为专用 fenced block，`transcript-markup` 的 createTranscriptMarkup 扩展渲染有来源标签的辅助信息：系统提示淡紫色、默认折叠，工具灰色标签与命令/目标摘要，保持轮内顺序；原始内容全部转义。llm-ui 将原生消息身份编码为通用 `data-mdx-disclosure-key`，由 mdxeditor 在快照更新时保留展开状态；普通回答仍使用 Markdown，未知代码语言继续走共享代码块控件，历史和打印均设置公共 `htmlPolicy: 'literal'`，打印复用同一视图的登记与扩展。仅视图投影登记的块允许角色呈现，并核对块正文；普通消息中的同名代码围栏继续按代码显示。回归见 app-shell 的 remote-conversation-editor 测试。
 
-Web 首屏仅通过 `@itookit/llm-ui-adapter/startup` 加载 Flow 模板和菜单；完整入口 `@itookit/llm-ui-adapter` 在首次打开聊天、Agent、Flow 或 Skill 正文时异步加载。`vite.startup.config.ts` 为发布包生成独立的 `dist/startup.js`。
+Web 首屏仅通过 `@nestos/llm-ui-adapter/startup` 加载 Flow 模板和菜单；完整入口 `@nestos/llm-ui-adapter` 在首次打开聊天、Agent、Flow 或 Skill 正文时异步加载。`vite.startup.config.ts` 为发布包生成独立的 `dist/startup.js`。
 
 ChatInput 工具栏的「对话 / 执行」由 `ExecutionModeControl` 呈现，通过具名 `ExecutionModeViewState` 接收展示状态；模式及 executionModeLocked 随 Session settings 保存；首次直接运行获准入队后固定，停止或失败不解锁，新草稿仍可选择。模式固定后隐藏输入区选择器，经 ChatInputOptions.executionModeInfo 在顶部更多菜单显示只读模式与说明，销毁释放外部挂载；原生执行器不显示本地模式。发送/重新生成显式携带模式，Flow 会话禁用开关。工具由宿主与 llm-session 装配：未配置白名单时执行模式使用宿主默认工具，显式白名单优先；UI 不自行枚举工具或改变目录授权。Task 过滤与预算由 llm-session 固定。相关回归在 app-shell 的 `chat-execution-mode.test.ts`。
 
@@ -72,7 +72,7 @@ ChatInput 工具栏的「对话 / 执行」由 `ExecutionModeControl` 呈现，�
 - `DagWorkbench` 从 `FlowCommand.Presentations` 返回的插件呈现（manifest + `ui.palette`）构建 Palette、端口和表单。
 - `builtin.flow@2` 单次调用按子 Flow 声明展示命名输出；`parameterSets` 多组调用仅展示按组返回的 `result` 端口。参数组数组或整值引用、共享 `parameters` 和 `maxConcurrency` 通过通用 SchemaForm 编辑，切换函数签名及保存须保留这些字段；DOM 回归见 app-shell 的 flow-function-authoring。
 - 函数选择与签名优先读取当前草稿的 `functions`，同名全局定义只作外部回退。内联函数不请求全局 RevisionGet；设计器、Controller 的编辑、撤销、重做及保存完整保留嵌套函数表，不能为展示签名将其拆成全局资源。
-- UI 不 import DAG Runtime；对 `@itookit/durable-kernel` 只有 `import type`。
+- UI 不 import DAG Runtime；对 `@nestos/durable-kernel` 只有 `import type`。
 - `/skills` 独立对话框中的 Skill 面板列表经 `src/shell/skill-refresh.ts` 的 `bindSkillRefresh(controls, sessionId, refresh)` 与 `SessionSkillControls.onChange` 保持同步：绑定后拉取一次、每次目录变更通知重新拉取，`LLMWorkspaceEditor.destroy()` 解绑（无轮询）。通知仅在宿主进程内传播，在途 Task 的上下文不变。
 - TTY 面板（`TtyPanel` / `TtyController`）只展示运行输出，输出块以文本节点写入（禁止拼接未转义 HTML）；交互输入必须通过 Kernel 控制面。 终态语义：`finalize(exitCode)` 如实报告退出码，`null`（`tty_close` 未观测到退出码）显示 `Process stopped (exit code unknown)`，且终态后到达的输出被忽略。回归在 `ui/app-shell/tests/tty-panel.test.ts`（jsdom；llm-ui 的 vitest 无 jsdom）。
 
@@ -93,13 +93,13 @@ Harness 工具卡片由 `node:appended` 立即挂载，再消费 `tool:running/s
 ## 运行
 
 ```bash
-pnpm --filter @itookit/llm-ui-adapter typecheck
-pnpm --filter @itookit/llm-ui-adapter build
+pnpm --filter @nestos/llm-ui-adapter typecheck
+pnpm --filter @nestos/llm-ui-adapter build
 ```
 
-测试用例为 `src/**/*.test.ts`：`pnpm --filter @itookit/llm-ui-adapter test`（vitest run）或 `test:watch`。
+测试用例为 `src/**/*.test.ts`：`pnpm --filter @nestos/llm-ui-adapter test`（vitest run）或 `test:watch`。
 
-Skill 列表通过 bindSkillRefresh 返回的 refresh/dispose 与 SessionSkillControls.onChange 保持一致；菜单请求共用刷新队列，销毁时 dispose。/sk-<id> 发送前重新核验定义，action/silent 仅走显式用户请求。测试入口为 pnpm --filter @itookit/llm-ui-adapter test（vitest run）及 test:watch。
+Skill 列表通过 bindSkillRefresh 返回的 refresh/dispose 与 SessionSkillControls.onChange 保持一致；菜单请求共用刷新队列，销毁时 dispose。/sk-<id> 发送前重新核验定义，action/silent 仅走显式用户请求。测试入口为 pnpm --filter @nestos/llm-ui-adapter test（vitest run）及 test:watch。
 
 恢复边界：`restoreWaitingAttachment` 只恢复当前 Session 仍待交互的非终态 Task；编辑器关闭、新挂接或会话身份改变后丢弃旧恢复结果。RunAttachmentController 在异步打开前捕获 revision，事件重放前核验审批仍为 pending。SendMessageCommand 不按轮次差集删除发送记录，失败可能只是回复丢失。TTY finalize 保留首次结束信息；未知退出码显示本地化的未知状态。回归见 app-shell 的 pending-interaction-restore、attachment-restore-race、send-failure-consistency、tty-panel、terminal-node-reason 测试。
 

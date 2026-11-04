@@ -41,7 +41,7 @@ nestos httpd
 ./apps/http-app/scripts/create-certificates.sh --cert-host 192.168.31.10
 ```
 
-也可运行 `pnpm --filter @itookit/http-app create:certs --cert-host 192.168.31.10`。脚本可从任意目录调用，`--help` 查看参数；使用 `--cert-dir /path/to/private/certs` 指定输出目录，相对路径按调用目录解析。脚本设置私有文件权限，并复用服务端证书生成逻辑。
+也可运行 `pnpm --filter @nestos/http-app create:certs --cert-host 192.168.31.10`。脚本可从任意目录调用，`--help` 查看参数；使用 `--cert-dir /path/to/private/certs` 指定输出目录，相对路径按调用目录解析。脚本设置私有文件权限，并复用服务端证书生成逻辑。
 
 默认生成到 `~/.config/nestos/http-certs`，可通过 `nestos.json` 的 `http.certDir` 修改；目录已存在时拒绝覆盖。`--cert-host` 可填写逗号分隔的 IP/DNS 名称，必须覆盖实际访问地址。初始化只打印文件位置，不打印密钥或密码。
 
@@ -61,7 +61,7 @@ nestos httpd
 pnpm httpd
 ```
 
-发布使用根目录的 `pnpm httpd:build` 构建并选择独立 release，再运行 `pnpm httpd`（或 `pnpm --filter @itookit/http-app start`）。`--cert-dir` 指定证书目录，`--audit-file` 指定 JSONL 日志；缺少有效证书或指纹允许名单时拒绝启动。没有匿名或明文降级开关。更新 UI 也需构建新 release，并在重启后生效。
+发布使用根目录的 `pnpm httpd:build` 构建并选择独立 release，再运行 `pnpm httpd`（或 `pnpm --filter @nestos/http-app start`）。`--cert-dir` 指定证书目录，`--audit-file` 指定 JSONL 日志；缺少有效证书或指纹允许名单时拒绝启动。没有匿名或明文降级开关。更新 UI 也需构建新 release，并在重启后生效。
 
 `pnpm httpd` 直接启动已选 release；默认监听 `0.0.0.0:2000`（所有 IPv4 网卡），Runtime 直接使用本地存储，不再监听内部 VFS 端口。优先读取启动目录下的 `nestos.json`，不存在时读取 `~/.config/nestos/nestos.json`，设置了 `XDG_CONFIG_HOME` 时读取其下的 `nestos/nestos.json`；文件缺失时创建与 CLI/桌面端相同的默认配置。证书默认使用该配置目录，可通过下面的 `http` 配置覆盖。可用 `pnpm httpd --host 127.0.0.1 --port 3000 --root /path/to/data` 覆盖启动参数。监听所有网卡不改变证书要求，`--cert-host` 仍需包含浏览器实际访问的 IP/DNS。
 

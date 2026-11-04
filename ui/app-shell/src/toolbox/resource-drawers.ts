@@ -1,9 +1,9 @@
-import { t } from '@itookit/common';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
+import { t } from '@nestos/common';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
 import { resourceIcon } from './resource-icons';
 import { type ToolboxFilter } from './routes';
-import { type Drawer } from '@itookit/app-contracts';
-import type { ToolboxDrawers } from '@itookit/app-contracts/services';
+import { type Drawer } from '@nestos/app-contracts';
+import type { ToolboxDrawers } from '@nestos/app-contracts/services';
 
 export function resourceDrawers(items: VFSNodeUI[], groups: ToolboxDrawers, filter: ToolboxFilter): VFSNodeUI[] {
     const files = new Map<string, VFSNodeUI>();

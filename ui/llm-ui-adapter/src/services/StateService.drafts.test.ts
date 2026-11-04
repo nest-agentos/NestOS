@@ -1,10 +1,10 @@
 import {expect, it, vi} from 'vitest';
 import {StateService} from './StateService';
-import type {ConversationUIState, ISessionRepository} from '@itookit/llm-session/contracts';
-import {randomUUID} from '@itookit/common';
+import type {ConversationUIState, ISessionRepository} from '@nestos/llm-session/contracts';
+import {randomUUID} from '@nestos/common';
 const diagnostics = vi.hoisted(() => ({debug: vi.fn(), warn: vi.fn()}));
-vi.mock('@itookit/common', async original => {
-    const actual = await original<typeof import('@itookit/common')>();
+vi.mock('@nestos/common', async original => {
+    const actual = await original<typeof import('@nestos/common')>();
     return {...actual, createModuleLogger: (name: string) => ['workspace-draft-store', 'workspace-state'].includes(name) ? diagnostics : actual.createModuleLogger(name)};
 });
 const input = (text: string) => ({collapse_states: {}, input_text: text, input_token: randomUUID(), input_files: []});

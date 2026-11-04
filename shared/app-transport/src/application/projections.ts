@@ -1,6 +1,6 @@
-import { createFile } from '@itookit/vfs-core';
-import { favoriteKey, projectNavigation, projectFileSource, projectWorkspaceAccess, toolGrant } from '@itookit/app-contracts';
-import type { ProjectFavoriteTarget } from '@itookit/app-contracts/services';
+import { createFile } from '@nestos/vfs-core';
+import { favoriteKey, projectNavigation, projectFileSource, projectWorkspaceAccess, toolGrant } from '@nestos/app-contracts';
+import type { ProjectFavoriteTarget } from '@nestos/app-contracts/services';
 import {readSessionHistory} from './session-history';
 import {shareFileObservers} from './file-observers';
 

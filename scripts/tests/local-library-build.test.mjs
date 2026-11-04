@@ -15,7 +15,7 @@ function fixture(t) {
     cpSync(join(repository, 'scripts'), join(root, 'scripts'), { recursive: true });
     mkdirSync(join(root, 'node_modules'));
     symlinkSync(join(repository, 'node_modules/yaml'), join(root, 'node_modules/yaml'));
-    const catalog = ['core', 'parent', 'leaf', 'other'].map(directory => ({ name: `@itookit/${directory}`, directory, version: '1.0.0' }));
+    const catalog = ['core', 'parent', 'leaf', 'other'].map(directory => ({ name: `@nestos/${directory}`, directory, version: '1.0.0' }));
     writeFileSync(join(root, 'scripts/npm-libraries.json'), JSON.stringify(catalog));
     writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'build-fixture', private: true, packageManager: 'pnpm@10.20.0' }));
     writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages:\n  - libraries/*\noverrides:\n' + catalog.map(item => `  "${item.name}": "workspace:*"`).join('\n') + '\n');
@@ -28,10 +28,10 @@ function createLibrary(root, item, dependency) {
     const directory = join(root, 'libraries', item.directory); mkdirSync(join(directory, 'src'), { recursive: true });
     writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: item.name, version: item.version,
         exports: { '.': './src/index.cjs' }, publishConfig: { exports: { '.': './dist/index.cjs' } },
-        files: ['dist'], scripts: { build: 'node build.cjs' }, ...(dependency && { dependencies: { [`@itookit/${dependency}`]: '1.0.0' } }) }));
-    writeFileSync(join(directory, 'src/index.cjs'), dependency ? `module.exports=require('@itookit/${dependency}');` : 'module.exports={value:1};');
+        files: ['dist'], scripts: { build: 'node build.cjs' }, ...(dependency && { dependencies: { [`@nestos/${dependency}`]: '1.0.0' } }) }));
+    writeFileSync(join(directory, 'src/index.cjs'), dependency ? `module.exports=require('@nestos/${dependency}');` : 'module.exports={value:1};');
     writeFileSync(join(directory, 'build.cjs'), `const fs=require('node:fs'); fs.mkdirSync('dist',{recursive:true}); fs.copyFileSync('src/index.cjs','dist/index.cjs');
-const value=${dependency ? `require('@itookit/${dependency}').value` : `require('./src/index.cjs').value`};
+const value=${dependency ? `require('@nestos/${dependency}').value` : `require('./src/index.cjs').value`};
 fs.appendFileSync(process.env.BUILD_LOG, '${item.directory}:'+value+'\\n');`);
 }
 function build(root, library) {
@@ -72,7 +72,7 @@ test('incremental builds reuse artifacts, rebuild dependents, and freeze unselec
     assert.equal(second.packages.find(item => item.directory === 'other').sha256, first.packages.find(item => item.directory === 'other').sha256);
     writeFileSync(join(root, 'libraries/core/src/index.cjs'), 'module.exports={value:3};');
     writeFileSync(join(root, 'libraries/other/package.json'), 'unfinished unrelated manifest');
-    result = build(root, '@itookit/parent'); assert.equal(result.status, 0, result.stdout + result.stderr);
+    result = build(root, '@nestos/parent'); assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.deepEqual(lines(root).slice(7), ['parent:2', 'leaf:2']);
     const third = preparedSnapshot(root);
     assert.equal(third.packages.find(item => item.directory === 'core').sha256, second.packages.find(item => item.directory === 'core').sha256);

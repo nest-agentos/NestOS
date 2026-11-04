@@ -1,12 +1,12 @@
 import type { AgentEvent } from '../contracts';
-import type { ChatCompletionResponse, TokenUsage } from '@itookit/driver-llm/contracts';
-import type { ChatMessage, ToolCall } from '@itookit/llm-context';
+import type { ChatCompletionResponse, TokenUsage } from '@nestos/driver-llm/contracts';
+import type { ChatMessage, ToolCall } from '@nestos/llm-context';
 import { DEFAULT_EFFECT_TIMEOUT_MS, resolveLlmRetryPolicy, resolveToolTimeoutMs } from '../contracts';
 import type {
     JsonValue,
     KernelAction,
     TaskInputEvent,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 import type {
     DurableCapabilitySignal,
     DurableDependencyBinding,
@@ -74,7 +74,7 @@ export function llmEffect(
     input: DurableProgramInput,
     messages: ChatMessage[],
     handleId: string,
-    tools?: import('@itookit/llm-context').ToolDefinition[],
+    tools?: import('@nestos/llm-context').ToolDefinition[],
     effectId?: string,
 ): KernelAction {
     const { retries, backoffMs } = resolveLlmRetryPolicy(input.llmRetry);

@@ -6,5 +6,5 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  external: ['@itookit/driver-llm/contracts', '@itookit/tools/contracts', '@itookit/llm-context', '@itookit/durable-kernel'],
+  external: ['@nestos/driver-llm/contracts', '@nestos/tools/contracts', '@nestos/llm-context', '@nestos/durable-kernel'],
 });

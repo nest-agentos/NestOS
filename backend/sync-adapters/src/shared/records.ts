@@ -1,4 +1,4 @@
-import { assertSync, decimal, validId, validPath, type SyncState } from '@itookit/vfs-sync';
+import { assertSync, decimal, validId, validPath, type SyncState } from '@nestos/vfs-sync';
 
 export function validRoot(root: string): void {
     assertSync(root.startsWith('/') && root !== '/' && !root.endsWith('/') && root !== '/var/lib/sync' && !root.startsWith('/var/lib/sync/') && !'/var/lib/sync'.startsWith(root + '/'), 'INVALID_SYNC_ROOT');

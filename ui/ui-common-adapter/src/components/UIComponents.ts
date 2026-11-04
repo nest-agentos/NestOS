@@ -1,8 +1,8 @@
-import {Modal as BaseModal, showConfirmDialog as confirm} from '@itookit/ui-common';
-import type {ModalOptions} from '@itookit/ui-common';
-import {t} from '@itookit/common';
-export {Toast} from '@itookit/ui-common';
-export type {ModalOptions} from '@itookit/ui-common';
+import {Modal as BaseModal, showConfirmDialog as confirm} from '@nestos/ui-common';
+import type {ModalOptions} from '@nestos/ui-common';
+import {t} from '@nestos/common';
+export {Toast} from '@nestos/ui-common';
+export type {ModalOptions} from '@nestos/ui-common';
 
 /** NestOS contributes labels; the independent foundation owns dialog behavior. */
 export class Modal extends BaseModal {

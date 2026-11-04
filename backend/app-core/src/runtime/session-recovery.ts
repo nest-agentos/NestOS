@@ -1,5 +1,5 @@
-import { traceBoot } from '@itookit/common';
-import type { Kernel } from '@itookit/durable-kernel';
+import { traceBoot } from '@nestos/common';
+import type { Kernel } from '@nestos/durable-kernel';
 import { SessionLeaseStore, type SessionLeaseRecord, type SessionOwnerKind } from '../kernel/session-lease';
 import { summarizeRecovery, type RecoverySample } from './recovery-trace';
 import { mapConcurrent } from '../utils/map-concurrent';

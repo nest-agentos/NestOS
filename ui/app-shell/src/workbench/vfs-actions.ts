@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { VFSUIShell, DirectoryBulkAction } from '@itookit/vfs-ui';
+import { t } from '@nestos/common';
+import type { VFSUIShell, DirectoryBulkAction } from '@nestos/vfs-ui';
 
 /** Reuses VFS menu policy and the existing export, delete and move commands. */
 export function directoryBulkActions(ui: VFSUIShell, beforeRun?: (ids: string[]) => void): DirectoryBulkAction[] {

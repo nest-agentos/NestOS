@@ -13,7 +13,7 @@
 ## 开发原则
 SOLID / DRY / KISS / YAGNI / CoC / LoD — 函数≤30行，圈复杂度≤10
 
-- 浏览器可达代码使用内部 ID 工具：应用层使用 `@itookit/common.randomUUID()`，独立包使用包内兼容工具；Session 内部沿用 `ulid`。禁止直接调用 `crypto.randomUUID()`（包括可选调用，它仍可能抛错）。`pnpm uuid:check` 已加入架构检查；Node 专用 `node:crypto` 不受此限制。
+- 浏览器可达代码使用内部 ID 工具：应用层使用 `@nestos/common.randomUUID()`，独立包使用包内兼容工具；Session 内部沿用 `ulid`。禁止直接调用 `crypto.randomUUID()`（包括可选调用，它仍可能抛错）。`pnpm uuid:check` 已加入架构检查；Node 专用 `node:crypto` 不受此限制。
 
 - 非通用业务通过独立的外部 Tool 包与 Flow 定义接入；新增核心代码只提供通用机制，不内置具体业务的字段、提示词、模板、打包实现或按工具名分支。
 - Flow 可以确定性调用 Tool，Agent 模型调用只是另一入口。平台负责授权、版本、连接绑定及持久执行；工具负责业务规则与副作用核对。详见 [策略与机制边界](./doc/design/application-policy-boundaries.md)。
@@ -36,8 +36,8 @@ pnpm typecheck                        # 当前消费模式的类型检查
 pnpm docs:check                       # 活文档与代码同步检查
 pnpm styles:check                     # markup 类名 ↔ CSS 规则一致性检查
 pnpm test                             # 全量测试矩阵（含 Rust 边界；crash-matrix 自动隔离）
-pnpm --filter @itookit/<pkg> test     # 单包测试（vitest）
-pnpm --filter @itookit/<pkg> typecheck
+pnpm --filter @nestos/<pkg> test     # 单包测试（vitest）
+pnpm --filter @nestos/<pkg> typecheck
 ```
 
 ## 源码联调与库快照
@@ -108,12 +108,12 @@ pnpm --filter @itookit/<pkg> typecheck
 
 - **技术栈**: 原生 DOM + 模板字符串 + `addEventListener` 委托绑定
 - **CSS**: BEM 命名 (`llm-input__xxx`), 变量在 `llm-ui-adapter/src/styles/variables.css`
-- **图标**: 从 `@itookit/common` import (`ENTITY_ICONS`, `ACTION_ICONS` 等), 禁止硬编码 emoji
+- **图标**: 从 `@nestos/common` import (`ENTITY_ICONS`, `ACTION_ICONS` 等), 禁止硬编码 emoji
 - **i18n**: `t('domain.section.item')`, key 在 `common/src/i18n/zh-CN.ts` 先加 → `en.ts` 同步
 
 ## UUID 与稳定身份
 
-- 跨平台、浏览器及 WebView 代码禁止直接调用 `crypto.randomUUID()`；HTTP 局域网地址和部分 WebView 中该方法可能缺失或抛错。需要 UUID v4 时，从 `@itookit/common` 公开入口使用 `randomUUID()`，不要用 `generateUUID()`、时间戳或临时拼接代替 UUID v4。
+- 跨平台、浏览器及 WebView 代码禁止直接调用 `crypto.randomUUID()`；HTTP 局域网地址和部分 WebView 中该方法可能缺失或抛错。需要 UUID v4 时，从 `@nestos/common` 公开入口使用 `randomUUID()`，不要用 `generateUUID()`、时间戳或临时拼接代替 UUID v4。
 - 独立库保持既有依赖边界，复用库内兼容 UUID 工具或注入 ID 生成器，不为生成 UUID 引入应用包；涉及此类代码的修改应覆盖原生 `randomUUID` 缺失和抛错的回归场景。
 - 草稿首次提交复用已分配的 Session ID；同一次提交及其重试保留稳定身份，不在渲染、刷新或重试过程中重新生成会话或操作 ID。
 

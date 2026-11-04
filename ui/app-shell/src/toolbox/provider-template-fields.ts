@@ -1,4 +1,4 @@
-import { randomUUID, t } from '@itookit/common';
+import { randomUUID, t } from '@nestos/common';
 import '../styles/toolbox-create.css';
 
 type Template = { id: string; name: string };

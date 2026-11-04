@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {CallTargetCatalog, CallTargetRef, ChatView, ComposerDraft} from '@itookit/llm-ui';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {CallTargetCatalog, CallTargetRef, ChatView, ComposerDraft} from '@nestos/llm-ui';
 
 /** Restore the next input preference; frozen operations and structured inputs retain their original versions. */
 export function restoreDraftTarget(draft: ComposerDraft, catalog?: CallTargetCatalog,

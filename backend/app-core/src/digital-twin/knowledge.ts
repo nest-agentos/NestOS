@@ -1,5 +1,5 @@
-import { randomUUID } from '@itookit/common';
-import { sha256HexSync } from '@itookit/llm-context';
+import { randomUUID } from '@nestos/common';
+import { sha256HexSync } from '@nestos/llm-context';
 import { memoryData, type TwinMemoryData, type TwinSourceData } from './domain';
 import type { TwinRecordRef } from './contracts';
 import { TwinRecords, write, type TwinDataRecord } from './records';

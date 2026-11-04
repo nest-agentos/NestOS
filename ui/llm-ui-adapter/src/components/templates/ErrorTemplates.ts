@@ -1,6 +1,6 @@
 // @file: llm-ui/components/templates/ErrorTemplates.ts
 
-import { escapeHTML, t } from '@itookit/common';
+import { escapeHTML, t } from '@nestos/common';
 
 export class ErrorTemplates {
     /**

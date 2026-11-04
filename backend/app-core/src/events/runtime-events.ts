@@ -1,5 +1,5 @@
-import {randomUUID} from '@itookit/common';
-import type {IFileSystem, FSEvent} from '@itookit/vfs-core';
+import {randomUUID} from '@nestos/common';
+import type {IFileSystem, FSEvent} from '@nestos/vfs-core';
 import type {ApplicationRuntime} from '../runtime/create-application-runtime';
 import {UserEventService} from './service';
 import {projectKernelEvents} from './kernel-source';

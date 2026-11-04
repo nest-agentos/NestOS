@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {AgentDefinition} from '@itookit/kernel-adapters/contracts';
+import type {AgentDefinition} from '@nestos/kernel-adapters/contracts';
 import {AgentPublications} from '../src/services/agent-publications';
 import {createSessionHost} from '../src/utils/host-ports';
 import {agentRevisionDigest, agentSourceDigest} from '../src/services/agent-definition-digest';

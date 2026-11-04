@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/app-core",
+  "name": "@nestos/app-core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -38,30 +38,39 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@itookit/common": "workspace:*",
-    "@itookit/durable-kernel": "workspace:*",
-    "@itookit/kernel-adapters": "workspace:*",
-    "@itookit/llm-flow": "workspace:*",
-    "@itookit/llm-session": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
-    "@itookit/driver-llm": "workspace:*",
-    "@itookit/llm-context": "workspace:*",
-    "@itookit/llm-tasks": "workspace:*",
-    "@itookit/tools": "workspace:*",
-    "@itookit/vfs-sync": "workspace:*",
-    "@itookit/cells-driver": "workspace:*",
-    "@itookit/app-contracts": "workspace:*",
+    "@nestos/common": "workspace:*",
+    "@nestos/durable-kernel": "workspace:*",
+    "@nestos/kernel-adapters": "workspace:*",
+    "@nestos/llm-flow": "workspace:*",
+    "@nestos/llm-session": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
+    "@nestos/driver-llm": "workspace:*",
+    "@nestos/llm-context": "workspace:*",
+    "@nestos/llm-tasks": "workspace:*",
+    "@nestos/tools": "workspace:*",
+    "@nestos/vfs-sync": "workspace:*",
+    "@nestos/cells-driver": "workspace:*",
+    "@nestos/app-contracts": "workspace:*",
     "js-yaml": "^4.1.1",
-    "@itookit/kanban": "workspace:*",
-    "@itookit/mail": "workspace:*"
+    "@nestos/kanban": "workspace:*",
+    "@nestos/mail": "workspace:*"
   },
   "devDependencies": {
-    "@itookit/vfsdriver-indexeddb": "workspace:*",
+    "@nestos/vfsdriver-indexeddb": "workspace:*",
     "@types/node": "^20.19.25",
     "fake-indexeddb": "^6.0.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
-    "@itookit/vfs-ui": "workspace:*",
+    "@nestos/vfs-ui": "workspace:*",
     "@types/js-yaml": "^4.0.9"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "backend/app-core"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

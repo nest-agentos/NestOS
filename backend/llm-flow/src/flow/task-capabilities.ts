@@ -1,4 +1,4 @@
-import { bindCapabilities, type CapabilityBinding, type SessionHandle, type TaskHandle } from '@itookit/durable-kernel';
+import { bindCapabilities, type CapabilityBinding, type SessionHandle, type TaskHandle } from '@nestos/durable-kernel';
 
 export function flowTaskNeedsCapabilities(programKind: string): boolean {
     return ['llm.agent', 'llm.chat', 'kernel-adapters.media', 'kernel-adapters.tool', 'kernel-adapters.harness'].includes(programKind);

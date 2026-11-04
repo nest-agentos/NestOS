@@ -1,11 +1,11 @@
-import {KanbanWorkbench as KanbanView, type KanbanUIOptions} from '@itookit/kanban/ui';
-import {executionSessionReference} from '@itookit/app-contracts';
-import {ACTION_ICONS, createModuleLogger, randomUUID, t} from '@itookit/common';
+import {KanbanWorkbench as KanbanView, type KanbanUIOptions} from '@nestos/kanban/ui';
+import {executionSessionReference} from '@nestos/app-contracts';
+import {ACTION_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
 import {WorkbenchTabs, type WorkbenchTab} from '../workbench/tabs';
 import type {WorkbenchWindowBinding} from '../workbench/windows';
 import {kanbanPresentation, kanbanReviewGuidance} from './host';
 import {KanbanSidebar} from './sidebar';
-import {VFS_DOM_EVENTS} from '@itookit/vfs-ui';
+import {VFS_DOM_EVENTS} from '@nestos/vfs-ui';
 
 const log = createModuleLogger('kanban-windows');
 export type KanbanWorkspaceOptions = Omit<KanbanUIOptions, 'presentation' | 'sidebar'> & {sidebar: HTMLElement; windows?: WorkbenchWindowBinding};

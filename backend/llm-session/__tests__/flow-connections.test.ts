@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import type { FlowRevision } from '@itookit/llm-flow/contracts';
-import type { ConnectionMeta, LLMProvider } from '@itookit/driver-llm/contracts';
-import { flowToDag } from '@itookit/llm-flow';
+import type { FlowRevision } from '@nestos/llm-flow/contracts';
+import type { ConnectionMeta, LLMProvider } from '@nestos/driver-llm/contracts';
+import { flowToDag } from '@nestos/llm-flow';
 import { prepareFlowConnections } from '../src/session/flow-connections';
 import { bindStandaloneFlowNode } from '../src/session/flow-node-binder';
 import { checkFlowConnectionSlots, checkFlowConnections } from '../src/session/flow-connection-check';
@@ -283,9 +283,9 @@ it.each([false, true])('keeps an unbound optional parent slot empty in a require
 });
 
 it.each([false, true])('checks an unbound required child only when its branch executes (multiple=%s)', async multiple => {
-    const { Kernel } = await import('@itookit/durable-kernel');
-    const { createVFS, MemoryBackend } = await import('@itookit/vfs-core');
-    const { DurableFlowExecutor, createBuiltinDagPluginRegistry, registerDurablePrograms } = await import('@itookit/llm-flow');
+    const { Kernel } = await import('@nestos/durable-kernel');
+    const { createVFS, MemoryBackend } = await import('@nestos/vfs-core');
+    const { DurableFlowExecutor, createBuiltinDagPluginRegistry, registerDurablePrograms } = await import('@nestos/llm-flow');
     const { manager } = await createVFS({ rootBackend: new MemoryBackend() });
     const fs = await manager.openFileSystem('/test');
     const kernel = new Kernel({ catalog: { fs }, pollMs: 5 });

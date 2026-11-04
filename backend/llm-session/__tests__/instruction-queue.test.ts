@@ -1,12 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import type { SessionInstructionInput } from '../src/contracts/instruction-queue';
 import { InstructionQueueStore } from '../src/persistence/instruction-queue-store';
 import { createInstructionQueueSessions } from '../src/persistence/instruction-queue-sessions';
 import { SessionInstructionQueues, type InstructionQueuePorts } from '../src/session/instruction-queue';
 import { createSessionHost } from '../src/utils/host-ports';
-import {createFlowRevision} from '@itookit/llm-flow';
+import {createFlowRevision} from '@nestos/llm-flow';
 import {prepareFlowAgentInput} from '../src/session/flow-agent';
 
 const cleanup: Array<() => Promise<void>> = [];

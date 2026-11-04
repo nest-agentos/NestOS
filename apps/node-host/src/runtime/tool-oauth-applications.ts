@@ -1,7 +1,7 @@
 import {mkdir, lstat, readFile, open, rename, unlink} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import path from 'node:path';
-import type {ToolOAuthApplicationInput} from '@itookit/app-contracts/services';
+import type {ToolOAuthApplicationInput} from '@nestos/app-contracts/services';
 import {acquireHostLock} from '../storage/host-lock';
 import {authFailure, validateOAuthRedirect} from './tool-oauth-client';
 

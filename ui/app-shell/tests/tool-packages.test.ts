@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import type {FlowInstallations, ToolPackageInfo, ToolPackages, ToolConnectionType, ToolAuthorizationView} from '@itookit/app-contracts/services';
+import type {FlowInstallations, ToolPackageInfo, ToolPackages, ToolConnectionType, ToolAuthorizationView} from '@nestos/app-contracts/services';
 import {showToolPackages} from '../src/toolbox/ToolPackagesDialog';
 
 const opened: Promise<void>[] = [];

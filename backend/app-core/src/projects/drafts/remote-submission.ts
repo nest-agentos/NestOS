@@ -1,5 +1,5 @@
 import {preparedTitle} from './title';
-import {FSError, type IFileSystem} from '@itookit/vfs-core';
+import {FSError, type IFileSystem} from '@nestos/vfs-core';
 import {RemoteConversationStore} from '../remote-conversation-store';
 import {ProjectDraftStore} from './store';
 import type {ProjectDraftRecord, ProjectDraftPromotion, RemoteDraftTarget} from './contracts';

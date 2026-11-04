@@ -44,7 +44,7 @@ function contractErrors(roots, role, root) {
     for (const file of roots) {
         for (const name of contractSpecifiers(readFileSync(file, 'utf8'), file)) {
             const target = resolveImport(file, name, entries);
-            const core = name === '@itookit/app-core' || name.startsWith('@itookit/app-core/')
+            const core = name === '@nestos/app-core' || name.startsWith('@nestos/app-core/')
                 || (target && relative(root, target).replaceAll('\\', '/').startsWith('backend/app-core/'));
             const frontend = target && moduleRole(target, root) === 'frontend';
             if ((role !== 'backend' && core) || (role !== 'frontend' && frontend))
@@ -59,7 +59,7 @@ export function directoryErrors(root = repository) {
     const legacy = resolve(root, 'packages');
     const misplaced = existsSync(legacy) ? readdirSync(legacy).filter(name => existsSync(resolve(legacy, name, 'package.json'))) : [];
     return [...misplaced.map(name => `packages/${name} must move to ui/, backend/, shared/ or apps/`), ...workspacePackages(root).flatMap(pkg => {
-        const group = groups.get(pkg.name.replace('@itookit/', ''));
+        const group = groups.get(pkg.name.replace('@nestos/', ''));
         return group && pkg.group !== group ? [`${pkg.name} belongs in ${group}/, found in ${pkg.group}/`] : [];
     })];
 }
@@ -171,7 +171,7 @@ export function separationErrors(root = repository) {
         const roots = workspacePackages(root)
             .filter(pkg => moduleRole(resolve(pkg.directory, 'src/index.ts'), root) === role)
             .flatMap(pkg => sourceFiles(resolve(pkg.directory, 'src')).filter(file => moduleRole(file, root) !== 'host'
-                && !(['@itookit/kanban', '@itookit/mail'].includes(pkg.name) && role === 'backend' && moduleRole(file, root) === 'frontend')));
+                && !(['@nestos/kanban', '@nestos/mail'].includes(pkg.name) && role === 'backend' && moduleRole(file, root) === 'frontend')));
         if (role === 'frontend') for (const name of ['kanban', 'mail']) roots.push(...sourceFiles(resolve(root, `libraries/${name}/src/ui`)));
         if (role === 'frontend') roots.push(...sourceFiles(resolve(root, 'apps/http-app/src/client')));
         if (role === 'backend') roots.push(...sourceFiles(resolve(root, 'apps/http-app/src/server')), ...sourceFiles(resolve(root, 'apps/cli/src')));

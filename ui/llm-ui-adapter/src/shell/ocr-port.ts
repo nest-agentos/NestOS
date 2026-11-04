@@ -1,6 +1,6 @@
-import {createModuleLogger} from '@itookit/common';
-import type {OcrControls} from '@itookit/app-contracts/services';
-import type {OcrPort} from '@itookit/llm-ui';
+import {createModuleLogger} from '@nestos/common';
+import type {OcrControls} from '@nestos/app-contracts/services';
+import type {OcrPort} from '@nestos/llm-ui';
 
 /** Bind recognition and authorized asset reads; llm-ui owns the interaction. */
 export function chatOcrPort(controls: OcrControls | undefined, read: NonNullable<OcrPort['read']>): OcrPort | undefined {

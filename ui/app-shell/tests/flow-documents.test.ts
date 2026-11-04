@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createMDxEditor} from '@itookit/mdx-adapter';
+import {createMDxEditor} from '@nestos/mdx-adapter';
 import {FlowDocuments, flowRequestMarkdown} from '../../llm-ui-adapter/src/components/dag/FlowDocuments';
 import {FlowCallDocument} from '../../llm-ui-adapter/src/components/dag/FlowCallDocument';
-vi.mock('@itookit/mdx-adapter', () => ({createMDxEditor: vi.fn(async (root: HTMLElement, options: {initialContent: string}) => {
+vi.mock('@nestos/mdx-adapter', () => ({createMDxEditor: vi.fn(async (root: HTMLElement, options: {initialContent: string}) => {
     root.textContent = options.initialContent;
     return {on: vi.fn(), destroy: vi.fn(), setText: vi.fn((text: string) => {root.textContent = text;}), getText: () => root.textContent,
         finishStreamingText: vi.fn(async (text: string) => {root.textContent = text;})};

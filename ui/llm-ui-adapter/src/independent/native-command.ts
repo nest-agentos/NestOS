@@ -1,5 +1,5 @@
 import type {ConversationControls, ConversationModelSelection, ConversationSlashCommand} from '../contracts';
-import {parseCommand} from '@itookit/llm-ui';
+import {parseCommand} from '@nestos/llm-ui';
 
 
 /** Both composer views preserve the submitted text while sharing native command semantics. */

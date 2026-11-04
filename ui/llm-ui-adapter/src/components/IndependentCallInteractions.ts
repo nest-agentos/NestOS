@@ -1,9 +1,9 @@
 import {InteractionDraftEditor} from '../services/InteractionDraftEditor';
 import type {InteractionDraftStorage, InteractionDraftRecord} from '../domain/interaction-draft';
-import {createInteractionCard, type InteractionCard, type InteractionResponse, type InputField, type OperationRecord} from '@itookit/llm-ui';
-import {createModuleLogger, getLocale, randomUUID, t} from '@itookit/common';
+import {createInteractionCard, type InteractionCard, type InteractionResponse, type InputField, type OperationRecord} from '@nestos/llm-ui';
+import {createModuleLogger, getLocale, randomUUID, t} from '@nestos/common';
 import {IndependentCallCommand, type ICommandBus, type IndependentCallView, type IndependentCallResponseRequest,
-    type IndependentCallResponseQuery, type IndependentCallInteractionDetail} from '@itookit/llm-session/contracts';
+    type IndependentCallResponseQuery, type IndependentCallInteractionDetail} from '@nestos/llm-session/contracts';
 import {CallControlOperations, callControlErrorCode} from '../independent/call-control';
 import {agentQuestionFields, agentQuestionAnswer} from './input/agent-questions';
 

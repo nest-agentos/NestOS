@@ -1,5 +1,5 @@
-import {FSError} from '@itookit/vfs-core';
-import type {ResourceMediaContent} from '@itookit/app-contracts';
+import {FSError} from '@nestos/vfs-core';
+import type {ResourceMediaContent} from '@nestos/app-contracts';
 
 type Media = Pick<ResourceMediaContent, 'kind' | 'mimeType' | 'text'>;
 /** Signatures take precedence over text decoding and untrusted filename extensions. */

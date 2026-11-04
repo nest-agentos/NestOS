@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger, type OperationRecord} from '@itookit/llm-ui';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {createOperationLedger, type OperationRecord} from '@nestos/llm-ui';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {ControlOperations, type ControlInput} from './control-operations';
 
 const input: ControlInput = {protocol: 'flow-control-v1', taskId: 'root', action: 'pause', expectedEpoch: 7};

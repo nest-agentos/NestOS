@@ -1,5 +1,5 @@
-import { checkOperation, operationScope, FSError, type OperationOptions } from '@itookit/vfs-core';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { checkOperation, operationScope, FSError, type OperationOptions } from '@nestos/vfs-core';
+import type { ProjectService } from '@nestos/app-contracts/services';
 
 /** A read-only native snapshot, not a runnable local Session/Kernel bundle. */
 export async function exportRemoteSession(projects: ProjectService, folder: string, profileId: string, sessionId: string, options?: OperationOptions) {

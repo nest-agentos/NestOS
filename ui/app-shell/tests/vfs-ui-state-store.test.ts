@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { VfsUIPersistence } from '../src/persistence/vfs-ui-state-store';
 import { VfsJsonStore } from '../src/persistence/vfs-json-store';
-import { bindApplicationBackend } from '@itookit/app-core/host';
-import type { LocalApplicationServices } from '@itookit/app-contracts/services';
+import { bindApplicationBackend } from '@nestos/app-core/host';
+import type { LocalApplicationServices } from '@nestos/app-contracts/services';
 
 const SCOPE = 'session-browser:v1:admin';
 const PATH = '/ui/session-browser_v1_admin.ui.json';

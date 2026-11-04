@@ -1,5 +1,5 @@
 import type {ConversationSnapshot} from '../contracts';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 
 
 const log = createModuleLogger('native-observation');

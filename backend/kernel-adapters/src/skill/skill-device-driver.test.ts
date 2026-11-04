@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SkillDefinition } from '@itookit/tools/contracts';
+import type { SkillDefinition } from '@nestos/tools/contracts';
 import type { SkillScopeSnapshot } from '../ports/capabilities';
 import { SkillDeviceDriver } from './skill-device-driver';
 import { createSessionSkillControls } from './session-skill-controls';

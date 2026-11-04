@@ -1,4 +1,4 @@
-import type {ToolConnectionType, ToolOAuthDefinition} from '@itookit/app-contracts/services';
+import type {ToolConnectionType, ToolOAuthDefinition} from '@nestos/app-contracts/services';
 export const authFailure = (code: string) => Object.assign(new Error(code), {code});
 export interface OAuthTokenReply {access_token: string; refresh_token?: string; expires_in?: number; scope?: string}
 export function validateOAuthRedirect(value: string): void {

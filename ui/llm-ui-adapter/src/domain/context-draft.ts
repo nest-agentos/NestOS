@@ -1,7 +1,7 @@
-import {assertConversationSelection, type ConversationSelection} from '@itookit/kernel-adapters/contracts';
-import {isTargetRef, sameTargetRef, type TargetRef} from '@itookit/llm-flow/contracts';
-import type {SubmissionRequest} from '@itookit/llm-session/contracts';
-import {t} from '@itookit/common';
+import {assertConversationSelection, type ConversationSelection} from '@nestos/kernel-adapters/contracts';
+import {isTargetRef, sameTargetRef, type TargetRef} from '@nestos/llm-flow/contracts';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
+import {t} from '@nestos/common';
 
 export type InputConversationSelection = Extract<ConversationSelection, {mode: 'new' | 'fork'}>;
 /** UI revisions and scope are recovery evidence, never executable call arguments. */

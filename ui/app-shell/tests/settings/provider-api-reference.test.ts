@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
-import { renderProviderApiReference } from '@itookit/llm-ui-adapter/settings';
-import type { ProviderApiReference } from '@itookit/kernel-adapters/contracts';
-import { t } from '@itookit/common';
+import { renderProviderApiReference } from '@nestos/llm-ui-adapter/settings';
+import type { ProviderApiReference } from '@nestos/kernel-adapters/contracts';
+import { t } from '@nestos/common';
 
 it('renders reference metadata read-only, distinguishes support and escapes text and unsafe links', () => {
     const reference: ProviderApiReference = {version: 1, reviewedAt: '2026-10-22', scope: 'HTTP only',

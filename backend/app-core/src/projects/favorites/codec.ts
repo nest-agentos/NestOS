@@ -1,4 +1,4 @@
-import { FSError, normalizeVirtualPath } from '@itookit/vfs-core';
+import { FSError, normalizeVirtualPath } from '@nestos/vfs-core';
 import { WORKSPACE_PATH } from '../../vfs/workspace-namespace';
 import type { ProjectFavorite, ProjectFavoriteTarget } from './contracts';
 

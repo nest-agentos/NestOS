@@ -2,8 +2,8 @@
 // /llm/systemprompt seqfile: key = agent id, value = SystemPromptDefinition
 // (system segments + quick-prompt presets). Seeded from DEFAULT_AGENTS on init.
 
-import type { IFileSystem, ISeqFileTransaction } from '@itookit/vfs-core';
-import type { SystemPromptDefinition } from '@itookit/tools/contracts';
+import type { IFileSystem, ISeqFileTransaction } from '@nestos/vfs-core';
+import type { SystemPromptDefinition } from '@nestos/tools/contracts';
 import type { InitialAgentDef } from '../contracts/agent';
 
 const SYSTEM_PROMPT_PATH = '/llm/systemprompt';

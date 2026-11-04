@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-vi.mock('@itookit/ui-common-adapter', async () => ({ ...await vi.importActual('@itookit/ui-common-adapter'), copyText: vi.fn(async () => {}) }));
-import {copyText} from '@itookit/ui-common-adapter';
+vi.mock('@nestos/ui-common-adapter', async () => ({ ...await vi.importActual('@nestos/ui-common-adapter'), copyText: vi.fn(async () => {}) }));
+import {copyText} from '@nestos/ui-common-adapter';
 import { HistoryView } from '../../llm-ui-adapter/src/components/HistoryView';
 import { SessionRenderer } from '../../llm-ui-adapter/src/components/history/SessionRenderer';
 

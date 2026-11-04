@@ -1,4 +1,4 @@
-import { assertSync, validId, type SyncState } from '@itookit/vfs-sync';
+import { assertSync, validId, type SyncState } from '@nestos/vfs-sync';
 import { decodePlan, encodePlan, validateState } from './records';
 export interface RecordFields {
     getRecordField(path: string, field: string): Promise<unknown>;

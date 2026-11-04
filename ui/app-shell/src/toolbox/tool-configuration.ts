@@ -1,6 +1,6 @@
-import { t } from '@itookit/common';
-import type { ToolboxResources } from '@itookit/app-contracts/services';
-import type { ToolboxTool } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import type { ToolboxResources } from '@nestos/app-contracts/services';
+import type { ToolboxTool } from '@nestos/app-contracts/services';
 
 export async function toolConfiguration(resources: ToolboxResources, tool: ToolboxTool): Promise<HTMLElement> {
     const section = document.createElement('section'); section.className = 'toolbox-configuration';

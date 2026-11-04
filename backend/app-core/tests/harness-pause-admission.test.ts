@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import {sha256HexSync} from '@itookit/common';
+import {sha256HexSync} from '@nestos/common';
 import {ExecutionJournal, nativeOperationId} from '../src/projects/harness-execution-journal';
 import {driveNativeInteractions} from '../src/projects/harness-execution-interactions';
 import type {NativeExecution} from '../src/projects/harness-execution-operations';

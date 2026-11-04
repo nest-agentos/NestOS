@@ -1,5 +1,5 @@
 import { indexSessionSummary, removeSessionSummary } from './session-navigation-index';
-import { FSError, type IFileSystem, type ISeqFileTransaction } from '@itookit/vfs-core';
+import { FSError, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
 import type { ConversationManifest, SessionFolder } from './types';
 import { resolveSessionStorageRoot } from './session-storage-locations';
 

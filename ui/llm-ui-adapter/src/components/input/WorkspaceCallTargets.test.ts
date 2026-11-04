@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
 import {WorkspaceCallTargets} from './WorkspaceCallTargets';
-import type {RootTargetCatalog} from '@itookit/llm-session/contracts';
+import type {RootTargetCatalog} from '@nestos/llm-session/contracts';
 
 it('refreshes publication metadata after an older in-flight catalog read instead of presenting its stale result', async () => {
     let finish!: (catalog: RootTargetCatalog) => void;

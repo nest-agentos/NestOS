@@ -1,11 +1,11 @@
-import type {Kernel, TaskRecord} from '@itookit/durable-kernel';
-import {sha256Hex} from '@itookit/llm-context';
-import {randomUUID} from '@itookit/common';
-import type {Artifact} from '@itookit/llm-flow/contracts';
-import type {TaskAssetReader} from '@itookit/tools/contracts';
-import type {SessionLogger} from '@itookit/llm-session';
+import type {Kernel, TaskRecord} from '@nestos/durable-kernel';
+import {sha256Hex} from '@nestos/llm-context';
+import {randomUUID} from '@nestos/common';
+import type {Artifact} from '@nestos/llm-flow/contracts';
+import type {TaskAssetReader} from '@nestos/tools/contracts';
+import type {SessionLogger} from '@nestos/llm-session';
 import type {ExecutionArtifactDescriptor, ExecutionArtifactPage, ExecutionArtifactScope, ListExecutionArtifacts,
-    ReadExecutionArtifact, ExecutionArtifactChunk} from '@itookit/app-contracts';
+    ReadExecutionArtifact, ExecutionArtifactChunk} from '@nestos/app-contracts';
 import {artifactCandidates, binaryReference, type ArtifactCandidate} from './artifact-catalog';
 import {artifactError, artifactId, parseArtifactId} from './artifact-reference';
 

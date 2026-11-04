@@ -1,6 +1,6 @@
-import { escapeHTML, t } from '@itookit/common';
-import { type ICommandBus } from '@itookit/llm-session/contracts';
-import { FlowCommand, type FlowTaskTranscript } from '@itookit/llm-flow/contracts';
+import { escapeHTML, t } from '@nestos/common';
+import { type ICommandBus } from '@nestos/llm-session/contracts';
+import { FlowCommand, type FlowTaskTranscript } from '@nestos/llm-flow/contracts';
 
 /** Interactive pages stay bounded; export re-reads the pinned version on demand. */
 const PAGE_BYTES = 256 * 1024;

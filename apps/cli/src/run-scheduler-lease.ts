@@ -3,8 +3,8 @@ import { leaseSkewConfig } from './lease-config';
 // lease and deletion tombstone serialize deletion against participating hosts' takeover.
 // Inspection opens storage without acquiring a Session lease or starting workers.
 
-import { SeqFileKernelStore } from '@itookit/durable-kernel';
-import { markSchedulerRunDeleted, parseSchedulerLeaseRecord, schedulerOwnerKey, type SchedulerLeaseRecord } from '@itookit/llm-flow';
+import { SeqFileKernelStore } from '@nestos/durable-kernel';
+import { markSchedulerRunDeleted, parseSchedulerLeaseRecord, schedulerOwnerKey, type SchedulerLeaseRecord } from '@nestos/llm-flow';
 import { CliStorageResolver, cliStorage, openProfileInspectionFs } from './runtime';
 
 export interface RunSchedulerLeaseRef {

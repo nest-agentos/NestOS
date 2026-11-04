@@ -1,7 +1,7 @@
-import { StudyView, type StudyHost } from '@itookit/mdxeditor';
-import { IEditor } from '@itookit/ui-common-adapter';
-import type { IFileSystem } from '@itookit/vfs-core';
-import { getLocale } from '@itookit/common';
+import { StudyView, type StudyHost } from '@nestos/mdxeditor';
+import { IEditor } from '@nestos/ui-common-adapter';
+import type { IFileSystem } from '@nestos/vfs-core';
+import { getLocale } from '@nestos/common';
 import { createAdapterStore } from './srs-store';
 import {createStudyPromptStore} from './study-prompt';
 import {studyIndex} from './study-index';

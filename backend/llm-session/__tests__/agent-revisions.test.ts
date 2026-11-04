@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import type {AgentDefinition, AgentPublishRequest, AgentRevisionContent} from '@itookit/kernel-adapters/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import type {AgentDefinition, AgentPublishRequest, AgentRevisionContent} from '@nestos/kernel-adapters/contracts';
 import {AgentRevisionStore, AGENT_REVISIONS_FILE} from '../src/persistence/agent-revisions';
 import {agentRevisionDigest, agentSourceDigest} from '../src/services/agent-definition-digest';
 

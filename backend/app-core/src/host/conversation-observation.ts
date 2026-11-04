@@ -1,4 +1,4 @@
-import type {SessionSnapshot, SessionManagementPort} from '@itookit/llm-session/contracts';
+import type {SessionSnapshot, SessionManagementPort} from '@nestos/llm-session/contracts';
 import type {ConversationClient, ConversationContexts} from '../runtime/conversation-contexts';
 
 /** Mirror host-owned execution into a reader without binding or submitting another run. */

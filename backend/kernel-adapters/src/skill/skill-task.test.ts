@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { SkillDefinition } from '@itookit/tools/contracts';
-import { Kernel, type DurableTaskProgram } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import type { SkillDefinition } from '@nestos/tools/contracts';
+import { Kernel, type DurableTaskProgram } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { createSkillTaskSpec } from './skill-task';
 
 describe('createSkillTaskSpec', () => {

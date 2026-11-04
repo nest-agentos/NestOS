@@ -1,6 +1,6 @@
-import { createModuleLogger, randomUUID, t, type NavigationRequest } from '@itookit/common';
-import type { ToolboxInventory, ToolboxResources } from '@itookit/app-contracts/services';
-import type { EditorFactory, EditorOptions, IEditor } from '@itookit/ui-common-adapter';
+import { createModuleLogger, randomUUID, t, type NavigationRequest } from '@nestos/common';
+import type { ToolboxInventory, ToolboxResources } from '@nestos/app-contracts/services';
+import type { EditorFactory, EditorOptions, IEditor } from '@nestos/ui-common-adapter';
 import { toolboxKind, toolboxSourcePath } from './routes';
 
 const log = createModuleLogger('toolbox-create-setup');

@@ -1,10 +1,10 @@
 import {afterEach, expect, it} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import type {KanbanCommand, KanbanClient} from '@itookit/kanban/contracts';
-import {kanbanReference} from '@itookit/kanban/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import type {KanbanCommand, KanbanClient} from '@nestos/kanban/contracts';
+import {kanbanReference} from '@nestos/kanban/contracts';
 import {createNestOSKanban} from '../src/kanban';
-import {SeqKanbanStore} from '@itookit/kanban/storage';
-import {KanbanError} from '@itookit/kanban';
+import {SeqKanbanStore} from '@nestos/kanban/storage';
+import {KanbanError} from '@nestos/kanban';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async()=>{for(const close of cleanup.splice(0)) await close();});

@@ -1,11 +1,11 @@
 import * as identity from '../src/persistence/ulid';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {Kernel, type SessionHandle} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend, type IVFSManager} from '@itookit/vfs-core';
-import {registerDurablePrograms} from '@itookit/llm-flow';
-import type {InvocationIdentity} from '@itookit/llm-flow/contracts';
-import {HarnessProgram, HarnessExecutionEffect} from '@itookit/kernel-adapters';
-import {sha256HexSync} from '@itookit/llm-context';
+import {Kernel, type SessionHandle} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend, type IVFSManager} from '@nestos/vfs-core';
+import {registerDurablePrograms} from '@nestos/llm-flow';
+import type {InvocationIdentity} from '@nestos/llm-flow/contracts';
+import {HarnessProgram, HarnessExecutionEffect} from '@nestos/kernel-adapters';
+import {sha256HexSync} from '@nestos/llm-context';
 import {IndependentCallService, prepareDirectConversationRun, type IndependentTaskCallPreparation} from '../src';
 import {ContentTransferService} from '../src/session/content-transfers';
 import {CommandBus} from '../src/core/command-bus';

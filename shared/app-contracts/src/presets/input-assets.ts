@@ -1,4 +1,4 @@
-import type {InputAssetReference} from '@itookit/tools/contracts';
+import type {InputAssetReference} from '@nestos/tools/contracts';
 
 /** Application input staging; selection and Task authorization are checked separately. */
 export const InputAssetCommand = {Import: 'app.assets.import', Read: 'app.assets.read', ImportFile: 'app.assets.import-file', Inspect: 'app.assets.inspect'} as const;

@@ -2,11 +2,11 @@ import { request, Agent } from 'node:https';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Server } from 'node:http';
-import type { IStorageBackend } from '@itookit/vfs-core';
-import { loadCertificates } from '@itookit/node-host/http';
-import { createHttpServer } from '@itookit/node-host/http';
-import type { AuditEvent, AuditPort } from '@itookit/node-host/logging';
-import type { HostedApi } from '@itookit/node-host/http';
+import type { IStorageBackend } from '@nestos/vfs-core';
+import { loadCertificates } from '@nestos/node-host/http';
+import { createHttpServer } from '@nestos/node-host/http';
+import type { AuditEvent, AuditPort } from '@nestos/node-host/logging';
+import type { HostedApi } from '@nestos/node-host/http';
 
 export async function authenticatedFetch(directory: string): Promise<{ fetcher: typeof fetch; close(): void }> {
     const [ca, cert, key] = await Promise.all(['ca.crt', 'client.crt', 'client.key'].map(file => readFile(path.join(directory, file))));

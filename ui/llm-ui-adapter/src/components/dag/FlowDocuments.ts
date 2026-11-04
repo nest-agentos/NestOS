@@ -1,4 +1,4 @@
-import {createModuleLogger, t} from '@itookit/common';
+import {createModuleLogger, t} from '@nestos/common';
 import {MDxController} from '../mdx/MDxController';
 
 interface DocumentView {element: HTMLDetailsElement; body: HTMLElement; editor: MDxController; text: string}

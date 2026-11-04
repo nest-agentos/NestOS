@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {FlowDefinitionStore, type FlowStore} from '@itookit/llm-flow';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {FlowDefinitionStore, type FlowStore} from '@nestos/llm-flow';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {FlowsEditor} from '../../llm-ui-adapter/src/components/FlowsEditor';
 import {DagWorkbench} from '../../llm-ui-adapter/src/components/DagWorkbench';
 

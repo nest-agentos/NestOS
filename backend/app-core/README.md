@@ -1,4 +1,4 @@
-# @itookit/app-core
+# @nestos/app-core
 
 Headless application core shared by Web, Tauri and CLI hosts.
 
@@ -21,4 +21,4 @@ Headless application core shared by Web, Tauri and CLI hosts.
 - `additionalTools`
 - `beforeRecover`
 
-`@itookit/app-shell` depends on this package and adds routing, Workbench, editors and theme. `apps/cli` depends on this package and adds YAML workflow compilation, CLI lifecycle commands, Node/OCI shell adapters and `RunStore`.
+`@nestos/app-shell` depends on this package and adds routing, Workbench, editors and theme. `apps/cli` depends on this package and adds YAML workflow compilation, CLI lifecycle commands, Node/OCI shell adapters and `RunStore`.

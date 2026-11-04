@@ -1,4 +1,4 @@
-import {getLocale, t} from '@itookit/common';
+import {getLocale, t} from '@nestos/common';
 import type {Run} from './session-output';
 
 const statuses: Record<string, Parameters<typeof t>[0]> = {

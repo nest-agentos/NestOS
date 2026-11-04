@@ -1,27 +1,27 @@
 import { toolGrant, saveToolGrant, type ToolGrantTarget } from './tool-grants';
 import { ToolboxDrawers, drawerKind, ungroupedId, type Drawer, type DrawerKind } from './toolbox-drawers';
-import { randomUUID, t } from '@itookit/common';
-import { type SystemPromptDefinition } from '@itookit/llm-tasks/contracts';
-import { mcpConfiguration, type MCPServer } from '@itookit/tools/mcp-contracts';
-import { type LLMProvider, type LLMConnection } from '@itookit/driver-llm/contracts';
-import { type AgentDefinition, type LLMSkill } from '@itookit/kernel-adapters/contracts';
-import { type ICommandBus } from '@itookit/llm-session/contracts';
-import { type FlowDraft } from '@itookit/llm-flow/contracts';
-import { FlowCommand } from '@itookit/llm-session';
-import type { ApplicationAgentPort } from '@itookit/app-contracts/services';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { randomUUID, t } from '@nestos/common';
+import { type SystemPromptDefinition } from '@nestos/llm-tasks/contracts';
+import { mcpConfiguration, type MCPServer } from '@nestos/tools/mcp-contracts';
+import { type LLMProvider, type LLMConnection } from '@nestos/driver-llm/contracts';
+import { type AgentDefinition, type LLMSkill } from '@nestos/kernel-adapters/contracts';
+import { type ICommandBus } from '@nestos/llm-session/contracts';
+import { type FlowDraft } from '@nestos/llm-flow/contracts';
+import { FlowCommand } from '@nestos/llm-session';
+import type { ApplicationAgentPort } from '@nestos/app-contracts/services';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { TOOLBOX_KINDS, toolboxPath, type ToolboxKind } from './toolbox-identity';
 import { defaultToolDrawers } from './tool-groups';
 import { createToolboxFiles } from './toolbox-files';
 import { ToolboxImportTrace } from './toolbox-import-trace';
 import { ProviderTemplates } from './provider-templates';
 import { planAgentFlowExport, publishAgentFlows, rewriteAgentFlow, rewriteFlowCalls } from './agent-flow-archive';
-import type { ToolboxInventory, ToolboxNavigation } from '@itookit/app-contracts/services';
+import type { ToolboxInventory, ToolboxNavigation } from '@nestos/app-contracts/services';
 
 /** Resource creation retains the owning services' identity and validation rules. */
 export class ToolboxResources {
-    readonly toolPackages?: import('@itookit/app-contracts/services').ToolPackages;
-    readonly flowInstallations?: import('@itookit/app-contracts/services').FlowInstallations;
+    readonly toolPackages?: import('@nestos/app-contracts/services').ToolPackages;
+    readonly flowInstallations?: import('@nestos/app-contracts/services').FlowInstallations;
     readonly drawers: ToolboxDrawers;
     private initialized?: Promise<void>;
     private readonly templates: ProviderTemplates;
@@ -29,7 +29,7 @@ export class ToolboxResources {
     constructor(readonly sources: Record<ToolboxKind, IFileSystem>, private readonly agents: ApplicationAgentPort, private readonly commands: ICommandBus, settings: IFileSystem,
         private readonly inventory?: ToolboxInventory & { refresh(): Promise<void> },
         private readonly defaultDrawers: readonly Drawer[] = [], providerTemplates: readonly LLMProvider[] = [],
-        installation: {toolPackages?: import('@itookit/app-contracts/services').ToolPackages; flowInstallations?: import('@itookit/app-contracts/services').FlowInstallations} = {},
+        installation: {toolPackages?: import('@nestos/app-contracts/services').ToolPackages; flowInstallations?: import('@nestos/app-contracts/services').FlowInstallations} = {},
         private readonly remoteChanges?: (listener: () => void) => () => void) {
         this.toolPackages = installation.toolPackages; this.flowInstallations = installation.flowInstallations;
         this.drawers = new ToolboxDrawers(settings); this.templates = new ProviderTemplates(providerTemplates, () => this.agents.getProviders(), this.agents);
@@ -55,7 +55,7 @@ export class ToolboxResources {
     }
     subscribe(listener: () => void): () => void { const stops = [this.agents.onChange(listener), this.remoteChanges?.(listener), this.toolPackages?.onChange?.(listener)]; return () => {for (const stop of stops) stop?.();}; }
     setDefaultConnection(id: string | null): Promise<void> { return this.agents.setDefaultConnection(id); }
-    setModelDefault(operation: import('@itookit/kernel-adapters/contracts').ModelOperation, id: string | null): Promise<void> { return this.agents.setModelDefault(operation, id); }
+    setModelDefault(operation: import('@nestos/kernel-adapters/contracts').ModelOperation, id: string | null): Promise<void> { return this.agents.setModelDefault(operation, id); }
     toolGrant = toolGrant;
     getAgents(): Promise<AgentDefinition[]> { return this.agents.getAgents(); }
     hasProvider(id: string): boolean { return this.agents.getProviders().some(item => item.id === id); }
@@ -194,12 +194,12 @@ export class ToolboxResources {
         return data;
     }
     async import(content: string): Promise<string[]> {return (await this.importWithReport(content)).paths;}
-    async importWithReport(content: string): Promise<{paths: string[]; installations: import('@itookit/app-contracts/services').FlowInstallationReport[]}> {
-        const trace = new ToolboxImportTrace(), installations: import('@itookit/app-contracts/services').FlowInstallationReport[] = [];
+    async importWithReport(content: string): Promise<{paths: string[]; installations: import('@nestos/app-contracts/services').FlowInstallationReport[]}> {
+        const trace = new ToolboxImportTrace(), installations: import('@nestos/app-contracts/services').FlowInstallationReport[] = [];
         const paths = await trace.run(() => this.importArchive(content, trace, installations));
         return {paths, installations};
     }
-    private async importArchive(content: string, trace: ToolboxImportTrace, installations: import('@itookit/app-contracts/services').FlowInstallationReport[]): Promise<string[]> {
+    private async importArchive(content: string, trace: ToolboxImportTrace, installations: import('@nestos/app-contracts/services').FlowInstallationReport[]): Promise<string[]> {
         const archive = JSON.parse(content);
         trace.step('validate');
         if (archive?.format !== 'itookit.toolbox' || archive.version !== 1 || !Array.isArray(archive.entries)) throw new Error(t('toolbox.importInvalid'));

@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { ProjectSyncContent } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import type { ProjectSyncContent } from '@nestos/app-contracts/services';
 import { paragraph } from './dialog';
 
 export function conflictMetadata(parent: HTMLElement, labels: [string,string], values: Array<{kind: string; hash?: string | null; size?: string | number} | null | undefined>): void {

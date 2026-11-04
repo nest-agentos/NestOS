@@ -1,9 +1,9 @@
 // @file: llm-ui/components/indicators/StatusIndicatorView.ts
 
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import type { IStatusPresenter } from '../../domain/ports/IStatusPresenter';
-import type { SessionSnapshot } from '@itookit/llm-session/contracts';
-import type {DOMCache} from '@itookit/llm-ui';
+import type { SessionSnapshot } from '@nestos/llm-session/contracts';
+import type {DOMCache} from '@nestos/llm-ui';
 
 interface StatusInfo {
     cls: string;

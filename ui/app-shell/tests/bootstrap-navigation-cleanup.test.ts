@@ -1,13 +1,13 @@
 import { initTestApp } from './helpers/application';
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { NAVIGATION_EVENTS } from '@itookit/common';
-import { OcrService, SettingsService, type ApplicationRuntime } from '@itookit/app-core';
-import { bindApplicationBackend } from '@itookit/app-core/host';
+import { NAVIGATION_EVENTS } from '@nestos/common';
+import { OcrService, SettingsService, type ApplicationRuntime } from '@nestos/app-core';
+import { bindApplicationBackend } from '@nestos/app-core/host';
 import { themeService } from '../src/ThemeService';
 import type { WorkspaceConfig } from '../src/types';
 import { fileContentFormat } from '../src/browser/file-format';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {UserEventService} from '../../../backend/app-core/src/events/service';
 
 const visibility = vi.hoisted(() => vi.fn());
@@ -20,15 +20,15 @@ vi.mock('../src/ThemeService', () => ({
     ThemeMode: undefined,
 }));
 
-vi.mock('@itookit/mdx-adapter', () => ({
+vi.mock('@nestos/mdx-adapter', () => ({
     defaultEditorFactory: vi.fn(async () => ({ destroy: vi.fn(async () => {}) })),
 }));
 
-vi.mock('@itookit/kernel-adapters', () => ({
+vi.mock('@nestos/kernel-adapters', () => ({
     createSessionSkillControls: vi.fn(() => ({})),
 }));
 
-vi.mock('@itookit/app-settings', () => ({
+vi.mock('@nestos/app-settings', () => ({
     createSettingsNavigation: vi.fn(() => ({})),
     createSettingsFactory: vi.fn(() => vi.fn(async () => ({ destroy: vi.fn(async () => {}) }))),
     SkillsEngine: class { dispose() {} },

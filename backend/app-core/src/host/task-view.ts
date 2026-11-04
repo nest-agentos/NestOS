@@ -1,6 +1,6 @@
-import { taskStat, KernelError, KernelErrorCode } from '@itookit/durable-kernel';
+import { taskStat, KernelError, KernelErrorCode } from '@nestos/durable-kernel';
 import { taskKeyEvent, taskSummary } from '../session/session-browser';
-import type { ApplicationKernelPort, TaskEventQuery, TaskEventView, TaskDetail, SessionTaskQuery, SessionTaskPage } from '@itookit/app-contracts/services';
+import type { ApplicationKernelPort, TaskEventQuery, TaskEventView, TaskDetail, SessionTaskQuery, SessionTaskPage } from '@nestos/app-contracts/services';
 
 export async function sessionTasks(kernel: ApplicationKernelPort, sessionId: string, options?: SessionTaskQuery): Promise<SessionTaskPage> {
     try {

@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {FlowLibraryCommand, InputAssetCommand} from '@itookit/app-contracts';
-import {SessionCommand, type SessionInstructionQueue, type SubmissionRequest} from '@itookit/llm-session/contracts';
-import type {FlowDraft} from '@itookit/llm-flow/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {FlowLibraryCommand, InputAssetCommand} from '@nestos/app-contracts';
+import {SessionCommand, type SessionInstructionQueue, type SubmissionRequest} from '@nestos/llm-session/contracts';
+import type {FlowDraft} from '@nestos/llm-flow/contracts';
 import {LLMWorkspaceEditor} from '../../llm-ui-adapter/src/shell/LLMWorkspaceEditor';
 import type {ChatInput} from '../../llm-ui-adapter/src/components/input/ChatInputView';
 import {draftFileId} from '../../llm-ui-adapter/src/domain/draft-file-identity';
 import {captureSubmissionDraft} from '../../llm-ui-adapter/src/domain/submission-draft';
 import {fileBytes} from '../../llm-ui-adapter/src/utils/file-bytes';
 
-vi.mock('@itookit/mdxeditor', async original => ({...await original<typeof import('@itookit/mdxeditor')>(),
+vi.mock('@nestos/mdxeditor', async original => ({...await original<typeof import('@nestos/mdxeditor')>(),
     AssetResolverPlugin: class {}, MDxRenderer: class {
         markedExtensions: unknown[] = []; usePlugin() {return this;}
         async render(node: HTMLElement, text: string) {node.textContent = text;}
@@ -57,7 +57,7 @@ async function setup() {
 type Fixture = Awaited<ReturnType<typeof setup>>;
 type View = Awaited<ReturnType<Fixture['open']>>;
 async function select(f: Fixture, view: View, file: File) {
-    const catalog = await f.original<import('@itookit/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
+    const catalog = await f.original<import('@nestos/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
     const target = catalog.entries.find(entry => entry.target.kind === 'flow' && entry.target.id === 'files')!.target;
     view.input.setConfig({target, agentId: ''}); view.input.restoreDraft('Inspect these files', [file], '');
 }

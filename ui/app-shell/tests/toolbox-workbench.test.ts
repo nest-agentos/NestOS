@@ -1,28 +1,28 @@
 import {ASSISTANT_ADD_EVENT} from '../src/navigation/assistant-actions';
-import { SystemPromptSettingsEditor } from '@itookit/llm-ui-adapter/settings';
+import { SystemPromptSettingsEditor } from '@nestos/llm-ui-adapter/settings';
 // @vitest-environment jsdom
 import * as archiveTransfer from '../src/files/archive-transfer';
-import { ProviderSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import { ConnectionSettingsEditor } from '@itookit/llm-ui-adapter/settings';
+import { ProviderSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import { ConnectionSettingsEditor } from '@nestos/llm-ui-adapter/settings';
 import { toolboxSettingsRoute } from '../src/toolbox/routes';
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
+import { MemoryBackend } from '@nestos/vfs-core';
 import { createToolboxFiles } from '../../../backend/app-core/src/configuration/toolbox-files';
-import { createApplicationRuntime, type ApplicationRuntime } from '@itookit/app-core';
+import { createApplicationRuntime, type ApplicationRuntime } from '@nestos/app-core';
 import { SkillsEngine } from '../../../backend/app-core/src/configuration/skills-files';
-import {BaseSettingsEditor, editorResourceId, type EditorOptions} from '@itookit/ui-common-adapter';
-import { MCPSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import { FlowCommand } from '@itookit/llm-session';
-import { ToolboxInventory } from '@itookit/app-core';
-import { ToolboxResources } from '@itookit/app-core';
+import {BaseSettingsEditor, editorResourceId, type EditorOptions} from '@nestos/ui-common-adapter';
+import { MCPSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import { FlowCommand } from '@nestos/llm-session';
+import { ToolboxInventory } from '@nestos/app-core';
+import { ToolboxResources } from '@nestos/app-core';
 import { createNestosFlowDrawers } from '../../../backend/app-core/src/presets/flow-library';
-import { createNestosProviderTemplates } from '@itookit/kernel-adapters/llm/presets';
+import { createNestosProviderTemplates } from '@nestos/kernel-adapters/llm/presets';
 import { createFlowContextMenuConfig } from '../../llm-ui-adapter/src/flows/context-menu';
 import { ToolboxWorkbench } from '../src/toolbox/ToolboxWorkbench';
 import { ToolDetailsEditor } from '../src/toolbox/ToolDetailsEditor';
 import { legacyToolboxRoute, TOOLBOX_KINDS } from '../src/toolbox/routes';
 import { MCPServerConnection } from '../../../backend/kernel-adapters/src/llm-management/skills/mcp-client';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import mediaProbeExamples from '../src/config/media-probe-examples.json';
 
 let runtime: ApplicationRuntime;
@@ -405,7 +405,7 @@ it('creates every editable category in named drawers and persists their organiza
         expect([...document.querySelectorAll<HTMLOptionElement>('.project-dialog datalist option')].map(option => option.value)).toContain('学习');
         document.querySelector('.project-dialog')!.dispatchEvent(new Event('cancel', { cancelable: true })); await again;
     }
-    const { ToolboxDrawers } = await import('@itookit/app-core');
+    const { ToolboxDrawers } = await import('@nestos/app-core');
     const reloaded = new ToolboxDrawers(await runtime.vfs.openFileSystem('/etc')); await reloaded.init();
     expect(reloaded.snapshot().filter(item => item.name === '学习')).toHaveLength(5);
 });

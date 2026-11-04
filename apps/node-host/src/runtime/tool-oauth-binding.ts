@@ -1,4 +1,4 @@
-import type {ToolConnectionInput, ToolConnectionType, ToolConnectionVerification} from '@itookit/app-contracts/services';
+import type {ToolConnectionInput, ToolConnectionType, ToolConnectionVerification} from '@nestos/app-contracts/services';
 import type {PrivateConnection} from './tool-authorization';
 import type {OAuthApplication} from './tool-oauth-applications';
 import {authFailure} from './tool-oauth-client';

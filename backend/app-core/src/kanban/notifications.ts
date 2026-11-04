@@ -1,9 +1,9 @@
-import {sha256HexSync} from '@itookit/common';
-import type {SeqEventJournal} from '@itookit/vfs-core';
-import type {ApplicationEventFact} from '@itookit/app-contracts/services';
-import type {KanbanBoard, KanbanEvent, KanbanClient} from '@itookit/kanban/contracts';
+import {sha256HexSync} from '@nestos/common';
+import type {SeqEventJournal} from '@nestos/vfs-core';
+import type {ApplicationEventFact} from '@nestos/app-contracts/services';
+import type {KanbanBoard, KanbanEvent, KanbanClient} from '@nestos/kanban/contracts';
 import {requireValue} from './validation';
-import {isKanbanEventRelevant} from '@itookit/kanban';
+import {isKanbanEventRelevant} from '@nestos/kanban';
 
 export interface KanbanNotifications {
     /** Stable identity of the authorized store/project, including the remote authority when applicable. */

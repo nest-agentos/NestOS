@@ -1,7 +1,7 @@
 import {rerunSessionFlow, type FlowRerunContext} from '../flows/rerun-flow';
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import {SessionCommand, type ICommandBus, type SessionViewPort, type SessionGroup} from '@itookit/llm-session/contracts';
-import type {ConversationSnapshot, MessageTarget, OperationContext, OperationReceipt, MessageAction, RenderContext} from '@itookit/llm-ui';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import {SessionCommand, type ICommandBus, type SessionViewPort, type SessionGroup} from '@nestos/llm-session/contracts';
+import type {ConversationSnapshot, MessageTarget, OperationContext, OperationReceipt, MessageAction, RenderContext} from '@nestos/llm-ui';
 
 interface Options {
     commands: ICommandBus; session: SessionViewPort;

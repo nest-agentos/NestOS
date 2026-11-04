@@ -3,8 +3,8 @@
  * @desc MDxEditor 完整演示入口文件
  */
 
-import '@itookit/mdxeditor/style.css';
-import { createMDxEditor } from '@itookit/mdxeditor';
+import '@nestos/mdxeditor/style.css';
+import { createMDxEditor } from '@nestos/mdxeditor';
 
 // ============================================================================
 // 1. 模拟数据源 (Mock Data & Providers)

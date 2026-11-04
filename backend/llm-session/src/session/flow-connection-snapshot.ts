@@ -1,5 +1,5 @@
-import { API_PROTOCOLS, resolveModelProtocol, type ConnectionMeta, type LLMProvider } from '@itookit/driver-llm/contracts';
-import { MODEL_OPERATIONS, hasConnectionCredentials, mediaEndpointIdentity, modelForOperation } from '@itookit/kernel-adapters/contracts';
+import { API_PROTOCOLS, resolveModelProtocol, type ConnectionMeta, type LLMProvider } from '@nestos/driver-llm/contracts';
+import { MODEL_OPERATIONS, hasConnectionCredentials, mediaEndpointIdentity, modelForOperation } from '@nestos/kernel-adapters/contracts';
 import type { FlowConnectionCatalog } from './flow-connections';
 import type { FlowConnectionSelection, FlowConnectionSnapshot } from '../contracts/flow-connection-snapshot';
 export type { FlowConnectionSelection, FlowConnectionSnapshot } from '../contracts/flow-connection-snapshot';

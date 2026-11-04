@@ -1,5 +1,5 @@
 import type {ConversationCommandOutputRef, ConversationCommandOutputPage, ConversationControls} from '../../contracts';
-import {arrayBufferToBase64, base64ToArrayBuffer, sha256Hex} from '@itookit/common';
+import {arrayBufferToBase64, base64ToArrayBuffer, sha256Hex} from '@nestos/common';
 
 import {readVerifiedContent} from '../../utils/verified-content';
 

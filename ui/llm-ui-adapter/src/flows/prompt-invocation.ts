@@ -1,10 +1,10 @@
 import {ParameterSources} from './parameter-sources';
-import {Toast} from '@itookit/ui-common-adapter';
-import {createOperationLedger, type OperationLedger} from '@itookit/llm-ui';
+import {Toast} from '@nestos/ui-common-adapter';
+import {createOperationLedger, type OperationLedger} from '@nestos/llm-ui';
 import {InvocationOperations} from './invocation-operations';
-import { escapeHTML, randomUUID, t } from '@itookit/common';
-import { type ICommandBus } from '@itookit/llm-session/contracts';
-import type { FlowParameter, FlowRevision, JsonValue } from '@itookit/llm-flow/contracts';
+import { escapeHTML, randomUUID, t } from '@nestos/common';
+import { type ICommandBus } from '@nestos/llm-session/contracts';
+import type { FlowParameter, FlowRevision, JsonValue } from '@nestos/llm-flow/contracts';
 import { promptFlowParameters, type FlowConnectionSelection } from '../components/FlowParameterForm';
 import { FlowInputSources } from './flow-input-sources';
 import { contentSourceError } from './content-source-picker';

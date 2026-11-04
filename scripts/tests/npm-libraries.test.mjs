@@ -7,10 +7,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 test('release manifests expose built entries and pin library dependencies', () => {
-    const manifest = {name:'example',version:'old',main:'./src/index.ts',dependencies:{'@itookit/vfs-core':'workspace:*'},publishConfig:{main:'./dist/index.cjs',exports:{'.':'./dist/index.js'}}};
+    const manifest = {name:'example',version:'old',main:'./src/index.ts',dependencies:{'@nestos/vfs-core':'workspace:*'},publishConfig:{main:'./dist/index.cjs',exports:{'.':'./dist/index.js'}}};
     const result = releaseManifest(manifest, '1.0.0');
     assert.equal(result.main, './dist/index.cjs');
-    assert.equal(result.dependencies['@itookit/vfs-core'],versions.get('@itookit/vfs-core'));
+    assert.equal(result.dependencies['@nestos/vfs-core'],versions.get('@nestos/vfs-core'));
     assert.equal(result.publishConfig,undefined);
     assert.equal(manifest.main,'./src/index.ts');
     assert.throws(() => releaseManifest({dependencies:{other:'workspace:*'}},'1.0.0'),/Non-registry dependency/);

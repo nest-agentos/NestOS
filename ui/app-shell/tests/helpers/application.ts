@@ -1,6 +1,6 @@
-import { SessionCommand } from '@itookit/llm-session/contracts';
-import { createApplicationClient, bindApplicationBackend } from '@itookit/app-core/host';
-import type { LocalApplicationServices } from '@itookit/app-contracts/services';
+import { SessionCommand } from '@nestos/llm-session/contracts';
+import { createApplicationClient, bindApplicationBackend } from '@nestos/app-core/host';
+import type { LocalApplicationServices } from '@nestos/app-contracts/services';
 import { SessionWorkbench, type SessionWorkbenchOptions } from '../../src/projects/SessionWorkbench';
 import type { AppOptions } from '../../src/types';
 

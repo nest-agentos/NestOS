@@ -1,11 +1,11 @@
-import {DEFAULT_KANBAN_WORK_TYPES} from '@itookit/kanban/contracts';
+import {DEFAULT_KANBAN_WORK_TYPES} from '@nestos/kanban/contracts';
 import {adoptDecomposition, validateSubtasks, type AnalysisSubtask} from './analysis-decomposition';
-import {randomUUID, sha256HexSync, t} from '@itookit/common';
-import {taskStat, type Kernel, type TaskCallResult} from '@itookit/durable-kernel';
-import type {IndependentCallService} from '@itookit/llm-session';
-import type {IndependentCallInput} from '@itookit/llm-session/contracts';
-import type {TargetRef} from '@itookit/llm-flow/contracts';
-import type {KanbanAnalysisStatus, KanbanBoard, KanbanItem, KanbanService, KanbanEstimate} from '@itookit/kanban/contracts';
+import {randomUUID, sha256HexSync, t} from '@nestos/common';
+import {taskStat, type Kernel, type TaskCallResult} from '@nestos/durable-kernel';
+import type {IndependentCallService} from '@nestos/llm-session';
+import type {IndependentCallInput} from '@nestos/llm-session/contracts';
+import type {TargetRef} from '@nestos/llm-flow/contracts';
+import type {KanbanAnalysisStatus, KanbanBoard, KanbanItem, KanbanService, KanbanEstimate} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 import {requireValue} from './validation';
 import preset from '../presets/kanban-planning.json';

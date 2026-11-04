@@ -1,7 +1,7 @@
-import { sha256Hex } from '@itookit/llm-context';
-import { taskStoragePath, type EffectExecutionContext } from '@itookit/durable-kernel';
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { MediaGenerationResult } from '@itookit/driver-llm/contracts';
+import { sha256Hex } from '@nestos/llm-context';
+import { taskStoragePath, type EffectExecutionContext } from '@nestos/durable-kernel';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { MediaGenerationResult } from '@nestos/driver-llm/contracts';
 import type { LlmMediaEffectRequest, MediaResultStore, StoredMediaResult, MediaAssetReference } from './llm-media-effect';
 type MediaStorageResolver = (context: EffectExecutionContext) => Promise<{ fs: IFileSystem; rootPath: string }>;
 /** Publish a receipt only after every binary asset has been written and verified. */

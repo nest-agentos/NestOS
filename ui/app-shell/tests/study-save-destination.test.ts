@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach,expect,it,vi} from 'vitest';
-import {createVFS,MemoryBackend} from '@itookit/vfs-core';
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {Workbench} from '../src/core/Workbench';
 const modal=Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype,'showModal'),close=Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype,'close');
 afterEach(()=>{vi.unstubAllGlobals();document.body.replaceChildren();

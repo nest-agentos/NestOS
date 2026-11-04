@@ -1,5 +1,5 @@
 // @file: llm-ui/components/templates/LayoutTemplates.ts
-import { ACTION_ICONS, escapeHTML, t } from '@itookit/common';
+import { ACTION_ICONS, escapeHTML, t } from '@nestos/common';
 
 export const LayoutTemplates = {
 
@@ -112,7 +112,7 @@ export const LayoutTemplates = {
             <p>${escapeHTML(t('chat.welcome.description'))}</p>
             <div class="llm-ui-welcome__prompts">
                 ${['promptSummary', 'promptPlan', 'promptIdeas'].map(key => {
-                    const label = escapeHTML(t(`chat.welcome.${key}` as import('@itookit/common').LocaleKey));
+                    const label = escapeHTML(t(`chat.welcome.${key}` as import('@nestos/common').LocaleKey));
                     return `<button type="button" class="llm-ui-welcome__prompt" data-prompt="${label}">${label}<span aria-hidden="true">↗</span></button>`;
                 }).join('')}
             </div>

@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
 import {SessionHistoryActions} from './session-history-actions';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 it('rejects a captured history action after a revision or active binding change', async () => {
     let revision = 1, active = true;
     const execute = vi.fn(async () => ({allowed: true}));

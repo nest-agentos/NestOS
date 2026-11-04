@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {SessionCommand, type SessionInstructionQueue} from '@itookit/llm-session/contracts';
-import {FlowCommand, type FlowDraft} from '@itookit/llm-flow/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {SessionCommand, type SessionInstructionQueue} from '@nestos/llm-session/contracts';
+import {FlowCommand, type FlowDraft} from '@nestos/llm-flow/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 
 type Runtime = Awaited<ReturnType<typeof createApplicationRuntime>>;
@@ -108,7 +108,7 @@ it('lists independent published roots without reading prompt bodies and keeps dr
     const draft = await runtime.commandBus.execute<FlowDraft>(FlowCommand.DraftLoad, {id: 'worker'});
     await runtime.commandBus.execute(FlowCommand.DraftSave, {draft: {...draft, exposure: 'local'}, expectedDraftVersion: draft.draftVersion});
     const prompt = vi.spyOn(runtime.agentService, 'getSystemPrompt').mockRejectedValue(new Error('Prompt bodies are not directory metadata'));
-    const catalog = await runtime.commandBus.execute<import('@itookit/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
+    const catalog = await runtime.commandBus.execute<import('@nestos/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
     expect(catalog.entries.filter(entry => entry.target.id === 'worker').map(entry => entry.target.kind).sort()).toEqual(['agent', 'flow']);
     expect(catalog.entries.some(entry => entry.target.id === 'private')).toBe(false); expect(prompt).not.toHaveBeenCalled();
     expect(JSON.stringify(catalog)).not.toContain('PRIVATE_PROMPT_BODY');
@@ -118,7 +118,7 @@ it('checks expected definition digests even if a mutable Agent source reuses its
     const {runtime, sessionId} = await setup();
     const agent = {id: 'agent', name: 'Agent', type: 'agent' as const, version: 'v1', config: {systemPrompt: 'Original'}};
     await runtime.agentService.saveAgent(agent);
-    const catalog = await runtime.commandBus.execute<import('@itookit/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
+    const catalog = await runtime.commandBus.execute<import('@nestos/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
     const expected = catalog.entries.find(entry => entry.target.id === 'agent')!.target;
     await runtime.agentService.saveAgent({...agent, config: {systemPrompt: 'Changed without a version update'}});
     await expect(runtime.commandBus.execute(SessionCommand.Submit, {target: {kind: 'agent', id: 'agent', version: 'v1'}, expectedTarget: expected,
@@ -129,7 +129,7 @@ it('checks expected definition digests even if a mutable Agent source reuses its
 it('regenerates a Flow as a new Flow invocation with preserved arguments and readable admission facts', async () => {
     const {runtime, sessionId} = await setup(); await submit(runtime, sessionId, 'original-flow', {request: 'Same task', count: 2});
     const [original] = await completed(runtime, sessionId), originalRoot = original.executions[0].taskId;
-    const result = await runtime.commandBus.execute<import('@itookit/llm-session/contracts').RegenerateResult>(SessionCommand.Regenerate,
+    const result = await runtime.commandBus.execute<import('@nestos/llm-session/contracts').RegenerateResult>(SessionCommand.Regenerate,
         {assistantId: `round-${original.id}-assistant`});
     expect(result.target).toEqual(original.target); expect(result.agentId).toBe('');
     const [next] = await completed(runtime, sessionId);

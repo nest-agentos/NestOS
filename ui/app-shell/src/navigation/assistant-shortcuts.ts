@@ -1,5 +1,5 @@
-import {folderBrowserPath} from '@itookit/app-contracts';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import {folderBrowserPath} from '@nestos/app-contracts';
+import type {ProjectService} from '@nestos/app-contracts/services';
 
 export type AssistantShortcutTarget = {kind: 'resource'; workspace: string; resource: string}
     | {kind: 'directory'; projectId: string; path: string} | {kind: 'newSession'; projectId: string}

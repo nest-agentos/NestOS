@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { SessionHandle, TaskRecord } from '@itookit/durable-kernel';
+import type { SessionHandle, TaskRecord } from '@nestos/durable-kernel';
 import { waitForFlowRunTasks } from '../src/flow/run-members';
 
 it('waits for detached members and descendants created while draining, without waiting for the aggregate', async () => {

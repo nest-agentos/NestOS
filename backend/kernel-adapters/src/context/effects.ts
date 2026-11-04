@@ -1,8 +1,8 @@
-import type { ContextPrepareInput, ContextCursor, IContextService, PreparedContext } from '@itookit/llm-context';
-import { CONTEXT_TOOL_IDS, invokeContextTool, ContextError } from '@itookit/llm-context';
-import { assertEffectGrant, type EffectAdapter, type EffectExecutionContext } from '@itookit/durable-kernel';
-import type { ChatCompletionResponse } from '@itookit/driver-llm/contracts';
-import type { ToolInvokeResult } from '@itookit/tools/contracts';
+import type { ContextPrepareInput, ContextCursor, IContextService, PreparedContext } from '@nestos/llm-context';
+import { CONTEXT_TOOL_IDS, invokeContextTool, ContextError } from '@nestos/llm-context';
+import { assertEffectGrant, type EffectAdapter, type EffectExecutionContext } from '@nestos/durable-kernel';
+import type { ChatCompletionResponse } from '@nestos/driver-llm/contracts';
+import type { ToolInvokeResult } from '@nestos/tools/contracts';
 import type { LlmChatEffectRequest } from '../effects/llm-chat-effect';
 import type { ToolCallEffectRequest } from '../effects/tool-call-effect';
 import { InFlightEffects } from '../effects/in-flight';
@@ -64,7 +64,7 @@ export class ContextLlmEffect implements EffectAdapter<SnapshotRequest, ChatComp
 interface ContextToolRequest extends ToolCallEffectRequest { maxOutputBytes?: number }
 interface OutputAdmittingToolEffect extends EffectAdapter<ToolCallEffectRequest, ToolInvokeResult> {
     executeWithOutputAdmission?: (request: ToolCallEffectRequest, context: EffectExecutionContext,
-        admit: import('@itookit/tools/contracts').ToolInvokeRequest['admitOutput']) => Promise<ToolInvokeResult>;
+        admit: import('@nestos/tools/contracts').ToolInvokeRequest['admitOutput']) => Promise<ToolInvokeResult>;
 }
 export class ContextToolEffect implements EffectAdapter<ContextToolRequest, ToolInvokeResult> {
     readonly kind = 'tool.call';

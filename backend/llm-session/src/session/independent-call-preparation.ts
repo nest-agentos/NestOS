@@ -1,7 +1,7 @@
-import {prepareTaskCall} from '@itookit/llm-flow';
-import {snapshotTaskCallPlan, type TaskSubmissionReceipt, type TaskCallPlan} from '@itookit/durable-kernel';
-import {isInvocationIdentity, targetLabels, type InvocationIdentity, type TargetRef} from '@itookit/llm-flow/contracts';
-import {sha256HexSync} from '@itookit/llm-context';
+import {prepareTaskCall} from '@nestos/llm-flow';
+import {snapshotTaskCallPlan, type TaskSubmissionReceipt, type TaskCallPlan} from '@nestos/durable-kernel';
+import {isInvocationIdentity, targetLabels, type InvocationIdentity, type TargetRef} from '@nestos/llm-flow/contracts';
+import {sha256HexSync} from '@nestos/llm-context';
 import type {SubmissionRequest} from '../contracts/submission';
 import type {PreparedDirectConversationRun, PreparedConversationContext} from './conversation-preparation';
 import {ulid} from '../persistence/ulid';

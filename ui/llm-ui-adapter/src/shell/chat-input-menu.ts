@@ -1,5 +1,5 @@
-import {CHAT_ICONS, ENTITY_ICONS, getLocale, t} from '@itookit/common';
-import {PopupPanel, type ChatView, type MountedToolbar} from '@itookit/llm-ui';
+import {CHAT_ICONS, ENTITY_ICONS, getLocale, t} from '@nestos/common';
+import {PopupPanel, type ChatView, type MountedToolbar} from '@nestos/llm-ui';
 import {ChatInputTemplates} from '../components/templates/ChatInputTemplates';
 import {HelpPanel} from '../components/input/HelpPanel';
 import type {ChatInputSettings} from '../domain/ports/IChatInputPresenter';

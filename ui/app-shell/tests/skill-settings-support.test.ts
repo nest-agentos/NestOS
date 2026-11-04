@@ -2,8 +2,8 @@
 import { expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-import { SkillSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import type { LLMSkill } from '@itookit/kernel-adapters/contracts';
+import { SkillSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import type { LLMSkill } from '@nestos/kernel-adapters/contracts';
 
 // Use the editor's YAML dependency; this integration harness lives with app-shell's DOM tests.
 const yaml = createRequire(resolve(process.cwd(), '../llm-ui-adapter/package.json'))('js-yaml');

@@ -1,5 +1,5 @@
 import { graphEffects } from './graph-decoder';
-import type { TaskHandle } from '@itookit/durable-kernel';
+import type { TaskHandle } from '@nestos/durable-kernel';
 import type { DagEdgeDefinition, DagNodeDefinition, DagRunSpec, GraphEffect, GraphPatch, JsonValue } from '../contracts';
 import type { EdgeState } from './delegation-runtime';
 import type { createRunCatalog } from './run-catalog';

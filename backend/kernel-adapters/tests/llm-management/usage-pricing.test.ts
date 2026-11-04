@@ -31,7 +31,7 @@ it('distinguishes unknown prices, incomplete usage, configured zero prices and m
 });
 
 it('adds injected provider defaults to old saved pricing without replacing custom defaults', async () => {
-    const {createVFS, MemoryBackend} = await import('@itookit/vfs-core');
+    const {createVFS, MemoryBackend} = await import('@nestos/vfs-core');
     const {loadPricingConfig, writePricingConfig} = await import('../../src/llm-management/constants/pricing');
     const {manager} = await createVFS({rootBackend: new MemoryBackend()});
     const fs = await manager.openFileSystem('/etc');

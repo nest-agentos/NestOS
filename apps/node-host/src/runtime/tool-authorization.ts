@@ -1,5 +1,5 @@
 import {createHash, randomBytes, randomUUID} from 'node:crypto';
-import type {ToolAuthorizationView, ToolConnectionType, ToolOAuthDefinition} from '@itookit/app-contracts/services';
+import type {ToolAuthorizationView, ToolConnectionType, ToolOAuthDefinition} from '@nestos/app-contracts/services';
 import {authFailure, tokenRequest, validateOAuthRedirect, type OAuthTokenReply} from './tool-oauth-client';
 
 export interface PrivateConnection {id: string; type: string; revision?: string; redirectUri?: string; authorizedScopes?: string[]; values: Record<string, string>}

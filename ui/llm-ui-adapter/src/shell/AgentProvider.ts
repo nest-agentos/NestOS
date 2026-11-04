@@ -2,11 +2,11 @@
 // Agent/Connection data-fetching helpers — extracted from LLMWorkspaceEditor.
 // Pure async functions: no DOM access, no mutable state.
 
-import { resolveChatModelForTier, resolveChatModelTiers, type IAgentConfigService, type ChatConfigurationSnapshot } from '@itookit/kernel-adapters/contracts';
+import { resolveChatModelForTier, resolveChatModelTiers, type IAgentConfigService, type ChatConfigurationSnapshot } from '@nestos/kernel-adapters/contracts';
 import type { ExecutorOption, ConnectionOption } from '../domain/types';
-import { ENTITY_ICONS, formatDefaultFileTitle, t } from '@itookit/common';
-import { modelReasoning, type ConnectionMeta, type LLMProvider } from '@itookit/driver-llm/contracts';
-import { isRootCallable } from '@itookit/llm-flow/contracts';
+import { ENTITY_ICONS, formatDefaultFileTitle, t } from '@nestos/common';
+import { modelReasoning, type ConnectionMeta, type LLMProvider } from '@nestos/driver-llm/contracts';
+import { isRootCallable } from '@nestos/llm-flow/contracts';
 
 export async function buildExecutorOptions(
     agentService: IAgentConfigService,

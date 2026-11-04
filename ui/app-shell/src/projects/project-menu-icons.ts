@@ -1,6 +1,6 @@
-import { ACTION_ICONS, CHAT_ICONS, TOOLBOX_ICONS, PROJECT_ACTION_ICONS, FILE_BROWSER_ICONS } from '@itookit/common';
-import type { ContextMenuBuilder } from '@itookit/ui-common-adapter';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
+import { ACTION_ICONS, CHAT_ICONS, TOOLBOX_ICONS, PROJECT_ACTION_ICONS, FILE_BROWSER_ICONS } from '@nestos/common';
+import type { ContextMenuBuilder } from '@nestos/ui-common-adapter';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
 
 const icons: Record<string, string> = {
     'project-status': ACTION_ICONS.info, 'project-settings': PROJECT_ACTION_ICONS.settings,

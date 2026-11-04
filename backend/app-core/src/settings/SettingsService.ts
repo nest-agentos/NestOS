@@ -1,15 +1,15 @@
 import { SettingsFiles, writeWorkspaceFile } from './workspace-files';
-import { exportFileSystem, importFileSystem } from '@itookit/vfs-core';
+import { exportFileSystem, importFileSystem } from '@nestos/vfs-core';
 /**
  * @file: app-settings/services/SettingsService.ts
  */
-import type { IVFSManager, IFileSystem } from '@itookit/vfs-core';
-import { FSNotFoundError } from '@itookit/vfs-core';
+import type { IVFSManager, IFileSystem } from '@nestos/vfs-core';
+import { FSNotFoundError } from '@nestos/vfs-core';
 import { LabelStore, TAG_STORE_PATH } from './LabelStore';
-import { traceBoot } from '@itookit/common';
-import { SettingsState, Contact, Tag } from '@itookit/app-contracts/settings';
-import type { SnapshotPort, SettingsPort, SettingsWorkspaceSource, WorkspaceDescription } from '@itookit/app-contracts/settings';
-import { FSError } from '@itookit/vfs-core';
+import { traceBoot } from '@nestos/common';
+import { SettingsState, Contact, Tag } from '@nestos/app-contracts/settings';
+import type { SnapshotPort, SettingsPort, SettingsWorkspaceSource, WorkspaceDescription } from '@nestos/app-contracts/settings';
+import { FSError } from '@nestos/vfs-core';
 
 // UI display: modules not shown to users in workspace picker
 
@@ -24,7 +24,7 @@ const FILES = {
 // ============================================
 
 // Re-export so existing callers don't need to change imports
-export type { LocalSnapshot } from '@itookit/app-contracts/settings';
+export type { LocalSnapshot } from '@nestos/app-contracts/settings';
 
 type ChangeListener = () => void;
 

@@ -1,2 +1,2 @@
-export { remoteLog, RemoteConnectionUnavailableError, reportRemoteFailure } from '@itookit/app-contracts';
-export type { MCPConnectionReason, MCPConnectionDiagnostic } from '@itookit/app-contracts';
+export { remoteLog, RemoteConnectionUnavailableError, reportRemoteFailure } from '@nestos/app-contracts';
+export type { MCPConnectionReason, MCPConnectionDiagnostic } from '@nestos/app-contracts';

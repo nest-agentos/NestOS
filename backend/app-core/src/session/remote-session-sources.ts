@@ -1,1 +1,1 @@
-export { remoteSessionSources } from '@itookit/app-contracts';
+export { remoteSessionSources } from '@nestos/app-contracts';

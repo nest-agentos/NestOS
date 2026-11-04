@@ -1,4 +1,4 @@
-import { type CoordinationGuard, type FileAction, type FileLocal, type Snapshot, type StoredFilePlan } from '@itookit/vfs-sync';
+import { type CoordinationGuard, type FileAction, type FileLocal, type Snapshot, type StoredFilePlan } from '@nestos/vfs-sync';
 export interface CapturedFiles { scan: Snapshot; objects: Record<string, Uint8Array<ArrayBuffer>> }
 export interface LocalApplicationStore {
     scoped(guard: CoordinationGuard): LocalApplicationStore;

@@ -1,4 +1,4 @@
-import type {SettingsUI} from '@itookit/llm-ui/settings';
+import type {SettingsUI} from '@nestos/llm-ui/settings';
 export {settings} from './host';
 import {settings} from './host';
 export const renderOcrSettings:SettingsUI['renderOcrSettings']=settings.renderOcrSettings;
@@ -118,4 +118,4 @@ export type AgentExecutionController=InstanceType<typeof settings.AgentExecution
 export type AgentPublicationController=InstanceType<typeof settings.AgentPublicationController>;
 export type ProviderAuthorizationPanel=InstanceType<typeof settings.ProviderAuthorizationPanel>;
 export type ModelPicker=InstanceType<typeof settings.ModelPicker>;
-export type {AgentCapabilityOptions,AgentExecutionOptions,AgentFlowChoice,AgentFlowRevision,AgentFlowDefinition,HarnessConnectionManagement} from '@itookit/llm-ui/settings';
+export type {AgentCapabilityOptions,AgentExecutionOptions,AgentFlowChoice,AgentFlowRevision,AgentFlowDefinition,HarnessConnectionManagement} from '@nestos/llm-ui/settings';

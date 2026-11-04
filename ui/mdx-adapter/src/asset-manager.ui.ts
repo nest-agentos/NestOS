@@ -2,15 +2,15 @@
  * @file mdx/plugins/ui/asset-manager.ui.ts
  * @desc 独立的资源管理器 UI 类，不绑定 MDxPlugin 上下文
  */
-import { Toast } from '@itookit/ui-common-adapter';
-import { guessMimeType, type IFileSystem, type FSNode, type FSFileNode } from '@itookit/vfs-core';
-import type { MDxEditor } from '@itookit/mdxeditor';
+import { Toast } from '@nestos/ui-common-adapter';
+import { guessMimeType, type IFileSystem, type FSNode, type FSFileNode } from '@nestos/vfs-core';
+import type { MDxEditor } from '@nestos/mdxeditor';
 import {
     isAssetVisible,
     generateAssetPath,
     extractFilenameFromPath,
     AssetConfigOptions
-} from '@itookit/mdxeditor';
+} from '@nestos/mdxeditor';
 
 interface AssetDisplayItem {
     node: FSNode;

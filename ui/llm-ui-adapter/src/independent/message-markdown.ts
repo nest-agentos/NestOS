@@ -1,7 +1,7 @@
 import type {EditorOptions} from '../contracts';
-import {AiChatPlugin, type AiChatHost} from '@itookit/mdxeditor';
-import {createModuleLogger} from '@itookit/common';
-import type {ChatOptions} from '@itookit/llm-ui';
+import {AiChatPlugin, type AiChatHost} from '@nestos/mdxeditor';
+import {createModuleLogger} from '@nestos/common';
+import type {ChatOptions} from '@nestos/llm-ui';
 
 
 interface MessageSource {documentPath: string; messageId: string; role: string; branch?: string; roundId?: string; userIndex?: number}

@@ -3,7 +3,7 @@ import type {
     EffectAdapter,
     KernelPlugin,
     KernelRegistration,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 
 export interface KernelAdaptersPluginOptions {
     effects: readonly EffectAdapter[];
@@ -12,7 +12,7 @@ export interface KernelAdaptersPluginOptions {
 }
 
 export class KernelAdaptersPlugin implements KernelPlugin {
-    readonly id = '@itookit/kernel-adapters';
+    readonly id = '@nestos/kernel-adapters';
     readonly version = '1';
 
     constructor(private readonly options: KernelAdaptersPluginOptions) {}

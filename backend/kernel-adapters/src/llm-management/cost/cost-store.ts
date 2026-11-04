@@ -3,8 +3,8 @@
 // key = `{sessionId}|{providerId}|{date}`，同 key 每次请求累加。
 // 一个 session 切换 provider 产生独立记录（不同 key）。
 
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { CostRecord } from '@itookit/kernel-adapters/contracts';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { CostRecord } from '@nestos/kernel-adapters/contracts';
 import { COST_SEQ_PATH } from '../constants/pricing';
 
 const SEQ_FILE_NAME = 'cost.seq';

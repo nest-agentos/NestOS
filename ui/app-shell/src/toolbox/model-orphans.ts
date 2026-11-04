@@ -1,6 +1,6 @@
-import { ENTITY_ICONS, t } from '@itookit/common';
-import type { ToolboxInventory } from '@itookit/app-contracts/services';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
+import { ENTITY_ICONS, t } from '@nestos/common';
+import type { ToolboxInventory } from '@nestos/app-contracts/services';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
 
 export const invalidConnectionsId = '/invalid-model-connections';
 

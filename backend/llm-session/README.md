@@ -1,9 +1,9 @@
-# @itookit/llm-session
+# @nestos/llm-session
 
 会话机制：Session、Round、分支、上下文提交、运行协调和历史投影。普通 Chat 提交 Direct Run，显式 Flow 才提交 DAG Run。
 
 ```ts
-import { initializeConversationSystem } from '@itookit/llm-session';
+import { initializeConversationSystem } from '@nestos/llm-session';
 
 const conversation = await initializeConversationSystem({
   agentService, sessionEngine, promptHistoryFiles,
@@ -25,7 +25,7 @@ await conversation.dispose();
 
 `agentResolution.missingAgent` 可以为 `'reject'`，也可以为返回 `ExecutorConfig` 的同步/异步函数，接收 Agent ID 与失败原因；省略时保留旧回退。`resolveExact` 始终严格校验 Agent 身份。授权、单写者和已锁定执行模式的约束不因回退策略改变。
 
-`@itookit/llm-session/contracts` 提供会话、事件、命令/扩展契约，兼容转发配置管理契约，不初始化 VFS、YAML 或运行时。配置声明和纯函数从 kernel-adapters/contracts 内联到发布产物，适配器仅作为开发依赖。
+`@nestos/llm-session/contracts` 提供会话、事件、命令/扩展契约，兼容转发配置管理契约，不初始化 VFS、YAML 或运行时。配置声明和纯函数从 kernel-adapters/contracts 内联到发布产物，适配器仅作为开发依赖。
 
 Session manifest 只接受规范 `schemaVersion: 3` 数据。作文预设和播种属于 app-core 的产品装配，不再由本包导出。
 

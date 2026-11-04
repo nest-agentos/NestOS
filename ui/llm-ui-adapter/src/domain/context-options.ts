@@ -1,5 +1,5 @@
-import {sameTargetRef} from '@itookit/llm-flow/contracts';
-import type {ContextOptionsPage, ContextOptionsQuery, ContextSourceOption, ContextCheckpointOption} from '@itookit/llm-session/contracts';
+import {sameTargetRef} from '@nestos/llm-flow/contracts';
+import type {ContextOptionsPage, ContextOptionsQuery, ContextSourceOption, ContextCheckpointOption} from '@nestos/llm-session/contracts';
 import type {InputContextDraft} from './context-draft';
 
 export function assertContextOptionsPage(page: ContextOptionsPage, query: ContextOptionsQuery): void {

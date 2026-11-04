@@ -1,8 +1,8 @@
 /**
  * @file app-shell/src/browser/mention/FileMentionSource.ts
  */
-import { escapeHTML } from '@itookit/common';
-import type { FSNode } from '@itookit/vfs-core';
+import { escapeHTML } from '@nestos/common';
+import type { FSNode } from '@nestos/vfs-core';
 import { type Suggestion, type HoverPreviewData } from './autocomplete-source';
 import { BaseMentionSource } from './BaseMentionSource';
 

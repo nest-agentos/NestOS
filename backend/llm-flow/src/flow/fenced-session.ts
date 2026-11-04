@@ -1,4 +1,4 @@
-import type { SessionHandle, SharedLeaseCondition, TaskHandle } from '@itookit/durable-kernel';
+import type { SessionHandle, SharedLeaseCondition, TaskHandle } from '@nestos/durable-kernel';
 
 /** Guard scheduler submissions and shared records without changing Task identity fingerprints. */
 export function fenceSchedulerSession(session: SessionHandle, condition: SharedLeaseCondition): SessionHandle {

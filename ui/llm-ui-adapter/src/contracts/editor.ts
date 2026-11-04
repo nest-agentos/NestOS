@@ -1,4 +1,4 @@
-import type {EditorOptions as HostEditorOptions} from '@itookit/ui-common-adapter';
+import type {EditorOptions as HostEditorOptions} from '@nestos/ui-common-adapter';
 import type {ConversationControls, RemoteAgentControls} from './ConversationControls';
 import type {SessionDraftControls} from './SessionDraftControls';
 
@@ -11,4 +11,4 @@ export interface ChatEditorOptions<TSubmission = unknown, TInitial = unknown> ex
 }
 export type EditorOptions<TSubmission = unknown, TInitial = unknown> = ChatEditorOptions<TSubmission, TInitial>;
 
-export type ChatEditorFactory = (container: HTMLElement, options: ChatEditorOptions) => Promise<import('@itookit/ui-common-adapter').IEditor>;
+export type ChatEditorFactory = (container: HTMLElement, options: ChatEditorOptions) => Promise<import('@nestos/ui-common-adapter').IEditor>;

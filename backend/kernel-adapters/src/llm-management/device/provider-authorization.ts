@@ -1,4 +1,4 @@
-import type { LLMProvider, ChatGPTConfig } from '@itookit/driver-llm/contracts';
+import type { LLMProvider, ChatGPTConfig } from '@nestos/driver-llm/contracts';
 import type { ProviderAuthorizationHost, ProviderAuthorizationState } from '../contracts/provider-authorization';
 
 /** Resolve private credentials only for an explicitly selected subscription provider. */

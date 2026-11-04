@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Kernel, type JsonValue, type SessionHandle } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IFileSystem, type IVFSManager } from '@itookit/vfs-core';
+import { Kernel, type JsonValue, type SessionHandle } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IFileSystem, type IVFSManager } from '@nestos/vfs-core';
 import { SchedulerCheckpointWriter, readFlowSchedulerCheckpoint } from '../src/flow/checkpoint-store';
 import type { SchedulerCheckpoint } from '../src/flow/scheduler-checkpoint';
 import { acquireSchedulerLease, type SchedulerLease } from '../src/flow/scheduler-lease';

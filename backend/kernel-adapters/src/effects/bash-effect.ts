@@ -1,8 +1,8 @@
-import type { LLMLogSink } from '@itookit/driver-llm/contracts';
+import type { LLMLogSink } from '@nestos/driver-llm/contracts';
 import { silentAdapterLog } from '../ports/diagnostics';
-import { assertEffectGrant } from '@itookit/durable-kernel';
-import type { IToolService, ToolInvokeResult } from '@itookit/tools/contracts';
-import type { EffectAdapter, EffectExecutionContext, EffectReconcileResult } from '@itookit/durable-kernel';
+import { assertEffectGrant } from '@nestos/durable-kernel';
+import type { IToolService, ToolInvokeResult } from '@nestos/tools/contracts';
+import type { EffectAdapter, EffectExecutionContext, EffectReconcileResult } from '@nestos/durable-kernel';
 import { resolveCapability, type CapabilitySource } from '../ports/capabilities';
 import { InFlightEffects } from './in-flight';
 import { requireToolSuccess } from './tool-call-effect';

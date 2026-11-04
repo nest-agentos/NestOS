@@ -1,4 +1,4 @@
-import {createModuleLogger} from '@itookit/common';
+import {createModuleLogger} from '@nestos/common';
 import type {NativeExecution} from './harness-execution-operations';
 import {nativeOperationId} from './harness-execution-journal';
 

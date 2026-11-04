@@ -1,5 +1,5 @@
 import type { TwinSourceIndex } from './source-index';
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 import type { TwinAnalysis } from './analysis';
 import type { TwinSettings } from './domain';
 import type { TwinScanPlan, TwinScanPlanInput, TwinScanRun } from './scan-domain';

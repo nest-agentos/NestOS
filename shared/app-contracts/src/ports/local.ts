@@ -1,11 +1,11 @@
 /** Host construction services. UI consumes ApplicationClient instead. */
-import type { IFileSystem, IVFSManager } from '@itookit/vfs-core';
-import type { ILLMService } from '@itookit/driver-llm/contracts';
-import type { IConnectionService, IAgentManagementService, SessionCapabilityRegistry } from '@itookit/kernel-adapters/contracts';
-import type { ISessionRepository, ICommandBus, SessionManagementPort } from '@itookit/llm-session/contracts';
+import type { IFileSystem, IVFSManager } from '@nestos/vfs-core';
+import type { ILLMService } from '@nestos/driver-llm/contracts';
+import type { IConnectionService, IAgentManagementService, SessionCapabilityRegistry } from '@nestos/kernel-adapters/contracts';
+import type { ISessionRepository, ICommandBus, SessionManagementPort } from '@nestos/llm-session/contracts';
 import type { SnapshotPort } from '../settings';
-import type { IToolService } from '@itookit/tools/contracts';
-import type { KernelInspectionPort } from '@itookit/durable-kernel/contracts';
+import type { IToolService } from '@nestos/tools/contracts';
+import type { KernelInspectionPort } from '@nestos/durable-kernel/contracts';
 import type { DigitalTwinService } from './digital-twin';
 import type { ModelConfigurationCommands } from './configuration';
 import type { ProjectService } from './projects';
@@ -19,7 +19,7 @@ export interface LocalApplicationServices {
     flowInstallations?: import('./flow-installation').FlowInstallations;
     toolPackages?: import('./flow-installation').ToolPackages;
     digitalTwin?: DigitalTwinService;
-    kanban?: import('@itookit/kanban/contracts').KanbanClient;
+    kanban?: import('@nestos/kanban/contracts').KanbanClient;
     vfs: IVFSManager;
     llmDriver: IConnectionService & { init(): Promise<void> };
     agentService: ApplicationAgentPort;
@@ -43,7 +43,7 @@ export interface LocalApplicationServices {
     acquireConversation?(sessionId: string): Promise<{ commandBus: ICommandBus; dispose(): Promise<void> }>;
 }
 
-export type ApplicationKernelPort = import('@itookit/durable-kernel/contracts').KernelViewPort;
+export type ApplicationKernelPort = import('@nestos/durable-kernel/contracts').KernelViewPort;
 
 export interface LocalBackendOptions {
     snapshots?(vfs: IVFSManager): SnapshotPort;

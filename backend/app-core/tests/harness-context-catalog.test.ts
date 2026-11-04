@@ -6,7 +6,7 @@ import {context, operation} from './harness-context-fixture';
 
 function fixture() {
     const f = durableState(), getShared = vi.fn(async (_id: string, key: string) => f.state.get(key));
-    const inspectSession = vi.fn(async (id: string) => ({getShared: <T extends import('@itookit/durable-kernel').JsonValue>(key: string) => getShared(id, key) as ReturnType<typeof f.state.get<T>>}));
+    const inspectSession = vi.fn(async (id: string) => ({getShared: <T extends import('@nestos/durable-kernel').JsonValue>(key: string) => getShared(id, key) as ReturnType<typeof f.state.get<T>>}));
     const reader = createContextBindingReader({inspectSession});
     return {...f, getShared, inspectSession, reader, store: new HarnessContextBindings(f.state, 's')};
 }

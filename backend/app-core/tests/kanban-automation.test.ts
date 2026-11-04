@@ -1,11 +1,11 @@
 import {readSessionFileResult} from '../src/run/session-file-result';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {afterEach, expect, it, vi} from 'vitest';
-import {randomUUID} from '@itookit/common';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import type {KanbanCommand, KanbanAutomationSettings} from '@itookit/kanban/contracts';
-import type {IndependentCallInput, IndependentCallView, RootTargetCatalog} from '@itookit/llm-session/contracts';
-import type {TaskRecord} from '@itookit/durable-kernel';
+import {randomUUID} from '@nestos/common';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import type {KanbanCommand, KanbanAutomationSettings} from '@nestos/kanban/contracts';
+import type {IndependentCallInput, IndependentCallView, RootTargetCatalog} from '@nestos/llm-session/contracts';
+import type {TaskRecord} from '@nestos/durable-kernel';
 import {UserEventService} from '../src/events/service';
 import {DiagnosticJournal} from '../src/diagnostics/journal';
 import {createPersonalKanban} from '../src/kanban/personal';
@@ -128,10 +128,10 @@ it('admits one planning call when two observers reconcile the same durable item 
 
 it('rejects a chat-only planning Flow without an authorized file result', async () => {
     const {createApplicationRuntime} = await import('../src/runtime/create-application-runtime');
-    const {FlowLibraryCommand} = await import('@itookit/app-contracts');
+    const {FlowLibraryCommand} = await import('@nestos/app-contracts');
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), startupMode: 'interactive', digitalTwinAutoStart: false});
     disposers.push(() => runtime.dispose());
-    const flow = (id: string, value: unknown): import('@itookit/llm-flow/contracts').FlowDraft => ({id: id as never, name: id,
+    const flow = (id: string, value: unknown): import('@nestos/llm-flow/contracts').FlowDraft => ({id: id as never, name: id,
         exposure: 'global', draftVersion: 1, updatedAt: 0, layout: {},
         parameters: [{name: 'request', type: 'string', inputSource: 'composer.text'}],
         nodes: [{id: 'return' as never, name: 'Return', plugin: 'builtin.transform', pluginVersion: '1.0.0', inputs: {}, config: {value} as never}],

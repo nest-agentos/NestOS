@@ -1,6 +1,6 @@
-import type { FileSystemSourceOwner } from '@itookit/vfs-core';
+import type { FileSystemSourceOwner } from '@nestos/vfs-core';
 import { createUnavailableDirectory } from './unavailable-directory';
-import { createFileSystemView, normalizeVirtualPath, FSError, type FileSystemContextOwner, type FileSystemMount, type FileSystemView, type IFileSystem } from '@itookit/vfs-core';
+import { createFileSystemView, normalizeVirtualPath, FSError, type FileSystemContextOwner, type FileSystemMount, type FileSystemView, type IFileSystem } from '@nestos/vfs-core';
 import { createVFSToolContext } from './tool-context';
 
 export interface SessionMountRecord {

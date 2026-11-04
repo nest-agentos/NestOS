@@ -1,5 +1,5 @@
-import { InputAssetCommand } from '@itookit/app-contracts';
-import type { Call, Reply } from '@itookit/app-transport/rpc';
+import { InputAssetCommand } from '@nestos/app-contracts';
+import type { Call, Reply } from '@nestos/app-transport/rpc';
 
 /** Only registered command names and bounded upload metadata may enter the audit log. */
 export function callDiagnostics(calls: Call[], operations: string[], commands: ReadonlySet<string>) {

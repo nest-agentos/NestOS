@@ -1068,7 +1068,7 @@ sequenceDiagram
 | Web 宿主 | WebProjectSync 复用远程服务器配置、HttpSourceProvider.transport 复用凭据；持久绑定、首次准备和未完成准备重试；IndexedDB 受管项目文件接入 | 原生目录、export checkout 同步、浏览器实际多窗口验收 |
 | llm-session | 保持现有领域与交换语义 | S4 全部同步格式、身份／版本映射、快照导入与安全接续 |
 
-首次接入由宿主显式创建新 bindingId/replicaId，使用 new IndexedDBSyncStore(backend.storageAccess(), bindingId).initialize 保存 schemaVersion=1 的初始状态，再调用 prepareProjectSync 注册、激活并按用户选择准备云端项目。从 @itookit/sync-adapters 导入 createIndexedDBSyncSession，返回可直接注入 ProjectSyncProvider 的 session。现有数据根或控制记录缺失时读取失败，不自动初始化空基线。authority/epoch 不符、过期副本与序列不匹配明确拒绝，宿主须按 19.3 重新接入；尚未实现自动迁移。
+首次接入由宿主显式创建新 bindingId/replicaId，使用 new IndexedDBSyncStore(backend.storageAccess(), bindingId).initialize 保存 schemaVersion=1 的初始状态，再调用 prepareProjectSync 注册、激活并按用户选择准备云端项目。从 @nestos/sync-adapters 导入 createIndexedDBSyncSession，返回可直接注入 ProjectSyncProvider 的 session。现有数据根或控制记录缺失时读取失败，不自动初始化空基线。authority/epoch 不符、过期副本与序列不匹配明确拒绝，宿主须按 19.3 重新接入；尚未实现自动迁移。
 
 FileSync 先缓存选中云端对象和稳定本地快照，再保存预览并释放锁。execute 复核绑定、范围与云端条件；上传仅发送 check 未命中的文件对象。发布与本地应用分开持久化，旧计划竞争失败可重规划；同文件冲突可以保留或显式选择 local/remote。目录类型冲突及扫描未知项不接受普通选侧覆盖。
 

@@ -1,7 +1,7 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {Kernel, type EffectExecutionContext, type EffectSessionState, type SharedStateEntry} from '@itookit/durable-kernel';
-import type {HarnessExecutionRequest} from '@itookit/kernel-adapters/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {Kernel, type EffectExecutionContext, type EffectSessionState, type SharedStateEntry} from '@nestos/durable-kernel';
+import type {HarnessExecutionRequest} from '@nestos/kernel-adapters/contracts';
 import {HarnessProgram} from '../../kernel-adapters/src/programs/harness-program';
 import {HarnessExecutionEffect} from '../../kernel-adapters/src/effects/harness-execution-effect';
 import {DurableFlowExecutor} from '../../llm-flow/src/flow/executor';

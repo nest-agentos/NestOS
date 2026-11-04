@@ -1,13 +1,13 @@
-import type { Kernel } from '@itookit/durable-kernel';
+import type { Kernel } from '@nestos/durable-kernel';
 import {
     AgentResolver,
     type IAgentConfigService,
     type IPrivilegedCommandService,
     type PlanCommandRequest,
     type ExecCommandRequest,
-} from '@itookit/llm-session';
-import { randomUUID } from '@itookit/common';
-import { submitRun } from '@itookit/llm-flow';
+} from '@nestos/llm-session';
+import { randomUUID } from '@nestos/common';
+import { submitRun } from '@nestos/llm-flow';
 import {toolCommandCatalog, submitToolCommand, type ToolCommandPorts} from './tool-commands';
 
 export class PrivilegedCommandService implements IPrivilegedCommandService {
@@ -21,11 +21,11 @@ export class PrivilegedCommandService implements IPrivilegedCommandService {
         this.agents = new AgentResolver(agentService);
     }
 
-    async tools(sessionId: string): Promise<import('@itookit/llm-session/contracts').ToolCommandOption[]> {
+    async tools(sessionId: string): Promise<import('@nestos/llm-session/contracts').ToolCommandOption[]> {
         if (!this.toolPorts) throw new Error('TOOL_COMMAND_UNAVAILABLE');
         return toolCommandCatalog(this.toolPorts, sessionId);
     }
-    async tool(request: import('@itookit/llm-session/contracts').ToolCommandRequest): Promise<string> {
+    async tool(request: import('@nestos/llm-session/contracts').ToolCommandRequest): Promise<string> {
         if (!this.toolPorts) throw new Error('TOOL_COMMAND_UNAVAILABLE');
         return submitToolCommand(this.kernel, this.toolPorts, request);
     }

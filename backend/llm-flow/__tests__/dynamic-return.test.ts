@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms } from '../src/flow';
 import { createRunCatalog } from '../src/flow/run-catalog';
 import { GraphMutationRuntime, type GraphMutationState } from '../src/flow/graph-mutations';

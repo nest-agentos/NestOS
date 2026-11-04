@@ -1,5 +1,5 @@
 import type { FlowId, JsonValue } from './flow-definition';
-import type { ChatExecutionMode } from '@itookit/llm-tasks/contracts';
+import type { ChatExecutionMode } from '@nestos/llm-tasks/contracts';
 
 export type FlowNodeId = string;
 

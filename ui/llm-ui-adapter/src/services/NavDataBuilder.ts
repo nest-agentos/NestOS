@@ -1,11 +1,11 @@
 // @file: llm-ui/services/NavDataBuilder.ts
 
 
-import { SessionCommand, SessionGroup, type BranchTreeNode } from '@itookit/llm-session/contracts';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
+import { SessionCommand, SessionGroup, type BranchTreeNode } from '@nestos/llm-session/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
 import { ChatNavItem, NavPanelData } from '../domain/ports/INavigationPresenter';
 import { BranchItem, CollapseStateMap } from '../domain/types';
-import {getPreviewText} from '@itookit/llm-ui';
+import {getPreviewText} from '@nestos/llm-ui';
 
 /**
  * 导航面板数据构建器

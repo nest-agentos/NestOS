@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/mdx-adapter",
+  "name": "@nestos/mdx-adapter",
   "version": "0.1.0",
   "description": "NestOS host and VFS adapter for the standalone mdxeditor.",
   "type": "module",
@@ -43,17 +43,17 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@itookit/app-contracts": "workspace:*",
-    "@itookit/common": "workspace:*",
-    "@itookit/ui-common-adapter": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
+    "@nestos/app-contracts": "workspace:*",
+    "@nestos/common": "workspace:*",
+    "@nestos/ui-common-adapter": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
     "js-yaml": "^4.1.1"
   },
   "peerDependencies": {
-    "@itookit/mdxeditor": "workspace:*"
+    "@nestos/mdxeditor": "workspace:*"
   },
   "devDependencies": {
-    "@itookit/mdxeditor": "workspace:*",
+    "@nestos/mdxeditor": "workspace:*",
     "@types/node": "^20.19.25",
     "jsdom": "^27.4.0",
     "tsup": "^8.5.1",
@@ -67,10 +67,14 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nest-agentos/NestOS.git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
     "directory": "ui/mdx-adapter"
   },
   "sideEffects": [
     "**/*.css"
-  ]
+  ],
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

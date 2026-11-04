@@ -1,5 +1,5 @@
 import type { DagRunSpec, JsonValue } from './contracts';
-import { bindCapabilities, type CapabilityBinding, type Kernel, type TaskHandle, type TaskSpec } from '@itookit/durable-kernel';
+import { bindCapabilities, type CapabilityBinding, type Kernel, type TaskHandle, type TaskSpec } from '@nestos/durable-kernel';
 import type { DurableFlowExecutor, FlowExecutionHandle } from './flow/executor';
 
 /** Trusted, compiled input. Session history and source configuration stay with the caller. */

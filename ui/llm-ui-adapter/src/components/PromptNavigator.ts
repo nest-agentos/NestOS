@@ -1,6 +1,6 @@
-import {ACTION_ICONS, getLocale, t} from '@itookit/common';
-import {PromptNavigator as SharedPromptNavigator} from '@itookit/llm-ui';
-export type {PromptNavigationItem} from '@itookit/llm-ui';
+import {ACTION_ICONS, getLocale, t} from '@nestos/common';
+import {PromptNavigator as SharedPromptNavigator} from '@nestos/llm-ui';
+export type {PromptNavigationItem} from '@nestos/llm-ui';
 
 export interface PromptNavigationOptions {
     reveal(id: string): HTMLElement | null;

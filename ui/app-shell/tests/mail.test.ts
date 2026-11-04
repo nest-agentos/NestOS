@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {bindApplicationBackend, restrictApplicationFiles} from '@itookit/app-core/host';
-import type {LocalApplicationServices} from '@itookit/app-contracts/services';
-import {RpcPeer} from '@itookit/app-transport/rpc';
-import {CAPABILITIES} from '@itookit/app-transport/application';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {bindApplicationBackend, restrictApplicationFiles} from '@nestos/app-core/host';
+import type {LocalApplicationServices} from '@nestos/app-contracts/services';
+import {RpcPeer} from '@nestos/app-transport/rpc';
+import {CAPABILITIES} from '@nestos/app-transport/application';
 import {createMailModule} from '../src/mail';
 const createEditor = vi.hoisted(() => vi.fn(async (container: HTMLElement, options: {initialContent: string}) => {
     container.textContent = options.initialContent; return {destroy: async () => {}, getText: () => options.initialContent};
 }));
-vi.mock('@itookit/mdxeditor', () => ({createMDxEditor: createEditor}));
+vi.mock('@nestos/mdxeditor', () => ({createMDxEditor: createEditor}));
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren(); vi.restoreAllMocks(); createEditor.mockClear();});
 it('exposes a scoped mail client through real RPC and keeps list responses free of bodies', async () => {
@@ -46,7 +46,7 @@ it('shares an index across view leases and keeps other leases usable after one c
 it('rejects the mail capability when the application view excludes its workspace', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); cleanup.push(() => manager.dispose());
     const backend = bindApplicationBackend({vfs: manager} as unknown as LocalApplicationServices);
-    const application = {services: {vfs: manager}, backend} as unknown as import('@itookit/app-contracts/services').ApplicationClient;
+    const application = {services: {vfs: manager}, backend} as unknown as import('@nestos/app-contracts/services').ApplicationClient;
     const restricted = restrictApplicationFiles(application, ['/home/admin/notes']);
     await expect(restricted.backend.mailView()).rejects.toMatchObject({code: 'EACCES'});
 });

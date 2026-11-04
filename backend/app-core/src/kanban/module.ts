@@ -1,9 +1,9 @@
-import {createKanbanActivityModule, type KanbanActivityModuleOptions} from '@itookit/kanban/activity';
-import {KanbanError} from '@itookit/kanban';
+import {createKanbanActivityModule, type KanbanActivityModuleOptions} from '@nestos/kanban/activity';
+import {KanbanError} from '@nestos/kanban';
 import type {KanbanNotifications} from './notifications';
 import {projectKanbanEvents} from './notifications';
-import {createKanbanExecutionBridge, type KanbanExecutionBridgeOptions} from '@itookit/kanban/execution';
-import {KANBAN_EXECUTION_SESSION, executionSessionReference} from '@itookit/app-contracts';
+import {createKanbanExecutionBridge, type KanbanExecutionBridgeOptions} from '@nestos/kanban/execution';
+import {KANBAN_EXECUTION_SESSION, executionSessionReference} from '@nestos/app-contracts';
 
 export interface NestOSKanbanOptions extends Omit<KanbanActivityModuleOptions, 'referenceSystem' | 'onCommitted'> {onCommitted?: KanbanActivityModuleOptions['onCommitted']; notifications?: KanbanNotifications}
 

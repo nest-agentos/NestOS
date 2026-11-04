@@ -14,13 +14,13 @@ import { DagCommandService } from '../src/flow/commands';
 import { FlowCommand } from '../src/flow/command-names';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DagRunSpec } from '../src/contracts';
-import type { ChatCompletionResponse } from '@itookit/driver-llm/contracts';
+import type { ChatCompletionResponse } from '@nestos/driver-llm/contracts';
 import {
     Kernel,
     type EffectAdapter,
-} from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IFileSystem, type IVFSManager } from '@itookit/vfs-core';
-import { DurableAgentProgram, DurableChatProgram } from '@itookit/llm-tasks';
+} from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IFileSystem, type IVFSManager } from '@nestos/vfs-core';
+import { DurableAgentProgram, DurableChatProgram } from '@nestos/llm-tasks';
 import { createBuiltinDagPluginRegistry } from '../src/flow/builtin-plugins';
 import { DurableFlowExecutor, upstreamOf, workspaceLeaseKey } from '../src/flow/executor';
 import { FlowAggregateProgram, FlowHumanProgram, FlowValueProgram } from '../src/flow/programs';

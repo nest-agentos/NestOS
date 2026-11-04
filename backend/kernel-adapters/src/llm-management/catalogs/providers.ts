@@ -1,5 +1,5 @@
 /** LLM device support: provider protocols, models, capabilities and initial ledger rates. */
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
 import { createDoubaoSpeechProvider } from './doubao-speech';
 import {volcengineImageModels} from './volcengine-images';
 

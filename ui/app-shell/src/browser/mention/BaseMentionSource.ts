@@ -10,7 +10,7 @@ import {
 import {
   type IFileSystem,
   type FSNode,
-} from '@itookit/vfs-core';
+} from '@nestos/vfs-core';
 const shouldFilterNode = (node: FSNode): boolean => !node.metadata?._showAll &&
   [node.name, ...node.path.split('/')].some(part => part.startsWith('.') || part.startsWith('_'));
 

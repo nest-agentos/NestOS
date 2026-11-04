@@ -1,6 +1,6 @@
-import { RECORD_PAGE_SQL, recordPageValues, decodeRecordPage, type RecordPageRow } from '@itookit/vfsdriver-local';
-import type { ISidecarDb, MetaExtRow } from '@itookit/vfsdriver-local';
-import { DDL, SCHEMA_VERSION, PATH_DATA_EXISTS, movePathStatements } from '@itookit/vfsdriver-local';
+import { RECORD_PAGE_SQL, recordPageValues, decodeRecordPage, type RecordPageRow } from '@nestos/vfsdriver-local';
+import type { ISidecarDb, MetaExtRow } from '@nestos/vfsdriver-local';
+import { DDL, SCHEMA_VERSION, PATH_DATA_EXISTS, movePathStatements } from '@nestos/vfsdriver-local';
 
 interface StatementSync {
     get(...values: unknown[]): unknown;

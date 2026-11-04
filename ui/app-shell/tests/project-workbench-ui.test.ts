@@ -1,11 +1,11 @@
 import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath } from '@itookit/app-core';
-import { projectConversationEntryPath, projectConversationsPath } from '@itookit/app-contracts';
+import { t } from '@nestos/common';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath } from '@nestos/app-core';
+import { projectConversationEntryPath, projectConversationsPath } from '@nestos/app-contracts';
 
 it('creates project Sessions from the selected project and edits its files in the same tree', async () => {
     const storage = new Map<string, string>();

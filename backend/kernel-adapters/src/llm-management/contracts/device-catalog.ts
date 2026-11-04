@@ -1,4 +1,4 @@
-import type {LLMProvider} from '@itookit/driver-llm/contracts';
+import type {LLMProvider} from '@nestos/driver-llm/contracts';
 import type {ModelPricingConfig} from './pricing';
 import type {ProviderApiReference} from './provider-reference';
 

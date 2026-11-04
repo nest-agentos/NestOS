@@ -4,11 +4,11 @@ import {AttachmentImagePreviews} from './AttachmentImagePreviews';
 
 import { ChatInputTemplates } from '../templates/ChatInputTemplates';
 import { downscaleImageForOcr } from '../../utils/imageDownscale';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { OcrReviewPanel } from './OcrReviewPanel';
 import {ImageAttachments} from './ImageAttachments';
-import type {ImageResizePolicy} from '@itookit/image-parser';
-import type { PopupPanel, PopupItem } from '@itookit/llm-ui';
+import type {ImageResizePolicy} from '@nestos/image-parser';
+import type { PopupPanel, PopupItem } from '@nestos/llm-ui';
 
 let CAMERA_GUARD = false;      // prevent double-open on some mobile browsers
 let PHOTO_ALBUM_GUARD = false;
@@ -20,7 +20,7 @@ export interface AttachmentManagerOptions {
     textarea: HTMLTextAreaElement;
     inputWrapper: HTMLElement;
     attachBtn: HTMLButtonElement;
-    ocr?: import('@itookit/app-contracts/services').OcrControls;
+    ocr?: import('@nestos/app-contracts/services').OcrControls;
     onRequestFiles?: (query: string) => Promise<any[]>;
     getLoading: () => boolean;
     canAttach?: () => boolean;

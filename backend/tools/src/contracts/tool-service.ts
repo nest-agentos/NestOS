@@ -1,8 +1,8 @@
 // Tool service and host execution ports.
-// Owned by @itookit/tools; legacy shared packages forward these types.
+// Owned by @nestos/tools; legacy shared packages forward these types.
 
 import type { ToolMeta, ToolInvokeRequest, ToolInvokeResult, ToolBatchResult } from './tool-types';
-import type { ToolDefinition } from '@itookit/llm-context';
+import type { ToolDefinition } from '@nestos/llm-context';
 
 /**
  * 工具设备服务接口。

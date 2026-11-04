@@ -1,15 +1,15 @@
 import {scanTaskControls, type TaskControlPorts} from './task-controls';
-import {taskDue} from '@itookit/kanban';
+import {taskDue} from '@nestos/kanban';
 import {workContext} from './work-context';
 import {completeCompositePlans} from './analysis-aggregation';
 import type {KanbanWorkLog, WorkLogFact} from './work-log';
-import {t} from '@itookit/common';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {IndependentCallService, SessionRepository} from '@itookit/llm-session';
-import type {Kernel} from '@itookit/durable-kernel';
-import type {RootTargetCatalog} from '@itookit/llm-session/contracts';
-import {boardAllowsStart, executableWorkItem} from '@itookit/kanban/contracts';
-import type {KanbanActor, KanbanBoard, KanbanItem, KanbanService, KanbanArtifactRef} from '@itookit/kanban/contracts';
+import {t} from '@nestos/common';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {IndependentCallService, SessionRepository} from '@nestos/llm-session';
+import type {Kernel} from '@nestos/durable-kernel';
+import type {RootTargetCatalog} from '@nestos/llm-session/contracts';
+import {boardAllowsStart, executableWorkItem} from '@nestos/kanban/contracts';
+import type {KanbanActor, KanbanBoard, KanbanItem, KanbanService, KanbanArtifactRef} from '@nestos/kanban/contracts';
 import {createNestOSKanbanExecutionBridge} from './module';
 import {createPublishedKanbanWorkExecutor} from './published-work';
 import {KanbanAutomationJournal} from './automation-journal';
@@ -21,25 +21,25 @@ import {withContinuedWork, type ContinueWorkOptions} from './continued-work';
 export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     itemOperations?(context: {service: KanbanService; journal: KanbanAutomationJournal; workLog: KanbanWorkLog;
         log: import('./item-operation-types').ReviewOperationsOptions['log']}): ReturnType<typeof import('./item-operations').createItemOperations>;
-    relatedSessions?(boardId: string, itemId: string): Promise<import('@itookit/kanban/contracts').KanbanSessionAssociation[]>;
+    relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
     sessionExecutionResources?(id: string): Promise<Array<{label: string; value: string}>>;
     continuation?: Pick<ContinueWorkOptions, 'submission' | 'prepare'>;
-    workResources?(context: {service: KanbanService; workLog: KanbanWorkLog; journal: KanbanAutomationJournal}): Pick<import('@itookit/kanban/contracts').KanbanClient, 'workResources' | 'cleanupWorkResource'>;
-    enqueueTaskReply?(request:import('@itookit/llm-session/contracts').SubmissionRequest):Promise<void>;
-    registerInstructionGate?(gate:(sessionId:string,input:import('@itookit/llm-session/contracts').SessionInstruction)=>Promise<boolean>):()=>void;
+    workResources?(context: {service: KanbanService; workLog: KanbanWorkLog; journal: KanbanAutomationJournal}): Pick<import('@nestos/kanban/contracts').KanbanClient, 'workResources' | 'cleanupWorkResource'>;
+    enqueueTaskReply?(request:import('@nestos/llm-session/contracts').SubmissionRequest):Promise<void>;
+    registerInstructionGate?(gate:(sessionId:string,input:import('@nestos/llm-session/contracts').SessionInstruction)=>Promise<boolean>):()=>void;
     executionResource?(sessionId:string,branch:string):Promise<string|undefined>;
     requiresItemResource?(board:KanbanBoard):boolean;
     readAnalysisOutput?(id:string):Promise<unknown|undefined>;
-    onAnalysis?(input: {boardId: string; id: string; item: KanbanItem; target: import('@itookit/llm-flow/contracts').TargetRef; outcome: 'succeeded' | 'failed' | 'cancelled'; code?: string}): Promise<void>;
-    prepareAnalysis?(input: {context?:unknown;reportActivity?(fact: WorkLogFact): Promise<void>; id: string; board: KanbanBoard; item: KanbanItem; target: import('@itookit/llm-flow/contracts').TargetRef}): Promise<{target: import('@itookit/llm-flow/contracts').TargetRef; instruction: string}>;
-    validatePreparation?(reference: import('@itookit/kanban/contracts').KanbanExternalReference, options?: Record<string, string>): void;
+    onAnalysis?(input: {boardId: string; id: string; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef; outcome: 'succeeded' | 'failed' | 'cancelled'; code?: string}): Promise<void>;
+    prepareAnalysis?(input: {context?:unknown;reportActivity?(fact: WorkLogFact): Promise<void>; id: string; board: KanbanBoard; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target: import('@nestos/llm-flow/contracts').TargetRef; instruction: string}>;
+    validatePreparation?(reference: import('@nestos/kanban/contracts').KanbanExternalReference, options?: Record<string, string>): void;
     verifyWork?(dispatchId: string): Promise<void>;
-    preparations?: import('@itookit/kanban/contracts').KanbanAutomationTarget[];
-    observeWork?(input: {boardId: string; dispatch: import('@itookit/kanban/contracts').KanbanDispatch;
-        observation: import('@itookit/kanban/execution').KanbanExecutionObservation; service: KanbanService; worker: KanbanService}): Promise<import('@itookit/kanban/execution').KanbanExecutionObservation>;
-    prepareWork?(input: {context?:unknown;dispatch: import('@itookit/kanban/contracts').KanbanDispatch; item: KanbanItem;
-        reportActivity?(fact: WorkLogFact): Promise<void>; stage?: 'decision' | 'task' | 'fix'; options?: Record<string, string>; preparation: import('@itookit/kanban/contracts').KanbanExternalReference; target: import('@itookit/llm-flow/contracts').TargetRef}): Promise<import('@itookit/llm-flow/contracts').TargetRef>;
-    projects?: Pick<import('@itookit/app-contracts/services').ProjectService, 'list' | 'get'> & Partial<Pick<import('@itookit/app-contracts/services').ProjectService,'openWorkspace'>>;
+    preparations?: import('@nestos/kanban/contracts').KanbanAutomationTarget[];
+    observeWork?(input: {boardId: string; dispatch: import('@nestos/kanban/contracts').KanbanDispatch;
+        observation: import('@nestos/kanban/execution').KanbanExecutionObservation; service: KanbanService; worker: KanbanService}): Promise<import('@nestos/kanban/execution').KanbanExecutionObservation>;
+    prepareWork?(input: {context?:unknown;dispatch: import('@nestos/kanban/contracts').KanbanDispatch; item: KanbanItem;
+        reportActivity?(fact: WorkLogFact): Promise<void>; stage?: 'decision' | 'task' | 'fix'; options?: Record<string, string>; preparation: import('@nestos/kanban/contracts').KanbanExternalReference; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<import('@nestos/llm-flow/contracts').TargetRef>;
+    projects?: Pick<import('@nestos/app-contracts/services').ProjectService, 'list' | 'get'> & Partial<Pick<import('@nestos/app-contracts/services').ProjectService,'openWorkspace'>>;
     calls: IndependentCallService; kernel: Kernel; sessions: SessionRepository;
     prepareSession(id: string): Promise<boolean>; catalog(): Promise<RootTargetCatalog>;
     ensureReady?(): Promise<void>;
@@ -125,7 +125,7 @@ async function planNext(options: Options, board: KanbanBoard, prepareSession: (i
 async function createBridge(options: Options, boardId: string, prepareSession: (id: string) => Promise<string>) {
     const manager = async () => {const board = await options.service.read(boardId); return options.serviceFor(board.automation!.coordinator);};
     const service = await manager();
-    const observe = options.observeWork ? async (dispatch: import('@itookit/kanban/contracts').KanbanDispatch, observation: import('@itookit/kanban/execution').KanbanExecutionObservation) => options.observeWork!({boardId, dispatch, observation,
+    const observe = options.observeWork ? async (dispatch: import('@nestos/kanban/contracts').KanbanDispatch, observation: import('@nestos/kanban/execution').KanbanExecutionObservation) => options.observeWork!({boardId, dispatch, observation,
         service, worker: options.serviceFor(dispatch.principal)}) : undefined;
     const primary = createPublishedKanbanWorkExecutor({...options, prepareSession,
         onSessionPrepared: (dispatch, item, sessionId) => options.workLog?.append(options.service, boardId, item.id, {stage: 'session.prepared', result: 'success', actor: dispatch.principal, dispatchId: dispatch.id,
@@ -152,10 +152,10 @@ async function createBridge(options: Options, boardId: string, prepareSession: (
         log: event => options.log({...event, boardId})});
 }
 async function estimateFor(journal: KanbanAutomationJournal, boardId: string, item: KanbanItem) {
-    const decomposed=await journal.get<import('@itookit/kanban/contracts').KanbanEstimate>('decomposition-estimate:'+JSON.stringify([boardId,item.id]));
+    const decomposed=await journal.get<import('@nestos/kanban/contracts').KanbanEstimate>('decomposition-estimate:'+JSON.stringify([boardId,item.id]));
     if(decomposed)return decomposed;
     const key = await journal.get<string>('analysis-current:' + JSON.stringify([boardId, item.id]));
-    return key ? (await journal.get<{result?: {estimate?: import('@itookit/kanban/contracts').KanbanEstimate}}>(key))?.result?.estimate : undefined;
+    return key ? (await journal.get<{result?: {estimate?: import('@nestos/kanban/contracts').KanbanEstimate}}>(key))?.result?.estimate : undefined;
 }
 async function dependencyResults(options: Options, boardId: string, item: KanbanItem): Promise<unknown> {
     const workflow = await options.service.workflow(boardId), results: Array<{itemId: string; outputs: Array<{reference: KanbanArtifactRef; value: unknown}>}> = [];

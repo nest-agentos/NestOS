@@ -814,7 +814,7 @@ function projection(
 describe('Flow rerun branches', () => {
     it.each([false, true])('reruns Session metadata with an empty current branch (prior run=%s)', async priorRun => {
         const { FlowRerunService } = await import('../src/session/flow-rerun');
-        const { FlowDefinitionStore } = await import('@itookit/llm-flow');
+        const { FlowDefinitionStore } = await import('@nestos/llm-flow');
         const { vi } = await import('vitest');
         const draftLoad = vi.spyOn(FlowDefinitionStore.prototype, 'loadDraft').mockResolvedValue(null);
         const engine = new InMemorySessionRepository(), log = new RoundLog(engine as never, 's');
@@ -862,7 +862,7 @@ describe('Flow rerun branches', () => {
 
     it('validates before forking and persists new parameters without changing the source', async () => {
         const { FlowRerunService } = await import('../src/session/flow-rerun');
-        const { FlowDefinitionStore } = await import('@itookit/llm-flow');
+        const { FlowDefinitionStore } = await import('@nestos/llm-flow');
         const { vi } = await import('vitest');
         const draftLoad = vi.spyOn(FlowDefinitionStore.prototype, 'loadDraft').mockResolvedValue(null);
         const engine = new InMemorySessionRepository();
@@ -925,7 +925,7 @@ describe('Flow rerun branches', () => {
 
 it('compares inline draft and published function contents without generated version or lock metadata', async () => {
     const { FlowRerunService } = await import('../src/session/flow-rerun');
-    const { FlowDefinitionStore, createFlowRevision } = await import('@itookit/llm-flow');
+    const { FlowDefinitionStore, createFlowRevision } = await import('@nestos/llm-flow');
     const { vi } = await import('vitest');
     const fn = { id: 'worker', name: 'Worker', draftVersion: 1, updatedAt: 0, layout: {}, edges: [], parameters: [],
         nodes: [{ id: 'echo', name: 'Echo', plugin: 'builtin.transform', pluginVersion: '1.0.0', inputs: {}, config: { value: 'original' } }],

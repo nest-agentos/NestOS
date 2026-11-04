@@ -7,13 +7,13 @@ import {meterSnapshot} from './metering';
 import { userIdentity } from './identity';
 import { extractionPrompt } from './extraction';
 import { selectionPattern, selectionKinds, type TwinSelectionTarget, type TwinSelectionType } from './selection';
-import { createModuleLogger, randomUUID } from '@itookit/common';
+import { createModuleLogger, randomUUID } from '@nestos/common';
 import { knowledgeGraph, type TwinEntityAlias } from './graph';
 import { TwinSourceIndex } from './source-index';
 import { scanRules, ruleLines, matchesLine, matchesRules, type TwinScanRuleInput, type TwinScanRules } from './scan-rules';
-import type { IFileSystem } from '@itookit/vfs-core';
-import { sha256HexSync, type ContextPlan } from '@itookit/llm-context';
-import type { KernelAdaptersRuntimeOptions } from '@itookit/kernel-adapters';
+import type { IFileSystem } from '@nestos/vfs-core';
+import { sha256HexSync, type ContextPlan } from '@nestos/llm-context';
+import type { KernelAdaptersRuntimeOptions } from '@nestos/kernel-adapters';
 import { TwinAnalysis } from './analysis';
 import { TwinContext, type TwinUseRecord } from './context';
 import { TWIN_KINDS } from './domain';
@@ -52,7 +52,7 @@ export interface DigitalTwinDependencies {
 
 /** Application-owned, host-bound workspace service. No authority is inferred from source text or model output. */
 export class DigitalTwinService {
-    private workspaceCatalog?: {list(): Promise<import('@itookit/app-contracts').TwinWorkspaceView[]>; open(id: string): Promise<DigitalTwinService>};
+    private workspaceCatalog?: {list(): Promise<import('@nestos/app-contracts').TwinWorkspaceView[]>; open(id: string): Promise<DigitalTwinService>};
     setWorkspaceCatalog(catalog: NonNullable<DigitalTwinService['workspaceCatalog']>): void {this.workspaceCatalog = catalog;}
     async workspaceView() {
         await this.authorizeWorkspace('read');
@@ -94,13 +94,13 @@ export class DigitalTwinService {
         }
         return acquireCollectionFiles(this.deps.fs, sessionId, run.data.collection, () => this.authorizeCollection(run.id));
     }
-    private sourceConnections?: import('@itookit/app-contracts/services').ToolConnections;
-    setSourceConnections(port?: import('@itookit/app-contracts/services').ToolConnections): void {this.sourceConnections = port;}
+    private sourceConnections?: import('@nestos/app-contracts/services').ToolConnections;
+    setSourceConnections(port?: import('@nestos/app-contracts/services').ToolConnections): void {this.sourceConnections = port;}
     async listSourceConnections() {
         await this.authorizeWorkspace('read');
         return this.sourceConnections?.snapshot() ?? {types: [], connections: []};
     }
-    async saveSourceConnection(input: import('@itookit/app-contracts/services').ToolConnectionInput): Promise<void> {
+    async saveSourceConnection(input: import('@nestos/app-contracts/services').ToolConnectionInput): Promise<void> {
         await this.authorizeWorkspace();
         if (!this.sourceConnections) throw new Error('TWIN_CONNECTION_CONFIGURATION_UNAVAILABLE');
         await this.sourceConnections.save(input); this.notify();
@@ -139,7 +139,7 @@ export class DigitalTwinService {
         await services.analysis.authorize(job.sessionId, job.connectionId);
         await bindScannerSession(services.records, job, sessionId);
     }
-    async authorizeScannerCall(plan: import('@itookit/durable-kernel').TaskCallPlan, owner: {sessionId: string}, phase: string): Promise<void> {
+    async authorizeScannerCall(plan: import('@nestos/durable-kernel').TaskCallPlan, owner: {sessionId: string}, phase: string): Promise<void> {
         if (phase !== 'execute' || !await this.initialized()) return;
         const services = await this.services('read'), job = await scannerJob(services.records, owner.sessionId);
         const collection = await services.records.get<{runId: string}>('checkpoint', 'collection-binding:' + owner.sessionId);
@@ -210,7 +210,7 @@ export class DigitalTwinService {
         this.listeners.clear();
     }
 
-    async activitySummary(): Promise<import('@itookit/app-contracts/services').TwinActivitySummary> {
+    async activitySummary(): Promise<import('@nestos/app-contracts/services').TwinActivitySummary> {
         const workspace = await this.workspaceView();
         if (!await this.initialized()) return {workspace, plans: [], runs: []};
         const records = (await this.services('read')).records;
@@ -333,7 +333,7 @@ export class DigitalTwinService {
         if (input.collection) {
             if (!this.collector) throw new Error('TWIN_SCANNER_EXECUTOR_UNAVAILABLE');
             if (input.collection.target.kind === 'tool') this.collector.validate?.(input.collection);
-            else {if (!this.scannerExecution) throw new Error('TWIN_SCANNER_EXECUTOR_UNAVAILABLE'); await this.scannerExecution.validate(input.collection as import('@itookit/app-contracts').TwinScannerExecutor);}
+            else {if (!this.scannerExecution) throw new Error('TWIN_SCANNER_EXECUTOR_UNAVAILABLE'); await this.scannerExecution.validate(input.collection as import('@nestos/app-contracts').TwinScannerExecutor);}
         }
         if (input.executor) {
             if (!this.scannerExecution) throw new Error('TWIN_SCANNER_EXECUTOR_UNAVAILABLE');

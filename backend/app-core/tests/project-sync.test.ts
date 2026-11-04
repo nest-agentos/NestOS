@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ProjectSyncService } from '../src/projects/sync/service';
 import { MemoryState, SerialCoordinator } from '../../../tests/helpers/sync';
-import { bindingToken, type StoredFilePlan, type FilePlan } from '@itookit/vfs-sync';
+import { bindingToken, type StoredFilePlan, type FilePlan } from '@nestos/vfs-sync';
 function setup(cancel: () => Promise<void> = async () => {}) {
     const store = new MemoryState();
     const session = { store, preview: async () => ({ id: 'preview' } as StoredFilePlan), execute: async () => ({ actions: [], conflicts: [], warnings: [] } as FilePlan), recover: async () => {}, cancel };

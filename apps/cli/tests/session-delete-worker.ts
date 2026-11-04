@@ -6,11 +6,11 @@
  * `finish <root> <sessionId>` opens the same root in a fresh process and must be
  * able to complete the deletion.
  */
-import { createVFS } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { Kernel } from '@itookit/durable-kernel';
-import { SessionDirectoryStorageResolver, SessionRepository, sessionDirectoryStorage } from '@itookit/llm-session';
-import { SessionLifecycleService } from '@itookit/app-core';
+import { createVFS } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { Kernel } from '@nestos/durable-kernel';
+import { SessionDirectoryStorageResolver, SessionRepository, sessionDirectoryStorage } from '@nestos/llm-session';
+import { SessionLifecycleService } from '@nestos/app-core';
 
 const [mode, root, sessionId] = process.argv.slice(2);
 

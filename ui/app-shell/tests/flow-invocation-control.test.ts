@@ -1,11 +1,11 @@
-import {createOperationLedger, type OperationLedger, type OperationRecord} from '@itookit/llm-ui';
+import {createOperationLedger, type OperationLedger, type OperationRecord} from '@nestos/llm-ui';
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {taskStat} from '@itookit/durable-kernel';
-import type {TaskRecord} from '@itookit/durable-kernel/contracts';
-import {FlowCommand, type DurableFlowSnapshot} from '@itookit/llm-flow/contracts';
-import {FlowInvocationCommand, type ICommandBus} from '@itookit/llm-session/contracts';
-import {t} from '@itookit/common';
+import {taskStat} from '@nestos/durable-kernel';
+import type {TaskRecord} from '@nestos/durable-kernel/contracts';
+import {FlowCommand, type DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
+import {FlowInvocationCommand, type ICommandBus} from '@nestos/llm-session/contracts';
+import {t} from '@nestos/common';
 import {InvocationPanel} from '../../llm-ui-adapter/src/flows/InvocationPanel';
 import {invocationControl} from '../../llm-ui-adapter/src/flows/invocation-control';
 

@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID, sha256HexSync, t} from '@itookit/common';
-import {FSError, type IFileSystem} from '@itookit/vfs-core';
+import {createModuleLogger, randomUUID, sha256HexSync, t} from '@nestos/common';
+import {FSError, type IFileSystem} from '@nestos/vfs-core';
 import {decodeDraftRecord, emptyDraft} from './record-codec';
 import type {ProjectDraftRecord} from './contracts';
 

@@ -3,18 +3,18 @@ import {IndependentSessionEditor} from './shell/IndependentSessionEditor';
 import {ChatDraftEditor} from './shell/drafts/ChatDraftEditor';
 import {createConversationEditor} from './conversation';
 import type {RetainedWorkspaceHandoff} from './shell/drafts/workspace-handoff';
-import {normalizeEditorOptions} from '@itookit/ui-common-adapter';
+import {normalizeEditorOptions} from '@nestos/ui-common-adapter';
 // @file: llm-ui/index.ts
 
 import './styles/index.css';
 
 import type { LLMEditorOptions } from './shell/session-editor-options';
-import type { ISessionRepository } from '@itookit/llm-session/contracts';
-import type { IAgentConfigService } from '@itookit/kernel-adapters/contracts';
-import {IEditor} from '@itookit/ui-common-adapter';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import {EditorFactory} from '@itookit/ui-common-adapter';
-import type { EditorTaskControlPlane } from '@itookit/durable-kernel/contracts';
+import type { ISessionRepository } from '@nestos/llm-session/contracts';
+import type { IAgentConfigService } from '@nestos/kernel-adapters/contracts';
+import {IEditor} from '@nestos/ui-common-adapter';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import {EditorFactory} from '@nestos/ui-common-adapter';
+import type { EditorTaskControlPlane } from '@nestos/durable-kernel/contracts';
 
 export type {
     IPrivilegedCommandService,
@@ -43,19 +43,19 @@ export type { FlowsEditorDeps } from './components/FlowsEditor';
  */
 /** A formal Session factory must receive one explicit instance source. */
 export type SessionViewBinding =
-    | { sessionManager: import('@itookit/llm-session/contracts').SessionViewPort; resolveSessionView?: never }
-    | { sessionManager?: never; resolveSessionView: () => import('@itookit/llm-session/contracts').SessionViewPort };
+    | { sessionManager: import('@nestos/llm-session/contracts').SessionViewPort; resolveSessionView?: never }
+    | { sessionManager?: never; resolveSessionView: () => import('@nestos/llm-session/contracts').SessionViewPort };
 
 export type LLMFactoryDependencies = SessionViewBinding & {
     defaultHarnessToolIds?: readonly string[];
     sessionRepository: ISessionRepository;
-    ocr?: import('@itookit/app-contracts/services').OcrControls;
+    ocr?: import('@nestos/app-contracts/services').OcrControls;
     commandBus?: ICommandBus;
     kernel?: EditorTaskControlPlane;
-    readTaskAttachment?: import('@itookit/durable-kernel/contracts').ReadTaskAttachment;
+    readTaskAttachment?: import('@nestos/durable-kernel/contracts').ReadTaskAttachment;
     privilegedCommands?: import('./domain/ports/IPrivilegedCommandService').IPrivilegedCommandService;
-    sessionSkills?: import('@itookit/tools/contracts').SessionSkillControls;
-    configuration?: import('@itookit/kernel-adapters/contracts').ChatConfigurationView;
+    sessionSkills?: import('@nestos/tools/contracts').SessionSkillControls;
+    configuration?: import('@nestos/kernel-adapters/contracts').ChatConfigurationView;
     onLoadMetrics?: LLMEditorOptions['onLoadMetrics'];
 };
 
@@ -69,7 +69,7 @@ export const createLLMFactory = (
     const pendingByContainer = new WeakMap<HTMLElement, Map<string, Promise<IEditor>>>();
 
     const createEditor = async (container: HTMLElement, options: EditorOptions, handoff?: RetainedWorkspaceHandoff): Promise<IEditor> => {
-        const chatOptions = normalizeEditorOptions(options as EditorOptions<import('@itookit/llm-flow/contracts').SessionSubmission, import('./services/SessionService').SessionLoadResult>);
+        const chatOptions = normalizeEditorOptions(options as EditorOptions<import('@nestos/llm-flow/contracts').SessionSubmission, import('./services/SessionService').SessionLoadResult>);
         if (options.conversation) {
             return createConversationEditor(container, options.conversation, options, handoff, deps.ocr);
         }

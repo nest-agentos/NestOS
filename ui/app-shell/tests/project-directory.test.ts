@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { FSNode, IFileSystem } from '@itookit/vfs-core';
+import type { FSNode, IFileSystem } from '@nestos/vfs-core';
 import { projectDirectoryNodes } from '../src/projects/project-directory';
 
 it('shares transparent grouping with the tree while keeping normal directories lazy', async () => {

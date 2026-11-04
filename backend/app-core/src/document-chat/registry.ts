@@ -1,6 +1,6 @@
-import {createModuleLogger} from '@itookit/common';
-import {FSError, type IFileSystem, type ISeqFileOperations} from '@itookit/vfs-core';
-import type {DocumentChatLink, LocalApplicationServices} from '@itookit/app-contracts/services';
+import {createModuleLogger} from '@nestos/common';
+import {FSError, type IFileSystem, type ISeqFileOperations} from '@nestos/vfs-core';
+import type {DocumentChatLink, LocalApplicationServices} from '@nestos/app-contracts/services';
 
 const table = '/fs/document-chat-links.seq', log = createModuleLogger('document-chat-registry');
 const queues = new WeakMap<object, Promise<unknown>>();

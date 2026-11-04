@@ -1,6 +1,6 @@
 import {vi} from 'vitest';
-import type {ContextBinding, AgentPublishedRevision} from '@itookit/kernel-adapters/contracts';
-import {directHarnessContextIdentity, type ContextOptionsQuery} from '@itookit/llm-session/contracts';
+import type {ContextBinding, AgentPublishedRevision} from '@nestos/kernel-adapters/contracts';
+import {directHarnessContextIdentity, type ContextOptionsQuery} from '@nestos/llm-session/contracts';
 import {createContextOptionsReader} from '../src/projects/harness-context-options';
 import {HarnessContextBindings} from '../src/projects/harness-context-bindings';
 import type {HarnessConnectionInspection} from '../src/projects/harness-connections';

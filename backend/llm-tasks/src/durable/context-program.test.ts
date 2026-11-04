@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import type { EffectRequest, KernelAction, TaskInputEvent } from '@itookit/durable-kernel';
+import type { EffectRequest, KernelAction, TaskInputEvent } from '@nestos/durable-kernel';
 import { ContextTaskProgram } from './context-program';
 import { DurableAgentProgram } from './agent-program';
 

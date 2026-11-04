@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BranchContextProfile, ContextPlan, ContextSnapshot } from '@itookit/llm-context';
+import type { BranchContextProfile, ContextPlan, ContextSnapshot } from '@nestos/llm-context';
 
 type Artifact = { id: string; content: unknown; contentHash?: string; [key: string]: unknown };
 import { ContextAssembler } from './context-assembler';

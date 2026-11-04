@@ -4,7 +4,7 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {IDBFactory} from 'fake-indexeddb';
 import {createRecoverableFileEditor} from '../src/browser/file-recovery';
 import {FileRecoveryStore} from '../src/persistence/file-recovery-store';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const release of cleanup.splice(0)) await release(); document.body.replaceChildren(); sessionStorage.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks();});

@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {createFileSystemSource, FileStorageAdapter, type FSNode, type IFileSystem, type FileStorageBackend} from '@itookit/vfs-core';
-import {filterGitignoredFiles} from '@itookit/vfs-ui';
+import {createFileSystemSource, FileStorageAdapter, type FSNode, type IFileSystem, type FileStorageBackend} from '@nestos/vfs-core';
+import {filterGitignoredFiles} from '@nestos/vfs-ui';
 import {filterDirectoryFiles} from '../src/session/directory-visibility';
 
 const node = (path: string, type: 'file' | 'directory' = 'file') => ({path, type} as FSNode);

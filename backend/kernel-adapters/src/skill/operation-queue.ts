@@ -1,5 +1,5 @@
-import { assertEffectGrant } from '@itookit/durable-kernel';
-import type { EffectAdapter, EffectExecutionContext } from '@itookit/durable-kernel';
+import { assertEffectGrant } from '@nestos/durable-kernel';
+import type { EffectAdapter, EffectExecutionContext } from '@nestos/durable-kernel';
 import type { SessionCapabilityRegistry } from '../ports/capabilities';
 
 interface SessionQueue { tail?: Promise<unknown>; invalidated: boolean; }

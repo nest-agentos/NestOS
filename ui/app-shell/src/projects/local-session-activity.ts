@@ -1,7 +1,7 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {resolveBrowserTarget} from '@itookit/app-contracts';
-import type {KernelViewPort, SessionActivity} from '@itookit/durable-kernel/contracts';
-import type {VFSNodeUI, VFSUIShell} from '@itookit/vfs-ui';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {resolveBrowserTarget} from '@nestos/app-contracts';
+import type {KernelViewPort, SessionActivity} from '@nestos/durable-kernel/contracts';
+import type {VFSNodeUI, VFSUIShell} from '@nestos/vfs-ui';
 import {localSessionStatus} from './local-session-status';
 
 const log = createModuleLogger('workbench-activity');

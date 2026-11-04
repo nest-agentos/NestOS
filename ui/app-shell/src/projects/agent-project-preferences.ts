@@ -1,5 +1,5 @@
-import { sha256HexSync } from '@itookit/common';
-import type { ApplicationBackend } from '@itookit/app-contracts/services';
+import { sha256HexSync } from '@nestos/common';
+import type { ApplicationBackend } from '@nestos/app-contracts/services';
 
 /** Per-agent host launch preferences, shared by browser and desktop clients. */
 export class AgentProjectPreferences {

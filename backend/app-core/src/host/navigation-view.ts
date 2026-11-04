@@ -1,5 +1,5 @@
-import { FSError, normalizeVirtualPath, type IFileSystem, type IVFSManager } from '@itookit/vfs-core';
-import type { NavigationDirectory, NavigationView } from '@itookit/app-contracts/services';
+import { FSError, normalizeVirtualPath, type IFileSystem, type IVFSManager } from '@nestos/vfs-core';
+import type { NavigationDirectory, NavigationView } from '@nestos/app-contracts/services';
 import { readUiDocuments } from './ui-documents';
 
 interface Entry { revision: number; time: number; valid: boolean; stop(): void; value: Promise<NavigationDirectory> }

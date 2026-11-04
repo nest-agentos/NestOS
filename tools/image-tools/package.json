@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/image-tools",
+  "name": "@nestos/image-tools",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,9 +13,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@itookit/image-parser": "workspace:*",
-    "@itookit/tools": "workspace:*",
-    "@itookit/llm-context": "workspace:*",
+    "@nestos/image-parser": "workspace:*",
+    "@nestos/tools": "workspace:*",
+    "@nestos/llm-context": "workspace:*",
     "sharp": "0.35.5",
     "zod": "^4.1.5"
   },
@@ -23,5 +23,14 @@
     "typescript": "^5.9.3",
     "vitest": "^1.6.1",
     "@types/node": "^20.19.25"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "tools/image-tools"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

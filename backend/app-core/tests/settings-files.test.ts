@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { IFileSystem, IVFSManager } from '@itookit/vfs-core';
+import type { IFileSystem, IVFSManager } from '@nestos/vfs-core';
 import { SettingsFiles } from '../src/settings/workspace-files';
 
 it('describes sources locally and opens only the selected workspace once', async () => {

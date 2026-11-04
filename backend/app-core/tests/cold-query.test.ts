@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest';
-import type {Kernel} from '@itookit/durable-kernel';
+import type {Kernel} from '@nestos/durable-kernel';
 import {coldQuery} from './helpers/cold-query';
 
 function fixture() {

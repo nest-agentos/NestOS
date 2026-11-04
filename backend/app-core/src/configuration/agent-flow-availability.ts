@@ -1,8 +1,8 @@
-import { checkFlowSource, type FlowDefinitionStore } from '@itookit/llm-flow';
-import type { AgentAvailability, AgentExecution } from '@itookit/kernel-adapters/contracts';
-import type { FlowEngine } from '@itookit/llm-session';
-import type { DagPluginCatalog } from '@itookit/llm-flow/contracts';
-import { isRootCallable } from '@itookit/llm-flow/contracts';
+import { checkFlowSource, type FlowDefinitionStore } from '@nestos/llm-flow';
+import type { AgentAvailability, AgentExecution } from '@nestos/kernel-adapters/contracts';
+import type { FlowEngine } from '@nestos/llm-session';
+import type { DagPluginCatalog } from '@nestos/llm-flow/contracts';
+import { isRootCallable } from '@nestos/llm-flow/contracts';
 
 /** Flow resource existence and publication are independent from Agent persistence. */
 export function createAgentFlowAvailability(engine: FlowEngine, definitions: FlowDefinitionStore, plugins?: DagPluginCatalog) {

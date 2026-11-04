@@ -1,10 +1,10 @@
 import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createApplicationRuntime, ProjectSyncService } from '@itookit/app-core';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { SyncError } from '@itookit/vfs-sync';
-import { t } from '@itookit/common';
+import { createApplicationRuntime, ProjectSyncService } from '@nestos/app-core';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { SyncError } from '@nestos/vfs-sync';
+import { t } from '@nestos/common';
 import { initialState, MemoryState, SerialCoordinator } from '../../../tests/helpers/sync';
 
 afterEach(() => {document.body.replaceChildren(); vi.unstubAllGlobals(); vi.restoreAllMocks();});

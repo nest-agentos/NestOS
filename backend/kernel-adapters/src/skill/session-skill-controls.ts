@@ -1,6 +1,6 @@
 import { runSessionSkillOperation } from './operation-queue';
-import type { SessionSkillControls, ISkillService } from '@itookit/tools/contracts';
-import type { Kernel } from '@itookit/durable-kernel';
+import type { SessionSkillControls, ISkillService } from '@nestos/tools/contracts';
+import type { Kernel } from '@nestos/durable-kernel';
 import type { SessionCapabilityRegistry } from '../ports/capabilities';
 import { forgetLoadedSkill, parseLoadedSkillIds, parseLoadedSkillVersions, rememberLoadedSkill, rollbackFailedLoad } from './loaded-state';
 
@@ -32,7 +32,7 @@ export function createSessionSkillControls(kernel: Pick<Kernel, 'openSession'>, 
         listLoaded: id => serial(id, () => list(id, true)),
         load: (id, skillId) => serial(id, async () => {
             const session = await kernel.openSession(id);
-            const state: NonNullable<import('@itookit/durable-kernel').EffectExecutionContext['sessionState']> = {
+            const state: NonNullable<import('@nestos/durable-kernel').EffectExecutionContext['sessionState']> = {
                 get: key => session.getShared(key),
                 set: (key, value, expectedVersion) => session.setShared(key, value, { expectedVersion }) };
             parseLoadedSkillIds((await state.get('kernel-adapters.skills.loaded'))?.value);
@@ -75,7 +75,7 @@ function requireEditorPath(filePath: string): void {
 }
 
 async function loadAndRemember(service: ISkillService, id: string,
-    state: NonNullable<import('@itookit/durable-kernel').EffectExecutionContext['sessionState']>): Promise<string[]> {
+    state: NonNullable<import('@nestos/durable-kernel').EffectExecutionContext['sessionState']>): Promise<string[]> {
     if (typeof id !== 'string' || !id.trim()) throw new Error('Skill id is required');
     const skill = service.getSkill(id);
     if (!skill?.enabled || skill.disableModelInvocation || skill.triggerStrategy === 'action') throw new Error(`Skill cannot be loaded into model context: ${id}`);

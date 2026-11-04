@@ -19,18 +19,18 @@
  * Session repository and records each source in `<dataRoot>/etc/legacy-chat-import.json`
  * so re-running is a no-op.
  *
- *   pnpm --filter @itookit/cli exec tsx scripts/migrate-legacy-chats.ts --root /path/to/data
- *   pnpm --filter @itookit/cli exec tsx scripts/migrate-legacy-chats.ts --root /path/to/data --apply
+ *   pnpm --filter @nestos/cli exec tsx scripts/migrate-legacy-chats.ts --root /path/to/data
+ *   pnpm --filter @nestos/cli exec tsx scripts/migrate-legacy-chats.ts --root /path/to/data --apply
  */
 import { readFile, readdir, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { createVFS } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { SessionRepository } from '@itookit/llm-session';
-import { parseSessionBundle } from '@itookit/app-core';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
+import { createVFS } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { SessionRepository } from '@nestos/llm-session';
+import { parseSessionBundle } from '@nestos/app-core';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 
 /**
  * Legacy system rounds only ever carried the default "You are a helpful assistant."

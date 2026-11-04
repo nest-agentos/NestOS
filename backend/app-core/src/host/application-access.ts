@@ -1,7 +1,7 @@
-import {workspaceRoot} from '@itookit/app-contracts';
+import {workspaceRoot} from '@nestos/app-contracts';
 import {privateConfigurationFiles} from './configuration-access';
-import { FSError, normalizeVirtualPath, type IFileSystem } from '@itookit/vfs-core';
-import type { ApplicationClient, FileSystemsPort } from '@itookit/app-contracts/services';
+import { FSError, normalizeVirtualPath, type IFileSystem } from '@nestos/vfs-core';
+import type { ApplicationClient, FileSystemsPort } from '@nestos/app-contracts/services';
 
 /** Managed state is writable through application commands; UI preferences remain files. */
 export function restrictApplicationFiles(client: ApplicationClient, roots: readonly string[], configurationReadonly = false): ApplicationClient {

@@ -1,7 +1,7 @@
 import { ulid } from '../persistence/ulid';
-import { sha256HexSync } from '@itookit/llm-context';
-import { type MemoryPolicy } from '@itookit/llm-tasks/contracts';
-import { FSError, type IFileSystem, type ISeqFileTransaction } from '@itookit/vfs-core';
+import { sha256HexSync } from '@nestos/llm-context';
+import { type MemoryPolicy } from '@nestos/llm-tasks/contracts';
+import { FSError, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
 
 type Reference = NonNullable<MemoryPolicy['sharedMemory']>;
 import type { MemoryOrigin, SharedMemoryGrant, SharedMemoryResource, SharedMemoryAudit } from '../contracts/memory';

@@ -1,4 +1,4 @@
-import {FSError, type IFileSystem} from '@itookit/vfs-core';
+import {FSError, type IFileSystem} from '@nestos/vfs-core';
 
 export interface NativeConversationIdentity {
     connectionId: string;

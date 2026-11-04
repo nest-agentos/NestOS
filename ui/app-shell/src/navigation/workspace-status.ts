@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 
 /** Loading and retry feedback belongs to the workspace, leaving global navigation available. */
 export function workspaceStatus(container: HTMLElement | null, error?: unknown, retry?: () => void): () => void {

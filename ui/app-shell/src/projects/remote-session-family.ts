@@ -1,6 +1,6 @@
-import type { ApplicationBackend } from '@itookit/app-contracts/services';
-import { t } from '@itookit/common';
-import { remoteSessionPath } from '@itookit/app-contracts';
+import type { ApplicationBackend } from '@nestos/app-contracts/services';
+import { t } from '@nestos/common';
+import { remoteSessionPath } from '@nestos/app-contracts';
 
 export async function showRemoteSessionFamily(conversationBranches: ApplicationBackend['conversationBranches'], target: {folder: string; profileId?: string; nativeSessionId?: string}, signal: AbortSignal,
     open: (path: string) => Promise<void>): Promise<void> {

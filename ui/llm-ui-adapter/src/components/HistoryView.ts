@@ -1,14 +1,14 @@
 // @file: llm-ui/components/HistoryView.ts
 
-import type { SessionGroup, SessionEventEnvelope, ExecutionNode } from '@itookit/llm-session/contracts';
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { SessionGroup, SessionEventEnvelope, ExecutionNode } from '@nestos/llm-session/contracts';
+import type { IFileSystem } from '@nestos/vfs-core';
 import type { IHistoryPresenter } from '../domain/ports/IHistoryPresenter';
 import type { CollapseStateMap, NodeActionCallback } from '../domain/types';
 import type { IEditorEventBus } from '../domain/events';
-import {ScrollController, ContentResizeTracker, TimerManager} from '@itookit/llm-ui';
+import {ScrollController, ContentResizeTracker, TimerManager} from '@nestos/llm-ui';
 import {EventBatchProcessor, BatchedEvents} from './common';
 import { ErrorTemplates } from './templates/ErrorTemplates';
-import {getPreviewText} from '@itookit/llm-ui';
+import {getPreviewText} from '@nestos/llm-ui';
 
 import { SessionRenderer, RendererContext } from './history/SessionRenderer';
 import { SubmissionFeedback } from './history/SubmissionFeedback';
@@ -18,9 +18,9 @@ import { CollapseController } from './history/CollapseController';
 import { EditController } from './history/EditController';
 import { EventDispatcher } from './history/EventDispatcher';
 import { TtyController } from './tty/TtyController';
-import type { MDxPlugin } from '@itookit/mdxeditor';
+import type { MDxPlugin } from '@nestos/mdxeditor';
 import type { MDxControllerOptions } from './mdx/MDxController';
-import type { ContentSearchView } from '@itookit/llm-ui';
+import type { ContentSearchView } from '@nestos/llm-ui';
 import { mountHistorySearch } from './history/content-search';
 
 export interface HistoryViewOptions {
@@ -547,7 +547,7 @@ export class HistoryView implements IHistoryPresenter {
                 break;
 
             case 'message:citations': {
-                const p = (event as any).payload as { messageId?: string; citations?: import('@itookit/driver-llm/contracts').Citation[] } | undefined;
+                const p = (event as any).payload as { messageId?: string; citations?: import('@nestos/driver-llm/contracts').Citation[] } | undefined;
                 if (p?.messageId && p?.citations?.length) {
                     this.stream.updateCitations(p.messageId, p.citations);
                 }

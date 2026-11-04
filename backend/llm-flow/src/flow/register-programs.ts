@@ -1,5 +1,5 @@
-import type { Kernel, DurableTaskProgram } from '@itookit/durable-kernel';
-import { ContextTaskProgram, DurableAgentProgram, DurableChatProgram, DurablePlanProgram } from '@itookit/llm-tasks';
+import type { Kernel, DurableTaskProgram } from '@nestos/durable-kernel';
+import { ContextTaskProgram, DurableAgentProgram, DurableChatProgram, DurablePlanProgram } from '@nestos/llm-tasks';
 import { FlowAggregateProgram, FlowHumanProgram, FlowValueProgram } from './programs';
 import { FlowInputProgram } from './structured/input';
 import type { FlowReducerRegistry } from './structured/join';

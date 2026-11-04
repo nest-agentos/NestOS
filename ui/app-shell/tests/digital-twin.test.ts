@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { DigitalTwinService } from '@itookit/app-core';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { sha256HexSync } from '@itookit/llm-context';
+import { DigitalTwinService } from '@nestos/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { sha256HexSync } from '@nestos/llm-context';
 import { TwinWorkbench } from '../src/digital-twin';
 import { twinNavigationSource } from '../src/digital-twin/navigation';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 it('retries failed first initialization from the empty page and clears the error on success', async () => {
@@ -272,7 +272,7 @@ it('configures private source connections without rendering stored secrets and p
 
 it('saves and runs a reviewed text scanner with its output limit and disables immediate runs for a disabled scanner', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()});
-    const extract = vi.fn(async (job: import('@itookit/app-contracts').TwinAnalysisJob, _text: string, attached: (id: string) => Promise<void>) => {
+    const extract = vi.fn(async (job: import('@nestos/app-contracts').TwinAnalysisJob, _text: string, attached: (id: string) => Promise<void>) => {
         await attached('fixture-task');
         return {tokens: 10, candidates: [{content: 'Prefers TypeScript', kind: 'preference' as const, subject: 'self', project: '', eventTime: '', quote: 'I prefer TypeScript.'}]};
     });

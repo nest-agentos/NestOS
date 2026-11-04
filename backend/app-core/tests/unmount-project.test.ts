@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { ProjectService, SessionLifecycleService } from '@itookit/app-contracts/services';
+import type { ProjectService, SessionLifecycleService } from '@nestos/app-contracts/services';
 import { unmountRemoteProject } from '../src/projects/unmount-project';
 
 it('unmounts local records without needing an online remote filesystem or native controller', async () => {

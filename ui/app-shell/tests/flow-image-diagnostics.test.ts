@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getLogger } from '@itookit/common';
+import { getLogger } from '@nestos/common';
 import { promptFlowParameters } from '../../llm-ui-adapter/src/components/FlowParameterForm';
 
 beforeEach(() => {

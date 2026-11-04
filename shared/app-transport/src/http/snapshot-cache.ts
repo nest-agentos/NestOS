@@ -1,4 +1,4 @@
-import {FSError} from '@itookit/vfs-core';
+import {FSError} from '@nestos/vfs-core';
 import type {WireValue} from '../rpc/protocol';
 
 const MAX_BYTES = 8 * 1024 * 1024, MAX_ENTRIES = 128;

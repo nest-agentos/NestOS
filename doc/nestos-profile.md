@@ -24,7 +24,7 @@ CLI（desktop profile）、Tauri 和 HTTP 存储宿主启动时，如果配置�
 
 三个宿主共用 `backend/app-core/src/profile/default-profile.json`，均将 `XDG_CONFIG_HOME` 视为配置基目录，并在其下使用 `nestos/`。可选的 `homeDir` 只在用户希望固定项目目录时填写。
 
-HTTP 存储宿主通过 `@itookit/app-core/profile` 公开子入口复用配置默认值和数据根解析；该入口可独立打包，无需加载应用 Runtime。
+HTTP 存储宿主通过 `@nestos/app-core/profile` 公开子入口复用配置默认值和数据根解析；该入口可独立打包，无需加载应用 Runtime。
 
 Schema：
 
@@ -96,7 +96,7 @@ pnpm migrate:legacy-chats --root <数据根>            # 先看清单
 pnpm migrate:legacy-chats --root <数据根> --apply    # 退出应用后写入
 ```
 
-脚本放在 `apps/cli/` 内而不是顶层 `scripts/`：工作区依赖（`@itookit/*`）只链接在各包的 `node_modules` 下，模块解析锚定脚本自身位置，才能从仓库任意目录调用（顶层 `scripts/` 下没有这些链接，`pnpm dlx tsx scripts/...` 会报 `Cannot find module '@itookit/vfs-core'`）。
+脚本放在 `apps/cli/` 内而不是顶层 `scripts/`：工作区依赖（`@nestos/*`）只链接在各包的 `node_modules` 下，模块解析锚定脚本自身位置，才能从仓库任意目录调用（顶层 `scripts/` 下没有这些链接，`pnpm dlx tsx scripts/...` 会报 `Cannot find module '@nestos/vfs-core'`）。
 
 转换沿用仓库自身历史上的 ChatNode → Round 迁移算法：按命名分支从 head 回溯到 root，共享前缀复用同一 Round，用户消息与其回答合成一轮，重新生成的回答成为同父的兄弟 Round。旧系统轮只承载默认问候语，由会话设置取代，直接丢弃；`status: deleted` 的消息一并丢弃并重新挂接其子节点。`module/` 其余目录（`projects`/`agents`/`flows` 等）与 `/home/admin/<name>` 内容一致，无需搬运——`chats` 之外不要整体搬迁，以免覆盖 9 月之后的新内容。
 

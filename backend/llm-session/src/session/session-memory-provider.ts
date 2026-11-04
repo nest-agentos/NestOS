@@ -1,8 +1,8 @@
 import { ulid } from '../persistence/ulid';
-import type { RetrievedMemoryEntry } from '@itookit/llm-context';
-import { sha256Hex, type ContextPlan } from '@itookit/llm-context';
-import { type MemoryPolicy } from '@itookit/llm-tasks/contracts';
-import { KernelError, KernelErrorCode, type Kernel, type SessionHandle } from '@itookit/durable-kernel';
+import type { RetrievedMemoryEntry } from '@nestos/llm-context';
+import { sha256Hex, type ContextPlan } from '@nestos/llm-context';
+import { type MemoryPolicy } from '@nestos/llm-tasks/contracts';
+import { KernelError, KernelErrorCode, type Kernel, type SessionHandle } from '@nestos/durable-kernel';
 import { SharedMemoryStore, type MemoryOrigin } from './shared-memory-store';
 
 import type { MemoryEntry, MemoryWrite, MemoryMutationOptions, MemoryCompressionSource } from '../contracts/memory';

@@ -1,8 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { bindCapabilities, type SessionHandle } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IDeviceDriver } from '@itookit/vfs-core';
-import { createContextService, type ChatMessage } from '@itookit/llm-context';
-import { createFileContextContentStore, createTaskContextStorage } from '@itookit/kernel-adapters';
+import { bindCapabilities, type SessionHandle } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IDeviceDriver } from '@nestos/vfs-core';
+import { createContextService, type ChatMessage } from '@nestos/llm-context';
+import { createFileContextContentStore, createTaskContextStorage } from '@nestos/kernel-adapters';
 import { createKernelRuntime, type HeadlessKernelRuntime } from '../src/runtime/create-kernel-runtime';
 
 const definition = (name: string) => ({ type: 'function' as const, function: { name, description: name,

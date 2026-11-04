@@ -1,7 +1,7 @@
-import type { ChatMessage, ToolCall, ToolDefinition } from '@itookit/llm-context';
+import type { ChatMessage, ToolCall, ToolDefinition } from '@nestos/llm-context';
 import type { OutputValidationPolicy } from '../contracts';
-import type { ResponseFormat, TokenUsage } from '@itookit/driver-llm/contracts';
-import type { JsonValue } from '@itookit/durable-kernel';
+import type { ResponseFormat, TokenUsage } from '@nestos/driver-llm/contracts';
+import type { JsonValue } from '@nestos/durable-kernel';
 
 export interface DurableDependencyBinding {
     taskId: string;
@@ -31,7 +31,7 @@ export interface DurableProgramInput {
     webSearch?: boolean;
     responseFormat?: ResponseFormat;
     outputValidation?: OutputValidationPolicy;
-    contextCompaction?: import('@itookit/llm-context').ContextCompactionPolicy;
+    contextCompaction?: import('@nestos/llm-context').ContextCompactionPolicy;
     dependencyBindings?: DurableDependencyBinding[];
     /** False keeps scheduling dependencies but does not append their outputs to messages. */
     includeDependencyOutputs?: boolean;
@@ -45,7 +45,7 @@ export interface DurableAgentInput extends DurableProgramInput {
      * behave exactly like runtime `load_skill` results: their critical rules are re-injected
      * every round and their tool definitions are exposed within `allowedToolIds` only.
      */
-    skillContexts?: Array<NonNullable<import('@itookit/tools/contracts').ToolInvokeResult['skillContext']>>;
+    skillContexts?: Array<NonNullable<import('@nestos/tools/contracts').ToolInvokeResult['skillContext']>>;
     maxExchanges?: number;
     toolTimeoutMs?: number;
     workingDirectory?: string;
@@ -70,13 +70,13 @@ export interface DurableChatOutput {
 }
 
 export interface DurableAgentOutput extends DurableChatOutput {
-    outputs?: { result: { content: import('@itookit/durable-kernel').JsonValue; type: 'json' } };
+    outputs?: { result: { content: import('@nestos/durable-kernel').JsonValue; type: 'json' } };
     exchanges: number;
 }
 
 export interface DurableAgentState {
     /** Successful Skill-load snapshots, independent of prunable tool messages. */
-    skillContexts?: Array<NonNullable<import('@itookit/tools/contracts').ToolInvokeResult['skillContext']>>;
+    skillContexts?: Array<NonNullable<import('@nestos/tools/contracts').ToolInvokeResult['skillContext']>>;
     input: DurableAgentInput;
     phase: 'collecting' | 'llm' | 'approval' | 'tool' | 'human';
     messages: ChatMessage[];

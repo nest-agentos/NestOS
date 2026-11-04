@@ -1,5 +1,5 @@
-import type { DirectoryMountPort, SessionFilesPort, SessionMountRecord } from '@itookit/app-contracts/services';
-import { t } from '@itookit/common';
+import type { DirectoryMountPort, SessionFilesPort, SessionMountRecord } from '@nestos/app-contracts/services';
+import { t } from '@nestos/common';
 import { localizeMountError } from './localize-mount-error';
 
 type Mode = 'mount' | 'home' | 'workspace';

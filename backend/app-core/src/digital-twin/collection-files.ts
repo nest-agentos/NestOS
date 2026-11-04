@@ -1,6 +1,6 @@
-import {createFileSystemView, type IFileSystem} from '@itookit/vfs-core';
-import {collectionExecutor, workspaceRoot, type TwinCollectionExecutor} from '@itookit/app-contracts';
-import {createModuleLogger} from '@itookit/common';
+import {createFileSystemView, type IFileSystem} from '@nestos/vfs-core';
+import {collectionExecutor, workspaceRoot, type TwinCollectionExecutor} from '@nestos/app-contracts';
+import {createModuleLogger} from '@nestos/common';
 import {createVFSToolContext} from '../vfs/tool-context';
 const log = createModuleLogger('twin-scanner');
 

@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { MemoryBackend } from '@itookit/vfs-core';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { MemoryBackend } from '@nestos/vfs-core';
 import { WORKSPACES } from '../../../apps/web-app/src/config/modules';
 import { createBrowserUI } from '../../../apps/web-app/src/ui';
-import { RpcPeer } from '@itookit/app-transport/application';
-import { QueryBatcher } from '@itookit/app-transport/http';
-import type { Call, Reply } from '@itookit/app-transport/rpc';
-import { installViewProjections } from '@itookit/app-transport/application';
-import { createHostedView } from '@itookit/node-host/http';
+import { RpcPeer } from '@nestos/app-transport/application';
+import { QueryBatcher } from '@nestos/app-transport/http';
+import type { Call, Reply } from '@nestos/app-transport/rpc';
+import { installViewProjections } from '@nestos/app-transport/application';
+import { createHostedView } from '@nestos/node-host/http';
 
 const releases: Array<() => Promise<void>> = [];
 const wireBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;

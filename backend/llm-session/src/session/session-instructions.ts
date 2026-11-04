@@ -1,4 +1,4 @@
-import {taskStat, type Kernel} from '@itookit/durable-kernel';
+import {taskStat, type Kernel} from '@nestos/durable-kernel';
 import {attachmentMetadata} from '../contracts/chat';
 import {freezeAttachments} from './attachment-integrity';
 import {AttachmentProcessor} from './attachment-processor';
@@ -54,7 +54,7 @@ export class SessionInstructions {
     }
 
     snapshot(id: string): SessionInstructionQueue | undefined { return this.runtime.snapshot(id); }
-    committed(id: string, submission: import('@itookit/llm-flow/contracts').SessionSubmission): Promise<boolean> {
+    committed(id: string, submission: import('@nestos/llm-flow/contracts').SessionSubmission): Promise<boolean> {
         return hasCommittedSubmission(this.registry.engine, id, submission);
     }
     hasPending(): boolean { return this.pending.size > 0 || this.runtime.hasPending(id => !!this.registry.getSessionRuntime(id)); }

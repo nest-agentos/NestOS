@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
 import {RemoteSessionProjection} from '../src/session/remote-session-projection';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import type {ProjectService} from '@nestos/app-contracts/services';
 const project = {id: 'folder', path: '/remote', name: 'Remote', createdAt: 1, updatedAt: 1, project: {id: 'p'}};
 function fixture() {
     const client = {profiles: vi.fn(async () => ({profiles: [{id: 'codex', kind: 'codex', projectRuntime: true, capabilities: {history: true}}]})),

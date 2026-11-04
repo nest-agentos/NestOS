@@ -1,5 +1,5 @@
-import { DefaultPrintService as StandalonePrintService } from '@itookit/mdxeditor';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { DefaultPrintService as StandalonePrintService } from '@nestos/mdxeditor';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { createAssetProvider } from './assets';
 
 export class DefaultPrintService extends StandalonePrintService {

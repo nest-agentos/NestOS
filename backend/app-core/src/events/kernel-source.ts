@@ -1,6 +1,6 @@
 import type {ApplicationRuntime} from '../runtime/create-application-runtime';
 import type {UserEventService} from './service';
-import {randomUUID} from '@itookit/common';
+import {randomUUID} from '@nestos/common';
 
 type Kernel = ApplicationRuntime['kernel']['kernel'];
 type Source = Awaited<ReturnType<Kernel['inspectSession']>>;

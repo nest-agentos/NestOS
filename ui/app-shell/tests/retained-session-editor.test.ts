@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import {SessionCommand, type RootTargetCatalog} from '@itookit/llm-session/contracts';
+import {SessionCommand, type RootTargetCatalog} from '@nestos/llm-session/contracts';
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {bindLocalApplicationServices} from '@itookit/app-core/host';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {bindLocalApplicationServices} from '@nestos/app-core/host';
 import {IndependentSessionEditor} from '../../llm-ui-adapter/src/shell/IndependentSessionEditor';
 
 const cleanup: (() => Promise<unknown>)[] = [];

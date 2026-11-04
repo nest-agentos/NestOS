@@ -37,7 +37,7 @@
 在仓库根目录执行；默认读取 desktop profile 的模型连接配置：
 
 ```bash
-pnpm --filter @itookit/cli build
+pnpm --filter @nestos/cli build
 cp backend/app-core/src/presets/essay-review.json /tmp/nestos-essay-review.flow
 node apps/cli/dist/cli.js run \
   -f /tmp/nestos-essay-review.flow \

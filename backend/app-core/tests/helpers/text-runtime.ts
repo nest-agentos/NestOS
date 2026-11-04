@@ -1,5 +1,5 @@
 import {vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
+import {MemoryBackend} from '@nestos/vfs-core';
 import {createApplicationRuntime} from '../../src/runtime/create-application-runtime';
 import {openApplicationView} from '../../src/host';
 export async function textRuntime() {

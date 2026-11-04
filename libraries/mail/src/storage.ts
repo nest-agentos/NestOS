@@ -1,4 +1,4 @@
-import {FSError, type IFileSystem} from '@itookit/vfs-core';
+import {FSError, type IFileSystem} from '@nestos/vfs-core';
 import type {MailSource, MailSummary} from './contracts';
 export interface IndexedMail {stamp: string; summary: MailSummary; text: string; thread: string}
 export interface MailIndex {revision: number; rows: IndexedMail[]; sources: MailSource[]; warnings: string[]}

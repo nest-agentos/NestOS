@@ -1,8 +1,8 @@
 import {type EditorOptions} from '../contracts';
 // @file: llm-ui/shell/EventBinder.ts
 
-import {installResponsiveActions} from '@itookit/ui-common-adapter';
-import {EventCleanup} from '@itookit/llm-ui';
+import {installResponsiveActions} from '@nestos/ui-common-adapter';
+import {EventCleanup} from '@nestos/llm-ui';
 
 export interface EventBinderCallbacks {
     mountCompactNavigation: NonNullable<EditorOptions['mountCompactNavigation']>;

@@ -1,8 +1,8 @@
 import {runInNewContext} from 'node:vm';
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {sha256Hex} from '@itookit/common';
-import {InputAssetCommand} from '@itookit/app-contracts';
+import {sha256Hex} from '@nestos/common';
+import {InputAssetCommand} from '@nestos/app-contracts';
 import {DraftFilesCodec} from '../../llm-ui-adapter/src/services/DraftFilesCodec';
 import {draftFileId} from '../../llm-ui-adapter/src/domain/draft-file-identity';
 import {flowInputAssets} from '../../llm-ui-adapter/src/flows/input-assets';
@@ -11,11 +11,11 @@ import {ChatInput} from '../../llm-ui-adapter/src/components/input/ChatInputView
 import {StateService} from '../../llm-ui-adapter/src/services/StateService';
 import {StateManager} from '../../llm-ui-adapter/src/shell/StateManager';
 import type {IChatInputConfig, IChatInputPresenter} from '../../llm-ui-adapter/src/domain/ports/IChatInputPresenter';
-import type {ConversationUIState} from '@itookit/llm-session/contracts';
+import type {ConversationUIState} from '@nestos/llm-session/contracts';
 
 const diagnostics = vi.hoisted(() => ({debug: vi.fn(), warn: vi.fn()}));
-vi.mock('@itookit/common', async original => {
-    const actual = await original<typeof import('@itookit/common')>();
+vi.mock('@nestos/common', async original => {
+    const actual = await original<typeof import('@nestos/common')>();
     return {...actual, createModuleLogger: (name: string) => name === 'draft-files' ? diagnostics : actual.createModuleLogger(name)};
 });
 

@@ -1,5 +1,5 @@
-import type { SkillDefinition, SkillToolBinding, ToolHandler } from '@itookit/tools/contracts';
-import type { SkillToolHandlerFactory } from '@itookit/kernel-adapters';
+import type { SkillDefinition, SkillToolBinding, ToolHandler } from '@nestos/tools/contracts';
+import type { SkillToolHandlerFactory } from '@nestos/kernel-adapters';
 
 export class BrowserSkillToolHandlerFactory implements SkillToolHandlerFactory {
     create(skill: SkillDefinition, binding: SkillToolBinding): ToolHandler | undefined {

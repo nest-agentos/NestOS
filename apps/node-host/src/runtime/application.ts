@@ -2,21 +2,21 @@ import {NodeToolConnections} from './tool-connections';
 import {ToolOAuthApplications} from './tool-oauth-applications';
 import {canonical, within} from './paths';
 import path from 'node:path';
-import { createApplicationRuntime, type ApplicationRuntime, type ApplicationRuntimeOptions } from '@itookit/app-core';
-import { createCellsDriver } from '@itookit/cells-driver';
+import { createApplicationRuntime, type ApplicationRuntime, type ApplicationRuntimeOptions } from '@nestos/app-core';
+import { createCellsDriver } from '@nestos/cells-driver';
 import { guardHostStorage } from '../storage/host-storage';
-import type { IStorageBackend } from '@itookit/vfs-core';
+import type { IStorageBackend } from '@nestos/vfs-core';
 import type { AuditPort } from '../logging/audit-log';
 import { openHostRuntime, closeHostResources } from './host-runtime';
 import { createStandardNodeTools, loadNodeToolModules, mergeNodePackageTools } from './tool-modules';
 import {NodeToolPackages, type NodeToolPackageOptions} from './tool-packages';
-import {BUILTIN_TOOLS} from '@itookit/tools';
+import {BUILTIN_TOOLS} from '@nestos/tools';
 
 export interface NodeApplicationOptions {
     oauthApplicationsDirectory?: string;
     authorizationRedirectUri?: string;
     toolPackages?: NodeToolPackageOptions;
-    createFs?: () => import('@itookit/vfsdriver-local').IFsOps;
+    createFs?: () => import('@nestos/vfsdriver-local').IFsOps;
     root: string; sidecar: string; authDir: string; auditFile: string;
     runtime?: Omit<ApplicationRuntimeOptions, 'backend' | 'providerAuthorization'>;
 }

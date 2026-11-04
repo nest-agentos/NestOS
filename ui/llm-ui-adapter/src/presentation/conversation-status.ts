@@ -1,4 +1,4 @@
-import { HARNESS_STATE_ICONS, t } from '@itookit/common';
+import { HARNESS_STATE_ICONS, t } from '@nestos/common';
 import type { ConversationSnapshot } from '../contracts/ConversationControls';
 
 type Observation = NonNullable<ConversationSnapshot['observation']>;

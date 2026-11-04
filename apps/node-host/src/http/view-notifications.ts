@@ -1,5 +1,5 @@
-import type { Call, Reply } from '@itookit/app-transport/rpc';
-import type {ApplicationViewEvent} from '@itookit/app-contracts/services';
+import type { Call, Reply } from '@nestos/app-transport/rpc';
+import type {ApplicationViewEvent} from '@nestos/app-contracts/services';
 
 interface NotificationStream { destroyed: boolean; writableLength: number; write(frame: string): unknown; end(): unknown; }
 

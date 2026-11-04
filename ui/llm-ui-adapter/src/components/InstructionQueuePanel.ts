@@ -1,7 +1,7 @@
 import {instructionQueueLabels} from './instruction-queue-labels';
-import {createModuleLogger, CHAT_ICONS, getLocale, t} from '@itookit/common';
-import {InstructionQueueView, type InstructionQueueSnapshot, type InstructionQueueEdit as ViewEdit} from '@itookit/llm-ui';
-import {SessionCommand, type ICommandBus, type SessionInstructionQueue} from '@itookit/llm-session/contracts';
+import {createModuleLogger, CHAT_ICONS, getLocale, t} from '@nestos/common';
+import {InstructionQueueView, type InstructionQueueSnapshot, type InstructionQueueEdit as ViewEdit} from '@nestos/llm-ui';
+import {SessionCommand, type ICommandBus, type SessionInstructionQueue} from '@nestos/llm-session/contracts';
 
 const log = createModuleLogger('session-instruction-queue');
 

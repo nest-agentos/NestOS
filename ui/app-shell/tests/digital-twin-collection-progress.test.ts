@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {expect, it} from 'vitest';
-import {DigitalTwinService} from '@itookit/app-core';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {DigitalTwinService} from '@nestos/app-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {scanRunPage, scanRunState} from '../src/digital-twin/scan-view';
 it('shows a saved batch awaiting continuation, without false zero-source counts or model budget controls', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()});

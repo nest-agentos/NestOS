@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parse } from 'yaml';
-import { findCycles } from '@itookit/llm-flow';
+import { findCycles } from '@nestos/llm-flow';
 import { expandWorkflow } from './expand';
 import { workflowSchema } from './schema';
 import type { TaskConfig, CompiledWorkflow, RouteCondition, WorkflowConfigV1, WorkflowTaskSpec } from './types';

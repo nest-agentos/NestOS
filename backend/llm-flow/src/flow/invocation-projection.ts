@@ -1,4 +1,4 @@
-import type {TaskRecord, SessionHandle} from '@itookit/durable-kernel';
+import type {TaskRecord, SessionHandle} from '@nestos/durable-kernel';
 import {readFlowRunMembers, type FlowRunMember} from './run-members';
 import {invocationFromLabels} from './invocation-identity';
 

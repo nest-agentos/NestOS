@@ -1,6 +1,6 @@
 // vfs-demo.js - VFSCore 使用示例
 
-import { getVFSManager } from '@itookit/vfs';
+import { getVFSManager } from '@nestos/vfs';
 
 /**
  * 主演示函数
@@ -487,7 +487,7 @@ async function demoCustomProvider(vfs) {
     console.log('--- 12. 自定义 Provider ---');
 
     // 导入 ContentProvider 基类
-    const { ContentProvider } = await import('@itookit/vfs');
+    const { ContentProvider } = await import('@nestos/vfs');
 
     // 创建自定义 Provider
     class HashtagProvider extends ContentProvider {

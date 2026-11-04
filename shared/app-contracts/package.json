@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/app-contracts",
+  "name": "@nestos/app-contracts",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -26,22 +26,31 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@itookit/common": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
-    "@itookit/kanban": "workspace:*",
-    "@itookit/mail": "workspace:*"
+    "@nestos/common": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
+    "@nestos/kanban": "workspace:*",
+    "@nestos/mail": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
-    "@itookit/kernel-adapters": "workspace:*",
-    "@itookit/durable-kernel": "workspace:*",
-    "@itookit/llm-session": "workspace:*",
-    "@itookit/tools": "workspace:*",
-    "@itookit/driver-llm": "workspace:*",
-    "@itookit/cells-driver": "workspace:*",
-    "@itookit/vfs-sync": "workspace:*",
-    "@itookit/llm-context": "workspace:*",
-    "@itookit/llm-flow": "workspace:*",
-    "@itookit/llm-tasks": "workspace:*"
-  }
+    "@nestos/kernel-adapters": "workspace:*",
+    "@nestos/durable-kernel": "workspace:*",
+    "@nestos/llm-session": "workspace:*",
+    "@nestos/tools": "workspace:*",
+    "@nestos/driver-llm": "workspace:*",
+    "@nestos/cells-driver": "workspace:*",
+    "@nestos/vfs-sync": "workspace:*",
+    "@nestos/llm-context": "workspace:*",
+    "@nestos/llm-flow": "workspace:*",
+    "@nestos/llm-tasks": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "shared/app-contracts"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

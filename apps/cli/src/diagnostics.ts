@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync, renameSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { errorDetails } from '@itookit/common';
+import { errorDetails } from '@nestos/common';
 
 const MAX_BYTES = 4 * 1024 * 1024;
 let active: RuntimeDiagnostics | undefined;

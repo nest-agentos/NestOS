@@ -1,8 +1,8 @@
-import {DOCUMENT_CHAT_META_KEY} from '@itookit/app-contracts';
-import {FSError} from '@itookit/vfs-core';
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {SessionCommand, type SubmissionRequest, type SessionGroup} from '@itookit/llm-session/contracts';
-import type {DocumentChatFile, DocumentChatFileRequest, DocumentChatLink, DocumentChatResponse, LocalApplicationServices} from '@itookit/app-contracts/services';
+import {DOCUMENT_CHAT_META_KEY} from '@nestos/app-contracts';
+import {FSError} from '@nestos/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {SessionCommand, type SubmissionRequest, type SessionGroup} from '@nestos/llm-session/contracts';
+import type {DocumentChatFile, DocumentChatFileRequest, DocumentChatLink, DocumentChatResponse, LocalApplicationServices} from '@nestos/app-contracts/services';
 import {DocumentChatRegistry} from './registry';
 
 const metaKey = DOCUMENT_CHAT_META_KEY, log = createModuleLogger('document-chat-links');

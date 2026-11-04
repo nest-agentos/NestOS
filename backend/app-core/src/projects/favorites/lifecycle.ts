@@ -1,4 +1,4 @@
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
 import type { FavoriteFileChanges } from './contracts';
 
 /** Follow committed VFS events and drain metadata updates before releasing the view. */

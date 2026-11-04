@@ -1,4 +1,4 @@
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 /** Query syntax is reserved only on a Session identity, never on file paths. */
 export function parseSessionRoute(resource: string): { path: string; branch?: string } {

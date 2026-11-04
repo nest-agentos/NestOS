@@ -1,5 +1,5 @@
-import {isRootCallable, callableExposure, assertRootCallable, isTargetRef, type DagPluginCatalog, type FlowRevision} from '@itookit/llm-flow/contracts';
-import {checkFlowSyntax, type FlowDefinitionStore} from '@itookit/llm-flow';
+import {isRootCallable, callableExposure, assertRootCallable, isTargetRef, type DagPluginCatalog, type FlowRevision} from '@nestos/llm-flow/contracts';
+import {checkFlowSyntax, type FlowDefinitionStore} from '@nestos/llm-flow';
 import type {AgentDefinition, IAgentConfigService} from '../contracts';
 import type {RootCallTarget, RootTargetCatalog} from '../contracts/submission';
 import type {SessionHost} from '../utils/host-ports';

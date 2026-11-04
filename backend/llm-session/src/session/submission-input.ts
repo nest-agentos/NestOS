@@ -1,5 +1,5 @@
 import {isAttachmentContentIdentity} from '../contracts/chat';
-import {assertTargetSelection, assertFlowCallSource, assertSelectedTarget, isTargetRef, createAgentSendIntent, flowTargetRevision, type SendIntent, type FlowRevision} from '@itookit/llm-flow/contracts';
+import {assertTargetSelection, assertFlowCallSource, assertSelectedTarget, isTargetRef, createAgentSendIntent, flowTargetRevision, type SendIntent, type FlowRevision} from '@nestos/llm-flow/contracts';
 import type {SubmissionRequest} from '../contracts/submission';
 import type {SessionInstructionInput} from '../contracts/instruction-queue';
 

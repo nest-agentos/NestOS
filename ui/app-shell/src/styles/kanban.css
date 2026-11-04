@@ -1,4 +1,4 @@
-@import '@itookit/kanban/ui.css';
+@import '@nestos/kanban/ui.css';
 
 .kanban {
     --kanban-bg-hover: var(--llm-bg-hover, #eef2f7);

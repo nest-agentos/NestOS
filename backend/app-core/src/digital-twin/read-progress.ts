@@ -1,4 +1,4 @@
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 import { diagnosticDetail, traceAnalysis } from './diagnostics';
 
 /** Re-read a fresh progress snapshot after conflicts; never replay a write transaction. */

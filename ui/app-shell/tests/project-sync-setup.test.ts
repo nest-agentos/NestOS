@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { showProjectSyncSetup } from '../src/projects/sync/setup';
 
 const descriptors = new Map<string, PropertyDescriptor | undefined>();

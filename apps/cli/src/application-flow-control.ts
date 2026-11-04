@@ -1,5 +1,5 @@
-import type {ApplicationClient} from '@itookit/app-contracts/services';
-import {FlowCommand, type DurableFlowSnapshot} from '@itookit/llm-flow/contracts';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
+import {FlowCommand, type DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
 import {recordRuntimeDiagnostic} from './diagnostics';
 
 const actions = ['show', 'receipt', 'pause', 'resume', 'withdraw-pause', 'cancel', 'reattach'];

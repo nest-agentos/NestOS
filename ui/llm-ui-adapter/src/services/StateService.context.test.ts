@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {ConversationUIState, ISessionRepository} from '@itookit/llm-session/contracts';
+import type {ConversationUIState, ISessionRepository} from '@nestos/llm-session/contracts';
 import {StateService} from './StateService';
 
 const target = {kind: 'agent' as const, id: 'worker', version: '1', digest: 'published'};

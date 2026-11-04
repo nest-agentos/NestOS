@@ -1,9 +1,9 @@
-import type {OcrControls} from '@itookit/app-contracts/services';
+import type {OcrControls} from '@nestos/app-contracts/services';
 
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { ModelDefaultsEditor } from '@itookit/llm-ui-adapter/settings';
-import { t } from '@itookit/common';
+import { ModelDefaultsEditor } from '@nestos/llm-ui-adapter/settings';
+import { t } from '@nestos/common';
 
 
 afterEach(() => { document.body.replaceChildren(); });

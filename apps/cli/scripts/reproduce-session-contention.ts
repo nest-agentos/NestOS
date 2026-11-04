@@ -2,12 +2,12 @@ import {mkdtemp, mkdir, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {openApplicationView} from '@itookit/app-core/host';
-import {openLocalFSBackend, type LocalFSBackend} from '@itookit/vfsdriver-local';
-import {NodeSqliteSidecarDb} from '@itookit/node-host/storage';
-import type {IFileSystem} from '@itookit/vfs-core';
-import {RoundLog} from '@itookit/llm-session';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {openApplicationView} from '@nestos/app-core/host';
+import {openLocalFSBackend, type LocalFSBackend} from '@nestos/vfsdriver-local';
+import {NodeSqliteSidecarDb} from '@nestos/node-host/storage';
+import type {IFileSystem} from '@nestos/vfs-core';
+import {RoundLog} from '@nestos/llm-session';
 import {SessionProfileRecorder} from './session-profile-recorder';
 
 const {values} = parseArgs({options: {sessions: {type: 'string', default: '24'}, rounds: {type: 'string', default: '40'}, samples: {type: 'string', default: '3'}, out: {type: 'string'}}});

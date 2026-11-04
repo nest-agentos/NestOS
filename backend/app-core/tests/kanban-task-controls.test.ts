@@ -1,9 +1,9 @@
 import {taskReplies} from '../src/kanban/task-replies';
 import {afterEach,expect,it,vi} from 'vitest';
-import {createVFS,MemoryBackend} from '@itookit/vfs-core';
-import {createKanbanModule} from '@itookit/kanban';
-import {SeqKanbanStore} from '@itookit/kanban/storage';
-import type {KanbanCommand} from '@itookit/kanban/contracts';
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
+import {createKanbanModule} from '@nestos/kanban';
+import {SeqKanbanStore} from '@nestos/kanban/storage';
+import type {KanbanCommand} from '@nestos/kanban/contracts';
 import {scanTaskControls} from '../src/kanban/task-controls';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 const closes:Array<()=>Promise<void>>=[];

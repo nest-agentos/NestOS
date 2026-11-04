@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import type { ProjectService } from '@nestos/app-contracts/services';
 import { remoteProjectFields } from './remote-project-fields';
 
 /** Keep validation errors and the user's draft inside the dialog. */

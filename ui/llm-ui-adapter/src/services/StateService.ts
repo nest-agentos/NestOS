@@ -1,9 +1,9 @@
 // @file: llm-ui/services/StateService.ts
 
-import type { ConversationUIState, ISessionRepository } from '@itookit/llm-session/contracts';
+import type { ConversationUIState, ISessionRepository } from '@nestos/llm-session/contracts';
 import type { ChatInputSettings } from '../domain/ports/IChatInputPresenter';
 import type { UIState } from '../domain/types';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import {DraftPersistence, readBranchDraft} from './DraftPersistence';
 import {persistOperations} from './OperationPersistence';
 import {readInputDraft} from '../domain/input-draft';
@@ -27,7 +27,7 @@ export class StateService {
         return {raw, state: raw ? fromConversationState(raw, branch) : null};
     }
 
-    saveOperations(sessionId: string, records: readonly import('@itookit/llm-ui').OperationRecord[]): Promise<readonly import('@itookit/llm-ui').OperationRecord[]> {
+    saveOperations(sessionId: string, records: readonly import('@nestos/llm-ui').OperationRecord[]): Promise<readonly import('@nestos/llm-ui').OperationRecord[]> {
         return persistOperations(this.engine, sessionId, records);
     }
 

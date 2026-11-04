@@ -1,7 +1,7 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {FlowCommand, type FlowDraft, type FlowRevision} from '@itookit/llm-flow/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {FlowCommand, type FlowDraft, type FlowRevision} from '@nestos/llm-flow/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {FlowInstallationService} from '../src/configuration/flow-installation';
 import {FlowToolPackages} from '../src/configuration/flow-tool-packages';

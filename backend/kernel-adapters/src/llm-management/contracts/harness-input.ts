@@ -1,5 +1,5 @@
 import type {HarnessInputAttachment, HarnessInlineAttachment, HarnessAssetAttachment} from './harness-execution';
-import {sha256HexSync} from '@itookit/llm-context/digest';
+import {sha256HexSync} from '@nestos/llm-context/digest';
 
 export interface HarnessInputMessage {role: string; content: unknown; attachments?: unknown[];}
 export interface PreparedHarnessInput {prompt: string; attachments?: HarnessInputAttachment[];}

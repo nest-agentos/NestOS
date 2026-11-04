@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { RpcPeer, type CapabilityRegistry } from '@itookit/app-transport/rpc';
-import { CAPABILITIES } from '@itookit/app-transport/application';
+import { RpcPeer, type CapabilityRegistry } from '@nestos/app-transport/rpc';
+import { CAPABILITIES } from '@nestos/app-transport/application';
 
 it('transports exact Task pause withdrawal identity and preserves a rejected control epoch', async () => {
     let server!: RpcPeer;

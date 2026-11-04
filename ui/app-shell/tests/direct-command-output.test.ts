@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { LLMWorkspaceEditor } from '../../llm-ui-adapter/src/shell/LLMWorkspaceEditor';
 
 /** The editor only adapts a task record to the inline panel; Kernel I/O is out of scope here. */

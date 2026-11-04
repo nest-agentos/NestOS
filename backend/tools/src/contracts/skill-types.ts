@@ -1,7 +1,7 @@
 // @file: common/interfaces/skills/skill-types.ts
 // Skill 相关的核心类型定义。
 
-import type { ToolDefinition } from '@itookit/llm-context';
+import type { ToolDefinition } from '@nestos/llm-context';
 
 /**
  * Skill 类型分类。

@@ -1,4 +1,4 @@
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 /** Paths are relative to the NestOS filesystem, never to the host OS root. */
 export const SESSION_STORAGE_ROOT = '/var/lib/sessions';

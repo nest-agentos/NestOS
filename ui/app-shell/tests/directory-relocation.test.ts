@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend, FSError} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend, FSError} from '@nestos/vfs-core';
 import {Workbench} from '../src/core/Workbench';
 import {createDirectoryList, refreshDirectoryList, relocateDirectoryList} from '../src/workbench/directory-list';
 

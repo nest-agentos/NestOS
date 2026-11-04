@@ -1,4 +1,4 @@
-import type { TaskControl, TaskRecord } from '@itookit/durable-kernel';
+import type { TaskControl, TaskRecord } from '@nestos/durable-kernel';
 import {hasFlowControlTree} from '../contracts/flow-control';
 export {hasFlowControlTree} from '../contracts/flow-control';
 

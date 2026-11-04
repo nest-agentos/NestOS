@@ -1,4 +1,4 @@
-import type {RunDefinition} from '@itookit/app-core';
+import type {RunDefinition} from '@nestos/app-core';
 import type {CliRuntime} from './runtime';
 import {recordRuntimeDiagnostic} from './diagnostics';
 

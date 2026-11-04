@@ -5,10 +5,10 @@ import path from 'node:path';
 import { createServer, connect } from 'node:net';
 import { request } from 'node:https';
 import { VFSAgentService } from '../../../backend/llm-session/src/index';
-import { startHost, type HttpHostOptions } from '@itookit/node-host/http';
-import { createCertificates } from '@itookit/node-host/http';
-import { loadCertificates } from '@itookit/node-host/http';
-import { acquireHostLock } from '@itookit/node-host/storage';
+import { startHost, type HttpHostOptions } from '@nestos/node-host/http';
+import { createCertificates } from '@nestos/node-host/http';
+import { loadCertificates } from '@nestos/node-host/http';
+import { acquireHostLock } from '@nestos/node-host/storage';
 import { authenticatedFetch } from './tls-fixture';
 
 let directory: string, certificates: HttpHostOptions['certificates'];

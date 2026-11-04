@@ -7,7 +7,7 @@
 
 > **2026-09-05 设计修订**：面向“随时中断/继续、Task/进程通信、共享状态等待和跨 Session 数据协作”的目标规范见 [Durable Harness Session / Task 协议](../design/durable-harness-protocol.md)。该文明确控制屏障、mailbox 消费、版本等待和持续恢复；与本文生命周期、重试或通信描述冲突时，以新协议为目标设计。下表的历史完成标记不代表新协议已落地，也不替代 [目标与实现映射](../design/durable-harness-evidence.md) 中的正确性验收。
 
-> **包名对照（2026-08-15 拆分后）**：本文写作时使用的 `llm-runtime` → 现为 `@itookit/llm-tasks`；`llm-conversation` → 现为 `@itookit/llm-session`（会话）+ `@itookit/llm-flow`（DAG 编排）。T19 等处提到的 `llm-kernel` 已删除，调度统一由 `@itookit/kernel` 承担。
+> **包名对照（2026-08-15 拆分后）**：本文写作时使用的 `llm-runtime` → 现为 `@nestos/llm-tasks`；`llm-conversation` → 现为 `@nestos/llm-session`（会话）+ `@nestos/llm-flow`（DAG 编排）。T19 等处提到的 `llm-kernel` 已删除，调度统一由 `@nestos/kernel` 承担。
 
 ## 0. 实施任务与完成状态
 
@@ -26,7 +26,7 @@
 | 新协议整体 | 设计基线，未实现/未验收 | 新协议 §15 故障与行为矩阵通过 |
 | Cache 控制 | 新增目标协议，未实现/未验收 | [Cache 协议](../design/durable-harness-cache.md)：Task 管理、显式选择、scope/retention/usage 分离、恢复读固定与淘汰隔离 |
 
-以下 T01–T23 表为历史实施记录，受上述校准约束。当前包名为 `@itookit/durable-kernel`；2026-09-05 本地原有测试为 36 项通过，不代表新增协议或故障反例已通过。
+以下 T01–T23 表为历史实施记录，受上述校准约束。当前包名为 `@nestos/durable-kernel`；2026-09-05 本地原有测试为 36 项通过，不代表新增协议或故障反例已通过。
 
 状态定义：`✅ 已完成` 表示代码已落地且相关测试/类型检查通过；`🟡 待验证` 表示代码已落地但尚未完成全部平台验证；`🚧 进行中` 表示仍在迁移或补齐；`⬜ 未开始` 表示属于后续阶段。
 
@@ -36,14 +36,14 @@
 | T02 Memory RecordStore | ✅ 已完成 | 已实现 copy-on-write 原子提交与回滚，作为 Kernel 单元测试后端。 |
 | T03 IndexedDB RecordStore | ✅ 已完成 | 使用单个 `readwrite` transaction；接口与工程类型检查通过。通用事务语义由 stdio 的 17 项 SeqFile 测试覆盖。 |
 | T04 LocalFS/Tauri RecordStore | 🟡 待验证 | records schema、事务接口和 backend adapter 已接入；adapter 事务测试及两个平台 TypeScript 检查通过，仍需原生 SQLite 并发、重启与 Tauri 实机验证。 |
-| T05 `@itookit/kernel` 新包与依赖边界 | ✅ 已完成 | 核心包已建立，唯一生产依赖为 `@itookit/vfs-core`；核心 typecheck 通过。 |
+| T05 `@nestos/kernel` 新包与依赖边界 | ✅ 已完成 | 核心包已建立，唯一生产依赖为 `@nestos/vfs-core`；核心 typecheck 通过。 |
 | T06 Session/Catalog/StorageResolver | ✅ 已完成 | 已实现 `catalog.seq`、`StorageBindingRef`、resolver registry、Session create/open/list 与 Chat assetdir resolver。 |
 | T07 Durable Task 状态机与目录事实源 | ✅ 已完成 | 已实现 Task create/claim/commit/signal/cancel、Effect/Signal/Interaction wait、Attempt lease/fencing、完整 Attempt 记录、逐版本 Task snapshot、EventJournal 和过期 Attempt 恢复；运行状态与历史均以 `task.seq` 为事实源。 |
 | T08 Durable Effect | ✅ 已完成 | 已实现开放 EffectRegistry、Effect Attempt lease/heartbeat/fencing、事务外执行、结果先持久化再唤醒、崩溃后 reconcile/indeterminate、取消持久化与 adapter cleanup；deadline 会主动结束等待并调用 adapter cancel，Effect 请求/结果拒绝非 JSON 对象。 |
 | T09 DAG、依赖推进与 Durable Wait | ✅ 已完成 | dependency readiness、ExitRecord 传递、Signal/Effect/Task wait、防丢唤醒、`spawn + wait child`、`(parentTaskId, spawnKey)` 幂等事务及嵌套 `any/all/quorum` 已实现。 |
 | T10 ResourceHandle/Grant | ✅ 已完成 | 已实现 ResourceRecord、Handle 权限子集授权、父链校验、级联 revoke、generation fencing、Effect 执行前 grant 检查及资源祖先 Budget。 |
 | T11 Session 生命周期 | ✅ 已完成 | create/open/suspend/resume/close、关闭时批量取消及 Session/Catalog 状态同步已实现；生命周期行为测试通过。 |
-| T12 Coreutils 能力包迁移 | ✅ 已完成 | 已建立 `@itookit/coreutils`，只保留抽象端口、平台无关公共实现、Session-scoped runtime 和 Durable Effect/Program；Node/Browser/Tauri 的文件系统、网络和 Shell 实现由 `apps/*` 注入。 |
+| T12 Coreutils 能力包迁移 | ✅ 已完成 | 已建立 `@nestos/coreutils`，只保留抽象端口、平台无关公共实现、Session-scoped runtime 和 Durable Effect/Program；Node/Browser/Tauri 的文件系统、网络和 Shell 实现由 `apps/*` 注入。 |
 | T13 Conversation/UI/App 一次性切换 | ✅ 已完成 | App Shell 直接装配 `Kernel + CoreutilsRuntime`；Conversation 使用 `SessionHandle/TaskHandle`；UI 使用 `TaskHandle/EventEnvelope/Interaction`，生产代码不再依赖旧 ControlPlane。 |
 | T14 Context/CrossSession/Budget/Workspace | ✅ 已完成 | Durable core v1 已实现 ContextCommit DAG/branch CAS、Session shared history、跨 Session outbox/inbox、祖先 Budget，以及开放 WorkspaceAdapter 的持久 snapshot/diff/merge 与合并父链。 |
 | T15 全仓验证与故障注入 | 🟡 待验证 | stdio、Kernel、Conversation projection、LocalFS adapter 测试，相关包类型检查/构建及 Web/Tauri Vite 构建通过；跨实例唯一 claim、notifier 丢包轮询和过期 Attempt replay 已覆盖。仍需真实进程 kill、原生 SQLite/IndexedDB 并发重启及 Tauri 实机验证。 |
@@ -51,7 +51,7 @@
 | T17 Durable Interaction | ✅ 已完成 | 已实现 `input/approval` 请求、Task 内持久 InteractionRecord、`interaction` wait、Session/Task respond API、响应事件与恢复后继续执行。 |
 | T18 Kernel 分层与公开扩展边界 | ✅ 已完成 | 已拆分 domain/application/ports/runtime/infrastructure/public；插件只能注册 Program、Effect、StorageResolver、Workspace，不访问存储内部。 |
 | T19 旧 Process Kernel 清理 | ✅ 已完成 | `packages/llm-kernel`、旧 Process Kernel/Scheduler/Checkpoint、`ProcessProgram/ProcessHost/RunHandle` 公共协议及旧 LLM Process Program 已删除，生产引用扫描为零。 |
-| T20 Chat/Agent Durable Program 迁移 | ✅ 已完成 | `@itookit/llm-tasks` 提供 Durable Chat/Agent Program；LLM/Tool 通过授权 Effect 执行，HITL 使用 Interaction；Flow 编译为新 Kernel `TaskSpec/dependsOn` DAG。 |
+| T20 Chat/Agent Durable Program 迁移 | ✅ 已完成 | `@nestos/llm-tasks` 提供 Durable Chat/Agent Program；LLM/Tool 通过授权 Effect 执行，HITL 使用 Interaction；Flow 编译为新 Kernel `TaskSpec/dependsOn` DAG。 |
 | T21 Coreutils 可靠性与平台边界加固 | 🟡 待验证 | 已实现 Session 级 Tool/Skill/TTY 隔离、Skill loaded shared-state 恢复、所有能力 ResourceHandle execute 授权、失败结果转 Effect failure、LLM finally 清理、TTY 所有权、Durable approval program、Web/Tauri 应用注入和 Tauri Shell timeout/cancel；待 Tauri 实机与真实进程崩溃验证。 |
 | T22 声明驱动模型与 Durable Skill 契约 | ✅ 已完成 | 已明确 Task/Attempt/Effect/Resource 状态边界；TaskHandle 可直接创建归属自身的 Resource；Skill manifest 可声明 `taskProgram` 并由 `createSkillTaskSpec` 编译为 deferred Durable Task；Program Decision 的 state/output/action payload 在提交前验证为 durable JSON。 |
 | T23 特权 Slash Command | ✅ 已完成 | `/plan`、`/exec` 通过应用端口创建 deferred Durable Task 并绑定最小 ResourceHandle；`/approve`、`/cancel`、`/resume` 操作当前附着 Task，当前特权 Task id 写入 Session shared state 以便编辑器重载后恢复附着。命令文本属于 UI，ExecProgram 属于 Coreutils，PlanProgram 属于 LLM Runtime，依赖由 App Shell 组装。 |
@@ -130,7 +130,7 @@ created -> blocked -> ready -> running -> waiting -> ready
 
 ### 0.5 SQLite、SeqFile 与目录位置澄清
 
-Kernel 只依赖 `@itookit/vfs-core`，因此其稳定契约是逻辑 SeqFile 路径，而不是直接打开某个 SQLite 文件：
+Kernel 只依赖 `@nestos/vfs-core`，因此其稳定契约是逻辑 SeqFile 路径，而不是直接打开某个 SQLite 文件：
 
 ```text
 chat module
@@ -165,7 +165,7 @@ Kernel 应实现为一个 **Agent 专用的轻量 Durable Kernel**，而不是�
 6. Skill 是可版本化能力包，可包含 `TaskProgram + Resource bundle + EffectAdapter`；加载/短调用是 Effect，复杂 Skill 作为 Task 执行，不能成为黑盒 Effect。
 7. Session context、Task private state、Task event trace、long-term memory 分开保存。
 8. Session 内同步由 `SessionStore` 保证；跨 Session 协作统一经过 `CrossSessionBus`，不直接访问对方数据库。
-9. Kernel 持久化统一使用 `@itookit/vfs-core` 的事务型 SeqFile；Web 使用 IndexedDB，LocalFS/Tauri 可在后端内部使用 SQLite sidecar。
+9. Kernel 持久化统一使用 `@nestos/vfs-core` 的事务型 SeqFile；Web 使用 IndexedDB，LocalFS/Tauri 可在后端内部使用 SQLite sidecar。
 10. Task 目录是事实源，Session `index.seq` 是可重建调度投影；通知只是低延迟 hint，不进入 TaskProgram 业务语义。
 
 ### 1.1 声明驱动状态机的准确理解
@@ -1883,7 +1883,7 @@ Task/Event/Effect schema 应保持稳定，以支持 Agent Lightning 类训练�
 ## 26. 建议模块边界
 
 ```text
-@itookit/kernel (唯一生产依赖 @itookit/vfs-core)
+@nestos/kernel (唯一生产依赖 @nestos/vfs-core)
   src/domain/          # 纯协议与状态模型：Session/Task/Effect/Interaction/Resource
   src/application/     # 用例编排：Kernel；不包含 provider 逻辑
   src/ports/           # Registry 与 KernelPlugin/KernelRegistration
@@ -1892,10 +1892,10 @@ Task/Event/Effect schema 应保持稳定，以支持 Agent Lightning 类训练�
   src/public/          # SessionHandle、TaskHandle、EventStream
   src/index.ts         # 稳定公开出口
 
-@itookit/vfs-core
+@nestos/vfs-core
   transactional SeqFile and backend capability
 
-@itookit/coreutils
+@nestos/coreutils
   LLM / Tool / Skill / Bash / TTY capability ports
   platform-neutral Session-scoped runtime
   CoreutilsKernelPlugin + approved-effect / exec DurableTaskProgram
@@ -1908,20 +1908,20 @@ apps/tauri-app
   Tauri filesystem Skill source + HTTP/Shell adapters
   Tauri process timeout/cancel implementation
 
-@itookit/llm-tasks
+@nestos/llm-tasks
   Durable Chat / Agent / Plan TaskProgram
   ContextAssembler + provider-neutral message policy
   depends only on common + Kernel public contracts
 
-@itookit/llm-conversation
+@nestos/llm-conversation
   ChatKernelStorageResolver / Round and Conversation projection
   Flow manifest registry + TaskSpec/dependsOn DAG compiler
 
-@itookit/llm-ui-adapter
+@nestos/llm-ui-adapter
   Slash command syntax + attached Task selection
   depends on IPrivilegedCommandService, never on concrete Exec/Plan programs
 
-@itookit/app-shell
+@nestos/app-shell
   PrivilegedCommandService composition
   resolves Agent configuration, submits Task, binds ResourceHandle, starts Task
 ```
@@ -1951,7 +1951,7 @@ apps/tauri-app
 | `packages/llm-kernel` | 旧 Process Kernel、RunHandle、DAG 调度 | 是，已删除 | 生产引用已清零；调度统一由 `packages/kernel` 承担 |
 | `packages/coreutils` | 能力抽象、平台无关公共实现、Session-scoped runtime 与 Durable Effect/Program | 否 | 长期保留；具体平台实现归属 `apps/*` |
 | `packages/llm-runtime` | Durable Chat/Agent Program、上下文组装、Provider 消息策略 | 否 | 长期保留；不包含 Session、Flow、Scheduler 或平台实现 |
-| `packages/llm-common` 的旧 Process 公共协议 | 旧 `ProcessProgram/ProcessHost/RunHandle` | 是，已删除 | 新公共执行协议只来自 `@itookit/kernel` |
+| `packages/llm-common` 的旧 Process 公共协议 | 旧 `ProcessProgram/ProcessHost/RunHandle` | 是，已删除 | 新公共执行协议只来自 `@nestos/kernel` |
 | `packages/llm-conversation` coordinator | Round/Flow 到 Durable Task 的业务编排 | 否 | 保留 Conversation 业务，不拥有第二套调度状态机 |
 | `packages/llm-ui/RunAttachmentController` | Task 控制面适配 | 否 | 已重写为 `TaskHandle/EventEnvelope/InteractionRequest` |
 | `packages/kernel/src` 根兼容 re-export | 已无引用 | 是，已清理 | 公开包入口继续由 `src/index.ts` 提供 |

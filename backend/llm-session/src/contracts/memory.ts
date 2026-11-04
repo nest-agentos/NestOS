@@ -1,5 +1,5 @@
-import type { RetrievedMemoryEntry } from '@itookit/llm-context';
-import type { MemoryPolicy } from '@itookit/llm-tasks/contracts';
+import type { RetrievedMemoryEntry } from '@nestos/llm-context';
+import type { MemoryPolicy } from '@nestos/llm-tasks/contracts';
 import type { SessionViewPort } from './session-view';
 import type { SessionRuntime, SessionSnapshot } from '../core/types';
 

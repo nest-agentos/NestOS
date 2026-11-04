@@ -1,6 +1,6 @@
-import type { ChatExecutionMode } from '@itookit/llm-tasks/contracts';
+import type { ChatExecutionMode } from '@nestos/llm-tasks/contracts';
 import type { ExecutorConfig, TaskInput } from '../core/types';
-import {isInvocationIdentity} from '@itookit/llm-flow/contracts';
+import {isInvocationIdentity} from '@nestos/llm-flow/contracts';
 
 export const CLIENT_WEB_SEARCH_TOOL = 'WebSearch';
 

@@ -1,8 +1,8 @@
-import type { IFileSystem } from '@itookit/vfs-core';
-import { normalizeVirtualPath, FSError } from '@itookit/vfs-core';
-import type { ScopedPersistenceStore } from '@itookit/mdxeditor';
-import { CLOZE_SRS_PATH, clozeDocumentPrefix } from '@itookit/app-contracts';
-import { createModuleLogger, randomUUID } from '@itookit/common';
+import type { IFileSystem } from '@nestos/vfs-core';
+import { normalizeVirtualPath, FSError } from '@nestos/vfs-core';
+import type { ScopedPersistenceStore } from '@nestos/mdxeditor';
+import { CLOZE_SRS_PATH, clozeDocumentPrefix } from '@nestos/app-contracts';
+import { createModuleLogger, randomUUID } from '@nestos/common';
 import { EngineMetadataStore } from './metadata-store';
 import {studyIndex} from './study-index';
 

@@ -1,8 +1,8 @@
 import {projectStatusLabel} from './presentation';
 import {renderProjectAccess, type ProjectAccessActions, type ProjectAccessDraft} from './project-access';
-import {t} from '@itookit/common';
-import {DiagnosticLogView, diagnosticReasonText} from '@itookit/app-settings';
-import type {ApplicationDiagnostics, ProjectRemoteMountPort, RemoteProjectStatus} from '@itookit/app-contracts/services';
+import {t} from '@nestos/common';
+import {DiagnosticLogView, diagnosticReasonText} from '@nestos/app-settings';
+import type {ApplicationDiagnostics, ProjectRemoteMountPort, RemoteProjectStatus} from '@nestos/app-contracts/services';
 
 interface Options extends ProjectAccessActions {
     container?: HTMLElement;

@@ -1,5 +1,5 @@
-import {IMAGE_PROCESSOR_VERSION} from '@itookit/image-parser/processing';
-import {createImageProcessor, createBlobSource, DEFAULT_IMAGE_SPEC} from '@itookit/image-parser';
+import {IMAGE_PROCESSOR_VERSION} from '@nestos/image-parser/processing';
+import {createImageProcessor, createBlobSource, DEFAULT_IMAGE_SPEC} from '@nestos/image-parser';
 import {createImageTools} from './core';
 import type {ImageEngine} from './contract';
 export function createBrowserImageTools() {

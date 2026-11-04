@@ -1,4 +1,4 @@
-# @itookit/cli
+# @nestos/cli
 
 CLI 是应用表示层和 Node 入口；本地/远程传输选择属于宿主。
 

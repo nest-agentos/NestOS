@@ -1,4 +1,4 @@
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 
 export interface EditorSwapSnapshot {content: string; savedAt: number;}
 /** One editor owns one opaque file; a disconnected capability does not delete crash recovery data. */

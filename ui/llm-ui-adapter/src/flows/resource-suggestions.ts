@@ -1,6 +1,6 @@
-import {guessMimeType} from '@itookit/vfs-core';
-import {ResourceCommand, parseResourceReference, type ResourceScope} from '@itookit/app-contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {guessMimeType} from '@nestos/vfs-core';
+import {ResourceCommand, parseResourceReference, type ResourceScope} from '@nestos/app-contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 import type {FileSuggestion} from '../domain/types';
 
 /** Discovery carries metadata only; file bodies are read when the user submits. */

@@ -1,7 +1,7 @@
-import type {AttachmentRef, DraftAttachment, ImageEditingPort} from '@itookit/llm-ui';
+import type {AttachmentRef, DraftAttachment, ImageEditingPort} from '@nestos/llm-ui';
 import {createBlobSource, DEFAULT_IMAGE_SPEC, validateSpec, resolveResize,
-    type ImageResizePolicy, type ImageSpec, type ImageProcessor, type PreparedImage} from '@itookit/image-parser';
-import {randomUUID, t} from '@itookit/common';
+    type ImageResizePolicy, type ImageSpec, type ImageProcessor, type PreparedImage} from '@nestos/image-parser';
+import {randomUUID, t} from '@nestos/common';
 import {openImageDialog} from '../components/input/image-dialog';
 import {ImageProcessingSession} from '../components/input/image-processing-session';
 

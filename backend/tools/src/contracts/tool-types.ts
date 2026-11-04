@@ -1,5 +1,5 @@
 // Tool execution metadata, requests and results.
-// Owned by @itookit/tools; legacy shared packages forward these types.
+// Owned by @nestos/tools; legacy shared packages forward these types.
 
 /**
  * 工具副作用分类。
@@ -73,7 +73,7 @@ export interface ToolInvokeRequest {
     executionIdentity?: import('./tool-lifecycle').ToolExecutionIdentity;
     onProgress?: (progress: ToolProgress) => Promise<void>;
     /** Host-only admission before legacy output truncation; never a model argument. */
-    admitOutput?: (output: string) => Promise<{ output: string; contentRef?: import('@itookit/llm-context').ContentRef }>;
+    admitOutput?: (output: string) => Promise<{ output: string; contentRef?: import('@nestos/llm-context').ContentRef }>;
     /** 工具 ID */
     toolId: string;
     /** 调用参数（JSON Schema 验证后的对象） */
@@ -91,7 +91,7 @@ export interface ToolInvokeRequest {
  */
 export interface ToolInvokeResult {
     /** Immutable source evidence for an externalized output. */
-    contentRef?: import('@itookit/llm-context').ContentRef;
+    contentRef?: import('@nestos/llm-context').ContentRef;
     /** 工具 ID */
     toolId: string;
     /** 是否成功 */
@@ -116,7 +116,7 @@ export interface ToolInvokeResult {
     skillContext?: {
         skillId: string;
         compactInstructions: string;
-        tools?: Array<{ toolId: string; definition: import('@itookit/llm-context').ToolDefinition; external: boolean }>;
+        tools?: Array<{ toolId: string; definition: import('@nestos/llm-context').ToolDefinition; external: boolean }>;
     };
 }
 

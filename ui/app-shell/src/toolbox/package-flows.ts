@@ -1,5 +1,5 @@
-import {escapeHTML, t, type LocaleKey} from '@itookit/common';
-import type {ToolPackageInfo} from '@itookit/app-contracts/services';
+import {escapeHTML, t, type LocaleKey} from '@nestos/common';
+import type {ToolPackageInfo} from '@nestos/app-contracts/services';
 const label = (key: string) => t(`toolbox.packages.${key}` as LocaleKey);
 export const packageFlowKey = (item: ToolPackageInfo): string => item.id + '@' + item.version;
 

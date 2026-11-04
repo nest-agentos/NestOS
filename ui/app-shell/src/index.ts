@@ -1,14 +1,14 @@
-export type { DirectorySourceProvider } from '@itookit/app-contracts/services';
-export { workspaceRoot } from '@itookit/app-contracts';
+export type { DirectorySourceProvider } from '@nestos/app-contracts/services';
+export { workspaceRoot } from '@nestos/app-contracts';
 import './styles/workspace.css';
 import './styles/digital-twin.css';
 import './styles/kanban.css';
 import './styles/calendar.css';
-import '@itookit/mail/ui.css';
+import '@nestos/mail/ui.css';
 
 export { initApp } from './bootstrap';
 export { windowSessionLeaseToken } from './session-owner';
-export type { SessionMountRecord, FilesRecord } from '@itookit/app-contracts/services';
+export type { SessionMountRecord, FilesRecord } from '@nestos/app-contracts/services';
 export { WS_SETTINGS, WS_WORKBENCH, WS_CHAT, WS_TOOLBOX, WS_TWIN, WS_KANBAN, WS_AGENTS, WS_NOTES, WS_PROJECTS, WS_EMAILS, WS_CALENDAR, WS_PRIVATE, WS_SKILLS, WS_FLOWS, WS_HOME, createWsMount } from './workspaces/index';
 export type {
     AppOptions,

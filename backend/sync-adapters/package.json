@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/sync-adapters",
+  "name": "@nestos/sync-adapters",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -14,18 +14,27 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@itookit/vfs-sync": "workspace:*",
-    "@itookit/vfsdriver-indexeddb": "workspace:*",
-    "@itookit/vfsdriver-local": "workspace:*",
-    "@itookit/cells-driver": "workspace:*"
+    "@nestos/vfs-sync": "workspace:*",
+    "@nestos/vfsdriver-indexeddb": "workspace:*",
+    "@nestos/vfsdriver-local": "workspace:*",
+    "@nestos/cells-driver": "workspace:*"
   },
   "devDependencies": {
-    "@itookit/app-core": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
+    "@nestos/app-core": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
     "fake-indexeddb": "^6.0.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "@types/node": "^20.19.25",
     "tsx": "^4.20.6"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "backend/sync-adapters"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

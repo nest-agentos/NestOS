@@ -1,4 +1,4 @@
-import {submitPreparedTaskCall, readTaskCallSubmission, readTaskCallExecution} from '@itookit/llm-flow';
+import {submitPreparedTaskCall, readTaskCallSubmission, readTaskCallExecution} from '@nestos/llm-flow';
 import {snapshotIndependentTaskCallPolicy, newIndependentKernelPreparation, assertIndependentPreparationMode, freezeIndependentTaskCall, readIndependentTaskCall, independentPreparationError, type IndependentKernelPreparation, type IndependentTaskCallPolicy, type IndependentTaskCallPreparation, type PreparedIndependentTaskCall, type IndependentTaskCallAdmission, type PreparationScope} from './independent-call-preparation';
 import {committedIndependentKernelHistory} from './independent-call-history';
 import {independentCallResult} from './independent-call-result';
@@ -8,8 +8,8 @@ import {independentCallTaskState, supportsCallCancellation} from './independent-
 import {readIndependentCallTree} from './independent-call-tree';
 import {IndependentCallResponses} from './independent-call-responses';
 import {IndependentCallControls} from './independent-call-controls';
-import {KernelError, KernelErrorCode, type Kernel, type JsonValue} from '@itookit/durable-kernel';
-import {sha256Hex} from '@itookit/llm-context';
+import {KernelError, KernelErrorCode, type Kernel, type JsonValue} from '@nestos/durable-kernel';
+import {sha256Hex} from '@nestos/llm-context';
 import {IndependentCallCommand, type IndependentCallExecutionQuery, type IndependentCallInput, type IndependentCallView, type IndependentCallListQuery, type IndependentCallReceipt} from '../contracts/independent-calls';
 import type {ICommandBus} from '../contracts/command-bus';
 import type {SubmissionRequest} from '../contracts/submission';
@@ -30,7 +30,7 @@ interface Options {
     prepareExecution?(sessionId: string): Promise<void>; canWrite?(sessionId: string): Promise<boolean>; hostPorts?: SessionHostPorts;
     prepareTaskCall?: IndependentTaskCallPreparation['prepare'];
     taskCallPolicy?(request: SubmissionRequest): Promise<IndependentTaskCallPolicy | undefined>;
-    resumeExecution?(target: import('@itookit/durable-kernel').TaskRef): Promise<void>;
+    resumeExecution?(target: import('@nestos/durable-kernel').TaskRef): Promise<void>;
     sessions?: FlowInvocationSessions;
 }
 interface ObservedCall {receipt: IndependentCallReceipt; round?: Round; callerState?: import('../contracts/independent-calls').IndependentCallExecutionState; historyPending?: boolean}
@@ -435,7 +435,7 @@ export class IndependentCallService {
         const executionState = independentCallTaskState(task), supported = supportsCallCancellation(task);
         return {executionState, executionTree, interactions, descendants, controlCapabilities: {cancel: supported, cancelRemaining: supported, respond: true, pause: supported ? 'boundary' : 'none', resume: supported, withdrawPause: supported}};
     }
-    private async readExecutionTree(receipt: IndependentCallReceipt, expected: import('@itookit/durable-kernel').TaskRecord) {
+    private async readExecutionTree(receipt: IndependentCallReceipt, expected: import('@nestos/durable-kernel').TaskRecord) {
         const started = Date.now(); let outcome = 'failure', code: string | undefined, tasks: number | undefined;
         try {const result = await readIndependentCallTree(this.options.kernel, expected); outcome = 'observed'; tasks = result.tree.tasks; return result;}
         catch (error) {const supplied = (error as {code?: unknown})?.code;
@@ -588,14 +588,14 @@ function outputSummary(round: Round): string {
     return text || round.error?.slice(0, 2000) || '';
 }
 
-function callAdmission(ready: PreparedIndependentTaskCall, submission: import('@itookit/durable-kernel').TaskSubmissionReceipt): IndependentTaskCallAdmission {
+function callAdmission(ready: PreparedIndependentTaskCall, submission: import('@nestos/durable-kernel').TaskSubmissionReceipt): IndependentTaskCallAdmission {
     return {operationId: ready.operationId, invocation: structuredClone(ready.invocation), executionSessionId: ready.executionSessionId, submission};
 }
 
 function callReceiptBase(route: CallRoute) {
     return {operationId: route.input.request.submission!.id, callerSessionId: route.input.request.expectedSessionId!, executionSessionId: route.executionSessionId};
 }
-function kernelReceipt(route: CallRoute, admitted: IndependentTaskCallAdmission, target?: import('@itookit/durable-kernel').TaskRef): IndependentCallReceipt {
+function kernelReceipt(route: CallRoute, admitted: IndependentTaskCallAdmission, target?: import('@nestos/durable-kernel').TaskRef): IndependentCallReceipt {
     return {...callReceiptBase(route), status: 'accepted', evidence: 'kernel', callerExecution: admitted.submission.task,
         ...(target ? {execution: {taskId: target.taskId, role: 'primary', invocation: structuredClone(admitted.invocation)}} : {})};
 }

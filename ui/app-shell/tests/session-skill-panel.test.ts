@@ -3,8 +3,8 @@ import { expect, it, vi } from 'vitest';
 import { SkillPanel } from '../../llm-ui-adapter/src/components/input/SkillPanel';
 import { ChatInput } from '../../llm-ui-adapter/src/components/input/ChatInputView';
 import { bindSkillRefresh } from '../../llm-ui-adapter/src/shell/skill-refresh';
-import type { SessionSkillControls } from '@itookit/tools/contracts';
-import { t } from '@itookit/common';
+import type { SessionSkillControls } from '@nestos/tools/contracts';
+import { t } from '@nestos/common';
 
 it('separates loaded instructions from tool grants and keeps configuration accessible without Skills', async () => {
     const root = document.createElement('div');

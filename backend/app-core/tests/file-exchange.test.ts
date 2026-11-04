@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import type {SubmissionRequest} from '@itookit/llm-session/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {advanceFileExchange, type FileExchangeOptions} from '../src/run/file-exchange';
 import {initializeFileExchange, fileRequestDigest, type FileRequest} from '../src/run/file-exchange-protocol';

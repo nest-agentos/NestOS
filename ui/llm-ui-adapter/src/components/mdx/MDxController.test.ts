@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createMDxEditor } from '@itookit/mdx-adapter';
+import { createMDxEditor } from '@nestos/mdx-adapter';
 import { MDxController } from './MDxController';
-vi.mock('@itookit/mdx-adapter', () => ({ createMDxEditor: vi.fn() }));
+vi.mock('@nestos/mdx-adapter', () => ({ createMDxEditor: vi.fn() }));
 afterEach(() => { vi.resetAllMocks(); });
 
 function fixture() {

@@ -1,5 +1,5 @@
-import {SettingsBaseEditor} from '@itookit/ui-common';
-import {ENTITY_ICONS, SETTINGS_ICON_CHOICES, randomUUID, t, escapeAttr} from '@itookit/common';
+import {SettingsBaseEditor} from '@nestos/ui-common';
+import {ENTITY_ICONS, SETTINGS_ICON_CHOICES, randomUUID, t, escapeAttr} from '@nestos/common';
 import {editorFilePath, type EditorOptions} from '../interfaces/IEditor';
 
 /** Connect shared settings lifecycle to the host file capabilities. */

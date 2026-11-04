@@ -31,15 +31,15 @@ import type { WorkspaceFinalization } from './workspace-finalization';
 import { createRunCatalog } from './run-catalog';
 import { expandFunctionCalls, functionTemplateNodes, functionCallFailureCategory } from './function-batch';
 import type { DagEdgeDefinition, DagNodeDefinition, DagPluginCatalog, DagRunSpec, JsonValue as CommonJsonValue } from '../contracts';
-import type { ToolDefinition } from '@itookit/llm-context';
+import type { ToolDefinition } from '@nestos/llm-context';
 import {
     type Kernel,
     type JsonValue,
     type SessionHandle,
     type TaskHandle,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 import type { HarnessHookEvent, HarnessHookRunner } from '../contracts';
-import type { SkillContext } from '@itookit/llm-tasks';
+import type { SkillContext } from '@nestos/llm-tasks';
 
 export { workspaceLeaseKey } from './run-lifecycle';
 export type { FlowWorkspaceLease, FlowWorkspaceManager, FlowWorkspaceRestoreOptions } from './run-lifecycle';

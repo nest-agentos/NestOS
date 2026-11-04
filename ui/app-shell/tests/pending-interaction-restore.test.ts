@@ -5,8 +5,8 @@
  * `/approve` 也无处可发，会话既不能继续也不能发送新消息。用真实 Kernel 验证选择与挂接。
  */
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { Kernel, type DurableTaskProgram, type TaskRecord } from '@itookit/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { Kernel, type DurableTaskProgram, type TaskRecord } from '@nestos/durable-kernel';
 import { RunAttachmentController } from '../../llm-ui-adapter/src/shell/RunAttachmentController';
 import { pendingInteractionTask, restoreWaitingAttachment } from '../../llm-ui-adapter/src/shell/pending-interaction';
 import {restoreTaskAttachment} from '../../llm-ui-adapter/src/shell/task-attachment-lifecycle';

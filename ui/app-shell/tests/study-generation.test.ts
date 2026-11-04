@@ -1,6 +1,6 @@
 import {expect,it,vi} from 'vitest';
 import {studyGeneration} from '../src/browser/study-generation';
-import type {ApplicationBackend} from '@itookit/app-contracts/services';
+import type {ApplicationBackend} from '@nestos/app-contracts/services';
 it('creates a named draft session, links it before completion, reuses its identity and renames after save',async()=>{
  const createSessionDraft=vi.fn(async()=> 'draft'),generateText=vi.fn(async()=> '--draft--'),cancelTextGeneration=vi.fn(async()=>{}),updateManifest=vi.fn(async()=>{});
  const api=studyGeneration({createSessionDraft,generateText,cancelTextGeneration} as unknown as ApplicationBackend,{updateManifest});

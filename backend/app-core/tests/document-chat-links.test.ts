@@ -1,7 +1,7 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {DOCUMENT_CHAT_META_KEY} from '@itookit/app-contracts';
-import type {SubmissionRequest} from '@itookit/llm-session/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {DOCUMENT_CHAT_META_KEY} from '@nestos/app-contracts';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {bindLocalApplicationServices} from '../src/host/application-services';
 import {DocumentChatFileView} from '../src/document-chat/file';
@@ -125,7 +125,7 @@ it('follows a rename but gives a copied document an independent identity', async
 });
 
 it('keeps one anchor when a persistent source file is opened through another mount depth', async () => {
-    const {createFileSystemView} = await import('@itookit/vfs-core');
+    const {createFileSystemView} = await import('@nestos/vfs-core');
     const f = await setup(), read = f.files.driver.getNode.bind(f.files.driver);
     vi.spyOn(f.files.driver, 'getNode').mockImplementation(async (...args) => {
         const node = await read(...args); return node ? {...node, sourceIdentity: 'stable-source-file'} : null;

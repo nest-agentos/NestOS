@@ -1,5 +1,5 @@
 import type {SessionDraftPreferences} from '../../contracts';
-import {isImageResizePolicy} from '@itookit/kernel-adapters/contracts';
+import {isImageResizePolicy} from '@nestos/kernel-adapters/contracts';
 
 import type {ChatInputSettings, IChatInputConfig} from '../../domain/ports/IChatInputPresenter';
 import type {ConnectionOption, ExecutorOption} from '../../domain/types';

@@ -1,11 +1,11 @@
-import {createModuleLogger, sha256Hex} from '@itookit/common';
-import {InputSourceCommand, type InputSourceExecution, type InputSourceReceipt} from '@itookit/app-contracts';
-import type {ProjectService} from '@itookit/app-contracts/services';
-import {createSessionId, sessionDirectoryStorage, type CommandBus, type ISessionRepository} from '@itookit/llm-session';
-import {FlowCommand, assertRootCallable, type FlowRevision} from '@itookit/llm-flow/contracts';
-import {KernelError, KernelErrorCode, type Kernel} from '@itookit/durable-kernel';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {ToolCommandOption} from '@itookit/llm-session/contracts';
+import {createModuleLogger, sha256Hex} from '@nestos/common';
+import {InputSourceCommand, type InputSourceExecution, type InputSourceReceipt} from '@nestos/app-contracts';
+import type {ProjectService} from '@nestos/app-contracts/services';
+import {createSessionId, sessionDirectoryStorage, type CommandBus, type ISessionRepository} from '@nestos/llm-session';
+import {FlowCommand, assertRootCallable, type FlowRevision} from '@nestos/llm-flow/contracts';
+import {KernelError, KernelErrorCode, type Kernel} from '@nestos/durable-kernel';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {ToolCommandOption} from '@nestos/llm-session/contracts';
 interface Options {
     commands: CommandBus; fs: IFileSystem; kernel: Kernel; repository: ISessionRepository; projects?: ProjectService;
     tools(): Promise<ToolCommandOption[]>; prepare?(id: string): Promise<void>; writable?(id: string): Promise<boolean>;

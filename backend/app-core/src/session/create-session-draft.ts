@@ -1,7 +1,7 @@
-import {createModuleLogger} from '@itookit/common';
-import { FSError } from '@itookit/vfs-core';
-import type { ISessionRepository } from '@itookit/llm-session/contracts';
-import type { ProjectService, SessionDraftRequest } from '@itookit/app-contracts/services';
+import {createModuleLogger} from '@nestos/common';
+import { FSError } from '@nestos/vfs-core';
+import type { ISessionRepository } from '@nestos/llm-session/contracts';
+import type { ProjectService, SessionDraftRequest } from '@nestos/app-contracts/services';
 
 /** Persist the initial input with the identity before publishing a new conversation. */
 export async function createSessionDraft(projects: ProjectService, repository: ISessionRepository,

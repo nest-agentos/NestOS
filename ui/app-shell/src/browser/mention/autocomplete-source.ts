@@ -1,16 +1,16 @@
-import type {IAutocompleteSource, Suggestion} from '@itookit/vfs-ui';
+import type {IAutocompleteSource, Suggestion} from '@nestos/vfs-ui';
 /**
  * @file app-shell/src/browser/mention/autocomplete-source.ts
  * Editor mention integration built on shared autocomplete contracts.
- * HoverPreviewData is defined in @itookit/common and re-exported here for convenience.
+ * HoverPreviewData is defined in @nestos/common and re-exported here for convenience.
  */
 
-import type { HoverPreviewData } from '@itookit/common';
+import type { HoverPreviewData } from '@nestos/common';
 
 export type { HoverPreviewData };
 
 
-export type { Suggestion } from '@itookit/vfs-ui';
+export type { Suggestion } from '@nestos/vfs-ui';
 
 export abstract class IMentionSource implements IAutocompleteSource {
     abstract getSuggestions(query: string): Promise<Suggestion[]>;

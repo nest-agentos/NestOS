@@ -1,8 +1,8 @@
 import {
     WS_SETTINGS, WS_WORKBENCH, WS_TOOLBOX, WS_TWIN, WS_KANBAN, WS_AGENTS, WS_NOTES,
     WS_EMAILS, WS_CALENDAR, WS_PRIVATE, WS_SKILLS, WS_FLOWS,
-} from '@itookit/app-shell/workspaces';
-import type { WorkspaceConfig } from '@itookit/app-shell';
+} from '@nestos/app-shell/workspaces';
+import type { WorkspaceConfig } from '@nestos/app-shell';
 
 export const ROUTE_ALIASES = {home: 'llm-workspace', projects: 'llm-workspace', workbench: 'llm-workspace'};
 

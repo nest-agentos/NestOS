@@ -1,6 +1,6 @@
-import {createModuleLogger, t} from '@itookit/common';
-import type {ExtensionRenderer, MessagePart} from '@itookit/llm-ui';
-import type {ExecutionNode} from '@itookit/llm-session/contracts';
+import {createModuleLogger, t} from '@nestos/common';
+import type {ExtensionRenderer, MessagePart} from '@nestos/llm-ui';
+import type {ExecutionNode} from '@nestos/llm-session/contracts';
 import {FlowDocuments, flowRequestMarkdown} from '../components/dag/FlowDocuments';
 import {runStatus} from '../flows/run-presentation';
 

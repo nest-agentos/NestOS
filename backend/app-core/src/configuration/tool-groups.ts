@@ -1,5 +1,5 @@
-import { TOOLBOX_ICONS, t } from '@itookit/common';
-import type { ToolboxInventory, ToolboxTool } from '@itookit/app-contracts/services';
+import { TOOLBOX_ICONS, t } from '@nestos/common';
+import type { ToolboxInventory, ToolboxTool } from '@nestos/app-contracts/services';
 
 type Category = 'files' | 'web' | 'memory' | 'tasks' | 'terminal' | 'collaboration' | 'extensions';
 const categories: Record<string, Category> = {
@@ -15,8 +15,8 @@ function toolDrawerId(tool: ToolboxTool): string {
     return '/tool-groups/' + category;
 }
 /** Plain grouping data for the application catalog, independent of rendering. */
-export function defaultToolDrawers(inventory: ToolboxInventory): import('@itookit/app-contracts').Drawer[] {
-    const groups = new Map<string, import('@itookit/app-contracts').Drawer>();
+export function defaultToolDrawers(inventory: ToolboxInventory): import('@nestos/app-contracts').Drawer[] {
+    const groups = new Map<string, import('@nestos/app-contracts').Drawer>();
     for (const tool of inventory.tools.values()) {
         const id = toolDrawerId(tool), category = id.slice('/tool-groups/'.length) as Category;
         const group = groups.get(id) ?? { id, kind: 'tools', name: tool.serverId ? 'MCP · ' + tool.source : t(`toolbox.category.${category}`),

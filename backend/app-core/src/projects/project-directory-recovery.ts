@@ -1,6 +1,6 @@
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
-import type { ISessionRepository, SessionFolder } from '@itookit/llm-session';
-import type { DirectoryMountService } from '@itookit/app-contracts/services';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
+import type { ISessionRepository, SessionFolder } from '@nestos/llm-session';
+import type { DirectoryMountService } from '@nestos/app-contracts/services';
 import { ProjectRepository, type StoredProject } from './project-repository';
 
 const ROOT = '/home/admin/projects';

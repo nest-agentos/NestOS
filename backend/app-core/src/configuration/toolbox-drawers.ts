@@ -1,9 +1,9 @@
-import { randomUUID, t } from '@itookit/common';
-import type { IFileSystem } from '@itookit/vfs-core';
+import { randomUUID, t } from '@nestos/common';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { toolboxKind, type ToolboxKind } from './toolbox-identity';
 
-import { DRAWER_KINDS, drawerKind, ungroupedId, type Drawer, type DrawerKind } from '@itookit/app-contracts';
-export { DRAWER_KINDS, drawerKind, ungroupedId, type Drawer, type DrawerKind } from '@itookit/app-contracts';
+import { DRAWER_KINDS, drawerKind, ungroupedId, type Drawer, type DrawerKind } from '@nestos/app-contracts';
+export { DRAWER_KINDS, drawerKind, ungroupedId, type Drawer, type DrawerKind } from '@nestos/app-contracts';
 interface State { version: 1; names: Record<string, { kind: DrawerKind; name: string }>; assignments: Record<string, string>; removed: string[] }
 const path = '/ui/toolbox-drawers.json';
 const normalized = (name: string): string => name.trim().normalize('NFC').toLocaleLowerCase();

@@ -1,5 +1,5 @@
-import { projectRelativePath, folderBrowserPath, folderPathFromBrowserPath, resolveBrowserTarget } from '@itookit/app-contracts';
-import type { ProjectTarget, ProjectService } from '@itookit/app-contracts/services';
+import { projectRelativePath, folderBrowserPath, folderPathFromBrowserPath, resolveBrowserTarget } from '@nestos/app-contracts';
+import type { ProjectTarget, ProjectService } from '@nestos/app-contracts/services';
 
 /** Sidebar encoding stops at the presentation boundary. */
 export async function archiveTarget(path: string, projects: ProjectService): Promise<ProjectTarget> {

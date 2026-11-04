@@ -1,4 +1,4 @@
-import type { JsonValue } from '@itookit/llm-flow/contracts';
+import type { JsonValue } from '@nestos/llm-flow/contracts';
 import type { RoundManifest } from './round-types';
 
 export type { ChatSessionSettings } from '../contracts';
@@ -9,7 +9,7 @@ export interface ConversationUIState {
     operationRecords?: JsonValue[];
     /** Opaque UI interaction drafts; independent from execution and answer receipts. */
     interactionDrafts?: Record<string, JsonValue>;
-    branchDrafts?: Record<string, {inputText?: string; inputAgentId?: string; inputTarget?: import('@itookit/llm-flow/contracts').TargetRef;
+    branchDrafts?: Record<string, {inputText?: string; inputAgentId?: string; inputTarget?: import('@nestos/llm-flow/contracts').TargetRef;
         inputArguments?: JsonValue; inputContext?: unknown; inputFiles?: JsonValue[]; inputToken?: string}>;
     collapseStates?: Record<string, boolean>;
     scrollPosition?: number;
@@ -139,6 +139,6 @@ export interface ISessionRepository extends SessionDeletionStore {
     listHistory(sessionId: string): Promise<string[]>;
     /** Create immutable content; identical replays succeed, conflicting bytes are rejected. */
     writeAttachment(sessionId: string, name: string, content: ArrayBuffer): Promise<void>;
-    openAttachments(sessionId: string): Promise<import('@itookit/vfs-core').FileSystemView>;
+    openAttachments(sessionId: string): Promise<import('@nestos/vfs-core').FileSystemView>;
     readSessionAsset(sessionId: string, name: string): Promise<Blob | null>;
 }

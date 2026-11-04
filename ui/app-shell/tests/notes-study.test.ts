@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { Workbench } from '../src/core/Workbench';
-import {registerStudyDocument, createAdapterStore} from '@itookit/mdx-adapter';
+import {registerStudyDocument, createAdapterStore} from '@nestos/mdx-adapter';
 import {studyIndex} from '../../mdx-adapter/src/study-index';
 afterEach(() => { vi.unstubAllGlobals(); document.body.replaceChildren(); });
 it.each(['full', 'compact'] as const)('opens study from the %s sidebar menu and keeps only file, directory and root inline', async toolbar => {

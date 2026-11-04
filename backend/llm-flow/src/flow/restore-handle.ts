@@ -1,6 +1,6 @@
 import { readFlowRunMembers } from './run-members';
 import type { FlowRunGoal } from '../contracts';
-import type { SessionHandle, JsonValue } from '@itookit/durable-kernel';
+import type { SessionHandle, JsonValue } from '@nestos/durable-kernel';
 import type { FlowExecutionHandle } from './executor';
 
 /** Reattach persisted task records; this does not restart the Flow scheduler. */

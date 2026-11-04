@@ -1,5 +1,5 @@
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
-import type { HarnessExecutionRequest } from '@itookit/kernel-adapters/contracts';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
+import type { HarnessExecutionRequest } from '@nestos/kernel-adapters/contracts';
 import type { HarnessConnectionService } from './harness-connections';
 import type { HarnessExecutionOptions } from './harness-execution';
 import { ExecutionJournal, executionError } from './harness-execution-journal';

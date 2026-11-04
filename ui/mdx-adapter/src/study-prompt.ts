@@ -1,7 +1,7 @@
 import yaml from 'js-yaml';
-import type {StudyPromptOptions} from '@itookit/mdxeditor';
-import type {IFileSystem} from '@itookit/vfs-core';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import type {StudyPromptOptions} from '@nestos/mdxeditor';
+import type {IFileSystem} from '@nestos/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 const path = '/.nestos/cloze/prompt.md';
 const listPath = '/.nestos/cloze/prompts.yaml';
 const log = createModuleLogger('study-prompt');

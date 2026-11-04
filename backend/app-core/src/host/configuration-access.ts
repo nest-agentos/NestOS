@@ -1,4 +1,4 @@
-import {FSError, normalizeVirtualPath, type IFileSystem} from '@itookit/vfs-core';
+import {FSError, normalizeVirtualPath, type IFileSystem} from '@nestos/vfs-core';
 
 const sensitive = new Set(['apiKey', 'accessToken', 'refreshToken', 'idToken', 'clientSecret', 'password', 'token', 'headers', 'env', 'args']);
 /** Read-only consumers receive configuration metadata; execution retains the original service. */

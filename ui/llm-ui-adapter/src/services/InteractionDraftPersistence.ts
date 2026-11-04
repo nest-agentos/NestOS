@@ -1,5 +1,5 @@
-import {createModuleLogger} from '@itookit/common';
-import type {ConversationUIState} from '@itookit/llm-session/contracts';
+import {createModuleLogger} from '@nestos/common';
+import type {ConversationUIState} from '@nestos/llm-session/contracts';
 import type {InteractionDraftContent, InteractionDraftRecord, InteractionDraftScope, InteractionDraftStorage, InteractionDraftWrite} from '../domain/interaction-draft';
 import {writeUIStateConditionally, type ConditionalUIRepository} from './conditional-ui-state';
 import {canonicalJson} from '../utils/canonical-json';

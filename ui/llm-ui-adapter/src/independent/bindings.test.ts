@@ -1,13 +1,13 @@
 import type {ConversationControls, ConversationSnapshot} from '../contracts';
 import { expect, it, vi } from 'vitest';
 
-import {createOperationLedger, type OperationLedger} from '@itookit/llm-ui';
+import {createOperationLedger, type OperationLedger} from '@nestos/llm-ui';
 import { createNativeChatBinding } from './native';
 import { ChatProjection } from './projection';
 import {NativeComposerCapabilities} from './native-composer';
-import {getLogger} from '@itookit/common';
+import {getLogger} from '@nestos/common';
 
-vi.mock('@itookit/llm-ui', async () => ({ ...(await vi.importActual<typeof import('@itookit/llm-ui')>('@itookit/llm-ui')), createChatView: vi.fn() }));
+vi.mock('@nestos/llm-ui', async () => ({ ...(await vi.importActual<typeof import('@nestos/llm-ui')>('@nestos/llm-ui')), createChatView: vi.fn() }));
 it('explicitly reloads external history instead of waiting for another process to emit local events', async () => {
     const host = fixture();
     host.emit({observation: {scope: 'external', execution: 'unknown', source: 'history', observedAt: Date.now(),
@@ -406,7 +406,7 @@ it('rejects a native attachment read finishing after binding disposal', async ()
 });
 
 it('assembles image preprocessing and metadata persistence when creating a native ChatView', async () => {
-    const {createChatView} = await import('@itookit/llm-ui'), {createNativeChatView} = await import('./native');
+    const {createChatView} = await import('@nestos/llm-ui'), {createNativeChatView} = await import('./native');
     const host = fixture(), close = vi.fn(async () => {}), dispose = vi.fn(async () => {}), setActive = vi.fn();
     vi.mocked(createChatView).mockResolvedValueOnce({destroy: close, setActive, replaceBinding: vi.fn()} as never);
     let uploadId = 0;

@@ -1,6 +1,6 @@
 import {expect, it} from 'vitest';
-import {buildTool} from '@itookit/tools';
-import type {IDeviceDriver} from '@itookit/vfs-core';
+import {buildTool} from '@nestos/tools';
+import type {IDeviceDriver} from '@nestos/vfs-core';
 import {createKernelAdaptersRuntime} from './create-kernel-adapters-runtime';
 
 function tool(name: string, description = 'A dynamically installed fixture') {

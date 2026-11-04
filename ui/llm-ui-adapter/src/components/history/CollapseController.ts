@@ -1,4 +1,4 @@
-import {DisclosureController, type DisclosureEntry} from '@itookit/llm-ui';
+import {DisclosureController, type DisclosureEntry} from '@nestos/llm-ui';
 import type {CollapseStateMap} from '../../domain/types';
 import type {SessionRenderer} from './SessionRenderer';
 import type {IEditorEventBus} from '../../domain/events';

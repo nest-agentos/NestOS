@@ -1,7 +1,7 @@
 import type {ConversationSnapshot} from '../contracts';
-import type {ComposerIndicator} from '@itookit/llm-ui';
+import type {ComposerIndicator} from '@nestos/llm-ui';
 
-import {getLocale, t} from '@itookit/common';
+import {getLocale, t} from '@nestos/common';
 import {conversationBudget} from '../shell/conversation-budget';
 import {conversationContext} from '../shell/conversation-metrics';
 export function nativeComposerIndicators(state: ConversationSnapshot): readonly ComposerIndicator[] {

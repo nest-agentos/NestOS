@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {AssetService} from '../../llm-ui-adapter/src/services/AssetService';
 
 const cleanup: Array<() => Promise<void>> = [];

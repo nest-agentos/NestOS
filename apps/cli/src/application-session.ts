@@ -1,8 +1,8 @@
 import {independentSessionCall} from './independent-session-call';
-import {randomUUID} from '@itookit/common';
+import {randomUUID} from '@nestos/common';
 import {recordRuntimeDiagnostic} from './diagnostics';
-import type {ApplicationClient} from '@itookit/app-contracts/services';
-import {IndependentCallCommand, SessionCommand, assertContextBindingQuery, type ContextBindingQuery, type SubmissionRequest, type SessionSnapshot} from '@itookit/llm-session/contracts';
+import type {ApplicationClient} from '@nestos/app-contracts/services';
+import {IndependentCallCommand, SessionCommand, assertContextBindingQuery, type ContextBindingQuery, type SubmissionRequest, type SessionSnapshot} from '@nestos/llm-session/contracts';
 import type {CommandOptions} from './commands';
 import {assertFrozenCallOptions, dispatchSessionSubmission, inspectSessionSubmission, prepareSessionSubmission, readSubmissionFile} from './application-submission';
 import {watchSubmissionExecution} from './submission-execution';

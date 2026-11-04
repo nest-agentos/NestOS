@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import { bindCapabilities } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IDeviceDriver } from '@itookit/vfs-core';
-import { SessionMemoryProvider } from '@itookit/llm-session';
+import { bindCapabilities } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IDeviceDriver } from '@nestos/vfs-core';
+import { SessionMemoryProvider } from '@nestos/llm-session';
 import { createKernelRuntime } from '../src/runtime/create-kernel-runtime';
 
 it('runs a model memory write through the shared Kernel tool Effect and returns its durable result', async () => {

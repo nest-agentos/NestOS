@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { assertBinding, assertSync, applyBaseline, sha256, validId, validPath,
-    type CoordinationGuard, type FileAction, type StateStore, type SyncState } from '@itookit/vfs-sync';
-import type { ISidecarDb, LocalStorageAccess } from '@itookit/vfsdriver-local';
+    type CoordinationGuard, type FileAction, type StateStore, type SyncState } from '@nestos/vfs-sync';
+import type { ISidecarDb, LocalStorageAccess } from '@nestos/vfsdriver-local';
 import { SeqControl } from '../shared/control';
 import { validRoot, validateState } from '../shared/records';
 import { LocalLeaseGuard } from './coordinator';

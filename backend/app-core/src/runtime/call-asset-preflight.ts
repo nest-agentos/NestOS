@@ -1,6 +1,6 @@
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 import {inputAssetError, readInputAsset} from './input-asset-store';
-import type {InputAssetReference} from '@itookit/tools/contracts';
+import type {InputAssetReference} from '@nestos/tools/contracts';
 
 /** Validate declared material blocks only; arbitrary business JSON is not an asset capability. */
 export async function validateCallAssets(fs: IFileSystem, value: unknown): Promise<void> {

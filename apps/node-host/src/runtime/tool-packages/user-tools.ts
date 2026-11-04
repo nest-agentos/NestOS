@@ -1,5 +1,5 @@
 import type {ToolHistory} from './history';
-import type {Tool} from '@itookit/tools';
+import type {Tool} from '@nestos/tools';
 import type {ToolPreferences} from './preferences';
 
 /** Shared code gets a user-bound gate; core platform primitives are left untouched. */

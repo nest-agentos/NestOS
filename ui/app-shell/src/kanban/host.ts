@@ -1,5 +1,5 @@
-import {ACTION_ICONS, CHAT_ICONS, t, createModuleLogger} from '@itookit/common';
-import type {KanbanPresentation, KanbanUIOptions} from '@itookit/kanban/ui';
+import {ACTION_ICONS, CHAT_ICONS, t, createModuleLogger} from '@nestos/common';
+import type {KanbanPresentation, KanbanUIOptions} from '@nestos/kanban/ui';
 const log = createModuleLogger('kanban');
 export const kanbanPresentation: KanbanPresentation = {
     text: (key, values) => t(`kanban.${key}` as Parameters<typeof t>[0], values),

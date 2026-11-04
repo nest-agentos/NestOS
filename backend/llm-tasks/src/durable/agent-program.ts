@@ -1,6 +1,6 @@
 import { DEFAULT_AGENT_MAX_EXCHANGES } from '../contracts';
-import { type ChatMessage, type ToolCall } from '@itookit/llm-context';
-import { type ToolInvokeResult } from '@itookit/tools/contracts';
+import { type ChatMessage, type ToolCall } from '@nestos/llm-context';
+import { type ToolInvokeResult } from '@nestos/tools/contracts';
 import {
     interactionApproved,
     type Decision,
@@ -8,7 +8,7 @@ import {
     type JsonValue,
     type KernelAction,
     type TaskInputEvent,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 import {
     CAPABILITY_SIGNAL,
     addUsage,
@@ -27,7 +27,7 @@ import {
     toolName,
 } from './program-helpers';
 import { collectDependency, dependenciesReady, dependencyWait } from './dependency-collector';
-import { compactMessages, validateContextCompaction } from '@itookit/llm-context';
+import { compactMessages, validateContextCompaction } from '@nestos/llm-context';
 import type {
     DurableAgentInput,
     DurableAgentOutput,

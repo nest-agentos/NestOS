@@ -1,4 +1,4 @@
-import type {FlowDraft, FlowRevision, JsonValue} from '@itookit/llm-flow/contracts';
+import type {FlowDraft, FlowRevision, JsonValue} from '@nestos/llm-flow/contracts';
 
 /** Project runtime binding changes Agent execution, never the published source definition. */
 export function promptHarnessFlow<T extends FlowDraft | FlowRevision>(flow: T, connectionId: string): T {

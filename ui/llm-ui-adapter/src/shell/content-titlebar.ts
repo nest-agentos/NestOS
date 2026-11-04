@@ -1,6 +1,6 @@
 import type {EditorOptions} from '../contracts';
 
-import type {ToolbarContext} from '@itookit/llm-ui';
+import type {ToolbarContext} from '@nestos/llm-ui';
 const mounted = new WeakMap<HTMLElement, () => void>();
 
 /** Consume public header slots without querying the independent chat DOM. */

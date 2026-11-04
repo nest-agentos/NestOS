@@ -19,7 +19,7 @@ src/
 
 ## 公共契约
 
-`@itookit/llm-tasks/contracts` 拥有执行事件、节点配置、输出校验/Memory 策略类型及执行默认值。入口不加载 Program 实现。机制直接依赖 driver-llm、llm-context、tools 的公开接口与 durable-kernel，不再依赖 common/llm-common。宿主负责解析配置引用、授权和选择策略。
+`@nestos/llm-tasks/contracts` 拥有执行事件、节点配置、输出校验/Memory 策略类型及执行默认值。入口不加载 Program 实现。机制直接依赖 driver-llm、llm-context、tools 的公开接口与 durable-kernel，不再依赖 common/llm-common。宿主负责解析配置引用、授权和选择策略。
 
 ## 约束
 
@@ -32,9 +32,9 @@ src/
 运行：
 
 ```bash
-pnpm --filter @itookit/llm-tasks typecheck
-pnpm --filter @itookit/llm-tasks test        # vitest run（等价于 test:run）
-pnpm --filter @itookit/llm-tasks test:watch  # 监听模式
+pnpm --filter @nestos/llm-tasks typecheck
+pnpm --filter @nestos/llm-tasks test        # vitest run（等价于 test:run）
+pnpm --filter @nestos/llm-tasks test:watch  # 监听模式
 ```
 
 ContextTaskProgram 为 Agent/Chat v2 bridge，负责把 context 写集转换为 Kernel actions；预算、Notes 与检索策略全部归独立 context 包。

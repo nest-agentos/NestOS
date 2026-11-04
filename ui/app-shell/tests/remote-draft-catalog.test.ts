@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {ProjectFolder, ProjectService} from '@itookit/app-contracts/services';
+import type {ProjectFolder, ProjectService} from '@nestos/app-contracts/services';
 import {remoteDraftCatalog} from '../src/projects/remote-draft-catalog';
 
 function fixture() {

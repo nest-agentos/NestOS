@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
+import { MemoryBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { MCPRemoteConnections, CELLS_EXTENSION, remoteMCPConnection } from '../src/projects/mcp-remote-connections';
 import { RemoteMountStore } from '../src/projects/remote-mount-store';

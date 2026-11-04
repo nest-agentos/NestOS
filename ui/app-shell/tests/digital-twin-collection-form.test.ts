@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {expect, it} from 'vitest';
-import type {TwinScannerTool} from '@itookit/app-contracts';
+import type {TwinScannerTool} from '@nestos/app-contracts';
 import {collectionFields, readCollectionExecutor} from '../src/digital-twin/collection-fields';
 import {scannerFieldChange} from '../src/digital-twin/scanner-fields';
 import {collectionDestinationSummary} from '../src/digital-twin/collection-destination';

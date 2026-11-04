@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { ExecProgram } from '@itookit/kernel-adapters';
-import type { IAgentConfigService } from '@itookit/llm-session';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { ExecProgram } from '@nestos/kernel-adapters';
+import type { IAgentConfigService } from '@nestos/llm-session';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { PrivilegedCommandService } from '../../../backend/app-core/src/kernel/privileged-command-service';
 import { ChatInput } from '../../llm-ui-adapter/src/components/input/ChatInputView';
 import { RunAttachmentController } from '../../llm-ui-adapter/src/shell/RunAttachmentController';

@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
-    resolve: { alias: [{ find: /^@itookit\/vfs-core$/, replacement: fileURLToPath(import.meta.resolve('@itookit/vfs-core')) }] },
+    resolve: { alias: [{ find: /^@itookit\/vfs-core$/, replacement: fileURLToPath(import.meta.resolve('@nestos/vfs-core')) }] },
     test: {
         globals: true,
         // Integration fixtures own kernels and LocalFS stores; bound workers to avoid I/O contention.

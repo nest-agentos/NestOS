@@ -1,5 +1,5 @@
-import { FSError } from '@itookit/vfs-core';
-import type { ProjectService, SessionLifecycleService } from '@itookit/app-contracts/services';
+import { FSError } from '@nestos/vfs-core';
+import type { ProjectService, SessionLifecycleService } from '@nestos/app-contracts/services';
 
 /** Unmount local records without traversing or modifying the remote file tree. */
 export async function unmountRemoteProject(projects: ProjectService, lifecycle: SessionLifecycleService, id: string): Promise<void> {

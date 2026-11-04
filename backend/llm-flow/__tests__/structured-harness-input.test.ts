@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TaskSpec } from '@itookit/durable-kernel';
+import type { TaskSpec } from '@nestos/durable-kernel';
 import { createBuiltinDagPluginRegistry } from '../src/flow';
 import { FlowTaskFactory } from '../src/flow/task-factory';
 import { prepareDispatch } from '../src/flow/structured/prepare';

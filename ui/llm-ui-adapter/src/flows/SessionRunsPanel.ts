@@ -1,6 +1,6 @@
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import {SessionCommand, type ICommandBus} from '@itookit/llm-session/contracts';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import {SessionCommand, type ICommandBus} from '@nestos/llm-session/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {openSessionFlowOutputs, unlinkedSessionRuns, type Branches, type Run} from './session-output';
 
 import {runIdentity, runStatus, runTitle} from './run-presentation';

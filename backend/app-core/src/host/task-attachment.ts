@@ -1,7 +1,7 @@
-import { FSError } from '@itookit/vfs-core';
-import { KernelError, KernelErrorCode } from '@itookit/durable-kernel';
-import type { TaskAttachmentRecovery, TaskRecord, JsonValue } from '@itookit/durable-kernel/contracts';
-import type { LocalApplicationServices } from '@itookit/app-contracts/services';
+import { FSError } from '@nestos/vfs-core';
+import { KernelError, KernelErrorCode } from '@nestos/durable-kernel';
+import type { TaskAttachmentRecovery, TaskRecord, JsonValue } from '@nestos/durable-kernel/contracts';
+import type { LocalApplicationServices } from '@nestos/app-contracts/services';
 
 const terminal = new Set(['succeeded', 'failed', 'cancelled']);
 

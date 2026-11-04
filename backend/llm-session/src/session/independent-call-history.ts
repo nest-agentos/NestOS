@@ -1,5 +1,5 @@
-import {sameTargetRef, isInvocationIdentity, type InvocationIdentity} from '@itookit/llm-flow/contracts';
-import type {TaskRef} from '@itookit/durable-kernel';
+import {sameTargetRef, isInvocationIdentity, type InvocationIdentity} from '@nestos/llm-flow/contracts';
+import type {TaskRef} from '@nestos/durable-kernel';
 import type {Round} from '../contracts/conversation';
 import type {SubmissionRequest} from '../contracts/submission';
 import type {ISessionRepository} from '../persistence/types';

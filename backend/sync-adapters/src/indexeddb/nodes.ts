@@ -1,5 +1,5 @@
-import { assertSync } from '@itookit/vfs-sync';
-import { req, STORE_NODES } from '@itookit/vfsdriver-indexeddb';
+import { assertSync } from '@nestos/vfs-sync';
+import { req, STORE_NODES } from '@nestos/vfsdriver-indexeddb';
 
 export interface StoredNode {
     path: string; type: 'file' | 'directory'; content: ArrayBuffer; size: number;

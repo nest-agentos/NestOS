@@ -1,4 +1,4 @@
-import type { ISeqFileTransaction } from '@itookit/vfs-core';
+import type { ISeqFileTransaction } from '@nestos/vfs-core';
 import type { TwinRecordFamily, TwinRecordRef } from './contracts';
 import { recordKey } from './codec';
 

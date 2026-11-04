@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { registerDurablePrograms } from '@itookit/llm-flow';
+import { registerDurablePrograms } from '@nestos/llm-flow';
 import {
     createRunDefinitionFromFlow,
     parseSessionRoute,

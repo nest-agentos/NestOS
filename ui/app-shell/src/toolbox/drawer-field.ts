@@ -1,6 +1,6 @@
-import { randomUUID, t } from '@itookit/common';
-import type { DrawerKind } from '@itookit/app-contracts';
-import type { ToolboxDrawers } from '@itookit/app-contracts/services';
+import { randomUUID, t } from '@nestos/common';
+import type { DrawerKind } from '@nestos/app-contracts';
+import type { ToolboxDrawers } from '@nestos/app-contracts/services';
 
 /** The native combobox supports typing a name and picking existing groups. */
 export function drawerField(drawers: ToolboxDrawers) {

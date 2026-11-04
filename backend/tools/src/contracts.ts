@@ -3,7 +3,7 @@ export type * from './contracts/tool-types';
 export type * from './contracts/tool-service';
 export type * from './contracts/tty';
 export type * from './contracts/ports';
-export type { ToolDefinition } from '@itookit/llm-context';
+export type { ToolDefinition } from '@nestos/llm-context';
 
 export type * from './contracts/skill-types';
 export type * from './contracts/skill-service';

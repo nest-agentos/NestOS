@@ -1,5 +1,5 @@
-import { t, type LocaleKey } from '@itookit/common';
-import { DirectorySourceUnavailableError, SessionUnfinishedTasksError, RemoteConnectionUnavailableError, type MCPConnectionReason, type MCPConnectionDiagnostic } from '@itookit/app-contracts';
+import { t, type LocaleKey } from '@nestos/common';
+import { DirectorySourceUnavailableError, SessionUnfinishedTasksError, RemoteConnectionUnavailableError, type MCPConnectionReason, type MCPConnectionDiagnostic } from '@nestos/app-contracts';
 
 const connectionReasons: Record<MCPConnectionReason, LocaleKey> = {
     'ready': 'remote.connectionReason.ready', 'catalog-not-loaded': 'remote.connectionReason.notLoaded',
@@ -15,7 +15,7 @@ export function localizeConnectionReason(diagnostic: Pick<MCPConnectionDiagnosti
 /**
  * Map platform-agnostic mount errors to localized copy.
  *
- * `@itookit/app-core` raises structured errors and owns no user-facing text (see its
+ * `@nestos/app-core` raises structured errors and owns no user-facing text (see its
  * AGENTS.md); the host decides how to phrase them. Unknown errors pass through unchanged
  * so their message is not swallowed.
  */

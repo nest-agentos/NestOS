@@ -1,6 +1,6 @@
-import type { HarnessClient, HarnessConversationJournal, HarnessConversationPort, HarnessConversationSnapshot, HarnessReceipt } from '@itookit/cells-driver';
+import type { HarnessClient, HarnessConversationJournal, HarnessConversationPort, HarnessConversationSnapshot, HarnessReceipt } from '@nestos/cells-driver';
 import type { RemoteConversationStore } from './remote-conversation-store';
-import {formatDefaultFileTitle, t} from '@itookit/common';
+import {formatDefaultFileTitle, t} from '@nestos/common';
 import {reportRemoteFailure} from './remote-diagnostics';
 
 export function remoteConversationJournal(recovery: RemoteConversationStore, epoch: string, draft: boolean, checkAccess = () => {}): HarnessConversationJournal {
@@ -12,7 +12,7 @@ export function remoteConversationJournal(recovery: RemoteConversationStore, epo
     }, save: record => {checkAccess(); return recovery.save({...record, submittedTurnId: record.submittedTurnId ?? recovery.submittedTurnId});}};
 }
 
-function hasRecoveryWork(record: import('@itookit/cells-driver').HarnessRecovery): boolean {
+function hasRecoveryWork(record: import('@nestos/cells-driver').HarnessRecovery): boolean {
     return !!(record.pending || record.responses?.length || record.draft || record.draftAttachments?.length
         || record.instructionQueue?.items.length || record.controls?.some(row => row.receipt === 'pending' || row.receipt === 'accepted' && !row.terminal));
 }

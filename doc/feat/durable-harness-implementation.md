@@ -142,10 +142,10 @@ Program 内可以用 `cache-create` action 自行创建 namespace，等待 `{ ty
 
 ## 7. 简化核心重构：实际 API 与边界
 
-新增入口 `@itookit/durable-kernel/core`，提供 `createHarness()`、`Session`、`Task`、`Resource` 类型与 `defineTask()`。旧根入口、状态枚举及已有存储仍兼容；不会把旧 ResourceRecord/Handle 自动解释成新容量池。
+新增入口 `@nestos/durable-kernel/core`，提供 `createHarness()`、`Session`、`Task`、`Resource` 类型与 `defineTask()`。旧根入口、状态枚举及已有存储仍兼容；不会把旧 ResourceRecord/Handle 自动解释成新容量池。
 
 ```ts
-import { createHarness, defineTask, resourceResult } from '@itookit/durable-kernel/core';
+import { createHarness, defineTask, resourceResult } from '@nestos/durable-kernel/core';
 
 const harness = createHarness({ catalog: { fs, rootPath: '/kernel' } });
 // 同一个事务型 IModuleFS 实例用于 kernel root 与这些 Session 的不同 root。

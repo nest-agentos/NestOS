@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type { Kernel } from '@itookit/durable-kernel';
+import type { Kernel } from '@nestos/durable-kernel';
 import { restoreFlowHistory } from '../src/persistence/restore-flow-history';
 import { SessionRegistry } from '../src/session/session-registry';
 import { RoundLog } from '../src/persistence/round-log';

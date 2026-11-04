@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { createUsageCostEstimator } from '../src/projects/usage-estimator';
 import { observeConversation } from '../src/projects/conversation-view';
-import type { ModelPricingConfig } from '@itookit/kernel-adapters/contracts';
+import type { ModelPricingConfig } from '@nestos/kernel-adapters/contracts';
 const tokens = {inputTokens: 1000000, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, reasoningTokens: 0};
 const usage = {sessionId: 's', revision: 'r', complete: true, source: 'native-history' as const, scope: 'transcript' as const, observedAt: Date.now(),
     totals: tokens, entries: [{id: 'e', turnId: 't', providerId: 'p', modelId: 'm', tokens}]};

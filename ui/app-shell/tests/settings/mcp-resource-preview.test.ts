@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { renderMCPResourcePreview } from '@itookit/llm-ui-adapter/settings';
-import { bindMCPContent } from '@itookit/llm-ui-adapter/settings';
+import { renderMCPResourcePreview } from '@nestos/llm-ui-adapter/settings';
+import { bindMCPContent } from '@nestos/llm-ui-adapter/settings';
 
 afterEach(() => vi.restoreAllMocks());
 

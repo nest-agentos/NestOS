@@ -1,6 +1,6 @@
-import type {MDxPlugin, PluginContext} from '@itookit/mdxeditor';
-import type {IFileSystem} from '@itookit/vfs-core';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import type {MDxPlugin, PluginContext} from '@nestos/mdxeditor';
+import type {IFileSystem} from '@nestos/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import {studyIndex} from './study-index';
 
 /** Register only documents whose cloze syntax has actually rendered. */

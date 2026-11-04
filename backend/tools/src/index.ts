@@ -1,5 +1,5 @@
 // @file: tools/src/index.ts
-// Public API for @itookit/tools
+// Public API for @nestos/tools
 
 export type * from './contracts';
 

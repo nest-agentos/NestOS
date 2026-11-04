@@ -1,4 +1,4 @@
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { isModelOperation, type ModelDefaults } from '../contracts/model-defaults';
 
 const SETTINGS_PATH = '/llm/.connection-settings.json';

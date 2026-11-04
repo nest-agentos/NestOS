@@ -1,7 +1,7 @@
 import {importConnection, sourceConnectionSettings} from '../src/configuration/tool-connections';
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import type {ToolConnections, ToolConnectionType, ToolConnectionView, ToolAuthorizationView} from '@itookit/app-contracts/services';
+import type {ToolConnections, ToolConnectionType, ToolConnectionView, ToolAuthorizationView} from '@nestos/app-contracts/services';
 import {showToolPackages} from '../src/toolbox/ToolPackagesDialog';
 
 const pending: Promise<void>[] = [];

@@ -1,11 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
+import { MemoryBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime } from '../../src/runtime/create-application-runtime';
 import { bindLocalApplicationServices } from '../../src/host/application-services';
 import { ViewScope } from '../../src/host/view-scope';
 import { bindApplicationBackend, createApplicationClient } from '../../src/host/application-client';
-import type { LocalApplicationServices } from '@itookit/app-contracts/services';
-import type { FileSystemContextOwner } from '@itookit/vfs-core';
+import type { LocalApplicationServices } from '@nestos/app-contracts/services';
+import type { FileSystemContextOwner } from '@nestos/vfs-core';
 
 const releases: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const release of releases.splice(0).reverse()) await release(); });

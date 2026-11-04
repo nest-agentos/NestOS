@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger, type ChatView} from '@itookit/llm-ui';
+import {createOperationLedger, type ChatView} from '@nestos/llm-ui';
 import {mountNativeRecovery} from './native-recovery';
 it('queries the original legacy operation from another scope without resubmitting or consuming new input', async () => {
     const operations = createOperationLedger({initial: [{context: {operationId: 'original', viewId: 'old'}, conversationId: 'native',

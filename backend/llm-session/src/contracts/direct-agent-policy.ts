@@ -1,4 +1,4 @@
-import { DEFAULT_AGENT_MAX_EXCHANGES, resolveLlmRetryPolicy, resolveToolTimeoutMs, type LlmRetryPolicy } from '@itookit/llm-tasks/contracts';
+import { DEFAULT_AGENT_MAX_EXCHANGES, resolveLlmRetryPolicy, resolveToolTimeoutMs, type LlmRetryPolicy } from '@nestos/llm-tasks/contracts';
 
 /** Host instructions and exchange budget for direct Agent sends; Flow keeps its own policy. */
 export interface DirectAgentPolicy {

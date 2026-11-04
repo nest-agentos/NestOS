@@ -1,10 +1,10 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import type {KanbanDiscoveryChange, KanbanScanInput, KanbanScanSession} from '@itookit/kanban/contracts';
-import {DEFAULT_KANBAN_SCAN_POLICY} from '@itookit/kanban/contracts';
-import {createKanbanDiscovery} from '@itookit/kanban/discovery';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import type {KanbanDiscoveryChange, KanbanScanInput, KanbanScanSession} from '@nestos/kanban/contracts';
+import {DEFAULT_KANBAN_SCAN_POLICY} from '@nestos/kanban/contracts';
+import {createKanbanDiscovery} from '@nestos/kanban/discovery';
 import {createNestOSKanban, createKanbanDiscoveryFlow, createHarnessKanbanSource} from '../src/kanban';
-import {SeqKanbanStore, ConditionalKanbanStore} from '@itookit/kanban/storage';
+import {SeqKanbanStore, ConditionalKanbanStore} from '@nestos/kanban/storage';
 
 const disposers: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const dispose of disposers.splice(0)) await dispose();});
@@ -109,7 +109,7 @@ it('remote project storage uses one conditional SeqFile transaction and never re
     expect(transaction).toHaveBeenCalledOnce(); expect(transaction.mock.calls[0][0]).toBe('kanban/boards.seq');
 });
 it('compiles the discovery Flow through the production compiler with a frozen analysis binding', async () => {
-    const {createFlowRevision, flowToDag} = await import('@itookit/llm-flow');
+    const {createFlowRevision, flowToDag} = await import('@nestos/llm-flow');
     const draft = createKanbanDiscoveryFlow();
     const graph = await flowToDag(createFlowRevision(draft, 1), undefined, 'analysis-connection', undefined, [], undefined,
         false, 'analysis-connection', {analysis: 'analysis-connection'}, async revision => ({...revision, connections: revision.connections?.map(slot => ({...slot, connectionId: 'analysis-connection'}))}), {snapshot: '{"sessions":[]}'});

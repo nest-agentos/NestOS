@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ProviderSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import type { LLMModel, LLMProvider } from '@itookit/driver-llm/contracts';
+import { ProviderSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import type { LLMModel, LLMProvider } from '@nestos/driver-llm/contracts';
 
 const operations: LLMModel['operations'] = {
     'image.generate': { inputModalities: ['text'], outputModalities: ['image'], formats: ['png'] },

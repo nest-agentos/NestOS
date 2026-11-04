@@ -1,4 +1,4 @@
-import type { JsonValue, SessionHandle, TaskHandle, TaskSpec } from '@itookit/durable-kernel';
+import type { JsonValue, SessionHandle, TaskHandle, TaskSpec } from '@nestos/durable-kernel';
 import type { DagNodeDefinition, FlowRunGoal } from '../contracts';
 import {invocationLabels} from '../contracts/flow';
 import {targetLabels} from '../contracts/call-target';

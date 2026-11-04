@@ -4,7 +4,7 @@
 
 系统沙箱属于**宿主进程能力层**。在创建 `nativeShell` / `ttyDriver` 时固定策略，在实际 spawn 前应用策略；由 `kernel-adapters` 按 Session / Run 提供这组能力。不要把操作系统沙箱实现放进 `llm-ui`、`llm-flow` 或 `durable-kernel`。
 
-新增包 [packages/sanbox](../../backend/sanbox/README.md)，包名 `@itookit/sanbox` 沿用需求拼写。已提供：
+新增包 [packages/sanbox](../../backend/sanbox/README.md)，包名 `@nestos/sanbox` 沿用需求拼写。已提供：
 
 - `SandboxPolicy`：只读目录、读写目录、默认拒绝的网络策略。
 - `createSandboxLaunchPlan`：分别生成 Bubblewrap argv / Seatbelt SBPL 与 argv。
@@ -101,10 +101,10 @@ MCP stdio server 必须在其**服务进程创建处**单独应用沙箱；仅�
 ## 验证
 
 ```bash
-pnpm --filter @itookit/sanbox test
-pnpm --filter @itookit/sanbox typecheck
-pnpm --filter @itookit/sanbox build
-SANBOX_TEST_NATIVE=1 pnpm --filter @itookit/sanbox test
+pnpm --filter @nestos/sanbox test
+pnpm --filter @nestos/sanbox typecheck
+pnpm --filter @nestos/sanbox build
+SANBOX_TEST_NATIVE=1 pnpm --filter @nestos/sanbox test
 pnpm --filter tauri-app test:rust
 pnpm docs:check
 ```

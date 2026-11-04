@@ -1,4 +1,4 @@
-import {FSError} from '@itookit/vfs-core';
+import {FSError} from '@nestos/vfs-core';
 import path from 'node:path';
 import {mkdir, realpath, lstat, chmod} from 'node:fs/promises';
 

@@ -1,4 +1,4 @@
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 export interface ConnectionNotice {type: string; formId: string; state: 'saving' | 'verifying' | 'saved' | 'error'; message: string}
 

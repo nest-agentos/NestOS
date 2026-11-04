@@ -1,4 +1,4 @@
-import type {HarnessConnectionSnapshot} from '@itookit/kernel-adapters/contracts';
+import type {HarnessConnectionSnapshot} from '@nestos/kernel-adapters/contracts';
 import type {ExecutorConfig} from '../core/types';
 
 /** Execution authority belongs to the selected harness, independently of the prompt identity. */

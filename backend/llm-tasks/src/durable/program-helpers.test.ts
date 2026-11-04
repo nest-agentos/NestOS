@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TaskInputEvent } from '@itookit/durable-kernel';
+import type { TaskInputEvent } from '@nestos/durable-kernel';
 import { applyDependencyMessages, dependencyOutput, llmEffect, type DurableDependencyBinding } from './program-helpers';
 import { collectDependency } from './dependency-collector';
 

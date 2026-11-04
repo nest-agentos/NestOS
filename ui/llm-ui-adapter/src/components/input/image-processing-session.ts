@@ -1,5 +1,5 @@
-import {createImageProcessor, resolveResize, type ImageProcessor, type ImageResizePolicy, type ImageSource, type ImageSpec} from '@itookit/image-parser';
-import {randomUUID, t} from '@itookit/common';
+import {createImageProcessor, resolveResize, type ImageProcessor, type ImageResizePolicy, type ImageSource, type ImageSpec} from '@nestos/image-parser';
+import {randomUUID, t} from '@nestos/common';
 
 /** Product default; explicit user and agent policies retain precedence. */
 export function resolveChatImageResize(override?: ImageResizePolicy, agent?: ImageResizePolicy): ImageResizePolicy {

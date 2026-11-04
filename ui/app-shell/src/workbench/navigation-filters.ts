@@ -1,5 +1,5 @@
-import {TOOLBOX_ICONS, t} from '@itookit/common';
-import {FilterPanel, type FilterChip} from '@itookit/vfs-ui';
+import {TOOLBOX_ICONS, t} from '@nestos/common';
+import {FilterPanel, type FilterChip} from '@nestos/vfs-ui';
 import {nestOSVFSPresentation} from '../browser/vfs-presentation';
 
 export type NavigationFilterChip = FilterChip;

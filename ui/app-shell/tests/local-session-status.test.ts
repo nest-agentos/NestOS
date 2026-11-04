@@ -1,9 +1,9 @@
 import {expect, it} from 'vitest';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 import {localSessionStatus} from '../src/projects/local-session-status';
 import {RemoteSessionStatusView} from '../src/projects/remote-session-status';
-import {harnessObservation} from '@itookit/app-contracts';
-import type {VFSNodeUI} from '@itookit/vfs-ui';
+import {harnessObservation} from '@nestos/app-contracts';
+import type {VFSNodeUI} from '@nestos/vfs-ui';
 
 const activity = (approval = 2, input = 1) => ({sessionId: 's', sessionStatus: 'open', revision: 1, asOfSequence: 8,
     counts: {running: 1, queued: 0, created: 0, waiting: 3, paused: 0, blocked: 0, succeeded: 0, failed: 0, cancelled: 0}, pending: {approval, input}});

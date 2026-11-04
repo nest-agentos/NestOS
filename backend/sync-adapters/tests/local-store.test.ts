@@ -2,8 +2,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile, mkdir, symlink, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { openLocalFSBackend, type LocalFSBackend } from '@itookit/vfsdriver-local';
-import { bindingToken, randomId, sha256, type FileAction, type SyncState } from '@itookit/vfs-sync';
+import { openLocalFSBackend, type LocalFSBackend } from '@nestos/vfsdriver-local';
+import { bindingToken, randomId, sha256, type FileAction, type SyncState } from '@nestos/vfs-sync';
 import { LocalSyncStore, LocalFileLocal, LocalSyncCoordinator } from '../src/local';
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); vi.restoreAllMocks(); });
@@ -82,8 +82,8 @@ it('coordinates independent SQLite connections and fences stale owners inside na
     const f = await setup(), other = await openLocalFSBackend(f.options); closes.push(() => other.close()); let now = 0;
     const options = { now: () => now, leaseMs: 20000, heartbeatMs: 10000, retryMs: 1 };
     const a = new LocalSyncCoordinator(f.backend.storageAccess(), options), b = new LocalSyncCoordinator(other.storageAccess(), options);
-    let release!: () => void, enter!: (guard: import('@itookit/vfs-sync').CoordinationGuard) => void;
-    const entered = new Promise<import('@itookit/vfs-sync').CoordinationGuard>(resolve => { enter = resolve; });
+    let release!: () => void, enter!: (guard: import('@nestos/vfs-sync').CoordinationGuard) => void;
+    const entered = new Promise<import('@nestos/vfs-sync').CoordinationGuard>(resolve => { enter = resolve; });
     const first = a.exclusive('b', async guard => { enter(guard!); await new Promise<void>(resolve => { release = resolve; }); });
     const rejected = expect(first).rejects.toThrow('SYNC_COORDINATION_LOST'), guard = await entered; now = 20001;
     await b.exclusive('b', async current => {

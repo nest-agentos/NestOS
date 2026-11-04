@@ -1,14 +1,14 @@
 import {StoredChatImages} from './stored-chat-images';
 import type {ImageAssetMetadata} from './image-editing';
-import {createOperationLedger, type AttachmentRef, type ComposerDraft, type OperationLedger} from '@itookit/llm-ui';
-import type {ConversationUIState, ISessionRepository} from '@itookit/llm-session/contracts';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createOperationLedger, type AttachmentRef, type ComposerDraft, type OperationLedger} from '@nestos/llm-ui';
+import type {ConversationUIState, ISessionRepository} from '@nestos/llm-session/contracts';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import {AssetService} from '../services/AssetService';
 import {DraftPersistence, readBranchDraft, type BranchDraft} from '../services/DraftPersistence';
 import {persistOperations} from '../services/OperationPersistence';
 import {readDraftFiles} from '../services/DraftFilesCodec';
 import {readInputDraft} from '../domain/input-draft';
-import {isTargetRef} from '@itookit/llm-flow/contracts';
+import {isTargetRef} from '@nestos/llm-flow/contracts';
 import {validDraftToken} from '../domain/draft-file-identity';
 import {readInputContextDraft} from '../domain/context-draft';
 import {canonicalJson} from '../utils/canonical-json';
@@ -48,7 +48,7 @@ export class SessionChatStore {
     get agentId(): string | undefined {return readBranchDraft(this.raw, this.branch)?.inputAgentId;}
     get draft(): ComposerDraft {return structuredClone(this.saved);}
     ledger(): OperationLedger {
-        return createOperationLedger({initial: this.raw?.operationRecords as unknown as import('@itookit/llm-ui').OperationRecord[] | undefined,
+        return createOperationLedger({initial: this.raw?.operationRecords as unknown as import('@nestos/llm-ui').OperationRecord[] | undefined,
             save: records => persistOperations(this.repository, this.sessionId, records)});
     }
     save(draft: ComposerDraft): Promise<void> {

@@ -1,4 +1,4 @@
-import { harnessPresentation } from '@itookit/common';
+import { harnessPresentation } from '@nestos/common';
 
 export function mountConversationSource(container: HTMLElement, kind: string, label?: string, slot?: HTMLElement): () => void {
     const source = harnessPresentation(kind), badge = document.createElement('span');

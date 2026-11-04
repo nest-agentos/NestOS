@@ -1,8 +1,8 @@
-import { FSError } from '@itookit/vfs-core';
-import type { HarnessClient, HarnessHistory } from '@itookit/cells-driver';
-import type { ProjectService, ProjectFolder } from '@itookit/app-contracts/services';
+import { FSError } from '@nestos/vfs-core';
+import type { HarnessClient, HarnessHistory } from '@nestos/cells-driver';
+import type { ProjectService, ProjectFolder } from '@nestos/app-contracts/services';
 import type { TwinSourceCatalog, TwinSourceContent } from './domain';
-import { sha256HexSync } from '@itookit/llm-context';
+import { sha256HexSync } from '@nestos/llm-context';
 
 export const harnessTarget = (project: string, profile: string, session: string) => JSON.stringify([project, profile, session]);
 export async function discoverHarness(projects: ProjectService, project: ProjectFolder, catalog: TwinSourceCatalog): Promise<void> {

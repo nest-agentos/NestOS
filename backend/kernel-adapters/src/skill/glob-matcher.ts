@@ -1,7 +1,7 @@
 // @file: kernel-adapters/src/skill/glob-matcher.ts
-// Glob 匹配工具，复用 @itookit/tools 中已有的 globToRegex。
+// Glob 匹配工具，复用 @nestos/tools 中已有的 globToRegex。
 
-import { globToRegex } from '@itookit/tools';
+import { globToRegex } from '@nestos/tools';
 
 export { globToRegex };
 

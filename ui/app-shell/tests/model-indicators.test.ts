@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {expect, it} from 'vitest';
 import {modelIndicators} from '../src/toolbox/model-indicators';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 it('deduplicates declared model abilities and gives every icon an accessible description', () => {
     const icons = modelIndicators(['chat', 'vision', 'tools', 'vision', 'image.generate'])!;

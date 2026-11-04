@@ -1,6 +1,6 @@
-import { t } from '@itookit/common';
-import { FSError } from '@itookit/vfs-core';
-import type { ConversationManifest, SessionSummary, ISessionRepository, SessionFolder } from '@itookit/llm-session';
+import { t } from '@nestos/common';
+import { FSError } from '@nestos/vfs-core';
+import type { ConversationManifest, SessionSummary, ISessionRepository, SessionFolder } from '@nestos/llm-session';
 import { sessionFamilyRoots } from './session-family';
 
 export interface ProjectNavigationSnapshot {

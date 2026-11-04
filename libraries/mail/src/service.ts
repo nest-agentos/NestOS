@@ -1,5 +1,5 @@
 import {readThread} from './thread';
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 import type {MailClient, MailDiagnostic, MailQuery, MailThreadPage, MailThreadQuery} from './contracts';
 import {safeCode, mailError} from './model';
 import {queryIndex, validateQuery, validateThreadQuery} from './query';

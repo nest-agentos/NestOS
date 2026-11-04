@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
 import {LocalSessionActivityView} from '../src/projects/local-session-activity';
-import type {KernelViewPort} from '@itookit/durable-kernel/contracts';
-import type {VFSNodeUI, VFSUIShell} from '@itookit/vfs-ui';
+import type {KernelViewPort} from '@nestos/durable-kernel/contracts';
+import type {VFSNodeUI, VFSUIShell} from '@nestos/vfs-ui';
 
 afterEach(() => vi.useRealTimers());
 

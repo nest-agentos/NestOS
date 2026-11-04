@@ -1,8 +1,8 @@
-import {DEFAULT_KANBAN_WORK_TYPES} from '@itookit/kanban/contracts';
+import {DEFAULT_KANBAN_WORK_TYPES} from '@nestos/kanban/contracts';
 import {journalCommand} from './journal-command';
-import {sha256HexSync} from '@itookit/common';
-import type {ProjectService} from '@itookit/app-contracts/services';
-import type {KanbanBoard, KanbanClient, KanbanCommand, KanbanProjectRecord, KanbanRecordExecution, KanbanRecordRunRequest, KanbanItem} from '@itookit/kanban/contracts';
+import {sha256HexSync} from '@nestos/common';
+import type {ProjectService} from '@nestos/app-contracts/services';
+import type {KanbanBoard, KanbanClient, KanbanCommand, KanbanProjectRecord, KanbanRecordExecution, KanbanRecordRunRequest, KanbanItem} from '@nestos/kanban/contracts';
 import {KanbanAutomationJournal} from './automation-journal';
 import {requireValue} from './validation';
 import {safeCode} from './automation-analysis';

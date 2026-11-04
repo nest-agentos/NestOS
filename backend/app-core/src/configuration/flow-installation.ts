@@ -1,8 +1,8 @@
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import {FlowCommand, collectFlowToolDependencies, flowParameterValues, isRootCallable, type FlowDraft, type FlowRevision, type FlowToolDependency} from '@itookit/llm-flow/contracts';
-import {checkFlowSource, externalFlowReferences, validateFlowParameters} from '@itookit/llm-flow';
-import {SessionCommand, type ICommandBus} from '@itookit/llm-session/contracts';
-import type {FlowConfigurationIssue, FlowInstallationReport, FlowInstallations} from '@itookit/app-contracts/services';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import {FlowCommand, collectFlowToolDependencies, flowParameterValues, isRootCallable, type FlowDraft, type FlowRevision, type FlowToolDependency} from '@nestos/llm-flow/contracts';
+import {checkFlowSource, externalFlowReferences, validateFlowParameters} from '@nestos/llm-flow';
+import {SessionCommand, type ICommandBus} from '@nestos/llm-session/contracts';
+import type {FlowConfigurationIssue, FlowInstallationReport, FlowInstallations} from '@nestos/app-contracts/services';
 import {FlowToolPackages} from './flow-tool-packages';
 
 const log = createModuleLogger('flow-installation');

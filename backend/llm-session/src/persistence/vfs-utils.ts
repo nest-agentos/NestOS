@@ -1,7 +1,7 @@
 // @file: llm-conversation/src/persistence/vfs-utils.ts
 // Shared VFS traversal utilities used by SessionRepository.
 
-import type { FSNode } from '@itookit/vfs-core';
+import type { FSNode } from '@nestos/vfs-core';
 
 /**
  * Recursively collect all file nodes under the given directory listing.

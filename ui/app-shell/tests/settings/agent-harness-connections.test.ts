@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { editHarnessConnection } from '@itookit/llm-ui-adapter/settings';
-import type { HarnessConnectionManagement } from '@itookit/llm-ui-adapter/settings';
+import { editHarnessConnection } from '@nestos/llm-ui-adapter/settings';
+import type { HarnessConnectionManagement } from '@nestos/llm-ui-adapter/settings';
 
 const target = { nodeConnectionId: 'node', projectId: 'project', projectName: '<img src=x>',
     available: true, profiles: [{ id: 'claude', kind: 'claude', name: 'Claude' }] };

@@ -1,7 +1,7 @@
 import {afterEach, expect, it} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {collectionExecutor} from '@itookit/app-contracts';
-import {buildTool, TaskListTool} from '@itookit/tools';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {collectionExecutor} from '@nestos/app-contracts';
+import {buildTool, TaskListTool} from '@nestos/tools';
 import {acquireCollectionFiles} from '../src/digital-twin/collection-files';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 

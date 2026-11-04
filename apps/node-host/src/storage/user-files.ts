@@ -1,8 +1,8 @@
 import path from 'node:path';
 import {promises as fs} from 'node:fs';
 import {randomUUID} from 'node:crypto';
-import {FSError} from '@itookit/vfs-core';
-import type {IFsOps, StatResult} from '@itookit/vfsdriver-local';
+import {FSError} from '@nestos/vfs-core';
+import type {IFsOps, StatResult} from '@nestos/vfsdriver-local';
 import {within} from '../runtime/paths';
 
 /** Keep logical record keys unchanged while user documents live directly in the portable home. */

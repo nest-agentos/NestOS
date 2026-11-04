@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { bindingToken, OperationManager, randomId, type CoordinationGuard, type SyncState } from '@itookit/vfs-sync';
+import { bindingToken, OperationManager, randomId, type CoordinationGuard, type SyncState } from '@nestos/vfs-sync';
 import { IndexedDBSyncCoordinator, IndexedDBSyncStore } from '../src';
 import { IndexedDBLeaseGuard } from '../src/indexeddb/lease';
-import { IndexedDBBackend, ALL_STORES, STORE_RECORDS, txDone } from '@itookit/vfsdriver-indexeddb';
+import { IndexedDBBackend, ALL_STORES, STORE_RECORDS, txDone } from '@nestos/vfsdriver-indexeddb';
 const backends: IndexedDBBackend[] = [];
 afterEach(async () => { vi.unstubAllGlobals(); await Promise.all(backends.splice(0).map(b => b.close())); });
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { promise, resolve }; }
@@ -55,8 +55,8 @@ it('recovers the same pending cloud command when an old response returns after t
     const options = { now: () => now, leaseMs: 20000, heartbeatMs: 10000, retryMs: 1 };
     const a = new IndexedDBSyncCoordinator(backend.storageAccess(), options), b = new IndexedDBSyncCoordinator(backend.storageAccess(), options);
     const sent = deferred<void>(), response = deferred<void>();
-    let committed: import('@itookit/vfs-sync').Receipt;
-    const remote = { execute: vi.fn(async (command: import('@itookit/vfs-sync').Command) => {
+    let committed: import('@nestos/vfs-sync').Receipt;
+    const remote = { execute: vi.fn(async (command: import('@nestos/vfs-sync').Command) => {
         committed = { operation: command.body, outcome: 'committed' } as typeof committed;
         sent.resolve(); await response.promise; return committed;
     }), operation: vi.fn(async () => committed), cancel: vi.fn(), replica: vi.fn() };

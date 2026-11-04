@@ -1,7 +1,7 @@
-import {KanbanError} from '@itookit/kanban';
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {installKanbanContent, inspectKanbanContent, type KanbanStore} from '@itookit/kanban/storage';
-import type {KanbanContent, KanbanClient, KanbanWorkType, KanbanNotificationPolicy} from '@itookit/kanban/contracts';
+import {KanbanError} from '@nestos/kanban';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {installKanbanContent, inspectKanbanContent, type KanbanStore} from '@nestos/kanban/storage';
+import type {KanbanContent, KanbanClient, KanbanWorkType, KanbanNotificationPolicy} from '@nestos/kanban/contracts';
 import type {InitialFileEntry, InitialResourceProvider} from './initial-files';
 import demo from './kanban-demo.json';
 const log = createModuleLogger('kanban-examples');

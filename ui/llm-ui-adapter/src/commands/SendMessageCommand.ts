@@ -2,22 +2,22 @@ import {isDirectCommandInput} from './direct-command';
 // @file: llm-ui/commands/SendMessageCommand.ts
 
 
-import { SessionCommand, type SessionOrigin, type HistoryPolicy } from '@itookit/llm-session/contracts';
+import { SessionCommand, type SessionOrigin, type HistoryPolicy } from '@nestos/llm-session/contracts';
 import { Command } from './Command';
 import { dispatchDirectCommand } from './direct-command';
-import { randomUUID, t } from '@itookit/common';
+import { randomUUID, t } from '@nestos/common';
 import type { ChatSubmission } from '../domain/submission';
-import { Toast } from '@itookit/ui-common-adapter';
+import { Toast } from '@nestos/ui-common-adapter';
 import { ErrorHandler } from '../utils/errorHandler';
 import type { ChatOverrides } from '../domain/types';
 import type {PreparedAttachmentUpload} from '../services/AssetService';
 
-import { createAgentSendIntent } from '@itookit/llm-flow/contracts';
-import type {SubmissionRequest} from '@itookit/llm-session/contracts';
+import { createAgentSendIntent } from '@nestos/llm-flow/contracts';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import {reconcileSessionCall, submitSessionCall} from './submit-session-call';
 import {canonicalJson as canonicalSubmission} from '../utils/canonical-json';
 import {captureSubmissionDraft, sameSubmissionDraft, type SubmissionDraft} from '../domain/submission-draft';
-import {sameTargetRef} from '@itookit/llm-flow/contracts';
+import {sameTargetRef} from '@nestos/llm-flow/contracts';
 import {sameInputDraft} from '../domain/input-draft';
 import type {IChatInputConfig} from '../domain/ports/IChatInputPresenter';
 import {validateComposerFiles} from '../flows/composer-file-bindings';
@@ -28,14 +28,14 @@ export interface SendMessageParams {
     draftConfig?: IChatInputConfig;
     context?: InputContextDraft;
     expectedBranch?: string;
-    target?: import('@itookit/llm-flow/contracts').TargetRef;
+    target?: import('@nestos/llm-flow/contracts').TargetRef;
     text: string;
     files: File[];
     agentId?: string;
     overrides?: ChatOverrides;
     origin?: SessionOrigin;
     historyPolicy?: HistoryPolicy;
-    submission?: import('@itookit/llm-flow/contracts').SendIntent['submission'];
+    submission?: import('@nestos/llm-flow/contracts').SendIntent['submission'];
 }
 
 interface PendingSend {
@@ -205,7 +205,7 @@ export class SendMessageCommand extends Command<SendMessageParams, boolean> {
     }
 
     private async accepted(active: ActiveSend, acceptedId: string): Promise<void> {
-        const queue = active.input.independentTitle ? undefined : await this.ctx.commands.execute<import('@itookit/llm-session/contracts').SessionInstructionQueue>(SessionCommand.GetInstructionQueue).catch(() => undefined);
+        const queue = active.input.independentTitle ? undefined : await this.ctx.commands.execute<import('@nestos/llm-session/contracts').SessionInstructionQueue>(SessionCommand.GetInstructionQueue).catch(() => undefined);
         if (active.input.independentTitle || queue?.items?.some(item => item.id === acceptedId && item.state !== 'dispatching')) this.ctx.historyView.setSubmission?.();
         else this.present(active, {state: 'accepted'});
         if (this.pending === active.pending) this.pending = undefined;

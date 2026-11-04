@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import { FSError, MemoryBackend, createFileSystemSource } from '@itookit/vfs-core';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import { FSError, MemoryBackend, createFileSystemSource } from '@nestos/vfs-core';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { mockCellsDiscovery } from './helpers/mcp-discovery';
 import { RemoteMountStore } from '../src/projects/remote-mount-store';

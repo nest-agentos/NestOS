@@ -8,8 +8,8 @@
  * Appends one JSON line per changed interval to `<rootDir>/var/log/vfs-trace.log`
  * through the app's own fs commands.
  */
-import type { IVFSManager } from '@itookit/vfs-core';
-import type { LocalFSBackend } from '@itookit/vfsdriver-local';
+import type { IVFSManager } from '@nestos/vfs-core';
+import type { LocalFSBackend } from '@nestos/vfsdriver-local';
 import { ipcCounter } from './traced-core';
 import { createActionMetrics, type ActionSnapshot } from './action-metrics';
 

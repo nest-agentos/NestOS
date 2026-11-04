@@ -1,4 +1,4 @@
-import {resolveFlowExpression, type FlowConnection, type FlowParameter, type JsonValue} from '@itookit/llm-flow/contracts';
+import {resolveFlowExpression, type FlowConnection, type FlowParameter, type JsonValue} from '@nestos/llm-flow/contracts';
 
 /** Group only presentation nodes; parameter/slot indices and submitted values remain unchanged. */
 export function groupFlowParameterFields(markup: string, parameters: FlowParameter[], slots: FlowConnection[] = []): string {

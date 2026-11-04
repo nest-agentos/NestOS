@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { SessionHandle, TaskHandle } from '@itookit/durable-kernel';
+import type { SessionHandle, TaskHandle } from '@nestos/durable-kernel';
 import { reconcileDispatchChildren } from '../src/flow/structured/reconcile';
 
 it.each([

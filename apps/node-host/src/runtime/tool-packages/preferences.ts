@@ -1,7 +1,7 @@
 import {mkdir, lstat, readFile, open, rename, rm} from 'node:fs/promises';
 import path from 'node:path';
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {ToolPackageSettings} from '@itookit/app-contracts/services';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {ToolPackageSettings} from '@nestos/app-contracts/services';
 import {packageError} from './manifest';
 const log = createModuleLogger('tool-preferences');
 const code = (value: string) => packageError(`TOOL_PACKAGE_PREFERENCES_${value}`, `Tool preferences ${value.toLowerCase().replaceAll('_', ' ')}`);

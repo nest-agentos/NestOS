@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
 import { ProviderTemplates } from '../src/configuration/provider-templates';
-import { getLogger } from '@itookit/common';
+import { getLogger } from '@nestos/common';
 
 it('copies only template configuration and keeps new instances and source templates independent', async () => {
     const source: LLMProvider = {id: 'preset', name: 'Preset', implementation: 'custom', baseURL: 'https://example.test',

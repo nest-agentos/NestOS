@@ -1,7 +1,7 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {ApplicationEventFeed} from '@itookit/app-transport/application';
-import type {ApplicationEvents, ApplicationEventFact} from '@itookit/app-contracts/services';
-import type {EventCursor} from '@itookit/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {ApplicationEventFeed} from '@nestos/app-transport/application';
+import type {ApplicationEvents, ApplicationEventFact} from '@nestos/app-contracts/services';
+import type {EventCursor} from '@nestos/vfs-core';
 
 const log = createModuleLogger('shell-events');
 const reset: ApplicationEventFact = {type: 'runtime.reset'};

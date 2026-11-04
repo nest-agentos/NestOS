@@ -1,7 +1,7 @@
 import type {TwinAnalysisJob} from './domain';
 import type {TwinRecords} from './records';
 import {retry} from './scan-store';
-import type {KernelAdaptersRuntimeOptions} from '@itookit/kernel-adapters';
+import type {KernelAdaptersRuntimeOptions} from '@nestos/kernel-adapters';
 
 type Request = Parameters<NonNullable<KernelAdaptersRuntimeOptions['authorizeLlm']>>[0];
 type Context = Parameters<NonNullable<KernelAdaptersRuntimeOptions['authorizeLlm']>>[1];

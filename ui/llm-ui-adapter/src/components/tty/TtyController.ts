@@ -6,8 +6,8 @@
 // Receives metaInfo dispatches from handleBatchedEvents() and creates / updates /
 // finalizes TtyPanel widgets accordingly.
 
-import {TtyPanel} from '@itookit/llm-ui';
-import {getLocale} from '@itookit/common';
+import {TtyPanel} from '@nestos/llm-ui';
+import {getLocale} from '@nestos/common';
 
 type TtyOpenMeta  = { sessionId: string; command: string; pid?: number };
 type TtyDataMeta  = { sessionId: string; chunk: string };

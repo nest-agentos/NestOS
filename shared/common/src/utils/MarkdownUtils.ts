@@ -1,5 +1,5 @@
 /**
- * @file @itookit/common/utils/MarkdownUtils.ts
+ * @file @nestos/common/utils/MarkdownUtils.ts
  * @description 统一的 Markdown 解析工具库 - 零依赖纯函数
  */
 

@@ -3,8 +3,8 @@ import {initializeDevelopmentExchange} from './kanban-file-exchange-protocol';
 import {publishImmutableFile} from '../run/prompt-bundle';
 import {lifecyclePromptFiles} from '../run/prompt-lifecycle';
 import {developmentStage} from './kanban-development-log';
-import type {AgentDefinition, IAgentManagementService} from '@itookit/kernel-adapters/contracts';
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {AgentDefinition, IAgentManagementService} from '@nestos/kernel-adapters/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
 import type {RemoteFileSourceProvider, ProjectRemoteMountService} from '../projects/remote-mounts';
 import type {HarnessConnectionService} from '../projects/harness-connections';
 import {publishManagedAgent} from '../configuration/managed-agent';
@@ -22,7 +22,7 @@ import preset from './kanban-development.json';
 
 interface Options {fs: IFileSystem; agents: IAgentManagementService; connections: HarnessConnectionService;
     remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
-    projects: Pick<import('@itookit/app-contracts/services').ProjectService, 'get' | 'openWorkspace'>}
+    projects: Pick<import('@nestos/app-contracts/services').ProjectService, 'get' | 'openWorkspace'>}
 type Input = Parameters<NonNullable<PersonalKanbanAutomationOptions['prepareWork']>>[0];
 export interface DevelopmentWorkspaceRecord {projectId: string; directory: string; worktreeId?: string; communicationDirectory?: string; repositories: WorktreeRepository[]; availableRepositories: WorktreeRepository[]; policy: DevelopmentPolicy; exchangeVersion?: 2; context?:unknown; commitContext?: CommitContext}
 

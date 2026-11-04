@@ -1,4 +1,4 @@
-import { assertSync, bindingToken, type StoredFilePlan, type StateStore, type FileEntry } from '@itookit/vfs-sync';
+import { assertSync, bindingToken, type StoredFilePlan, type StateStore, type FileEntry } from '@nestos/vfs-sync';
 import type { LocalApplicationStore } from './local';
 
 export interface FileContentPreview {

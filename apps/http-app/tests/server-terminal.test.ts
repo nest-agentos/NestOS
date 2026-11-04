@@ -1,7 +1,7 @@
 import {afterEach, describe, expect, it} from 'vitest';
 import {NodeServerTerminals} from '../../node-host/src/terminal/server-terminals';
-import type {ServerTerminal} from '@itookit/app-contracts/services';
-import {RpcPeer, installViewProjections} from '@itookit/app-transport/application';
+import type {ServerTerminal} from '@nestos/app-contracts/services';
+import {RpcPeer, installViewProjections} from '@nestos/app-transport/application';
 
 const hosts: NodeServerTerminals[] = [];
 afterEach(async () => {await Promise.all(hosts.splice(0).map(host => host.dispose()));});
@@ -61,9 +61,9 @@ describe('server Bash terminal', () => {
 });
 
 it('exposes server terminals only to administrator views and releases them on view closure', async () => {
-    const {createApplicationRuntime} = await import('@itookit/app-core');
-    const {MemoryBackend} = await import('@itookit/vfs-core');
-    const {createHostedView} = await import('@itookit/node-host/http');
+    const {createApplicationRuntime} = await import('@nestos/app-core');
+    const {MemoryBackend} = await import('@nestos/vfs-core');
+    const {createHostedView} = await import('@nestos/node-host/http');
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'web', startupMode: 'interactive', digitalTwinAutoStart: false});
     const admin = await createHostedView(runtime), user = await createHostedView(runtime, true);
     try {

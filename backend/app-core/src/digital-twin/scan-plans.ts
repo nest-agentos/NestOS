@@ -1,8 +1,8 @@
 import {uniqueScanSources} from './scan-plan-sources';
 import { migrateMailDefault } from './default-rules';
 import type { TwinSourceIndex } from './source-index';
-import {sha256HexSync} from '@itookit/llm-context';
-import { randomUUID, createModuleLogger } from '@itookit/common';
+import {sha256HexSync} from '@nestos/llm-context';
+import { randomUUID, createModuleLogger } from '@nestos/common';
 import { selectedRules } from './selection';
 import { TWIN_KINDS, type TwinSourceData, type TwinSettings } from './domain';
 import { scanInput, type TwinScanPlan, type TwinScanPlanInput, type TwinScanRun } from './scan-domain';

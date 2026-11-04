@@ -1,4 +1,4 @@
-import { VFS_DOM_EVENTS } from '@itookit/vfs-ui';
+import { VFS_DOM_EVENTS } from '@nestos/vfs-ui';
 
 function hasEditorContent(editor: HTMLElement): boolean {
     if (editor.classList.contains('workbench-tabs') && editor.dataset.workbenchView)

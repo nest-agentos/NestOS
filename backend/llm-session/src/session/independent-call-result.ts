@@ -1,6 +1,6 @@
-import {taskStat, type TaskRecord} from '@itookit/durable-kernel';
-import type {DurableChatOutput} from '@itookit/llm-tasks';
-import {formatFlowOutput, type DagRunSpec, type JsonValue} from '@itookit/llm-flow/contracts';
+import {taskStat, type TaskRecord} from '@nestos/durable-kernel';
+import type {DurableChatOutput} from '@nestos/llm-tasks';
+import {formatFlowOutput, type DagRunSpec, type JsonValue} from '@nestos/llm-flow/contracts';
 import type {Round} from '../contracts/conversation';
 import type {SubmissionRequest} from '../contracts/submission';
 import type {PreparedIndependentTaskCall} from './independent-call-preparation';
@@ -47,7 +47,7 @@ function flowHistory(task: TaskRecord): Round['flow'] {
     const initial = (task.input as {initialScheduler?: {spec: DagRunSpec; parameters?: Record<string, JsonValue>}}).initialScheduler;
     const invocation = initial?.spec.invocation;
     if (!invocation) return;
-    return {flowId: invocation.flowId as import('@itookit/llm-flow/contracts').FlowId, revision: invocation.revision, input: structuredClone(initial!.spec.input),
+    return {flowId: invocation.flowId as import('@nestos/llm-flow/contracts').FlowId, revision: invocation.revision, input: structuredClone(initial!.spec.input),
         ...(initial?.parameters ? {parameters: structuredClone(initial.parameters)} : {})};
 }
 function invalid(code: string): Error {return Object.assign(new Error(code), {code});}

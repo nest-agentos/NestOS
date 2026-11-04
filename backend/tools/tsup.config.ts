@@ -6,5 +6,5 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  external: ['@itookit/llm-context', '@itookit/vfs-core', /^node:/],
+  external: ['@nestos/llm-context', '@nestos/vfs-core', /^node:/],
 });

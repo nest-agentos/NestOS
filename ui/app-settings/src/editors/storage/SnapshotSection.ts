@@ -1,7 +1,7 @@
 // @file: app-settings/editors/storage/SnapshotSection.ts
 
-import { Toast, Modal } from '@itookit/ui-common-adapter';
-import type { SettingsPort as SettingsService, LocalSnapshot } from '@itookit/app-contracts/settings';
+import { Toast, Modal } from '@nestos/ui-common-adapter';
+import type { SettingsPort as SettingsService, LocalSnapshot } from '@nestos/app-contracts/settings';
 import { StorageUtils } from './StorageUtils';
 
 export class SnapshotSection {

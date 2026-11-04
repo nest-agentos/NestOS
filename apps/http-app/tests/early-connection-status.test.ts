@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {RpcPeer} from '@itookit/app-transport/application';
+import {RpcPeer} from '@nestos/app-transport/application';
 import {connectApplication} from '../src/client/application-connection';
 import {installHttpStatus} from '../src/client/status-banner';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 const releases: Array<() => unknown> = [];
 afterEach(async () => {

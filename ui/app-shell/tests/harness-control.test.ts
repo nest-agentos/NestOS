@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { HarnessClient } from '@itookit/app-core';
-import { t } from '@itookit/common';
+import type { HarnessClient } from '@nestos/app-core';
+import { t } from '@nestos/common';
 import { showHarnessControl } from '../src/harness/control';
 
 const session = { id:'s',title:'<script>title</script>',cwd:'/workspace',status:'idle',updatedAt:1,resumable:true };

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createOperationLedger, type ChatMessage, type ExtensionRenderer} from '@itookit/llm-ui';
-import type {ICommandBus, IndependentCallView, SessionGroup} from '@itookit/llm-session/contracts';
+import {createOperationLedger, type ChatMessage, type ExtensionRenderer} from '@nestos/llm-ui';
+import type {ICommandBus, IndependentCallView, SessionGroup} from '@nestos/llm-session/contracts';
 import {SessionCallPresentation} from '../../llm-ui-adapter/src/independent/session-calls';
 
 let presentation: SessionCallPresentation | undefined;

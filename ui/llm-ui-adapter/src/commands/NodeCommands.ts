@@ -1,7 +1,7 @@
 // @file: llm-ui/commands/NodeCommands.ts
 
 
-import { SessionCommand, type SessionGroup, type ExecutionNode } from '@itookit/llm-session/contracts';
+import { SessionCommand, type SessionGroup, type ExecutionNode } from '@nestos/llm-session/contracts';
 import { Command } from './Command';
 import { dispatchDirectCommand } from './direct-command';
 import type { ErrorSeverity } from '../utils/errorHandler';

@@ -6,11 +6,11 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { X509Certificate } from 'node:crypto';
 import path from 'node:path';
-import { openLocalFSBackend, type LocalFSBackend } from '@itookit/vfsdriver-local';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
-import { createCertificates } from '@itookit/node-host/http';
-import { loadCertificates } from '@itookit/node-host/http';
-import { AuditLog } from '@itookit/node-host/logging';
+import { openLocalFSBackend, type LocalFSBackend } from '@nestos/vfsdriver-local';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
+import { createCertificates } from '@nestos/node-host/http';
+import { loadCertificates } from '@nestos/node-host/http';
+import { AuditLog } from '@nestos/node-host/logging';
 import { secureServers, authenticatedFetch, close } from './tls-fixture';
 
 let temp: string, certificates: string, untrusted: string, backend: LocalFSBackend;

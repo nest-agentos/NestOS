@@ -1,6 +1,6 @@
 import {expect, it} from 'vitest';
-import {providerTestResult} from '@itookit/llm-ui-adapter/settings';
-import {t} from '@itookit/common';
+import {providerTestResult} from '@nestos/llm-ui-adapter/settings';
+import {t} from '@nestos/common';
 
 it('shows operation, model, stage and actionable network advice while retaining the request ID', () => {
     const result = providerTestResult({success: false, message: 'Failed to fetch', code: 'NETWORK_ERROR', stage: 'transport',

@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import type {KanbanBoard,KanbanItem} from '@itookit/kanban/contracts';
+import type {KanbanBoard,KanbanItem} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {workContext} from '../src/kanban/work-context';
 const board={id:'development',title:'开发'} as KanbanBoard;

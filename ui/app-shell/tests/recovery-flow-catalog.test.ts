@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { FlowCommand, type FlowDraft, type FlowRevision } from '@itookit/llm-flow/contracts';
-import { t } from '@itookit/common';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { FlowCommand, type FlowDraft, type FlowRevision } from '@nestos/llm-flow/contracts';
+import { t } from '@nestos/common';
 import { createApplicationRuntime } from '../../../backend/app-core/src/runtime/create-application-runtime';
 import { bindLocalApplicationServices } from '../../../backend/app-core/src/host/application-services';
 import { createApplicationClient } from '../../../backend/app-core/src/host/application-client';

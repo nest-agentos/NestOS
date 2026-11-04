@@ -1,5 +1,5 @@
-import { assertEffectGrant, type EffectAdapter, type EffectExecutionContext, type EffectReconcileResult } from '@itookit/durable-kernel';
-import { validateMediaRequest, type ILLMService, type MediaGenerationInput, type MediaGenerationRequest, type MediaGenerationResult, type TokenUsage } from '@itookit/driver-llm/contracts';
+import { assertEffectGrant, type EffectAdapter, type EffectExecutionContext, type EffectReconcileResult } from '@nestos/durable-kernel';
+import { validateMediaRequest, type ILLMService, type MediaGenerationInput, type MediaGenerationRequest, type MediaGenerationResult, type TokenUsage } from '@nestos/driver-llm/contracts';
 import { assertModelConnection, mediaEndpointIdentity, type ModelConnectionSnapshot } from '../llm-management/contracts/model-requirements';
 import { InFlightEffects } from './in-flight';
 export interface MediaAssetReference { sessionId: string; taskId: string; owner: string; name: string; mimeType: string; bytes: number; sha256: string }

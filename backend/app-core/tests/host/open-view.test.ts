@@ -1,11 +1,11 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
+import {MemoryBackend} from '@nestos/vfs-core';
 import {createApplicationRuntime} from '../../src/runtime/create-application-runtime';
 import {openApplicationView} from '../../src/host/application-view';
 import {bindLocalApplicationServices} from '../../src/host/application-services';
 import {createApplicationClient} from '../../src/host/application-client';
-import {FlowInvocationCommand} from '@itookit/llm-session/contracts';
-import type {ApplicationViewEvent} from '@itookit/app-contracts/services';
+import {FlowInvocationCommand} from '@nestos/llm-session/contracts';
+import type {ApplicationViewEvent} from '@nestos/app-contracts/services';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); vi.restoreAllMocks();});

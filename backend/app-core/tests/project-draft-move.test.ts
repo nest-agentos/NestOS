@@ -1,7 +1,7 @@
 import {interceptConversationTransactions} from './remote-conversation-faults';
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {SessionRepository} from '@itookit/llm-session';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {SessionRepository} from '@nestos/llm-session';
 import {ProjectDraftStore} from '../src/projects/drafts/store';
 import {ProjectDraftService} from '../src/projects/drafts/service';
 

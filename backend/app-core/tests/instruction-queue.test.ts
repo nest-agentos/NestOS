@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { SessionCommand, type SessionInstructionQueue } from '@itookit/llm-session/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { SessionCommand, type SessionInstructionQueue } from '@nestos/llm-session/contracts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 
 afterEach(() => vi.unstubAllGlobals());

@@ -6,7 +6,7 @@ import {readSubmissionReceipt} from './submission-receipt';
 import {assertContextBindingQuery, type ContextBindingReader, type ContextBindingQuery} from '../contracts/context-bindings';
 import {assertContextOptionsQuery} from '../contracts/context-options';
 import {ulid} from '../persistence/ulid';
-import { KernelError, KernelErrorCode } from '@itookit/durable-kernel';
+import { KernelError, KernelErrorCode } from '@nestos/durable-kernel';
 import { flowBranchExecutions } from './flow-branches';
 import { FlowRerunService } from './flow-rerun';
 // @file: llm-conversation/session/session-manager.ts
@@ -29,17 +29,17 @@ import {
     SessionOrigin,
     HistoryPolicy,
 } from '../core/types';
-import type { DagPluginCatalog, JsonValue, SendIntent } from '@itookit/llm-flow/contracts';
-import type { ToolDefinition } from '@itookit/llm-context';
-import type { FlowStore } from '@itookit/llm-flow';
-import {FlowDefinitionStore} from '@itookit/llm-flow';
+import type { DagPluginCatalog, JsonValue, SendIntent } from '@nestos/llm-flow/contracts';
+import type { ToolDefinition } from '@nestos/llm-context';
+import type { FlowStore } from '@nestos/llm-flow';
+import {FlowDefinitionStore} from '@nestos/llm-flow';
 import {RootTargetDirectory} from './root-target-catalog';
 import { ConversationError, ConversationErrorCode } from '../core/errors';
 import { CONVERSATION_DEFAULTS } from '../core/constants';
 import { ISessionRepository, BranchTreeNode } from '../persistence/types';
 import type { IAgentConfigService } from '../services/agent-service';
 import type { ISession, Signal } from '../contracts';
-import type { AgentEvent } from '@itookit/llm-tasks/contracts';
+import type { AgentEvent } from '@nestos/llm-tasks/contracts';
 import { SessionRunCoordinator } from './session-run-coordinator';
 import { AgentResolver, AgentInfo, ModelInfo } from './agent-resolver';
 import { AttachmentProcessor } from './attachment-processor';
@@ -53,9 +53,9 @@ import { SessionQuery } from './session-query';
 import { RoundOperations } from './round-operations';
 import { BranchService } from './branch-service';
 import { ContextProfileStore } from '../persistence/context-profile-store';
-import { createContextAssembler } from '@itookit/llm-context';
+import { createContextAssembler } from '@nestos/llm-context';
 import { RoundLog } from '../persistence/round-log';
-import type { Kernel, SessionHandle } from '@itookit/durable-kernel';
+import type { Kernel, SessionHandle } from '@nestos/durable-kernel';
 import { sessionDirectoryStorage } from '../persistence/session-directory-storage';
 import { DurableConversationProjection, RUNTIME_KEY } from '../persistence/durable-conversation-projection';
 import { SessionMemoryProvider } from './session-memory-provider';
@@ -512,7 +512,7 @@ export class SessionManager implements ISession, SessionQuery {
 
     /** Trusted host preparation only; explicit child identity never rebinds this manager's view. */
     async prepareIndependentTaskCall(supplied: import('../contracts/submission').SubmissionRequest,
-        suppliedInvocation: import('@itookit/llm-flow/contracts').InvocationIdentity) {
+        suppliedInvocation: import('@nestos/llm-flow/contracts').InvocationIdentity) {
         const safe = (value: unknown) => typeof value === 'string' && /^[\w:-]{1,256}$/.test(value) ? value : undefined;
         const identity = {operationId: safe(supplied?.submission?.id), sessionId: safe(supplied?.expectedSessionId)};
         const started = Date.now(); let stage = 'input', errorCode: string | undefined;
@@ -598,7 +598,7 @@ export class SessionManager implements ISession, SessionQuery {
         }
     }
 
-    async hasCommittedSubmission(input: {sessionId: string; submission: import('@itookit/llm-flow/contracts').SessionSubmission}): Promise<boolean> {
+    async hasCommittedSubmission(input: {sessionId: string; submission: import('@nestos/llm-flow/contracts').SessionSubmission}): Promise<boolean> {
         if (input?.sessionId !== this.registry.ensureBound().sessionId || !input.submission
             || !/^[\w-]{1,128}$/.test(input.submission.id) || !input.submission.source)
             throw Object.assign(new Error('Invalid submission observation binding'), {code: 'SUBMISSION_INVALID'});

@@ -3,15 +3,15 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createVFS, MemoryBackend, type IStorageBackend } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { NodeFsOps } from '@itookit/vfsdriver-local/node';
-import { Kernel } from '@itookit/durable-kernel';
-import { SessionRepository, SessionManager, SessionCommand } from '@itookit/llm-session';
+import { createVFS, MemoryBackend, type IStorageBackend } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { NodeFsOps } from '@nestos/vfsdriver-local/node';
+import { Kernel } from '@nestos/durable-kernel';
+import { SessionRepository, SessionManager, SessionCommand } from '@nestos/llm-session';
 import { SessionDirectoryStorageResolver } from '../../../backend/llm-session/src/persistence/session-directory-storage';
 import { createLLMFactory } from '../../llm-ui-adapter/src/chat';
 import { LLMWorkspaceEditor } from '../../llm-ui-adapter/src/shell/LLMWorkspaceEditor';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
 
 const cleanup: Array<() => void | Promise<void>> = [];
 afterEach(async () => {

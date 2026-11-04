@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { EffectSessionState, JsonValue, SharedStateEntry } from '@itookit/durable-kernel';
+import type { EffectSessionState, JsonValue, SharedStateEntry } from '@nestos/durable-kernel';
 
 /** A test-only, single-writer CAS port; reopening must read the atomic file rather than retained objects. */
 export async function diskState(path: string): Promise<{ state: EffectSessionState; close(): void }> {

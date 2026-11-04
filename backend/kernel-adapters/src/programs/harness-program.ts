@@ -1,8 +1,8 @@
-import type { Decision, DurableTaskProgram, JsonValue, TaskInputEvent, WaitSpec } from '@itookit/durable-kernel';
-import type {ContextSnapshot} from '@itookit/llm-context';
+import type { Decision, DurableTaskProgram, JsonValue, TaskInputEvent, WaitSpec } from '@nestos/durable-kernel';
+import type {ContextSnapshot} from '@nestos/llm-context';
 import {assertHarnessContextRequest} from '../llm-management/contracts/context-binding';
 import {harnessInputDigest, prepareHarnessInput, type HarnessInputMessage} from '../llm-management/contracts/harness-input';
-import {sha256HexSync} from '@itookit/llm-context';
+import {sha256HexSync} from '@nestos/llm-context';
 import type { HarnessConnectionSnapshot, HarnessExecutionRequest, HarnessExecutionResult,
     HarnessInteractionNotification } from '../llm-management/contracts/harness-execution';
 

@@ -1,10 +1,10 @@
 import { afterEach, expect, it } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
+import { MemoryBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { bindLocalApplicationServices } from '../src/host/application-services';
 import { createApplicationClient } from '../src/host/application-client';
 import { ToolboxResources } from '../src/configuration/toolbox-resources';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
 import { externalFlowLibrary, externalFlowDrawers } from './fixtures/flow-library';
 
 const cleanup: Array<() => Promise<unknown>> = [];

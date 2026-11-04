@@ -1,8 +1,8 @@
 import {ChatInputTemplates} from '../components/templates/ChatInputTemplates';
-import {resolveResize} from '@itookit/image-parser';
-import {t} from '@itookit/common';
-import {renderParameterFields, readParameterFields, type FormParameter} from '@itookit/llm-ui/forms';
-import type {SelectorView, ChatView} from '@itookit/llm-ui';
+import {resolveResize} from '@nestos/image-parser';
+import {t} from '@nestos/common';
+import {renderParameterFields, readParameterFields, type FormParameter} from '@nestos/llm-ui/forms';
+import type {SelectorView, ChatView} from '@nestos/llm-ui';
 import type {ChatInputSettings} from '../domain/ports/IChatInputPresenter';
 import type {ConnectionOption} from '../domain/types';
 

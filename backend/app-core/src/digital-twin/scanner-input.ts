@@ -1,4 +1,4 @@
-import {sha256HexSync} from '@itookit/llm-context';
+import {sha256HexSync} from '@nestos/llm-context';
 import type {TwinSourceReader} from './domain';
 import type {TwinRecords} from './records';
 const prefix = 'scanner-input://';

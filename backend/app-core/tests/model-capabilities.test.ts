@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { getLogger } from '@itookit/common';
-import type { ConnectionMeta, LLMProvider } from '@itookit/driver-llm/contracts';
+import { getLogger } from '@nestos/common';
+import type { ConnectionMeta, LLMProvider } from '@nestos/driver-llm/contracts';
 import { configuredModels, modelCapabilities, runnableModel } from '../src/configuration/model-capabilities';
 import { ToolboxImportTrace } from '../src/configuration/toolbox-import-trace';
 

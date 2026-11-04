@@ -1,5 +1,5 @@
 import { createSessionHost, type SessionLogger } from './host-ports';
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
 export type ChangeListener = () => void;
 
 /** Business persistence helpers over an injected file capability; no host ownership. */

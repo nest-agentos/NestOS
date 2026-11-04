@@ -6,17 +6,17 @@ import { skillContextResolver, type DirectConversationPorts } from './direct-con
 import { createSessionHost, type SessionHost, type SessionHostPorts } from '../utils/host-ports';
 import { FlowHistory } from './flow-history';
 import { snapshotDirectAgentPolicy, type DirectAgentPolicy, type ResolvedDirectAgentPolicy } from '../contracts/direct-agent-policy';
-import { formatFlowOutput } from '@itookit/llm-flow/contracts';
-import type { AgentEvent, ToolCallInfo } from '@itookit/llm-tasks/contracts';
-import type { DagPluginCatalog, DagRunSpec, DagNodeDefinition } from '@itookit/llm-flow/contracts';
-import type { ChatMessage, ContextSnapshot } from '@itookit/llm-context';
+import { formatFlowOutput } from '@nestos/llm-flow/contracts';
+import type { AgentEvent, ToolCallInfo } from '@nestos/llm-tasks/contracts';
+import type { DagPluginCatalog, DagRunSpec, DagNodeDefinition } from '@nestos/llm-flow/contracts';
+import type { ChatMessage, ContextSnapshot } from '@nestos/llm-context';
 import type { RoundResult, Signal } from '../contracts';
 import {
     type EventEnvelope,
     type Kernel,
     type JsonValue,
     type TaskHandle,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 import type {
     ExecutionNode,
     ExecutionTask,
@@ -24,11 +24,11 @@ import type {
 } from '../core/types';
 import {
     type DurableChatOutput as ChatProgramOutput,
-} from '@itookit/llm-tasks';
+} from '@nestos/llm-tasks';
 import { formatErrorMessage } from '../utils/error-formatter';
 import { SessionEventBus } from './session-event-bus';
 import { SessionState } from './session-state';
-import { DurableFlowExecutor, prepareFlowCallTask, submitRun, type RunExecution } from '@itookit/llm-flow';
+import { DurableFlowExecutor, prepareFlowCallTask, submitRun, type RunExecution } from '@nestos/llm-flow';
 
 export interface ConversationExecution extends ConversationContextInput {
     task: ExecutionTask;
@@ -52,7 +52,7 @@ export interface ConversationRunCoordinatorOptions extends ConversationContextOp
      * `GitWorktreeFlowWorkspaceManager`; the desktop/Web hosts inject their own (see
      * doc/design/flow-execution-model.md).
      */
-    workspaceManager?: import('@itookit/llm-flow').FlowWorkspaceManager;
+    workspaceManager?: import('@nestos/llm-flow').FlowWorkspaceManager;
 }
 
 export class ConversationRunCoordinator {

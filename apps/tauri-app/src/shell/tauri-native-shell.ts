@@ -13,8 +13,8 @@
 
 import { shellOutputChannel } from './shell-output-channel';
 import { invoke } from '@tauri-apps/api/core';
-import type { INativeShell, NativeShellResult, NativeShellOptions } from '@itookit/tools';
-import { randomUUID } from '@itookit/common';
+import type { INativeShell, NativeShellResult, NativeShellOptions } from '@nestos/tools';
+import { randomUUID } from '@nestos/common';
 
 interface NativeCapabilities {
   ripgrep: boolean;

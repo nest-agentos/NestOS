@@ -1,8 +1,8 @@
-import type {ApplicationViewEvent, OpenViewRequest} from '@itookit/app-contracts/services';
+import type {ApplicationViewEvent, OpenViewRequest} from '@nestos/app-contracts/services';
 import {SnapshotCache, type CachedReply} from './snapshot-cache';
 import {ApplicationObservation} from './application-observation';
-import type { HostedApplicationClient } from '@itookit/app-contracts/services';
-import { FSError } from '@itookit/vfs-core';
+import type { HostedApplicationClient } from '@nestos/app-contracts/services';
+import { FSError } from '@nestos/vfs-core';
 import { RpcPeer } from '../application/peer';
 import type { Reply, CallbackRequest, Call } from '../rpc/protocol';
 import { RPC_VERSION } from '../rpc/protocol';

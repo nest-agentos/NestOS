@@ -1,5 +1,5 @@
-import { ACTION_ICONS, getLocale } from '@itookit/common';
-import { createContentSearch, type ContentSearchView, type SearchContent } from '@itookit/llm-ui';
+import { ACTION_ICONS, getLocale } from '@nestos/common';
+import { createContentSearch, type ContentSearchView, type SearchContent } from '@nestos/llm-ui';
 
 interface SearchHistory {
     contents(): readonly SearchContent[];

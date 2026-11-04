@@ -1,6 +1,6 @@
-import { escapeHTML, escapeAttr, t } from '@itookit/common';
-import { TWIN_KINDS, type TwinMemoryData } from '@itookit/app-contracts';
-import type { DigitalTwinService, TwinDataRecord } from '@itookit/app-contracts/services';
+import { escapeHTML, escapeAttr, t } from '@nestos/common';
+import { TWIN_KINDS, type TwinMemoryData } from '@nestos/app-contracts';
+import type { DigitalTwinService, TwinDataRecord } from '@nestos/app-contracts/services';
 import { scanListFilters, scanListPagination } from './scan-list';
 
 export type TwinSnapshot = Awaited<ReturnType<DigitalTwinService['snapshot']>>;

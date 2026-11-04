@@ -1,10 +1,10 @@
-import type { JsonValue, DagRunSpec } from '@itookit/llm-flow/contracts';
-import {assertRootCallable, isTargetRef, sameTargetRef} from '@itookit/llm-flow/contracts';
+import type { JsonValue, DagRunSpec } from '@nestos/llm-flow/contracts';
+import {assertRootCallable, isTargetRef, sameTargetRef} from '@nestos/llm-flow/contracts';
 import {flowTargetRef} from './flow-target';
 import type { ICommandBus } from '../contracts';
-import type { Kernel, SessionHandle } from '@itookit/durable-kernel';
-import {simpleHash} from '@itookit/llm-context';
-import { FlowCommand, FlowDefinitionStore, prepareFlowCallInput, type DagCommandService } from '@itookit/llm-flow';
+import type { Kernel, SessionHandle } from '@nestos/durable-kernel';
+import {simpleHash} from '@nestos/llm-context';
+import { FlowCommand, FlowDefinitionStore, prepareFlowCallInput, type DagCommandService } from '@nestos/llm-flow';
 import type { ContentTransferService } from './content-transfers';
 import { createSessionHost, type SessionHostPorts } from '../utils/host-ports';
 import type { FlowInvocationSessions } from '../persistence/flow-invocation-sessions';

@@ -1,14 +1,14 @@
-import {t} from '@itookit/common';
-import {createModuleLogger} from '@itookit/common';
+import {t} from '@nestos/common';
+import {createModuleLogger} from '@nestos/common';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
 import {verifyPromptBundle} from '../run/prompt-bundle';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 import {readContextCatalog, type ContextInspector} from '../projects/harness-context-catalog';
 import type {PreparedWorktree} from '../projects/worktree-preparation';
 import {journalCommand} from '../kanban/journal-command';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {ProjectService} from '@itookit/app-contracts/services';
-import type {KanbanCommand} from '@itookit/kanban/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {ProjectService} from '@nestos/app-contracts/services';
+import type {KanbanCommand} from '@nestos/kanban/contracts';
 import {consumeWorkspaceMessages, unresolvedWorkspaceIssues, type WorkspaceMessage} from '../run/workspace-messages';
 import {KanbanAutomationJournal} from '../kanban/automation-journal';
 import {REMOTE_PROJECT_REFERENCE} from '../kanban/record-execution';
@@ -100,7 +100,7 @@ async function linkResult(options: Options, journal: KanbanAutomationJournal, in
         revision: JSON.stringify({projectId, connectionId: binding.connectionId, profileId: binding.nativeRef.profileId,
             turnId: binding.knownHeadRef, dispatchId: input.dispatch.id})});
 }
-async function linkReference(journal: KanbanAutomationJournal, input: Input, reference: import('@itookit/kanban/contracts').KanbanExternalReference): Promise<void> {
+async function linkReference(journal: KanbanAutomationJournal, input: Input, reference: import('@nestos/kanban/contracts').KanbanExternalReference): Promise<void> {
     const {item} = await input.service.item(input.boardId, input.dispatch.itemId);
     if (item.externalRefs?.some(ref => JSON.stringify(ref) === JSON.stringify(reference))) return;
     const key = 'workspace-reference:' + input.dispatch.id + ':' + reference.system + ':' + (reference.revision ?? '');

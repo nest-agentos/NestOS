@@ -1,7 +1,7 @@
 import { shellOutputChannel } from './shell-output-channel';
 import { invoke } from '@tauri-apps/api/core';
-import type { ApplicationKernelPlatform } from '@itookit/app-core';
-import { randomUUID } from '@itookit/common';
+import type { ApplicationKernelPlatform } from '@nestos/app-core';
+import { randomUUID } from '@nestos/common';
 
 type Factory = NonNullable<ApplicationKernelPlatform['createSessionProcesses']>;
 

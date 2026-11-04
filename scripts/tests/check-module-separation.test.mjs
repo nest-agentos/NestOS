@@ -12,7 +12,7 @@ function fixture(t) {
         const group = name === 'app-core' ? 'backend' : ['app-contracts', 'app-transport'].includes(name) ? 'shared' : name === 'node-host' ? 'apps' : 'ui';
         const directory = join(root, group, name);
         mkdirSync(join(directory, 'src'), { recursive: true });
-        writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@itookit/' + name, exports: { '.': './src/index.ts' } }));
+        writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@nestos/' + name, exports: { '.': './src/index.ts' } }));
         writeFileSync(join(directory, 'src/index.ts'), source);
     };
     return { root, add };
@@ -25,8 +25,8 @@ test('type-only dependencies are erased while re-exports, lazy and CommonJS load
 
 test('a frontend barrel cannot hide a backend dependency through shared contracts', t => {
     const { root, add } = fixture(t);
-    add('app-shell', "export { run } from '@itookit/app-contracts';");
-    add('app-contracts', "export { run } from '@itookit/app-core';");
+    add('app-shell', "export { run } from '@nestos/app-contracts';");
+    add('app-contracts', "export { run } from '@nestos/app-core';");
     add('app-core', 'export function run() {}');
     const errors = separationErrors(root);
     assert.ok(errors.some(error => /frontend loads backend.*app-contracts.*app-core/.test(error)));
@@ -35,8 +35,8 @@ test('a frontend barrel cannot hide a backend dependency through shared contract
 
 test('backend cannot load UI and frontend cannot derive contracts from backend classes', t => {
     const { root, add } = fixture(t);
-    add('app-shell', "import type { Runtime } from '@itookit/app-core'; export const ui = 1;");
-    add('app-core', "export interface Runtime {} export const load = () => import('@itookit/app-shell');");
+    add('app-shell', "import type { Runtime } from '@nestos/app-core'; export const ui = 1;");
+    add('app-core', "export interface Runtime {} export const load = () => import('@nestos/app-shell');");
     const errors = separationErrors(root);
     assert.ok(errors.some(error => error.startsWith('frontend references implementation contract')));
     assert.ok(errors.some(error => error.startsWith('backend loads frontend')));
@@ -76,9 +76,9 @@ test('installed library artifacts retain frontend, backend and shared boundaries
 test('browser tool assembly is host-owned and stays unreachable from Node entrypoints', t => {
     const {root, add} = fixture(t); add('app-shell', 'export const ui = 1;');
     const directory = join(root, 'tools/image-tools'); mkdirSync(join(directory, 'src'), {recursive: true});
-    writeFileSync(join(directory, 'package.json'), JSON.stringify({name: '@itookit/image-tools', exports: {'.': './src/node.ts'}}));
+    writeFileSync(join(directory, 'package.json'), JSON.stringify({name: '@nestos/image-tools', exports: {'.': './src/node.ts'}}));
     writeFileSync(join(directory, 'src/node.ts'), 'export const node = 1;');
-    writeFileSync(join(directory, 'src/browser.ts'), "import '@itookit/app-shell';");
+    writeFileSync(join(directory, 'src/browser.ts'), "import '@nestos/app-shell';");
     assert.deepEqual(separationErrors(root), []);
     writeFileSync(join(directory, 'src/node.ts'), "import './browser';");
     assert.ok(separationErrors(root).some(error => /backend loads frontend.*browser.*app-shell/.test(error)));
@@ -88,15 +88,15 @@ test('browser tool assembly is host-owned and stays unreachable from Node entryp
 test('a business UI package kept outside ui is rejected even if its imports are otherwise empty', t => {
     const { root } = fixture(t), directory = join(root, 'libraries/app-shell');
     mkdirSync(directory, { recursive: true });
-    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@itookit/app-shell' }));
-    assert.deepEqual(directoryErrors(root), ['@itookit/app-shell belongs in ui/, found in libraries/']);
+    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@nestos/app-shell' }));
+    assert.deepEqual(directoryErrors(root), ['@nestos/app-shell belongs in ui/, found in libraries/']);
 });
 
 test('neutral application interfaces are permitted and backend type-only UI references are rejected', t => {
     const { root, add } = fixture(t);
     add('app-contracts', 'export interface ProjectPort { list(): Promise<string[]> }');
-    add('app-shell', "import type { ProjectPort } from '@itookit/app-contracts'; export interface View { projects: ProjectPort }");
-    add('app-core', "import type { View } from '@itookit/app-shell'; export type Service = View;");
+    add('app-shell', "import type { ProjectPort } from '@nestos/app-contracts'; export interface View { projects: ProjectPort }");
+    add('app-core', "import type { View } from '@nestos/app-shell'; export type Service = View;");
     const errors = separationErrors(root);
     assert.equal(errors.filter(error => error.startsWith('frontend')).length, 0);
     assert.ok(errors.some(error => /backend references implementation contract/.test(error)));
@@ -106,7 +106,7 @@ test('neutral application interfaces are permitted and backend type-only UI refe
 test('legacy packages cannot silently fall outside workspace directory checks', t => {
     const { root } = fixture(t), directory = join(root, 'packages/app-shell');
     mkdirSync(directory, { recursive: true });
-    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@itookit/app-shell' }));
+    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@nestos/app-shell' }));
     assert.deepEqual(directoryErrors(root), ['packages/app-shell must move to ui/, backend/, shared/ or apps/']);
 });
 
@@ -120,8 +120,8 @@ test('type-only relative imports cannot bypass application implementation isolat
 
 test('portable transport cannot load the Node host, and Node host cannot load UI', t => {
     const {root, add} = fixture(t);
-    add('app-transport', "export {host} from '@itookit/node-host';");
-    add('node-host', "export {ui as host} from '@itookit/app-shell';");
+    add('app-transport', "export {host} from '@nestos/node-host';");
+    add('node-host', "export {ui as host} from '@nestos/app-shell';");
     add('app-shell', 'export const ui = 1;');
     const errors = separationErrors(root);
     assert.ok(errors.some(error => /shared loads backend/.test(error)));
@@ -131,7 +131,7 @@ test('portable transport cannot load the Node host, and Node host cannot load UI
 test('mixed Kanban entries keep the UI and persistence graphs separate', t => {
     const {root} = fixture(t), directory = join(root, 'libraries/kanban');
     mkdirSync(join(directory, 'src/ui'), {recursive: true});
-    writeFileSync(join(directory, 'package.json'), JSON.stringify({name: '@itookit/kanban', exports: {'.': './src/index.ts', './ui': './src/ui/index.ts'}}));
+    writeFileSync(join(directory, 'package.json'), JSON.stringify({name: '@nestos/kanban', exports: {'.': './src/index.ts', './ui': './src/ui/index.ts'}}));
     writeFileSync(join(directory, 'src/index.ts'), 'export const store = 1;');
     writeFileSync(join(directory, 'src/ui/index.ts'), "export {store} from '../index';");
     assert.ok(separationErrors(root).some(error => error.startsWith('frontend loads backend')));
@@ -142,7 +142,7 @@ test('mixed Kanban entries keep the UI and persistence graphs separate', t => {
 
 test('split Kanban artifacts follow their owned sourcemap sources and fail closed without evidence', t => {
     const {root} = fixture(t);
-    const directory = join(root, 'node_modules/.pnpm/artifact/node_modules/@itookit/kanban/dist');
+    const directory = join(root, 'node_modules/.pnpm/artifact/node_modules/@nestos/kanban/dist');
     mkdirSync(directory, {recursive: true});
     const chunk = join(directory, 'chunk-NEUTRAL.js');
     const save = sources => writeFileSync(chunk + '.map', JSON.stringify({version: 3, sources}));
@@ -165,7 +165,7 @@ test('split Kanban artifacts follow their owned sourcemap sources and fail close
 });
 
 test('bundler guard accepts neutral split artifacts and rejects backend or mixed code in frontend builds', t => {
-    const {root} = fixture(t), directory = join(root, 'node_modules/@itookit/kanban/dist');
+    const {root} = fixture(t), directory = join(root, 'node_modules/@nestos/kanban/dist');
     mkdirSync(directory, {recursive: true});
     const chunk = join(directory, 'chunk-GUARD.js'), context = {
         getModuleIds: () => [chunk], error: message => {throw new Error(message);},

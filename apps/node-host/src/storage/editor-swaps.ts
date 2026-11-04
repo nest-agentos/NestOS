@@ -2,8 +2,8 @@ import {constants} from 'node:fs';
 import {mkdir, lstat, open, rename, unlink, readdir} from 'node:fs/promises';
 import {createHash, randomUUID} from 'node:crypto';
 import path from 'node:path';
-import {createModuleLogger} from '@itookit/common';
-import type {EditorSwap, EditorSwapStore, EditorSwapSnapshot} from '@itookit/app-contracts/services';
+import {createModuleLogger} from '@nestos/common';
+import type {EditorSwap, EditorSwapStore, EditorSwapSnapshot} from '@nestos/app-contracts/services';
 import {canonical, within} from '../runtime/paths';
 
 const log = createModuleLogger('editor-swaps'), maxBytes = 512 * 1024, retentionMs = 48 * 60 * 60 * 1000;

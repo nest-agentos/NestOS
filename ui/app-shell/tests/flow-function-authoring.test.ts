@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createBuiltinDagPluginRegistry } from '@itookit/llm-flow';
-import { FlowCommand, type FlowDraft, type JsonValue } from '@itookit/llm-flow/contracts';
-import { SessionCommand } from '@itookit/llm-session/contracts';
+import { createBuiltinDagPluginRegistry } from '@nestos/llm-flow';
+import { FlowCommand, type FlowDraft, type JsonValue } from '@nestos/llm-flow/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
 import { DagWorkbench } from '../../llm-ui-adapter/src/components/DagWorkbench';
 import { DagDraftController } from '../../llm-ui-adapter/src/components/dag/DagDraftController';
 

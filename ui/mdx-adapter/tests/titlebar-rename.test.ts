@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { CoreTitleBarPlugin } from '@itookit/mdxeditor';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { CoreTitleBarPlugin } from '@nestos/mdxeditor';
 import { renameDocument } from '../src/document-host';
 
 it('renames from the actual filename, preserving its suffix until explicitly replaced', async () => {

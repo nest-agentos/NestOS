@@ -10,8 +10,8 @@ import {
     LogEntry,
     LogFilter,
     escapeHTML
-} from '@itookit/common';
-import { Toast, Modal } from '@itookit/ui-common-adapter';
+} from '@nestos/common';
+import { Toast, Modal } from '@nestos/ui-common-adapter';
 
 export class LogViewerSection {
     private container: HTMLElement;

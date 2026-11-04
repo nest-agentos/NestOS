@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { ToolDeviceDriver } from '@itookit/tools';
+import { ToolDeviceDriver } from '@nestos/tools';
 import { LLM_IOCTL } from '../llm-management/contracts/device';
 import { MCPToolAdapter, mcpToolId, mcpResourceToolId, mcpPromptToolId } from './mcp-tools';
 

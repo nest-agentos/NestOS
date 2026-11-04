@@ -1,6 +1,6 @@
-import { filesBrowserPrefix, folderBrowserPath, folderPathFromBrowserPath, parentBrowserPath, remoteSessionPath, resolveBrowserTarget } from '@itookit/app-contracts';
-import { t } from '@itookit/common';
-import type { FSNode } from '@itookit/vfs-core';
+import { filesBrowserPrefix, folderBrowserPath, folderPathFromBrowserPath, parentBrowserPath, remoteSessionPath, resolveBrowserTarget } from '@nestos/app-contracts';
+import { t } from '@nestos/common';
+import type { FSNode } from '@nestos/vfs-core';
 import { fileDirectoryBreadcrumbs, type DirectoryBreadcrumb } from '../workbench/directory-breadcrumbs';
 
 /** Project route policy stays outside the generic breadcrumb renderer. */

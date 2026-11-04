@@ -1,6 +1,6 @@
-import {createModuleLogger} from '@itookit/common';
-import type {OperationLedger, OperationRecord, OperationReceipt} from '@itookit/llm-ui';
-import {IndependentCallCommand, type IndependentCallCancelRemainingRequest, type IndependentCallTreeCancellationReceipt, type IndependentCallCancelRequest, type IndependentCallCancellationReceipt, type IndependentCallStateControlRequest, type IndependentCallStateControlReceipt, type IndependentCallResponseRequest, type IndependentCallResponseReceipt, type ICommandBus} from '@itookit/llm-session/contracts';
+import {createModuleLogger} from '@nestos/common';
+import type {OperationLedger, OperationRecord, OperationReceipt} from '@nestos/llm-ui';
+import {IndependentCallCommand, type IndependentCallCancelRemainingRequest, type IndependentCallTreeCancellationReceipt, type IndependentCallCancelRequest, type IndependentCallCancellationReceipt, type IndependentCallStateControlRequest, type IndependentCallStateControlReceipt, type IndependentCallResponseRequest, type IndependentCallResponseReceipt, type ICommandBus} from '@nestos/llm-session/contracts';
 import {canonicalJson} from '../utils/canonical-json';
 
 export const callTreeCancellationProtocol = 'independent-call-tree-cancel-v1';

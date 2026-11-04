@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
-import type { SessionMemoryControls } from '@itookit/llm-session';
+import { t } from '@nestos/common';
+import type { SessionMemoryControls } from '@nestos/llm-session';
 import { showMemoryDialog } from '../src/files/memory-dialog';
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });

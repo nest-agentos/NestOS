@@ -1,7 +1,7 @@
-import {createModuleLogger} from '@itookit/common';
-import type {KernelViewPort, TaskRecord} from '@itookit/durable-kernel/contracts';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {createModuleLogger} from '@nestos/common';
+import type {KernelViewPort, TaskRecord} from '@nestos/durable-kernel/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 
 const log = createModuleLogger('flow-scheduler-recovery');
 /** Reattach admitted Flow schedulers, including reruns which have no invocation journal. */

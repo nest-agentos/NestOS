@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
-import {FSError} from '@itookit/vfs-core';
-import {MAX_BODY_BYTES} from '@itookit/app-transport/rpc';
+import {FSError} from '@nestos/vfs-core';
+import {MAX_BODY_BYTES} from '@nestos/app-transport/rpc';
 import type {AuditPort} from '../logging/audit-log';
 
 interface Entry {data: string; bytes: number; expires: number}

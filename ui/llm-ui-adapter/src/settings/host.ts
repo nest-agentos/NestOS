@@ -1,12 +1,12 @@
 import {settingsNavigation} from './navigation';
-import * as presentation from '@itookit/common';
-import {createSettingsUI,type SettingsHost,type SettingsEditorOptions,type SettingsUI} from '@itookit/llm-ui/settings';
-import * as rules from '@itookit/kernel-adapters/contracts';
-import * as config from '@itookit/kernel-adapters/llm/config';
-import {getPrimaryProtocol,getProviderProtocols,getProviderDefaultProtocol,modelReasoning,isReasoningCapabilities,isMediaCatalog,requireMediaCapabilities,API_PROTOCOLS} from '@itookit/driver-llm/contracts';
-import {mcpConfiguration,mcpTimeoutMs} from '@itookit/tools/mcp-contracts';
+import * as presentation from '@nestos/common';
+import {createSettingsUI,type SettingsHost,type SettingsEditorOptions,type SettingsUI} from '@nestos/llm-ui/settings';
+import * as rules from '@nestos/kernel-adapters/contracts';
+import * as config from '@nestos/kernel-adapters/llm/config';
+import {getPrimaryProtocol,getProviderProtocols,getProviderDefaultProtocol,modelReasoning,isReasoningCapabilities,isMediaCatalog,requireMediaCapabilities,API_PROTOCOLS} from '@nestos/driver-llm/contracts';
+import {mcpConfiguration,mcpTimeoutMs} from '@nestos/tools/mcp-contracts';
 import yaml from 'js-yaml';
-import {editorFilePath,type EditorOptions} from '@itookit/ui-common-adapter';
+import {editorFilePath,type EditorOptions} from '@nestos/ui-common-adapter';
 
 function prepareOptions(value:unknown):SettingsEditorOptions {
     const options=(value??{}) as EditorOptions, path=editorFilePath(options), files=options.files?.fs;

@@ -62,9 +62,9 @@ interrupt 事务保存控制请求、清理责任和 lost attempt，旧结果 / 
 应用挂接也传入观察专用 AbortSignal；[RunAttachmentController](../../ui/llm-ui-adapter/src/shell/RunAttachmentController.ts) 在 detach 时中断挂起的 next，不取消后台 Task。对应 16 项挂接测试通过，包含新增的观察释放回归。
 
 ```bash
-pnpm --filter @itookit/durable-kernel typecheck
-pnpm --filter @itookit/durable-kernel test
-pnpm --filter @itookit/durable-kernel test:package
+pnpm --filter @nestos/durable-kernel typecheck
+pnpm --filter @nestos/durable-kernel test
+pnpm --filter @nestos/durable-kernel test:package
 pnpm typecheck
 pnpm docs:check
 pnpm architecture:check

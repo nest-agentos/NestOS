@@ -1,4 +1,4 @@
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 import type { TwinRecordFamily, TwinRecordWrite } from './contracts';
 import { TwinRecords, write, type TwinDataRecord } from './records';
 import { identifiers, SCAN_TERMINAL, type TwinScanRun } from './scan-domain';

@@ -1,4 +1,4 @@
-import type {LLMModel} from '@itookit/driver-llm/contracts';
+import type {LLMModel} from '@nestos/driver-llm/contracts';
 
 /** Complete an exact ID from the host's declared catalog; never infer from display names. */
 export function completeModelDeclaration(model: LLMModel, declared?: LLMModel): LLMModel {

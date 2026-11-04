@@ -1,4 +1,4 @@
-import {MOBILE_NAVIGATION_QUERY} from '@itookit/ui-common-adapter';
+import {MOBILE_NAVIGATION_QUERY} from '@nestos/ui-common-adapter';
 /** Reports the sidebar surface; each workspace owns the visibility of its local views. */
 export function observeNavigationVisibility(layout: HTMLElement, sidebar: HTMLElement, changed: (visible: boolean) => void): () => void {
     const workspace = layout.closest('.workspace-view'), media = window.matchMedia?.(MOBILE_NAVIGATION_QUERY);

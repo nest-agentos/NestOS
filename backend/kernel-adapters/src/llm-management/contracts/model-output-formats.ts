@@ -1,4 +1,4 @@
-import {API_PROTOCOLS, type ApiProtocol, type LLMModel, type ResponseFormat} from '@itookit/driver-llm/contracts';
+import {API_PROTOCOLS, type ApiProtocol, type LLMModel, type ResponseFormat} from '@nestos/driver-llm/contracts';
 
 export type ModelOutputFormat = ResponseFormat['type'];
 type OutputModel = Pick<LLMModel, 'id' | 'category' | 'supportsStructuredOutput'>;

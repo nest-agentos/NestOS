@@ -1,7 +1,7 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import type {TaskRecord} from '@itookit/durable-kernel';
-import type {KanbanDispatch, KanbanItem} from '@itookit/kanban/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import type {TaskRecord} from '@nestos/durable-kernel';
+import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {UserEventService} from '../src/events/service';
 import {developmentLifecycle} from '../src/presets/kanban-development-lifecycle';

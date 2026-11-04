@@ -3,8 +3,8 @@ import sharp from 'sharp';
 import {createTools, sharpEngine} from '../src/node';
 import {createImageTools} from '../src/core';
 import {imageInputSchema} from '../src/contract';
-import type {ToolUseContext} from '@itookit/tools';
-import {sha256Hex} from '@itookit/llm-context';
+import type {ToolUseContext} from '@nestos/tools';
+import {sha256Hex} from '@nestos/llm-context';
 const recipe = {version:1 as const, resize:{mode:'max-edge' as const,maxEdge:100},color:'grayscale' as const,
     output:{mimeType:'image/jpeg' as const,quality:0.9,minQuality:0.65,maxBytes:5000}};
 const fixture = () => sharp({create:{width:200,height:100,channels:3,background:'#e03070'}}).png().toBuffer();

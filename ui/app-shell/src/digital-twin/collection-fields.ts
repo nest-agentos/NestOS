@@ -1,7 +1,7 @@
-import {escapeHTML, escapeAttr} from '@itookit/common';
-import type {TwinCollectionExecutor, TwinScannerTool} from '@itookit/app-contracts';
-import type {RootCallTarget} from '@itookit/llm-session/contracts';
-import {renderParameterFields, readParameterFields} from '@itookit/llm-ui/forms';
+import {escapeHTML, escapeAttr} from '@nestos/common';
+import type {TwinCollectionExecutor, TwinScannerTool} from '@nestos/app-contracts';
+import type {RootCallTarget} from '@nestos/llm-session/contracts';
+import {renderParameterFields, readParameterFields} from '@nestos/llm-ui/forms';
 import {executorFields, readScannerExecutor} from './scanner-fields';
 import {collectionParameters, collectionVariant, selectedCollectionBranch} from './collection-schema';
 import {label} from './view';
@@ -9,7 +9,7 @@ import {collectionDestinationFields, readCollectionDestination, type CollectionP
 export const collectionKey = (target: {kind: string; id: string; version: string; digest: string}) => JSON.stringify([target.kind, target.id, target.version, target.digest]);
 export function collectionFields(targets: RootCallTarget[], tools: TwinScannerTool[], selected?: TwinCollectionExecutor, projects: CollectionProject[] = []): string {
     const tool = tools.find(item => selected && collectionKey(item.target) === collectionKey(selected.target));
-    const host = executorFields(targets, selected?.target.kind === 'tool' ? undefined : selected as import('@itookit/app-contracts').TwinScannerExecutor | undefined, 'collection');
+    const host = executorFields(targets, selected?.target.kind === 'tool' ? undefined : selected as import('@nestos/app-contracts').TwinScannerExecutor | undefined, 'collection');
     const options = tools.filter(item => !item.hidden || tool === item).map(item => `<option value="${escapeAttr(collectionKey(item.target))}" ${tool === item ? 'selected' : ''}>${escapeHTML(item.name)}</option>`).join('');
     const base = selected ? host : host.replace('<option value="">', '<option value="" selected>');
     let html = base.replace('<select name="collection">', '<select name="collection">' + options);

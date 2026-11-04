@@ -1,5 +1,5 @@
-import { createModuleLogger, randomUUID } from '@itookit/common';
-import type { FlowImageConstraints } from '@itookit/llm-flow/contracts';
+import { createModuleLogger, randomUUID } from '@nestos/common';
+import type { FlowImageConstraints } from '@nestos/llm-flow/contracts';
 
 const log = createModuleLogger('flow-images');
 export class FlowImageError extends Error {

@@ -1,8 +1,8 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import {ResourceCommand, type ResourceMediaContent, type ResourceScope} from './resource-reference';
 import {InputAssetCommand} from '../presets/input-assets';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
-import type {FlowParameter, JsonValue} from '@itookit/llm-flow/contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
+import type {FlowParameter, JsonValue} from '@nestos/llm-flow/contracts';
 
 const log = createModuleLogger('flow-arguments');
 type Values = Record<string, JsonValue>;

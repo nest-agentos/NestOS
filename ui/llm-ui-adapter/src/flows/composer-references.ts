@@ -1,6 +1,6 @@
-import {createModuleLogger} from '@itookit/common';
-import type {ResourceScope} from '@itookit/app-contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {createModuleLogger} from '@nestos/common';
+import type {ResourceScope} from '@nestos/app-contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 import {resolveFlowArguments} from './flow-arguments';
 
 const log = createModuleLogger('flow-composer-references');

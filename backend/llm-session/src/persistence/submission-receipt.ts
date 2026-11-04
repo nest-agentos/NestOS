@@ -1,4 +1,4 @@
-import type { SessionSubmission } from '@itookit/llm-flow/contracts';
+import type { SessionSubmission } from '@nestos/llm-flow/contracts';
 import type { Round } from '../contracts';
 import type { ISessionRepository } from './types';
 

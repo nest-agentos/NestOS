@@ -4,12 +4,12 @@
 // Process programs use ILLMService through the injected LLM resource port.
 // 不直接感知 device driver 的 open/write/readStream 模式。
 
-import type { MediaGenerationRequest, MediaGenerationResult, ChatCompletionParams, ChatCompletionResponse, ChatCompletionChunk, ConnectionMeta, LLMProvider } from '@itookit/driver-llm/contracts';
-import type { ILLMService } from '@itookit/driver-llm/contracts';
+import type { MediaGenerationRequest, MediaGenerationResult, ChatCompletionParams, ChatCompletionResponse, ChatCompletionChunk, ConnectionMeta, LLMProvider } from '@nestos/driver-llm/contracts';
+import type { ILLMService } from '@nestos/driver-llm/contracts';
 import type {
     IDeviceDriver,
     DeviceContext,
-} from '@itookit/vfs-core';
+} from '@nestos/vfs-core';
 import { LLM_IOCTL } from '../llm-management/contracts/device';
 
 const BASE_CTX: DeviceContext = { nodeId: 'llm', name: 'llm' };

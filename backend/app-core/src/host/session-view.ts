@@ -1,6 +1,6 @@
-import { FSError, type FileSystemContextOwner } from '@itookit/vfs-core';
-import { SessionCommand, type SessionSnapshot } from '@itookit/llm-session/contracts';
-import type { LocalApplicationServices, SessionEditorInitialData, SessionOpenView } from '@itookit/app-contracts/services';
+import { FSError, type FileSystemContextOwner } from '@nestos/vfs-core';
+import { SessionCommand, type SessionSnapshot } from '@nestos/llm-session/contracts';
+import type { LocalApplicationServices, SessionEditorInitialData, SessionOpenView } from '@nestos/app-contracts/services';
 
 /** Preparation may fail without replacing the editor's current binding. */
 export async function openSessionView(services: LocalApplicationServices, sessionId: string): Promise<SessionOpenView> {

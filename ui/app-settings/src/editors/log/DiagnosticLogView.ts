@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import type {ApplicationDiagnostics, DiagnosticEvent, DiagnosticQuery} from '@itookit/app-contracts/services';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import type {ApplicationDiagnostics, DiagnosticEvent, DiagnosticQuery} from '@nestos/app-contracts/services';
 
 const pageSize = 20;
 const log = createModuleLogger('diagnostic-log-view');

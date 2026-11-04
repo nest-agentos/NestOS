@@ -1,4 +1,4 @@
-import { SyncError, type Coordinator } from '@itookit/vfs-sync';
+import { SyncError, type Coordinator } from '@nestos/vfs-sync';
 
 /** Web Locks span tabs; native application transactions still validate inputs. */
 export class WebSyncCoordinator implements Coordinator {

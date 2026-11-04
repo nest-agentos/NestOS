@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SessionHandle } from '@itookit/durable-kernel';
+import type { SessionHandle } from '@nestos/durable-kernel';
 import type { DagEdgeDefinition, DagNodeDefinition } from '../src/contracts';
 import { downstreamNodes, consumeGraphRetryIntents, type FlowGraphRetryIntent } from '../src/flow/graph-retry';
 

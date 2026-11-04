@@ -1,7 +1,7 @@
 import {mountTitleBar as mountSharedTitleBar, navigationButton,
-    type ContentTitleBarParts, type ContentTitleBarState} from '@itookit/ui-common';
-import {installNavigationButtonPresentation} from '@itookit/ui-common-adapter';
-import {ACTION_ICONS, t} from '@itookit/common';
+    type ContentTitleBarParts, type ContentTitleBarState} from '@nestos/ui-common';
+import {installNavigationButtonPresentation} from '@nestos/ui-common-adapter';
+import {ACTION_ICONS, t} from '@nestos/common';
 import {navigateWorkspaceBack} from '../navigation/page-history';
 const mounted = new WeakMap<HTMLElement, () => void>();
 

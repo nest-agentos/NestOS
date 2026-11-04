@@ -1,11 +1,11 @@
-import { createFileSystemSource, MemoryBackend, type FileSystemSourceOwner } from '@itookit/vfs-core';
+import { createFileSystemSource, MemoryBackend, type FileSystemSourceOwner } from '@nestos/vfs-core';
 import { configuredModels, modelCapabilities, runnableModel } from './model-capabilities';
-import { createModuleLogger, ENTITY_ICONS, randomUUID, t } from '@itookit/common';
-import { type SystemPromptDefinition } from '@itookit/llm-tasks/contracts';
-import { type MCPServer, type MCPConnectionState } from '@itookit/tools/mcp-contracts';
-import { operationModelNames, hasConnectionCredentials, resolveChatModelTiers, resolveModelForTier, type IConnectionService } from '@itookit/kernel-adapters/contracts';
-import { type ToolMeta } from '@itookit/tools/contracts';
-import { type ToolDefinition } from '@itookit/llm-context';
+import { createModuleLogger, ENTITY_ICONS, randomUUID, t } from '@nestos/common';
+import { type SystemPromptDefinition } from '@nestos/llm-tasks/contracts';
+import { type MCPServer, type MCPConnectionState } from '@nestos/tools/mcp-contracts';
+import { operationModelNames, hasConnectionCredentials, resolveChatModelTiers, resolveModelForTier, type IConnectionService } from '@nestos/kernel-adapters/contracts';
+import { type ToolMeta } from '@nestos/tools/contracts';
+import { type ToolDefinition } from '@nestos/llm-context';
 
 export interface ToolboxTool { id: string; name: string; description: string; source: string; serverId?: string; enabled: boolean; parameters?: unknown }
 import type { RemoteHarnessAgent } from '../projects/remote-agent-catalog';
@@ -20,9 +20,9 @@ export class ToolboxInventory {
     readonly remoteAgents = new Map<string, RemoteHarnessAgent>();
     get remoteAgentSource() { return this.owners.remoteAgents!.fs; }
     readonly providers = new Map<string, { id: string; name: string; icon?: string; enabled: boolean; configured: boolean; capabilityTags?: string[]; authentication?: 'chatgpt'; authorizationAvailable?: boolean }>();
-    readonly connections = new Map<string, { providerId: string; enabled: boolean; credentialsReady?: boolean; model?: string | null; configuredModel?: string | null; primaryModel?: string | null; primaryCapabilityTags?: string[]; operationModels?: Partial<Record<import('@itookit/kernel-adapters/contracts').ModelOperation, string>>; capabilityTags?: string[] }>();
+    readonly connections = new Map<string, { providerId: string; enabled: boolean; credentialsReady?: boolean; model?: string | null; configuredModel?: string | null; primaryModel?: string | null; primaryCapabilityTags?: string[]; operationModels?: Partial<Record<import('@nestos/kernel-adapters/contracts').ModelOperation, string>>; capabilityTags?: string[] }>();
     defaultConnectionId?: string;
-    modelDefaults: import('@itookit/kernel-adapters/contracts').ModelDefaults = {};
+    modelDefaults: import('@nestos/kernel-adapters/contracts').ModelDefaults = {};
     readonly tools = new Map<string, ToolboxTool>();
     constructor(private readonly servers: () => Promise<MCPServer[]>, private readonly catalog: Catalog, private readonly models?: IConnectionService, private readonly prompts?: () => Promise<SystemPromptDefinition[]>, private readonly harnesses?: () => Promise<RemoteHarnessAgent[]>, private readonly projectHealth?: (id: string) => Promise<{total: number; offline: number; unknown: number; degraded: number}>) {}
     async init(): Promise<void> {

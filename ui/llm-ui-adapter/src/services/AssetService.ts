@@ -1,8 +1,8 @@
 // @file: llm-ui/services/AssetService.ts
 
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
-import {createModuleLogger, randomUUID, sha256Hex, t} from '@itookit/common';
-import type {ChatAttachment} from '@itookit/llm-session/contracts';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
+import {createModuleLogger, randomUUID, sha256Hex, t} from '@nestos/common';
+import type {ChatAttachment} from '@nestos/llm-session/contracts';
 import {fileBytes} from '../utils/file-bytes';
 import type {DraftFilePort} from './DraftFilesCodec';
 import {validDraftToken} from '../domain/draft-file-identity';

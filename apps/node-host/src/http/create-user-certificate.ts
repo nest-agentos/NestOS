@@ -5,7 +5,7 @@ import path from 'node:path';
 import {promisify} from 'node:util';
 import {validUserId} from './certificates';
 import {privateDirectory} from '../runtime/paths';
-import {createModuleLogger} from '@itookit/common';
+import {createModuleLogger} from '@nestos/common';
 
 const execute = promisify(execFile), log = createModuleLogger('http-certificates');
 /** Issue a new device identity without replacing the CA, server certificate or existing users. */

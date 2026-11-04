@@ -1,11 +1,11 @@
 import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { SessionFilesService } from '@itookit/app-core';
-import type { Kernel } from '@itookit/durable-kernel';
-import type {EditorFactory} from '@itookit/ui-common-adapter';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { SessionFilesService } from '@nestos/app-core';
+import type { Kernel } from '@nestos/durable-kernel';
+import type {EditorFactory} from '@nestos/ui-common-adapter';
 
 afterEach(() => vi.unstubAllGlobals());
 

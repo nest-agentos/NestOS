@@ -1,6 +1,6 @@
-import { escapeHTML, t } from '@itookit/common';
-import { type FlowDraft, type FlowNodeDefinition } from '@itookit/llm-flow/contracts';
-import { renderFlowTemplate } from '@itookit/llm-flow/contracts';
+import { escapeHTML, t } from '@nestos/common';
+import { type FlowDraft, type FlowNodeDefinition } from '@nestos/llm-flow/contracts';
+import { renderFlowTemplate } from '@nestos/llm-flow/contracts';
 
 /** Authoring helpers only; neither preview nor variable insertion invokes a model. */
 export function enhanceInvocationEditor(root: HTMLElement, draft: FlowDraft, node: FlowNodeDefinition, allowPreview = true): void {

@@ -1,4 +1,4 @@
-import type { JsonValue, SessionHandle, TaskRecord } from '@itookit/durable-kernel';
+import type { JsonValue, SessionHandle, TaskRecord } from '@nestos/durable-kernel';
 import type { FlowWorkspacePolicy } from '../contracts';
 import { readFlowSchedulerCheckpoint } from './checkpoint-store';
 import { readFlowRunMembers } from './run-members';

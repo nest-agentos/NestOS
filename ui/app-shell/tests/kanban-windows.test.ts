@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {createNestOSKanban} from '@itookit/app-core/kanban';
-import {SeqKanbanStore} from '@itookit/kanban/storage';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {createNestOSKanban} from '@nestos/app-core/kanban';
+import {SeqKanbanStore} from '@nestos/kanban/storage';
 import {KanbanWindowWorkbench} from '../src/kanban/windows';
 import {WorkbenchWindows} from '../src/workbench/windows';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); document.body.replaceChildren();});

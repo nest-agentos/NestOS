@@ -1,9 +1,9 @@
 import {ContentTransferService} from '../src/session/content-transfers';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { createBuiltinDagPluginRegistry, registerDurablePrograms, DagCommandService, FlowCommand, FlowDefinitionStore } from '@itookit/llm-flow';
-import type { FlowRevision } from '@itookit/llm-flow/contracts';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { createBuiltinDagPluginRegistry, registerDurablePrograms, DagCommandService, FlowCommand, FlowDefinitionStore } from '@nestos/llm-flow';
+import type { FlowRevision } from '@nestos/llm-flow/contracts';
 import { FlowInvocationService } from '../src/session/flow-invocations';
 import { CommandBus } from '../src/core/command-bus';
 import { SessionManager } from '../src/session/session-manager';

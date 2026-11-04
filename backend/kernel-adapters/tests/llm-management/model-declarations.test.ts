@@ -7,7 +7,7 @@ it('inherits declared token capacities without overriding an explicit user confi
 });
 import {createLlmDeviceCatalog} from '../../src/llm-management/catalogs';
 const volcengineImageModels = createLlmDeviceCatalog().providers.volcengine.models.filter(model => model.category === 'image');
-import {requireMediaCapabilities} from '@itookit/driver-llm/contracts';
+import {requireMediaCapabilities} from '@nestos/driver-llm/contracts';
 
 it('repairs exact documented image IDs while retaining user-specific configuration', () => {
     const preset = volcengineImageModels.find(model => model.id === 'doubao-seedream-5-0-flash-260915')!;

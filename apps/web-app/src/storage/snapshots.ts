@@ -5,11 +5,11 @@
  * Operates below the VFS abstraction — snapshots are raw database clones,
  * not VFS backups. For VFS-level backup/restore use vfs.maintenance.*.
  */
-import type { IVFSManager } from '@itookit/vfs-core';
+import type { IVFSManager } from '@nestos/vfs-core';
 
 const SNAPSHOT_PREFIX = 'snapshot_';
 
-import type { LocalSnapshot, SnapshotPort } from '@itookit/app-contracts/settings';
+import type { LocalSnapshot, SnapshotPort } from '@nestos/app-contracts/settings';
 export class SnapshotService implements SnapshotPort {
     constructor(
         private readonly vfs: IVFSManager,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { SessionDirectoryStorageResolver, sessionDirectoryStorage } from '../src/persistence/session-directory-storage';
 
 const cleanup: Array<() => Promise<void>> = [];

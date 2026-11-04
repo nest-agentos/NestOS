@@ -1,5 +1,5 @@
-import {createModuleLogger, t} from '@itookit/common';
-import {IndependentCallCommand, type IndependentCallView, type IndependentCallDescendant, type IndependentCallDescendantPage, type IndependentCallDescendantsResult, type ICommandBus} from '@itookit/llm-session/contracts';
+import {createModuleLogger, t} from '@nestos/common';
+import {IndependentCallCommand, type IndependentCallView, type IndependentCallDescendant, type IndependentCallDescendantPage, type IndependentCallDescendantsResult, type ICommandBus} from '@nestos/llm-session/contracts';
 import type {CallControlOperations} from '../independent/call-control';
 import {assertDescendantPage} from '../independent/descendant-page';
 import {callControlErrorCode} from '../independent/call-control';

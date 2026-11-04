@@ -1,6 +1,6 @@
-import { FSError } from '@itookit/vfs-core';
-import { SessionCommand } from '@itookit/llm-session/contracts';
-import type { ICommandBus, SessionSnapshot, SessionViewPort, SessionEventEnvelope } from '@itookit/llm-session/contracts';
+import { FSError } from '@nestos/vfs-core';
+import { SessionCommand } from '@nestos/llm-session/contracts';
+import type { ICommandBus, SessionSnapshot, SessionViewPort, SessionEventEnvelope } from '@nestos/llm-session/contracts';
 
 export interface ConversationClient {
     sessionManager: Pick<SessionViewPort, 'onEvent' | 'onGlobalEvent'> & { getSnapshot(): SessionSnapshot };

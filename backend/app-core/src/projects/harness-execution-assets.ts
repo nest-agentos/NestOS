@@ -1,9 +1,9 @@
-import type {EffectExecutionContext} from '@itookit/durable-kernel';
-import {prepareHarnessInput, type HarnessAssetAttachment, type HarnessExecutionRequest, type HarnessInlineAttachment} from '@itookit/kernel-adapters/contracts';
-import {sha256Hex} from '@itookit/llm-context/digest';
-import {isSupportedTextContent} from '@itookit/driver-llm';
-import {validateHarnessAttachments, type HarnessProfile} from '@itookit/cells-driver/harness';
-import type {TaskAssetReader} from '@itookit/tools/contracts';
+import type {EffectExecutionContext} from '@nestos/durable-kernel';
+import {prepareHarnessInput, type HarnessAssetAttachment, type HarnessExecutionRequest, type HarnessInlineAttachment} from '@nestos/kernel-adapters/contracts';
+import {sha256Hex} from '@nestos/llm-context/digest';
+import {isSupportedTextContent} from '@nestos/driver-llm';
+import {validateHarnessAttachments, type HarnessProfile} from '@nestos/cells-driver/harness';
+import type {TaskAssetReader} from '@nestos/tools/contracts';
 import {executionError} from './harness-execution-journal';
 import {validateExecutionInput} from './harness-execution-call-input';
 

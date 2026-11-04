@@ -3,15 +3,15 @@
 // Flow nodes. Both reference configuration entities (system prompt, tools,
 // skills, connection) by id, so editing an entity updates every referrer.
 
-import type { ModelTier } from '@itookit/driver-llm/contracts';
-import type { ResponseFormat } from '@itookit/driver-llm/contracts';
+import type { ModelTier } from '@nestos/driver-llm/contracts';
+import type { ResponseFormat } from '@nestos/driver-llm/contracts';
 
 /** How an LLM node assembles its conversation history. */
 export type HistoryPolicy = 'inherit' | 'none' | 'upstream';
 /** How inherited and node-local system prompts are composed. */
 export type SystemPromptPolicy = 'inherit' | 'replace' | 'none';
 
-export type { PromptPreset, SystemPromptDefinition } from '@itookit/tools/contracts';
+export type { PromptPreset, SystemPromptDefinition } from '@nestos/tools/contracts';
 
 /**
  * How long a scope's entries are kept. This is a *storage* bound, not a retrieval
@@ -44,8 +44,8 @@ export interface OutputValidationPolicy {
     onInvalid?: 'fail' | 'repair' | 'continue';
 }
 
-import type { ContextCompactionPolicy } from '@itookit/llm-context';
-export type { ContextCompactionPolicy } from '@itookit/llm-context';
+import type { ContextCompactionPolicy } from '@nestos/llm-context';
+export type { ContextCompactionPolicy } from '@nestos/llm-context';
 
 /**
  * Unified node configuration: reference configuration entities by id plus

@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { SkillDefinition } from '@itookit/tools/contracts';
+import type { SkillDefinition } from '@nestos/tools/contracts';
 import { SkillDeviceDriver } from './skill-device-driver';
 import { buildSkillPromptContext } from './prompt-context';
 

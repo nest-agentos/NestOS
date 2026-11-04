@@ -1,2 +1,2 @@
-export { userIdentity, identityKey } from '@itookit/app-contracts';
-export type { TwinUserIdentity } from '@itookit/app-contracts';
+export { userIdentity, identityKey } from '@nestos/app-contracts';
+export type { TwinUserIdentity } from '@nestos/app-contracts';

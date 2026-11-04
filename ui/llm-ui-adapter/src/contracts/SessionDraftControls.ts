@@ -1,5 +1,5 @@
-import type {IEditor} from '@itookit/ui-common-adapter';
-import type {EditorFactory} from '@itookit/ui-common-adapter';
+import type {IEditor} from '@nestos/ui-common-adapter';
+import type {EditorFactory} from '@nestos/ui-common-adapter';
 
 export interface SessionDraftMaterialization {
     container: HTMLElement;

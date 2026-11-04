@@ -1,4 +1,4 @@
-import { requireMediaCapabilities, type ConnectionMeta, type LLMModel, type LLMProvider } from '@itookit/driver-llm/contracts';
+import { requireMediaCapabilities, type ConnectionMeta, type LLMModel, type LLMProvider } from '@nestos/driver-llm/contracts';
 import { resolveChatModelForTier, resolveModelForTier } from './connection';
 
 export const MODEL_OPERATIONS = ['chat', 'image.generate', 'speech.synthesize'] as const;

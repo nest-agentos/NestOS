@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
 const bundledContracts = new Set([
-    '@itookit/llm-tasks/contracts', '@itookit/kernel-adapters/contracts',
-    '@itookit/driver-llm/contracts', '@itookit/tools/mcp-contracts',
+    '@nestos/llm-tasks/contracts', '@nestos/kernel-adapters/contracts',
+    '@nestos/driver-llm/contracts', '@nestos/tools/mcp-contracts',
 ]);
 
 export default defineConfig({

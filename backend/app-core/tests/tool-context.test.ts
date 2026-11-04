@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createVFS, createFileSystemView, MemoryBackend, type IFileSystem } from '@itookit/vfs-core';
+import { createVFS, createFileSystemView, MemoryBackend, type IFileSystem } from '@nestos/vfs-core';
 import { createVFSToolContext } from '../src/vfs/tool-context';
 
 const cleanup: Array<() => Promise<void>> = [];

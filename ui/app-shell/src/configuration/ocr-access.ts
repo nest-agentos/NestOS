@@ -1,5 +1,5 @@
-import type { OcrService } from '@itookit/app-contracts/services';
-import type { IAgentManagementService } from '@itookit/kernel-adapters/contracts';
+import type { OcrService } from '@nestos/app-contracts/services';
+import type { IAgentManagementService } from '@nestos/kernel-adapters/contracts';
 import { lazyResource } from '../lifecycle/lazy-resource';
 
 /** Observing an empty input must not load OCR; bind its remote events on first use. */

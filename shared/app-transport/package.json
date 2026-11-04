@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/app-transport",
+  "name": "@nestos/app-transport",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,10 +13,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@itookit/app-contracts": "workspace:*",
-    "@itookit/vfs-core": "workspace:*"
+    "@nestos/app-contracts": "workspace:*",
+    "@nestos/vfs-core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "shared/app-transport"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

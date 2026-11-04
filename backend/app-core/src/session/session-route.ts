@@ -1,1 +1,1 @@
-export { parseSessionRoute, sessionRoute } from '@itookit/app-contracts';
+export { parseSessionRoute, sessionRoute } from '@nestos/app-contracts';

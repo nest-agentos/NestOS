@@ -1,6 +1,6 @@
 // @file: llm-ui/components/templates/FloatingNavPanelTemplates.ts
 
-import { escapeHTML } from '@itookit/common';
+import { escapeHTML } from '@nestos/common';
 import { BranchItem } from '../../domain/types';
 import { ChatNavItem } from '../../domain/ports/INavigationPresenter';
 

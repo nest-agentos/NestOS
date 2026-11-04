@@ -1,6 +1,6 @@
-import { assertEffectGrant } from '@itookit/durable-kernel';
-import type { ISkillService } from '@itookit/tools/contracts';
-import type { EffectAdapter, EffectExecutionContext, EffectReconcileResult } from '@itookit/durable-kernel';
+import { assertEffectGrant } from '@nestos/durable-kernel';
+import type { ISkillService } from '@nestos/tools/contracts';
+import type { EffectAdapter, EffectExecutionContext, EffectReconcileResult } from '@nestos/durable-kernel';
 import { resolveCapability, type CapabilitySource } from '../ports/capabilities';
 import { forgetLoadedSkill } from '../skill/loaded-state';
 import { InFlightEffects } from './in-flight';

@@ -4,8 +4,8 @@ import {independentPreparationInstruction, independentPreparationError} from './
 import { prepareFlowConnections } from './flow-connections';
 import {callInputProjection} from './call-input-projection';
 import { type Signal } from '../contracts';
-import { type ToolDefinition, type ContextSnapshot } from '@itookit/llm-context';
-import type { Kernel } from '@itookit/durable-kernel';
+import { type ToolDefinition, type ContextSnapshot } from '@nestos/llm-context';
+import type { Kernel } from '@nestos/durable-kernel';
 import { ulid } from '../persistence/ulid';
 import type {
     ChatAttachment,
@@ -19,16 +19,16 @@ import type {
 } from '../core/types';
 import { ConversationError, ConversationErrorCode } from '../core/errors';
 import type { ISessionRepository } from '../persistence/types';
-import { FlowDefinitionStore, type FlowStore } from '@itookit/llm-flow';
+import { FlowDefinitionStore, type FlowStore } from '@nestos/llm-flow';
 import { RoundLog } from '../persistence/round-log';
-import { flowToDag, hasValidationErrors, validateFlowParameters } from '@itookit/llm-flow';
+import { flowToDag, hasValidationErrors, validateFlowParameters } from '@nestos/llm-flow';
 import { formatErrorMessage } from '../utils/error-formatter';
 import { createSessionHost, type SessionHost } from '../utils/host-ports';
 import { AgentResolver } from './agent-resolver';
 import {freezeQueuedAgent, readQueuedAgent} from './queued-agent';
 import {boundFlowIdentity, flowTargetIdentity} from './flow-target';
 import {reviseQueuedInput} from './revise-queued-input';
-import {assertSelectedTarget, assertRootCallable, sameTargetRef, flowTargetRevision, type FlowRevision} from '@itookit/llm-flow/contracts';
+import {assertSelectedTarget, assertRootCallable, sameTargetRef, flowTargetRevision, type FlowRevision} from '@nestos/llm-flow/contracts';
 import { AttachmentProcessor } from './attachment-processor';
 import { ConversationRunCoordinator, type ConversationExecution } from './conversation-run-coordinator';
 import { SessionEventBus } from './session-event-bus';
@@ -43,7 +43,7 @@ import { frozenFlowIdentities } from './flow-identity-snapshot';
 import { bindPlannedFlowGraph, validatePlannedFlowConnections } from './flow-run-plan';
 import { isHarnessAgentSnapshot } from './harness-binding';
 import {conversationFlowInvocation, newRerunInvocation} from './invocation-identity';
-import {assertConversationSelection} from '@itookit/kernel-adapters/contracts';
+import {assertConversationSelection} from '@nestos/kernel-adapters/contracts';
 
 export interface SessionRunCallbacks {
     validateCallAssets?: import('../contracts/submission').CallAssetValidator;
@@ -79,7 +79,7 @@ export class SessionRunCoordinator {
         private readonly attachments: AttachmentProcessor,
         private readonly callbacks: SessionRunCallbacks,
         private readonly kernel: Kernel,
-        private readonly dagPlugins: import('@itookit/llm-flow/contracts').DagPluginCatalog,
+        private readonly dagPlugins: import('@nestos/llm-flow/contracts').DagPluginCatalog,
         private readonly flowStore: FlowStore,
         resolveTools?: (sessionId: string, allowedIds: string[]) => Promise<{
             definitions: ToolDefinition[];
@@ -142,7 +142,7 @@ export class SessionRunCoordinator {
 
     /** Resolve the actual published target and child context without a view, queue or running Task. */
     async prepareIndependentTaskCall(supplied: import('../contracts/submission').SubmissionRequest,
-        suppliedInvocation: import('@itookit/llm-flow/contracts').InvocationIdentity) {
+        suppliedInvocation: import('@nestos/llm-flow/contracts').InvocationIdentity) {
         const request = structuredClone(supplied), invocation = structuredClone(suppliedInvocation);
         const item = independentPreparationInstruction(request, invocation), sessionId = request.expectedSessionId!;
         const manifest = await this.engine.getManifest(sessionId);
@@ -175,7 +175,7 @@ export class SessionRunCoordinator {
         return reviseQueuedInput(sessionId, item, this.agents, this.dagPlugins, this.host, this.callbacks.validateCallAssets);
     }
 
-    publishedAgentTarget(target?: import('@itookit/llm-flow/contracts').TargetRef) {return this.agents.publishedTarget(target);}
+    publishedAgentTarget(target?: import('@nestos/llm-flow/contracts').TargetRef) {return this.agents.publishedTarget(target);}
 
     private async resolveSelectedIdentity(input: Pick<TaskInput, 'agentId' | 'target' | 'expectedTarget' | 'source' | 'sendIntent' | 'sessionId'>): Promise<ExecutorConfig> {
         const target = input.target;
@@ -341,7 +341,7 @@ export class SessionRunCoordinator {
         );
     }
 
-    private async flowSpecification(task: ExecutionTask, setup: Pick<ExecutionSetup, 'config' | 'roundId'>, revision: import('@itookit/llm-flow/contracts').FlowRevision,
+    private async flowSpecification(task: ExecutionTask, setup: Pick<ExecutionSetup, 'config' | 'roundId'>, revision: import('@nestos/llm-flow/contracts').FlowRevision,
         snapshot: ContextSnapshot, identities: FlowIdentityResolver) {
         const binding = task.input.instructionFlowBinding;
         const catalog = binding ? frozenFlowConnections(this.agents, binding.connections) : this.agents;

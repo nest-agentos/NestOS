@@ -1,5 +1,5 @@
-import {ACTION_ICONS, t} from '@itookit/common';
-import type {ContextMenuBuilder, MenuItem} from '@itookit/ui-common-adapter';
+import {ACTION_ICONS, t} from '@nestos/common';
+import type {ContextMenuBuilder, MenuItem} from '@nestos/ui-common-adapter';
 import type {AssistantShortcut} from './assistant-shortcuts';
 
 export const ASSISTANT_ADD_EVENT = 'nestos:assistant-add-shortcut';

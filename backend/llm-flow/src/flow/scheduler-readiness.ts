@@ -1,4 +1,4 @@
-import type { TaskHandle } from '@itookit/durable-kernel';
+import type { TaskHandle } from '@nestos/durable-kernel';
 import type { DagNodeDefinition, DagEdgeDefinition, DagRunSpec } from '../contracts';
 import type { EdgeState } from './delegation-runtime';
 import { recordFlowSkip, type FlowSkipCause, type FlowSkipReason, type FlowSkipRecords } from './skip-state';

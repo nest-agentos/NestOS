@@ -1,4 +1,4 @@
-import type { InteractionRequest, JsonValue } from '@itookit/durable-kernel/contracts';
+import type { InteractionRequest, JsonValue } from '@nestos/durable-kernel/contracts';
 import type { ChatInputInteraction } from '../domain/ports/IChatInputPresenter';
 import { agentQuestionFields } from '../components/input/agent-questions';
 

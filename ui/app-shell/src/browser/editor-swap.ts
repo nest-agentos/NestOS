@@ -1,6 +1,6 @@
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import type {ApplicationBackend, EditorSwap} from '@itookit/app-contracts/services';
-import type {EditorFactory} from '@itookit/ui-common-adapter';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import type {ApplicationBackend, EditorSwap} from '@nestos/app-contracts/services';
+import type {EditorFactory} from '@nestos/ui-common-adapter';
 import {canPreserveRefreshBackup} from '../persistence/file-recovery-store';
 
 const log = createModuleLogger('editor-swap');

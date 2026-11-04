@@ -1,4 +1,4 @@
-import type { HarnessSession, HarnessObservation } from '@itookit/cells-driver/harness';
+import type { HarnessSession, HarnessObservation } from '@nestos/cells-driver/harness';
 
 export function harnessObservation(session: HarnessSession | undefined, requests: Array<{kind: string}> = [],
     evidence: Partial<HarnessObservation> = {}): HarnessObservation {

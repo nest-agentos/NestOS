@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from 'vitest';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
-import { readProviderForm, renderProtocolOptions, renderProviderAdvanced, syncProtocolControls } from '@itookit/llm-ui-adapter/settings';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
+import { readProviderForm, renderProtocolOptions, renderProviderAdvanced, syncProtocolControls } from '@nestos/llm-ui-adapter/settings';
 
 const provider: LLMProvider = { id: 'gateway', name: 'Gateway', implementation: 'openai-compatible',
     apiKey: 'stored', baseURL: 'https://example.com', models: [],

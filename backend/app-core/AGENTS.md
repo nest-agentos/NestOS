@@ -1,8 +1,8 @@
-# @itookit/app-core
+# @nestos/app-core
 
 Kanban 的实际执行者按 WorkItem ↔ Session 关联，执行绑定通过 nestos-execution-session 外部引用与核心状态同事务保存；Dispatch 记录尝试身份，自动适配使用真实 executionSessionId。queryActivity/executionSession 只投影 Session 状态与活动，不向看板暴露内部 Task；普通 participants 不触发执行标记。Session 状态取授权来源的冷摘要，lastActivityAt 不能使用读取、心跳或 manifest.updatedAt 补齐；过期/不可达不计活跃。源端授权和只读核对留在应用集成层。
 
-Kanban 通用规则、契约与 SeqFile 存储位于独立库 `@itookit/kanban`（仅依赖 vfs-core）。本包 kanban/ 仅承担授权 Session 来源读取、远程客户端绑定、正式发布 Agent/Flow 调用、Kernel 回执核对和 UserEventService 投影。扫描状态机、远程事务编码、执行日志与恢复及活动投影归独立库；应用仅提供端口，不改写 reducer、不代转出库 API。示例配置保留在 presets，借助库 installKanbanContent 安装。独立执行桥先保存冻结请求及 submitting 标记再调用执行入口，重启只核对原身份；unknown 不重派。Runtime 关停先停止准入和监听、排空事务与观察，再关闭 VFS；恢复错误通过现有 global event/notify 去重报告。个人看板显式启用 AI 协作后复用正式发布调用分析与执行，默认关闭；项目接线仍使用 configureKanban，见 [协调设计](../../doc/design/kanban-coordination.md)。
+Kanban 通用规则、契约与 SeqFile 存储位于独立库 `@nestos/kanban`（仅依赖 vfs-core）。本包 kanban/ 仅承担授权 Session 来源读取、远程客户端绑定、正式发布 Agent/Flow 调用、Kernel 回执核对和 UserEventService 投影。扫描状态机、远程事务编码、执行日志与恢复及活动投影归独立库；应用仅提供端口，不改写 reducer、不代转出库 API。示例配置保留在 presets，借助库 installKanbanContent 安装。独立执行桥先保存冻结请求及 submitting 标记再调用执行入口，重启只核对原身份；unknown 不重派。Runtime 关停先停止准入和监听、排空事务与观察，再关闭 VFS；恢复错误通过现有 global event/notify 去重报告。个人看板显式启用 AI 协作后复用正式发布调用分析与执行，默认关闭；项目接线仍使用 configureKanban，见 [协调设计](../../doc/design/kanban-coordination.md)。
 
 远程原生队列启动恢复由 projects/remote-conversation-recovery 扫描当前用户已有 journal，重验连接、项目、principal 与稳定会话身份后挂入 ConversationRegistry。恢复只建立观察和读取基线，不直接重发原指令；失效绑定或不可用远端保留 deferred 与原记录。所有存储沿注入 IFileSystem 的 SeqFile CAS，不创建跨用户全局 events.seq，也不把会话恢复策略放进 vfs-core。
 
@@ -98,7 +98,7 @@ const kernel = await createKernelRuntime({ systemFS, llmDriver, storageResolver,
 - 修改挂载前必须确认该 Session 没有未结束的 Task（`mountGuard`）。
 - Context GC 只登记已授权恢复/执行的 Session；完整应用每个 Task 前检查租约，关闭作用域先等待维护事务。策略和可达性算法在 context，事务适配在 kernel-adapters，装配层不裁剪历史根。
 - `SessionFilesService.acquireWorkspaceFiles` 为宿主提供独立工作区视图：替换唯一匹配的现有挂载，来源由宿主提供；默认 rw 要求原授权可写，可选 ro 将全部用户挂载同时降权而不改持久授权。原授权配置改变、禁用或服务销毁时撤销全部派生工作区视图。运行时已透传 `scopeForEffect`/`fileContextForScope` 到 kernel-adapters；提供作用域文件工厂时默认按 llm-flow 持久成员及工作区租约选择 Run。Tauri 已连接独立副本文件视图、进程映射及释放，并在成功取得 Session 写租约后的 beforeSessionRecovery 回调核对创建意图。
-- 用户可见文案不写在本包：结构化错误（宿主可分支/本地化，见 `src/vfs/errors.ts`）或 `t()` 键（文案在 `@itookit/common`）。`tests/no-user-copy.test.ts` 守卫本包源码不含 CJK 文案。
+- 用户可见文案不写在本包：结构化错误（宿主可分支/本地化，见 `src/vfs/errors.ts`）或 `t()` 键（文案在 `@nestos/common`）。`tests/no-user-copy.test.ts` 守卫本包源码不含 CJK 文案。
 - 长耗时启动步骤应经 `traceBoot`/`logStep` 暴露进度，便于宿主显示启动状态。
 - StartupCoordinator.close 拒绝新初始化并排空已接纳工作；已创建的依赖 Promise 在关闭期间仍可读取，保留原结果或原错误，不重新初始化，也不能改写为 Startup is closed。快速 CLI 查询/准备退出的恢复回调继续使用同一已就绪依赖；回归见 startup-coordinator。
 - 租约恢复关闭后，已在途的准备回调返回时不得再开始 Kernel 恢复；Runtime 先排空恢复及租约释放，再停止 Kernel，分别保留释放与停止错误，不能靠吞掉 DISPOSED 异常掩盖关闭顺序。
@@ -106,8 +106,8 @@ const kernel = await createKernelRuntime({ systemFS, llmDriver, storageResolver,
 ## 运行
 
 ```bash
-pnpm --filter @itookit/app-core test        # vitest：目前 39 文件 / 215 用例
-pnpm --filter @itookit/app-core typecheck
+pnpm --filter @nestos/app-core test        # vitest：目前 39 文件 / 215 用例
+pnpm --filter @nestos/app-core typecheck
 ```
 
 > 本包模块的测试已在 `tests/`（2026-09-11 从 app-shell 迁回，app-shell 的兼容 re-export shim 全部删除）；app-shell 只保留其 UI 层测试。

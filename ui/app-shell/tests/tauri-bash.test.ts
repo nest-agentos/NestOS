@@ -121,8 +121,8 @@ it('reports initialization and grant cleanup failures together', async () => {
 });
 
 it('binds an isolated workspace file view and Tauri Bash to the same copy', async () => {
-    const { createVFS, MemoryBackend } = await import('@itookit/vfs-core');
-    const { SessionFilesService, acquireWorkspaceProcessContext } = await import('@itookit/app-core');
+    const { createVFS, MemoryBackend } = await import('@nestos/vfs-core');
+    const { SessionFilesService, acquireWorkspaceProcessContext } = await import('@nestos/app-core');
     const { manager } = await createVFS({ rootBackend: new MemoryBackend() });
     const root = await manager.openFileSystem('/');
     await root.driver.createFile({ parentPath: '/base', name: 'file', content: 'base', recursive: true });

@@ -1,10 +1,10 @@
 import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { DirectoryMountService, SessionFilesService } from '@itookit/app-core';
-import { createSessionAttachmentMounts } from '@itookit/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { DirectoryMountService, SessionFilesService } from '@nestos/app-core';
+import { createSessionAttachmentMounts } from '@nestos/app-core';
 
 it('routes a real vfs-ui tree to chat, Task history and the Session mapped file context', async () => {
     vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => setTimeout(fn, 0));

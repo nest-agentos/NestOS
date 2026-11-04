@@ -1,4 +1,4 @@
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 /** Explicit disposal and view closure join the same resource cleanup. */
 export class ViewScope {

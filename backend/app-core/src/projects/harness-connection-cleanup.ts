@@ -1,4 +1,4 @@
-import type {EffectExecutionContext} from '@itookit/durable-kernel';
+import type {EffectExecutionContext} from '@nestos/durable-kernel';
 import type {HarnessConnectionAcquisition} from './harness-connections';
 import {executionError, harnessExecutionJournalKey} from './harness-execution-journal';
 

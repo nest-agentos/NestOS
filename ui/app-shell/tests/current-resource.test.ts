@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {Workbench} from '../src/core/Workbench';
 import {createTestWorkbench} from './helpers/application';
-import {SessionRepository} from '@itookit/llm-session';
-import {DirectoryMountService, ProjectService, SessionFilesService} from '@itookit/app-core';
-import {bindApplicationBackend} from '@itookit/app-core/host';
-import type {LocalApplicationServices} from '@itookit/app-contracts/services';
+import {SessionRepository} from '@nestos/llm-session';
+import {DirectoryMountService, ProjectService, SessionFilesService} from '@nestos/app-core';
+import {bindApplicationBackend} from '@nestos/app-core/host';
+import type {LocalApplicationServices} from '@nestos/app-contracts/services';
 import {observeNavigationVisibility} from '../src/navigation/navigation-visibility';
 
 const releases: Array<() => void | Promise<void>> = [];

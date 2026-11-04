@@ -2,7 +2,7 @@ import {verifyCommitContexts} from './kanban-commit-context';
 import {developmentStage} from './kanban-development-log';
 import {failure} from '../run/prompt-bundle';
 import type {RepositoryEvidence} from '../projects/worktree-modules';
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../projects/remote-mounts';
 import {verifyWorktreeDelivery} from '../projects/worktree-modules';
 import {KanbanAutomationJournal} from '../kanban/automation-journal';

@@ -1,7 +1,7 @@
-import type {ContextSnapshot} from '@itookit/llm-context';
-import type {CapabilityBinding} from '@itookit/durable-kernel';
-import type {TaskRunDefinition} from '@itookit/llm-flow';
-import {invocationLabels, targetLabels} from '@itookit/llm-flow/contracts';
+import type {ContextSnapshot} from '@nestos/llm-context';
+import type {CapabilityBinding} from '@nestos/durable-kernel';
+import type {TaskRunDefinition} from '@nestos/llm-flow';
+import {invocationLabels, targetLabels} from '@nestos/llm-flow/contracts';
 import type {LLMSkill} from '../contracts';
 import {snapshotDirectAgentPolicy, type DirectAgentPolicy} from '../contracts/direct-agent-policy';
 import {directTaskSpec, type DirectConversationInput, type DirectToolCatalog} from './direct-conversation';

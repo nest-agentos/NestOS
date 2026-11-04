@@ -1,8 +1,8 @@
 import {moveProjectDraft} from './move';
 import { emptyDraft, decodeDraftRecord } from './record-codec';
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 import {nativeIdentityKey} from './remote-identity';
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
 
 import type { ProjectDraftRecord, ProjectDraftPromotion, RemoteDraftTarget } from './contracts';
 

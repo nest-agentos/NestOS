@@ -1,6 +1,6 @@
 /** Shared application capabilities; implementations belong to backend/app-core. */
-import type * as ContextContracts from '@itookit/llm-context';
-import type { ContextPlan } from '@itookit/llm-context';
+import type * as ContextContracts from '@nestos/llm-context';
+import type { ContextPlan } from '@nestos/llm-context';
 import type * as AppContracts from '../index';
 import type { TwinMemoryKind, TwinAnalysisJob, TwinSourceData, TwinMemoryData, TwinSettings, TwinSourceSpec, TwinSelectionTarget, TwinSelectionType } from '../index';
 
@@ -76,7 +76,7 @@ export interface DigitalTwinService {
     openWorkspace(id: string): Promise<DigitalTwinService>;
     collectionTools(): Promise<AppContracts.TwinScannerTool[]>;
     triggerScanPlan(id: string, eventId: string): Promise<string>;
-    scannerTargets(): Promise<import('@itookit/llm-session/contracts').RootCallTarget[]>;
+    scannerTargets(): Promise<import('@nestos/llm-session/contracts').RootCallTarget[]>;
     diagnostics(): {
         initialization: string;
     };

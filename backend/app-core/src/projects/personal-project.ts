@@ -1,7 +1,7 @@
-import {LEGACY_LOCAL_PROJECT_NAMES} from '@itookit/app-contracts';
-import {FSError, type IFileSystem} from '@itookit/vfs-core';
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {ProjectFolder} from '@itookit/app-contracts/services';
+import {LEGACY_LOCAL_PROJECT_NAMES} from '@nestos/app-contracts';
+import {FSError, type IFileSystem} from '@nestos/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {ProjectFolder} from '@nestos/app-contracts/services';
 const path = '/etc/system-local-project.json';
 const legacyPath = '/etc/system-personal-project.json';
 /** Reserved local identity is independent of the user's selectable default. */

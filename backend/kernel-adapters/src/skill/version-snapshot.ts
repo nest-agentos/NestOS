@@ -1,5 +1,5 @@
-import { sha256HexSync } from '@itookit/llm-context';
-import { type SkillDefinition, type SkillVersionSnapshot } from '@itookit/tools/contracts';
+import { sha256HexSync } from '@nestos/llm-context';
+import { type SkillDefinition, type SkillVersionSnapshot } from '@nestos/tools/contracts';
 
 /** Object key order and catalog timestamps do not define a Skill version. */
 function canonical(value: unknown): unknown {
@@ -30,7 +30,7 @@ export function validateSkillVersionSnapshot(value: unknown): SkillVersionSnapsh
     return structuredClone(snapshot);
 }
 
-export function snapshotLoadResult(snapshot: SkillVersionSnapshot): import('@itookit/tools/contracts').SkillLoadResult {
+export function snapshotLoadResult(snapshot: SkillVersionSnapshot): import('@nestos/tools/contracts').SkillLoadResult {
     return { skillId: snapshot.definition.id, success: true, toolIds: snapshot.definition.tools.map(tool => tool.toolId),
         instructions: snapshot.instructions, compactInstructions: snapshot.compactInstructions, snapshot: structuredClone(snapshot) };
 }

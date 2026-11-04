@@ -1,7 +1,7 @@
 import preset from './essay-review.json';
 import { createNestosFlowLibrary } from './flow-library';
-import type { FlowDraft } from '@itookit/llm-flow/contracts';
-import type { FlowDefinitionStore } from '@itookit/llm-flow';
+import type { FlowDraft } from '@nestos/llm-flow/contracts';
+import type { FlowDefinitionStore } from '@nestos/llm-flow';
 
 export const ESSAY_REVIEW_FLOW_ID = preset.id;
 

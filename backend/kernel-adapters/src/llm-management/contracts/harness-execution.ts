@@ -1,4 +1,4 @@
-import type { EffectExecutionContext, JsonValue } from '@itookit/durable-kernel';
+import type { EffectExecutionContext, JsonValue } from '@nestos/durable-kernel';
 
 /** A named execution target references existing host-owned node credentials and project grants. */
 export interface HarnessExecutionConnection {
@@ -51,7 +51,7 @@ export interface HarnessExecutionRequest {
 /** Target adapters resolve authorized immutable assets before applying native inline limits. */
 export type HarnessInputAttachment = HarnessInlineAttachment | HarnessAssetAttachment;
 export interface HarnessInlineAttachment {kind: 'text' | 'image'; name: string; content: string; mimeType?: string;}
-export interface HarnessAssetAttachment {kind: 'asset'; name: string; asset: import('@itookit/tools/contracts').BinaryAssetReference;}
+export interface HarnessAssetAttachment {kind: 'asset'; name: string; asset: import('@nestos/tools/contracts').BinaryAssetReference;}
 
 export interface HarnessExecutionResult {
     text: string;

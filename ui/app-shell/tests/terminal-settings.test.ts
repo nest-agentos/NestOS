@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
 import {TerminalSettingsEditor} from '../../app-settings/src/editors/TerminalSettingsEditor';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 const state = vi.hoisted(() => ({data: undefined as undefined | ((data: string) => void), write: vi.fn(), dispose: vi.fn()}));
 vi.mock('../../app-settings/node_modules/@xterm/xterm/lib/xterm.js', () => ({Terminal: class {

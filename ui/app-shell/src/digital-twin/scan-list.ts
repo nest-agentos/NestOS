@@ -1,4 +1,4 @@
-import { escapeAttr, escapeHTML, t } from '@itookit/common';
+import { escapeAttr, escapeHTML, t } from '@nestos/common';
 import { label } from './view';
 
 type ListKind = 'plans' | 'sources';

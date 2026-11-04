@@ -1,4 +1,4 @@
-import type { JsonValue, SessionHandle } from '@itookit/durable-kernel';
+import type { JsonValue, SessionHandle } from '@nestos/durable-kernel';
 import type { SchedulerCheckpoint } from './scheduler-checkpoint';
 import { decodeSchedulerCheckpoint } from './checkpoint-decoder';
 import { isRecord } from './graph-decoder';

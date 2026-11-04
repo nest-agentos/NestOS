@@ -1,6 +1,6 @@
 // @file: llm-ui/domain/ports/IHistoryPresenter.ts
 
-import type { SessionGroup, SessionEventEnvelope } from '@itookit/llm-session/contracts';
+import type { SessionGroup, SessionEventEnvelope } from '@nestos/llm-session/contracts';
 import type { ICollapseManager } from './ICollapseManager';
 import type { IStreamingController } from './IStreamingController';
 

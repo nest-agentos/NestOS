@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { getLogger, LogLevel } from '@itookit/common';
-import { MemoryBackend } from '@itookit/vfs-core';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
+import { getLogger, LogLevel } from '@nestos/common';
+import { MemoryBackend } from '@nestos/vfs-core';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { MCPRemoteConnections, CELLS_EXTENSION } from '../src/projects/mcp-remote-connections';
 import { ProjectRemoteMountService } from '../src/projects/remote-mounts';

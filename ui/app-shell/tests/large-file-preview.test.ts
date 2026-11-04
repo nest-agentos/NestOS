@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { it, expect, vi } from 'vitest';
-import type { ProjectService } from '@itookit/app-core';
-import { FSError } from '@itookit/vfs-core';
+import type { ProjectService } from '@nestos/app-core';
+import { FSError } from '@nestos/vfs-core';
 import { openProjectFileEditor } from '../src/projects/project-file-editor';
 import { ViewLoad } from '../src/lifecycle/view-load';
 

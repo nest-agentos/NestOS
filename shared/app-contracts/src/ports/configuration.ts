@@ -1,10 +1,10 @@
 /** Shared application capabilities; implementations belong to backend/app-core. */
-import type * as VfsContracts from '@itookit/vfs-core';
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { ToolDefinition } from '@itookit/llm-context';
-import type { LLMProvider, ConnectionMeta, ModelTier } from '@itookit/driver-llm/contracts';
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import type { ToolMeta } from '@itookit/tools/contracts';
+import type * as VfsContracts from '@nestos/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { ToolDefinition } from '@nestos/llm-context';
+import type { LLMProvider, ConnectionMeta, ModelTier } from '@nestos/driver-llm/contracts';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import type { ToolMeta } from '@nestos/tools/contracts';
 import type { DrawerKind, Drawer, ToolboxKind } from '../index';
 import type { RemoteHarnessAgent } from './projects';
 
@@ -34,7 +34,7 @@ export interface ToolboxResources {
     readonly drawers: ToolboxDrawers;
     subscribe(listener: () => void): () => void;
     setDefaultConnection(id: string | null): Promise<void>;
-    setModelDefault(operation: import('@itookit/kernel-adapters/contracts').ModelOperation, id: string | null): Promise<void>;
+    setModelDefault(operation: import('@nestos/kernel-adapters/contracts').ModelOperation, id: string | null): Promise<void>;
     toolGrant: typeof toolGrant;
     getAgents(): Promise<AgentDefinition[]>;
     hasProvider(id: string): boolean;
@@ -108,11 +108,11 @@ export interface ToolboxInventory {
         /** Exact primary model and its capabilities, independently of routing tiers. */
         primaryModel?: string | null;
         primaryCapabilityTags?: string[];
-        operationModels?: Partial<Record<import('@itookit/kernel-adapters/contracts').ModelOperation, string>>;
+        operationModels?: Partial<Record<import('@nestos/kernel-adapters/contracts').ModelOperation, string>>;
         capabilityTags?: string[];
     }>;
     defaultConnectionId?: string;
-    modelDefaults?: import('@itookit/kernel-adapters/contracts').ModelDefaults;
+    modelDefaults?: import('@nestos/kernel-adapters/contracts').ModelDefaults;
     readonly tools: Map<string, ToolboxTool>;
     readonly sources: {
         prompts: VfsContracts.IFileSystem;

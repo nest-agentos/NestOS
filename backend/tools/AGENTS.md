@@ -1,4 +1,4 @@
-# @itookit/tools 开发说明
+# @nestos/tools 开发说明
 
 独立工具包，采用 `buildTool()` 工厂 + 按工具分目录的架构模式。平台能力由宿主注入：文件读写走 `ToolVFSContext`，命令执行走 `INativeShell`（本包不 spawn 进程），Grep/Glob 在无 VFS 时回退到 Node 文件系统遍历；通过同一发现服务支持 `.gitignore` / `.nestosignore` 和 `includeIgnored`，不使用 rg/fd 的独立过滤路径。
 
@@ -35,7 +35,7 @@ src/
 
 ## 公共契约
 
-`@itookit/tools/contracts` 提供 Tool/TTY、Skill 和子代理执行契约与最小 `SkillLoaderPort`、`AgentDelegationPort`，入口没有运行时初始化。TTY 契约由独立库 @itookit/device-tty/contracts 拥有，本包只做兼容类型转发，不加载 Node 驱动。实现不依赖 common 或 llm-common；消息与内容引用类型来自 llm-context，模型层级类型来自 driver-llm/contracts；MCP 协议版本、发现类型与超时规范化在 tools/mcp-contracts，入口不加载 MCP SDK。Skill/Agent 工厂仅接收其使用的操作，宿主不必实现完整的管理服务。
+`@nestos/tools/contracts` 提供 Tool/TTY、Skill 和子代理执行契约与最小 `SkillLoaderPort`、`AgentDelegationPort`，入口没有运行时初始化。TTY 契约由独立库 @nestos/device-tty/contracts 拥有，本包只做兼容类型转发，不加载 Node 驱动。实现不依赖 common 或 llm-common；消息与内容引用类型来自 llm-context，模型层级类型来自 driver-llm/contracts；MCP 协议版本、发现类型与超时规范化在 tools/mcp-contracts，入口不加载 MCP SDK。Skill/Agent 工厂仅接收其使用的操作，宿主不必实现完整的管理服务。
 
 ## 核心模式
 
@@ -92,9 +92,9 @@ ToolDeviceDriver.registerToolInstance 可接收宿主预计算的 meta/definitio
 ## 命令
 
 ```bash
-pnpm --filter @itookit/tools build       # tsup
-pnpm --filter @itookit/tools typecheck
-pnpm --filter @itookit/tools test        # vitest
+pnpm --filter @nestos/tools build       # tsup
+pnpm --filter @nestos/tools typecheck
+pnpm --filter @nestos/tools test        # vitest
 ```
 
 相关文档：[开发模式](../../doc/dev-patterns.md) `#tools`、[接口契约](../../doc/interface-contracts.md)

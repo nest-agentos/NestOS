@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, createFileSystemView, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
+import { createVFS, createFileSystemView, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
 import { SessionFilesService } from '../src/vfs/session-files';
 import { createSessionAttachmentMounts } from '../src/vfs/session-attachments';
 import { DirectoryMountService } from '../src/vfs/directory-mounts';
@@ -101,7 +101,7 @@ it('retains unavailable mounts, keeps attachments usable, and reconnects without
     await old.context.fs.driver.createFile({ parentPath: '/attachments', name: 'new.txt', content: 'own' });
     await expect(old.context.fs.driver.readContent('/demo/a.md')).rejects.toMatchObject({ code: 'EACCES' });
     // Registering the same identity restores the original config, not a different default directory.
-    const { createFileSystemView } = await import('@itookit/vfs-core');
+    const { createFileSystemView } = await import('@nestos/vfs-core');
     const homeContext = createFileSystemView({ viewId: 'reconnected-home', mounts: [{ mountId: 'home', at: '/', root: '/home/admin', fs: f.root, access: 'rw' }] });
     cleanup.push(() => homeContext.dispose());
     restarted.registerSource('admin-home', homeContext);
@@ -117,7 +117,7 @@ it.each(['append', 'create-file', 'seq-write', 'seq-transaction'] as const)('kee
     await f.root.meta.seq!.setEntry(`${source}/state.seq`, 'state', 'original');
     await f.mounts.addDirectory(f.a, '~/projects/demo', 'ro', '/demo');
     const view = (await f.acquire(f.a)).fs;
-    const transaction = vi.fn(async (tx: import('@itookit/vfs-core').ISeqFileTransaction) => tx.setEntry('/demo/state.seq', 'state', 'changed'));
+    const transaction = vi.fn(async (tx: import('@nestos/vfs-core').ISeqFileTransaction) => tx.setEntry('/demo/state.seq', 'state', 'changed'));
     const attempt = () => {
         if (operation === 'append') return view.driver.appendContent('/demo/a.md', 'changed');
         if (operation === 'create-file') return view.driver.createFile({ parentPath: '/demo', name: 'new.md', content: 'changed' });

@@ -1,8 +1,8 @@
 // @file: kernel-adapters/src/skill/compact-extractor.ts
 // Compact Instructions 提取器：从 SKILL.md 中解析压缩保护区块。
 
-import type { CompactSection } from '@itookit/tools/contracts';
-import type { SkillDefinition } from '@itookit/tools/contracts';
+import type { CompactSection } from '@nestos/tools/contracts';
+import type { SkillDefinition } from '@nestos/tools/contracts';
 
 const COMPACT_HEADING_RE = /^##\s+Compact Instructions(?:\s*\([^)]*\))?\s*$/im;
 const NEXT_H2_RE = /^##\s+/m;

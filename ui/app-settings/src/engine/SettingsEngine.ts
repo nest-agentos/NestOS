@@ -23,9 +23,9 @@ import type {
     FSEvent,
     IAssetOperations,
     ITagOperations,
-} from '@itookit/vfs-core';
-import { FSCapabilityError } from '@itookit/vfs-core';
-import { ENTITY_ICONS, TOOLBOX_ICONS, t } from '@itookit/common';
+} from '@nestos/vfs-core';
+import { FSCapabilityError } from '@nestos/vfs-core';
+import { ENTITY_ICONS, TOOLBOX_ICONS, t } from '@nestos/common';
 
 // UI 定义：ID -> 元数据
 export const SETTINGS_PAGES: Record<string, { name: string, icon: string }> = {

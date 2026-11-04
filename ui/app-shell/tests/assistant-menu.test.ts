@@ -1,7 +1,7 @@
-import {ACTION_ICONS} from '@itookit/common';
+import {ACTION_ICONS} from '@nestos/common';
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import type {AssistantEvent, AssistantOverview} from '@itookit/app-contracts/services';
+import type {AssistantEvent, AssistantOverview} from '@nestos/app-contracts/services';
 import {installAssistantMenu} from '../src/navigation/assistant-menu';
 import {ASSISTANT_MENU_DOCUMENT, emptyAssistantState, readAssistantState, shortcutNavigation} from '../src/navigation/assistant-shortcuts';
 import {requestAssistantShortcut, withAssistantShortcut} from '../src/navigation/assistant-actions';

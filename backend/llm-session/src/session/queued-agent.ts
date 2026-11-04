@@ -1,5 +1,5 @@
-import {sha256HexSync} from '@itookit/llm-context';
-import {isRootCallable, isTargetRef} from '@itookit/llm-flow/contracts';
+import {sha256HexSync} from '@nestos/llm-context';
+import {isRootCallable, isTargetRef} from '@nestos/llm-flow/contracts';
 import type {ExecutorConfig} from '../core/types';
 import type {SessionInstruction} from '../contracts/instruction-queue';
 

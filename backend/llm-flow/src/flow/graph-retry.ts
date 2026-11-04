@@ -7,7 +7,7 @@ import { isIdentity, isRecord, strings } from './graph-decoder';
 // 这样控制服务与调度进程可以分离，且崩溃不会丢掉已受理的重算请求。
 
 import type { DagEdgeDefinition, DagNodeDefinition } from '../contracts';
-import type { JsonValue, SessionHandle, TaskRecord } from '@itookit/durable-kernel';
+import type { JsonValue, SessionHandle, TaskRecord } from '@nestos/durable-kernel';
 import { readFlowRunMembers } from './run-members';
 import { retryFlowTask } from './retry-task';
 import { readFlowSchedulerCheckpoint } from './checkpoint-store';

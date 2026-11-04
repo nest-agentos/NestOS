@@ -1,4 +1,4 @@
-import type { FSNode, FileSystemContext } from '@itookit/vfs-core';
+import type { FSNode, FileSystemContext } from '@nestos/vfs-core';
 
 /** Read metadata only; ignore-file text avoids extra discovery probes during first rendering. */
 export interface NavigationDirectory {

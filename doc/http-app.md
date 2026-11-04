@@ -318,9 +318,9 @@ HTTP 提前连接保留当前连接状态，状态提示安装时同步补报；
 复核范围包括初始握手与快照缓存、Shell 的打开/观察装配、真实 Kernel 重建后的审批恢复，以及过期候选和监听释放。历史样本的请求数、响应大小和测试计数通过 Git 查阅，不作为当前运行版本的性能保证；v15 发布需前后端同步更新。运行版本核对见[启动与认证](#启动与认证)。
 
 ```bash
-pnpm --filter @itookit/http-app test tests/view-api.test.ts tests/snapshot-cache.test.ts
-pnpm --filter @itookit/app-shell test --maxWorkers=4 tests/http-handshake-shell.test.ts tests/opened-view-projection.test.ts tests/task-attachment-recovery.test.ts tests/pending-interaction-restore.test.ts
-pnpm --filter @itookit/llm-ui-adapter test --minWorkers=1 --maxWorkers=4
+pnpm --filter @nestos/http-app test tests/view-api.test.ts tests/snapshot-cache.test.ts
+pnpm --filter @nestos/app-shell test --maxWorkers=4 tests/http-handshake-shell.test.ts tests/opened-view-projection.test.ts tests/task-attachment-recovery.test.ts tests/pending-interaction-restore.test.ts
+pnpm --filter @nestos/llm-ui-adapter test --minWorkers=1 --maxWorkers=4
 ```
 
 原生会话状态由 `RemoteSessionStatus` 按项目共享：初次订阅读取权威快照，后续实时变化由共享 SSE 触发，同时保留 15 秒权威核对；显式 `refresh` 或会话活动变化也可触发读取。缓存读取不触发远端查询；变化才通知，执行期间失败退避 1–30 秒。最后一个订阅退出后保留最多 30 秒的过期投影，重新订阅可先展示并读取一次最新状态。闲置缓存最多 64 个项目、合计 4096 行，单个超过 512 行的项目不保留；缓存身份包含配置、服务器和授权 revision，身份改变立即拒绝旧缓存。过期记录禁止中断/审批操作。任务的最终结果、运行状态与命令回执仍以持久记录为准；缓存不替代写入门、租约、版本校验或结果未知命令的核对。
@@ -389,7 +389,7 @@ pnpm httpd:activate <版本ID>   # 下次启动使用此版本
 `_nestos/worktrees/<dispatch>` 是 Git worktree，`release/`（含 `local-libraries/` 与 `httpd/`）默认落在各自检出内，因此新 worktree 首次构建是冷启动；此外 `lib:build` 需要根依赖（`yaml`），原生模块指纹与 deploy 的原生运行时复制都取自当前检出，所以 worktree 至少要 `pnpm install --ignore-scripts` 一次。按代价从轻到重选择：
 
 ```bash
-pnpm typecheck && pnpm --filter @itookit/<pkg> test   # 类型与逻辑，不产生 release
+pnpm typecheck && pnpm --filter @nestos/<pkg> test   # 类型与逻辑，不产生 release
 pnpm httpd:dev                                        # Vite 构建开发 UI + tsx 运行服务端，不 deploy
 pnpm httpd:build --share-main --no-activate            # 复用主检出的基线、安装与编译缓存
 NESTOS_HTTPD_RELEASE_ROOT=<主检出>/release/httpd pnpm httpd  # 启动主检出目录中的共享 release
@@ -494,7 +494,7 @@ RPC 能力分类中，HarnessConversationPort 必须同时具备 `snapshot`、`r
 - [性能与并发回归](../apps/http-app/tests/view-performance.test.ts)：查询缓存、追加补丁、乱序版本、批次上限、通知顺序与并发回调寿命。
 - [本地存储回归](../apps/http-app/tests/storage.test.ts)：daemon 内部跨 SeqFile 原子提交/回滚和路径保护。
 
-前端 Vite 与服务端 tsup 均检查实际模块图；前端不加载后端实现，后端不加载 UI。运行 `pnpm --filter @itookit/http-app test`、`typecheck`、`build`，以及根目录的模块检查。
+前端 Vite 与服务端 tsup 均检查实际模块图；前端不加载后端实现，后端不加载 UI。运行 `pnpm --filter @nestos/http-app test`、`typecheck`、`build`，以及根目录的模块检查。
 
 ## 性能与恢复
 
@@ -591,4 +591,4 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 
 邮件页通过 `ApplicationBackend.mailView()` 取得授权的 MailClient，`queryMail` 每页返回 20 个主题的摘要、来源计数和分页信息。搜索先在后端完整索引上匹配，再合并主题、排序及分页，支持邮件头和正文范围；翻页不逐封请求 IFSDriver.readContent。点击主题才调用 readThread，正文每批最多 20 封并受字节预算限制。列表切换不预加载 MDXEditor。
 
-`@itookit/mail` 在用户 `/var/lib/mail/archive.seq` 持久化派生索引，首次访问建立，重启后复用版本戳，只重读变化邮件；正文搜索副本不传浏览器。运行日志 mail.index 区分 index.load、index.scan、index.persist 和 reconcile，记录操作 ID、读取数、字节、结果和耗时；mail.query、mail.thread、mail.refresh 记录查询/正文/刷新阶段及具体安全错误码，不记录搜索词、邮箱、路径或正文。HTTP 审计通过 MailClient.queryMail/readThread/refreshMail 与 requestId 关联请求耗时。实际首屏性能须以新 release 的运行版本与日志验收。
+`@nestos/mail` 在用户 `/var/lib/mail/archive.seq` 持久化派生索引，首次访问建立，重启后复用版本戳，只重读变化邮件；正文搜索副本不传浏览器。运行日志 mail.index 区分 index.load、index.scan、index.persist 和 reconcile，记录操作 ID、读取数、字节、结果和耗时；mail.query、mail.thread、mail.refresh 记录查询/正文/刷新阶段及具体安全错误码，不记录搜索词、邮箱、路径或正文。HTTP 审计通过 MailClient.queryMail/readThread/refreshMail 与 requestId 关联请求耗时。实际首屏性能须以新 release 的运行版本与日志验收。

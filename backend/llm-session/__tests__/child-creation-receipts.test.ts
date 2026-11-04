@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {Kernel} from '@itookit/durable-kernel';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {Kernel} from '@nestos/durable-kernel';
 import {CommandBus} from '../src/core/command-bus';
 import {SessionRepository} from '../src/persistence/session-repository';
 import {sessionDirectoryStorage, SessionDirectoryStorageResolver} from '../src/persistence/session-directory-storage';

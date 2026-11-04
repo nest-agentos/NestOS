@@ -1,5 +1,5 @@
-import type { Kernel } from '@itookit/durable-kernel';
-import type { ISessionRepository } from '@itookit/llm-session';
+import type { Kernel } from '@nestos/durable-kernel';
+import type { ISessionRepository } from '@nestos/llm-session';
 import type { SessionLeaseStore, SessionOwnerKind } from '../kernel/session-lease';
 import { SessionLifecycleService } from '../session/session-lifecycle';
 

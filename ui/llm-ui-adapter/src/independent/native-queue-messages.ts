@@ -1,6 +1,6 @@
 import type {ConversationInstructionQueue, ConversationSnapshot as NativeSnapshot} from '../contracts';
-import {getLocale, t} from '@itookit/common';
-import type {ChatMessage, ConversationSnapshot, OperationLedger} from '@itookit/llm-ui';
+import {getLocale, t} from '@nestos/common';
+import type {ChatMessage, ConversationSnapshot, OperationLedger} from '@nestos/llm-ui';
 
 
 /** Queue edits change previews, never the immutable submitted input or its receipt. */

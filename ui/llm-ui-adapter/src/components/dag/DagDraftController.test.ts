@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DagPluginManifest, FlowDraft, FlowEdgeId } from '@itookit/llm-flow/contracts';
+import type { DagPluginManifest, FlowDraft, FlowEdgeId } from '@nestos/llm-flow/contracts';
 import {
     DagDraftController,
     createFlowEdge,

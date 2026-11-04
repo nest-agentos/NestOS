@@ -1,19 +1,19 @@
 import {TabBarViewport} from './tab-bar-viewport';
-import { ACTION_ICONS, FILE_ICONS, FILE_BROWSER_ICONS, fileTypeIcon, t } from '@itookit/common';
+import { ACTION_ICONS, FILE_ICONS, FILE_BROWSER_ICONS, fileTypeIcon, t } from '@nestos/common';
 import { decorateButton, decorateResourceButton } from './controls';
-import type { IEditor } from '@itookit/ui-common-adapter';
+import type { IEditor } from '@nestos/ui-common-adapter';
 import type { WorkbenchSnapshot } from './state';
 import {navigateWorkspaceBack} from '../navigation/page-history';
 import {revealWorkspaceNavigation} from '../navigation/window-navigation';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import {windowNavigation} from './window-navigation';
 import {openedButton} from './opened-button';
 import {compactNavigation} from './compact-navigation';
 import {mountContentTitleBar} from './content-titlebar';
-import type {ContentTitleBarParts} from '@itookit/ui-common-adapter';
-import {MOBILE_NAVIGATION_QUERY} from '@itookit/ui-common-adapter';
-import { Drawer, formatDisplayLabel } from '@itookit/vfs-ui';
-import type {WindowManagementOptions} from '@itookit/vfs-ui';
+import type {ContentTitleBarParts} from '@nestos/ui-common-adapter';
+import {MOBILE_NAVIGATION_QUERY} from '@nestos/ui-common-adapter';
+import { Drawer, formatDisplayLabel } from '@nestos/vfs-ui';
+import type {WindowManagementOptions} from '@nestos/vfs-ui';
 import type { WorkbenchWindowBinding, WorkbenchWindow } from './windows';
 import {captureEditor, restoreEditor, type EditorRecoveryState} from './recovery';
 

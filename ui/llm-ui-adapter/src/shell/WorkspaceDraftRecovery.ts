@@ -1,4 +1,4 @@
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 import type {DraftConflict} from '../services/DraftPersistence';
 interface DraftRecoveryPort {
     read(): DraftConflict | undefined;

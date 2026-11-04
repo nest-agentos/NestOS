@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend, transferFileSystemEntry, type IFileSystem, type IVFSManager } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend, transferFileSystemEntry, type IFileSystem, type IVFSManager } from '@nestos/vfs-core';
 import { SessionRepository } from '../src/persistence/session-repository';
 import { moveSessionDataDirectory } from '../src/persistence/session-storage-locations';
 import * as identifiers from '../src/persistence/ulid';

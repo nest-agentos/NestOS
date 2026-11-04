@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it} from 'vitest';
-import type {FlowInputGroup, FlowParameter} from '@itookit/llm-flow/contracts';
+import type {FlowInputGroup, FlowParameter} from '@nestos/llm-flow/contracts';
 import {flowParameterFields, readFlowParameterForm} from '../../llm-ui-adapter/src/components/FlowParameterForm';
 import {bindFlowParameterState, showFlowFieldError} from '../../llm-ui-adapter/src/components/FlowParameterState';
 const cleanups: Array<() => void> = [];

@@ -1,5 +1,5 @@
-import type {IFileSystem, ISeqFileTransaction} from '@itookit/vfs-core';
-import type {AgentPublishedRevision, AgentPublishRequest, AgentRevisionContent} from '@itookit/kernel-adapters/contracts';
+import type {IFileSystem, ISeqFileTransaction} from '@nestos/vfs-core';
+import type {AgentPublishedRevision, AgentPublishRequest, AgentRevisionContent} from '@nestos/kernel-adapters/contracts';
 import {agentRevisionDigest, agentSourceDigest, canonicalAgentJson} from '../services/agent-definition-digest';
 import {assertAgentRevisionContent} from './agent-revision-validation';
 

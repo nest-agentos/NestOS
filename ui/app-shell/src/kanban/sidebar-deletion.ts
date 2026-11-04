@@ -1,6 +1,6 @@
-import {ACTION_ICONS, randomUUID, t} from '@itookit/common';
-import type {KanbanClient, KanbanDeletionPreview} from '@itookit/kanban/contracts';
-import type {BrowserDeletion, BrowserNode} from '@itookit/vfs-ui';
+import {ACTION_ICONS, randomUUID, t} from '@nestos/common';
+import type {KanbanClient, KanbanDeletionPreview} from '@nestos/kanban/contracts';
+import type {BrowserDeletion, BrowserNode} from '@nestos/vfs-ui';
 
 /** The sidebar exposes logical resources; lifecycle and Git validation remain on the server. */
 export function kanbanSidebarDeletion(service: KanbanClient | undefined, removed: (node: BrowserNode) => Promise<void>): BrowserDeletion | undefined {

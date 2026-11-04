@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 
 it('preflights the saved model and selected protocol before creating a session or requesting model output', async () => {

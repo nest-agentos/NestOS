@@ -1,6 +1,6 @@
-import {randomUUID} from '@itookit/common';
-import {KanbanError} from '@itookit/kanban';
-import type {KanbanCommand, KanbanRequest, KanbanService} from '@itookit/kanban/contracts';
+import {randomUUID} from '@nestos/common';
+import {KanbanError} from '@nestos/kanban';
+import type {KanbanCommand, KanbanRequest, KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 
 interface Entry {request: KanbanRequest; done?: boolean}

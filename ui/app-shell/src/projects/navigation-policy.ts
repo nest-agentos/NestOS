@@ -1,6 +1,6 @@
-import { ACTION_ICONS, FILE_ICONS, getLocale, t } from '@itookit/common';
-import { resolveBrowserTarget, WORKSPACE_PATH } from '@itookit/app-contracts';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
+import { ACTION_ICONS, FILE_ICONS, getLocale, t } from '@nestos/common';
+import { resolveBrowserTarget, WORKSPACE_PATH } from '@nestos/app-contracts';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
 
 /** Fixed project entries keep their order independently of user sort direction. */
 export function navigationPriority(path: string): number {

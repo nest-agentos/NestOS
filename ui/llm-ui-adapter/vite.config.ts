@@ -7,20 +7,20 @@ export default defineConfig(
     fileName: 'llm-ui',
     rootDir: __dirname,
     external: [
-      '@itookit/mdx-adapter',
-      '@itookit/common',
-      '@itookit/vfs-core',
-      '@itookit/llm-session',
-      '@itookit/mdxeditor',
+      '@nestos/mdx-adapter',
+      '@nestos/common',
+      '@nestos/vfs-core',
+      '@nestos/llm-session',
+      '@nestos/mdxeditor',
       'marked',
       'js-yaml'
     ],
     globals: {
-      '@itookit/mdx-adapter': 'MDxAdapter',
-      '@itookit/common': 'ItookitCommon',
-      '@itookit/vfs-core': 'ItookitStdio',
-      '@itookit/llm-session': 'LLMConversation',
-      '@itookit/mdxeditor': 'MDxEditor',
+      '@nestos/mdx-adapter': 'MDxAdapter',
+      '@nestos/common': 'ItookitCommon',
+      '@nestos/vfs-core': 'ItookitStdio',
+      '@nestos/llm-session': 'LLMConversation',
+      '@nestos/mdxeditor': 'MDxEditor',
       'marked': 'marked',
       'js-yaml': 'jsyaml'
     }

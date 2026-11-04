@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import type { WorkspaceConfig } from '../types';
 
 export const START_PAGE_ID = 'app-start-page';

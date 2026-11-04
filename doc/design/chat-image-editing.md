@@ -6,7 +6,7 @@
 
 ## 1 结论与首版范围
 
-源码位于 `libraries/image-parser`，包名 `@itookit/image-parser`，支持 npm tarball 安装与源码工作区引用。Git origin 为 `git@github.com:nest-agentos/image-parser.git`；源码按独立 Git 子模块管理，主仓库固定子模块提交；推送与 npm 发布分别进行。名称沿用 image-parser，但 README 需说明它是图片处理与编辑组件，不提供 OCR 或语义识别。
+源码位于 `libraries/image-parser`，包名 `@nestos/image-parser`，支持 npm tarball 安装与源码工作区引用。Git origin 为 `git@github.com:nest-agentos/image-parser.git`；源码按独立 Git 子模块管理，主仓库固定子模块提交；推送与 npm 发布分别进行。名称沿用 image-parser，但 README 需说明它是图片处理与编辑组件，不提供 OCR 或语义识别。
 
 | 能力 | 首版规则 |
 | --- | --- |
@@ -294,7 +294,7 @@ llm-ui 只需要一个可选的图片能力端口，由宿主装配。已实现�
 - 库单测覆盖配置优先级、选区、预算、取消、动画拒绝、VFS 版本和整组导出失败。真实 Chromium 像素测试覆盖 2400×1600 → 1024×683、矩形、Scanic 透视、原字节复用、小图及多图切换。
 - 工作台真实 ChatInput 的桌面与 390×844 手机视口验证覆盖同名双图粘贴、整组编辑完成、设置 2048 及从保存原图恢复原尺寸；这是 Chromium 验证，不代替 Safari 真机。
 - 项目草稿编码测试验证原图、选区与派生文件可恢复；适配层测试验证迟到移除不复活、原图重新派生与失败不部分替换。独立 llm-ui 测试验证发送接纳保留编辑的新版本。
-- 包输出 ESM/CJS、声明和 CSS；tarball 在工作区外安装，根入口及 UI 不要求安装 VFS。`pnpm --filter @itookit/image-parser test:browser` 可重复运行像素与交互检查。
+- 包输出 ESM/CJS、声明和 CSS；tarball 在工作区外安装，根入口及 UI 不要求安装 VFS。`pnpm --filter @nestos/image-parser test:browser` 可重复运行像素与交互检查。
 
 剩余限制：Safari 真机、EXIF/透明度专项及大图性能验收尚未完成；当前用有界 Canvas 处理，Scanic 同步计算不能中途取消。独立调用方仍需提供资源存储与元数据端口；调用 `createSessionChatView` / `createNativeChatView` 时的 images 配置会自动装配图片处理、上传和资源读取，并释放自身图片端口。工作台继续使用兼容 ChatInput，现已复用同一个 createImageEditingPort；这不表示整个聊天工作区已替换为独立 ChatView。
 

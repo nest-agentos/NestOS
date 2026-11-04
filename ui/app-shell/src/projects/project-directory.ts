@@ -1,4 +1,4 @@
-import type { FSNode, IFileSystem } from '@itookit/vfs-core';
+import type { FSNode, IFileSystem } from '@nestos/vfs-core';
 
 /** Both directory and tree views expose members of backend-declared transparent containers. */
 export async function projectDirectoryNodes(fs: IFileSystem, path: string): Promise<FSNode[]> {

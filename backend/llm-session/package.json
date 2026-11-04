@@ -1,7 +1,7 @@
 {
-  "name": "@itookit/llm-session",
+  "name": "@nestos/llm-session",
   "version": "0.1.0",
-  "description": "Conversation rounds, sessions, persistence, and UI projections (DAG flow orchestration lives in @itookit/llm-flow)",
+  "description": "Conversation rounds, sessions, persistence, and UI projections (DAG flow orchestration lives in @nestos/llm-flow)",
   "type": "module",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
@@ -57,20 +57,29 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@itookit/durable-kernel": "workspace:*",
-    "@itookit/llm-tasks": "workspace:*",
-    "@itookit/llm-flow": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
+    "@nestos/durable-kernel": "workspace:*",
+    "@nestos/llm-tasks": "workspace:*",
+    "@nestos/llm-flow": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
     "yaml": "^2.8.2",
-    "@itookit/llm-context": "workspace:*",
-    "@itookit/driver-llm": "workspace:*",
-    "@itookit/tools": "workspace:*"
+    "@nestos/llm-context": "workspace:*",
+    "@nestos/driver-llm": "workspace:*",
+    "@nestos/tools": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.19.25",
     "rimraf": "^6.1.3",
     "typescript": "^5.9.3",
     "vitest": "^1.6.1",
-    "@itookit/kernel-adapters": "workspace:*"
-  }
+    "@nestos/kernel-adapters": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "backend/llm-session"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

@@ -1,9 +1,9 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanExamples} from '../src/presets/kanban-examples';
 import demo from '../src/presets/kanban-demo.json';
 import {createNestOSKanban} from '../src/kanban';
-import {SeqKanbanStore} from '@itookit/kanban/storage';
+import {SeqKanbanStore} from '@nestos/kanban/storage';
 import {UserEventService} from '../src/events/service';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {openApplicationView} from '../src/host';

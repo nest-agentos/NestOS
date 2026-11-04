@@ -1,4 +1,4 @@
-import type {Attachment} from '@itookit/llm-context';
+import type {Attachment} from '@nestos/llm-context';
 /** A file attachment associated with a conversation message. */
 export interface ChatAttachment {
     name: string;
@@ -37,13 +37,13 @@ export function historyAttachment(attachment: Attachment, fallbackMimeType = '')
 }
 
 /** Per-conversation UI execution preferences. */
-import type { ChatExecutionMode } from '@itookit/llm-tasks/contracts';
-export type { ChatExecutionMode } from '@itookit/llm-tasks/contracts';
+import type { ChatExecutionMode } from '@nestos/llm-tasks/contracts';
+export type { ChatExecutionMode } from '@nestos/llm-tasks/contracts';
 
 export interface ChatSessionSettings {
     /** Host-prepared execution target; Agent definitions only supply instructions. */
     harnessConnectionId?: string;
-    imageResize?: import('@itookit/kernel-adapters/contracts').ImageResizePolicy;
+    imageResize?: import('@nestos/kernel-adapters/contracts').ImageResizePolicy;
     /** Omitted means follow the global default connection. */
     connectionId?: string;
     executionMode?: ChatExecutionMode;

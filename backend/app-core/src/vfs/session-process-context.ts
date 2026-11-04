@@ -1,5 +1,5 @@
-import type { KernelAdaptersRuntimeOptions } from '@itookit/kernel-adapters';
-import type { SessionFilesService } from '@itookit/app-contracts/services';
+import type { KernelAdaptersRuntimeOptions } from '@nestos/kernel-adapters';
+import type { SessionFilesService } from '@nestos/app-contracts/services';
 
 type ToolFiles = Awaited<ReturnType<SessionFilesService['acquire']>>;
 type RuntimeFiles = Awaited<ReturnType<NonNullable<KernelAdaptersRuntimeOptions['fileContextForSession']>>>;

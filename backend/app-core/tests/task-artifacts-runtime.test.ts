@@ -1,7 +1,7 @@
 import {expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {ArtifactCommand, type ExecutionArtifactPage, type ExecutionArtifactChunk} from '@itookit/app-contracts';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {ArtifactCommand, type ExecutionArtifactPage, type ExecutionArtifactChunk} from '@nestos/app-contracts';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 
 it('wires artifact commands and the Session context reader to committed outputs without activation', async () => {

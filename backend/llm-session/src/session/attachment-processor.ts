@@ -1,5 +1,5 @@
-import {guessMimeType} from '@itookit/vfs-core';
-import type {Attachment} from '@itookit/llm-context';
+import {guessMimeType} from '@nestos/vfs-core';
+import type {Attachment} from '@nestos/llm-context';
 import {attachmentMetadata, type ChatAttachment} from '../contracts/chat';
 import type {ISessionRepository} from '../persistence/types';
 import {createSessionHost, type SessionLogger} from '../utils/host-ports';

@@ -1,4 +1,4 @@
-import type {KanbanActor, KanbanService} from '@itookit/kanban/contracts';
+import type {KanbanActor, KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 import {journalCommand} from './journal-command';
 

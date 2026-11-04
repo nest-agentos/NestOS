@@ -1,4 +1,4 @@
-import type { TaskHandle, SessionHandle } from '@itookit/durable-kernel';
+import type { TaskHandle, SessionHandle } from '@nestos/durable-kernel';
 import type { DagRunSpec } from '../contracts';
 import type { DelegationGroup, EdgeState } from './delegation-runtime';
 import type { SchedulerCheckpoint } from './scheduler-checkpoint';

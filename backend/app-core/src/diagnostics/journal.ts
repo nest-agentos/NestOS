@@ -1,6 +1,6 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {type IFileSystem} from '@itookit/vfs-core';
-import type {ApplicationDiagnostics, DiagnosticEvent, DiagnosticPage, DiagnosticQuery} from '@itookit/app-contracts/services';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {type IFileSystem} from '@nestos/vfs-core';
+import type {ApplicationDiagnostics, DiagnosticEvent, DiagnosticPage, DiagnosticQuery} from '@nestos/app-contracts/services';
 
 import {DiagnosticStore, maxEntries, maxBytes} from './store';
 import {DiagnosticSeriesTracker, initial} from './series';

@@ -1,7 +1,7 @@
-import { FSError, type OperationOptions } from '@itookit/vfs-core';
+import { FSError, type OperationOptions } from '@nestos/vfs-core';
 import type { ProjectFavoriteTarget } from '../projects/favorites/contracts';
-import type { ProjectService } from '@itookit/app-contracts/services';
-import type { HarnessConversationSnapshot } from '@itookit/cells-driver';
+import type { ProjectService } from '@nestos/app-contracts/services';
+import type { HarnessConversationSnapshot } from '@nestos/cells-driver';
 
 export type NativeSessionCommand = {kind: 'rename'; name: string} | {kind: 'archive' | 'unarchive'} | {kind: 'delete'; preserveSessionId?: string};
 /** Management uses the same persistent mutation journal as the opened conversation. */
@@ -27,7 +27,7 @@ export async function manageRemoteSession(projects: ProjectService, folder: stri
     } finally { await controls.close(); }
 }
 
-async function applyCommand(controls: import('@itookit/cells-driver').HarnessConversationPort, command: NativeSessionCommand): Promise<HarnessConversationSnapshot> {
+async function applyCommand(controls: import('@nestos/cells-driver').HarnessConversationPort, command: NativeSessionCommand): Promise<HarnessConversationSnapshot> {
     if (command.kind === 'rename') {
         if (!controls.rename) throw new FSError('ECAPABILITY', 'Native rename unavailable');
         return controls.rename(command.name);
@@ -49,7 +49,7 @@ async function updateFavorites(projects: ProjectService, projectId: string, comm
 }
 
 /** Native removal can cascade; protect the currently viewed branch before committing. */
-async function assertBranchRemovable(controls: import('@itookit/cells-driver').HarnessConversationPort, target: string, preserve: string): Promise<void> {
+async function assertBranchRemovable(controls: import('@nestos/cells-driver').HarnessConversationPort, target: string, preserve: string): Promise<void> {
     const branches = await controls.branches();
     const byId = new Map(branches.map(branch => [branch.id, branch]));
     let id: string | null | undefined = preserve;

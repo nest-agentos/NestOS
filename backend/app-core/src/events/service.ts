@@ -1,6 +1,6 @@
-import {randomUUID} from '@itookit/common';
-import {FSError, SeqEventJournal, type IFileSystem, type EventCursor} from '@itookit/vfs-core';
-import type {ApplicationEvents, ApplicationEventFact} from '@itookit/app-contracts/services';
+import {randomUUID} from '@nestos/common';
+import {FSError, SeqEventJournal, type IFileSystem, type EventCursor} from '@nestos/vfs-core';
+import type {ApplicationEvents, ApplicationEventFact} from '@nestos/app-contracts/services';
 
 /** One instance per authenticated runtime. Publication is host-only, never an RPC method. */
 export class UserEventService implements ApplicationEvents {

@@ -1,9 +1,9 @@
 import {lifecyclePromptFiles} from '../run/prompt-lifecycle';
 import {developmentObservation} from './kanban-development-log';
-import {t} from '@itookit/common';
-import type {TargetRef} from '@itookit/llm-flow/contracts';
-import type {KanbanDispatch, KanbanItem, KanbanSessionAssociation} from '@itookit/kanban/contracts';
-import type {KanbanExecutionObservation} from '@itookit/kanban/execution';
+import {t} from '@nestos/common';
+import type {TargetRef} from '@nestos/llm-flow/contracts';
+import type {KanbanDispatch, KanbanItem, KanbanSessionAssociation} from '@nestos/kanban/contracts';
+import type {KanbanExecutionObservation} from '@nestos/kanban/execution';
 import type {UserEventService} from '../events/service';
 import {createPublishedKanbanWorkExecutor, type PublishedKanbanWorkOptions} from '../kanban/published-work';
 import {KanbanAutomationJournal} from '../kanban/automation-journal';
@@ -35,7 +35,7 @@ export async function developmentLifecycleSessions(options: Pick<Options, 'journ
     for (const key of keys) {
         const job = await options.journal.get<Job>(key);
         if (!job || job.boardId !== boardId || job.dispatch.itemId !== itemId) continue;
-        const request = job.request as {input: import('@itookit/llm-session/contracts').IndependentCallInput};
+        const request = job.request as {input: import('@nestos/llm-session/contracts').IndependentCallInput};
         const admission = await options.calls.inspectTaskCallSubmission(request.input);
         if (admission?.executionSessionId) rows.push({sessionId: admission.executionSessionId, purpose: 'finalization', execution: {id: job.id, purpose: 'finalization'}});
     }

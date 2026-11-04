@@ -3,15 +3,15 @@ import { isConnection } from './argument-validation';
 //
 // ConnectionManager — CRUD for LLMConnection with VFS persistence.
 
-import type { LLMConnection, ConnectionMeta, LLMProvider } from '@itookit/driver-llm/contracts';
-import type { IVFSManager, IFileSystem } from '@itookit/vfs-core';
-import { toConnectionMeta, aggregateProviderCosts } from '@itookit/kernel-adapters/contracts';
+import type { LLMConnection, ConnectionMeta, LLMProvider } from '@nestos/driver-llm/contracts';
+import type { IVFSManager, IFileSystem } from '@nestos/vfs-core';
+import { toConnectionMeta, aggregateProviderCosts } from '@nestos/kernel-adapters/contracts';
 import { snapshotLlmPresets, type LlmManagementPresets, type ProviderConnectionPolicy } from '../contracts/presets';
 import { VFSHelpers } from './vfs-helpers';
 import type { ProviderManager } from './provider-manager';
 import { ModelDefaultStore } from './model-default-store';
 import { isModelOperation, modelForOperation, type ModelDefaults, type ModelOperation } from '../contracts/model-defaults';
-import type { LLMLogSink } from '@itookit/driver-llm/contracts';
+import type { LLMLogSink } from '@nestos/driver-llm/contracts';
 
 const CONNECTIONS_DIR  = '/llm/.connections';
 const DEFAULTS_VERSION = '/llm/.connections_version.json';

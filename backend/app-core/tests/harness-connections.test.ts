@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend, type IVFSManager } from '@itookit/vfs-core';
-import type { HarnessClient, HarnessProfile } from '@itookit/cells-driver';
-import type { HarnessExecutionConnection } from '@itookit/kernel-adapters/contracts';
+import { createVFS, MemoryBackend, type IVFSManager } from '@nestos/vfs-core';
+import type { HarnessClient, HarnessProfile } from '@nestos/cells-driver';
+import type { HarnessExecutionConnection } from '@nestos/kernel-adapters/contracts';
 import type { ProjectRemoteMount } from '../src/projects/remote-mounts';
 import { HarnessConnectionService } from '../src/projects/harness-connections';
 import type { ProjectFolder } from '../src/projects/project-service';

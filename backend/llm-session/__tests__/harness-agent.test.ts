@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { HarnessConnectionSnapshot } from '@itookit/kernel-adapters/contracts';
+import type { HarnessConnectionSnapshot } from '@nestos/kernel-adapters/contracts';
 import { AgentResolver } from '../src/session/agent-resolver';
 import { SessionRunCoordinator } from '../src/session/session-run-coordinator';
 import { bindStandaloneFlowNode } from '../src/session/flow-node-binder';

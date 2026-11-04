@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
 import { AgentFlowAvailabilityProjection } from '../src/services/agent-flow-availability';
 import type { SessionLogger } from '../src/utils/host-ports';
 

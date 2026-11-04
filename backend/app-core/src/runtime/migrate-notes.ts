@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {FSError, type IFileSystem} from '@itookit/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {FSError, type IFileSystem} from '@nestos/vfs-core';
 
 const log = createModuleLogger('notes-migration');
 /** Move through VFS so metadata follows content; never overwrite either namespace. */

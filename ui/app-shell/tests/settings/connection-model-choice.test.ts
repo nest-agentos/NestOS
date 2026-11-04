@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {MODEL_CAPABILITY_META, t} from '@itookit/common';
-import {ConnectionSettingsEditor} from '@itookit/llm-ui-adapter/settings';
-import {modelChoiceLabel, modelPriceLabel} from '@itookit/llm-ui-adapter/settings';
-import {renderModelCapabilityBadges} from '@itookit/llm-ui-adapter/settings';
-import {ProviderSettingsEditor} from '@itookit/llm-ui-adapter/settings';
+import {MODEL_CAPABILITY_META, t} from '@nestos/common';
+import {ConnectionSettingsEditor} from '@nestos/llm-ui-adapter/settings';
+import {modelChoiceLabel, modelPriceLabel} from '@nestos/llm-ui-adapter/settings';
+import {renderModelCapabilityBadges} from '@nestos/llm-ui-adapter/settings';
+import {ProviderSettingsEditor} from '@nestos/llm-ui-adapter/settings';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanups.splice(0)) await close(); document.body.replaceChildren(); vi.restoreAllMocks();});

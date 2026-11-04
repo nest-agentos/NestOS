@@ -3,8 +3,8 @@ import { isProvider, isStoredProvider } from './argument-validation';
 //
 // ProviderManager — manages LLMProvider catalog (built-in + user custom).
 
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
+import type { IFileSystem } from '@nestos/vfs-core';
 import { snapshotLlmPresets, type LlmManagementPresets } from '../contracts/presets';
 import { loadPricingConfig, writePricingConfig, applyPricingToModel } from '../constants/pricing';
 import type { ModelPricingConfig } from '../constants/pricing';
@@ -142,17 +142,17 @@ export class ProviderManager {
         return structuredClone(this.presets.providers);
     }
 
-    getPricingConfig(): import('@itookit/kernel-adapters/contracts').ModelPricingConfig {
+    getPricingConfig(): import('@nestos/kernel-adapters/contracts').ModelPricingConfig {
         if (this._pricingConfig) this._pricingConfig = ensureProviderPricing(this._pricingConfig, this._providers.keys());
         const config = this._pricingConfig ?? { model_pricing: [] };
         return this.presets.pricing.reference_catalog ? {...config, reference_catalog: structuredClone(this.presets.pricing.reference_catalog)} : config;
     }
 
-    getPricingDefaults(): import('@itookit/kernel-adapters/contracts').ModelPricingConfig {
+    getPricingDefaults(): import('@nestos/kernel-adapters/contracts').ModelPricingConfig {
         return structuredClone(this.presets.pricing);
     }
 
-    async writePricing(config: import('@itookit/kernel-adapters/contracts').ModelPricingConfig): Promise<void> {
+    async writePricing(config: import('@nestos/kernel-adapters/contracts').ModelPricingConfig): Promise<void> {
         await writePricingConfig(this.engine, config);
         this._pricingConfig = config;
         this.reloadProvidersFrom([...this._providers.values()].filter(p => !p.isBuiltin));

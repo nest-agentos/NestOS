@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/node-host",
+  "name": "@nestos/node-host",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,18 +16,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@itookit/tools": "workspace:*",
+    "@nestos/tools": "workspace:*",
     "zod": "^4.4.2",
-    "@itookit/app-core": "workspace:*",
-    "@itookit/app-contracts": "workspace:*",
-    "@itookit/app-transport": "workspace:*",
-    "@itookit/common": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
-    "@itookit/vfsdriver-local": "workspace:*",
-    "@itookit/cells-driver": "workspace:*",
-    "@itookit/kernel-adapters": "workspace:*",
-    "@itookit/driver-llm": "workspace:*",
-    "@itookit/image-tools": "workspace:*",
+    "@nestos/app-core": "workspace:*",
+    "@nestos/app-contracts": "workspace:*",
+    "@nestos/app-transport": "workspace:*",
+    "@nestos/common": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
+    "@nestos/vfsdriver-local": "workspace:*",
+    "@nestos/cells-driver": "workspace:*",
+    "@nestos/kernel-adapters": "workspace:*",
+    "@nestos/driver-llm": "workspace:*",
+    "@nestos/image-tools": "workspace:*",
     "js-yaml": "^4.3.2",
     "node-pty": "^1.1.0"
   },
@@ -35,5 +35,14 @@
     "typescript": "^5.9.3",
     "@types/node": "^20.19.25",
     "@types/js-yaml": "^4.0.9"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "apps/node-host"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

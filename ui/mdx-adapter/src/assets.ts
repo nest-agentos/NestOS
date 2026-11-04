@@ -1,5 +1,5 @@
-import { createMDXFile, guessMimeType, type IFileSystem } from '@itookit/vfs-core';
-import type { AssetProvider } from '@itookit/mdxeditor';
+import { createMDXFile, guessMimeType, type IFileSystem } from '@nestos/vfs-core';
+import type { AssetProvider } from '@nestos/mdxeditor';
 
 /** Reject traversal before forwarding a relative attachment name to a granted view. */
 function assetName(name: string): string {

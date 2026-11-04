@@ -1,7 +1,7 @@
 // @file: app-settings/editors/storage/DangerZoneSection.ts
 
-import { Toast, Modal } from '@itookit/ui-common-adapter';
-import type { SettingsPort as SettingsService } from '@itookit/app-contracts/settings';
+import { Toast, Modal } from '@nestos/ui-common-adapter';
+import type { SettingsPort as SettingsService } from '@nestos/app-contracts/settings';
 
 export class DangerZoneSection {
   constructor(private container: HTMLElement, private service: SettingsService) {}

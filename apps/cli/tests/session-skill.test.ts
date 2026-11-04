@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
-import { bindCapabilities, type DurableTaskProgram } from '@itookit/durable-kernel';
+import { bindCapabilities, type DurableTaskProgram } from '@nestos/durable-kernel';
 import { loadWorkflow } from '../src/config';
 import { createCliRuntime, cliStorage } from '../src/runtime';
 import type { RunManifest } from '../src/types';

@@ -1,6 +1,6 @@
 import {readFile, realpath, stat} from 'node:fs/promises';
 import path from 'node:path';
-import type {ToolPackageFlow as FlowDraft} from '@itookit/app-contracts/services';
+import type {ToolPackageFlow as FlowDraft} from '@nestos/app-contracts/services';
 import {packageError, type ToolPackageSource} from './manifest';
 
 /** Only installed, fingerprinted package resources can contribute workflow definitions. */

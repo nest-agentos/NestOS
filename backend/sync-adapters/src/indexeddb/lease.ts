@@ -1,5 +1,5 @@
-import { type CoordinationGuard } from '@itookit/vfs-sync';
-import { req, txDone, STORE_RECORDS, type IndexedDBStorageAccess } from '@itookit/vfsdriver-indexeddb';
+import { type CoordinationGuard } from '@nestos/vfs-sync';
+import { req, txDone, STORE_RECORDS, type IndexedDBStorageAccess } from '@nestos/vfsdriver-indexeddb';
 
 export { LEASE_PATH, type Lease } from '../shared/lease';
 import { LEASE_PATH, decodeLease, assertLease, type Lease } from '../shared/lease';

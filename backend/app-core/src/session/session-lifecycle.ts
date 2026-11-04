@@ -1,8 +1,8 @@
-import { FSError } from '@itookit/vfs-core';
-import { KernelError, KernelErrorCode } from '@itookit/durable-kernel';
-import type { ISessionRepository } from '@itookit/llm-session';
+import { FSError } from '@nestos/vfs-core';
+import { KernelError, KernelErrorCode } from '@nestos/durable-kernel';
+import type { ISessionRepository } from '@nestos/llm-session';
 
-export interface SessionLifecycleDependencies { repository: ISessionRepository; kernel: import('@itookit/durable-kernel/contracts').KernelViewPort }
+export interface SessionLifecycleDependencies { repository: ISessionRepository; kernel: import('@nestos/durable-kernel/contracts').KernelViewPort }
 export interface SessionLifecycleOptions {
     /**
      * Bound for the whole close step: both the `closeSession` call (which waits for in-flight

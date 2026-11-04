@@ -1,11 +1,11 @@
-import { createContextAssembler, type IContextAssembler, type ContextSnapshot } from '@itookit/llm-context';
+import { createContextAssembler, type IContextAssembler, type ContextSnapshot } from '@nestos/llm-context';
 import type {DirectConversationInput} from './direct-conversation';
 import type {ExecutionTask, ChatAttachment} from '../core/types';
 import type {RoundLog} from '../persistence/round-log';
 import type {ISessionRepository} from '../persistence/types';
-import type {Artifact} from '@itookit/llm-flow/contracts';
-import type {ContextPlan, RetrievedMemoryEntry} from '@itookit/llm-context';
-import type {MemoryPolicy} from '@itookit/llm-tasks/contracts';
+import type {Artifact} from '@nestos/llm-flow/contracts';
+import type {ContextPlan, RetrievedMemoryEntry} from '@nestos/llm-context';
+import type {MemoryPolicy} from '@nestos/llm-tasks/contracts';
 import type { ResolvedDirectAgentPolicy } from '../contracts/direct-agent-policy';
 import { ContextProfileStore } from '../persistence/context-profile-store';
 import { directExecutionMode } from './direct-execution-mode';
@@ -87,9 +87,9 @@ export class ConversationContextBuilder {
         branchRef: string,
         manifest: RoundManifest,
         includeMemory = true,
-        pending?: import('@itookit/llm-context').ChatMessage[],
+        pending?: import('@nestos/llm-context').ChatMessage[],
     ): IContextAssembler {
-        const resolved = new Map<import('@itookit/llm-context').ChatMessage, Promise<import('@itookit/llm-context').ChatMessage>>();
+        const resolved = new Map<import('@nestos/llm-context').ChatMessage, Promise<import('@nestos/llm-context').ChatMessage>>();
         pending?.forEach((message, index) => {if (execution.currentInputs?.[index]) resolved.set(message, Promise.resolve(execution.currentInputs[index]));});
         const materialize = execution.config.execution?.kind === 'harness' ? materializeHarnessMessage : materializeAttachmentMessage;
         return createContextAssembler({
@@ -113,7 +113,7 @@ function contextPlan(
     execution: ConversationContextInput,
     location: ConversationLocation,
     profile: { id: string; revision: number },
-    pendingUserMessages: import('@itookit/llm-context').ChatMessage[],
+    pendingUserMessages: import('@nestos/llm-context').ChatMessage[],
 ) {
     return {
         branchRef: location.branchRef,
@@ -124,7 +124,7 @@ function contextPlan(
         pendingUserMessages,
         pendingUserMessage: pendingUserMessages[pendingUserMessages.length - 1],
         pendingRoundId: execution.roundId,
-        explicitInputs: [] as import('@itookit/llm-context').InputBinding[],
+        explicitInputs: [] as import('@nestos/llm-context').InputBinding[],
         tokenBudget: execution.config.defaultContextPolicy?.tokenBudget,
     };
 }

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { DagRunSpec, DispatchConfig, SerializableExpression } from '../src/contracts';
-import { Kernel, type EffectAdapter } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IVFSManager, type IFileSystem } from '@itookit/vfs-core';
+import { Kernel, type EffectAdapter } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IVFSManager, type IFileSystem } from '@nestos/vfs-core';
 import { createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms } from '../src/flow';
 import { readFlowRunMembers } from '../src/flow/run-members';
 import { flowToDag } from '../src/flow/to-dag';

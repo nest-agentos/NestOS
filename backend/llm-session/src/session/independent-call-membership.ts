@@ -1,4 +1,4 @@
-import type {Kernel, TaskRecord} from '@itookit/durable-kernel';
+import type {Kernel, TaskRecord} from '@nestos/durable-kernel';
 
 export async function belongsToCall(root: TaskRecord, candidate: TaskRecord, read: (id: string) => Promise<TaskRecord>, treeError: string): Promise<boolean> {
     const seen = new Set<string>(); let task = candidate;

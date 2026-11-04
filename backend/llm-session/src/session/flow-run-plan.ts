@@ -1,6 +1,6 @@
-import { simpleHash } from '@itookit/llm-context';
-import { isDagRunSpec, type FlowNodeBinder } from '@itookit/llm-flow';
-import type { DagRunSpec, FlowRevision } from '@itookit/llm-flow/contracts';
+import { simpleHash } from '@nestos/llm-context';
+import { isDagRunSpec, type FlowNodeBinder } from '@nestos/llm-flow';
+import type { DagRunSpec, FlowRevision } from '@nestos/llm-flow/contracts';
 import type { FlowIdentitySnapshot, FlowRunPlan } from '../contracts/flow-run-plan';
 import { prepareFlowConnections, type FlowConnectionCatalog } from './flow-connections';
 import { withAdmittedConnections } from './flow-agent-connections';
@@ -37,7 +37,7 @@ export async function bindPlannedFlowGraph(graph: DagRunSpec, bind: FlowNodeBind
 
 /** Recheck authorization and materialize admitted connection fields without choosing new identities. */
 export async function validatePlannedFlowConnections(source: DagRunSpec, flow: FlowRevision, catalog: FlowConnectionCatalog,
-    defaults?: import('@itookit/kernel-adapters/contracts').ModelDefaults): Promise<DagRunSpec> {
+    defaults?: import('@nestos/kernel-adapters/contracts').ModelDefaults): Promise<DagRunSpec> {
     const graph = structuredClone(source);
     const nodes = graph.nodes.filter(node => {
         const config = node.config as Record<string, unknown> | null;

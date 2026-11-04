@@ -1,6 +1,6 @@
-import {assertFlowCallSignature, flowCallValues, type FlowParameter, type FlowRevision, type JsonValue} from '@itookit/llm-flow/contracts';
+import {assertFlowCallSignature, flowCallValues, type FlowParameter, type FlowRevision, type JsonValue} from '@nestos/llm-flow/contracts';
 import type {AgentFlowDraftInput} from './agent-flow';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 /** Composer data only fills fields that explicitly declare its source. */
 export function agentFlowInput(parameters: FlowParameter[], draft?: AgentFlowDraftInput, defaults?: Readonly<Record<string, unknown>>): {

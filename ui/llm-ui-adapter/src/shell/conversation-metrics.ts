@@ -1,5 +1,5 @@
 import type {ConversationSnapshot} from '../contracts';
-import {getLocale, t} from '@itookit/common';
+import {getLocale, t} from '@nestos/common';
 
 import {conversationBudget} from './conversation-budget';
 const count = (n: number) => new Intl.NumberFormat(getLocale(), {maximumFractionDigits: 1}).format(n);

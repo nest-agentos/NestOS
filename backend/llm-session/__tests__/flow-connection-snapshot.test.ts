@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import { createFlowRevision, createBuiltinDagPluginRegistry } from '@itookit/llm-flow';
-import type { FlowDraft } from '@itookit/llm-flow/contracts';
-import type { ConnectionMeta, LLMProvider } from '@itookit/driver-llm/contracts';
+import { createFlowRevision, createBuiltinDagPluginRegistry } from '@nestos/llm-flow';
+import type { FlowDraft } from '@nestos/llm-flow/contracts';
+import type { ConnectionMeta, LLMProvider } from '@nestos/driver-llm/contracts';
 import { captureFlowConnections, frozenFlowConnections, isFlowConnectionSnapshot } from '../src/session/flow-connection-snapshot';
 import { prepareFlowConnections } from '../src/session/flow-connections';
 import { prepareFlowAgentInput } from '../src/session/flow-agent';

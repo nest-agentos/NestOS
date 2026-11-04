@@ -1,11 +1,11 @@
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {Kernel} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend, FSError, type IVFSManager, type IFileSystem} from '@itookit/vfs-core';
-import {sha256Hex} from '@itookit/llm-context';
+import {Kernel} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend, FSError, type IVFSManager, type IFileSystem} from '@nestos/vfs-core';
+import {sha256Hex} from '@nestos/llm-context';
 import {TaskArtifacts} from '../src/session/task-artifacts';
 import {createTaskAssetStore} from '../src/runtime/task-asset-store';
 import {createTaskAssetReader} from '../src/runtime/task-assets';
-import type {ExecutionArtifactDescriptor} from '@itookit/app-contracts';
+import type {ExecutionArtifactDescriptor} from '@nestos/app-contracts';
 
 let manager: IVFSManager, fs: IFileSystem, kernel: Kernel, artifacts: TaskArtifacts;
 const values = new Map<string, unknown>();

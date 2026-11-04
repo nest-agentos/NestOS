@@ -1,4 +1,4 @@
-import type {IFileSystem} from '@itookit/vfs-core';
+import type {IFileSystem} from '@nestos/vfs-core';
 import type {Definition,Options,SavedFix} from './task-fix-contracts';
 import {parseSessionFile} from '../run/session-file-result';
 import {requireValue} from './validation';

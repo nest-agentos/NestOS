@@ -1,6 +1,6 @@
 import { ulid } from '../persistence/ulid';
-import type { Kernel, EffectExecutionContext } from '@itookit/durable-kernel';
-import type { DurableAgentInput } from '@itookit/llm-tasks';
+import type { Kernel, EffectExecutionContext } from '@nestos/durable-kernel';
+import type { DurableAgentInput } from '@nestos/llm-tasks';
 import { SessionMemoryProvider } from './session-memory-provider';
 
 /** Called only by a host Effect adapter with Kernel-owned execution identity. */

@@ -1,4 +1,4 @@
-# @itookit/app-transport
+# @nestos/app-transport
 
 同一观察回调的通知必须按调用顺序完成编码与传送，不能让较大的队列快照被后来的运行事件超越。只串行同一回调，普通查询及不同观察通道继续并行；失败回执继续报告，不重放写入。回归见 app-shell 的 rpc-notification-order 与 draft-promotion。
 

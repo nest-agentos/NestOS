@@ -1,4 +1,4 @@
-import type {ChatMessage, MessagePart} from '@itookit/llm-ui';
+import type {ChatMessage, MessagePart} from '@nestos/llm-ui';
 
 /** Keep execution outcomes visible without changing backend execution facts. */
 export function messageState(status?: string): ChatMessage['state'] {

@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
+import {MemoryBackend} from '@nestos/vfs-core';
 import {createInfrastructure} from '../src/runtime/infrastructure';
 import {UserEventService} from '../src/events/service';
 import {projectKernelEvents} from '../src/events/kernel-source';

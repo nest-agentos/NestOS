@@ -3,14 +3,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { NodeFsOps } from '@itookit/vfsdriver-local/node';
+import { NodeFsOps } from '@nestos/vfsdriver-local/node';
 
 let root: string;
 beforeEach(async () => { root = await fs.mkdtemp(join(tmpdir(), 'localfs-atomic-')); });
 afterEach(async () => { vi.restoreAllMocks(); await fs.rm(root, { recursive: true, force: true }); });
 
 it('retries editor content through the real atomic writer after publication failure', async () => {
-    const { MDxEditor } = await import('@itookit/mdxeditor');
+    const { MDxEditor } = await import('@nestos/mdxeditor');
     const path = join(root, 'document.md');
     await fs.writeFile(path, 'original');
     const writer = new NodeFsOps();

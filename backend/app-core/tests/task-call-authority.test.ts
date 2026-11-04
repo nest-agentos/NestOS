@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend, type IDeviceDriver} from '@itookit/vfs-core';
-import {taskStat, type Kernel, type TaskCallPlan} from '@itookit/durable-kernel';
-import {getLogger} from '@itookit/common';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {createVFS, MemoryBackend, type IDeviceDriver} from '@nestos/vfs-core';
+import {taskStat, type Kernel, type TaskCallPlan} from '@nestos/durable-kernel';
+import {getLogger} from '@nestos/common';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import {createSessionTaskCallAuthority} from '../src/session/task-call-authority';
 import {createKernelRuntime} from '../src/runtime/create-kernel-runtime';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';

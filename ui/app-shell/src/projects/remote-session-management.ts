@@ -1,7 +1,7 @@
 import {confirmRemoteRemoval} from './remote-session-removal';
-import type { NativeSessionCommand } from '@itookit/app-contracts/services';
-import type { ApplicationBackend } from '@itookit/app-contracts/services';
-import { t } from '@itookit/common';
+import type { NativeSessionCommand } from '@nestos/app-contracts/services';
+import type { ApplicationBackend } from '@nestos/app-contracts/services';
+import { t } from '@nestos/common';
 import { showNameDialog } from '../files/project-dialog';
 
 interface Target {folder: string; profileId?: string; nativeSessionId?: string; archived?: boolean}

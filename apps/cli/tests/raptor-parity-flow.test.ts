@@ -3,12 +3,12 @@ import { cp, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
-import { FlowCommand, type FlowDraft, type FlowRevision } from '@itookit/llm-flow/contracts';
-import { SessionCommand } from '@itookit/llm-session/contracts';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
+import { FlowCommand, type FlowDraft, type FlowRevision } from '@nestos/llm-flow/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 import { CliDirectorySourceProvider } from '../src/directories';
 import { NodeNativeShell } from '../src/shell';
 

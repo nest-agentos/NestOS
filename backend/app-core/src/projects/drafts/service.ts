@@ -1,8 +1,8 @@
 import {preparedTitle} from './title';
-import { FSError } from '@itookit/vfs-core';
-import type { ISessionRepository } from '@itookit/llm-session';
-import { type SessionSubmission } from '@itookit/llm-flow/contracts';
-import { hasCommittedSubmission } from '@itookit/llm-session';
+import { FSError } from '@nestos/vfs-core';
+import type { ISessionRepository } from '@nestos/llm-session';
+import { type SessionSubmission } from '@nestos/llm-flow/contracts';
+import { hasCommittedSubmission } from '@nestos/llm-session';
 import type { ProjectDraftPromotion, ProjectDraftRecord, ProjectDraftComposer, DraftStore } from './contracts';
 
 /** Reconcile from durable evidence; notifications never create successor drafts. */

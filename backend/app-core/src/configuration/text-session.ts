@@ -1,6 +1,6 @@
-import {t, createModuleLogger} from '@itookit/common';
-import {SessionCommand, assistantResponseText, type Round, type SessionInstructionQueue} from '@itookit/llm-session/contracts';
-import type {ApplicationBackend, LocalApplicationServices} from '@itookit/app-contracts/services';
+import {t, createModuleLogger} from '@nestos/common';
+import {SessionCommand, assistantResponseText, type Round, type SessionInstructionQueue} from '@nestos/llm-session/contracts';
+import type {ApplicationBackend, LocalApplicationServices} from '@nestos/app-contracts/services';
 
 type Request = Parameters<ApplicationBackend['generateText']>[0];
 const failure = (code: string) => Object.assign(new Error(code), {code});
@@ -23,7 +23,7 @@ export async function generateInSession(services: LocalApplicationServices, requ
 }
 
 function observe(services: LocalApplicationServices, request: Request, signal: AbortSignal,
-    commands: import('@itookit/llm-session/contracts').ICommandBus): Promise<string> {
+    commands: import('@nestos/llm-session/contracts').ICommandBus): Promise<string> {
     return new Promise((resolve, reject) => {new TextSessionObserver(services, request, signal, commands, resolve, reject).start();});
 }
 class TextSessionObserver {
@@ -34,7 +34,7 @@ class TextSessionObserver {
     private unsubscribe = () => {};
     private timer?: ReturnType<typeof setInterval>;
     constructor(private services: LocalApplicationServices, private request: Request, private signal: AbortSignal,
-        private commands: import('@itookit/llm-session/contracts').ICommandBus,
+        private commands: import('@nestos/llm-session/contracts').ICommandBus,
         private resolve: (content: string) => void, private reject: (error: unknown) => void) {}
     start(): void {
         this.unsubscribe = this.services.sessionRepository.subscribe(change => {

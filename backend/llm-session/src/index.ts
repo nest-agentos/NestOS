@@ -5,7 +5,7 @@ export {prepareDirectRun, type DirectRunPreparation} from './session/direct-run-
 export type {DirectConversationInput} from './session/direct-conversation';
 import {IndependentCallService} from './session/independent-calls';
 import { prepareFlowConnections } from './session/flow-connections';
-import { operationModelNames, modelForOperation } from '@itookit/kernel-adapters/contracts';
+import { operationModelNames, modelForOperation } from '@nestos/kernel-adapters/contracts';
 import { checkFlowConnectionSlots, checkFlowConnections, type FlowConnectionCheckInput } from './session/flow-connection-check';
 import { skillContextResolver } from './session/direct-conversation';
 import { createSessionHost, type SessionHostPorts } from './utils/host-ports';
@@ -45,8 +45,8 @@ export type { SessionHistoryChain } from './persistence/history-chain';
 export { FlowEngine, FLOW_MODULE_NAME } from './persistence/flow-engine';
 export { RoundLog, roundToProjection, hasEffectiveAssistant } from './persistence/round-log';
 export { RoundGraphService, RoundGraphError } from './persistence/round-graph-service';
-export * from '@itookit/llm-flow';
-export { FlowDefinitionStore, FlowDraftVersionConflictError } from '@itookit/llm-flow';
+export * from '@nestos/llm-flow';
+export { FlowDefinitionStore, FlowDraftVersionConflictError } from '@nestos/llm-flow';
 export type {
     RoundManifest,
     RoundProjection,
@@ -92,9 +92,9 @@ export {
 } from './persistence/session-directory-storage';
 export { DurableConversationProjection } from './persistence/durable-conversation-projection';
 export { formatErrorMessage } from './utils/error-formatter';
-import type { DagPluginCatalog } from '@itookit/llm-flow/contracts';
-import type { ToolDefinition } from '@itookit/llm-context';
-import type { Kernel } from '@itookit/durable-kernel';
+import type { DagPluginCatalog } from '@nestos/llm-flow/contracts';
+import type { ToolDefinition } from '@nestos/llm-context';
+import type { Kernel } from '@nestos/durable-kernel';
 import type { IAgentConfigService } from './services/agent-service';
 import type { ISessionRepository } from './persistence/types';
 import { SessionManager } from './session/session-manager';
@@ -104,9 +104,9 @@ import { ExtensionRegistry } from './core/extension-registry';
 import { createSessionPlugin, SessionCommand } from './plugins/session-plugin';
 import { createVcsPlugin } from './plugins/vcs-plugin';
 import { createHistoryPlugin } from './plugins/history-plugin';
-import { FlowDefinitionStore, type FlowStore } from '@itookit/llm-flow';
-import { DagCommandService, FlowCommand } from '@itookit/llm-flow';
-import { registerDurablePrograms } from '@itookit/llm-flow';
+import { FlowDefinitionStore, type FlowStore } from '@nestos/llm-flow';
+import { DagCommandService, FlowCommand } from '@nestos/llm-flow';
+import { registerDurablePrograms } from '@nestos/llm-flow';
 
 export interface ConversationSystemOptions {
     independentCalls?: IndependentCallService;
@@ -127,7 +127,7 @@ export interface ConversationSystemOptions {
     retrieveMemory?: import('./session/conversation-run-coordinator').ConversationRunCoordinatorOptions['retrieveMemory'];
     agentService: IAgentConfigService;
     sessionEngine: ISessionRepository;
-    promptHistoryFiles: import('@itookit/vfs-core').IFileSystem;
+    promptHistoryFiles: import('@nestos/vfs-core').IFileSystem;
     kernel: Kernel;
     /** Standalone workflow storage (flows VFS module). */
     flowStore: FlowStore;
@@ -334,7 +334,7 @@ export { TaskMemoryService } from './session/task-memory-service';
 
 export { bindStandaloneFlowNode, type FlowIdentityResolver } from './session/flow-node-binder';
 
-export { buildSkillContexts } from '@itookit/llm-tasks';
+export { buildSkillContexts } from '@nestos/llm-tasks';
 
 export { FlowRunProjection, projectTaskInteractions, type FlowRunProjectionOptions } from './persistence/flow-run-projection';
 

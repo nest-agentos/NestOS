@@ -1,4 +1,4 @@
-import {ACTION_ICONS, CHAT_ICONS} from '@itookit/common';
+import {ACTION_ICONS, CHAT_ICONS} from '@nestos/common';
 import {LayoutTemplates} from '../components/templates/LayoutTemplates';
 import {ChatInputTemplates} from '../components/templates/ChatInputTemplates';
 

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IFileSystem, type IVFSManager } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IFileSystem, type IVFSManager } from '@nestos/vfs-core';
 import { SessionMemoryProvider } from '../src/session/session-memory-provider';
 import { TaskMemoryService } from '../src/session/task-memory-service';
-import { DurableAgentProgram } from '@itookit/llm-tasks';
+import { DurableAgentProgram } from '@nestos/llm-tasks';
 
 let manager: IVFSManager, fs: IFileSystem, kernel: Kernel;
 const policy = { namespaceId: 'agent', readScopes: ['project'], writeScopes: ['project'], retrievalLimit: 10 };

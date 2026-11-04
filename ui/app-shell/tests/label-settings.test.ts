@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createVFS, createFileSystemSource, MemoryBackend } from '@itookit/vfs-core';
-import { SettingsService } from '@itookit/app-core';
-import { LabelStore } from '@itookit/app-core';
+import { createVFS, createFileSystemSource, MemoryBackend } from '@nestos/vfs-core';
+import { SettingsService } from '@nestos/app-core';
+import { LabelStore } from '@nestos/app-core';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { vi.useRealTimers(); for (const close of cleanup.splice(0).reverse()) await close(); });

@@ -1,12 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import { FlowCommand, type FlowRevision } from '@itookit/llm-flow/contracts';
-import { SessionCommand, type SessionInstructionQueue } from '@itookit/llm-session/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import { FlowCommand, type FlowRevision } from '@nestos/llm-flow/contracts';
+import { SessionCommand, type SessionInstructionQueue } from '@nestos/llm-session/contracts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { bindLocalApplicationServices } from '../src/host/application-services';
 import { createApplicationClient } from '../src/host/application-client';
-import { FlowDefinitionStore } from '@itookit/llm-flow';
+import { FlowDefinitionStore } from '@nestos/llm-flow';
 import { compileAgentComposition } from '../src/configuration/agent-composition';
 
 type Runtime = Awaited<ReturnType<typeof createApplicationRuntime>>;
@@ -113,7 +113,7 @@ it('serializes concurrent preparation and saves so the final author configuratio
 it('checks the complete published body before reusing a managed revision', async () => {
     const { runtime } = await setup(); await runtime.agentService.saveAgent(team());
     const binding = (await runtime.agentService.getAgentConfig('team'))!.execution as { flowId: string; revision: number };
-    const draft = await runtime.commandBus.execute<import('@itookit/llm-flow/contracts').FlowDraft>(FlowCommand.DraftLoad, { id: binding.flowId });
+    const draft = await runtime.commandBus.execute<import('@nestos/llm-flow/contracts').FlowDraft>(FlowCommand.DraftLoad, { id: binding.flowId });
     const edited = await runtime.commandBus.execute<{ draft: typeof draft }>(FlowCommand.DraftSave, {
         draft: { ...draft, systemPrompt: ['Unexpected global instruction'] }, expectedDraftVersion: draft.draftVersion,
     });

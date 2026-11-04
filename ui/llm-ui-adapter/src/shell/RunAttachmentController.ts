@@ -4,11 +4,11 @@ import type {
     JsonValue,
     TaskRecord,
     TaskSignal,
-} from '@itookit/durable-kernel/contracts';
-import { randomUUID } from '@itookit/common';
+} from '@nestos/durable-kernel/contracts';
+import { randomUUID } from '@nestos/common';
 
-import type { AttachedTask, TaskControlPlane } from '@itookit/durable-kernel/contracts';
-export type { AttachedTask, TaskControlPlane } from '@itookit/durable-kernel';
+import type { AttachedTask, TaskControlPlane } from '@nestos/durable-kernel/contracts';
+export type { AttachedTask, TaskControlPlane } from '@nestos/durable-kernel';
 
 export interface RunAttachmentCallbacks {
     onEvent(event: EventEnvelope): void;
@@ -164,7 +164,7 @@ function isTerminal(status: string): boolean {
     return ['succeeded', 'failed', 'cancelled'].includes(status);
 }
 
-function acceptsSignal(wait: import('@itookit/durable-kernel/contracts').WaitSpec | undefined, type: string): boolean {
+function acceptsSignal(wait: import('@nestos/durable-kernel/contracts').WaitSpec | undefined, type: string): boolean {
     if (!wait) return false;
     if (wait.type === 'signal') return wait.id === undefined || wait.id === type;
     if (wait.type === 'any' || wait.type === 'all' || wait.type === 'quorum') {

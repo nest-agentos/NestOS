@@ -1,5 +1,5 @@
 import { skillIndexPrompt, validateSkillIndexLimit } from './index-prompt';
-import type { ISkillService, SkillLoadResult } from '@itookit/tools/contracts';
+import type { ISkillService, SkillLoadResult } from '@nestos/tools/contracts';
 import { rollbackFailedLoad } from './loaded-state';
 
 /** Build a new-run snapshot through the Session service; this does not grant tools. */

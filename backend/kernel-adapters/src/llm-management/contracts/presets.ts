@@ -1,4 +1,4 @@
-import type { LLMProvider, LLMConnection } from '@itookit/driver-llm/contracts';
+import type { LLMProvider, LLMConnection } from '@nestos/driver-llm/contracts';
 import type { InitialAgentDef } from './agent';
 import type { DefaultConnectionDef } from './connection';
 import type { ModelPricingConfig } from './pricing';

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {remoteSessionPath} from '@itookit/app-contracts';
-import {t} from '@itookit/common';
+import {remoteSessionPath} from '@nestos/app-contracts';
+import {t} from '@nestos/common';
 import {confirmRemoteRemoval, remoteRemovalItems, type RemoteRemovalItem} from '../src/projects/remote-session-removal';
 import {nativeSessionMenu} from '../src/projects/remote-session-management';
 

@@ -2,13 +2,13 @@ import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createVFS, MemoryBackend, type IFileSystem } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { DirectoryMountService, ProjectService, SessionFilesService, folderBrowserPath } from '@itookit/app-core';
+import { createVFS, MemoryBackend, type IFileSystem } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { DirectoryMountService, ProjectService, SessionFilesService, folderBrowserPath } from '@nestos/app-core';
 import { ProjectNavigation } from '../src/projects/ProjectNavigation';
 import { projectItems } from '../src/projects/navigation-policy';
 import { refreshDirectoryList } from '../src/workbench/directory-list';
-import { conversationResourcePath } from '@itookit/app-contracts';
+import { conversationResourcePath } from '@nestos/app-contracts';
 
 function actions() {
     return { createProject: vi.fn(), createSession: vi.fn(), createChild: vi.fn(), importItems: vi.fn(),
@@ -34,7 +34,7 @@ it('keeps all-project sidebar sessions after refresh and shares project rows wit
         kernel: { onChanged: () => () => {}, async *listSessions() {} } as never, factory: async () => ({ destroy() {} }) as never, onSelect() {} });
     try {
         await workbench.start();
-        const ui = (workbench as unknown as { sidebarUI: import('@itookit/vfs-ui').VFSUIShell }).sidebarUI;
+        const ui = (workbench as unknown as { sidebarUI: import('@nestos/vfs-ui').VFSUIShell }).sidebarUI;
         await ui.expandPath(path); await workbench.refresh();
         expect(sidebar.textContent).toContain('Visible conversation');
         expect(sidebar.querySelector<HTMLSelectElement>('.workbench-project-navigation select')!.value).toBe('/');
@@ -258,7 +258,7 @@ it('renders directory entries before blocked sidebar navigation and ignores its 
         await (workbench as unknown as {fileNavigation: Promise<void>}).fileNavigation;
         expect(workbench.getActiveResourceId()).toBe('/');
         expect(sidebar.querySelector<HTMLSelectElement>('.workbench-project-navigation select')!.value).toBe('/'); navigation.mockRestore();
-        const ui = (workbench as unknown as {sidebarUI: import('@itookit/vfs-ui').VFSUIShell}).sidebarUI;
+        const ui = (workbench as unknown as {sidebarUI: import('@nestos/vfs-ui').VFSUIShell}).sidebarUI;
         await ui.selectPath(directory); await ui.refresh();
         expect(workbench.getActiveResourceId()).toBe('/');
     } finally {

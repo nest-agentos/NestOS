@@ -1,5 +1,5 @@
-import type { ConnectionMeta } from '@itookit/driver-llm/contracts';
-import type { ModelOperation } from '@itookit/kernel-adapters/contracts';
+import type { ConnectionMeta } from '@nestos/driver-llm/contracts';
+import type { ModelOperation } from '@nestos/kernel-adapters/contracts';
 
 /** Selection data only; credentials and arbitrary metadata remain in the live catalog. */
 export interface FlowConnectionSelection {

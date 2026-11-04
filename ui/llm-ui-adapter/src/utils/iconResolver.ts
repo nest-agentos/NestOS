@@ -1,13 +1,13 @@
 // @file: llm-ui/utils/iconResolver.ts
 
-import { ExecutionNode } from '@itookit/llm-session/contracts';
-import { EXECUTOR_TYPE_ICONS, ENTITY_ICONS } from '@itookit/common';
+import { ExecutionNode } from '@nestos/llm-session/contracts';
+import { EXECUTOR_TYPE_ICONS, ENTITY_ICONS } from '@nestos/common';
 
 /**
  * Agent/Node 图标解析器
  *
  * 统一的图标决策逻辑，消除 NodeRenderer 和 SessionRenderer 中的重复。
- * 图标常量统一来自 @itookit/common 的 EXECUTOR_TYPE_ICONS。
+ * 图标常量统一来自 @nestos/common 的 EXECUTOR_TYPE_ICONS。
  */
 export class IconResolver {
     /**

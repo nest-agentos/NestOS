@@ -1,5 +1,5 @@
-import {sha256HexSync} from '@itookit/common';
-import type {SessionInstruction} from '@itookit/llm-session/contracts';
+import {sha256HexSync} from '@nestos/common';
+import type {SessionInstruction} from '@nestos/llm-session/contracts';
 import type {Options,SavedFix,Snapshot} from './task-fix-contracts';
 import {parseDefinition,inWorkspace} from './task-fix-files';
 import {acceptSnapshot} from './task-fix-acceptance';

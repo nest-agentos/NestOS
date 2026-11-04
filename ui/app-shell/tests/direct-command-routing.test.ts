@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { SessionCommand } from '@itookit/llm-session';
+import { SessionCommand } from '@nestos/llm-session';
 import { SendMessageCommand } from '../../llm-ui-adapter/src/commands/SendMessageCommand';
 import { RegenerateCommand, EditAndRetryCommand } from '../../llm-ui-adapter/src/commands/NodeCommands';
 import { rerunSession } from '../../llm-ui-adapter/src/shell/rerun-session';

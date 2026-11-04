@@ -1,7 +1,7 @@
 // @file: kernel-adapters/src/tty/tty-write.ts
 // tty_write — send input to an active TTY session and collect the response.
 
-import type { ToolMeta, ToolDefinition, ToolHandler, ITTYSessionManager } from '@itookit/tools/contracts';
+import type { ToolMeta, ToolDefinition, ToolHandler, ITTYSessionManager } from '@nestos/tools/contracts';
 import { collectOutput } from './session-manager';
 
 export const ttyWriteMeta: ToolMeta = {

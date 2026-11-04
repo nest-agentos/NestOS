@@ -1,6 +1,6 @@
-import type {OperationLedger, OperationRecord} from '@itookit/llm-ui';
-import {t} from '@itookit/common';
-import type {SessionInstructionQueue, SubmissionRequest} from '@itookit/llm-session/contracts';
+import type {OperationLedger, OperationRecord} from '@nestos/llm-ui';
+import {t} from '@nestos/common';
+import type {SessionInstructionQueue, SubmissionRequest} from '@nestos/llm-session/contracts';
 
 /** Reconcile frozen submissions without entering the composer, recompiling targets or sending input. */
 export class WorkspaceSubmissionRecovery {

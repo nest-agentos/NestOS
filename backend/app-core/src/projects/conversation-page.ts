@@ -1,4 +1,4 @@
-import { FSError, type FSNode } from '@itookit/vfs-core';
+import { FSError, type FSNode } from '@nestos/vfs-core';
 import { mapConcurrent } from '../utils/map-concurrent';
 
 export interface ConversationSource {

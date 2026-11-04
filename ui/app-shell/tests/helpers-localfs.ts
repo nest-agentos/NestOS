@@ -18,10 +18,10 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { promises as fsp } from 'node:fs';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
 import { FakeSidecarDb } from './fake-sidecar';
-import { createVFS } from '@itookit/vfs-core';
-import type { IVFSManager, IFileSystem } from '@itookit/vfs-core';
+import { createVFS } from '@nestos/vfs-core';
+import type { IVFSManager, IFileSystem } from '@nestos/vfs-core';
 
 // ── Paths ──────────────────────────────────────────────────────────────────────
 

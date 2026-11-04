@@ -1,5 +1,5 @@
-import type { ProjectService } from '@itookit/app-contracts/services';
-import { t } from '@itookit/common';
+import type { ProjectService } from '@nestos/app-contracts/services';
+import { t } from '@nestos/common';
 
 /** The same project policy drives page, sidebar and menu creation commands. */
 export function sessionCreationReason(projects: ProjectService, projectId: string): string | undefined {

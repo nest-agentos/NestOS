@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { createCellsDriver, type HarnessClient, type HarnessEvents, type RemoteProject } from '@itookit/cells-driver';
+import { createCellsDriver, type HarnessClient, type HarnessEvents, type RemoteProject } from '@nestos/cells-driver';
 
 const metadataFile = process.env.NESTOS_HARNESS_LIVE_METADATA;
 interface Metadata { endpoint: string; project: RemoteProject; credentialFile: string; profileId: string; root: string; gatewayPid: number }

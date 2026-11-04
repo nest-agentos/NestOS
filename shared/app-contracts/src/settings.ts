@@ -1,8 +1,8 @@
 // @file app-settings/types.ts
 
 // LLM 相关类型直接从 common 导入，避免对 llm-management / llm-runtime 的间接依赖
-import type { LLMConnection } from '@itookit/driver-llm/contracts';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
+import type { LLMConnection } from '@nestos/driver-llm/contracts';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
 
 // 向后兼容重新导出
 export type { LLMConnection };
@@ -32,7 +32,7 @@ export interface SettingsState {
     contacts: Contact[];
 }
 
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
 
 /** Host-selected sources for settings export and tag management; names are UI labels, not filesystem roots. */
 export interface WorkspaceDescription {

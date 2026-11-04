@@ -1,6 +1,6 @@
-import {escapeHTML, t, type LocaleKey} from '@itookit/common';
-import type {AssistantScanner, ProjectFolder} from '@itookit/app-contracts/services';
-import type {SessionSummary} from '@itookit/llm-session/contracts';
+import {escapeHTML, t, type LocaleKey} from '@nestos/common';
+import type {AssistantScanner, ProjectFolder} from '@nestos/app-contracts/services';
+import type {SessionSummary} from '@nestos/llm-session/contracts';
 import {matchesShortcutQuery, validShortcutTarget, type AssistantShortcut} from './assistant-shortcuts';
 export interface AssistantChoices {projects: ProjectFolder[]; sessions: SessionSummary[]; scanners: AssistantScanner[]}
 export const assistantLabel = (key: string, values?: Record<string, string | number>) => t(`assistant.${key}` as LocaleKey, values);

@@ -1,6 +1,6 @@
 import {promptHarnessNode} from './prompt-harness';
-import { DELEGATION_LIMITS, type FlowNodeDefinition } from '@itookit/llm-flow/contracts';
-import { type ChatMessage, type ContextSnapshot } from '@itookit/llm-context';
+import { DELEGATION_LIMITS, type FlowNodeDefinition } from '@nestos/llm-flow/contracts';
+import { type ChatMessage, type ContextSnapshot } from '@nestos/llm-context';
 import { type LLMSkill } from '../contracts';
 import type { ExecutionTask, ExecutorConfig } from '../core/types';
 import { AgentResolver } from './agent-resolver';

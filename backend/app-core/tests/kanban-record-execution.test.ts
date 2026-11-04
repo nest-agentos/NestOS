@@ -1,9 +1,9 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {createKanbanModule} from '@itookit/kanban';
-import {SeqKanbanStore} from '@itookit/kanban/storage';
-import type {KanbanCommand, KanbanWorkType} from '@itookit/kanban/contracts';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {createKanbanModule} from '@nestos/kanban';
+import {SeqKanbanStore} from '@nestos/kanban/storage';
+import type {KanbanCommand, KanbanWorkType} from '@nestos/kanban/contracts';
+import type {ProjectService} from '@nestos/app-contracts/services';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {createRecordExecution, validateRemoteReferences} from '../src/kanban/record-execution';
 

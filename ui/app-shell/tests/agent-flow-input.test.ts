@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { InputAssetCommand } from '@itookit/app-contracts';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
-import { SessionCommand } from '@itookit/llm-session/contracts';
+import { InputAssetCommand } from '@nestos/app-contracts';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
 import { ChatInput } from '../../llm-ui-adapter/src/components/input/ChatInputView';
 import { prepareAgentFlow, type AgentFlowDraftInput } from '../../llm-ui-adapter/src/flows/agent-flow';
 import type { ExecutorOption } from '../../llm-ui-adapter/src/domain/types';

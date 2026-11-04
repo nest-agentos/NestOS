@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {t} from '@itookit/common';
-import type {ContextOptionsPage, ContextOptionsQuery} from '@itookit/llm-session/contracts';
+import {t} from '@nestos/common';
+import type {ContextOptionsPage, ContextOptionsQuery} from '@nestos/llm-session/contracts';
 import type {InputContextDraft} from '../../llm-ui-adapter/src/domain/context-draft';
 import {ChatInput} from '../../llm-ui-adapter/src/components/input/ChatInputView';
 import {WorkspaceContextPicker, type ContextPickerState} from '../../llm-ui-adapter/src/components/input/WorkspaceContextPicker';
-import {RpcPeer} from '@itookit/app-transport/application';
-import {createOperationLedger} from '@itookit/llm-ui';
-import {SessionCommand, type SubmissionRequest, type SessionInstructionQueue, type ICommandBus} from '@itookit/llm-session/contracts';
+import {RpcPeer} from '@nestos/app-transport/application';
+import {createOperationLedger} from '@nestos/llm-ui';
+import {SessionCommand, type SubmissionRequest, type SessionInstructionQueue, type ICommandBus} from '@nestos/llm-session/contracts';
 import {submitSessionCall} from '../../llm-ui-adapter/src/commands/submit-session-call';
 import type {CommandContext} from '../../llm-ui-adapter/src/commands/CommandContext';
 import {SendMessageCommand} from '../../llm-ui-adapter/src/commands/SendMessageCommand';

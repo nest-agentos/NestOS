@@ -1,9 +1,9 @@
 /** Shared application capabilities; implementations belong to backend/app-core. */
-import type * as VfsContracts from '@itookit/vfs-core';
-import type { IFileSystem, OperationOptions, FSNode } from '@itookit/vfs-core';
-import type { ISessionRepository, ConversationManifest, ChatSessionSettings, PlanCommandRequest, ExecCommandRequest } from '@itookit/llm-session/contracts';
-import type * as KernelContracts from '@itookit/durable-kernel/contracts';
-import type { TaskRecord, EventEnvelope } from '@itookit/durable-kernel/contracts';
+import type * as VfsContracts from '@nestos/vfs-core';
+import type { IFileSystem, OperationOptions, FSNode } from '@nestos/vfs-core';
+import type { ISessionRepository, ConversationManifest, ChatSessionSettings, PlanCommandRequest, ExecCommandRequest } from '@nestos/llm-session/contracts';
+import type * as KernelContracts from '@nestos/durable-kernel/contracts';
+import type { TaskRecord, EventEnvelope } from '@nestos/durable-kernel/contracts';
 import type { ProjectTarget, ProjectService, ProjectSearch } from './projects';
 import type { SessionFilesService } from './files';
 import type { ApplicationKernelPort } from './local';
@@ -205,8 +205,8 @@ export interface WorkbenchView {
 
 export interface WorkbenchChatControls {
     privilegedCommands: PrivilegedCommandService;
-    sessionSkills: import('@itookit/tools/contracts').SessionSkillControls;
-    configuration?: import('@itookit/kernel-adapters/contracts').ChatConfigurationView;
+    sessionSkills: import('@nestos/tools/contracts').SessionSkillControls;
+    configuration?: import('@nestos/kernel-adapters/contracts').ChatConfigurationView;
 }
 
 /** An interest lease owns probes, never Session execution. */
@@ -217,15 +217,15 @@ export interface ConnectionObservation {
 
 /** Optional host-prepared metadata, consumed only when opening this Session. */
 export interface SessionPresentationState {
-    taskAttachment?: import('@itookit/durable-kernel/contracts').TaskAttachmentRecovery;
-    flowInvocations?: import('@itookit/llm-session/contracts').FlowInvocationRecord[];
-    skills?: Awaited<ReturnType<import('@itookit/tools/contracts').SessionSkillControls['list']>>;
+    taskAttachment?: import('@nestos/durable-kernel/contracts').TaskAttachmentRecovery;
+    flowInvocations?: import('@nestos/llm-session/contracts').FlowInvocationRecord[];
+    skills?: Awaited<ReturnType<import('@nestos/tools/contracts').SessionSkillControls['list']>>;
 }
 
 /** Prepared once by the backend; the editor owns the returned file lease. */
 export interface SessionEditorInitialData extends SessionPresentationState {
     sessionId: string;
-    snapshot: import('@itookit/llm-session/contracts').SessionSnapshot;
+    snapshot: import('@nestos/llm-session/contracts').SessionSnapshot;
     title: string;
     manifest: ConversationManifest;
     settings: ChatSessionSettings;
@@ -245,8 +245,8 @@ export type SessionOrganizationStore = Pick<ISessionRepository, 'list' | 'listSu
 export interface PrivilegedCommandService {
     plan(request: PlanCommandRequest): Promise<string>;
     exec(request: ExecCommandRequest): Promise<string>;
-    tools?(sessionId: string): Promise<import('@itookit/llm-session/contracts').ToolCommandOption[]>;
-    tool?(request: import('@itookit/llm-session/contracts').ToolCommandRequest): Promise<string>;
+    tools?(sessionId: string): Promise<import('@nestos/llm-session/contracts').ToolCommandOption[]>;
+    tool?(request: import('@nestos/llm-session/contracts').ToolCommandRequest): Promise<string>;
 }
 
 export interface NestosInitialFiles {

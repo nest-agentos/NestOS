@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import type {CallTargetCatalog, ChatView, ComposerDraft} from '@itookit/llm-ui';
+import type {CallTargetCatalog, ChatView, ComposerDraft} from '@nestos/llm-ui';
 import {refreshDraftTarget, restoreDraftTarget} from './restore-draft-target';
 
 const old = {kind: 'agent', id: 'assistant', version: 'old', digest: 'old'};

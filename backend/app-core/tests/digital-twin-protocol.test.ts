@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { Kernel } from '@itookit/durable-kernel';
+import type { Kernel } from '@nestos/durable-kernel';
 import type { TwinAnalysisJob } from '../src/digital-twin/domain';
 import { KernelTwinExtractor, parseCandidates } from '../src/digital-twin/extraction';
 import { diagnosticDetail } from '../src/digital-twin/diagnostics';

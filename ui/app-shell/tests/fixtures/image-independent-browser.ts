@@ -1,5 +1,5 @@
-import type {ConversationControls, ConversationSnapshot} from '@itookit/llm-ui-adapter/contracts';
-import {createOperationLedger} from '@itookit/llm-ui';
+import type {ConversationControls, ConversationSnapshot} from '@nestos/llm-ui-adapter/contracts';
+import {createOperationLedger} from '@nestos/llm-ui';
 
 import {createNativeChatBinding, createNativeChatView, type ImageEditingHost, type ImageAssetMetadata} from '../../../llm-ui-adapter/src/independent';
 import '../../../llm-ui-adapter/src/styles/index.css';
@@ -10,7 +10,7 @@ async function waitFor(test: () => boolean) {
 async function checks() {
     const assets = new Map<string, Blob>(), metadata = new Map<string, ImageAssetMetadata>(); let serial = 0;
     const sent: NonNullable<Parameters<ConversationControls['send']>[1]>[] = [];
-    let resize: import('@itookit/image-parser').ImageResizePolicy = {mode: 'max-edge', maxEdge: 1024};
+    let resize: import('@nestos/image-parser').ImageResizePolicy = {mode: 'max-edge', maxEdge: 1024};
     const policyListeners = new Set<() => void>();
     const images: ImageEditingHost = {
         read: async ref => {const blob = assets.get(ref.id); if (!blob) throw new Error('Missing resource'); return blob;},

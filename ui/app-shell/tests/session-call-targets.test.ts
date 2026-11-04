@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {SessionCommand} from '@itookit/llm-session/contracts';
-import {hasCommittedSubmission} from '@itookit/llm-session';
-import {createOperationLedger} from '@itookit/llm-ui';
-import {FlowCommand, type FlowDraft} from '@itookit/llm-flow/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {SessionCommand} from '@nestos/llm-session/contracts';
+import {hasCommittedSubmission} from '@nestos/llm-session';
+import {createOperationLedger} from '@nestos/llm-ui';
+import {FlowCommand, type FlowDraft} from '@nestos/llm-flow/contracts';
 import {createSessionChatBinding, createSessionChatView} from '../../llm-ui-adapter/src/independent/session';
 import {LLMWorkspaceEditor} from '../../llm-ui-adapter/src/shell/LLMWorkspaceEditor';
 import type {ChatInput} from '../../llm-ui-adapter/src/components/input/ChatInputView';
-import {RpcPeer} from '@itookit/app-transport/application';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {RpcPeer} from '@nestos/app-transport/application';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 
-vi.mock('@itookit/mdxeditor', async original => ({...await original<typeof import('@itookit/mdxeditor')>(),
+vi.mock('@nestos/mdxeditor', async original => ({...await original<typeof import('@nestos/mdxeditor')>(),
     AssetResolverPlugin: class {}, MDxRenderer: class {
         markedExtensions: unknown[] = []; usePlugin() {return this;}
         async render(node: HTMLElement, text: string) {node.textContent = text;}
@@ -96,7 +96,7 @@ it('keeps Flows reachable after more than ten Agents and supports group filterin
         id: `picker-agent-${index}`, name: `Picker agent ${index}`, type: 'agent', config: {},
     });
     const view = await f.open();
-    const catalog = await f.runtime.commandBus.execute<import('@itookit/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
+    const catalog = await f.runtime.commandBus.execute<import('@nestos/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
     const flowNames = catalog.entries.filter(entry => entry.target.kind === 'flow').map(entry => entry.name);
     await selectFlow(view.host);
     expect(view.input.getConfig().target).toMatchObject({kind: 'flow', id: 'worker'});
@@ -149,7 +149,7 @@ it('uses the default workspace picker and queues a second Flow while the first s
     await submitForm(view.host, 'First request');
     await submitForm(view.host, 'Second request');
     expect(calls).toBe(2);
-    const queue = await original<import('@itookit/llm-session/contracts').SessionInstructionQueue>(SessionCommand.GetInstructionQueue);
+    const queue = await original<import('@nestos/llm-session/contracts').SessionInstructionQueue>(SessionCommand.GetInstructionQueue);
     expect(queue.items.map(item => item.flowBinding?.inputResolution?.parameters)).toEqual([{request: 'First request', count: 0}, {request: 'Second request', count: 0}]);
     expect(execute.mock.calls.filter(([name]) => name === SessionCommand.Send)).toEqual([]);
     const saved = await f.runtime.sessionRepository.getUIState(f.sessionId);
@@ -158,7 +158,7 @@ it('uses the default workspace picker and queues a second Flow while the first s
     finish(); await view.close();
     const reopened = await f.open();
     expect(reopened.input.getConfig().target).toEqual(view.input.getConfig().target);
-    expect((await original<import('@itookit/llm-session/contracts').SessionInstructionQueue>(SessionCommand.GetInstructionQueue)).items).toHaveLength(2);
+    expect((await original<import('@nestos/llm-session/contracts').SessionInstructionQueue>(SessionCommand.GetInstructionQueue)).items).toHaveLength(2);
 });
 
 it('runs a first-class Flow from the default workspace and persists its display text separately from confirmed arguments', async () => {
@@ -220,11 +220,11 @@ it('reopens an unknown submission from the saved ledger and reconciles it withou
     expect((await f.runtime.sessionRepository.getUIState(f.sessionId))?.operationRecords).toHaveLength(1);
     expect((await f.runtime.sessionRepository.readHistoryChain(f.sessionId)).rounds).toEqual([]);
     await second.close();
-    const record = (await f.runtime.sessionRepository.getUIState(f.sessionId))!.operationRecords![0] as unknown as {input: {request: import('@itookit/llm-session/contracts').SubmissionRequest}};
+    const record = (await f.runtime.sessionRepository.getUIState(f.sessionId))!.operationRecords![0] as unknown as {input: {request: import('@nestos/llm-session/contracts').SubmissionRequest}};
     await execute(SessionCommand.Bind, {sessionId: f.sessionId});
     await (await f.runtime.kernel.kernel.openSession(f.sessionId)).suspend();
     await execute(SessionCommand.Submit, record.input.request);
-    const queued = await execute<import('@itookit/llm-session/contracts').SessionInstructionQueue>(SessionCommand.GetInstructionQueue);
+    const queued = await execute<import('@nestos/llm-session/contracts').SessionInstructionQueue>(SessionCommand.GetInstructionQueue);
     await execute(SessionCommand.EditInstructionQueue, {action: 'remove', id: record.input.request.submission!.id, expectedRevision: queued.revision});
     const removed = await execute(SessionCommand.GetInstructionQueue);
     const draft = await execute<FlowDraft>(FlowCommand.DraftLoad, {id: 'worker'});
@@ -270,7 +270,7 @@ it('carries the default workspace target, confirmed arguments and committed hist
     }})) as Pick<ICommandBus, 'execute'>;
     const commands = {execute: remote.execute, register: f.runtime.commandBus.register.bind(f.runtime.commandBus), list: f.runtime.commandBus.list.bind(f.runtime.commandBus)};
     const view = await f.open(commands); await selectFlow(view.host); await submitForm(view.host, 'RPC request');
-    const call = received.find(item => item.name === SessionCommand.Submit)!.args as import('@itookit/llm-session/contracts').SubmissionRequest;
+    const call = received.find(item => item.name === SessionCommand.Submit)!.args as import('@nestos/llm-session/contracts').SubmissionRequest;
     expect(call).toMatchObject({expectedSessionId: f.sessionId, expectedBranch: 'main', expectedTarget: {kind: 'flow', id: 'worker', version: '1'},
         source: {kind: 'arguments', value: {request: 'RPC request', count: 0}}, presentation: {text: 'RPC request'}});
     await vi.waitFor(async () => expect(await remote.execute(SessionCommand.HasCommittedSubmission, {sessionId: f.sessionId, submission: call.submission})).toBe(true));
@@ -314,7 +314,7 @@ it.each(['local', 'rpc'])('submits an independent child from ChatView over %s an
     await vi.waitFor(() => expect(operations.getSnapshot()[0]?.status).toBe('accepted'), {timeout: 10000});
     expect(view.getDraft().text).toBe('');
     expect(operations.getSnapshot()[0].input).toMatchObject({selection: {callMode: 'independent'}, independentTitle: 'worker'});
-    const calls = await f.runtime.commandBus.execute<import('@itookit/llm-session/contracts').IndependentCallView[]>('session.calls.list', {sessionId: f.sessionId});
+    const calls = await f.runtime.commandBus.execute<import('@nestos/llm-session/contracts').IndependentCallView[]>('session.calls.list', {sessionId: f.sessionId});
     expect(calls).toHaveLength(1); expect(calls[0].receipt.executionSessionId).not.toBe(f.sessionId);
     const card = host.querySelector<HTMLElement>('[data-independent-call]')!;
     expect(card).not.toBeNull(); expect(card.querySelector('[data-input]')!.textContent).toContain('Child request');
@@ -328,7 +328,7 @@ it.each(['local', 'rpc'])('submits an independent child from ChatView over %s an
     currentMode.value = 'current'; currentMode.dispatchEvent(new Event('change', {bubbles: true}));
     view.setText('Parent request'); view.setArguments('{"count":0}'); await view.submit();
     await vi.waitFor(async () => expect((await f.runtime.sessionRepository.readHistoryChain(f.sessionId)).rounds).toHaveLength(1));
-    const child = (await commands.execute<import('@itookit/llm-session/contracts').IndependentCallView[]>('session.calls.list', {sessionId: f.sessionId}))[0];
+    const child = (await commands.execute<import('@nestos/llm-session/contracts').IndependentCallView[]>('session.calls.list', {sessionId: f.sessionId}))[0];
     const query = {sessionId: f.sessionId, branchId: 'main', callId: child.receipt.operationId,
         executionSessionId: child.receipt.executionSessionId!, taskId: child.receipt.execution!.taskId, requestId: `cancel-${transport}`};
     const cancelled = await commands.execute('session.call.cancel', {...query, expectedEpoch: child.executionState!.controlEpoch});
@@ -394,13 +394,13 @@ it.each(['local', 'rpc'])('recovers a persisted independent answer over %s after
         const client = new RpcPeer('client', call => server.handle(call)); server = new RpcPeer('server', call => client.handle(call));
         cleanup.push(async () => {await client.close(); await server.close();}); commands = client.decode(await server.expose({execute})) as ICommandBus;
     }
-    const catalog = await commands.execute<import('@itookit/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
+    const catalog = await commands.execute<import('@nestos/llm-session/contracts').RootTargetCatalog>(SessionCommand.ListTargets);
     const target = catalog.entries.find(entry => entry.target.kind === 'flow')!.target;
     await commands.execute('session.call.submit', {title: 'Answer test', request: {expectedSessionId: f.sessionId, expectedBranch: 'main',
         target: {kind: target.kind, id: target.id, version: target.version}, expectedTarget: target, source: {kind: 'arguments', value: {request: 'Work', count: 0}},
         submission: {id: 'answer-call', source: {kind: 'conversation', ownerId: f.sessionId, id: 'answer-call'}}}});
-    let call!: import('@itookit/llm-session/contracts').IndependentCallView;
-    await vi.waitFor(async () => {call = (await commands.execute<import('@itookit/llm-session/contracts').IndependentCallView[]>('session.calls.list', {sessionId: f.sessionId}))[0]; expect(call.interactions?.total).toBe(1);});
+    let call!: import('@nestos/llm-session/contracts').IndependentCallView;
+    await vi.waitFor(async () => {call = (await commands.execute<import('@nestos/llm-session/contracts').IndependentCallView[]>('session.calls.list', {sessionId: f.sessionId}))[0]; expect(call.interactions?.total).toBe(1);});
     const scope = {sessionId: f.sessionId, branchId: 'main', callId: call.receipt.operationId, executionSessionId: call.receipt.executionSessionId!, taskId: call.receipt.execution!.taskId};
     await commands.execute('session.call.control', {...scope, requestId: 'pause-answer', action: 'pause', expectedEpoch: call.executionState!.controlEpoch});
     await f.runtime.commandBus.execute(SessionCommand.Bind, {sessionId: f.sessionId});
@@ -447,8 +447,8 @@ it.each(['local', 'rpc'])('stops remaining tasks from the real ChatView over %s 
     const target = host.querySelector<HTMLSelectElement>('[data-call-target]')!; target.value = choice.id; target.dispatchEvent(new Event('change', {bubbles: true}));
     const mode = host.querySelector<HTMLSelectElement>('[data-selector-id="callMode"]')!; mode.value = 'independent'; mode.dispatchEvent(new Event('change', {bubbles: true}));
     view.setText('Parent work'); await view.submit(); view.setText('Next draft');
-    let call!: import('@itookit/llm-session/contracts').IndependentCallView;
-    await vi.waitFor(async () => {call = (await commands.execute<import('@itookit/llm-session/contracts').IndependentCallView[]>('session.calls.list', {sessionId: f.sessionId}))[0]; expect(call?.receipt.execution?.taskId).toBeTruthy();});
+    let call!: import('@nestos/llm-session/contracts').IndependentCallView;
+    await vi.waitFor(async () => {call = (await commands.execute<import('@nestos/llm-session/contracts').IndependentCallView[]>('session.calls.list', {sessionId: f.sessionId}))[0]; expect(call?.receipt.execution?.taskId).toBeTruthy();});
     const kernel = f.runtime.kernel.kernel, execution = await kernel.openSession(call.receipt.executionSessionId!);
     const spec = {program: {kind: 'test.remaining', version: '1'}, input: null, deferStart: true};
     const child = await execution.submit({...spec, parent: call.receipt.execution!.taskId}), unrelated = await execution.submit(spec);

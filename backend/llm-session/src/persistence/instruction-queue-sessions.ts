@@ -1,4 +1,4 @@
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
 
 export interface InstructionQueueSessions {
     mark(sessionId: string): Promise<void>;

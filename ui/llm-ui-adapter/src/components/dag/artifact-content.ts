@@ -1,6 +1,6 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {ArtifactCommand, type ExecutionArtifactChunk, type ExecutionArtifactDescriptor, type ExecutionArtifactReference} from '@itookit/app-contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {ArtifactCommand, type ExecutionArtifactChunk, type ExecutionArtifactDescriptor, type ExecutionArtifactReference} from '@nestos/app-contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 import {readVerifiedContent, type VerifiedContentOptions} from '../../utils/verified-content';
 
 export type ArtifactReadOptions = VerifiedContentOptions;

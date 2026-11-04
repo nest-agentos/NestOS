@@ -1,5 +1,5 @@
-import {getLocale, t} from '@itookit/common';
-import type {ImageEditItem, ImageProcessor, ImageResizePolicy, PreparedImage} from '@itookit/image-parser';
+import {getLocale, t} from '@nestos/common';
+import type {ImageEditItem, ImageProcessor, ImageResizePolicy, PreparedImage} from '@nestos/image-parser';
 
 interface Options {items: readonly ImageEditItem[]; activeId: string; processor: ImageProcessor; resize: ImageResizePolicy;
     signal: AbortSignal; own(close: () => void): void;
@@ -32,7 +32,7 @@ function bindActions({dialog, host, error, cancel, apply, done}: ReturnType<type
 }
 /** The host owns modal focus and durable handoff; the library owns only its panel. */
 export async function openImageDialog(options: Options): Promise<void> {
-    const {createImageEditor} = await import('@itookit/image-parser/ui'); options.signal.throwIfAborted();
+    const {createImageEditor} = await import('@nestos/image-parser/ui'); options.signal.throwIfAborted();
     const {dialog, host, error, cancel, apply, done} = dialogElements(); document.body.append(dialog);
     const focus = document.activeElement as HTMLElement | null, task = new AbortController();
     let resize = options.resize, changed = false, settled = false;

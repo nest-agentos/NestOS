@@ -1,12 +1,12 @@
 # kernel-adapters 模型管理
 
-NestOS 的 LLM 宿主集成层。独立模型通信请使用 `@itookit/driver-llm`。
+NestOS 的 LLM 宿主集成层。独立模型通信请使用 `@nestos/driver-llm`。
 
 本包提供 VFS 设备接口、Provider/Connection 配置、费用记录、默认 Agent、系统提示词、Skill、MCP 和 `.llm` 配置导入导出；Provider 支持目录在 `src/llm-management/catalogs/`，只经 `/llm/presets` 入口加载。
 
 ```ts
-import { LLMDeviceDriver } from '@itookit/kernel-adapters/llm/core';
-import { createNestosLlmPresets } from '@itookit/kernel-adapters/llm/presets';
+import { LLMDeviceDriver } from '@nestos/kernel-adapters/llm/core';
+import { createNestosLlmPresets } from '@nestos/kernel-adapters/llm/presets';
 
 const driver = new LLMDeviceDriver(vfs, { llmLogger, presets: createNestosLlmPresets() });
 await driver.init();
@@ -28,8 +28,8 @@ Provider、模型 ID、模型能力、厂商接口资料及价格统一归 `src/
 机制入口的宿主接入采用实例选项：
 
 ```ts
-import { LLMDeviceDriver } from '@itookit/kernel-adapters/llm/core';
-import { createMCPStdioTransportFactory } from '@itookit/kernel-adapters/llm/mcp-host';
+import { LLMDeviceDriver } from '@nestos/kernel-adapters/llm/core';
+import { createMCPStdioTransportFactory } from '@nestos/kernel-adapters/llm/mcp-host';
 
 const stdioTransport = createMCPStdioTransportFactory(processBridge);
 const driver = new LLMDeviceDriver(vfs, { mcp: { stdioTransport } });

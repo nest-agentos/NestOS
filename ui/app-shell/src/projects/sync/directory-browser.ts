@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import type { SyncDialog } from './dialog';
 /** Browse only project-relative directories; stale results cannot replace a new selection. */
 export function installDirectoryBrowser(dialog: SyncDialog,parent: HTMLElement,projects: HTMLSelectElement,path: HTMLInputElement,

@@ -1,5 +1,5 @@
-import {createModuleLogger} from '@itookit/common';
-import type {ApplicationBackend, SessionResponse} from '@itookit/app-contracts/services';
+import {createModuleLogger} from '@nestos/common';
+import type {ApplicationBackend, SessionResponse} from '@nestos/app-contracts/services';
 import {reportResultQuery, resultQueryFailure} from './result-query-diagnostic';
 
 type Reader = Pick<ApplicationBackend, 'sessionResponse'> & Partial<Pick<ApplicationBackend, 'reportClientDiagnostic'>>;

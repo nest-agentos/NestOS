@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend, FSError, createFileSystemSource, type OperationOptions} from '@itookit/vfs-core';
+import {MemoryBackend, FSError, createFileSystemSource, type OperationOptions} from '@nestos/vfs-core';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {DiagnosticJournal} from '../src/diagnostics/journal';
 import {diagnosticFailure} from '../src/diagnostics/failure';

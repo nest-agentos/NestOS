@@ -1,5 +1,5 @@
-import {FILE_BROWSER_ICONS, t} from '@itookit/common';
-import {navigationButton} from '@itookit/ui-common-adapter';
+import {FILE_BROWSER_ICONS, t} from '@nestos/common';
+import {navigationButton} from '@nestos/ui-common-adapter';
 
 export interface WindowNavigation {
     home?(): void;

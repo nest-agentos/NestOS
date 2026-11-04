@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { DigitalTwinService } from '@itookit/app-core';
-import { createVFS, MemoryBackend, FSError } from '@itookit/vfs-core';
+import { DigitalTwinService } from '@nestos/app-core';
+import { createVFS, MemoryBackend, FSError } from '@nestos/vfs-core';
 import { TwinWorkbench } from '../src/digital-twin';
-import { VFS_DOM_EVENTS } from '@itookit/vfs-ui';
+import { VFS_DOM_EVENTS } from '@nestos/vfs-ui';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren(); });

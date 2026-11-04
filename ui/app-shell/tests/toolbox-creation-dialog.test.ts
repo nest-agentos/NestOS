@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ToolboxDrawers } from '@itookit/app-contracts/services';
-import { getLogger, t } from '@itookit/common';
+import type { ToolboxDrawers } from '@nestos/app-contracts/services';
+import { getLogger, t } from '@nestos/common';
 import { showToolboxCreationDialog, type ToolboxCreationDraft } from '../src/toolbox/create-resource-dialog';
 
 let controller: AbortController;

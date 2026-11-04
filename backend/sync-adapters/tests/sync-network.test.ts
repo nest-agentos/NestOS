@@ -5,14 +5,14 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { once } from 'node:events';
-import { FileSync, type SyncState } from '@itookit/vfs-sync';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import { LocalFSBackend } from '@itookit/vfsdriver-local';
+import { FileSync, type SyncState } from '@nestos/vfs-sync';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import { LocalFSBackend } from '@nestos/vfsdriver-local';
 import { LocalSyncStore, createLocalSyncSession } from '../src/local';
 import { SerialCoordinator } from '../../../tests/helpers/sync';
 import { HttpSyncClient } from '../src';
 import { IndexedDBFileLocal, IndexedDBSyncStore } from '../src';
-import { prepareProjectSync } from '@itookit/app-core';
+import { prepareProjectSync } from '@nestos/app-core';
 
 it('roundtrips IndexedDB and local clients against cells without overwriting offline edits', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'itookit-sync-'));

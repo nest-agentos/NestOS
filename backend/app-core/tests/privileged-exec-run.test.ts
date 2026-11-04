@@ -1,8 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { ExecProgram } from '@itookit/kernel-adapters';
-import type { IAgentConfigService } from '@itookit/llm-session';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { ExecProgram } from '@nestos/kernel-adapters';
+import type { IAgentConfigService } from '@nestos/llm-session';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { PrivilegedCommandService } from '../src/kernel/privileged-command-service';
 
 it.each([true, false])('unified exec submission preserves the approval boundary (approved: %s)', async approved => {

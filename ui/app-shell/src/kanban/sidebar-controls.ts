@@ -1,5 +1,5 @@
-import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, randomUUID, t} from '@itookit/common';
-import type {KanbanBoardSummary, KanbanClient, KanbanCommand} from '@itookit/kanban/contracts';
+import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
+import type {KanbanBoardSummary, KanbanClient, KanbanCommand} from '@nestos/kanban/contracts';
 
 const log = createModuleLogger('kanban-sidebar-controls');
 export const controlLabel = (key: string) => t(`kanban.boardControl.${key}` as Parameters<typeof t>[0]);

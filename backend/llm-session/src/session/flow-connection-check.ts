@@ -1,14 +1,14 @@
-import { checkFlowSyntax, flowToDag, mergeAgentConfig, type FlowNodeBinder } from '@itookit/llm-flow';
-import type { FlowDefinitionStore } from '@itookit/llm-flow';
+import { checkFlowSyntax, flowToDag, mergeAgentConfig, type FlowNodeBinder } from '@nestos/llm-flow';
+import type { FlowDefinitionStore } from '@nestos/llm-flow';
 import type { IAgentConfigService } from '../contracts';
-import { assertFlowCallSignature, flowParameterValues, validateFlowInputGroups, type DagPluginCatalog, type FlowDraft, type FlowRevision, type JsonValue } from '@itookit/llm-flow/contracts';
+import { assertFlowCallSignature, flowParameterValues, validateFlowInputGroups, type DagPluginCatalog, type FlowDraft, type FlowRevision, type JsonValue } from '@nestos/llm-flow/contracts';
 import { admitFlowConnectionSlot, prepareFlowConnections } from './flow-connections';
 import { bindFlowAgentConnection } from './flow-agent-connections';
 import { AgentResolver } from './agent-resolver';
 import {inferFlowConnectionRequirements} from '../contracts/flow-connection-policy';
 import {ulid} from '../persistence/ulid';
 import {createSessionHost, type SessionLogger} from '../utils/host-ports';
-import {assertRootCallable} from '@itookit/llm-flow/contracts';
+import {assertRootCallable} from '@nestos/llm-flow/contracts';
 
 export interface FlowConnectionCheckInput {
     flow?: FlowDraft | FlowRevision;

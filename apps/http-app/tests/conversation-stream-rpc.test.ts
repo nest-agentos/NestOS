@@ -1,6 +1,6 @@
 import {expect,it,vi} from 'vitest';
-import {RpcPeer,installViewProjections} from '@itookit/app-transport/application';
-import {openApplicationView} from '@itookit/app-core/host';
+import {RpcPeer,installViewProjections} from '@nestos/app-transport/application';
+import {openApplicationView} from '@nestos/app-core/host';
 import {textRuntime} from '../../../backend/app-core/tests/helpers/text-runtime';
 it('transports background thinking and content to an already open Session reader',async()=>{
  const f=await textRuntime(),reader=await openApplicationView(f.runtime);let server!:RpcPeer;

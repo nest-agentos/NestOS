@@ -1,14 +1,14 @@
 import { TerminalSettingsEditor } from '../editors/TerminalSettingsEditor';
 import type { InitialFilesPort } from '../editors/initial-files';
-import type { MCPServer, MCPDiscovery } from '@itookit/tools/mcp-contracts';
-import type {ConfigurationFormControls} from '@itookit/ui-common-adapter';
-import {editorResourceId} from '@itookit/ui-common-adapter';
+import type { MCPServer, MCPDiscovery } from '@nestos/tools/mcp-contracts';
+import type {ConfigurationFormControls} from '@nestos/ui-common-adapter';
+import {editorResourceId} from '@nestos/ui-common-adapter';
 // @file app-settings/factories/settingsFactory.ts
-import type { IConnectionService, MediaProbeExamples } from '@itookit/kernel-adapters/contracts';
-import type {EditorOptions} from '@itookit/ui-common-adapter';
-import type { IAgentManagementService } from '@itookit/kernel-adapters/contracts';
-import type {EditorFactory, IEditor} from '@itookit/ui-common-adapter';
-import type { SettingsPort as SettingsService } from '@itookit/app-contracts/settings';
+import type { IConnectionService, MediaProbeExamples } from '@nestos/kernel-adapters/contracts';
+import type {EditorOptions} from '@nestos/ui-common-adapter';
+import type { IAgentManagementService } from '@nestos/kernel-adapters/contracts';
+import type {EditorFactory, IEditor} from '@nestos/ui-common-adapter';
+import type { SettingsPort as SettingsService } from '@nestos/app-contracts/settings';
 import { SETTINGS_PAGES } from '../engine/SettingsEngine';
 
 import { TagSettingsEditor } from '../editors/TagSettingsEditor';
@@ -20,9 +20,9 @@ import { LogSettingsEditor } from '../editors/LogSettingsEditor';
 import { SystemFSExploreEditor, type FileBrowserConnector } from '../editors/SystemFSExploreEditor';
 import { AppearanceSettingsEditor } from '../editors/AppearanceSettingsEditor';
 
-/** Injected UI editors from @itookit/llm-ui-adapter (to avoid upward dependency). */
+/** Injected UI editors from @nestos/llm-ui-adapter (to avoid upward dependency). */
 export interface LLMUIEditors {
-    ModelDefaultsEditor: new (container: HTMLElement, service: IConnectionService, options: EditorOptions, ocr?: import('@itookit/app-contracts/services').OcrControls) => IEditor;
+    ModelDefaultsEditor: new (container: HTMLElement, service: IConnectionService, options: EditorOptions, ocr?: import('@nestos/app-contracts/services').OcrControls) => IEditor;
     ProviderSettingsEditor: new (container: HTMLElement, service: IConnectionService, options: EditorOptions, examples?: MediaProbeExamples) => IEditor;
     ConnectionSettingsEditor: new (container: HTMLElement, service: IConnectionService, options: EditorOptions) => IEditor;
     MCPSettingsEditor: new (container: HTMLElement, service: IAgentManagementService, options: EditorOptions, controls?: ConfigurationFormControls<MCPServer,MCPDiscovery>) => IEditor;
@@ -45,10 +45,10 @@ function resolveSettingsSlug(nodeId: string): string {
 }
 
 export interface SettingsFactoryOptions {
-    serverTerminals?: import('@itookit/app-contracts/services').ServerTerminals;
-    diagnostics?: import('@itookit/app-contracts/services').ApplicationDiagnostics;
+    serverTerminals?: import('@nestos/app-contracts/services').ServerTerminals;
+    diagnostics?: import('@nestos/app-contracts/services').ApplicationDiagnostics;
     mediaProbeExamples?: MediaProbeExamples;
-    ocr?: import('@itookit/app-contracts/services').OcrControls;
+    ocr?: import('@nestos/app-contracts/services').OcrControls;
     settingsService: SettingsService;
     agentService: IAgentManagementService;
     connectionService: IConnectionService;
@@ -56,7 +56,7 @@ export interface SettingsFactoryOptions {
     connectBrowser: FileBrowserConnector;
     initialFiles?: InitialFilesPort;
     restoreFlows?: () => Promise<number>;
-    requestDelete?: import('@itookit/ui-common-adapter').EditorHostContext['requestDelete'];
+    requestDelete?: import('@nestos/ui-common-adapter').EditorHostContext['requestDelete'];
 }
 export const createSettingsFactory = ({ settingsService, agentService, connectionService, llmUiEditors,
     connectBrowser, restoreFlows, initialFiles, requestDelete, ocr, mediaProbeExamples, diagnostics, serverTerminals }: SettingsFactoryOptions): EditorFactory => {

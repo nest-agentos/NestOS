@@ -1,5 +1,5 @@
-import type { ToolVFSContext } from '@itookit/tools/contracts';
-import { SessionFileSkillSource } from '@itookit/kernel-adapters';
+import type { ToolVFSContext } from '@nestos/tools/contracts';
+import { SessionFileSkillSource } from '@nestos/kernel-adapters';
 import { parse } from 'yaml';
 
 /** Tauri supplies YAML parsing; discovery remains shared with the headless CLI. */

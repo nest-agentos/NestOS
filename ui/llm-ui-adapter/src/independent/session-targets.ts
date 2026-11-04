@@ -1,7 +1,7 @@
-import type {CallTargetCatalog, CallTargetChoice, CallTargetRef} from '@itookit/llm-ui';
-import {isTargetRef} from '@itookit/llm-flow/contracts';
-import {SessionCommand, type ICommandBus, type RootTargetCatalog} from '@itookit/llm-session/contracts';
-import {createModuleLogger, randomUUID, t, ENTITY_ICONS} from '@itookit/common';
+import type {CallTargetCatalog, CallTargetChoice, CallTargetRef} from '@nestos/llm-ui';
+import {isTargetRef} from '@nestos/llm-flow/contracts';
+import {SessionCommand, type ICommandBus, type RootTargetCatalog} from '@nestos/llm-session/contracts';
+import {createModuleLogger, randomUUID, t, ENTITY_ICONS} from '@nestos/common';
 
 const log = createModuleLogger('SessionCallTargets');
 

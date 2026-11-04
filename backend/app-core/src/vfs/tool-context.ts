@@ -1,5 +1,5 @@
-import type { ToolVFSContext } from '@itookit/tools/contracts';
-import { createVFSFileDiscoverySource, discoverFiles, normalizeVirtualPath, pathUtils, type FileSystemContext } from '@itookit/vfs-core';
+import type { ToolVFSContext } from '@nestos/tools/contracts';
+import { createVFSFileDiscoverySource, discoverFiles, normalizeVirtualPath, pathUtils, type FileSystemContext } from '@nestos/vfs-core';
 
 /** One exact-path adapter per authorized view. Never resolves a basename globally. */
 export function createVFSToolContext(context: FileSystemContext): ToolVFSContext {

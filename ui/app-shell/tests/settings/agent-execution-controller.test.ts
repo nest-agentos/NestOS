@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
-import { bindAgentExecution, readAgentExecution, renderAgentExecution, type AgentExecutionController } from '@itookit/llm-ui-adapter/settings';
-import type { AgentExecutionOptions, AgentFlowChoice, AgentFlowRevision } from '@itookit/llm-ui-adapter/settings';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
+import { bindAgentExecution, readAgentExecution, renderAgentExecution, type AgentExecutionController } from '@nestos/llm-ui-adapter/settings';
+import type { AgentExecutionOptions, AgentFlowChoice, AgentFlowRevision } from '@nestos/llm-ui-adapter/settings';
 
 const controllers: AgentExecutionController[] = [];
 beforeEach(() => { vi.spyOn(console, 'info').mockImplementation(() => {}); vi.spyOn(console, 'error').mockImplementation(() => {}); });

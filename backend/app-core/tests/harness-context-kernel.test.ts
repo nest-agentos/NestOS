@@ -1,8 +1,8 @@
 import {expect, it, vi} from 'vitest';
-import {Kernel, bindCapabilities} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {HarnessProgram, HarnessExecutionEffect} from '@itookit/kernel-adapters';
-import {sha256HexSync} from '@itookit/common';
+import {Kernel, bindCapabilities} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {HarnessProgram, HarnessExecutionEffect} from '@nestos/kernel-adapters';
+import {sha256HexSync} from '@nestos/common';
 import {createHarnessExecutionProvider} from '../src/projects/harness-execution';
 import {createHarnessCleanupState} from '../src/projects/harness-cleanup-state';
 import {createHarnessContextCleanup} from '../src/projects/harness-context-cleanup';

@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { StateManager } from './StateManager';
 import type { IChatInputPresenter } from '../domain/ports/IChatInputPresenter';
 import type { StateService } from '../services/StateService';
-import type { SessionViewPort } from '@itookit/llm-session/contracts';
+import type { SessionViewPort } from '@nestos/llm-session/contracts';
 import type {IChatInputConfig} from '../domain/ports/IChatInputPresenter';
 it('snapshots context before queued persistence and restores it without following another branch', async () => {
     const target = {kind: 'agent' as const, id: 'worker', version: '1', digest: 'published'};

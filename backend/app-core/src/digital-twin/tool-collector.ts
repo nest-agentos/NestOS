@@ -1,7 +1,7 @@
-import {submitPreparedTaskCall} from '@itookit/llm-flow';
-import type {Kernel, TaskCallPlan, TaskCallResult} from '@itookit/durable-kernel';
-import type {SessionRepository} from '@itookit/llm-session';
-import type {TwinCollectionExecutor} from '@itookit/app-contracts';
+import {submitPreparedTaskCall} from '@nestos/llm-flow';
+import type {Kernel, TaskCallPlan, TaskCallResult} from '@nestos/durable-kernel';
+import type {SessionRepository} from '@nestos/llm-session';
+import type {TwinCollectionExecutor} from '@nestos/app-contracts';
 import {validateCollectionTool, type CollectionToolCatalog} from './collection-tools';
 import type {TwinCollectionRequest} from './scanner-collector';
 import {TwinDiagnosticError} from './diagnostics';
@@ -12,7 +12,7 @@ export interface ToolCollectorOptions {
 }
 /** Direct calls use the existing Tool Program and tool.call Effect, without creating a Flow resource. */
 export async function collectWithTool(options: ToolCollectorOptions, request: TwinCollectionRequest,
-    attached: (id: string) => Promise<void>, bind: (id: string) => Promise<void>): Promise<import('@itookit/app-contracts').TwinCollectionProgress | undefined> {
+    attached: (id: string) => Promise<void>, bind: (id: string) => Promise<void>): Promise<import('@nestos/app-contracts').TwinCollectionProgress | undefined> {
     validateCollectionTool(options.tools, request.executor);
     const child = request.sessionId + '-tool';
     for (const id of [request.sessionId, child]) {

@@ -1,6 +1,6 @@
 import {resolveChatImageResize} from './image-processing-session';
-import {t} from '@itookit/common';
-import {type ImageResizePolicy} from '@itookit/image-parser';
+import {t} from '@nestos/common';
+import {type ImageResizePolicy} from '@nestos/image-parser';
 
 export class ImageResizeSettings {
     private readonly select = document.createElement('select');

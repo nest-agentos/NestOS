@@ -11,7 +11,7 @@ import type {
     SpawnEdge,
     SupervisorConfig,
     WorkflowTaskSpec,
-} from '@itookit/llm-flow';
+} from '@nestos/llm-flow';
 export type {
     DependencyRef,
     RouteCondition,
@@ -37,7 +37,7 @@ export interface WorkflowConfigV1 {
     sandbox?: SandboxConfig;
 }
 
-/** Run-level workspace policy; mirrors `FlowWorkspacePolicy` from `@itookit/common`. */
+/** Run-level workspace policy; mirrors `FlowWorkspacePolicy` from `@nestos/common`. */
 export interface WorkspacePolicyConfig {
     mode: 'shared' | 'read-only' | 'worktree';
     base?: string;
@@ -75,7 +75,7 @@ export interface ConnectionConfig {
 }
 
 export interface AgentConfig {
-    response_format?: import('@itookit/driver-llm/contracts').ResponseFormat;
+    response_format?: import('@nestos/driver-llm/contracts').ResponseFormat;
     output_validation?: { on_invalid?: 'fail' | 'repair' | 'continue'; retries?: number };
     memory_policy?: {
         shared_memory?: { id: string; incarnation: string };
@@ -106,13 +106,13 @@ export interface AgentConfig {
 
 /** 路由条件：字符串为相等匹配，对象支持 eq/neq/in/exists/and/or/not 组合。 */
 export interface TaskConfig {
-    port_schemas?: import('@itookit/llm-flow/contracts').NodePortSchemas;
+    port_schemas?: import('@nestos/llm-flow/contracts').NodePortSchemas;
     delegation?: { agent: string; instruction?: string; max_tasks?: number; max_concurrency?: number;
         failure_policy?: 'fail-fast' | 'continue' };
     id: string;
     /** 显式任务类型；缺省时按 route/spawn/supervisor 字段推断。 */
     kind?: 'agent' | 'route' | 'spawn' | 'supervisor' | 'node';
-    node?: import('@itookit/llm-flow').WorkflowTaskSpec['node'];
+    node?: import('@nestos/llm-flow').WorkflowTaskSpec['node'];
     agent?: string;
     description?: string;
     route?: RouteConfig;
@@ -169,8 +169,8 @@ export interface BlockedEffect {
 
 export interface RunManifest {
     flow?: {
-        definition: import('@itookit/app-core').RunDefinition;
-        parameters?: Record<string, import('@itookit/durable-kernel').JsonValue>;
+        definition: import('@nestos/app-core').RunDefinition;
+        parameters?: Record<string, import('@nestos/durable-kernel').JsonValue>;
         config: WorkflowConfigV1;
     };
     version: 1;

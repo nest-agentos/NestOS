@@ -1,6 +1,6 @@
 import { remoteIconButton } from './remote-icon-button';
-import { t } from '@itookit/common';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import type { ProjectService } from '@nestos/app-contracts/services';
 import { remoteConnectionError } from './remote-connection-error';
 
 type DirectoryPage = { paths: string[]; nextCursor: string | null };

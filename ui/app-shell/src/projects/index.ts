@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type { ApplicationServices } from '@itookit/app-contracts/services';
+import {t} from '@nestos/common';
+import type { ApplicationServices } from '@nestos/app-contracts/services';
 import type { AppUI } from '../types';
 import { showMemoryDialog } from '../files/memory-dialog';
 import { setupHitlVfsBridge } from '../workspaces/hitl-bridge';
@@ -7,10 +7,10 @@ import { createWorkspaceModule, type WorkspaceModule } from '../workspaces/modul
 import { SessionWorkbench, type SessionWorkbenchOptions } from './SessionWorkbench';
 
 interface ProjectModuleOptions extends Pick<SessionWorkbenchOptions, 'sidebar' | 'container' | 'factory' | 'createFactory' | 'fileFactory' | 'onSelect' | 'onBeforeNavigate' | 'hostContext' | 'sessionSkills' | 'onSidebarReady' | 'initialResource' | 'deferNavigation' | 'uiPersistence' | 'workbenchState' | 'windows' | 'projectSyncSetup' | 'projectSyncDirectory'> {
-    backend: import('@itookit/app-contracts/services').ApplicationBackend;
+    backend: import('@nestos/app-contracts/services').ApplicationBackend;
     services: Pick<ApplicationServices, 'sessionRepository' | 'sessionFiles' | 'kernel' | 'directoryMounts' | 'sessionManager' | 'flowEngine' | 'projects' | 'commandBus' | 'projectSync' | 'digitalTwin' | 'prepareSession' | 'agentService'>;
-    executorUsage?: import('@itookit/ui-common-adapter').EditorOptions['executorUsage'];
-    agentFactory: import('@itookit/ui-common-adapter').EditorFactory;
+    executorUsage?: import('@nestos/ui-common-adapter').EditorOptions['executorUsage'];
+    agentFactory: import('@nestos/ui-common-adapter').EditorFactory;
     createFlowContextMenu: AppUI['createFlowContextMenu'];
 }
 

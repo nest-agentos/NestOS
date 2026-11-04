@@ -2,8 +2,8 @@
 
 import type { IBranchPresenter } from '../../domain/ports/IBranchPresenter';
 import type { IEditorEventBus } from '../../domain/events';
-import type {DOMCache} from '@itookit/llm-ui';
-import {EventCleanup, TimerManager} from '@itookit/llm-ui';
+import type {DOMCache} from '@nestos/llm-ui';
+import {EventCleanup, TimerManager} from '@nestos/llm-ui';
 import { BranchIndicatorTemplates } from '../templates/BranchIndicatorTemplates';
 import type { IBranchStore } from '../../domain/ports/IBranchStore';
 

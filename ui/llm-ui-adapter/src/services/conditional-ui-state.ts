@@ -1,4 +1,4 @@
-import type {ConversationUIState, ISessionRepository} from '@itookit/llm-session/contracts';
+import type {ConversationUIState, ISessionRepository} from '@nestos/llm-session/contracts';
 export type ConditionalUIRepository = Pick<ISessionRepository, 'getManifest' | 'compareAndSetUIState'>;
 export interface UIStateChange<T> {value: T; patch?: Partial<ConversationUIState>}
 interface WriteOptions {

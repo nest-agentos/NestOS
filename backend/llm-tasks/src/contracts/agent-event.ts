@@ -1,5 +1,5 @@
-import type { AgentEventStreamThinking, AgentEventStreamContent, AgentEventCitations, AgentEventLlmRequest } from '@itookit/driver-llm/contracts';
-export type { AgentEventStreamThinking, AgentEventStreamContent, AgentEventCitations, AgentEventLlmRequest } from '@itookit/driver-llm/contracts';
+import type { AgentEventStreamThinking, AgentEventStreamContent, AgentEventCitations, AgentEventLlmRequest } from '@nestos/driver-llm/contracts';
+export type { AgentEventStreamThinking, AgentEventStreamContent, AgentEventCitations, AgentEventLlmRequest } from '@nestos/driver-llm/contracts';
 // Canonical AgentEvent schema — single event vocabulary for the entire LLM subsystem.
 //
 // Replaces 5 event vocabularies + 3 translation layers (~91 events) with ~22 events.
@@ -10,7 +10,7 @@ export type { AgentEventStreamThinking, AgentEventStreamContent, AgentEventCitat
 //   - tool events follow queued→running→success/error lifecycle
 //   - await_signal is the ONLY pause mechanism (unifies HITL / plan-confirm / request_input)
 
-import type { TokenUsage } from '@itookit/driver-llm/contracts';
+import type { TokenUsage } from '@nestos/driver-llm/contracts';
 
 // ─── Round lifecycle (authoritative) ──────────────────────────────────
 
@@ -67,7 +67,7 @@ export interface AgentEventToolInput {
 
 export interface AgentEventToolProgress {
     type: 'tool:progress';
-    call: ToolCallInfo & { progress: import('@itookit/tools/contracts').ToolProgress };
+    call: ToolCallInfo & { progress: import('@nestos/tools/contracts').ToolProgress };
 }
 
 export interface AgentEventToolSuccess {

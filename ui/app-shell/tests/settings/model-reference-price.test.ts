@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {t} from '@itookit/common';
-import type {ModelPricingConfig} from '@itookit/kernel-adapters/contracts';
-import {modelPriceLabel, modelPriceSource} from '@itookit/llm-ui-adapter/settings';
-import {matchesModelQuery} from '@itookit/llm-ui-adapter/settings';
+import {t} from '@nestos/common';
+import type {ModelPricingConfig} from '@nestos/kernel-adapters/contracts';
+import {modelPriceLabel, modelPriceSource} from '@nestos/llm-ui-adapter/settings';
+import {matchesModelQuery} from '@nestos/llm-ui-adapter/settings';
 
 afterEach(() => vi.useRealTimers());
 const config: ModelPricingConfig = {model_pricing: [], reference_catalog: {version: 1, providers: {

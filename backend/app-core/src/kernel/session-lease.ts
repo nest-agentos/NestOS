@@ -1,4 +1,4 @@
-import { FSError, pathUtils, type IFileSystem } from '@itookit/vfs-core';
+import { FSError, pathUtils, type IFileSystem } from '@nestos/vfs-core';
 
 export type SessionOwnerKind = 'cli' | 'tauri' | 'web' | 'httpd';
 

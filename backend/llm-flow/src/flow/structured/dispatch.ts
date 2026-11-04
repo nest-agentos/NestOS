@@ -1,8 +1,8 @@
 import { flowTemplateReferences, renderFlowText } from '../../contracts';
 import { assignmentUpdates } from '../variables';
 import type { JsonValue } from '../../contracts';
-import type { Decision, DurableTaskProgram, KernelAction, TaskInputEvent } from '@itookit/durable-kernel';
-import { collectDependency, dependenciesReady, dependencyWait } from '@itookit/llm-tasks';
+import type { Decision, DurableTaskProgram, KernelAction, TaskInputEvent } from '@nestos/durable-kernel';
+import { collectDependency, dependenciesReady, dependencyWait } from '@nestos/llm-tasks';
 import { evaluate } from '../operations';
 import { flowSchemaIssue } from '../schema-registry';
 import { invalidFields, mergeInput } from './input';

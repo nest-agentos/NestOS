@@ -19,13 +19,13 @@ import { promises as fsp } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createVFS } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { Kernel } from '@itookit/durable-kernel';
-import { SessionRepository, VFSAgentService, SessionDirectoryStorageResolver, sessionDirectoryStorage } from '@itookit/llm-session';
-import { LLMDeviceDriver } from '@itookit/kernel-adapters/llm/core';
-import { createNestosLlmPresets, firstChatModelConnection } from '@itookit/kernel-adapters/llm/presets';
-import type { IVFSManager } from '@itookit/vfs-core';
+import { createVFS } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { Kernel } from '@nestos/durable-kernel';
+import { SessionRepository, VFSAgentService, SessionDirectoryStorageResolver, sessionDirectoryStorage } from '@nestos/llm-session';
+import { LLMDeviceDriver } from '@nestos/kernel-adapters/llm/core';
+import { createNestosLlmPresets, firstChatModelConnection } from '@nestos/kernel-adapters/llm/presets';
+import type { IVFSManager } from '@nestos/vfs-core';
 
 // ── Module list (mirrors tauri-app/src/config/modules.ts, minus settings/home) ─
 

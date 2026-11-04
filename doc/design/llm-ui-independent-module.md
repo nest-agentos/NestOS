@@ -2,9 +2,9 @@
 
 状态：默认 Session、项目草稿及支持持久草稿端口的原生会话已接入共享 ChatView；旧宿主保留显式兼容入口。日期：2026-10-29。
 
-`@itookit/llm-ui` 是原生 DOM 的 LLM 界面库，**同时包含 Chat 和 Flow 功能**，唯一直接运行时依赖为 `@itookit/mdxeditor`。Flow 通过同一包的 `/flow` 子入口按需加载，不建立单独的 Flow UI 包。
+`@nestos/llm-ui` 是原生 DOM 的 LLM 界面库，**同时包含 Chat 和 Flow 功能**，唯一直接运行时依赖为 `@nestos/mdxeditor`。Flow 通过同一包的 `/flow` 子入口按需加载，不建立单独的 Flow UI 包。
 
-NestOS 的 Session、Task、Flow 执行、VFS、配置和权限由 `@itookit/llm-ui-adapter` 及宿主连接，不进入独立库的类型或实现。后端 `@itookit/llm-flow` 继续负责 Flow 执行语义，与 UI 的包划分是不同边界。
+NestOS 的 Session、Task、Flow 执行、VFS、配置和权限由 `@nestos/llm-ui-adapter` 及宿主连接，不进入独立库的类型或实现。后端 `@nestos/llm-flow` 继续负责 Flow 执行语义，与 UI 的包划分是不同边界。
 
 ## 1 模块与当前实施范围
 
@@ -223,7 +223,7 @@ NestOS 工作台的调用目标选择器完整展示 `session.targets.list` 返�
 
 ### 6.1 配置表单共用与宿主定制
 
-智能体的 Flow 默认配置、Flow 运行参数面板及独立 llm-ui 的节点检查器共用 `@itookit/llm-ui/forms`，不在设置包中重新实现一套类型控件。公共层只接受轻量 `FormParameter`、JSON 值和展示选项，不引用 FlowDraft、AgentDefinition、Session、注册服务或配置存储。NestOS 适配层将领域定义投影到公共字段；公开 `/forms` 入口可独立使用，不加载 Chat、Markdown 或 Flow 执行代码。
+智能体的 Flow 默认配置、Flow 运行参数面板及独立 llm-ui 的节点检查器共用 `@nestos/llm-ui/forms`，不在设置包中重新实现一套类型控件。公共层只接受轻量 `FormParameter`、JSON 值和展示选项，不引用 FlowDraft、AgentDefinition、Session、注册服务或配置存储。NestOS 适配层将领域定义投影到公共字段；公开 `/forms` 入口可独立使用，不加载 Chat、Markdown 或 Flow 执行代码。
 
 | 层次 | 职责 | 定制方式 |
 | --- | --- | --- |
@@ -248,7 +248,7 @@ Composite 的作者配置为 `composition`，包含主持者、允许成员和�
 
 「行为与模型」是页面分类，其「模型选择」按对话、绘图、语音合成分别配置 Agent 用途默认，候选由用途能力筛选；不另设同级「默认连接」入口。没有显式选择时遵循 Agent 默认再系统默认，Session 或 Flow 的显式配置优先；继承值不写回会话选择，已失效的 Agent 默认报具体错误，不静默替换。Workflow 基本页的具名槽位称为「流程连接覆盖」，独立于用途默认：同类用途可以声明多个槽位，各自绑定不同连接；未绑定的可选槽不因用途默认而启用。输入图片处理是发给模型的图片缩放，界面名称应与图像生成输出尺寸区分。
 
-自定义字段是可信宿主代码，必须提供相同 `data-parameter` 索引的原生 input/select/textarea 作为值通道；公共层继续执行类型与数值约束。图片上传、特殊选择器的事件绑定和释放由注入它们的宿主负责，公共组件不拥有后台执行或存储服务。独立使用时可导入 `@itookit/llm-ui/forms.css`，也可通过 classes 使用宿主主题。
+自定义字段是可信宿主代码，必须提供相同 `data-parameter` 索引的原生 input/select/textarea 作为值通道；公共层继续执行类型与数值约束。图片上传、特殊选择器的事件绑定和释放由注入它们的宿主负责，公共组件不拥有后台执行或存储服务。独立使用时可导入 `@nestos/llm-ui/forms.css`，也可通过 classes 使用宿主主题。
 
 ## 7 Markdown、扩展与生命周期
 
@@ -626,6 +626,6 @@ ChatDraftEditor 在挂载输入框前，依次恢复草稿附件、读取执行�
 
 ### 设置界面统一入口
 
-设置编辑器统一由独立 `@itookit/llm-ui/settings` 提供，样式由 `@itookit/llm-ui/settings.css` 提供。`createSettingsUI(host)` 按实例接收文案、图标、纯校验与配置编解码回调；编辑器通过传入的管理服务端口操作配置。导航、锚点消费、文件改名和元数据更新通过回调接入，不依赖 VFS 或 NestOS 路由。
+设置编辑器统一由独立 `@nestos/llm-ui/settings` 提供，样式由 `@nestos/llm-ui/settings.css` 提供。`createSettingsUI(host)` 按实例接收文案、图标、纯校验与配置编解码回调；编辑器通过传入的管理服务端口操作配置。导航、锚点消费、文件改名和元数据更新通过回调接入，不依赖 VFS 或 NestOS 路由。
 
 NestOS 的 `llm-ui-adapter/settings` 只负责服务与宿主能力接线，聊天入口不会加载设置模块。自动保存、失败保留输入、销毁前保存及内存表单恢复只有 ui-common 一份实现。原独立业务包已删除，原行为测试迁至 app-shell 的 settings 集成测试目录，保留原服务端保存、发布及修订冲突语义。

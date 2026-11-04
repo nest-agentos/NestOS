@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import type { NativeShellResult, NativeShellOptions } from '@itookit/tools';
+import type { NativeShellResult, NativeShellOptions } from '@nestos/tools';
 import { signalProcessGroup, stopProcessGroup } from './process-stop';
 
 interface ProcessOptions extends Omit<NativeShellOptions, 'env'> {

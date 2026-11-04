@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { RoundLog, SessionRepository } from '@itookit/llm-session';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { RoundLog, SessionRepository } from '@nestos/llm-session';
 import { exportSessionBundle, importSessionBundle, isSessionBundle, SESSION_BUNDLE_VERSION } from '../src/session/session-bundle';
 
 let cleanup: Array<() => Promise<void>> = [];

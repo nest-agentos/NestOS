@@ -1,6 +1,6 @@
 # app-shell 启动与装配
 
-`initApp(options)` 是唯一顶层初始化函数，只负责 UI 装配；平台无关的 VFS / LLM / Kernel / Session 组合由 `@itookit/app-core` 的 `createApplicationRuntime()` 完成。
+`initApp(options)` 是唯一顶层初始化函数，只负责 UI 装配；平台无关的 VFS / LLM / Kernel / Session 组合由 `@nestos/app-core` 的 `createApplicationRuntime()` 完成。
 
 ```text
 1. 宿主注入 options.services 与 options.backend（后端创建只在宿主执行）

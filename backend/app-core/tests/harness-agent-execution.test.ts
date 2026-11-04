@@ -1,16 +1,16 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import type { HarnessClient } from '@itookit/cells-driver';
-import type { HarnessConnectionSnapshot } from '@itookit/kernel-adapters/contracts';
-import { SessionCommand, type ContextBindingPage } from '@itookit/llm-session/contracts';
-import { FlowLibraryCommand, InputAssetCommand } from '@itookit/app-contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import type { HarnessClient } from '@nestos/cells-driver';
+import type { HarnessConnectionSnapshot } from '@nestos/kernel-adapters/contracts';
+import { SessionCommand, type ContextBindingPage } from '@nestos/llm-session/contracts';
+import { FlowLibraryCommand, InputAssetCommand } from '@nestos/app-contracts';
 import {createTaskAssetStore} from '../src/runtime/task-asset-store';
-import {buildTool, TaskListTool} from '@itookit/tools';
-import type { FlowDraft } from '@itookit/llm-flow/contracts';
+import {buildTool, TaskListTool} from '@nestos/tools';
+import type { FlowDraft } from '@nestos/llm-flow/contracts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import {CONTEXT_BINDINGS_KEY} from '../src/projects/harness-context-bindings';
 import {harnessExecutionJournalKey} from '../src/projects/harness-execution-journal';
-import {sha256Hex} from '@itookit/llm-context/digest';
+import {sha256Hex} from '@nestos/llm-context/digest';
 
 const connection: HarnessConnectionSnapshot = { id: 'remote', name: 'Remote', kind: 'harness', nodeConnectionId: 'node',
     projectId: 'project', profileId: 'claude', version: 1, revision: 1, project: { serverProjectId: 'native-project' } };
@@ -53,7 +53,7 @@ async function setup(checkpointFork = false, attachmentKinds?: Array<'text' | 'i
         execution: { kind: 'harness', connectionId: 'remote' } });
     return { runtime, prompts, sessions, fetch, forks, attachments };
 }
-async function send(runtime: Runtime, agentId: string, text: string, files: import('@itookit/llm-session/contracts').ChatAttachment[] = []) {
+async function send(runtime: Runtime, agentId: string, text: string, files: import('@nestos/llm-session/contracts').ChatAttachment[] = []) {
     const id = await runtime.sessionRepository.createSession('Remote execution');
     await runtime.commandBus.execute(SessionCommand.Bind, { sessionId: id });
     await runtime.commandBus.execute(SessionCommand.Send, { text, files, agentId,

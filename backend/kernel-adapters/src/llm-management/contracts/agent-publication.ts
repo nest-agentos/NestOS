@@ -1,5 +1,5 @@
 import type {AgentDefinition} from './agent';
-import type {SystemPromptDefinition} from '@itookit/tools/contracts';
+import type {SystemPromptDefinition} from '@nestos/tools/contracts';
 
 /** Published policy and dependency identities; credentials and execution state do not belong here. */
 export interface AgentRevisionContent {

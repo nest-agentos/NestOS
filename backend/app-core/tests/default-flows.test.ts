@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { FlowStore } from '@itookit/llm-flow';
-import { FlowDefinitionStore } from '@itookit/llm-flow';
+import type { FlowStore } from '@nestos/llm-flow';
+import { FlowDefinitionStore } from '@nestos/llm-flow';
 import { createNestosFlowLibrary, createNestosFlowDrawers } from '../src/presets/flow-library';
 import { essayReviewDraft, seedDefaultFlows, ESSAY_REVIEW_FLOW_ID } from '../src/presets/default-flows';
 import { externalFlow } from './fixtures/flow-library';

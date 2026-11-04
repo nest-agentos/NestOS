@@ -1,5 +1,5 @@
-import type {TaskRecord} from '@itookit/durable-kernel/contracts';
-import {hasFlowControlTree, type DurableFlowSnapshot} from '@itookit/llm-flow/contracts';
+import type {TaskRecord} from '@nestos/durable-kernel/contracts';
+import {hasFlowControlTree, type DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
 
 export interface InvocationControl {
     terminal: boolean;

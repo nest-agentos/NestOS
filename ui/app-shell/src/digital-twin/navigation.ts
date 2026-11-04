@@ -1,6 +1,6 @@
 import {assistantShortcutAction} from '../navigation/assistant-actions';
-import { ENTITY_ICONS, t } from '@itookit/common';
-import { VFSUIShell, type BrowserNode, type BrowserSource } from '@itookit/vfs-ui';
+import { ENTITY_ICONS, t } from '@nestos/common';
+import { VFSUIShell, type BrowserNode, type BrowserSource } from '@nestos/vfs-ui';
 import { nestOSVFSPresentation } from '../browser/vfs-presentation';
 import { TWIN_PAGES, label } from './view';
 

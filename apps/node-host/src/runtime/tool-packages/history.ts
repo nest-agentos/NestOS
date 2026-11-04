@@ -1,9 +1,9 @@
 import {z} from 'zod/v4';
 import {mkdir, lstat, readFile, writeFile, rename, rm} from 'node:fs/promises';
 import path from 'node:path';
-import {randomUUID, createModuleLogger} from '@itookit/common';
-import type {ToolRunRecord} from '@itookit/app-contracts/services';
-import type {Tool} from '@itookit/tools';
+import {randomUUID, createModuleLogger} from '@nestos/common';
+import type {ToolRunRecord} from '@nestos/app-contracts/services';
+import type {Tool} from '@nestos/tools';
 const text = z.string().max(200);
 const collection = z.object({version: z.literal(1), complete: z.boolean(), processed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), batchCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional()});
 const record = z.object({id: text, packageKey: text, toolId: text, version: text, startedAt: z.number().nonnegative(), finishedAt: z.number().nonnegative().optional(), durationMs: z.number().nonnegative().optional(), status: z.enum(['running', 'succeeded', 'failed', 'cancelled', 'unknown']), code: text.optional(), sessionId: text.optional(), taskId: text.optional(), operationId: text.optional(), collection: collection.optional()});

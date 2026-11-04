@@ -1,5 +1,5 @@
-import { folderPathFromBrowserPath, projectRelativePath, resolveBrowserTarget } from '@itookit/app-contracts';
-import type { ProjectFolder, ProjectService, ProjectSearch, ProjectSearchMatch } from '@itookit/app-contracts/services';
+import { folderPathFromBrowserPath, projectRelativePath, resolveBrowserTarget } from '@nestos/app-contracts';
+import type { ProjectFolder, ProjectService, ProjectSearch, ProjectSearchMatch } from '@nestos/app-contracts/services';
 import { ProjectSearchPanel } from './project-search-panel';
 
 /** Page searches use source queries; the sidebar keeps its separate loaded-tree filter. */

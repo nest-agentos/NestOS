@@ -26,7 +26,7 @@ nestos.yml ──┐
 
 ## 会话与命令的统一提交
 
-`@itookit/llm-flow` 的 `CompiledRunDefinition` 是已解析配置的提交协议：
+`@nestos/llm-flow` 的 `CompiledRunDefinition` 是已解析配置的提交协议：
 
 | kind | 内容 | 使用入口 |
 |---|---|---|

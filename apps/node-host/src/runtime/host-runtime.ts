@@ -1,7 +1,7 @@
 import path from 'node:path';
-import type {IFsOps} from '@itookit/vfsdriver-local';
+import type {IFsOps} from '@nestos/vfsdriver-local';
 import {resolveHostPaths} from './paths';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
 import { NodeSqliteSidecarDb } from '../storage/sqlite-sidecar';
 import { AuditLog } from '../logging/audit-log';
 import { PrivateAuthStore } from '../authorization/private-store';

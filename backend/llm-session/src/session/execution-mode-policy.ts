@@ -1,5 +1,5 @@
 import { t, type SessionTextKey } from '../utils/host-ports';
-import type { ChatExecutionMode } from '@itookit/llm-tasks/contracts';
+import type { ChatExecutionMode } from '@nestos/llm-tasks/contracts';
 import type { ChatSessionSettings } from '../contracts';
 
 /** Pure session policy shared by admission and transactional preference updates. */

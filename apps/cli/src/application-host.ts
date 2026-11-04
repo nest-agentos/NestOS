@@ -1,7 +1,7 @@
 import path from 'node:path';
-import { openNodeApplication, configDirectory, resolveHttpDirectories, type NodeApplicationHost } from '@itookit/node-host/runtime';
-import { openApplicationView } from '@itookit/app-core/host';
-import type { ApplicationClient } from '@itookit/app-contracts/services';
+import { openNodeApplication, configDirectory, resolveHttpDirectories, type NodeApplicationHost } from '@nestos/node-host/runtime';
+import { openApplicationView } from '@nestos/app-core/host';
+import type { ApplicationClient } from '@nestos/app-contracts/services';
 import type { CommandOptions } from './commands';
 import { resolveProfileRoot } from './nestos';
 import { CliDirectorySourceProvider } from './directories';
@@ -22,7 +22,7 @@ export async function openLocalApplication(options: CommandOptions, initializeWo
 /** Transport selection belongs to the CLI host; commands consume only ApplicationClient. */
 export async function openCliApplication(options: CommandOptions): Promise<{client: ApplicationClient; close(): Promise<void>}> {
     if (options.connect) {
-        const [{HttpViewClient}, {openNodeHttpClient}] = await Promise.all([import('@itookit/app-transport/http'), import('@itookit/node-host/client')]);
+        const [{HttpViewClient}, {openNodeHttpClient}] = await Promise.all([import('@nestos/app-transport/http'), import('@nestos/node-host/client')]);
         const endpoint = new URL(options.connect);
         if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error('--connect requires an HTTPS endpoint without embedded credentials');
         const transport = await openNodeHttpClient(options);

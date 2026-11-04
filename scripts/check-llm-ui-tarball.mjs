@@ -14,20 +14,20 @@ function run(command, args, cwd = root, env = {}) {
     if (result.error) throw result.error;
     assert.equal(result.status, 0, `${command} ${args.join(' ')} failed; retained ${directory}`);
 }
-for (const name of ['llm-ui', 'mdxeditor']) run('pnpm', ['--filter', `@itookit/${name}`, 'pack', '--out', resolve(artifacts, `${name}.tgz`)], root,
+for (const name of ['llm-ui', 'mdxeditor']) run('pnpm', ['--filter', `@nestos/${name}`, 'pack', '--out', resolve(artifacts, `${name}.tgz`)], root,
     { npm_config_ignore_scripts: 'true' });
 writeFileSync(resolve(consumer, 'package.json'), JSON.stringify({ private: true, type: 'module', packageManager: 'pnpm@10.20.0', dependencies: {
-    '@itookit/llm-ui': 'file:../artifacts/llm-ui.tgz', '@itookit/mdxeditor': 'file:../artifacts/mdxeditor.tgz',
+    '@nestos/llm-ui': 'file:../artifacts/llm-ui.tgz', '@nestos/mdxeditor': 'file:../artifacts/mdxeditor.tgz',
 }, devDependencies: { typescript: '5.9.3', vite: '5.4.21', jsdom: '27.2.0' } }, null, 2));
-writeFileSync(resolve(consumer, 'pnpm-workspace.yaml'), 'packages: ["."]\noverrides:\n  "@itookit/mdxeditor": "file:../artifacts/mdxeditor.tgz"\n');
+writeFileSync(resolve(consumer, 'pnpm-workspace.yaml'), 'packages: ["."]\noverrides:\n  "@nestos/mdxeditor": "file:../artifacts/mdxeditor.tgz"\n');
 run('pnpm', ['install', '--ignore-scripts', ...(process.argv.includes('--online') ? [] : ['--offline'])], consumer);
 for (const name of ['llm-ui', 'mdxeditor']) assert.ok(realpathSync(resolve(consumer, 'node_modules/@itookit', name)).startsWith(consumer + '/'));
 writeFileSync(resolve(consumer, 'main.ts'), `
-import { createChatView, createOperationLedger, type ChatOptions } from '@itookit/llm-ui';
-import { createFlowView, type FlowSnapshot } from '@itookit/llm-ui/flow';
-import '@itookit/llm-ui/style.css';
-import '@itookit/llm-ui/flow.css';
-import '@itookit/mdxeditor/style.css';
+import { createChatView, createOperationLedger, type ChatOptions } from '@nestos/llm-ui';
+import { createFlowView, type FlowSnapshot } from '@nestos/llm-ui/flow';
+import '@nestos/llm-ui/style.css';
+import '@nestos/llm-ui/flow.css';
+import '@nestos/mdxeditor/style.css';
 export { createChatView, createOperationLedger, createFlowView };
 export type { ChatOptions, FlowSnapshot };
 `);
@@ -56,8 +56,8 @@ for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'HTMLInputE
     Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
 globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
-const { createChatView, createOperationLedger } = await import('@itookit/llm-ui');
-const { createFlowView } = await import('@itookit/llm-ui/flow');
+const { createChatView, createOperationLedger } = await import('@nestos/llm-ui');
+const { createFlowView } = await import('@nestos/llm-ui/flow');
 const operations = createOperationLedger(), listeners = new Set(), flowListeners = new Set();
 let snapshot = { conversationId: 'c', viewId: 'v', revision: 0, title: 'Chat', messages: [], interactions: [],
     loading: false, execution: 'idle', connection: 'online', hasEarlier: false, allowed: ['send'] };
@@ -80,7 +80,7 @@ assert.ok(document.querySelector('#chat .llm-flow'), 'lazy Flow module loads fro
 await view.setFlowEnabled(false); assert.equal(flowListeners.size, 0);
 const flow = await createFlowView(document.querySelector('#flow'), flowOptions); await flow.destroy(); await view.destroy();
 assert.equal(listeners.size, 0); assert.equal(flowListeners.size, 0);
-assert.equal(typeof createRequire(import.meta.url)('@itookit/llm-ui').createChatView, 'function');
+assert.equal(typeof createRequire(import.meta.url)('@nestos/llm-ui').createChatView, 'function');
 dom.window.close(); console.log('Tarball Chat, lazy Flow, lifecycle and CJS smoke passed.');
 `);
 run('node', ['smoke.mjs'], consumer);

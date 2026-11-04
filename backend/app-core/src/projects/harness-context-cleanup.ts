@@ -1,6 +1,6 @@
-import {createModuleLogger} from '@itookit/common';
-import type {EffectExecutionContext, Kernel} from '@itookit/durable-kernel';
-import type {ContextBinding} from '@itookit/kernel-adapters/contracts';
+import {createModuleLogger} from '@nestos/common';
+import type {EffectExecutionContext, Kernel} from '@nestos/durable-kernel';
+import type {ContextBinding} from '@nestos/kernel-adapters/contracts';
 import {harnessCleanupRecord} from './harness-cleanup-state';
 import {CONTEXT_BINDINGS_KEY, HarnessContextBindings} from './harness-context-bindings';
 import {settleExecutionContext, type ContextBindingSettlementPort} from './harness-execution-context';

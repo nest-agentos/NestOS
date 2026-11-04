@@ -1,10 +1,10 @@
-import type {IndependentCallService} from '@itookit/llm-session';
-import type {IndependentCallInput, IndependentCallView} from '@itookit/llm-session/contracts';
-import type {TargetRef} from '@itookit/llm-flow/contracts';
-import {taskStat, type Kernel, type TaskCallResult} from '@itookit/durable-kernel';
-import type {KanbanDispatch, KanbanItem} from '@itookit/kanban/contracts';
-import type {KanbanExecutionPort, KanbanExecutionObservation} from '@itookit/kanban/execution';
-import {KanbanError} from '@itookit/kanban';
+import type {IndependentCallService} from '@nestos/llm-session';
+import type {IndependentCallInput, IndependentCallView} from '@nestos/llm-session/contracts';
+import type {TargetRef} from '@nestos/llm-flow/contracts';
+import {taskStat, type Kernel, type TaskCallResult} from '@nestos/durable-kernel';
+import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
+import type {KanbanExecutionPort, KanbanExecutionObservation} from '@nestos/kanban/execution';
+import {KanbanError} from '@nestos/kanban';
 interface WorkExecutionPolicy {maxDepth: number; timeoutMs?: number | null}
 interface FrozenWork {schema: 1; dispatch: KanbanDispatch; input: IndependentCallInput; policy: WorkExecutionPolicy}
 export interface PublishedKanbanWorkOptions {

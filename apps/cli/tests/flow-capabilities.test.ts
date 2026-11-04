@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { openProfileInspectionFs } from '../src/runtime';
-import { SessionRepository, RoundLog } from '@itookit/llm-session';
+import { SessionRepository, RoundLog } from '@nestos/llm-session';
 import { createServer, type Server } from 'node:http';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

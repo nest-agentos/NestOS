@@ -1,7 +1,7 @@
 import type {ConversationMessage} from '../contracts';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 
-import type { SessionGroup, ExecutionNode } from '@itookit/llm-session/contracts';
+import type { SessionGroup, ExecutionNode } from '@nestos/llm-session/contracts';
 import { TRANSCRIPT_CONTEXT, TRANSCRIPT_SYSTEM, TRANSCRIPT_TOOL, contextLabel, transcriptCodeBlock, type TranscriptEncoder } from './transcript-markup';
 
 interface Round { key: string; users: ConversationMessage[]; responses: ConversationMessage[] }

@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {sha256HexSync} from '@itookit/common';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {sha256HexSync} from '@nestos/common';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {createItemOperations} from '../src/kanban/item-operations';
 import {jobKey, reviewKey, type ReviewOperationsOptions, type ReviewJob} from '../src/kanban/item-operation-types';

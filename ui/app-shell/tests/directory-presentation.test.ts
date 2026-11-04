@@ -1,5 +1,5 @@
 import {afterEach, expect, it} from 'vitest';
-import {getLogger, LogLevel} from '@itookit/common';
+import {getLogger, LogLevel} from '@nestos/common';
 import {directoryPresentation} from '../src/workbench/directory-presentation';
 
 afterEach(() => {getLogger().clear(); getLogger().setLevel('directory-view', LogLevel.INFO);});

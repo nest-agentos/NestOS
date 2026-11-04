@@ -1,15 +1,15 @@
 import {isHarnessConnectionSnapshot} from '../session/harness-binding';
 import {isAttachmentContentIdentity} from '../contracts/chat';
-import type { JsonValue, Kernel } from '@itookit/durable-kernel';
+import type { JsonValue, Kernel } from '@nestos/durable-kernel';
 import type { SessionInstructionQueue } from '../contracts/instruction-queue';
-import { flowRevisionDigest } from '@itookit/llm-flow';
+import { flowRevisionDigest } from '@nestos/llm-flow';
 import { isFlowConnectionSnapshot } from '../session/flow-connection-snapshot';
 import { isHarnessAgentSnapshot } from '../session/harness-binding';
 import {isQueuedAgent} from '../session/queued-agent';
 import { isFlowRunPlan } from '../session/flow-run-plan';
-import { isModelDefaults } from '@itookit/kernel-adapters/contracts';
-import {isInvocationIdentity} from '@itookit/llm-flow/contracts';
-import {isTargetSelection, isTargetRef, assertSelectedTarget} from '@itookit/llm-flow/contracts';
+import { isModelDefaults } from '@nestos/kernel-adapters/contracts';
+import {isInvocationIdentity} from '@nestos/llm-flow/contracts';
+import {isTargetSelection, isTargetRef, assertSelectedTarget} from '@nestos/llm-flow/contracts';
 import {boundFlowIdentity} from '../session/flow-target';
 
 export const INSTRUCTION_QUEUE_KEY = 'conversation/instructions';

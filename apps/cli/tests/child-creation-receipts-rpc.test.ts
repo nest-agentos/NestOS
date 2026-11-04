@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {RpcPeer} from '@itookit/app-transport/application';
-import {ContentTransferCommand, SessionCommand, type ChildCreationReceipt, type ICommandBus} from '@itookit/llm-session/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {RpcPeer} from '@nestos/app-transport/application';
+import {ContentTransferCommand, SessionCommand, type ChildCreationReceipt, type ICommandBus} from '@nestos/llm-session/contracts';
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close();});
 it('reads original child creation facts over RPC while the creation response is suspended', async () => {

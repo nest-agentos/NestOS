@@ -4,10 +4,10 @@ import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { createCellsDriver, type RemoteProject } from '@itookit/cells-driver';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { createCellsDriver, type RemoteProject } from '@nestos/cells-driver';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 import { RunStore } from '../src/run-store';
 
 const metadataFile = process.env.NESTOS_HARNESS_LIVE_METADATA;

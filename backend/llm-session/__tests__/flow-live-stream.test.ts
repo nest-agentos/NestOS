@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { createBuiltinDagPluginRegistry, registerDurablePrograms } from '@itookit/llm-flow';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { createBuiltinDagPluginRegistry, registerDurablePrograms } from '@nestos/llm-flow';
 import { LlmChatEffectAdapter } from '../../kernel-adapters/src/effects/llm-chat-effect';
 import { ConversationRunCoordinator } from '../src/session/conversation-run-coordinator';
 

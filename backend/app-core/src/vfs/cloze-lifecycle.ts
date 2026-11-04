@@ -1,6 +1,6 @@
-import type { IFileSystem, ISeqFileTransaction } from '@itookit/vfs-core';
-import { CLOZE_SRS_PATH, clozeDocumentPrefix, parseClozeStorageKey } from '@itookit/app-contracts';
-import { createModuleLogger, randomUUID } from '@itookit/common';
+import type { IFileSystem, ISeqFileTransaction } from '@nestos/vfs-core';
+import { CLOZE_SRS_PATH, clozeDocumentPrefix, parseClozeStorageKey } from '@nestos/app-contracts';
+import { createModuleLogger, randomUUID } from '@nestos/common';
 
 const log = createModuleLogger('cloze-lifecycle');
 function failureCode(error: unknown): string {

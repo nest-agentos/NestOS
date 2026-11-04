@@ -1,12 +1,12 @@
-import type { ChatMessage, ContextSnapshot, ToolDefinition } from '@itookit/llm-context';
-import type { TaskSpec } from '@itookit/durable-kernel';
+import type { ChatMessage, ContextSnapshot, ToolDefinition } from '@nestos/llm-context';
+import type { TaskSpec } from '@nestos/durable-kernel';
 import type { LLMSkill } from '../contracts';
 import type { ResolvedDirectAgentPolicy } from '../contracts/direct-agent-policy';
-import { buildLlmTaskInput, buildSkillContexts, type DurableAgentInput, type SkillContext } from '@itookit/llm-tasks';
+import { buildLlmTaskInput, buildSkillContexts, type DurableAgentInput, type SkillContext } from '@nestos/llm-tasks';
 import { CLIENT_WEB_SEARCH_TOOL, directExecutionMode, directToolIds } from './direct-execution-mode';
-import {sha256HexSync} from '@itookit/llm-context';
-import {harnessInputDigest, prepareHarnessInput, type HarnessContextRequest} from '@itookit/kernel-adapters/contracts';
-import type {HarnessProgramInput} from '@itookit/kernel-adapters';
+import {sha256HexSync} from '@nestos/llm-context';
+import {harnessInputDigest, prepareHarnessInput, type HarnessContextRequest} from '@nestos/kernel-adapters/contracts';
+import type {HarnessProgramInput} from '@nestos/kernel-adapters';
 import {directHarnessContextIdentity} from '../contracts/context-options';
 
 import type {ChatAttachment, ExecutionTask, ExecutorConfig} from '../core/types';

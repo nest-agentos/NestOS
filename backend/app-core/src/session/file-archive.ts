@@ -1,4 +1,4 @@
-import { FSError, type IFileSystem, type FSNode } from '@itookit/vfs-core';
+import { FSError, type IFileSystem, type FSNode } from '@nestos/vfs-core';
 
 export interface FileArchiveEntry {
     path: string; type: 'file' | 'directory' | 'seqfile'; base64?: string;

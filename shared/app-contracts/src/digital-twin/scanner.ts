@@ -1,4 +1,4 @@
-import type {TargetRef, JsonValue} from '@itookit/llm-flow/contracts';
+import type {TargetRef, JsonValue} from '@nestos/llm-flow/contracts';
 
 /** Published target plus ordinary arguments; input text uses the target's declared composer binding. */
 export interface TwinScannerExecutor {target: TargetRef; values?: Record<string, JsonValue>; outputPath?: string[]}

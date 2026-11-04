@@ -1,5 +1,5 @@
-import {parseSessionRoute, resolveBrowserTarget} from '@itookit/app-contracts';
-import type {ApplicationBackend, OpenedApplicationView} from '@itookit/app-contracts/services';
+import {parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts';
+import type {ApplicationBackend, OpenedApplicationView} from '@nestos/app-contracts/services';
 
 export function openInitialView(backend: ApplicationBackend, documents: string[], resource?: string): Promise<OpenedApplicationView> {
     return backend.openView(initialViewRequest(documents, resource));

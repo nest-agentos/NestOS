@@ -3,7 +3,7 @@
 // 供 flow 的 FlowValue/FlowHuman 与 durable 的 agent/chat Program 复用，
 // 消除「collectDependency / dependenciesReady / dependencyWait」模板重复。
 
-import type { JsonValue, TaskInputEvent } from '@itookit/durable-kernel';
+import type { JsonValue, TaskInputEvent } from '@nestos/durable-kernel';
 import { dependencyOutput, mergeDependencyOutput } from './program-helpers';
 import type { DurableDependencyBinding } from './types';
 

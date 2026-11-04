@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {HarnessExecutionRequest} from '@itookit/kernel-adapters/contracts';
+import type {HarnessExecutionRequest} from '@nestos/kernel-adapters/contracts';
 import {HarnessContextBindings} from '../src/projects/harness-context-bindings';
 import {harnessExecutionJournalKey} from '../src/projects/harness-execution';
 import {context, operation} from './harness-context-fixture';

@@ -1,4 +1,4 @@
-import { normalizeVirtualPath } from '@itookit/vfs-core';
+import { normalizeVirtualPath } from '@nestos/vfs-core';
 
 /** One lazy-created file within the notes navigation filesystem. */
 export const CLOZE_SRS_PATH = '/.nestos/cloze-srs.seq';

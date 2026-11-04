@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import type {IFileSystem} from '@itookit/vfs-core';
-import {sha256Hex} from '@itookit/llm-context/digest';
+import type {IFileSystem} from '@nestos/vfs-core';
+import {sha256Hex} from '@nestos/llm-context/digest';
 import {readMediaAsset} from './media-result-store';
 
 it.each(['identity', 'missing', 'integrity', 'denied', 'unknown'] as const)('classifies %s Task asset failures without exposing storage details', async mode => {

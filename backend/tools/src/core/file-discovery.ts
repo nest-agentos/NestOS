@@ -1,4 +1,4 @@
-import { discoverFiles, pathUtils, type FileDiscoverySource } from '@itookit/vfs-core';
+import { discoverFiles, pathUtils, type FileDiscoverySource } from '@nestos/vfs-core';
 import type { ToolUseContext } from './types';
 
 export async function* discoverToolFiles(context: ToolUseContext, path?: string, includeIgnored?: boolean): AsyncGenerator<string> {

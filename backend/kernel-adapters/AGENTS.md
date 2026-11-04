@@ -1,4 +1,4 @@
-# @itookit/kernel-adapters
+# @nestos/kernel-adapters
 
 内核**能力适配层**：把 `driver-llm`（模型）、`tools`（工具与原生 shell）、Skill 目录、TTY 驱动接到 `durable-kernel` 的 Effect 面与工具面上，并托管 Skill 的加载身份与提示注入。它是 Kernel 与具体能力实现之间的唯一粘合层。详见 [架构设计](../../doc/architecture.md)、[事件流](../../doc/event-flows.md)、[Skill 设计](../../doc/design/skill-design.md)。
 
@@ -79,8 +79,8 @@ await runtime.dispose();
 ## 运行
 
 ```bash
-pnpm --filter @itookit/kernel-adapters test        # vitest run（测试与实现同目录）
-pnpm --filter @itookit/kernel-adapters typecheck
+pnpm --filter @nestos/kernel-adapters test        # vitest run（测试与实现同目录）
+pnpm --filter @nestos/kernel-adapters typecheck
 ```
 
 ## 相关文档
@@ -98,7 +98,7 @@ pnpm --filter @itookit/kernel-adapters typecheck
 
 ## 模型管理子入口
 
-`@itookit/kernel-adapters/llm/core` 提供 LLMDeviceDriver、LLM_IOCTL、配置、费用、Skill 与 MCP 管理；Provider 支持目录在 `src/llm-management/catalogs/`，只经可选 `/llm/presets` 入口加载。源码在 `src/llm-management/`，回归在 `tests/llm-management/`；不是额外 npm 包。公开通信客户端与契约来自 driver-llm，禁止其反向依赖本包。MCP stdio 保留 browser/default 条件入口。详见 [模型集成](./doc/llm-management/README.md)。
+`@nestos/kernel-adapters/llm/core` 提供 LLMDeviceDriver、LLM_IOCTL、配置、费用、Skill 与 MCP 管理；Provider 支持目录在 `src/llm-management/catalogs/`，只经可选 `/llm/presets` 入口加载。源码在 `src/llm-management/`，回归在 `tests/llm-management/`；不是额外 npm 包。公开通信客户端与契约来自 driver-llm，禁止其反向依赖本包。MCP stdio 保留 browser/default 条件入口。详见 [模型集成](./doc/llm-management/README.md)。
 
 ## 配置契约入口
 
@@ -106,7 +106,7 @@ ModelRequirements.responseFormats 声明所需 text/json_object/json_schema 模�
 
 ModelDefaults / ModelOperation / modelForOperation 属于模型管理契约。ConnectionManager 串行读写对话、绘图、语音默认表；旧默认 API 仅表示对话，旧文档不推断媒体默认。配置保存不发起网络验证，配置和用途能力校验不替代执行准入。详见 [用途默认](../../doc/design/model-purpose-defaults.md)。
 
-`@itookit/kernel-adapters/contracts` 定义 Agent、连接管理、恢复与定价契约及纯策略，不加载适配器运行时、VFS、YAML 或 MCP SDK。Session 与设置 UI 直接消费此入口；适配层不得反向依赖 Session、Flow 或 Tasks。模型事件来自 driver-llm/contracts 的 LlmCommunicationEvent。
+`@nestos/kernel-adapters/contracts` 定义 Agent、连接管理、恢复与定价契约及纯策略，不加载适配器运行时、VFS、YAML 或 MCP SDK。Session 与设置 UI 直接消费此入口；适配层不得反向依赖 Session、Flow 或 Tasks。模型事件来自 driver-llm/contracts 的 LlmCommunicationEvent。
 
 `resolveChatModelTiers` 统一工具箱与聊天菜单的模型档位解析：只返回 Provider 目录中存在的聊天模型，保留缺省 category 的聊天语义，不为 standard/fast 添加未配置档位；optimal 缺省时沿用连接 model。未知 ID 和媒体模型不可作为聊天候选，执行准入继续由 assertModelConnection 校验。`resolveChatModelForTier` 复用执行档位的回退规则，解析任意指定档位的实际聊天模型；显式配置的媒体/未知模型返回 undefined，不能跳过它回退到其他聊天档位。
 

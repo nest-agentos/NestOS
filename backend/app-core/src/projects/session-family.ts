@@ -1,4 +1,4 @@
-import type { SessionSummary } from '@itookit/llm-session';
+import type { SessionSummary } from '@nestos/llm-session';
 
 /** A damaged relation remains reachable as a root instead of disappearing from navigation. */
 export function sessionFamilyRoots(sessions: SessionSummary[]): Map<string, string> {

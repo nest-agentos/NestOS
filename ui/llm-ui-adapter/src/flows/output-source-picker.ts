@@ -1,7 +1,7 @@
-import {randomUUID, t} from '@itookit/common';
-import {InputSourceCommand, type InputSourceExecution, type InputSourceReceipt, type ResourceScope} from '@itookit/app-contracts';
-import {FlowCommand, type DurableFlowSnapshot} from '@itookit/llm-flow/contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {randomUUID, t} from '@nestos/common';
+import {InputSourceCommand, type InputSourceExecution, type InputSourceReceipt, type ResourceScope} from '@nestos/app-contracts';
+import {FlowCommand, type DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 import {DagWorkbench} from '../components/DagWorkbench';
 import {sourceValues, type SourceValue} from './source-output';
 import {sourceExecutionForm} from './source-execution-form';

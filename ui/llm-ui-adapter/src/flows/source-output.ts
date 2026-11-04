@@ -1,4 +1,4 @@
-import type {DurableFlowSnapshot, JsonValue} from '@itookit/llm-flow/contracts';
+import type {DurableFlowSnapshot, JsonValue} from '@nestos/llm-flow/contracts';
 export interface SourceValue {label: string; value: JsonValue}
 /** Expose values rather than output-envelope metadata, without coercing objects to text. */
 export function sourceValues(snapshot: DurableFlowSnapshot): SourceValue[] {

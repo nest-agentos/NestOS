@@ -4,7 +4,7 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {nativeObservationDiagnostics} from './native-observation-diagnostics';
 
 const logs = vi.hoisted(() => ({info: vi.fn(), warn: vi.fn()}));
-vi.mock('@itookit/common', () => ({createModuleLogger: () => logs, randomUUID: () => 'operation'}));
+vi.mock('@nestos/common', () => ({createModuleLogger: () => logs, randomUUID: () => 'operation'}));
 const state: ConversationSnapshot = {sessionId: 'session', title: 'private-title',
     messages: [{id: 'message', role: 'assistant', text: 'private-content'}], requests: [], pending: false,
     gap: false, disconnected: false, canSend: false, canInterrupt: false, canRespond: false};

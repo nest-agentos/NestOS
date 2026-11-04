@@ -1,4 +1,4 @@
-import { Toast } from '@itookit/ui-common-adapter';
+import { Toast } from '@nestos/ui-common-adapter';
 
 export function promptInterruptedRun(
     snapshot: { interruptedAssistantId?: string },

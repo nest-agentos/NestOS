@@ -1,9 +1,9 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {sha256Hex} from '@itookit/llm-context';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {IndependentCallCommand, SessionCommand, type IndependentCallInput, type IndependentCallReceipt, type IndependentCallView, type RootTargetCatalog} from '@itookit/llm-session/contracts';
-import type {AgentDefinition, HarnessConnectionSnapshot} from '@itookit/kernel-adapters/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {sha256Hex} from '@nestos/llm-context';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {IndependentCallCommand, SessionCommand, type IndependentCallInput, type IndependentCallReceipt, type IndependentCallView, type RootTargetCatalog} from '@nestos/llm-session/contracts';
+import type {AgentDefinition, HarnessConnectionSnapshot} from '@nestos/kernel-adapters/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 
 type Runtime = Awaited<ReturnType<typeof createApplicationRuntime>>;

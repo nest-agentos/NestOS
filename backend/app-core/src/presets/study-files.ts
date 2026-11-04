@@ -1,6 +1,6 @@
 import yaml from 'js-yaml';
-import type {IFileSystem} from '@itookit/vfs-core';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import type {IFileSystem} from '@nestos/vfs-core';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import prompts from './study-prompts.json';
 import notes from './study-notes.json';
 const log = createModuleLogger('study-files');

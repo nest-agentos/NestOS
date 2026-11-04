@@ -1,6 +1,6 @@
-import {FSError, type IFileSystem} from '@itookit/vfs-core';
-import {randomUUID} from '@itookit/common';
-import type {ProjectConversationPort, ConversationComposerDraft} from '@itookit/app-contracts/services';
+import {FSError, type IFileSystem} from '@nestos/vfs-core';
+import {randomUUID} from '@nestos/common';
+import type {ProjectConversationPort, ConversationComposerDraft} from '@nestos/app-contracts/services';
 
 const empty = (): ConversationComposerDraft => ({revision: '0', data: '', acceptedOperationIds: []});
 /** Opaque input state and immutable assets stay local to the application host. */

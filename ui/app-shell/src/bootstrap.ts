@@ -1,4 +1,4 @@
-import {ACTION_ICONS, randomUUID} from '@itookit/common';
+import {ACTION_ICONS, randomUUID} from '@nestos/common';
 import {studyDraftStore} from './persistence/study-draft-store';
 import {showFlowDependencies} from './configuration/flow-dependencies-dialog';
 import {ShellApplicationEvents, workspaceConsumesEvent} from './lifecycle/application-events';
@@ -9,9 +9,9 @@ import {installAssistantMenu} from './navigation/assistant-menu';
 import {createEditorSwapFactory} from './browser/editor-swap';
 import { WorkbenchWindows } from './workbench/windows';
 import {mountApplicationNavigation, revealWorkspaceNavigation} from './navigation/window-navigation';
-import {t as translate} from '@itookit/common';
+import {t as translate} from '@nestos/common';
 import {rememberPagePresentation, writePageHistory, type PagePresentation} from './navigation/page-history';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
 import {withInitialDirectory} from './browser/initial-directory';
 import {OpenedViewProjection} from './lifecycle/opened-view';
 import {openInitialView} from './lifecycle/initial-view';
@@ -24,8 +24,8 @@ import { installStartPage, START_PAGE_ID, START_PAGE_SLUG } from './navigation/s
 import { workspaceStatus } from './navigation/workspace-status';
 import { createSettingsAccess } from './configuration/settings-access';
 import { twinSourceMenu } from './digital-twin/source-menu';
-import { DEFAULT_HARNESS_TOOL_IDS } from '@itookit/app-contracts';
-import { FSError } from '@itookit/vfs-core';
+import { DEFAULT_HARNESS_TOOL_IDS } from '@nestos/app-contracts';
+import { FSError } from '@nestos/vfs-core';
 import { createFileChatHandler } from './projects/file-chat';
 import { createOcrControls } from './configuration/ocr-controls';
 import { ConfigurationDeletionDialog } from './configuration/delete-dialog';
@@ -45,14 +45,14 @@ import { VfsJsonStore } from './persistence/vfs-json-store';
 import { TOOLBOX_PREFERENCES_DOC } from './toolbox/ToolboxWorkbench';
 import { setupHitlVfsBridge } from './workspaces/hitl-bridge';
 import { createWorkspaceModule, restoreWorkspaceResource, type WorkspaceHandle } from './workspaces/module';
-import { workspaceRoot, type WorkspaceController, type WorkspaceCreation } from '@itookit/app-contracts';
+import { workspaceRoot, type WorkspaceController, type WorkspaceCreation } from '@nestos/app-contracts';
 import { parseWorkspaceHash, resolveLegacyProjectResource } from './navigation/workspace-route';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
 import type { EditorFileType as FileTypeDefinition } from './browser/types';
 import { connectEditorLifecycle } from './browser/editor-connector';
-import {NavigationRequest, NAVIGATION_EVENTS, formatDefaultFileTitle, traceBoot, setBootTraceEnabled} from '@itookit/common';
-import { MenuItem } from '@itookit/ui-common-adapter';
-import { EditorFactory } from '@itookit/ui-common-adapter';
+import {NavigationRequest, NAVIGATION_EVENTS, formatDefaultFileTitle, traceBoot, setBootTraceEnabled} from '@nestos/common';
+import { MenuItem } from '@nestos/ui-common-adapter';
+import { EditorFactory } from '@nestos/ui-common-adapter';
 import { Workbench } from './core/Workbench';
 import { setupMobileWorkspaceView } from './navigation/mobile-workspace-view';
 import { installMobileViewport } from './navigation/mobile-viewport';
@@ -166,7 +166,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         requestDelete: targets => deletionDialog.request(targets),
     });
     cleanupFns.push(() => settings.close());
-    const createChatFactory = (controls: import('@itookit/app-contracts/services').WorkbenchChatControls): EditorFactory => {
+    const createChatFactory = (controls: import('@nestos/app-contracts/services').WorkbenchChatControls): EditorFactory => {
         const factory = options.ui.createChatEditor(agentService, {
             defaultHarnessToolIds: DEFAULT_HARNESS_TOOL_IDS, sessionManager, sessionRepository, ocr, commandBus,
             kernel: kernel.kernel, readTaskAttachment: backend.taskAttachment?.bind(backend), ...controls,
@@ -175,9 +175,9 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         return async (container, config) => { await executorUsage.load(); return withMarkdown(container, {...config, executorUsage}); };
     };
     const agentFactory = options.ui.createAgentEditor(agentService, { defaultToolIds: DEFAULT_HARNESS_TOOL_IDS,
-        listFlows: () => commandBus.execute<import('@itookit/llm-flow/contracts').FlowDraft[]>(FlowCommand.DraftList),
-        listFlowRevisions: id => commandBus.execute<import('@itookit/llm-flow/contracts').FlowRevision[]>(FlowCommand.RevisionList, {id}),
-        getFlowRevision: (id, revision) => commandBus.execute<import('@itookit/llm-flow/contracts').FlowRevision | null>(FlowCommand.RevisionGet, {id, revision}),
+        listFlows: () => commandBus.execute<import('@nestos/llm-flow/contracts').FlowDraft[]>(FlowCommand.DraftList),
+        listFlowRevisions: id => commandBus.execute<import('@nestos/llm-flow/contracts').FlowRevision[]>(FlowCommand.RevisionList, {id}),
+        getFlowRevision: (id, revision) => commandBus.execute<import('@nestos/llm-flow/contracts').FlowRevision | null>(FlowCommand.RevisionGet, {id, revision}),
         listConnections: () => agentService.getConnections(),
         openFlow: id => handleNavigationRequest({target: 'toolbox', resourceId: '/flows/' + id + '.flow'}),
     });
@@ -216,8 +216,8 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         standard: defaultEditorFactory, agent: defaultEditorFactory,
         settings: settings.factory,  skills: skillsFactory, flows: flowsFactory,
     };
-    const workspaceFiles = new Map<string, import('@itookit/vfs-core').FileSystemContext>();
-    const filesForWorkspace = async (workspace: WorkspaceConfig): Promise<import('@itookit/vfs-core').FileSystemContext> => {
+    const workspaceFiles = new Map<string, import('@nestos/vfs-core').FileSystemContext>();
+    const filesForWorkspace = async (workspace: WorkspaceConfig): Promise<import('@nestos/vfs-core').FileSystemContext> => {
         const cached = workspaceFiles.get(workspace.elementId);
         if (cached) return cached;
         const fs = workspace.files?.fs ?? (workspace.type === 'settings' ? settings.files()
@@ -599,7 +599,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         if (!closed && !replayingHistory && routingRevision === undefined && visibleWorkspaceId === id) updateHistory(id, resource, mode);
     };
 
-    const performNavigation = async (workspaceId: string, resourceId?: string, sourceSlug?: string, historyReplay?: symbol, openOptions?: import('@itookit/app-contracts').WorkspaceOpenOptions): Promise<void> => {
+    const performNavigation = async (workspaceId: string, resourceId?: string, sourceSlug?: string, historyReplay?: symbol, openOptions?: import('@nestos/app-contracts').WorkspaceOpenOptions): Promise<void> => {
         if (replayingHistory !== historyReplay) replayingHistory = undefined;
         const revision = ++navigationRevision;
         if (closed) return;

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { CLOZE_SRS_PATH, clozeDocumentPrefix } from '@itookit/app-contracts';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { CLOZE_SRS_PATH, clozeDocumentPrefix } from '@nestos/app-contracts';
 import { SeqFileStore, createAdapterStore } from '../src/srs-store';
 import { EngineMetadataStore } from '../src/metadata-store';
 

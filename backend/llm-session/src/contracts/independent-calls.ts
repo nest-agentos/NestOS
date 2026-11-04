@@ -1,4 +1,4 @@
-import type {TaskStat} from '@itookit/durable-kernel/contracts';
+import type {TaskStat} from '@nestos/durable-kernel/contracts';
 import type {SubmissionRequest, SubmissionReceipt} from './submission';
 import type {TransferReference} from './content-transfer';
 import type {ExecutionRef} from './conversation';
@@ -12,7 +12,7 @@ export const IndependentCallCommand = {Submit: 'session.call.submit', Inspect: '
 export interface IndependentCallInput {request: SubmissionRequest; title: string; transfer?: TransferReference}
 export interface IndependentCallReceipt extends SubmissionReceipt {
     /** Original Kernel caller admission; independent of target dispatch and history commit. */
-    callerExecution?: import('@itookit/durable-kernel/contracts').TaskRef;
+    callerExecution?: import('@nestos/durable-kernel/contracts').TaskRef;
     callerSessionId: string;
     executionSessionId?: string;
     execution?: ExecutionRef;
@@ -68,14 +68,14 @@ export interface IndependentCallCancellationQuery extends IndependentCallControl
 export interface IndependentCallCancelRequest extends IndependentCallCancellationQuery {expectedEpoch: number}
 export interface IndependentCallCancellationReceipt extends IndependentCallCancellationQuery {
     /** Admission evidence only; absence means unknown, never permission to resubmit. */
-    receipt?: import('@itookit/durable-kernel/contracts').TaskCancellationReceipt;
+    receipt?: import('@nestos/durable-kernel/contracts').TaskCancellationReceipt;
 }
 
 
 /** Remaining-tree control always targets the primary execution, never a caller-supplied descendant. */
 export interface IndependentCallCancelRemainingRequest extends IndependentCallControlQuery {expectedEpoch: number}
 export interface IndependentCallTreeCancellationReceipt extends IndependentCallControlQuery {
-    receipt?: import('@itookit/durable-kernel/contracts').TaskTreeCancellationReceipt;
+    receipt?: import('@nestos/durable-kernel/contracts').TaskTreeCancellationReceipt;
 }
 
 export type IndependentCallControlAction = 'pause' | 'resume' | 'withdraw';
@@ -83,7 +83,7 @@ export interface IndependentCallStateControlQuery extends IndependentCallControl
 export interface IndependentCallStateControlRequest extends IndependentCallStateControlQuery {expectedEpoch: number}
 export interface IndependentCallStateControlReceipt extends IndependentCallStateControlQuery {
     /** Original admission, distinct from the latest acknowledgement or active control. */
-    receipt?: import('@itookit/durable-kernel/contracts').TaskControlReceipt;
+    receipt?: import('@nestos/durable-kernel/contracts').TaskControlReceipt;
 }
 
 export interface IndependentCallInteractions {
@@ -92,12 +92,12 @@ export interface IndependentCallInteractions {
 }
 
 export interface IndependentCallResponseQuery extends IndependentCallControlQuery {targetTaskId: string; interactionId: string}
-export interface IndependentCallResponseRequest extends IndependentCallResponseQuery {value: import('@itookit/durable-kernel/contracts').JsonValue}
+export interface IndependentCallResponseRequest extends IndependentCallResponseQuery {value: import('@nestos/durable-kernel/contracts').JsonValue}
 export interface IndependentCallResponseReceipt extends IndependentCallResponseQuery {
-    receipt?: import('@itookit/durable-kernel/contracts').InteractionResponseReceipt;
+    receipt?: import('@nestos/durable-kernel/contracts').InteractionResponseReceipt;
 }
 
 export interface IndependentCallInteractionDetail extends IndependentCallResponseQuery {
-    interaction: Pick<import('@itookit/durable-kernel/contracts').InteractionRecord<import('@itookit/durable-kernel/contracts').JsonValue>,
+    interaction: Pick<import('@nestos/durable-kernel/contracts').InteractionRecord<import('@nestos/durable-kernel/contracts').JsonValue>,
         'id' | 'kind' | 'prompt' | 'payload' | 'requestedAt' | 'status'>;
 }

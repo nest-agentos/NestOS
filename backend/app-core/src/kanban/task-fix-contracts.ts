@@ -1,5 +1,5 @@
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {KanbanClient, KanbanItem, KanbanDispatch, KanbanFixSession} from '@itookit/kanban/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {KanbanClient, KanbanItem, KanbanDispatch, KanbanFixSession} from '@nestos/kanban/contracts';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import type {KanbanAutomationJournal} from './automation-journal';
 import type {UserEventService} from '../events/service';

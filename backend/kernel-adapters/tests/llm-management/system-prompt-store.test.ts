@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { SystemPromptStore } from '../../src/llm-management/device/system-prompt-store';
 import { DEFAULT_AGENTS } from '../../src/llm-management/constants/agents';
 

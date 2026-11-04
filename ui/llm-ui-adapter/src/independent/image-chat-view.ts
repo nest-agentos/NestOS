@@ -1,7 +1,7 @@
 import {chatAttachmentMenu} from '../shell/chat-attachment-menu';
 import {disposeEditorResources} from '../shell/editor-disposal';
 import {presentChatButton} from './button-presentation';
-import type {ChatOptions} from '@itookit/llm-ui';
+import type {ChatOptions} from '@nestos/llm-ui';
 import {createImageEditingPort, type ImageEditingHost} from './image-editing';
 export type ImageChatOptions = Omit<ChatOptions, 'source' | 'actions' | 'operations'> & {readonly images?: ImageEditingHost};
 

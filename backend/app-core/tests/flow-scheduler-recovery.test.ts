@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {SessionCommand} from '@itookit/llm-session/contracts';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
-import {FlowCommand, type FlowRevision} from '@itookit/llm-flow/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {SessionCommand} from '@nestos/llm-session/contracts';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
+import {FlowCommand, type FlowRevision} from '@nestos/llm-flow/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 
 const cleanup: (() => Promise<unknown>)[] = [];

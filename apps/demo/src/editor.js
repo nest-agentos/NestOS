@@ -2,7 +2,7 @@
  * #demo/editor-demo.js
  * @file Demo showcasing the new plugin-based architecture for the MDx library.
  */
-import '@itookit/mdxeditor/style.css';
+import '@nestos/mdxeditor/style.css';
 
 // [新增] CodeMirror 6 独立演示所需的导入
 import { EditorView, lineNumbers, keymap } from "@codemirror/view";
@@ -12,7 +12,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { bracketMatching, foldGutter, foldKeymap, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 
-import {IMentionSource} from '@itookit/common';
+import {IMentionSource} from '@nestos/common';
 // [修改] 现有 MDxEditor 库的导入
 import {
     createMDxEditor,      // [修改] 导入新的工厂函数替代 MDxEditor 构造函数
@@ -30,11 +30,11 @@ import {
     ClozePlugin,
     TaskListPlugin,
     // Import keys for services
-} from '@itookit/mdxeditor';
+} from '@nestos/mdxeditor';
 
 /**
- * @typedef {import('@itookit/mdxeditor').MDxPlugin} MDxPlugin
- * @typedef {import('@itookit/mdxeditor').PluginContext} PluginContext
+ * @typedef {import('@nestos/mdxeditor').MDxPlugin} MDxPlugin
+ * @typedef {import('@nestos/mdxeditor').PluginContext} PluginContext
  */
 
 // [NEW] 为 Mention 插件定义一个唯一的服务 Key
@@ -825,7 +825,7 @@ Let's check the technical specs too: @Technical Spec
 });
 
 /*
-import { getVFSManager,VFSPersistenceAdapter } from '@itookit/vfs';
+import { getVFSManager,VFSPersistenceAdapter } from '@nestos/vfs';
 import { MemoryPluginV2 } from './plugins/MemoryPlugin.v2.js';
 
 async function initEditor() {
@@ -861,8 +861,8 @@ async function initEditor() {
 
 示例 A：使用 VFSCore（推荐）
 
-import { getVFSManager } from '@itookit/vfs';
-import { MDxEditor } from '@itookit/mdxeditor';
+import { getVFSManager } from '@nestos/vfs';
+import { MDxEditor } from '@nestos/mdxeditor';
 import { MemoryPluginV2 } from './plugins/MemoryPlugin.v2.js';
 
 async function createEditor() {
@@ -889,7 +889,7 @@ async function createEditor() {
 
 示例 B：使用传统 dataAdapter（向后兼容）
 
-import { MDxEditor } from '@itookit/mdxeditor';
+import { MDxEditor } from '@nestos/mdxeditor';
 import { LocalStorageAdapter } from './adapters/LocalStorageAdapter.js';
 import { MemoryPlugin } from './plugins/MemoryPlugin.js'; // 旧版本
 

@@ -1,6 +1,6 @@
 import type { ServerResponse, IncomingMessage } from 'node:http';
-import { FSError, type FSErrorCode } from '@itookit/vfs-core';
-import { MAX_BODY_BYTES } from '@itookit/app-transport/rpc';
+import { FSError, type FSErrorCode } from '@nestos/vfs-core';
+import { MAX_BODY_BYTES } from '@nestos/app-transport/rpc';
 import { recordResponseQueued } from '../logging/audit-log';
 
 export async function readJson(request: IncomingMessage): Promise<{ method?: unknown; args?: unknown }> {

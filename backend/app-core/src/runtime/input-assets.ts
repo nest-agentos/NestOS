@@ -1,9 +1,9 @@
-import {randomUUID} from '@itookit/common';
-import {sha256Hex} from '@itookit/llm-context';
-import type {InputAssetReference} from '@itookit/tools/contracts';
-import type {IFileSystem} from '@itookit/vfs-core';
-import type {CommandBus} from '@itookit/llm-session';
-import {InputAssetCommand} from '@itookit/app-contracts';
+import {randomUUID} from '@nestos/common';
+import {sha256Hex} from '@nestos/llm-context';
+import type {InputAssetReference} from '@nestos/tools/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
+import type {CommandBus} from '@nestos/llm-session';
+import {InputAssetCommand} from '@nestos/app-contracts';
 import {readInputAsset, inputAssetError, INPUT_ASSET_OWNER as owner} from './input-asset-store';
 import {importInputFile, inspectInputFile} from './input-file-assets';
 export {readInputAsset} from './input-asset-store';
@@ -32,12 +32,12 @@ async function persistInputAsset(fs: IFileSystem, bytes: Uint8Array, mimeType: s
         await readInputAsset(fs, ref); return ref;
     } catch (error) { throw inputAssetError('INPUT_ASSET_PERSISTENCE', 'Could not persist the uploaded image', error); }
 }
-export function registerInputAssets(commands: CommandBus, fs: IFileSystem, readTask?: (ref: import('@itookit/tools/contracts').TaskAssetReference) => Promise<Uint8Array>): {dispose(): void} {
+export function registerInputAssets(commands: CommandBus, fs: IFileSystem, readTask?: (ref: import('@nestos/tools/contracts').TaskAssetReference) => Promise<Uint8Array>): {dispose(): void} {
     const upload = commands.register(InputAssetCommand.Import, args => importInputAsset(fs, (args as {url: string}).url));
-    const files = commands.register(InputAssetCommand.ImportFile, args => importInputFile(fs, args as import('@itookit/app-contracts').InputFileUpload));
-    const inspect = commands.register(InputAssetCommand.Inspect, args => inspectInputFile(fs, args as import('@itookit/app-contracts').InputFileIdentity));
+    const files = commands.register(InputAssetCommand.ImportFile, args => importInputFile(fs, args as import('@nestos/app-contracts').InputFileUpload));
+    const inspect = commands.register(InputAssetCommand.Inspect, args => inspectInputFile(fs, args as import('@nestos/app-contracts').InputFileIdentity));
     const read = commands.register(InputAssetCommand.Read, async args => {
-        const ref = (args as {reference: InputAssetReference | import('@itookit/tools/contracts').TaskAssetReference}).reference;
+        const ref = (args as {reference: InputAssetReference | import('@nestos/tools/contracts').TaskAssetReference}).reference;
         if (!ref || !/^image\/(png|jpeg|webp)$/.test(ref.mimeType)) throw new Error('Invalid preview asset');
         const bytes = 'kind' in ref ? await readInputAsset(fs, ref) : await readTask?.(ref);
         if (!bytes) throw new Error('Asset preview is unavailable');

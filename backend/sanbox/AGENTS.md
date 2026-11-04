@@ -1,4 +1,4 @@
-# @itookit/sanbox
+# @nestos/sanbox
 
 系统进程沙箱策略与启动计划。目录和包名沿用需求中的 `sanbox`；类型/API 使用 `Sandbox`。
 
@@ -10,10 +10,10 @@
 - 修改策略必须覆盖参数注入、符号链接、环境变量和原生边界测试。
 
 ```bash
-pnpm --filter @itookit/sanbox test
-pnpm --filter @itookit/sanbox typecheck
-pnpm --filter @itookit/sanbox build
-SANBOX_TEST_NATIVE=1 pnpm --filter @itookit/sanbox test
+pnpm --filter @nestos/sanbox test
+pnpm --filter @nestos/sanbox typecheck
+pnpm --filter @nestos/sanbox build
+SANBOX_TEST_NATIVE=1 pnpm --filter @nestos/sanbox test
 pnpm --filter tauri-app test:rust
 ```
 

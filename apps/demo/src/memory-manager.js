@@ -1,11 +1,11 @@
 // demo/memory-manager.js
-// --- 模拟导入 (在真实项目中，这些通过 import { ... } from '@itookit/...' 引入) ---
+// --- 模拟导入 (在真实项目中，这些通过 import { ... } from '@nestos/...' 引入) ---
 // 假设浏览器环境配置了 import map 或者使用 Vite
 
 // --- 模拟导入 ---
-import { createVFSCore, VFSEventType } from '@itookit/vfs'; // [修正] 导入工厂函数
-import { Workbench } from '@itookit/app-shell';
-import { createMDxEditor } from '@itookit/mdxeditor';
+import { createVFSCore, VFSEventType } from '@nestos/vfs'; // [修正] 导入工厂函数
+import { Workbench } from '@nestos/app-shell';
+import { createMDxEditor } from '@nestos/mdxeditor';
 
 // --- 辅助工具：标准配置生成器 (模拟库提供的 Helper) ---
 // 这个 Helper 极大简化了用户的配置负担

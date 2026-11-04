@@ -1,9 +1,9 @@
 import {mountResourceSearch} from './resource-search';
 import {pickOutputSource} from './output-source-picker';
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import {ResourceCommand, type ResourceContent, type ResourceScope} from '@itookit/app-contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
-import type {FlowParameter} from '@itookit/llm-flow/contracts';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import {ResourceCommand, type ResourceContent, type ResourceScope} from '@nestos/app-contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
+import type {FlowParameter} from '@nestos/llm-flow/contracts';
 import {parameterSourceValue} from './flow-arguments';
 
 /** A source is read only on explicit selection; confirmed values use the ordinary parameter schema. */

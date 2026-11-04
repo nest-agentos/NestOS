@@ -3,7 +3,7 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {WorkbenchTabs} from '../src/workbench/tabs';
 import {WorkbenchWindows} from '../src/workbench/windows';
 import {mountApplicationNavigation} from '../src/navigation/window-navigation';
-import {t, getLogger} from '@itookit/common';
+import {t, getLogger} from '@nestos/common';
 
 afterEach(() => {document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 function fixture() {

@@ -1,4 +1,4 @@
-import type {EffectExecutionContext, EffectReconcileResult} from '@itookit/durable-kernel';
+import type {EffectExecutionContext, EffectReconcileResult} from '@nestos/durable-kernel';
 import {assertConnectionNotStarted, type ConnectionReconcileResult} from '../llm-management/contracts/connection-control';
 
 /** Running and uncertain native operations must never become new executions. */

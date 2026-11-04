@@ -13,7 +13,7 @@
 | 活文档检查 | `pnpm docs:check` | 通过（70 份活文档，10 条告警：5 条历史表述 + 5 条 `[missing-doc]`） |
 | 样式一致性 | `pnpm styles:check` | 通过（63 stylesheets / 813 markup / 3768 类） |
 | 包构建 | `pnpm build:libs` | 通过 |
-| CLI 构建 | `pnpm --filter @itookit/cli build` | 通过（`apps/cli/dist/cli.js`） |
+| CLI 构建 | `pnpm --filter @nestos/cli build` | 通过（`apps/cli/dist/cli.js`） |
 | 前端构建 | `pnpm --filter tauri-app build` | 通过（`apps/tauri-app/dist/`） |
 | Tauri 生产二进制 | `cargo build --offline --features tauri/custom-protocol` | 通过（2 条 dead_code 告警） |
 
@@ -23,28 +23,28 @@
 
 | 套件 | 命令 | 结果 |
 |---|---|---|
-| `@itookit/durable-kernel` | `pnpm --filter @itookit/durable-kernel test` | 201 通过 |
-| `@itookit/kernel-adapters` | 同上 | 95 通过 |
-| `@itookit/llm-flow` | 同上 | 177 通过 |
-| `@itookit/llm-session` | 同上 | 97 通过（第六十六轮 96→97，新增 consumer-join 回归） |
-| `@itookit/llm-tasks` | 同上 | 37 通过 |
-| `@itookit/app-core` | 同上 | 65 通过 |
-| `@itookit/app-shell` | 同上 | 133 通过 / 30 跳过（第六十七轮 +1：LocalFS 双通道空闲回归） |
-| `@itookit/vfs-core` | 同上 | 173 通过 |
-| `@itookit/vfs-ui` | 同上 | 88 通过 |
-| `@itookit/vfsdriver-local` | 同上 | 64 通过（第六十七轮 +3：sidecar 计量；此后为 journal / 只读路径 / 前缀免元数据 / 并发写 / 嵌套视图 / 前缀批量回归） |
-| `@itookit/vfsdriver-indexeddb` | 同上 | 15 通过 |
-| `@itookit/driver-llm` | 同上 | 49 通过 |
-| `@itookit/device-tty` | 同上 | 4 通过 |
-| `@itookit/tools` | 同上 | 2 通过 |
-| `@itookit/llm-ui-adapter` | 同上（本轮新增脚本） | 19 通过 |
-| `@itookit/mdxeditor` | 同上（本轮新增 vitest/jsdom 与脚本） | 9 通过 |
-| `@itookit/llm-ui/settings` | 同上 | 1 通过 |
-| `apps/cli` | `pnpm --filter @itookit/cli exec vitest run --exclude 'tests/crash-matrix.test.ts'` | 88 通过 / 24 文件 |
-| `apps/cli`（崩溃矩阵） | `pnpm --filter @itookit/cli exec vitest run tests/crash-matrix.test.ts` | 6 通过（真实 SIGKILL，~160s，需单独跑） |
+| `@nestos/durable-kernel` | `pnpm --filter @nestos/durable-kernel test` | 201 通过 |
+| `@nestos/kernel-adapters` | 同上 | 95 通过 |
+| `@nestos/llm-flow` | 同上 | 177 通过 |
+| `@nestos/llm-session` | 同上 | 97 通过（第六十六轮 96→97，新增 consumer-join 回归） |
+| `@nestos/llm-tasks` | 同上 | 37 通过 |
+| `@nestos/app-core` | 同上 | 65 通过 |
+| `@nestos/app-shell` | 同上 | 133 通过 / 30 跳过（第六十七轮 +1：LocalFS 双通道空闲回归） |
+| `@nestos/vfs-core` | 同上 | 173 通过 |
+| `@nestos/vfs-ui` | 同上 | 88 通过 |
+| `@nestos/vfsdriver-local` | 同上 | 64 通过（第六十七轮 +3：sidecar 计量；此后为 journal / 只读路径 / 前缀免元数据 / 并发写 / 嵌套视图 / 前缀批量回归） |
+| `@nestos/vfsdriver-indexeddb` | 同上 | 15 通过 |
+| `@nestos/driver-llm` | 同上 | 49 通过 |
+| `@nestos/device-tty` | 同上 | 4 通过 |
+| `@nestos/tools` | 同上 | 2 通过 |
+| `@nestos/llm-ui-adapter` | 同上（本轮新增脚本） | 19 通过 |
+| `@nestos/mdxeditor` | 同上（本轮新增 vitest/jsdom 与脚本） | 9 通过 |
+| `@nestos/llm-ui/settings` | 同上 | 1 通过 |
+| `apps/cli` | `pnpm --filter @nestos/cli exec vitest run --exclude 'tests/crash-matrix.test.ts'` | 88 通过 / 24 文件 |
+| `apps/cli`（崩溃矩阵） | `pnpm --filter @nestos/cli exec vitest run tests/crash-matrix.test.ts` | 6 通过（真实 SIGKILL，~160s，需单独跑） |
 | `tauri-app`（Rust） | `pnpm --filter tauri-app test:rust` | 16 通过（第七十六轮 +1：无挂载时的 Session Bash 文案） |
 
-合计 **1339 通过 / 30 跳过**（含 CLI 94 与 Rust 16；llm-session 97、vfs-core 173、vfsdriver-local 64、app-shell 133/30 跳过；各轮增量为 96→97、54→57、132→133、57→59、59→60、60→62、62→63、63→64、Rust 15→16）。**2026-09-11 第六十轮在本工作树逐项复跑核对**：`pnpm test`（`scripts/test-all.mjs`，含 crash-matrix 6 与 Rust 15）输出 `=== full matrix passed`、exit 0；逐包重采计数与上表 17 行**完全一致**（65/123+30/46/4/201/95/177/91/1/37/19/9/2/173/15/54/88，合计 1309 + CLI 94）；`pnpm build:libs`、`pnpm --filter @itookit/cli build`、`pnpm --filter nestos-web build`、`pnpm --filter tauri-app build` 全部成功。注意：`apps/cli` 的 `crash-matrix` 与其他文件并行会拖慢时序敏感用例，必须单独复跑——该隔离已固化到根脚本 `pnpm test`（`scripts/test-all.mjs`：各包套件 → CLI 去掉 crash-matrix → crash-matrix → `tauri-app test:rust`，任一步失败即停止）。本轮之前 `llm-ui` / `mdxeditor` 两个套件因缺少脚本（后者还缺 vitest/jsdom 依赖）从未进入任何聚合验证；`llm-tasks` 的 `test` 曾是 watch 模式，现已改为 `vitest run` 并保留 `test:watch`。
+合计 **1339 通过 / 30 跳过**（含 CLI 94 与 Rust 16；llm-session 97、vfs-core 173、vfsdriver-local 64、app-shell 133/30 跳过；各轮增量为 96→97、54→57、132→133、57→59、59→60、60→62、62→63、63→64、Rust 15→16）。**2026-09-11 第六十轮在本工作树逐项复跑核对**：`pnpm test`（`scripts/test-all.mjs`，含 crash-matrix 6 与 Rust 15）输出 `=== full matrix passed`、exit 0；逐包重采计数与上表 17 行**完全一致**（65/123+30/46/4/201/95/177/91/1/37/19/9/2/173/15/54/88，合计 1309 + CLI 94）；`pnpm build:libs`、`pnpm --filter @nestos/cli build`、`pnpm --filter nestos-web build`、`pnpm --filter tauri-app build` 全部成功。注意：`apps/cli` 的 `crash-matrix` 与其他文件并行会拖慢时序敏感用例，必须单独复跑——该隔离已固化到根脚本 `pnpm test`（`scripts/test-all.mjs`：各包套件 → CLI 去掉 crash-matrix → crash-matrix → `tauri-app test:rust`，任一步失败即停止）。本轮之前 `llm-ui` / `mdxeditor` 两个套件因缺少脚本（后者还缺 vitest/jsdom 依赖）从未进入任何聚合验证；`llm-tasks` 的 `test` 曾是 watch 模式，现已改为 `vitest run` 并保留 `test:watch`。
 
 ## 3. 桌面端到端（P0-01 复验，当前工作树）
 
@@ -197,14 +197,14 @@ CLI 实测（单节点 + 1.5s mock 响应，探针 `.tauri-acceptance/probe-publ
 | P1-05 cache 缺三项验收：依赖版本、generation fencing、策略矩阵 | 已验收：`libraries/durable-kernel/src/protocol.test.ts` 新增/明确——fingerprint 变化与 `expectedVersion` 不符 → miss（匹配才 hit）；`invalidate` 后新 operationId miss、旧 generation 的 publish 冲突；`prefer-cache`/`cache-only` 命中，`refresh`/`bypass` 恒 bypass 且不消费 single-use。`durable-harness-evidence.md` §5 对应行由「缺口」改为证据（终态清理与 provider 能力差异仍记为缺口，因为 cache 只有内置 SeqFile 实现） |
 | P2-06 `any` 读取 VFS 私有字段 `_engine` | 已修：vfs-core 暴露 `IO_OPERATIONS`/`IOOperation` 与 `IVFSManager.ioStats`/`resetIOStats()`；app-core 启动埋点与 `vfs-trace.ts` 改用公开 API。回归 `https://github.com/nest-agentos/vfs-core/blob/main/tests/23-io-stats.test.ts`（vfs-core 173） |
 | P1-04 被丢弃实例的 token 退款语义 | 已实现：`applyGraphRetry` 丢弃已提交下游实例时按 `output.usage` 从 `consumedTokens` 退款；`llm-flow` 新增「refunds discarded downstream tokens so a graph retry is not double-charged」（`maxTokens: 6`，无退款则 8/6 失败；有退款 exit succeeded、usage=4） |
-| P2-06 `app-core/index.ts` 转发外家符号与历史别名 | 已修：移除 `registerKernelPrograms` 转发与 `createNestOSRuntime`/`NestOSRuntime`/`CreateNestOSRuntimeOptions`/`NestOSKernelPorts` 别名；CLI HTTP 主机与文档改用 `createApplicationRuntime`/`ApplicationRuntime`。回归：app-core 测试改从 `@itookit/llm-flow` 导入 `registerDurablePrograms`（app-core 11 通过） |
+| P2-06 `app-core/index.ts` 转发外家符号与历史别名 | 已修：移除 `registerKernelPrograms` 转发与 `createNestOSRuntime`/`NestOSRuntime`/`CreateNestOSRuntimeOptions`/`NestOSKernelPorts` 别名；CLI HTTP 主机与文档改用 `createApplicationRuntime`/`ApplicationRuntime`。回归：app-core 测试改从 `@nestos/llm-flow` 导入 `registerDurablePrograms`（app-core 11 通过） |
 | P0-02② UI 侧空闲流来源 | 证据（jsdom）：真实 vfs-ui 侧栏 + `SessionWorkbench` + 真实 VFS 静置 6s → **0 次 VFS 操作**，转为回归测试 `ui/app-shell/tests/session-workbench-idle.test.ts`。与内核修复（1504→0 ops/10s）及 trace 算术一致。**第六十七轮补齐 sidecar 通道**：`LocalFSBackend.sidecarStats` 计量 SQLite 调用，trace 同时输出两条通道，并在 LocalFS 后端上回归验证静置 1s 内 VFS 与 sidecar 增量均为 0；真实 Tauri IPC 的 llm-ui 聊天视图与真实窗口仍未覆盖 |
 | P2-06 `createApplicationRuntime` 单函数承担策略 | 大部分完成：抽出 `recoverSessionsWithLeases` 与 `createConversationSystem` 与其返回的实例 dispose；主函数只剩接线与清理。剩余 `createInfrastructure` 拆分与启动埋点收口 |
 | P1-04 委派组的图级重算 | 已实现：`applyGraphRetry` 丢弃父节点前先 `discardDelegationGroups`（取消/移除子实例与合成节点/边/组状态，并递增子节点 generation 以避免回放旧 Task）；仅拒绝「源本身是 `:delegate:` 合成子节点」。回归 `llm-flow`「recomputes a delegation group after a graph retry of an upstream node」；隔离工作区同样覆盖：「recomputes a delegation group inside an isolated workspace without re-preparing it」（`prepare` 1 次 / `restore` 1 次；llm-flow 171） |
 | P1-04 DagWorkbench 图级 retry 入口 | 已实现：Run 根非终态且节点终态时显示「重试并重算下游」（`downstream: true`，独立 pending key），Run 终态后隐藏。回归 `app-shell/tests/dag-run-retry.test.ts` 两条用例；app-shell 115 通过 / 30 跳过 |
 | P2-06 app-core 用户文案泄漏（挂载守卫/目录来源） | 已修：新增 `vfs/errors.ts` 的 `SessionUnfinishedTasksError`(EBUSY)/`DirectorySourceUnavailableError`(EACCES)，挂载守卫与 `createUnavailableDirectory` 改抛结构化错误；app-shell 经 `localizeMountError` 用 `t('error.*')` 本地化（mount-dialog 与 `directoryCommands` 包装）。回归：`app-core/tests/mount-errors.test.ts`、`app-shell/tests/mount-error-localization.test.ts` |
 | P2-06 app-core 全部用户文案 | 已完成：挂载守卫/目录来源改结构化错误并由 `localizeMountError` 本地化；`directory-mounts.ts`/`session-browser.ts`/启动 `logStep` 改用 `t('mount.*')`/`t('session.tasks.more')`/`t('boot.*')`。守卫 `app-core/tests/no-user-copy.test.ts`（源码非注释行无 CJK），app-core 14 通过 |
-| P2-06 app-core 测试被 shim 覆盖（假绿灯） | 已完成：8 个纯 app-core 测试迁回 `backend/app-core/tests/`（含 `session-files`，app-core 补 `fake-indexeddb`/`@itookit/vfsdriver-indexeddb` devDeps），app-shell 的 11 个兼容 shim 全部删除。app-core 58 通过、app-shell 113 通过 / 30 跳过（迁移前合计 171 不变） |
+| P2-06 app-core 测试被 shim 覆盖（假绿灯） | 已完成：8 个纯 app-core 测试迁回 `backend/app-core/tests/`（含 `session-files`，app-core 补 `fake-indexeddb`/`@nestos/vfsdriver-indexeddb` devDeps），app-shell 的 11 个兼容 shim 全部删除。app-core 58 通过、app-shell 113 通过 / 30 跳过（迁移前合计 171 不变） |
 | P1-02 CLI 本机 SQLite 锁与通用调度租约未统一：共享存储上 `delete` 只靠本地文件锁，可能删掉另一宿主正在推进的 Run | 已修：新增 `apps/cli/src/run-scheduler-lease.ts`（`openProfileInspectionFs` 只开数据根 VFS，不取 Session 租约），`deleteCommand` 在本地锁 + manifest 终态检查之后再读 Session shared 的 `flow.run.<rootTaskId>.scheduler-owner`——另一宿主租约未到期时以 `Run … is scheduled by … until …` 拒绝并保留 Run 目录，租约到期即放行。回归 `apps/cli/tests/run-scheduler-lease-delete.test.ts` 2 通过：用被 SIGKILL 的真实 CLI 宿主留下的租约（TTL 60s / 1s）分别验证拒绝与到期放行；注释掉守卫后「拒绝」用例失败。记录解析复用 llm-flow 新导出的 `parseSchedulerLeaseRecord`（原为包内私有），保证两侧 schema 一致 |
 | P1-03 宿主未装配 worktree 模式的 workspaceManager（隔离工作区只有包级证据） | 已装配（CLI）：YAML 新增 `runtime.workspace`（mode/base/merge/cleanup）→ `RunDefinition.policy.runPolicy.workspace` → `createCliRuntime` 构造 `GitWorktreeFlowWorkspaceManager`（`<stateDir>/worktrees/<sessionId>`，argv-safe git 适配宿主 shell）；`read-only` 与「worktree + OCI」fail closed。接入时修掉两个真实缺陷：节点被硬编码 `workingDirectory=workspaceRoot`（导致隔离模式仍跑在基础仓库）与未声明 `workspace_access: write` 时工具句柄缺失。回归 `apps/cli/tests/worktree-run.test.ts` 4 通过（worktree 内执行且基础仓库无污染 / 干净工作区按默认策略移除 / 脏工作区保留且不改写 Run 结果 / SIGKILL 后 `resume` 复用同一 worktree），`config.test.ts` 增补 3 条策略校验。未完成：Web/Tauri 端装配 |
 | P2-06 app-core `files/` 目录混合 VFS 视图服务、导航模型、数据交换格式与生命周期 | 已拆分（2026-09-11）：`src/files/` → `src/session/`（browser/bundle/lifecycle/route/workspace-paths）+ `src/vfs/`（session-files/directory-mounts/session-attachments/session-process-context/tool-context/unavailable-directory/errors），依赖单向 `session/ → vfs/`；同步改 `index.ts`、`create-application-runtime.ts`、8 个测试的导入与活文档/`AGENTS.md` 结构表。回归：app-core 15/58、app-shell 21/115（+30 跳过）、`pnpm typecheck`、`pnpm docs:check` 通过。顺带移除 `ui/app-shell/package.json` 中指向已删除 shim（`src/files/workspace-paths.ts`）且无消费者的 `./layout` 子路径导出 |
@@ -229,11 +229,11 @@ CLI 实测（单节点 + 1.5s mock 响应，探针 `.tauri-acceptance/probe-publ
 | P2-04 VFS 挂载验收 §7 只读动词与跨 Session 同名挂载点缺显式证据 | 本轮补证并逐条映射（2026-09-11 第四十三轮）：`backend/app-core/tests/directory-mounts.test.ts`——只读授权下 `writeContent`/`rename`/`move`/`delete`/`updateMetadata`/`setTags`/`createDirectory` 全部返回 `EROFS`，并补 `/demo/../notes/secret.md` 遍历拒绝与根视图仅含授权子树；新增「keeps the same mount point name bound to each Session source independently」验证两个 Session 用同名 `/demo` 指向不同来源且互不可见。挂载设计 §7 的 1–6 项现均有对应自动化证据（第 7 项 bwrap 由 `tauri-app test:rust` 覆盖，真实 GUI/网络隔离仍缺）；app-core 62 |
 | P2-01「L4 编辑器 open/close 接线」缺失（服务侧 `mountByGlob` 已有能力，UI 从不调用） | 已实现（2026-09-11 第四十四轮）：`SessionSkillControls` 新增 `mountByGlob(sessionId, filePath)`/`unmountByGlob(sessionId, filePath)`（`kernel-adapters` 经 Session 操作队列串行化、空路径拒绝、不写持久 loaded 身份），`SessionWorkbench` 在文件编辑器/预览创建后挂载、在 `closeEditor()`（切换资源/销毁）时卸载，失败只报告不打断编辑器；`bootstrap` 注入 controls。回归 `backend/kernel-adapters/src/skill/session-skill-controls.test.ts`「mounts and unmounts editor targets through the Session scope in order」与 `ui/app-shell/tests/session-browser-ui.test.ts`（打开 `/workspace/note.md` → 挂载；切走 → 卸载）；kernel-adapters 92、app-shell 115（+30 跳过） |
 | P2-01「初始化工具激活」缺失（初始化选中的 Skill 只注入指令，其工具不可调用） | 已完成直接聊天路径（2026-09-11 第四十五轮）：`DurableAgentInput.skillContexts` 字段 + agent program `initialState` 装载 + `buildLlmTaskInput` 透传；`ConversationRunCoordinator.initialSkillContexts` 为 `capabilityPolicy.skillIds` 中被选中且可用的 Skill 生成与运行时 `load_skill` 同形的快照（工具 = Skill 声明 ∩ `allowedToolIds` ∩ catalog 定义，external 由 catalog 标记，未选/disabled/disableModelInvocation/action 触发一律不激活）。回归 `backend/llm-session/__tests__/direct-skill-context.test.ts`（`input.skillContexts` 精确断言）与 `backend/llm-tasks/src/durable/context-compaction.test.ts`「activates initially selected Skills without a load_skill call」；llm-tasks 37、llm-session 90。Flow 节点路径仍待接线 |
-| P2-01「初始化工具激活」的 **Flow 节点路径**缺失（节点 `skillIds` 只产出身份/规则消息） | 已实现（2026-09-11 第四十六轮）：`DurableFlowExecutorOptions.resolveSkillContexts(sessionId, skillIds, allowedToolIds)`，`taskSpec` 按节点 `config.skillIds`（字符串去重、非字符串忽略）取快照写入 `llm.agent` 输入，委派子节点同一路径；共享构建器 `buildSkillContexts` 移入 `@itookit/llm-tasks`，`ConversationRunCoordinator.skillContextResolver` 用它为聊天内 Flow 注入端口（工具 = Skill 声明 ∩ 节点能力 ∩ catalog 定义，不扩权；无端口/无目录时返回空数组不阻断）。回归 `backend/llm-flow/__tests__/durable-flow-executor.test.ts`「activates a node's initially selected Skills through the host port」与 `backend/llm-session/__tests__/direct-skill-context.test.ts` 的 resolver 用例；llm-flow 177、llm-session 91 |
+| P2-01「初始化工具激活」的 **Flow 节点路径**缺失（节点 `skillIds` 只产出身份/规则消息） | 已实现（2026-09-11 第四十六轮）：`DurableFlowExecutorOptions.resolveSkillContexts(sessionId, skillIds, allowedToolIds)`，`taskSpec` 按节点 `config.skillIds`（字符串去重、非字符串忽略）取快照写入 `llm.agent` 输入，委派子节点同一路径；共享构建器 `buildSkillContexts` 移入 `@nestos/llm-tasks`，`ConversationRunCoordinator.skillContextResolver` 用它为聊天内 Flow 注入端口（工具 = Skill 声明 ∩ 节点能力 ∩ catalog 定义，不扩权；无端口/无目录时返回空数组不阻断）。回归 `backend/llm-flow/__tests__/durable-flow-executor.test.ts`「activates a node's initially selected Skills through the host port」与 `backend/llm-session/__tests__/direct-skill-context.test.ts` 的 resolver 用例；llm-flow 177、llm-session 91 |
 | P0-00「相同项目规则与 Skill 在两端一致」缺 CLI 半边证据 | 已取证（2026-09-11 第四十七轮）：`apps/cli/tests/run-skill-context.test.ts` 用真实 CLI 运行时 + 记录型 mock 模型跑两次 Run——模型请求含 `_agent/AGENT.md` 项目规则、auto-load Skill 正文与 `[红线]` 关键规则（并断言非红线 compact 正文不进入该路径，符合 `aggregateCompactInstructions` 契约）；首个 Run 的 Session 内核 `kernel-adapters.skills.loaded` 持久记录该 Skill（用 `openProfileInspectionFs` + `CliStorageResolver` 直接读取验证）；第二个 Run 在同一数据根重新推导出同样上下文。Tauri/GUI 半边仍缺。CLI 94 / 25 文件 |
 | P0-00「重开 Session 后新建运行 / 卸载后再运行」两个场景缺证据 | 已在包级补证（2026-09-11 第四十八轮）：`backend/kernel-adapters/src/skill/session-skill-restore.test.ts` 用真实 `createKernelAdaptersRuntime` + `Kernel`：首次运行按触发词加载并把身份写入 `kernel-adapters.skills.loaded`（`['review']`）；**新的作用域实例**（等价重开 Session/换宿主）在用户消息不再匹配时仍按持久身份恢复并重新注入正文与 `[红线]` 关键规则；显式 `unload`（经 `SessionSkillControls` CAS）后新实例不再恢复，且再次匹配可重新加载（unload 非永久禁用）。kernel-adapters 93 |
 
-| 无单一聚合命令跑全量验证（`pnpm test` 是报错桩，`crash-matrix` 与其它 CLI 用例并行会拖慢时序敏感用例） | 已固化（2026-09-11 第四十九轮）：新增根脚本 `scripts/test-all.mjs` 并接到 `package.json` 的 `test`（另留 `test:matrix` 别名）——按序跑 `pnpm -r --filter '!@itookit/cli' test` → CLI 去掉 `crash-matrix` → `crash-matrix`（隔离运行）→ `pnpm --filter tauri-app test:rust`，任一步非零即停止并汇总失败步骤。实跑输出 `=== full matrix passed` 且 exit 0。它只编排既有套件，不新增断言；矩阵计数仍以本文件 §2 为准 |
+| 无单一聚合命令跑全量验证（`pnpm test` 是报错桩，`crash-matrix` 与其它 CLI 用例并行会拖慢时序敏感用例） | 已固化（2026-09-11 第四十九轮）：新增根脚本 `scripts/test-all.mjs` 并接到 `package.json` 的 `test`（另留 `test:matrix` 别名）——按序跑 `pnpm -r --filter '!@nestos/cli' test` → CLI 去掉 `crash-matrix` → `crash-matrix`（隔离运行）→ `pnpm --filter tauri-app test:rust`，任一步非零即停止并汇总失败步骤。实跑输出 `=== full matrix passed` 且 exit 0。它只编排既有套件，不新增断言；矩阵计数仍以本文件 §2 为准 |
 | P2-01「运行中更新」缺失（Skill 目录变化后输入区列表要重开编辑器才更新） | 已实现（2026-09-11 第五十轮）：服务侧 `SessionSkillControls.onChange(sessionId, listener)` 转发活动作用域订阅（非函数参数拒绝，经 `SessionCapabilityRegistry` 取该 Session 的 service）；UI 侧新增 `ui/llm-ui-adapter/src/shell/skill-refresh.ts` 的 `bindSkillRefresh(controls, sessionId, refresh)`（绑定后拉取一次 + 每次变更通知重新拉取，返回解绑函数；销毁后到达的订阅立即退订，列表/订阅失败只忽略），`LLMWorkspaceEditor` 在输入区创建后订阅、`destroy()` 开头解绑。回归 `ui/llm-ui-adapter/src/shell/skill-refresh.test.ts`（4 用例：初次渲染 + 变更重取 + 解绑后不再重取 + 宿主同步抛错仍不阻断编辑器）、`backend/kernel-adapters/src/skill/session-skill-controls.test.ts`「forwards change subscriptions to the live Session scope…」、`skill-device-driver.test.ts`「notifies a Session change subscription whenever the live Skill catalog changes」（真实 driver：`saveSkill` 触发通知、解绑后不再触发）。末段用真实 `ChatInput`（jsdom）验证整链：`SessionSkillControls` 变更通知 → `bindSkillRefresh` 重新拉取 → `ChatInput.refreshSkills`，面板条目由 1 变 2——`ui/app-shell/tests/session-skill-panel.test.ts`「refreshes the visible Skill list when the Session scope reports a catalog change」。llm-ui 15→19、kernel-adapters 93→95、app-shell 115→116。**边界（不夸大）**：通知只在宿主进程内传播（`SkillDeviceDriver.notifyChange`：saveSkill/deleteSkill/文件系统来源刷新），跨进程直接改 Skill 文件不触发；已在途 Task 的 system 消息不变，新定义在下一次上下文组装（`prompt-context.ts` 的 `refreshScopedSkills`）才生效；严格版本冻结与自动委派仍未实施 |
 
 | P1-05 Resources §9「owner leader 迁移后旧 leader 写入」缺 authority 服务 | 已落地内核侧骨架（2026-09-11 第五十一轮）：`resources.seq` 新增 `managed/authority/<id>`，保存 `{authorityId, ownerEpoch, ownerId, binding, serviceEndpoint, status, updatedAt}`；`ResourceApi.claimAuthority` 首次声明写 epoch 1、接管必须提交观察到的 `expectedEpoch` 并 CAS 递增（失配报 `Authority epoch conflict: <id> is owned by <owner> at epoch <n>`，未知 authority 拒绝接管），`ResourceApi.authority(id, scope?)` 只读且 Kernel 重建后仍可读；`ResourceCommand` 新增可选 `authority: {authorityId, epoch}`，在权威事务内校验：过期 leader 的**新**写入被拒绝，已受理请求的重放仍返回记录结果（幂等优先于 fence）。回归 `libraries/durable-kernel/src/resources.test.ts`「fences a superseded authority leader by the ownerEpoch it presents」「keeps the authority binding fixed to the first claim and survives Kernel reconstruction」「rejects invalid authority claims and epoch presentations」「refuses a Decision resource write whose authority epoch was superseded」（Task Decision 内的资源命令同样在提交事务内被 fence）；durable-kernel 194→198。**边界（不宣称该验收行通过）**：资源端 adapter 执行令牌 fence、真实多进程/多 store 竞争与迁移切换屏障未实现；account/allocation/export/import（跨 Session 授权、订阅、预留账本）仍未实现，`authority/` 之外的记录族未拆分 |
@@ -244,7 +244,7 @@ CLI 实测（单节点 + 1.5s mock 响应，探针 `.tauri-acceptance/probe-publ
 
 | P0-02「Session 关闭（运行中删除）时应用 UI 与持久状态一致」未验收 | 已取证并修复缺陷（2026-09-11 第五十四轮）：`backend/app-core/tests/session-delete-lifecycle.test.ts` 新增「cancels a running Task while deleting and removes storage, catalog and records」——在途 Effect 的 Task 被关闭取消（在 `closeSession` 返回后立刻断言 Task 为 `cancelled`，此后记录随 Session 删除），存储根、catalog 与仓库 manifest 全部移除；以及「reports a bounded failure and deletes nothing while the in-flight Effect never confirms」——设备从不确认停止时删除在 `closeTimeoutMs` 内以 `EBUSY … nothing was deleted` 失败，manifest/存储/catalog 与 Task 记录全部保留，确认后重试成功。**修复缺陷**：`closeTimeoutMs` 此前只约束 `closeSession` 之后的轮询，`closeSession` 自身（等待在途 Effect 确认停止）无上界，不确认的外部设备会让删除无限挂起且永不报错；现同一 deadline 覆盖两步，迟到的完成仍被观察而非成为未处理拒绝。app-core 62→64。**边界**：真实设备/IPC 场景与 UI 侧按钮等待/失败文案的实窗口验收未做 |
 
-| P1-05 §2 不变量 10「观察者能区分请求已接受/逻辑状态已变化/外部是否停止」缺取消侧证据与 GUI 记录 | 已补证（2026-09-11 第五十五轮）：`libraries/durable-kernel/src/kernel.test.ts`「distinguishes an accepted cancel request from a confirmed external stop」——取消在途 Effect（适配器未确认停止）时 `task.stat()` 为 `{ phase: 'done', control: { requested: 'cancel', acknowledged: false }, activeOperations: 1 }`，适配器确认后 `{ acknowledged: true, activeOperations: 0 }`；`taskStat`/`taskStats`/`sessionStat` 由 `@itookit/durable-kernel` 包入口公开导出；`@itookit/app-core` 的 `taskSummary` 增加 `control`/`activeOperations`（回归 `session-browser.test.ts`「exposes whether an accepted cancel is still waiting for the external stop」覆盖 pending 与 stopped 两态）；`SessionWorkbench` 任务视图渲染 `[data-stop-state]`（`none`/`pending`/`stopped`）+ i18n `session.tasks.stopPending|stopStopped`，jsdom 回归 `ui/app-shell/tests/session-browser-ui.test.ts`（none → pending 含在途操作数 → stopped）。durable-kernel 200→201、app-core 64→65。**边界**：真实窗口可见性验收未做（本轮为 jsdom）；pause 请求未渲染同类文案 |
+| P1-05 §2 不变量 10「观察者能区分请求已接受/逻辑状态已变化/外部是否停止」缺取消侧证据与 GUI 记录 | 已补证（2026-09-11 第五十五轮）：`libraries/durable-kernel/src/kernel.test.ts`「distinguishes an accepted cancel request from a confirmed external stop」——取消在途 Effect（适配器未确认停止）时 `task.stat()` 为 `{ phase: 'done', control: { requested: 'cancel', acknowledged: false }, activeOperations: 1 }`，适配器确认后 `{ acknowledged: true, activeOperations: 0 }`；`taskStat`/`taskStats`/`sessionStat` 由 `@nestos/durable-kernel` 包入口公开导出；`@nestos/app-core` 的 `taskSummary` 增加 `control`/`activeOperations`（回归 `session-browser.test.ts`「exposes whether an accepted cancel is still waiting for the external stop」覆盖 pending 与 stopped 两态）；`SessionWorkbench` 任务视图渲染 `[data-stop-state]`（`none`/`pending`/`stopped`）+ i18n `session.tasks.stopPending|stopStopped`，jsdom 回归 `ui/app-shell/tests/session-browser-ui.test.ts`（none → pending 含在途操作数 → stopped）。durable-kernel 200→201、app-core 64→65。**边界**：真实窗口可见性验收未做（本轮为 jsdom）；pause 请求未渲染同类文案 |
 
 | P0-00「相同项目规则与 Skill 在两端一致」缺 Tauri 应用半边证据 | 已取证（无界面宿主装配，2026-09-11 第五十六轮）：`ui/app-shell/tests/tauri-host-skill-context.test.ts` 按 `apps/tauri-app/src/main.ts` 的同一装配创建运行时（`createApplicationRuntime` + `kernelPlatform.skillSourceForSession = new TauriSkillSource(files.vfs, files.cwd)`），把含 `_agent/AGENT.md` 与 `_agent/skills/review/SKILL.md`（含 `[红线]`）的项目目录挂为 Session 工作区，经 `SessionCommand.Bind`/`Send` 发起真实聊天运行后断言**落盘运行输入**含项目规则、Skill 正文与关键规则、不含非红线 compact 正文，并断言 `kernel-adapters.skills.loaded === ['review']`（宿主持久身份）与「消息不再匹配时仍按身份恢复正文/关键规则」（调用两宿主共用的 `resolveSessionSkillContext`）。app-shell 121→122。**仓库级重开宿主已补证（第五十七轮）**：同一文件用真实本地存储根（LocalFS + 共享 sidecar）跑两个宿主实例——宿主 A 建会话/挂目录/发起首次运行并持久 `kernel-adapters.skills.loaded` 后 `dispose()`（释放 Session 租约），宿主 B 仍能列出该 Session 并用**不再匹配触发词**的消息发起新运行，新运行落盘输入仍含项目规则、Skill 正文与 `[红线]` 关键规则。**边界**：仍是无界面装配证据，不是真实窗口/IPC 或真机验收（P0-04 仍缺） |
 
@@ -252,7 +252,7 @@ CLI 实测（单节点 + 1.5s mock 响应，探针 `.tauri-acceptance/probe-publ
 
 | P0-02「文件保存失败时应用 UI 与持久状态一致」缺证据 | 已取证并修复缺陷（2026-09-11 第五十九轮）：[mdxeditor/tests/save-manager.test.ts](https://github.com/nest-agentos/mdxeditor/blob/main/tests/save-manager.test.ts) 新增失败契约 3 条——保存失败保持 dirty 且回调 `onError`（不误报成功）、后续保存重试成功后清除 dirty、`finalSave` 失败只报告一次并保持 dirty（不空转）；mdxeditor 6→9。同轮发现并修复应用层缺口：`SessionWorkbench` 的文件编辑器把 `saveContent` 直接透传给 VFS 写入，写失败（只读挂载/IPC/授权撤销）时只保持编辑器 dirty，**界面无任何提示**，关闭编辑器时的 `finalSave` 也静默失败；现写失败先 `this.report(error)`（渲染 `role=alert` 提示）再重新抛出，编辑器保持 dirty 可重试。回归 `ui/app-shell/tests/session-browser-ui.test.ts` 断言提示内容为 `EROFS: mount is read-only`；未修复时该断言失败（已实测），证明缺口可复现。**边界**：真实 Tauri IPC/窗口下重测未做同轮修复第五十七轮重开用例的偶发失败（宿主 A 在 dispose 前等待首个运行到达终态，宿主 B 的失败信息进入断言）；随后 5 次全量 `app-shell` 套件连跑均 123 通过（+30 跳过），`mdxeditor` 9 通过。**边界**：真实 Tauri IPC/窗口下重测未做 |
 
-| 聚合验证与构建未在当前树复核（§2 各行计数可能漂移） | 已复核（2026-09-11 第六十轮）：`pnpm test`（全量矩阵脚本）输出 `=== full matrix passed`、exit 0——各包套件 + CLI 去掉 crash-matrix + crash-matrix（6 通过，163s，真实 SIGKILL）+ `tauri-app test:rust`（15 通过）；逐包重采计数与 §2 的 17 行全部一致（app-core 65、app-shell 123/+30、driver-llm 46、device-tty 4、durable-kernel 201、kernel-adapters 95、llm-flow 177、llm-session 91、llm-settings-ui 1、llm-tasks 37、llm-ui 19、mdxeditor 9、tools 2、vfs-core 173、vfsdriver-indexeddb 15、vfsdriver-local 54、vfs-ui 88；合计 1309 + CLI 94 + Rust 15 与文档一致）；构建面 `pnpm build:libs`（全部 packages）、`@itookit/cli`（tsup）、`nestos-web`（web 前端）、`tauri-app`（桌面前端）全部成功。顺带复核文档口径：`backend/app-core/src/` 已无 `files/` 目录、`llm-flow/__tests__/transcript-budget.test.ts` 存在、`packages/*/package.json` 恰 22 个 + 4 个 app、Effect 清理与调度租约默认超时均为 30s、Rust 输出上限 1 MiB 与文档一致 |
+| 聚合验证与构建未在当前树复核（§2 各行计数可能漂移） | 已复核（2026-09-11 第六十轮）：`pnpm test`（全量矩阵脚本）输出 `=== full matrix passed`、exit 0——各包套件 + CLI 去掉 crash-matrix + crash-matrix（6 通过，163s，真实 SIGKILL）+ `tauri-app test:rust`（15 通过）；逐包重采计数与 §2 的 17 行全部一致（app-core 65、app-shell 123/+30、driver-llm 46、device-tty 4、durable-kernel 201、kernel-adapters 95、llm-flow 177、llm-session 91、llm-settings-ui 1、llm-tasks 37、llm-ui 19、mdxeditor 9、tools 2、vfs-core 173、vfsdriver-indexeddb 15、vfsdriver-local 54、vfs-ui 88；合计 1309 + CLI 94 + Rust 15 与文档一致）；构建面 `pnpm build:libs`（全部 packages）、`@nestos/cli`（tsup）、`nestos-web`（web 前端）、`tauri-app`（桌面前端）全部成功。顺带复核文档口径：`backend/app-core/src/` 已无 `files/` 目录、`llm-flow/__tests__/transcript-budget.test.ts` 存在、`packages/*/package.json` 恰 22 个 + 4 个 app、Effect 清理与调度租约默认超时均为 30s、Rust 输出上限 1 MiB 与文档一致 |
 
 | P0-02「区分工具 Effect 成功与子命令退出成功」与 TTY 面板终态语义缺测试 | 已补证（2026-09-11 第六十一轮）：① **Effect 与退出码可区分**——`apps/cli/tests/nested-harness.test.ts`（`it.each([false, true])`）用真实子 CLI 断言：子命令退出非 0 时外层 Task 仍 `succeeded`、Bash Effect 仍为 `succeeded`，而工具结果文本是 `[exit 1]`（成功路径为 `[exit 0]` 且含子运行结果），即「工具是否执行」与「子命令是否成功」不会互相冒充；本轮实跑该文件复核通过。② **TTY 面板契约**——新增 `ui/app-shell/tests/tty-panel.test.ts`（jsdom，驱动真实 `TtyPanel`/`TtyController`）5 条：输出与命令一律以文本节点写入（注入 `<script>`/`<img onerror>` 不产生元素）、`finalize` 之后到达的输出被忽略、`[exit 0]`/`[exit 3]` 如实报告、输出超上限只保留最新 100k 字符、meta 只路由到匹配会话且 `ttyOpen` 幂等、`destroyAll` 移除面板。同轮修复缺陷：`finalize(null)`（`tty_close` 未观测到退出码时会话被杀）此前显示 `Process exited (code ?)`，现为 `Process stopped (exit code unknown)`，与 `tty_close` 工具自身文案一致；新测试在修复前失败（`expected 'Process exited (code ?)' …`）。app-shell 123→128。③ **重开宿主用例的偶发失败已定位并修掉**：第五十七轮用例在满载并行下偶发 `ConversationError: Cannot send consecutive user messages`——「Kernel Task 已终态」并不等于「会话 round 已持久化」：宿主 A 在 round 文档状态与分支 head 落盘前 `dispose()`，重开的宿主 B 只会恢复出「以用户消息结尾」的转写并拒绝发送。用例现改为等待**持久条件**（`manifest.currentHead` 指向的 round 文档 `status === 'failed'`）再关闭宿主；此后 5 次全量 `app-shell` 连跑（含并行真实 CLI 子进程压力）均 128 通过。这也记录了宿主关闭顺序要求：应在会话 round 结算后再退出，而不是只看 Kernel Task 终态 |
 
@@ -683,7 +683,7 @@ P0-01 的后半段——**外层 harness → `tool.call` Effect → 真实 Bash�
 
 - **根因**：`cancelInterrupted` 调 `root.cancel(...)` 只表示**取消请求被接受**，子 Task 的取消决策随后才由内核提交；`projectTerminalStatuses` 只列一次任务表就落盘，于是偶尔/稳定地把 `waiting` 写进终态 Run。
 - **修复**（`apps/cli/src/commands.ts`）：`projectTerminalStatuses` 变为**有界轮询**——每 25ms 重列并投影，直到所有带 `flowNodeId` 的 Task 都终态，或到达 `PROJECTION_SETTLE_MS = 2000` 上限再落盘；`enforceTaskTimeout` 复用同一终态判定（`isTerminalTaskStatus`）。上限保证「设备始终不确认停止」时不会挂住退出路径，退出码语义不变。
-- **验证**：该用例修复前 3/3 失败、修复后 3/3 通过；`pnpm --filter @itookit/cli typecheck` 通过；整仓 `pnpm test` → `=== full matrix passed`（durable-kernel 202、CLI 88 非 crash-matrix + 6 crash-matrix、Rust 16）。
+- **验证**：该用例修复前 3/3 失败、修复后 3/3 通过；`pnpm --filter @nestos/cli typecheck` 通过；整仓 `pnpm test` → `=== full matrix passed`（durable-kernel 202、CLI 88 非 crash-matrix + 6 crash-matrix、Rust 16）。
 
 ### 19.4 边界
 
@@ -1196,7 +1196,7 @@ Rust 新增 3 项测试：真实临时 Git 仓库 + 提交 + 目录授权，缺�
 
 `TauriWorkspaceGitRunner` 将共享 worktree manager 的命令接口接到 `git_command`：cwd 限构造时指定的仓库或副本，worktree 创建/删除目标限该副本；按调用打开仓库目录授权，修改 worktree 时另开目标父目录授权。调用结束释放全部已获取句柄，部分获取失败也回收先前句柄；命令错误与多个关闭错误一起保留。
 
-验证：`pnpm --filter @itookit/app-shell exec vitest run tests/tauri-workspace-git.test.ts` 6 项通过；Tauri TypeScript 检查通过。测试覆盖共享 manager 经真实 TypeScript 适配器创建与收尾，但 IPC 为替身。生产入口尚未注入工作区 manager，未进行本轮真实窗口验收，P1-03 仍未完成。
+验证：`pnpm --filter @nestos/app-shell exec vitest run tests/tauri-workspace-git.test.ts` 6 项通过；Tauri TypeScript 检查通过。测试覆盖共享 manager 经真实 TypeScript 适配器创建与收尾，但 IPC 为替身。生产入口尚未注入工作区 manager，未进行本轮真实窗口验收，P1-03 仍未完成。
 
 
 ## 43. 恢复前宿主绑定与工作区授权解析（2026-09-13 第一百零四轮）
@@ -1237,7 +1237,7 @@ Tauri 仓库解析返回授权 revision、挂载及来源身份和原生路径�
 
 新增两项测试，均通过真实 SessionFilesService.configure 改变授权 revision：Git 创建返回前改变授权，prepare 拒绝并删除未发布副本及分支，cleanup=keep 不阻止此次回滚；打开来源期间改变授权，fileContext 拒绝并关闭已获取进程句柄及来源，但保留已持久化副本。
 
-`pnpm --filter @itookit/app-shell exec vitest run tests/tauri-flow-workspaces.test.ts` 共 6 项通过。Git IPC 和来源后端使用替身；本轮没有 GUI 或进程崩溃验证。Git 成功但返回前失败及创建到租约持久化之间的孤儿窗口仍待处理，未据此完成 P1-03。
+`pnpm --filter @nestos/app-shell exec vitest run tests/tauri-flow-workspaces.test.ts` 共 6 项通过。Git IPC 和来源后端使用替身；本轮没有 GUI 或进程崩溃验证。Git 成功但返回前失败及创建到租约持久化之间的孤儿窗口仍待处理，未据此完成 P1-03。
 
 
 ## 48. Git 创建前的宿主恢复记录（2026-09-13 第一百零九轮）
@@ -1337,14 +1337,14 @@ Tauri manager 支持 read-only：创建独立 Git 副本并持久化 mode，恢�
 
 CLI 配置接受 OCI read-only，禁止 native 和回合并；运行时文件挂载、Bash、TTY 和新增授权均限制为只读。Git 副本管理由宿主 shell 单独执行，Agent 不复用该管理 shell。恢复复用共享 manager 的租约，--set-home 组合在创建运行时资源前拒绝。
 
-配置/OCI 参数/授权测试验证单次与交互挂载均 ro，即使 Task 或历史 grant 标记 write 也不会放宽。最终执行 `pnpm --filter @itookit/cli test tests/config.test.ts tests/shell.test.ts tests/workspace.test.ts tests/worktree-run.test.ts`，4 个文件、33 项全部通过，其中 5 项真实 Git worktree 回归覆盖文件工具定位、清理、脏副本保留及崩溃恢复复用。CLI TypeScript 检查通过；文档检查通过（76 份活文档、5 条历史表述告警）。当前 command -v podman/docker 无输出，没有真实容器端到端证据；此实现不声明 CLI 只读完整验收通过。
+配置/OCI 参数/授权测试验证单次与交互挂载均 ro，即使 Task 或历史 grant 标记 write 也不会放宽。最终执行 `pnpm --filter @nestos/cli test tests/config.test.ts tests/shell.test.ts tests/workspace.test.ts tests/worktree-run.test.ts`，4 个文件、33 项全部通过，其中 5 项真实 Git worktree 回归覆盖文件工具定位、清理、脏副本保留及崩溃恢复复用。CLI TypeScript 检查通过；文档检查通过（76 份活文档、5 条历史表述告警）。当前 command -v podman/docker 无输出，没有真实容器端到端证据；此实现不声明 CLI 只读完整验收通过。
 
 
 ## 60. OCI 工作目录映射修复（2026-09-13 第一百二十一轮）
 
 额外挂载 `/external/data → /data` 时，原实现把 cwd 映射到未挂载的 `/mnt/grants/extra/sub`；会话虚拟 cwd `/workspace/sub` 则静默退回 `/workspace`。新增单次命令/交互 TTY 两条回归先复现失败，再修复为按实际挂载目标映射；保留虚拟子目录，嵌套宿主来源优先匹配最具体挂载，越出挂载范围的 cwd 明确拒绝。
 
-`pnpm --filter @itookit/cli test tests/config.test.ts tests/shell.test.ts tests/workspace.test.ts`：3 个文件、30 项通过。CLI TypeScript 检查通过；文档检查通过（76 份、5 条历史告警）。这些是参数构造证据，不能替代真实 OCI 容器执行；P1-03 仍开放。
+`pnpm --filter @nestos/cli test tests/config.test.ts tests/shell.test.ts tests/workspace.test.ts`：3 个文件、30 项通过。CLI TypeScript 检查通过；文档检查通过（76 份、5 条历史告警）。这些是参数构造证据，不能替代真实 OCI 容器执行；P1-03 仍开放。
 
 
 ## 61. 记忆管理界面持久化（2026-09-13 第一百二十六轮）
@@ -1358,7 +1358,7 @@ CLI 配置接受 OCI read-only，禁止 native 和回合并；运行时文件挂
 
 恢复前重新打开磁盘，核对记忆内容（写入存在、删除为空）和工具 Effect 的成功回执、单次执行次数。普通 `resume` 在未决 LLM Effect 上退出 3，未增加模型请求；显式 `retryIndeterminate` 后仅补模型调用，Run 成功。恢复前后对整个记忆版本记录和工具 Effect 记录做相等断言，避免重复删除因结果仍为空而漏检。
 
-验证命令：`pnpm --filter @itookit/cli test tests/crash-matrix.test.ts -t 'preserves a committed memory'`。两项通过，其余六个既有故障场景因筛选未执行；CLI 类型检查通过。进程崩溃后仍等待未决 Effect 的既有 30 秒租约，不将观察等待当作停止失败。
+验证命令：`pnpm --filter @nestos/cli test tests/crash-matrix.test.ts -t 'preserves a committed memory'`。两项通过，其余六个既有故障场景因筛选未执行；CLI 类型检查通过。进程崩溃后仍等待未决 Effect 的既有 30 秒租约，不将观察等待当作停止失败。
 
 边界：此处覆盖记忆操作及其成功回执已持久化、下一轮模型调用尚未返回的窗口。尚未覆盖记忆 CAS 提交与 Effect 回执之间的强杀、提交前强杀、真实云供应商或 Tauri 窗口；不据此宣称 Memory 故障矩阵完成。
 
@@ -1369,7 +1369,7 @@ CLI 配置接受 OCI read-only，禁止 native 和回合并；运行时文件挂
 
 `crash-matrix.test.ts` 的 `blocks an unreceipted` 参数化用例覆盖 memory_write/memory_remove × before/after 四个窗口。删除场景先完成写入。每次崩溃后重开磁盘，分别核对条目是否存在，以及目标工具 Effect 仍处于 leased、尚无成功回执。普通 resume 等待租约并将工具置为 TOOL_INDETERMINATE，退出 3；期间模型请求数不增加，记忆版本不变。显式 retryIndeterminate 后才重放未决工具并继续模型调用，检查最终数据、成功 Effect 和 Run 终态。
 
-验证命令：`pnpm --filter @itookit/cli test tests/crash-matrix.test.ts -t 'blocks an unreceipted'`。四项通过（124.76 秒），其余八项因筛选未执行；CLI 类型检查通过。
+验证命令：`pnpm --filter @nestos/cli test tests/crash-matrix.test.ts -t 'blocks an unreceipted'`。四项通过（124.76 秒），其余八项因筛选未执行；CLI 类型检查通过。
 
 边界：这是服务调用前、服务已提交且回执未写入的进程崩溃，未注入 SQLite 事务内部断电。无法从缺失回执推断存储操作是否发生，故默认阻断是预期行为。显式重放无条件写可能再次更新记忆版本；不提供 exactly-once 承诺，也不把内容摘要条件视为操作去重标识。真实云模型、Tauri 窗口、条件写冲突后的人工处置及独立 retention/GC 故障仍需各自证据。
 
@@ -1378,7 +1378,7 @@ CLI 配置接受 OCI read-only，禁止 native 和回合并；运行时文件挂
 
 新增可维护探针 `apps/cli/tests/fixtures/profile-send-cost.ts`，修正旧临时探针合并操作/归因计数、混入事件轮询与收敛期的问题。详见 [sidecar 读取成本 §0](design/vfs-sidecar-read-cost.md)。两次独立临时数据根运行均为发送前 554 次 sidecar 逻辑调用，本地耗时 63/64 ms；操作分布一致。CLI 类型检查通过。
 
-命令：`pnpm --filter @itookit/cli exec node --import tsx tests/fixtures/profile-send-cost.ts`。需要本地 HTTP 监听权限，沙箱拒绝后按权限机制重试。探针不访问用户 profile，完成后释放运行时、关闭服务并删除本次临时数据根。
+命令：`pnpm --filter @nestos/cli exec node --import tsx tests/fixtures/profile-send-cost.ts`。需要本地 HTTP 监听权限，沙箱拒绝后按权限机制重试。探针不访问用户 profile，完成后释放运行时、关闭服务并删除本次临时数据根。
 
 这项仅建立当前树的无 GUI 归因基线，没有修改执行路径，也没有改善或重新验证真实 Tauri 发送性能。旧 1804 总数与缓存百分比不再作性能决策证据；P0-02 的 ≤2 秒 / ≤100 次完整 IPC 目标仍未达成。
 
@@ -1387,7 +1387,7 @@ CLI 配置接受 OCI read-only，禁止 native 和回合并；运行时文件挂
 
 `ManagedResourceStore.sweep` 在资源状态扫描事务内收集 cleanup 候选，避免随后为枚举候选重复开启事务。候选不作为执行授权：`runCleanups` 在认领每条清理操作时仍重读状态/重试期限；外部清理、停止回执与释放容量保持原路径。
 
-验证：`pnpm --filter @itookit/durable-kernel test` 最终实现 4 文件 / 202 项通过，含 35 项资源测试；同包类型检查通过。发送成本探针最终树 532 次 sidecar 逻辑调用，begin/commit 各 64 次，对照改动前 554 次、各 74 次。中间测量 520–533 次表明后台调度有波动，详见 [读取成本 §0.1](design/vfs-sidecar-read-cost.md)。
+验证：`pnpm --filter @nestos/durable-kernel test` 最终实现 4 文件 / 202 项通过，含 35 项资源测试；同包类型检查通过。发送成本探针最终树 532 次 sidecar 逻辑调用，begin/commit 各 64 次，对照改动前 554 次、各 74 次。中间测量 520–533 次表明后台调度有波动，详见 [读取成本 §0.1](design/vfs-sidecar-read-cost.md)。
 
 未运行新的 Tauri 窗口性能验收，不能换算成真实 IPC 降幅或宣称 ≤2 秒 / ≤100 次目标达成；未缩减任何持久化、清理确认或恢复要求。
 
@@ -1541,7 +1541,7 @@ P0-00 此前只有「项目规则 + Skill 进入真实窗口请求」的证据�
 
 另一侧边界由 run-live-owner-refusal.test.ts 启动两个真实 CLI：第一进程的模型请求挂起且持有租约；第二进程执行 cancel，以退出码 2 拒绝并报告持有者。拒绝后连接保持、拥有者仍存活；向拥有者发送 SIGINT 后退出码 130，模型连接关闭，manifest 持久为 cancelled，模型只收到一次请求。测试排空两个子进程输出，避免管道填满干扰运行。
 
-复核：`pnpm --filter @itookit/cli exec vitest run tests/crash-matrix.test.ts` 与 `pnpm --filter @itookit/cli exec vitest run tests/run-live-owner-refusal.test.ts`。临时日志 `/tmp/x1-crash-complete.log`、`/tmp/x1-cancel-owner.log`；测试源包含配置、故障点、持久记录读取与断言，临时数据根在测试后清理。
+复核：`pnpm --filter @nestos/cli exec vitest run tests/crash-matrix.test.ts` 与 `pnpm --filter @nestos/cli exec vitest run tests/run-live-owner-refusal.test.ts`。临时日志 `/tmp/x1-crash-complete.log`、`/tmp/x1-cancel-owner.log`；测试源包含配置、故障点、持久记录读取与断言，临时数据根在测试后清理。
 
 范围为本机真实 Node/SQLite/CLI 与本地 HTTP mock，不证明供应商不会重复计费、跨主机时钟/存储排他或物理资源 fencing。crash-matrix 内既有 after-reply 故障以发送回复后杀进程为触发，不声称精确锁定所有持久提交间隙。P1-01/P1-02 及其余协议故障矩阵继续开放。
 ## 2026-09-14：Session 新建目标与桌面关闭语义复核
@@ -1567,7 +1567,7 @@ P0-00 此前只有「项目规则 + Skill 进入真实窗口请求」的证据�
 
 边界：连接断开后 2 秒的第一张截图仍显示总体 Error / 助手 RUNNING；打开 Inspector 后画面已显示 FAILED 和错误卡片。现有证据无法区分绘制延迟与事件消费延迟，不能以最终画面替代有界 live 收敛证明，P0-02 保留此项。原生已停止这里只指本地 HTTP 连接被关闭，不证明远端供应商计算或计费已停止。原始结构化错误码并未据此宣称完整穿透所有持久错误序列化层。
 
-可复现命令：`pnpm --filter @itookit/driver-llm test`、`pnpm --filter @itookit/app-shell test`；窗口步骤：本地 OpenAI-compatible mock 等待 120 秒后回复，发送消息并观察约 60 秒连接断开，核对错误卡片和 Task/Effect 持久错误。数据根 `/tmp/nestos-live-close-VIgRBk`；截图 `timeout-inflight.png`、`timeout-live.png`、`console.png`，持久摘录 `timeout-persisted.json`，请求日志 `mock.log`。测试/构建日志 `/tmp/x1-timeout-before.log`、`/tmp/x1-timeout-device.log`、`/tmp/x1-timeout-shell.log`、`/tmp/x1-timeout-types.log`、`/tmp/x1-timeout-front.log`、`/tmp/x1-timeout-native.log`。临时文件会消失，长期证据以本提交测试与步骤为准。
+可复现命令：`pnpm --filter @nestos/driver-llm test`、`pnpm --filter @nestos/app-shell test`；窗口步骤：本地 OpenAI-compatible mock 等待 120 秒后回复，发送消息并观察约 60 秒连接断开，核对错误卡片和 Task/Effect 持久错误。数据根 `/tmp/nestos-live-close-VIgRBk`；截图 `timeout-inflight.png`、`timeout-live.png`、`console.png`，持久摘录 `timeout-persisted.json`，请求日志 `mock.log`。测试/构建日志 `/tmp/x1-timeout-before.log`、`/tmp/x1-timeout-device.log`、`/tmp/x1-timeout-shell.log`、`/tmp/x1-timeout-types.log`、`/tmp/x1-timeout-front.log`、`/tmp/x1-timeout-native.log`。临时文件会消失，长期证据以本提交测试与步骤为准。
 
 补验：旧拥有者租约自然过期后，用新进程重开同一数据根，`timeout-reopened.png` 显示原消息 FAILED 与同一 60000 ms 超时原因。随后发送 `hello user-cancel`，mock 于 `03:36:49.210Z` 收齐，点击真实停止按钮后 `03:36:49.883Z` 记录连接关闭；`user-cancel-live.png` 显示 ABORTED，SQLite 中 Task `task_23d85d37-042a-4541-9a95-f48722ea2592` 和 Effect 为 cancelled、cleanupPending=false，未误写 TIMEOUT，前一条超时仍为 failed。摘录见 `timeout-and-cancel-persisted.json`。取消卡片仍写“执行失败”和 Task cancelled，用户取消文案优化仍属 P0-02，不据此宣称三态文案完成。验收结束后关闭本次应用和 mock，正常构建产物保留。
 
@@ -1619,10 +1619,10 @@ P0-00 此前只有「项目规则 + Skill 进入真实窗口请求」的证据�
 | `pnpm docs:check` | 76 份活文档通过（5 条历史表述告警） | <1 s |
 | `pnpm styles:check` | 63 样式表 / 842 markup / 3939 类，无未覆盖类名 | 1 s |
 | `pnpm build:libs` | 20 个库构建通过 | 31 s |
-| `pnpm --filter @itookit/cli build` | 通过 | 1 s |
+| `pnpm --filter @nestos/cli build` | 通过 | 1 s |
 | `pnpm --filter tauri-app build` | 通过（普通前端，非 trace） | 5 s |
 | `cargo test`（tauri-app src-tauri，offline） | **36 passed**, 0 failed | 3 s |
-| `pnpm -r --filter '!@itookit/cli' test` | **1508 passed / 30 skipped**（190 文件，3 文件整体跳过） | 46 s |
+| `pnpm -r --filter '!@nestos/cli' test` | **1508 passed / 30 skipped**（190 文件，3 文件整体跳过） | 46 s |
 | CLI 非崩溃测试（`--exclude tests/crash-matrix.test.ts`） | **108 passed**（27 文件） | 42 s |
 | CLI crash-matrix（单独进程） | **12 passed** | 377 s |
 | `cargo build --features tauri/custom-protocol` | 通过 | 3 s |
@@ -1636,7 +1636,7 @@ P0-00 此前只有「项目规则 + Skill 进入真实窗口请求」的证据�
 
 ## 2026-09-14：P0-04 平台边界——图标字体与原生目录选择器
 
-**图标方框字符（根因已定位）。** 文件列表/导航栏图标是 emoji 码位，来自 `@itookit/common` 的 `getFileIcon`/`ENTITY_ICONS`（另有少量在 `vfs-ui` 中硬编码，如 `📁`/`📄`/`📁+`）。本机**没有安装任何 emoji 字体**：`fc-list | grep -ci emoji` 为 0，且 `fc-list ':charset=1F4C1'`（📁）、`':charset=1F5D1'`（🗑）、`':charset=2795'`（➕）**均为 0 条**——即没有任何已安装字体包含这些码位，所以必然渲染为方框。这与上一轮“10 个本地 FontAwesome 字体面加载成功”不冲突：FontAwesome 覆盖的是私有使用区图标，与这些 emoji 码位无关。结论是**宿主字体依赖**，不是本轮代码回归；标准桌面发行版（GNOME/KDE）自带 Noto Color Emoji 时正常，本容器/最小化系统上会显示方框。应用不自带 emoji 字体，这属于已记录的**支持边界**，未在本轮通过捆绑字体解决。
+**图标方框字符（根因已定位）。** 文件列表/导航栏图标是 emoji 码位，来自 `@nestos/common` 的 `getFileIcon`/`ENTITY_ICONS`（另有少量在 `vfs-ui` 中硬编码，如 `📁`/`📄`/`📁+`）。本机**没有安装任何 emoji 字体**：`fc-list | grep -ci emoji` 为 0，且 `fc-list ':charset=1F4C1'`（📁）、`':charset=1F5D1'`（🗑）、`':charset=2795'`（➕）**均为 0 条**——即没有任何已安装字体包含这些码位，所以必然渲染为方框。这与上一轮“10 个本地 FontAwesome 字体面加载成功”不冲突：FontAwesome 覆盖的是私有使用区图标，与这些 emoji 码位无关。结论是**宿主字体依赖**，不是本轮代码回归；标准桌面发行版（GNOME/KDE）自带 Noto Color Emoji 时正常，本容器/最小化系统上会显示方框。应用不自带 emoji 字体，这属于已记录的**支持边界**，未在本轮通过捆绑字体解决。
 
 **原生 GTK 目录选择器（部分验证）。** 真实窗口点击导航栏 `#btn-add-mount`（`title="Mount directory…"`）后，经 `@tauri-apps/plugin-dialog` → XDG Desktop Portal（日志显示 `Successfully activated service 'org.freedesktop.portal.desktop'` 与 `org.freedesktop.impl.portal.desktop.gtk`）弹出了**真实原生对话框** `Select Folder`（1494×1144，AT-SPI 暴露“文件选择小部件”、侧栏“主目录”、`取消(C)`/`打开(O)`），而不是应用内自绘控件。截图 `.tauri-acceptance/measure/native-folder-chooser.png`（临时）。
 
@@ -1657,7 +1657,7 @@ P0-00 此前只有「项目规则 + Skill 进入真实窗口请求」的证据�
 
 剩余边界：首次超时后消息状态的短暂 RUNNING 残留及其有界收敛仍需定位；pause 三态及未确认物理停止的真实窗口场景仍未完成。独立关闭并保留记录已由后续 `d393d2fc` / `3c3afe5d` 实现和验收，不再作为本条剩余入口。重新打开 Session 时顶部可显示 Ready（当前没有活跃执行），不把它当作历史 Task 状态。本文不宣称整个 P0-02 完成。
 
-可复核命令：`pnpm --filter @itookit/app-shell test`、`pnpm --filter @itookit/llm-session test`、`pnpm styles:check`。长期回归在 `cancelled-history.test.ts` 与 `session-terminal-node.test.ts`；窗口步骤为发送至等待响应的本地 mock，再点停止并重开原会话。临时日志 `/tmp/x1-cancel-ui-shell.log`、`/tmp/x1-cancel-ui-session.log`、`/tmp/x1-cancel-ui-types.log`、`/tmp/x1-cancel-ui-styles.log`、`/tmp/x1-cancel-ui-front-final.log`、`/tmp/x1-cancel-ui-native-final.log`；临时记录会消失，不替代源码回归。
+可复核命令：`pnpm --filter @nestos/app-shell test`、`pnpm --filter @nestos/llm-session test`、`pnpm styles:check`。长期回归在 `cancelled-history.test.ts` 与 `session-terminal-node.test.ts`；窗口步骤为发送至等待响应的本地 mock，再点停止并重开原会话。临时日志 `/tmp/x1-cancel-ui-shell.log`、`/tmp/x1-cancel-ui-session.log`、`/tmp/x1-cancel-ui-types.log`、`/tmp/x1-cancel-ui-styles.log`、`/tmp/x1-cancel-ui-front-final.log`、`/tmp/x1-cancel-ui-native-final.log`；临时记录会消失，不替代源码回归。
 
 重开补验：在旧租约自然过期后，用含历史取消配色的原生快照重开同一数据根，`cancel-ui-reopened.png` 显示 ABORTED、原 Task cancelled 原因及中性底色。该 GUI 快照含 `52754e9a` 与取消文案/配色选定文件，不含后续独立关闭、发送计量等功能，不能作为当前 HEAD 全量 GUI 证明。随后工作树已推进到 `390079cb`；最终合入仅补历史原因区配色和事件说明，并在当前工作树重做文档/样式检查及正常前端构建。
 
@@ -1722,7 +1722,7 @@ P0-00 此前只有「项目规则 + Skill 进入真实窗口请求」的证据�
 
 环境侧证据（未变）：选择器由 XDG Portal 承载，`xdg-desktop-portal` 报告 `fuse: device /dev/fuse not found`、`error: fuse init failed`、`Document portal fuse mount point unknown`，本容器没有 `/dev/fuse`，门户文档门户不可用；点击门户的“打开(O)”后对话框关闭，但既没有 `sources.json` 落盘也没有新增导航项，`/var/lib/kernel/local-sources` 为空。**门户选择失败的确切形态（reject / 返回 null / 停留不返回）本轮仍未判定**，不能据此宣称原生选择器在本机可用或不可用。
 
-复现：`pnpm --filter @itookit/app-shell exec vitest run tests/directory-dialog.test.ts`（包级）；窗口部分需要可用的合成输入与 `/dev/fuse`，本环境未满足。
+复现：`pnpm --filter @nestos/app-shell exec vitest run tests/directory-dialog.test.ts`（包级）；窗口部分需要可用的合成输入与 `/dev/fuse`，本环境未满足。
 
 
 ## 2026-09-14：P1 审计、提交间隙与契约漂移
@@ -1765,12 +1765,12 @@ P0-00 此前只有「项目规则 + Skill 进入真实窗口请求」的证据�
 
 | 命令 | 结果 |
 | --- | --- |
-| `pnpm --filter @itookit/llm-flow test` | 18 文件，220 通过 |
-| `pnpm --filter @itookit/cli exec vitest run --exclude tests/crash-matrix.test.ts` | 27 文件，108 通过 |
-| `pnpm --filter @itookit/cli exec vitest run tests/crash-matrix.test.ts` | 当时 16 项完整矩阵通过，约 416 秒（真实 Effect lease 到期） |
-| `pnpm --filter @itookit/cli exec vitest run tests/crash-matrix.test.ts -t 'loop iteration whose checkpoint'` | 后增循环窗口 1 通过；其余 16 为选择器未选，不是功能跳过 |
-| `pnpm --filter @itookit/cli exec vitest run tests/crash-matrix.test.ts -t 'scheduler SIGKILL window\|loop iteration whose checkpoint'` | 最终夹具五个新增窗口全部通过（约 45 秒）；其余 12 为选择器未选 |
-| `pnpm --filter @itookit/llm-flow typecheck` / `pnpm --filter @itookit/cli typecheck` | 通过 |
+| `pnpm --filter @nestos/llm-flow test` | 18 文件，220 通过 |
+| `pnpm --filter @nestos/cli exec vitest run --exclude tests/crash-matrix.test.ts` | 27 文件，108 通过 |
+| `pnpm --filter @nestos/cli exec vitest run tests/crash-matrix.test.ts` | 当时 16 项完整矩阵通过，约 416 秒（真实 Effect lease 到期） |
+| `pnpm --filter @nestos/cli exec vitest run tests/crash-matrix.test.ts -t 'loop iteration whose checkpoint'` | 后增循环窗口 1 通过；其余 16 为选择器未选，不是功能跳过 |
+| `pnpm --filter @nestos/cli exec vitest run tests/crash-matrix.test.ts -t 'scheduler SIGKILL window\|loop iteration whose checkpoint'` | 最终夹具五个新增窗口全部通过（约 45 秒）；其余 12 为选择器未选 |
+| `pnpm --filter @nestos/llm-flow typecheck` / `pnpm --filter @nestos/cli typecheck` | 通过 |
 | `pnpm docs:check` | 76 份活文档通过，5 条既有历史表述告警 |
 
 HTTP 监听首次在沙箱内遭 EPERM，随后经正常提权运行通过。日志：`/tmp/p1-flow.log`、`/tmp/p1-cli.log`、`/tmp/p1-crash-full.log`、`/tmp/p1-loop-gap.log`，临时文件不作为长期唯一证据。没有执行全仓最终矩阵、发布产物构建或本轮真实窗口验收。
@@ -1790,10 +1790,10 @@ HTTP 监听首次在沙箱内遭 EPERM，随后经正常提权运行通过。日
 
 | 验证 | 最终结果 |
 | --- | --- |
-| `pnpm --filter @itookit/durable-kernel test` | 257 通过 |
-| `pnpm --filter @itookit/llm-flow test` | 225 通过 |
-| `pnpm --filter @itookit/cli exec vitest run --exclude tests/crash-matrix.test.ts` | 108 通过 |
-| `pnpm --filter @itookit/cli exec vitest run tests/crash-matrix.test.ts -t 'scheduler SIGKILL window\|loop iteration whose checkpoint'` | 5 通过；12 为选择器未选 |
+| `pnpm --filter @nestos/durable-kernel test` | 257 通过 |
+| `pnpm --filter @nestos/llm-flow test` | 225 通过 |
+| `pnpm --filter @nestos/cli exec vitest run --exclude tests/crash-matrix.test.ts` | 108 通过 |
+| `pnpm --filter @nestos/cli exec vitest run tests/crash-matrix.test.ts -t 'scheduler SIGKILL window\|loop iteration whose checkpoint'` | 5 通过；12 为选择器未选 |
 | `pnpm typecheck` | 全仓通过 |
 | `pnpm docs:check` / `git diff --check` | 通过；文档检查 77 份、5 条既有历史告警 |
 
@@ -1877,12 +1877,12 @@ Git 工作区 `finish` 现在返回可选说明；按策略保留的目录/分�
 
 回归命令与结果：
 
-- `pnpm --filter @itookit/kernel-adapters test`：128 项通过。
-- `pnpm --filter @itookit/llm-session test`：124 项通过。
-- `pnpm --filter @itookit/app-core test`：103 项通过。
-- `pnpm --filter @itookit/cli test tests/run-memory.test.ts tests/run-skill-context.test.ts`：4 项通过，使用本地 HTTP mock。
-- `pnpm --filter @itookit/cli test tests/shared-memory.test.ts`：13 项通过（12 个事务 SIGKILL 窗口 + 1 个双进程/创建者删除场景）。测试宿主关闭在 dispose 后等待 Kernel.waitIdle，再释放 SQLite，避免在途轮询访问已关闭文件视图。
-- `pnpm --filter @itookit/app-shell test`：221 项通过、30 项既有跳过；`scheduler-paused-owner.test.ts` 一个既有用例返回 `Host exited: 1`，单独重跑仍失败，不能记为整包通过。本批 Memory/Skill DOM 与宿主回归均通过；共享管理 DOM 使用生产 controls/provider/store，覆盖创建、读/写授权、撤权、审计与删除。
+- `pnpm --filter @nestos/kernel-adapters test`：128 项通过。
+- `pnpm --filter @nestos/llm-session test`：124 项通过。
+- `pnpm --filter @nestos/app-core test`：103 项通过。
+- `pnpm --filter @nestos/cli test tests/run-memory.test.ts tests/run-skill-context.test.ts`：4 项通过，使用本地 HTTP mock。
+- `pnpm --filter @nestos/cli test tests/shared-memory.test.ts`：13 项通过（12 个事务 SIGKILL 窗口 + 1 个双进程/创建者删除场景）。测试宿主关闭在 dispose 后等待 Kernel.waitIdle，再释放 SQLite，避免在途轮询访问已关闭文件视图。
+- `pnpm --filter @nestos/app-shell test`：221 项通过、30 项既有跳过；`scheduler-paused-owner.test.ts` 一个既有用例返回 `Host exited: 1`，单独重跑仍失败，不能记为整包通过。本批 Memory/Skill DOM 与宿主回归均通过；共享管理 DOM 使用生产 controls/provider/store，覆盖创建、读/写授权、撤权、审计与删除。
 - 全仓 `pnpm typecheck` 通过；`pnpm styles:check` 通过，剩余 48 个选择器/状态类豁免；`pnpm docs:check` 通过并保留既有历史表述告警。
 
 样式实际规则补在所属包，打印 CSS 同时覆盖独立打印文档和编辑器打印容器；已删除 59 个待补/待复核类名豁免。此次没有执行真实窗口视觉检查、Tauri/CLI 发布构建、全仓最终测试矩阵、真实云模型、其他平台及跨主机验收，不用包级结果代替这些要求。共享资源墓碑、审计和幂等回执当前永久保留，未实施物理历史 GC；history 默认返回前 100 项、最多 1000 项，未提供分页归档。

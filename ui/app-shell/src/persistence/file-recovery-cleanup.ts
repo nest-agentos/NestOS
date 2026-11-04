@@ -1,4 +1,4 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import type {FileRecovery} from './file-recovery-store';
 import {canPreserveRefreshBackup} from './file-recovery-store';
 

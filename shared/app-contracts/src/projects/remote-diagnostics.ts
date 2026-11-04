@@ -1,5 +1,5 @@
-import { createModuleLogger, getLogger, LogLevel } from '@itookit/common';
-import { FSError } from '@itookit/vfs-core';
+import { createModuleLogger, getLogger, LogLevel } from '@nestos/common';
+import { FSError } from '@nestos/vfs-core';
 
 export type MCPConnectionReason = 'ready' | 'catalog-not-loaded' | 'mcp-not-found' | 'unsupported-transport'
     | 'auth-missing' | 'extension-missing' | 'invalid-descriptor' | 'endpoint-mismatch' | 'invalid-endpoint';

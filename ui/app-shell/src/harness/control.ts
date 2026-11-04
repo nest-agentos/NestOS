@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { HarnessClient, HarnessProfile, HarnessSession, HarnessEvents } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import type { HarnessClient, HarnessProfile, HarnessSession, HarnessEvents } from '@nestos/app-contracts/services';
 import { historyText } from './history';
 import { renderInteraction } from './interactions';
 

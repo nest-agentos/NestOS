@@ -1,7 +1,7 @@
-import type {SessionRepository} from '@itookit/llm-session';
-import type {ChatMessage} from '@itookit/llm-context';
-import type {KanbanScanSession, KanbanScanText} from '@itookit/kanban/contracts';
-import type {KanbanScanSource} from '@itookit/kanban/discovery';
+import type {SessionRepository} from '@nestos/llm-session';
+import type {ChatMessage} from '@nestos/llm-context';
+import type {KanbanScanSession, KanbanScanText} from '@nestos/kanban/contracts';
+import type {KanbanScanSource} from '@nestos/kanban/discovery';
 import {requireValue} from './validation';
 
 /** The host catalog supplies project membership, archive policy and authoritative queue/Task activity. */

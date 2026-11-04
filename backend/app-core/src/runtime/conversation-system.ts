@@ -11,27 +11,27 @@ import {registerInputAssets} from './input-assets';
 import {validateCallAssets} from './call-asset-preflight';
 import { createNestosDirectAgentPolicy } from '../presets/direct-agent-policy';
 import { createFlowCapabilities } from './flow-capabilities';
-import { createFlowInvocationSessions, initializeConversationSystem, type CommandBus, type FlowEngine, type SessionManager, type SessionRepository, type VFSAgentService } from '@itookit/llm-session';
-import { resolveSessionSkillContext, resolveSessionSelectedSkills } from '@itookit/kernel-adapters';
-import type { IFileSystem, IVFSManager } from '@itookit/vfs-core';
+import { createFlowInvocationSessions, initializeConversationSystem, type CommandBus, type FlowEngine, type SessionManager, type SessionRepository, type VFSAgentService } from '@nestos/llm-session';
+import { resolveSessionSkillContext, resolveSessionSelectedSkills } from '@nestos/kernel-adapters';
+import type { IFileSystem, IVFSManager } from '@nestos/vfs-core';
 import type { HeadlessKernelRuntime } from './create-kernel-runtime';
 import { withWorkspaceScopeCleanup } from './workspace-scope-cleanup';
-import { t, createModuleLogger, traceBoot } from '@itookit/common';
+import { t, createModuleLogger, traceBoot } from '@nestos/common';
 import { registerFlowLibraryRecovery } from '../presets/restore-flows';
 
 export interface OwnedConversationView { sessionManager: SessionManager; commandBus: CommandBus; dispose(): Promise<void> }
 
 export interface ConversationSystemOptions {
-    projects?: import('@itookit/app-contracts/services').ProjectService;
-    independentCalls?: import('@itookit/llm-session').IndependentCallService;
+    projects?: import('@nestos/app-contracts/services').ProjectService;
+    independentCalls?: import('@nestos/llm-session').IndependentCallService;
     ensureFlowDependencies?(flowId: string): Promise<void>;
-    executionActivity?: import('@itookit/llm-session').SessionExecutionActivity;
-    instructionQueueSessions?: import('@itookit/llm-session').InstructionQueueSessions;
+    executionActivity?: import('@nestos/llm-session').SessionExecutionActivity;
+    instructionQueueSessions?: import('@nestos/llm-session').InstructionQueueSessions;
     scheduleAgentInitialization?: (initialize: () => Promise<void>) => void | Promise<void>;
     scheduleInvocationRecovery?: (recover: () => Promise<void>) => void | Promise<void>;
     digitalTwin?: import('../digital-twin/service').DigitalTwinService;
-    directAgentPolicy?: import('@itookit/llm-session/contracts').DirectAgentPolicy;
-    agentResolution?: import('@itookit/llm-session').AgentResolutionPolicy;
+    directAgentPolicy?: import('@nestos/llm-session/contracts').DirectAgentPolicy;
+    agentResolution?: import('@nestos/llm-session').AgentResolutionPolicy;
     vfs: IVFSManager;
     promptHistoryFiles?: IFileSystem;
     /** Root view shared by Session-independent services; holds the Flow invocation marker. */
@@ -48,7 +48,7 @@ export interface ConversationSystemOptions {
     ensureWritable?(sessionId: string): Promise<boolean>;
     prepareSessionExecution?(sessionId: string): Promise<void>;
     /** Host-provided isolated workspace manager for Flow runs (absent → non-shared modes fail closed). */
-    flowWorkspaceManager?: import('@itookit/llm-flow').FlowWorkspaceManager;
+    flowWorkspaceManager?: import('@nestos/llm-flow').FlowWorkspaceManager;
 }
 
 /**
@@ -58,7 +58,7 @@ export interface ConversationSystemOptions {
  */
 export async function createConversationSystem(
     options: ConversationSystemOptions,
-): Promise<{ sessionManager: SessionManager; commandBus: CommandBus; independentCalls?: import('@itookit/llm-session').IndependentCallService; dispose(): Promise<void> }> {
+): Promise<{ sessionManager: SessionManager; commandBus: CommandBus; independentCalls?: import('@nestos/llm-session').IndependentCallService; dispose(): Promise<void> }> {
     const { vfs, agentService, sessionRepository, flowEngine, kernel, systemFS } = options;
     const capabilities = createFlowCapabilities(kernel);
     const artifacts = createTaskArtifactServices(kernel.kernel, systemFS);

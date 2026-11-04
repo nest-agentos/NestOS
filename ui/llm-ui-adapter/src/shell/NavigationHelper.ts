@@ -3,18 +3,18 @@
 // Handles: viewport-aware session finding, scroll-to navigation, and the floating nav panel.
 
 
-import { SessionCommand, type SessionGroup } from '@itookit/llm-session/contracts';
+import { SessionCommand, type SessionGroup } from '@nestos/llm-session/contracts';
 import type { IHistoryPresenter } from '../domain/ports/IHistoryPresenter';
 import type { INavigationPresenter, NavPanelData } from '../domain/ports/INavigationPresenter';
 import type { IEditorEventBus } from '../domain/events';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
 
 import type { IBranchStore } from '../domain/ports/IBranchStore';
 import type { NavDataBuilder } from '../services/NavDataBuilder';
-import type {DOMCache} from '@itookit/llm-ui';
-import type {TimerManager} from '@itookit/llm-ui';
+import type {DOMCache} from '@nestos/llm-ui';
+import type {TimerManager} from '@nestos/llm-ui';
 import { FloatingNavPanel } from '../components/FloatingNavPanel';
-import { Toast } from '@itookit/ui-common-adapter';
+import { Toast } from '@nestos/ui-common-adapter';
 import { visibleSessionId } from '../components/history/visible-session';
 import { PromptNavigator } from '../components/PromptNavigator';
 

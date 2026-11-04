@@ -1,6 +1,6 @@
 import { randomUUID } from './random';
 import { SnapshotCodec, wireSize } from './snapshot-codec';
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 import { affectedDomains, isViewQuery, viewDomain, subscriptionMode, type ViewDomain, type CapabilitySchema, type CapabilityRegistry } from './capabilities';
 import type { Call, Reply, WireValue, Descriptor } from './protocol';
 import { MAX_RPC_HANDLES } from './protocol';

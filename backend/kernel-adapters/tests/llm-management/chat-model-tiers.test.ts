@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { resolveChatModelForTier, resolveChatModelTiers, resolveModelForTier } from '../../src/contracts';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
 
 const provider: Pick<LLMProvider, 'models'> = {models: [
     {id: 'chat', name: 'Chat', category: 'chat'},

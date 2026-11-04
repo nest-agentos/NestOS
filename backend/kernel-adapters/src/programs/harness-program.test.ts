@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Kernel, bindCapabilities, type EffectExecutionContext } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel, bindCapabilities, type EffectExecutionContext } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import type { HarnessConnectionSnapshot, HarnessExecutionProvider, HarnessExecutionRequest } from '../llm-management/contracts/harness-execution';
 import { HarnessProgram } from './harness-program';
 import { HarnessExecutionEffect } from '../effects/harness-execution-effect';

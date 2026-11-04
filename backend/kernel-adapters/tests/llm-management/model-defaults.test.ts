@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { ConnectionManager } from '../../src/llm-management/device/connection-manager';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
 
 function fixture(document?: unknown) {
     let stored = document === undefined ? undefined : JSON.stringify(document);

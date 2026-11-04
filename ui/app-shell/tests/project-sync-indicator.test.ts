@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { ENTITY_ICONS, FEEDBACK_ICONS, t } from '@itookit/common';
+import { ENTITY_ICONS, FEEDBACK_ICONS, t } from '@nestos/common';
 import { initialState } from '../../../tests/helpers/sync';
 import { projectSyncIndicator, syncIndicatorDescription } from '../src/projects/sync/presentation';
 import { ProjectSyncStatusIndicator, projectSyncIcon } from '../src/projects/sync/indicator';
 import { ProjectNavigation } from '../src/projects/ProjectNavigation';
-import type { VFSNodeUI } from '@itookit/vfs-ui';
+import type { VFSNodeUI } from '@nestos/vfs-ui';
 
 afterEach(() => {document.body.replaceChildren(); vi.restoreAllMocks();});
 it('identifies configured sync without implying that the server has been probed', () => {

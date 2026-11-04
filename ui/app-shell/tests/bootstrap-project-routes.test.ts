@@ -1,10 +1,10 @@
 import { initTestApp } from './helpers/application';
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath, type ApplicationRuntime } from '@itookit/app-core';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { defaultEditorFactory } from '@itookit/mdx-adapter';
+import { DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath, type ApplicationRuntime } from '@nestos/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { defaultEditorFactory } from '@nestos/mdx-adapter';
 import type { WorkspaceConfig } from '../src/types';
 
 vi.mock('../src/ThemeService', () => ({
@@ -12,15 +12,15 @@ vi.mock('../src/ThemeService', () => ({
     ThemeMode: undefined,
 }));
 
-vi.mock('@itookit/mdx-adapter', () => ({
+vi.mock('@nestos/mdx-adapter', () => ({
     defaultEditorFactory: vi.fn(async () => ({ destroy: vi.fn(async () => {}) })),
 }));
 
-vi.mock('@itookit/kernel-adapters', () => ({
+vi.mock('@nestos/kernel-adapters', () => ({
     createSessionSkillControls: vi.fn(() => ({})),
 }));
 
-vi.mock('@itookit/app-settings', () => ({
+vi.mock('@nestos/app-settings', () => ({
     createSettingsNavigation: vi.fn(() => ({})),
     createSettingsFactory: vi.fn(() => vi.fn(async () => ({ destroy: vi.fn(async () => {}) }))),
     SkillsEngine: class { async dispose() {} },

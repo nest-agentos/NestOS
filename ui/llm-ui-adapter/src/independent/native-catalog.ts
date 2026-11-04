@@ -1,5 +1,5 @@
 import type {ConversationSnapshot} from '../contracts';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 
 /** A partial command directory does not make the conversation or its read-only queries offline. */

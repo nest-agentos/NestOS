@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
-import { getProviderProtocols } from '@itookit/driver-llm/contracts';
-import { createProvider } from '@itookit/driver-llm';
-import { ResponsesProvider } from '@itookit/driver-llm';
-import { AnthropicProvider } from '@itookit/driver-llm';
-import { OpenAIProvider } from '@itookit/driver-llm';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
+import { getProviderProtocols } from '@nestos/driver-llm/contracts';
+import { createProvider } from '@nestos/driver-llm';
+import { ResponsesProvider } from '@nestos/driver-llm';
+import { AnthropicProvider } from '@nestos/driver-llm';
+import { OpenAIProvider } from '@nestos/driver-llm';
 import { fromLLMProvider, toLLMProvider } from '../../src/llm-management/constants/llm-loader';
 
 const provider: LLMProvider = { id: 'custom', name: 'Custom', implementation: 'openai-compatible',
@@ -31,7 +31,7 @@ it('round trips protocol and catalog configuration along with model preference',
 
 it('selects the protocol for the actual requested model when a driver switches tiers', async () => {
     const { vi } = await import('vitest');
-    const { LLMDriver } = await import('@itookit/driver-llm');
+    const { LLMDriver } = await import('@nestos/driver-llm');
     const messages = vi.spyOn(AnthropicProvider.prototype, 'create').mockResolvedValue({
         id: 'test', model: 'claude', object: 'chat.completion', created: 0,
         choices: [{ index: 0, message: { role: 'assistant', content: 'OK' }, finish_reason: 'stop' }],

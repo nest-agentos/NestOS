@@ -1,4 +1,4 @@
-import {randomUUID} from '@itookit/common';
+import {randomUUID} from '@nestos/common';
 
 const identities = new WeakMap<File, string>();
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;

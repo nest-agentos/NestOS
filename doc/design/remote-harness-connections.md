@@ -101,8 +101,8 @@ CLI也已真实运行仓库原版 `.flow` 与 `agentId` 引用两个入口，核
 可通过 `NESTOS_HARNESS_REAL_METADATA=<真实节点元数据文件>` 运行CLI真实验收；应用验收额外提供 `NESTOS_REAL_COORDINATOR_CONFIG=<受限模型配置文件>`：
 
 ```bash
-pnpm --filter @itookit/app-core exec vitest run tests/harness-real-model-live.test.ts
-pnpm --filter @itookit/cli exec vitest run tests/harness-real-model-live.test.ts
+pnpm --filter @nestos/app-core exec vitest run tests/harness-real-model-live.test.ts
+pnpm --filter @nestos/cli exec vitest run tests/harness-real-model-live.test.ts
 ```
 
 测试缺少显式环境变量时跳过，不隐式使用日常会话或发送用户消息。测试设施使用临时项目和profile；业务工作流仍由 `.flow` 声明。

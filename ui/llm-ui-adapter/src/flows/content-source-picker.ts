@@ -1,5 +1,5 @@
-import { escapeHTML, t } from '@itookit/common';
-import { ContentTransferCommand, type ContentCapture, type ContentTransfer, type ICommandBus, type TransferSelection } from '@itookit/llm-session/contracts';
+import { escapeHTML, t } from '@nestos/common';
+import { ContentTransferCommand, type ContentCapture, type ContentTransfer, type ICommandBus, type TransferSelection } from '@nestos/llm-session/contracts';
 
 type SourceKind = 'custom' | 'latest' | 'conversation' | 'replies' | 'summary' | 'selected' | 'output';
 interface PickerOptions {

@@ -1,5 +1,5 @@
-import { assertSync } from '@itookit/vfs-sync';
-import { req, txDone, STORE_NODES, STORE_RECORDS, type IndexedDBStorageAccess } from '@itookit/vfsdriver-indexeddb';
+import { assertSync } from '@nestos/vfs-sync';
+import { req, txDone, STORE_NODES, STORE_RECORDS, type IndexedDBStorageAccess } from '@nestos/vfsdriver-indexeddb';
 import { ensurePrivateParents, makeNode } from './nodes';
 import { IndexedDBLeaseGuard } from './lease';
 import { decodeLease, LEASE_PATH, type LeaseAccess } from '../shared/lease';

@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import {Sidebar, type WindowManagementOptions} from '@itookit/vfs-ui';
+import {t} from '@nestos/common';
+import {Sidebar, type WindowManagementOptions} from '@nestos/vfs-ui';
 import {nestOSVFSPresentation} from '../browser/vfs-presentation';
 import type {WorkbenchSnapshot, WorkbenchStatePort} from './state';
 

@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import {t} from '@nestos/common';
+import type {ProjectService} from '@nestos/app-contracts/services';
 
 /** Keep environment text in form controls; never interpolate it into markup. */
 export async function projectExecutionSettings(remote: NonNullable<ProjectService['remoteMounts']>, id: string, signal: AbortSignal) {

@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { configDirectory, resolveDataRoot, resolveHttpConfigDirectory, resolveHttpDirectories } from '@itookit/node-host/runtime';
-import { options } from '@itookit/node-host/http';
+import { configDirectory, resolveDataRoot, resolveHttpConfigDirectory, resolveHttpDirectories } from '@nestos/node-host/runtime';
+import { options } from '@nestos/node-host/http';
 
 let temp: string, config: string, cwd: string;
 it('uses only a configured HTTPS origin for tool authorization callbacks', async () => {

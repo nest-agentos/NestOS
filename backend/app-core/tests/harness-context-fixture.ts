@@ -1,4 +1,4 @@
-import type {ContextBindingOperation, HarnessContextRequest} from '@itookit/kernel-adapters/contracts';
+import type {ContextBindingOperation, HarnessContextRequest} from '@nestos/kernel-adapters/contracts';
 
 export const context: HarnessContextRequest = {invocationId: 'call-1', branchId: 'main', targetRef: 'agent@1', scopeRef: 'conversation',
     policyRef: 'policy', workspaceRef: 'workspace', memoryPolicyRef: 'native-inherited', conversation: {mode: 'new'},

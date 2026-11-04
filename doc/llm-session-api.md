@@ -1,4 +1,4 @@
-# @itookit/llm-session — API 参考
+# @nestos/llm-session — API 参考
 
 `SessionCommand.ListTargets`（`session.targets.list`）只读列出 global Agent 和已发布 Flow 的 `RootTargetCatalog`，同 ID 的不同类型保持独立，坏定义通过 issues 隔离。`SessionCommand.Submit`（`session.submit`）接收 `SubmissionRequest`：`target`、可选 `expectedTarget/expectedSessionId/expectedBranch`、`source`、已准备附件和稳定 `submission`，复用现有 Session 指令队列。宿主核对实际 Session、目标版本及摘要后冻结定义、连接与默认参数；调用者不能注入预编译计划或 Invocation。普通 Agent 只接收其支持的输入，独立 Flow 不解析或伪造 Agent 定义。
 
@@ -29,9 +29,9 @@ Agent 可声明 `execution: {kind: 'flow', flowId, revision?, parameters?, conne
 
 宿主可通过 prepareSessionExecution 在子会话元数据已保存后、执行恢复写入门之前准备 Kernel 存储。app-core 复用 createSessionExecutionPreparer，先取得元数据写租约，再打开或创建同一身份的执行存储，随后经过 canWriteSession 的恢复门；避免新子会话尚无 Kernel 记录就尝试恢复。拒租不会触碰执行存储，准备与后续调用各自保留具体阶段诊断。
 
-> 用户可见的会话语义 + 持久化：Session 生命周期、Round/Branch、SessionRepository（会话目录持久化）、RoundLog、SessionEventBus、UI projections、Durable Conversation。同时是上层装配入口：`initializeConversationSystem()` 统一注册 `llm.chat/agent/plan` 与 `flow.*` Programs 并装配 CommandBus/DAG。公共 API 从 `@itookit/llm-session` 根导出；少数内部工具（`RUNTIME_KEY`、`ulid`/`extractTimestamp`、`log`、`ContextProfileStore`、`VFSEntityStore`、`SessionFolder` 类型）仅按源码路径可用。
+> 用户可见的会话语义 + 持久化：Session 生命周期、Round/Branch、SessionRepository（会话目录持久化）、RoundLog、SessionEventBus、UI projections、Durable Conversation。同时是上层装配入口：`initializeConversationSystem()` 统一注册 `llm.chat/agent/plan` 与 `flow.*` Programs 并装配 CommandBus/DAG。公共 API 从 `@nestos/llm-session` 根导出；少数内部工具（`RUNTIME_KEY`、`ulid`/`extractTimestamp`、`log`、`ContextProfileStore`、`VFSEntityStore`、`SessionFolder` 类型）仅按源码路径可用。
 
-**依赖方向**：`llm-session → llm-flow → llm-tasks → durable-kernel`（本包 re-export `@itookit/llm-flow` 全部 API）。
+**依赖方向**：`llm-session → llm-flow → llm-tasks → durable-kernel`（本包 re-export `@nestos/llm-flow` 全部 API）。
 
 ## 目录
 
@@ -390,7 +390,7 @@ function sessionDirectoryStorage(sessionId: string): StorageBindingRef;
 **一致性约定**：
 
 - **删除顺序**：`deleteSession()` 先做物理删除（目录），成功后才清除 SeqFile 记录。SeqFile 记录独立于文件存在（删文件不清理记录），若先清记录而物理删除失败（Kernel 固定布局 `vfsFixedLayout`、宿主权限），会话将不可恢复地消失。
-- **Kernel 存储先删**：`<id>/kernel` 属于 Kernel，仓库不触碰。调用方须先 `kernel.removeSession(id)`（解除固定布局并删除该子树），再调 `deleteSession()`。应用层统一走 `SessionLifecycleService`（`@itookit/app-core`）：close → 等待 `closed` → `removeSession` → `deleteSession`，任一步失败都保留数据。
+- **Kernel 存储先删**：`<id>/kernel` 属于 Kernel，仓库不触碰。调用方须先 `kernel.removeSession(id)`（解除固定布局并删除该子树），再调 `deleteSession()`。应用层统一走 `SessionLifecycleService`（`@nestos/app-core`）：close → 等待 `closed` → `removeSession` → `deleteSession`，任一步失败都保留数据。
 - **文件夹读写**：`createFolder/deleteFolder/renameFolder` 的读-改-写在同一 `fs.meta.seq.transaction` 内完成；`renameFolder` 把文件夹表与所有受影响会话的归属更新提交在同一事务里。
 - **归属校验**：新建会话或修改 `folder` 时目标文件夹必须已存在，否则抛 `ENOENT`（避免产生任何列表都看不到的"幽灵会话"）。
 - **全新 seq 文件先清空**：`ensureSession()` 重建缺失的 seq 文件时会清掉同名遗留记录，防止复用身份时复活已删除会话。
@@ -425,7 +425,7 @@ class DurableConversationProjection {
 
 ## 源码结构：文件与路径
 
-`@itookit/llm-session` 的公共 API 从 `backend/llm-session/src/index.ts` 根导出（并 re-export `@itookit/llm-flow`）。包内按 **core / session / persistence / plugins / services / utils** 组织：
+`@nestos/llm-session` 的公共 API 从 `backend/llm-session/src/index.ts` 根导出（并 re-export `@nestos/llm-flow`）。包内按 **core / session / persistence / plugins / services / utils** 组织：
 
 ```
 backend/llm-session/src/
@@ -865,4 +865,4 @@ createFlowInvocationSessions(fs, "independent") 提供独立调用恢复索引�
 
 ### 提取助手正文
 
-`assistantResponseText(round)` 从 `@itookit/llm-session/contracts` 导出，只拼接 assistant 的文本内容，不包含 reasoning/thinking、工具、图片或用户输入。生成回填与应用层的 `ApplicationBackend.sessionResponse` 共用此实现，后者提供按分支、轮次或提交操作选择结果的只读 API。
+`assistantResponseText(round)` 从 `@nestos/llm-session/contracts` 导出，只拼接 assistant 的文本内容，不包含 reasoning/thinking、工具、图片或用户输入。生成回填与应用层的 `ApplicationBackend.sessionResponse` 共用此实现，后者提供按分支、轮次或提交操作选择结果的只读 API。

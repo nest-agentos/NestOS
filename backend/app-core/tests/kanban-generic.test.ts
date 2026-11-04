@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import type {KanbanActor, KanbanBoardInput, KanbanCommand, KanbanPlanning} from '@itookit/kanban/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import type {KanbanActor, KanbanBoardInput, KanbanCommand, KanbanPlanning} from '@nestos/kanban/contracts';
 import {createNestOSKanban, projectKanbanEvents} from '../src/kanban';
-import {SeqKanbanStore} from '@itookit/kanban/storage';
+import {SeqKanbanStore} from '@nestos/kanban/storage';
 import {UserEventService} from '../src/events/service';
 
 const cleanup: Array<() => Promise<void>> = [];

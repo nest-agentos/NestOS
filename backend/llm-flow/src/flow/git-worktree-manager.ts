@@ -1,4 +1,4 @@
-import type { JsonValue } from '@itookit/durable-kernel';
+import type { JsonValue } from '@nestos/durable-kernel';
 import type { FlowWorkspacePolicy } from '../contracts';
 import type { FlowWorkspaceLease, FlowWorkspaceManager, FlowWorkspaceRestoreOptions } from './executor';
 

@@ -1,19 +1,19 @@
 // @file: llm-ui/components/history/SessionRenderer.ts
 
-import { SessionGroup, ExecutionNode } from '@itookit/llm-session/contracts';
+import { SessionGroup, ExecutionNode } from '@nestos/llm-session/contracts';
 import { MDxController, type MDxControllerOptions } from '../mdx/MDxController';
 import { NodeRenderer } from './NodeRenderer';
 import { NodeTemplates } from '../templates/NodeTemplates';
 import { LayoutTemplates } from '../templates/LayoutTemplates';
-import type { IFileSystem } from '@itookit/vfs-core';
-import { t } from '@itookit/common';
-import {TimerManager} from '@itookit/llm-ui';
-import {getPreviewText} from '@itookit/llm-ui';
+import type { IFileSystem } from '@nestos/vfs-core';
+import { t } from '@nestos/common';
+import {TimerManager} from '@nestos/llm-ui';
+import {getPreviewText} from '@nestos/llm-ui';
 import { IconResolver } from '../../utils/iconResolver';
-import type { MDxPlugin } from '@itookit/mdxeditor';
+import type { MDxPlugin } from '@nestos/mdxeditor';
 import {TaskArtifactBrowser} from '../dag/TaskArtifactBrowser';
-import type {ExecutionArtifactScope} from '@itookit/app-contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import type {ExecutionArtifactScope} from '@nestos/app-contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 
 export interface RendererContext {
     artifacts?: {commands: ICommandBus; scope(group: SessionGroup): ExecutionArtifactScope | undefined;};

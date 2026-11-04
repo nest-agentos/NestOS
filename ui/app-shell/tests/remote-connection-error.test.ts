@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { setLocale } from '@itookit/common';
+import { setLocale } from '@nestos/common';
 import { remoteConnectionError } from '../src/files/remote-connection-error';
 
 it('renders actionable translated messages for each failure, without leaking server text or secrets', () => {

@@ -1,5 +1,5 @@
-import { ENTITY_ICONS, STATUS_META, escapeAttr, t } from '@itookit/common';
-import type { MCPConnectionState } from '@itookit/tools/mcp-contracts';
+import { ENTITY_ICONS, STATUS_META, escapeAttr, t } from '@nestos/common';
+import type { MCPConnectionState } from '@nestos/tools/mcp-contracts';
 
 export function mcpStatusIcon(custom: Record<string, unknown>): string {
     const state = custom.mcpConnectionState as MCPConnectionState | undefined;

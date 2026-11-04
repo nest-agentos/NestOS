@@ -1,6 +1,6 @@
-import { acquireWorkspaceProcessContext, type ApplicationPlatformServices, type HeadlessKernelRuntime } from '@itookit/app-core';
-import { randomUUID } from '@itookit/common';
-import { GitWorktreeFlowWorkspaceManager, readFlowSchedulerCheckpoint, type FlowWorkspaceLease, type FlowWorkspaceManager } from '@itookit/llm-flow';
+import { acquireWorkspaceProcessContext, type ApplicationPlatformServices, type HeadlessKernelRuntime } from '@nestos/app-core';
+import { randomUUID } from '@nestos/common';
+import { GitWorktreeFlowWorkspaceManager, readFlowSchedulerCheckpoint, type FlowWorkspaceLease, type FlowWorkspaceManager } from '@nestos/llm-flow';
 import { TauriFsOps } from '../fs/tauri-fs-ops';
 import { resolveTauriWorkspaceGrant, type TauriWorkspaceGrant } from './workspace-grant';
 import { TauriWorkspaceGitRunner } from './workspace-git';

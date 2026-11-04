@@ -1,7 +1,7 @@
 // @file: llm-ui/services/FileSearchService.ts
 
-import { createVFSFileDiscoverySource, discoverFiles, guessMimeType } from '@itookit/vfs-core';
-import type { FileDiscoveryOptions, IFileSystem } from '@itookit/vfs-core';
+import { createVFSFileDiscoverySource, discoverFiles, guessMimeType } from '@nestos/vfs-core';
+import type { FileDiscoveryOptions, IFileSystem } from '@nestos/vfs-core';
 import type { FileSuggestion } from '../domain/types';
 
 const guessMimeTypeFromName = guessMimeType;

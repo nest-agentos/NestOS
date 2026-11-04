@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { Kernel, KernelError, KernelErrorCode, type EffectExecutionContext } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel, KernelError, KernelErrorCode, type EffectExecutionContext } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { rememberLoadedSkill, forgetLoadedSkill } from './loaded-state';
 
 it('merges concurrent successful loads into real Kernel shared records without duplicates', async () => {

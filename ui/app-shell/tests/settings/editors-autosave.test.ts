@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { AgentConfigEditor } from '@itookit/llm-ui-adapter/settings';
-import { SkillSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import { MCPSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import { SystemPromptSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import { CostEditor } from '@itookit/llm-ui-adapter/settings';
+import { AgentConfigEditor } from '@nestos/llm-ui-adapter/settings';
+import { SkillSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import { MCPSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import { SystemPromptSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import { CostEditor } from '@nestos/llm-ui-adapter/settings';
 
 const editors: Array<{ destroy(): Promise<void> }> = [];
 afterEach(async () => {

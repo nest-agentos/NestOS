@@ -1,6 +1,6 @@
 import { twinError } from './error-view';
-import { escapeHTML, escapeAttr } from '@itookit/common';
-import type { DigitalTwinService } from '@itookit/app-contracts/services';
+import { escapeHTML, escapeAttr } from '@nestos/common';
+import type { DigitalTwinService } from '@nestos/app-contracts/services';
 import { label } from './view';
 export type SourceInfo = Awaited<ReturnType<DigitalTwinService['selectionInfo']>>;
 export function analysisHTML(info: SourceInfo, historyLimit = 20): string {

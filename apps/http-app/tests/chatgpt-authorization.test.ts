@@ -3,11 +3,11 @@ import { mkdtemp, rm, stat, readFile, readdir, chmod } from 'node:fs/promises';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { PrivateAuthStore } from '@itookit/node-host/authorization';
-import { ChatGPTAuthorization } from '@itookit/node-host/authorization';
-import { OpenAIOidc } from '@itookit/node-host/authorization';
-import { acquireHostLock } from '@itookit/node-host/storage';
-import type { AuditEvent } from '@itookit/node-host/logging';
+import { PrivateAuthStore } from '@nestos/node-host/authorization';
+import { ChatGPTAuthorization } from '@nestos/node-host/authorization';
+import { OpenAIOidc } from '@nestos/node-host/authorization';
+import { acquireHostLock } from '@nestos/node-host/storage';
+import type { AuditEvent } from '@nestos/node-host/logging';
 
 const releases: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const release of releases.splice(0).reverse()) await release(); });

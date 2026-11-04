@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import 'fake-indexeddb/auto';
-import { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import type { ConversationManifest } from '@itookit/llm-session';
+import { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import type { ConversationManifest } from '@nestos/llm-session';
 import { sessionFamilyRoots } from '../src/projects/session-family';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 

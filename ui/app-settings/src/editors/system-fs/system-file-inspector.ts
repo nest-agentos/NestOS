@@ -1,8 +1,8 @@
-import { createFileSystemSource, createFileSystemView, MemoryBackend } from '@itookit/vfs-core';
-import type { WorkspaceFileSource } from '@itookit/app-contracts/settings';
+import { createFileSystemSource, createFileSystemView, MemoryBackend } from '@nestos/vfs-core';
+import type { WorkspaceFileSource } from '@nestos/app-contracts/settings';
 
 /** Reuse the normal view protocol; the inspector has no alternate ID/path parser. */
-export async function createSystemFileInspector(sources: readonly WorkspaceFileSource[], devices: readonly import('@itookit/app-contracts/services').DeviceDescription[]) {
+export async function createSystemFileInspector(sources: readonly WorkspaceFileSource[], devices: readonly import('@nestos/app-contracts/services').DeviceDescription[]) {
     const descriptions = await createFileSystemSource({ backend: new MemoryBackend(), viewId: 'device-descriptions', internal: true });
     try {
         for (const device of devices) {

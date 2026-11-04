@@ -2,8 +2,8 @@
 // pricing.json 加载工具 + 路径常量。
 // Pricing contracts; this module only handles VFS I/O and model projection.
 
-import type { IFileSystem } from '@itookit/vfs-core';
-import type { LLMModel } from '@itookit/driver-llm/contracts';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type { LLMModel } from '@nestos/driver-llm/contracts';
 import { lookupPricingEntry, extractPrices, type ModelPricingConfig, type ModelPricingEntry } from '../contracts/pricing';
 
 export const PRICING_FILE_PATH = '/llm/pricing.json';

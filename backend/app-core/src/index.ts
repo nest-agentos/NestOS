@@ -129,7 +129,7 @@ export type { ProjectSyncProvider, ProjectSyncSession, ProjectSyncComparison, Pr
 
 export { prepareProjectSync } from './projects/sync/prepare';
 export type { ProjectSyncPreparationRemote } from './projects/sync/prepare';
-export type { HarnessClient, HarnessProfile, HarnessSession, HarnessPage, HarnessHistory, HarnessEvent, HarnessEvents, HarnessReceipt } from '@itookit/cells-driver/harness';
+export type { HarnessClient, HarnessProfile, HarnessSession, HarnessPage, HarnessHistory, HarnessEvent, HarnessEvents, HarnessReceipt } from '@nestos/cells-driver/harness';
 
 export { MCPRemoteConnections, CELLS_EXTENSION, remoteMCPConnection, cellsConfiguration, isCellsTool } from './projects/mcp-remote-connections';
 export type { CellsConfiguration, MCPConfigurationStore } from './projects/mcp-remote-connections';

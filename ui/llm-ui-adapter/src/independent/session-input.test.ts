@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
-import {SessionCommand} from '@itookit/llm-session/contracts';
+import {createOperationLedger} from '@nestos/llm-ui';
+import {SessionCommand} from '@nestos/llm-session/contracts';
 import {createSessionChatBinding} from './session';
 
 function fixture() {

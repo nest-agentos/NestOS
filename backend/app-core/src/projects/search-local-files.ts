@@ -1,5 +1,5 @@
-import { checkOperation, createVFSFileDiscoverySource, discoverFiles, FSError, matchesKeywords, searchKeywords, type IFileSystem, type OperationOptions } from '@itookit/vfs-core';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { checkOperation, createVFSFileDiscoverySource, discoverFiles, FSError, matchesKeywords, searchKeywords, type IFileSystem, type OperationOptions } from '@nestos/vfs-core';
+import type { ProjectService } from '@nestos/app-contracts/services';
 import type { ProjectSearchQuery, ProjectSearchMatch, ProjectSearchResult } from './project-search';
 
 export async function searchLocalFiles(projects: ProjectService, folder: string, projectId: string, query: ProjectSearchQuery, options?: OperationOptions): Promise<ProjectSearchResult> {

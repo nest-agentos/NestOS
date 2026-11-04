@@ -1,4 +1,4 @@
-import type {SessionHandle, TaskControl, TaskRecord} from '@itookit/durable-kernel';
+import type {SessionHandle, TaskControl, TaskRecord} from '@nestos/durable-kernel';
 import {assertFlowControlTree, flowControlError, hasFlowControlTree} from './control-tree';
 import {assertCurrentFlowControl} from './control-tree';
 export {assertCurrentFlowControl} from './control-tree';

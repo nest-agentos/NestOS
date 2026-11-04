@@ -1,6 +1,6 @@
-import type { Kernel } from '@itookit/durable-kernel';
-import type { KernelAdaptersRuntimeOptions } from '@itookit/kernel-adapters';
-import { TaskMemoryService, type SessionMemoryProvider } from '@itookit/llm-session';
+import type { Kernel } from '@nestos/durable-kernel';
+import type { KernelAdaptersRuntimeOptions } from '@nestos/kernel-adapters';
+import { TaskMemoryService, type SessionMemoryProvider } from '@nestos/llm-session';
 
 /** Advertise metadata globally; execution resolves authority from the current persisted Task. */
 export function createMemoryTools(kernel: () => Kernel, memory?: () => SessionMemoryProvider): NonNullable<KernelAdaptersRuntimeOptions['effectTools']> {

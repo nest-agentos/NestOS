@@ -1,4 +1,4 @@
-import { createFileSystemSource, FSError, type FSNode, type IStorageBackend } from '@itookit/vfs-core';
+import { createFileSystemSource, FSError, type FSNode, type IStorageBackend } from '@nestos/vfs-core';
 import type { ISessionRepository } from './types';
 
 /** Read-through file projection of Session records; never a second durable copy. */

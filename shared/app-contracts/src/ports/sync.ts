@@ -1,6 +1,6 @@
 /** Shared application capabilities; implementations belong to backend/app-core. */
-import type * as SyncContracts from '@itookit/vfs-sync';
-import type { bindingToken, StoredFilePlan, FilePlan, Binding } from '@itookit/vfs-sync';
+import type * as SyncContracts from '@nestos/vfs-sync';
+import type { bindingToken, StoredFilePlan, FilePlan, Binding } from '@nestos/vfs-sync';
 
 export interface ProjectSyncService {
     readonly bindingToken: (binding: Parameters<typeof bindingToken>[0]) => string | Promise<string>;

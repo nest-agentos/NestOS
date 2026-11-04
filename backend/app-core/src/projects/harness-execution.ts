@@ -1,6 +1,6 @@
 import {HarnessConnectionCleanup} from './harness-connection-cleanup';
-import type { EffectExecutionContext, EffectSessionState } from '@itookit/durable-kernel';
-import type { ConnectionCancelResult, ConnectionReconcileResult, HarnessExecutionProvider, HarnessExecutionRequest, HarnessExecutionResult } from '@itookit/kernel-adapters/contracts';
+import type { EffectExecutionContext, EffectSessionState } from '@nestos/durable-kernel';
+import type { ConnectionCancelResult, ConnectionReconcileResult, HarnessExecutionProvider, HarnessExecutionRequest, HarnessExecutionResult } from '@nestos/kernel-adapters/contracts';
 import type {HarnessConnectionService, HarnessConnectionAcquisition} from './harness-connections';
 import { ExecutionJournal, executionError, harnessExecutionJournalKey, type ExecutionJournalData } from './harness-execution-journal';
 import { prepareNativeTurn, type NativeExecution } from './harness-execution-operations';
@@ -11,9 +11,9 @@ import {prepareExecutionAttachments} from './harness-execution-assets';
 
 export { harnessExecutionJournalKey } from './harness-execution-journal';
 export interface HarnessExecutionOptions {
-    readTaskAsset?: import('@itookit/tools/contracts').TaskAssetReader;
+    readTaskAsset?: import('@nestos/tools/contracts').TaskAssetReader;
     stateForCleanup?: (context: EffectExecutionContext) => Promise<EffectSessionState>;
-    settleContextForCleanup?: (journal: ExecutionJournal, unstarted: boolean, context: EffectExecutionContext) => Promise<import('@itookit/kernel-adapters/contracts').ContextBindingRef | undefined>;
+    settleContextForCleanup?: (journal: ExecutionJournal, unstarted: boolean, context: EffectExecutionContext) => Promise<import('@nestos/kernel-adapters/contracts').ContextBindingRef | undefined>;
     pollMs?: number;
     cancelTimeoutMs?: number;
 }
@@ -104,7 +104,7 @@ class NativeHarnessExecutionProvider implements HarnessExecutionProvider {
         await diagnose(context, 'execute', 'failure', startedAt, safeCode(failure), correlation); throw failure;
     }
     private async prepareInput(request: HarnessExecutionRequest, context: EffectExecutionContext, journal: ExecutionJournal,
-        acquired: HarnessConnectionAcquisition, startedAt: number): Promise<import('@itookit/kernel-adapters/contracts').HarnessInlineAttachment[] | undefined> {
+        acquired: HarnessConnectionAcquisition, startedAt: number): Promise<import('@nestos/kernel-adapters/contracts').HarnessInlineAttachment[] | undefined> {
         const correlation = executionCorrelation(request, journal);
         try {
             const attachments = await prepareExecutionAttachments(request, context, acquired.profile, this.options.readTaskAsset);

@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository, RoundLog, type Round } from '@itookit/llm-session';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository, RoundLog, type Round } from '@nestos/llm-session';
 import { NestosTwinSourceReader } from '../src/digital-twin/source-reader';
 
 const cleanup: Array<() => Promise<void>> = [];

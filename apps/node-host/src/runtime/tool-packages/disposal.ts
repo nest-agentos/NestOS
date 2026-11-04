@@ -1,5 +1,5 @@
-import type {Tool} from '@itookit/tools';
-import {createModuleLogger} from '@itookit/common';
+import type {Tool} from '@nestos/tools';
+import {createModuleLogger} from '@nestos/common';
 const log = createModuleLogger('tool-packages');
 
 /** Disposal must never turn a committed business result into an execution failure. */

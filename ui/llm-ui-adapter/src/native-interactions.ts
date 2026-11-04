@@ -1,7 +1,7 @@
 import type {ConversationRequest} from './contracts';
 
-import type {InputField, InteractionResponse, InteractionView} from '@itookit/llm-ui';
-import {t} from '@itookit/common';
+import type {InputField, InteractionResponse, InteractionView} from '@nestos/llm-ui';
+import {t} from '@nestos/common';
 
 export function nativeInteraction(request: ConversationRequest, revision = 0): InteractionView {
     const base = {id: `${typeof request.id}:${request.id}`, revision, state: 'pending' as const, responding: request.responding,

@@ -1,6 +1,6 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {AssistantEvent, AssistantOverview, LocalApplicationServices, TwinActivitySummary} from '@itookit/app-contracts/services';
-import type {SessionActivity} from '@itookit/durable-kernel/contracts';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {AssistantEvent, AssistantOverview, LocalApplicationServices, TwinActivitySummary} from '@nestos/app-contracts/services';
+import type {SessionActivity} from '@nestos/durable-kernel/contracts';
 const log = createModuleLogger('assistant-overview');
 type Services = Pick<LocalApplicationServices, 'kernel' | 'sessionRepository' | 'digitalTwin'>;
 interface PendingOverview {kernel: Services['kernel']['kernel']; twin: Services['digitalTwin']; result: Promise<AssistantOverview>}

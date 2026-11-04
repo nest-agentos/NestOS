@@ -251,14 +251,14 @@ sidecar_begin(IPC) → sidecar_select(journal intent, IPC) → 业务 SQL(IPC) �
 
 ```bash
 # 启动成本（含 session.seq / journal 的分操作与热点签名）
-pnpm --filter @itookit/cli exec tsx tests/fixtures/profile-boot-cost.ts
+pnpm --filter @nestos/cli exec tsx tests/fixtures/profile-boot-cost.ts
 
 # journal 探测语义（每事务探测一次、rename 后仍迁移）
-pnpm --filter @itookit/vfsdriver-local test -- tests/25-journal-probe.test.ts
+pnpm --filter @nestos/vfsdriver-local test -- tests/25-journal-probe.test.ts
 
 # 两进程 SIGKILL / 跨进程可见性
-pnpm --filter @itookit/cli test -- tests/20-kernel-ipc.test.ts
+pnpm --filter @nestos/cli test -- tests/20-kernel-ipc.test.ts
 
 # 会话恢复写入预算（干净恢复 0 写、记录读次数上限）
-pnpm --filter @itookit/durable-kernel test -- src/session-open-cost.test.ts
+pnpm --filter @nestos/durable-kernel test -- src/session-open-cost.test.ts
 ```

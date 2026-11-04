@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { ConnectionRecovery } from './connection-recovery';
 import type {ApplicationConnection, ConnectionState} from './application-connection';
 

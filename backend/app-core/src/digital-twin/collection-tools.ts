@@ -1,7 +1,7 @@
-import type {TwinCollectionExecutor, TwinScannerTool} from '@itookit/app-contracts';
-import {sha256HexSync} from '@itookit/llm-context';
-import type {IToolService} from '@itookit/tools/contracts';
-import type {ToolPackageInfo} from '@itookit/app-contracts/services';
+import type {TwinCollectionExecutor, TwinScannerTool} from '@nestos/app-contracts';
+import {sha256HexSync} from '@nestos/llm-context';
+import type {IToolService} from '@nestos/tools/contracts';
+import type {ToolPackageInfo} from '@nestos/app-contracts/services';
 export type CollectionToolCatalog = Pick<IToolService, 'listTools' | 'getToolDefinitions' | 'getToolDefaults'>;
 /** Catalog metadata is safe to project; executable handlers and credentials remain in the Session scope. */
 export function collectionTools(catalog: CollectionToolCatalog): TwinScannerTool[] {

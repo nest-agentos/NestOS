@@ -1,5 +1,5 @@
-import {escapeHTML, t} from '@itookit/common';
-import type {ToolPackageGuide, ToolPackageInfo} from '@itookit/app-contracts/services';
+import {escapeHTML, t} from '@nestos/common';
+import type {ToolPackageGuide, ToolPackageInfo} from '@nestos/app-contracts/services';
 
 /** Package-owned documentation stays visible independently of registration state. */
 export function packageGuide(item: ToolPackageInfo): string {

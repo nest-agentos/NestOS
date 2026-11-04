@@ -1,7 +1,7 @@
-import {createModuleLogger} from '@itookit/common';
+import {createModuleLogger} from '@nestos/common';
 import {taskInputParameters} from '../flows/task-input-parameters';
-import type {InteractionRequest, JsonValue} from '@itookit/durable-kernel/contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import type {InteractionRequest, JsonValue} from '@nestos/durable-kernel/contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 import {promptFlowParameters} from '../components/FlowParameterForm';
 import {flowInputAssets} from '../flows/input-assets';
 import type {RunAttachmentController} from './RunAttachmentController';

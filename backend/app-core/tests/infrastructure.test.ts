@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { LLMDeviceDriver } from '@itookit/kernel-adapters/llm/core';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { LLMDeviceDriver } from '@nestos/kernel-adapters/llm/core';
 import { createInfrastructure } from '../src/runtime/infrastructure';
 
 afterEach(() => vi.restoreAllMocks());

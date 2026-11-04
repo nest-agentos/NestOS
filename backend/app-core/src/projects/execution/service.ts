@@ -1,4 +1,4 @@
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 import type { ProjectExecutionProvider, ProjectExecutionSources } from './contracts';
 import { resolveExecutionBinding, executionGrantRevision, executionGrantChanged } from './policy';
 

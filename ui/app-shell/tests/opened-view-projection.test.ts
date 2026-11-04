@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
 import {OpenedViewProjection} from '../src/lifecycle/opened-view';
-import type {ApplicationViewEvent, ApplicationServices, ApplicationBackend, OpenedApplicationView} from '@itookit/app-contracts/services';
+import type {ApplicationViewEvent, ApplicationServices, ApplicationBackend, OpenedApplicationView} from '@nestos/app-contracts/services';
 
 function fixture(interests?: string[]) {
     let listener!: (event: ApplicationViewEvent) => void, cursor = 10;

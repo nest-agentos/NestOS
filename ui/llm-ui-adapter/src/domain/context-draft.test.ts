@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest';
-import type {SubmissionRequest} from '@itookit/llm-session/contracts';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import {canConsumeContextDraft, contextDraftMatchesRequest, prepareInputContextDraft, readInputContextDraft,
     sameInputContextDraft} from './context-draft';
 

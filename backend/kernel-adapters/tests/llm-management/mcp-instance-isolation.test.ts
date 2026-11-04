@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type { Transport } from '@modelcontextprotocol/client';
-import { MCP_PROTOCOL_VERSION } from '@itookit/tools/mcp-contracts';
+import { MCP_PROTOCOL_VERSION } from '@nestos/tools/mcp-contracts';
 import { MCPClient, MCPServerConnection } from '../../src/llm-management/skills/mcp-client';
 import { LLMDeviceDriver } from '../../src/llm-management/core';
 import { MCPManager } from '../../src/llm-management/device/mcp-manager';

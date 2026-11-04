@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
 import { SkillUnloadEffectAdapter } from './skill-unload-effect';
 
 function context(): EffectExecutionContext {

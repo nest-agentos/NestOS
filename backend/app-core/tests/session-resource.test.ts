@@ -1,5 +1,5 @@
 import {expect,it,vi} from 'vitest';
-import type {ProjectService} from '@itookit/app-contracts/services';
+import type {ProjectService} from '@nestos/app-contracts/services';
 import type {ProjectRemoteMountService} from '../src/projects/remote-mounts';
 import {nativeSessionResource} from '../src/projects/session-resource';
 import {HarnessContextBindings} from '../src/projects/harness-context-bindings';
@@ -14,7 +14,7 @@ async function fixture(){
         await store.release(id,operation.operationId,staged.revision+1);
     };
     await add('one');
-    const kernel={inspectSession:vi.fn(async()=>({getShared:<T extends import('@itookit/durable-kernel').JsonValue>(key:string)=>f.state.get<T>(key)}))};
+    const kernel={inspectSession:vi.fn(async()=>({getShared:<T extends import('@nestos/durable-kernel').JsonValue>(key:string)=>f.state.get<T>(key)}))};
     const projects={list:vi.fn(async()=>[{path:'/x1',project:{id:'x1'}}])} as unknown as Pick<ProjectService,'list'>;
     const remote={list:vi.fn(()=>[{at:'/',connectionId:'node',serverProjectId:'workspace'}])} as unknown as Pick<ProjectRemoteMountService,'list'>;
     return {...f,add,kernel,projects,remote,resolve:nativeSessionResource(kernel,projects,remote)};

@@ -1,6 +1,6 @@
-import { randomUUID, sha256HexSync } from '@itookit/common';
-import type { EffectExecutionContext, EffectSessionState, JsonValue } from '@itookit/durable-kernel';
-import type {ContextBinding, ContextBindingOperation, ContextBindingRef, HarnessExecutionRequest, HarnessExecutionResult} from '@itookit/kernel-adapters/contracts';
+import { randomUUID, sha256HexSync } from '@nestos/common';
+import type { EffectExecutionContext, EffectSessionState, JsonValue } from '@nestos/durable-kernel';
+import type {ContextBinding, ContextBindingOperation, ContextBindingRef, HarnessExecutionRequest, HarnessExecutionResult} from '@nestos/kernel-adapters/contracts';
 import { canonical } from './harness-connection-policy';
 
 export interface NativeOperation { requestId: string; outcome: 'pending' | 'committed' | 'not-committed'; result?: JsonValue; code?: string }

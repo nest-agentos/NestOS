@@ -1,7 +1,7 @@
-import { ContextError, createContextService, createContextEngine, measureContext, type ContextEngineOptions, type IContextContentStore } from '@itookit/llm-context';
-import { createTaskContextStorage, type ContextServiceResolver } from '@itookit/kernel-adapters';
-import type { EffectExecutionContext, Kernel, ResolvedStorageBinding } from '@itookit/durable-kernel';
-import type { ILLMService } from '@itookit/driver-llm/contracts';
+import { ContextError, createContextService, createContextEngine, measureContext, type ContextEngineOptions, type IContextContentStore } from '@nestos/llm-context';
+import { createTaskContextStorage, type ContextServiceResolver } from '@nestos/kernel-adapters';
+import type { EffectExecutionContext, Kernel, ResolvedStorageBinding } from '@nestos/durable-kernel';
+import type { ILLMService } from '@nestos/driver-llm/contracts';
 
 export function createRuntimeContextResolver(kernel: () => Kernel, llm: () => ILLMService,
     observe?: (sessionId: string, binding: ResolvedStorageBinding) => void, engineOptions?: ContextEngineOptions): ContextServiceResolver {

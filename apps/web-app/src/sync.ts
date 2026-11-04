@@ -1,11 +1,11 @@
-import { prepareProjectSync, type ProjectService, type ProjectSyncProvider, type ProjectSyncSession, type ProjectSyncService } from '@itookit/app-core';
-import { showProjectSyncSetup, showDirectorySync, showSyncPreview } from '@itookit/app-shell';
-import { t } from '@itookit/common';
-import { OperationManager, randomId, scopedStore, SyncError, assertSync, validId, type CoordinationGuard, type SyncState, type Coordinator, type FileRemote } from '@itookit/vfs-sync';
-import { normalizeVirtualPath } from '@itookit/vfs-core';
-import type { CellsDriver } from '@itookit/cells-driver';
-import type { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
-import { HttpSyncClient, IndexedDBSyncStore, IndexedDBSyncCoordinator, createIndexedDBSyncSession, browserSyncStorageStatus, compareSyncConflict } from '@itookit/sync-adapters';
+import { prepareProjectSync, type ProjectService, type ProjectSyncProvider, type ProjectSyncSession, type ProjectSyncService } from '@nestos/app-core';
+import { showProjectSyncSetup, showDirectorySync, showSyncPreview } from '@nestos/app-shell';
+import { t } from '@nestos/common';
+import { OperationManager, randomId, scopedStore, SyncError, assertSync, validId, type CoordinationGuard, type SyncState, type Coordinator, type FileRemote } from '@nestos/vfs-sync';
+import { normalizeVirtualPath } from '@nestos/vfs-core';
+import type { CellsDriver } from '@nestos/cells-driver';
+import type { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
+import { HttpSyncClient, IndexedDBSyncStore, IndexedDBSyncCoordinator, createIndexedDBSyncSession, browserSyncStorageStatus, compareSyncConflict } from '@nestos/sync-adapters';
 
 /** Web composition reuses the remote server catalog and its credential resolver. */
 export class WebProjectSync implements ProjectSyncProvider {

@@ -1,8 +1,8 @@
-import {MailArchive} from '@itookit/mail';
-import type {MailClient} from '@itookit/mail/contracts';
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import type {FileSystemsPort} from '@itookit/app-contracts/services';
-import {workspaceRoot} from '@itookit/app-contracts';
+import {MailArchive} from '@nestos/mail';
+import type {MailClient} from '@nestos/mail/contracts';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {FileSystemsPort} from '@nestos/app-contracts/services';
+import {workspaceRoot} from '@nestos/app-contracts';
 const log = createModuleLogger('mail');
 interface Shared {refs: number; archive: Promise<MailArchive>}
 const archives = new WeakMap<FileSystemsPort, Shared>();

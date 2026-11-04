@@ -1,5 +1,5 @@
-import {randomUUID, sha256HexSync} from '@itookit/common';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {randomUUID, sha256HexSync} from '@nestos/common';
+import type {IFileSystem} from '@nestos/vfs-core';
 
 export interface PromptFile {name: string; content: string; sha256: string; source: string}
 export interface PromptBundle {version: 1; files: PromptFile[]}

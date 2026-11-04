@@ -1,11 +1,11 @@
 import yaml from 'js-yaml';
 import { afterEach, expect, it } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { NestosInitialFiles } from '../src/presets/initial-files';
 import demo from '../src/presets/digital-twin-demo.json';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
 import { createNestosFlowLibrary } from '../src/presets/flow-library';
 import { externalFlowLibrary } from './fixtures/flow-library';
 

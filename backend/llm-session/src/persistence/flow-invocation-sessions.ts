@@ -1,6 +1,6 @@
 // @file: llm-session/src/persistence/flow-invocation-sessions.ts
 // 记录"曾经受理过 Flow 调用"的 Session，供启动恢复跳过其余会话。
-import type { IFileSystem } from '@itookit/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
 
 /**
  * Sessions that ever admitted a Flow invocation.

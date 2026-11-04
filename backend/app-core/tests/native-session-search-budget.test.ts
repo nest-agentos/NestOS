@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { checkOperation, type OperationOptions } from '@itookit/vfs-core';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { checkOperation, type OperationOptions } from '@nestos/vfs-core';
+import type { ProjectService } from '@nestos/app-contracts/services';
 import { ProjectSearch } from '../src/projects/project-search';
 
 function fixture(delays: number[]) {

@@ -20,13 +20,13 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
-        '@itookit/driver-llm',
-        '@itookit/vfs'
+        '@nestos/driver-llm',
+        '@nestos/vfs'
       ],
       output: {
         globals: {
-          '@itookit/driver-llm': 'LLMDriver',
-          '@itookit/vfs': 'VFSCore'
+          '@nestos/driver-llm': 'LLMDriver',
+          '@nestos/vfs': 'VFSCore'
         }
       }
     },

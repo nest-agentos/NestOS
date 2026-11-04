@@ -1,5 +1,5 @@
-import type { IConnectionService, ModelPricingConfig, ConflictStrategy, ConflictItem, ImportStats, ConfigurationImportPort } from '@itookit/kernel-adapters/contracts';
-import { toLLMProvider, toRuntimeConnection, toRuntimeAgent, getProviderDefs, type LLMConfigFile } from '@itookit/kernel-adapters/llm/config';
+import type { IConnectionService, ModelPricingConfig, ConflictStrategy, ConflictItem, ImportStats, ConfigurationImportPort } from '@nestos/kernel-adapters/contracts';
+import { toLLMProvider, toRuntimeConnection, toRuntimeAgent, getProviderDefs, type LLMConfigFile } from '@nestos/kernel-adapters/llm/config';
 
 interface AgentStore {
     getAgents(): Promise<Array<{ id: string }>>;

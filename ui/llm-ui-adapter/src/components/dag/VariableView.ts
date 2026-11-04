@@ -1,5 +1,5 @@
-import { escapeHTML, t } from '@itookit/common';
-import type { DurableFlowSnapshot } from '@itookit/llm-flow/contracts';
+import { escapeHTML, t } from '@nestos/common';
+import type { DurableFlowSnapshot } from '@nestos/llm-flow/contracts';
 
 /** Show persisted outer variables and the live state of isolated dispatch scopes. */
 export function renderVariables(snapshot: DurableFlowSnapshot): string {

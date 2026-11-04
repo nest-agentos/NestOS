@@ -1,9 +1,9 @@
-import {buildTool, TaskListTool} from '@itookit/tools';
+import {buildTool, TaskListTool} from '@nestos/tools';
 import {expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {RpcPeer, installViewProjections} from '@itookit/app-transport/application';
-import {createHostedView} from '@itookit/node-host/http';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {RpcPeer, installViewProjections} from '@nestos/app-transport/application';
+import {createHostedView} from '@nestos/node-host/http';
 
 it('exposes independently authorized Twin workspace handles and scanner catalogs through RPC', async () => {
     const save = vi.fn(async () => {});

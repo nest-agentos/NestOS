@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { RpcPeer } from '@itookit/app-transport/application';
-import { installViewProjections } from '@itookit/app-transport/application';
-import { QueryBatcher } from '@itookit/app-transport/http';
-import { ViewNotifications } from '@itookit/node-host/http';
+import { RpcPeer } from '@nestos/app-transport/application';
+import { installViewProjections } from '@nestos/app-transport/application';
+import { QueryBatcher } from '@nestos/app-transport/http';
+import { ViewNotifications } from '@nestos/node-host/http';
 import type { ServerResponse } from 'node:http';
-import type { Call, Reply, WireValue } from '@itookit/app-transport/rpc';
+import type { Call, Reply, WireValue } from '@nestos/app-transport/rpc';
 import {observeConversation} from '../../../backend/app-core/src/projects/conversation-view';
 
 const peers: RpcPeer[] = [];

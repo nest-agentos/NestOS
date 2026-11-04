@@ -1,6 +1,6 @@
 import {applyFlowParameterVisibility} from './FlowParameterPresentation';
-import {escapeHTML, randomUUID, t} from '@itookit/common';
-import {flowInputPresent, validateFlowInputGroups, type FlowInputGroup, type FlowParameter, type JsonValue} from '@itookit/llm-flow/contracts';
+import {escapeHTML, randomUUID, t} from '@nestos/common';
+import {flowInputPresent, validateFlowInputGroups, type FlowInputGroup, type FlowParameter, type JsonValue} from '@nestos/llm-flow/contracts';
 
 type ParameterField = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 const mountedGroups = new WeakMap<HTMLElement, readonly FlowInputGroup[]>();

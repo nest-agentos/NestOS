@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type {FlowParameter} from '@itookit/llm-flow/contracts';
+import {t} from '@nestos/common';
+import type {FlowParameter} from '@nestos/llm-flow/contracts';
 import type {FlowConnectionSelection} from './FlowParameterForm';
 
 /** Declarative connection controls write ordinary parameters before submission. */

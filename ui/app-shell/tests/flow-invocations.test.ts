@@ -1,21 +1,21 @@
-import {ArtifactCommand} from '@itookit/app-contracts';
+import {ArtifactCommand} from '@nestos/app-contracts';
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {FlowsEditor} from '../../llm-ui-adapter/src/components/FlowsEditor';
-import {SessionRepository, ContentTransferService, SessionDirectoryStorageResolver} from '@itookit/llm-session';
-import {createOperationLedger, type OperationRecord} from '@itookit/llm-ui';
+import {SessionRepository, ContentTransferService, SessionDirectoryStorageResolver} from '@nestos/llm-session';
+import {createOperationLedger, type OperationRecord} from '@nestos/llm-ui';
 import {StateService} from '../../llm-ui-adapter/src/services/StateService';
-import {Toast} from '@itookit/ui-common-adapter';
-import type {DurableFlowSnapshot} from '@itookit/llm-flow/contracts';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { CommandBus, FlowEngine, FlowDefinitionStore, DagCommandService, FlowInvocationService, FlowCommand, SessionCommand, createBuiltinDagPluginRegistry, registerDurablePrograms } from '@itookit/llm-session';
+import {Toast} from '@nestos/ui-common-adapter';
+import type {DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { CommandBus, FlowEngine, FlowDefinitionStore, DagCommandService, FlowInvocationService, FlowCommand, SessionCommand, createBuiltinDagPluginRegistry, registerDurablePrograms } from '@nestos/llm-session';
 import { invokeFlowText } from '../../llm-ui-adapter/src/flows/invoke-flow';
 import { InvocationPanel } from '../../llm-ui-adapter/src/flows/InvocationPanel';
 import { SlashCommandPlugin } from '../../llm-ui-adapter/src/components/input/plugins/SlashCommandPlugin';
 import { ChatInput } from '../../llm-ui-adapter/src/components/input/ChatInputView';
-import { t } from '@itookit/common';
-import {FlowInvocationCommand, type FlowInvocationRecord} from '@itookit/llm-session/contracts';
+import { t } from '@nestos/common';
+import {FlowInvocationCommand, type FlowInvocationRecord} from '@nestos/llm-session/contracts';
 
 vi.mock('../../llm-ui-adapter/src/components/mdx/MDxController', () => ({
     MDxController: class {

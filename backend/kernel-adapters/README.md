@@ -1,8 +1,8 @@
-# @itookit/kernel-adapters
+# @nestos/kernel-adapters
 
 Kernel 外部能力公共包。提供 LLM、Tool、Skill load、Bash、TTY 的抽象端口、平台无关公共实现和 Durable Effect 适配器。
 
-`@itookit/durable-kernel` 只负责调度、状态和资源管理；本包通过 `KernelPlugin` 注册外部能力。
+`@nestos/durable-kernel` 只负责调度、状态和资源管理；本包通过 `KernelPlugin` 注册外部能力。
 
 ## 目录
 
@@ -27,7 +27,7 @@ src/
 `/llm/core` 提供 LLMDeviceDriver 与设备常量；`/contracts` 拥有公共管理接口，`/llm/config` 提供配置编码，`/llm/presets` 提供可选 NestOS 目录，`/llm/mcp-host` 提供实例传输桥。旧 `/llm` 聚合已删除。
 
 ```ts
-import { LLMDeviceDriver } from '@itookit/kernel-adapters/llm/core';
+import { LLMDeviceDriver } from '@nestos/kernel-adapters/llm/core';
 
 const driver = new LLMDeviceDriver(vfs, { llmLogger, presets: hostPresets });
 await driver.init();
@@ -39,7 +39,7 @@ await driver.dispose();
 
 需要 NestOS 默认行为时，从 `/llm/presets` 导入 `createNestosLlmPresets`、`firstChatModelConnection`，显式传入这两个选项。旧 `/llm` 入口继续自动选择这套预设和策略，仅作兼容。契约入口 `/contracts` 不加载 VFS、YAML、MCP 或产品目录。
 
-只需要模型通信时使用独立的 `@itookit/driver-llm`；它没有运行时依赖，不需要本包。模型集成详情见 [管理接口](./doc/llm-management/README.md)。
+只需要模型通信时使用独立的 `@nestos/driver-llm`；它没有运行时依赖，不需要本包。模型集成详情见 [管理接口](./doc/llm-management/README.md)。
 
 ## 使用
 

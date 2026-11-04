@@ -1,4 +1,4 @@
-import type { SessionHandle, TaskHandle, TaskSpec } from '@itookit/durable-kernel';
+import type { SessionHandle, TaskHandle, TaskSpec } from '@nestos/durable-kernel';
 import {assertLiveFlowRoot, flowTaskHeld, isPausedParentAdmission} from './control-tree';
 
 interface DispatchGateOptions {

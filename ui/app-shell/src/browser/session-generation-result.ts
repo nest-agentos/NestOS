@@ -1,4 +1,4 @@
-import type {ApplicationBackend} from '@itookit/app-contracts/services';
+import type {ApplicationBackend} from '@nestos/app-contracts/services';
 import {recoverGenerationResult} from './generation-result-recovery';
 
 /** A durable terminal result can finish the UI even while the original reply is delayed. */

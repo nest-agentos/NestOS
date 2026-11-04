@@ -1,5 +1,5 @@
-import {sha256HexSync} from '@itookit/common';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {sha256HexSync} from '@nestos/common';
+import type {IFileSystem} from '@nestos/vfs-core';
 import {failure, publishImmutableFile, readPrompt} from './prompt-bundle';
 import {parseSessionFile} from './session-file-result';
 export interface FileReply {path: string; sha256: string}

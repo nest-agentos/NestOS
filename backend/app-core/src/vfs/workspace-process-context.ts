@@ -1,4 +1,4 @@
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
 import type { SessionFilesService, SessionMountRecord } from './session-files';
 import { acquireSessionProcessContext, type SessionProcessFactory, type SessionProcessMount } from './session-process-context';
 import { createVFSToolContext } from './tool-context';

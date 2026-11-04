@@ -1,9 +1,9 @@
 import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { SessionRepository } from '@itookit/llm-session';
-import { DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath } from '@itookit/app-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { SessionRepository } from '@nestos/llm-session';
+import { DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath } from '@nestos/app-core';
 import { directoryBreadcrumbs } from '../src/projects/directory-label';
 import {refreshDirectoryList} from '../src/workbench/directory-list';
 
@@ -64,7 +64,7 @@ it('creates a project file beside the activated file, not at the Files root', as
         const pathToSub = projectPath + '/@files/sub';
         await workbench.openResource(pathToSub, { directory: true });
         const current = () => main.querySelector('.workbench-tabs__panel:not([hidden])')!;
-        const ui = (workbench as unknown as { sidebarUI: import('@itookit/vfs-ui').VFSUIShell }).sidebarUI;
+        const ui = (workbench as unknown as { sidebarUI: import('@nestos/vfs-ui').VFSUIShell }).sidebarUI;
         current().querySelector<HTMLButtonElement>('.workbench-directory__path [data-directory-path="' + projectPath + '/@files"]')!.click();
         await vi.waitFor(() => expect(workbench.getActiveResourceId()).toBe(projectPath + '/@files'));
         await (workbench as unknown as {fileNavigation: Promise<void>}).fileNavigation;

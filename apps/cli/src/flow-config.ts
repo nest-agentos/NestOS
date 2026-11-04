@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { FlowDraft, FlowRevision } from '@itookit/llm-flow/contracts';
-import { createFlowRevision, flowRevisionDigest, checkFlowSyntax } from '@itookit/llm-flow';
+import type { FlowDraft, FlowRevision } from '@nestos/llm-flow/contracts';
+import { createFlowRevision, flowRevisionDigest, checkFlowSyntax } from '@nestos/llm-flow';
 
 /** Load a `.flow` draft or revision and normalize it to an immutable FlowRevision. */
 export async function loadFlowDefinition(file: string): Promise<FlowRevision> {

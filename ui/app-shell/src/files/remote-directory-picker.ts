@@ -1,7 +1,7 @@
 import { remoteIconButton } from './remote-icon-button';
 import { remoteConnectionError } from './remote-connection-error';
-import { t } from '@itookit/common';
-import type { ProjectService } from '@itookit/app-contracts/services';
+import { t } from '@nestos/common';
+import type { ProjectService } from '@nestos/app-contracts/services';
 
 /** Browse one page at a time; a new navigation supersedes every older response. */
 export function remoteDirectoryPicker(projects: ProjectService, parent: HTMLElement,

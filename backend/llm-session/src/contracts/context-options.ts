@@ -1,5 +1,5 @@
-import {isTargetRef, type TargetRef} from '@itookit/llm-flow/contracts';
-import {sha256HexSync} from '@itookit/llm-context/digest';
+import {isTargetRef, type TargetRef} from '@nestos/llm-flow/contracts';
+import {sha256HexSync} from '@nestos/llm-context/digest';
 import {assertContextBindingQuery, type ContextBindingCursor, type ContextBindingSummary, type ContextCheckpointSummary} from './context-bindings';
 
 /** Destination identity is explicit; source bindings may belong to another branch of this Session. */

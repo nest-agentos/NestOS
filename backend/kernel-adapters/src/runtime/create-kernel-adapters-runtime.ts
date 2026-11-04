@@ -5,19 +5,19 @@ import { LlmMediaEffectAdapter, type MediaResultStore } from '../effects/llm-med
 import { MediaProgram } from '../programs/media-program';
 import { MCPToolAdapter } from '../tool/mcp-tools';
 import { silentAdapterLog, type KernelAdapterDiagnostics } from '../ports/diagnostics';
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 import { createSkillToolHandlers } from '../skill/tool-handlers';
 import { coordinateSkillEffect, runSessionSkillOperation, invalidateSessionSkillOperations, reopenSessionSkillOperations, closeSessionSkillOperations } from '../skill/operation-queue';
 import { restoreLoadedSkills } from '../skill/restore-loaded-skills';
 import { createUnloadSkillHandler, unloadSkillDefinition, unloadSkillMeta } from '../tool/unload-skill';
 import { SkillUnloadEffectAdapter } from '../effects/skill-unload-effect';
 import { rememberLoadedSkill, withSkillDriftPersistence, requireLoadedSkillVersions } from '../skill/loaded-state';
-import type { ISkillService, SkillDefinition } from '@itookit/tools/contracts';
-import type { IToolService, ITTYDriver, ToolVFSContext } from '@itookit/tools/contracts';
-import type { ILLMService } from '@itookit/driver-llm/contracts';
-import type { IDeviceDriver } from '@itookit/vfs-core';
-import { BUILTIN_TOOLS, ToolDeviceDriver } from '@itookit/tools';
-import type { INativeShell, Tool } from '@itookit/tools';
+import type { ISkillService, SkillDefinition } from '@nestos/tools/contracts';
+import type { IToolService, ITTYDriver, ToolVFSContext } from '@nestos/tools/contracts';
+import type { ILLMService } from '@nestos/driver-llm/contracts';
+import type { IDeviceDriver } from '@nestos/vfs-core';
+import { BUILTIN_TOOLS, ToolDeviceDriver } from '@nestos/tools';
+import type { INativeShell, Tool } from '@nestos/tools';
 import { LLMServiceAdapter } from '../llm/llm-service-adapter';
 import { SkillDeviceDriver } from '../skill/skill-device-driver';
 import { createLoadSkillHandler, loadSkillDefinition, loadSkillMeta } from '../tool/load-skill';
@@ -43,15 +43,15 @@ import { ContextPrepareEffect, ContextLlmEffect, ContextToolEffect, type Context
 import {LiveTools} from './live-tools';
 
 export interface KernelAdaptersRuntimeOptions extends KernelAdapterDiagnostics {
-    authorizeTool?(request: import('../effects/tool-call-effect').ToolCallEffectRequest, context: import('@itookit/durable-kernel').EffectExecutionContext): Promise<void>;
+    authorizeTool?(request: import('../effects/tool-call-effect').ToolCallEffectRequest, context: import('@nestos/durable-kernel').EffectExecutionContext): Promise<void>;
     harnessExecution?: import('../llm-management/contracts/harness-execution').HarnessExecutionProvider;
-    taskAssetStore?: import('@itookit/tools/contracts').TaskAssetStore;
-    readTaskAsset?: import('@itookit/tools/contracts').TaskAssetReader;
+    taskAssetStore?: import('@nestos/tools/contracts').TaskAssetStore;
+    readTaskAsset?: import('@nestos/tools/contracts').TaskAssetReader;
     mediaResultStore?: MediaResultStore;
     contextService?: ContextServiceResolver;
     effectTools?: import('../effects/tool-call-effect').EffectToolBinding[];
     /** Resolve a trusted Task to its isolated Run identity; undefined selects the normal Session. */
-    scopeForEffect?: (context: import('@itookit/durable-kernel').EffectExecutionContext) => Promise<string | undefined>;
+    scopeForEffect?: (context: import('@nestos/durable-kernel').EffectExecutionContext) => Promise<string | undefined>;
     fileContextForScope?: (sessionId: string, scopeId: string) => ReturnType<NonNullable<KernelAdaptersRuntimeOptions['fileContextForSession']>>;
     /** Acquired independently for each real Session, before any tool can run. */
     fileContextForSession?: (sessionId: string) => Promise<{
@@ -147,7 +147,7 @@ interface KernelAdaptersScope extends SessionCapabilityScope {
 
 class KernelAdaptersSessionRegistry implements SessionCapabilityRegistry {
     private readonly runScopes = new Map<string, Map<string, KernelAdaptersSessionRegistry>>();
-    private readonly effectScopes = new WeakMap<import('@itookit/durable-kernel').EffectExecutionContext, Promise<string | undefined>>();
+    private readonly effectScopes = new WeakMap<import('@nestos/durable-kernel').EffectExecutionContext, Promise<string | undefined>>();
     private disposal?: Promise<void>;
     private closeWork?: () => Promise<void>;
     private closed = false;
@@ -181,7 +181,7 @@ class KernelAdaptersSessionRegistry implements SessionCapabilityRegistry {
     }
 
     async getForContext(
-        context: import('@itookit/durable-kernel').EffectExecutionContext,
+        context: import('@nestos/durable-kernel').EffectExecutionContext,
     ): Promise<KernelAdaptersScope> {
         const registry = await this.forEffect(context);
         if (registry !== this) return registry.getForContext(context);
@@ -195,11 +195,11 @@ class KernelAdaptersSessionRegistry implements SessionCapabilityRegistry {
         });
     }
 
-    async getForEffect(context: import('@itookit/durable-kernel').EffectExecutionContext): Promise<KernelAdaptersScope> {
+    async getForEffect(context: import('@nestos/durable-kernel').EffectExecutionContext): Promise<KernelAdaptersScope> {
         return (await this.forEffect(context)).get(context.sessionId);
     }
 
-    private async forEffect(context: import('@itookit/durable-kernel').EffectExecutionContext): Promise<KernelAdaptersSessionRegistry> {
+    private async forEffect(context: import('@nestos/durable-kernel').EffectExecutionContext): Promise<KernelAdaptersSessionRegistry> {
         let selected = this.effectScopes.get(context);
         if (!selected) {
             selected = Promise.resolve().then(() => this.options.scopeForEffect?.(context));
@@ -405,12 +405,12 @@ function createEffects(
     ttyEnabled: boolean,
     effectTools: import('../effects/tool-call-effect').EffectToolBinding[] = [],
     diagnostics: KernelAdaptersRuntimeOptions,
-): import('@itookit/durable-kernel').EffectAdapter[] {
-    const tools = async (context: import('@itookit/durable-kernel').EffectExecutionContext) =>
+): import('@nestos/durable-kernel').EffectAdapter[] {
+    const tools = async (context: import('@nestos/durable-kernel').EffectExecutionContext) =>
         (await registry.getForContext(context)).toolService;
-    const skills = async (context: import('@itookit/durable-kernel').EffectExecutionContext) =>
+    const skills = async (context: import('@nestos/durable-kernel').EffectExecutionContext) =>
         (await registry.getForContext(context)).skillService;
-    const effects: import('@itookit/durable-kernel').EffectAdapter[] = [
+    const effects: import('@nestos/durable-kernel').EffectAdapter[] = [
         new LlmChatEffectAdapter(llm, diagnostics.logger, diagnostics.authorizeLlm, diagnostics.readTaskAsset),
         new ToolCallEffectAdapter(async (context, request) => {
             await diagnostics.authorizeTool?.(request, context);
@@ -460,8 +460,8 @@ function createEffects(
 }
 
 async function persistLoadedSkill(
-    result: import('@itookit/tools/contracts').SkillLoadResult,
-    context: import('@itookit/durable-kernel').EffectExecutionContext,
+    result: import('@nestos/tools/contracts').SkillLoadResult,
+    context: import('@nestos/durable-kernel').EffectExecutionContext,
 ): Promise<void> {
     await rememberLoadedSkill(result.skillId, context.sessionState, result.snapshot);
 }

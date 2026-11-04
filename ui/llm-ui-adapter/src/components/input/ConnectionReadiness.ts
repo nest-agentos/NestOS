@@ -1,4 +1,4 @@
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import type { ConnectionIssue } from './ConnectionTierController';
 
 export type ConnectionLoadState = 'loading' | 'ready' | 'failed';

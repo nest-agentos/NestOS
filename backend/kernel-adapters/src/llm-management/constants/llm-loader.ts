@@ -9,8 +9,8 @@
 //   - mcp                  — MCP server configs
 
 import yaml from 'js-yaml';
-import type { LLMProvider, LLMModel, LLMConnection } from '@itookit/driver-llm/contracts';
-import type { DefaultConnectionDef, AgentDefinition, AgentType, AgentConfig, ModelPricingEntry } from '@itookit/kernel-adapters/contracts';
+import type { LLMProvider, LLMModel, LLMConnection } from '@nestos/driver-llm/contracts';
+import type { DefaultConnectionDef, AgentDefinition, AgentType, AgentConfig, ModelPricingEntry } from '@nestos/kernel-adapters/contracts';
 
 // ─── .llm File Types ─────────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import { requireMediaCapabilities, resolveModelProtocol, type ConnectionMeta, type LLMProvider } from '@itookit/driver-llm/contracts';
+import { requireMediaCapabilities, resolveModelProtocol, type ConnectionMeta, type LLMProvider } from '@nestos/driver-llm/contracts';
 import { hasConnectionCredentials } from './connection';
 import {assertModelOutputFormats, type ModelOutputFormat} from './model-output-formats';
 export interface ModelRequirements { operation: string; inputModalities?: string[]; outputModalities?: string[]; features?: string[]; responseFormats?: ModelOutputFormat[] }

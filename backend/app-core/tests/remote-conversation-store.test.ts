@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {RemoteConversationStore} from '../src/projects/remote-conversation-store';
 import {interceptConversationTransactions} from './remote-conversation-faults';
 it('persists inline native draft attachments with CAS and rejects malformed or excessive recovery data', async () => {

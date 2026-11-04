@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend, type IFileSystem} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend, type IFileSystem} from '@nestos/vfs-core';
 import {defaultEditorFactory} from '../src/factory';
 import {SeqFileStore} from '../src/srs-store';
 

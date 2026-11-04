@@ -1,5 +1,5 @@
-import { escapeHTML, FEEDBACK_ICONS, getLocale, t } from '@itookit/common';
-import { createInteractionCard, type InteractionCard, type InteractionResponse } from '@itookit/llm-ui';
+import { escapeHTML, FEEDBACK_ICONS, getLocale, t } from '@nestos/common';
+import { createInteractionCard, type InteractionCard, type InteractionResponse } from '@nestos/llm-ui';
 import type { ChatInputInteraction, InteractionReply } from '../../domain/ports/IChatInputPresenter';
 import { agentQuestionAnswer } from './agent-questions';
 

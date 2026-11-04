@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {createApplicationRuntime} from '@itookit/app-core';
-import {bindApplicationBackend} from '@itookit/app-core/host';
-import {folderBrowserPath, projectConversationsPath, projectConversationEntryPath} from '@itookit/app-contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {bindApplicationBackend} from '@nestos/app-core/host';
+import {folderBrowserPath, projectConversationsPath, projectConversationEntryPath} from '@nestos/app-contracts';
 import {SessionWorkbench} from '../src/projects/SessionWorkbench';
 import {observeNavigationVisibility} from '../src/navigation/navigation-visibility';
-import {FlowCommand, createFlowRevision} from '@itookit/llm-flow';
-import {sessionDirectoryStorage} from '@itookit/llm-session';
-import type {VFSUIShell} from '@itookit/vfs-ui';
+import {FlowCommand, createFlowRevision} from '@nestos/llm-flow';
+import {sessionDirectoryStorage} from '@nestos/llm-session';
+import type {VFSUIShell} from '@nestos/vfs-ui';
 import type {WorkbenchSnapshot} from '../src/workbench/state';
 
 const cleanup: Array<() => void | Promise<unknown>> = [];

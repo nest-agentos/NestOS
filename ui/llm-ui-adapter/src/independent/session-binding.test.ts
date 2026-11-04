@@ -1,12 +1,12 @@
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import { expect, it, vi } from 'vitest';
-import {createOperationLedger, type OperationLedger, type OperationRecord} from '@itookit/llm-ui';
-import {FlowInvocationCommand, SessionCommand} from '@itookit/llm-session/contracts';
-import type { ICommandBus, SessionGroup, SessionViewPort } from '@itookit/llm-session/contracts';
-import type {SessionInstructionQueue} from '@itookit/llm-session/contracts';
+import {createOperationLedger, type OperationLedger, type OperationRecord} from '@nestos/llm-ui';
+import {FlowInvocationCommand, SessionCommand} from '@nestos/llm-session/contracts';
+import type { ICommandBus, SessionGroup, SessionViewPort } from '@nestos/llm-session/contracts';
+import type {SessionInstructionQueue} from '@nestos/llm-session/contracts';
 import { createSessionChatBinding } from './session';
 
-vi.mock('@itookit/llm-ui', async () => ({...(await vi.importActual<typeof import('@itookit/llm-ui')>('@itookit/llm-ui')), createChatView: vi.fn()}));
+vi.mock('@nestos/llm-ui', async () => ({...(await vi.importActual<typeof import('@nestos/llm-ui')>('@nestos/llm-ui')), createChatView: vi.fn()}));
 
 function fixture(input?: OperationRecord['input']) {
     let committed = false, groups: SessionGroup[] = [];
@@ -14,7 +14,7 @@ function fixture(input?: OperationRecord['input']) {
     const listeners = new Set<() => void>();
     let record: OperationRecord = { context: { operationId: 'op', viewId: 'expired' }, conversationId: 'session',
         kind: 'send', input: input ?? { text: 'hello' }, status: 'unknown' };
-    const target = (input as {target?: import('@itookit/llm-flow/contracts').TargetRef})?.target;
+    const target = (input as {target?: import('@nestos/llm-flow/contracts').TargetRef})?.target;
     if (target) record = {...record, input: {...input as object, sessionRequest: {expectedSessionId: 'session', target, expectedTarget: target,
         source: {kind: 'composer', text: 'hello', attachments: [], values: {}},
         submission: {id: 'op', source: {kind: 'conversation', ownerId: 'session', id: 'op'}}}} as unknown as OperationRecord['input']};

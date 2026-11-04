@@ -207,9 +207,9 @@ acceptance: 指定回归通过，原任务执行不受影响。
 
 ## 验证入口
 
-- `pnpm --filter @itookit/kanban test`：可控时钟、竞争/重启、编辑租约、统一状态、执行与 UI 回归。
-- `pnpm --filter @itookit/app-core exec vitest run kanban workspace-messages`：具体分析失败、控制回执、文件协议、fix 快照与通知补偿。
-- `pnpm --filter @itookit/llm-session exec vitest run __tests__/instruction-queue.test.ts`：正式队列确认门及接纳回执。
+- `pnpm --filter @nestos/kanban test`：可控时钟、竞争/重启、编辑租约、统一状态、执行与 UI 回归。
+- `pnpm --filter @nestos/app-core exec vitest run kanban workspace-messages`：具体分析失败、控制回执、文件协议、fix 快照与通知补偿。
+- `pnpm --filter @nestos/llm-session exec vitest run __tests__/instruction-queue.test.ts`：正式队列确认门及接纳回执。
 - CLI 使用 `kanban query <board>`、`kanban item <board> <item>` 读取同一投影；`execute --file` 传原冻结 operationId/expectedRevision/command，`fix --file`、`reply --file` 复用宿主接口，传输未知不自动换身份重发。
 - Chromium fixture 位于 `libraries/kanban/tests/browser/`。运行该目录 Vite 配置，再运行 `acceptance.mjs`；Playwright 由验收环境提供，输出截图及实际 YAML/回执。该 fixture 使用真实 DOM、VFS/SeqFile、执行桥和 fix 服务，原生执行端口为确定性替身；真实远程 x1 的执行进程由宿主最终验收，不把替身结果写成生产验收成功。
 

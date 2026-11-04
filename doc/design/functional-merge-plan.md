@@ -2304,8 +2304,8 @@ inspect 返回 evidence=kernel 和 callerExecution；列表再投影真实 prima
 
 当前工作树集中运行以下发布前类型检查，均通过：
 
-- pnpm --filter @itookit/app-core typecheck
-- pnpm --filter @itookit/llm-ui-adapter typecheck
+- pnpm --filter @nestos/app-core typecheck
+- pnpm --filter @nestos/llm-ui-adapter typecheck
 
 已生成 HTTP 制品 20261026T102344-4cbdd261-dirty，pnpm httpd:build 成功；构建后恢复原启动指针，没有自行重启服务。用户随后确认已重启。携客户端证书请求 /api/health，确认当前实际运行版本为 20261026T110715-600146cc-dirty、ready=true、mode=release；启动日志 Version 与健康接口一致。当前运行版本来自工作树，保留 dirty 标识。
 

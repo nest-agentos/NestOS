@@ -1,4 +1,4 @@
-// @itookit/ui-common-adapter — shared UI components, contracts, and browser utilities.
+// @nestos/ui-common-adapter — shared UI components, contracts, and browser utilities.
 
 // ── Editor / UI contracts ──
 export {
@@ -34,4 +34,4 @@ export { SettingsAutoSave, SettingsValidationError, requestSettingsSave } from '
 export type { SettingsSave } from './components/SettingsAutoSave';
 
 export { installNavigationButtonPresentation } from './components/navigation-button';
-export * from '@itookit/ui-common';
+export * from '@nestos/ui-common';

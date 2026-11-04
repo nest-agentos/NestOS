@@ -1,7 +1,7 @@
 import type {ConversationSnapshot} from '../contracts';
-import {ACTION_ICONS, escapeHTML, t} from '@itookit/common';
+import {ACTION_ICONS, escapeHTML, t} from '@nestos/common';
 
-import {setTimePresentation} from '@itookit/ui-common-adapter';
+import {setTimePresentation} from '@nestos/ui-common-adapter';
 import {conversationMetrics} from './conversation-metrics';
 import {conversationUsage} from './conversation-usage';
 import {nativeWriterLockText} from './native-writer-lock';

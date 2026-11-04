@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest';
-import {sha256HexSync} from '@itookit/llm-context';
+import {sha256HexSync} from '@nestos/llm-context';
 import {prepareHarnessInput, harnessInputDigest} from '../llm-management/contracts/harness-input';
 import type {HarnessConnectionSnapshot} from '../llm-management/contracts/harness-execution';
 import type {HarnessContextRequest} from '../llm-management/contracts/context-binding';

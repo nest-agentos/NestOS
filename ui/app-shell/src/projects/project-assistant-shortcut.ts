@@ -1,5 +1,5 @@
-import {conversationResourcePath, resolveBrowserTarget} from '@itookit/app-contracts';
-import type {VFSNodeUI} from '@itookit/vfs-ui';
+import {conversationResourcePath, resolveBrowserTarget} from '@nestos/app-contracts';
+import type {VFSNodeUI} from '@nestos/vfs-ui';
 import type {ShortcutRequest} from '../navigation/assistant-actions';
 
 export function projectAssistantShortcut(item: VFSNodeUI): ShortcutRequest {

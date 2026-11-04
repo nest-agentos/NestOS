@@ -1,8 +1,8 @@
 import type {ConversationComposerDraft, ConversationControls} from '../contracts';
 import {StoredChatImages} from './stored-chat-images';
 import type {ImageEditingHost} from './image-editing';
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {createOperationLedger, type AttachmentRef, type ComposerDraft, type OperationRecord} from '@itookit/llm-ui';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {createOperationLedger, type AttachmentRef, type ComposerDraft, type OperationRecord} from '@nestos/llm-ui';
 
 import {readDraftFiles} from '../services/DraftFilesCodec';
 import {draftFileId} from '../domain/draft-file-identity';

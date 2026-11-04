@@ -1,4 +1,4 @@
-# @itookit/common 开发说明
+# @nestos/common 开发说明
 
 共享接口、类型、工具和 i18n。运行时包通过这里的协议解耦。
 
@@ -12,9 +12,9 @@
 
 通用哈希工具在本包独立实现；llm-context 为保持独立运行保留自身实现，算法兼容性由测试覆盖。
 
-## VFS 核心协议（@itookit/vfs-core）
+## VFS 核心协议（@nestos/vfs-core）
 
-VFS 协议与事件总线在 `@itookit/vfs-core`（`src/interfaces/` + `src/eventbus/`）：
+VFS 协议与事件总线在 `@nestos/vfs-core`（`src/interfaces/` + `src/eventbus/`）：
 
 | 层级 | 接口（位于 vfs-core） |
 | --- | --- |
@@ -27,13 +27,13 @@ VFS 协议与事件总线在 `@itookit/vfs-core`（`src/interfaces/` + `src/even
 ## 命令
 
 ```bash
-pnpm --filter @itookit/common build       # tsup
-pnpm --filter @itookit/common typecheck
+pnpm --filter @nestos/common build       # tsup
+pnpm --filter @nestos/common typecheck
 ```
 
 ## 约束
 
-- 新增跨包 LLM 协议定义在对应能力模块，VFS 协议定义在 `@itookit/vfs-core`，本包不再新增协议。
+- 新增跨包 LLM 协议定义在对应能力模块，VFS 协议定义在 `@nestos/vfs-core`，本包不再新增协议。
 - 接口优先使用 `interface`，判别联合使用 `type`。
 - 公共协议不得 import 上层包。
 - 不在本包实现 Kernel、Session Service 或 UI Projection。

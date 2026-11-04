@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {createNestOSKanban} from '@itookit/app-core/kanban';
-import {SeqKanbanStore} from '@itookit/kanban/storage';
-import {KanbanWorkbench} from '@itookit/kanban/ui';
-import {executionSessionReference} from '@itookit/app-contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {createNestOSKanban} from '@nestos/app-core/kanban';
+import {SeqKanbanStore} from '@nestos/kanban/storage';
+import {KanbanWorkbench} from '@nestos/kanban/ui';
+import {executionSessionReference} from '@nestos/app-contracts';
 import {kanbanPresentation} from '../src/kanban/host';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const cleanup of cleanups.splice(0)) await cleanup(); document.body.replaceChildren();});
-async function fixture(source?: import('@itookit/app-core/kanban').KanbanSessionSource) {
+async function fixture(source?: import('@nestos/app-core/kanban').KanbanSessionSource) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()});
     const store = await SeqKanbanStore.open(await manager.openFileSystem('/'));
     const service = createNestOSKanban({store, actor: {kind: 'human', id: 'admin'}, authorize: async () => {}, log: vi.fn(),executionSessions:source?{source}:undefined});

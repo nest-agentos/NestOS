@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {HarnessContextRequest, NativeContextRef} from '@itookit/kernel-adapters/contracts';
+import type {HarnessContextRequest, NativeContextRef} from '@nestos/kernel-adapters/contracts';
 import {CONTEXT_BINDINGS_KEY, HarnessContextBindings} from '../src/projects/harness-context-bindings';
 import {durableState, request} from './harness-execution-fixture';
 import {context, operation} from './harness-context-fixture';

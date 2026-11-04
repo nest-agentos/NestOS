@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
 import {KanbanSidebarControls} from '../src/kanban/sidebar-controls';
-import {t} from '@itookit/common';
-import type {KanbanBoardSummary, KanbanClient} from '@itookit/kanban/contracts';
+import {t} from '@nestos/common';
+import type {KanbanBoardSummary, KanbanClient} from '@nestos/kanban/contracts';
 import {KanbanSidebar} from '../src/kanban/sidebar';
 
 const cleanups: Array<() => void> = [];

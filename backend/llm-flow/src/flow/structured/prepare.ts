@@ -1,5 +1,5 @@
 import type { DagNodeDefinition, DagPluginCatalog, DispatchBranch, DispatchConfig, FlowInvocationDefaults, JsonValue } from '../../contracts';
-import type { TaskSpec } from '@itookit/durable-kernel';
+import type { TaskSpec } from '@nestos/durable-kernel';
 import { validateSchema } from '../validation';
 import type { DispatchInput, PreparedBranch } from './types';
 import { json, object } from './value';

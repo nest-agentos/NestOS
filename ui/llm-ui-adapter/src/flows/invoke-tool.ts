@@ -1,6 +1,6 @@
-import {t} from '@itookit/common';
-import type {IPrivilegedCommandService} from '@itookit/llm-session/contracts';
-import type {JsonValue} from '@itookit/llm-flow/contracts';
+import {t} from '@nestos/common';
+import type {IPrivilegedCommandService} from '@nestos/llm-session/contracts';
+import type {JsonValue} from '@nestos/llm-flow/contracts';
 import {promptToolCall, type ToolCallValue} from './tool-call-form';
 
 /** Direct arguments and the visual picker use the same durable command port. */

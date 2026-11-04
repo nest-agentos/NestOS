@@ -1,9 +1,9 @@
-import type {KanbanExecutionPort} from '@itookit/kanban/execution';
-import type {KanbanDispatch, KanbanItem} from '@itookit/kanban/contracts';
-import type {IndependentCallService} from '@itookit/llm-session';
-import type {SubmissionRequest, IndependentCallInput} from '@itookit/llm-session/contracts';
-import type {TargetRef} from '@itookit/llm-flow/contracts';
-import type {Kernel} from '@itookit/durable-kernel';
+import type {KanbanExecutionPort} from '@nestos/kanban/execution';
+import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
+import type {IndependentCallService} from '@nestos/llm-session';
+import type {SubmissionRequest, IndependentCallInput} from '@nestos/llm-session/contracts';
+import type {TargetRef} from '@nestos/llm-flow/contracts';
+import type {Kernel} from '@nestos/durable-kernel';
 import {readContextCatalog} from '../projects/harness-context-catalog';
 import {requireValue} from './validation';
 import type {sessionSubmission} from '../run/session-submission';
@@ -14,7 +14,7 @@ export interface ContinueWorkOptions {
     submission: ReturnType<typeof sessionSubmission>; calls: Pick<IndependentCallService, 'inspectTaskCallSubmission' | 'list'>;
     kernel: Pick<Kernel, 'inspectSession' | 'sessionActivity'>;
     prepare?(input: {dispatch: KanbanDispatch; item: KanbanItem; originalDispatch: KanbanDispatch; sessionId: string; target: TargetRef}): Promise<string>;
-    observe?(dispatch: KanbanDispatch, result: import('@itookit/kanban/execution').KanbanExecutionObservation): Promise<import('@itookit/kanban/execution').KanbanExecutionObservation>;
+    observe?(dispatch: KanbanDispatch, result: import('@nestos/kanban/execution').KanbanExecutionObservation): Promise<import('@nestos/kanban/execution').KanbanExecutionObservation>;
 }
 /** The predecessor remains terminal; a new request runs in its original execution Session. */
 export function withContinuedWork(executor: KanbanExecutionPort, options: ContinueWorkOptions): KanbanExecutionPort {

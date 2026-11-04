@@ -1,5 +1,5 @@
-import {sha256HexSync} from '@itookit/common';
-import type {KanbanService, KanbanItem} from '@itookit/kanban/contracts';
+import {sha256HexSync} from '@nestos/common';
+import type {KanbanService, KanbanItem} from '@nestos/kanban/contracts';
 import type {PromptJournal} from '../run/prompt-bundle';
 import {failure} from '../run/prompt-bundle';
 import type {FileRequest} from '../run/file-exchange-protocol';

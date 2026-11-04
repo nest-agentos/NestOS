@@ -1,8 +1,8 @@
 import path from 'node:path';
 import {mkdir, lstat, rename, rm, cp} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
-import {FSError, type IStorageBackend} from '@itookit/vfs-core';
-import {type LocalStorageAccess, openLocalFSBackend} from '@itookit/vfsdriver-local';
+import {FSError, type IStorageBackend} from '@nestos/vfs-core';
+import {type LocalStorageAccess, openLocalFSBackend} from '@nestos/vfsdriver-local';
 import {NodeSqliteSidecarDb} from '../storage/sqlite-sidecar';
 import {acquireHostLock} from '../storage/host-lock';
 import {guardHostStorage} from '../storage/host-storage';

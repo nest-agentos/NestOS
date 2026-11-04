@@ -1,4 +1,4 @@
-import { createModuleLogger, t, type LocaleKey } from '@itookit/common';
+import { createModuleLogger, t, type LocaleKey } from '@nestos/common';
 
 const log = createModuleLogger('toolbox-filters');
 const labels: Record<string, LocaleKey> = {

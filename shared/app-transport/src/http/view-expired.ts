@@ -1,4 +1,4 @@
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 /** Terminal transport state: existing capabilities must never be sent to a new view. */
 export class ViewExpiredError extends FSError {

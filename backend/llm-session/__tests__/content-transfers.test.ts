@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { Kernel, KernelErrorCode } from '@itookit/durable-kernel';
-import { DagCommandService, createBuiltinDagPluginRegistry, registerDurablePrograms, type FlowDefinitionStore, type FlowRevision } from '@itookit/llm-flow';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { Kernel, KernelErrorCode } from '@nestos/durable-kernel';
+import { DagCommandService, createBuiltinDagPluginRegistry, registerDurablePrograms, type FlowDefinitionStore, type FlowRevision } from '@nestos/llm-flow';
 import { CommandBus } from '../src/core/command-bus';
 import { SessionRepository } from '../src/persistence/session-repository';
 import { RoundLog } from '../src/persistence/round-log';
@@ -11,7 +11,7 @@ import { FlowInvocationService } from '../src/session/flow-invocations';
 import { ContentTransferCommand, type ContentCapture, type ContentTransfer, type Round } from '../src/contracts';
 import { ConversationContextBuilder } from '../src/session/conversation-context';
 import { snapshotDirectAgentPolicy } from '../src/contracts/direct-agent-policy';
-import { ContextAssembler, type ContextPlan } from '@itookit/llm-context';
+import { ContextAssembler, type ContextPlan } from '@nestos/llm-context';
 
 let manager: Awaited<ReturnType<typeof createVFS>>['manager'], kernel: Kernel, repository: SessionRepository;
 let commands: CommandBus, service: ContentTransferService, sessionId: string, log: RoundLog;

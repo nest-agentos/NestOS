@@ -1,8 +1,8 @@
-import {ArtifactCommand, type ListExecutionArtifacts, type ReadExecutionArtifact} from '@itookit/app-contracts';
-import {createModuleLogger} from '@itookit/common';
-import type {Kernel} from '@itookit/durable-kernel';
-import type {CommandBus} from '@itookit/llm-session';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {ArtifactCommand, type ListExecutionArtifacts, type ReadExecutionArtifact} from '@nestos/app-contracts';
+import {createModuleLogger} from '@nestos/common';
+import type {Kernel} from '@nestos/durable-kernel';
+import type {CommandBus} from '@nestos/llm-session';
+import type {IFileSystem} from '@nestos/vfs-core';
 import {TaskArtifacts} from '../session/task-artifacts';
 import {createTaskAssetReader} from './task-assets';
 

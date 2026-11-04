@@ -1,4 +1,4 @@
-import type { Kernel, SessionHandle, SharedLeaseCondition } from '@itookit/durable-kernel';
+import type { Kernel, SessionHandle, SharedLeaseCondition } from '@nestos/durable-kernel';
 import { acquireSchedulerLease, isSchedulerOwnershipLost, type SchedulerLease } from './scheduler-lease';
 import { fenceSchedulerSession } from './fenced-session';
 

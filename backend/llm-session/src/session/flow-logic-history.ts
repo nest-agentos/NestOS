@@ -1,7 +1,7 @@
 import { t, type SessionTextKey } from '../utils/host-ports';
-import type { FlowLogicEvent } from '@itookit/llm-flow/contracts';
+import type { FlowLogicEvent } from '@nestos/llm-flow/contracts';
 import type { FlowInteraction } from '../contracts';
-import type { EventEnvelope, TaskRecord } from '@itookit/durable-kernel';
+import type { EventEnvelope, TaskRecord } from '@nestos/durable-kernel';
 import { flowActor } from './flow-identity';
 
 /** Both live history and read-only recovery consume the same durable phase event. */

@@ -5,7 +5,7 @@
  * Import whichever you need and spread-override any field that differs.
  *
  * @example
- *   import { WS_CHAT, WS_AGENTS } from '@itookit/app-shell';
+ *   import { WS_CHAT, WS_AGENTS } from '@nestos/app-shell';
  *   const WORKSPACES = [
  *     WS_CHAT,
  *     { ...WS_AGENTS, mentionScope: ['agents', 'notes'] },
@@ -171,7 +171,7 @@ export const WS_HOME: WorkspaceConfig = {
  * Each mount gets a unique id (e.g. 'mnt_1234567890') and its own VFS module.
  * Backend wiring is the caller's responsibility.
  */
-export function createWsMount(id: string, label: string, files: import('@itookit/vfs-core').FileSystemContext): WorkspaceConfig {
+export function createWsMount(id: string, label: string, files: import('@nestos/vfs-core').FileSystemContext): WorkspaceConfig {
     return {
         files,
         elementId: `${id}-workspace`,

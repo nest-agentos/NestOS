@@ -1,5 +1,5 @@
-import type {OperationOptions} from '@itookit/vfs-core';
-import type {RemoteAuthorizationInspection} from '@itookit/app-contracts/services';
+import type {OperationOptions} from '@nestos/vfs-core';
+import type {RemoteAuthorizationInspection} from '@nestos/app-contracts/services';
 import type {ProjectRemoteMount, RemoteFileConnection, RemoteFileSourceProvider} from './remote-mounts';
 import {diagnosticFailure} from '../diagnostics/failure';
 

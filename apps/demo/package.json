@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/demo",
+  "name": "@nestos/demo",
   "private": true,
   "version": "0.4.1",
   "type": "module",
@@ -15,14 +15,14 @@
     "@codemirror/language": "^6.11.3",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.8",
-    "@itookit/app-settings": "workspace:*",
-    "@itookit/common": "workspace:*",
-    "@itookit/driver-llm": "workspace:*",
-    "@itookit/llm-ui-adapter": "workspace:*",
-    "@itookit/mdx-adapter": "workspace:*",
-    "@itookit/mdxeditor": "workspace:*",
-    "@itookit/ui-common-adapter": "workspace:*",
-    "@itookit/vfs-ui": "workspace:*",
+    "@nestos/app-settings": "workspace:*",
+    "@nestos/common": "workspace:*",
+    "@nestos/driver-llm": "workspace:*",
+    "@nestos/llm-ui-adapter": "workspace:*",
+    "@nestos/mdx-adapter": "workspace:*",
+    "@nestos/mdxeditor": "workspace:*",
+    "@nestos/ui-common-adapter": "workspace:*",
+    "@nestos/vfs-ui": "workspace:*",
     "dexie": "^4.2.1",
     "immer": "^10.2.0",
     "marked": "^16.4.2",
@@ -32,5 +32,14 @@
     "@types/node": "^20.19.25",
     "typescript": "^5.9.3",
     "vite": "^5.4.21"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "apps/demo"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

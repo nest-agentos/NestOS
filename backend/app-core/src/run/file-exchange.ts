@@ -1,6 +1,6 @@
-import {randomUUID, sha256HexSync} from '@itookit/common';
-import type {SubmissionRequest} from '@itookit/llm-session/contracts';
-import type {IFileSystem} from '@itookit/vfs-core';
+import {randomUUID, sha256HexSync} from '@nestos/common';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
+import type {IFileSystem} from '@nestos/vfs-core';
 import {failure, publishImmutableFile, readPrompt, type PromptJournal} from './prompt-bundle';
 import type {sessionSubmission, SessionSubmissionObservation} from './session-submission';
 import {readFileRequests, fileRequestDigest, responseText, type FileRequest, type FileResponse, type FileReply} from './file-exchange-protocol';

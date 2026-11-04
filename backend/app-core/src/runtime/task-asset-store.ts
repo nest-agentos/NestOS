@@ -1,7 +1,7 @@
-import {taskStoragePath, type Kernel} from '@itookit/durable-kernel';
-import {sha256Hex} from '@itookit/llm-context';
-import type {TaskAssetStore, TaskAssetReference, ToolExecutionIdentity} from '@itookit/tools/contracts';
-import {readMediaAsset} from '@itookit/kernel-adapters';
+import {taskStoragePath, type Kernel} from '@nestos/durable-kernel';
+import {sha256Hex} from '@nestos/llm-context';
+import type {TaskAssetStore, TaskAssetReference, ToolExecutionIdentity} from '@nestos/tools/contracts';
+import {readMediaAsset} from '@nestos/kernel-adapters';
 
 /** Content-addressed binaries and small immutable receipts owned by the executing Task. */
 export function createTaskAssetStore(getKernel: () => Kernel): TaskAssetStore {return new DurableTaskAssets(getKernel);}

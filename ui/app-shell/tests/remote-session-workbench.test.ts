@@ -1,14 +1,14 @@
 import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
-import { MemoryBackend, createFileSystemSource, FSError } from '@itookit/vfs-core';
-import { createApplicationRuntime, remoteSessionPath, folderBrowserPath } from '@itookit/app-core';
-import { HarnessConversation, type HarnessClient, type ProjectClient } from '@itookit/cells-driver';
+import { t } from '@nestos/common';
+import { MemoryBackend, createFileSystemSource, FSError } from '@nestos/vfs-core';
+import { createApplicationRuntime, remoteSessionPath, folderBrowserPath } from '@nestos/app-core';
+import { HarnessConversation, type HarnessClient, type ProjectClient } from '@nestos/cells-driver';
 import {createLLMFactory} from '../../llm-ui-adapter/src/chat';
-import type {EditorOptions} from '@itookit/ui-common-adapter';
-import type { VFSUIShell } from '@itookit/vfs-ui';
-import { projectConversationEntryPath, projectConversationsPath } from '@itookit/app-contracts';
+import type {EditorOptions} from '@nestos/ui-common-adapter';
+import type { VFSUIShell } from '@nestos/vfs-ui';
+import { projectConversationEntryPath, projectConversationsPath } from '@nestos/app-contracts';
 
 const dialogMethods = new Map<string, PropertyDescriptor | undefined>();
 beforeEach(() => {
@@ -204,7 +204,7 @@ it('browses mounted native history pages, opens their conversations and routes a
         await vi.waitFor(()=>expect(workbench.getActiveResourceId()).toBe(remoteSessionPath(project.path,'codex','native')));
         expect(selector.value).toBe('/');
         const folder=await runtime.projects.sessionFolder(project);
-        const controls=(workbench as unknown as {remoteAgentControls(folder:string):import('@itookit/llm-ui-adapter/contracts').RemoteAgentControls}).remoteAgentControls(folder);
+        const controls=(workbench as unknown as {remoteAgentControls(folder:string):import('@nestos/llm-ui-adapter/contracts').RemoteAgentControls}).remoteAgentControls(folder);
         const remoteId=(await controls.list())[0].id;expect(remoteId).toContain('remote:');
         const before=(await runtime.sessionRepository.list()).length;
         await workbench.startSessionDraft(remotePath, undefined, remoteId);

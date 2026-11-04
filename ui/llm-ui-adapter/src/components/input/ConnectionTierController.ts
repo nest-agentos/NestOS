@@ -1,14 +1,14 @@
-import {getLocale} from '@itookit/common';
-import { TOOLBOX_ICONS, t } from '@itookit/common';
-import type { ModelTier } from '@itookit/driver-llm/contracts';
+import {getLocale} from '@nestos/common';
+import { TOOLBOX_ICONS, t } from '@nestos/common';
+import type { ModelTier } from '@nestos/driver-llm/contracts';
 import { ChatInputTemplates } from '../templates/ChatInputTemplates';
-import { PopupPanel, type PopupItem } from '@itookit/llm-ui';
+import { PopupPanel, type PopupItem } from '@nestos/llm-ui';
 import type { ConnectionOption } from '../../domain/types';
 
 interface ConnectionTierDeps {
     onNavigateSettings: (target: { resourceId: string }) => void;
     onChange: () => void;
-    onReasoning?: (capabilities: import('@itookit/driver-llm/contracts').ReasoningCapabilities | undefined, identity: string, selected: boolean) => void;
+    onReasoning?: (capabilities: import('@nestos/driver-llm/contracts').ReasoningCapabilities | undefined, identity: string, selected: boolean) => void;
     onRefreshConnections?: () => Promise<void>;
 }
 

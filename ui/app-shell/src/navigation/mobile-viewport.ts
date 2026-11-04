@@ -1,4 +1,4 @@
-import {MOBILE_NAVIGATION_QUERY} from '@itookit/ui-common-adapter';
+import {MOBILE_NAVIGATION_QUERY} from '@nestos/ui-common-adapter';
 /** Keep the app inside the visible viewport when mobile keyboards resize it. */
 export function installMobileViewport(): () => void {
     const viewport = window.visualViewport;

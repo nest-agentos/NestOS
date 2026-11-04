@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { FileSearchService } from './FileSearchService';
 
 const cleanup: Array<() => Promise<void>> = [];

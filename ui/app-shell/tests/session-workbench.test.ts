@@ -1,11 +1,11 @@
 import { createTestWorkbench } from './helpers/application';
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FSError } from '@itookit/vfs-core';
-import { RemoteConnectionUnavailableError } from '@itookit/app-core';
-import { t } from '@itookit/common';
-import { createVFSUI } from '@itookit/vfs-ui';
-vi.mock('@itookit/vfs-ui', async (importOriginal) => ({ ...(await importOriginal<typeof import('@itookit/vfs-ui')>()),
+import { FSError } from '@nestos/vfs-core';
+import { RemoteConnectionUnavailableError } from '@nestos/app-core';
+import { t } from '@nestos/common';
+import { createVFSUI } from '@nestos/vfs-ui';
+vi.mock('@nestos/vfs-ui', async (importOriginal) => ({ ...(await importOriginal<typeof import('@nestos/vfs-ui')>()),
     filterGitignoredFiles: async (_fs: unknown, _path: string, nodes: unknown[]) => nodes,
     createVFSUI: vi.fn(() => ({ on: () => () => {}, start: async () => {}, getActiveSession: () => undefined, refresh: async () => {}, selectPath: async () => {}, destroy: () => {} })) }));
 const element = () => document.createElement('div');

@@ -1,9 +1,9 @@
-import { CHAT_ICONS, harnessPresentation, t } from '@itookit/common';
-import { projectConversationsPath, projectConversationEntryPath, remoteSessionPath, type BrowserTarget } from '@itookit/app-contracts';
-import type { FSNode } from '@itookit/vfs-core';
+import { CHAT_ICONS, harnessPresentation, t } from '@nestos/common';
+import { projectConversationsPath, projectConversationEntryPath, remoteSessionPath, type BrowserTarget } from '@nestos/app-contracts';
+import type { FSNode } from '@nestos/vfs-core';
 import type { RemoteSessionProjection } from '../session/remote-session-projection';
 import { localConversationSource, readConversationPage } from './conversation-page';
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 
 function aliasNode(directory: string, node: FSNode): FSNode {
     return {...node, path: projectConversationEntryPath(directory, node.path), parentPath: directory,

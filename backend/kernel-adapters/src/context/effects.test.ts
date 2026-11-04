@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createContextContentStore, createContextService } from '@itookit/llm-context';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
+import { createContextContentStore, createContextService } from '@nestos/llm-context';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
 import { ContextLlmEffect, ContextPrepareEffect, ContextToolEffect } from './effects';
 
 function fixture() {

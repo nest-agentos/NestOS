@@ -1,5 +1,5 @@
 import type { DagNodeDefinition } from '../../contracts';
-import type { SessionHandle, TaskHandle, TaskRecord } from '@itookit/durable-kernel';
+import type { SessionHandle, TaskHandle, TaskRecord } from '@nestos/durable-kernel';
 import { startFlowTask } from '../task-capabilities';
 import { object } from '../structured/value';
 import {flowTaskHeld} from '../control-tree';

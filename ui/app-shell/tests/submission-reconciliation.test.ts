@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
+import {createOperationLedger} from '@nestos/llm-ui';
 import {ChatInput} from '../../llm-ui-adapter/src/components/input/ChatInputView';
 import {SendMessageCommand} from '../../llm-ui-adapter/src/commands/SendMessageCommand';
 import type {CommandContext} from '../../llm-ui-adapter/src/commands/CommandContext';
-import type {SubmissionReceipt, SubmissionRequest} from '@itookit/llm-session/contracts';
+import type {SubmissionReceipt, SubmissionRequest} from '@nestos/llm-session/contracts';
 
 const cleanup: Array<() => void> = [];
 afterEach(() => {cleanup.splice(0).forEach(close => close()); document.body.replaceChildren();});

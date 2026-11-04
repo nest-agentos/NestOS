@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { LLMSkill } from '@itookit/kernel-adapters/contracts';
+import type { LLMSkill } from '@nestos/kernel-adapters/contracts';
 import { SkillsEngine } from '../src/configuration/skills-files';
 
 function fixture() {

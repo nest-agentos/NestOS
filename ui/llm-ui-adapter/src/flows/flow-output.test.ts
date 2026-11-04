@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flowOutputEntries, formatFlowOutput, nodeOutputEntries } from '@itookit/llm-flow/contracts';
+import { flowOutputEntries, formatFlowOutput, nodeOutputEntries } from '@nestos/llm-flow/contracts';
 import { renderFlowOutput } from '../components/dag/FlowOutput';
 
 describe('Flow result projection', () => {

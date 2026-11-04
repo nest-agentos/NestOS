@@ -1,5 +1,5 @@
-import {requireMediaCapabilities, supportsMediaEndpoint, type ConnectionMeta, type LLMModel, type LLMProvider} from '@itookit/driver-llm/contracts';
-import { resolveModelForTier } from '@itookit/kernel-adapters/contracts';
+import {requireMediaCapabilities, supportsMediaEndpoint, type ConnectionMeta, type LLMModel, type LLMProvider} from '@nestos/driver-llm/contracts';
+import { resolveModelForTier } from '@nestos/kernel-adapters/contracts';
 
 /** Catalog declarations describe discoverability; credentials remain a separate readiness check. */
 export function modelCapabilities(provider: LLMProvider | undefined, models = provider?.models ?? []): string[] {

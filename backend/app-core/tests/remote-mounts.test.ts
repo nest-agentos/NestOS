@@ -1,5 +1,5 @@
 import { it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MemoryBackend, createFileSystemSource, createFileSystemView, createVFS, FSError, type FileSystemSourceOwner } from '@itookit/vfs-core';
+import { MemoryBackend, createFileSystemSource, createFileSystemView, createVFS, FSError, type FileSystemSourceOwner } from '@nestos/vfs-core';
 import { createSessionBrowser, folderBrowserPath } from '../src/session/session-browser';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { MCPRemoteConnections } from '../src/projects/mcp-remote-connections';
@@ -420,7 +420,7 @@ it('binds a server-managed writable subdirectory while keeping workbench Session
         if (input.createDirectory) await remoteBackend.mkdir('/group/new'); return record;
     });
     const harnessClose=vi.fn(async () => {}), stopEvents=vi.fn(), subscribeEvents=vi.fn(() => stopEvents), harness=vi.fn(() => ({close:harnessClose,subscribe:subscribeEvents}));
-    const client={register,read:async()=>record,close:vi.fn(async()=>{}),harness} as unknown as import('@itookit/cells-driver').ProjectClient;
+    const client={register,read:async()=>record,close:vi.fn(async()=>{}),harness} as unknown as import('@nestos/cells-driver').ProjectClient;
     const runtime=await createApplicationRuntime({backend:new MemoryBackend(),ownerKind:'web',remoteSourceProvider:{
         resolveCredential:()=>'fixture-secret', setCredential() {},async dispose() {},projects:()=>client,
         discover:vi.fn(async()=>{throw new Error('Use generic MCP discovery');}),

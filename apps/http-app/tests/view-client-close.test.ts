@@ -1,7 +1,7 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {RpcPeer} from '@itookit/app-transport/application';
-import {HttpViewClient} from '@itookit/app-transport/http';
-import type {Call} from '@itookit/app-transport/rpc';
+import {RpcPeer} from '@nestos/app-transport/application';
+import {HttpViewClient} from '@nestos/app-transport/http';
+import type {Call} from '@nestos/app-transport/rpc';
 
 type Request = {kind: string; call?: Call; calls?: Call[]};
 const releases: Array<() => Promise<void>> = [];

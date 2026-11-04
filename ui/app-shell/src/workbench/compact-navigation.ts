@@ -1,7 +1,7 @@
-import {contentTitleBar, installNavigationButtonPresentation, navigationButton} from '@itookit/ui-common-adapter';
+import {contentTitleBar, installNavigationButtonPresentation, navigationButton} from '@nestos/ui-common-adapter';
 import {windowNavigation, type WindowNavigation} from './window-navigation';
 import {openedButton} from './opened-button';
-import {ACTION_ICONS, t} from '@itookit/common';
+import {ACTION_ICONS, t} from '@nestos/common';
 
 /** Compatibility adapter delegates all content title layout to ui-common. */
 export function compactNavigation(container: HTMLElement, context: string, back: () => void, open: (origin: HTMLButtonElement) => void, actions?: WindowNavigation) {

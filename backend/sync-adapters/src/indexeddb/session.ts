@@ -1,6 +1,6 @@
 import { IndexedDBSyncStore } from './store';
-import { FileSync, randomId, type Coordinator, type FileRemote, type Scope } from '@itookit/vfs-sync';
-import type { IndexedDBBackend } from '@itookit/vfsdriver-indexeddb';
+import { FileSync, randomId, type Coordinator, type FileRemote, type Scope } from '@nestos/vfs-sync';
+import type { IndexedDBBackend } from '@nestos/vfsdriver-indexeddb';
 import { IndexedDBFileLocal } from './local';
 import { IndexedDBSyncCoordinator } from './lease-coordinator';
 

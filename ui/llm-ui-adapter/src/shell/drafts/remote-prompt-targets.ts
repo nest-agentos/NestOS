@@ -1,6 +1,6 @@
-import type {CallTargetCatalog, CallTargetChoice} from '@itookit/llm-ui';
+import type {CallTargetCatalog, CallTargetChoice} from '@nestos/llm-ui';
 import type {ExecutorOption} from '../../domain/types';
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 /** Native execution remains available beside published NestOS prompt targets. */
 export function remotePromptTargets(catalog: CallTargetCatalog, executors: readonly ExecutorOption[]): CallTargetCatalog {

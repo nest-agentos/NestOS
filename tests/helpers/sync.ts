@@ -1,4 +1,4 @@
-import type { Binding, Coordinator, StateStore, SyncState } from '@itookit/vfs-sync';
+import type { Binding, Coordinator, StateStore, SyncState } from '@nestos/vfs-sync';
 export const binding: Binding = { bindingId: 'b', bindingRevision: '1', locatorRevision: '1', policyRevision: '1', scopeRevision: '1',
     state: 'active', authorityId: 'a', namespaceId: 'personal', historyEpoch: 'e', projectId: 'p', localProjectId: 'local',
     replicaId: 'r', sourceId: 'idb', root: '/workspace', datasetId: 'files', direction: 'both' };

@@ -6,7 +6,7 @@
  * ~/.config/nestos/nestos.json) and resolves the real NestOS data root.
  * Mirrors apps/tauri-app/src-tauri/src/lib.rs `resolve_all_paths`.
  */
-import {configurationFilePath, configDirectory} from '@itookit/node-host/runtime';
+import {configurationFilePath, configDirectory} from '@nestos/node-host/runtime';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
@@ -14,7 +14,7 @@ import {
     resolveNestOSProfile as resolveProfile,
     type NestOSProfile,
     type NestOSProfileSettings,
-} from '@itookit/app-core';
+} from '@nestos/app-core';
 
 /** Config dir: $XDG_CONFIG_HOME/nestos or ~/.config/nestos. */
 function configDir(): string { return configDirectory(); }

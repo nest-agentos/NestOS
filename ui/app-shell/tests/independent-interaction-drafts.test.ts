@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
-import {IndependentCallCommand, type IndependentCallView} from '@itookit/llm-session/contracts';
+import {createOperationLedger} from '@nestos/llm-ui';
+import {IndependentCallCommand, type IndependentCallView} from '@nestos/llm-session/contracts';
 import {IndependentCallPanel} from '../../llm-ui-adapter/src/components/IndependentCallPanel';
 import {InteractionDraftPersistence} from '../../llm-ui-adapter/src/services/InteractionDraftPersistence';
 let panel: IndependentCallPanel | undefined;

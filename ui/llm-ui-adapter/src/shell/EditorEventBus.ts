@@ -1,6 +1,6 @@
 // @file: llm-ui/shell/EditorEventBus.ts
 
-import { EventBus as CoreEventBus } from '@itookit/vfs-core';
+import { EventBus as CoreEventBus } from '@nestos/vfs-core';
 import type { IEditorEventBus, EditorBusEvents, EditorEventKey } from '../domain/events';
 
 /**

@@ -2,9 +2,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { SessionLeaseStore } from '@itookit/app-core';
-import { createVFS } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
+import { SessionLeaseStore } from '@nestos/app-core';
+import { createVFS } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { await Promise.all(cleanup.splice(0).map(run => run())); });

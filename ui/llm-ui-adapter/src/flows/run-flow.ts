@@ -1,10 +1,10 @@
 import { flowConnectionSelection } from './connection-selection';
-import { t } from '@itookit/common';
-import { type FlowDraft, type FlowRevision, type JsonValue } from '@itookit/llm-flow/contracts';
-import { type ICommandBus } from '@itookit/llm-session/contracts';
-import { SessionCommand } from '@itookit/llm-session/contracts';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
-import { assertRootCallable, CallableExposureError } from '@itookit/llm-flow/contracts';
+import { t } from '@nestos/common';
+import { type FlowDraft, type FlowRevision, type JsonValue } from '@nestos/llm-flow/contracts';
+import { type ICommandBus } from '@nestos/llm-session/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
+import { assertRootCallable, CallableExposureError } from '@nestos/llm-flow/contracts';
 import { promptFlowParameters, type FlowConnectionSelection } from '../components/FlowParameterForm';
 
 function assertLaunchScope(flow: FlowDraft | FlowRevision): void {

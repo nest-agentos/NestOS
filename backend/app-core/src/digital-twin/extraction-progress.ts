@@ -1,4 +1,4 @@
-import type { Kernel } from '@itookit/durable-kernel';
+import type { Kernel } from '@nestos/durable-kernel';
 import { traceAnalysis } from './diagnostics';
 import { readProgress } from './read-progress';
 import type { TwinAnalysisJob } from './domain';

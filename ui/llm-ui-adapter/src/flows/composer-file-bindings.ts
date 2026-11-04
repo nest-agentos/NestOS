@@ -1,4 +1,4 @@
-import {createModuleLogger, randomUUID, sha256Hex, t} from '@itookit/common';
+import {createModuleLogger, randomUUID, sha256Hex, t} from '@nestos/common';
 import {fileBytes} from '../utils/file-bytes';
 
 interface Material {name?: string; asset: {bytes?: number; sha256?: string; mimeType?: string}}

@@ -1,6 +1,6 @@
 /** Shared application capabilities; implementations belong to backend/app-core. */
-import type * as ToolContracts from '@itookit/tools/contracts';
-import type { IFileSystem, FileSystemMount, FileSystemSourceOwner, FileSystemContextOwner } from '@itookit/vfs-core';
+import type * as ToolContracts from '@nestos/tools/contracts';
+import type { IFileSystem, FileSystemMount, FileSystemSourceOwner, FileSystemContextOwner } from '@nestos/vfs-core';
 
 export interface SessionMountRecord {
     mountId: string;
@@ -82,10 +82,10 @@ export interface SessionProcessMount {
 }
 
 /** Browser-facing file capabilities exclude manager, driver and execution ownership. */
-export type DeviceDescription = Pick<import('@itookit/vfs-core').IDeviceDriver, 'handlerId' | 'description' | 'writable' | 'streamable' | 'sessionable'>;
+export type DeviceDescription = Pick<import('@nestos/vfs-core').IDeviceDriver, 'handlerId' | 'description' | 'writable' | 'streamable' | 'sessionable'>;
 export interface FileSystemsPort {
     openFileSystem(rootPath: string): Promise<IFileSystem>;
-    readonly ioStats: import('@itookit/vfs-core').IVFSManager['ioStats'];
+    readonly ioStats: import('@nestos/vfs-core').IVFSManager['ioStats'];
     readonly devices: { list(): string[]; get(id: string): DeviceDescription };
 }
 export type SessionFilesPort = Pick<SessionFilesService, 'invalidate' | 'subscribe' | 'inspect' | 'configure' | 'disable' | 'acquireFiles'>;

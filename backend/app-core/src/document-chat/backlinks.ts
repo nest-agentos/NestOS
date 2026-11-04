@@ -1,5 +1,5 @@
-import {FSError} from '@itookit/vfs-core';
-import type {LocalApplicationServices} from '@itookit/app-contracts/services';
+import {FSError} from '@nestos/vfs-core';
+import type {LocalApplicationServices} from '@nestos/app-contracts/services';
 import {DocumentChatRegistry} from './registry';
 
 /** Branch backlinks query the canonical reverse index, never a second independently edited list. */

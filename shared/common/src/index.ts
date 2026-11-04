@@ -1,6 +1,6 @@
 // shared/common/src/index.ts
 
-// ── UI 契约已迁移至 @itookit/ui-common-adapter（IEditor/ISessionUI/EditorFactory 及 UI 组件）──
+// ── UI 契约已迁移至 @nestos/ui-common-adapter（IEditor/ISessionUI/EditorFactory 及 UI 组件）──
 
 // ── 日志 ──
 export {
@@ -54,7 +54,7 @@ export {
     ENTITY_ICONS, AGENT_ICON_PALETTE, SLASH_ICONS, getFileIcon, harnessPresentation,
 } from './i18n/icons';
 
-// ── EventBus: 已移入 @itookit/vfs-core；消费方从 vfs-core 导入 ──
+// ── EventBus: 已移入 @nestos/vfs-core；消费方从 vfs-core 导入 ──
 
 export { FILE_ICONS, FILE_BROWSER_ICONS, fileTypeIcon } from './i18n/file-icons';
 export { HARNESS_STATE_ICONS } from './i18n/icons';

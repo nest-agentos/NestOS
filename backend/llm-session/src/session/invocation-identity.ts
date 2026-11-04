@@ -1,5 +1,5 @@
-import type {DagRunSpec, FlowRevision, InvocationIdentity} from '@itookit/llm-flow/contracts';
-import type {Kernel} from '@itookit/durable-kernel';
+import type {DagRunSpec, FlowRevision, InvocationIdentity} from '@nestos/llm-flow/contracts';
+import type {Kernel} from '@nestos/durable-kernel';
 import type {ExecutionRef, Round} from '../contracts/conversation';
 import type {ExecutionTask} from '../core/types';
 import {ulid} from '../persistence/ulid';

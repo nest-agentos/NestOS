@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { createFileSystemSource, MemoryBackend } from '@itookit/vfs-core';
+import { createFileSystemSource, MemoryBackend } from '@nestos/vfs-core';
 import { ProjectSearch } from '../src/projects/project-search';
 import type { ProjectService } from '../src/projects/project-service';
 

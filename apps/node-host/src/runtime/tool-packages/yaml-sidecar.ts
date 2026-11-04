@@ -1,7 +1,7 @@
 import {lstat, readFile, writeFile, rename, rm} from 'node:fs/promises';
 import path from 'node:path';
 import {load, dump, JSON_SCHEMA} from 'js-yaml';
-import {randomUUID} from '@itookit/common';
+import {randomUUID} from '@nestos/common';
 import {packageError} from './manifest';
 
 /** Host-owned YAML never supplies executable code or arbitrary filesystem paths. */

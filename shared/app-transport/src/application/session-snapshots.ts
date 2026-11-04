@@ -1,4 +1,4 @@
-import type {ApplicationViewObservation} from '@itookit/app-contracts/services';
+import type {ApplicationViewObservation} from '@nestos/app-contracts/services';
 import {SessionHistory} from './session-history';
 
 type Snapshot = Record<string, any>;

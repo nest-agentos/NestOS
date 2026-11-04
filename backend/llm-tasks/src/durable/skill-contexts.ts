@@ -1,5 +1,5 @@
-import type { SkillDefinition } from '@itookit/tools/contracts';
-import type { ToolDefinition } from '@itookit/llm-context';
+import type { SkillDefinition } from '@nestos/tools/contracts';
+import type { ToolDefinition } from '@nestos/llm-context';
 import type { DurableAgentInput } from './types';
 
 /** One activated Skill snapshot, exactly the shape a runtime `load_skill` result carries. */

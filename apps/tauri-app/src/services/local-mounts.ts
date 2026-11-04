@@ -1,9 +1,9 @@
 /** User-selected directories are independent sources, never global root mounts. */
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { createFileSystemSource, type FileSystemContext, type FileSystemSourceOwner, type IFileSystem } from '@itookit/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { createFileSystemSource, type FileSystemContext, type FileSystemSourceOwner, type IFileSystem } from '@nestos/vfs-core';
 import { TauriSqlSidecarDb } from '../db/tauri-sql-sidecar';
 import { TauriFsOps } from '../fs/tauri-fs-ops';
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 
 export interface MountEntry {
     id: string;

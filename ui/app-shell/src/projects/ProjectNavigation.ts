@@ -1,16 +1,16 @@
 import {showProjectSettings} from './project-settings';
 import {projectStatusLabel} from '../diagnostics/presentation';
-import {diagnosticReasonText} from '@itookit/app-settings';
+import {diagnosticReasonText} from '@nestos/app-settings';
 import { sessionCreationReason } from './session-creation-policy';
 import { fileFirst, projectItems } from './navigation-policy';
 import { remapProjectPath } from './project-paths';
-import { t, FILE_BROWSER_ICONS, VFS_TOOLBAR_ICONS, ENTITY_ICONS, FEEDBACK_ICONS, PROJECT_ACTION_ICONS } from '@itookit/common';
+import { t, FILE_BROWSER_ICONS, VFS_TOOLBAR_ICONS, ENTITY_ICONS, FEEDBACK_ICONS, PROJECT_ACTION_ICONS } from '@nestos/common';
 import { ProjectSyncStatusIndicator, projectSyncIcon } from './sync/indicator';
 import type { ProjectSyncIndicator } from './sync/presentation';
-import { browserTargetFolder, folderBrowserPath, resolveBrowserTarget } from '@itookit/app-contracts';
-import type { ProjectFolder, ProjectNavigationView, ProjectService } from '@itookit/app-contracts/services';
-import { ScopeSelector } from '@itookit/vfs-ui';
-import type { VFSActionDefinition, VFSActionContext, VFSToolbarContext, VFSColumnsOptions, VFSNodeUI, VFSUIShell } from '@itookit/vfs-ui';
+import { browserTargetFolder, folderBrowserPath, resolveBrowserTarget } from '@nestos/app-contracts';
+import type { ProjectFolder, ProjectNavigationView, ProjectService } from '@nestos/app-contracts/services';
+import { ScopeSelector } from '@nestos/vfs-ui';
+import type { VFSActionDefinition, VFSActionContext, VFSToolbarContext, VFSColumnsOptions, VFSNodeUI, VFSUIShell } from '@nestos/vfs-ui';
 import { decorateButton } from '../workbench/controls';
 import { showProjectDefaultSettings } from './project-default-settings';
 

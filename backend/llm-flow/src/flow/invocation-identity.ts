@@ -1,4 +1,4 @@
-import {sha256HexSync} from '@itookit/llm-context';
+import {sha256HexSync} from '@nestos/llm-context';
 import {isInvocationIdentity, type InvocationIdentity} from '../contracts/flow';
 
 /** Stable business identity; graph generations and Kernel attempt ids do not participate. */
@@ -25,7 +25,7 @@ export function flowNodeInvocation(version: 1 | undefined, parent: Partial<Invoc
 }
 
 /** Do not upgrade or downgrade accepted Task fingerprints during recovery. */
-export function assertInvocationCheckpoint(root: import('@itookit/durable-kernel').TaskRecord, version: 1 | undefined): void {
+export function assertInvocationCheckpoint(root: import('@nestos/durable-kernel').TaskRecord, version: 1 | undefined): void {
     const initial = (root.input as {initialScheduler?: {invocationIdentityVersion?: unknown}} | undefined)?.initialScheduler;
     if (initial?.invocationIdentityVersion !== version)
         throw Object.assign(new Error('Invocation identity protocol differs from the frozen Run'), {code: 'FLOW_INVOCATION_CHECKPOINT_MISMATCH'});

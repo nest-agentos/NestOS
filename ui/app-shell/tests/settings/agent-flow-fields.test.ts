@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
-import { renderAgentFlowFields, readAgentFlowFields } from '@itookit/llm-ui-adapter/settings';
-import type { FormParameter } from '@itookit/llm-ui/forms';
+import { renderAgentFlowFields, readAgentFlowFields } from '@nestos/llm-ui-adapter/settings';
+import type { FormParameter } from '@nestos/llm-ui/forms';
 
 function form(parameters: FormParameter[], values: Record<string, unknown> = {}) {
     const root = document.createElement('div');

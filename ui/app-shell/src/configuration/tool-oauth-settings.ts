@@ -1,5 +1,5 @@
-import {escapeAttr, escapeHTML, t, type LocaleKey} from '@itookit/common';
-import type {ToolConnectionType, ToolConnectionView} from '@itookit/app-contracts/services';
+import {escapeAttr, escapeHTML, t, type LocaleKey} from '@nestos/common';
+import type {ToolConnectionType, ToolConnectionView} from '@nestos/app-contracts/services';
 const label = (key: string) => escapeHTML(t(`toolbox.connections.${key}` as LocaleKey));
 
 export function applicationSettings(type: ToolConnectionType, redirect?: string): string {

@@ -1,11 +1,11 @@
 import { expect, it, vi } from 'vitest';
-import type { SkillDefinition } from '@itookit/tools/contracts';
-import type { ToolExecutionContext } from '@itookit/tools/contracts';
-import type { INativeShell } from '@itookit/tools';
+import type { SkillDefinition } from '@nestos/tools/contracts';
+import type { ToolExecutionContext } from '@nestos/tools/contracts';
+import type { INativeShell } from '@nestos/tools';
 import { createSkillToolHandlers } from './tool-handlers';
 import { MCPToolAdapter, mcpToolId } from '../tool/mcp-tools';
 import { SkillDeviceDriver } from './skill-device-driver';
-import { ToolDeviceDriver } from '@itookit/tools';
+import { ToolDeviceDriver } from '@nestos/tools';
 
 const skill: SkillDefinition = { id: 'test', name: 'Test', description: '', type: 'prompt', enabled: true,
     instructions: '', tools: [], triggerPatterns: [], autoLoad: false, priority: 1 };

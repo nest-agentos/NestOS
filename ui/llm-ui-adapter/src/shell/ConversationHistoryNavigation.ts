@@ -1,9 +1,9 @@
-import { copyText, Toast } from '@itookit/ui-common-adapter';
-import type { SessionGroup } from '@itookit/llm-session/contracts';
+import { copyText, Toast } from '@nestos/ui-common-adapter';
+import type { SessionGroup } from '@nestos/llm-session/contracts';
 import { FloatingNavPanel } from '../components/FloatingNavPanel';
 import type { HistoryView } from '../components/HistoryView';
 import { visibleSessionId } from '../components/history/visible-session';
-import {getPreviewText} from '@itookit/llm-ui';
+import {getPreviewText} from '@nestos/llm-ui';
 import { EditorEventBus } from './EditorEventBus';
 import { PromptNavigator, type PromptNavigationItem, type PromptNavigationOptions } from '../components/PromptNavigator';
 

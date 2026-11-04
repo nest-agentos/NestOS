@@ -3,12 +3,12 @@ import { expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createVFS } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { SessionRepository } from '@itookit/llm-session';
+import { createVFS } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { SessionRepository } from '@nestos/llm-session';
 import { SessionRegistry } from '../../../backend/llm-session/src/session/session-registry';
-import { Kernel } from '@itookit/durable-kernel';
-import { NodeFsOps } from '@itookit/vfsdriver-local/node';
+import { Kernel } from '@nestos/durable-kernel';
+import { NodeFsOps } from '@nestos/vfsdriver-local/node';
 
 it('measures cold history loading on LocalFS without reading each round twice', async () => {
     const root = await mkdtemp(join(tmpdir(), 'session-load-cost-'));

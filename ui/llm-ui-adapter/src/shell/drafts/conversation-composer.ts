@@ -1,5 +1,5 @@
 import type {ConversationControls} from '../../contracts';
-import {randomUUID, t} from '@itookit/common';
+import {randomUUID, t} from '@nestos/common';
 
 import type {IChatInputConfig} from '../../domain/ports/IChatInputPresenter';
 import {DraftDataCodec} from './session-draft-data';

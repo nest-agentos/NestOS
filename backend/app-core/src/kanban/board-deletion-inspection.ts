@@ -1,5 +1,5 @@
-import {sha256HexSync} from '@itookit/common';
-import type {KanbanClient, KanbanDeletionPreview} from '@itookit/kanban/contracts';
+import {sha256HexSync} from '@nestos/common';
+import type {KanbanClient, KanbanDeletionPreview} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 import {analysisHistory} from './automation-analysis';
 import {requireValue} from './validation';

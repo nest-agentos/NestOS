@@ -1,8 +1,8 @@
-import { FlowAggregateProgram } from '@itookit/llm-flow';
+import { FlowAggregateProgram } from '@nestos/llm-flow';
 import { expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { DurableChatProgram } from '@itookit/llm-tasks';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { DurableChatProgram } from '@nestos/llm-tasks';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { ConversationRunCoordinator } from '../src/session/conversation-run-coordinator';
 import { skillContextResolver } from '../src/session/direct-conversation';
 

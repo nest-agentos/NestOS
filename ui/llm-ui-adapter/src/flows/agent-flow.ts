@@ -1,12 +1,12 @@
-import {promptHarnessFlow} from '@itookit/llm-session/contracts';
+import {promptHarnessFlow} from '@nestos/llm-session/contracts';
 import {expandComposerReferences} from './composer-references';
 import {ParameterSources} from './parameter-sources';
 import {resolveFlowArguments} from './flow-arguments';
-import type {ResourceScope} from '@itookit/app-contracts';
-import { createModuleLogger, t, randomUUID } from '@itookit/common';
-import {assertRootCallable, flowParameterValues, FlowCommand, type FlowRevision, type JsonValue} from '@itookit/llm-flow/contracts';
-import type {RootCallTarget} from '@itookit/llm-session/contracts';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
+import type {ResourceScope} from '@nestos/app-contracts';
+import { createModuleLogger, t, randomUUID } from '@nestos/common';
+import {assertRootCallable, flowParameterValues, FlowCommand, type FlowRevision, type JsonValue} from '@nestos/llm-flow/contracts';
+import type {RootCallTarget} from '@nestos/llm-session/contracts';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
 import type { ExecutorOption } from '../domain/types';
 import { promptFlowParameters, readFlowParameterDefaults } from '../components/FlowParameterForm';
 import { flowConnectionSelection } from './connection-selection';
@@ -113,7 +113,7 @@ async function prepareDefinition(commands: ICommandBus, flow: FlowRevision, sign
         flowConnectionBindings: connection.bindings, connectionId: connection.selected};
 }
 
-async function directRunValues(parameters: import('@itookit/llm-flow/contracts').FlowParameter[], flow: FlowRevision,
+async function directRunValues(parameters: import('@nestos/llm-flow/contracts').FlowParameter[], flow: FlowRevision,
     connection: import('../components/FlowParameterForm').FlowConnectionSelection, trace: AgentFlowTrace): Promise<Record<string, JsonValue> | undefined> {
     let values: Record<string, JsonValue>;
     try {values = readFlowParameterDefaults(parameters, flow.inputGroups);}

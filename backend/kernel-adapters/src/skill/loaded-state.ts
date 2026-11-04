@@ -1,6 +1,6 @@
-import type { ISkillService, SkillVersionSnapshot, SkillVersionDrift } from '@itookit/tools/contracts';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
-import { KernelError, KernelErrorCode } from '@itookit/durable-kernel';
+import type { ISkillService, SkillVersionSnapshot, SkillVersionDrift } from '@nestos/tools/contracts';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
+import { KernelError, KernelErrorCode } from '@nestos/durable-kernel';
 import { validateSkillVersionSnapshot } from './version-snapshot';
 
 export interface LoadedSkillVersions {

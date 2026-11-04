@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import {KernelError, KernelErrorCode} from '@itookit/durable-kernel';
+import {KernelError, KernelErrorCode} from '@nestos/durable-kernel';
 import {createSessionExecutionPreparer} from '../src/session/prepare-session-execution';
 
 it('prepares storage only after the metadata lease and refuses a denied owner before Kernel access', async () => {

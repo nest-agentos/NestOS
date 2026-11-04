@@ -1,4 +1,4 @@
-import type { ChatGPTConfig } from '@itookit/driver-llm/contracts';
+import type { ChatGPTConfig } from '@nestos/driver-llm/contracts';
 
 /** Safe view state; credentials and PKCE material never cross the application boundary. */
 export interface ProviderAuthorizationState {

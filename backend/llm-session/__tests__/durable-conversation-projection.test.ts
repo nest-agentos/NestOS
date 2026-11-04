@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Kernel, type SessionHandle } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IFileSystem, type IVFSManager } from '@itookit/vfs-core';
+import { Kernel, type SessionHandle } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IFileSystem, type IVFSManager } from '@nestos/vfs-core';
 import { DurableConversationProjection } from '../src/persistence/durable-conversation-projection';
 import type { ConversationManifest, ISessionRepository } from '../src/persistence/types';
 

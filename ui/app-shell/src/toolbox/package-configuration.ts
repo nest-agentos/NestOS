@@ -1,7 +1,7 @@
-import '@itookit/llm-ui/forms.css';
-import {escapeHTML, t, type LocaleKey} from '@itookit/common';
-import type {ToolPackageInfo, ToolPackageSettings} from '@itookit/app-contracts/services';
-import {renderParameterFields, readParameterFields} from '@itookit/llm-ui/forms';
+import '@nestos/llm-ui/forms.css';
+import {escapeHTML, t, type LocaleKey} from '@nestos/common';
+import type {ToolPackageInfo, ToolPackageSettings} from '@nestos/app-contracts/services';
+import {renderParameterFields, readParameterFields} from '@nestos/llm-ui/forms';
 const label = (key: string) => escapeHTML(t(`toolbox.packages.${key}` as LocaleKey));
 
 export function packageConfiguration(item: ToolPackageInfo, busy: boolean): string {

@@ -15,7 +15,7 @@ import {
     SessionOrigin,
     HistoryPolicy,
 } from '../core/types';
-import type { SendIntent } from '@itookit/llm-flow/contracts';
+import type { SendIntent } from '@nestos/llm-flow/contracts';
 import { ConversationError, ConversationErrorCode } from '../core/errors';
 import { SessionState } from './session-state';
 import { SessionRegistry } from './session-registry';

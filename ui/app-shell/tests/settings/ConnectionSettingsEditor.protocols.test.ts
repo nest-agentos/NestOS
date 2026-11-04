@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { ConnectionSettingsEditor } from '@itookit/llm-ui-adapter/settings';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
+import { ConnectionSettingsEditor } from '@nestos/llm-ui-adapter/settings';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
 
 afterEach(() => { document.body.innerHTML = ''; });
 

@@ -1,5 +1,5 @@
 import { it, expect, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { ProjectDraftStore } from '../src/projects/drafts/store';
 
 it('allocates stable draft and session identities without native randomUUID', async () => {

@@ -1,5 +1,5 @@
-import { randomUUID, t } from '@itookit/common';
-import { ContentTransferCommand, type ContentTransfer, type ICommandBus } from '@itookit/llm-session/contracts';
+import { randomUUID, t } from '@nestos/common';
+import { ContentTransferCommand, type ContentTransfer, type ICommandBus } from '@nestos/llm-session/contracts';
 import { promptFlowParameters } from '../components/FlowParameterForm';
 import { FlowInputSources } from './flow-input-sources';
 import { contentSourceError } from './content-source-picker';

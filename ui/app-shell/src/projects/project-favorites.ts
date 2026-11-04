@@ -1,8 +1,8 @@
-import { resolveBrowserTarget } from '@itookit/app-contracts';
-import type { ProjectFavoriteTarget, ProjectService } from '@itookit/app-contracts/services';
-import type { ISessionRepository } from '@itookit/llm-session/contracts';
-import type { FavoriteAction, VFSNodeUI } from '@itookit/vfs-ui';
-import type { FSNode } from '@itookit/vfs-core';
+import { resolveBrowserTarget } from '@nestos/app-contracts';
+import type { ProjectFavoriteTarget, ProjectService } from '@nestos/app-contracts/services';
+import type { ISessionRepository } from '@nestos/llm-session/contracts';
+import type { FavoriteAction, VFSNodeUI } from '@nestos/vfs-ui';
+import type { FSNode } from '@nestos/vfs-core';
 
 type FavoriteRoute = Extract<ReturnType<typeof resolveBrowserTarget>, { kind: 'project-files' | 'session' | 'favorite' | 'remote' }>;
 

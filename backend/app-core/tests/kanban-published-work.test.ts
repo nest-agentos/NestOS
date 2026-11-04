@@ -1,7 +1,7 @@
 import {expect, it, vi} from 'vitest';
-import type {IndependentCallView, IndependentCallInput} from '@itookit/llm-session/contracts';
-import type {KanbanDispatch, KanbanItem} from '@itookit/kanban/contracts';
-import type {TaskRecord} from '@itookit/durable-kernel';
+import type {IndependentCallView, IndependentCallInput} from '@nestos/llm-session/contracts';
+import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
+import type {TaskRecord} from '@nestos/durable-kernel';
 import {createPublishedKanbanWorkExecutor, type PublishedKanbanWorkOptions} from '../src/kanban/published-work';
 const dispatch:KanbanDispatch={id:'dispatch',itemId:'item',itemRevision:1,planId:'plan',planRevision:1,principal:{kind:'service',id:'worker'},definitionDigest:'a'.repeat(64),attempt:1,fence:'fence',preparedAt:1,outcome:'prepared',inputs:{}};
 async function fixture() {

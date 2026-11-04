@@ -1,5 +1,5 @@
-import {FSError} from '@itookit/vfs-core';
-import {randomUUID} from '@itookit/common';
+import {FSError} from '@nestos/vfs-core';
+import {randomUUID} from '@nestos/common';
 import type {RemoteProcessHandle} from './remote-mounts';
 
 export interface PreparedWorktree {id: string; directory: string; branch: string; baseCommit: string; phase: 'prepared' | 'creating' | 'ready'; claim?: string}

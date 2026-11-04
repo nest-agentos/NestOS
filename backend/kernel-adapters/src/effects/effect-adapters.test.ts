@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { IToolService, ToolInvokeResult } from '@itookit/tools/contracts';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
+import type { IToolService, ToolInvokeResult } from '@nestos/tools/contracts';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
 import { ToolCallEffectAdapter } from './tool-call-effect';
 import { TtyEffectAdapter } from './tty-effect';
 import { BashEffectAdapter } from './bash-effect';

@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import {resolveBrowserTarget, type BrowserTarget} from '@itookit/app-contracts';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import {resolveBrowserTarget, type BrowserTarget} from '@nestos/app-contracts';
 import {showNameDialog} from '../files/project-dialog';
 
 type Target = Extract<BrowserTarget, {kind: 'remote'}>;

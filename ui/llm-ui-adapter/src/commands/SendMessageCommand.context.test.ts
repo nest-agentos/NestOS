@@ -1,10 +1,10 @@
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
-import {SessionCommand, type SubmissionRequest} from '@itookit/llm-session/contracts';
+import {createOperationLedger} from '@nestos/llm-ui';
+import {SessionCommand, type SubmissionRequest} from '@nestos/llm-session/contracts';
 import {SendMessageCommand} from './SendMessageCommand';
 import type {CommandContext} from './CommandContext';
 import type {IChatInputConfig} from '../domain/ports/IChatInputPresenter';
-import {Toast} from '@itookit/ui-common-adapter';
+import {Toast} from '@nestos/ui-common-adapter';
 
 const target = {kind: 'agent' as const, id: 'worker', version: '1', digest: 'published'};
 const context = () => ({revision: 1, sessionId: 'session', branchId: 'main', target: {...target}, selection: {

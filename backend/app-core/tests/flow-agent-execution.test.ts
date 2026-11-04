@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
-import { FlowCommand, type FlowDraft, type JsonValue } from '@itookit/llm-flow/contracts';
-import { ContentTransferCommand, FlowInvocationCommand, SessionCommand, type FlowInvocationRecord, type SessionInstructionQueue } from '@itookit/llm-session/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
+import { FlowCommand, type FlowDraft, type JsonValue } from '@nestos/llm-flow/contracts';
+import { ContentTransferCommand, FlowInvocationCommand, SessionCommand, type FlowInvocationRecord, type SessionInstructionQueue } from '@nestos/llm-session/contracts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 
 type Runtime = Awaited<ReturnType<typeof createApplicationRuntime>>;

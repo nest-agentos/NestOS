@@ -1,6 +1,6 @@
-import { randomUUID } from '@itookit/common';
-import { sha256HexSync } from '@itookit/llm-context';
-import type { IFileSystem, ISeqFileTransaction } from '@itookit/vfs-core';
+import { randomUUID } from '@nestos/common';
+import { sha256HexSync } from '@nestos/llm-context';
+import type { IFileSystem, ISeqFileTransaction } from '@nestos/vfs-core';
 import { decodeCleanup, decodeRecord, epoch, identity, payload, recordKey, recordRef, refs, MAX_FORGET_RECORDS } from './codec';
 import type { TwinCleanup, TwinCommit, TwinCommitReceipt, TwinForget, TwinRecord, TwinRecordFamily, TwinRecordRef,
     TwinRecordWrite, TwinStore } from './contracts';

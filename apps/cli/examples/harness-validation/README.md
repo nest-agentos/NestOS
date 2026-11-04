@@ -16,7 +16,7 @@
 从仓库根目录执行：
 
 ```bash
-pnpm --filter @itookit/cli test tests/harness-validation-examples.test.ts
+pnpm --filter @nestos/cli test tests/harness-validation-examples.test.ts
 ```
 
 测试在独立临时 profile 中运行这些文件，使用可控模型响应驱动真实 Harness、Grep/Read、Skill 装配、MCP SDK 和本地 stdio 子进程。MCP 服务是仓库当前协议版本的本地 fixture，不访问外部系统。测试不调用付费模型；因此证明执行链路、审批、返回值和持久化，不证明某个真实模型一定会正确选择工具。
@@ -31,7 +31,7 @@ pnpm --filter @itookit/cli test tests/harness-validation-examples.test.ts
 
 ```bash
 node apps/cli/examples/harness-validation/prepare.mjs /tmp/nestos-harness-validation
-pnpm --filter @itookit/cli build
+pnpm --filter @nestos/cli build
 ```
 
 脚本创建：

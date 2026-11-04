@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { IDeviceDriver } from '@itookit/vfs-core';
+import type { IDeviceDriver } from '@nestos/vfs-core';
 import { createKernelAdaptersRuntime } from '../runtime/create-kernel-adapters-runtime';
 import { createSessionSkillControls } from './session-skill-controls';
 

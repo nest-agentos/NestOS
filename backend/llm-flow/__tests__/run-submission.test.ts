@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend, type IVFSManager } from '@itookit/vfs-core';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend, type IVFSManager } from '@nestos/vfs-core';
 import { createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms, submitRun } from '../src';
 import type { TaskRunDefinition } from '../src';
 

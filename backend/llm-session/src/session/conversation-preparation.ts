@@ -1,5 +1,5 @@
-import type {ContextSnapshot} from '@itookit/llm-context';
-import type {TaskRunDefinition} from '@itookit/llm-flow';
+import type {ContextSnapshot} from '@nestos/llm-context';
+import type {TaskRunDefinition} from '@nestos/llm-flow';
 import {snapshotDirectAgentPolicy, type DirectAgentPolicy} from '../contracts/direct-agent-policy';
 import {createSessionHost, type SessionHost, type SessionHostPorts} from '../utils/host-ports';
 import {ConversationContextBuilder, type ConversationContextInput, type ConversationContextOptions} from './conversation-context';

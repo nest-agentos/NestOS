@@ -1,5 +1,5 @@
-import { taskStat } from '@itookit/durable-kernel';
-import type { SessionHandle, TaskRecord, TaskHandle } from '@itookit/durable-kernel';
+import { taskStat } from '@nestos/durable-kernel';
+import type { SessionHandle, TaskRecord, TaskHandle } from '@nestos/durable-kernel';
 import {isInvocationIdentity, type InvocationIdentity} from '../contracts/flow';
 import {invocationFromLabels} from './invocation-identity';
 import {submitFlowRetry} from './retry-submission';

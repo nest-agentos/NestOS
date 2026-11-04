@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { LLMDeviceDriver } from '../../src/llm-management/core';
 import { ConnectionManager } from '../../src/llm-management/device/connection-manager';
 import { SystemPromptStore } from '../../src/llm-management/device/system-prompt-store';

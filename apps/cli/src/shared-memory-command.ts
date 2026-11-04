@@ -1,4 +1,4 @@
-import { SharedMemoryStore } from '@itookit/llm-session';
+import { SharedMemoryStore } from '@nestos/llm-session';
 import type { CommandOptions } from './commands';
 import { resolveProfileRoot } from './nestos';
 import { openProfileInspectionFs } from './runtime';

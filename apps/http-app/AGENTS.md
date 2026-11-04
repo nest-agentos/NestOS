@@ -1,4 +1,4 @@
-# @itookit/http-app
+# @nestos/http-app
 
 HTTP 应用薄入口；Node 能力统一位于 apps/node-host，传输统一位于 shared/app-transport。服务端持有 ApplicationRuntime，浏览器通过共享服务端口展示和控制，完整复用 app-shell.initApp。
 
@@ -21,7 +21,7 @@ HTTP 应用薄入口；Node 能力统一位于 apps/node-host，传输统一位�
 
 - `apps/node-host/src/authorization/` 持有 OAuth 的 loopback 回调、PKCE/OIDC 校验和私密令牌；仅安全状态及命令通过应用能力描述公开，禁止公开 credentials、令牌或私有存储。
 
-验证：`pnpm --filter @itookit/http-app test`、`typecheck`、`build`。
+验证：`pnpm --filter @nestos/http-app test`、`typecheck`、`build`。
 
 - 通知只运行一个刷新循环，256 条限制包含处理中和等待中的回调；客户端通知缓存有界。查询每批最多 32 项、最多 2 批在途、队列最多 1024 项。
 - `nestos:http-disconnected` 区分 reconnecting 和 expired：短暂中断由传输恢复同一 SSE，成功发出 `nestos:http-reconnected` 收起提示；视图过期才探测健康，服务就绪后由 view-recovery 捕获全部已打开标签的编辑器快照并重建应用视图，不刷新整个文档。恢复接口显式保存输入、附件、配置和滚动位置；不支持的编辑器、在途提交及尚未提交的弹窗保留原页并给出具体原因，不依赖输入事件判断是否安全恢复。恢复快照在失败重试间保留，设置密钥只留在内存，不写入浏览器存储或日志。`nestos:http-retry` 唤醒退避，不重发业务写入。`nestos:http-view-error` 显示页面更新失败和手动重载入口，不单独触发自动重载，保留当前页面未发送内容。

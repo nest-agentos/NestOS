@@ -16,11 +16,11 @@ import { promises as fsp } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createVFS } from '@itookit/vfs-core';
-import type { IFileSystem } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
+import { createVFS } from '@nestos/vfs-core';
+import type { IFileSystem } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
 import { FakeSidecarDb } from './fake-sidecar';
-import { SessionRepository } from '@itookit/llm-session';
+import { SessionRepository } from '@nestos/llm-session';
 
 // ── Temp dir helpers ──────────────────────────────────────────────────────────
 

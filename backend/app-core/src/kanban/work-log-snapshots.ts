@@ -1,4 +1,4 @@
-import type {KanbanService, KanbanItemSummary, KanbanProjectRecord} from '@itookit/kanban/contracts';
+import type {KanbanService, KanbanItemSummary, KanbanProjectRecord} from '@nestos/kanban/contracts';
 import {activityRecord, ancestorIds, lifecycleReferences} from './work-log-events';
 
 /** Reconcile legacy projections using persisted facts without executing coordination commands. */

@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {createOperationLedger} from '@itookit/llm-ui';
-import type {IPrivilegedCommandService} from '@itookit/llm-session/contracts';
+import {createOperationLedger} from '@nestos/llm-ui';
+import type {IPrivilegedCommandService} from '@nestos/llm-session/contracts';
 import {ToolCommandOperations} from './tool-operations';
 
 it('persists before dispatch and reuses the same request after an unknown response and reload', async () => {

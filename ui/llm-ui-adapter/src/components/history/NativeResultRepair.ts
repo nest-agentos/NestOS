@@ -1,4 +1,4 @@
-import {t} from '@itookit/common';
+import {t} from '@nestos/common';
 
 type ResultError = {operationId: string; code: string};
 

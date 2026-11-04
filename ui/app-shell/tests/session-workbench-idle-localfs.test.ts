@@ -6,10 +6,10 @@ import { expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createVFS } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { SessionRepository } from '@itookit/llm-session';
-import { SessionFilesService, createSessionAttachmentMounts } from '@itookit/app-core';
+import { createVFS } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { SessionRepository } from '@nestos/llm-session';
+import { SessionFilesService, createSessionAttachmentMounts } from '@nestos/app-core';
 
 function positiveDeltas(before: Record<string, number>, after: Record<string, number>): Record<string, number> {
     const delta: Record<string, number> = {};

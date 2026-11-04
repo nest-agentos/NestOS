@@ -3,8 +3,8 @@
 
 import type { BranchItem } from '../domain/types';
 import type { IBranchStore } from '../domain/ports/IBranchStore';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import {t} from '@itookit/common';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import {t} from '@nestos/common';
 
 
 export class BranchError extends Error {

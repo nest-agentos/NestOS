@@ -1,1 +1,1 @@
-export type { LocalApplicationServices } from '@itookit/app-contracts/services';
+export type { LocalApplicationServices } from '@nestos/app-contracts/services';

@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
-import {RpcPeer} from '@itookit/app-transport/application';
-import type {FSEvent} from '@itookit/vfs-core';
+import {RpcPeer} from '@nestos/app-transport/application';
+import type {FSEvent} from '@nestos/vfs-core';
 import {shareFileObservers} from '../../../shared/app-transport/src/application/file-observers';
 
 it('shares remote filesystem observations across event types and releases only the final interest', async () => {

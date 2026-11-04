@@ -1,5 +1,5 @@
-import type { ISessionRepository } from '@itookit/llm-session';
-import type { FileSystemMount, FileSystemView } from '@itookit/vfs-core';
+import type { ISessionRepository } from '@nestos/llm-session';
+import type { FileSystemMount, FileSystemView } from '@nestos/vfs-core';
 
 /** The only intrinsic user file grant. History and system services have separate APIs. */
 export function createSessionAttachmentMounts(repository: ISessionRepository) {

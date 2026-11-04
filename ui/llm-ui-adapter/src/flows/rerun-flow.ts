@@ -1,8 +1,8 @@
 import { flowConnectionSelection } from './connection-selection';
-import { t } from '@itookit/common';
-import { type FlowRevision, type JsonValue } from '@itookit/llm-flow/contracts';
-import { type ICommandBus } from '@itookit/llm-session/contracts';
-import { SessionCommand } from '@itookit/llm-session/contracts';
+import { t } from '@nestos/common';
+import { type FlowRevision, type JsonValue } from '@nestos/llm-flow/contracts';
+import { type ICommandBus } from '@nestos/llm-session/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
 import { promptFlowParameters } from '../components/FlowParameterForm';
 
 export interface FlowRerunContext {

@@ -1,5 +1,5 @@
-import type {Kernel, TaskRecord} from '@itookit/durable-kernel';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import type {Kernel, TaskRecord} from '@nestos/durable-kernel';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {IndependentCallCommand, type IndependentCallControlQuery, type IndependentCallResponseQuery,
     type IndependentCallResponseRequest, type IndependentCallResponseReceipt, type IndependentCallInteractionDetail} from '../contracts/independent-calls';
 import type {ICommandBus} from '../contracts/command-bus';

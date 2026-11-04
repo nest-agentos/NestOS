@@ -1,10 +1,10 @@
 import {expect, it} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {SeqTwinStore} from '../src/digital-twin/seq-twin-store';
 import {TwinRecords} from '../src/digital-twin/records';
 import {authorizeScannerExchange} from '../src/digital-twin/scanner-authority';
 import {assertScannerPlan} from '../src/digital-twin/scanner-executor';
-import {scannerExecutor} from '@itookit/app-contracts';
+import {scannerExecutor} from '@nestos/app-contracts';
 import {assertCollectionPlan} from '../src/digital-twin/scanner-collector';
 it('preauthorizes a provider attempt once and refuses later attempts outside the reserved envelope', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()});

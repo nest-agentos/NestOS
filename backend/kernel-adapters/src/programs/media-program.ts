@@ -1,4 +1,4 @@
-import type { Decision, DurableTaskProgram, TaskInputEvent } from '@itookit/durable-kernel';
+import type { Decision, DurableTaskProgram, TaskInputEvent } from '@nestos/durable-kernel';
 import type { LlmMediaEffectRequest, StoredMediaResult } from '../effects/llm-media-effect';
 export type MediaProgramInput = Omit<LlmMediaEffectRequest, 'resourceHandleId'> & { timeoutMs?: number };
 interface State { input: MediaProgramInput; phase: 'capability' | 'effect' }

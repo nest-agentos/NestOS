@@ -7,16 +7,16 @@ export default defineConfig(
     fileName: 'app-settings',
     rootDir: __dirname,
     external: [
-      '@itookit/mdx-adapter',
-      '@itookit/common',
-      '@itookit/vfs',
-      '@itookit/llm-ui-adapter'
+      '@nestos/mdx-adapter',
+      '@nestos/common',
+      '@nestos/vfs',
+      '@nestos/llm-ui-adapter'
     ],
     globals: {
-      '@itookit/mdx-adapter': 'MDxAdapter',
-      '@itookit/common': 'ItookitCommon',
-      '@itookit/vfs': 'VFSCore',
-      '@itookit/llm-ui-adapter': 'LLMUI'
+      '@nestos/mdx-adapter': 'MDxAdapter',
+      '@nestos/common': 'ItookitCommon',
+      '@nestos/vfs': 'VFSCore',
+      '@nestos/llm-ui-adapter': 'LLMUI'
     }
   })
 );

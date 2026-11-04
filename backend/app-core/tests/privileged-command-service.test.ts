@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Kernel, TaskHandle } from '@itookit/durable-kernel';
-import type { IAgentConfigService } from '@itookit/llm-session';
+import type { Kernel, TaskHandle } from '@nestos/durable-kernel';
+import type { IAgentConfigService } from '@nestos/llm-session';
 import { PrivilegedCommandService } from '../src/kernel/privileged-command-service';
 
 describe('PrivilegedCommandService', () => {

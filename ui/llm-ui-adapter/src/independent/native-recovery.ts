@@ -1,5 +1,5 @@
-import {t} from '@itookit/common';
-import type {ChatView, OperationLedger, OperationReceipt} from '@itookit/llm-ui';
+import {t} from '@nestos/common';
+import type {ChatView, OperationLedger, OperationReceipt} from '@nestos/llm-ui';
 
 /** Legacy requests from another draft scope stay queryable without consuming the current input. */
 export function mountNativeRecovery(root: HTMLElement, operations: OperationLedger, view: () => ChatView | undefined,

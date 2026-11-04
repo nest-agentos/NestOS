@@ -1,4 +1,4 @@
-import {assertRootCallable} from '@itookit/llm-flow/contracts';
+import {assertRootCallable} from '@nestos/llm-flow/contracts';
 import { recordRuntimeDiagnostic } from './diagnostics';
 import { acquireRunSchedulerLock } from './run-scheduler-lock';
 import { markRunDeleted } from './run-scheduler-lease';
@@ -8,20 +8,20 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { stringify as yamlStringify } from 'yaml';
-import type { EventEnvelope, ExitRecord, JsonValue, Kernel, TaskHandle } from '@itookit/durable-kernel';
+import type { EventEnvelope, ExitRecord, JsonValue, Kernel, TaskHandle } from '@nestos/durable-kernel';
 import { loadWorkflow, parseDuration, validateWorkflow } from './config';
 import { expandWorkflow } from './expand';
 import { resolveProfileRoot } from './nestos';
 import { compileDag, createCliRuntime, cliStorage, type CliRuntime } from './runtime';
 import { compileRunDefinition } from './run-definition';
 import {bindWorkflowHarness} from './workflow-harness';
-import { createRunDefinitionFromFlow, toDagRunSpec, type RunDefinition } from '@itookit/app-core';
+import { createRunDefinitionFromFlow, toDagRunSpec, type RunDefinition } from '@nestos/app-core';
 import { loadFlowDefinition, siblingFlowResolver } from './flow-config';
-import { readFlowTaskTranscript } from '@itookit/llm-flow';
+import { readFlowTaskTranscript } from '@nestos/llm-flow';
 import { RunStore, selectFinalResult } from './run-store';
 import { sandboxDoctor } from './shell';
 import type { BlockedEffect, CompiledWorkflow, PendingInteraction, RunManifest } from './types';
-import type { FlowRevision } from '@itookit/llm-flow/contracts';
+import type { FlowRevision } from '@nestos/llm-flow/contracts';
 
 export interface CommandOptions {
     connectionBindingsFile?: string;
@@ -103,7 +103,7 @@ function isTerminalTaskStatus(status: string): boolean {
 
 export async function validateCommand(options: CommandOptions): Promise<number> {
     if (options.file?.endsWith('.flow')) {
-        const { checkFlowSource } = await import('@itookit/llm-flow');
+        const { checkFlowSource } = await import('@nestos/llm-flow');
         const report = await checkFlowSource(await readFile(options.file, 'utf8'), { resolveComposite: siblingFlowResolver(options.file) });
         print(options, { valid: report.valid, diagnostics: report.diagnostics });
         return report.valid ? 0 : 1;

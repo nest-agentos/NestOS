@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {t} from '@itookit/common';
-import type {ApplicationDiagnostics, DiagnosticEvent, ProjectRemoteMountPort} from '@itookit/app-contracts/services';
+import {t} from '@nestos/common';
+import type {ApplicationDiagnostics, DiagnosticEvent, ProjectRemoteMountPort} from '@nestos/app-contracts/services';
 import {DiagnosticLogView} from '../../app-settings/src/editors/log/DiagnosticLogView';
 import {showDiagnostics} from '../src/diagnostics/dialog';
 import {mcpStatusIcon} from '../src/toolbox/mcp-status';

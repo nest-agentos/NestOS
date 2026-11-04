@@ -1,5 +1,5 @@
-import { t } from '@itookit/common';
-import type { FileSystemContextOwner } from '@itookit/vfs-core';
+import { t } from '@nestos/common';
+import type { FileSystemContextOwner } from '@nestos/vfs-core';
 import type { ViewLoad } from '../lifecycle/view-load';
 
 export const PROJECT_EDITOR_MAX_BYTES = 32 * 1024 * 1024;

@@ -1,5 +1,5 @@
 import type {ConversationSnapshot} from '../contracts';
-import { getLocale, t } from '@itookit/common';
+import { getLocale, t } from '@nestos/common';
 
 
 /** Renders host-prepared usage and quotes; no provider catalogs or pricing rules. */

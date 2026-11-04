@@ -1,6 +1,6 @@
-import {ResourceCommand, type ResourceScope} from '@itookit/app-contracts';
-import {t} from '@itookit/common';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {ResourceCommand, type ResourceScope} from '@nestos/app-contracts';
+import {t} from '@nestos/common';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 
 /** Search only on request; suggestions never read file bodies. */
 export function mountResourceSearch(input: HTMLInputElement, commands: ICommandBus, scope: ResourceScope, signal: AbortSignal): HTMLElement {

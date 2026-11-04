@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ProjectRemoteMountPort } from '@itookit/app-contracts/services';
+import type { ProjectRemoteMountPort } from '@nestos/app-contracts/services';
 import { observeConnections } from '../../src/host/connection-observation';
 
 afterEach(() => vi.useRealTimers());

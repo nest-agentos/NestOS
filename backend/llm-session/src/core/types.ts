@@ -1,8 +1,8 @@
 // @file: llm-conversation/src/core/types.ts
 
 import type { AgentDefinition, ChatAttachment, WebSearchMode } from '../contracts';
-import type { Citation, ModelTier } from '@itookit/driver-llm/contracts';
-import type { SendIntent } from '@itookit/llm-flow/contracts';
+import type { Citation, ModelTier } from '@nestos/driver-llm/contracts';
+import type { SendIntent } from '@nestos/llm-flow/contracts';
 
 // ═══════════════════════════════════════════════════════════════
 // Core types (NodeStatus, ExecutorConfig, ExecutorType — consolidated in llm-conversation)
@@ -30,7 +30,7 @@ export type ExecutorType = 'agent' | 'flow';
 export interface ExecutorConfig {
     id: string;
     /** Admitted definition identity; Flow execution does not imply an Agent definition. */
-    target?: import('@itookit/llm-flow/contracts').TargetRef;
+    target?: import('@nestos/llm-flow/contracts').TargetRef;
     exposure?: AgentDefinition['exposure'];
     name: string;
     type: ExecutorType;
@@ -54,7 +54,7 @@ export interface ExecutorConfig {
     /** Frozen AgentDefinition version used for reproducible AgentTasks. */
     agentVersion?: string;
     execution?: AgentDefinition['execution'];
-    harnessConnection?: import('@itookit/kernel-adapters/contracts').HarnessConnectionSnapshot;
+    harnessConnection?: import('@nestos/kernel-adapters/contracts').HarnessConnectionSnapshot;
     capabilityPolicy?: AgentDefinition['capabilityPolicy'];
     memoryPolicy?: AgentDefinition['memoryPolicy'];
     defaultContextPolicy?: AgentDefinition['defaultContextPolicy'];
@@ -113,8 +113,8 @@ export interface SessionTokenUsage {
 export interface ExecutionOverrides {
     modelName?: string;
     /** Explicit earlier user messages in this same request, kept as separate messages. */
-    userMessagePrefix?: import('@itookit/llm-context').ChatMessage[];
-    executionMode?: import('@itookit/llm-tasks/contracts').ChatExecutionMode;
+    userMessagePrefix?: import('@nestos/llm-context').ChatMessage[];
+    executionMode?: import('@nestos/llm-tasks/contracts').ChatExecutionMode;
     /**
      * 覆盖使用的 LLM 连接 ID（替代 modelId）。
      * Explicit connection for this execution; otherwise use Session/global defaults.
@@ -148,14 +148,14 @@ export interface ExecutionOverrides {
     /** Optional Flow/branch controls supplied by ChatInput. */
     flowId?: string;
     flowRevision?: number;
-    flowParameters?: Record<string, import('@itookit/llm-flow/contracts').JsonValue>;
-    flowExpectedSignature?: Pick<import('@itookit/llm-flow/contracts').FlowRevision, 'id' | 'revision' | 'digest'>;
+    flowParameters?: Record<string, import('@nestos/llm-flow/contracts').JsonValue>;
+    flowExpectedSignature?: Pick<import('@nestos/llm-flow/contracts').FlowRevision, 'id' | 'revision' | 'digest'>;
     flowConnectionBindings?: Record<string, string>;
     branchMode?: 'continue' | 'fork';
     baseRoundId?: string;
     newBranchName?: string;
     /** Explicit native context selection; model and Flow targets must reject this override. */
-    harnessConversation?: import('@itookit/kernel-adapters/contracts').ConversationSelection;
+    harnessConversation?: import('@nestos/kernel-adapters/contracts').ConversationSelection;
     retentionMode?: 'persistent' | 'temporary';
 }
 
@@ -240,10 +240,10 @@ export interface BranchMetadata {
  */
 export interface SessionGroup {
     /** Canonical ordered user inputs; display projection must preserve their boundaries. */
-    inputMessages?: import('@itookit/llm-context').ChatMessage[];
-    target?: import('@itookit/llm-flow/contracts').TargetRef;
+    inputMessages?: import('@nestos/llm-context').ChatMessage[];
+    target?: import('@nestos/llm-flow/contracts').TargetRef;
     callInput?: import('../contracts/conversation').Round['callInput'];
-    invocation?: import('@itookit/llm-flow/contracts').InvocationIdentity;
+    invocation?: import('@nestos/llm-flow/contracts').InvocationIdentity;
     execution?: import('../contracts/conversation').ExecutionRef;
     /** 会话组 ID */
     id: string;
@@ -298,7 +298,7 @@ export interface RegenerateOptions {
  * 重新生成结果
  */
 export interface RegenerateResult {
-    target?: import('@itookit/llm-flow/contracts').TargetRef;
+    target?: import('@nestos/llm-flow/contracts').TargetRef;
     /** 新分支名称 */
     branchName: string;
     /** 新分支中的 user node ID */
@@ -374,11 +374,11 @@ export interface SessionRuntime {
 export interface TaskInput {
     expectedBranch?: string;
     sessionId: string;
-    target?: import('@itookit/llm-flow/contracts').TargetSelection;
-    expectedTarget?: import('@itookit/llm-flow/contracts').TargetRef;
-    source?: import('@itookit/llm-flow/contracts').FlowCallSource;
+    target?: import('@nestos/llm-flow/contracts').TargetSelection;
+    expectedTarget?: import('@nestos/llm-flow/contracts').TargetRef;
+    source?: import('@nestos/llm-flow/contracts').FlowCallSource;
     /** Host-owned call identity from a durable queue claim or explicit new execution. */
-    invocation?: import('@itookit/llm-flow/contracts').InvocationIdentity;
+    invocation?: import('@nestos/llm-flow/contracts').InvocationIdentity;
     /** Internal queue identity; absent for directly submitted requests. */
     instructionId?: string;
     submissionDigest?: string;
@@ -474,7 +474,7 @@ export interface DeleteResult {
 // LLM 2.0 canonical event types (S7)
 // ═══════════════════════════════════════════════════════════════
 
-import type { AgentEvent } from '@itookit/llm-tasks/contracts';
+import type { AgentEvent } from '@nestos/llm-tasks/contracts';
 
 /**
  * Engine-level UI projection events for tree-based rendering.
@@ -499,7 +499,7 @@ export type MessageProjectionEvent =
             messageId: string;
             /** Persisted execution association; independent of streamed content. */
             execution?: import('../contracts/conversation').ExecutionRef;
-            target?: import('@itookit/llm-flow/contracts').TargetRef;
+            target?: import('@nestos/llm-flow/contracts').TargetRef;
             callInput?: import('../contracts/conversation').Round['callInput'];
             /** Streaming chunk — text delta appended to field. */
             delta?: string;
@@ -553,7 +553,7 @@ export type SessionStructuralEvent =
         displayPosition: 'top' | 'branch-root' | 'bottom';
     }}
     | { type: 'regenerate_started'; payload: {
-        target?: import('@itookit/llm-flow/contracts').TargetRef;
+        target?: import('@nestos/llm-flow/contracts').TargetRef;
         sourceId: string;
         newUserNodeId: string;
         branchName: string;
@@ -604,8 +604,8 @@ export type RegistryEvent =
     | {
         type: 'execution_task_projected';
         payload: { sessionId: string; taskId: string; roundId: string;
-            invocation?: import('@itookit/llm-flow/contracts').InvocationIdentity;
-            submission?: import('@itookit/llm-flow/contracts').SendIntent['submission'] };
+            invocation?: import('@nestos/llm-flow/contracts').InvocationIdentity;
+            submission?: import('@nestos/llm-flow/contracts').SendIntent['submission'] };
     }
     /**
      * 后台会话打开了 TTY 交互进程。

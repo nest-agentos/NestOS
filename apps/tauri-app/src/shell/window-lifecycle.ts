@@ -1,5 +1,5 @@
 import type { Window } from '@tauri-apps/api/window';
-import type { AppHandle } from '@itookit/app-shell';
+import type { AppHandle } from '@nestos/app-shell';
 import { recordDiagnostic } from '../log/desktop-diagnostics';
 
 /** Keep the WebView alive until consumers, kernel work and Session leases are released. */

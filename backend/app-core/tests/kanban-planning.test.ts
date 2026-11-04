@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import type {KanbanActor, KanbanCommand, KanbanPlanning, KanbanPolicy} from '@itookit/kanban/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import type {KanbanActor, KanbanCommand, KanbanPlanning, KanbanPolicy} from '@nestos/kanban/contracts';
 import {createNestOSKanban, openProjectKanbanStore} from '../src/kanban';
 
 const disposers: Array<() => Promise<void>> = [];
@@ -132,7 +132,7 @@ it('keeps archive replay idempotent across independent module instances', async 
     expect((await f.service.query('board', {view: 'archive'})).total).toBe(1);
 });
 it('preserves archived records and restores them atomically through the remote single-file adapter', async () => {
-    const {ConditionalKanbanStore} = await import('@itookit/kanban/storage');
+    const {ConditionalKanbanStore} = await import('@nestos/kanban/storage');
     const f = await fixture(); await f.create('old'); await f.finish('old');
     const saved = (await f.store.read('board'))!, data = new Map<string, unknown>(); let revision = 0;
     const transaction = vi.fn(async (_path: string, expected: string | null, changes: Array<{action: string; key: string; value?: unknown}>) => {

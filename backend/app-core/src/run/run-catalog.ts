@@ -1,5 +1,5 @@
-import type { ISessionRepository } from '@itookit/llm-session';
-import type { Kernel, TaskRecord, TaskStatus } from '@itookit/durable-kernel';
+import type { ISessionRepository } from '@nestos/llm-session';
+import type { Kernel, TaskRecord, TaskStatus } from '@nestos/durable-kernel';
 
 export interface RunCatalogEntry {
     runId: string;

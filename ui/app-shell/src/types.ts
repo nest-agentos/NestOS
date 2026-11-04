@@ -1,20 +1,20 @@
-import type {FileCreationConfig} from '@itookit/vfs-ui';
+import type {FileCreationConfig} from '@nestos/vfs-ui';
 import type { EditorFileType as FileTypeDefinition, EditorResolver as CustomEditorResolver } from './browser/types';
-import type { NavigationRequest } from '@itookit/common';
-import type { ICommandBus } from '@itookit/llm-session/contracts';
-import type { ApplicationServices } from '@itookit/app-contracts/services';
-import type {EditorFactory, EditorOptions, ContextMenuConfig} from '@itookit/ui-common-adapter';
-import type { IFileSystem } from '@itookit/vfs-core';
-import type {StudyCreation, StudyDraft} from '@itookit/mdxeditor';
+import type { NavigationRequest } from '@nestos/common';
+import type { ICommandBus } from '@nestos/llm-session/contracts';
+import type { ApplicationServices } from '@nestos/app-contracts/services';
+import type {EditorFactory, EditorOptions, ContextMenuConfig} from '@nestos/ui-common-adapter';
+import type { IFileSystem } from '@nestos/vfs-core';
+import type {StudyCreation, StudyDraft} from '@nestos/mdxeditor';
 import type { ThemeMode } from './ThemeService';
-import type { VFSUIOptions } from '@itookit/vfs-ui';
+import type { VFSUIOptions } from '@nestos/vfs-ui';
 import type {
     ISessionRepository,
     IAgentManagementService,
     IAgentConfigService,
     IPrivilegedCommandService,
-} from '@itookit/llm-session/contracts';
-import type { LLMUIEditors } from '@itookit/app-settings';
+} from '@nestos/llm-session/contracts';
+import type { LLMUIEditors } from '@nestos/app-settings';
 
 export interface StudyCreationOptions extends Pick<StudyCreation, 'generation' | 'prompts' | 'sources' | 'recovery'> {
     /** Host post-save policy, outside the independent editor contract. */
@@ -25,7 +25,7 @@ export type WorkspaceType = 'standard' | 'settings' | 'agent' | 'chat' | 'skills
 
 export interface WorkspaceConfig {
     /** Explicit application file context. workspaceName selects the default user directory. */
-    files?: import('@itookit/vfs-core').FileSystemContext;
+    files?: import('@nestos/vfs-core').FileSystemContext;
     elementId: string;
     workspaceName: string;
     /** URL hash segment, e.g. 'chat', 'files', 'agents' */
@@ -54,21 +54,21 @@ export interface WorkspaceConfig {
 
 // ── UI 装配契约 ──────────────────────────────────────────────────────────
 //
-// app-shell 不直接依赖 @itookit/llm-ui-adapter：编辑器工厂 / AI 右键菜单 / LLM 设置
+// app-shell 不直接依赖 @nestos/llm-ui-adapter：编辑器工厂 / AI 右键菜单 / LLM 设置
 // 编辑器均通过 AppOptions.ui 由 apps 入口注入。契约类型定义在 app-shell
 // （装配层，已依赖全部所需类型），llm-ui 的实现靠结构类型在入口处兼容。
 
 export interface ChatEditorDeps {
     defaultHarnessToolIds?: readonly string[];
-    sessionManager: import('@itookit/llm-session/contracts').SessionViewPort;
+    sessionManager: import('@nestos/llm-session/contracts').SessionViewPort;
     sessionRepository: ISessionRepository;
-    ocr?: import('@itookit/app-contracts/services').OcrControls;
+    ocr?: import('@nestos/app-contracts/services').OcrControls;
     commandBus?: ICommandBus;
-    kernel?: import('@itookit/durable-kernel/contracts').EditorTaskControlPlane;
-    readTaskAttachment?: import('@itookit/durable-kernel/contracts').ReadTaskAttachment;
+    kernel?: import('@nestos/durable-kernel/contracts').EditorTaskControlPlane;
+    readTaskAttachment?: import('@nestos/durable-kernel/contracts').ReadTaskAttachment;
     privilegedCommands?: IPrivilegedCommandService;
-    sessionSkills?: import('@itookit/tools/contracts').SessionSkillControls;
-    configuration?: import('@itookit/kernel-adapters/contracts').ChatConfigurationView;
+    sessionSkills?: import('@nestos/tools/contracts').SessionSkillControls;
+    configuration?: import('@nestos/kernel-adapters/contracts').ChatConfigurationView;
     onLoadMetrics?(metrics: {sessionId: string; durationMs: number; stages: Record<string, number>}): void;
 }
 
@@ -101,8 +101,8 @@ export interface AIContextMenuNode {
 
 export interface AppUI {
     prepareChatSubmission?(options: {commands: ICommandBus; agents: IAgentConfigService;
-        choice: import('@itookit/llm-session/contracts').RootCallTarget; request: import('@itookit/llm-session/contracts').SubmissionRequest;
-        files: File[]; assets?: IFileSystem; signal: AbortSignal}): Promise<import('@itookit/llm-session/contracts').SubmissionRequest>;
+        choice: import('@nestos/llm-session/contracts').RootCallTarget; request: import('@nestos/llm-session/contracts').SubmissionRequest;
+        files: File[]; assets?: IFileSystem; signal: AbortSignal}): Promise<import('@nestos/llm-session/contracts').SubmissionRequest>;
     restoreFlowLibrary?(commands: ICommandBus): Promise<number>;
     createFlowContextMenu<TNode extends { id: string; type: 'file' | 'directory' }>(deps: {
         commands: ICommandBus;
@@ -111,9 +111,9 @@ export interface AppUI {
     createChatEditor(agentService: IAgentConfigService, deps: ChatEditorDeps): EditorFactory;
     createAgentEditor(agentService: IAgentManagementService, options?: {
         defaultToolIds?: readonly string[];
-        listFlows?(): Promise<Array<Pick<import('@itookit/llm-flow/contracts').FlowDraft, 'id' | 'name' | 'parameters' | 'connections'>>>;
-        listFlowRevisions?(id: string): Promise<Array<Pick<import('@itookit/llm-flow/contracts').FlowRevision, 'revision' | 'createdAt' | 'parameters' | 'connections'>>>;
-        getFlowRevision?(id: string, revision?: number): Promise<import('@itookit/llm-flow/contracts').FlowRevision | null>;
+        listFlows?(): Promise<Array<Pick<import('@nestos/llm-flow/contracts').FlowDraft, 'id' | 'name' | 'parameters' | 'connections'>>>;
+        listFlowRevisions?(id: string): Promise<Array<Pick<import('@nestos/llm-flow/contracts').FlowRevision, 'revision' | 'createdAt' | 'parameters' | 'connections'>>>;
+        getFlowRevision?(id: string, revision?: number): Promise<import('@nestos/llm-flow/contracts').FlowRevision | null>;
         listConnections?(): Promise<Array<{ id: string; name: string }>>;
         openFlow?(id: string): Promise<void>;
     }): EditorFactory;
@@ -132,7 +132,7 @@ export interface BootWorkspaceParts {
 export interface AppOptions {
     studyGeneration?: StudyCreationOptions;
     recovery?: import('./workbench/recovery').AppRecoveryState;
-    initialView?: import('@itookit/app-contracts/services').OpenedApplicationView;
+    initialView?: import('@nestos/app-contracts/services').OpenedApplicationView;
     fileTypes?: import('./config/file-registry').AppFileTypeConfig[];
     /** Host UI for selecting a server/project and persisting a fresh binding. */
     projectSyncSetup?(projectId: string, signal: AbortSignal): Promise<void>;
@@ -140,7 +140,7 @@ export interface AppOptions {
     /** Application capabilities. The UI never creates an execution runtime. */
     services: ApplicationServices;
     /** Host-bound application queries and commands; no construction dependencies. */
-    backend: import('@itookit/app-contracts/services').ApplicationBackend;
+    backend: import('@nestos/app-contracts/services').ApplicationBackend;
     workspaces: WorkspaceConfig[];
     /** Product templates are provided by the host, never loaded from an execution adapter. */
     fileTemplates?: Readonly<Record<string, string>>;
@@ -180,7 +180,7 @@ export interface AppHandle {
     /** Host-owned resources close with the application, in reverse registration order. */
     onDestroy(cleanup: () => void | Promise<void>, phase?: 'consumers' | 'sources'): void;
     vfs: ApplicationServices['vfs'];
-    sessionFiles: import('@itookit/app-contracts/services').SessionFilesPort;
+    sessionFiles: import('@nestos/app-contracts/services').SessionFilesPort;
     services: ApplicationServices;
 }
 
@@ -189,9 +189,9 @@ export interface AppHandle {
 export interface WorkbenchConfig {
     studyGeneration?: StudyCreationOptions;
     deferNavigation?: boolean;
-    chatFromFile?: import('@itookit/ui-common-adapter').EditorHostContext['chatFromFile'];
+    chatFromFile?: import('@nestos/ui-common-adapter').EditorHostContext['chatFromFile'];
     /** Preferred input: an already authorized file context. The host owns its lifetime. */
-    files: import('@itookit/vfs-core').FileSystemContext;
+    files: import('@nestos/vfs-core').FileSystemContext;
     /** VFS 侧边栏挂载容器（消费方负责创建 DOM） */
     sidebarContainer: HTMLElement;
     /** 编辑器挂载容器（消费方负责创建 DOM） */
@@ -213,7 +213,7 @@ export interface WorkbenchConfig {
     windows?: import('./workbench/windows').WorkbenchWindowBinding;
     uiOptions?: Partial<Omit<VFSUIOptions, 'defaultEditorFactory'>>;
     /** Host-owned sidebar snapshot storage; omitted means the workspace restores nothing. */
-    uiPersistence?: import('@itookit/vfs-ui').UIPersistencePort;
+    uiPersistence?: import('@nestos/vfs-ui').UIPersistencePort;
     fileTypes?: FileTypeDefinition[];
     customEditorResolver?: CustomEditorResolver;
     showFileExtensions?: boolean;

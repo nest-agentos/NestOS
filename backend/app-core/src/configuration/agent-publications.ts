@@ -1,6 +1,6 @@
-import {checkFlowSource, prepareFlowCallInput, type FlowDefinitionStore} from '@itookit/llm-flow';
-import {assertRootCallable, type DagPluginCatalog, type JsonValue} from '@itookit/llm-flow/contracts';
-import type {AgentExecution, AgentRevisionContent} from '@itookit/kernel-adapters/contracts';
+import {checkFlowSource, prepareFlowCallInput, type FlowDefinitionStore} from '@nestos/llm-flow';
+import {assertRootCallable, type DagPluginCatalog, type JsonValue} from '@nestos/llm-flow/contracts';
+import type {AgentExecution, AgentRevisionContent} from '@nestos/kernel-adapters/contracts';
 
 /** Agent publication freezes a validated implementation revision while preserving public required inputs. */
 export function createAgentPublicationDependencies(definitions: FlowDefinitionStore, plugins?: DagPluginCatalog) {

@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID, t} from '@itookit/common';
-import type {FlowInstallations, FlowInstallationReport} from '@itookit/app-contracts/services';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import type {FlowInstallations, FlowInstallationReport} from '@nestos/app-contracts/services';
 
 const log = createModuleLogger('flow-dependencies-ui');
 const codeOf = (error: unknown) => typeof (error as {code?: unknown})?.code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test((error as {code: string}).code)

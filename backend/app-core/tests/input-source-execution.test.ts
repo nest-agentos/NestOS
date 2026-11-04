@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {CommandBus} from '@itookit/llm-session';
-import {InputSourceCommand, type InputSourceExecution} from '@itookit/app-contracts';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {CommandBus} from '@nestos/llm-session';
+import {InputSourceCommand, type InputSourceExecution} from '@nestos/app-contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
 import {registerInputSourceExecution} from '../src/host/input-source-execution';
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0)) await close();});
@@ -32,7 +32,7 @@ it('persists source identity, preserves approval and reconciles a lost response 
 it('executes a published source Flow through the application runtime', async () => {
     const {createApplicationRuntime} = await import('../src/runtime/create-application-runtime');
     const {externalFlow} = await import('./fixtures/flow-library');
-    const {FlowLibraryCommand} = await import('@itookit/app-contracts');
+    const {FlowLibraryCommand} = await import('@nestos/app-contracts');
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), digitalTwinAutoStart: false});
     closes.push(() => runtime.dispose());
     await runtime.commandBus.execute(FlowLibraryCommand.Restore, {templates: [externalFlow('source-fixture')]});

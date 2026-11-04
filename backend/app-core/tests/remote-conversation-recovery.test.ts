@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {getLogger} from '@itookit/common';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {getLogger} from '@nestos/common';
 import {RemoteConversationStore} from '../src/projects/remote-conversation-store';
 import {recoverRemoteConversationQueues} from '../src/projects/remote-conversation-recovery';
 import {ConversationRegistry} from '../src/projects/conversation-registry';

@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/llm-tasks",
+  "name": "@nestos/llm-tasks",
   "version": "0.1.0",
   "description": "Durable LLM task programs, context assembly, and provider-neutral message policies",
   "type": "module",
@@ -72,21 +72,21 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nest-agentos/NestOS.git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
     "directory": "backend/llm-tasks"
   },
   "bugs": {
     "url": "https://github.com/nest-agentos/NestOS/issues"
   },
-  "homepage": "https://github.com/nest-agentos/NestOS/tree/main/backend/llm-tasks#readme",
+  "homepage": "https://github.com/nest-agentos/NestOS#readme",
   "engines": {
     "node": ">=16.0.0"
   },
   "dependencies": {
-    "@itookit/durable-kernel": "workspace:*",
-    "@itookit/llm-context": "workspace:*",
-    "@itookit/tools": "workspace:*",
-    "@itookit/driver-llm": "workspace:*"
+    "@nestos/durable-kernel": "workspace:*",
+    "@nestos/llm-context": "workspace:*",
+    "@nestos/tools": "workspace:*",
+    "@nestos/driver-llm": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.19.25",

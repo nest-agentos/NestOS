@@ -1,4 +1,4 @@
-import {sha256HexSync} from '@itookit/llm-context';
+import {sha256HexSync} from '@nestos/llm-context';
 import type { ToolInvokeResult } from '../contracts';
 import type { Tool } from '../core/Tool';
 import type { ToolUseContext } from '../core/types';

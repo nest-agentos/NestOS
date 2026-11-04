@@ -1,23 +1,23 @@
-import { RPC_VERSION } from '@itookit/app-transport/rpc';
+import { RPC_VERSION } from '@nestos/app-transport/rpc';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { openLocalFSBackend, type LocalFSBackend } from '@itookit/vfsdriver-local';
-import { createApplicationApi } from '@itookit/node-host/http';
-import { createCertificates } from '@itookit/node-host/http';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
-import { HttpViewClient, SnapshotCache, ViewExpiredError } from '@itookit/app-transport/http';
+import { openLocalFSBackend, type LocalFSBackend } from '@nestos/vfsdriver-local';
+import { createApplicationApi } from '@nestos/node-host/http';
+import { createCertificates } from '@nestos/node-host/http';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
+import { HttpViewClient, SnapshotCache, ViewExpiredError } from '@nestos/app-transport/http';
 import { authenticatedFetch, close, secureServers } from './tls-fixture';
-import {ArtifactCommand, FlowLibraryCommand, InputAssetCommand, type ExecutionArtifactPage, type ExecutionArtifactChunk} from '@itookit/app-contracts';
-import {FlowCommand, validFlowImages, type FlowDraft, type FlowRevision, type DurableFlowSnapshot} from '@itookit/llm-flow/contracts';
+import {ArtifactCommand, FlowLibraryCommand, InputAssetCommand, type ExecutionArtifactPage, type ExecutionArtifactChunk} from '@nestos/app-contracts';
+import {FlowCommand, validFlowImages, type FlowDraft, type FlowRevision, type DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
 import {createHash} from 'node:crypto';
-type SessionInstructionQueue = NonNullable<import('@itookit/app-contracts/services').SessionEditorInitialData['snapshot']['instructionQueue']>;
+type SessionInstructionQueue = NonNullable<import('@nestos/app-contracts/services').SessionEditorInitialData['snapshot']['instructionQueue']>;
 
 let certificateRoot: string, certificates: string, directory: string, backend: LocalFSBackend;
 let api: Awaited<ReturnType<typeof createApplicationApi>>, server: Awaited<ReturnType<typeof secureServers>>, auth: Awaited<ReturnType<typeof authenticatedFetch>>;
 const clients: HttpViewClient[] = [];
-const auditEvents: import('@itookit/node-host/logging').AuditEvent[] = [];
+const auditEvents: import('@nestos/node-host/logging').AuditEvent[] = [];
 beforeAll(async () => { certificateRoot = await mkdtemp(path.join(tmpdir(), 'nestos-view-certs-')); certificates = path.join(certificateRoot, 'certs'); await createCertificates(certificates, ['127.0.0.1']); });
 afterAll(async () => { await rm(certificateRoot, { recursive: true, force: true }); });
 beforeEach(async () => {
@@ -176,7 +176,7 @@ it('opens independent cold views in one call and replays changes between the bas
     const [first, second] = await Promise.all([a.backend.openView(options(one)), b.backend.openView(options(two))]);
     expect(first.initial?.snapshot.sessionId).toBe(one); expect(second.initial?.snapshot.sessionId).toBe(two);
     await b.services.projects.sessions.rename(one, 'Changed before observation');
-    const events: import('@itookit/app-contracts/services').ApplicationViewEvent[] = [];
+    const events: import('@nestos/app-contracts/services').ApplicationViewEvent[] = [];
     const stop = await first.observation.observeView(first.cursor, event => events.push(event));
     await vi.waitFor(() => expect(events.some(event => event.topic === 'repository' && event.value?.sessionId === one)).toBe(true));
     expect(events[0].sequence).toBe(first.cursor + 1);

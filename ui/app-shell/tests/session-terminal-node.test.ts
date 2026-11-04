@@ -1,8 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import { createApplicationRuntime } from '@itookit/app-core';
-import { SessionCommand, type SessionEventEnvelope } from '@itookit/llm-session';
-import { createAgentSendIntent } from '@itookit/llm-flow/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import { createApplicationRuntime } from '@nestos/app-core';
+import { SessionCommand, type SessionEventEnvelope } from '@nestos/llm-session';
+import { createAgentSendIntent } from '@nestos/llm-flow/contracts';
 
 it.each(['failed', 'aborted'])('addresses %s status to the mounted assistant and preserves cancellation identity', async status => {
     const backend = new MemoryBackend(); await backend.init();

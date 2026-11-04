@@ -1,6 +1,6 @@
 import { flowTemplateReferences, renderFlowTemplate, type FlowTemplateContext } from '../contracts';
 import type { DagNodeDefinition, DagRunSpec, FlowVariables, JsonValue } from '../contracts';
-import { extractNodeOutput } from '@itookit/llm-tasks';
+import { extractNodeOutput } from '@nestos/llm-tasks';
 
 export interface VariableCommit { taskId: string; nodeId: string; scope: string; updates: Record<string, JsonValue> }
 export interface VariableCheckpoint {

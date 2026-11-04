@@ -1,6 +1,6 @@
 import { diagnosticDetail } from './diagnostics';
 import type { TwinSourceIndex } from './source-index';
-import { sha256HexSync } from '@itookit/llm-context';
+import { sha256HexSync } from '@nestos/llm-context';
 import type { TwinAnalysisJob, TwinSettings, TwinSourceData } from './domain';
 import type { TwinAnalysis } from './analysis';
 import { type TwinScanPlan, type TwinScanRun, type TwinScanScope, scanError } from './scan-domain';
@@ -10,7 +10,7 @@ import { TwinSources } from './sources';
 import {write, type TwinDataRecord} from './records';
 
 export interface TwinCollectionRunner {
-    collect(run: TwinDataRecord<TwinScanRun>, attached: (taskId: string) => Promise<void>): Promise<import('@itookit/app-contracts').TwinCollectionProgress | void>;
+    collect(run: TwinDataRecord<TwinScanRun>, attached: (taskId: string) => Promise<void>): Promise<import('@nestos/app-contracts').TwinCollectionProgress | void>;
     cancel(run: TwinDataRecord<TwinScanRun>): Promise<void>;
 }
 /** One online host coordinates scans; extraction still runs as native durable tasks. */

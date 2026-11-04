@@ -1,4 +1,4 @@
-import type { ITTYSession, ITTYSessionManager } from '@itookit/tools/contracts';
+import type { ITTYSession, ITTYSessionManager } from '@nestos/tools/contracts';
 
 export class TTYSessionManager implements ITTYSessionManager {
     private readonly sessions = new Map<string, ITTYSession>();

@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {ConversationComposerStore} from '../src/projects/conversation-composer-store';
 
 it('persists opaque drafts and originals with CAS, idempotent receipts and owner-scoped asset reads', async () => {

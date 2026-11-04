@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import type {SessionHandle} from '@itookit/durable-kernel';
+import type {SessionHandle} from '@nestos/durable-kernel';
 import {fenceSchedulerSession} from '../src/flow/fenced-session';
 
 it('fences pause withdrawal on submitted, attached and retried tasks without replacing control identity', async () => {

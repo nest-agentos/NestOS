@@ -1,8 +1,8 @@
-import type { AppUI } from '@itookit/app-shell';
+import type { AppUI } from '@nestos/app-shell';
 import { createFlowContextMenuConfig, createAIContextMenuConfig,
-    restoreFlowLibrary } from '@itookit/llm-ui-adapter/startup';
+    restoreFlowLibrary } from '@nestos/llm-ui-adapter/startup';
 import { ProviderSettingsEditor, ConnectionSettingsEditor, ModelDefaultsEditor, MCPSettingsEditor,
-    CostEditor, SystemPromptSettingsEditor } from '@itookit/llm-ui-adapter/settings';
+    CostEditor, SystemPromptSettingsEditor } from '@nestos/llm-ui-adapter/settings';
 
 import {loadChatEditor} from './editor-modules';
 export {preloadBrowserEditor} from './editor-modules';
@@ -16,17 +16,17 @@ function lazyEditorFactory(load: () => Promise<EditorFactory>): EditorFactory {
 
 export function createBrowserUI(library: Parameters<typeof restoreFlowLibrary>[1]): AppUI {
     return {
-        prepareChatSubmission: async options => (await import('@itookit/llm-ui-adapter/independent')).prepareSessionChatRequest(options),
+        prepareChatSubmission: async options => (await import('@nestos/llm-ui-adapter/independent')).prepareSessionChatRequest(options),
         createChatEditor: (service, deps) => lazyEditorFactory(async () =>
             (await loadChatEditor()).createLLMFactory(service, deps)),
         createAgentEditor: (service, capabilities) => lazyEditorFactory(async () =>
-            (await import('@itookit/llm-ui-adapter/settings')).createAgentEditorFactory(service, capabilities)),
+            (await import('@nestos/llm-ui-adapter/settings')).createAgentEditorFactory(service, capabilities)),
         createFlowEditor: deps => lazyEditorFactory(async () =>
             (await loadChatEditor()).createFlowsEditorFactory(deps)),
         createFlowContextMenu: deps => createFlowContextMenuConfig({ ...deps, library: library }),
         restoreFlowLibrary: commands => restoreFlowLibrary(commands, library),
         createSkillEditor: service => lazyEditorFactory(async () =>
-            (await import('@itookit/llm-ui-adapter/settings')).createSkillsEditorFactory(service)),
+            (await import('@nestos/llm-ui-adapter/settings')).createSkillsEditorFactory(service)),
         createAIContextMenu: createAIContextMenuConfig,
         llmUiEditors: {
             ProviderSettingsEditor,

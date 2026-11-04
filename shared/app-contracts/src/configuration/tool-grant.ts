@@ -1,4 +1,4 @@
-import type { AgentDefinition } from '@itookit/kernel-adapters/contracts';
+import type { AgentDefinition } from '@nestos/kernel-adapters/contracts';
 import { DEFAULT_HARNESS_TOOL_IDS } from '../presets/harness-tools';
 export interface ToolGrantTarget { id: string; serverId?: string }
 export function toolGrant(tool: ToolGrantTarget, agent: AgentDefinition) {

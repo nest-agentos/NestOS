@@ -1,5 +1,5 @@
-import { flowConnectionRequired, flowParameterValues, type FlowConnection, type FlowRevision, type JsonValue } from '@itookit/llm-flow/contracts';
-import type { ModelRequirements } from '@itookit/kernel-adapters/contracts';
+import { flowConnectionRequired, flowParameterValues, type FlowConnection, type FlowRevision, type JsonValue } from '@nestos/llm-flow/contracts';
+import type { ModelRequirements } from '@nestos/kernel-adapters/contracts';
 
 /** Pure Flow requirements shared by admission and form projection. */
 export function inferFlowConnectionRequirements(flow: Pick<FlowRevision, 'nodes' | 'connections' | 'parameters' | 'inputGroups'>, parameters?: Record<string, JsonValue>): FlowConnection[] {

@@ -1,4 +1,4 @@
-import type { TaskRecord, TaskStat, KernelViewPort } from '@itookit/durable-kernel/contracts';
+import type { TaskRecord, TaskStat, KernelViewPort } from '@nestos/durable-kernel/contracts';
 import type { taskKeyEvent, taskSummary } from './session';
 
 export type TaskEventQuery = Parameters<KernelViewPort['taskEventPage']>[2];

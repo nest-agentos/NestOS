@@ -3,13 +3,13 @@ import {mkdtemp, mkdir, readFile, writeFile, rm, cp} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {X509Certificate} from 'node:crypto';
-import {createCertificates, createUserCertificate, loadCertificates, startHost} from '@itookit/node-host/http';
-import {HttpViewClient} from '@itookit/app-transport/http';
-import {ApplicationEventFeed} from '@itookit/app-transport/application';
+import {createCertificates, createUserCertificate, loadCertificates, startHost} from '@nestos/node-host/http';
+import {HttpViewClient} from '@nestos/app-transport/http';
+import {ApplicationEventFeed} from '@nestos/app-transport/application';
 import {authenticatedFetch} from './tls-fixture';
-import {openLocalFSBackend} from '@itookit/vfsdriver-local';
-import {NodeSqliteSidecarDb} from '@itookit/node-host/storage';
-import {createVFS} from '@itookit/vfs-core';
+import {openLocalFSBackend} from '@nestos/vfsdriver-local';
+import {NodeSqliteSidecarDb} from '@nestos/node-host/storage';
+import {createVFS} from '@nestos/vfs-core';
 import {UserEventService} from '../../../backend/app-core/src/events/service';
 
 it('serves independent browser cursors, isolates users and reopens their real persisted homes after host restart', async () => {

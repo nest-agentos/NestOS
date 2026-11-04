@@ -1,10 +1,10 @@
-import {conversationStatus} from '@itookit/llm-ui-adapter/presentation';
-import { harnessObservation as observeHarness } from '@itookit/app-contracts';
+import {conversationStatus} from '@nestos/llm-ui-adapter/presentation';
+import { harnessObservation as observeHarness } from '@nestos/app-contracts';
 import {expect, it, vi} from 'vitest';
 
-import {t} from '@itookit/common';
-import {harnessObservation} from '@itookit/cells-driver';
-import {remoteSessionPath, type ProjectService} from '@itookit/app-core';
+import {t} from '@nestos/common';
+import {harnessObservation} from '@nestos/cells-driver';
+import {remoteSessionPath, type ProjectService} from '@nestos/app-core';
 import {RemoteSessionStatusView} from '../src/projects/remote-session-status';
 it('shares visible session observers without reading file versions or refreshing directory contents', () => {
     let callback: (() => void) | undefined, version: string | undefined;

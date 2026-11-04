@@ -1,5 +1,5 @@
 {
-  "name": "@itookit/ui-common-adapter",
+  "name": "@nestos/ui-common-adapter",
   "version": "0.1.0",
   "description": "NestOS editor contracts and host adapters for the independent UI foundation.",
   "type": "module",
@@ -42,15 +42,24 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@itookit/common": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
-    "@itookit/ui-common": "workspace:*"
+    "@nestos/common": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
+    "@nestos/ui-common": "workspace:*"
   },
   "devDependencies": {
-    "@itookit/common": "workspace:*",
-    "@itookit/vfs-core": "workspace:*",
+    "@nestos/common": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
-  "peerDependencies": {}
+  "peerDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "ui/ui-common-adapter"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS#readme"
 }

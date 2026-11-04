@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { ConversationContexts } from '../src/runtime/conversation-contexts';
 import { conversationIdle } from '../src/runtime/conversation-idle';
-import { SessionCommand } from '@itookit/llm-session/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
 
 const hosts: ConversationContexts[] = [];
 afterEach(async () => { for (const host of hosts.splice(0)) await host.close(); vi.useRealTimers(); });

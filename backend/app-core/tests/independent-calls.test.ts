@@ -1,9 +1,9 @@
 import {coldQuery} from './helpers/cold-query';
-import {getLogger} from '@itookit/common';
+import {getLogger} from '@nestos/common';
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend} from '@itookit/vfs-core';
-import {ArtifactCommand, type ExecutionArtifactPage, type ExecutionArtifactChunk, FlowLibraryCommand} from '@itookit/app-contracts';
-import {IndependentCallCommand, SessionCommand, type IndependentCallView, type IndependentCallInput, type IndependentCallReceipt, type RootTargetCatalog} from '@itookit/llm-session/contracts';
+import {MemoryBackend} from '@nestos/vfs-core';
+import {ArtifactCommand, type ExecutionArtifactPage, type ExecutionArtifactChunk, FlowLibraryCommand} from '@nestos/app-contracts';
+import {IndependentCallCommand, SessionCommand, type IndependentCallView, type IndependentCallInput, type IndependentCallReceipt, type RootTargetCatalog} from '@nestos/llm-session/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 
 const cleanup: Array<() => Promise<unknown>> = [];
@@ -355,7 +355,7 @@ it('pauses an independent Flow at its boundary, saves an answer without resuming
     });
     const views = await commands.execute<IndependentCallView[]>(IndependentCallCommand.List, {sessionId: f.parent});
     expect(views[0].interactions).toMatchObject({total: 1, items: [{taskId: member, interactionId: 'approval', kind: 'input'}]});
-    const paused = await commands.execute<import('@itookit/llm-session/contracts').IndependentCallStateControlReceipt>(IndependentCallCommand.Control,
+    const paused = await commands.execute<import('@nestos/llm-session/contracts').IndependentCallStateControlReceipt>(IndependentCallCommand.Control,
         {...query, action: 'pause', expectedEpoch: 0});
     expect(paused).toMatchObject({action: 'pause', receipt: {action: 'pause', accepted: {mode: 'pause', epoch: 1}}});
     await vi.waitFor(async () => expect((await kernel.task(query.executionSessionId, query.taskId)).control?.acknowledged).toBe(true));
@@ -450,7 +450,7 @@ it('cold-pages all call descendants beyond the embedded limit without changing t
     for (let i = 0; i < 55; i++) children.push((await session.submit({program: {kind: 'deferred-worker', version: '1'}, parent: query.taskId, input: null, deferStart: true})).id);
     const unrelated = await session.submit({program: {kind: 'deferred-worker', version: '1'}, input: null, deferStart: true});
     const open = vi.spyOn(kernel, 'openSession');
-    const read = (afterTaskId?: string) => commands.execute<import('@itookit/llm-session/contracts').IndependentCallDescendantsResult>(IndependentCallCommand.Descendants, {...query, ...(afterTaskId ? {afterTaskId} : {})});
+    const read = (afterTaskId?: string) => commands.execute<import('@nestos/llm-session/contracts').IndependentCallDescendantsResult>(IndependentCallCommand.Descendants, {...query, ...(afterTaskId ? {afterTaskId} : {})});
     const first = await read(); expect(first.descendants.items).toHaveLength(50); expect(first.descendants.nextAfterTaskId).toBeTruthy();
     const second = await read(first.descendants.nextAfterTaskId), ids = [...first.descendants.items, ...second.descendants.items].map(item => item.taskId);
     expect(second.descendants.nextAfterTaskId).toBeUndefined(); expect(new Set(ids).size).toBe(ids.length);

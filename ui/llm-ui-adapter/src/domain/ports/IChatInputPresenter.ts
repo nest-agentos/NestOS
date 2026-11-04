@@ -1,7 +1,7 @@
 // @file: llm-ui/domain/ports/IChatInputPresenter.ts
 
-import type { JsonValue } from '@itookit/llm-flow/contracts';
-import type { InputField } from '@itookit/llm-ui';
+import type { JsonValue } from '@nestos/llm-flow/contracts';
+import type { InputField } from '@nestos/llm-ui';
 import type {
     ChatOverrides,
     ChatSessionSettings,
@@ -22,7 +22,7 @@ export interface IChatInputConfig {
     draftToken?: string;
     text: string;
     agentId: string;
-    target?: import('@itookit/llm-flow/contracts').TargetRef;
+    target?: import('@nestos/llm-flow/contracts').TargetRef;
     input?: import('../input-draft').WorkspaceArgumentDraft;
     context?: import('../context-draft').InputContextDraft;
     settings: ChatInputSettings;

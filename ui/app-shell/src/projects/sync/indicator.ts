@@ -1,4 +1,4 @@
-import { ACTION_ICONS, PROJECT_ACTION_ICONS, ENTITY_ICONS, FEEDBACK_ICONS, escapeAttr, t, randomUUID } from '@itookit/common';
+import { ACTION_ICONS, PROJECT_ACTION_ICONS, ENTITY_ICONS, FEEDBACK_ICONS, escapeAttr, t, randomUUID } from '@nestos/common';
 import { syncIndicatorDescription, type ProjectSyncIndicator } from './presentation';
 
 /** Icon markup uses only shared icons; names and issues are escaped as attribute text. */

@@ -2,7 +2,7 @@ import {lstat} from 'node:fs/promises';
 import {createInterface} from 'node:readline/promises';
 import {stdin, stdout} from 'node:process';
 import path from 'node:path';
-import {createModuleLogger, randomUUID} from '@itookit/common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
 import {canonical, within} from '../runtime/paths';
 import {createCertificates} from './create-certificates';
 

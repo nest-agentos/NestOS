@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { FSError } from '@itookit/vfs-core';
+import { FSError } from '@nestos/vfs-core';
 import { readProgress } from '../src/digital-twin/read-progress';
 import { TwinAnalysis } from '../src/digital-twin/analysis';
 

@@ -1,7 +1,7 @@
-import {sha256HexSync} from '@itookit/common';
-import type {ContextBinding, ContextCheckpoint} from '@itookit/kernel-adapters/contracts';
-import {directHarnessContextIdentity, type ContextOptionsQuery, type ContextSourceQualification} from '@itookit/llm-session/contracts';
-import type {SessionRepository} from '@itookit/llm-session';
+import {sha256HexSync} from '@nestos/common';
+import type {ContextBinding, ContextCheckpoint} from '@nestos/kernel-adapters/contracts';
+import {directHarnessContextIdentity, type ContextOptionsQuery, type ContextSourceQualification} from '@nestos/llm-session/contracts';
+import type {SessionRepository} from '@nestos/llm-session';
 import type {HarnessConnectionInspection} from './harness-connections';
 import {canonical} from './harness-connection-policy';
 import {contextBindingCheckpoints} from './harness-context-catalog';

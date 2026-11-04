@@ -1,5 +1,5 @@
-import { OperationManager, assertSync, decimal, encodeManifest, type Coordinator, type StateStore } from '@itookit/vfs-sync';
-import type { FileRemote } from '@itookit/vfs-sync';
+import { OperationManager, assertSync, decimal, encodeManifest, type Coordinator, type StateStore } from '@nestos/vfs-sync';
+import type { FileRemote } from '@nestos/vfs-sync';
 export interface ProjectSyncPreparationRemote extends FileRemote {
     capabilities(): Promise<{ authorityId: string; namespaceId: string; historyEpoch: string }>;
     register(replica: string): Promise<{ state: string; lastAdmittedSeq: string }>;

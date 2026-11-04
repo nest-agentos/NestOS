@@ -9,11 +9,11 @@ import type {
     KernelRegistration,
     JsonValue,
     SharedStateEntry,
-} from '@itookit/durable-kernel';
-import type { IDeviceDriver } from '@itookit/vfs-core';
-import type { SkillDefinition } from '@itookit/tools/contracts';
-import type { ITTYDriver } from '@itookit/tools/contracts';
-import { ToolDeviceDriver } from '@itookit/tools';
+} from '@nestos/durable-kernel';
+import type { IDeviceDriver } from '@nestos/vfs-core';
+import type { SkillDefinition } from '@nestos/tools/contracts';
+import type { ITTYDriver } from '@nestos/tools/contracts';
+import { ToolDeviceDriver } from '@nestos/tools';
 import { createKernelAdaptersRuntime } from './create-kernel-adapters-runtime';
 import { buildSkillPromptContext } from '../skill/prompt-context';
 import { ApprovedEffectProgram } from '../programs/approved-effect-program';
@@ -415,7 +415,7 @@ describe('createKernelAdaptersRuntime', () => {
         runtime.plugin.install(registration(effects));
         const tool = effects.find(effect => effect.kind === 'tool.call')!;
         const result = await tool.execute({ resourceHandleId: 'tool-handle', toolId: 'load_skill',
-            args: { skill_id: 'review' } }, context(sessionState())) as import('@itookit/tools/contracts').ToolInvokeResult;
+            args: { skill_id: 'review' } }, context(sessionState())) as import('@nestos/tools/contracts').ToolInvokeResult;
         expect(result.skillContext?.tools).toEqual([
             { toolId: 'publish', definition: { name: 'publish', description: 'Publish review' }, external: true },
         ]);
@@ -575,7 +575,7 @@ describe('createKernelAdaptersRuntime', () => {
         const effects: EffectAdapter[] = []; runtime.plugin.install(registration(effects));
         const result = await effects.find(effect => effect.kind === 'tool.call')!.execute({
             resourceHandleId: 'tool-handle', toolId: 'load_skill', args: { skill_id: 'review' },
-        }, context(sessionState())) as import('@itookit/tools/contracts').ToolInvokeResult;
+        }, context(sessionState())) as import('@nestos/tools/contracts').ToolInvokeResult;
         for (const content of ['Reference material', 'Output format', 'Past correction']) expect(result.output).toContain(content);
         await runtime.dispose();
         const unbound = await createKernelAdaptersRuntime({ llmDriver: {} as IDeviceDriver });

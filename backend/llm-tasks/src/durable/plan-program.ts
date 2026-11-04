@@ -4,7 +4,7 @@ import {
     type DurableTaskProgram,
     type SerializableError,
     type TaskInputEvent,
-} from '@itookit/durable-kernel';
+} from '@nestos/durable-kernel';
 import { assistantMessage, capabilitySignal, llmEffect, response } from './program-helpers';
 import type { DurableCapabilitySignal, DurableProgramInput } from './types';
 

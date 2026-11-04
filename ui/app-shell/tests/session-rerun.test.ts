@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { SessionCommand } from '@itookit/llm-session';
+import { SessionCommand } from '@nestos/llm-session';
 import { rerunSession } from '../../llm-ui-adapter/src/shell/rerun-session';
 import { LLMWorkspaceEditor } from '../../llm-ui-adapter/src/shell/LLMWorkspaceEditor';
 

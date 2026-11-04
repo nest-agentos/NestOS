@@ -2,16 +2,16 @@
 
 import { ExecutorConfig } from '../core/types';
 import { resolveModelForTier, resolveWebSearchStrategy } from '../contracts';
-import { modelReasoning, getProviderDefaultProtocol, type ModelTier } from '@itookit/driver-llm/contracts';
+import { modelReasoning, getProviderDefaultProtocol, type ModelTier } from '@nestos/driver-llm/contracts';
 import {agentDefinitionDigest, publishedAgentDefinition} from '../services/agent-definition-digest';
-import type {AgentPublishedRevision} from '@itookit/kernel-adapters/contracts';
-import type { ConnectionMeta } from '@itookit/driver-llm/contracts';
+import type {AgentPublishedRevision} from '@nestos/kernel-adapters/contracts';
+import type { ConnectionMeta } from '@nestos/driver-llm/contracts';
 import type { WebSearchMode } from '../contracts';
 import { IAgentConfigService } from '../services/agent-service';
 import { ConversationError, ConversationErrorCode } from '../core/errors';
 import { createSessionHost, type SessionHost } from '../utils/host-ports';
 import { admitHarnessConnection } from './harness-binding';
-import { assertRootCallable, callableExposure, isRootCallable, CallableExposureError, sameTargetRef, type TargetRef } from '@itookit/llm-flow/contracts';
+import { assertRootCallable, callableExposure, isRootCallable, CallableExposureError, sameTargetRef, type TargetRef } from '@nestos/llm-flow/contracts';
 import { ulid } from '../persistence/ulid';
 
 export interface AgentInfo {
@@ -168,14 +168,14 @@ export class AgentResolver {
     }
 
     /** Definition metadata does not require credentials, native attachment or prompt-library reads. */
-    async describeTarget(agent: import('../contracts').AgentDefinition): Promise<import('@itookit/llm-flow/contracts').TargetRef> {
+    async describeTarget(agent: import('../contracts').AgentDefinition): Promise<import('@nestos/llm-flow/contracts').TargetRef> {
         callableExposure(agent.exposure);
         const digest = agentDefinitionDigest(agent);
         return {kind: 'agent', id: agent.id, version: agent.version ?? digest, digest};
     }
 
     /** Resolve a System Prompt library entry by id. */
-    async getSystemPrompt(id: string): Promise<import('@itookit/llm-tasks/contracts').SystemPromptDefinition | null> {
+    async getSystemPrompt(id: string): Promise<import('@nestos/llm-tasks/contracts').SystemPromptDefinition | null> {
         return this.agentService.getSystemPrompt(id);
     }
 

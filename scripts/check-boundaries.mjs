@@ -7,9 +7,9 @@ import ts from 'typescript';
 import { libraries } from './npm-libraries.mjs';
 import { WORKSPACE_GROUPS } from './workspace-packages.mjs';
 
-const application = new Set(['@itookit/app-core', '@itookit/app-shell', '@itookit/app-settings']);
+const application = new Set(['@nestos/app-core', '@nestos/app-shell', '@nestos/app-settings']);
 const coreDependencies = new Set(['app-contracts', 'common', 'llm-context', 'vfs-core', 'durable-kernel', 'kernel-adapters',
-    'llm-flow', 'llm-session', 'llm-tasks', 'tools', 'driver-llm', 'vfs-sync', 'cells-driver', 'kanban', 'mail'].map(name => '@itookit/' + name));
+    'llm-flow', 'llm-session', 'llm-tasks', 'tools', 'driver-llm', 'vfs-sync', 'cells-driver', 'kanban', 'mail'].map(name => '@nestos/' + name));
 // Portable codecs are allowed explicitly; native I/O still requires host ports.
 coreDependencies.add('js-yaml');
 const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionStorage', 'navigator',
@@ -17,33 +17,33 @@ const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionSt
 
 export function dependencyError(source, target) {
     if (source === target) return;
-    if (source === '@itookit/device-tty' && target.startsWith('@itookit/')) return 'device-tty must use owned contracts and must not depend on application packages';
-    if (source === '@itookit/image-parser' && target.startsWith('@itookit/') && target !== '@itookit/vfs-core') return 'image-parser only accepts optional VFS host adaptation';
-    if (source === '@itookit/ui-common') return 'ui-common must remain dependency-free; host capabilities require generic ports';
-    if (source === '@itookit/llm-ui' && !['@itookit/mdxeditor', '@itookit/ui-common'].includes(target)) return 'independent llm-ui may only depend on mdxeditor and ui-common';
-    if (source === '@itookit/cells-driver' && target.startsWith('@itookit/') &&
-        !['@itookit/vfs-core', '@itookit/vfs-sync'].includes(target))
+    if (source === '@nestos/device-tty' && target.startsWith('@nestos/')) return 'device-tty must use owned contracts and must not depend on application packages';
+    if (source === '@nestos/image-parser' && target.startsWith('@nestos/') && target !== '@nestos/vfs-core') return 'image-parser only accepts optional VFS host adaptation';
+    if (source === '@nestos/ui-common') return 'ui-common must remain dependency-free; host capabilities require generic ports';
+    if (source === '@nestos/llm-ui' && !['@nestos/mdxeditor', '@nestos/ui-common'].includes(target)) return 'independent llm-ui may only depend on mdxeditor and ui-common';
+    if (source === '@nestos/cells-driver' && target.startsWith('@nestos/') &&
+        !['@nestos/vfs-core', '@nestos/vfs-sync'].includes(target))
         return 'cells-driver must receive application policy through public ports';
-    if ((source === '@itookit/vfs-core' || source.startsWith('@itookit/vfsdriver-')) && target.startsWith('@itookit/') && target !== '@itookit/vfs-core')
+    if ((source === '@nestos/vfs-core' || source.startsWith('@nestos/vfsdriver-')) && target.startsWith('@nestos/') && target !== '@nestos/vfs-core')
         return 'VFS core and drivers must remain independent; drivers may only depend on vfs-core';
-    if (source === '@itookit/vfs-sync') return 'vfs-sync must receive all I/O through owned ports';
-    if (source === '@itookit/common' && target.startsWith('@itookit/')) return 'common must not depend on capability packages';
-    if (source === '@itookit/ui-common-adapter' && target.startsWith('@itookit/') && !['@itookit/common', '@itookit/vfs-core', '@itookit/ui-common'].includes(target)) return 'shared UI must receive domain data through generic ports';
-    if (source === '@itookit/kernel-adapters' && ['@itookit/llm-tasks', '@itookit/llm-flow', '@itookit/llm-session'].includes(target)) return 'adapters must not depend on execution or conversation layers';
-    if (['@itookit/kernel-adapters', '@itookit/tools', '@itookit/device-tty', '@itookit/llm-tasks', '@itookit/llm-flow', '@itookit/llm-session'].includes(source) &&
-        ['@itookit/common', '@itookit/llm-common'].includes(target)) return 'execution capabilities must use owned contracts and injected ports';
-    if (source === '@itookit/driver-llm') return 'driver-llm must receive host capabilities through its public ports';
-    if (source === '@itookit/llm-context') return 'llm-context must receive I/O through its public ports';
-    if (source === '@itookit/mdxeditor' && target.startsWith('@itookit/') && target !== '@itookit/ui-common') return 'mdxeditor must receive host capabilities through its public ports';
-    if (source === '@itookit/vfs-ui' && target !== '@itookit/vfs-core') return 'vfs-ui must not depend on host packages; use its public ports';
-    if (source === '@itookit/mail' && !['@itookit/vfs-core', '@itookit/ui-common'].includes(target)) return 'mail only depends on VFS and UI ports';
-    if (source === '@itookit/kanban' && !['@itookit/vfs-core', '@itookit/ui-common'].includes(target)) return 'kanban may only depend on vfs-core and ui-common; execution and application policy require host ports';
-    if (source === '@itookit/app-core' && !coreDependencies.has(target)) return 'app-core may only depend on its platform-neutral capabilities';
-    if (source !== '@itookit/app-shell' && application.has(target)) return 'capability packages must not depend on application packages';
+    if (source === '@nestos/vfs-sync') return 'vfs-sync must receive all I/O through owned ports';
+    if (source === '@nestos/common' && target.startsWith('@nestos/')) return 'common must not depend on capability packages';
+    if (source === '@nestos/ui-common-adapter' && target.startsWith('@nestos/') && !['@nestos/common', '@nestos/vfs-core', '@nestos/ui-common'].includes(target)) return 'shared UI must receive domain data through generic ports';
+    if (source === '@nestos/kernel-adapters' && ['@nestos/llm-tasks', '@nestos/llm-flow', '@nestos/llm-session'].includes(target)) return 'adapters must not depend on execution or conversation layers';
+    if (['@nestos/kernel-adapters', '@nestos/tools', '@nestos/device-tty', '@nestos/llm-tasks', '@nestos/llm-flow', '@nestos/llm-session'].includes(source) &&
+        ['@nestos/common', '@nestos/llm-common'].includes(target)) return 'execution capabilities must use owned contracts and injected ports';
+    if (source === '@nestos/driver-llm') return 'driver-llm must receive host capabilities through its public ports';
+    if (source === '@nestos/llm-context') return 'llm-context must receive I/O through its public ports';
+    if (source === '@nestos/mdxeditor' && target.startsWith('@nestos/') && target !== '@nestos/ui-common') return 'mdxeditor must receive host capabilities through its public ports';
+    if (source === '@nestos/vfs-ui' && target !== '@nestos/vfs-core') return 'vfs-ui must not depend on host packages; use its public ports';
+    if (source === '@nestos/mail' && !['@nestos/vfs-core', '@nestos/ui-common'].includes(target)) return 'mail only depends on VFS and UI ports';
+    if (source === '@nestos/kanban' && !['@nestos/vfs-core', '@nestos/ui-common'].includes(target)) return 'kanban may only depend on vfs-core and ui-common; execution and application policy require host ports';
+    if (source === '@nestos/app-core' && !coreDependencies.has(target)) return 'app-core may only depend on its platform-neutral capabilities';
+    if (source !== '@nestos/app-shell' && application.has(target)) return 'capability packages must not depend on application packages';
 }
 
 export function manifestDependencyError(source, target) {
-    if (source === '@itookit/driver-llm') return 'driver-llm published manifest must have no runtime dependencies';
+    if (source === '@nestos/driver-llm') return 'driver-llm published manifest must have no runtime dependencies';
     return dependencyError(source, target);
 }
 
@@ -60,42 +60,42 @@ function ownerOf(file, packages) {
 }
 
 export function importError(source, file, specifier, packages) {
-    if (source.name === '@itookit/image-parser' && specifier === '@itookit/vfs-core' && file !== resolve(source.dir, 'src/vfs.ts'))
+    if (source.name === '@nestos/image-parser' && specifier === '@nestos/vfs-core' && file !== resolve(source.dir, 'src/vfs.ts'))
         return 'image-parser VFS types and runtime stay in the optional vfs entry';
-    if (source.name === '@itookit/llm-ui' && !specifier.startsWith('.') && !['@itookit/mdxeditor', '@itookit/ui-common', '@itookit/ui-common/navigation.css'].includes(specifier))
+    if (source.name === '@nestos/llm-ui' && !specifier.startsWith('.') && !['@nestos/mdxeditor', '@nestos/ui-common', '@nestos/ui-common/navigation.css'].includes(specifier))
         return 'independent llm-ui may only import mdxeditor and ui-common';
-    if (source.name === '@itookit/mail' && specifier.startsWith('@itookit/ui-common') && !file.startsWith(resolve(source.dir, 'src/ui') + sep))
+    if (source.name === '@nestos/mail' && specifier.startsWith('@nestos/ui-common') && !file.startsWith(resolve(source.dir, 'src/ui') + sep))
         return 'mail backend must not load UI';
-    if (source.name === '@itookit/kanban' && specifier.startsWith('@itookit/ui-common') && !file.startsWith(resolve(source.dir, 'src/ui') + sep))
+    if (source.name === '@nestos/kanban' && specifier.startsWith('@nestos/ui-common') && !file.startsWith(resolve(source.dir, 'src/ui') + sep))
         return 'kanban backend must not import UI; ui-common belongs to the optional ui entry';
-    if ((source.host || source.name === '@itookit/app-transport') && file.startsWith(resolve(source.dir, 'src/rpc') + sep)) {
+    if ((source.host || source.name === '@nestos/app-transport') && file.startsWith(resolve(source.dir, 'src/rpc') + sep)) {
         const local = specifier.startsWith('.') && resolve(file, '..', specifier).startsWith(resolve(source.dir, 'src/rpc') + sep);
-        if (!local && specifier !== '@itookit/vfs-core') return 'RPC mechanisms must receive application metadata through injection';
+        if (!local && specifier !== '@nestos/vfs-core') return 'RPC mechanisms must receive application metadata through injection';
     }
-    if (source.name === '@itookit/app-shell' && (specifier === '@itookit/app-core' || specifier.startsWith('@itookit/app-core/')))
+    if (source.name === '@nestos/app-shell' && (specifier === '@nestos/app-core' || specifier.startsWith('@nestos/app-core/')))
         return 'frontend shell must use shared app-contracts and injected backend ports; runtime assembly belongs to hosts';
-    if (specifier === '@itookit/kernel-adapters/llm' && (source.host || ['@itookit/app-core', '@itookit/app-shell'].includes(source.name)))
+    if (specifier === '@nestos/kernel-adapters/llm' && (source.host || ['@nestos/app-core', '@nestos/app-shell'].includes(source.name)))
         return 'hosts must select explicit LLM core, presets or config entries';
-    if (source.name === '@itookit/llm-ui-adapter' && file !== resolve(source.dir, 'src/settings.ts') && !file.startsWith(resolve(source.dir, 'src/settings') + sep)) {
+    if (source.name === '@nestos/llm-ui-adapter' && file !== resolve(source.dir, 'src/settings.ts') && !file.startsWith(resolve(source.dir, 'src/settings') + sep)) {
         const target = specifier.startsWith('.') ? resolve(file, '..', specifier).replace(/\.ts$/, '') : '';
         const settings = resolve(source.dir, 'src/settings');
-        if (specifier.startsWith('@itookit/llm-ui/settings') || target === settings || target.startsWith(settings + sep))
+        if (specifier.startsWith('@nestos/llm-ui/settings') || target === settings || target.startsWith(settings + sep))
             return 'chat and shared UI must not load optional settings implementations';
     }
-    if (source.name === '@itookit/llm-ui-adapter' && specifier === '@itookit/kernel-adapters/llm/mcp-host')
+    if (source.name === '@nestos/llm-ui-adapter' && specifier === '@nestos/kernel-adapters/llm/mcp-host')
         return 'settings UI must query service instance capabilities, not the global host registry';
-    if (source.name === '@itookit/llm-ui-adapter' && specifier === '@itookit/kernel-adapters/llm')
+    if (source.name === '@nestos/llm-ui-adapter' && specifier === '@nestos/kernel-adapters/llm')
         return 'settings UI must use config codecs, contracts or explicit host ports; not the management aggregate';
-    if (source.name === '@itookit/llm-ui-adapter' && /\.flow(?:\?raw)?$/.test(specifier))
+    if (source.name === '@nestos/llm-ui-adapter' && /\.flow(?:\?raw)?$/.test(specifier))
         return 'UI must receive Flow template catalogs from the host';
-    if (source.name === '@itookit/llm-ui-adapter' && specifier === '@itookit/llm-session')
+    if (source.name === '@nestos/llm-ui-adapter' && specifier === '@nestos/llm-session')
         return 'chat UI must use session contracts and injected views; runtime instances belong to the host';
-    if (source.name === '@itookit/app-core' && (specifier.startsWith('node:') || builtinModules.includes(specifier))) return 'app-core must receive native capabilities through injected ports';
+    if (source.name === '@nestos/app-core' && (specifier.startsWith('node:') || builtinModules.includes(specifier))) return 'app-core must receive native capabilities through injected ports';
     if (specifier.startsWith('.')) {
         const target = ownerOf(resolve(file, '..', specifier), packages);
         return target && target !== source ? 'cross-package relative imports bypass public exports' : undefined;
     }
-    if (['@itookit/app-core', '@itookit/driver-llm', '@itookit/llm-context'].includes(source.name) &&
+    if (['@nestos/app-core', '@nestos/driver-llm', '@nestos/llm-context'].includes(source.name) &&
         !specifier.startsWith('node:') && !builtinModules.includes(specifier)) {
         const name = specifier.split('/').slice(0, specifier.startsWith('@') ? 2 : 1).join('/');
         const error = dependencyError(source.name, name);
@@ -132,26 +132,26 @@ export function sourceErrors(source, file, text, packages) {
     const errors = [];
     const report = (node, message) => errors.push(`${file}:${ast.getLineAndCharacterOfPosition(node.getStart()).line + 1}: ${message}`);
     const visit = node => {
-        if (source.name === '@itookit/app-shell' && ts.isStringLiteralLike(node) && /(?:\.|^)vfs-[\w-]+/.test(node.text))
+        if (source.name === '@nestos/app-shell' && ts.isStringLiteralLike(node) && /(?:\.|^)vfs-[\w-]+/.test(node.text))
             report(node, 'app-shell must use public VFS options/events instead of internal DOM classes');
-        if (source.name === '@itookit/llm-ui-adapter' && ts.isStringLiteralLike(node) && node.text === 'app_create_params')
+        if (source.name === '@nestos/llm-ui-adapter' && ts.isStringLiteralLike(node) && node.text === 'app_create_params')
             report(node, 'UI must receive initial input through instance options, not ambient host storage');
         const specifier = moduleSpecifier(node);
-        if (source.name === '@itookit/app-contracts' && ts.isExportDeclaration(node) && specifier && ts.isStringLiteralLike(specifier) && specifier.text.startsWith('@itookit/kanban'))
+        if (source.name === '@nestos/app-contracts' && ts.isExportDeclaration(node) && specifier && ts.isStringLiteralLike(specifier) && specifier.text.startsWith('@nestos/kanban'))
             report(node, 'Kanban contracts belong to the independent library; import its public entry directly');
-        if (source.name === '@itookit/app-core' && file.startsWith(resolve(source.dir, 'src/kanban') + sep) && ts.isExportDeclaration(node) && specifier && ts.isStringLiteralLike(specifier) && specifier.text.startsWith('@itookit/kanban'))
+        if (source.name === '@nestos/app-core' && file.startsWith(resolve(source.dir, 'src/kanban') + sep) && ts.isExportDeclaration(node) && specifier && ts.isStringLiteralLike(specifier) && specifier.text.startsWith('@nestos/kanban'))
             report(node, 'NestOS Kanban adapters must not forward independent library APIs');
         if (specifier && ts.isStringLiteralLike(specifier)) {
             const error = importError(source, file, specifier.text, packages);
             if (error) report(node, `${error} (${specifier.text})`);
         }
-        if (['@itookit/kernel-adapters', '@itookit/llm-session', '@itookit/llm-ui-adapter'].includes(source.name) &&
+        if (['@nestos/kernel-adapters', '@nestos/llm-session', '@nestos/llm-ui-adapter'].includes(source.name) &&
             ts.isIdentifier(node) && node.text === 'DEFAULT_HARNESS_TOOL_IDS')
             report(node, 'NestOS default tool grants belong to the host; capabilities receive injected policy');
-        if (source.name === '@itookit/app-shell' && ts.isIdentifier(node) && ['LocalBackendPort', 'LocalApplicationServices', 'IVFSManager', 'SessionFilesService', 'DirectoryMountService'].includes(node.text))
+        if (source.name === '@nestos/app-shell' && ts.isIdentifier(node) && ['LocalBackendPort', 'LocalApplicationServices', 'IVFSManager', 'SessionFilesService', 'DirectoryMountService'].includes(node.text))
             report(node, 'UI must consume ApplicationClient ports, not backend construction contracts');
-        if (source.name === '@itookit/app-core' && browserReference(node)) report(node, 'app-core must not reference DOM or browser storage');
-        if (source.name === '@itookit/app-core' && file === resolve(source.dir, 'src/index.ts') &&
+        if (source.name === '@nestos/app-core' && browserReference(node)) report(node, 'app-core must not reference DOM or browser storage');
+        if (source.name === '@nestos/app-core' && file === resolve(source.dir, 'src/index.ts') &&
             ts.isExportDeclaration(node) && !node.exportClause) report(node, 'app-core public exports must be explicit');
         ts.forEachChild(node, visit);
     };
@@ -160,7 +160,7 @@ export function sourceErrors(source, file, text, packages) {
 }
 
 export function vfsStyleErrors(source, file, text) {
-    if (source.name !== '@itookit/app-shell') return [];
+    if (source.name !== '@nestos/app-shell') return [];
     return text.split('\n').flatMap((line, index) => /\.vfs-[\w-]+/.test(line)
         ? [`${file}:${index + 1}: app-shell must style its own layout or public VFS CSS variables, not internal component selectors`] : []);
 }

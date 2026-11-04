@@ -1,4 +1,4 @@
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
 
 /** Resume interrupted copies without replacing a differing target or deleting originals. */
 export async function copySessionAttachments(fs: IFileSystem, from: string, to: string): Promise<void> {

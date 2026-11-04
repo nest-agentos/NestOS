@@ -2,10 +2,10 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { startHost, createCertificates, loadCertificates } from '@itookit/node-host/http';
-import { ProjectRemoteMountService } from '@itookit/app-core';
+import { startHost, createCertificates, loadCertificates } from '@nestos/node-host/http';
+import { ProjectRemoteMountService } from '@nestos/app-core';
 import { openCliApplication } from '../../cli/src/application-host';
-import {FlowLibraryCommand} from '@itookit/app-contracts';
+import {FlowLibraryCommand} from '@nestos/app-contracts';
 import { executeApplicationCommand } from '../../cli/src/application-command';
 
 const cleanup: Array<() => Promise<unknown>> = [];

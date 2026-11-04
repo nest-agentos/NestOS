@@ -1,5 +1,5 @@
-import { interactionApproved, type Decision, type DurableTaskProgram, type TaskInputEvent } from '@itookit/durable-kernel';
-import type { ToolInvokeResult } from '@itookit/tools/contracts';
+import { interactionApproved, type Decision, type DurableTaskProgram, type TaskInputEvent } from '@nestos/durable-kernel';
+import type { ToolInvokeResult } from '@nestos/tools/contracts';
 export interface ToolProgramInput {
     toolId: string; toolVersion: string; args: Record<string, unknown>; allowedToolIds: string[];
     approval?: 'all' | 'none'; timeoutMs?: number;
@@ -51,7 +51,7 @@ function bind(state: Readonly<State>, event: TaskInputEvent): ToolDecision {
 }
 function awaitingInputs(state: Readonly<State>): ToolDecision {
     const pending = (state.input.dependencies ?? []).filter(binding => !state.resolved?.includes(binding.taskId));
-    const waits: import('@itookit/durable-kernel').WaitSpec[] = pending.map(binding => ({ type: 'task', id: binding.taskId }));
+    const waits: import('@nestos/durable-kernel').WaitSpec[] = pending.map(binding => ({ type: 'task', id: binding.taskId }));
     if (!state.handleId) waits.push({ type: 'signal', id: 'capabilities' });
     if (waits.length) return {state: {...state}, next: {type: 'wait', on: {type: 'all', waits}}};
     const next: State = { ...state, phase: 'approval' };

@@ -1,10 +1,10 @@
 import {copyToolbox} from './toolbox';
 import {copyPackageGuide} from './guide';
-import type {ToolConnectionAccess} from '@itookit/app-contracts/services';
+import type {ToolConnectionAccess} from '@nestos/app-contracts/services';
 import {access, mkdir, mkdtemp, rename, rm, stat} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import path from 'node:path';
-import type {Tool} from '@itookit/tools';
+import type {Tool} from '@nestos/tools';
 import {copyPackageFiles, packageFiles, packageFingerprint, resolvePackageExecutables, type ExecutableBinding} from './files';
 import {packageError, readToolPackage, type ToolPackageSource} from './manifest';
 import type {RegisteredToolPackage} from './store';

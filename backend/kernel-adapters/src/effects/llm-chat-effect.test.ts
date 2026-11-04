@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ApiProtocol, ConnectionMeta, ILLMService, LLMProvider } from '@itookit/driver-llm/contracts';
-import type { EffectExecutionContext } from '@itookit/durable-kernel';
+import type { ApiProtocol, ConnectionMeta, ILLMService, LLMProvider } from '@nestos/driver-llm/contracts';
+import type { EffectExecutionContext } from '@nestos/durable-kernel';
 import { LlmChatEffectAdapter, type LlmChatEffectRequest } from './llm-chat-effect';
 
 describe('LlmChatEffectAdapter frozen connection', () => {

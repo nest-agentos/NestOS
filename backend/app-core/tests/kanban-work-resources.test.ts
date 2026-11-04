@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {developmentWorkResources} from '../src/presets/kanban-work-resources';
 import {inspectWorktree, worktreeBlockers} from '../src/projects/worktree-status';

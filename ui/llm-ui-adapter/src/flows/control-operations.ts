@@ -1,8 +1,8 @@
-import {sha256HexSync} from '@itookit/common';
-import type {OperationLedger, OperationRecord, OperationReceipt} from '@itookit/llm-ui';
-import type {TaskControlReceipt, TaskCancellationReceipt} from '@itookit/durable-kernel/contracts';
-import {FlowCommand} from '@itookit/llm-flow/contracts';
-import type {ICommandBus} from '@itookit/llm-session/contracts';
+import {sha256HexSync} from '@nestos/common';
+import type {OperationLedger, OperationRecord, OperationReceipt} from '@nestos/llm-ui';
+import type {TaskControlReceipt, TaskCancellationReceipt} from '@nestos/durable-kernel/contracts';
+import {FlowCommand} from '@nestos/llm-flow/contracts';
+import type {ICommandBus} from '@nestos/llm-session/contracts';
 
 export interface ControlInput {executionSessionId?: string; protocol: 'flow-control-v1'; taskId: string; action: 'pause' | 'resume' | 'withdraw' | 'cancel'; expectedEpoch: number}
 

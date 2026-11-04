@@ -1,6 +1,6 @@
-import type {OperationLedger, OperationReceipt} from '@itookit/llm-ui';
-import {IndependentCallCommand, type IndependentCallReceipt, SessionCommand, type SessionInstructionQueue, type SubmissionRequest} from '@itookit/llm-session/contracts';
-import {createModuleLogger, t} from '@itookit/common';
+import type {OperationLedger, OperationReceipt} from '@nestos/llm-ui';
+import {IndependentCallCommand, type IndependentCallReceipt, SessionCommand, type SessionInstructionQueue, type SubmissionRequest} from '@nestos/llm-session/contracts';
+import {createModuleLogger, t} from '@nestos/common';
 import type {CommandContext} from './CommandContext';
 import {sameContextDraftEvidence, type InputContextDraft} from '../domain/context-draft';
 import {sameSubmissionDraft, type SubmissionDraft} from '../domain/submission-draft';

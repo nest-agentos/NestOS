@@ -1,5 +1,5 @@
 import {afterEach,expect,it,vi} from 'vitest';
-import {RpcPeer,installViewProjections} from '@itookit/app-transport/application';
+import {RpcPeer,installViewProjections} from '@nestos/app-transport/application';
 import {textRuntime} from '../../../backend/app-core/tests/helpers/text-runtime';
 afterEach(()=>vi.restoreAllMocks());
 it('receives client diagnostic metadata through RPC and rejects content fields',async()=>{

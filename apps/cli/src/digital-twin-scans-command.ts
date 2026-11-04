@@ -1,4 +1,4 @@
-import { TWIN_KINDS, type DigitalTwinService, type TwinScanPlanInput, type TwinScanRuleInput, type TwinScanRules } from '@itookit/app-core';
+import { TWIN_KINDS, type DigitalTwinService, type TwinScanPlanInput, type TwinScanRuleInput, type TwinScanRules } from '@nestos/app-core';
 
 export async function scanCommand(service: DigitalTwinService, args: string[], value?: string): Promise<unknown> {
     const [action, id, revision] = args;

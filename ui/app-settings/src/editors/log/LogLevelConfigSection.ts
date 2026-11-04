@@ -3,9 +3,9 @@
  * @description 日志级别配置面板
  */
 
-import {getLogger, LogLevel, LogLevelNames, escapeHTML} from '@itookit/common';
-import { Toast } from '@itookit/ui-common-adapter';
-import type { SettingsPort } from '@itookit/app-contracts/settings';
+import {getLogger, LogLevel, LogLevelNames, escapeHTML} from '@nestos/common';
+import { Toast } from '@nestos/ui-common-adapter';
+import type { SettingsPort } from '@nestos/app-contracts/settings';
 
 interface ModuleLevelConfig {
     module: string;

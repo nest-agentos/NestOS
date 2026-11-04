@@ -2,7 +2,7 @@
 
 调用方只依赖接口，不依赖实现。契约按能力归属：driver-llm/contracts（模型通信与服务端口）、llm-context（领域消息与上下文）、tools/contracts（Tool 执行）、device-tty/contracts（TTY 接口，tools/contracts 保留兼容类型导出）、vfs-core（文件系统）；llm-tasks/contracts、llm-flow/contracts 和 llm-session/contracts 分别承载执行、编排与会话契约；kernel-adapters/contracts 承载配置管理与定价；common 不再转发 LLM 契约。
 
-独立 `@itookit/llm-ui` 的 ChatOptions/ConversationSource/ConversationActions/OperationLedger 定义于 [contracts.ts](../libraries/llm-ui/src/contracts.ts)，FlowSource/FlowActions 定义于 [flow-contracts.ts](../libraries/llm-ui/src/flow-contracts.ts)。两者只依赖展示数据与 mdxeditor；NestOS 接线位于 `llm-ui-adapter/independent`，原工厂兼容入口迁至适配包。Flow 通过 `features.flow` 与 `setFlowEnabled` 控制，默认关闭。
+独立 `@nestos/llm-ui` 的 ChatOptions/ConversationSource/ConversationActions/OperationLedger 定义于 [contracts.ts](../libraries/llm-ui/src/contracts.ts)，FlowSource/FlowActions 定义于 [flow-contracts.ts](../libraries/llm-ui/src/flow-contracts.ts)。两者只依赖展示数据与 mdxeditor；NestOS 接线位于 `llm-ui-adapter/independent`，原工厂兼容入口迁至适配包。Flow 通过 `features.flow` 与 `setFlowEnabled` 控制，默认关闭。
 
 `SessionChatBindingOptions.hasCommittedSubmission(submission)` 由宿主注入，委托 llm-session 的公开持久提交查询；不再注入仓储或在 UI 解析 Round。Send 入队后的回执与后续 confirmed 投影均依据同一后端证据；unknown 的 edit/retry 锁定目标消息，respond 锁定请求 ID/revision。Flow 的恢复 submitting 操作可显式核对，检查器保存后从新节点快照获取下次编辑版本。
 
@@ -11,7 +11,7 @@
 `ContextOptionsReader/ContextOptionsQuery/ContextOptionsPage`（`session.context.options`）补充显式目的分支、已发布目标及来源检查点的被动静态资格；同一查询只读取一次已登记项目 profiles，不装配上下文或获取 writer。basis 只用于观察一致性，最终策略及来源 CAS 仍由派发复验；原生选择进入原 SubmissionRequest，UI 草稿修订作为同一 OperationLedger 的独立恢复证据。契约与 C4 见[上下文协议 8.5–8.6](design/execution-context-binding.md#85-被动资格查询)。
 
 
-## VFS 体系（@itookit/vfs-core）
+## VFS 体系（@nestos/vfs-core）
 
 | 接口 | 核心方法 | 定义 | 实现 | 消费 |
 |---|---|---|---|---|
@@ -55,7 +55,7 @@
 | `FlowDraft/FlowRevision/FlowNodeDefinition` | `nodes/edges/layout` | `llm-flow/src/contracts/flow-definition.ts` | `llm-flow FlowDefinitionStore` | `llm-ui`、`llm-session` |
 | `SerializableExpression` | `kind: eq/neq/in/and/or/not/…` | `llm-flow/src/contracts/flow-definition.ts` | `llm-flow operations` | `cli` 编译路由条件 |
 
-## Kernel 执行内核（@itookit/durable-kernel）
+## Kernel 执行内核（@nestos/durable-kernel）
 
 | 接口/类型 | 核心方法/字段 | 说明 |
 |---|---|---|
@@ -73,7 +73,7 @@
 | `assertEffectGrant` / `interactionApproved` | — | effect 授权断言 / 审批判定 |
 | `bindCapabilities(task, bindings)` | — | 上层能力绑定统一入口（独立函数，非 `TaskHandle` 方法） |
 
-## LLM 任务单元（@itookit/llm-tasks）
+## LLM 任务单元（@nestos/llm-tasks）
 
 | 接口/类型 | 说明 |
 |---|---|
@@ -85,13 +85,13 @@
 | `extractNodeOutput` | `outputs[name].content → message.content → raw` 统一提取 |
 | `collectDependency/dependenciesReady/dependencyWait` | 依赖收集状态机 |
 | `ContextTaskProgram` | v2 执行 bridge：Context 写集、Task 状态与下一 Effect 联合提交 |
-| `ContextAssembler` / `ProviderMessageAdapter` | 兼容转发至 `@itookit/llm-context` |
+| `ContextAssembler` / `ProviderMessageAdapter` | 兼容转发至 `@nestos/llm-context` |
 
-## 上下文（@itookit/llm-context）
+## 上下文（@nestos/llm-context）
 
 独立接口为 `IContextAssembler`、`IContextProfiles`、`IContextEngine`、`IContextService`、`IContextReader`、`IContextContentStore`、`IContextGcStore`。`PreparedContext` 返回 cursor、explanation 和 CAS writes；消费方通过 Kernel 通用 action 提交，Context 不依赖 Kernel。GC 端口提供与发布和根提交串行化的原子视图，默认仅回收静止终态 Task 的过期孤儿。完整字段与调用链见 [Context API](context-api.md)。
 
-## DAG 编排（@itookit/llm-flow）
+## DAG 编排（@nestos/llm-flow）
 
 | 接口/类型 | 说明 |
 |---|---|
@@ -104,7 +104,7 @@
 
 已有根 Invocation 的 Flow 为节点、循环和动态 worker 保存独立 invocationId/parentInvocationId。RunGet/RunList 与成员读取公开关联；当前 Task 与历史尝试分开投影，controlTaskIds 只表达当前持久成员，仍需后端复验写权限和状态。身份版本冻结在 checkpoint，旧运行保留原提交摘要。详见[子调用与尝试投影](design/invocation-presentation.md#7-当前实施覆盖)。
 
-## 会话层（@itookit/llm-session）
+## 会话层（@nestos/llm-session）
 
 | 接口/类型 | 说明 |
 |---|---|
@@ -121,7 +121,7 @@
 | `CommandBus` / `ExtensionRegistry` / `ILLMPlugin` | 控制面命令与插件系统 |
 | `ConversationSystem` / `initializeConversationSystem` | 装配入口（session + flow + programs + kernel） |
 
-## 能力实现（@itookit/kernel-adapters）
+## 能力实现（@nestos/kernel-adapters）
 
 | EffectAdapter | kind | 说明 |
 |---|---|---|
@@ -171,13 +171,13 @@ HTTP 外挂的条件写入、取消与项目授权见 [HTTP VFS 设计](design/v
 
 ## 独立编辑器宿主接口
 
-[mdxeditor 的 editor/contracts.ts](https://github.com/nest-agentos/mdxeditor/blob/main/src/editor/contracts.ts) 定义并从 `@itookit/mdxeditor` 导出 `AssetProvider`、`StoreFactory`、`EditorHost`、`EditorOptions` 与 `IEditor`。核心不持有 `IFileSystem`，附件与插件存储按需注入，保存通过 `onSave` 注入。`@itookit/mdx-adapter` 将 `ui-common` 的 target/files/hostContext 转成上述公共端口，在构造编辑器前校验 namespace 与 Session；消息和会话标识保留在宿主，核心只使用可选 `documentPath`。
+[mdxeditor 的 editor/contracts.ts](https://github.com/nest-agentos/mdxeditor/blob/main/src/editor/contracts.ts) 定义并从 `@nestos/mdxeditor` 导出 `AssetProvider`、`StoreFactory`、`EditorHost`、`EditorOptions` 与 `IEditor`。核心不持有 `IFileSystem`，附件与插件存储按需注入，保存通过 `onSave` 注入。`@nestos/mdx-adapter` 将 `ui-common` 的 target/files/hostContext 转成上述公共端口，在构造编辑器前校验 namespace 与 Session；消息和会话标识保留在宿主，核心只使用可选 `documentPath`。
 
 ### 独立 VFS UI 接入
 
 `vfs-ui` 仅依赖 `vfs-core`。`BrowserSource` / `BrowserAction` 接收自定义资源与动作；`VFSPresentationOptions` 按实例注入翻译、SVG 和启动跟踪；`TagEditorFactory` / `ContextMenuConfig` / `UIPersistencePort` 接收宿主组件、菜单和存储。消费方从 vfs-ui 导入这些类型，或提供结构兼容实现，无需依赖 common/ui-common。NestOS 展示适配位于 `app-shell/src/browser/vfs-presentation.ts`。
 
-通信契约的权威实现已迁到 `https://github.com/nest-agentos/driver-llm/blob/main/src/types/`，原 llm-common 和 common 的 LLM 兼容转发已删除。通信消息 DTO 由 `https://github.com/nest-agentos/driver-llm/blob/main/src/types/message.ts` 定义；上下文领域消息仍归 `llm-context/src/domain/message.ts`。两包互不依赖，宿主将上下文结果映射为通信请求；目前兼容字段可直接按结构赋值。模型设备与配置实现已迁到 `kernel-adapters/src/llm-management/`，通过 `@itookit/kernel-adapters/llm` 公开。
+通信契约的权威实现已迁到 `https://github.com/nest-agentos/driver-llm/blob/main/src/types/`，原 llm-common 和 common 的 LLM 兼容转发已删除。通信消息 DTO 由 `https://github.com/nest-agentos/driver-llm/blob/main/src/types/message.ts` 定义；上下文领域消息仍归 `llm-context/src/domain/message.ts`。两包互不依赖，宿主将上下文结果映射为通信请求；目前兼容字段可直接按结构赋值。模型设备与配置实现已迁到 `kernel-adapters/src/llm-management/`，通过 `@nestos/kernel-adapters/llm` 公开。
 
 ## 外部 harness 端口
 
@@ -392,7 +392,7 @@ StudyCreation.documents.save 可返回 {label: string}，由宿主提供包含�
 
 ### Kanban 协调与执行端口
 
-`@itookit/kanban` 的 KanbanService/KanbanStore 与 DTO 位于独立库公开入口；createKanban 提供分组查询与轻量 Commit，createKanbanModule 提供服务接口。`/storage` 拥有本地/条件事务存储，`/discovery` 拥有来源扫描与原子检查点提交，`/activity` 拥有可选活动投影，`/ui` 通过实例端口接入文案、图标及导航；应用端口直接引用库自包含的 KanbanClient，DTO 和库 API 不在应用包代转出。核心只依赖 vfs-core，宿主注入 actor、authorize、verifyOutputs、onCommitted 和 log。execute 使用稳定 operationId/expectedRevision；workflow(boardId) 查询计划、派发与 ready，不启动任务。quiesce 拒绝新准入并等待已接纳操作。
+`@nestos/kanban` 的 KanbanService/KanbanStore 与 DTO 位于独立库公开入口；createKanban 提供分组查询与轻量 Commit，createKanbanModule 提供服务接口。`/storage` 拥有本地/条件事务存储，`/discovery` 拥有来源扫描与原子检查点提交，`/activity` 拥有可选活动投影，`/ui` 通过实例端口接入文案、图标及导航；应用端口直接引用库自包含的 KanbanClient，DTO 和库 API 不在应用包代转出。核心只依赖 vfs-core，宿主注入 actor、authorize、verifyOutputs、onCommitted 和 log。execute 使用稳定 operationId/expectedRevision；workflow(boardId) 查询计划、派发与 ready，不启动任务。quiesce 拒绝新准入并等待已接纳操作。
 
 publish-plan → prepare-dispatch → observe-execution → accept-execution 表达已封闭计划的控制协议，状态、依赖产物引用、派发、事件/outbox 和幂等回执同 SeqFile 事务。KanbanExecutionPort 属于独立库 `/execution`，Session/Task/模型调用由 NestOS 的正式 IndependentCallService 适配；prepare 冻结可持久请求，start 仅在提交前日志 CAS 胜出时调用，inspect 只能核对原身份。unknown 不产生重派授权；产物需要内容核验，默认独立验收后解锁依赖。文件键、关闭与恢复边界见 [Kanban 设计](design/kanban-coordination.md)。
 
@@ -412,6 +412,6 @@ ChatOptions.ocr 是独立 llm-ui 的可选识别端口，支持 recognize、read
 
 ## 邮件归档查询
 
-`ApplicationBackend.mailView()` 返回宿主授权的 `@itookit/mail/contracts` 的 MailClient；接口与 DTO 由独立库拥有，应用契约不代转出。queryMail、readThread、refreshMail 在 RPC 中均为只读 query，dispose 释放当前视图租约。queryMail 固定每页 20 个主题，先对完整邮箱范围搜索再分组分页，不传邮件正文；正文搜索通过后端索引执行。readThread 支持旧 `.email` 路径和稳定主题引用，按修订有界读取正文；索引变化继续翻页返回 MAIL_THREAD_CHANGED。
+`ApplicationBackend.mailView()` 返回宿主授权的 `@nestos/mail/contracts` 的 MailClient；接口与 DTO 由独立库拥有，应用契约不代转出。queryMail、readThread、refreshMail 在 RPC 中均为只读 query，dispose 释放当前视图租约。queryMail 固定每页 20 个主题，先对完整邮箱范围搜索再分组分页，不传邮件正文；正文搜索通过后端索引执行。readThread 支持旧 `.email` 路径和稳定主题引用，按修订有界读取正文；索引变化继续翻页返回 MAIL_THREAD_CHANGED。
 
 后端共享实例按用户 VFS 对象隔离，最后一个租约关闭才释放文件监听；SeqFile 派生索引位于该用户 `/var/lib/mail/archive.seq`，不能通过邮件视图或通用 UI 文件接口读取。详见 [模块协议](../libraries/mail/README.md)。

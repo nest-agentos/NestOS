@@ -1,4 +1,4 @@
-import type {BinaryAssetReference} from '@itookit/tools/contracts';
+import type {BinaryAssetReference} from '@nestos/tools/contracts';
 import {artifactError, pointer, record} from './artifact-reference';
 
 export interface ArtifactCandidate {path: string; outputName: string; value: unknown; type?: string;}

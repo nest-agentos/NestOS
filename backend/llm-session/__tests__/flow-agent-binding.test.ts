@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { createFlowRevision } from '@itookit/llm-flow';
-import type { FlowDraft } from '@itookit/llm-flow/contracts';
+import { createFlowRevision } from '@nestos/llm-flow';
+import type { FlowDraft } from '@nestos/llm-flow/contracts';
 import type { TaskInput } from '../src/core/types';
 import { prepareFlowAgentInput, frozenFlowResolver, type FlowAgentPorts } from '../src/session/flow-agent';
 import { InstructionQueueStore } from '../src/persistence/instruction-queue-store';

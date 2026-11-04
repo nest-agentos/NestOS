@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { AgentConfigEditor } from '@itookit/llm-ui-adapter/settings';
-import type {EditorOptions} from '@itookit/ui-common-adapter';
-import {getLogger} from '@itookit/common';
+import { AgentConfigEditor } from '@nestos/llm-ui-adapter/settings';
+import type {EditorOptions} from '@nestos/ui-common-adapter';
+import {getLogger} from '@nestos/common';
 
 const editors: AgentConfigEditor[] = [];
 afterEach(async () => {

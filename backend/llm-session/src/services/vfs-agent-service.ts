@@ -1,4 +1,4 @@
-import type { ProviderConnectionTestParams } from '@itookit/driver-llm/contracts';
+import type { ProviderConnectionTestParams } from '@nestos/driver-llm/contracts';
 // @file: llm-conversation/src/services/vfs-agent-service.ts
 //
 // Agent VFS 持久化服务。
@@ -6,20 +6,20 @@ import type { ProviderConnectionTestParams } from '@itookit/driver-llm/contracts
 
 import { FileBackedService } from '../utils/file-backed-service';
 import { AgentFlowAvailabilityProjection, agentSource, type AgentFlowAvailabilitySource } from './agent-flow-availability';
-import { FSError, type IFileSystem } from '@itookit/vfs-core';
-import type { FSNode, FSSearchQuery } from '@itookit/vfs-core';
+import { FSError, type IFileSystem } from '@nestos/vfs-core';
+import type { FSNode, FSSearchQuery } from '@nestos/vfs-core';
 import type { RestorableItem } from '../contracts';
 import type { ILLMManagementService, AgentDefinition, LLMSkill, InitialAgentDef, DefaultConnectionDef } from '../contracts';
-import type { ConnectionMeta, LLMConnection, LLMProvider, ConnectionTestResult } from '@itookit/driver-llm/contracts';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
-import type { SystemPromptDefinition } from '@itookit/llm-tasks/contracts';
+import type { ConnectionMeta, LLMConnection, LLMProvider, ConnectionTestResult } from '@nestos/driver-llm/contracts';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
+import type { SystemPromptDefinition } from '@nestos/llm-tasks/contracts';
 
 import { IAgentManagementService } from './agent-service';
 import { createSessionHost, type SessionHost } from '../utils/host-ports';
-import { isModelDefaults } from '@itookit/kernel-adapters/contracts';
+import { isModelDefaults } from '@nestos/kernel-adapters/contracts';
 import { validateAgentModelDefaults } from './agent-model-defaults';
 import { ulid } from '../persistence/ulid';
-import { callableExposure } from '@itookit/llm-flow/contracts';
+import { callableExposure } from '@nestos/llm-flow/contracts';
 import {AgentPublications, type AgentPublicationDependencies} from './agent-publications';
 import {publicationError} from '../persistence/agent-revisions';
 
@@ -44,8 +44,8 @@ export class VFSAgentService extends FileBackedService implements IAgentManageme
     private readonly publications: AgentPublications;
     private prepareAgent?: (agent: AgentDefinition) => Promise<AgentDefinition>;
     private readonly agentSaves = new Map<string, Promise<void>>();
-    private harnessConnectionReader?: (id: string) => Promise<import('@itookit/kernel-adapters/contracts').HarnessConnectionSnapshot | undefined>;
-    private harnessConnectionList?: () => Promise<import('@itookit/kernel-adapters/contracts').HarnessExecutionConnection[]>;
+    private harnessConnectionReader?: (id: string) => Promise<import('@nestos/kernel-adapters/contracts').HarnessConnectionSnapshot | undefined>;
+    private harnessConnectionList?: () => Promise<import('@nestos/kernel-adapters/contracts').HarnessExecutionConnection[]>;
     private harnessConnectionManagement?: {
         get: NonNullable<IAgentManagementService['getHarnessConnectionRecord']>;
         save: NonNullable<IAgentManagementService['saveHarnessConnection']>;
@@ -70,10 +70,10 @@ export class VFSAgentService extends FileBackedService implements IAgentManageme
         return this.publications.store.get(id, version);
     }
     async getAgentPublicationStatus(id: string) {await this.waitForLoad(); return this.publications.status(id);}
-    async getAgentPublicationReceipt(request: import('@itookit/kernel-adapters/contracts').AgentPublishRequest) {
+    async getAgentPublicationReceipt(request: import('@nestos/kernel-adapters/contracts').AgentPublishRequest) {
         await this.waitForLoad(); return this.publications.store.receipt(request);
     }
-    async publishAgent(request: import('@itookit/kernel-adapters/contracts').AgentPublishRequest) {
+    async publishAgent(request: import('@nestos/kernel-adapters/contracts').AgentPublishRequest) {
         await this.waitForLoad(); const result = await this.publications.publish(request); this.notify(); return result;
     }
     private async readPublicationSource(id: string): Promise<AgentDefinition> {
@@ -114,23 +114,23 @@ export class VFSAgentService extends FileBackedService implements IAgentManageme
         this.harnessConnectionManagement = management;
     }
 
-    getHarnessConnection(id: string): Promise<import('@itookit/kernel-adapters/contracts').HarnessConnectionSnapshot | undefined> {
+    getHarnessConnection(id: string): Promise<import('@nestos/kernel-adapters/contracts').HarnessConnectionSnapshot | undefined> {
         return this.harnessConnectionReader?.(id) ?? Promise.resolve(undefined);
     }
 
-    getHarnessConnections(): Promise<import('@itookit/kernel-adapters/contracts').HarnessExecutionConnection[]> {
+    getHarnessConnections(): Promise<import('@nestos/kernel-adapters/contracts').HarnessExecutionConnection[]> {
         return this.harnessConnectionList?.() ?? Promise.resolve([]);
     }
 
-    getHarnessConnectionRecord(id: string): Promise<import('@itookit/kernel-adapters/contracts').HarnessExecutionConnectionRecord | undefined> {
+    getHarnessConnectionRecord(id: string): Promise<import('@nestos/kernel-adapters/contracts').HarnessExecutionConnectionRecord | undefined> {
         return this.harnessConnectionManagement?.get(id) ?? Promise.resolve(undefined);
     }
 
-    getHarnessConnectionTargets(): Promise<import('@itookit/kernel-adapters/contracts').HarnessExecutionConnectionTarget[]> {
+    getHarnessConnectionTargets(): Promise<import('@nestos/kernel-adapters/contracts').HarnessExecutionConnectionTarget[]> {
         return this.harnessConnectionManagement?.targets?.() ?? Promise.resolve([]);
     }
 
-    async saveHarnessConnection(connection: import('@itookit/kernel-adapters/contracts').HarnessExecutionConnection, expectedRevision: number) {
+    async saveHarnessConnection(connection: import('@nestos/kernel-adapters/contracts').HarnessExecutionConnection, expectedRevision: number) {
         if (!this.harnessConnectionManagement) throw new FSError('ECAPABILITY', 'Harness connection management is unavailable');
         const record = await this.harnessConnectionManagement.save(connection, expectedRevision); this.notify(); return record;
     }
@@ -356,12 +356,12 @@ export class VFSAgentService extends FileBackedService implements IAgentManageme
         return this.llmService.getConnection(id);
     }
 
-    async getDefaultConnection(operation?: import('@itookit/kernel-adapters/contracts').ModelOperation): Promise<ConnectionMeta | null> {
+    async getDefaultConnection(operation?: import('@nestos/kernel-adapters/contracts').ModelOperation): Promise<ConnectionMeta | null> {
         return this.llmService.getDefaultConnection(operation);
     }
     async setDefaultConnection(id: string | null): Promise<void> { return this.llmService.setDefaultConnection(id); }
     getModelDefaults() { return this.llmService.getModelDefaults(); }
-    setModelDefault(operation: import('@itookit/kernel-adapters/contracts').ModelOperation, id: string | null) { return this.llmService.setModelDefault(operation, id); }
+    setModelDefault(operation: import('@nestos/kernel-adapters/contracts').ModelOperation, id: string | null) { return this.llmService.setModelDefault(operation, id); }
 
     // ─── IAgentManagementService — Agent CRUD ─────────────────────────────────
 

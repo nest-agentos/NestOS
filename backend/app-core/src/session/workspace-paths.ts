@@ -1,1 +1,1 @@
-export { workspaceRoot } from '@itookit/app-contracts';
+export { workspaceRoot } from '@nestos/app-contracts';

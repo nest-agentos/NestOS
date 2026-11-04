@@ -1,5 +1,5 @@
-import type {KanbanBoard, KanbanItem, KanbanItemOperationRequest} from '@itookit/kanban/contracts';
-import {sha256HexSync} from '@itookit/common';
+import type {KanbanBoard, KanbanItem, KanbanItemOperationRequest} from '@nestos/kanban/contracts';
+import {sha256HexSync} from '@nestos/common';
 import {automationTarget} from './automation-targets';
 import {requireValue} from './validation';
 import {safeCode} from './automation-analysis';

@@ -1,6 +1,6 @@
-import { escapeHTML, t } from '@itookit/common';
-import { type ICommandBus } from '@itookit/llm-session/contracts';
-import { FlowCommand } from '@itookit/llm-flow/contracts';
+import { escapeHTML, t } from '@nestos/common';
+import { type ICommandBus } from '@nestos/llm-session/contracts';
+import { FlowCommand } from '@nestos/llm-flow/contracts';
 
 interface RunSummary { taskId: string; sessionId: string; name: string; status: string; createdAt: number }
 

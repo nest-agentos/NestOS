@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
+import { t } from '@nestos/common';
 import { ChatInput, type ChatInputOptions } from '../../llm-ui-adapter/src/components/input/ChatInputView';
 import type { ConnectionOption } from '../../llm-ui-adapter/src/domain/types';
 

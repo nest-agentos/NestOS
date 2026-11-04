@@ -1,5 +1,5 @@
-import {createModuleLogger, randomUUID} from '@itookit/common';
-import {MOBILE_NAVIGATION_QUERY} from '@itookit/ui-common';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import {MOBILE_NAVIGATION_QUERY} from '@nestos/ui-common';
 const log = createModuleLogger('navigation-history');
 export interface PagePresentation { mobileView?: string; navigationScope?: string }
 interface PageState extends PagePresentation { workspaceId: string; resourceId: string | null; nestosPage: number }

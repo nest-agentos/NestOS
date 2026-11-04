@@ -1,4 +1,4 @@
-import type { TaskHandle } from '@itookit/durable-kernel';
+import type { TaskHandle } from '@nestos/durable-kernel';
 import type { DagEdgeDefinition, DagNodeDefinition, DagPluginCatalog, DagRunSpec, DagTaskDefinition, DagTaskDependencyBinding, FlowTemplateContext, JsonValue } from '../contracts';
 import type { EdgeState } from './delegation-runtime';
 import type { DispatchInput } from './structured/types';

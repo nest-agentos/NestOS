@@ -1,5 +1,5 @@
-import type { JsonValue } from '@itookit/durable-kernel';
-import type { HarnessEvent } from '@itookit/cells-driver';
+import type { JsonValue } from '@nestos/durable-kernel';
+import type { HarnessEvent } from '@nestos/cells-driver';
 import { executionError } from './harness-execution-journal';
 
 interface Question { id: string; question: string; multiSelect?: boolean }

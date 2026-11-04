@@ -3,8 +3,8 @@
 import type { LLMConnection, ConnectionMeta, LLMProvider, DefaultConnectionDef, ConnectionTestResult, LLMModel, ProviderConnectionTestParams } from './connection';
 import type { RestorableItem } from './restore';
 import type { ProviderAuthorizationService } from './provider-authorization';
-import type { SkillDefinition } from '@itookit/tools/contracts';
-import type { SystemPromptDefinition, PromptPreset } from '@itookit/tools/contracts';
+import type { SkillDefinition } from '@nestos/tools/contracts';
+import type { SystemPromptDefinition, PromptPreset } from '@nestos/tools/contracts';
 import type { AgentComposition } from './agent-composition';
 export type { AgentComposition } from './agent-composition';
 
@@ -46,7 +46,7 @@ export interface AgentInterfaceDef {
  * 用于 Agent 配置中预定义的快捷提示词，可在输入框下拉选择填入。
  * Re-exported from node-config (part of the unified system-prompt model).
  */
-export type { PromptPreset } from '@itookit/tools/contracts';
+export type { PromptPreset } from '@nestos/tools/contracts';
 
 /** Safe presentation metadata; credential values and system prompt bodies stay in the host. */
 export interface ChatConfigurationSnapshot {
@@ -138,9 +138,9 @@ export type LLMSkill = SkillDefinition;
 
 // ─── MCP ──────────────────────────────────────────────────────────────────────
 
-export { MCP_PROTOCOL_VERSION, mcpTimeoutMs } from '@itookit/tools/mcp-contracts';
-export type { MCPServer, MCPDiscovery } from '@itookit/tools/mcp-contracts';
-import type { MCPServer, MCPDiscovery } from '@itookit/tools/mcp-contracts';
+export { MCP_PROTOCOL_VERSION, mcpTimeoutMs } from '@nestos/tools/mcp-contracts';
+export type { MCPServer, MCPDiscovery } from '@nestos/tools/mcp-contracts';
+import type { MCPServer, MCPDiscovery } from '@nestos/tools/mcp-contracts';
 
 // ─── IConnectionReader ────────────────────────────────────────────────────────
 

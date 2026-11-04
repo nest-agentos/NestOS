@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
-import {createKanbanModule, SeqKanbanStore, type KanbanCommand, type KanbanModuleHandle} from '@itookit/kanban';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
+import {createKanbanModule, SeqKanbanStore, type KanbanCommand, type KanbanModuleHandle} from '@nestos/kanban';
 import {createNestOSKanbanExecutionBridge} from '../src/kanban';
-import type {KanbanExecutionPort} from '@itookit/kanban/execution';
+import type {KanbanExecutionPort} from '@nestos/kanban/execution';
 const closes: Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of closes.splice(0).reverse()) await close();});
 async function fixture() {

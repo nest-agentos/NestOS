@@ -1,8 +1,8 @@
 import {resolveChatImageResize} from './image-processing-session';
-import {getLocale} from '@itookit/common';
-import {InputPluginRegistry} from '@itookit/llm-ui';
-import {isCommandInput, resizeMessageInput, shouldSubmitMessage} from '@itookit/llm-ui';
-import {Modal, Toast} from '@itookit/ui-common-adapter';
+import {getLocale} from '@nestos/common';
+import {InputPluginRegistry} from '@nestos/llm-ui';
+import {isCommandInput, resizeMessageInput, shouldSubmitMessage} from '@nestos/llm-ui';
+import {Modal, Toast} from '@nestos/ui-common-adapter';
 // @file: llm-ui/components/input/ChatInputView.ts
 
 import type { IChatInputPresenter, IChatInputConfig } from '../../domain/ports/IChatInputPresenter';
@@ -11,9 +11,9 @@ import type {
     ExecutorOption, ConnectionOption,
     ChatOverrides, SkillInfo, FileSuggestion,
 } from '../../domain/types';
-import { t, randomUUID, ENTITY_ICONS, CHAT_ICONS } from '@itookit/common';
-import {sameTargetRef, type TargetRef, type JsonValue} from '@itookit/llm-flow/contracts';
-import type {RootCallTarget, RootTargetCatalog} from '@itookit/llm-session/contracts';
+import { t, randomUUID, ENTITY_ICONS, CHAT_ICONS } from '@nestos/common';
+import {sameTargetRef, type TargetRef, type JsonValue} from '@nestos/llm-flow/contracts';
+import type {RootCallTarget, RootTargetCatalog} from '@nestos/llm-session/contracts';
 import {WorkspaceCallTargets} from './WorkspaceCallTargets';
 import {draftFileId, validDraftToken} from '../../domain/draft-file-identity';
 import {draftSettings} from '../../domain/submission-draft';
@@ -21,18 +21,18 @@ import {canonicalJson} from '../../utils/canonical-json';
 import {sameInputDraft, type WorkspaceArgumentDraft} from '../../domain/input-draft';
 import {sameInputContextDraft, type InputContextDraft} from '../../domain/context-draft';
 import {WorkspaceContextPicker, type ContextOptionsPort, type ContextScope} from './WorkspaceContextPicker';
-import { type ModelTier } from '@itookit/driver-llm/contracts';
+import { type ModelTier } from '@nestos/driver-llm/contracts';
 import { ChatInputTemplates } from '../templates/ChatInputTemplates';
 import type { InputPlugin, InputPluginContext } from './plugins/InputPlugin';
 import { SlashSuggestionsPlugin } from './plugins/NativeSlashCommandPlugin';
 import { MentionPlugin } from './plugins/MentionPlugin';
 import { TokenMeterPlugin } from './plugins/TokenMeterPlugin';
-import { PopupPanel } from '@itookit/llm-ui';
-import type { PopupItem } from '@itookit/llm-ui';
+import { PopupPanel } from '@nestos/llm-ui';
+import type { PopupItem } from '@nestos/llm-ui';
 import { AttachmentManager } from './AttachmentManager';
 import {knownImageFileState} from './image-file-state';
 import {ImageResizeSettings} from './ImageResizeSettings';
-import {type ImageResizePolicy} from '@itookit/image-parser';
+import {type ImageResizePolicy} from '@nestos/image-parser';
 import { ToolOutputPanel } from './ToolOutputPanel';
 import { HelpPanel } from './HelpPanel';
 import { SkillPanel } from './SkillPanel';
@@ -52,7 +52,7 @@ export interface ChatInputOptions {
     nativeModels?(executorId: string): Promise<import('../../contracts').ConversationModelCatalog>;
     /** Host-owned menu slot for immutable conversation mode information. */
     executionModeInfo?: HTMLElement;
-    executorUsage?: import('@itookit/ui-common-adapter').EditorOptions['executorUsage'];
+    executorUsage?: import('@nestos/ui-common-adapter').EditorOptions['executorUsage'];
     attachments?: boolean;
     attachmentAccept?: string;
     attachmentHint?: string;
@@ -128,7 +128,7 @@ export interface ChatInputOptions {
     onRequestReferences?: (query: string, options?: {includeIgnored?: boolean}) => Promise<FileSuggestion[]>;
 
     /** Host-owned image recognition, shared configuration and live connection label. */
-    ocr?: import('@itookit/app-contracts/services').OcrControls;
+    ocr?: import('@nestos/app-contracts/services').OcrControls;
 
     /**
      * 预留（本期不接线）：语音转文字。
@@ -861,7 +861,7 @@ export class ChatInput implements IChatInputPresenter {
         this.initPluginSystem();
     }
 
-    private syncModelReasoning(caps: import('@itookit/driver-llm/contracts').ReasoningCapabilities | undefined, identity: string, selected: boolean): void {
+    private syncModelReasoning(caps: import('@nestos/driver-llm/contracts').ReasoningCapabilities | undefined, identity: string, selected: boolean): void {
         const select = this.container.querySelector<HTMLSelectElement>('.llm-input__reasoning-select');
         const toggle = this.container.querySelector<HTMLInputElement>('.llm-input__thinking-toggle');
         if (!select || !toggle) return;
@@ -1712,7 +1712,7 @@ export class ChatInput implements IChatInputPresenter {
     // ── Prompt Picker methods ─────────────────────────────────────────────────
 
     /** Current agent's preset prompts (empty when none configured). */
-    private getCurrentPrompts(): import('@itookit/llm-tasks/contracts').PromptPreset[] {
+    private getCurrentPrompts(): import('@nestos/llm-tasks/contracts').PromptPreset[] {
         const agent = this.agents.find(a => a.id === this.config.agentId);
         return agent?.defaultPrompts ?? [];
     }

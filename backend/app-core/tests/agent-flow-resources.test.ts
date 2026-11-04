@@ -1,13 +1,13 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryBackend } from '@itookit/vfs-core';
-import type { AgentDefinition, AgentExecution } from '@itookit/kernel-adapters/contracts';
-import { FlowLibraryCommand } from '@itookit/app-contracts';
-import { FlowCommand, type FlowDraft, type FlowRevision } from '@itookit/llm-flow/contracts';
+import { MemoryBackend } from '@nestos/vfs-core';
+import type { AgentDefinition, AgentExecution } from '@nestos/kernel-adapters/contracts';
+import { FlowLibraryCommand } from '@nestos/app-contracts';
+import { FlowCommand, type FlowDraft, type FlowRevision } from '@nestos/llm-flow/contracts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { bindLocalApplicationServices } from '../src/host/application-services';
 import { createApplicationClient } from '../src/host/application-client';
 import { createChatConfigurationView } from '../src/configuration/chat-configuration';
-import { SessionCommand } from '@itookit/llm-session/contracts';
+import { SessionCommand } from '@nestos/llm-session/contracts';
 import { externalFlow, standaloneFlow } from './fixtures/flow-library';
 
 const cleanup: Array<() => Promise<unknown>> = [];

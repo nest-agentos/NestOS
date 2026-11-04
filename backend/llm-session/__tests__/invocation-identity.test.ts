@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, expect, it} from 'vitest';
-import {Kernel} from '@itookit/durable-kernel';
-import {createVFS, MemoryBackend} from '@itookit/vfs-core';
+import {Kernel} from '@nestos/durable-kernel';
+import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import type {Round} from '../src/contracts';
 import {newRerunInvocation} from '../src/session/invocation-identity';
 

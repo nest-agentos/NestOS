@@ -1,7 +1,7 @@
 import { firstChatModelConnection } from '../../src/llm-management/presets';
 import { expect, it, vi } from 'vitest';
 import { ConnectionManager } from '../../src/llm-management/device/connection-manager';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
 
 it('creates one usable connection for an enabled Provider and preserves manual disables', async () => {
     const provider: LLMProvider = { id: 'p', name: 'Provider', models: [{ id: 'm', name: 'Model' }], enabled: false };

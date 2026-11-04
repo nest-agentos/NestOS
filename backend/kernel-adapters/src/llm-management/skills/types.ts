@@ -1,4 +1,4 @@
-import type { MCPAuthentication } from '@itookit/tools/mcp-contracts';
+import type { MCPAuthentication } from '@nestos/tools/mcp-contracts';
 
 // ─── MCP Types (local definition, host integration contracts) ──────────────────
 

@@ -3,12 +3,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
-import { t } from '@itookit/common';
-import { Kernel } from '@itookit/durable-kernel';
-import { createVFS } from '@itookit/vfs-core';
-import { openLocalFSBackend } from '@itookit/vfsdriver-local';
-import { SessionManager, SessionRepository, SessionDirectoryStorageResolver } from '@itookit/llm-session';
-import { NodeSqliteSidecarDb } from '@itookit/node-host/storage';
+import { t } from '@nestos/common';
+import { Kernel } from '@nestos/durable-kernel';
+import { createVFS } from '@nestos/vfs-core';
+import { openLocalFSBackend } from '@nestos/vfsdriver-local';
+import { SessionManager, SessionRepository, SessionDirectoryStorageResolver } from '@nestos/llm-session';
+import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 import { showMemoryDialog } from '../src/files/memory-dialog';
 
 async function host(root: string) {

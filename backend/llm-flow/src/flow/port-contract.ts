@@ -1,7 +1,7 @@
 import { nodePortSchemas } from './node-port-schemas';
 import { assertFlowSchema, flowSchemaIssue } from './schema-registry';
 import { schemaCompatibilityIssue } from './schema-compat';
-import { extractNodeOutput } from '@itookit/llm-tasks';
+import { extractNodeOutput } from '@nestos/llm-tasks';
 import type { DagEdgeDefinition, DagNodeDefinition, DagPluginCatalog } from '../contracts';
 
 /**

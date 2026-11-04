@@ -1,5 +1,5 @@
-import { assertSync, type CoordinationGuard } from '@itookit/vfs-sync';
-import type { ISidecarDb, LocalStorageAccess } from '@itookit/vfsdriver-local';
+import { assertSync, type CoordinationGuard } from '@nestos/vfs-sync';
+import type { ISidecarDb, LocalStorageAccess } from '@nestos/vfsdriver-local';
 import { LeaseCoordinator, type LeaseOptions } from '../shared/coordinator';
 import { assertLease, decodeLease, LEASE_PATH, type Lease } from '../shared/lease';
 import { ensureSeqFile, nativePath } from './files';

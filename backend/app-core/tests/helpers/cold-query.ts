@@ -1,6 +1,6 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {expect, vi} from 'vitest';
-import type {Kernel} from '@itookit/durable-kernel';
+import type {Kernel} from '@nestos/durable-kernel';
 
 /** Count activations caused by this query, excluding already-running cleanup and queue workers. */
 export async function coldQuery<T>(kernel: Pick<Kernel, 'openSession'>, query: () => Promise<T>): Promise<T> {

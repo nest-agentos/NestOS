@@ -1,6 +1,6 @@
-import {CHAT_SLOT_CLASSES} from '@itookit/llm-ui';
+import {CHAT_SLOT_CLASSES} from '@nestos/llm-ui';
 import {disposeEditorResources} from '../shell/editor-disposal';
-import {createChatView, type ChatView} from '@itookit/llm-ui';
+import {createChatView, type ChatView} from '@nestos/llm-ui';
 import type {createSessionChatBinding} from './session';
 import {SessionContextPicker} from './session-context';
 import {sessionQueueToolbar} from './session-queue';

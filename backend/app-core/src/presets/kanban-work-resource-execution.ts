@@ -1,9 +1,9 @@
 import {jobKey, reviewKey, type ReviewJob, type ReviewSettings} from '../kanban/item-operation-types';
 import {readContextCatalog, type ContextInspector} from '../projects/harness-context-catalog';
-import type {IndependentCallService} from '@itookit/llm-session';
-import type {IndependentCallView} from '@itookit/llm-session/contracts';
-import type {ProjectConversationPort} from '@itookit/app-contracts/services';
-import type {ContextBinding} from '@itookit/kernel-adapters/contracts';
+import type {IndependentCallService} from '@nestos/llm-session';
+import type {IndependentCallView} from '@nestos/llm-session/contracts';
+import type {ProjectConversationPort} from '@nestos/app-contracts/services';
+import type {ContextBinding} from '@nestos/kernel-adapters/contracts';
 import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import type {KanbanAutomationJournal} from '../kanban/automation-journal';
 

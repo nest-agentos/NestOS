@@ -12,7 +12,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { IFsOps, StatResult, DirEntry } from '@itookit/vfsdriver-local';
+import type { IFsOps, StatResult, DirEntry } from '@nestos/vfsdriver-local';
 
 interface RustStatResult {
     size:         number;

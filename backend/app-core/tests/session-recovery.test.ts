@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { SessionLeaseStore } from '../src/index';
 import { recoverSessionsWithLeases } from '../src/runtime/session-recovery';
-import { Kernel, SeqFileKernelStore } from '@itookit/durable-kernel';
+import { Kernel, SeqFileKernelStore } from '@nestos/durable-kernel';
 
 describe('Session recovery with leases', () => {
     it('does not begin Kernel recovery after close while an accepted preparation callback is draining', async () => {

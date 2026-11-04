@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest';
-import { Kernel, type EffectExecutionContext } from '@itookit/durable-kernel';
-import { createVFS, MemoryBackend } from '@itookit/vfs-core';
-import { HarnessProgram, HarnessExecutionEffect } from '@itookit/kernel-adapters';
-import type { HarnessExecutionRequest } from '@itookit/kernel-adapters/contracts';
-import { createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms, submitRun } from '@itookit/llm-flow';
+import { Kernel, type EffectExecutionContext } from '@nestos/durable-kernel';
+import { createVFS, MemoryBackend } from '@nestos/vfs-core';
+import { HarnessProgram, HarnessExecutionEffect } from '@nestos/kernel-adapters';
+import type { HarnessExecutionRequest } from '@nestos/kernel-adapters/contracts';
+import { createBuiltinDagPluginRegistry, DurableFlowExecutor, registerDurablePrograms, submitRun } from '@nestos/llm-flow';
 import {prepareDirectConversationRun} from '../src';
 
 const connection = { version: 1 as const, revision: 1, id: 'remote', name: 'Remote', kind: 'harness' as const,

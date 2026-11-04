@@ -1,6 +1,6 @@
 import {mkdir, readFile, rename, rm, open} from 'node:fs/promises';
 import path from 'node:path';
-import {randomUUID} from '@itookit/common';
+import {randomUUID} from '@nestos/common';
 import {packageError, packageIdentity} from './manifest';
 import type {ExecutableBinding} from './files';
 

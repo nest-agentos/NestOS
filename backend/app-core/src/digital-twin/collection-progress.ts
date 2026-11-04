@@ -1,4 +1,4 @@
-import type {TwinCollectionProgress} from '@itookit/app-contracts';
+import type {TwinCollectionProgress} from '@nestos/app-contracts';
 
 /** Only the reserved, versioned receipt is interpreted; provider cursors and business results stay opaque. */
 export function collectionProgress(output: unknown): TwinCollectionProgress | undefined {

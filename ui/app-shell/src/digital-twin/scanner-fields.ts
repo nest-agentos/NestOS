@@ -1,10 +1,10 @@
 import {changeCollectionVariant, collectionKey, toolFields} from './collection-fields';
-import type {TwinScannerTool} from '@itookit/app-contracts';
+import type {TwinScannerTool} from '@nestos/app-contracts';
 import {readUtf8File} from '../files/read-text-file';
-import {escapeHTML, escapeAttr} from '@itookit/common';
-import type {RootCallTarget} from '@itookit/llm-session/contracts';
-import type {TwinScannerExecutor} from '@itookit/app-contracts';
-import {renderParameterFields, readParameterFields} from '@itookit/llm-ui/forms';
+import {escapeHTML, escapeAttr} from '@nestos/common';
+import type {RootCallTarget} from '@nestos/llm-session/contracts';
+import type {TwinScannerExecutor} from '@nestos/app-contracts';
+import {renderParameterFields, readParameterFields} from '@nestos/llm-ui/forms';
 import {label} from './view';
 const key = (target: RootCallTarget['target']) => JSON.stringify([target.kind, target.id, target.version, target.digest]);
 export function executorFields(targets: RootCallTarget[], selected?: TwinScannerExecutor, slot: 'executor' | 'collection' = 'executor'): string {

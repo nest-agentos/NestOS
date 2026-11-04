@@ -1,4 +1,4 @@
-import type { ApplicationBackend } from '@itookit/app-contracts/services';
+import type { ApplicationBackend } from '@nestos/app-contracts/services';
 
 type DocumentPort = Pick<ApplicationBackend, 'readUiDocuments' | 'writeUiDocuments'>;
 

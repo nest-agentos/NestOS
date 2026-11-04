@@ -1,6 +1,6 @@
 import {afterEach, expect, expectTypeOf, it, vi} from 'vitest';
-import {RpcPeer} from '@itookit/app-transport/application';
-import type {ApplicationServices, ApplicationViewEvent, ApplicationViewObservation, LocalApplicationServices} from '@itookit/app-contracts/services';
+import {RpcPeer} from '@nestos/app-transport/application';
+import type {ApplicationServices, ApplicationViewEvent, ApplicationViewObservation, LocalApplicationServices} from '@nestos/app-contracts/services';
 import {ViewObservation} from '../../../backend/app-core/src/host/view-observation';
 
 const peers: RpcPeer[] = [];

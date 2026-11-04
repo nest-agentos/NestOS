@@ -1,12 +1,12 @@
-import type {SessionDraftControls, SessionDraftMaterialization} from '@itookit/llm-ui-adapter/contracts';
-import type { ProjectDraftComposer } from '@itookit/app-contracts/services';
-import type {IEditor} from '@itookit/ui-common-adapter';
+import type {SessionDraftControls, SessionDraftMaterialization} from '@nestos/llm-ui-adapter/contracts';
+import type { ProjectDraftComposer } from '@nestos/app-contracts/services';
+import type {IEditor} from '@nestos/ui-common-adapter';
 
 /** Navigation adapts a headless draft use case into editor controls. */
 export function createProjectDraftControls(composer: ProjectDraftComposer,
     navigation: { check(): Promise<void>; open(id: string, request?: SessionDraftMaterialization): Promise<IEditor>;
         remote?(request: SessionDraftMaterialization): Promise<IEditor>; identity?(id: string): void },
-    presentation: Pick<SessionDraftControls, 'scope' | 'executorScope' | 'promptHarness' | 'presentation'> = {}): SessionDraftControls<import('@itookit/llm-flow/contracts').SessionSubmission> {
+    presentation: Pick<SessionDraftControls, 'scope' | 'executorScope' | 'promptHarness' | 'presentation'> = {}): SessionDraftControls<import('@nestos/llm-flow/contracts').SessionSubmission> {
     let identity = composer.id, locked = composer.locked;
     return {
         ...presentation,

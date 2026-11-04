@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {createVFS, MemoryBackend, type IVFSManager} from '@itookit/vfs-core';
-import {sha256Hex} from '@itookit/llm-context';
+import {createVFS, MemoryBackend, type IVFSManager} from '@nestos/vfs-core';
+import {sha256Hex} from '@nestos/llm-context';
 import {SessionRepository} from '../src/persistence/session-repository';
 import {AttachmentProcessor} from '../src/session/attachment-processor';
 import {freezeAttachments, identifyRuntimeAttachments} from '../src/session/attachment-integrity';

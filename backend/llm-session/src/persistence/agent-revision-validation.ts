@@ -1,5 +1,5 @@
-import type {AgentDefinition, AgentRevisionContent} from '@itookit/kernel-adapters/contracts';
-import {callableExposure} from '@itookit/llm-flow/contracts';
+import type {AgentDefinition, AgentRevisionContent} from '@nestos/kernel-adapters/contracts';
+import {callableExposure} from '@nestos/llm-flow/contracts';
 
 /** Publication validates platform fields; business argument names are owned by the Flow schema. */
 export function assertAgentRevisionContent(content: AgentRevisionContent): void {

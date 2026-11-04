@@ -1,5 +1,5 @@
-import { createModuleLogger, randomUUID } from '@itookit/common';
-import type { ChatMessage, ConversationSnapshot, ConversationSource } from '@itookit/llm-ui';
+import { createModuleLogger, randomUUID } from '@nestos/common';
+import type { ChatMessage, ConversationSnapshot, ConversationSource } from '@nestos/llm-ui';
 
 /** Preserve unchanged message identities while converting mutable domain projections. */
 export class ChatProjection implements ConversationSource {

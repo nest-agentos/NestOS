@@ -1,7 +1,7 @@
 import {assertContextOptionsPage, assertContextOptionSelection} from '../../domain/context-options';
-import {createModuleLogger, escapeHTML, randomUUID, t} from '@itookit/common';
-import {type TargetRef} from '@itookit/llm-flow/contracts';
-import type {ContextOptionsPage, ContextOptionsQuery, ContextSourceOption, ContextCheckpointOption} from '@itookit/llm-session/contracts';
+import {createModuleLogger, escapeHTML, randomUUID, t} from '@nestos/common';
+import {type TargetRef} from '@nestos/llm-flow/contracts';
+import type {ContextOptionsPage, ContextOptionsQuery, ContextSourceOption, ContextCheckpointOption} from '@nestos/llm-session/contracts';
 import {prepareInputContextDraft, sameInputContextDraft, type InputContextDraft} from '../../domain/context-draft';
 
 export interface ContextScope {sessionId: string; branchId: string}

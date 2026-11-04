@@ -1,10 +1,10 @@
 import {inspectAuthorization} from './authorization-inspection';
 import {DiagnosticJournal} from '../diagnostics/journal';
 import {diagnosticFailure} from '../diagnostics/failure';
-import type {DiagnosticEvent, RemoteProjectStatus} from '@itookit/app-contracts/services';
+import type {DiagnosticEvent, RemoteProjectStatus} from '@nestos/app-contracts/services';
 import {ConversationRegistry} from './conversation-registry';
 import {ConversationComposerStore, withConversationComposer} from './conversation-composer-store';
-import type { ProjectConversationPort } from '@itookit/app-contracts/services';
+import type { ProjectConversationPort } from '@nestos/app-contracts/services';
 import { observeConversation } from './conversation-view';
 import {prepareRemoteDraft, remoteConversationKey} from './drafts/remote-submission';
 import {readConversationIdentity} from './drafts/remote-identity';
@@ -13,21 +13,21 @@ import type {RemoteConversationRecoveryTarget} from './remote-conversation-recov
 import {RemoteConversationRecoveryLoop} from './remote-conversation-retry';
 import {draftHarness, draftConversation, remoteConversationJournal} from './remote-draft-conversation';
 import { RemoteSessionStatus } from '../session/remote-session-status';
-import type { MCPServer } from '@itookit/tools/mcp-contracts';
+import type { MCPServer } from '@nestos/tools/mcp-contracts';
 import type { MCPDeletedProject, MCPDeletionReference } from '../configuration/model-commands';
 import { MCPRemoteConnections, remoteMCPConnection } from './mcp-remote-connections';
 import { RemoteConnectionUnavailableError, reportRemoteFailure, remoteLog, type MCPConnectionDiagnostic } from './remote-diagnostics';
 import type { ExecutionCapabilities, ProjectExecutionContext } from './execution/contracts';
 import { RemoteMountStore, type RemoteMountCatalog as Catalog } from './remote-mount-store';
-import { randomUUID } from '@itookit/common';
+import { randomUUID } from '@nestos/common';
 import { checkOperation, createFileSystemView, FSError, normalizeVirtualPath, operationScope,
-    type FileSystemSourceOwner, type FileSystemMount, type IFileSystem, type OperationOptions } from '@itookit/vfs-core';
+    type FileSystemSourceOwner, type FileSystemMount, type IFileSystem, type OperationOptions } from '@nestos/vfs-core';
 import { createUnavailableDirectory } from '../vfs/unavailable-directory';
 import { canReaddressConnection, normalizeConnection, remoteCredentialIdentity, remoteProjectPath, type RemoteFileSystemConfig, type RemoteFileSystemInput } from './remote-connections';
-import type { HarnessClient } from '@itookit/cells-driver/harness';
-import type { ProjectClient, RemoteProject, HarnessConversationPort, HarnessProfile, HarnessConversationJournal } from '@itookit/cells-driver';
+import type { HarnessClient } from '@nestos/cells-driver/harness';
+import type { ProjectClient, RemoteProject, HarnessConversationPort, HarnessProfile, HarnessConversationJournal } from '@nestos/cells-driver';
 
-export interface RemoteFileConnection { endpoint: string; alias: string; credentialRef: string; username?: string; anonymous?: boolean; authorization?: import('@itookit/cells-driver').RemoteAuthorization; }
+export interface RemoteFileConnection { endpoint: string; alias: string; credentialRef: string; username?: string; anonymous?: boolean; authorization?: import('@nestos/cells-driver').RemoteAuthorization; }
 
 /** One directory grant as the execution node must expose it to a process. */
 export interface RemoteProcessMount { alias: string; path: string; at: string; access: 'ro' | 'rw' }
@@ -41,10 +41,10 @@ export interface RemoteProcessRequest {
 export interface RemoteProcessHandle { nativeShell: NonNullable<ProjectExecutionContext['nativeShell']>; release(): Promise<void> }
 
 export interface RemoteFileSourceProvider {
-    observeHarness?(client: HarnessClient, writable?: boolean, options?: {watchFiles?: boolean}): import('@itookit/cells-driver').HarnessStatusPort;
+    observeHarness?(client: HarnessClient, writable?: boolean, options?: {watchFiles?: boolean}): import('@nestos/cells-driver').HarnessStatusPort;
     conversation?(client: HarnessClient, profile: HarnessProfile, workspaceId: string, sessionId?: string, writable?: boolean, journal?: HarnessConversationJournal): HarnessConversationPort;
     resolveCredential?(reference: string): string | Promise<string>;
-    discover?(connection: Omit<RemoteFileConnection, 'alias'>, options?: OperationOptions): Promise<import('@itookit/cells-driver').CellsDescriptor>;
+    discover?(connection: Omit<RemoteFileConnection, 'alias'>, options?: OperationOptions): Promise<import('@nestos/cells-driver').CellsDescriptor>;
     projects?(connection: Omit<RemoteFileConnection, 'alias'>): ProjectClient;
     projectProcess?(connection: Omit<RemoteFileConnection, 'alias'>, project: RemoteProject, request: RemoteProcessRequest): Promise<RemoteProcessHandle>;
     harness?(connection: Omit<RemoteFileConnection, 'alias'>): HarnessClient;
@@ -61,7 +61,7 @@ export interface RemoteFileSourceProvider {
     dispose(): Promise<void>;
 }
 export interface ProjectRemoteMount extends RemoteFileConnection {
-    capabilities?: import('@itookit/cells-driver').RemoteProjectCapabilities;
+    capabilities?: import('@nestos/cells-driver').RemoteProjectCapabilities;
     serverProjectId?: string; serverProjectRevision?: number; serverId?: string; mountId: string; at: string; root: string; access: 'ro' | 'rw'; connectionId?: string;
 }
 export type RemoteConnectionStatus = 'unknown' | 'checking' | 'online' | 'offline';
@@ -70,7 +70,7 @@ export type RemoteConnectionStatus = 'unknown' | 'checking' | 'online' | 'offlin
 export class ProjectRemoteMountService {
     private readonly conversations = new ConversationRegistry();
     private conversationRecovery?: RemoteConversationRecoveryLoop;
-    estimateUsage?: (usage: import('@itookit/cells-driver').HarnessUsage) => import('@itookit/kernel-adapters/contracts').UsageCostEstimate;
+    estimateUsage?: (usage: import('@nestos/cells-driver').HarnessUsage) => import('@nestos/kernel-adapters/contracts').UsageCostEstimate;
     readonly sessionStatus = new RemoteSessionStatus(id => {
         const grants = this.list(id), root = grants.find(m => m.at === '/');
         return !this.closed && root?.connectionId && root.serverProjectId ? JSON.stringify(grants) : undefined;
@@ -93,7 +93,7 @@ export class ProjectRemoteMountService {
     private readonly states = new Map<string, RemoteConnectionStatus>();
     private readonly projectIssues = new Map<string, Map<string, DiagnosticEvent>>();
     private readonly guardedClients = new WeakSet<HarnessClient>();
-    private readonly authorizationInspections = new Map<string, {fingerprint: string; value: import('@itookit/app-contracts/services').RemoteAuthorizationInspection}>();
+    private readonly authorizationInspections = new Map<string, {fingerprint: string; value: import('@nestos/app-contracts/services').RemoteAuthorizationInspection}>();
     private readonly observations = new Map<string, {checkedAt: number; lastSuccessAt?: number; failure?: DiagnosticEvent}>();
     private readonly connectionStates = new Map<string, RemoteConnectionStatus>();
     private readonly listeners = new Set<() => void>();
@@ -472,7 +472,7 @@ export class ProjectRemoteMountService {
             return {project, ...await client.executionSettings(project, options)};
         } finally { await client.close(); }
     }
-    async setExecution(projectId: string, expected: RemoteProject, execution: import('@itookit/cells-driver').ProjectEnvironment, options?: OperationOptions): Promise<void> {
+    async setExecution(projectId: string, expected: RemoteProject, execution: import('@nestos/cells-driver').ProjectEnvironment, options?: OperationOptions): Promise<void> {
         await this.trackProject('project.execution.configure', projectId, () => this.serial(async () => {
             await this.beforeChange(projectId);
             const grants = this.list(projectId), root = grants.find(m => m.at === '/');
@@ -539,7 +539,7 @@ export class ProjectRemoteMountService {
             const granted=this.list(projectId);
             if (expected.length!==granted.length || expected.some(m=>!granted.some(g=>g.alias===m.alias && g.root===m.root && g.at===m.at)) || mount.access==='rw' && project.mounts.some(m=>granted.find(g=>g.at===m.at.slice('/workspace'.length))?.access!==m.access)) throw new FSError('ECONFLICT','Server project mounts changed; refresh the project binding');
     }
-    async searchFiles(projectId: string, query: import('@itookit/cells-driver').FileSearchQuery, options?: OperationOptions) {
+    async searchFiles(projectId: string, query: import('@nestos/cells-driver').FileSearchQuery, options?: OperationOptions) {
         const mount = this.list(projectId).find(m => m.at === '/');
         if (!mount?.connectionId || !mount.serverProjectId || !this.provider.projects) throw new FSError('ECAPABILITY', 'Project search unavailable');
         const fingerprint = JSON.stringify(this.list(projectId));
@@ -555,7 +555,7 @@ export class ProjectRemoteMountService {
             return result;
         } finally { await client.close(); }
     }
-    async projectModels(projectId: string, profileId: string, options?: OperationOptions): Promise<import('@itookit/cells-driver').HarnessModelCatalog> {
+    async projectModels(projectId: string, profileId: string, options?: OperationOptions): Promise<import('@nestos/cells-driver').HarnessModelCatalog> {
         const client = await this.projectHarness(projectId, options);
         const fingerprint = JSON.stringify(this.list(projectId));
         try {

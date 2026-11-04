@@ -1,5 +1,5 @@
 import { copySessionAttachments } from './session-attachment-copy';
-import { FSError, type IFileSystem, type ISeqFileTransaction } from '@itookit/vfs-core';
+import { FSError, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
 import type { SessionStorageTrace } from './session-storage-trace';
 
 const INDEX = '/var/lib/sessions/folders.seq';

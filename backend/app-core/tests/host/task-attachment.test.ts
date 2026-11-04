@@ -1,6 +1,6 @@
 import {expect, it, vi} from 'vitest';
 import {taskAttachment} from '../../src/host/task-attachment';
-import {KernelError, KernelErrorCode} from '@itookit/durable-kernel';
+import {KernelError, KernelErrorCode} from '@nestos/durable-kernel';
 
 function fixture() {
     const pending = (id: string, updatedAt: number, status = 'waiting', interaction = 'pending') => ({id, updatedAt, status, interactions: {answer: {status: interaction}}});

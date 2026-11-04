@@ -1,5 +1,5 @@
-import type { SharedMemoryStore } from '@itookit/llm-session';
-import type { MemoryPolicy } from '@itookit/llm-tasks/contracts';
+import type { SharedMemoryStore } from '@nestos/llm-session';
+import type { MemoryPolicy } from '@nestos/llm-tasks/contracts';
 import type { AgentConfig } from './types';
 
 /** Translate CLI field names without sharing mutable policy arrays with the workflow. */

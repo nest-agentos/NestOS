@@ -1,7 +1,7 @@
-import { t, FILE_BROWSER_ICONS, ACTION_ICONS } from '@itookit/common';
-import type { ProjectSearchMatch, ProjectSearchQuery } from '@itookit/app-contracts/services';
+import { t, FILE_BROWSER_ICONS, ACTION_ICONS } from '@nestos/common';
+import type { ProjectSearchMatch, ProjectSearchQuery } from '@nestos/app-contracts/services';
 import { decorateButton } from '../workbench/controls';
-import type { ProjectSearch } from '@itookit/app-contracts/services';
+import type { ProjectSearch } from '@nestos/app-contracts/services';
 
 interface SearchPanelOptions {
     scopes?: readonly (ProjectSearchQuery['scope'] | 'loaded-tree')[];

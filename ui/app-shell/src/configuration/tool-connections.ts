@@ -1,5 +1,5 @@
-import {createModuleLogger, escapeAttr, escapeHTML, randomUUID, t, type LocaleKey} from '@itookit/common';
-import type {ToolConnections, ToolConnectionType, ToolConnectionView, ToolPackageGuide} from '@itookit/app-contracts/services';
+import {createModuleLogger, escapeAttr, escapeHTML, randomUUID, t, type LocaleKey} from '@nestos/common';
+import type {ToolConnections, ToolConnectionType, ToolConnectionView, ToolPackageGuide} from '@nestos/app-contracts/services';
 import {readUtf8File} from '../files/read-text-file';
 import {guideContent} from '../toolbox/package-guide';
 import {applicationSettings, authorizationFields} from './tool-oauth-settings';

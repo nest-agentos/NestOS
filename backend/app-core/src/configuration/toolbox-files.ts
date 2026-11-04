@@ -1,5 +1,5 @@
-import { createFileSystemView, type IFileSystem } from '@itookit/vfs-core';
-import { TOOLBOX_KINDS, type ToolboxKind } from '@itookit/app-contracts';
+import { createFileSystemView, type IFileSystem } from '@nestos/vfs-core';
+import { TOOLBOX_KINDS, type ToolboxKind } from '@nestos/app-contracts';
 
 /** Resolve granted mount boundaries and link checks where their storage lives. */
 export function createToolboxFiles(sources: Record<ToolboxKind, IFileSystem>) {

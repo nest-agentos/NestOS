@@ -1,5 +1,5 @@
-import {createModuleLogger, ENTITY_ICONS, randomUUID, t} from '@itookit/common';
-import type {ProjectService, ProjectFolder} from '@itookit/app-contracts/services';
+import {createModuleLogger, ENTITY_ICONS, randomUUID, t} from '@nestos/common';
+import type {ProjectService, ProjectFolder} from '@nestos/app-contracts/services';
 
 const log = createModuleLogger('remote-draft-catalog');
 /** A model read reuses this editor's profile discovery; the backend revalidates its grant. */

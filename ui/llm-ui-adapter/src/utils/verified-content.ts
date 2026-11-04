@@ -1,4 +1,4 @@
-import {sha256Hex} from '@itookit/common';
+import {sha256Hex} from '@nestos/common';
 
 export interface VerifiedContentOptions {maxBytes: number; previewBytes?: number; signal: AbortSignal;}
 export interface VerifiedContentIdentity {bytes: number; sha256: string}

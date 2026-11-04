@@ -1,4 +1,4 @@
-@import '@itookit/ui-common/navigation.css';
+@import '@nestos/ui-common/navigation.css';
 
 /* Workspace layout styles — used by consumers (app-shell, app-settings, demo)
    to create sidebar + editor flex containers. MemoryManager itself creates zero DOM;

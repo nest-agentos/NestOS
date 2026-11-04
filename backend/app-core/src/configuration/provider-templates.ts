@@ -1,5 +1,5 @@
-import { createModuleLogger, randomUUID, t } from '@itookit/common';
-import type { LLMProvider } from '@itookit/driver-llm/contracts';
+import { createModuleLogger, randomUUID, t } from '@nestos/common';
+import type { LLMProvider } from '@nestos/driver-llm/contracts';
 
 const log = createModuleLogger('toolbox-provider');
 const mutations = new WeakMap<object, Promise<string>>();

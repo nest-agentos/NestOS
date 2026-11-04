@@ -1,5 +1,5 @@
-import { randomUUID } from '@itookit/common';
-import type { FlowDraft, FlowNodeId, DagPluginManifest, FlowEdgeDefinition, FlowEdgeId, FlowNodeDefinition, FlowConnection, FlowParameter, FlowDefaults } from '@itookit/llm-flow/contracts';
+import { randomUUID } from '@nestos/common';
+import type { FlowDraft, FlowNodeId, DagPluginManifest, FlowEdgeDefinition, FlowEdgeId, FlowNodeDefinition, FlowConnection, FlowParameter, FlowDefaults } from '@nestos/llm-flow/contracts';
 
 export interface DeleteNodeResult {
     nodeId: FlowNodeId;
@@ -49,7 +49,7 @@ export class DagDraftController {
     }
 
     /** One undo step owns both the input producer and its explicit data edge. */
-    addToolSource(descriptor: DagPluginManifest, value: {toolId: string; toolVersion: string; args: Record<string, import('@itookit/llm-flow/contracts').JsonValue>}, targetId?: FlowNodeId): FlowNodeDefinition {
+    addToolSource(descriptor: DagPluginManifest, value: {toolId: string; toolVersion: string; args: Record<string, import('@nestos/llm-flow/contracts').JsonValue>}, targetId?: FlowNodeId): FlowNodeDefinition {
         const node = createFlowNode(descriptor);
         node.name = value.toolId;
         node.config = {...value, approval: 'all'};
@@ -134,7 +134,7 @@ export class DagDraftController {
         parameters?: FlowParameter[];
         variables?: FlowDraft['variables'];
         defaults?: FlowDefaults;
-        runPolicy?: import('@itookit/llm-flow/contracts').FlowRunPolicy;
+        runPolicy?: import('@nestos/llm-flow/contracts').FlowRunPolicy;
     }): void {
         this.change(draft => {
             if ('exposure' in settings) draft.exposure = settings.exposure;

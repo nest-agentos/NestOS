@@ -8,9 +8,9 @@ export default defineConfig({
     clean: true,
     sourcemap: true,
     external: [
-        '@itookit/driver-llm',
-        '@itookit/durable-kernel',
-        '@itookit/vfs-core',
-        '@itookit/tools',
+        '@nestos/driver-llm',
+        '@nestos/durable-kernel',
+        '@nestos/vfs-core',
+        '@nestos/tools',
     ],
 });
