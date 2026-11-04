@@ -1,3 +1,4 @@
+import {navigationFolders} from './navigation-folders';
 import {LEGACY_LOCAL_PROJECT_NAMES} from '@nestos/app-contracts';
 import {ProjectEnvironmentStore} from './project-environment';
 import {PersonalProject} from './personal-project';
@@ -159,13 +160,7 @@ export class ProjectService {
     async navigationFolders(folders?: readonly SessionFolder[]): Promise<SessionFolder[]> {
         const cached = folders ?? await this.repository.listFolders();
         const projects = this.navigationFromIndex ? this.listNavigation(cached) : await this.list(cached);
-        const children = cached.filter(folder => !folder.project && projects.some(project =>
-            folder.path.startsWith(project.path + '/') || project.path.startsWith(folder.path + '/')));
-        // Directory identities can exist before their Session organization records.
-        // Reads expose the fixed section without mutating the authoritative catalog.
-        const sections = projects.filter(project => !children.some(folder => folder.path === project.path + '/@sessions'))
-            .map(project => ({ path: project.path + '/@sessions', name: '@sessions', parentPath: project.path, updatedAt: project.updatedAt }));
-        return [...projects, ...children, ...sections];
+        return navigationFolders(projects, cached);
     }
     private legacyRecovery?: Promise<void>;
     private legacyFailures = new Map<string, unknown>();

@@ -18,7 +18,7 @@ export async function runHttpHost(args = process.argv.slice(2), defaultStaticDir
     const backlog = validBacklog(values.backlog);
     const cwd = process.env.INIT_CWD ?? process.cwd(), selected = resolveHttpConfigDirectory(cwd), config = selected.directory;
     console.log(`[HTTP] Config: ${configurationFilePath(config)} (${selected.source})`);
-    const {certDir, authDir: authPath, editorSwap, usersDir, certificateClients, authorizationRedirectUri} = await resolveHttpDirectories(config, cwd,
+    const {certDir, authDir: authPath, editorSwap, usersDir, certificateClients, authorizationRedirectUri, strictPathChecks} = await resolveHttpDirectories(config, cwd,
         {certDir: values['cert-dir'], authDir: values['auth-dir'], usersDir: values['users-dir']}, logMode);
     const root = await resolveDataRoot(config, cwd, values.root), sidecar = path.resolve(cwd, values.sidecar ?? path.join(root, '_meta'));
     const configuredStatic = values.static ? path.resolve(cwd, values.static) : defaultStaticDir;
@@ -55,7 +55,7 @@ export async function runHttpHost(args = process.argv.slice(2), defaultStaticDir
         throw new Error('Server certificates and legacy authorization must remain outside user bundles');
     const certificates = await loadCertificates(certDir, certificateClients), port = validPort(values.port);
     const controller = new AbortController();
-    const starting = startHost({ signal: controller.signal, root: canonicalRoot, sidecar: canonicalSidecar, certificates, staticDir, auditFile, authDir, editorSwap, logMode, port, host: values.host, backlog, usersDir, authorizationRedirectUri });
+    const starting = startHost({ signal: controller.signal, root: canonicalRoot, sidecar: canonicalSidecar, certificates, staticDir, auditFile, authDir, editorSwap, logMode, port, host: values.host, backlog, usersDir, authorizationRedirectUri, strictPathChecks });
     installShutdown(starting, controller);
     await starting;
 }

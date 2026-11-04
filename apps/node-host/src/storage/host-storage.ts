@@ -2,8 +2,8 @@ import { type IStorageBackend } from '@nestos/vfs-core';
 import { PathGuard } from './path-guard';
 
 /** Keep filesystem checks inside the daemon, beneath every domain service. */
-export function guardHostStorage(backend: IStorageBackend, root: string): IStorageBackend {
-    const guard = new PathGuard(root), singlePath = new Set(['stat', 'statType', 'read', 'write', 'mkdir', 'delete', 'list', 'listEntries', 'chmod', 'readlink', 'updateMetadata', 'setTags', 'replace']);
+export function guardHostStorage(backend: IStorageBackend, root: string, strictPathChecks = true): IStorageBackend {
+    const guard = new PathGuard(root, strictPathChecks), singlePath = new Set(['stat', 'statType', 'read', 'write', 'mkdir', 'delete', 'list', 'listEntries', 'chmod', 'readlink', 'updateMetadata', 'setTags', 'replace']);
     return new Proxy(backend, { get(target, key) {
         const value = Reflect.get(target, key, target);
         if (key === 'close') return async () => {};

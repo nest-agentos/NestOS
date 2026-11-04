@@ -1,3 +1,4 @@
+import {PathChecks, type PathProbes} from './path-checks';
 import path from 'node:path';
 import {promises as fs} from 'node:fs';
 import {randomUUID} from 'node:crypto';
@@ -7,20 +8,20 @@ import {within} from '../runtime/paths';
 
 /** Keep logical record keys unchanged while user documents live directly in the portable home. */
 export class UserFiles implements IFsOps {
-    constructor(private readonly state: string, private readonly home: string) {}
-    private async resolve(value: string): Promise<string> {
+    private readonly checks = new PathChecks();
+    constructor(private readonly state: string, private readonly home: string, private readonly strictPathChecks = true) {}
+    private target(value: string): string {
         const prefix = path.join(this.state, 'home', 'admin');
         const document = within(prefix, value);
         const result = document ? path.join(this.home, path.relative(prefix, value)) : value;
         if (document && within(path.join(this.home, '.nestos'), result)) throw new FSError('EACCES', 'User internals are private');
         if (!within(this.home, result)) throw new FSError('EACCES', 'User storage path escaped its bundle');
-        let current = this.home;
-        for (const part of path.relative(this.home, result).split(path.sep).filter(Boolean)) {
-            current = path.join(current, part);
-            try {if ((await fs.lstat(current)).isSymbolicLink()) throw new FSError('EACCES', 'User storage links are unavailable');}
-            catch (error) {if ((error as NodeJS.ErrnoException).code === 'ENOENT') break; throw error;}
-        }
         return result;
+    }
+    private async resolve(value: string): Promise<string> {
+        const target = this.target(value);
+        if (this.strictPathChecks) await this.checks.check(this.home, target);
+        return target;
     }
     async readFile(value: string): Promise<ArrayBuffer | null> {
         try {const data = await fs.readFile(await this.resolve(value)); return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;}
@@ -40,12 +41,20 @@ export class UserFiles implements IFsOps {
         finally {await fs.unlink(temporary).catch(error => {if (error.code !== 'ENOENT') throw error;});}
     }
     async appendFile(value: string, data: ArrayBuffer): Promise<void> {await fs.appendFile(await this.resolve(value), Buffer.from(data), {mode: 0o600});}
-    async stat(value: string): Promise<StatResult | null> {
-        try {const info = await fs.lstat(await this.resolve(value)); return {size: info.size, mtimeMs: info.mtimeMs, birthtimeMs: info.birthtimeMs,
-            isDirectory: info.isDirectory(), isFile: info.isFile(), isSymbolicLink: info.isSymbolicLink()};}
-        catch (error) {if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null; throw error;}
+    stat(value: string): Promise<StatResult | null> {return this.statChecked(value);}
+    private async statChecked(value: string, probes?: PathProbes): Promise<StatResult | null> {
+        try {
+            const target = this.target(value);
+            const info = await (this.strictPathChecks ? this.checks.check(this.home, target, probes) : this.checks.probe(target, probes));
+            return info ? {size: info.size, mtimeMs: info.mtimeMs, birthtimeMs: info.birthtimeMs,
+                isDirectory: info.isDirectory(), isFile: info.isFile(), isSymbolicLink: info.isSymbolicLink()} : null;
+        } catch (error) {if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null; throw error;}
     }
-    statMany(values: string[]): Promise<Array<StatResult | null>> {return Promise.all(values.map(value => this.stat(value)));}
+    async statMany(values: string[]): Promise<Array<StatResult | null>> {
+        const probes: PathProbes = new Map();
+        try {return await Promise.all(values.map(value => this.statChecked(value, probes)));}
+        finally {probes.clear();}
+    }
     async readDir(value: string) {
         const target = await this.resolve(value);
         try {return (await fs.readdir(target, {withFileTypes: true})).filter(entry => target !== this.home || entry.name !== '.nestos')

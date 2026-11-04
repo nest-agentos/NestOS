@@ -35,6 +35,20 @@ it.each(['/folder:P/@files', '/s/files'])('keeps the file directory %s unchanged
         expect(showDirectory).not.toHaveBeenCalled();
     } finally {await f.workbench.destroy();}
 });
+it('uses one prepared directory for sidebar navigation and the current content during a refresh', async () => {
+    const f = setup(); await f.workbench.start();
+    const workbench = f.workbench as any, view = {node: {}, nodes: [], navigation: {path: '/folder:P'}, directories: []};
+    const read = vi.spyOn(workbench, 'readDirectoryData').mockResolvedValue(view);
+    const show = vi.spyOn(workbench, 'showDirectory').mockResolvedValue(undefined), refresh = vi.fn(async () => {});
+    workbench.active = '/folder:P'; workbench.navigationReady = true; workbench.navigationDirty = true;
+    workbench.browser.readDirectory = vi.fn(); workbench.projectNavigation = {refresh, cancelPending() {}, destroy() {}};
+    try {
+        await workbench.refreshView(['repository']);
+        expect(read).toHaveBeenCalledOnce(); expect(refresh).toHaveBeenCalledWith(view.navigation);
+        expect(show).toHaveBeenCalledWith('/folder:P', undefined, view);
+    } finally {await f.workbench.destroy();}
+});
+
 describe('Session workbench lifecycle', () => {
     it('opens a requested internal tab without replacing the previous preview or duplicating an existing Session', async () => {
         const f = setup(); await f.workbench.start(); const tabs = (f.workbench as any).tabs;

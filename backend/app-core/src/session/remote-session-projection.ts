@@ -1,3 +1,4 @@
+import type {BrowserReadContext} from './browser-read-context';
 import { ENTITY_ICONS, harnessPresentation, t } from '@nestos/common';
 import { FSError, type FSNode } from '@nestos/vfs-core';
 import type { SessionFolder } from '@nestos/llm-session/contracts';
@@ -17,7 +18,7 @@ export function remoteSessionRootPath(project: SessionFolder, mounts: readonly P
 }
 
 export class RemoteSessionProjection {
-    constructor(private readonly projects?: ProjectService) {}
+    constructor(private readonly projects?: ProjectService, private readonly reads?: Pick<BrowserReadContext, 'project' | 'loadFavorites'>) {}
     private node(path: string, title: string, directory: boolean, times?: Pick<HarnessSession, 'createdAt' | 'updatedAt'>): FSNode {
         const index = path.lastIndexOf('/');
         const base = {path, name: path.slice(index + 1), parentPath: path.slice(0, index), createdAt: times?.createdAt ?? 0, modifiedAt: times?.updatedAt ?? 0,
@@ -58,7 +59,7 @@ export class RemoteSessionProjection {
         try {
             client = await remote.projectHarness(project.project.id, {timeoutMs: 3000});
             const profiles = (await client.profiles({timeoutMs: 3000})).profiles.filter(profile => profile.projectRuntime && (!filterProfile || profile.id === filterProfile || profile.aliases?.includes(filterProfile)));
-            if (root.serverId) await this.projects!.favorites.list(project.project.id);
+            if (root.serverId) await (this.reads?.loadFavorites(project.project.id) ?? this.projects!.favorites.list(project.project.id));
             const active = client;
             return {sources: profiles.filter(profile => profile.capabilities.history).map(profile => ({id: 'remote:' + profile.id,
                 read: cursor => this.timelinePage(active, project, root, profile, cursor, limit)})),
@@ -85,7 +86,7 @@ export class RemoteSessionProjection {
         ];
     }
     async list(path: string, target: Target): Promise<FSNode[]> {
-        const project = await this.projects?.forFolder(target.folder), remote = this.projects?.remoteMounts;
+        const project = await (this.reads?.project(target.folder) ?? this.projects?.forFolder(target.folder)), remote = this.projects?.remoteMounts;
         if (!remote || !project || project.path !== target.folder) throw new FSError('ENOENT', 'Remote project unavailable');
         if (target.nativeSessionId || target.draft) return [];
         let client: import('@nestos/cells-driver').HarnessClient | undefined;
@@ -97,7 +98,7 @@ export class RemoteSessionProjection {
             if (!profile) throw new FSError('ENOENT', 'Remote profile unavailable');
             const page = profile.capabilities.history ? await client.list(profile.id, {cursor: target.cursor, ...(target.archived ? {archived: true} : {})}, {timeoutMs: 3000}) : {sessions: [], nextCursor: null};
             const root = remote.list(project.project.id).find(m => m.at === '/')!;
-            if (root.serverId) await this.projects?.favorites?.list(project.project.id);
+            if (root.serverId) await (this.reads?.loadFavorites(project.project.id) ?? this.projects?.favorites?.list(project.project.id));
             return [ ...(profile.capabilities.create && (profile.projectCapabilities?.sessionControl ?? root.access === 'rw') && !target.cursor && !target.archived ? [this.node(path + '/@new', t('harness.create'), false)] : []),
                 ...(profile.capabilities.history && !target.cursor && !target.archived ? [this.node(path + '/@archived', t('harness.archivedSessions'), true)] : []),
                 ...page.sessions.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || a.id.localeCompare(b.id))
@@ -113,12 +114,12 @@ export class RemoteSessionProjection {
     async stat(path: string, target: Target): Promise<FSNode | null> {
         if (!target.profileId) return (await this.root(target.folder))[0] ?? null;
         if (!target.nativeSessionId) return this.node(path, target.draft ? t('harness.create') : target.cursor ? t('harness.more') : target.archived ? t('harness.archivedSessions') : target.profileId, !target.draft);
-        const project = await this.projects?.forFolder(target.folder), remote = this.projects?.remoteMounts;
+        const project = await (this.reads?.project(target.folder) ?? this.projects?.forFolder(target.folder)), remote = this.projects?.remoteMounts;
         if (!remote || !project || project.path !== target.folder) return null;
         const client = await remote.projectHarness(project.project.id, {timeoutMs: 3000});
         try { const history = await (client.inspect ? client.inspect(target.profileId, target.nativeSessionId, {timeoutMs: 3000}) : client.read(target.profileId, target.nativeSessionId, {timeoutMs: 3000}));
             const root = remote.list(project.project.id).find(m => m.at === '/')!;
-            if (root.serverId) await this.projects?.favorites?.list(project.project.id);
+            if (root.serverId) await (this.reads?.loadFavorites(project.project.id) ?? this.projects?.favorites?.list(project.project.id));
             const profile = (await client.profiles({timeoutMs: 3000})).profiles.find(profile => profile.id === target.profileId || profile.aliases?.includes(target.profileId!));
             const node = this.sessionNode(path, history.session, this.favorite(project.project.id, root, target.profileId, target.nativeSessionId),
                 profile && this.management(profile, root, history.session, target.archived));

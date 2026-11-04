@@ -1,29 +1,32 @@
 import {FSError, type FSNode, type IFileSystem} from '@nestos/vfs-core';
 import {browserTargetFolder, resolveBrowserTarget} from '@nestos/app-contracts';
-import type {ProjectService, SessionDirectoryView, NavigationDirectory} from '@nestos/app-contracts/services';
+import type {ProjectService, SessionDirectoryView, NavigationDirectory, ProjectNavigationView} from '@nestos/app-contracts/services';
 import {createModuleLogger, randomUUID} from '@nestos/common';
 import {recentConversationPreview} from '../projects/conversation-directory';
 
 const log = createModuleLogger('directory-view');
 /** Flatten virtual containers locally; no browser round trip is needed for each group. */
 export async function readDirectoryView(fs: IFileSystem, projects: ProjectService | undefined, path: string,
-    options: {projectId?: string | null} = {}): Promise<SessionDirectoryView> {
-    const operationId = randomUUID(), started = performance.now(), revision = fs.revision;
+    options: {projectId?: string | null} = {}, navigationRead?: () => Promise<ProjectNavigationView | undefined>, operationId = randomUUID()): Promise<SessionDirectoryView> {
+    const started = performance.now(), revision = fs.revision;
     const directories = new Map<string, NavigationDirectory & {path: string}>();
     try {
-        const [nodes, navigation] = await Promise.all([flatten(fs, path, directories), projects?.navigation({path, projectId: options.projectId})]);
+        const [directory, prepared] = await Promise.allSettled([flatten(fs, path, directories), navigationRead ? navigationRead() : projects?.navigation({path, projectId: options.projectId})]);
+        if (directory.status === 'rejected') throw directory.reason;
+        if (prepared.status === 'rejected') throw prepared.reason;
+        const nodes = directory.value, navigation = prepared.value;
         const folder = browserTargetFolder(resolveBrowserTarget(path), path);
         const project = navigation?.projects.filter(item => folder === item.path || folder.startsWith(item.path + '/'))
             .sort((a, b) => b.path.length - a.path.length)[0] ?? null;
         const stale = fs.revision !== revision;
         const result = {node: directories.get(path)!.node!, nodes, project, navigation,
             directories: directorySeeds(directories, nodes, fs.revision, stale)};
-        log.debug('directory.read', {operationId, stage: 'aggregate', result: 'success', count: nodes.length, directoryCount: directories.size,
+        log.info('directory.read', {operation: 'browser.directory', operationId, stage: 'aggregate', result: 'success', count: nodes.length, directoryCount: directories.size,
             durationMs: Math.round(performance.now() - started)});
         return result;
     } catch (error) {
         const code = (error as {code?: unknown})?.code;
-        log.warn('directory.read', {operationId, stage: 'aggregate', result: 'failure',
+        log.warn('directory.read', {operation: 'browser.directory', operationId, stage: 'aggregate', result: 'failure',
             code: typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'DIRECTORY_READ_FAILED', durationMs: Math.round(performance.now() - started)});
         throw error;
     }

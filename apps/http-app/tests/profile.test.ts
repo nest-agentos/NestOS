@@ -85,3 +85,15 @@ it('reads user storage and certificate mappings from JSON and keeps CLI director
     await writeFile(path.join(config, 'nestos.json'), JSON.stringify({http: {mtls: {clients: {}}}}));
     await expect(settings.certificateClients!()).rejects.toMatchObject({code: 'CLIENT_POLICY_INVALID'});
 });
+
+
+it('defaults strict storage checks off and accepts only an explicit boolean', async () => {
+    const config = await mkdtemp(path.join(tmpdir(), 'nestos-path-check-config-'));
+    try {
+        expect((await resolveHttpDirectories(config, config)).strictPathChecks).toBe(false);
+        await writeFile(path.join(config, 'nestos.json'), JSON.stringify({http: {strictPathChecks: true}}));
+        expect((await resolveHttpDirectories(config, config)).strictPathChecks).toBe(true);
+        await writeFile(path.join(config, 'nestos.json'), JSON.stringify({http: {strictPathChecks: 'false'}}));
+        await expect(resolveHttpDirectories(config, config)).rejects.toThrow('strictPathChecks');
+    } finally {await rm(config, {recursive: true, force: true});}
+});

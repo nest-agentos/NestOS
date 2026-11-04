@@ -174,6 +174,18 @@ C4Component
 
 旧 HttpStorageBackend、记录事务传输、loopback 存储监听、精简 ApplicationShell 与禁用菜单适配已删除。`/api/vfs` 始终拒绝访问；`/api/health` 返回就绪状态及运行模式、构建版本。
 
+## 存储路径强化检查
+
+`nestos.json` 的 `http.strictPathChecks` 控制 HTTP 宿主额外的物理路径逐级 `lstat` 检查，默认 `false`；设为 `true` 后开启，修改后需重启宿主。只接受布尔值，字符串等错误配置会拒绝启动。
+
+```json
+{"http": {"strictPathChecks": true}}
+```
+
+两种模式均保留路径规范化、VFS 挂载/读写授权、用户逻辑目录映射和私有路径隐藏；用户 bundle、凭据与数据库目录的启动校验不受开关影响。普通模式省去 PathGuard/UserFiles 的额外物理前缀走查，不能将其视为抵御宿主符号链接替换的隔离保证；严格模式的 `lstat` 同样不是原子路径解析。cells 的 `openat2` 约束保持独立。Firecracker 隔离尚未由此配置提供。CLI 和显式创建的 Node 宿主保持严格默认值，只有 HTTP 默认关闭额外检查。
+
+启动审计 `storage.path-policy` 记录实际的 `strictPathChecks`。严格模式在批量 stat 中共享同一批的祖先检查结果；批次结束释放，普通独立操作仅共享仍在途的探测，不保留跨操作的路径判定。
+
 ## 性能边界
 
 工具箱的 `ToolboxView.files` 由后端组合，权限与链接校验在后端完成；前端只消费文件能力，不重新挂载远端文件源。视图由后端 ViewScope 拥有，工作区关闭后统一释放。工具箱刷新由后端 `refreshGroups` 在一次目录扫描中同时生成分组和导航目录，前端不再按 Agent/Flow 子目录逐个发起 getChildren。描述查询与分组刷新可并行；路径未改变的标题/状态更新不调用 relocate，纯描述查询不触发写域失效。Provider 删除确认以服务端提交为完成条件，导航刷新单独执行，刷新失败不重放删除命令。Provider 删除仍校验确认计划、清理关联连接和默认选择，内置条目以删除标记阻止重启重建；不能直接删除配置文件绕过这些规则。

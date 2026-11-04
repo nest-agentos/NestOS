@@ -7,7 +7,7 @@ export interface AuditEvent {
     userId?: string; operationId?: string; stage?: string; result?: string; count?: number; bytes?: number;
     event: string; requestId?: string; remoteAddress?: string; method?: string; route?: string;
     status?: number; durationMs?: number; operation?: string; code?: string; certificate?: string; parentRequestId?: string;
-    asset?: string;
+    asset?: string; strictPathChecks?: boolean;
     rpcKind?: string; rpcBatchSize?: number; rpcOperations?: string[];
     rpcCommands?: string[]; rpcErrorCount?: number; rpcErrorCodes?: string[];
     uploads?: Array<{mimeType: string; bytes?: number}>;

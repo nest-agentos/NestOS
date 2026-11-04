@@ -24,11 +24,11 @@ export function userErrorCode(error: unknown, fallback = 'USER_RUNTIME_INITIALIZ
     return typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : fallback;
 }
 export {privateDirectory} from '../runtime/paths';
-async function openBackend(root: string, meta: string, cleanup: HostCleanup) {
+async function openBackend(root: string, meta: string, cleanup: HostCleanup, strictPathChecks: boolean) {
     await privateDirectory(root); await privateDirectory(meta);
     const backend = await openLocalFSBackend({rootDir: root, sidecarDir: meta, durability: 'full', createDb: file => NodeSqliteSidecarDb.open(file)});
     cleanup.push(namedCleanup('shared-storage.close', () => backend.close()));
-    return guardHostStorage(backend, root);
+    return guardHostStorage(backend, root, strictPathChecks);
 }
 
 /** One bundle owns all mutable user state; only explicitly mounted definitions are shared. */
@@ -73,7 +73,7 @@ export async function validateUserHostPaths(options: HttpHostOptions): Promise<v
 async function sharedMounts(options: HttpHostOptions, userId: string, cleanup: HostCleanup): Promise<NonNullable<HttpRuntimeMounts>> {
     const mounts: NonNullable<HttpRuntimeMounts> = [];
     for (const name of ['llm', 'agents', 'flows']) {
-        const backend = await openBackend(path.join(options.root, 'etc', name), path.join(options.root, 'etc', '_meta', name), cleanup);
+        const backend = await openBackend(path.join(options.root, 'etc', name), path.join(options.root, 'etc', '_meta', name), cleanup, options.strictPathChecks ?? false);
         mounts.push({path: name === 'llm' ? '/etc/llm' : `/home/admin/${name}`, backend,
             options: {readonly: userId !== 'admin', crossMountStrategy: 'deny'}});
     }
@@ -83,7 +83,7 @@ async function openUserRuntime(options: HttpHostOptions, home: string, internal:
     const state = path.join(internal, 'state');
     await privateDirectory(state); await privateDirectory(path.join(internal, 'meta')); await privateDirectory(path.join(internal, 'private'));
     const host = await openNodeApplication({root: state, sidecar: path.join(internal, 'meta'), authDir: path.join(internal, 'private'),
-        oauthApplicationsDirectory: path.join(options.authDir, 'tool-oauth-applications'), authorizationRedirectUri: options.authorizationRedirectUri, createFs: () => new UserFiles(state, home),
+        oauthApplicationsDirectory: path.join(options.authDir, 'tool-oauth-applications'), authorizationRedirectUri: options.authorizationRedirectUri, createFs: () => new UserFiles(state, home, options.strictPathChecks ?? false), strictPathChecks: options.strictPathChecks ?? false,
         toolPackages: {canManage: !configurationReadonly, directories: configurationReadonly ? [] : undefined, dataDirectory: path.join(options.root, 'tools'), registryFile: path.join(options.root, 'etc', 'tool-packages.json')},
         auditFile: path.join(internal, 'logs', 'audit.jsonl'), runtime: {startupMode: 'server', ownerKind: 'httpd', additionalMounts: mounts,
             sharedLlmConfiguration: true, configurationReadonly, costStorageRoot: '/var/lib/accounting'}});

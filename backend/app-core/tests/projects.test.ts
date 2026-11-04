@@ -641,3 +641,18 @@ it('prepares workspace metadata without reading file content and keeps missing f
     try {expect(missing.initialFile?.node).toBeNull();} finally {await missing.dispose();}
     await expect(r.projects.openWorkspace(project.path, {initialPath: '/workspace/../outside'})).rejects.toMatchObject({code: 'EINVAL'});
 });
+
+it('prepares a project directory once per query and reads fresh membership on the next query', async () => {
+    const r = await setup(), project = (await r.projects.current())!, path = folderBrowserPath(project.path);
+    const navigation = vi.spyOn(r.projects, 'navigation'), workspace = vi.spyOn(r.projects, 'openWorkspace');
+    const favorites = vi.spyOn(r.projects.favorites, 'list'), unusedSummaries = vi.spyOn(r.sessionRepository, 'listSummariesInFolder');
+    await r.browser.readDirectory!(path);
+    expect(navigation).toHaveBeenCalledOnce(); expect(workspace).toHaveBeenCalledOnce(); expect(favorites).toHaveBeenCalledOnce();
+    expect(unusedSummaries).not.toHaveBeenCalled();
+    const session = await r.sessionRepository.createSession('Fresh member', project.path);
+    const next = await r.browser.readDirectory!(path);
+    expect(next.nodes.map(node => ({path: node.path, title: node.metadata.title}))).toEqual(expect.arrayContaining([
+        expect.objectContaining({path: expect.stringContaining(session), title: 'Fresh member'}),
+    ]));
+    expect(workspace).toHaveBeenCalledTimes(2);
+});

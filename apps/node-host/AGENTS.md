@@ -45,3 +45,5 @@ toolbox.yaml 的普通参数可声明 connectionType；工具包配置投影当�
 - 工具包显式 switchVersion 为即时切换：按共享注册锁准备所有用户实例、持久入口与同步目录发布；稳定执行代理在业务调用前写入 Task 实现引用，旧调用/重试/核对按原指纹恢复。缺少历史绑定拒绝猜测，提交结果未知时暂停新准入并按 activationId 核对。二进制热升级要求新旧包 executionEnvironment:instance，通过工厂 executables 映射实例隔离；旧进程环境绑定变化明确拒绝。
 
 Host shutdown traces use HTTPShutdown with PID, operationId, nested stage, result and elapsed time; waiting stages report every five seconds without recording bodies or arguments. Keep storage locks until owned runtime work is drained. The external httpd process controller bounds the safe-stop wait and permits SIGKILL escalation only with explicit --force; never release database locks early to simulate a stopped process.
+
+HTTP `http.strictPathChecks` defaults to false and controls only additional physical ancestor walks in PathGuard/UserFiles. Canonical paths, mount authorization, logical user mapping, private paths and startup credential/bundle directory checks remain mandatory. CLI/direct Node hosts keep the strict default. Never describe either lstat mode as atomic confinement or Firecracker isolation. Emit storage.path-policy with the selected mode.

@@ -141,7 +141,7 @@ it('opens project files before blocked navigation and discards stale navigation 
     const startupProject = (await projects.current())!;
     const startupPath = folderBrowserPath(startupProject.path);
     const restored = { expandedFolderIds: [startupPath, startupPath + '/@files', startupPath + '/@files/old'], selectedItemIds: [] };
-    const openFiles = vi.spyOn(projects, 'openFiles');
+    const openFiles = vi.spyOn(projects, 'openWorkspace');
     const sidebar = document.createElement('div'), main = document.createElement('div'); document.body.append(sidebar, main);
     const factory = vi.fn(async () => ({ destroy: vi.fn() }));
     const kernel = { onChanged: () => () => {}, async *listSessions() {} };

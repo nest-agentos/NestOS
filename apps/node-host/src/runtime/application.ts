@@ -14,6 +14,7 @@ import {NodeToolPackages, type NodeToolPackageOptions} from './tool-packages';
 import {BUILTIN_TOOLS} from '@nestos/tools';
 
 export interface NodeApplicationOptions {
+    strictPathChecks?: boolean;
     oauthApplicationsDirectory?: string;
     authorizationRedirectUri?: string;
     toolPackages?: NodeToolPackageOptions;
@@ -25,6 +26,7 @@ export interface NodeApplicationHost {runtime: ApplicationRuntime; audit: AuditP
 /** Node capabilities are shared by local CLI and HTTP; application policy stays in app-core. */
 export async function openNodeApplication(options: NodeApplicationOptions): Promise<NodeApplicationHost> {
     const resources = await openHostRuntime(options);
+    resources.audit.write({event: 'storage.path-policy', operation: 'storage.configure', stage: 'path-policy', result: 'success', strictPathChecks: options.strictPathChecks ?? true, durationMs: 0});
     let connections: NodeToolConnections | undefined;
     try {
         const applicationDirectory = await canonical(path.resolve(options.oauthApplicationsDirectory ?? path.join(options.authDir, 'tool-oauth-applications')));
@@ -33,15 +35,15 @@ export async function openNodeApplication(options: NodeApplicationOptions): Prom
             applications: new ToolOAuthApplications(applicationDirectory),
             manageApplications: options.runtime?.configurationReadonly !== true});
         const ownedConnections = connections;
-        const runtime = await createNodeRuntime(resources.backend, resources.root, {...options.runtime, providerAuthorization: resources.authorization, toolConnections: connections}, {preferencesFile: path.join(options.authDir, 'tool-preferences', 'preferences.json'), ...options.toolPackages});
+        const runtime = await createNodeRuntime(resources.backend, resources.root, {...options.runtime, providerAuthorization: resources.authorization, toolConnections: connections}, {preferencesFile: path.join(options.authDir, 'tool-preferences', 'preferences.json'), ...options.toolPackages}, options.strictPathChecks ?? true);
         let closing: Promise<void> | undefined;
         return {runtime, audit: resources.audit, close: () => closing ??= closeHostResources([namedCleanup('resources.close', resources.close), namedCleanup('connections.close', () => ownedConnections.close()), namedCleanup('application.dispose', () => runtime.dispose())])};
     } catch (error) { await connections?.close(); await resources.close(); throw error; }
 }
 
 /** Backend ownership remains with the resource host; this factory never closes borrowed storage. */
-export async function createNodeRuntime(source: IStorageBackend, root?: string, options: Omit<ApplicationRuntimeOptions, 'backend'> = {}, toolPackages?: NodeToolPackageOptions) {
-    const backend = root ? guardHostStorage(source, root) : source;
+export async function createNodeRuntime(source: IStorageBackend, root?: string, options: Omit<ApplicationRuntimeOptions, 'backend'> = {}, toolPackages?: NodeToolPackageOptions, strictPathChecks = true) {
+    const backend = root ? guardHostStorage(source, root, strictPathChecks) : source;
     const borrowed = new Proxy(backend, {get(target, key) {
         if (key === 'close') return async () => {};
         const value = Reflect.get(target, key, target); return typeof value === 'function' ? value.bind(target) : value;

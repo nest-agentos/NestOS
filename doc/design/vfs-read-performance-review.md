@@ -94,3 +94,31 @@ flowchart LR
 回归覆盖 100 个订阅者共享一次路径转换、回调数据独立、100 个 Session 仅唤醒对应根目录、最后一个订阅者释放上游，以及文件变化不广播为全局命名空间变更。
 
 Kernel 本地提交已经经作用域路由唤醒对应会话，不应再触发一次全局水位扫描。CommitRescanner 保留跨进程遗漏补扫，但使用 getEntriesMany 的只读批量快照，不为纯读取建立写事务。自动化 Journal 对内容相同的更新不重复写入或广播提交；决策状态没有变化时不更新 updatedAt，避免检查本身制造变化。
+
+
+## 工作台查询范围与嵌套视图校验（2026-11-04）
+
+工作台展示准备由 app-core 的 `BrowserReadContext` 拥有：同一次目录查询共享项目目录、组织记录、收藏读取和工作区句柄。文件准备不依赖导航完成，避免慢导航阻塞已授权文件的显示。查询完成或失败均排空已接纳读取并释放借用句柄；下一次查询重新读取，不把该范围内的复用扩展为授权或跨进程数据缓存。项目根不再读取不会显示的完整本地 Session 摘要。
+
+应用层 `readDirectoryView` 继续通过 VFS 读取投影目录；它等待目录与导航两条分支都结束后清理。前端刷新先取得聚合结果，目录种子供侧栏消费，项目导航和正文复用同一结果；不在前端重新组合领域记录。
+
+VFS 每层保留自身路径规范化、可见性、挂载和写权限约束。来源是同一实现的 `FileSystemView` 时，外层把完整映射路径交给内层，不再逐前缀触发内层递归走查；未知来源继续完整前缀检查。该委托不缓存路径判定，符号链接、跨挂载和只读拒绝保持在各自边界。
+
+确定性内存基准：五级路径、20 次读取，1/2/4/8 层额外视图，旧实现底层类型检查分别为 440/1140/5060/40060 次，新实现均为 140 次。8 层单轮耗时样本为 846ms → 5ms；这是机制验证，不是线上 x1 首屏延迟保证。
+
+HTTP 物理前缀强化检查由 `http.strictPathChecks` 控制，默认关闭，范围与限制见 [HTTP 宿主](../http-app.md#存储路径强化检查)。
+
+```mermaid
+C4Component
+    Container(ui, "工作台前端", "DOM / TypeScript", "显示目录、侧栏与导航")
+    Container_Boundary(app, "应用后端") {
+        Component(query, "BrowserReadContext", "查询范围", "共享准备结果与句柄，结束释放")
+        Component(domain, "领域服务", "Projects / Sessions / Favorites", "业务规则与索引")
+        Component(vfs, "VFS", "FileSystemView", "逐层授权，完整路径向内委托")
+    }
+    System_Ext(storage, "宿主与 cells", "物理存储访问与远端能力")
+    Rel(ui, query, "查询展示数据")
+    Rel(query, domain, "复用领域读取")
+    Rel(domain, vfs, "公开文件与记录契约")
+    Rel(vfs, storage, "底层 IO")
+```

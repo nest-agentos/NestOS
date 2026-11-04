@@ -1,9 +1,10 @@
 import path from 'node:path';
-import { lstat } from 'node:fs/promises';
+import {PathChecks} from './path-checks';
 import { FSError } from '@nestos/vfs-core';
 
 export class PathGuard {
-    constructor(private readonly root: string) {}
+    private readonly checks = new PathChecks();
+    constructor(private readonly root: string, private readonly strictPathChecks = true) {}
     visible(value: string): boolean {
         return !['/_meta', '/__vfs_namespace_journal__'].some(root => value === root || value.startsWith(`${root}/`));
     }
@@ -13,12 +14,7 @@ export class PathGuard {
             || value.split('/').slice(1).some(part => part === '..' || part === '.' || (!part && value !== '/'))) {
             throw new FSError('EINVAL', 'Expected a canonical VFS path');
         }
-        let current = this.root;
-        for (const part of value.split('/').filter(Boolean)) {
-            current = path.join(current, part);
-            try { if ((await lstat(current)).isSymbolicLink()) throw new FSError('EACCES', 'Symbolic links are unavailable over HTTP'); }
-            catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') break; throw error; }
-        }
+        if (this.strictPathChecks) await this.checks.check(this.root, path.join(this.root, value));
         return value;
     }
 }

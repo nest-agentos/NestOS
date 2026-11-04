@@ -38,6 +38,7 @@ export function conversationNavigationNodes(folder: string): FSNode[] {
 export function recentConversationPreview(folder: string, nodes: FSNode[]): FSNode[] {
     const directory = projectConversationsPath(folder, {recent: true});
     const sessions = nodes.filter(node => {
+        if (node.metadata._disabled || node.metadata.conversationMore) return false;
         const target = resolveBrowserTarget(String(node.metadata.navigationTarget ?? node.path));
         return target.kind === 'session' || target.kind === 'remote' && !!target.nativeSessionId;
     });

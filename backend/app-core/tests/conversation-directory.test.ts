@@ -102,3 +102,11 @@ it('shows one fixed new-conversation entry in remote projects and filters the se
     expect(entries.filter(row => isSession(row.path))).toHaveLength(15);
     expect(entries.filter(row => isSession(row.path)).every(row => row.metadata.harnessProfileId === 'codex')).toBe(true);
 });
+
+it('keeps an unavailable local source visible without parsing its disabled row as a native identity', async () => {
+    const {project} = await setup();
+    vi.spyOn(app!.sessionRepository, 'listSummaryPage').mockRejectedValueOnce(Object.assign(new Error('unavailable'), {code: 'EIO'}));
+    const directory = await browser!.readDirectory!(folderBrowserPath(project.path));
+    expect(directory.nodes.some(node => node.metadata._disabled)).toBe(true);
+    expect(directory.directories.some(seed => seed.path.endsWith('/@recent-conversations'))).toBe(true);
+});

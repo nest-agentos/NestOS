@@ -779,7 +779,8 @@ export class SessionWorkbench implements WorkspaceController {
             this.lastRefreshAt = now;
         }
         this.kernelChanges = {};
-        if (this.navigationDirty || sources.length === 0 || sources.includes('visibility-interrupted')) await this.refreshResourceNavigation(sources);
+        const prepared = this.navigationDirty || sources.length === 0 || sources.includes('visibility-interrupted')
+            ? await this.refreshResourceNavigation(sources) : undefined;
         if (!this.visible || this.closed) { this.viewRefresh.mark('visibility-interrupted', false); return; }
         await this.localActivity.refresh();
         await this.syncBranchRoute();
@@ -788,16 +789,22 @@ export class SessionWorkbench implements WorkspaceController {
             const target = resolveBrowserTarget(this.active);
             if (target.kind === 'task') await this.showTask(this.active);
             else if (target.kind === 'folder' || target.kind === 'favorites' || target.kind === 'project-conversations' || target.kind === 'remote' && !target.nativeSessionId && !target.draft
-                || target.kind === 'tasks') await this.showDirectory(this.active);
+                || target.kind === 'tasks') await this.showDirectory(this.active, undefined, prepared?.path === this.active ? prepared.view : undefined);
         }
     }
-    private async refreshResourceNavigation(sources: readonly string[]): Promise<void> {
+    private async refreshResourceNavigation(sources: readonly string[]) {
         if (!this.resourceNavigationVisible || !this.navigationReady) return;
         await this.browser?.invalidateNavigation({activity: sources.length === 0 || sources.includes('events')});
         if (!this.resourceNavigationVisible || !this.visible || this.closed) { this.navigationDirty = true; return; }
+        const path = this.active?.startsWith('/') ? this.active : undefined, target = path ? resolveBrowserTarget(path) : undefined;
+        const prepared = path && this.browser?.readDirectory && target && ['folder', 'favorites', 'project-conversations'].includes(target.kind)
+            ? {path, view: await this.readDirectoryData(path)} : undefined;
+        if (prepared && path !== this.active) {this.navigationDirty = true; return;}
         await this.sidebarUI?.refresh();
         if (!this.resourceNavigationVisible || !this.visible || this.closed) { this.navigationDirty = true; return; }
-        await this.projectNavigation?.refresh(); this.navigationDirty = false; this.navigationReadAt = performance.now(); this.updateRemoteAvailability();
+        await this.projectNavigation?.refresh(prepared && 'navigation' in prepared.view ? prepared.view.navigation : undefined);
+        this.navigationDirty = false; this.navigationReadAt = performance.now(); this.updateRemoteAvailability();
+        return prepared;
     }
     private message(text: string): void {
         const node = document.createElement('div'); node.className = 'mm-placeholder'; node.textContent = text;
@@ -1293,12 +1300,13 @@ export class SessionWorkbench implements WorkspaceController {
         ]);
         return {...directory, project: project ?? null};
     }
-    private async showDirectory(path: string, source?: {fs?: IFileSystem; node?: FSNode; signal?: AbortSignal}): Promise<void> {
+    private async showDirectory(path: string, source?: {fs?: IFileSystem; node?: FSNode; signal?: AbortSignal},
+        prepared?: Awaited<ReturnType<SessionWorkbench['readDirectoryData']>>): Promise<void> {
         if (!this.browser) throw new Error('Session browser not started');
         const target = resolveBrowserTarget(path);
         if (target.kind === 'tasks') return this.showTasks(target.sessionId);
         const generation = ++this.contentVersion;
-        const {nodes, node: directoryNode, project} = await traceBoot('projectDirectory.read', () => this.readDirectoryData(path, source));
+        const {nodes, node: directoryNode, project} = prepared ?? await traceBoot('projectDirectory.read', () => this.readDirectoryData(path, source));
         if (this.closed || generation !== this.contentVersion) return;
         const panel = document.createElement('div'); panel.className = 'session-detail session-detail--directory';
         const heading = document.createElement('h2');

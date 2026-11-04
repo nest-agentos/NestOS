@@ -1,3 +1,4 @@
+import {BrowserReadContext} from './browser-read-context';
 import { filterDirectoryFiles } from './directory-visibility';
 import {readDirectoryView} from './directory-view';
 import { SessionActivityProjection } from './session-activity';
@@ -73,7 +74,7 @@ interface FileDirectoryOptions extends OperationOptions { fs?: IFileSystem; node
 class BrowserBackend implements IStorageBackend {
     private agentFilter?: string;
     setSessionFilter(agentId?: string): void { this.agentFilter = agentId; this.invalidateNavigation(); }
-    private get remoteSessions() { return new RemoteSessionProjection(this.deps.projects); }
+    private get remoteSessions() { return new RemoteSessionProjection(this.deps.projects, this.queryContext); }
     readonly name = 'session-browser';
     private readonly lifecycle: import('@nestos/app-contracts/services').SessionLifecycleService;
     private snapshot?: Promise<[SessionFolder[], import('@nestos/llm-session').SessionSummary[]]>;
@@ -81,11 +82,12 @@ class BrowserBackend implements IStorageBackend {
     private directorySnapshots = new Map<string | null, Promise<import('@nestos/llm-session').SessionSummary[]>>();
     private subscriptions: Array<() => void> = [];
     private readonly activity: SessionActivityProjection;
-    constructor(private readonly deps: SessionBrowserDependencies) {
+    constructor(private readonly deps: SessionBrowserDependencies, private readonly queryContext?: BrowserReadContext) {
         this.activity = new SessionActivityProjection(deps.kernel);
         this.lifecycle = deps.lifecycle ?? new SessionLifecycleService({ repository: deps.repository, kernel: deps.kernel });
     }
     async init() {
+        if (this.queryContext) return;
         this.subscriptions.push(this.deps.repository.subscribe(change => { if (change?.kind !== 'ui-state') this.invalidateNavigation(); }));
         if (this.deps.projects) this.subscriptions.push(this.deps.projects.subscribeChanges(() => this.invalidateNavigation()));
         const unsubscribe = this.deps.kernel.onChanged?.(event => {
@@ -94,13 +96,14 @@ class BrowserBackend implements IStorageBackend {
         });
         if (unsubscribe) this.subscriptions.push(unsubscribe);
     }
-    async close() { for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe(); this.activity.invalidate(); this.invalidateNavigation(); }
+    async close() { for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe(); this.activity.invalidate(); this.invalidateNavigation(); await this.queryContext?.close(); }
     invalidateNavigation(): void { this.snapshot = undefined; this.folderSnapshot = undefined; this.directorySnapshots.clear(); }
     refreshNavigation(options?: {activity?: boolean}): void {
         if (options?.activity !== false) this.activity.invalidate();
         this.invalidateNavigation();
     }
     private folders(): Promise<SessionFolder[]> {
+        if (this.queryContext) return this.queryContext.folders();
         if (!this.folderSnapshot) {
             const work = this.deps.repository.listFolders().then(folders => this.deps.projects?.navigationFolders(folders) ?? folders);
             this.folderSnapshot = work;
@@ -144,7 +147,8 @@ class BrowserBackend implements IStorageBackend {
     private async withFiles<T>(target: FileTarget, fn: (fs: import('@nestos/vfs-core').IFileSystem) => Promise<T>): Promise<T> {
         if (target.kind === 'project-files') {
             if (!this.deps.projects) throw new FSError('ENOENT', 'Projects unavailable');
-            const owner = await this.deps.projects.openWorkspace(target.folder);
+            const owner = await (this.queryContext?.workspace(target.folder) ?? this.deps.projects.openWorkspace(target.folder));
+            if (this.queryContext) return fn(owner.fs);
             try { return await fn(owner.fs); } finally { await owner.dispose(); }
         }
         const owner = await this.deps.files.acquireFiles(target.sessionId);
@@ -158,7 +162,7 @@ class BrowserBackend implements IStorageBackend {
     private async fileProjection(folder: string | null, withFavorites: boolean): Promise<FileProjection | undefined> {
         const projects = this.deps.projects;
         if (!projects) return undefined;
-        const catalog = await projects.list(), project = await projects.forFolder(folder, catalog);
+        const catalog = await (this.queryContext?.catalog() ?? projects.list()), project = await (this.queryContext?.project(folder) ?? projects.forFolder(folder, catalog));
         if (!project) return undefined;
         const id = project.project.id;
         const mounts = projects.remoteMounts?.list(id) ?? [];
@@ -167,7 +171,7 @@ class BrowserBackend implements IStorageBackend {
                 location: projectFileLocation(item, '/', projects.remoteMounts?.list(item.project.id) ?? []) })),
             offline: !!projects.remoteMounts?.projectOffline(id), favorite: () => false };
         if (!withFavorites) return projection;
-        await projects.favorites.list(id);
+        await (this.queryContext?.loadFavorites(id) ?? projects.favorites.list(id));
         return { ...projection, favorite: (path, type) => projects.favorites.has(id, { kind: 'file', path, nodeType: type }) };
     }
     /** Folder that owns a Session or project file listing. */
@@ -255,7 +259,7 @@ class BrowserBackend implements IStorageBackend {
         }
         if (target.kind === 'remote') return this.remoteSessions.stat(path, target);
         if (target.kind === 'project-conversations') {
-            const project = await this.deps.projects?.forFolder(target.folder);
+            const project = await this.projectForFolder(target.folder);
             const node = conversationDirectoryNode(target.folder, target.recent, target.cursor);
             return project?.path === target.folder ? {...node, path, parentPath: parentBrowserPath(path), name: browserName(path)} : null;
         }
@@ -267,7 +271,7 @@ class BrowserBackend implements IStorageBackend {
         if (target.kind === 'favorite') return (await this.favoriteNodes(parentBrowserPath(path), target.folder)).find(node => node.path === path) ?? null;
         if (target.kind === 'project-files') {
             if (target.path === WORKSPACE_PATH) {
-                const project = await this.deps.projects?.forFolder(target.folder);
+                const project = await this.projectForFolder(target.folder);
                 return project ? this.fileEntry(path, target.folder) : null;
             }
             return this.statFiles(path, target);
@@ -311,8 +315,9 @@ class BrowserBackend implements IStorageBackend {
         const target = resolveBrowserTarget(path);
         if (target.kind === 'folder') {
             const folderPath = folderPathFromBrowserPath(path);
-            const [folders, sessions] = await this.directoryNavigation(folderPath);
+            const folders = await this.folders();
             const project = folders.find(folder => folder.path === folderPath);
+            const sessions = project?.project ? [] : (await this.directoryNavigation(folderPath))[1];
             return [
                 ...folders.filter(folder => folder.parentPath === folderPath && !(project?.project && folder.name === '@sessions')).map(folder => this.folderNode(folder)),
                 ...(this.deps.projects && folders.find(folder => folder.path === folderPath)?.project
@@ -343,7 +348,7 @@ class BrowserBackend implements IStorageBackend {
         throw new FSError('ENOTDIR', 'Task is a history entry');
     }
     private async projectConversations(path: string, target: Extract<BrowserTarget, {kind: 'project-conversations'}>): Promise<FSNode[]> {
-        const project = await this.deps.projects?.forFolder(target.folder);
+        const project = await this.projectForFolder(target.folder);
         if (!project || project.path !== target.folder) throw new FSError('ENOENT', 'Project unavailable');
         const folders = await this.folders();
         const groups = [project.path, ...folders.filter(folder => folder.parentPath === project.path && folder.name === '@sessions').map(folder => folder.path)];
@@ -440,10 +445,10 @@ class BrowserBackend implements IStorageBackend {
             metadata: { ...node.metadata, _fixedEntry: true, _readOnly: true } };
     }
     private async favoriteNodes(path: string, folder: string): Promise<FSNode[]> {
-        const project = await this.deps.projects?.forFolder(folder);
+        const project = await this.projectForFolder(folder);
         if (!project || !this.deps.projects) return [];
         const offline = this.deps.projects.remoteMounts?.projectOffline(project.project.id);
-        const items = await this.deps.projects.favorites.list(project.project.id);
+        const items = await (this.queryContext?.loadFavorites(project.project.id) ?? this.deps.projects.favorites.list(project.project.id));
         return items.map(item => ({ ...this.node(`${path}/${item.id}`, item.title, false),
             icon: item.target.kind === 'remote-session' ? ENTITY_ICONS.remoteSession : item.target.kind === 'session' ? ENTITY_ICONS.chat : fileTypeIcon(item.target.path, item.target.nodeType === 'directory'),
             metadata: { title: item.title, _fixedEntry: true, _readOnly: true, _favorite: true, _showAll: true, _fileDetails: false,
@@ -462,11 +467,28 @@ class BrowserBackend implements IStorageBackend {
             ...(disabled ? { navigationDescription: offline ? t('remote.projectOffline') : t('project.filesUnavailable', { reason: availability.reason! }) } : {}) } };
     }
     private async fileAvailability(folder: string | null): Promise<{ readOnly: boolean; reason?: string }> {
-        try { return { readOnly: !!folder && !!await this.deps.projects?.workspaceReadOnly(folder) }; }
+        try {
+            if (folder && this.queryContext) return {readOnly: (await (await this.queryContext.workspace(folder)).fs.capabilitiesAt(WORKSPACE_PATH)).readonly};
+            return { readOnly: !!folder && !!await this.deps.projects?.workspaceReadOnly(folder) }; }
         catch (error) {
             // A missing source must not hide the project's Sessions and navigation entries.
             if (!(error instanceof FSError) || !['ENOENT', 'ENOTDIR', 'EACCES'].includes(error.code)) throw error;
             return { readOnly: true, reason: error.message };
+        }
+    }
+    private projectForFolder(folder: string | null | undefined) {
+        return this.queryContext?.project(folder) ?? this.deps.projects?.forFolder(folder);
+    }
+    async readQuery<T>(path: string, options: {projectId?: string | null}, run: (backend: BrowserBackend, fs: IFileSystem, context: BrowserReadContext) => Promise<T>): Promise<T> {
+        const context = new BrowserReadContext(this.deps.repository, this.deps.projects, path, options);
+        const backend = new BrowserBackend(this.deps, context); backend.agentFilter = this.agentFilter;
+        const source = await createFileSystemSource({tags: false, backend, viewId: 'session-browser:query', access: 'ro'});
+        let failure: unknown;
+        try { return await run(backend, source.fs, context); }
+        catch (error) {failure = error; throw error;}
+        finally {
+            try {await source.dispose();}
+            catch (error) {throw failure ? new AggregateError([failure, error], 'Browser query and cleanup failed') : error;}
         }
     }
     private async assertAvailable(path: string): Promise<void> {
@@ -723,9 +745,9 @@ export async function createSessionBrowser(deps: SessionBrowserDependencies): Pr
     return Object.assign(owner, { transferItems: (mode: 'copy' | 'move', ids: string[], destination: string) => backend.transfer(mode, ids, destination),
         readDirectory: (path: string, options?: {projectId?: string | null; refresh?: boolean}) => {
             if (options?.refresh) backend.refreshNavigation();
-            return readDirectoryView(owner.fs, deps.projects, path, options);
+            return backend.readQuery(path, options ?? {}, (_backend, fs, context) => readDirectoryView(fs, deps.projects, path, options, () => context.navigation(), context.operationId));
         },
-        readFileDirectory: (path: string, options?: FileDirectoryOptions) => backend.readFileDirectory(path, options),
+        readFileDirectory: (path: string, options?: FileDirectoryOptions) => backend.readQuery(path, {}, scoped => scoped.readFileDirectory(path, options)),
         invalidateNavigation: async (options?: {activity?: boolean}) => { backend.refreshNavigation(options); },
         setSessionFilter: async (agentId?: string) => { backend.setSessionFilter(agentId); } });
 }

@@ -22,12 +22,12 @@ export function configurationFilePath(directory: string): string {
 }
 
 interface NodeProfileSettings extends NestOSProfileSettings {
-    http?: {certDir?: string; authDir?: string; usersDir?: string; publicOrigin?: string; mtls?: {clients?: unknown}; editorSwap?: boolean; swapDir?: string};
+    http?: {certDir?: string; authDir?: string; usersDir?: string; publicOrigin?: string; mtls?: {clients?: unknown}; editorSwap?: boolean; swapDir?: string; strictPathChecks?: boolean};
 }
 
 /** Configured paths are relative to the config directory; explicit flags are relative to cwd. */
 export async function resolveHttpDirectories(configDir: string, cwd: string,
-    overrides: {certDir?: string; authDir?: string; usersDir?: string} = {}, mode = 'standalone'): Promise<{certDir: string; authDir: string; usersDir?: string; authorizationRedirectUri?: string; certificateClients?: () => Promise<unknown>; editorSwap: {enabled: boolean; directory: string}}> {
+    overrides: {certDir?: string; authDir?: string; usersDir?: string} = {}, mode = 'standalone'): Promise<{strictPathChecks: boolean; certDir: string; authDir: string; usersDir?: string; authorizationRedirectUri?: string; certificateClients?: () => Promise<unknown>; editorSwap: {enabled: boolean; directory: string}}> {
     const settings = await readSettings(configDir), http = settings.http;
     if (http !== undefined && (!http || typeof http !== 'object' || Array.isArray(http)))
         throw new Error('Expected http to be an object in nestos.json');
@@ -39,8 +39,10 @@ export async function resolveHttpDirectories(configDir: string, cwd: string,
     const authBase = path.resolve(configDir, http?.authDir ?? 'http-auth');
     if (http?.editorSwap !== undefined && typeof http.editorSwap !== 'boolean') throw new Error('Expected http.editorSwap to be a boolean');
     if (http?.swapDir !== undefined && (typeof http.swapDir !== 'string' || !http.swapDir.trim())) throw new Error('Expected http.swapDir to be a non-empty path');
+    if (http?.strictPathChecks !== undefined && typeof http.strictPathChecks !== 'boolean') throw new Error('Expected http.strictPathChecks to be a boolean');
     const swapDir = http?.swapDir ?? path.join(homedir(), 'swap');
     return {
+        strictPathChecks: http?.strictPathChecks === true,
         authorizationRedirectUri: http?.publicOrigin === undefined ? undefined : authorizationRedirect(http.publicOrigin),
         usersDir: overrides.usersDir !== undefined ? path.resolve(cwd, overrides.usersDir) : http?.usersDir ? path.resolve(configDir, http.usersDir) : undefined,
         certificateClients: http?.mtls !== undefined ? () => readCertificateClients(configDir) : undefined,
