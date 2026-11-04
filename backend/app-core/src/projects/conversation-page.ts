@@ -12,17 +12,6 @@ interface Buffer { source: ConversationSource; position: Position; nodes?: FSNod
 export function compareConversations(a: FSNode, b: FSNode): number {
     return b.modifiedAt - a.modifiedAt || a.path.localeCompare(b.path);
 }
-export function localConversationSource(nodes: FSNode[]): ConversationSource {
-    return {id: '@nestos', cursorAfter: node => JSON.stringify([node.modifiedAt, node.path]), read: async cursor => {
-        if (!cursor) return {nodes};
-        let after: unknown;
-        try {after = JSON.parse(cursor);} catch {throw new FSError('EINVAL', 'Invalid local conversation cursor');}
-        if (!Array.isArray(after) || after.length !== 2 || !Number.isFinite(after[0]) || typeof after[1] !== 'string')
-            throw new FSError('EINVAL', 'Invalid local conversation position');
-        const [time, path] = after as [number, string];
-        return {nodes: nodes.filter(node => node.modifiedAt < time || node.modifiedAt === time && node.path.localeCompare(path) > 0)};
-    }};
-}
 
 function positions(cursor?: string): Record<string, Position> {
     if (!cursor) return {};

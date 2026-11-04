@@ -173,6 +173,7 @@ class SessionRepository implements ISessionRepository {
     getLoadState(sessionId: string): Promise<SessionLoadState>;
     list(): Promise<ConversationManifest[]>;
     listSummaries(): Promise<SessionSummary[]>;
+    listSummaryPage(folder: string | null, options: {cursor?: string; limit: number; agentId?: string}): Promise<{items: SessionSummary[]; nextCursor?: string}>;
     deleteSession(sessionId: string): Promise<void>;
 
     // 文件夹
@@ -866,3 +867,5 @@ createFlowInvocationSessions(fs, "independent") 提供独立调用恢复索引�
 ### 提取助手正文
 
 `assistantResponseText(round)` 从 `@nestos/llm-session/contracts` 导出，只拼接 assistant 的文本内容，不包含 reasoning/thinking、工具、图片或用户输入。生成回填与应用层的 `ApplicationBackend.sessionResponse` 共用此实现，后者提供按分支、轮次或提交操作选择结果的只读 API。
+
+`listSummaryPage` 使用 navigation-version=2 的目录/来源/修改时间有序摘要索引，在底层限制返回行数；不加载 history、UI 草稿或完整 manifest。索引随权威摘要原子维护，升级时重建。仅为可见项按需批量补充 `parentTitle`；完整组织检查仍使用原有仓储接口。

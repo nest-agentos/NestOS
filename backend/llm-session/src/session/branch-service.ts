@@ -411,6 +411,7 @@ function assistantGroup(projection: RoundProjection): SessionGroup {
             name: 'Assistant',
             status: message.status,
             startTime: projection.createdAt,
+            endTime: projection.completedAt,
             data: {
                 output: message.content,
                 thought: message.thinking ?? '',

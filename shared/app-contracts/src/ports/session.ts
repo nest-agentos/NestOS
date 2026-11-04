@@ -177,6 +177,8 @@ export declare function createSessionBrowser(deps: SessionBrowserDependencies): 
 export interface FileDirectoryOptions extends OperationOptions {
     fs?: IFileSystem;
     node?: FSNode;
+    /** Latest-first sidebar window; omitted for a complete directory view. */
+    limit?: number;
 }
 
 export interface SessionBrowserDependencies {

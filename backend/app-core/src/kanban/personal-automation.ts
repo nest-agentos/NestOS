@@ -79,10 +79,12 @@ async function scanBoards(options: Options, bridges: Map<string, Awaited<ReturnT
         if (!entry.automation) continue;
         const started = Date.now();
         try {
-            const board = await options.service.read(entry.id); assertAutomationPrincipals(board.automation!);
+            const board = await options.service.read(entry.id); if (!active()) return; assertAutomationPrincipals(board.automation!);
             let bridge = bridges.get(board.id);
             if (!bridge) {bridge = await createBridge(options, board.id, prepareSession); bridges.set(board.id, bridge);}
+            if (!active()) {await bridge.quiesce(); return;}
             await scanTaskControls(options, options.journal, board, options.serviceFor(board.automation!.coordinator));
+            if (!active()) return;
             await bridge.scan();
             if (!active()) return;
             await planNext(options, await options.service.read(board.id), prepareSession, active);

@@ -73,5 +73,6 @@ export class TwinScans {
     }
     pump() { return this.worker.pump(); }
     cancel(id: string) { return this.worker.cancel(id); }
+    quiesce() { return this.worker.quiesce(); }
     dispose() { return this.worker.dispose(); }
 }

@@ -1,11 +1,11 @@
 # @nestos/mail
 
-独立 VFS 邮件归档库。根入口拥有解析、摘要索引、查询与增量核对，contracts/ 仅含纯 DTO，ui/ 仅通过 MailClient 与宿主注入的编辑器、文案、图标和导航工作。
+独立 VFS 邮件归档库。根入口拥有解析、摘要索引、查询与增量核对，contracts/ 仅含纯 DTO，ui/ 仅通过 MailClient 与共享的 mdxeditor 内容视图、宿主文案、图标和导航工作。
 
-- 只依赖 vfs-core；ui/ 可使用 ui-common。不依赖应用包、Node、Session/Flow、数据库私有接口或具体供应商。
+- 只依赖 vfs-core；ui/ 可使用 ui-common 与 mdxeditor。不依赖应用包、Node、Session/Flow、数据库私有接口或具体供应商。
 - 原始邮件是事实来源，摘要和搜索文本是可重建派生索引；事务按文件版本戳更新，查询不传正文，正文显式打开后读取。
 - 先搜索完整授权范围，再主题分组和每页 20 个主题分页。不同来源目录的同主题邮件不合并。
 - 注入 createOperationId；诊断不得记录路径、主题、搜索词、发件人、账号或正文。
-- UI 每主题一个只读编辑器；纯文本/HTML 策略由宿主配置。销毁等待迟到的编辑器释放，搜索迟到结果不能覆盖新筛选。
+- UI 每封邮件一个独立 ContentView 与纯文本 ContentReader，ContentListView 管理顺序和选区入口；可选 createReader 仅用于宿主扩展正文展示。销毁等待迟到的编辑器释放，搜索迟到结果不能覆盖新筛选。
 
 协议、限制和验证见 [README](README.md)。

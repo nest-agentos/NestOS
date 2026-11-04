@@ -204,6 +204,10 @@ export class DigitalTwinService {
         const services = await this.services();
         if (!this.disposed) { await this.resolveDefaultModel(services); await services.scans.pump(); }
     }
+    async quiesce(): Promise<void> {
+        this.disposed = true; clearInterval(this.scanTimer); this.scanTimer = undefined;
+        if (this.opening) await (await this.opening).scans.quiesce();
+    }
     async dispose(): Promise<void> {
         this.disposed = true; clearInterval(this.scanTimer); this.scanTimer = undefined;
         if (this.opening) await (await this.opening).scans.dispose();
@@ -556,7 +560,7 @@ export class DigitalTwinService {
         if (settings.data.connectionId === undefined) await records.save('settings', 'pot', { ...settings.data,
             connectionId: await this.deps.defaultConnection?.().catch(() => '') ?? '', globalExclude: settings.data.globalExclude ?? [] }, settings.revision);
         const sources = new TwinSources(records, scannerInputReader(records, this.deps.reader), this.deps.connectionFingerprint ?? (async id => id));
-        const index = new TwinSourceIndex(records, sources);
+        const index = new TwinSourceIndex(records, sources, () => !this.disposed);
         const scanStore = new TwinScanStore(records, this.deps.scanHost?.kind ?? 'local', this.deps.scanHost?.now, this.deps.scanHost?.leaseMs);
         const guard = createScanGuard(scanStore);
         const extraction: TwinExtractionPort = {
@@ -571,7 +575,7 @@ export class DigitalTwinService {
         });
         const knowledge = new TwinKnowledge(records);
         const scans = new TwinScans(scanStore, sources, analysis, () => this.notify(), index, async () => {
-            await knowledge.recoverCleanup(); await analysis.recoverCleanup();
+            await knowledge.recoverCleanup(() => !this.disposed); await analysis.recoverCleanup(() => !this.disposed);
         }, {
             collect: async (run, attached) => {
                 if (!run.data.collection || !this.collector) throw new Error('TWIN_SCANNER_EXECUTOR_UNAVAILABLE');

@@ -1,14 +1,16 @@
 import type {MailClient, MailDiagnostic} from '../contracts';
-export interface ReaderEditor {destroy(): Promise<void>; getText(): string}
+export interface MailReader {destroy(): Promise<void>;}
 export interface MailPresentation {
+    locale?: 'zh-CN' | 'en';
     text(key: string): string;
     icons: {refresh: string; settings: string; fold: string; unfold: string; copy: string};
     diagnostic?(record: MailDiagnostic): void;
     createOperationId(): string;
 }
 export interface MailUIOptions {
+    onContentSelection?(selection: import('@nestos/mdxeditor').ContentSelection, signal: AbortSignal): Promise<void>;
     client: MailClient; sidebar: HTMLElement; editor: HTMLElement; presentation: MailPresentation;
-    createEditor(container: HTMLElement, content: string, title: string): Promise<ReaderEditor>;
+    createReader?(container: HTMLElement, content: string, title: string): Promise<MailReader>;
     selected?(id: string): void; scanners?(): Promise<void>;
 }
 export function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {

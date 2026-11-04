@@ -14,13 +14,30 @@
 .mail__button:focus-visible, .mail__row:focus-visible { outline: 2px solid var(--vscode-focusBorder, #2563eb); outline-offset: -2px; }
 .mail__icon, .mail__icon svg { display: block; width: 18px; height: 18px; }
 .mail__reader { display: flex; flex-direction: column; overflow: auto; background: var(--mm-bg-color, #fff); color: var(--text-primary, #1e293b); }
-.mail__thread { padding: 20px; min-width: 0; }
-.mail__thread-header { align-items: flex-start; flex-wrap: wrap; }
-.mail__thread-title { flex: 1; min-width: 140px; margin: 0; font-size: 20px; overflow-wrap: anywhere; }
 .mail__actions > button:first-child svg { transform: rotate(180deg); }
 .mail__thread-body { margin-block: 16px; min-width: 0; }
-.mail__thread-body[hidden] { display: none; }
+
 .mail__alert { margin: 0; padding: 0 12px; font-size: 13px; color: var(--vscode-errorForeground, #dc2626); overflow-wrap: anywhere; }
 .mail__alert:not(:empty) { padding-block: 8px; }
 .mail__empty { padding: 16px; color: var(--text-secondary, #64748b); }
-@media (max-width: 768px) { .mail__sidebar { width: 100%; } .mail__thread { padding: 12px; } .mail__button { min-width: 44px; min-height: 44px; } }
+@media (max-width: 768px) { .mail__sidebar { width: 100%; } .mail__button { min-width: 44px; min-height: 44px; } }
+
+/* Hidden controls must override the button's flex display. */
+.mail__reader [hidden] { display: none !important; }
+.mail__thread { min-width: 0; max-width: 1120px; width: 100%; box-sizing: border-box; margin-inline: auto; padding: 28px 32px; }
+.mail__thread-header { flex-wrap: wrap; gap: 16px; align-items: center; }
+.mail__thread-title { flex: 1; min-width: 140px; margin: 0; overflow-wrap: anywhere; font-size: 22px; font-weight: 500; line-height: 1.4; }
+.mail__actions { flex-shrink: 0; }
+.mail__actions .mail__button { border-color: transparent; border-radius: 50%; }
+.mail__button:hover:not(:disabled) { background: var(--mm-sidebar-bg, #f1f5f9); }
+.mail__thread-info { margin-block: 8px 20px; }
+.mail__thread-body { display: flex; flex-direction: column; gap: 0; }
+.mail__message { --mdx-content-padding: 0; }
+.mail__metadata { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0 0 20px; font-size: 12px; line-height: 1.6; }
+.mail__metadata dt { color: var(--text-secondary, #64748b); }
+.mail__metadata dd { margin: 0; overflow-wrap: anywhere; }
+.mail__more { display: flex; margin: 24px auto 0; border-radius: 20px; padding-inline: 20px; }
+@media (max-width: 768px) {
+    .mail__thread { padding: 16px 10px; }
+    .mail__thread-title { font-size: 19px; }
+}

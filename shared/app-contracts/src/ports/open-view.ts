@@ -9,7 +9,7 @@ export interface OpenViewRequest {
 }
 export interface ApplicationViewSources {
     repository: Parameters<Parameters<NonNullable<ApplicationServices['sessionRepository']['subscribe']>>[0]>[0];
-    files: undefined;
+    files: Parameters<Parameters<ApplicationServices['sessionFiles']['subscribe']>[0]>[0];
     favorites: undefined;
     kernel: Parameters<Parameters<ApplicationServices['kernel']['kernel']['onChanged']>[0]>[0];
     draft: Parameters<Parameters<ApplicationServices['projects']['drafts']['onPromoted']>[0]>[0];

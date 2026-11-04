@@ -946,3 +946,14 @@ it('compares inline draft and published function contents without generated vers
         expect((await service.context())!.definitionKey).not.toBe(draftContext!.definitionKey);
     } finally { draftLoad.mockRestore(); revisionLoad.mockRestore(); }
 });
+
+it('projects persisted and live completion instants and clears them before another execution', () => {
+    const start = 1791458565000, end = start + 11000, state = new SessionState('session');
+    const round = makeRound({id: 'timed', createdAt: start, completedAt: end, messages: [...makeUserPayload('Prompt'), ...makeAssistantPayload('Reply')]});
+    state.loadFromProjection(roundToProjection(round, round.id));
+    expect(state.getSessions().find(group => group.role === 'assistant')?.executionRoot).toMatchObject({startTime: start, endTime: end});
+    state.apply({type: 'round:updated', roundId: round.id, changes: {status: 'running', completedAt: null}});
+    expect(state.getSessions().find(group => group.role === 'assistant')?.executionRoot?.endTime).toBeUndefined();
+    state.apply({type: 'round:updated', roundId: round.id, changes: {status: 'success', completedAt: end + 5000}});
+    expect(state.getSessions().find(group => group.role === 'assistant')?.executionRoot?.endTime).toBe(end + 5000);
+});

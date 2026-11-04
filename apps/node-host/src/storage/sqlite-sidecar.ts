@@ -58,6 +58,21 @@ export class NodeSqliteSidecarDb implements ISidecarDb {
         return (row as MetaExtRow | undefined) ?? null;
     }
 
+    async getMetaExtMany(paths: string[]): Promise<MetaExtRow[]> {
+        const unique = [...new Set(paths)];
+        if (!unique.length) return [];
+        return this.prepare(`SELECT * FROM meta_ext WHERE path IN (${unique.map(() => '?').join(', ')})`)
+            .all(...unique) as MetaExtRow[];
+    }
+
+    async getRecordFields(itemPath: string, fields: string[]): Promise<Record<string, unknown>> {
+        const unique = [...new Set(fields)];
+        if (!unique.length) return {};
+        const rows = this.prepare(`SELECT field, value FROM records WHERE path = ? AND field IN (${unique.map(() => '?').join(', ')})`)
+            .all(itemPath, ...unique) as Array<{field: string; value: string}>;
+        return Object.fromEntries(rows.map(row => [row.field, JSON.parse(row.value)]));
+    }
+
     async upsertMetaExt(row: MetaExtRow): Promise<void> {
         this.prepare(`
             INSERT INTO meta_ext (path, icon, device_handler, is_asset_dir, tags, metadata, extra)
@@ -139,13 +154,19 @@ export class NodeSqliteSidecarDb implements ISidecarDb {
         return rows.map(row => ({ field: row.field, value: JSON.parse(row.value) }));
     }
 
-    async listRecordFieldsPage(path: string, prefix: string, offset: number, limit: number) {
-        const rows = this.prepare(RECORD_PAGE_SQL).all(...recordPageValues(path, prefix, offset, limit)) as RecordPageRow[];
+    async listRecordFieldsPage(path: string, prefix: string, offset: number, limit: number, after?: string) {
+        const rows = this.prepare(RECORD_PAGE_SQL).all(...recordPageValues(path, prefix, offset, limit, after)) as RecordPageRow[];
         return decodeRecordPage(rows);
     }
 
     async clearRecordFields(itemPath: string): Promise<void> {
         this.prepare('DELETE FROM records WHERE path = ?').run(itemPath);
+    }
+
+    async readTransaction<T>(operation: (db: ISidecarDb) => Promise<T>): Promise<T> {
+        this.db.exec('BEGIN');
+        try { const result = await operation(this); this.db.exec('COMMIT'); return result; }
+        catch (error) { this.db.exec('ROLLBACK'); throw error; }
     }
 
     async begin(): Promise<void> {

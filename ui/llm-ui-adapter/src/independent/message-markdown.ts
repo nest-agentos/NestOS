@@ -46,3 +46,8 @@ export function workspaceMessagePlugins(options: EditorOptions, branch: () => st
         return [new AiChatPlugin({host: bound})];
     };
 }
+
+/** Preserve the host callback through both local and native ChatView composition. */
+export function contentSelectionAction(options: EditorOptions): ChatOptions['onContentSelection'] {
+    return (options.defaultPluginOptions?.['content:selection'] as {run?: ChatOptions['onContentSelection']} | undefined)?.run;
+}

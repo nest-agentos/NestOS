@@ -21,7 +21,7 @@ function assertSource(source: ContextSourceOption): void {
 function assertCheckpoint(checkpoint: ContextCheckpointOption): void {
     if (!checkpoint || typeof checkpoint.ref !== 'string' || !validQualification(checkpoint.fork)) throw failure('CONTEXT_OPTIONS_RESPONSE_INVALID');
 }
-function validMode(mode: ContextOptionsPage['modes']['new']): boolean {
+function validMode(mode: ContextOptionsPage['modes']['new'] | undefined): boolean {
     return !!mode && typeof mode.supported === 'boolean' && (mode.code === undefined || /^[A-Z][A-Z0-9_]{0,79}$/.test(mode.code));
 }
 function validQualification(value: ContextSourceOption['fork']): boolean {

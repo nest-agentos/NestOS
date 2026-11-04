@@ -12,7 +12,7 @@ export function createItemOperations(options: ReviewOperationsOptions) {
     let stopped = false; const tails = new Map<string, Promise<unknown>>();
     const queue = <T>(board: string, item: string, work: () => Promise<T>): Promise<T> => {
         requireValue(!stopped, 'SERVICE_STOPPING'); const key = reviewKey(board, item);
-        const pending = (tails.get(key) ?? Promise.resolve()).catch(() => {}).then(work); tails.set(key, pending);
+        const pending = (tails.get(key) ?? Promise.resolve()).catch(() => {}).then(() => {requireValue(!stopped, 'SERVICE_STOPPING'); return work();}); tails.set(key, pending);
         void pending.finally(() => {if (tails.get(key) === pending) tails.delete(key);}).catch(() => {}); return pending;
     };
     return {itemOperations: (board: string, item: string) => queue(board, item, async () => view(options, await load(options, board, item, true))),
@@ -22,7 +22,7 @@ export function createItemOperations(options: ReviewOperationsOptions) {
             for (const scope of await options.journal.get<Array<{board: string; item: string}>>('review-operation-scopes') ?? []) {
                 if (stopped) return;
                 await queue(scope.board, scope.item, async () => {const context = await load(options, scope.board, scope.item, false);
-                    for (const job of context.jobs) {if (job.phase !== 'settled') await advanceReviewJob(options, job); else await options.report?.(job);}});
+                    for (const job of context.jobs) {if (stopped) return; if (job.phase !== 'settled') await advanceReviewJob(options, job); else await options.report?.(job);}});
             }
         },
         guardResource: <T>(board: string, item: string, work: () => Promise<T>) => queue(board, item, async () => {

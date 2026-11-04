@@ -15,6 +15,7 @@ export type RoundLogEvent =
     | { type: 'round:deleted'; roundId: RoundId; cascadeIds?: RoundId[] };
 
 export interface RoundChangeSet {
+    completedAt?: number | null;
     admission?: import('../contracts').ExecutionAdmission;
     /** Latest primary execution association, independent of assistant content. */
     execution?: import('../contracts').ExecutionRef;

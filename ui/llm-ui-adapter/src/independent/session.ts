@@ -414,6 +414,9 @@ function projectGroup(group: SessionGroup, ledger: OperationLedger, confirmed: R
         file: { id: file.path ?? file.name, name: file.name, mimeType: file.type } });
     if (outputs) parts.push(...messageOutputs(group));
     return { id: group.id, revision: 0, role: group.role, parts, timestamp: group.timestamp,
+        timing: group.role === 'user' ? {submittedAt: operation?.submittedAt ?? group.timestamp} : {startedAt: group.executionRoot?.startTime,
+            completedAt: group.executionRoot?.status === 'success' ? group.executionRoot.endTime : undefined,
+            endedAt: ['failed', 'cancelled', 'aborted'].includes(group.executionRoot?.status ?? '') ? group.executionRoot?.endTime : undefined, scope: 'turn' as const},
         state: messageState(group.executionRoot?.status),
         submissionId: operation?.context.operationId,
         acceptance: operation && !confirmed.has(operation.context.operationId) ? 'optimistic' as const : 'confirmed' as const };

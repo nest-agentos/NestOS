@@ -258,3 +258,16 @@ describe('lazily resolved mount sources', () => {
         expect(await service.inspect('missing')).toBeNull();
     });
 });
+it('does not broadcast source content changes as namespace changes, while acquired views retain file events', async () => {
+    const {service, home} = await setup();
+    await service.configure('a', {mounts: mount('/a'), cwd: '/workspace'}, 0);
+    const owner = await service.acquireFiles('a'); cleanup.push(() => owner.release());
+    const configuration = vi.fn(), content = vi.fn();
+    const offConfiguration = service.subscribe(configuration), offContent = owner.context.fs.on('node:created', content);
+    try {
+        await home.driver.createFile({parentPath: '/a', name: 'added.md', content: 'content'});
+        expect(content).toHaveBeenCalledOnce(); expect(configuration).not.toHaveBeenCalled();
+        await service.configure('a', {mounts: mount('/b'), cwd: '/workspace'}, 1);
+        expect(configuration).toHaveBeenCalledOnce();
+    } finally {offConfiguration(); offContent();}
+});

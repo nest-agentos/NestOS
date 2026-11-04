@@ -9,6 +9,8 @@ import path from 'node:path';
 import { hostArguments, hostEnvironment, runtimePaths, runtimeLog, releaseDirectory, releasesRoot, verifyRelease } from './httpd-runtime.mjs';
 import { buildHttpRelease } from './httpd-build.mjs';
 
+import {withHttpdControl, runningHttpd, registerHttpd, unregisterHttpd, stopHttpd, lifecycleLog, setLifecycleLog} from './httpd-process.mjs';
+
 const root = fileURLToPath(new URL('..', import.meta.url));
 const app = path.join(root, 'apps/http-app'), releases = releasesRoot(root);
 const developmentUI = path.join(root, 'release/httpd-dev/dist');
@@ -35,6 +37,8 @@ function build(args) {
     console.log(`HTTP release ready: ${id}\nStart: ${shared ? `NESTOS_HTTPD_RELEASE_ROOT=${directory} pnpm httpd` : 'pnpm httpd'}\nDevelopment: pnpm httpd:dev`);
 }
 async function serve(mode, args) {
+    const hosts = await runningHttpd(root, mode, releases);
+    if (hosts.length) throw new Error(`HTTPD_ALREADY_RUNNING: pid=${hosts.map(row => row.pid).join(',')}; use pnpm httpd:restart`);
     if (process.platform === 'linux') await recoverTemporaryProcesses(undefined, event => {
         if (event.result === 'failure') console.warn('[TemporaryProcess]', JSON.stringify(event));
         else console.info('[TemporaryProcess]', JSON.stringify(event));
@@ -53,22 +57,59 @@ async function serve(mode, args) {
         env: { ...hostEnvironment(), INIT_CWD: root, NESTOS_HTTPD_MODE: mode, NESTOS_HTTPD_VERSION: id } });
     child.stdout.on('data', chunk => { output.write(chunk); process.stdout.write(chunk); });
     child.stderr.on('data', chunk => { output.write(chunk); process.stderr.write(chunk); });
-    let stopping = false;
-    const signals = ['SIGINT', 'SIGTERM'];
-    for (const signal of signals) process.on(signal, () => { if (!stopping) { stopping = true; child.kill(signal); } });
-    child.once('error', error => { output.close(); console.error(error.message); process.exitCode = 1; });
-    child.once('exit', (code, signal) => { output.close(); process.exitCode = code ?? (signal ? 1 : 0); });
+    await supervise(child, mode, entry, args, output);
 }
-const [command = 'start', ...args] = process.argv.slice(2);
+async function supervise(child, mode, entry, args, output) {
+    let stopping = false, registration;
+    const signals = ['SIGINT', 'SIGTERM'];
+    const onSignal = () => {
+        if (stopping) return; stopping = true;
+        void Promise.resolve(registration).then(owned => owned && stopHttpd(root, mode, releases, {owned})).catch(error => {
+            lifecycleLog({pid: child.pid, stage: 'stop', result: 'failure', code: error.code ?? 'HTTPD_STOP_FAILED'}); process.exitCode = 1;
+        });
+    };
+    for (const signal of signals) process.on(signal, onSignal);
+    child.once('error', error => {console.error(error.message); process.exitCode = 1;});
+    child.once('close', () => output.close());
+    let record;
+    child.once('exit', (code, signal) => {
+        for (const event of signals) process.removeListener(event, onSignal);
+        if (record) void withHttpdControl(root, () => unregisterHttpd(root, mode, record)).catch(error => {
+            if (error.code !== 'HTTPD_CONTROL_BUSY') lifecycleLog({pid: child.pid, stage: 'registry.remove', result: 'failure', code: error.code ?? 'HTTPD_REGISTRY_FAILED'});
+        });
+        process.exitCode = stopping ? 0 : code ?? (signal ? 1 : 0);
+    });
+    try {registration = registerHttpd(root, mode, child.pid, entry, args); record = await registration;
+        lifecycleLog({operationId: randomUUID(), pid: child.pid, stage: 'start.registered', result: 'success'});
+    } catch (error) {child.kill('SIGTERM'); throw error;}
+}
+function prepareLifecycleLog(command, args) {
+    if (!['start', 'stop', 'restart', 'dev'].includes(command)) return;
+    const mode = command === 'dev' || args.includes('--dev') ? 'dev' : 'release';
+    try {
+        const output = runtimeLog(runtimePaths(mode).runtime);
+        setLifecycleLog(chunk => output.write(chunk)); process.once('exit', () => output.close());
+    } catch (error) {console.warn('[HTTPProcess] log unavailable:', error.code ?? 'HTTPD_LOG_UNAVAILABLE');}
+}
+const [command = 'start', ...args] = process.argv.slice(2), commandStarted = Date.now();
 try {
+    prepareLifecycleLog(command, args);
     if (command === 'build') build(args);
-    else if (command === 'dev') await serve('dev', args);
-    else if (command === 'start') await serve('release', args);
+    else if (command === 'dev') await withHttpdControl(root, () => serve('dev', args));
+    else if (command === 'start') await withHttpdControl(root, () => serve('release', args));
+    else if (command === 'stop' || command === 'restart') await withHttpdControl(root, async () => {
+        const mode = args.includes('--dev') ? 'dev' : 'release';
+        const timeoutAt = args.indexOf('--timeout-ms'), timeoutMs = timeoutAt < 0 ? undefined : Number(args[timeoutAt + 1]);
+        const forwarded = args.filter((arg, index) => !['--dev', '--force', '--timeout-ms'].includes(arg) && (timeoutAt < 0 || index !== timeoutAt + 1));
+        const stopped = await stopHttpd(root, mode, releases, {force: args.includes('--force'), timeoutMs});
+        if (command === 'restart') await serve(mode, forwarded.length ? forwarded : stopped?.args ?? []);
+    });
     else if (command === 'activate' && args[0]) activate(args[0]);
     else if (command === 'list') {
         for (const entry of readdirSync(releases)) if (!entry.startsWith('.') && entry !== 'current.json') console.log(entry);
     }
-    else throw new Error('Usage: httpd.mjs build [--share-main] [--no-cache] [--no-activate] | start [httpd options] | dev [httpd options] | list | activate <release-id>');
+    else throw new Error('Usage: httpd.mjs build [--share-main] [--no-cache] [--no-activate] | start [httpd options] | dev [httpd options] | stop [--dev] | restart [--dev] [httpd options] | list | activate <release-id>');
 } catch (error) {
+    lifecycleLog({operationId: randomUUID(), stage: command, result: 'failure', code: error.code ?? 'HTTPD_COMMAND_FAILED', durationMs: Date.now() - commandStarted});
     console.error(error.code === 'ENOENT' && command === 'start' ? 'No HTTP release found. Run pnpm httpd:build first.' : error.message); process.exitCode = 1;
 }

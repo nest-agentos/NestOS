@@ -27,7 +27,7 @@ export class StartupCoordinator {
         return () => {
             // Draining work may still await an already accepted dependency during shutdown.
             if (ready) return ready;
-            if (this.closed) return Promise.reject(new Error('Startup is closed'));
+            if (this.closed) return Promise.reject(Object.assign(new Error('Startup is closed'), {code: 'SERVICE_STOPPING'}));
             ready = Promise.resolve().then(() => this.hooks.trace(label, action));
             this.pending.add(ready);
             void ready.finally(() => this.pending.delete(ready!)).catch(() => {});

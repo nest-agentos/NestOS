@@ -82,13 +82,16 @@ it('loads manifest, branch drafts and settings in one fresh transaction without 
 
 it('saves UI state without touching history and suppresses unchanged writes and notifications', async () => {
     const { repository, id, backend } = await fixture();
+    const session = `/var/lib/sessions/${id}/session.seq`;
+    const writable = new Set([session, '/var/lib/sessions/folders.seq']);
     const get = vi.spyOn(backend.records!, 'getRecordField');
     const set = vi.spyOn(backend.records!, 'setRecordField');
     const changed = vi.fn(); repository.subscribe(changed);
     const state = { branchDrafts: { main: { inputText: 'draft' } } };
     await repository.updateUIState(id, state);
     expect(get.mock.calls.map(call => call[1]).filter(field => field !== '__vfs_seq__:navigation-version')).toEqual(['__vfs_seq__:session']);
-    expect(set.mock.calls.map(call => call[1]).filter(field => !field.startsWith('__vfs_seq__:navigation'))).toEqual(['__vfs_seq__:session']);
+    expect(set.mock.calls.every(([path]) => writable.has(path))).toBe(true);
+    expect(set.mock.calls.filter(([path]) => path === session).map(([, field]) => field)).toEqual(['__vfs_seq__:session']);
     expect(changed).toHaveBeenCalledWith({ kind: 'ui-state', sessionId: id });
     const before = await repository.getManifest(id);
     get.mockClear(); set.mockClear(); changed.mockClear();
@@ -100,4 +103,24 @@ it('saves UI state without touching history and suppresses unchanged writes and 
     expect((await repository.getManifest(id)).uiState?.branchDrafts?.main.inputText).toBe('');
     await repository.updateManifest(id, { currentBranch: 'other', currentHead: 'other' });
     expect(await repository.readHistoryChain(id)).toMatchObject({ branch: 'other', chain: ['other'] });
+});
+
+it('keeps recent summaries current for draft activity without promoting view-only preferences or exposing drafts', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const {repository, id} = await fixture();
+    const recent = async (updatedAt: number) => {
+        const page = await repository.listSummaryPage(null, {limit: 2});
+        expect(page.items).toEqual([expect.objectContaining({id, updatedAt})]);
+        expect(page.items[0]).not.toHaveProperty('uiState');
+    };
+    await recent(1000);
+    clock.mockReturnValue(2000);
+    await repository.updateUIState(id, {branchDrafts: {main: {inputText: 'draft'}}});
+    await recent(2000);
+    clock.mockReturnValue(3000);
+    await repository.updateUIState(id, {scrollPosition: 50, historyVisibility: 'hidden'});
+    await recent(2000);
+    clock.mockReturnValue(4000);
+    await repository.updateUIState(id, {branchDrafts: {main: {inputText: ''}}});
+    await recent(4000);
 });

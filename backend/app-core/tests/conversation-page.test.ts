@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import type { FSNode } from '@nestos/vfs-core';
-import { localConversationSource, readConversationPage, type ConversationSource } from '../src/projects/conversation-page';
+import { readConversationPage, type ConversationSource } from '../src/projects/conversation-page';
 
 const node = (id: string, modifiedAt: number) => ({path: '/' + id, modifiedAt}) as FSNode;
 function source(id: string, times: number[], size = 4) {
@@ -52,3 +52,10 @@ it('does not shift local continuation rows when a newer conversation arrives', a
     expect(second.hasMore).toBe(false);
     expect((await readConversationPage([localConversationSource(nodes.slice(0, 15))], undefined, 15)).hasMore).toBe(false);
 });
+
+function localConversationSource(nodes: FSNode[]): ConversationSource {
+    return {id: 'local', cursorAfter: row => JSON.stringify([row.modifiedAt, row.path]), read: async cursor => {
+        const after = cursor ? JSON.parse(cursor) as [number, string] : undefined;
+        return {nodes: nodes.filter(row => !after || row.modifiedAt < after[0] || row.modifiedAt === after[0] && row.path.localeCompare(after[1]) > 0)};
+    }};
+}

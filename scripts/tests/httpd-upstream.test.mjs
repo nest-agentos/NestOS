@@ -12,6 +12,7 @@ function fixture(libraryExitCode) {
     writeFileSync(path.join(root, 'tools/temporary-process/node/index.mjs'), 'export const recover = async () => {};\n');
     writeFileSync(path.join(root, 'package.json'), '{"type":"module"}');
     writeFileSync(path.join(root, 'release/httpd/current.json'), '{"id":"previous"}\n');
+    writeFileSync(path.join(root, 'scripts/httpd-process.mjs'), readFileSync(new URL('../httpd-process.mjs', import.meta.url)));
     writeFileSync(path.join(root, 'scripts/httpd.mjs'), readFileSync(new URL('../httpd.mjs', import.meta.url)));
     writeFileSync(path.join(root, 'scripts/httpd-runtime.mjs'), `
         export const hostArguments = () => [], hostEnvironment = () => ({}), runtimePaths = () => ({}), runtimeLog = () => ({});

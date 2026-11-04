@@ -2,6 +2,7 @@ import {FSError, type FSNode, type IFileSystem} from '@nestos/vfs-core';
 import {browserTargetFolder, resolveBrowserTarget} from '@nestos/app-contracts';
 import type {ProjectService, SessionDirectoryView, NavigationDirectory} from '@nestos/app-contracts/services';
 import {createModuleLogger, randomUUID} from '@nestos/common';
+import {recentConversationPreview} from '../projects/conversation-directory';
 
 const log = createModuleLogger('directory-view');
 /** Flatten virtual containers locally; no browser round trip is needed for each group. */
@@ -42,7 +43,14 @@ async function flatten(fs: IFileSystem, path: string, directories: Map<string, N
     if (node.type !== 'directory') throw new FSError('ENOTDIR', 'Not a directory');
     directories.set(path, {path, node, nodes, revision: fs.revision});
     const parents = new Set([...ancestors, path]);
-    const rows = await Promise.all(nodes.filter(child => child.metadata.navigationHidden !== true).map(child => child.metadata.navigationTransparent === true
-        ? flatten(fs, String(child.metadata.directoryPath ?? child.path), directories, parents) : [child]));
+    const rows = await Promise.all(nodes.filter(child => child.metadata.navigationHidden !== true).map(async child => {
+        if (child.metadata.navigationTransparent !== true) return [child];
+        const rows = await flatten(fs, String(child.metadata.directoryPath ?? child.path), directories, parents);
+        const target = resolveBrowserTarget(child.path);
+        if (target.kind === 'project-conversations' && target.recent)
+            directories.set(child.path, {path: child.path, node: child,
+                nodes: recentConversationPreview(target.folder, rows), revision: fs.revision});
+        return rows;
+    }));
     return rows.flat();
 }

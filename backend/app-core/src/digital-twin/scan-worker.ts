@@ -17,6 +17,9 @@ export interface TwinCollectionRunner {
 export class TwinScanWorker {
     private pumping?: Promise<void>;
     private stopped = false;
+    private safeStopping = false;
+    private quiescing?: Promise<void>;
+    private stage = 'idle';
     private error = '';
     private renewing?: Promise<void>;
     constructor(private readonly store: TwinScanStore, private readonly plans: TwinScanPlans,
@@ -27,7 +30,17 @@ export class TwinScanWorker {
         return this.pumping ??= this.execute().catch(error => { this.error = scanError(error); this.changed(); })
             .finally(() => { this.pumping = undefined; });
     }
+    quiesce(): Promise<void> {
+        this.stopped = this.safeStopping = true;
+        return this.quiescing ??= (async () => {
+            const started = Date.now();
+            const report = (result: string) => console.info('[ScannerShutdown]', JSON.stringify({operation: 'scanner.quiesce', workerId: this.store.owner, stage: this.stage, result, durationMs: Date.now() - started}));
+            report('started'); const timer = setInterval(() => report('waiting'), 5000);
+            try {await this.pumping; await this.store.release(); report('success');} finally {clearInterval(timer);}
+        })();
+    }
     async dispose(): Promise<void> {
+        if (this.safeStopping) return this.quiesce();
         this.stopped = true;
         for (const job of await this.store.records.list<TwinAnalysisJob>('job')) {
             if (job.data.scanScope && ['queued', 'running'].includes(job.data.state)) {
@@ -53,15 +66,7 @@ export class TwinScanWorker {
         this.error = '';
         const heartbeat = setInterval(() => { this.renewing ??= this.heartbeat(fence).finally(() => { this.renewing = undefined; }); }, Math.max(1000, this.store.leaseMs / 3));
         try {
-            await this.recover(fence);
-            await this.maintenance();
-            for (const plan of await this.plans.refreshBindings()) {
-                for (const run of await this.store.active()) if (run.data.planId === plan.id && run.data.planRevision !== plan.revision) await this.cancel(run.id);
-            }
-            // Reconciliation remains active when analysis or a plan is paused.
-            if (await this.discoveryDue()) await this.index?.sync();
-            await this.sources.reconcile(false);
-            await this.schedule();
+            if (!await this.prepare(fence)) return;
             while (!this.stopped) {
                 const settings = await this.store.records.get<TwinSettings>('settings', 'pot');
                 const run = (await this.store.active()).find(item => item.data.state === 'queued' && (!settings?.data.paused || item.data.mode === 'reconcile'));
@@ -69,6 +74,26 @@ export class TwinScanWorker {
                 await this.run(run, fence);
             }
         } finally { clearInterval(heartbeat); await this.renewing; await this.store.release(); this.changed(); }
+    }
+    private async prepare(fence: number): Promise<boolean> {
+        if (this.stopped) return false;
+        await this.step('recovery', () => this.recover(fence)); if (this.stopped) return false;
+        await this.step('maintenance', () => this.maintenance()); if (this.stopped) return false;
+        const plans = await this.step('bindings', () => this.plans.refreshBindings(() => !this.stopped));
+        for (const plan of plans) {
+            if (this.stopped) return false;
+            for (const run of await this.store.active()) if (run.data.planId === plan.id && run.data.planRevision !== plan.revision) await this.cancel(run.id);
+        }
+        if (this.stopped) return false;
+        const discovery = await this.step('discovery-due', () => this.discoveryDue()); if (this.stopped) return false;
+        if (discovery) await this.step('discovery', async () => {await this.index?.sync();});
+        if (this.stopped) return false;
+        await this.step('sources', () => this.sources.reconcile(false, () => !this.stopped)); if (this.stopped) return false;
+        await this.step('schedule', () => this.schedule()); return !this.stopped;
+    }
+    private async step<T>(stage: string, work: () => Promise<T>): Promise<T> {
+        const previous = this.stage; this.stage = stage;
+        try {return await work();} finally {this.stage = previous;}
     }
     private async discoveryDue(): Promise<boolean> {
         if ((await this.store.active()).some(run => run.data.rules && run.data.state === 'queued')) return true;
@@ -97,6 +122,7 @@ export class TwinScanWorker {
     }
     private async schedule(): Promise<void> {
         for (const plan of await this.store.records.list<TwinScanPlan>('scan-plan')) {
+            if (this.stopped) return;
             if (!plan.data.enabled || ['manual', 'event'].includes(plan.data.trigger)) continue;
             const schedule = await this.plans.schedule(plan.id);
             if (schedule && schedule.data.nextAt > this.store.now()) continue;
@@ -115,15 +141,24 @@ export class TwinScanWorker {
             await this.store.records.save('scan-run', record.id, { ...record.data, state: 'running', owner: this.store.owner,
                 fence, startedAt: this.store.now() }, record.revision, [await this.store.fence(fence)]);
             this.changed();
-            if (record.data.collection) await this.collectSources(record.id, fence);
+            if (record.data.collection) await this.step('collection', () => this.collectSources(record.id, fence));
             if (record.data.mode !== 'collect') await this.scanSources(record.id, { runId: record.id, planId: record.data.planId,
                 planRevision: record.data.planRevision, sourceId: '', fence, kinds: record.data.kinds, focus: record.data.focus, executor: record.data.executor, maxOutputTokens: record.data.maxOutputTokens });
+            if (this.safeStopping) {await this.checkpoint(record.id, fence); return;}
             await this.store.finish(record.id, this.stopped ? 'interrupted' : 'succeeded', this.stopped ? 'TWIN_SCAN_INTERRUPTED' : '', fence);
         } catch (error) {
             if (scanError(error) === 'TWIN_SCAN_LEASE_LOST') throw error;
+            if (this.safeStopping && scanError(error) === 'TWIN_SCAN_CANCELLED') {await this.checkpoint(record.id, fence); return;}
             const code = scanError(error), paused = /BUDGET_EXHAUSTED|ANALYSIS_PAUSED/.test(code);
-            await this.store.finish(record.id, this.stopped ? 'interrupted' : paused ? 'paused' : 'failed', this.stopped ? 'TWIN_SCAN_INTERRUPTED' : code, fence, diagnosticDetail(error));
+            const interrupted = this.stopped && !this.safeStopping;
+            await this.store.finish(record.id, interrupted ? 'interrupted' : paused ? 'paused' : 'failed', interrupted ? 'TWIN_SCAN_INTERRUPTED' : code, fence, diagnosticDetail(error));
         }
+        this.changed();
+    }
+    private async checkpoint(id: string, fence: number): Promise<void> {
+        const current = await this.store.records.get<TwinScanRun>('scan-run', id);
+        if (current?.data.state === 'running') await this.store.records.save('scan-run', id,
+            {...current.data, state: 'queued', owner: '', error: ''}, current.revision, [await this.store.fence(fence)]);
         this.changed();
     }
     private async collectSources(id: string, fence: number): Promise<void> {
@@ -179,7 +214,8 @@ export class TwinScanWorker {
             await this.store.fence(scope.fence);
             const { source } = await this.sources.readCurrent(id);
             if ((await this.analysis.progress(source, scope)).complete) return;
-            await this.analysis.run(id, scope);
+            if (this.stopped) throw new Error('TWIN_SCAN_CANCELLED');
+            await this.step('analysis.batch', () => this.analysis.run(id, scope));
             if (singleBatch) return;
         }
     }

@@ -354,3 +354,63 @@ it('logs conditional UI outcomes without opaque data and preserves results when 
         expect(JSON.stringify([...debug.mock.calls, ...warn.mock.calls])).not.toContain('PRIVATE_PAYLOAD');
     } finally {await reader.dispose();}
 });
+
+it('pages a time-ordered summary index and maintains it across updates, moves and deletion', async () => {
+    await repository.createFolder('/Rows'); await repository.createFolder('/Other');
+    const ids: string[] = [];
+    const clock = vi.spyOn(Date, 'now');
+    try {
+    for (let i = 0; i < 24; i++) {
+        clock.mockReturnValue(i + 1);
+        const id = await repository.createSession(`row-${i}`, '/Rows', null, undefined, {agentId: i % 2 ? 'writer' : 'reader'});
+        await repository.updateManifest(id, {updatedAt: i + 1}); ids.push(id);
+    }
+    const history = vi.spyOn(repository, 'getManifest'), scan = vi.spyOn(repository, 'listSummariesInFolder');
+    const page = await repository.listSummaryPage('/Rows', {limit: 15});
+    expect(page.items.map(row => row.id)).toEqual(ids.slice(9).reverse());
+    expect(page.nextCursor).toBeDefined();
+    expect(history).not.toHaveBeenCalled(); expect(scan).not.toHaveBeenCalled();
+    expect((await repository.listSummaryPage('/Rows', {cursor: page.nextCursor, limit: 15})).items).toHaveLength(9);
+    clock.mockReturnValue(100);
+    const inserted = await repository.createSession('Inserted after paging', '/Rows');
+    expect((await repository.listSummaryPage('/Rows', {cursor: page.nextCursor, limit: 15})).items.map(row => row.id)).toEqual(ids.slice(0, 9).reverse());
+    await repository.deleteSession(inserted);
+    expect((await repository.listSummaryPage('/Rows', {limit: 15, agentId: 'writer'})).items).toHaveLength(12);
+    clock.mockReturnValue(100);
+    await repository.updateManifest(ids[0], {title: 'Latest'});
+    expect((await repository.listSummaryPage('/Rows', {limit: 1})).items[0].id).toBe(ids[0]);
+    await repository.updateManifest(ids[0], {folder: '/Other'});
+    expect((await repository.listSummaryPage('/Rows', {limit: 1})).items[0].id).toBe(ids[23]);
+    await repository.deleteSession(ids[23]);
+    expect((await repository.listSummaryPage('/Rows', {limit: 1})).items[0].id).toBe(ids[22]);
+    } finally {clock.mockRestore();}
+});
+
+it('rebuilds the ordered index from existing metadata once and preserves off-page parent titles', async () => {
+    await repository.createFolder('/Indexed');
+    const parent = await repository.createSession('Old parent', '/Indexed');
+    for (let i = 0; i < 18; i++) await repository.createSession(`child-${i}`, '/Indexed', parent);
+    const path = '/var/lib/sessions/folders.seq';
+    await fs.meta.seq!.setEntry(path, 'navigation-version', '1');
+    const keys: string[] = [];
+    await fs.meta.seq!.walkEntries(path, entry => {keys.push(entry.key); return true;}, {keyPrefix: 'recent/'});
+    await fs.meta.seq!.transaction!(async tx => {for (const key of keys) await tx.deleteEntry(path, key);});
+    const reader = new SessionRepository(fs);
+    try {
+        await reader.init();
+        const page = await reader.listSummaryPage('/Indexed', {limit: 15});
+        expect(page.items).toHaveLength(15);
+        expect(page.items.filter(row => row.parentSessionId === parent).every(row => row.parentTitle === 'Old parent')).toBe(true);
+        expect(await fs.meta.seq!.getEntry(path, 'navigation-version')).toBe('2');
+    } finally {await reader.dispose();}
+});
+
+it.each(['private fixture summary', JSON.stringify({id: 'bad', title: 'private fixture summary'})])('reports a malformed summary index without exposing its stored contents: %s', async raw => {
+    const logger = {debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn()};
+    await fs.meta.seq!.setEntry('/var/lib/sessions/folders.seq', 'recent//all/0000000000000000/bad', raw);
+    const reader = new SessionRepository(fs, undefined, logger);
+    await expect(reader.listSummaryPage(null, {limit: 15})).rejects.toMatchObject({code: 'EIO', message: expect.not.stringContaining('private fixture')});
+    expect(logger.error).toHaveBeenCalledWith('session.navigation', expect.objectContaining({code: 'SESSION_SUMMARY_PARSE_FAILED', operationId: expect.any(String), stage: 'index-page'}));
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain('private fixture');
+    await reader.dispose();
+});

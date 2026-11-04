@@ -75,17 +75,18 @@ export class TwinKnowledge {
         await this.finishCleanup(operationId);
     }
 
-    async recoverCleanup(): Promise<void> {
+    async recoverCleanup(active: () => boolean = () => true): Promise<void> {
         let pending = await this.records.store.pendingCleanup();
-        while (pending.length) {
-            for (const operation of pending) await this.finishCleanup(operation.operationId);
+        while (pending.length && active()) {
+            for (const operation of pending) {if (!active()) return; await this.finishCleanup(operation.operationId, active);}
+            if (!active()) return;
             pending = await this.records.store.pendingCleanup();
         }
     }
 
-    private async finishCleanup(operationId: string): Promise<void> {
+    private async finishCleanup(operationId: string, active: () => boolean = () => true): Promise<void> {
         let operation = await this.records.store.cleanBatch(operationId, 100);
-        while (operation.state !== 'completed') operation = await this.records.store.cleanBatch(operationId, 100);
+        while (operation.state !== 'completed' && active()) operation = await this.records.store.cleanBatch(operationId, 100);
     }
 
     async suppress(id: string, revision: string): Promise<void> {

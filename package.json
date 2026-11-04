@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "pnpm --filter nestos-web dev",
     "httpd": "node scripts/httpd.mjs start",
+    "httpd:stop": "node scripts/httpd.mjs stop",
+    "httpd:restart": "node scripts/httpd.mjs restart",
     "temp:run": "node tools/temporary-process/node/cli.mjs run",
     "temp:recover": "node tools/temporary-process/node/cli.mjs recover",
     "build": "node scripts/business-workspace.mjs build",

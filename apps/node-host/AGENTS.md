@@ -43,3 +43,5 @@ toolbox.yaml 的普通参数可声明 connectionType；工具包配置投影当�
 - terminal/ 只为 HTTP 管理员认证视图提供服务器 Bash PTY，经 ServerTerminals/ServerTerminal 契约开放。每视图最多两个进程，输出有界；视图与编辑器销毁释放 PTY，输入从不自动重放。普通用户不获得此能力；日志不包含命令、输出或环境值。定向回归为 http-app 的 server-terminal 与 view-api 终端场景。
 
 - 工具包显式 switchVersion 为即时切换：按共享注册锁准备所有用户实例、持久入口与同步目录发布；稳定执行代理在业务调用前写入 Task 实现引用，旧调用/重试/核对按原指纹恢复。缺少历史绑定拒绝猜测，提交结果未知时暂停新准入并按 activationId 核对。二进制热升级要求新旧包 executionEnvironment:instance，通过工厂 executables 映射实例隔离；旧进程环境绑定变化明确拒绝。
+
+Host shutdown traces use HTTPShutdown with PID, operationId, nested stage, result and elapsed time; waiting stages report every five seconds without recording bodies or arguments. Keep storage locks until owned runtime work is drained. The external httpd process controller bounds the safe-stop wait and permits SIGKILL escalation only with explicit --force; never release database locks early to simulate a stopped process.

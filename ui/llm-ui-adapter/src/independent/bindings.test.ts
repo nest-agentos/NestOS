@@ -591,3 +591,15 @@ it('projects native reasoning as a collapsible assistant part', async () => {
         parts: [{kind: 'reasoning', text: 'reasoning fixture'}]});
     binding.dispose();
 });
+
+it('projects explicit native send and completion instants without inventing legacy completion', async () => {
+    const host = fixture(), start = 1791458565000;
+    host.emit({messages: [{id: 'u', role: 'user', text: 'Prompt', submittedAt: start},
+        {id: 'a', role: 'assistant', text: 'Reply', status: 'completed', startedAt: start + 1000, completedAt: start + 11000},
+        {id: 'old', role: 'assistant', text: 'Legacy', timestamp: start, status: 'completed'},
+        {id: 'live', role: 'assistant', text: 'Partial', startedAt: start + 12000, status: 'inProgress'}]});
+    const binding = await createNativeChatBinding(host.options), messages = binding.source.getSnapshot().messages;
+    expect(messages[0].timing?.submittedAt).toBe(start);
+    expect(messages[1].timing).toMatchObject({startedAt: start + 1000, completedAt: start + 11000, scope: 'message'});
+    expect(messages[2].timing?.completedAt).toBeUndefined(); expect(messages[3].state).toBe('streaming'); binding.dispose();
+});

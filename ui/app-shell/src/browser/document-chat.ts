@@ -1,7 +1,7 @@
 import {sessionRoute, DOCUMENT_CHAT_META_KEY} from '@nestos/app-contracts';
-import {createModuleLogger, t, type NavigationRequest} from '@nestos/common';
+import {createModuleLogger, randomUUID, t, type NavigationRequest} from '@nestos/common';
 import {SessionCommand, type RootCallTarget, type RootTargetCatalog, type SubmissionRequest, type SubmissionReceipt} from '@nestos/llm-session/contracts';
-import type {AiChatHost, AiChatSubmitRequest} from '@nestos/mdxeditor';
+import type {AiChatHost, AiChatSubmitRequest, ContentSelection} from '@nestos/mdxeditor';
 import type {ApplicationBackend, ApplicationServices, DocumentChatFile, DocumentChatLink} from '@nestos/app-contracts/services';
 import type {EditorFactory, IEditor} from '@nestos/ui-common-adapter';
 import type {AppUI} from '../types';
@@ -14,6 +14,9 @@ interface MessageAnchor {documentPath: string; branch?: string; roundId?: string
 export function createDocumentChatFactory(factory: EditorFactory, services: ApplicationServices, backend: ApplicationBackend,
     prepare: AppUI['prepareChatSubmission'], navigate: (request: NavigationRequest) => Promise<void>): EditorFactory {
     return async (container, options) => {
+        if (prepare && !options.defaultPluginOptions?.['content:selection']) options = {...options,
+            defaultPluginOptions: {...options.defaultPluginOptions, 'content:selection': {run: createContentSelectionChat(services, backend, prepare, navigate,
+                options.target?.kind === 'session' ? {sessionId: options.target.sessionId} : undefined)}}};
         const target = options.target;
         const isSession = target?.kind === 'session';
         if (!prepare || !target || !isSession && (target.kind !== 'file' || options.contentFormat === 'text' || !/\.(md|mdx|markdown)$/i.test(target.path))) return factory(container, options);
@@ -149,6 +152,34 @@ export function createDocumentChatFactory(factory: EditorFactory, services: Appl
         return editor;
     };
 }
+/** Every explicit selection opens a new Session; retries inspect the same frozen operation. */
+export function createContentSelectionChat(services: ApplicationServices, backend: ApplicationBackend,
+    prepare: NonNullable<AppUI['prepareChatSubmission']>, navigate: (request: NavigationRequest) => Promise<void>, association?: Association) {
+    const operations = new WeakMap<ContentSelection, Pending & {operationId: string}>();
+    return async (selection: ContentSelection, signal: AbortSignal): Promise<void> => {
+        let operation = operations.get(selection);
+        if (!operation) {operation = {sessionId: randomUUID(), branchName: 'main', documentPath: 'selection', operationId: randomUUID()}; operations.set(selection, operation);}
+        const started = Date.now(); let stage = 'selection.targets';
+        try {
+            signal.throwIfAborted();
+            if (!operation.request) {
+                const catalog = await services.commandBus.execute<RootTargetCatalog>(SessionCommand.ListTargets);
+                const preferred = await preferredTarget(catalog, services, association?.sessionId);
+                const choice = catalog.entries.find(item => JSON.stringify(item.target) === preferred?.id);
+                if (!choice) throw failure('CALL_TARGET_UNAVAILABLE', t('callable.catalog.unavailable'));
+                trace(operation.operationId, stage, started); stage = 'selection.prepare';
+                const input: AiChatSubmitRequest = {operationId: operation.operationId, prompt: selection.text,
+                    target: {id: JSON.stringify(choice.target), kind: choice.target.kind, label: choice.name}, attachments: [], source: {defaultPrompt: ''}, signal};
+                operation.request = await prepareRequest(input, operation, association, {}, services, backend, prepare);
+                trace(operation.operationId, stage, started);
+            }
+            signal.throwIfAborted(); stage = 'selection.admission'; await admit(operation.request, services, backend);
+            trace(operation.operationId, stage, started);
+            if (!signal.aborted) {stage = 'selection.navigate'; await navigate({target: 'chat', resourceId: sessionRoute(operation.sessionId, operation.branchName)}); trace(operation.operationId, stage, started);}
+        } catch (error) {trace(operation.operationId, stage, started, error); throw error;}
+    };
+}
+
 async function preferredTarget(catalog: RootTargetCatalog, services: ApplicationServices, sessionId?: string, branch?: string) {
     let selected: {kind: 'agent' | 'flow'; id: string} | undefined;
     if (sessionId) {

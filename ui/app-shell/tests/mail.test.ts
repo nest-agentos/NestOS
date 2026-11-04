@@ -5,13 +5,10 @@ import {bindApplicationBackend, restrictApplicationFiles} from '@nestos/app-core
 import type {LocalApplicationServices} from '@nestos/app-contracts/services';
 import {RpcPeer} from '@nestos/app-transport/rpc';
 import {CAPABILITIES} from '@nestos/app-transport/application';
+import {ContentReader} from '@nestos/mdxeditor';
 import {createMailModule} from '../src/mail';
-const createEditor = vi.hoisted(() => vi.fn(async (container: HTMLElement, options: {initialContent: string}) => {
-    container.textContent = options.initialContent; return {destroy: async () => {}, getText: () => options.initialContent};
-}));
-vi.mock('@nestos/mdxeditor', () => ({createMDxEditor: createEditor}));
 const cleanup: Array<() => Promise<unknown>> = [];
-afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren(); vi.restoreAllMocks(); createEditor.mockClear();});
+afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren(); vi.restoreAllMocks();});
 it('exposes a scoped mail client through real RPC and keeps list responses free of bodies', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); cleanup.push(() => manager.dispose());
     const files = await manager.openFileSystem('/home/admin/emails');
@@ -29,9 +26,12 @@ it('exposes a scoped mail client through real RPC and keeps list responses free 
     await remote.refreshMail(); expect(calls.slice(0, 3)).toEqual(['query', 'query', 'query']); expect(errors).not.toHaveBeenCalled();
     const sidebar = document.createElement('aside'), editor = document.createElement('main'); document.body.append(sidebar, editor);
     const module = createMailModule({client: remote, sidebar, editor, selected: () => {}, scanners: async () => {}}); cleanup.push(() => module.dispose());
-    await module.workbench.start(); expect(createEditor).not.toHaveBeenCalled();
+    const reader = vi.spyOn(ContentReader.prototype, 'setText');
+    await module.workbench.start(); expect(reader).not.toHaveBeenCalled();
     await module.workbench.openResource('/test.email');
-    expect(createEditor).toHaveBeenCalledWith(expect.any(HTMLElement), expect.objectContaining({readOnly: true, contentFormat: 'text', htmlPolicy: 'literal', scrollMode: 'host'}));
+    expect(reader).toHaveBeenCalledWith('private-body');
+    expect(editor.querySelector('.mdx-content-reader--text')).not.toBeNull();
+    expect(editor.querySelector('.mdx-content-view__actions button')).not.toBeNull();
     expect(editor.textContent).toContain('private-body');
 });
 it('shares an index across view leases and keeps other leases usable after one closes', async () => {

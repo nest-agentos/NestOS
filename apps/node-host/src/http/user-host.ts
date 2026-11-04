@@ -1,3 +1,4 @@
+import {traceHostCleanup} from '../runtime/host-cleanup';
 import type {IncomingMessage, ServerResponse} from 'node:http';
 import type {TLSSocket} from 'node:tls';
 import path from 'node:path';
@@ -5,7 +6,7 @@ import {randomUUID} from 'node:crypto';
 import {FSError} from '@nestos/vfs-core';
 import {AuditLog, type AuditPort} from '../logging/audit-log';
 import {acquireHostLock} from '../storage/host-lock';
-import {closeHostResources, type HostCleanup} from '../runtime/host-runtime';
+import {closeHostResources, namedCleanup, type HostCleanup} from '../runtime/host-runtime';
 import {createHttpServer} from './http-server';
 import type {HttpHostOptions} from './start-host';
 import {openUserApplication, privateDirectory, userAudit, userErrorCode, validateUserHostPaths} from './user-application';
@@ -36,10 +37,18 @@ export class UserApplications {
             await this.options.certificates.identity?.(request.socket as TLSSocket) === userId);
     }
     endStreams(): void {for (const value of this.users.values()) void value.then(user => user.application.endStreams()).catch(() => {});}
-    async close(): Promise<void> {
+    private quiescing?: Promise<void>;
+    quiesce(): Promise<void> {
         this.closed = true;
-        const ready = await Promise.allSettled(this.users.values());
-        this.users.clear();
+        return this.quiescing ??= (async () => {
+            const acknowledgements = await Promise.allSettled([...this.users.values()].map(async (ready, index) => traceHostCleanup(`user-${index + 1}.quiesce`, () => ready.then(user => user.quiesce()))));
+            const failures = acknowledgements.flatMap(row => row.status === 'rejected' ? [row.reason] : []);
+            if (failures.length) throw new AggregateError(failures, 'USER_QUIESCE_FAILED');
+        })();
+    }
+    async close(): Promise<void> {
+        await this.quiesce();
+        const ready = await Promise.allSettled(this.users.values()); this.users.clear();
         await closeHostResources(ready.flatMap(value => value.status === 'fulfilled' ? [value.value.close] : []));
     }
 }
@@ -48,24 +57,32 @@ export async function startUserHost(options: HttpHostOptions) {
     if (!options.certificates.identity || !options.certificates.users) throw new Error('Multi-user hosting requires certificate-to-user enrollment');
     const cleanup: HostCleanup = [], audit = new AuditLog(options.auditFile), operationId = randomUUID(), started = Date.now();
     try {
-        await audit.initialize(); cleanup.push(() => audit.close());
+        await audit.initialize(); cleanup.push(namedCleanup('audit.close', () => audit.close()));
         await validateUserHostPaths(options);
         await privateDirectory(path.join(options.root, '_meta'));
-        cleanup.push(await acquireHostLock(path.join(options.root, '_meta')));
-        const users = new UserApplications(options, audit); cleanup.push(() => users.close());
+        cleanup.push(namedCleanup('storage.host-lock.release', await acquireHostLock(path.join(options.root, '_meta'))));
+        const users = new UserApplications(options, audit); cleanup.push(namedCleanup('users.close', () => users.close()));
         // Seed shared definitions before opening any read-only consumer; recover all enrolled users before listen.
         const enrolled = await options.certificates.users();
         if (!enrolled.includes('admin')) throw new FSError('EINVAL', 'Multi-user hosting requires an enrolled admin certificate');
-        await users.get('admin');
-        for (const userId of enrolled.filter(id => id !== 'admin')) await users.get(userId);
+        if (!options.signal?.aborted) await users.get('admin');
+        for (const userId of enrolled.filter(id => id !== 'admin')) {
+            if (options.signal?.aborted) break;
+            await users.get(userId);
+        }
         const server = createHttpServer({certificates: options.certificates, staticDir: options.staticDir, audit, application: users, multiUser: true,
             userAudit: id => userAudit(audit, id), build: {mode: options.logMode ?? 'standalone', version: process.env.NESTOS_HTTPD_VERSION}});
-        cleanup.push(async () => {users.endStreams(); await stopUserServer(server);});
+        let serverClosing: Promise<void> | undefined;
+        const stopServer = () => serverClosing ??= (async () => {users.endStreams(); await stopUserServer(server);})();
+        cleanup.push(namedCleanup('server.close', stopServer));
         await listenUserServer(server, options);
         audit.write({event: 'server.started', operationId, stage: 'listen', result: 'success', count: enrolled.length, durationMs: Date.now() - started});
         console.log(`NestOS HTTPS UI: https://${options.host}:${(server.address() as {port: number}).port}\nClient certificate required; multi-user hosting enabled\nAudit log: ${options.auditFile}`);
         let closing: Promise<void> | undefined;
-        return {server, close: () => closing ??= closeHostResources(cleanup)};
+        return {server, close: () => closing ??= (async () => {
+            await Promise.all([stopServer(), users.quiesce()]);
+            await closeHostResources(cleanup);
+        })()};
     } catch (error) {
         audit.write({event: 'server.start.failed', operationId, stage: 'startup', result: 'failure', code: userErrorCode(error, 'HTTP_START_FAILED'), durationMs: Date.now() - started});
         try {await closeHostResources(cleanup);} catch { /* Preserve the startup error. */ }

@@ -7,7 +7,7 @@ import {chatOcrPort} from './ocr-port';
 
 import {CHAT_SLOT_CLASSES} from '@nestos/llm-ui';
 import {presentHostControl} from '../independent/button-presentation';
-import {messageMarkdown} from '../independent/message-markdown';
+import {contentSelectionAction, messageMarkdown} from '../independent/message-markdown';
 import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, escapeHTML, getLocale, t} from '@nestos/common';
 import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventCallback, type EditorEventMap} from '@nestos/ui-common-adapter';
 import type {ChatView, OperationReceipt} from '@nestos/llm-ui';
@@ -90,7 +90,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
             view.configureInput({selection: {...draft.selection, imageResize: JSON.stringify(resize)}}, draft.revision);});
         const ocr = chatOcrPort(this.ocrControls, (ref, signal) => images.read(ref, {signal}));
         return {promptHistoryPages: 3, images, ocr,
-             messageActions: ({message}) => this.historyBranches?.actions(message.id) ?? [], locale: getLocale(), initialDraft: this.store.draft, markdown: messageMarkdown(this.options),
+             messageActions: ({message}) => this.historyBranches?.actions(message.id) ?? [], locale: getLocale(), initialDraft: this.store.draft, onContentSelection: contentSelectionAction(this.options), markdown: messageMarkdown(this.options),
             upload: this.options.readOnly ? undefined : this.store.upload.bind(this.store),
             assets: {read: async id => (await this.store.read({id, name: id}, {signal: this.lifetime.signal})).arrayBuffer()},
             saveDraft: draft => this.suspended || this.options.readOnly ? Promise.resolve() : this.store.saveDraft(draft),

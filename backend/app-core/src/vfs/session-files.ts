@@ -1,3 +1,4 @@
+import type {SessionFilesChange} from '@nestos/app-contracts/services';
 import type { FileSystemSourceOwner } from '@nestos/vfs-core';
 import { createUnavailableDirectory } from './unavailable-directory';
 import { createFileSystemView, normalizeVirtualPath, FSError, type FileSystemContextOwner, type FileSystemMount, type FileSystemView, type IFileSystem } from '@nestos/vfs-core';
@@ -23,7 +24,7 @@ export class SessionFilesService {
     workspaceComposer?: (id: string, mount: FileSystemMount) => Promise<FileSystemSourceOwner | undefined>;
     workspaceProvider?: (id: string, mount: SessionMountRecord) => Promise<FileSystemSourceOwner | undefined>;
     invalidate(id: string): Promise<void> {
-        return this.serial(id, async () => { await this.revokeSessionViews(id); this.notify(); });
+        return this.serial(id, async () => { await this.revokeSessionViews(id); this.notify({sessionId: id}); });
     }
     private readonly sources = new Map<string, IFileSystem>();
     private readonly unavailable = new Map<string, ReturnType<typeof createUnavailableDirectory>>();
@@ -33,10 +34,10 @@ export class SessionFilesService {
     private readonly tails = new Map<string, Promise<unknown>>();
     private recordsPath(id: string) { this.key(id); return `/var/lib/sessions/${id}/session.seq`; }
     private closed = false;
-    private readonly listeners = new Set<() => void>();
-    private readonly sourceSubscriptions: Array<() => void> = [];
-    subscribe(listener: () => void): () => void { this.assertOpen(); this.listeners.add(listener); return () => this.listeners.delete(listener); }
-    private notify(): void { for (const listener of this.listeners) listener(); }
+    private readonly listeners = new Set<(change: SessionFilesChange) => void>();
+    /** Namespace and source availability changes only; content is observed through the acquired filesystem. */
+    subscribe(listener: (change: SessionFilesChange) => void): () => void { this.assertOpen(); this.listeners.add(listener); return () => this.listeners.delete(listener); }
+    private notify(change: SessionFilesChange): void { for (const listener of this.listeners) listener(change); }
 
 
     constructor(private readonly store: IFileSystem,
@@ -63,8 +64,7 @@ export class SessionFilesService {
             this.views.delete(sessionId);
             if (view) void view.dispose().catch(() => {});
         }
-        this.notify();
-        if (source.onAny) this.sourceSubscriptions.push(source.onAny(() => this.notify()));
+        this.notify({sourceId: id});
     }
 
     async inspect(sessionId: string): Promise<FilesRecord | null> {
@@ -92,7 +92,7 @@ export class SessionFilesService {
                 await this.revokeSessionViews(sessionId);
                 await this.save(sessionId, next, { ...next, state: 'draining' });
                 this.views.set(sessionId, prepared);
-                this.notify();
+                this.notify({sessionId});
                 return next;
             } catch (error) { await prepared.dispose(); throw error; }
         });
@@ -108,7 +108,7 @@ export class SessionFilesService {
             await this.save(sessionId, draining, old);
             await this.revokeSessionViews(sessionId);
             await this.save(sessionId, next, draining);
-            this.notify();
+            this.notify({sessionId});
             return next;
         });
     }
@@ -176,7 +176,7 @@ export class SessionFilesService {
 
     async dispose(): Promise<void> {
         this.closed = true;
-        this.listeners.clear(); this.sourceSubscriptions.splice(0).forEach(off => off());
+        this.listeners.clear();
         await Promise.allSettled([...this.tails.values()]);
         await Promise.all([...new Set([...this.workspaceViews.keys(), ...this.views.keys()])].map(id => this.revokeSessionViews(id)));
         await Promise.all([...this.unavailable.values()].map(async source => (await source).dispose())); this.unavailable.clear();

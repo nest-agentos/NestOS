@@ -59,7 +59,7 @@ import { installMobileViewport } from './navigation/mobile-viewport';
 import { installMobileShellState } from './navigation/mobile-shell-state';
 
 import { AppOptions, AppHandle, WorkspaceConfig } from './types';
-import {createDocumentChatFactory} from './browser/document-chat';
+import {createContentSelectionChat, createDocumentChatFactory} from './browser/document-chat';
 import { lazyMdxEditorFactory as baseEditorFactory } from './browser/lazy-mdx';
 import { FILE_REGISTRY, EditorTypeKey } from './config/file-registry';
 import { themeService, ThemeMode } from './ThemeService';
@@ -331,6 +331,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
 
         if (strategyType === 'mail') {
             const module = createMailModule({client: await backend.mailView(),
+                onContentSelection: options.ui.prepareChatSubmission ? createContentSelectionChat(services, backend, options.ui.prepareChatSubmission, handleNavigationRequest) : undefined,
                 sidebar: sidebarEl, editor: editorEl, selected: path => selectionHistory(elementId, path, 'push'),
                 scanners: () => handleNavigationRequest({target: 'twin', resourceId: '/sources'})});
             own(module.dispose); await module.workbench.start(); managerCache.set(elementId, module.workbench);

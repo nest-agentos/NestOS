@@ -16,6 +16,8 @@ export interface SessionRecovery {
     /** Lease for structural writes (create/delete/move); waits out the boot sweep of that Session. */
     acquireMetadataLease(sessionId: string): Promise<boolean>;
     startBackground(): void;
+    stopBackground(): void;
+    quiesce(): Promise<void>;
     release(): Promise<void>;
 }
 
@@ -28,6 +30,9 @@ class LeasedRecovery implements SessionRecovery {
     private sweep?: Promise<void>;
     private swept?: Set<string>;
     private released = false;
+    private stopping = false;
+    private backgroundStopped = false;
+    private quiescing?: Promise<void>;
     private scanning?: Promise<void>;
     private readonly acquisitions = new Map<string, Promise<boolean>>();
     constructor(private kernel: RecoveryKernel, private store: SessionLeaseStore, private owner: Owner,
@@ -57,25 +62,25 @@ class LeasedRecovery implements SessionRecovery {
 
     /** Online recovery is per Session and respects Task/Effect leases in other active Sessions. */
     startBackground(): void {
-        if (this.scanning || this.released) return;
+        if (this.scanning || this.released || this.stopping || this.backgroundStopped) return;
         this.scanning = this.scanOnline();
         void this.scanning.catch(error => console.warn('[Lease] Background scan failed; Sessions recover on access', error));
     }
     private async scanOnline(): Promise<void> {
         const ids: string[] = [];
         for await (const session of this.kernel.listSessions()) {
-            if (this.released) return;
+            if (this.released || this.stopping || this.backgroundStopped) return;
             if (!this.excluded.has(session.id)) ids.push(session.id);
         }
         await mapConcurrent(ids, 2, async id => {
-            if (this.released) return;
+            if (this.released || this.stopping || this.backgroundStopped) return;
             try { await this.acquireLater(id); }
             catch (error) { console.warn(`[Lease] Background recovery failed for ${id}`, error); }
         });
     }
     private async ensureReconciliationLeases(ids: string[]): Promise<void> {
         for (const id of ids) {
-            if (this.released || this.excluded.has(id) || !(await this.renew(id) || await this.acquire(id)))
+            if (this.released || this.stopping || this.excluded.has(id) || !(await this.renew(id) || await this.acquire(id)))
                 throw new Error(`Session is owned by another host: ${id}`);
         }
     }
@@ -110,16 +115,16 @@ class LeasedRecovery implements SessionRecovery {
     }
 
     async acquireMetadataLease(id: string): Promise<boolean> {
-        if (this.released) return false;
+        if (this.released || this.stopping) return false;
         // Structural writes must not race the sweep; a failed sweep still leaves the lease gate.
         await this.settleSweep(id).catch(() => {});
         if (this.pending.has(id)) await this.pending.get(id);
-        if (this.released || this.excluded.has(id)) return false;
+        if (this.released || this.stopping || this.excluded.has(id)) return false;
         return await this.renew(id) || await this.acquire(id);
     }
 
     acquireLater(id: string): Promise<boolean> {
-        if (this.released || this.excluded.has(id)) return Promise.resolve(false);
+        if (this.released || this.stopping || this.excluded.has(id)) return Promise.resolve(false);
         const current = this.pending.get(id);
         if (current) return current;
         const work = this.prepare(id);
@@ -132,26 +137,27 @@ class LeasedRecovery implements SessionRecovery {
         // Captured before any await: a write that arrives while the sweep is pending must observe
         // that sweep's outcome, even when it settles during the lease renewal below.
         const sweep = this.sweep;
-        if (await this.renew(id) && this.ready.has(id)) return !this.released;
-        if (this.released) return false;
+        if (await this.renew(id) && this.ready.has(id)) return !this.released && !this.stopping;
+        if (this.released || this.stopping) return false;
         // A Session leased at boot is recovered by the sweep; waiting here keeps its writes
         // refused until recovery finishes, and surfaces a sweep failure to the writer. A failed
         // or unfruitful sweep falls through to online recovery of this Session alone.
         if (sweep && !this.ready.has(id) && this.swept?.has(id)) {
             await sweep;
-            if (this.ready.has(id)) return !this.released;
+            if (this.ready.has(id)) return !this.released && !this.stopping;
         }
         if (!await this.renew(id) && !await this.acquire(id)) return false;
         try {
             await this.beforeRecover?.(id, ids => this.ensureReconciliationLeases(ids));
-            if (this.released) return false;
+            if (this.released || this.stopping) return false;
             // Online recovery respects existing Task/Effect leases; it never fences work in other Sessions.
             await this.kernel.recoverSession(id);
-            if (this.released || !await this.renew(id)) return false;
+            if (this.released || this.stopping || !await this.renew(id)) return false;
             this.ready.add(id);
             return true;
         } catch (error) {
             this.ready.delete(id);
+            if (this.stopping) return false;
             const lease = this.leases.get(id);
             this.leases.delete(id);
             if (lease) await this.store.release(lease);
@@ -207,8 +213,16 @@ class LeasedRecovery implements SessionRecovery {
         }
     }
 
+    stopBackground(): void {this.backgroundStopped = true;}
+    quiesce(): Promise<void> {
+        this.stopBackground(); this.stopping = true;
+        return this.quiescing ??= Promise.allSettled([...(this.scanning ? [this.scanning] : []), ...(this.sweep ? [this.sweep] : []),
+            ...this.pending.values(), ...this.acquisitions.values()]).then(() => {});
+    }
+
     async release(): Promise<void> {
         if (this.released) return;
+        await this.quiesce();
         this.released = true;
         clearInterval(this.heartbeat);
         // The sweep must finish before its leases are released; a failed sweep was reported to

@@ -15,7 +15,7 @@ import {SessionHistoryActions} from '../independent/session-history-actions';
 import {CHAT_SLOT_CLASSES} from '@nestos/llm-ui';
 import {SessionRunsPanel} from '../flows/SessionRunsPanel';
 import {presentHostControl} from '../independent/button-presentation';
-import {messageMarkdown} from '../independent/message-markdown';
+import {contentSelectionAction, messageMarkdown} from '../independent/message-markdown';
 import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, escapeHTML, getLocale, randomUUID, t} from '@nestos/common';
 import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventMap, type EditorEventCallback} from '@nestos/ui-common-adapter';
 import type {ChatView, ChatSubmission, ComposerDraft} from '@nestos/llm-ui';
@@ -199,7 +199,7 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
         const ocr = chatOcrPort(this.config.ocr, (ref, signal) => images.read(ref, {signal}));
         return {images, inputPresentation: 'host', attachmentMenu: chatAttachmentMenu(true), plugins: workspaceInputPlugins(this.config.commandBus, {navigation: 'projects', sessionId: this.config.sessionId},
             () => this.view?.getDraft().target?.id ?? 'default', this.config.sessionManager.promptHistory), ocr, setActive: active => {history?.setActive(active); taskPanel?.setActive(active); if (active) void inputCommands?.restore().catch(error => this.fail(error));},
-            release: () => disposeEditorResources([releaseUsage, () => history?.destroy(), () => inputCommands?.destroy(), () => taskPanel?.destroy()]),messageActions: context => history?.messageActions(context) ?? [], locale: getLocale(), initialDraft: draft, markdown: messageMarkdown(this.config, id => this.messageAnchor(id)),
+            release: () => disposeEditorResources([releaseUsage, () => history?.destroy(), () => inputCommands?.destroy(), () => taskPanel?.destroy()]),messageActions: context => history?.messageActions(context) ?? [], locale: getLocale(), initialDraft: draft, onContentSelection: contentSelectionAction(this.config), markdown: messageMarkdown(this.config, id => this.messageAnchor(id)),
             assets: createAssetProvider(undefined, undefined, this.config.assets), upload: this.config.assets ? store.upload.bind(store) : undefined,
             saveDraft: value => this.save(store, value), onDraftChange: value => {this.emit('interactiveChange', undefined); const next = JSON.stringify([value.target, value.selection]);
                 if (next !== inputSignature) {inputSignature = next; for (const listener of this.inputListeners) listener();}},

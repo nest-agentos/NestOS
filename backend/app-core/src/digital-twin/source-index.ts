@@ -13,14 +13,15 @@ export class TwinSourceIndex {
     private syncing?: Promise<void>;
     private resync = false;
     private errors: string[] = [];
-    constructor(private readonly records: TwinRecords, private readonly sources: TwinSources) {}
+    constructor(private readonly records: TwinRecords, private readonly sources: TwinSources, private readonly active: () => boolean = () => true) {}
     status() { return { errors: this.errors }; }
     sync(): Promise<void> {
+        if (!this.active()) return Promise.resolve();
         if (this.syncing) { this.resync = true; return this.syncing; }
         return this.syncing = this.drain().finally(() => { this.syncing = undefined; });
     }
     private async drain(): Promise<void> {
-        do { this.resync = false; await retry(() => this.update()); } while (this.resync);
+        do { this.resync = false; await retry(() => this.update()); } while (this.resync && this.active());
     }
     async preview(rules: import('./scan-rules').TwinScanRules) {
         if (!this.sources.reader.discover) throw new Error('TWIN_PROJECT_CATALOG_UNAVAILABLE');
@@ -30,17 +31,19 @@ export class TwinSourceIndex {
         return { resources: catalog.resources.filter(allowed), excluded: catalog.resources.filter(resource => !allowed(resource)), errors: catalog.errors };
     }
     private async update(): Promise<void> {
-        const catalog = this.sources.reader.discover ? await this.sources.reader.discover() : null;
-        if (!catalog) return;
+        if (!this.active() || !this.sources.reader.discover) return;
+        const [allPlans, existing] = await Promise.all([this.records.list<TwinScanPlan>('scan-plan'), this.records.list<TwinSourceData>('source')]);
+        const plans = allPlans.filter(plan => plan.data.rules && plan.data.mode !== 'collect');
+        if (!this.active() || (!plans.length && !existing.some(source => source.data.managed))) return;
+        const catalog = await this.sources.reader.discover(); if (!this.active()) return;
         this.errors = catalog.errors;
-        const plans = (await this.records.list<TwinScanPlan>('scan-plan')).filter(plan => plan.data.rules && plan.data.mode !== 'collect');
-        if (!this.sources.reader.discover || (!plans.length && !(await this.records.list<TwinSourceData>('source')).some(source => source.data.managed))) return;
         const settings = (await this.records.get<TwinSettings>('settings', 'pot'))!.data;
         const fingerprint = settings.connectionId ? await this.sources.fingerprint(settings.connectionId).catch(() => {
             this.errors.push('TWIN_CONNECTION_UNAVAILABLE'); return '';
         }) : '';
-        const existing = await this.records.list<TwinSourceData>('source'), byId = new Map(existing.map(source => [source.id, source])), seen = new Set<string>();
+        const byId = new Map(existing.map(source => [source.id, source])), seen = new Set<string>();
         for (const resource of catalog.resources) {
+            if (!this.active()) return;
             const id = resourceId(resource); if (seen.has(id)) continue; seen.add(id);
             const enabled = Boolean(fingerprint) && plans.some(plan => plan.data.enabled && matchesRules(resource, plan.data.rules!))
                 && !(settings.globalExclude ?? []).some(line => matchesLine(resource, line));
@@ -52,7 +55,10 @@ export class TwinSourceIndex {
                 && !(settings.globalExclude ?? []).some(line => matchesLine(resource, line)));
             if (enabled || current) await this.upsert(id, resource, enabled, retained, settings.connectionId ?? '', fingerprint, current);
         }
-        for (const source of existing.filter(item => item.data.managed && !seen.has(item.id))) await this.missing(source, catalog);
+        for (const source of existing.filter(item => item.data.managed && !seen.has(item.id))) {
+            if (!this.active()) return;
+            await this.missing(source, catalog);
+        }
     }
     private async upsert(id: string, resource: TwinDiscoveredSource, enabled: boolean, retained: boolean, connectionId: string, fingerprint: string, current?: TwinDataRecord<TwinSourceData>) {
         const spec = { kind: resource.kind, target: resource.target, label: resource.label };
@@ -61,7 +67,7 @@ export class TwinSourceIndex {
                 nativeIdentity: '', hash: '', analyzedHash: '', offset: 0, checkedAt: 0, status: 'inaccessible', characters: 0 };
         if (current && current.data.connectionFingerprint !== fingerprint) { data.offset = 0; data.analyzedHash = ''; }
         if (!current || JSON.stringify(data) !== JSON.stringify(current.data)) await this.records.save('source', id, data, current?.revision ?? null);
-        if (enabled) await this.sources.checkOne(id, true);
+        if (enabled && this.active()) await this.sources.checkOne(id, true);
     }
     private async missing(source: TwinDataRecord<TwinSourceData>, catalog: TwinSourceCatalog) {
         const resource = source.data.resource!;

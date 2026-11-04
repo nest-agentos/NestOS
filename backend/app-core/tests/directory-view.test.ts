@@ -8,7 +8,7 @@ function fixture() {
         type: 'directory', version: 1, createdAt: 0, modifiedAt: 0, tags: [], metadata});
     const root = node('/folder:Work'), files = node(root.path + '/@files'), conversation = node(root.path + '/@conversations');
     const recent = node(root.path + '/@recent-conversations', {navigationTransparent: true, directoryPath: conversation.path});
-    const session = {...node(conversation.path + '/session'), type: 'file' as const, size: 0};
+    const session = {...node(conversation.path + '/session'), type: 'file' as const, size: 0, metadata: {navigationTarget: root.path + '/session'}};
     const values = new Map([root, files, recent, conversation, session].map(value => [value.path, value]));
     const children = new Map([[root.path, [files, recent, node('/hidden', {navigationHidden: true})]], [conversation.path, [session]]]);
     const getNode = vi.fn(async (path: string) => values.get(path) ?? null), getChildren = vi.fn(async (path: string) => children.get(path) ?? []);
@@ -24,9 +24,12 @@ it('prepares the flattened directory and project once while keeping ordinary dir
     expect(view.project).toEqual(f.project); expect(view.navigation?.project).toBeUndefined();
     expect(f.navigation).toHaveBeenCalledOnce(); expect(f.navigation).toHaveBeenCalledWith({path: f.root.path, projectId: null});
     expect(f.getChildren.mock.calls.map(([path]) => path)).toEqual([f.root.path, f.conversation.path]);
-    expect(view.directories).toHaveLength(2); expect(view.directories.every(row => !row.stale && row.revision === 7)).toBe(true);
+    expect(view.directories).toHaveLength(3); expect(view.directories.every(row => !row.stale && row.revision === 7)).toBe(true);
     const group = view.directories.find(row => row.path === f.conversation.path)!;
     expect(group.nodes).toBeUndefined(); expect(group.entryIndices).toEqual([1]);
+    const recent = view.directories.find(row => row.path.endsWith('/@recent-conversations'))!;
+    expect(recent.nodes).toHaveLength(1);
+    expect(recent.nodes![0].metadata.navigationTarget).toBe('/folder:Work/session');
 });
 it('marks prepared metadata stale if its source changes during the read', async () => {
     const f = fixture(), original = f.getChildren.getMockImplementation()!;

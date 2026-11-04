@@ -34,7 +34,13 @@ async function removeBoard(options: Options, id: string, request: KanbanDeletion
     await journal.update<Receipt>(key, old => ({...old!, phase: 'deleted'}));
 }
 async function cleanupResources({service}: Options, id: string, request: KanbanDeletionRequest, preview: KanbanDeletionPreview): Promise<void> {
-    for (const {itemId, resource} of preview.resources) if (resource.canCleanup) {
+    const groups = new Map<string, KanbanDeletionPreview['resources']>();
+    for (const row of preview.resources) {
+        const key = JSON.stringify([row.resource.kind, row.resource.id, row.resource.location]);
+        const group = groups.get(key) ?? []; group.push(row); groups.set(key, group);
+    }
+    for (const group of groups.values()) if (group.every(row => row.resource.canCleanup)) {
+        const {itemId, resource} = group[0];
         requireValue(service.cleanupWorkResource, 'WORK_RESOURCE_CLEANUP_UNAVAILABLE');
         await traced(id, request.operationId, 'cleanup', () => service.cleanupWorkResource!(id, {itemId, resourceId: resource.id, version: resource.version,
             operationId: sha256HexSync(JSON.stringify([request.operationId, resource.id]))}));
@@ -50,7 +56,22 @@ async function traced<T>(boardId: string, operationId: string, stage: string, ru
 export function withBoardDeletion<T extends KanbanClient & {quiesce?(): Promise<void>; dispose?(): Promise<void>}>(service: T, deletion: ReturnType<typeof createBoardDeletion>): T & Pick<typeof deletion, 'previewDeletion' | 'deleteBoard'> {
     let barrier: Promise<unknown> = Promise.resolve(), stopping = false;
     const pending = new Set<Promise<unknown>>();
-    const close = async (method: 'quiesce' | 'dispose') => {stopping = true; await barrier; await Promise.allSettled([...pending]); await service[method]?.();};
+    let quiescing: Promise<void> | undefined, disposing: Promise<void> | undefined;
+    const quiesce = () => {
+        stopping = true;
+        if (!quiescing) {
+            // Broadcast immediately, including while an exclusive operation is finishing.
+            const acknowledgements = Promise.allSettled([service.quiesce?.() ?? Promise.resolve(), ...pending]);
+            quiescing = (async () => {
+                await barrier;
+                const [ack] = await acknowledgements;
+                if (ack.status === 'rejected') throw ack.reason;
+            })();
+        }
+        return quiescing;
+    };
+    const close = (method: 'quiesce' | 'dispose') => method === 'quiesce' ? quiesce()
+        : disposing ??= quiesce().then(() => service.dispose?.());
     const admit = <R>(run: () => Promise<R>): Promise<R> => {
         if (stopping) return Promise.reject(new KanbanError('SERVICE_STOPPING'));
         const next = barrier.then(run); pending.add(next); void next.finally(() => pending.delete(next)).catch(() => {}); return next;

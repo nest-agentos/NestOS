@@ -85,3 +85,43 @@ it('keeps new fix and reply ports inside the existing deletion admission boundar
     await expect(api.replyTask('b', {itemId: 't', attemptId: 'attempt', replyTo: 'question', content: 'reply', operationId: 'reply'})).rejects.toMatchObject({code: 'BOARD_DELETED'});
     expect(fixTask).not.toHaveBeenCalled(); expect(replyTask).not.toHaveBeenCalled();
 });
+it('returns display names and queries the item catalog only once per preview', async () => {
+    const f = await fixture(), query = vi.spyOn(f.service, 'query');
+    const preview = await f.api.previewDeletion('b');
+    expect(preview.itemTitles).toEqual({t: 'Task'}); expect(query).toHaveBeenCalledOnce();
+});
+it('cleans a shared resource once and only when every item association permits cleanup', async () => {
+    const f = await fixture(); f.resources.push(resource('shared', true));
+    await f.core.execute('b', {operationId: 'another', expectedRevision: 2, command: {type: 'create-item', item: {id: 'second', title: 'Second', responsibility: 'Work', acceptance: 'Done'}}});
+    expect((await f.api.previewDeletion('b')).resources).toHaveLength(2);
+    await f.api.deleteBoard('b', await f.request()); expect(f.cleanup).toHaveBeenCalledOnce();
+    const g = await fixture();
+    await g.core.execute('b', {operationId: 'another', expectedRevision: 2, command: {type: 'create-item', item: {id: 'second', title: 'Second', responsibility: 'Work', acceptance: 'Done'}}});
+    g.service.workResources = async (_board, item) => [resource('shared', item === 't')];
+    await g.api.deleteBoard('b', await g.request()); expect(g.cleanup).not.toHaveBeenCalled();
+});
+it('bounds parallel execution checks and drains in-flight reads after a failure', async () => {
+    const f = await fixture();
+    for (let index = 0; index < 7; index++) await f.core.execute('b', {operationId: 'add-' + index, expectedRevision: index + 2,
+        command: {type: 'create-item', item: {id: 't' + index, title: 'Task ' + index, responsibility: 'Work', acceptance: 'Done'}}});
+    let active = 0, peak = 0;
+    f.service.executionSession = async (_board, item) => {
+        active++; peak = Math.max(peak, active);
+        await new Promise(resolve => setTimeout(resolve, 5)); active--;
+        if (item === 't') throw Object.assign(new Error('PRIVATE_BODY'), {code: 'REMOTE_OFFLINE'});
+        return {history: [], sessions: []};
+    };
+    await expect(f.api.previewDeletion('b')).rejects.toMatchObject({code: 'REMOTE_OFFLINE'});
+    expect(peak).toBeGreaterThan(1); expect(peak).toBeLessThanOrEqual(4); expect(active).toBe(0);
+});
+it('signals an active scanner before waiting for its acknowledgement and never disposes it early', async () => {
+    const f = await fixture(); let release!: () => void, started!: () => void, settled = false;
+    const entered = new Promise<void>(resolve => {started = resolve;});
+    const scan = vi.fn(async () => {started(); await new Promise<void>(resolve => {release = resolve;}); settled = true;});
+    const quiesce = vi.fn(async () => {release();}), dispose = vi.fn(async () => {expect(settled).toBe(true);});
+    const api = withBoardDeletion({...f.service, scan, quiesce, dispose}, f.deletion);
+    const pending = api.scan(); await entered;
+    await api.quiesce(); await pending;
+    expect(quiesce).toHaveBeenCalledOnce(); expect(settled).toBe(true); expect(dispose).not.toHaveBeenCalled();
+    await api.dispose(); expect(dispose).toHaveBeenCalledOnce(); expect(quiesce).toHaveBeenCalledOnce();
+});

@@ -1,8 +1,8 @@
 import { CHAT_ICONS, harnessPresentation, t } from '@nestos/common';
-import { projectConversationsPath, projectConversationEntryPath, remoteSessionPath, type BrowserTarget } from '@nestos/app-contracts';
+import { projectConversationsPath, projectConversationEntryPath, remoteSessionPath, resolveBrowserTarget, type BrowserTarget } from '@nestos/app-contracts';
 import type { FSNode } from '@nestos/vfs-core';
 import type { RemoteSessionProjection } from '../session/remote-session-projection';
-import { localConversationSource, readConversationPage } from './conversation-page';
+import { readConversationPage, type ConversationSource } from './conversation-page';
 import { FSError } from '@nestos/vfs-core';
 
 function aliasNode(directory: string, node: FSNode): FSNode {
@@ -34,11 +34,27 @@ export function conversationNavigationNodes(folder: string): FSNode[] {
     return [conversationDirectoryNode(folder, true), {...full, metadata: {...full.metadata, navigationHidden: true}}];
 }
 
+/** Derive the sidebar window from an already requested full page, keeping canonical identities. */
+export function recentConversationPreview(folder: string, nodes: FSNode[]): FSNode[] {
+    const directory = projectConversationsPath(folder, {recent: true});
+    const sessions = nodes.filter(node => {
+        const target = resolveBrowserTarget(String(node.metadata.navigationTarget ?? node.path));
+        return target.kind === 'session' || target.kind === 'remote' && !!target.nativeSessionId;
+    });
+    const preview = sessions.slice(0, 15).map(node => aliasNode(directory,
+        {...node, path: String(node.metadata.navigationTarget ?? node.path)}));
+    for (const node of nodes.filter(node => node.metadata._disabled))
+        preview.push(aliasNode(directory, {...node, path: String(node.metadata.navigationTarget ?? node.path)}));
+    if (sessions.length > 15 || nodes.some(node => node.metadata.conversationMore))
+        preview.push(continuationNode(directory, {kind: 'project-conversations', folder, recent: true}, ''));
+    return preview;
+}
+
 export async function conversationDirectory(directory: string, target: Extract<BrowserTarget, {kind: 'project-conversations'}>,
-    local: Promise<FSNode[]>, remote: () => ReturnType<RemoteSessionProjection['timeline']>, agentId?: string): Promise<FSNode[]> {
-    const localNodes = await local, timeline = await remote();
+    local: ConversationSource[], remote: () => ReturnType<RemoteSessionProjection['timeline']>, agentId?: string): Promise<FSNode[]> {
+    const timeline = await remote();
     try {
-        const page = await readConversationPage([localConversationSource(localNodes), ...timeline.sources], filteredCursor(target.cursor, agentId), target.recent ? 15 : 50);
+        const page = await readConversationPage([...local, ...timeline.sources], filteredCursor(target.cursor, agentId), target.recent ? 15 : 50);
         const errors = page.errors.map(({source}) => unavailableNode(target.folder, source));
         const actions = target.recent ? [] : timeline.actions.filter(action => !action.path.endsWith('/@new'));
         const nodes = [...actions, ...page.nodes, ...errors].map(node => aliasNode(directory, node));

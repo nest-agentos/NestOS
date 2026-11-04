@@ -1,3 +1,4 @@
+import {traceHostCleanup, shutdownSignal} from '../runtime/host-cleanup';
 import { startHost } from './start-host';
 import { mkdir, realpath, access } from 'node:fs/promises';
 import path from 'node:path';
@@ -53,8 +54,10 @@ export async function runHttpHost(args = process.argv.slice(2), defaultStaticDir
     if (usersDir && (within(await canonicalPath(usersDir, cwd), canonicalCertificates) || within(await canonicalPath(usersDir, cwd), authDir)))
         throw new Error('Server certificates and legacy authorization must remain outside user bundles');
     const certificates = await loadCertificates(certDir, certificateClients), port = validPort(values.port);
-    const hosted = await startHost({ root: canonicalRoot, sidecar: canonicalSidecar, certificates, staticDir, auditFile, authDir, editorSwap, logMode, port, host: values.host, backlog, usersDir, authorizationRedirectUri });
-    installShutdown(hosted);
+    const controller = new AbortController();
+    const starting = startHost({ signal: controller.signal, root: canonicalRoot, sidecar: canonicalSidecar, certificates, staticDir, auditFile, authDir, editorSwap, logMode, port, host: values.host, backlog, usersDir, authorizationRedirectUri });
+    installShutdown(starting, controller);
+    await starting;
 }
 
 function protectPaths(root: string, sidecar: string, certificates: string, log: string): void {
@@ -75,12 +78,12 @@ function validBacklog(value: string): number {
     if (!Number.isInteger(backlog) || backlog < 1 || backlog > 2147483647) throw new Error('Expected backlog between 1 and 2147483647');
     return backlog;
 }
-function installShutdown(hosted: Awaited<ReturnType<typeof startHost>>): void {
+function installShutdown(starting: ReturnType<typeof startHost>, controller: AbortController): void {
     let stopping = false;
-    const stop = () => {
-        if (stopping) return; stopping = true;
-        void hosted.close().then(() => { process.exitCode = 0; }).catch(() => { process.exitCode = 1; });
+    const stop = (signal: string) => {
+        if (stopping) return; stopping = true; shutdownSignal(signal); controller.abort();
+        void traceHostCleanup('host.close', async () => {const hosted = await starting; await hosted.close();}).then(() => { process.exitCode = 0; }).catch(() => { process.exitCode = 1; });
     };
-    process.once('SIGINT', stop); process.once('SIGTERM', stop);
-    hosted.server.on('error', stop);
+    process.on('SIGINT', stop); process.on('SIGTERM', stop);
+    void starting.then(hosted => hosted.server.on('error', () => stop('SERVER_ERROR'))).catch(() => {});
 }

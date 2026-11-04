@@ -28,3 +28,16 @@ it('blocks symlink escapes, private metadata and traversal beneath the applicati
     await expect(storage.read('/../secret')).rejects.toMatchObject({ code: 'EINVAL' });
     await expect(storage.read('/_meta/private')).rejects.toMatchObject({ code: 'EINVAL' });
 });
+
+it('serves a read snapshot while another Node connection has an uncommitted write', async () => {
+    await backend.records.setRecordField('/a.seq', 'state', 'committed');
+    const writer = await NodeSqliteSidecarDb.open(path.join(directory, 'meta/index.db'));
+    await writer.begin();
+    try {
+        await writer.setRecordField('/a.seq', 'state', 'pending');
+        backend.resetSidecarStats();
+        expect(await backend.records.getRecordField('/a.seq', 'state')).toBe('committed');
+        expect(backend.sidecarStats.begin).toBe(0);
+        expect(backend.sidecarStats.readTransaction).toBe(1);
+    } finally {await writer.rollback(); await writer.close();}
+});

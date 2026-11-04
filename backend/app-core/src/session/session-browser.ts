@@ -69,7 +69,7 @@ export interface SessionBrowserDependencies {
     /** Optional host presentation policy. Raw project/Session file APIs are unaffected. */
     filterDisplayedFiles?(fs: IFileSystem, nodes: FSNode[], signal?: AbortSignal): Promise<FSNode[]>;
 }
-interface FileDirectoryOptions extends OperationOptions { fs?: IFileSystem; node?: FSNode }
+interface FileDirectoryOptions extends OperationOptions { fs?: IFileSystem; node?: FSNode; limit?: number }
 class BrowserBackend implements IStorageBackend {
     private agentFilter?: string;
     setSessionFilter(agentId?: string): void { this.agentFilter = agentId; this.invalidateNavigation(); }
@@ -208,7 +208,7 @@ class BrowserBackend implements IStorageBackend {
         return sessions.filter(item => (item.folder ?? null) === folder).map(item => {
             const node = this.sessionNode(item), root = roots.get(item.id)!;
             return { ...node, metadata: { ...node.metadata, familyRoot: root, familyCount: counts.get(root) ?? 1,
-                parentTitle: byId.get(item.parentSessionId ?? '')?.title ?? '' } };
+                parentTitle: byId.get(item.parentSessionId ?? '')?.title ?? item.parentTitle ?? '' } };
         });
     }
     private folderNode(folder: SessionFolder): FSNode {
@@ -348,25 +348,40 @@ class BrowserBackend implements IStorageBackend {
         const folders = await this.folders();
         const groups = [project.path, ...folders.filter(folder => folder.parentPath === project.path && folder.name === '@sessions').map(folder => folder.path)];
         const agentId = this.agentFilter;
-        const local = Promise.all(groups.map(async folder => {
-            const [, sessions] = await this.directoryNavigation(folder);
-            return this.sessionNodes(sessions, folder, agentId ?? null);
-        })).then(rows => rows.flat());
-        return conversationDirectory(path, target, local, () => this.remoteSessions.timeline(project, agentId), agentId);
+        const local = groups.map(folder => ({id: '@nestos:' + folder,
+            cursorAfter: (node: FSNode) => JSON.stringify([node.modifiedAt, browserName(node.path)]),
+            read: async (cursor?: string) => {
+                const page = await this.deps.repository.listSummaryPage(folder, {cursor, limit: target.recent ? 16 : 51, agentId});
+                return {nodes: this.sessionNodes(page.items, folder, agentId ?? null), nextCursor: page.nextCursor};
+            }}));
+        return conversationDirectory(path, target, local, () => this.remoteSessions.timeline(project, agentId, target.recent ? 16 : 51), agentId);
     }
     private async listFiles(path: string, target: FileTarget): Promise<FSNode[]> {
         return this.withFiles(target, fs => this.fileNodes(path, target, fs));
     }
-    private async fileNodes(path: string, target: FileTarget, fs: IFileSystem, options?: OperationOptions,
+    private async fileNodes(path: string, target: FileTarget, fs: IFileSystem, options?: OperationOptions & {limit?: number},
         projection = this.fileProjectionFor(target)): Promise<FSNode[]> {
         const prefix = filesBrowserPrefix(path);
-        const pending = [projection, fs.driver.getChildren(target.path, options)] as const;
+        const bounded = options?.limit !== undefined && (!this.deps.filterDisplayedFiles || this.deps.filterDisplayedFiles === filterDirectoryFiles);
+        const pending = [projection, bounded ? this.previewFileNodes(fs, target.path, options!, projection)
+            : fs.driver.getChildren(target.path, options)] as const;
         let state: FileProjection | undefined, raw: FSNode[];
         try { [state, raw] = await Promise.all(pending); } finally { await Promise.allSettled(pending); }
-        const visible = this.deps.filterDisplayedFiles ? await this.deps.filterDisplayedFiles(fs, raw, options?.signal) : raw;
+        const visible = this.deps.filterDisplayedFiles && !bounded ? await this.deps.filterDisplayedFiles(fs, raw, options?.signal) : raw;
         const nodes = await Promise.all(visible.filter(node => node.path !== '/workspace/.nestos' && !this.isOtherProjectRoot(node, state))
             .map(node => this.mapped(fs, node, prefix, state)));
         return nodes.map(node => this.withMountStatus(node, prefix, target, state));
+    }
+    private async previewFileNodes(fs: IFileSystem, path: string, options: OperationOptions & {limit?: number}, projection: Promise<FileProjection | undefined>): Promise<FSNode[]> {
+        const limit = options.limit!;
+        const entries = await fs.driver.getChildren(path, {...options, fields: 'entry'});
+        const lightweight = entries.map(entry => ({...entry, parentPath: path, createdAt: 0, version: 1, tags: [], metadata: {}} as FSNode));
+        const visible = this.deps.filterDisplayedFiles ? await this.deps.filterDisplayedFiles(fs, lightweight, options.signal) : lightweight;
+        const state = await projection;
+        const selected = visible.filter(node => node.path !== '/workspace/.nestos' && !this.isOtherProjectRoot(node, state))
+            .sort((a, b) => b.modifiedAt - a.modifiedAt || a.path.localeCompare(b.path)).slice(0, limit);
+        const nodes = await Promise.all(selected.map(node => fs.driver.getNode(node.path, options)));
+        return nodes.filter((node): node is FSNode => !!node);
     }
     private async fileProjectionFor(target: FileTarget): Promise<FileProjection | undefined> {
         return this.fileProjection(await this.filesFolder(target), target.kind === 'project-files');
@@ -376,6 +391,8 @@ class BrowserBackend implements IStorageBackend {
         const target = resolveBrowserTarget(path);
         if (!isFileTarget(target)) throw new FSError('ENOTDIR', 'Not a file directory');
         checkOperation(options);
+        if (options.limit !== undefined && (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 100))
+            throw new FSError('EINVAL', 'Invalid directory preview limit');
         const {fs: supplied, node: known, ...operation} = options;
         const read = async (fs: IFileSystem) => {
             const projection = this.fileProjectionFor(target);

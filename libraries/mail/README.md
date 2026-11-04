@@ -4,7 +4,7 @@
 
 - 根入口：`MailArchive`、`SeqMailIndex`、邮件解析。宿主注入已授权的邮件/索引文件视图、索引位置、操作 ID 与诊断函数。
 - `@nestos/mail/contracts`：`MailClient`、分页摘要与主题正文 DTO，不加载 I/O 或 UI。
-- `@nestos/mail/ui`：`MailWorkbench`，宿主注入 MDXEditor 工厂、文案、图标和导航。
+- `@nestos/mail/ui`：`MailWorkbench`，复用 mdxeditor 的 ContentView / ContentListView / ContentReader，宿主注入文案、图标和导航，可选 createReader 扩展正文阅读器。
 - `@nestos/mail/ui.css`：可选阅读器样式。
 
 ## 查询与搜索
@@ -13,7 +13,7 @@
 
 同一来源目录内的主题按 NFKC、大小写与空白归一化，并去掉重复的 Re/Fw/Fwd/回复/答复/转发前缀后合并。不同邮箱不合并。相同主题但无直接回复关系的邮件也会合并；当前格式没有可靠的 Message-ID/References。主题身份由来源目录与归一化主题确定，新增回复不改变身份。历史 `.email` 路径仍可打开对应主题。
 
-`readThread({id, offset, revision})` 按需读取正文，每批至多 20 封、约 1 MiB，单封至多 512 KiB。继续读取携带 revision，索引变化返回 `MAIL_THREAD_CHANGED`，避免翻页时遗漏或重复。UI 每个主题只挂载一个只读 MDXEditor，呈现各封的邮件头、时间和邮箱；折叠/展开控制正文，复制当前编辑器已加载的邮件，长主题显式加载更多并显示已加载/总数。宿主使用纯文本和 literal HTML 策略，邮件内容不能触发脚本、外部图片或插件执行。
+`readThread({id, offset, revision})` 按需读取正文，每批至多 20 封、约 1 MiB，单封至多 512 KiB。继续读取携带 revision，索引变化返回 `MAIL_THREAD_CHANGED`，避免翻页时遗漏或重复。UI 每封邮件挂载独立的 ContentView 与 ContentReader，卡片显示发件人、主题、日期与正文摘要；默认展开最新一封，其余折叠，支持单封和全部折叠/展开。展开后邮件头与正文分开呈现，正文按阅读排版保留原始文本。复制整个主题已加载的邮件；仅当 nextOffset 存在且小于总数时显示加载更多，追加邮件保留已有正文实例和折叠状态，并显示已加载/总数。默认正文使用纯文本和 literal HTML 策略，邮件内容不能触发脚本、外部图片或插件执行。
 
 ## 存储与更新
 
@@ -24,3 +24,5 @@
 重建与并发查询共用同一在途任务；文件读取使用最多八个连续工作者，避免固定批次屏障。SeqFile 事务原子更新变化行、删除失效行及 manifest，并检查索引修订，竞争失败重新读取后重试。宿主应在同一用户归档的多个视图间共享一个实例，最后一个租约关闭时释放监听。
 
 验证：`pnpm --filter @nestos/mail typecheck`、`test`、`build`。
+
+选区 AI 通过可选 `onContentSelection(selection, signal)` 注入；只取可见正文中实际选择的文字，跨多封邮件保留有序不透明来源 ID。选中文字只显示入口，点击才调用宿主创建新会话。失败重试保留同一选区对象，隐藏/销毁终止观察，不撤销已接纳的执行；分页和邮件业务不进入 mdxeditor。

@@ -4,11 +4,11 @@ import {ViewObservation} from '../../src/host/view-observation';
 function fixture() {
     const sources = new Set<(value?: unknown) => void>(), stop = vi.fn();
     const subscribe = (listener: (value?: unknown) => void) => {sources.add(listener); return () => {sources.delete(listener); stop();};};
-    let session!: (value: unknown) => void;
-    const services = {sessionRepository: {subscribe}, sessionFiles: {subscribe}, kernel: {kernel: {onChanged: subscribe}},
+    let session!: (value: unknown) => void, files!: (value: unknown) => void;
+    const services = {sessionRepository: {subscribe}, sessionFiles: {subscribe: (listener: typeof files) => {files = listener; return subscribe(listener);}}, kernel: {kernel: {onChanged: subscribe}},
         sessionManager: {onEvent: (listener: typeof session) => {session = listener; return subscribe(listener);}, onGlobalEvent: subscribe},
         agentService: {onChange: subscribe}};
-    return {view: new ViewObservation(services as never), sources, emit: (event: unknown) => session(event)};
+    return {view: new ViewObservation(services as never), sources, emit: (event: unknown) => session(event), files: (value: unknown) => files(value)};
 }
 it('keeps replay payloads detached and stops every source when disposed', async () => {
     const f = fixture(), payload = {type: 'stream:content', payload: {delta: 'first'}};
@@ -33,4 +33,15 @@ it('releases earlier sources when registering a later observer fails', () => {
         sessionFiles: {subscribe: () => {throw new Error('Observer registration failed');}}};
     expect(() => new ViewObservation(services as never)).toThrow('Observer registration failed');
     expect(stop).toHaveBeenCalledOnce();
+});
+
+it('invalidates only the Session whose namespace changed', async () => {
+    const f = fixture();
+    try {
+        f.files({sessionId: 'changed'});
+        expect(f.view.changedSince(0, ['files'], 'changed')).toBe(true);
+        expect(f.view.changedSince(0, ['files'], 'unrelated')).toBe(false);
+        f.files({sourceId: 'new-source'});
+        expect(f.view.changedSince(1, ['files'], 'unrelated')).toBe(true);
+    } finally {await f.view.dispose();}
 });

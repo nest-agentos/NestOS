@@ -316,3 +316,22 @@ describe('Session browser projection', () => {
         expect(stopped).toMatchObject({ control: { requested: 'cancel', acknowledged: true }, activeOperations: 0 });
     });
 });
+
+it('hydrates only the latest preview window and never opens nested directories', async () => {
+    const f = await setup();
+    const entries = Array.from({length: 200}, (_, i) => ({path: `/workspace/f${i}`, name: `f${i}`,
+        type: i % 2 ? 'file' as const : 'directory' as const, modifiedAt: i + 1, size: 0}));
+    const getChildren = vi.fn(async () => entries);
+    const getNode = vi.fn(async (path: string) => {
+        const entry = entries.find(item => item.path === path);
+        return entry ? {...entry, createdAt: 1, parentPath: '/workspace', version: 1, tags: [], metadata: {}}
+            : {path, name: 'workspace', type: 'directory' as const, createdAt: 1, modifiedAt: 1, parentPath: '/', version: 1, tags: [], metadata: {}};
+    });
+    const fs = {driver: {getChildren, getNode}, capabilitiesAt: async () => ({readonly: false})} as never;
+    const page = await f.browser.readFileDirectory(`/${f.a}/files/workspace`, {fs, limit: 16});
+    expect(page.nodes.map(node => node.modifiedAt)).toEqual(Array.from({length: 16}, (_, i) => 200 - i));
+    expect(getNode).toHaveBeenCalledTimes(17);
+    expect(getChildren).toHaveBeenCalledOnce();
+    expect(getChildren).toHaveBeenCalledWith('/workspace', expect.objectContaining({fields: 'entry'}));
+    await expect(f.browser.readFileDirectory(`/${f.a}/files/workspace`, {fs, limit: 0})).rejects.toMatchObject({code: 'EINVAL'});
+});

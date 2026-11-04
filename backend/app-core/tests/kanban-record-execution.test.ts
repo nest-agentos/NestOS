@@ -163,3 +163,17 @@ it('provides a single resource selector that inherits and locks the parent proje
     expect(await f.open().itemResources('source','parent')).toMatchObject({selected:reference,required:true,readonly:true,resources:[
         {reference:{system:'nestos-remote-project',id:'one'}},{reference:{system:'nestos-remote-project',id:'two'}}]});
 });
+it('quiesces at a committed decision boundary and reopens with the same run and items', async () => {
+    const f = await fixture(), first = f.open();
+    await f.command({type: 'review-record', recordId: 'decision', accept: true});
+    const request = {recordId: 'decision', operationId: 'safe-restart', expectedRevision: (await f.service.record('source', 'decision')).revision};
+    const before = await first.runRecord('source', request);
+    await first.quiesce(); await expect(first.runRecord('source', request)).rejects.toMatchObject({code: 'SERVICE_STOPPING'});
+    const after = await f.open().runRecord('source', request);
+    expect(after.id).toBe(before.id); expect(after.itemIds).toEqual(before.itemIds);
+    expect((await f.service.read('source')).items.map(row => row.id)).toEqual(expect.arrayContaining(before.itemIds!));
+    expect(after.updatedAt).toBe(before.updatedAt);
+    const receipt = await f.journal.get<Record<string, unknown>>('record-operation:safe-restart');
+    expect(receipt).toMatchObject({schema: 2, id: before.id, sourceBoardId: 'source'});
+    expect(receipt).not.toHaveProperty('state'); expect(receipt).not.toHaveProperty('record');
+});

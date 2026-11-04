@@ -2,6 +2,7 @@
 import {expect, it, vi} from 'vitest';
 import {createDocumentChatFactory} from '../src/browser/document-chat';
 import type {AiChatHost} from '@nestos/mdxeditor';
+import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {ApplicationBackend, ApplicationServices} from '@nestos/app-contracts/services';
 import type {EditorFactory} from '@nestos/ui-common-adapter';
 
@@ -18,7 +19,7 @@ async function fixture(session = true) {
     let configured: any;
     const base = vi.fn(async (_container, options) => {configured = options; return editor;}) as unknown as EditorFactory;
     const prepare = vi.fn(async ({request}) => request), navigate = vi.fn(async () => {});
-    const backend = {createSessionDraft: vi.fn(async () => {}), submitSession: vi.fn(async () => ({operationId: 'operation-1', status: 'accepted'})),
+    const backend = {createSessionDraft: vi.fn(async () => {}), submitSession: vi.fn(async (_request: SubmissionRequest) => ({operationId: 'operation-1', status: 'accepted'})),
         prepareSessionBranch: vi.fn(async request => request)};
     const factory = createDocumentChatFactory(base, services as unknown as ApplicationServices, backend as unknown as ApplicationBackend, prepare, navigate);
     const target = session ? {kind: 'session' as const, sessionId: 'session'} : {kind: 'file' as const, path: '/note.md'};
@@ -83,4 +84,22 @@ it('appends anchored sends to one branch, quotes the selection and navigates onl
 
     await host.openConversation!({source: input.source, signal: input.signal}); expect(navigate).toHaveBeenCalledOnce();
     saved(); await mounted.destroy(); expect(port.reconcile).toHaveBeenCalledWith(['anchor']); expect(port.dispose).toHaveBeenCalledOnce();
+});
+
+it('starts a new Session from the frozen multi-content selection and reuses its identity on explicit retry', async () => {
+    const {createContentSelectionChat} = await import('../src/browser/document-chat');
+    const f = await fixture(), selection = Object.freeze({text: 'Selected prompt\n\nSelected reply', items: Object.freeze([
+        Object.freeze({id: 'user', text: 'Selected prompt'}), Object.freeze({id: 'assistant', text: 'Selected reply'}),
+    ])});
+    const run = createContentSelectionChat(f.services as unknown as ApplicationServices, f.backend as unknown as ApplicationBackend, f.prepare, f.navigate);
+    f.backend.submitSession.mockImplementation(async (request: SubmissionRequest) => ({operationId: request.submission!.id, status: 'accepted'}));
+    f.backend.submitSession.mockRejectedValueOnce(new Error('Transport interrupted'));
+    const signal = new AbortController().signal;
+    await expect(run(selection, signal)).rejects.toThrow('Transport interrupted');
+    const initial = f.backend.submitSession.mock.calls[0][0]; expect(initial.expectedSessionId).not.toBe('session');
+    expect(initial.source.text).toBe(selection.text); expect(f.navigate).not.toHaveBeenCalled();
+    await run(selection, signal);
+    expect(f.backend.submitSession.mock.calls[1][0]).toBe(initial);
+    expect(f.backend.createSessionDraft).toHaveBeenCalledOnce(); expect(f.prepare).toHaveBeenCalledOnce();
+    expect(f.navigate).toHaveBeenCalledWith(expect.objectContaining({target: 'chat', resourceId: expect.stringContaining(initial.expectedSessionId)}));
 });

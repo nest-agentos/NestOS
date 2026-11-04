@@ -324,7 +324,8 @@ function nativeMessage(message: NativeSnapshot['messages'][number], operations: 
         data: JSON.parse(JSON.stringify(message.commandOutput)) as JsonValue});
     return { id: message.id, revision: 0, role: message.role, state: messageState(message.status),
         submissionId: record?.context.operationId, acceptance: /^(submitted|steered):/.test(message.id) ? 'optimistic' : 'confirmed',
-        parts };
+        timestamp: message.timestamp, timing: {submittedAt: message.role === 'user' ? record?.submittedAt ?? message.submittedAt ?? message.timestamp : undefined,
+            startedAt: message.startedAt, completedAt: message.completedAt, endedAt: message.endedAt, scope: 'message'}, parts };
 }
 
 function nativeResultNotice(state: NativeSnapshot): {code: string; message: string} | undefined {

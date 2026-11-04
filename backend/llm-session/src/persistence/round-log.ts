@@ -399,6 +399,7 @@ export function roundToProjection(round: PersistedRound, roundId: RoundId): Roun
         } : undefined,
         assistantMessage: assistantProjection(round, kind, assistantMsg, roundId),
         createdAt: round.createdAt,
+        completedAt: round.completedAt,
         origin: round.origin,
         agentId: round.agentId,
         ...(round.target ? {target: structuredClone(round.target)} : {}),

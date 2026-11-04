@@ -62,8 +62,9 @@ export class TwinAnalysis {
             || (await this.records.store.inspect()).forgetEpoch !== job.data.epoch) throw new Error('TWIN_ANALYSIS_PERMISSION_STALE');
     }
 
-    async recoverCleanup(): Promise<void> {
+    async recoverCleanup(active: () => boolean = () => true): Promise<void> {
         for (const job of await this.records.list<TwinAnalysisJob>('job')) {
+            if (!active()) return;
             if (!job.data.cleaned && !this.running.has(job.data.sourceId) && ['committed', 'failed', 'cancelled'].includes(job.data.state)) {
                 if (job.data.state === 'cancelled' && !job.data.cancelConfirmed) await this.extractor.cancel(job.data);
                 await this.cleanup(job);

@@ -42,7 +42,7 @@ export class RemoteSessionProjection {
         return {...node, icon: source.icon, metadata: {...node.metadata, harnessKind: profile.kind, harnessLabel: source.label, harnessProfileId: profile.id,
             navigationDescription: source.label}};
     }
-    async timeline(project: SessionFolder & {project: {id: string}}, agentId?: string): Promise<{sources: ConversationSource[]; actions: FSNode[]; close(): Promise<void>}> {
+    async timeline(project: SessionFolder & {project: {id: string}}, agentId?: string, limit = 51): Promise<{sources: ConversationSource[]; actions: FSNode[]; close(): Promise<void>}> {
         const remote = this.projects?.remoteMounts, root = remote?.list(project.project.id).find(mount => mount.at === '/');
         if (!remote || !remoteSessionRootPath(project, remote.list(project.project.id)) || !root) return {sources: [], actions: [], async close() {}};
         let filterProfile: string | undefined;
@@ -61,7 +61,7 @@ export class RemoteSessionProjection {
             if (root.serverId) await this.projects!.favorites.list(project.project.id);
             const active = client;
             return {sources: profiles.filter(profile => profile.capabilities.history).map(profile => ({id: 'remote:' + profile.id,
-                read: cursor => this.timelinePage(active, project, root, profile, cursor)})),
+                read: cursor => this.timelinePage(active, project, root, profile, cursor, limit)})),
                 actions: profiles.flatMap(profile => this.timelineActions(project.path, profile, root)), close: () => active.close()};
         } catch (error) {
             await client?.close(); reportRemoteFailure(error, {stage: 'session-list', projectId: project.project.id});
@@ -69,9 +69,9 @@ export class RemoteSessionProjection {
         }
     }
     private async timelinePage(client: import('@nestos/cells-driver').HarnessClient, project: SessionFolder & {project: {id: string}},
-        root: ProjectRemoteMount, profile: HarnessProfile, cursor?: string) {
+        root: ProjectRemoteMount, profile: HarnessProfile, cursor?: string, limit = 51) {
         try {
-            const page = await client.list(profile.id, {cursor}, {timeoutMs: 3000});
+            const page = await client.list(profile.id, {cursor, limit}, {timeoutMs: 3000});
             return {nodes: page.sessions.map(session => this.sourced(this.sessionNode(remoteSessionPath(project.path, profile.id, session.id), session,
                 this.favorite(project.project.id, root, profile.id, session.id), this.management(profile, root, session)), profile)), nextCursor: page.nextCursor ?? undefined};
         } catch (error) {reportRemoteFailure(error, {stage: 'session-list', projectId: project.project.id, profileId: profile.id}); throw error;}

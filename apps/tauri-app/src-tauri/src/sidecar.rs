@@ -477,12 +477,16 @@ impl SidecarTransactions {
         }
     }
 
-    async fn begin(
+    async fn begin(&self, pool: &SqlitePool, owner: &str, scope: u64, database: &str) -> Result<u64, String> {
+        self.begin_mode(pool, owner, scope, database, false).await
+    }
+    async fn begin_mode(
         &self,
         pool: &SqlitePool,
         owner: &str,
         scope: u64,
         database: &str,
+        read_only: bool,
     ) -> Result<u64, String> {
         let started = Instant::now();
         if self.state.lock().await.scopes.get(owner) != Some(&scope) {
@@ -493,7 +497,7 @@ impl SidecarTransactions {
         let wait_start = Instant::now();
         // Do not hold active's mutex while waiting for another SQLite writer.
         let opened = pool
-            .begin_with("BEGIN IMMEDIATE")
+            .begin_with(if read_only { "BEGIN" } else { "BEGIN IMMEDIATE" })
             .await
             .map_err(|e| e.to_string());
         timings.wait_ms = wait_start.elapsed().as_millis();
@@ -502,7 +506,7 @@ impl SidecarTransactions {
             Err(error) => Err(error),
         };
         record_sql(
-            "begin",
+            if read_only { "begin-read" } else { "begin" },
             database,
             Some(scope),
             started.elapsed().as_millis(),
@@ -967,6 +971,7 @@ pub async fn sidecar_open_scope(
 pub async fn sidecar_begin(
     database: String,
     scope: u64,
+    read_only: Option<bool>,
     webview: tauri::WebviewWindow,
     databases: State<'_, DbInstances>,
     transactions: State<'_, SidecarTransactions>,
@@ -982,7 +987,7 @@ pub async fn sidecar_begin(
         }
     };
     transactions
-        .begin(&pool, webview.label(), scope, &database)
+        .begin_mode(&pool, webview.label(), scope, &database, read_only.unwrap_or(false))
         .await
 }
 
@@ -1228,6 +1233,29 @@ mod tests {
 
             pool.close().await;
             std::fs::remove_file(path).unwrap();
+        });
+    }
+
+    #[test]
+    fn read_snapshots_do_not_wait_for_an_uncommitted_writer() {
+        tauri::async_runtime::block_on(async {
+            let path = std::env::temp_dir().join(format!("sidecar-read-{}-{}.sqlite", std::process::id(),
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+            let database = format!("sqlite:{}", path.display());
+            let pool = connect_database(&database).await.unwrap();
+            sqlx::query("CREATE TABLE records(value TEXT)").execute(&pool).await.unwrap();
+            let mut writer = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+            sqlx::query("INSERT INTO records VALUES ('pending')").execute(&mut *writer).await.unwrap();
+            let transactions = SidecarTransactions::default();
+            let scope = transactions.open_scope("main").await.unwrap();
+            transactions.register_database("main", scope, &database).await.unwrap();
+            let id = tokio::time::timeout(Duration::from_millis(500),
+                transactions.begin_mode(&pool, "main", scope, &database, true)).await.unwrap().unwrap();
+            let rows = transactions.select(id, "main", scope, &database, "SELECT COUNT(*) AS n FROM records", vec![]).await.unwrap();
+            assert_eq!(rows[0]["n"], 0);
+            transactions.finish(id, "main", scope, &database, true).await.unwrap();
+            writer.rollback().await.unwrap(); pool.close().await;
+            let _ = std::fs::remove_file(path);
         });
     }
 

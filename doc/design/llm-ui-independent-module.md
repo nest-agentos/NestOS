@@ -252,6 +252,12 @@ Composite 的作者配置为 `composition`，包含主持者、允许成员和�
 
 ## 7 Markdown、扩展与生命周期
 
+邮件与聊天共用 mdxeditor 的 `ContentView` 外框与 `ContentListView` 多内容容器。公共层提供标题、摘要、折叠、复制、更多菜单、可点击时间详情及选区动作生命周期；不包含角色、邮件、Session 或分页语义。聊天正文继续逐 part 使用 `MDxRenderer`，邮件默认使用 `ContentReader` 的纯文本阅读模式，完整编辑器仍可挂载到公共正文槽。旧邮件专用编辑器样式与重复聊天标题/折叠样式已移除。
+
+聊天时间由 `ChatMessage.timing` 明确提供发送、开始、完成和失败/取消结束时间；本地 Round.completedAt 经 RoundProjection 与 ExecutionNode.endTime 透传，原生 Cells 生命周期事件与可确认的历史记录提供时间。旧助手 timestamp 只显示记录时间，缺少完成时间不补造；显示时钟不改变执行状态或发起轮询。操作台账保存 submittedAt，准备、重试和回执替换不重置身份与发送时间。
+
+选区 AI 由宿主 `onContentSelection` 接入新建 Session 的既有准入链路，单项与跨项只读取实际选中的可见正文。选中仅展示按钮，点击才冻结输入；同一选区失败重试复用 operationId/sessionId 和已准备请求，先核对原回执。隐藏、销毁和绑定替换撤销观察及旧入口，不取消已接纳执行。公共组件与日志不包含 Session 规则或选区正文。
+
 mdxeditor 的 [公开契约](../../libraries/mdxeditor/src/editor/contracts.ts)提供 AssetProvider、EditorHost、StoreFactory、翻译、HTML 和滚动策略。独立库直接消费公开 API，资源权限由宿主把关。
 
 已加载内容搜索属于 llm-ui；适配层按当前 DOM 展示顺序投影稳定身份与正文，向前分页后保留当前命中。导航先通过宿主展开历史卡片，再调用 mdxeditor 的 `revealRenderedContent(target, root)` 展开目标祖先 details 与代码块，最后测量并滚动历史视口。代码块控件维护自身展开状态，搜索层不读取其内部样式，也不展开无关代码块。搜索 DOM 标识使用实例序号，不依赖 Web Crypto。

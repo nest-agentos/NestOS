@@ -39,7 +39,7 @@ async function setup(kind: 'memory' | 'indexeddb') {
         const settings = (await service.snapshot()).settings;
         await service.configure({ paused }, settings.revision);
     };
-    return { fs, service, a, b, input, texts, extractor, pause, maximum: () => maximum, advance: (ms: number) => { now += ms; },
+    return { fs, service, reader: deps.reader, a, b, input, texts, extractor, pause, maximum: () => maximum, advance: (ms: number) => { now += ms; },
         reopen: () => { const host = new DigitalTwinService(deps); closes.push(() => host.dispose()); return host; } };
 }
 
@@ -273,4 +273,35 @@ it.each(['memory', 'indexeddb'] as const)('persists event receipts and queues on
         expect((await reopened.snapshot()).scans.runs.filter(run => run.data.planId === id)).toHaveLength(2);
         await expect(reopened.triggerScanPlan(id, '')).rejects.toThrow('TWIN_EVENT_INVALID');
     } finally {release(); await pending;}
+});
+it.each(['memory', 'indexeddb'] as const)('quiesces at an extraction checkpoint and resumes the same scan without redoing committed chunks on %s', async kind => {
+    const host = await setup(kind); let release!: () => void;
+    const gate = new Promise<void>(resolve => {release = resolve;}), original = vi.mocked(host.extractor.run).getMockImplementation()!;
+    vi.mocked(host.extractor.run).mockImplementationOnce(async (...args) => {await args[2]('safe-chunk'); await gate; return original(...args);});
+    const plan = await host.service.saveScanPlan(null, null, host.input([host.a, host.b]));
+    const runId = await host.service.runScanPlan(plan);
+    await vi.waitFor(() => expect(host.extractor.run).toHaveBeenCalledOnce());
+    let acknowledged = false;
+    const stopping = host.service.quiesce().then(() => {acknowledged = true;});
+    await Promise.resolve(); expect(acknowledged).toBe(false);
+    release(); await stopping;
+    expect(host.extractor.cancel).not.toHaveBeenCalled();
+    const other = host.reopen(); await other.waitScanRun(runId);
+    const run = (await other.snapshot()).scans.runs.find(row => row.id === runId)!;
+    expect(run.data.state).toBe('succeeded'); expect(run.data.completedSourceIds).toEqual(expect.arrayContaining([host.a, host.b]));
+    expect(host.extractor.run).toHaveBeenCalledTimes(2);
+});
+
+it('observes the stop flag between source checks instead of draining the entire source list', async () => {
+    const host = await setup('memory'), read = host.reader.read;
+    let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => {entered = resolve;}), gate = new Promise<void>(resolve => {release = resolve;});
+    const clock = Date.now, date = vi.spyOn(Date, 'now').mockImplementation(() => clock() + 60000);
+    const calls = vi.spyOn(host.reader, 'read').mockImplementationOnce(async spec => {entered(); await gate; return read(spec);});
+    try {
+        const scanning = host.service.scanOnce(); await started;
+        const stopping = host.service.quiesce(); await Promise.resolve(); release();
+        await stopping; await scanning;
+        expect(calls).toHaveBeenCalledOnce(); expect(host.extractor.run).not.toHaveBeenCalled();
+    } finally {release(); date.mockRestore(); calls.mockRestore();}
 });

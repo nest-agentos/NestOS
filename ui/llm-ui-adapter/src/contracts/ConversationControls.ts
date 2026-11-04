@@ -6,6 +6,7 @@ export interface ConversationMessage {
     /** Native provenance aligned with contentParts; absent or unknown means ordinary prompt text. */
     contentPartKinds?: string[];
     turnId?: string; name?: string; input?: string; inputLanguage?: 'bash' | 'json' | 'text';
+    submittedAt?: number; startedAt?: number; completedAt?: number; endedAt?: number;
     timestamp?: number; paths?: string[]; operation?: 'read' | 'write' | 'search' | 'list' | 'execute'; commandPreview?: string;
     commandOutput?: ConversationCommandOutput;
 }

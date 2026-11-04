@@ -1,3 +1,4 @@
+import {cleanupStep, cleanupStage, type CleanupStep} from './cleanup-stage';
 import {nativeSessionResource} from '../projects/session-resource';
 import {OperationLifetime} from '../run/operation-lifetime';
 import {developmentAnalysis} from '../presets/kanban-development-analysis';
@@ -150,6 +151,7 @@ export interface ApplicationRuntime {
     conversationObservation?: Pick<ConversationContexts, 'subscribe'>;
     startBackground?(): void;
     prepareSession?(sessionId: string): Promise<boolean>;
+    quiesce(): Promise<void>;
     dispose(): Promise<void>;
 }
 
@@ -208,7 +210,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
     const diagnostics = new DiagnosticJournal();
     const policy = applicationStartupPolicy(options.startupMode);
     const startup = new StartupCoordinator();
-    const cleanupFns: Array<() => void | Promise<void>> = [];
+    const cleanupFns: CleanupStep[] = [];
     const sourceCleanupFns: Array<() => void | Promise<void>> = [];
     let remoteConnections: ProjectRemoteMountService | undefined;
     const injectedMCP = options.mcp;
@@ -257,7 +259,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             if (directoryMounts.getHome()) await directoryMounts.mountHome(id);
             else await directoryMounts.setWorkspace(id, options.defaultSessionDirectory);
         }, createModuleLogger('session-storage'));
-        cleanupFns.push(() => sessionRepository.dispose());
+        cleanupFns.push(cleanupStep('sessionRepository.dispose', () => sessionRepository.dispose()));
         const repositoryReady = startup.task('sessionRepository.init (parallel)', () => sessionRepository.init())();
         const flowEngine     = new FlowEngine(flowFiles);
         await traceBoot('flowEngine.init', () => flowEngine.init());
@@ -274,7 +276,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         sessionFiles.registerSource('admin-home', homeFiles);
         await options.configureSessionFiles?.(sessionFiles);
         if (options.directorySourceProvider) cleanupFns.push(() => options.directorySourceProvider!.dispose());
-        cleanupFns.push(() => sessionFiles.dispose());
+        cleanupFns.push(cleanupStep('sessionFiles.dispose', () => sessionFiles.dispose()));
         let mountChanged: (id: string) => Promise<void> = async () => {};
         let mountGuard: (id: string) => Promise<void> = async () => {};
         const directoryMounts: DirectoryMountService = new DirectoryMountService(systemFS, sessionFiles, options.directorySourceProvider,
@@ -288,7 +290,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             openSession: (...args) => kernel.kernel.openSession(...args),
             createSession: (...args) => kernel.kernel.createSession(...args),
         });
-        cleanupFns.push(() => projects.dispose());
+        cleanupFns.push(cleanupStep('projects.dispose', () => projects.dispose()));
         let remoteGuard = async (id: string) => mountGuard(id);
         let initializeRemoteConfiguration: () => Promise<void> = () => Promise.resolve();
         if (options.remoteSourceProvider) {
@@ -473,14 +475,14 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         };
         ensureExecutionWrite = id => renewSessionWriteLease(id, recovery.leases, lease => leaseStore.renew(lease));
         mayCollectContext = id => (recovery.leases.get(id)?.leaseUntil ?? 0) > Date.now();
-        cleanupFns.push(() => kernel.dispose());
-        cleanupFns.push(async () => {
+        cleanupFns.push(cleanupStep('kernel.dispose', () => kernel.dispose()));
+        cleanupFns.push(cleanupStep('recovery.release-and-kernel.dispose', async () => {
             const errors: unknown[] = [];
             try {await recovery.release();} catch (error) {errors.push(error);}
             kernelCore.dispose();
             try {await kernelCore.waitIdle();} catch (error) {errors.push(error);}
             if (errors.length) throw new AggregateError(errors, 'Session recovery and Kernel shutdown failed');
-        });
+        }));
         cleanupFns.push(() => skillsReady.catch(() => {}));
         cleanupFns.push(async () => {await Promise.all(twinServices.map(twin => twin.dispose()));});
         if (policy.skills === 'before-ready') await skillsReady;
@@ -520,8 +522,11 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 digitalTwin,
                 scheduleAgentInitialization: run => startup.schedule(policy.agents, 'agents.initialize', run),
                 scheduleInvocationRecovery: run => startup.schedule(policy.invocations, 'invocations.recover', async () => { await initializeProjects(); await run(); }),
-                ensureWritable: async sessionId => !await sessionRepository.isSessionDeletionPending(sessionId)
-                    && await recovery.acquireLater(sessionId) && await projects.sessionMoves.ready(sessionId),
+                ensureWritable: async sessionId => {
+                    const allowed = !await sessionRepository.isSessionDeletionPending(sessionId)
+                        && await recovery.acquireLater(sessionId) && await projects.sessionMoves.ready(sessionId);
+                    return allowed;
+                },
                 flowWorkspaceManager: options.kernelPlatform?.flowWorkspaceManager } satisfies import('./conversation-system').ConversationSystemOptions;
         const { sessionManager, commandBus, independentCalls, dispose: disposeConversations } = await traceBoot('initializeConversationSystem',
             () => createConversationSystem(conversationOptions));
@@ -537,7 +542,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const installations = flowInstallations;
         cleanupFns.push(() => installations.close());
         const conversationViews = new ConversationViews();
-        cleanupFns.push(() => conversationViews.close());
+        cleanupFns.push(cleanupStep('conversationViews.close', () => conversationViews.close()));
         const createConversationView = async () => {
             const context = await createConversationSystem({ ...conversationOptions,
                 independentCalls, scheduleAgentInitialization: initialize => initialize(), scheduleInvocationRecovery: () => {} });
@@ -546,8 +551,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         };
         const conversationContexts = new ConversationContexts(() => startup.task('host.conversation', createConversationView)(),
             id => recovery.acquireMetadataLease(id), { canRelease: id => conversationIdle(kernel.kernel, id) });
-        cleanupFns.push(disposeConversations);
-        cleanupFns.push(() => conversationContexts.close());
+        cleanupFns.push(cleanupStep('conversations.dispose', disposeConversations));
+        cleanupFns.push(cleanupStep('conversationContexts.close', () => conversationContexts.close()));
         await startup.schedule(policy.invocations, 'instructions.recover', async () => {
             await initializeProjects();
             await traceBoot('remote.instructions.recover', async () => remoteConnections?.recoverConversations());
@@ -579,7 +584,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const events = await UserEventService.open(systemFS);
         let wakeKanban = () => {};
         const developmentOperations = new OperationLifetime();
-        cleanupFns.push(() => developmentOperations.close());
+        cleanupFns.push(cleanupStep('developmentOperations.close', () => developmentOperations.close()));
         const developmentBindings = remoteConnections && options.remoteSourceProvider ? {fs: systemFS, agents: agentService,
             connections: executionConnections, remote: remoteConnections, provider: options.remoteSourceProvider, projects} : undefined;
         const prepareDevelopment = developmentBindings ? developmentPreparation(developmentBindings) : undefined;
@@ -656,7 +661,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             try {await reportKanbanHealth(events,error);} catch { /* Preserve the initialization failure. */ }
             throw error;
         });
-        cleanupFns.push(() => kanban.dispose());
+        cleanupFns.push(cleanupStep('kanban.dispose', () => kanban.dispose()));
         const kanbanIntegrations = await options.configureKanban?.({fs:systemFS,service:kanban,kernel:kernelCore,calls:independentCalls,
             sessions:sessionRepository,prepareSession:id=>recovery.acquireLater(id)}) ?? [];
         const stopKanbanIntegrations = kanbanIntegrations.map(integration => {
@@ -668,23 +673,43 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const eventSources = await attachRuntimeEvents(events, {kernel, sessionRepository, digitalTwin}, notesFiles);
         cleanupFns.push(() => eventSources.dispose());
         cleanupFns.push(async () => {await kanbanMonitor?.dispose();});
-        let disposed = false;
-        const dispose = async () => {
-            if (disposed) return;
-            disposed = true;
+        let quiescing: Promise<void> | undefined, disposal: Promise<void> | undefined;
+        const cleanupOperationId = randomUUID();
+        const stop = <T>(stage: string, run: () => T | Promise<T>) => cleanupStage(cleanupOperationId, stage, run);
+        const quiesce = () => quiescing ??= (async () => {
+            // Stop upstream scheduling first; accepted submissions retain their dependency services.
+            recovery.stopBackground();
+            const requests = [
+                stop('startup.close', () => startup.close()),
+                stop('kanban.quiesce', () => kanban.quiesce()),
+                stop('developmentMessages.quiesce', () => developmentMessages.quiesce()),
+                stop('developmentOperations.close', () => developmentOperations.close()),
+                stop('kanbanMonitor.dispose', async () => {await kanbanMonitor?.dispose();}),
+                ...twinServices.map((twin, index) => stop(`scanner-${index + 1}.quiesce`, () => twin.quiesce())),
+                ...stopKanbanIntegrations.map((close, index) => stop(`integration-${index + 1}.quiesce`, close)),
+            ];
+            const admitted = Promise.allSettled(requests);
+            const consumers = (async () => {
+                await stop('kernel.await-producers', () => admitted);
+                await stop('kernel.quiesce', async () => {while (!(await kernelCore.quiesce({timeoutMs: 5000})).localIdle) { /* Wait for the current atomic step. */ }});
+            })();
+            const leases = (async () => {
+                await stop('recovery.await-kernel', () => consumers);
+                await stop('recovery.quiesce', () => recovery.quiesce());
+            })();
+            const results = [...await admitted, ...await Promise.allSettled([consumers, leases])];
+            const failures = results.flatMap(row => row.status === 'rejected' ? [row.reason] : []);
+            if (failures.length) throw new AggregateError(failures, 'Application quiescence failed');
+        })();
+        const dispose = () => disposal ??= (async () => {
+            await quiesce();
             const errors: unknown[] = [];
-            const stoppingStartup = startup.close();
-            const stoppingKanban = kanban.quiesce();
-            const stoppingDevelopment = developmentMessages.quiesce();
-            const drainingDevelopment = developmentOperations.close();
-            const stopping = await Promise.allSettled([kanbanMonitor?.dispose(), ...stopKanbanIntegrations.map(close=>close()), stoppingKanban, stoppingStartup, stoppingDevelopment, drainingDevelopment]);
-            for (const result of stopping) if (result.status === 'rejected') errors.push(result.reason);
-            try {await executionActivity.dispose();} catch(error) {errors.push(error);}
-            for (const close of [...cleanupFns].reverse().concat([...sourceCleanupFns].reverse())) {
-                try { await close(); } catch (error) { errors.push(error); }
+            try {await stop('executionActivity.dispose', () => executionActivity.dispose());} catch(error) {errors.push(error);}
+            for (const [index, close] of [...cleanupFns].reverse().concat([...sourceCleanupFns].reverse()).entries()) {
+                try { await stop((close as CleanupStep).cleanupStage ?? `resource-${index + 1}`, close); } catch (error) { errors.push(error); }
             }
             if (errors.length) throw new AggregateError(errors, 'Application runtime cleanup failed');
-        };
+        })();
         await startup.schedule(policy.workers, 'runtime.workers', async () => {
             await initializeProjects();
             if (!startup.active) return;
@@ -704,7 +729,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         if (policy.projects === 'before-ready') startBackground();
         diagnostics.record({module: 'application', operation: 'application.runtime', stage: 'ready', result: 'success', level: 'info'});
         return { events, diagnostics, vfs, llmDriver, agentService, configuration, sessionRepository, flowEngine, sessionFiles, directoryMounts, projects, executionConnections, toolConnections: options.toolConnections,
-            flowInstallations: installations, toolPackages: installations.toolPackages, kernel, sessionManager, commandBus, independentCalls, runCatalog, dispose, startBackground, prepareSession: async id => { await initializeProjects(); return recovery.acquireLater(id); },
+            flowInstallations: installations, toolPackages: installations.toolPackages, kernel, sessionManager, commandBus, independentCalls, runCatalog, quiesce, dispose, startBackground, prepareSession: async id => { await initializeProjects(); return recovery.acquireLater(id); },
             projectSync, digitalTwin, kanban, createView: createConversationView, openConversation: id => conversationContexts.open(id), conversationObservation: conversationContexts };
     } catch (error) {
         await startup.close();

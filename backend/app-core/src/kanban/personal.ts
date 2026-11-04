@@ -68,7 +68,13 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
             const failures = results.filter(result => result.status === 'rejected');
             if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'KANBAN_SCAN_FAILED');
         },
-        quiesce: async () => {releaseGate?.(); await records?.quiesce(); await operations?.quiesce(); await automation?.quiesce(); await service.quiesce();},
+        quiesce: async () => {
+            releaseGate?.();
+            const acknowledgements = await Promise.allSettled([automation?.quiesce(), records?.quiesce(), operations?.quiesce()]);
+            const failures = acknowledgements.flatMap(row => row.status === 'rejected' ? [row.reason] : []);
+            await service.quiesce();
+            if (failures.length) throw new AggregateError(failures, 'KANBAN_QUIESCE_FAILED');
+        },
         dispose: async () => {releaseGate?.(); await records?.quiesce(); await operations?.quiesce(); await automation?.quiesce(); await service.dispose();}}, deletion);
 }
 

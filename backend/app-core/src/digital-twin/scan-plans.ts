@@ -44,13 +44,14 @@ export class TwinScanPlans {
         try { await this.store.commit(writes, [{ family: 'settings', id: settings.id, expectedRevision: settings.revision }]); }
         catch (error) { if (!await this.store.records.get('checkpoint', 'scan-rules-initialized')) throw error; }
     }
-    async refreshBindings(): Promise<Array<{ id: string; revision: string }>> {
+    async refreshBindings(active: () => boolean = () => true): Promise<Array<{ id: string; revision: string }>> {
         const settings = (await this.store.records.get<TwinSettings>('settings', 'pot'))!.data;
         if (!settings.connectionId) return [];
         const fingerprint = await this.sources.fingerprint(settings.connectionId).catch(() => '');
         if (!fingerprint) return [];
         const changed: Array<{ id: string; revision: string }> = [];
         for (const plan of await this.store.records.list<TwinScanPlan>('scan-plan')) {
+            if (!active()) return changed;
             if (plan.data.mode === 'collect' || !plan.data.rules || (plan.data.connectionId === settings.connectionId && plan.data.connectionFingerprint === fingerprint)) continue;
             await this.save(plan.id, plan.revision, plan.data);
             changed.push({ id: plan.id, revision: (await this.store.records.get('scan-plan', plan.id))!.revision });

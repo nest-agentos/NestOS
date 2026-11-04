@@ -1,4 +1,4 @@
-import { serializeSessionSummary, indexSessionSummary, navigationPrefix, NAVIGATION_VERSION, NAVIGATION_REVISION } from './session-navigation-index';
+import { serializeSessionSummary, indexSessionSummary, navigationPrefix, NAVIGATION_VERSION, NAVIGATION_REVISION, NAVIGATION_SCHEMA, recentNavigationPrefix, recentNavigationKey } from './session-navigation-index';
 import { sessionSettings, mergeSessionSettings } from './session-settings';
 import { SessionRelations, assertSessionAvailable, readSessionMetadata, touchSessionRelations } from './session-relations';
 import { ulid } from './ulid';
@@ -291,14 +291,14 @@ export class SessionRepository implements ISessionRepository {
         return ids;
     }
     private async ensureNavigationIndex(version: string | null): Promise<void> {
-        if (version === '1') return;
+        if (version === NAVIGATION_SCHEMA) return;
         for (let attempt = 0; attempt < 3; attempt++) {
             const revision = await this.fs.meta.seq!.getEntry(FOLDERS_PATH, NAVIGATION_REVISION);
             const summaries = await this.scanSummaries(true);
             const indexed = await this.fs.meta.seq!.transaction!(async tx => {
                 if (await tx.getEntry(FOLDERS_PATH, NAVIGATION_REVISION) !== revision) return false;
                 for (const summary of summaries) await indexSessionSummary(tx, summary);
-                await tx.setEntry(FOLDERS_PATH, NAVIGATION_VERSION, '1');
+                await tx.setEntry(FOLDERS_PATH, NAVIGATION_VERSION, NAVIGATION_SCHEMA);
                 return true;
             });
             if (indexed) return;
@@ -308,13 +308,49 @@ export class SessionRepository implements ISessionRepository {
     async listSummariesInFolder(folder: string | null): Promise<SessionSummary[]> {
         if (this.closed) throw new FSError('EACCES', 'Session repository is closed');
         const normalized = normalizeFolderPath(folder);
-        if (await this.fs.meta.seq!.getEntry(FOLDERS_PATH, NAVIGATION_VERSION) !== '1')
+        if (await this.fs.meta.seq!.getEntry(FOLDERS_PATH, NAVIGATION_VERSION) !== NAVIGATION_SCHEMA)
             return (await this.listSummaries()).filter(session => (session.folder ?? null) === normalized);
         const rows: SessionSummary[] = [];
         await this.fs.meta.seq!.walkEntries(FOLDERS_PATH, entry => { rows.push(JSON.parse(entry.value)); return true; },
             { keyPrefix: navigationPrefix(normalized) });
         const moving = await this.pendingStorageSessionIds();
         return rows.filter(row => !moving.has(row.id)).sort((a, b) => b.updatedAt - a.updatedAt);
+    }
+    async listSummaryPage(folder: string | null, options: {cursor?: string; limit: number; agentId?: string}) {
+        if (this.closed) throw new FSError('EACCES', 'Session repository is closed');
+        const limit = options.limit, normalized = normalizeFolderPath(folder);
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new FSError('EINVAL', 'Invalid session summary page');
+        const after = summaryPagePosition(normalized, options.cursor, options.agentId);
+        const started = performance.now(), metadata = {operation: 'session.summary-page', operationId: ulid(), stage: 'index-page', limit};
+        let parsing = false;
+        try {
+            const items: SessionSummary[] = [], moving = await this.pendingStorageSessionIds(); let last: SessionSummary | undefined;
+            const page = await this.fs.meta.seq!.walkEntries(FOLDERS_PATH, entry => {
+                parsing = true; const row = decodeNavigationSummary(entry.value); parsing = false; last = row;
+                if (!moving.has(row.id)) items.push(row);
+                return true;
+            }, {keyPrefix: recentNavigationPrefix(normalized, options.agentId), after, limit, order: 'key'});
+            const nextCursor = last && page.processed < page.total ? JSON.stringify([last.updatedAt, last.id]) : undefined;
+            const result = {items: await this.withParentTitles(items), nextCursor};
+            this.logger?.debug('session.navigation', {...metadata, result: 'success', count: result.items.length,
+                hasMore: !!nextCursor, durationMs: Math.round(performance.now() - started)});
+            return result;
+        } catch (error) {
+            const code = (error as {code?: unknown})?.code;
+            this.logger?.error('session.navigation', {...metadata, result: 'failure', durationMs: Math.round(performance.now() - started),
+                code: parsing ? 'SESSION_SUMMARY_PARSE_FAILED' : typeof code === 'string' && /^[A-Z0-9_]+$/.test(code) ? code : 'SESSION_SUMMARY_READ_FAILED'});
+            if (parsing) throw new FSError('EIO', 'Invalid session navigation index metadata');
+            throw error;
+        }
+    }
+    private async withParentTitles(items: SessionSummary[]): Promise<SessionSummary[]> {
+        const titles = new Map(items.map(item => [item.id, item.title]));
+        const parents = [...new Set(items.flatMap(item => item.parentSessionId && !titles.has(item.parentSessionId) ? [item.parentSessionId] : []))];
+        if (!parents.length) return items;
+        const locations = await this.fs.meta.seq!.getEntries(FOLDERS_PATH, parents.map(id => `navigation-location/${id}`));
+        const rows = await this.fs.meta.seq!.getEntries(FOLDERS_PATH, Object.values(locations));
+        for (const raw of Object.values(rows)) {const parent = decodeNavigationSummary(raw); titles.set(parent.id, parent.title);}
+        return items.map(item => item.parentSessionId ? {...item, parentTitle: titles.get(item.parentSessionId)} : item);
     }
     listSummaries(): Promise<SessionSummary[]> { return this.scanSummaries(); }
     private async scanSummaries(includeMoving = false): Promise<SessionSummary[]> {
@@ -730,4 +766,23 @@ function activeDrafts(manifest: ConversationManifest): string {
 function folderParent(path: string): string | null {
     const index = path.lastIndexOf('/');
     return index <= 0 ? null : path.slice(0, index);
+}
+
+function decodeNavigationSummary(raw: string): SessionSummary {
+    let value: SessionSummary;
+    try {value = JSON.parse(raw) as SessionSummary;}
+    catch {throw new FSError('EIO', 'Invalid session navigation index metadata');}
+    if (!value || typeof value.id !== 'string' || !value.id || typeof value.title !== 'string'
+        || !Number.isFinite(value.createdAt) || !Number.isFinite(value.updatedAt))
+        throw new FSError('EIO', 'Invalid session navigation index metadata');
+    return value;
+}
+
+function summaryPagePosition(folder: string | null, cursor?: string, agentId?: string): string | undefined {
+    if (cursor === undefined) return;
+    let value: unknown;
+    try {value = JSON.parse(cursor);} catch {throw new FSError('EINVAL', 'Invalid session summary cursor');}
+    if (!Array.isArray(value) || value.length !== 2 || !Number.isSafeInteger(value[0]) || value[0] < 0
+        || typeof value[1] !== 'string' || !/^[A-Za-z0-9_-]{1,1024}$/.test(value[1])) throw new FSError('EINVAL', 'Invalid session summary cursor');
+    return recentNavigationKey(folder, value[0], value[1], agentId);
 }

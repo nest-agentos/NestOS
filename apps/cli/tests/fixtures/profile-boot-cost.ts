@@ -32,7 +32,7 @@ function countingDb(db: ISidecarDb, report: (signature: string) => void): ISidec
             const value = Reflect.get(object, property, object);
             if (typeof value !== 'function') return value;
             const name = String(property);
-            if (name === 'transaction') {
+            if (name === 'transaction' || name === 'readTransaction') {
                 return (operation: (inner: ISidecarDb) => Promise<unknown>) => {
                     report(`${name}()`);
                     return (value as (callback: (inner: ISidecarDb) => Promise<unknown>) => Promise<unknown>)

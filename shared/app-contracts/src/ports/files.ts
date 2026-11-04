@@ -10,12 +10,14 @@ export interface SessionMountRecord {
     access: 'ro' | 'rw';
 }
 
+export interface SessionFilesChange {sessionId?: string; sourceId?: string}
+
 export interface SessionFilesService {
     beforeAcquire?: (sessionId: string) => Promise<void>;
     workspaceComposer?: (id: string, mount: FileSystemMount) => Promise<FileSystemSourceOwner | undefined>;
     workspaceProvider?: (id: string, mount: SessionMountRecord) => Promise<FileSystemSourceOwner | undefined>;
     invalidate(id: string): Promise<void>;
-    subscribe(listener: () => void): () => void;
+    subscribe(listener: (change: SessionFilesChange) => void): () => void;
     initialize(): Promise<void>;
     source(id: string): IFileSystem | undefined;
     registerSource(id: string, source: IFileSystem): void;

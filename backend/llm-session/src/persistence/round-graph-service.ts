@@ -390,7 +390,7 @@ export class RoundGraphService {
             ...round,
             output: update.assistantMessages.map(message => ({ ...message })),
             status: 'completed',
-            completedAt: Date.now(),
+            completedAt: round.status === 'completed' ? round.completedAt ?? Date.now() : Date.now(),
             ...(update.agentId ? { agentId: update.agentId } : {}),
             result: update.result,
         };
@@ -398,6 +398,7 @@ export class RoundGraphService {
 
         const assistant = update.assistantMessages.find(message => message.role === 'assistant');
         const changes: RoundChangeSet = {
+            completedAt: updated.completedAt, status: roundStatusToNodeStatus(updated.status),
             assistantContent: assistant && typeof assistant.content === 'string' ? assistant.content : '',
             thinking: assistant && typeof (assistant as any).thinking === 'string'
                 ? (assistant as any).thinking
@@ -418,7 +419,7 @@ export class RoundGraphService {
     ): Promise<void> {
         const round = await this.readRound(roundId);
         if (!round) throw new RoundGraphError(`Round not found: ${roundId}`, 'NOT_FOUND');
-        const completedAt = isTerminalConversationStatus(status) ? Date.now() : undefined;
+        const completedAt = isTerminalConversationStatus(status) ? round.status === status ? round.completedAt ?? Date.now() : Date.now() : undefined;
         // Cancellation is a terminal failure too: dropping its reason made a reloaded run show an
         // unexplained empty assistant bubble while the live transcript had shown the reason.
         const failure = status === 'failed' || status === 'cancelled' ? error : undefined;
@@ -429,7 +430,7 @@ export class RoundGraphService {
         this.onEvent?.({
             type: 'round:updated',
             roundId,
-            changes: { status: roundStatusToNodeStatus(status), error: failure, flowInteractions: result?.flowInteractions },
+            changes: { completedAt: completedAt ?? null, status: roundStatusToNodeStatus(status), error: failure, flowInteractions: result?.flowInteractions },
         });
     }
 
@@ -445,10 +446,10 @@ export class RoundGraphService {
             throw new RoundGraphError('Execution already has different admission facts', 'EXECUTION_ADMISSION_CONFLICT');
         if (!previous) {
             executions.push(execution);
-            await this.writeRoundUpdate(roundId, { ...round, ...structuredClone(admission ?? {}), executions, status: 'running' });
+            await this.writeRoundUpdate(roundId, { ...round, ...structuredClone(admission ?? {}), executions, status: 'running', completedAt: undefined });
         }
         const primary = [...executions].reverse().find(item => item.role === 'primary');
-        this.onEvent?.({ type: 'round:updated', roundId, changes: { execution: primary, ...(admission ? {admission: structuredClone(admission)} : {}) } });
+        this.onEvent?.({ type: 'round:updated', roundId, changes: { ...(!previous ? {completedAt: null} : {}), execution: primary, ...(admission ? {admission: structuredClone(admission)} : {}) } });
     }
 
     /** Remove assistant payload — used by delete-assistant and resend. */
@@ -465,7 +466,7 @@ export class RoundGraphService {
         await this.writeRoundUpdate(roundId, updated);
 
         if (this.onEvent) {
-            this.onEvent({ type: 'round:updated', roundId, changes: { assistantContent: '', thinking: '' } });
+            this.onEvent({ type: 'round:updated', roundId, changes: { assistantContent: '', thinking: '', completedAt: null } });
         }
     }
 

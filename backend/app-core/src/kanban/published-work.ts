@@ -34,8 +34,12 @@ export function createPublishedKanbanWorkExecutor(options: PublishedKanbanWorkOp
         async start(value) {
             const frozen=validateFrozen(value);
             try {await options.calls.prepareTaskCall(frozen.input,frozen.policy);}
-            catch(error) {return {outcome:'failed',code:knownCode(error,'WORK_PREPARATION_FAILED')};}
-            await options.calls.submitPreparedTaskCall(frozen.input);
+            catch(error) {if (isStopping(error)) throw unstarted(error); return {outcome:'failed',code:knownCode(error,'WORK_PREPARATION_FAILED')};}
+            try {await options.calls.submitPreparedTaskCall(frozen.input);}
+            catch (error) {
+                if (isStopping(error) && !await options.calls.inspectTaskCallSubmission(frozen.input)) throw unstarted(error);
+                throw error;
+            }
             const observation = await inspectWork(options,frozen);
             return options.observe ? options.observe(frozen.dispatch, observation) : observation;
         },
@@ -66,3 +70,9 @@ function validateFrozen(value: unknown): FrozenWork {
     if(frozen?.schema!==1||!frozen.dispatch?.id||!frozen.policy||frozen.input?.request?.submission?.id!==frozen.dispatch.id) throw new KanbanError('INVALID_FROZEN_EXECUTION');return frozen;
 }
 function knownCode(error: unknown, fallback: string): string {const code=(error as {code?:unknown})?.code;return typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:fallback;}
+
+function isStopping(error: unknown): boolean {return ['SERVICE_STOPPING', 'DISPOSED'].includes(knownCode(error, ''));}
+/** Only a definite lack of admission allows replaying the same frozen request after restart. */
+function unstarted(error: unknown): Error {
+    return Object.assign(new KanbanError(knownCode(error, 'SERVICE_STOPPING')), {executionOutcome: 'not-started', retryable: true});
+}

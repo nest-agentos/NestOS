@@ -31,8 +31,9 @@ export class TwinSources {
         await this.records.save('source', id, { ...source.data, enabled, retained: false }, revision);
     }
 
-    async reconcile(includeManaged = true): Promise<void> {
+    async reconcile(includeManaged = true, active: () => boolean = () => true): Promise<void> {
         for (const source of await this.records.list<TwinSourceData>('source')) {
+            if (!active()) return;
             if (source.data.enabled && source.data.status !== 'deleted' && (includeManaged || !source.data.managed)) await this.check(source);
         }
     }

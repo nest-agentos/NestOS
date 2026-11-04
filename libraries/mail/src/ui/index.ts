@@ -1,7 +1,7 @@
 import type {MailPage, MailQuery} from '../contracts';
 import {ThreadReader} from './reader';
 import {button, element, type MailUIOptions} from './ports';
-export type {MailUIOptions, MailPresentation, ReaderEditor} from './ports';
+export type {MailUIOptions, MailPresentation, MailReader} from './ports';
 export class MailWorkbench {
     private readonly abort = new AbortController();
     private readonly reader: ThreadReader;
@@ -108,14 +108,15 @@ export class MailWorkbench {
         this.search.value = this.query.search ?? ''; this.mode.value = this.query.searchMode ?? 'headers'; this.invalidateFromEvents();
     }
     invalidateFromEvents(): void {this.revision++; this.dirty = true; if (this.visible) void this.refresh();}
-    setVisible(visible: boolean): void {this.visible = visible; if (visible && this.dirty) void this.refresh();}
+    setVisible(visible: boolean): void {this.visible = visible; this.reader.setVisible(visible); if (visible && this.dirty) void this.refresh();}
     suspendForRecovery(): void {this.abort.abort(); clearTimeout(this.timer); this.reader.suspend();}
     async destroy(): Promise<void> {this.suspendForRecovery(); await this.loading; await this.reader.destroy(); await this.options.client.dispose();}
     private failure(error: unknown, stage: string): void {
         if (this.abort.signal.aborted) return;
         const raw = (error as {code?: string})?.code ?? (error instanceof Error ? error.message : '');
-        const code = /^(?:MAIL_[A-Z_]+|EACCES|EIO|ENOENT|ECONFLICT)$/.test(raw) ? raw : 'MAIL_READ_FAILED';
-        this.alert.textContent = this.options.presentation.text('failed') + ' · ' + code;
+        const selection = stage === 'thread.selection';
+        const code = selection && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : /^(?:MAIL_[A-Z_]+|CALL_TARGET_UNAVAILABLE|SUBMISSION_UNKNOWN|DOCUMENT_CONTEXT_TOO_LARGE|EACCES|EIO|ENOENT|ECONFLICT)$/.test(raw) ? raw : 'MAIL_READ_FAILED';
+        this.alert.textContent = this.options.presentation.text(selection ? 'selectionFailed' : 'failed') + ' · ' + code;
         try {this.options.presentation.diagnostic?.({operation: 'mail.view', operationId: this.options.presentation.createOperationId(), stage, result: 'failure', code, durationMs: 0});} catch { /* Diagnostics do not alter UI recovery. */ }
     }
 }

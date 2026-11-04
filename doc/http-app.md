@@ -366,6 +366,12 @@ C4Component
 ## 启动与认证
 
 ```bash
+pnpm httpd:stop                # 按进程身份停止；默认等待安全点 15 秒；未确认则报告等待，不强杀
+pnpm httpd:restart             # 确认旧进程退出后启动已选 release；不自动构建
+pnpm httpd:build && pnpm httpd:restart # 先构建，成功后替换运行版本
+pnpm httpd:stop --force        # 明确允许超时后 SIGKILL，再等待最多 5 秒确认
+pnpm httpd:stop --timeout-ms 60000 # 等待更长的安全步骤
+pnpm httpd:stop --dev          # 停止源码宿主，和 release 独立登记
 pnpm httpd:build --no-activate # 仅构建和验证，不改变下次启动选择
 pnpm httpd:build --no-cache    # 绕过构建缓存，重新安装和编译
 pnpm httpd:build --share-main  # 链接 worktree 中复用主检出的基线、缓存与 release 目录
@@ -383,6 +389,16 @@ pnpm httpd:activate <版本ID>   # 下次启动使用此版本
 构建缓存位于忽略目录 `release/httpd/.build-cache/`。源码、库快照、运行时及构建环境均未变化时，校验并复用完整 release；源码有变化时复用依赖安装环境，按 Vite/tsup 实际输入分别判断是否重新编译 UI 和服务端。新增文件、配置、锁文件、库快照、Node/ABI、pnpm 或原生模块变化会使对应缓存失效。输出损坏会重新编译，构建锁防止并发改写隔离环境；每步日志包含 operationId、缓存命中原因及耗时。变更构建仍重新 deploy 生产依赖，发布副本与缓存互相独立。清除 `.build-cache/` 后下次重建即可，不影响已有 release；清理时应确保没有构建进程。
 
 源码变化检查只覆盖 HTTP 的有效构建输入：backend/ui/shared 生产文件、Web/HTTP/Node 宿主、提供生产模块的 tools 工作区包及依赖清单、锁文件和构建脚本。`tests`/`__tests__`、`*.test.*`/`*.spec.*`、测试配置、文档及 Tauri/CLI 的实现不触发此检查；其他应用的 package.json 仍参与依赖安装校验。库源码先制成不可变快照，独立检查生产与打包输入，测试变动不触发库重建。生产文件在捕获后变化仍报 `HTTP_BUILD_SOURCE_CHANGED`，需要等待本次编辑完成后重试，不能因此取消制品一致性保护。
+
+停止命令优先读取忽略目录 `release/httpd-processes/<mode>.json`，登记 PID、启动身份、模式和启动参数（0600），不读取用户数据库或 Session。Linux 的启动身份包含本次系统启动 ID 与进程 starttime，避免旧 PID 被复用后误杀其他进程；主线程已退出但仍有工作线程时继续等待，不能提前报告停止。仅旧版未登记宿主会扫描 `/proc`，匹配本检出启动脚本和 release 入口，绝不按端口猜测。生命周期操作由独立 SQLite OS 锁互斥，退出自动释放，不使用永久占用的哨兵锁文件。登记更新使用原子替换，旧宿主退出不能移除新实例的登记。
+
+`stop` 先发 SIGTERM，等待所有工作单元完成当前安全步骤并持久化；15 秒仍未退出则返回 `HTTPD_SAFE_STOP_PENDING`，保留进程、锁与登记，restart 不启动新实例。只有显式 `--force` 才会在超时后发 SIGKILL；强制后 5 秒仍无法确认退出则返回 `HTTPD_STOP_UNCONFIRMED`。日志区分正常退出、超时升级与已经停止；进程仍在不等于 HTTP 已就绪，`start.registered` 仅表示进程登记。Ctrl+C/SIGTERM 也由外层启动器请求安全停止，重复信号不默认终止仍在排空的宿主；强制停止可能中断本次执行，后续依赖既有持久恢复协议，不伪造任务成功或删除数据库。
+
+`[HTTPShutdown]` 记录信号和嵌套关闭阶段（server、views、runtime、storage、lock），包含 PID、operationId、阶段、结果、耗时；等待超过 5 秒持续报告当前阶段及 CPU 用量。应用内部的 `[RuntimeCleanup]` 继续细分 startup、Kanban quiesce、开发任务、会话与 Kernel 清理。失败记录错误分类，不输出正文、参数或令牌。启动器的 `[HTTPProcess]` 用 PID 对应这些日志；不能仅凭最后一条普通业务日志推断阻塞位置。
+
+安全停止先向所有用户 Runtime 并行请求 quiesce；每个 Runtime 同时停止 startup、Session 恢复、Kernel 准入与轮询、Kanban、开发协调、扫描器和扩展的准入。不能先等待扫描结束再通知扫描器停止。全部确认后再释放视图、连接、存储和锁；Kernel quiesce 保留查询与租约，不等同于取消 Task，最终 dispose 发生在依赖关闭之后。
+
+恢复继续使用各模块已有的持久阶段与幂等身份。Kanban 决策与派发保留原 run/operation/session ID，提交回执仍核对后再前进；Kernel 已完成 Task 不重跑，未完成任务从已提交状态续办。扫描器在已提交的提取批次边界退出，把同一 run 及源偏移保留为 queued，重启继续未完成批次；安全停止不调用取消已接纳提取的接口。显式强停没有安全确认，不能假定当前外部副作用已完成，仍走既有 unknown/核对协议。
 
 ### 在 worktree 中验证
 
@@ -592,3 +608,20 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 邮件页通过 `ApplicationBackend.mailView()` 取得授权的 MailClient，`queryMail` 每页返回 20 个主题的摘要、来源计数和分页信息。搜索先在后端完整索引上匹配，再合并主题、排序及分页，支持邮件头和正文范围；翻页不逐封请求 IFSDriver.readContent。点击主题才调用 readThread，正文每批最多 20 封并受字节预算限制。列表切换不预加载 MDXEditor。
 
 `@nestos/mail` 在用户 `/var/lib/mail/archive.seq` 持久化派生索引，首次访问建立，重启后复用版本戳，只重读变化邮件；正文搜索副本不传浏览器。运行日志 mail.index 区分 index.load、index.scan、index.persist 和 reconcile，记录操作 ID、读取数、字节、结果和耗时；mail.query、mail.thread、mail.refresh 记录查询/正文/刷新阶段及具体安全错误码，不记录搜索词、邮箱、路径或正文。HTTP 审计通过 MailClient.queryMail/readThread/refreshMail 与 requestId 关联请求耗时。实际首屏性能须以新 release 的运行版本与日志验收。
+
+### 停止点审查
+
+退出标志是当前宿主的内存控制，不把用户已保存的暂停设置改写为“已停止”。业务安全点、游标、操作 ID 与回执仍由所属模块的 seq 记录持久化；重启新建宿主控制器，按原持久阶段恢复。
+
+| 工作单元 | 最小检查边界 | 停止后保留 |
+|---|---|---|
+| Kanban 扫描与操作队列 | 每个看板、事项、验收操作前 | 冻结命令与原执行身份；未开始的后续项留待恢复 |
+| 扫描器准备阶段 | 每个准备阶段、计划与来源条目之间 | 已确认的来源版本和计划修订 |
+| 来源发现 | 每个来源更新；停止时跳过未完成发现的缺失判定 | 原来源身份；中断发现不把未遍历项标为删除 |
+| 知识清理 | 每批 100 条及每个清理任务之间 | 原清理操作及已提交游标 |
+| 提取分析 | 当前提取批次提交后 | 同一个扫描 run、来源偏移与已提交结果 |
+| Kernel | 当前 reducer/effect 提交边界 | 原 Session/Task、控制 epoch 和持久执行状态 |
+| Session 恢复 | 后台每个 Session；租约最终在 Kernel 排空后释放 | 原执行身份，禁止旧宿主失权后继续写 |
+| 启动中宿主 | 已接受的初始化步骤后；剩余用户初始化和 listen 可跳过 | 已完成的初始化事务；从持锁前就处理退出信号 |
+
+长耗时外部请求需要按其能力处理。已经持久接纳且支持核对/续办的执行保留原身份；不具备安全取消或结果查询能力的外部调用，不能仅因停止标志改变就丢弃结果并重试。此时保留进程和锁，日志显示当前等待阶段，普通 stop 不虚报成功或自动强杀。小安全点不等于可在任意网络字节之间中止具有副作用的操作。

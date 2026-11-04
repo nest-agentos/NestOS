@@ -147,6 +147,7 @@ export class SessionState {
         if (!round) return [];
 
         const { changes } = event;
+        if (Object.hasOwn(changes, 'completedAt')) round.completedAt = changes.completedAt ?? undefined;
 
         // Metadata updates must survive an empty assistant result; resend uses
         // the persisted agentId to avoid falling back to the default provider.
@@ -615,6 +616,7 @@ export class SessionState {
                     executorId: p.target?.id ?? p.agentId ?? '',
                     status: p.assistantMessage.status,
                     startTime: p.createdAt,
+                    endTime: p.completedAt,
                     parentId: undefined,
                     data: {
                         output: p.assistantMessage.content,

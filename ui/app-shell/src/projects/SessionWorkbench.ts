@@ -398,7 +398,8 @@ export class SessionWorkbench implements WorkspaceController {
         this.sidebarLayout.navigation.prepend(this.agentFilterBar);
         if (this.projects) this.installProjectNavigation();
         this.sidebarUI = createVFSUI({ sessionListContainer: tree, title: this.projects ? t('project.workspace') : '会话', scopeId: SESSION_BROWSER_SCOPE,
-            directoryPreview: node => projectNavigationPreview(node, path => this.openResource(path, {directory: true})),
+            directoryPreview: node => projectNavigationPreview(node, path => this.openResource(path, {directory: true}),
+                async (path, limit) => (await this.browser!.readFileDirectory(path, {limit})).nodes),
             navigationChildren: node => (node.children ?? []).filter(child => child.metadata.custom.navigationTransparent === true).map(child => child.id),
             persistence: presentationPersistence(this.uiPersistence), onError: error => this.report(error),
             listItems: items => {
@@ -444,6 +445,7 @@ export class SessionWorkbench implements WorkspaceController {
             toolbar: 'full', hideGitignored: false,
             searchPlaceholder: t(this.projects ? 'project.searchContents' : 'project.search'), showFileExtensions: true,
             readOnly: false, activateDirectories: true, autoSelectFirst: !this.projects, defaultUiSettings: { sortBy: 'lastModified' },
+            sort: {by: 'lastModified', direction: 'desc'},
             compareItems: compareSessionEntries,
             restoreExpandedDirectory: isExpandableDirectory,
             deferExpansion: true,

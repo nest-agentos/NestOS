@@ -3,17 +3,36 @@ import {sha256HexSync} from '@nestos/common';
 import type {KanbanArtifactRef} from '@nestos/kanban/contracts';
 import {requireValue} from './validation';
 
+import {boardIndexPath, boardIndexPrefix, boardIndexKeys, migrateBoardIndex, updateBoardIndex} from './automation-board-index';
+
 const path = '/var/lib/kanban/automation.seq';
 export class KanbanAutomationJournal {
     private readonly writes = new Set<Promise<unknown>>();
     constructor(private readonly fs: IFileSystem) {}
     async open(): Promise<void> {
-        try {await this.fs.driver.createFile({parentPath: '/var/lib/kanban', name: 'automation.seq', type: 'seqfile', recursive: true});}
-        catch (error) {if ((error as {code?: string}).code !== 'EEXIST') throw error;}
         requireValue(this.fs.meta.seq?.transaction, 'TRANSACTION_REQUIRED');
+        for (const name of ['automation.seq', 'automation-board-index.seq']) {
+            try {await this.fs.driver.createFile({parentPath: '/var/lib/kanban', name, type: 'seqfile', recursive: true});}
+            catch (error) {if ((error as {code?: string}).code !== 'EEXIST') throw error;}
+        }
+        if (await this.fs.meta.seq!.getEntry(boardIndexPath, 'version') !== '1')
+            await this.fs.meta.seq!.transaction!(tx => migrateBoardIndex(tx, path));
     }
     async get<T>(key: string): Promise<T | undefined> {
         const raw = await this.fs.meta.seq!.getEntry(path, key); return raw ? JSON.parse(raw) as T : undefined;
+    }
+    async getMany<T>(keys: string[]): Promise<Array<T | undefined>> {
+        if (!keys.length) return [];
+        const rows = await this.fs.meta.seq!.getEntries(path, keys);
+        return keys.map(key => rows[key] === undefined ? undefined : JSON.parse(rows[key]) as T);
+    }
+    async findForBoard<T>(family: string, boardId: string, matches: (value: T) => boolean): Promise<Array<{key: string; value: T}>> {
+        const keys: string[] = [];
+        await this.fs.meta.seq!.walkEntries(boardIndexPath, entry => {
+            keys.push(entry.value); requireValue(keys.length <= 1000, 'SESSION_RELATION_LIMIT'); return true;
+        }, {keyPrefix: boardIndexPrefix(boardId, family)});
+        const values = await this.getMany<T>(keys);
+        return values.flatMap((value, index) => value !== undefined && matches(value) ? [{key: keys[index], value}] : []);
     }
     async find<T>(keyPrefix: string, matches: (value: T, key: string) => boolean): Promise<Array<{key: string; value: T}>> {
         const rows: Array<{key: string; value: T}> = [];
@@ -40,8 +59,12 @@ export class KanbanAutomationJournal {
     }
     private async commit<T>(key: string, change: (previous: T | undefined) => T): Promise<T> {
         return this.fs.meta.seq!.transaction!(async tx => {
-            const raw = await tx.getEntry(path, key), value = change(raw ? JSON.parse(raw) as T : undefined);
-            await tx.setEntry(path, key, JSON.stringify(value)); return structuredClone(value);
+            const raw = await tx.getEntry(path, key), previous = raw ? JSON.parse(raw) as T : undefined;
+            const previousIndex = boardIndexKeys(key, previous), value = change(previous);
+            const encoded = JSON.stringify(value);
+            if (encoded === raw) return structuredClone(value);
+            await updateBoardIndex(tx, key, previousIndex, value);
+            await tx.setEntry(path, key, encoded); return structuredClone(value);
         });
     }
     async artifact(dispatchId: string, value: unknown): Promise<KanbanArtifactRef[]> {

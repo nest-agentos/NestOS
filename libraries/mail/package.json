@@ -20,7 +20,8 @@
     "@nestos/vfs-core": "^0.5.1"
   },
   "dependencies": {
-    "@nestos/ui-common": "^0.5.1"
+    "@nestos/ui-common": "^0.5.1",
+    "@nestos/mdxeditor": "^0.5.1"
   },
   "devDependencies": {
     "@nestos/vfs-core": "workspace:*",

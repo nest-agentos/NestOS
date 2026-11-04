@@ -53,7 +53,7 @@ function projectRound(round: Round, encode: TranscriptEncoder): SessionGroup[] {
     if (round.responses.length) {
         const root: ExecutionNode = {id: id + '-output', executorId: 'native', executorType: 'agent', messageRole: 'assistant',
             name: t('harness.roleAssistant'), status: responseStatus(round.responses), startTime: firstTime(round.responses),
-            endTime: round.responses.at(-1)?.timestamp,
+            endTime: round.responses.at(-1)?.completedAt ?? round.responses.at(-1)?.endedAt,
             data: {output: round.responses.map(message => messageMarkdown(message, encode)).join('\n\n'), metaInfo: {nativeRole: 'assistant'}}};
         groups.push({id: id + '-response', role: 'assistant', timestamp: root.startTime, executionRoot: root});
     }

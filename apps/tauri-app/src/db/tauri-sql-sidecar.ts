@@ -281,8 +281,8 @@ export class TauriSqlSidecarDb implements ISidecarDb {
         return rows.map(row => ({ field: row.field, value: JSON.parse(row.value) }));
     }
 
-    async listRecordFieldsPage(path: string, prefix: string, offset: number, limit: number) {
-        const rows = await this.db.select<RecordPageRow[]>(RECORD_PAGE_SQL, recordPageValues(path, prefix, offset, limit));
+    async listRecordFieldsPage(path: string, prefix: string, offset: number, limit: number, after?: string) {
+        const rows = await this.db.select<RecordPageRow[]>(RECORD_PAGE_SQL, recordPageValues(path, prefix, offset, limit, after));
         return decodeRecordPage(rows);
     }
 
@@ -317,9 +317,15 @@ export class TauriSqlSidecarDb implements ISidecarDb {
 
     // ── transaction ────────────────────────────────────────────────────────────
 
-    async transaction<T>(operation: (db: ISidecarDb) => Promise<T>): Promise<T> {
+    transaction<T>(operation: (db: ISidecarDb) => Promise<T>): Promise<T> {
+        return this.withTransaction(operation, false);
+    }
+    readTransaction<T>(operation: (db: ISidecarDb) => Promise<T>): Promise<T> {
+        return this.withTransaction(operation, true);
+    }
+    private async withTransaction<T>(operation: (db: ISidecarDb) => Promise<T>, readOnly: boolean): Promise<T> {
         if (!this.databaseUrl) throw new Error('Nested sidecar transactions are not supported');
-        const transactionId = await invoke<number>('sidecar_begin', { database: this.databaseUrl, scope: this.scope });
+        const transactionId = await invoke<number>('sidecar_begin', { database: this.databaseUrl, scope: this.scope, readOnly });
         const identity = { transactionId, database: this.databaseUrl, scope: this.scope };
         const scoped = new TauriSqlSidecarDb({
             execute: (query, values) => invoke('sidecar_execute', { ...identity, query, values: values ?? [] }),

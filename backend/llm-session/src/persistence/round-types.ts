@@ -116,6 +116,7 @@ export interface RoundProjection {
     };
 
     createdAt: number;
+    completedAt?: number;
     origin: import('../contracts').Round['origin'];
     agentId?: string;
     stale?: boolean;

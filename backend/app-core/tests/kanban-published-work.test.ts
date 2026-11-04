@@ -49,3 +49,24 @@ it('reports the execution Session identity without exposing internal Task data',
     const result=await f.executor.inspect(f.frozen);expect(result).toEqual({executionSessionId:'execution-child',outcome:'running'});
     expect(JSON.stringify(result)).not.toContain('private-task-id');
 });
+it('returns a safe unstarted checkpoint during shutdown, then reuses the frozen Session and request', async () => {
+    const f = await fixture();
+    f.calls.prepareTaskCall.mockRejectedValueOnce(Object.assign(new Error('stopping'), {code: 'SERVICE_STOPPING'}));
+    await expect(f.executor.start(f.frozen)).rejects.toMatchObject({executionOutcome: 'not-started', retryable: true});
+    expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
+    expect(await f.executor.start(f.frozen)).toMatchObject({outcome: 'succeeded'});
+    expect(f.prepareSession).toHaveBeenCalledOnce();
+    expect(f.calls.prepareTaskCall.mock.calls.every(call => call[0].request.expectedSessionId === 'session')).toBe(true);
+    expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledExactlyOnceWith(f.frozen.input);
+});
+it('distinguishes an unsubmitted shutdown from a committed receipt whose reply was interrupted', async () => {
+    const f = await fixture();
+    f.calls.submitPreparedTaskCall.mockRejectedValueOnce(Object.assign(new Error('shutdown'), {code: 'DISPOSED'}));
+    f.calls.inspectTaskCallSubmission.mockResolvedValueOnce(undefined);
+    await expect(f.executor.start(f.frozen)).rejects.toMatchObject({executionOutcome: 'not-started', retryable: true});
+    f.calls.submitPreparedTaskCall.mockRejectedValueOnce(Object.assign(new Error('shutdown'), {code: 'DISPOSED'}));
+    try {await f.executor.start(f.frozen); throw Error('Expected interruption');}
+    catch (error) {expect(error).toMatchObject({code: 'DISPOSED'}); expect((error as {executionOutcome?: string}).executionOutcome).toBeUndefined();}
+    expect(await f.executor.inspect(f.frozen)).toMatchObject({outcome: 'succeeded'});
+    expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(2); expect(f.prepareSession).toHaveBeenCalledOnce();
+});

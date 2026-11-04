@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {FSError} from '@nestos/vfs-core';
 import {openLocalFSBackend} from '@nestos/vfsdriver-local';
 import {openNodeApplication} from '../runtime/application';
-import {closeHostResources, type HostCleanup} from '../runtime/host-runtime';
+import {closeHostResources, namedCleanup, type HostCleanup} from '../runtime/host-runtime';
 import {canonical, within, privateDirectory} from '../runtime/paths';
 import {acquireHostLock} from '../storage/host-lock';
 import {NodeSqliteSidecarDb} from '../storage/sqlite-sidecar';
@@ -27,7 +27,7 @@ export {privateDirectory} from '../runtime/paths';
 async function openBackend(root: string, meta: string, cleanup: HostCleanup) {
     await privateDirectory(root); await privateDirectory(meta);
     const backend = await openLocalFSBackend({rootDir: root, sidecarDir: meta, durability: 'full', createDb: file => NodeSqliteSidecarDb.open(file)});
-    cleanup.push(() => backend.close());
+    cleanup.push(namedCleanup('shared-storage.close', () => backend.close()));
     return guardHostStorage(backend, root);
 }
 
@@ -40,7 +40,7 @@ export async function openUserApplication(options: HttpHostOptions, userId: stri
     try {
         const home = await privateDirectory(path.join(options.usersDir!, userId)), internal = path.join(home, '.nestos');
         await privateDirectory(internal);
-        cleanup.push(await acquireHostLock(path.join(internal, 'host-lock')));
+        cleanup.push(namedCleanup('storage.user-lock.release', await acquireHostLock(path.join(internal, 'host-lock'))));
         scoped.write({event: 'user.paths.ready', operationId, stage, result: 'success', durationMs: Date.now() - started});
         stage = 'configuration';
         const mounts = await sharedMounts(options, userId, cleanup);
@@ -48,10 +48,11 @@ export async function openUserApplication(options: HttpHostOptions, userId: stri
         stage = 'storage';
         const host = await openUserRuntime(options, home, internal, mounts, userId !== 'admin', cleanup);
         scoped.write({event: 'user.storage.ready', operationId, stage, result: 'success', durationMs: Date.now() - started});
+        if (options.signal?.aborted) await host.runtime.quiesce();
         const application = new ViewApi(Promise.resolve(host.runtime), scoped, false, userId !== 'admin');
-        cleanup.push(() => application.close());
+        cleanup.push(namedCleanup('views.close', () => application.close()));
         scoped.write({event: 'user.runtime.ready', operationId, stage: 'ready', result: 'success', durationMs: Date.now() - started});
-        return {application, close: () => closeUser(cleanup, scoped)};
+        return {application, quiesce: () => host.runtime.quiesce(), close: () => closeUser(cleanup, scoped)};
     } catch (error) {
         scoped.write({event: 'user.runtime.failed', operationId, stage, result: 'failure', code: userErrorCode(error), durationMs: Date.now() - started});
         try {await closeHostResources(cleanup);} catch {scoped.write({event: 'user.runtime.cleanup.failed', operationId, result: 'failure', code: 'USER_CLEANUP_FAILED'});}
@@ -86,7 +87,7 @@ async function openUserRuntime(options: HttpHostOptions, home: string, internal:
         toolPackages: {canManage: !configurationReadonly, directories: configurationReadonly ? [] : undefined, dataDirectory: path.join(options.root, 'tools'), registryFile: path.join(options.root, 'etc', 'tool-packages.json')},
         auditFile: path.join(internal, 'logs', 'audit.jsonl'), runtime: {startupMode: 'server', ownerKind: 'httpd', additionalMounts: mounts,
             sharedLlmConfiguration: true, configurationReadonly, costStorageRoot: '/var/lib/accounting'}});
-    cleanup.push(host.close);
+    cleanup.push(namedCleanup('runtime.close', host.close));
     if (options.editorSwap?.enabled) {
         const swap = await NodeEditorSwapStore.start(path.join(internal, 'swap'), state, options.staticDir);
         host.runtime.editorSwapStore = swap; cleanup.push(() => swap.dispose());

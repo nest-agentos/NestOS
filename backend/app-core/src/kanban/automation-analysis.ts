@@ -93,7 +93,7 @@ export async function analysisHistory(journal: KanbanAutomationJournal, boardId:
         saved = await journal.update<{keys: string[]; indexed?: boolean}>(key, old =>
             ({keys: [...new Set([...old?.keys ?? [], ...rows.map(row => row.key)])], indexed: true}));
     }
-    const jobs = await Promise.all(saved.keys.map(key => journal.get<Job>(key)));
+    const jobs = await journal.getMany<Job>(saved.keys);
     return jobs.filter((job): job is Job => !!job);
 }
 function newJob(board: KanbanBoard, item: KanbanItem, target: TargetRef, signature: string, id = randomUUID(), instruction = preset.instruction): Job {

@@ -1,3 +1,4 @@
+import {namedCleanup} from './host-cleanup';
 import {NodeToolConnections} from './tool-connections';
 import {ToolOAuthApplications} from './tool-oauth-applications';
 import {canonical, within} from './paths';
@@ -34,7 +35,7 @@ export async function openNodeApplication(options: NodeApplicationOptions): Prom
         const ownedConnections = connections;
         const runtime = await createNodeRuntime(resources.backend, resources.root, {...options.runtime, providerAuthorization: resources.authorization, toolConnections: connections}, {preferencesFile: path.join(options.authDir, 'tool-preferences', 'preferences.json'), ...options.toolPackages});
         let closing: Promise<void> | undefined;
-        return {runtime, audit: resources.audit, close: () => closing ??= closeHostResources([resources.close, () => ownedConnections.close(), () => runtime.dispose()])};
+        return {runtime, audit: resources.audit, close: () => closing ??= closeHostResources([namedCleanup('resources.close', resources.close), namedCleanup('connections.close', () => ownedConnections.close()), namedCleanup('application.dispose', () => runtime.dispose())])};
     } catch (error) { await connections?.close(); await resources.close(); throw error; }
 }
 

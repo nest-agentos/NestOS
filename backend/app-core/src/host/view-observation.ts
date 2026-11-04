@@ -20,7 +20,7 @@ export class ViewObservation implements ApplicationViewObservation {
     }
     private attachSources(services: LocalApplicationServices): void {
         this.releases.push(services.sessionRepository.subscribe?.(event => this.publish('repository', event)) ?? (() => {}));
-        this.releases.push(services.sessionFiles.subscribe(() => this.publish('files', undefined)));
+        this.releases.push(services.sessionFiles.subscribe(change => this.publish('files', change)));
         this.releases.push(services.kernel.kernel.onChanged(event => this.publish('kernel', event)));
         this.releases.push(services.sessionManager.onEvent(event => this.publish('session', event)));
         this.releases.push(services.sessionManager.onGlobalEvent(event => this.publish('global', event)));
@@ -47,6 +47,7 @@ export class ViewObservation implements ApplicationViewObservation {
     }
     private affectsSession(event: ApplicationViewEvent, sessionId: string): boolean {
         if (event.topic === 'kernel') return event.value.sessionId === sessionId;
+        if (event.topic === 'files') return !event.value.sessionId || event.value.sessionId === sessionId;
         if (event.topic === 'repository') return !event.value?.sessionId || event.value.sessionId === sessionId;
         return true;
     }
