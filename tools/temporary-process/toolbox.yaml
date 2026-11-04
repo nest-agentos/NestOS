@@ -1,0 +1,14 @@
+version: 1
+preinstall: true
+tools:
+  temporary.run:
+    label: 临时验收执行
+    parameters:
+      - name: command
+        label: 执行程序
+      - name: args
+        label: 参数
+      - name: cwd
+        label: 工作目录
+      - name: timeoutMs
+        label: 最长运行时间（毫秒）

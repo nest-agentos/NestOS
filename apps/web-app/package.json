@@ -1,0 +1,62 @@
+{
+  "name": "nestos-web",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.0",
+    "@codemirror/commands": "^6.10.0",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.11.3",
+    "@codemirror/lint": "^6.9.2",
+    "@codemirror/search": "^6.5.11",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.8",
+    "@fortawesome/fontawesome-free": "^7.1.0",
+    "@itookit/app-core": "workspace:*",
+    "@itookit/vfs-sync": "workspace:*",
+    "@itookit/app-settings": "workspace:*",
+    "@itookit/app-shell": "workspace:*",
+    "@itookit/common": "workspace:*",
+    "@itookit/driver-llm": "workspace:*",
+    "@itookit/kernel-adapters": "workspace:*",
+    "@itookit/llm-session": "workspace:*",
+    "@itookit/llm-ui-adapter": "workspace:*",
+    "@itookit/mdx-adapter": "workspace:*",
+    "@itookit/mdxeditor": "workspace:*",
+    "@itookit/ui-common-adapter": "workspace:*",
+    "@itookit/vfs-core": "workspace:*",
+    "@itookit/vfs-ui": "workspace:*",
+    "@itookit/vfsdriver-indexeddb": "workspace:*",
+    "codemirror": "^6.0.2",
+    "dexie": "^4.2.1",
+    "immer": "^10.2.0",
+    "marked": "^16.4.2",
+    "mermaid": "^11.12.1",
+    "@itookit/tools": "workspace:*",
+    "@itookit/sync-adapters": "workspace:*",
+    "@itookit/cells-driver": "workspace:*",
+    "@itookit/app-contracts": "workspace:*",
+    "@itookit/image-tools": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21"
+  },
+  "exports": {
+    "./startup": "./src/startup.ts",
+    "./preload": "./src/editor-modules.ts",
+    "./ui": "./src/ui.ts",
+    "./workspaces": "./src/config/modules.ts",
+    "./skill-tools": "./src/kernel/browser-skill-tools.ts",
+    "./style.css": "./src/styles/index.css",
+    "./index.html": "./index.html"
+  }
+}

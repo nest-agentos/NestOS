@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>NestOS</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="NestOS">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="./icon.svg">
+
+    <!-- 3. 应用样式 -->
+    <script>
+        try {
+            var mode = localStorage.getItem('mindos.theme');
+            document.documentElement.dataset.theme = mode === 'dark' || mode === 'light' ? mode
+                : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        } catch (_) {}
+        performance.mark('nestos:document');
+    </script>
+    <style>
+        html { background: #f7f8fa; }
+        html[data-theme="dark"] { background: #181a1f; }
+        body[data-app-starting] > :is(.app-sidebar, .main-content-area) { visibility: hidden; }
+        #app-initial-view { display: none; }
+        body[data-app-starting] > #app-initial-view { position: fixed; inset: 0; z-index: 9000; display: flex; flex-direction: column; padding: 0 20px env(safe-area-inset-bottom, 0px); background: #f7f8fa; color: #e3e6eb; }
+        html[data-theme="dark"] body[data-app-starting] > #app-initial-view { background: #181a1f; color: #30343c; }
+        #app-initial-view header { display: flex; align-items: center; gap: 12px; height: 64px; flex: 0 0 64px; border-bottom: 1px solid currentColor; }
+        #app-initial-view i, #app-initial-view span { display: block; background: currentColor; border-radius: 8px; }
+        #app-initial-view header i { width: 28px; height: 28px; }
+        #app-initial-view header span { width: 140px; height: 14px; }
+        #app-initial-view main { width: 100%; max-width: 820px; margin: 32px auto; flex: 1; }
+        #app-initial-view main i { width: 68%; height: 12px; margin: 16px 0; }
+        #app-initial-view main i:nth-child(2) { width: 44%; }
+        #app-initial-view main i:nth-child(3) { width: 55%; margin-left: auto; margin-top: 48px; }
+        #app-initial-view footer { width: 100%; max-width: 820px; height: 100px; min-height: 100px; margin: 0 auto 16px; border: 1px solid currentColor; border-radius: 16px; }
+        .app-startup { position: fixed; z-index: 9999; inset: 16px 16px auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; color: #111; box-shadow: 0 4px 20px #0002; overflow-wrap: anywhere; }
+        html[data-theme="dark"] .app-startup { background: #181a1f; color: #e3e6eb; border-color: #30343c; }
+        .app-startup h1 { font-size: 18px; margin-bottom: 12px; }
+        .app-startup p { white-space: pre-wrap; }
+        .app-startup button { margin-top: 16px; padding: 8px 16px; cursor: pointer; }
+        @media (min-width: 769px) { body[data-app-starting] > #app-initial-view { padding-left: 100px; padding-right: 40px; } }
+    </style>
+    <link rel="stylesheet" href="src/styles/index.css">
+</head>
+
+<body data-app-starting>
+    <div id="app-initial-view" aria-hidden="true">
+        <header><i></i><span></span></header>
+        <main><i></i><i></i><i></i></main>
+        <footer></footer>
+    </div>
+
+    <!-- ============================================= -->
+    <!--          1. 左侧主导航栏 (App Sidebar)         -->
+    <!-- ============================================= -->
+    <nav class="app-sidebar" aria-label="主导航">
+        <div class="app-sidebar__brand" aria-label="NestOS 个人助理"><span>NestOS</span></div>
+        <ul class="main-nav-list">
+            <li class="app-nav-item--primary">
+                <button type="button" class="app-nav-btn active" data-target="llm-workspace" title="工作台" aria-label="工作台">
+                    <i class="fas fa-comment-dots" aria-hidden="true"></i><span>工作台</span>
+                </button>
+            </li>
+            <li class="app-nav-item--primary">
+                <button type="button" class="app-nav-btn" data-target="kanban-workspace" title="看板" aria-label="看板"><span data-kanban-icon aria-hidden="true"></span><span>看板</span></button>
+            </li>
+            <li class="app-nav-item--primary">
+                <button type="button" class="app-nav-btn" data-target="notes-workspace" title="笔记" aria-label="笔记">
+                    <i class="fas fa-pen-to-square" aria-hidden="true"></i><span>笔记</span>
+                </button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="email-workspace" title="邮件" aria-label="邮件">
+                    <i class="fas fa-envelope" aria-hidden="true"></i><span>邮件</span>
+                </button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="calendar-workspace" title="日历" aria-label="日历"><span data-calendar-icon aria-hidden="true"></span><span>日历</span></button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="private-workspace" title="私密笔记" aria-label="私密笔记">
+                    <i class="fas fa-lock" aria-hidden="true"></i><span>私密</span>
+                </button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="twin-workspace" title="数字分身" aria-label="数字分身"><i class="fas fa-user-circle" aria-hidden="true"></i><span>数字分身</span></button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="toolbox-workspace" title="工具箱" aria-label="工具箱">
+                    <i class="fas fa-toolbox" aria-hidden="true"></i><span>工具箱</span>
+                </button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="settings-workspace" title="设置" aria-label="设置">
+                    <i class="fas fa-cog" aria-hidden="true"></i><span>设置</span>
+                </button>
+            </li>
+            <li class="app-nav-item--more">
+                <button type="button" class="app-nav-btn" id="mobile-more-button" aria-label="更多功能" aria-haspopup="dialog" aria-controls="mobile-more-menu" aria-expanded="false">
+                    <i class="fas fa-ellipsis" aria-hidden="true"></i><span>更多</span>
+                </button>
+            </li>
+        </ul>
+    </nav>
+    <dialog id="mobile-more-menu" class="mobile-more-menu" aria-label="更多功能">
+        <div class="mobile-more-menu__header"><strong>更多功能</strong><button type="button" class="mobile-more-menu__close" aria-label="关闭更多功能">×</button></div>
+        <div class="mobile-more-menu__grid">
+            <button type="button" class="app-nav-btn" data-target="calendar-workspace"><span data-calendar-icon aria-hidden="true"></span><span>日历</span></button>
+            <button type="button" class="app-nav-btn" data-target="email-workspace"><i class="fas fa-envelope" aria-hidden="true"></i><span>邮件</span></button>
+            <button type="button" class="app-nav-btn" data-target="private-workspace"><i class="fas fa-lock" aria-hidden="true"></i><span>私密笔记</span></button>
+            <button type="button" class="app-nav-btn" data-target="twin-workspace"><i class="fas fa-user-circle" aria-hidden="true"></i><span>数字分身</span></button>
+            <button type="button" class="app-nav-btn" data-target="toolbox-workspace"><i class="fas fa-toolbox" aria-hidden="true"></i><span>工具箱</span></button>
+            <button type="button" class="app-nav-btn" data-target="settings-workspace"><i class="fas fa-cog" aria-hidden="true"></i><span>设置</span></button>
+        </div>
+    </dialog>
+
+    <!-- ============================================= -->
+    <!--         2. 主内容区域 (Workspace Area)         -->
+    <!-- ============================================= -->
+    <main class="main-content-area">
+
+        <!-- 
+           [重要修改] 
+           由 MemoryManager 接管的容器现在是空的。
+           JS 会自动在其中创建 Sidebar 和 Editor。
+        -->
+
+
+<!-- (C) Email Workspace -->
+        <div id="email-workspace" class="workspace-view"></div>
+
+        <!-- (D) Private Workspace -->
+        <div id="private-workspace" class="workspace-view"></div>
+
+        <!-- (E) LLM Workspace -->
+        <div id="llm-workspace" class="workspace-view active"></div>
+
+        <!-- (A) Prompt Workspace (默认激活) -->
+        <div id="notes-workspace" class="workspace-view"></div>
+
+        <!-- (A) Agent Workspace (默认激活) -->
+        <div id="agent-workspace" class="workspace-view"></div>
+        <div id="calendar-workspace" class="workspace-view"></div>
+        <div id="twin-workspace" class="workspace-view"></div>
+        <div id="kanban-workspace" class="workspace-view"></div>
+        <div id="toolbox-workspace" class="workspace-view"></div>
+
+        <!-- Skills Workspace -->
+        <div id="skills-workspace" class="workspace-view"></div>
+
+        <!-- Workflows Workspace -->
+        <div id="flows-workspace" class="workspace-view"></div>
+        <!-- 
+           Settings Workspace 
+           这是一个特殊的视图，不使用 MemoryManager 文件管理，
+           所以保留内部结构供 React/Vue 或原生 JS 渲染内容。
+        -->
+        <div id="settings-workspace" class="workspace-view">
+            <div id="settings-content">
+                <!-- Settings UI 将被挂载到这里 -->
+            </div>
+        </div>
+    </main>
+
+    <!-- 主应用程序脚本 -->
+    <script type="module" src="./src/main.ts"></script>
+
+</body>
+
+</html>

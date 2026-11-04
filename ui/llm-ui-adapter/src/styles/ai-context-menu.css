@@ -1,0 +1,296 @@
+/* @file: llm-ui/styles/ai-context-menu.css */
+/* =====================================================
+   AI 右键菜单对话框 (Agent 绑定 & 初始提示)
+   ===================================================== */
+
+/* ── Overlay ─────────────────────────────────────────── */
+
+.ai-cm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: ai-cm-fade-in 0.15s ease;
+}
+
+@keyframes ai-cm-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ── Dialog card ─────────────────────────────────────── */
+
+.ai-cm-dialog {
+    background: var(--llm-bg-primary, #ffffff);
+    border-radius: 16px;
+    width: 460px;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.06),
+        0 8px 24px rgba(0, 0, 0, 0.12),
+        0 24px 48px rgba(0, 0, 0, 0.10);
+    animation: ai-cm-slide-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes ai-cm-slide-in {
+    from { opacity: 0; transform: scale(0.92) translateY(10px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+
+/* ── Header ──────────────────────────────────────────── */
+
+.ai-cm-dialog__header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--llm-border-color, #e5e7eb);
+    flex-shrink: 0;
+}
+
+.ai-cm-dialog__title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--llm-text-primary, #111827);
+    margin: 0 0 4px;
+    font-family: var(--llm-font-family, system-ui, sans-serif);
+}
+
+.ai-cm-dialog__subtitle {
+    font-size: 13px;
+    color: var(--llm-text-secondary, #6b7280);
+    margin: 0;
+    font-family: var(--llm-font-family, system-ui, sans-serif);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Body ────────────────────────────────────────────── */
+
+.ai-cm-dialog__body {
+    padding: 16px 24px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ── Agent list ──────────────────────────────────────── */
+
+.ai-cm-agent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.ai-cm-agent-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    background: var(--llm-bg-secondary, #f9fafb);
+    transition:
+        background var(--llm-transition-fast, 0.15s ease),
+        border-color var(--llm-transition-fast, 0.15s ease);
+    user-select: none;
+}
+
+.ai-cm-agent-item:hover {
+    background: var(--llm-bg-hover, #f3f4f6);
+    border-color: rgba(59, 130, 246, 0.25);
+}
+
+.ai-cm-agent-item.is-selected {
+    background: rgba(59, 130, 246, 0.07);
+    border-color: var(--llm-color-primary, #3b82f6);
+}
+
+.ai-cm-agent-item__icon {
+    font-size: 20px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--llm-bg-primary, #ffffff);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+}
+
+.ai-cm-agent-item__info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-cm-agent-item__name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--llm-text-primary, #111827);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--llm-font-family, system-ui, sans-serif);
+}
+
+.ai-cm-agent-item__desc {
+    font-size: 12px;
+    color: var(--llm-text-secondary, #6b7280);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--llm-font-family, system-ui, sans-serif);
+}
+
+.ai-cm-agent-item__check {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--llm-color-primary, #3b82f6);
+    opacity: 0;
+    flex-shrink: 0;
+    transition: opacity var(--llm-transition-fast, 0.15s ease);
+}
+
+.ai-cm-agent-item.is-selected .ai-cm-agent-item__check {
+    opacity: 1;
+}
+
+/* ── Clear row ───────────────────────────────────────── */
+
+.ai-cm-clear-row {
+    margin-top: 12px;
+    text-align: center;
+}
+
+/* ── Textarea ────────────────────────────────────────── */
+
+.ai-cm-textarea {
+    width: 100%;
+    min-height: 130px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--llm-border-color, #e5e7eb);
+    border-radius: var(--llm-radius-lg, 8px);
+    background: var(--llm-bg-secondary, #f9fafb);
+    color: var(--llm-text-primary, #111827);
+    font-size: 14px;
+    line-height: 1.6;
+    font-family: var(--llm-font-family, system-ui, sans-serif);
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+    transition:
+        border-color var(--llm-transition-fast, 0.15s ease),
+        box-shadow   var(--llm-transition-fast, 0.15s ease),
+        background   var(--llm-transition-fast, 0.15s ease);
+}
+
+.ai-cm-textarea:focus {
+    border-color: var(--llm-color-primary, #3b82f6);
+    background: var(--llm-bg-primary, #ffffff);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.ai-cm-textarea::placeholder {
+    color: var(--llm-text-placeholder, #9ca3af);
+}
+
+/* ── Help text ───────────────────────────────────────── */
+
+.ai-cm-help {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--llm-text-secondary, #6b7280);
+    line-height: 1.5;
+    font-family: var(--llm-font-family, system-ui, sans-serif);
+}
+
+/* ── Footer ──────────────────────────────────────────── */
+
+.ai-cm-dialog__footer {
+    padding: 14px 24px;
+    border-top: 1px solid var(--llm-border-color, #e5e7eb);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+
+.ai-cm-btn {
+    padding: 8px 18px;
+    border: none;
+    border-radius: var(--llm-radius-lg, 8px);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: var(--llm-font-family, system-ui, sans-serif);
+    transition:
+        opacity   var(--llm-transition-fast, 0.15s ease),
+        background var(--llm-transition-fast, 0.15s ease),
+        transform  0.1s ease;
+    line-height: 1;
+}
+
+.ai-cm-btn:active {
+    transform: scale(0.97);
+}
+
+.ai-cm-btn--primary {
+    background: var(--llm-color-primary, #3b82f6);
+    color: #ffffff;
+}
+
+.ai-cm-btn--primary:hover {
+    background: var(--llm-color-primary-hover, #2563eb);
+}
+
+.ai-cm-btn--secondary {
+    background: var(--llm-bg-tertiary, #f3f4f6);
+    color: var(--llm-text-primary, #374151);
+}
+
+.ai-cm-btn--secondary:hover {
+    background: var(--llm-bg-hover, #e5e7eb);
+}
+
+.ai-cm-btn--danger {
+    background: transparent;
+    color: var(--llm-color-error, #ef4444);
+    margin-right: auto;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.ai-cm-btn--danger:hover {
+    background: var(--llm-color-error-bg, #fee2e2);
+}
+
+/* Link-style button (used inside body, e.g. "清除绑定") */
+.ai-cm-btn-link {
+    background: none;
+    border: none;
+    color: var(--llm-color-error, #ef4444);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--llm-radius-sm, 4px);
+    font-family: var(--llm-font-family, system-ui, sans-serif);
+    font-weight: 400;
+    transition: background var(--llm-transition-fast, 0.15s ease);
+}
+
+.ai-cm-btn-link:hover {
+    background: var(--llm-color-error-bg, #fee2e2);
+}

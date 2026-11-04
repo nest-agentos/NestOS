@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <script>performance.mark('mindos.document');</script>
+    <script>
+        // Paint the shell in the persisted theme before any module runs. ThemeService mirrors the
+        // chosen mode here ('light' | 'dark' | 'system'); without it the app flashes the
+        // stylesheet default until the VFS-backed preference loads.
+        try {
+            const saved = localStorage.getItem('mindos.theme');
+            document.documentElement.dataset.theme = saved === 'light' || saved === 'dark' ? saved
+                : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        } catch { /* storage unavailable: keep the stylesheet default */ }
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>X1</title>
+    <link rel="stylesheet" href="src/styles/index.css" />
+</head>
+<body>
+    <nav class="app-sidebar" aria-label="主导航">
+        <div class="app-sidebar__brand" aria-label="NestOS 个人助理"><span>X1</span><small>NestOS</small></div>
+        <ul class="main-nav-list">
+            <li class="app-nav-item--primary">
+                <button type="button" class="app-nav-btn active" data-target="llm-workspace" title="工作台" aria-label="工作台">
+                    <i class="fas fa-comment-dots" aria-hidden="true"></i><span>工作台</span>
+                </button>
+            </li>
+            <li class="app-nav-item--primary">
+                <button type="button" class="app-nav-btn" data-target="kanban-workspace" title="看板" aria-label="看板"><span data-kanban-icon aria-hidden="true"></span><span>看板</span></button>
+            </li>
+            <li class="app-nav-item--primary">
+                <button type="button" class="app-nav-btn" data-target="notes-workspace" title="笔记" aria-label="笔记">
+                    <i class="fas fa-pen-to-square" aria-hidden="true"></i><span>笔记</span>
+                </button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="email-workspace" title="邮件" aria-label="邮件">
+                    <i class="fas fa-envelope" aria-hidden="true"></i><span>邮件</span>
+                </button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="calendar-workspace" title="日历" aria-label="日历"><span data-calendar-icon aria-hidden="true"></span><span>日历</span></button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="private-workspace" title="私密笔记" aria-label="私密笔记">
+                    <i class="fas fa-lock" aria-hidden="true"></i><span>私密</span>
+                </button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="twin-workspace" title="数字分身" aria-label="数字分身"><i class="fas fa-user-circle" aria-hidden="true"></i><span>数字分身</span></button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="toolbox-workspace" title="工具箱" aria-label="工具箱">
+                    <i class="fas fa-toolbox" aria-hidden="true"></i><span>工具箱</span>
+                </button>
+            </li>
+            <li class="app-nav-item--secondary">
+                <button type="button" class="app-nav-btn" data-target="settings-workspace" title="设置" aria-label="设置">
+                    <i class="fas fa-cog" aria-hidden="true"></i><span>设置</span>
+                </button>
+            </li>
+            <li class="app-nav-item--more">
+                <button type="button" class="app-nav-btn" id="mobile-more-button" aria-label="更多功能" aria-haspopup="dialog" aria-controls="mobile-more-menu" aria-expanded="false">
+                    <i class="fas fa-ellipsis" aria-hidden="true"></i><span>更多</span>
+                </button>
+            </li>
+        </ul>
+    </nav>
+    <dialog id="mobile-more-menu" class="mobile-more-menu" aria-label="更多功能">
+        <div class="mobile-more-menu__header"><strong>更多功能</strong><button type="button" class="mobile-more-menu__close" aria-label="关闭更多功能">×</button></div>
+        <div class="mobile-more-menu__grid">
+            <button type="button" class="app-nav-btn" data-target="calendar-workspace"><span data-calendar-icon aria-hidden="true"></span><span>日历</span></button>
+            <button type="button" class="app-nav-btn" data-target="email-workspace"><i class="fas fa-envelope" aria-hidden="true"></i><span>邮件</span></button>
+            <button type="button" class="app-nav-btn" data-target="private-workspace"><i class="fas fa-lock" aria-hidden="true"></i><span>私密笔记</span></button>
+            <button type="button" class="app-nav-btn" data-target="twin-workspace"><i class="fas fa-user-circle" aria-hidden="true"></i><span>数字分身</span></button>
+            <button type="button" class="app-nav-btn" data-target="toolbox-workspace"><i class="fas fa-toolbox" aria-hidden="true"></i><span>工具箱</span></button>
+            <button type="button" class="app-nav-btn" data-target="settings-workspace"><i class="fas fa-cog" aria-hidden="true"></i><span>设置</span></button>
+        </div>
+    </dialog>
+
+
+    <main class="main-content-area">
+        <!-- Boot overlay lives in the content area so the nav/sidebar stay visible from the first
+             paint; main.ts reuses this element (id) and only rewrites the message. -->
+        <div id="__boot-overlay" class="boot-overlay" role="status" aria-live="polite">
+            <div class="boot-overlay__spinner" aria-hidden="true"></div>
+            <div id="__boot-msg" class="boot-overlay__message">正在初始化…</div>
+        </div>
+        <div id="home-workspace"     class="workspace-view"></div>
+        <div id="llm-workspace"      class="workspace-view active"></div>
+        <div id="email-workspace"    class="workspace-view"></div>
+        <div id="private-workspace"  class="workspace-view"></div>
+        <div id="notes-workspace"    class="workspace-view"></div>
+        <div id="skills-workspace"   class="workspace-view"></div>
+        <div id="flows-workspace"    class="workspace-view"></div>
+        <div id="agent-workspace"    class="workspace-view"></div>
+        <div id="calendar-workspace" class="workspace-view"></div>
+        <div id="twin-workspace" class="workspace-view"></div>
+        <div id="kanban-workspace" class="workspace-view"></div>
+        <div id="toolbox-workspace" class="workspace-view"></div>
+        <div id="settings-workspace" class="workspace-view">
+            <div id="settings-content"></div>
+        </div>
+        <!-- Dynamic mount workspace panels appended here by main.ts -->
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

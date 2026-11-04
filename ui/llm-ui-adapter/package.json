@@ -1,0 +1,160 @@
+{
+  "name": "@itookit/llm-ui-adapter",
+  "version": "0.1.0",
+  "description": "NestOS conversation, settings and execution adapters for llm-ui",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./startup": {
+      "types": "./src/startup.ts",
+      "import": "./src/startup.ts",
+      "default": "./src/startup.ts"
+    },
+    "./style.css": "./src/styles/index.css",
+    "./chat": {
+      "types": "./src/chat.ts",
+      "import": "./src/chat.ts",
+      "default": "./src/chat.ts"
+    },
+    "./settings": {
+      "types": "./src/settings.ts",
+      "import": "./src/settings.ts",
+      "default": "./src/settings.ts"
+    },
+    "./conversation": {
+      "types": "./src/conversation.ts",
+      "import": "./src/conversation.ts",
+      "default": "./src/conversation.ts"
+    },
+    "./independent": "./src/independent.ts",
+    "./contracts": {
+      "types": "./src/contracts.ts",
+      "import": "./src/contracts.ts",
+      "default": "./src/contracts.ts"
+    },
+    "./presentation": {
+      "types": "./src/presentation.ts",
+      "import": "./src/presentation.ts",
+      "default": "./src/presentation.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/llm-ui.umd.cjs",
+    "module": "./dist/llm-ui.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/llm-ui.js",
+        "require": "./dist/llm-ui.umd.cjs"
+      },
+      "./startup": {
+        "types": "./dist/startup.d.ts",
+        "import": "./dist/startup.js"
+      },
+      "./style.css": "./dist/style.css",
+      "./chat": {
+        "types": "./dist/chat.d.ts",
+        "import": "./dist/chat.js"
+      },
+      "./settings": {
+        "types": "./dist/settings.d.ts",
+        "import": "./dist/settings.js"
+      },
+      "./conversation": {
+        "types": "./dist/conversation.d.ts",
+        "import": "./dist/conversation.js"
+      },
+      "./independent": {
+        "types": "./dist/independent.d.ts",
+        "import": "./dist/independent.js"
+      },
+      "./contracts": {
+        "types": "./dist/contracts.d.ts",
+        "import": "./dist/contracts.js"
+      },
+      "./presentation": {
+        "types": "./dist/presentation.d.ts",
+        "import": "./dist/presentation.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "vite build && vite build --config vite.startup.config.ts && vite build --config vite.entries.config.ts",
+    "dev": "vite build --watch",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "llm-ui",
+    "ai-workspace",
+    "chat-interface",
+    "streaming-ui",
+    "agent-visualization",
+    "session-manager",
+    "editor-adapter",
+    "typescript"
+  ],
+  "author": "lizlok@gmail.com",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nest-agentos/NestOS.git",
+    "directory": "ui/llm-ui-adapter"
+  },
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS/tree/main/ui/llm-ui#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "@itookit/app-contracts": "workspace:*",
+    "@itookit/common": "workspace:*",
+    "@itookit/durable-kernel": "workspace:*",
+    "@itookit/llm-flow": "workspace:*",
+    "@itookit/llm-session": "workspace:*",
+    "@itookit/ui-common-adapter": "workspace:*",
+    "@itookit/vfs-core": "workspace:*",
+    "js-yaml": "^4.1.1",
+    "marked": "^16.4.2",
+    "@itookit/llm-ui": "workspace:*",
+    "@itookit/driver-llm": "workspace:*",
+    "@itookit/kernel-adapters": "workspace:*",
+    "@itookit/llm-tasks": "workspace:*",
+    "@itookit/tools": "workspace:*",
+    "@itookit/image-parser": "workspace:*"
+  },
+  "peerDependencies": {
+    "@itookit/mdx-adapter": "workspace:*",
+    "@itookit/mdxeditor": "workspace:*"
+  },
+  "devDependencies": {
+    "@itookit/mdx-adapter": "workspace:*",
+    "@itookit/mdxeditor": "workspace:*",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.19.25",
+    "@vitest/coverage-v8": "^4.1.12",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.1.12"
+  }
+}

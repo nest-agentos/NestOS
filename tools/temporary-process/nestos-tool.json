@@ -1,0 +1,8 @@
+{
+  "format": 1,
+  "id": "temporary-process",
+  "version": "0.1.0",
+  "module": "node/extension.mjs",
+  "tools": [{"id": "temporary.run", "version": "1"}],
+  "files": ["node"]
+}

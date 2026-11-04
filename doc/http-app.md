@@ -1,0 +1,594 @@
+# HTTP 应用宿主
+
+`apps/http-app` 在 Node.js 中装配 ApplicationRuntime：默认单用户；显式 `--users-dir` 时按 mTLS 用户分别装配。浏览器使用与 Web 相同的 HTML、CSS、工作区配置、编辑器工厂和 `app-shell.initApp()`，通过服务端口操作后端，不创建 IndexedDB、LLM 或 Kernel Runtime。Tauri 仍通过本地端口注入同一套 UI。CLI 的 `-d` 模式见 [CLI HTTP 模式](http-mode.md)。
+
+## 模块和所有权
+
+| 模块 | 职责 |
+|---|---|
+| [app-contracts/services](../shared/app-contracts/src/services.ts) | ApplicationClient 前端能力；应用操作异步，快照 selector 同步 |
+| [app-shell](../ui/app-shell/src/bootstrap.ts) | 唯一 UI 装配入口；项目、文件、设置、工具箱、数字分身及 Flow 使用原组件 |
+| [HTTP 客户端](../shared/app-transport/src/http/view-client.ts) | HTTP 调用、SSE 接收、回调回复与连接状态 |
+| [应用能力描述](../shared/app-transport/src/application/capabilities.ts) | 显式方法、字段、查询模式、观察和失效；按 ApplicationBackend 校验方法覆盖 |
+| [传输机制](../shared/app-transport/src/rpc/peer.ts) | 注入能力描述；编码、远程句柄、版本、资源借用与撤销 |
+| [工作台读模型](../backend/app-core/src/host/workbench-view.ts) | 一次装配侧栏文件视图、生命周期、检索、当前项目、聊天控制和可选首目录/导航数据 |
+| [视图缓存](../shared/app-transport/src/rpc/view-cache.ts) | 纯字段差分、版本补丁与追加内容；业务失效关系由应用描述提供 |
+| [视图宿主](../apps/node-host/src/http/view-services.ts) | 绑定统一应用门面和每个浏览器的独立会话绑定 |
+| [HTTP API](../apps/node-host/src/http/view-api.ts) | 客户端证书指纹与 clientId 隔离、事件连接、空闲回收 |
+| [存储保护](../apps/node-host/src/storage/host-storage.ts) | 数据根路径、内部目录和符号链接检查；存储不经过 HTTP |
+
+目录隔离与远程行为一致性分别验证。Web、Tauri 与 HTTP 共用 app-core/host 的应用门面；UI 不传仓储、内核或构造工厂，任务详情和工具箱在后端聚合。同步/异步返回契约显式声明，传输适配持有远端对象句柄；`app-shell`、`llm-ui`、`app-settings` 不识别 HTTP、URL 或证书。
+
+运行时、存储、租约、扫描和任务执行属于 daemon。浏览器只拥有视图绑定、文件视图和订阅。各浏览器的 Session 绑定独立；默认模式共用同一份持久化数据与 Kernel，多用户模式只在同一 userId 内共享。
+
+`pnpm httpd` 和 `pnpm httpd:dev` 沿用启动环境中的 `http_proxy` / `https_proxy`（也支持大写）及 `no_proxy` / `NO_PROXY`。存在非空 HTTP(S) 代理地址且未显式设置 `NODE_USE_ENV_PROXY` 时，启动器为后端进程自动启用 Node 环境代理，无需每次额外设置开关；地址、大小写优先级和绕过规则由 Node 处理。显式 `NODE_USE_ENV_PROXY=0` 保持关闭，没有代理地址时保持默认行为；启动器不修改父进程环境。此规则属于宿主启动层，不进入前端、app-core 或 LLM Provider。
+
+HTTP 配置优先读取启动目录下的 `nestos.json`，不存在时使用原 XDG 配置目录。启动目录遵循 `INIT_CWD`，否则使用进程 cwd。选中配置后的相对路径均相对于配置文件目录；本地配置损坏时明确报错，不静默回退其他 profile。启动输出 `[HTTP] Config:` 显示实际文件及来源。CLI 和桌面宿主的默认配置定位不变。
+
+单用户启动会输出 ANSI **红色加粗**的 `【单用户模式：admin】` 提示，并写入 `server.mode` 审计事件；提示即使在日志重定向时也保留样式控制码。
+
+外部工具包的网页 OAuth 由 admin 在“工具箱 → 工具包 → 我的数据连接 → 管理员：授权应用配置”保存一次 Client ID、Secret 和完整 HTTPS 回调 `/api/tool-connections/callback`。普通用户只需点击“连接账号”并同意权限，各自的令牌仍隔离保存。应用配置位于宿主 `authDir/tool-oauth-applications/`，多用户共用，修改无需重启用户运行时；更换应用配置后旧授权必须重新连接。可选 `http.publicOrigin`（例如 `https://nestos.example.com:2000`）用于预填回调及兼容旧个人客户端；未设置不妨碍使用界面已保存的应用回调。管理员须在供应商登记地址，授权浏览器须携带本用户客户端证书。细节见[外部功能扩展](design/function-extensions.md)。
+
+## mTLS 多用户与可迁移 home
+
+在启动目录的 `nestos.json` 中配置用户目录和证书映射：
+
+```json
+{
+  "rootDir": "/srv/nestos",
+  "http": {
+    "certDir": "/srv/nestos-host/certs",
+    "authDir": "/srv/nestos-host/auth",
+    "usersDir": "/srv/nestos/home",
+    "mtls": {
+      "clients": {
+        "<admin证书的64位小写SHA256指纹>": {"userId": "admin"},
+        "<li证书的64位小写SHA256指纹>": {"userId": "li"},
+        "<sxw证书的64位小写SHA256指纹>": {"userId": "sxw"}
+      }
+    }
+  }
+}
+```
+
+`http.usersDir` 或 `--users-dir` 显式启用多用户。HTTPS 强制校验客户端证书。配置了 `http.mtls.clients` 后，该映射是唯一登记来源，每次认证重新读取；删除或损坏策略会拒绝认证，不回退旧登记。未配置 `http.mtls` 时兼容证书目录的 `clients.json`，其对象格式与 `clients` 相同，旧指纹数组映射到 admin。
+
+使用现有 CA 签发独立用户证书：
+
+```bash
+pnpm httpd --create-user-cert li
+pnpm httpd --create-user-cert sxw
+```
+
+命令生成 `certDir/users/<userId>/browser-client.p12` 和 `client-password.txt`，输出证书指纹供填写上述映射，不自动登记，不覆盖已有用户证书，不打印密码。用户导入自己的 p12；admin 继续使用原证书，也拥有独立数据目录。
+
+userId 必须匹配 `[a-z][a-z0-9_-]{0,63}`，不能用客户端参数或证书 CN 选择目录。多张证书可以登记为同一 userId；换证保留 userId 即保留数据。至少登记一张 admin 证书。登记非 admin 身份后，未开启多用户的宿主拒绝启动和访问，避免误入旧共享 Runtime。登记策略每次请求重读，SSE 每 15 秒重新验证证书及原 userId；撤销或重新分配证书会停止原事件流。浏览器通过认证后的 `/api/identity` 确认身份并钉住后续请求，证书用户变化时必须重新加载，不能把旧页面恢复到新账号。
+
+```bash
+# 新安装；证书和日志沿用原来的私密目录配置
+pnpm httpd --root /srv/nestos --users-dir /srv/nestos/home
+```
+
+启动先打开 admin，完成公共配置初始化，再恢复所有已登记用户，全部成功后才监听。请求只能进入证书所属的 Runtime/ViewApi；同一用户的新窗口复用该 Runtime，不同用户的相同 clientId、Session ID 和逻辑路径不会选择到同一份私有存储。新增登记的用户在首次应用请求时初始化，并复用初始化中的 Promise；最多同时保留 100 个用户 Runtime。关闭网页不停止后台任务，宿主退出才依次释放流、视图、Runtime、数据库和锁。当前实现面向少量用户，每用户仍有独立 Kernel、工具装配与后台恢复开销。
+
+远程项目挂载和本地会话记录归各用户所有；不同用户可以挂载同一远程目录。共享 `/etc/llm` 中的 MCP 连接使用同一远端凭据，因此在 cells 上代表同一 principal，其远端项目和原生会话按该 principal 授权，不会自动按 NestOS userId 隔离。需要远端身份隔离时必须配置不同凭据；挂载复用优先核对已验证 principal；未验证的 Bearer 连接按凭据引用区分，不能因为用户名都为空而合并。HTTP 宿主租约使用 `httpd` 标识，历史 `cli` 租约仍按原有效期处理。
+
+多用户工具包安装到 `<rootDir>/tools/<包名>/<版本>`，登记文件为 `<rootDir>/etc/tool-packages.json`；所有用户加载同一份工具代码，运行数据仍归各自用户。工具包源沿用 `NESTOS_TOOL_PACKAGE_DIRS` 或启动目录的 `tools/`。`bin/` 可用于命令行入口，不作为工具注册依据。 可信包 `toolbox.yaml` 的 `preinstall: true` 在启动时预装，默认按用户停用；每用户启用及普通默认参数位于 `.nestos/private/tool-preferences/preferences.json`，认证连接仍单独保存。共享代码、组织空间不共享这些个人设置。
+
+物理布局：
+
+```text
+/srv/nestos/
+├── _meta/                          宿主互斥锁
+├── etc/                            所有用户共用，只有 admin 可修改
+│   ├── llm/                        Provider、Connection、MCP、Skill、定价与提示配置
+│   ├── agents/                     公共 Agent 定义
+│   ├── flows/                      公共 Flow 定义
+│   └── _meta/                      公共配置的 SQLite 索引和记录
+└── home/
+    ├── admin/
+    │   ├── notes/、projects/、…     用户正文
+    │   └── .nestos/
+    │       ├── state/              私有逻辑根，含 etc、var/lib、var/log 等
+    │       ├── meta/               私有 SQLite 索引与 SeqFile 记录
+    │       ├── private/            个人 OAuth 授权，不进入 VFS
+    │       ├── logs/               用户宿主审计
+    │       ├── host-lock/          用户数据包互斥锁
+    │       └── swap/               启用 editorSwap 时的私有恢复文件
+    ├── li/
+    │   └── …
+    └── sxw/
+        └── …
+```
+
+Runtime 内继续使用既有 `/home/admin` 作为“当前用户 home”的逻辑别名，不代表服务器 admin 的物理目录。宿主 `UserFiles` 将该路径映射到当前用户 home，将其他私有路径留在 `.nestos/state`；记录键仍沿用原逻辑路径，正文、会话和项目记录共用一个用户索引，保留既有事务边界。顶层 `.nestos` 不允许通过用户文件能力、链接或普通目录遍历访问；项目内部已有的 `.nestos` 会话布局不受此规则影响。
+
+Node SQLite 每个连接最多保留 128 个预编译 SQL 语句，变长批量查询超出容量后淘汰旧语句。缓存只复用语句编译，不缓存读取结果；参数绑定、事务、回滚、rename journal 核对与连接隔离保持原语义，关闭连接释放引用。会话切换的 CLI 隔离复现与 CPU/事务计时见 [CLI 与 HTTP 模式](./http-mode.md)。
+
+公共配置只有 admin 可写，普通用户通过同一份配置执行，公共密钥仍由服务端执行路径使用；普通用户的完整配置查询返回脱敏结果，原始 `/etc/llm` 文档不通过普通用户文件或设置偏好读取接口开放。个人偏好、默认项目、远程项目连接登记、会话、任务、草稿、费用记录和 OAuth 授权都留在用户目录中。共享 MCP 端点或外部项目是否具有用户隔离能力取决于外部服务及其授权，不能因本地 Runtime 隔离就假定远端也隔离。公共配置修改后重启 httpd，使所有用户重新加载配置；当前不承诺跨 Runtime 配置热更新。
+
+浏览器 DTO 缓存和文件恢复副本按认证 userId 分区；跨账号不消费原有未分区恢复副本。已打开页面遇到证书重新分配时停止复用旧状态，重新加载后进入新的用户空间。
+
+### 从旧单用户数据离线导入
+
+先停止占用旧数据根及授权目录的宿主，使用新的 rootDir 和 home 目录。导入通过存储 API 复制文件、元数据、标签和 SeqFile 字段，不能只复制空 `.seq` 文件。它会取得旧数据与可选授权目录的互斥锁，保留源数据，拒绝覆盖已有 admin 数据包或公共配置；成功后退出，不启动服务。
+
+```bash
+pnpm httpd --root /srv/nestos --users-dir /srv/nestos/home \
+  --import-legacy-root /path/to/old-data \
+  --import-legacy-auth-dir /path/to/old-private-auth
+
+pnpm httpd --root /srv/nestos --users-dir /srv/nestos/home
+```
+
+旧侧车数据库必须位于旧根的 `_meta`；使用自定义外置侧车的 profile 应先制作完整离线副本并整理为此布局。`--import-legacy-auth-dir` 可省略，省略后 admin 需重新完成个人 OAuth 授权。公共配置进入 `<rootDir>/etc`，原费用记录进入 admin 的私有记账目录，其他旧数据归 admin。不要把目标 rootDir/home 放在旧数据根内。导入中断后，源数据仍在；未发布的 `.import-*`/`.etc-*` 目录可在确认没有导入进程后清理，不能把残留暂存目录当成成功结果。
+
+后续迁移单个用户时，停止拥有该数据包的宿主后复制完整 `home/<userId>`，保留文件权限；目标服务必须提供对应公共配置并重新登记证书映射。当前全局 httpd 停止后再复制即可，不支持在线一致快照或在线逐用户卸载。宿主外部目录、远程项目和系统工具依赖需在新机器核对；这些外部内容不会随 home 复制。VFS 隔离不等于操作系统沙箱，开放任意 Shell/TTY 的部署仍需单独配置系统账号或容器边界。
+
+诊断复用总审计日志，重要事件为 `auth.accepted/rejected`、`user.paths.ready`、`user.configuration.ready`、`user.storage.ready`、`user.runtime.start/ready/failed/closed` 和 `user.import.start/complete/failed`。记录 userId、requestId 或 operationId、阶段、结果、安全错误码和耗时；请求日志和应用业务失败也带 userId。`HOST_LOCK_BUSY`、`CLIENT_POLICY_INVALID`、目录或链接拒绝可分别定位，不记录文件正文、消息、参数、授权令牌或配置密钥。
+
+## 协议
+
+`POST /api/application` 使用 `version: 15` 与 `clientId`，支持 bootstrap、queries、bindings、call、reply、close，以及只读 updates-read。bootstrap 返回公开服务图、产品模板与 Flow 库，以扁平描述避免重复导出对象图；call 只能调用本视图已经导出的能力句柄上的公开方法。v14 将初始视图打开与观察登记并入 bootstrap，并支持按内容摘要复用纯数据缓存，要求前后端同步更新；聊天配置聚合观察和冷启动目标会话准备继续保留；后端拥有技能文件系统、默认工具分组与工具箱导航装配；toolboxView 初始快照及 resources.navigation 聚合刷新返回目录数据，不接受浏览器反向文件系统能力，消除浏览器逐段路径检查及重复遍历；保留 Provider 订阅授权状态与命令；保留 navigationView、warmNavigation、工作台聚合、会话准备/激活及 UI 文档批量端口；升级服务后需重新加载页面。句柄包含视图随机身份，不能用于另一个浏览器。私有字段、原型访问、Runtime.dispose、设备注册、SQL 和原始记录写入不开放。
+
+queries 合并同一微任务中独立的只读查询，bindings 合并订阅注册，每批最多 32 项、每个合批器最多 2 批在途，等待与在途调用合计最多 1024 项；服务端先检查整批方法类别再执行。共享只读命令策略使 GetSnapshot、GetSessions 和 Flow 读取进入查询批次，不触发全域失效。业务写入独立确认，不混入查询或订阅批次；后续命令先等待此前发起的订阅注册确认，避免快速执行漏事件，独立只读查询仍可并行；失败与结果未知的命令不自动重放。
+
+文件操作经过应用文件视图。用户内容可以读写；`/etc` 的直接写入仅允许 UI 偏好，配置、会话和任务修改通过各自服务执行。字节、Map、Set、回调与持续句柄有显式编码。同步 UI 查询读取已加载的快照；执行和持久化调用经异步端口完成，不使用同步 XMLHttpRequest。
+
+`GET /api/application/events?clientId=<id>` 提供 SSE。通知按 16 ms 窗口合并，只运行一个刷新循环，256 条 / 1 MiB 上限覆盖等待和处理中的事件；刷新期间的失效只安排一次后续刷新，保持事件顺序。客户端也限制排队通知的数量和字节；需要结果的回调单独经 reply 返回，不等待通知批次。领域服务变更也主动更新其他浏览器的快照。客户端先安装 bootstrap，再按序消费已经缓冲的 SSE；服务端在首次快照建立前暂停通知快照刷新。快照补丁携带前后版本，客户端缓冲乱序补丁、忽略旧版本，缺失更新不能覆盖新状态。长连接每 15 秒重新验证证书。初次连接通过 `resume=1` 显式协商带序号的 SSE，未协商的旧客户端仍收到原有 data 帧格式。短暂中断通过 `after=<最后接收序号>&version=15` 恢复同一视图，服务端以 `X-NestOS-View-Resume: 1` 声明支持；按视图保留最近 256 帧 / 2 MiB 内存事件日志，包含离线期间通知。恢复前验证证书、已初始化视图、协议版本和序号范围，缺失历史或回调超时必须重新加载，不能静默漏掉更新或为旧句柄创建新视图。客户端按序接收、忽略重复帧，首次立即重连，连续失败按 1/2/4/8/15 秒退避；响应头成功但立即 EOF 仍累计退避，连接持续 15 秒后重置，online/focus 或立即重连可唤醒；45 秒无心跳触发重连，取消与销毁停止恢复。写请求不会自动重发。事件日志不跨 daemon 重启，不提供持久命令回执，不能宣称跨重载的 exactly-once 保证。
+
+`POST /api/application/files?clientId=<id>&version=15` 使用 application/octet-stream 传输文件字节，X-View-Call 携带编码后的文件能力参数。权限仍由已导出的文件视图检查，不提供宿主路径或存储驱动入口。二进制读写省去 JSON/base64 编码；读取响应头与写入回执携带文件 revision，前端在操作完成前更新 onRevision，条件写入参数保持原有含义。文件接口仍使用完整 ArrayBuffer，不是无限大小的流式存储接口。
+
+v15 按 Session ID 与分支保留最多 8 份历史基线，历史缓存按编码字符预算有界（约 8 MiB，单个当前历史可超出预算）；每次绑定仍读取宿主最新状态。A→B→A 与 A 的原基线比较，变化较小时同步增量，支持末尾追加、中间编辑和删除；历史数组补丁超过 64 KiB 时改为整段替换，缓存淘汰或分支基线缺失时也完整同步。基线随版本补丁一起传输和淘汰，不依赖客户端猜测缓存命中；公开 SessionSnapshot 返回形状保持不变。
+
+SSE 通知包超过 64 KiB 时只发送 `updatesRead` 身份；浏览器通过同一 mTLS/clientId 的 `updates-read` 读取已准备的更新并按原序应用，不重新执行 Session 绑定或业务命令。准备区最多 32 项 / 32 MiB，保留 60 秒，允许断线重放时重复读取；过期或被淘汰时报告视图过期并保留草稿恢复，不跳过缺失更新。`view.update.read` 审计包含操作身份、读取 requestId、阶段、结果、字节数和耗时，不记录正文。前后端协议升级到 v15，浏览器 DTO 缓存也按协议版本隔离。
+
+客户端待处理通知最多 256 项 / 2 MiB，单帧也最多 2 MiB；字节预算统一按 UTF-8 线传长度计算，与服务端一致。一次网络读取可能包含多帧，逐帧校验，并在即将超限时给已排队回调一次事件循环排空机会；不等待阻塞回调，不扩大或取消上限。数量或字节真实超限时保留队列计数、传入大小、序号、耗时及错误分类，不记录正文。回归覆盖大历史的 A→B→A 切换、合并读块、真正阻塞和多字节超大帧。
+
+HTTP 客户端分别报告传输断开和视图更新失败。fetch/SSE 短暂断开恢复原视图且保留页面与输入，恢复成功收起提示；服务重启或视图过期返回 `X-NestOS-View-Expired: 1` 后，旧句柄的查询、命令和二进制文件请求在客户端立即拒绝，避免重复无效轮询。过期后保留页面及草稿，服务就绪后捕获编辑器快照并自动重建视图，不刷新文档；受阻或恢复失败时保留草稿，显示具体原因和重试/手动重载入口。DOM 输入事件不能证明所有编辑已保存，健康检查成功也不代表视图已经恢复。快照应用、回调、事件解析和通知过载显示页面数据更新失败，提供手动重载入口，保留当前页面未发送内容，不单独触发健康探测或自动重载。解析失败和过载中止事件消费；写命令始终不自动重放。原生 harness 另行区分连接状态与 `refreshError`：目录监听失败不改变会话在线状态，各 profile 的状态读取错误独立显示阶段和安全错误码，events/list 的实际传输断开均标 offline，协议、权限错误与超时只标 stale，成功空轮询也可恢复传输状态。
+
+```mermaid
+C4Component
+    title HTTP 视图恢复的职责与调用边界
+    Person(user, "用户", "继续编辑；恢复受阻时处理具体原因")
+    Container_Boundary(browser, "HTTP 浏览器") {
+        Component(shell, "工作台与编辑器", "app-shell / llm-ui", "保留当前页面与草稿")
+        Component(status, "恢复控制与提示", "http-app", "就绪后自动重建；失败保留快照")
+        Component(transport, "HttpViewClient", "app-transport", "同视图续传、持续退避、过期停止")
+    }
+    Container_Boundary(host, "Node 宿主") {
+        Component(events, "视图与事件日志", "node-host", "校验身份、序号和可恢复历史")
+        Component(health, "健康检查", "node-host", "只报告服务就绪")
+    }
+    Rel(shell, transport, "经应用端口查询、写入与订阅")
+    Rel(transport, events, "短暂中断恢复原视图；不重放写入", "HTTPS / SSE")
+    Rel(transport, status, "通知过期或更新失败")
+    Rel(status, health, "过期后探测就绪", "HTTPS")
+    Rel(status, shell, "捕获草稿并等待新编辑器完成恢复")
+    Rel(user, status, "受阻时重试或保留内容后手动重载")
+```
+
+每个视图最多 4096 个活跃能力句柄、16 个在途业务请求和 128 个待回复回调，最多 128 个浏览器视图。dispose/release/close 撤销独占子图并传送句柄撤销，关闭资源时同步取消其订阅；共享子图按可达拥有者保留；压缩的撤销区间使迟到更新不能复活已释放句柄。回调中的事务能力仅借用到回调结束。没有事件连接和在途回调的视图在空闲 60 秒后回收。JSON 与独立二进制传输分别限制为 32 MiB；通知等待队列和流写缓冲也有上限。
+
+网页视图释放只停止展示与连接兴趣。cells 独立按项目/profile 回收连续空闲 5 分钟的原生运行时，每 60 秒检查一次内存状态；执行、待答交互和在途请求会阻止卸载，等待回答不自动取消。原生历史与操作回执保留，重新访问延迟创建 driver，打开会话时重新读取待答框。进程退出或服务重启的恢复能力仍受原生 harness 限制；该保留策略不承诺跨原生进程故障恢复尚未完成的工具调用。
+
+旧 HttpStorageBackend、记录事务传输、loopback 存储监听、精简 ApplicationShell 与禁用菜单适配已删除。`/api/vfs` 始终拒绝访问；`/api/health` 返回就绪状态及运行模式、构建版本。
+
+## 性能边界
+
+工具箱的 `ToolboxView.files` 由后端组合，权限与链接校验在后端完成；前端只消费文件能力，不重新挂载远端文件源。视图由后端 ViewScope 拥有，工作区关闭后统一释放。工具箱刷新由后端 `refreshGroups` 在一次目录扫描中同时生成分组和导航目录，前端不再按 Agent/Flow 子目录逐个发起 getChildren。描述查询与分组刷新可并行；路径未改变的标题/状态更新不调用 relocate，纯描述查询不触发写域失效。Provider 删除确认以服务端提交为完成条件，导航刷新单独执行，刷新失败不重放删除命令。Provider 删除仍校验确认计划、清理关联连接和默认选择，内置条目以删除标记阻止重启重建；不能直接删除配置文件绕过这些规则。
+
+普通文件模块通过 `navigationView({ root, scope })` 一次取得受限文件能力、首层元数据、根忽略规则及两份不透明 UI 状态；首屏不再顺序调用 openFileSystem、readUiDocuments、getChildren 和 getNodeType。快照只用一次，文件事件、显式版本回调和后续刷新使用实时端口。首次进入空模块不再隐式创建样例文件；用户点击新建时仍使用注册模板。
+
+外壳初始路由完成后，空闲任务优先提前装配工具箱与工作台导航，复用相同的模块加载与订阅，不打开编辑器、会话或 Session 租约，不切换当前路由。用户提前点击时共享在途加载；隐藏工具箱与工作台暂停目录读取、积累变更。任务串行并让出前台加载，随后最多为两个尚未加载的常用目录调用一次 warmNavigation，这一步不导出文件能力或构造普通模块。节省流量模式、低速连接跳过；隐藏页面暂停并在重新可见时继续，销毁取消剩余任务。后端缓存最多 8 个根，每根最多 1000 行 / 512 KiB JSON，15 秒过期；文件事件立即失效，失败不缓存。挂载 revision 不是内容版本，不能单靠它判断数据新旧。缓存前检查已授权根，`/etc` 等托管路径继续保持命令写入约束。
+
+普通模块首层可用后再恢复目录展开；已缓存的普通模块和工作台在没有变化且未过期时直接切回，隐藏期间积累的变更在恢复可见时合并刷新。未通知到当前进程的外部写入依靠短期缓存到期及显式刷新重新读取，缓存不作为正文写入或任务操作的权威。
+
+模块边界不应逐一变成网络请求。可见延迟主要由本地处理、关键路径上的串行往返和传输量组成；总请求数不能直接当作串行往返次数。同步视图查询读取前端快照，业务执行和持久化留在后端。同一套 UI 可使用本地端口或 HTTP 端口，但 HTTP 仍有网络与序列化成本。
+
+bootstrap 不预开文件系统；主题与 UI 状态通过文档端口读取，功能服务和工作区文件视图按消费创建，重复引用使用句柄。只读查询不触发全域快照计算；配置、项目、会话、文件、设置、分身按变更事件失效，只有受影响的能力重新计算。小变更发送字段补丁，追加 token/历史发送追加内容。目录过滤、工具箱扫描留在后端；列表只读取 Provider 的安全元数据，完整配置在打开编辑器时读取。普通事件单向通知，不要求浏览器逐条回复。
+
+`workbenchView` 由后端完成服务装配与首目录读取。HTTP 宿主选择预取，本地宿主直接提供服务；UI 消费同一接口，首目录数据只使用一次，后续刷新读取当前视图。首屏读模型由应用用例返回，不改写底层 RPC proxy，不因描述更新退回细碎调用。并发请求只释放自己借用的回调，订阅回调保持到取消订阅。
+
+完整 Shell 集成测试使用内存后端和进程内协议，空数据启动测量如下。当前大小按 UTF-8 字节计算，不含静态资源、TLS 或 HTTP 头；不是广域网延迟测量。通知到达时序可能使启动窗口内的回调数与响应量略有变化。
+
+| 指标 | 轻量入口 | 聊天首页 | 笔记深链 `/简历.mind` |
+|---|---:|---:|---:|
+| 启动阶段客户端方法调用（不含 bootstrap） | 1 | 15 | 14 |
+| 启动阶段请求（不含 bootstrap/SSE） | 1 | 7 | 8 |
+| 启动阶段反向回调 | 0 | 0 | 0 |
+| 启动阶段响应体（UTF-8，不含 bootstrap） | 91 B | 约 7.7 KB | 约 5.8 KB |
+
+上述启动路径均不调用 settings、ocr 或 initialFiles 工厂。设置导航只生成本地页面节点；实际编辑器打开后才请求 backend.settings，联系人和标签定义在后端加载。工作区来源只传声明身份或已有文件视图，导出、标签统计和系统浏览按需打开相应来源，保持原有写权限。
+
+2026-10-15 性能复测使用真实 RPC 编解码器、每条正文 256 字符的合成数据，连续九轮向最后一条追加六个字符。旧路径全量刷新，新路径消费带消息身份的更新事件；中位数如下，不代表真实网络或所有领域投影的延迟。
+
+| 历史记录数 | 全量刷新旧测量 | 消息增量投影复测 | 当前补丁大小 |
+|---:|---:|---:|---:|
+| 100 | 1.9ms | 0.23ms | 206B |
+| 1000 | 15ms | 0.85ms | 207B |
+| 5000 | 71ms | 2.74ms | 208B |
+
+1000 条记录不变时，poll 响应由 313955B 降为 111B。单个 Session 管理器事件不再重读另外 20 个会话快照，读取次数由 21 降为 1。回归约束使用消息 getter 次数、通知顺序、队列容量与查询在途数，不以易受环境影响的毫秒阈值作为正确性条件。整个工作区导航的合批数受事件到达时序影响，不承诺固定请求数。
+
+## 业务装配与后台缓存
+
+进入工作台通过 `workbenchView` 获取当前项目、导航首屏和聊天控制。HTTP 的 `chat.configuration` 返回已就绪的 `ChatConfigurationView`，一次提供 Agent 展示字段、预设提示词、连接安全元数据、模型目录与默认连接 ID；不包含凭据或系统提示词正文。后端合并配置失效并发布新快照，编辑器共享一个配置订阅，先安装快照再通知本地选择器；本地宿主仍可直接消费配置服务。UI 不再分别请求特权命令、Skill 工厂和当前项目，也不逐 Agent 请求提示词或单独读取连接。聊天深链在主题初始化前预取主题、侧栏、标签和执行器使用记录，合并为一次文档读取；结果各消费一次，新写入优先。`readUiDocuments` 每次最多读取 32 个不透明 UI 文档；`writeUiDocuments` 在后端串行 upsert，前端合并同一轮修改并跳过未变化的内容，失败保留待写数据，flush 可重试。偏好写入不是业务事务批处理。
+
+`ProjectService.navigation` 聚合目标归属、当前项目、离线状态与不透明分组路径；`SessionBrowserPort` 显式声明异步导航失效屏障与目录读取，不依赖 RPC 通用对象的隐式方法。`createSessionDraft` 在服务端完成来源解析和带初始输入的会话创建，客户端收到确认后才导航。`sessionTasks` 返回裁剪后的任务分页，不传输完整任务内部记录。客户端关闭只解绑会话视图，Runtime 保留执行及草稿收尾，闲置上下文按引用和任务状态回收。
+
+冷启动的 `workbenchView({initialSessionId})` 将目标的只读准备与工作台并行完成，通过 `initialSession` 返回；失效链接不阻断工作台，其他准备失败时排空并释放已取得的资源。未使用的准备在更换目标或销毁工作台时释放。普通切换先调用 `openSessionView`，在后端校验/准备访问并取得 manifest、项目、目录权限和文件租约。旧编辑器保存、关闭之后才 `activate(branch)`，后端完成 Bind/分支选择并返回消息快照、设置和元信息，编辑器直接消费，事件绑定后读取同一会话的已观察快照，缺少同步选择器时才回退 GetSnapshot。两步顺序用于保留目标准备失败时的旧视图，避免旧编辑器保存/解绑影响新会话。取消或关闭准备中的视图会释放文件租约；不会取消业务 Task。缓存标签恢复会话绑定，关闭其他标签不解除当前绑定。
+
+连接探测由 Runtime 共享的观察器执行。前端只提交可见项目和打开标签的兴趣集合；后台跳过无远程挂载的项目，最多同时检查 4 个项目，每次检查预算 3 秒，完成后间隔 15 秒再检查。同一挂载的在途检查继续由 remote-mount 服务合并，最后一个观察者退出后中止探测并停止定时器，不取消任务。
+
+### 当前会话后台恢复聚合
+
+原生聊天发送遇到 HTTP 响应丢失时，已冻结提交的界面会按同一个 submissionId 查询一次回执；只有匹配的 accepted/rejected 回执才解除待确认状态，查询失败或仍 pending 保留输入和手动查询入口，不自动重发。提交前的只读检查失败返回 not-committed，拒绝回执保留安全错误码，避免已确认的写锁冲突被显示为结果未知。Codex 后台的写锁可能在界面退出后延迟释放，不能根据历史 source 字段判断当前客户端。
+
+`ApplicationBackend.taskAttachment(sessionId, sharedKey)` 是只读应用聚合端口：校验会话后，通过 Kernel 的只读 inspectSession 在宿主读取指定共享记录、活动任务状态和待审批索引，只返回活动任务 ID 与按更新时间排序的候选 ID，不改变任何浏览器的会话绑定。尚未创建 Kernel Session 的有效会话返回空候选；存储故障仍向调用方报错。读取不附着、不审批、不启动或取消 Task。
+
+llm-ui 通过可选 `readTaskAttachment` 回调消费该能力，没有注入时保留原始 Kernel 端口路径。回复到达后继续校验当前编辑器、会话和附着代次；没有候选时跳过额外的 Flow 列表查询。活动候选附着前读取实时任务状态，已终结则继续待交互候选；待交互候选排除当前 Flow 所属任务，并核对同一 Session、非终态和仍有 pending interaction，过期候选跳过后继续查找。任务打开和状态读取之后均检查编辑器代次，读取失败向上传递；聚合返回的是恢复线索，不是执行凭据。真实 Kernel 重建后的审批恢复测试覆盖两种路径，并核对完成的是原任务。
+
+`session.flow.invocations` 纳入共享只读命令集合，查询不触发全域失效。RPC 的订阅屏障也使用动态查询分类：只读命令不等待先前订阅，写命令继续等待订阅确认，不自动重试。OCR 设置表单与附件管理共享一个 Agent 配置源订阅，每个消费者退出时移除自身监听，最后一个消费者退出时释放源订阅。
+
+JSON 应用请求的 `request.complete` 新增可选 `bodyReadMs`（请求体接收及解析）、`viewReadyMs`（等待应用视图）、`rpcMs`（能力执行、快照及 JSON 响应生成）和 `responseFlushMs`（响应提交至 Node finish/close）。`application.complete.durationMs` 保留原含义，通过 requestId 关联。flush 不代表浏览器收到或渲染完成，客户端证书验证也不计入这些阶段；日志不记录文档、命令参数、共享键或用户内容。部署新版本后可据此区分此前 1 秒级 HTTP 请求与毫秒级 RPC 之间的差异。
+
+`application.complete` 还记录注册命令目录确认的 `rpcCommands`、业务回复的 `rpcErrorCount/rpcErrorCodes`；HTTP 200 不能代替业务成功。图片上传只额外记录声明的 MIME 与字节数 `uploads`，不写文件名、data URL 或异常正文。上传错误区分 `INPUT_ASSET_FORMAT`、`INPUT_ASSET_TOO_LARGE`、`INPUT_ASSET_PERSISTENCE`，存储错误保留安全错误码；业务错误回复附加 HTTP requestId，前端 flow-images 日志可据此关联。当前宿主输入暂存单文件预算为 20 MiB，与 Flow 自行声明的总字节/数量限制分别校验。
+
+### RPC 与往返的生命周期边界
+
+RPC 是逻辑操作，HTTP 往返是传输批次；SSE 是独立的持续事件通道，不能把持续连接的存活时间当作一次加载耗时。目前 queries/bindings 只合并同一轮发起的独立调用；组件之间的 await 会把一次打开拆成多轮网络依赖。
+
+| 生命周期/数据 | 当前调用 | 关系与处理方向 |
+|---|---|---|
+| 首次进入聊天资源 | openView：UI 文档、工作台、配置、目标准备 | 已合并为应用用例；普通模块仍使用 navigationView，未打开模块不预热 |
+| 当前会话激活 | 冷启动由 openView 内部激活；切换用 SessionOpenView.activate | 冷启动无旧编辑器；已有编辑器切换需先保存/释放，保留激活屏障 |
+| 初始恢复 | openView 内部读取 taskAttachment、Flow 与 Skill 列表 | 初始编辑器一次消费；读取期间有对应变更则放弃预取，回到实时端口；存在候选时仍核对任务归属 |
+| 持续观察 | observation.observeView(cursor, callback) | 宿主先订阅源，再准备首屏；一个远程观察按 topic 在前端分发；底层文件 onAny 仍按文件视图订阅 |
+| 可见侧栏 | getNodeType、getChildren、ProjectService.navigation | 只有侧栏可见才需要；首层可用一个导航读模型，第二次读取需依据真实失效，不能因无关写入重刷 |
+| 偏好持久化 | writeUiDocuments | 初始化不等于修改；先跳过未变化状态，再按用户操作合并持久化，退出/切换按需 flush |
+| 实际业务命令 | 保存文件、发送、取消、审批 | 独立确认和授权顺序仍需保留；结果未知时不得自动重放 |
+
+更高层的目标是“一个前端视图的打开与观察”，不是一个全局当前页面：携带 resource、uiScope、visiblePanels 等明确兴趣，返回首屏快照、资源句柄及事件水位，再消费同一视图的 SSE 增量。后端必须将初始快照与观察水位对齐，避免快照完成到订阅建立之间漏事件。前端 DOM、滚动、菜单及未提交输入继续在各端独立。冷启动与带未保存内容的会话切换走不同准备顺序，不能用同一个无条件批次覆盖。
+
+### 打开与观察聚合（已实现）
+
+`ApplicationBackend.openView({documents, workbench, branch?, taskAttachmentKey?})` 处理首次进入聊天工作区或本地会话深链，返回不透明 UI 文档、工作台资源、可选会话初始数据、`observation` 与 `cursor`。`workbench.initialNavigation` 表达是否读取首层目录，手机正文与隐藏侧栏继续跳过读取。普通文件、原生会话、草稿沿用各自的打开端口，不提前初始化其他工作区。
+
+1. 宿主先订阅仓储、文件、收藏、Kernel、草稿、挂载、Agent 和当前客户端会话事件，再并行读取工作台和 UI 文档；配置与初始 Skill 观察随对应能力建立。
+2. 当前客户端无绑定时，宿主内部激活目标分支，并行读取任务恢复、Flow 与 Skill 初始数据。已有绑定的冷打开与同客户端并发打开返回 EBUSY；普通标签切换继续先准备、保存旧编辑器、释放旧绑定，再显式 activate。
+3. 返回前同步采集当前会话快照及事件水位，校验绑定仍属于目标；读取期间发生相关变更时不使用过期的恢复/列表预取。恢复缓存同时校验 sessionId 与 sharedKey，一次消费；其他会话事件不会无条件清空当前会话缓存。
+4. 前端通过一个 `observeView(cursor, callback)` 登记；宿主按序补发首屏返回到登记之间的变化，再持续经现有 SSE 发送。应用事件日志最多 256 条 / 1 MiB，历史缺失拒绝订阅，不能静默跳过；SSE 自身的断线日志与恢复规则继续独立生效。
+5. 前端装配期间缓冲应用事件；读取已经更新的会话快照时记录相同 SSE 帧内的观察水位，跳过已包含的流式增量，后续事件按序分发一次。事件缺口、缓冲超限或通知回调失败报告页面更新失败，保留当前页面。此水位仅对当前视图有效，不是持久化事务版本。
+6. 任一打开步骤失败先释放已经取得的资源，仅解绑本次请求激活的目标，不取消 Task；销毁释放源订阅、配置、连接观察和文件租约。每个 HTTP/CLI 客户端有独立绑定与观察，运行任务和业务记录仍由 Runtime 共享。聚合视图是显式受管能力；HTTP 关闭先等待已发起的 RPC（包含从取消订阅到远程释放的整个异步过程）排空，再发送关闭请求。排空、关闭请求和本地清理共用 5 秒上限，超时中止在途请求；重复关闭共用一次过程，不重放命令。
+
+内部仍使用各模块的类型化回调；外部调用使用有结果的异步端口，持续变化走带序号的事件。跨 Task、Flow 与 Skill 的 `SessionPresentationState` 定义在 app-contracts；聚合位于 app-core/app-shell 应用层，llm-ui 保留公开的初始数据与恢复回调，不依赖 HTTP、应用 Runtime 或 app-contracts。
+
+模块关系如下；本地宿主直接将应用端口交给 Shell，HTTP 宿主通过两端传输适配同一契约。
+
+```mermaid
+C4Component
+    Container_Boundary(browser, "浏览器") {
+        Component(shell, "app-shell", "TypeScript / DOM", "路由、编辑器生命周期、事件本地分发")
+        Component(chat, "llm-ui", "独立聊天 UI", "实时核对恢复候选、任务附着、按编辑器释放监听")
+        Component(client, "app-transport 客户端", "HTTP / RPC", "快照安装、SSE、有界关闭")
+    }
+    Container_Boundary(host, "HTTP 宿主") {
+        Component(server, "app-transport 服务端", "RPC 能力适配", "按公开观察契约编码增量快照")
+        Component(core, "app-core", "应用用例", "openView、观察日志、任务恢复聚合")
+        Component(kernel, "durable-kernel", "执行内核", "任务事实、共享提示与只读索引")
+    }
+    Component(contracts, "app-contracts", "共享类型与纯变换", "应用端口、DTO、资源所有权")
+    Rel(shell, client, "调用应用端口，消费快照与事件")
+    Rel(shell, chat, "注入初始数据、恢复回调和领域控制端口")
+    Rel(chat, client, "经 Kernel 端口读取实时任务状态并附着")
+    Rel(client, server, "能力调用、快照补丁、SSE", "RPC v15")
+    Rel(server, core, "openView / getSessionBaseline / observeView")
+    Rel(core, kernel, "宿主只读检查", "KernelInspectionPort")
+    Rel(shell, contracts, "依赖公开类型")
+    Rel(core, contracts, "实现应用契约")
+    Rel(server, contracts, "按公开契约适配")
+```
+
+### 一次打开同步握手与首帧（v14）
+
+HTTP 页面现在由轻入口同时启动数据连接、Shell 模块和当前编辑器代码加载。聊天目标及 UI 文档名称通过 app-shell/startup 的纯函数构造，当前路由之外的工作区保持延迟创建。SSE 建连和初始 POST 并行，不再先等待 SSE 响应头才发送 bootstrap。
+
+初始 `POST /api/application` 的 `kind=bootstrap` 可以携带 `initialView: OpenViewRequest` 与 `knownSnapshots: string[]`。后端在本客户端中完成 openView、注册初始观察，再导出服务图和 `initialView`。初始连接兴趣在 openView 内建立，前端按单调 revision 更新：只有已确认相同集合才省略请求；在途或失败时不能按旧集合去重，较早响应不能覆盖较新确认。装配期间只保留最高 revision。普通的无目标 bootstrap 与后续 openView 接口继续可用；已有编辑器切换仍保存后激活。
+
+初始响应开启缓存时为 `{payload, cache}`：payload 中的 `{$cache: sha256}` 指向本地已验证的数据或本次 cache 字典。未携带 knownSnapshots 的显式协议调用继续返回普通 RPC Reply。初始观察事件使用同一 SSE 帧的 viewEvents 字段发送；HttpViewClient 在安装能力图后按序处理，提供本地 observeView 适配，组件不再远程登记初始订阅。全量快照、版本补丁、回调和应用事件仍使用有界顺序队列。
+
+缓存边界与校准：
+
+- ViewApi 持有跨客户端的有界纯数据缓存，浏览器在 sessionStorage 中按当前协议版本（v15）保存副本。两端最多 128 项 / 8 MiB，单块 1–128 KiB；更大的对象按子树处理。资源句柄、函数、回调和包含句柄的对象不进入缓存。
+- SHA-256 根据当前实际编码数据计算，不使用预设 getConfigVersion，也不复用旧视图的 descriptor.version。相同数据可以只传摘要；数据改变则发送该块完整当前内容。现有视图内的增量补丁机制继续生效。后台不会以客户端上传的状态覆盖业务记录。
+- 前端加载持久副本时验证内容摘要，只有本地确实存在的有效块才声明 knownSnapshots；损坏/不可用缓存按未命中处理，存储配额不足不阻断页面。服务器仍从当前授权视图构造数据和本次连接的新句柄。
+- 响应引用缺失时，客户端只调用 `kind=bootstrap-data` 重读同一份已准备响应，不重新打开、绑定、发送消息或执行命令。此补读只服务当前认证客户端，不能按摘要任意读取后台缓存。
+- 缓存覆盖纯展示数据；各前端的会话、分支绑定、兴趣和资源生命周期仍独立。已有 SSE 断线恢复继续按同一视图的事件序号补发；历史失效仍要求重新加载，不重放写命令。
+- 初始装配使用 observation.getSessionBaseline 的成对快照/水位，避免读取更新的游标后误跳过尚未包含的流式事件。调用者只读使用快照；传输通过公开 observeView 接收失效事件，自行持有不可变 Session 行投影，不依赖具体后端的私有方法。单条流式变更只复制受影响行，分支变化仍全量重建。异步观察登记失败向上报告，关闭后才完成的登记立即释放。
+
+首帧处理：共享 HTML 直接提供当前主题背景和静态页面骨架；主题镜像只用于首帧，后端 UI 文档返回后校准。骨架不显示历史正文或可交互按钮，正常启动没有加载 banner。主样式表以非阻塞方式加载，避免下载大 CSS 时只能显示白色页面。当前目标加载完成后移除骨架；失败时显示现有错误入口。普通 SSE 重连不重建 DOM 或显示首屏骨架。
+
+HTML 的样式处理器在模块加载前记录 load/error，HTTP 和 Web 本地入口共用 `nestos-web/startup` 读取已有结果并等待样式，最长 30 秒；超时或失败释放其他样式的等待监听，显示可重载的错误。提示所需样式内联在 HTML，不依赖失败的 CSS。Web 在 IndexedDB 或 Runtime 初始化失败时也解除骨架并显示错误，样式与本地初始化并行。
+
+HTTP 提前连接保留当前连接状态，状态提示安装时同步补报；终结的更新错误或视图过期不会被迟到的重连清除。`nestos:data-ready` 只记录连接数据就绪，不包含编辑器代码和样式等待。服务端通知刷新失败后关闭队列并使 SSE 日志失效，后续请求报告视图过期；不会跳过丢失序号继续发送，也不重放业务命令。回归见 [浏览器启动](../apps/http-app/tests/browser-startup.test.ts)、[Web 初始化失败](../apps/http-app/tests/web-startup-failure.test.ts)、[提前连接状态](../apps/http-app/tests/early-connection-status.test.ts) 和 [通知刷新失败](../apps/http-app/tests/view-notification-failure.test.ts)。
+
+浏览器 Performance 条目 `nestos:document-to-editor` 记录 HTML 脚本开始至编辑器就绪，`nestos:entry-to-editor` 记录入口执行至编辑器就绪；二者包括相应网络/代码/装配等待，不能用服务器 rpcMs 替代。bootstrap 现在也记录 application.complete 和 rpcMs，日志不记录目标、已知摘要或用户正文。
+
+复核范围包括初始握手与快照缓存、Shell 的打开/观察装配、真实 Kernel 重建后的审批恢复，以及过期候选和监听释放。历史样本的请求数、响应大小和测试计数通过 Git 查阅，不作为当前运行版本的性能保证；v15 发布需前后端同步更新。运行版本核对见[启动与认证](#启动与认证)。
+
+```bash
+pnpm --filter @itookit/http-app test tests/view-api.test.ts tests/snapshot-cache.test.ts
+pnpm --filter @itookit/app-shell test --maxWorkers=4 tests/http-handshake-shell.test.ts tests/opened-view-projection.test.ts tests/task-attachment-recovery.test.ts tests/pending-interaction-restore.test.ts
+pnpm --filter @itookit/llm-ui-adapter test --minWorkers=1 --maxWorkers=4
+```
+
+原生会话状态由 `RemoteSessionStatus` 按项目共享：初次订阅读取权威快照，后续实时变化由共享 SSE 触发，同时保留 15 秒权威核对；显式 `refresh` 或会话活动变化也可触发读取。缓存读取不触发远端查询；变化才通知，执行期间失败退避 1–30 秒。最后一个订阅退出后保留最多 30 秒的过期投影，重新订阅可先展示并读取一次最新状态。闲置缓存最多 64 个项目、合计 4096 行，单个超过 512 行的项目不保留；缓存身份包含配置、服务器和授权 revision，身份改变立即拒绝旧缓存。过期记录禁止中断/审批操作。任务的最终结果、运行状态与命令回执仍以持久记录为准；缓存不替代写入门、租约、版本校验或结果未知命令的核对。
+
+执行期间的状态缓存对 offline 和 refreshError 均退避，成功观察恢复正常间隔；缓存层异常只令投影过期并显示状态观察失败，连接判断沿用端口证据，订阅回调异常不改变连接投影。空闲观察失败后不启动自动重试，由下一次显式读取核对。
+
+连接观察不再每 15 秒探测，只在进入新的远程项目或授权绑定变化时检查一次。前端聊天只订阅后端快照，不定时调用 poll；后端在有活动轮次且有展示订阅时每 200 ms 推进游标，结束或取消展示即停止。目录和空闲历史由用户显式刷新，文件观察覆盖不足不再制造每 30 秒变化的版本。浏览器隐藏时暂停工作区展示订阅，返回时重新读取；任务执行和持久化不依赖页面可见性。SSE 的 15 秒保活与证书复核保留，不触发业务读取或界面重绘。
+
+前端启动与导航诊断默认静默；需要排查时设置 `localStorage['vfs:debug']='1'` 后重新加载页面。进度回调与错误处理不依赖诊断输出，Node 宿主的启动日志保持原有行为。
+
+原生聊天标题状态显示事件投影的执行阶段及距最近活动的秒数。整理上下文时，独立视图和兼容视图在聊天区额外显示醒目提示与等待秒数，结束后自动撤下；阶段变化由读屏状态区播报，秒数不反复播报。空正文思考项仍提供阶段；没有时间证据时不补造计时。秒数只更新状态文本，不轮询、不重绘消息、不判断执行存活；隐藏、关闭或终态停止计时。Codex 摘要由节点 profile 的 `[harnesses.codex] reasoning_summary` 显式启用，新轮次生效；摘要改善可见反馈，不承诺模型提速。
+
+外部 CLI/桌面写入的 Codex 会话不依赖本节点的本地事件流更新正文。既有 15 秒状态核对比较 `historyRevision`，有变化才补读；外部会话的显式刷新和重新激活直接读取历史。节点与驱动需配套更新才能自动核对版本；旧节点仍可显式刷新。内部会话继续消费实时事件和游标，空闲时的版本核对及事件故障后的历史补齐也覆盖没有指令队首的会话。观察成功不能代替历史版本已同步的证据。
+
+原生聊天界面停止更新时，对照运行日志 `[Conversation] Observation` 的 `refresh_start` / `refresh_end` / `publish` 与浏览器内存日志 `native-observation` 模块的 `chat.native.pipeline`：`receive` 表示浏览器绑定已收到快照，`receive_project` 表示投影通知返回，`render_toolbar` 表示同步消息 DOM 更新已推进到工具栏更新阶段，不证明异步 Markdown 渲染或浏览器绘制完成。按 sessionId、turnId、observedAt、messageCount、textLength 和 queueRevision 对照，前端另记视图 revision、挂载状态、消息 DOM 数量和页面可见性。每个观察实例的每阶段成功日志最多每 5 秒一条，失败不节流；日志不含正文或原始异常。后端 publish 只证明已通知本地订阅者，不能代替浏览器接收证据；一分钟核查恢复入口保持原有行为。
+
+默认 Flow 由后端初始化按安装回执准备，用户删除或修改的模板不会在刷新页面时重新覆盖；前端只保留显式恢复与运行交互。
+
+```mermaid
+C4Component
+    title 业务查询、缓存与事件更新
+    Container_Boundary(front, "共用前端 Web / Tauri / HTTP") {
+        Component(shell, "工作台与编辑器", "ui/*", "导航、展示、草稿、标签资源")
+    }
+    Container_Boundary(back, "应用后端") {
+        Component(usecase, "应用视图用例", "app-core/host", "workbenchView / openSessionView / activate")
+        Component(observer, "共享观察器", "app-core", "首次/显式读取；仅活动轮次推进游标；空闲停止")
+        Component(cache, "状态与读模型缓存", "app-core / HTTP projections", "身份、过期、容量、事件失效")
+        Component(store, "持久业务服务", "Session / Kernel / VFS", "任务结果、权限、租约与版本")
+    }
+    System_Ext(remote, "远程项目服务", "文件与原生会话状态")
+    Rel(shell, usecase, "业务动作", "直接 API 或 HTTP")
+    Rel(usecase, store, "校验与装配")
+    Rel(shell, observer, "声明兴趣、释放观察")
+    Rel(observer, remote, "共享后台检查")
+    Rel(observer, cache, "更新最近状态")
+    Rel(store, cache, "提交事件使读模型失效")
+    Rel(cache, shell, "快照与变化通知", "直接订阅或 SSE")
+```
+
+`application.complete` 与 `request.complete` 通过 requestId 对照：前者记录 rpcKind、rpcBatchSize、rpcOperations（注册能力名与方法名）及执行耗时，后者记录整次 HTTP 请求耗时。只记录公开方法元数据，不记录参数、UI 文档名、文件路径、消息或凭据；批次至多记录 32 个方法。bootstrap/SSE/文件传输仍用请求事件统计；不能将逻辑调用数当作 HTTP 请求数或把 SSE 连接寿命当作启动耗时。
+
+## 启动与认证
+
+```bash
+pnpm httpd:build --no-activate # 仅构建和验证，不改变下次启动选择
+pnpm httpd:build --no-cache    # 绕过构建缓存，重新安装和编译
+pnpm httpd:build --share-main  # 链接 worktree 中复用主检出的基线、缓存与 release 目录
+pnpm httpd:build              # 自动增量构建库，再构建并选择独立 release；不重启当前服务，开发工作区保持源码
+pnpm httpd                    # 直接运行已选 release，无构建步骤
+pnpm httpd:dev                # 开发工作树，默认端口 2001
+pnpm httpd:list
+pnpm httpd:activate <版本ID>   # 下次启动使用此版本
+```
+
+`httpd:build` 自动先执行增量 `lib:build`，只重建变化的库及受影响依赖方，无变化时复用快照；库构建失败不会继续 HTTP release 构建或激活。无需再手动串联两条命令。
+
+隔离环境安装依赖及 deploy 均优先复用本地 pnpm 缓存，缺失的安装包或 registry 元数据允许联网补齐，不要求开发环境事先缓存全部依赖。安装先以 `--offline` 复用 store，store 缺少包或 registry 元数据时自动以 `--prefer-offline` 重试，并记录 `stage=install result=store-miss packages=<缺失包>` 与 `result=store-warmed`；锁文件不一致、registry 拒绝等其他安装错误按 `HTTP_BUILD_INSTALL_FAILED` 直接失败，不触发联网重试。完全离线且 store 缺包时错误信息保留 pnpm 给出的缺失包，可在仓库根执行 `pnpm install --prefer-offline --frozen-lockfile` 预热 store 后重试。
+
+构建缓存位于忽略目录 `release/httpd/.build-cache/`。源码、库快照、运行时及构建环境均未变化时，校验并复用完整 release；源码有变化时复用依赖安装环境，按 Vite/tsup 实际输入分别判断是否重新编译 UI 和服务端。新增文件、配置、锁文件、库快照、Node/ABI、pnpm 或原生模块变化会使对应缓存失效。输出损坏会重新编译，构建锁防止并发改写隔离环境；每步日志包含 operationId、缓存命中原因及耗时。变更构建仍重新 deploy 生产依赖，发布副本与缓存互相独立。清除 `.build-cache/` 后下次重建即可，不影响已有 release；清理时应确保没有构建进程。
+
+源码变化检查只覆盖 HTTP 的有效构建输入：backend/ui/shared 生产文件、Web/HTTP/Node 宿主、提供生产模块的 tools 工作区包及依赖清单、锁文件和构建脚本。`tests`/`__tests__`、`*.test.*`/`*.spec.*`、测试配置、文档及 Tauri/CLI 的实现不触发此检查；其他应用的 package.json 仍参与依赖安装校验。库源码先制成不可变快照，独立检查生产与打包输入，测试变动不触发库重建。生产文件在捕获后变化仍报 `HTTP_BUILD_SOURCE_CHANGED`，需要等待本次编辑完成后重试，不能因此取消制品一致性保护。
+
+### 在 worktree 中验证
+
+`_nestos/worktrees/<dispatch>` 是 Git worktree，`release/`（含 `local-libraries/` 与 `httpd/`）默认落在各自检出内，因此新 worktree 首次构建是冷启动；此外 `lib:build` 需要根依赖（`yaml`），原生模块指纹与 deploy 的原生运行时复制都取自当前检出，所以 worktree 至少要 `pnpm install --ignore-scripts` 一次。按代价从轻到重选择：
+
+```bash
+pnpm typecheck && pnpm --filter @itookit/<pkg> test   # 类型与逻辑，不产生 release
+pnpm httpd:dev                                        # Vite 构建开发 UI + tsx 运行服务端，不 deploy
+pnpm httpd:build --share-main --no-activate            # 复用主检出的基线、安装与编译缓存
+NESTOS_HTTPD_RELEASE_ROOT=<主检出>/release/httpd pnpm httpd  # 启动主检出目录中的共享 release
+```
+
+`--share-main` 只在链接 worktree 生效（主检出自身为无操作），等价于同时设置：
+
+| 变量 | 作用 |
+|---|---|
+| `NESTOS_LIBRARY_SEED_ROOT=<主检出>` | 本检出没有 prepared 指针时，用该检出的 prepared 快照作增量基线；未改动的库直接复用 tarball，只重建改动库及其依赖方。种子不可用时记录 `stage=plan-base result=seed-fallback` 并回退全量构建 |
+| `NESTOS_HTTPD_RELEASE_ROOT=<目录>` | `httpd:build`、`list`、`activate`、`start` 的 release 根目录，连同 `.build-cache/`（依赖安装隔离环境与 Vite/tsup 制品缓存）一起共享 |
+
+缓存键全部由内容决定：库快照 id 是打包产物的哈希，依赖键包含快照 id、锁文件与构建配置、Node/ABI、pnpm 版本和原生模块指纹，制品键另校验每个编译输入文件的 sha256，源码捕获每次按当前 worktree 的 Git 输入重写。因此跨检出命中不会把别的 checkout 的产物当成本次源码的结果，构建锁保证共享目录不被并发改写。`--no-activate` 不改主检出下次启动的 `current.json`；需要切换时显式执行 `pnpm httpd:activate <版本ID>`。
+
+种子只用它的 prepared 快照做增量基线：命中时写入本检出的只是那份库快照副本（约 3 MiB）与 `prepared.json`，未选中任何库时不编译（日志 `rebuild=0 reuse=<全部>`）；基线与本检出源码不一致的库仍按 `source-changed` / `build-inputs-changed` 重建，并连带重建依赖方。种子不可用（格式错、快照缺失、被删）时记录 `stage=plan-base result=seed-fallback` 或 `code=PREPARED_MISSING` 并回退全量构建。
+
+依赖方源码未初始化时报 `LOCAL_LIBRARIES_SOURCE_MISSING: <库名>; initialize libraries/<目录> in this checkout`，按平台既有的 submodule 初始化方式只取该模块即可：
+
+```bash
+git -c protocol.file.allow=always submodule update --init -- libraries/<目录>
+```
+
+即使全部命中，源码变化仍会重新 deploy 一份生产依赖（每份约 0.4 GiB），因为发布副本与缓存互相独立；只在需要验证 deploy、原生运行时、校验和与版本 ID 时才构建 release，其余情况用 `pnpm httpd:dev`。release 目录不会自动淘汰：`release/httpd/` 下每个版本约 0.4 GiB，`current.json` 只指向一份，回滚不需要的旧版本应手工清理。
+
+release 保存在 `release/httpd/<版本ID>/`，包括固定的服务端、UI 与运行依赖副本，启动校验服务端/UI 校验和及 Node 主版本。依赖打包在临时源码副本执行，不修改开发工作区的 node_modules；构建中源码发生变化则拒绝激活。保留旧版本可回滚，正在运行的进程继续使用原版本和对应静态资源。第一次从旧 tsx 启动方式迁移时，需要先结束原实例再启动 release；不能让两个宿主同时使用真实数据。后续版本切换在下次启动生效。
+
+release 沿用原 profile 数据；dev 默认使用 `<configDir>/http-dev/data`，忽略原 profile 数据根。两者的 OAuth 凭据分别在 `<configDir>/http-auth/release` 与 `dev`。数据根和凭据目录分别以 SQLite 排他锁防止新宿主重复打开，崩溃后由操作系统释放。
+
+界面“设置 → 系统日志”通过认证应用能力 `ApplicationBackend.diagnostics.query/onChange` 读取当前用户 Runtime 的重要事件。远程项目菜单/项目选择器旁的“项目状态”可在远端离线时打开，工具箱 MCP 详情提供连接事件及各项目入口。每个用户的 `/var/log/application-diagnostics.seq` 按独立 entry 和事务索引保存最多 500 组 / 512 KiB 安全元数据，连续相同事件保留起止时间、累计次数和有界关联样本，查询最多 200 组；它是用户系统文件空间中的有界应用事件记录，不是宿主运行日志或审计文件的任意读取接口。初始化或持久化失败会明确标识仅内存状态，查询失败显示错误与重试入口。客户端刷新可重新读取已保存事件，实时可用性需要重新探测；日志不含消息/文件/参数正文、密钥或请求头。多用户 HTTPS 回归覆盖身份隔离，真实 RPC 回归覆盖订阅与释放。
+
+默认排查 release 日志：运行日志 `/var/log/nestos/httpd.runtime.log`，审计日志 `/var/log/nestos/httpd.audit.jsonl`。dev 使用同目录的 `httpd.debug.runtime.log` 和 `httpd.debug.audit.jsonl`。目录和文件名不包含版本 ID，切换 release 后继续追加；版本 ID 保留在运行日志的启动记录中。每份 10 MiB，保留当前文件及追加 `.1`、`.2`、`.3` 的轮转文件，文件权限 0600。旧版本目录中的日志不自动迁移或删除。
+
+系统部署时先创建由服务运行用户拥有的目录。以下命令用于以当前用户运行的服务；独立服务账号应替换 owner/group：
+
+```bash
+sudo install -d -m 0700 -o "$(id -un)" -g "$(id -gn)" /var/log/nestos
+pnpm httpd
+```
+
+目录不可写时启动失败。默认固定使用 `/var/log/nestos`，不会因旧 `/var/log/mindos` 目录存在而回退；旧日志需在原目录查询。可用 `NESTOS_HTTPD_LOG_DIR=/path/to/logs pnpm httpd` 同时覆盖运行与审计日志目录，`--audit-file` 单独覆盖审计文件；配置、凭据和数据路径仍按原规则解析。相对日志目录按启动工作目录解析。
+
+查询当前运行版本需要使用已登记的客户端证书，访问证书覆盖的实际主机地址：
+
+```bash
+cert_dir="${XDG_CONFIG_HOME:-$HOME/.config}/nestos/http-certs"
+curl --fail --silent --show-error --cacert "$cert_dir/ca.crt" \
+  --cert "$cert_dir/client.crt" --key "$cert_dir/client.key" \
+  https://127.0.0.1:2000/api/health
+tail -n 100 /var/log/nestos/httpd.runtime.log
+```
+
+健康检查返回 `{"ready":true,"mode":"release","version":"<release-id>"}`，其中 `version` 才是当前服务版本。版本 ID 为 `<UTC构建时间 YYYYMMDDTHHmmss>-<Git提交前8位>[-dirty]`，例如 `20261017T100615-b109df0a-dirty`；`dirty` 表示构建时存在未提交修改。运行日志中最新的 `Version:` 记录可用于核对启动版本，但进程退出后仍保留。`release/httpd/current.json` 只指定下次启动选择，不证明当前服务已切换；修改日志目录后，日志查询命令也应使用新目录。
+
+HTTP release 在隔离构建完成后保留已选择版本及最近另一版本的原始 hash 静态资源，避免手机保留的旧页面在切换版本后按需加载模块时收到 404。仅保留 `dist/assets/` 下带 hash 的产物并核对摘要，不复制旧 HTML 或后端；`release.json.uiAssets` 记录本次构建自身资源，避免历史资源递归积累。构建日志 `stage=retain-ui-assets` 记录保留数量、代数和错误分类。更早页面仍应重新加载；模块加载失败会给出版本变化/网络中断提示，不自动刷新已有未发送内容。
+
+Safari 可能把失败的 modulepreload 留在内存缓存中，普通刷新仍会重复失败（[WebKit 270357](https://bugs.webkit.org/show_bug.cgi?id=270357)）。启动失败页的重新加载按钮先以 `cache: reload` 重新获取已捕获失败项及页面模块，再重新加载文档；仅允许同源 `assets/` 下的 hash JS/CSS，去除查询参数，不执行响应正文、不清理草稿或浏览器数据。请求逐个消费，总时限 15 秒、单个 8 秒；网络/认证失败保留错误页及重试，已退役的 404 模块转为重新加载当前 HTML。诊断记录阶段、数量、结果和安全资源名；宿主审计的 asset 字段也只记录 hash JS/CSS 文件名，不记录用户路径和查询参数。Safari 18 同代 WebKit 回归已复现一次 503 导致普通刷新仍失败，调用实际修复模块后恢复成功。
+
+httpd 使用 `startupMode: 'server'`：LLM 配置与设备、MCP 首次自动连接尝试、依赖的项目目录、Skill、Agent、会话调用恢复和项目草稿初始化完成后才创建监听。失败向启动入口传播，关闭 Runtime、存储、日志并释放目录锁，不打印服务已启动，也不开放健康检查。远端 MCP 首次尝试失败作为已观测的连接状态保留，不要求所有远端服务可达；持续任务恢复、周期扫描与分身分析不等待业务运行结束。Web/Tauri 的交互式延迟初始化策略保持独立。
+
+默认只监听 HTTPS `0.0.0.0:2000`，backlog 为 4096。TLS 验证客户端证书与 clients.json 的 SHA-256 指纹，没有匿名或明文入口。CA、密钥、浏览器导入包和审计日志位于数据根之外。
+
+数据根优先级：`--root` → `NESTOS_ROOT` → nestos.json 的 rootDir → 配置目录/data。配置目录遵循 XDG_CONFIG_HOME，默认 `~/.config/nestos`。SQLite 默认保存在 `<root>/_meta/index.db`；`--sidecar` 可以指定数据根之外的位置。
+`nestos.json` 的 `http.certDir` 指定证书目录，`http.authDir` 指定认证基址（release/dev 分别追加子目录）；
+显式 `--cert-dir` / `--auth-dir` 仍优先且为最终目录，省略配置保持旧路径，不自动迁移。
+配置路径相对配置目录解析，CLI 路径相对调用目录解析；两类私有目录仍须在数据根、静态 UI 根之外。`--internal-port` 已移除。
+
+审计仅记录请求和认证元数据，不记录正文、参数、消息或凭据。服务器退出记录 `server.stopping`，先结束 SSE 并停止接入，最多等待 5 秒排空 HTTP 连接，随后关闭残留连接并记录 `server.stopped`，再关闭视图、Runtime、存储、日志和锁。完整释放后运行日志输出 `HTTP host stopped; data and credential locks released`。原生目录选择、Shell/TTY、存储快照等平台能力由宿主注入；统一界面不意味着 Node、浏览器和 Tauri 的平台权限相同。
+
+`pgrep -af 'httpd.mjs|server/main.js'` 按完整命令行查找宿主；`pgrep -l httpd` 可能漏掉进程名为 node/node-MainThread 的实例。可用 `lslocks --pid <PID>` 核对持锁路径。数据锁位于 `<root>/_meta/httpd-host-lock.sqlite`，凭据锁位于 `<authDir>/httpd-host-lock.sqlite`；进程退出时由操作系统自动释放，锁文件保留不表示仍被占用。停机后应确认旧进程结束再启动新实例，不通过删除锁文件绕过独占保护。
+
+## ChatGPT 订阅授权
+
+入口为 **工具箱 → 模型 → ChatGPT · 订阅 → Provider 设置 → 使用 ChatGPT 继续**；现有 **OpenAI** 设置顶部也提供“ChatGPT 订阅授权”跳转，原 API Key 配置保留。授权完成后加载账号模型目录并保存配置；连接选择器依据宿主的 `credentialsReady` 判断可用性，不再把订阅账号当成缺少 API Key。
+
+准备授权后，面板显示只读完整 URL、“打开授权页面”和“复制授权链接”，支持用户在自选浏览器中完成登录；链接显示有效期，等待提示明确下一步操作。“重新生成授权链接”顺序调用现有取消和发起授权命令，旧链接及其回调立即失效，新流程清空旧回调输入；正常登录期间无需重新生成，也不会自动刷新链接。重新生成失败时重新读取后端状态，避免保留已取消的链接。复制操作只在本地执行，不重新请求授权状态或更改 Provider；剪贴板不可用时选中链接供手工复制。准备链接与提交回调分别显示处理状态，避免重复提交；无关通知保留正在输入的回调。
+
+httpd 注入私有 `ProviderAuthorizationHost`，负责 PKCE、state、nonce、OIDC 签名与账号校验、凭据原子保存、共享刷新和退出撤销。UI 只取得授权链接、进度和账号显示，访问/刷新令牌不进入 RPC、VFS、模型配置导出或日志。状态查询读取宿主缓存，UI 无授权轮询计时器。未注入授权宿主的 Web/Tauri 明确显示不支持。
+
+[官方 OAuth 文档](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)要求 `http://127.0.0.1:<端口>/auth/callback` 回调。浏览器与 httpd 同机时自动完成；远程 httpd 可以通过 SSH 转发回调端口，也可以把浏览器授权后地址栏的完整回调 URL 粘贴回已通过 mTLS 认证的授权面板。后一种是本应用的回调转送实现，由后端验证 state、PKCE 与身份后交换授权码，不要求用户复制令牌。
+
+私有凭据目录权限 0700、文件 0600，必须位于数据根和静态目录之外；注销后保留客户端注册身份，清除本地令牌，远端撤销未确认时明确提示。授权流程、刷新和 RPC 用签名模拟响应验证，尚未使用真实订阅账号验收。
+
+授权交换失败写入当前宿主审计文件（release 默认为 `/var/log/nestos/httpd.audit.jsonl`）的 `provider.authorization.failed` 事件，`operation` 区分客户端注册检查、令牌交换、令牌结构/权限校验、OIDC 身份校验、账号核对和凭据保存；记录耗时、HTTP 状态及白名单错误分类，合法的远端请求 ID 作为 `providerRequestId` 保留。上游错误正文、异常原文、回调 URL、授权码及令牌不写日志。授权成功保存后记录 `provider.authorization.completed`。回调结果页的 HTTP 200 仅表示结果页已返回，页面正文才表明授权结果；已有账号在重新授权失败后保持可用，结果页仍明确报告本次失败。
+
+身份字段校验使用独立错误分类区分 issuer、audience、authorized party、过期时间、签发时间、生效时间、subject 及 nonce 缺失/不匹配，不记录字段值。`aud` 可以是包含当前客户端的字符串或字符串数组；单元素数组不强制要求 `azp`，多个 audience 时要求 `azp`，提供的 `azp` 必须匹配当前客户端。身份校验始终在签名验证成功后执行，失败不保存凭据。
+
+授权面板通过后端订阅更新，窗口重新获得焦点或页面恢复可见时补查一次授权状态，同一轮触发合并；无状态变化保留回调输入，销毁后移除监听，不常驻轮询。HTTP 页面的短暂断线由 SSE 续传恢复；视图过期或模块加载失败后才探测 `/api/health`，探测失败按 1、2、4、8、15 秒退避，单次超时 5 秒；联网和窗口返回可提前重试，页面关闭时取消。仅事件订阅与 bootstrap 可创建视图，其他请求遇到不存在或未初始化的视图时返回 `ECAPABILITY` 及 `X-NestOS-View-Expired: 1`；JSON 与二进制客户端据此立即触发恢复，同一次连接丢失只通知一次。服务就绪后按编辑器显式恢复接口保存内存快照、重建视图并恢复表单，不根据输入/选择事件猜测未保存状态；程序填入的草稿同样保留。不能自动恢复时保留原页与具体原因，用户可重试或复制内容后手动重载。不自动重放写命令，也不把 health 就绪当成旧视图已经恢复。
+
+RPC 能力分类中，HarnessConversationPort 必须同时具备 `snapshot`、`respond` 和 `subscribe`，避免将含异步 `snapshot()` 的 TaskHandle 误识别为同步会话快照。TaskHandle 通过 `status` 等公开查询读取状态，不导出内部 `snapshot`。快照编码失败保留错误码、原因和具体能力/方法；不得通过自动等待 Promise 掩盖能力分类错误。真实内核任务经 `openTask` 导出及通知续传的回归见 [task-handle-rpc.test.ts](../apps/http-app/tests/task-handle-rpc.test.ts)。
+
+正文 AI 输入沿用 Session 分支已选 Agent（缺失时回退 default），候选来源于公开调用目录；验收定义须标为 local，不能污染用户调用选择器。HTTP 附件视图通过独立 `FileSystemView` 能力保留 `dispose()`，防止提交准备的清理异常覆盖原始错误；回归见 [附件视图生命周期](../apps/http-app/tests/view-ports.test.ts) 和 [正文 AI 输入](../ui/app-shell/tests/document-chat.test.ts)。
+
+## 验证
+
+- [完整 Shell 回归](../ui/app-shell/tests/http-full-shell.test.ts)：通过远端服务端口装配原 UI、切换工作区，检查导航未被隐藏。
+- [重连退避回归](../apps/http-app/tests/view-reconnect-backoff.test.ts)：响应头成功后 EOF、订阅失败、稳定连接重置、立即重试及关闭取消。
+- [恢复提示回归](../apps/http-app/tests/status-banner.test.ts)：程序填入草稿保留、手动重载、短暂重连及迟到事件隔离。
+- [工具箱重启恢复](../ui/app-shell/tests/http-toolbox-recovery.test.ts)：真实 HTTPS 宿主关闭并在同一端口重启，连接深链表单恢复无输入事件的未保存名称；等待编辑器挂载后才判定完成。
+- [服务端口回归](../apps/http-app/tests/view-ports.test.ts)：文件、配置、项目、设置、数字分身、二进制、订阅、异步迭代与所有权边界。
+- [真实 HTTPS 回归](../apps/http-app/tests/view-api.test.ts)：mTLS、独立会话绑定、共享持久化、旧存储入口拒绝、版本与跨来源检查。
+- [一致性与所有权回归](../apps/http-app/tests/view-consistency.test.ts)：bootstrap 竞态、收藏身份/缓存、750 次资源释放、共享句柄与子服务订阅清理、poll 后快照。
+- [性能与并发回归](../apps/http-app/tests/view-performance.test.ts)：查询缓存、追加补丁、乱序版本、批次上限、通知顺序与并发回调寿命。
+- [本地存储回归](../apps/http-app/tests/storage.test.ts)：daemon 内部跨 SeqFile 原子提交/回滚和路径保护。
+
+前端 Vite 与服务端 tsup 均检查实际模块图；前端不加载后端实现，后端不加载 UI。运行 `pnpm --filter @itookit/http-app test`、`typecheck`、`build`，以及根目录的模块检查。
+
+## 性能与恢复
+
+Session getSnapshot 是唯一历史快照，getSessions、getStatus 和 isGenerating 从中派生。应用投影将 message:updated 定位到受影响的分组，其余分组保持不可变引用；未知事件和结构变化重新构造投影。编码器复用不可变 DTO 子树，差分、长度比较和引用扫描不再遍历未变消息正文；仍有数组索引与上游领域投影成本，不能宣称总开销与历史长度完全无关。
+
+原生会话在宿主通过 conversation-view 共享一个事件游标推进源，变化时才通知订阅者；关闭最后一个订阅停止后台读取。普通方法返回快照引用，相关版本更新随响应到达后再解析，避免 read/refresh/loadEarlier 同时携带完整返回值和补丁。节点事件经共享 SSE 到达宿主；没有订阅的自定义端口不启动后台轮询。历史由加载入口或明确定位按需读取，不自动遍历全部页面；完整快照和原生 gap 恢复仍保留。
+
+项目 lookup 预热读取内存挂载目录，不再扫描持久项目目录。OCR 后端服务共享首次配置读取；readSettings、label、ready 不写默认值，显式打开配置才 prepareConfiguration，识别不恢复已删除提示词。空输入框订阅也不创建 OCR 服务。工具箱投影内容未变化时跳过写入和元数据事件。
+
+静态 hash 资源使用私有 immutable 缓存，HTML 使用 no-cache 和 ETag 重新验证；gzip 结果按文件身份、大小、修改时间和编码缓存，最多 64 项 / 16 MiB。所有请求仍先通过证书认证。API 响应继续 no-store。
+
+项目与全部项目切换通过 `SessionBrowserPort.readDirectory` 一次聚合目录节点、透明分组、项目归属和导航；按钮、搜索和侧栏复用该结果，不分别查询 `forFolder`。目录种子按 revision 单次消费，变化事件或读取期间发生变更会使种子失效；普通子目录保持按需读取，显式刷新重新核对来源。返回种子用行索引复用已传输的摘要，不复制聊天历史或附件正文。后端 `directory-view` 日志记录聚合阶段、数量、错误分类和耗时。
+
+HTTP 文件系统事件在 application 适配层按能力对象共享 `onAny` 连接，文件浏览器、工具箱、笔记等消费者仍独立按类型筛选及释放，全部退出后才取消远程连接。共享范围不跨用户、命名空间或文件视图；登记失败允许后续兴趣重新登记，描述符更新保留现有兴趣，旧连接迟到通知被丢弃。HTTP 之外的编辑器事件及执行观察继续遵循原生命周期。
+
+旧 ApplicationPort / ApplicationHost / 持久回执实现、专属测试及废弃设计已删除，不再保留第二套生产入口。
+
+## C4 事件路径
+
+```mermaid
+C4Component
+    title HTTP 视图更新：应用策略与有界传输
+    Container_Boundary(browser, "浏览器") {
+        Component(ui, "共同 UI", "AppShell / LLM UI", "交互、按需历史、渲染")
+        Component(client, "HttpViewClient", "HTTP / SSE", "有界查询、版本安装、通知消费")
+    }
+    Container_Boundary(host, "Node 宿主") {
+        Component(policy, "application/", "应用策略", "读写分类、资源观察、不可变消息投影")
+        Component(rpc, "RpcPeer", "传输机制", "能力、快照引用、子树复用、版本补丁")
+        Component(queue, "ViewNotifications", "有界机制", "单个刷新循环、事件顺序与背压")
+        Component(view, "ConversationView", "应用视图", "共享游标、串行操作、变化通知")
+    }
+    System_Ext(native, "原生远程会话", "提供事件页、历史页与控制接口")
+    Rel(ui, client, "读取、命令、订阅")
+    Rel(client, rpc, "查询批次、独立命令", "HTTPS")
+    Rel(rpc, policy, "调用注入的分类与投影")
+    Rel(policy, view, "观察对应会话")
+    Rel(view, native, "推进一个游标、按需历史")
+    Rel(view, queue, "通过资源观察标记失效")
+    Rel(queue, rpc, "合并后计算版本更新")
+    Rel(queue, client, "补丁和有序通知", "SSE")
+    Rel(client, ui, "安装快照后通知展示")
+```
+
+## 当前视图恢复
+
+短暂断线复用已有编辑器和 SSE 视图；页面重新可见或 pageshow 时立即检查流活动，超过 30 秒无活动则替换旧流，健康连接不额外请求。服务重启、闲置视图或事件历史过期时，健康检查就绪后自动捕获所有标签的本地快照并重建应用视图，不刷新文档；只按当前 URL 打开一个资源，其他标签延迟恢复，不构造未打开的工作区。文件深链不以导航目录为前提，工作台以 initialNavigation=false 跳过根目录与组织预读；目录可见后再独立读取，隐藏目录和非活动会话停止观察与轮询。正常启动和恢复静默进行，失败局部重试。
+
+手机页面的恢复目标由当前 URL 决定，工作区用 `data-workspace-opening` 保持正文呈现，不以编辑器 DOM 暂时为空退回列表。内嵌导航准备期间隐藏中间窗口栏；共享 HTML 的 `data-app-starting` 在首个有效导航完成或失败后释放，冷重载不先展示全局导航与历史窗口入口。该标记只控制首次显示，不参与后端会话状态或写命令恢复；SSE 重连保持既有正文、输入和阅读位置。回归见 [手机正文切换](../ui/app-shell/tests/mobile-workspace-view.test.ts)、[手机导航状态](../ui/app-shell/tests/mobile-shell-state.test.ts) 和 [初始资源恢复](../ui/app-shell/tests/bootstrap-project-routes.test.ts)。
+
+文件编辑通过 app-shell 的 browser/file-recovery 保存浏览器本地恢复副本；backend 文件正文与条件写 revision 仍为真相。当前标签页小文本保存在 sessionStorage，大文本进入 IndexedDB，资源间隔离；重载只读取当前文件的副本，先核对原文摘要和权限，冲突保留副本而不覆盖后端。写请求结果未知时不重发，若重新读取的后端正文已等于副本则按已持久化处理。
+
+HTTP 自动恢复保留聊天正文草稿、附件、连接选择、光标与标签滚动位置，以及 Provider/Connection 和模型用途默认表单的内存草稿；不重发消息、工具或结果未知的写入，不能恢复的编辑器、在途提交和弹窗明确阻止自动重建。设置密钥只在内存中交接，不写入 sessionStorage/IndexedDB 或日志。工具箱恢复时打开资源须等待编辑器装配完成；快照在编辑器前后到达均可恢复，未完成装配报告 RECOVERY_RESTORE_INCOMPLETE，恢复异常保留原错误分类。单连接表单的服务通知不替换已挂载草稿。重建失败保留快照供重试，文件原文摘要已变化时显示可复制的冲突副本，不覆盖后端。服务端审计 view.expired 用 requestId 关联 VIEW_NOT_FOUND、VIEW_NOT_INITIALIZED、VIEW_STREAM_INVALIDATED、VIEW_PROTOCOL_MISMATCH、VIEW_HISTORY_EXPIRED；浏览器 http.view.recovery 记录 operationId、阶段、结果和耗时。
+
+## npm 分发
+
+HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` 安装，
+`nestos init-certs --cert-host <实际 IP/DNS>` 初始化身份，导入 CA 和浏览器个人证书后运行 `nestos httpd`。
+支持聊天/分支、Agent/Flow、Markdown/嵌入式 AI、附件、项目文件、工具箱和共享工作台；模型与远程项目仍需相应配置。
+完整启动参数、功能与升级说明见 [npm README](../apps/http-app/npm/README.md)。
+
+打包入口 `pnpm nestos:pack` 复用本地库快照与隔离 HTTP 构建，不激活运行版本；
+服务端编译记录外部运行依赖，npm 包冻结为公开注册表版本，由目标系统安装原生模块。
+只打包 bin/server/dist、构建身份、README 和许可证；私有工作区依赖打入服务端，用户数据与证书不进包。
+`pnpm nestos:publish` 按已准备 tarball 的 SHA-256 核对后发布。npm 进程以前台日志运行，
+默认审计仍在用户配置目录的 `logs/http/`，仓库 `pnpm httpd` 的系统日志路径不变。
+
+首次交互终端启动（stdin 为 TTY，允许 stdout 经启动脚本转发到日志）缺少证书目录时，询问是否初始化，默认否，并收集访问 IP/DNS。
+用户确认后复用 createCertificates，完成后显示 CA/浏览器个人证书导入位置并继续启动；不记录密钥、密码或证书正文。
+已有证书目录不覆盖；非交互启动缺少目录时直接报出 --init-certs 命令，不等待输入。
+初始化前解析真实父目录，检查证书目的地不在数据根或静态网页根中，包含符号链接父路径。
+
+
+编辑临时副本可由 `http.editorSwap: true` 显式开启，默认关闭；`http.swapDir` 默认 `~/swap`，支持 `~/`。
+仅 httpd 开启时提供查看菜单、修改后防抖写入小文件副本；每个编辑器正常关闭时删除自己的 swap。
+达到或超过 512 KiB 的文件不写 swap；httpd 启动时和每小时清理最后更新超过 48 小时的文件。
+历史配置、证书及数据的兼容读取规则见仓库 `doc/nestos-rename.md`；已有私有文件不会因为产品改名重新生成。
+
+### 确认后停止与重启验收（2026-10-29）
+
+真实 release `20261029T093448-908678c7-dirty` 上构造确认输入及 120 个顺序 transform 节点。17:47:28（UTC+8）确认已持久接纳，后续完成数为 0；SIGTERM 停止后，于 17:47:34 启动同一 release，17:47:37 就绪，17:49:10 原根成功结束。全部 120 步各只有一条任务记录，原输入回执保持 resolved，未手动调用 RunResume 或新建重跑。验收后 httpd 保持运行。完整身份与阶段记录见 [真实停启证据](design/fixtures/httpd-confirm-restart-20261029.json)。这证明本次正常停机恢复，不将其扩展为所有 SIGKILL、断电或外部副作用未知结果均可自动重试的承诺。
+
+补做 `SIGKILL`（与 `fuser -k 2000/tcp` 默认信号一致）后，旧 release 暴露一次性恢复的缺口：确认已保存，但重启观察 50 秒仍停在 0/30。恢复逻辑现对尚未取得的 Session 写租约与 Flow 调度租约保留有界退避重试，不抢占有效租约，退出时清理定时器。修复部署为 `20261029T095550-908678c7-dirty`。同版本重新构造 30 步测试，17:58:30 确认后立即强杀，17:58:32 服务就绪，约 61 秒后旧 Session 写租约到期，自动继续，18:00:01 原根成功结束。30 步各仅一个任务记录、原确认保持 resolved，未手工调用恢复；此前失败的旧任务也已在新宿主自动完成。机器记录保留正常停机、强杀失败及修复后强杀通过三轮结果，不覆盖旧失败证据。
+
+## 设置中的服务器 Terminal
+
+管理员可在「设置 → Terminal」打开交互式 Bash，支持目录切换、环境变量、Ctrl+C、终端尺寸变化及交互式程序。Bash 在 NestOS **服务器**上运行，继承 httpd 系统账号的权限，初始目录为该账号的 home；不是浏览器或项目的文件沙箱。普通用户的认证视图不提供终端能力，Web/桌面独立宿主显示不可用原因。
+
+终端通过既有 mTLS 应用 RPC 传输输入与输出，采用 node-pty 和 xterm。每个浏览器视图最多两个终端，输出缓冲有界，超过缓冲时明确提示截断；读取或连接失败不会重放输入。关闭终端、关闭设置页或释放认证视图会结束 Bash，重开创建新进程。短暂断网后旧视图尚未释放时，终端仍可能继续运行；视图过期不恢复进程状态或自动重发命令。
+
+服务器须提供 `/bin/bash` 及可加载的 node-pty 原生模块。启动失败会在页面提示具体检查项；`server-terminal` 日志记录操作 ID、阶段、结果、退出码和耗时，不记录命令、输出或环境值。
+
+## 邮件列表加载与诊断
+
+邮件页通过 `ApplicationBackend.mailView()` 取得授权的 MailClient，`queryMail` 每页返回 20 个主题的摘要、来源计数和分页信息。搜索先在后端完整索引上匹配，再合并主题、排序及分页，支持邮件头和正文范围；翻页不逐封请求 IFSDriver.readContent。点击主题才调用 readThread，正文每批最多 20 封并受字节预算限制。列表切换不预加载 MDXEditor。
+
+`@itookit/mail` 在用户 `/var/lib/mail/archive.seq` 持久化派生索引，首次访问建立，重启后复用版本戳，只重读变化邮件；正文搜索副本不传浏览器。运行日志 mail.index 区分 index.load、index.scan、index.persist 和 reconcile，记录操作 ID、读取数、字节、结果和耗时；mail.query、mail.thread、mail.refresh 记录查询/正文/刷新阶段及具体安全错误码，不记录搜索词、邮箱、路径或正文。HTTP 审计通过 MailClient.queryMail/readThread/refreshMail 与 requestId 关联请求耗时。实际首屏性能须以新 release 的运行版本与日志验收。

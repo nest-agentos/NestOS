@@ -1,0 +1,50 @@
+{
+  "name": "tauri-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "typecheck": "tsc --noEmit",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p itookit-sanbox && cargo test --manifest-path src-tauri/Cargo.toml"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.1.0",
+    "@itookit/app-core": "workspace:*",
+    "@itookit/app-settings": "workspace:*",
+    "@itookit/app-shell": "workspace:*",
+    "@itookit/common": "workspace:*",
+    "@itookit/driver-llm": "workspace:*",
+    "@itookit/kernel-adapters": "workspace:*",
+    "@itookit/llm-session": "workspace:*",
+    "@itookit/llm-ui-adapter": "workspace:*",
+    "@itookit/mdx-adapter": "workspace:*",
+    "@itookit/mdxeditor": "workspace:*",
+    "@itookit/ui-common-adapter": "workspace:*",
+    "@itookit/tools": "workspace:*",
+    "@itookit/vfs-core": "workspace:*",
+    "@itookit/vfs-ui": "workspace:*",
+    "@itookit/vfsdriver-indexeddb": "workspace:*",
+    "@itookit/vfsdriver-local": "workspace:*",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
+    "@tauri-apps/plugin-fs": "^2.0.0",
+    "immer": "^10.2.0",
+    "marked": "^16.4.2",
+    "yaml": "^2.8.2",
+    "@itookit/llm-flow": "workspace:*",
+    "@itookit/cells-driver": "workspace:*",
+    "@itookit/app-contracts": "workspace:*",
+    "@itookit/image-tools": "workspace:*"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21"
+  }
+}

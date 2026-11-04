@@ -1,0 +1,107 @@
+/* ============================================
+   Toggle 开关样式 (Stream Mode)
+   ============================================ */
+
+.llm-input__toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.llm-input__toggle {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.llm-input__toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.llm-input__toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--llm-bg-hover);
+    border-radius: 20px;
+    transition: background-color var(--llm-transition-normal);
+}
+
+.llm-input__toggle-slider::before {
+    position: absolute;
+    content: '';
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform var(--llm-transition-normal);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.llm-input__toggle input:checked+.llm-input__toggle-slider {
+    background-color: var(--llm-color-primary);
+}
+
+.llm-input__toggle input:checked+.llm-input__toggle-slider::before {
+    transform: translateX(16px);
+}
+
+.llm-input__toggle-label {
+    font-size: 0.8rem;
+    color: var(--llm-text-secondary);
+    user-select: none;
+}
+
+/* ============================================
+   Settings 面板入场动画
+   ============================================ */
+
+@keyframes llm-ui-slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    to {
+        opacity: 1;
+        max-height: 500px;
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+}
+
+.llm-input__settings-panel--entering {
+    animation: llm-ui-slideDown 0.2s ease-out;
+}
+
+/* ============================================
+   File 相关补充
+   ============================================ */
+
+.llm-input__file-icon {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.llm-input__filename {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.llm-input__filesize {
+    font-size: 0.7rem;
+    color: var(--llm-text-muted);
+}

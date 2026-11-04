@@ -1,0 +1,18 @@
+{
+  "id": "harness-combined", "name": "Harness 验证：工具、Skill、MCP 串联", "draftVersion": 1, "updatedAt": 0,
+  "parameters": [
+    { "name": "file", "type": "string", "required": true, "default": "./notes.txt", "widget": "text", "label": "文件路径" },
+    { "name": "topic", "type": "string", "required": true, "default": "release", "widget": "text", "label": "查询主题" }
+  ],
+  "nodes": [
+    { "id": "review", "name": "读取、查询、审查", "plugin": "builtin.agent", "pluginVersion": "1.0.0", "inputs": {},
+      "config": { "connectionId": "default", "toolIds": ["Read"], "skillIds": ["validation-review"], "mcpProfileIds": ["validation"],
+        "approval": "external", "historyPolicy": "none", "stream": false, "maxExchanges": 5,
+        "prompt": "First read ${param.file} with Read, then call mcp__validation__lookup with topic=${param.topic}. Follow the selected Skill to compare file evidence against the returned rule. Include the Skill marker and the actual MCP marker. If a call is denied, say so."
+      } },
+    { "id": "report", "name": "传递实际返回值", "plugin": "builtin.transform", "pluginVersion": "1.0.0", "inputs": {},
+      "config": { "value": { "review": "${nodes.review.outputs.result}", "topic": "${param.topic}" } } }
+  ],
+  "edges": [], "outputs": { "result": { "value": "${nodes.report.outputs.result}" } },
+  "layout": { "nodes": { "review": { "x": 80, "y": 80 }, "report": { "x": 420, "y": 80 } } }
+}

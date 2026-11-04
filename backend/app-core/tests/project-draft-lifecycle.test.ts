@@ -1,0 +1,166 @@
+import { it, expect, vi } from 'vitest';
+import { createVFS, MemoryBackend } from '@itookit/vfs-core';
+import { SessionRepository } from '@itookit/llm-session';
+import { ProjectDraftStore } from '../src/projects/drafts/store';
+import { ProjectDraftService } from '../src/projects/drafts/service';
+
+async function fixture() {
+    const { manager } = await createVFS({ rootBackend: new MemoryBackend() });
+    const fs = await manager.openFileSystem('/'), repo = new SessionRepository(fs); await repo.init();
+    const lifecycle = new ProjectDraftService(id => new ProjectDraftStore(fs, id), repo, async () => ['p']);
+    const draft = new ProjectDraftStore(fs, 'p'); await draft.load(); await draft.saveData('unsent payload');
+    const intent = await draft.begin('2026-09-29 12-00-00');
+    const source = { id: intent.submissionId!, source: { kind: 'project-draft', ownerId: 'p', id: intent.id } };
+    await repo.ensureSession(intent.sessionId!, intent.title!);
+    const accept = async (patch = {}, committed = true) => { await repo.writeDocument(intent.sessionId!, `round-${intent.submissionId}.json`, JSON.stringify({
+        id: intent.submissionId, sessionId: intent.sessionId, submission: source,
+        input: [{ role: 'user', content: 'hello' }], executions: [{ taskId: 'task', role: 'primary' }], ...patch,
+    }));
+        if (committed) await repo.updateManifest(intent.sessionId!, { rootRoundId: intent.submissionId!, currentHead: intent.submissionId!, branches: { main: intent.submissionId! } });
+    };
+    return { manager, fs, repo, lifecycle, draft, intent, source, accept };
+}
+
+it('only durable first-message evidence promotes a draft; unrelated Session creation leaves it alone', async () => {
+    const f = await fixture(), notify = vi.fn(); f.lifecycle.onPromoted(notify);
+    try {
+        await f.repo.createSession('CLI or imported'); await f.lifecycle.recover();
+        expect((await new ProjectDraftStore(f.fs, 'p').load()).id).toBe(f.intent.id);
+        await f.accept({}, false); await f.lifecycle.recover(); expect(notify).not.toHaveBeenCalled();
+        await f.accept({ submission: { ...f.source, source: { ...f.source.source, id: 'other' } } }); await f.lifecycle.recover();
+        expect(notify).not.toHaveBeenCalled();
+        await f.accept({ executions: [] }); await f.lifecycle.recover(); expect(notify).not.toHaveBeenCalled();
+        await f.accept(); await f.lifecycle.recover(f.intent.sessionId, f.intent.submissionId);
+        const next = await new ProjectDraftStore(f.fs, 'p').load();
+        expect(next).toMatchObject({ state: 'draft', data: '' }); expect(next.id).not.toBe(f.intent.id);
+        expect(f.intent.sessionId).toBe(f.intent.id);
+        expect((await f.repo.getManifest(f.intent.id)).id).toBe(f.intent.id);
+        const nextStore = new ProjectDraftStore(f.fs, 'p'); await nextStore.load();
+        expect((await nextStore.begin('Next title')).sessionId).toBe(next.id);
+        expect(notify).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+            type: 'project.draftPromoted', draftId: f.intent.id, sessionId: f.intent.sessionId, nextDraftId: next.id,
+        }));
+        await expect(f.draft.saveData('late write')).rejects.toMatchObject({ code: 'ECONFLICT' });
+        await f.lifecycle.recover(); expect(notify).toHaveBeenCalledOnce();
+    } finally { await f.manager.dispose(); }
+});
+
+it('captures the creation agent with the draft identity and keeps it immutable on retries and edits', async () => {
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    const fs = await manager.openFileSystem('/'), repo = new SessionRepository(fs); await repo.init();
+    const drafts = new ProjectDraftService(id => new ProjectDraftStore(fs, id), repo, async () => ['p']);
+    try {
+        const draft = await drafts.open('p', '/');
+        await draft.save!(JSON.stringify({version: 2, config: {agentId: 'writer', text: 'Keep identity'}, files: []}));
+        const prepared = await draft.prepare();
+        expect((await repo.getManifest(prepared.sessionId)).createdWithAgentId).toBe('writer');
+        expect((await repo.listSummaries()).find(row => row.id === prepared.sessionId)?.createdWithAgentId).toBe('writer');
+        await repo.ensureSession(prepared.sessionId, 'Retry', 'tauri', '/', null, {agentId: 'other'});
+        await repo.saveSessionSettings(prepared.sessionId, {agentId: 'other'});
+        expect((await repo.getManifest(prepared.sessionId)).createdWithAgentId).toBe('writer');
+        await expect(repo.updateManifest(prepared.sessionId, {createdWithAgentId: 'other'})).rejects.toMatchObject({code: 'EINVAL'});
+    } finally {await repo.dispose(); await manager.dispose();}
+});
+
+it('recovers a lost notification and creates only one successor across concurrent recovery', async () => {
+    const f = await fixture();
+    try {
+        await f.accept();
+        const restarted = new ProjectDraftService(id => new ProjectDraftStore(f.fs, id), f.repo, async () => ['p']);
+        const notify = vi.fn(); restarted.onPromoted(notify); f.lifecycle.onPromoted(notify);
+        await Promise.all([restarted.recover(), f.lifecycle.recover()]);
+        expect(notify).toHaveBeenCalledOnce();
+        const next = await new ProjectDraftStore(f.fs, 'p').load();
+        const raw = await f.fs.meta.seq!.getEntry('/var/lib/projects/p/draft.seq', `promotion/${f.intent.id}`);
+        expect(JSON.parse(raw!)).toMatchObject({ state: 'promoted', nextDraftId: next.id });
+        await restarted.recover(); expect((await new ProjectDraftStore(f.fs, 'p').load()).id).toBe(next.id);
+        expect(await restarted.submissionForSession('p', f.intent.sessionId!)).toBeUndefined();
+    } finally { await f.manager.dispose(); }
+});
+
+it('offers a fresh composer after promotion while rejecting writes through the old browser cursor', async () => {
+    const f = await fixture();
+    try {
+        const browser = await f.lifecycle.open('p', '/');
+        expect(await browser.refresh?.()).toBeUndefined();
+        await f.accept(); await f.lifecycle.recover();
+        const next = await browser.refresh?.(); expect(next?.initialData).toBe('');
+        await expect(browser.save('stale input')).rejects.toMatchObject({code: 'ECONFLICT'});
+        await next!.save('New browser conversation');
+        expect((await new ProjectDraftStore(f.fs, 'p').load()).data).toBe('New browser conversation');
+    } finally {await f.manager.dispose();}
+});
+
+it('refreshes committed drafts without notifications and promotes only once across concurrent refreshes', async () => {
+    const f = await fixture(), promoted = vi.fn(); f.lifecycle.onPromoted(promoted);
+    try {
+        const browser = await f.lifecycle.open('p', '/');
+        await f.accept({}, false);
+        expect(await browser.refresh?.()).toBeUndefined();
+        expect(promoted).not.toHaveBeenCalled();
+        await f.accept();
+        const [first, second] = await Promise.all([browser.refresh!(), browser.refresh!()]);
+        expect(first?.initialData).toBe(''); expect(second?.initialData).toBe('');
+        expect(promoted).toHaveBeenCalledOnce();
+        await expect(browser.save('late input')).rejects.toMatchObject({code: 'ECONFLICT'});
+        await first!.save('Next conversation');
+        await expect(second!.save('Competing input')).rejects.toMatchObject({code: 'ECONFLICT'});
+        expect((await new ProjectDraftStore(f.fs, 'p').load()).data).toBe('Next conversation');
+    } finally {await f.manager.dispose();}
+});
+
+it('retries draft promotion on refresh after submission reconciliation failed', async () => {
+    const f = await fixture();
+    const promote = vi.spyOn(ProjectDraftStore.prototype, 'promote');
+    try {
+        const browser = await f.lifecycle.open('p', '/'); await f.accept();
+        promote.mockRejectedValueOnce(new Error('Temporary storage failure'));
+        await expect(f.lifecycle.submitted({sessionId: f.intent.sessionId!, roundId: f.source.id, submission: f.source}))
+            .rejects.toThrow('Temporary storage failure');
+        expect((await browser.refresh?.())?.initialData).toBe('');
+        expect(promote).toHaveBeenCalledTimes(2);
+        await expect(browser.save('late input')).rejects.toMatchObject({code: 'ECONFLICT'});
+    } finally {promote.mockRestore(); await f.manager.dispose();}
+});
+
+it('retains the same submission identity for explicit retry of an unaccepted reserved Session', async () => {
+    const f = await fixture();
+    try {
+        expect(await f.lifecycle.submissionForSession('p', f.intent.sessionId!)).toEqual(f.source);
+        expect((await new ProjectDraftStore(f.fs, 'p').load()).data).toBe('unsent payload');
+        const other = await f.repo.createSession('ordinary');
+        expect(await f.lifecycle.submissionForSession('p', other)).toBeUndefined();
+    } finally { await f.manager.dispose(); }
+});
+
+it('accepts legacy persisted origin through the receipt adapter without leaking it into new submissions', async () => {
+    const f = await fixture();
+    try {
+        await f.accept({ submission: undefined, projectDraft: {
+            projectId: 'p', draftId: f.intent.id, submissionId: f.intent.submissionId,
+        } });
+        await f.lifecycle.recover();
+        expect((await new ProjectDraftStore(f.fs, 'p').load()).id).not.toBe(f.intent.id);
+    } finally { await f.manager.dispose(); }
+});
+
+it('pins a host-authorized harness to a durable draft without changing its stable Session id', async () => {
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    const fs = await manager.openFileSystem('/'), repo = new SessionRepository(fs); await repo.init();
+    const authorize = vi.fn(async (_id: string, request?: {harness?: {profileId: string}}) => {
+        if (!request?.harness) throw Object.assign(new Error('Remote executor required'), {code: 'EACCES'});
+        return request.harness.profileId;
+    });
+    const service = new ProjectDraftService(id => new ProjectDraftStore(fs, id), repo, async () => ['p'], authorize);
+    try {
+        await repo.createFolder('/remote');
+        const draft = await service.open('p', '/remote');
+        await expect(draft.prepare()).rejects.toMatchObject({code: 'EACCES'});
+        const first = await draft.prepare({harness: {profileId: 'chosen'}});
+        expect(first.sessionId).toBe(draft.id);
+        expect((await repo.getSessionSettings(first.sessionId)).harnessConnectionId).toBe('chosen');
+        expect(await draft.prepare({harness: {profileId: 'chosen'}})).toMatchObject({sessionId: first.sessionId});
+        await expect(draft.prepare({harness: {profileId: 'other'}})).rejects.toMatchObject({code: 'ECONFLICT'});
+        const saved = await new ProjectDraftStore(fs, 'p').load(); expect(saved.harnessConnectionId).toBe('chosen');
+    } finally {await manager.dispose();}
+});

@@ -1,0 +1,417 @@
+# 跨包接口契约
+
+调用方只依赖接口，不依赖实现。契约按能力归属：driver-llm/contracts（模型通信与服务端口）、llm-context（领域消息与上下文）、tools/contracts（Tool 执行）、device-tty/contracts（TTY 接口，tools/contracts 保留兼容类型导出）、vfs-core（文件系统）；llm-tasks/contracts、llm-flow/contracts 和 llm-session/contracts 分别承载执行、编排与会话契约；kernel-adapters/contracts 承载配置管理与定价；common 不再转发 LLM 契约。
+
+独立 `@itookit/llm-ui` 的 ChatOptions/ConversationSource/ConversationActions/OperationLedger 定义于 [contracts.ts](../libraries/llm-ui/src/contracts.ts)，FlowSource/FlowActions 定义于 [flow-contracts.ts](../libraries/llm-ui/src/flow-contracts.ts)。两者只依赖展示数据与 mdxeditor；NestOS 接线位于 `llm-ui-adapter/independent`，原工厂兼容入口迁至适配包。Flow 通过 `features.flow` 与 `setFlowEnabled` 控制，默认关闭。
+
+`SessionChatBindingOptions.hasCommittedSubmission(submission)` 由宿主注入，委托 llm-session 的公开持久提交查询；不再注入仓储或在 UI 解析 Round。Send 入队后的回执与后续 confirmed 投影均依据同一后端证据；unknown 的 edit/retry 锁定目标消息，respond 锁定请求 ID/revision。Flow 的恢复 submitting 操作可显式核对，检查器保存后从新节点快照获取下次编辑版本。
+
+上下文绑定的公开只读端口为 `llm-session/contracts` 的 `ContextBindingReader/ContextBindingQuery/ContextBindingPage`，由 app-core 注入；`session.context.bindings` 先核对显式 Session/分支，再读取 Kernel 既有 shared state。安全摘要与原生控制身份分开，分页游标绑定集合修订及查询范围。`kernel-adapters/contracts` 的 `ContextCheckpoint` 区分真实 terminal Invocation 与未归属 legacy-head；终态检查点发布归原 Effect journal 的 settlement，不由目录查询创建。契约与 C4 见[上下文协议 8.4](design/execution-context-binding.md#84-已确认检查点与只读目录)。
+
+`ContextOptionsReader/ContextOptionsQuery/ContextOptionsPage`（`session.context.options`）补充显式目的分支、已发布目标及来源检查点的被动静态资格；同一查询只读取一次已登记项目 profiles，不装配上下文或获取 writer。basis 只用于观察一致性，最终策略及来源 CAS 仍由派发复验；原生选择进入原 SubmissionRequest，UI 草稿修订作为同一 OperationLedger 的独立恢复证据。契约与 C4 见[上下文协议 8.5–8.6](design/execution-context-binding.md#85-被动资格查询)。
+
+
+## VFS 体系（@itookit/vfs-core）
+
+| 接口 | 核心方法 | 定义 | 实现 | 消费 |
+|---|---|---|---|---|
+| `FileStorageBackend` / `OperationOptions` | `files` + 可选 `mutations`，signal/timeoutMs，opaque revision | `https://github.com/nest-agentos/vfs-core/blob/main/src/interfaces/storage/file-storage.ts`、`https://github.com/nest-agentos/vfs-core/blob/main/src/interfaces/core/operation.ts` | `cells-driver` | `FileStorageAdapter` → VFS |
+| `IStorageBackend` | `stat/list/read/write/mkdir/delete/rename` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/storage/` | `vfsdriver-indexeddb`、`vfsdriver-local` | `vfs-core (VFSEngine)` |
+| `IVFSManager` | `openFileSystem()/mounts/devices/plugins` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/services/vfs-manager.ts` | `vfs-core (VFSManager)` | `app-core`、`app-shell`、`kernel-adapters` |
+| `IFileSystem` | `openFile()/driver/meta/capabilities/capabilitiesAt()/discoveryRoot?()` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/services/file-system.ts` | `vfs-core (FileSystemView)` | `vfs-ui`、`llm-ui`、`llm-session`、`app-core` |
+| `FileSystemView` | `IFileSystem` 加 `dispose()`；拥有独立生命周期的文件视图 | `vfs-core` 公共接口 | `SessionRepository.openAttachments()` 等 | HTTP RPC 显式保留 `dispose`，释放附件视图不关闭仓库或底层 VFS |
+| `IFSDriver` | `getNode/getChildren/readContent/writeContent/createFile/createDirectory/rename/move/delete/search` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/services/fs-driver.ts` | `FileSystemView.driver` | `vfs-ui`、`mdx-adapter`、`llm-session` |
+| `IFSMetaDriver` | `assets/tags/seq/refs/watcher` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/services/fs-meta-driver.ts` | `FileSystemView.meta` | `llm-session`、`mdx-adapter` |
+| `IFile` | `read()/write()`（extends `IIOStream`） | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/IFile.ts` | `FileHandle`、`MDXFileHandle` | `mdx-adapter`、`llm-session` |
+| `FileDiscoverySource` / `FileDiscoveryOptions` | `list/stat/readIgnoreFile/rootFor`；`includeIgnored/excludeDirectories/signal` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/services/file-discovery.ts` | VFS 适配器、tools Node 适配器 | `discoverFiles` → 工具搜索及 llm-ui 文件候选 |
+| `IIOStream` | `read()/write()/readStream?/close?` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/` | 文件/设备句柄 | 文件↔LLM↔TTY 互拷 |
+| `IDeviceDriver` | `open()/ioctl()/close()` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/device/` | `LLMDeviceDriver`、TTY driver | `kernel-adapters`、`app-core` |
+
+## LLM 契约（能力包公开入口）
+
+`ProviderAuthorizationService` 的状态查询、开始/完成/取消/退出授权属于安全的配置端口，定义在 `kernel-adapters/src/llm-management/contracts/provider-authorization.ts`，从 `/contracts` 导出。私有 `ProviderAuthorizationHost` 只由宿主经 `/llm/core` 注入，不对外导出凭据方法。`ConnectionMeta.credentialsReady` 可选字段由宿主解析授权状态；旧实现缺省仍依据 API Key/Codex 判断。
+
+| 接口/类型 | 核心字段/方法 | 定义 | 实现 | 消费 |
+|---|---|---|---|---|
+| `SessionPresentationState` | 可选 taskAttachment/flowInvocations/skills；应用启动组合读模型 | `app-contracts/src/ports/session.ts` | `app-core/host/open-view.ts` | `app-shell/lifecycle/opened-view.ts`，向编辑器注入领域初始数据 |
+| `TaskAttachmentRecovery` / `ReadTaskAttachment` | 活动任务与待审批候选 ID；显式 Session、共享键，只读恢复线索，附着前核对实时状态 | `durable-kernel/src/ports/task-control.ts` | `app-core/host/task-attachment.ts`，由 ApplicationBackend.taskAttachment 提供 | `llm-ui` 可选恢复回调 |
+| `EditorTaskControlPlane` / `AttachedTask` | openTask/openSession/listSessionTasks；共享挂接身份、Task 事件及控制 | `durable-kernel/src/ports/task-control.ts`，从 Kernel 根入口导出 | Kernel 或宿主远程客户端 | 聊天编辑器、任务挂接及 pending 恢复 |
+| `SessionViewBinding` / `LLMFactoryDependencies` | 显式 sessionManager 或 resolveSessionView；仓储及可选宿主端口 | `llm-ui-adapter/src/chat.ts` | 宿主组合根 | createLLMFactory |
+| `ILLMService` | `chat()`、`chatStream()`、`abort()`、`getConnection()` | `https://github.com/nest-agentos/driver-llm/blob/main/src/types/service.ts` | `kernel-adapters LLMServiceAdapter` | `llm-tasks`（经 effect）、`llm-session` |
+| `ChatMessage` | `role/content/attachments?` | `https://github.com/nest-agentos/driver-llm/blob/main/src/types/message.ts` | driver-llm | 宿主通信适配 |
+| `ChatCompletionParams/ChatCompletionResponse/ChatCompletionChunk` | `messages/model/tools/stream/webSearch`… | `https://github.com/nest-agentos/driver-llm/blob/main/src/types/response.ts` | driver-llm providers | `llm-tasks`、`kernel-adapters` |
+| `Citation` | `text/source/title/url`（联网搜索引用） | `https://github.com/nest-agentos/driver-llm/blob/main/src/types/response.ts` | driver-llm providers | `kernel-adapters`、`llm-ui` |
+| `TokenUsage` | `prompt_tokens/completion_tokens/total_tokens` | `https://github.com/nest-agentos/driver-llm/blob/main/src/types/response.ts` | driver-llm | `llm-tasks`、预算扣减 |
+| `LLMConnection/ConnectionMeta` | `id/name/providerId/tiers/model/protocol/credentialsReady?` | `https://github.com/nest-agentos/driver-llm/blob/main/src/types/connection.ts` | `driver-llm` | `llm-session AgentResolver` |
+| `WebSearchMode` | `'builtin'\|'client-tool'\|'disabled'` | `kernel-adapters/src/llm-management/contracts/connection.ts` | `resolveWebSearchStrategy`（纯函数） | `llm-session` |
+| `SettingsAutoSave` / `requestSettingsSave` | 设置表单延迟保存、串行写入、失败重试与安全释放；不重建编辑 DOM | `ui-common-adapter/src/components/SettingsAutoSave.ts` | `BaseSettingsEditor`、`configuration-form.ts` | 七类 LLM 设置编辑器 |
+| `ChatConfigurationView` / `ChatConfigurationSnapshot` | getConfigurationSnapshot/subscribe/dispose；安全展示配置，先安装快照再通知 | `kernel-adapters/src/llm-management/contracts/agent.ts` | `app-core/configuration/chat-configuration.ts` | `llm-ui` 选择器，HTTP workbenchView 注入 |
+| `IConnectionService.listProviderModels` | 接受完整未保存 Provider，返回归一化模型目录；无持久化副作用 | `kernel-adapters/src/llm-management/contracts/agent.ts` | `LLMDeviceDriver` → `providers/model-catalog.ts`，`VFSAgentService` 转发 | `ProviderSettingsEditor` |
+| `LLMProvider.supportedProtocols/defaultProtocol/modelsPath`、`LLMModel.preferredProtocol` | Provider 协议集合与默认、模型目录覆盖、模型首选；连接显式协议优先 | `https://github.com/nest-agentos/driver-llm/blob/main/src/types/connection.ts`、`https://github.com/nest-agentos/driver-llm/blob/main/src/types/protocol.ts` | `driver-llm` registry / Driver / `.llm` 转换 | Provider / Connection 设置页 |
+| `LLMProvider.capabilities.serverSideWebSearch` | 服务端内置联网搜索能力（唯一事实源） | `https://github.com/nest-agentos/driver-llm/blob/main/src/types/connection.ts` | `kernel-adapters/src/llm-management/catalogs/providers.ts` | `resolveWebSearchStrategy` |
+| `ToolCall` / `ToolDefinition` | `id/name/arguments` | `https://github.com/nest-agentos/driver-llm/blob/main/src/types/message.ts` | driver-llm | 宿主通信适配 |
+| `ToolInvokeResult` | `success/output/durationMs`；可选 `data/errorCode/recoverable/truncated` | `backend/tools/src/contracts/tool-types.ts` | `tools`、`kernel-adapters` | `llm-tasks`：显式 recoverable 失败反馈模型，其余失败终止任务 |
+| `DagNodeDefinition/DagEdgeDefinition/DagRunSpec/DagNodeOutcome` | `id/plugin/config/outputs/effects` | `llm-flow/src/contracts/dag-plugin.ts` | `llm-flow` | `llm-session`、`cli` |
+| `FlowDraft/FlowRevision/FlowNodeDefinition` | `nodes/edges/layout` | `llm-flow/src/contracts/flow-definition.ts` | `llm-flow FlowDefinitionStore` | `llm-ui`、`llm-session` |
+| `SerializableExpression` | `kind: eq/neq/in/and/or/not/…` | `llm-flow/src/contracts/flow-definition.ts` | `llm-flow operations` | `cli` 编译路由条件 |
+
+## Kernel 执行内核（@itookit/durable-kernel）
+
+| 接口/类型 | 核心方法/字段 | 说明 |
+|---|---|---|
+| `DurableTaskProgram<S,I,O>` | `init(input) → Decision`、`reduce(state, event) → Decision` | 持久化状态机（Program 定义） |
+| `EffectAdapter<R,O>` | `execute(request, ctx)`、`reconcile?`、`cancel?` | effect 执行适配器（能力面） |
+| `Decision<S,O>` | `state + actions + next`（`complete/fail/wait/continue`） | 程序推进的返回结构 |
+| `KernelAction` | `effect/spawn/request-interaction/set-shared/delete-shared/emit` | 程序声明的副作用 |
+| `WaitSpec` | `signal/effect/task/interaction/all/any/quorum/child` | 等待条件 |
+| `TaskHandle<O>` | `wait()/poll()/signal()/start()/respond()/createResource()/cancel()/events()` | 任务句柄 |
+| `SessionHandle` | `submit()/signal()/respond()/createResource()/setBudget()/chargeBudget()/commitContext()/events()` | 会话句柄 |
+| `TaskSpec<I>` | `program/input/dependsOn/retry/deferStart` | 提交任务的规格 |
+| `TaskInputEvent` | `signal/task-exited/effect-completed/effect-failed/interaction-resolved` | 程序收到的输入事件 |
+| `EffectExecutionContext` | `grants/abortSignal/emit()/chargeBudget()/sessionState` | effect 执行上下文 |
+| `CapabilityBinding` / `bindCapabilities` | `kind/uri/rights/signalKey` | 能力绑定（createResource+signal+start） |
+| `assertEffectGrant` / `interactionApproved` | — | effect 授权断言 / 审批判定 |
+| `bindCapabilities(task, bindings)` | — | 上层能力绑定统一入口（独立函数，非 `TaskHandle` 方法） |
+
+## LLM 任务单元（@itookit/llm-tasks）
+
+| 接口/类型 | 说明 |
+|---|---|
+| `DurableProgramInput` | `sessionId/roundId/messages/connectionId/model/temperature/…` |
+| `DurableAgentInput` | + `maxExchanges/workingDirectory/approval/tools/externalToolIds` |
+| `DurableAgentOutput` / `DurableChatOutput` | `{ message, usage, finishReason, exchanges }` |
+| `DurableDependencyBinding` | `taskId/input/output?`（跨节点数据边） |
+| `buildLlmTaskInput` | 统一装配 llm.agent/chat 的 input |
+| `extractNodeOutput` | `outputs[name].content → message.content → raw` 统一提取 |
+| `collectDependency/dependenciesReady/dependencyWait` | 依赖收集状态机 |
+| `ContextTaskProgram` | v2 执行 bridge：Context 写集、Task 状态与下一 Effect 联合提交 |
+| `ContextAssembler` / `ProviderMessageAdapter` | 兼容转发至 `@itookit/llm-context` |
+
+## 上下文（@itookit/llm-context）
+
+独立接口为 `IContextAssembler`、`IContextProfiles`、`IContextEngine`、`IContextService`、`IContextReader`、`IContextContentStore`、`IContextGcStore`。`PreparedContext` 返回 cursor、explanation 和 CAS writes；消费方通过 Kernel 通用 action 提交，Context 不依赖 Kernel。GC 端口提供与发布和根提交串行化的原子视图，默认仅回收静止终态 Task 的过期孤儿。完整字段与调用链见 [Context API](context-api.md)。
+
+## DAG 编排（@itookit/llm-flow）
+
+| 接口/类型 | 说明 |
+|---|---|
+| `DagPlugin` / `DagPluginRegistry` / `DagPluginCatalog` | 插件契约与注册表 |
+| `DurableFlowExecutor` | 动态图调度（route/loop/spawn/compensate/on_failure/budget） |
+| `FlowValueProgram` / `FlowHumanProgram` / `FlowAggregateProgram` | flow 内置 durable programs（`flow.value/human/aggregate`） |
+| `FlowDefinitionStore` / `FlowStore` | Flow 定义持久化（依赖最小 asset 存储面） |
+| `DagCommandService` | DAG 控制面命令（run/snapshot/…） |
+| `findCycles` | 环检测（回边 + 环上节点） |
+
+已有根 Invocation 的 Flow 为节点、循环和动态 worker 保存独立 invocationId/parentInvocationId。RunGet/RunList 与成员读取公开关联；当前 Task 与历史尝试分开投影，controlTaskIds 只表达当前持久成员，仍需后端复验写权限和状态。身份版本冻结在 checkpoint，旧运行保留原提交摘要。详见[子调用与尝试投影](design/invocation-presentation.md#7-当前实施覆盖)。
+
+## 会话层（@itookit/llm-session）
+
+| 接口/类型 | 说明 |
+|---|---|
+| `ISessionRepository` | 会话持久化门面（VFS 资产/消息/会话清单），由 SessionRepository 实现 |
+| `ConversationManifest` / `ConversationUIState` / `BranchTreeNode` | 会话清单/UI 状态/分支树 |
+| `RoundManifest` / `RoundProjection` / `BranchMeta` | Round 持久化投影 |
+| `SessionManager` / `SessionRegistry` / `SessionState` | 会话生命周期与状态 |
+| `TargetSelection` / `TargetRef` / `SubmissionRequest` | Agent/Flow 目标身份、预期 Session/分支/定义版本、结构化调用输入；正式 Session 与本地项目首次草稿通过 `SessionCommand.Submit` 进入现有队列 |
+| `RootTargetCatalog` / `SessionCommand.ListTargets` | 公开根目标的只读元数据目录；单项问题通过 issues 隔离 |
+| `SessionCommand.HasCommittedSubmission` | 已绑定 Session 内核对提交、执行引用及历史索引，不派发执行 |
+| `SubmissionReceipt` / `SessionCommand.GetSubmissionReceipt` | 按原冻结请求及摘要只读核对队列或历史接纳，返回 accepted/unknown 与证据来源；不证明执行完成，不重新提交 |
+| `SessionCommand.InspectSubmissionReceipt` | 显式 expectedSessionId 的无绑定只读核对，与 receipt 共用现有记录；不激活或创建 Session、不唤醒队列、不改变当前视图绑定 |
+| `IAgentConfigService` | Agent/Connection 配置服务（供 AgentResolver 解析） |
+| `CommandBus` / `ExtensionRegistry` / `ILLMPlugin` | 控制面命令与插件系统 |
+| `ConversationSystem` / `initializeConversationSystem` | 装配入口（session + flow + programs + kernel） |
+
+## 能力实现（@itookit/kernel-adapters）
+
+| EffectAdapter | kind | 说明 |
+|---|---|---|
+| `LlmChatEffectAdapter` | `llm.chat` | LLM 对话（流式/非流式 + token 预算扣减） |
+| `ToolCallEffectAdapter` | `tool.call` | 工具调用 |
+| `SkillLoadEffectAdapter` | `skill.load` | Skill 加载 |
+| `SkillUnloadEffectAdapter` | `skill.unload` | Skill 卸载 |
+| `BashEffectAdapter` | `process.exec` | Shell 命令 |
+| `TtyEffectAdapter` | `tty.command` | TTY 会话 |
+
+## UI 体系（Ports/Adapters）
+
+| Port 接口 | 关键方法 | 实现 |
+|---|---|---|
+| `IChatInputPresenter` | `setLoading()/setConfig()/getConfig()/restoreInput()/focus()` | `ChatInput` |
+| `IHistoryPresenter` | `renderFull()/processEvent()/scrollToBottom()/getSessionElement()` | `HistoryView` |
+| `IEditor`（抽象类） | `init()/destroy()/getText()/setText()/setTitle()/updateNodeId?()/flushPendingSave?()/cancelPendingRender?()` | `MDxEditor`、`FlowsEditor`、`LLMWorkspaceEditor` |
+| `IStreamingController` | `enterStreamingMode()/exitStreamingMode()` | `HistoryView`（经 `StreamController`） |
+| `ICollapseManager` | `toggleSessionCollapse()/setAllCollapsed()/toggleAllFold()` | `HistoryView`（经 `CollapseController`） |
+| `INavigationPresenter` | `toggle()/update()` | `FloatingNavPanel` |
+| `IStatusPresenter` | `update()/updateFromSnapshot()/updateBackground()` | `StatusIndicatorView` |
+
+### 会话目录配置
+
+`EditorHostContext.chatFromFile(reference, association?)` 由宿主注入。MDX 仅提供当前文件路径、当前内容或选区快照；项目文件宿主补充 projectFolder，Session 文件宿主补充 sessionId。app-shell 负责项目归属、新建会话、持久化 main 分支输入草稿和导航，不自动发送。
+
+`EditorHostContext.directoryCommands.configureWorkspace(mode)` 由 SessionWorkbench 注入，llm-ui 的 WorkspaceDirectoryMenu 消费。`workspaceReadOnly` 表示主目录设置仅供查看，不改变文件权限：项目会话的 `workspace` 模式展示项目目录，`mount` 模式管理额外挂载；未归属项目的会话仍可设置主目录。界面不直接接触宿主文件路径 API。运行时向 `DirectoryMountService.fixedWorkspace(sessionId)` 注入所属项目的目录，服务在写入授权前校验主挂载来源、权限和 cwd，拒绝替换、移除或借附加挂载改变主目录；继续复用 Session 授权 revision 和挂载变更守卫。
+
+文件搜索可通过 `ToolVFSContext.walkFiles(dir, options)` 增量消费路径；`createVFSToolContext` 同时实现惰性接口和兼容的 `listFiles`，两者共享忽略规则。Grep/Glob 必须优先使用惰性接口，达到结果上限立即关闭迭代器，避免桌面 IPC 完整遍历导致工具超时。
+
+## Tool / Skill / MCP 能力配置
+
+`ILLMManagementService` 的 `testMCPServer`、`readMCPResource`、`getMCPPrompt` 由 LLMDeviceDriver 实现，VFSAgentService 转发给设置 UI。`SessionCapabilityScope.resolveMCPToolIds` 经 app-core 注入 AgentResolver 与 Harness/Flow 提交层；最终授权固定在 Task 输入。`ToolExecutionContext.onProgress` 与 `INativeShell.exec` 的 `onOutput` 连接进度生产者和 History 投影。详细语义与验证见 [能力配置与执行](./design/tool-skill-mcp-capabilities.md)。
+
+
+### 文件编辑展示与读取
+
+`EditorOptions.contentFormat` 区分 `markdown` 与 `text`。AppShell 根据统一文件注册表声明文档别名；默认编辑器将其他文件视为源码，保留编辑与保存能力，禁止 Markdown 预览。大 Markdown 默认源码模式，但仍允许用户显式预览。源码策略不改变 `readOnly` 或文件视图授权。
+
+桌面 `fs_read_file` 和 `directory_read_file` 使用 Tauri 原始 `ArrayBuffer` 响应；后者缺失文件返回 `null`，越界、符号链接或已关闭 grant 仍拒绝访问。旧的完整文件 JSON 数字数组不再是这两个客户端入口的协议。
+
+`EditorOptions.signal` 用于编辑器初始化期间的视图取消；完成初始化后解除绑定。宿主隐藏已创建的编辑器时调用 `cancelPendingRender`，独立于 `flushPendingSave`。取消预览不取消保存或持久任务。
+
+HTTP 外挂的条件写入、取消与项目授权见 [HTTP VFS 设计](design/vfs-http-driver.md)；调用方必须使用读取字节时返回的 revision，不使用保存前 stat 替代读取版本。
+
+`EditorHostContext.openFile(path, anchor?)` 打开编辑器文件命名空间中的文档。MDX 使用当前文件路径解析普通 Markdown 相对链接，宿主映射到所属项目/会话路由并打开标签；收藏入口仍以实际文件路径为基准，移动与重命名通过 updateNodeId 更新解析基准。外部 URL、附件与 mention 保留各自行为。
+
+## 独立编辑器宿主接口
+
+[mdxeditor 的 editor/contracts.ts](https://github.com/nest-agentos/mdxeditor/blob/main/src/editor/contracts.ts) 定义并从 `@itookit/mdxeditor` 导出 `AssetProvider`、`StoreFactory`、`EditorHost`、`EditorOptions` 与 `IEditor`。核心不持有 `IFileSystem`，附件与插件存储按需注入，保存通过 `onSave` 注入。`@itookit/mdx-adapter` 将 `ui-common` 的 target/files/hostContext 转成上述公共端口，在构造编辑器前校验 namespace 与 Session；消息和会话标识保留在宿主，核心只使用可选 `documentPath`。
+
+### 独立 VFS UI 接入
+
+`vfs-ui` 仅依赖 `vfs-core`。`BrowserSource` / `BrowserAction` 接收自定义资源与动作；`VFSPresentationOptions` 按实例注入翻译、SVG 和启动跟踪；`TagEditorFactory` / `ContextMenuConfig` / `UIPersistencePort` 接收宿主组件、菜单和存储。消费方从 vfs-ui 导入这些类型，或提供结构兼容实现，无需依赖 common/ui-common。NestOS 展示适配位于 `app-shell/src/browser/vfs-presentation.ts`。
+
+通信契约的权威实现已迁到 `https://github.com/nest-agentos/driver-llm/blob/main/src/types/`，原 llm-common 和 common 的 LLM 兼容转发已删除。通信消息 DTO 由 `https://github.com/nest-agentos/driver-llm/blob/main/src/types/message.ts` 定义；上下文领域消息仍归 `llm-context/src/domain/message.ts`。两包互不依赖，宿主将上下文结果映射为通信请求；目前兼容字段可直接按结构赋值。模型设备与配置实现已迁到 `kernel-adapters/src/llm-management/`，通过 `@itookit/kernel-adapters/llm` 公开。
+
+## 外部 harness 端口
+
+`CellsDriver` 由宿主装配并注入远程来源服务，统一凭据，暴露文件/进程 provider、sync 与 harness。`HarnessClient`、`HarnessProfile`、`HarnessSession`、`HarnessEvents`、`HarnessReceipt` 位于 cells-driver `/harness` 公共入口，app-core 消费该端口，分别装配原生会话展示和持久远程执行；UI不持有底层凭据。
+
+创建仅使用服务端声明的 workspaceId；继续先核对 native cwd 授权并拒绝抢占活跃会话；发送、响应和中断必须属于本服务接管的会话。只读历史不触发 resume。修改必须使用当前 epoch/requestId，未知结果查询 operation 收据，禁止自动重放。事件有独立 epoch、递增 seq 与 cursor；gap 要求刷新历史，不能宣称完整输出。客户端关闭不代表原生 turn 停止。
+
+`MCPServer.auth` 保存 basic/bearer 类型、username 和 credentialRef，密钥由 `MCPConnectionOptions.resolveCredential` 在每次请求解析。`beforeSave/beforeDelete/configurationChanged` 由应用注入授权与投影刷新；机制不依赖 app-core。`MCPConnectionOptions.extensions` 注册 `MCPConfigurationExtension`，其 `matches` 本地筛选标准发现结果，`discover` 通过 `MCPConfigurationExtensionContext` 消费 `MCPDiscovery.metadata` 或复用当前连接的 `callTool`。验证结果放入 `MCPDiscovery.extensions`，管理器负责测试/保存复用与连接身份变更后的重新验证。
+
+cells 可直接使用标准 `MCPServer.apiKey`（Bearer，无 username）。app-core 注册的扩展优先验证 `server/discover._meta['itookit/cells']`（兼容旧 `itookit/cells`）；旧服务通过已声明的能力工具验证，不为普通 MCP 发专用探测。结果保存于 `MCPServer.extensions['itookit/cells']`，绑定须匹配当前 MCP endpoint 及已知 fileProtocol。`MCPRemoteConnections` 从已验证配置恢复驱动凭据，API Key 不复制到项目挂载记录。旧 basic/bearer credentialRef 仍支持。配置展示名自由修改，不用名称判断能力；设置 UI 控件只呈现已识别扩展。
+
+`ProjectFolder.displayName` 是当前服务器名与项目名的组合；持久身份 name 与可选 navigationName 区分人类名称和稳定路由。`MCPRemoteConnections` 是 MCP 目录的只读投影及旧连接迁移适配，不在挂载目录保存第二份连接配置。
+
+
+`CellsDriver.projects` 暴露 ProjectClient/RemoteProject/ProjectMount/RegisterProject；服务端目录项目与 sync 数据项目是不同身份。项目文件请求使用项目 ID、revision 与只读衰减 headers，project_exec/harness 从服务端同一份授权获取 mounts。ProjectLauncher 是进程/harness 共用启动端口，当前 bubblewrap，VMM 尚未实现。详见 [项目模型](design/cells-project-model.md)。
+
+`ProjectRemoteMountService.remountProject` 修改客户端项目权限，必要时经可选 `ProjectClient.remount` 调用 `project_remount` 提升服务端项目根授权；所有写入均校验当前权限与版本，不修改项目身份。客户端降为只读只衰减本地绑定。`ApplicationBackend.unmountProject` 是本地卸载用例，允许远端离线，不通过远程文件删除或服务端 `project_forget` 执行。
+
+### 远程 Harness 执行连接
+
+`HarnessExecutionConnection` / `HarnessConnectionSnapshot` / `HarnessExecutionProvider` 从 `kernel-adapters/contracts` 导出。具名配置引用已有节点连接、项目与profile，快照冻结修订和授权；`HarnessConnectionService` 负责CAS配置、发现与准入，`createHarnessExecutionProvider` 负责原生操作journal和终态核对。Kernel adapter只依赖Provider端口，使用 `harness.execute@1`，不直接依赖远程驱动实现。
+
+`IAgentManagementService` 可提供独立 Agent 发布：getAgentPublicationStatus、publishAgent、getAgentRevision、getAgentPublicationReceipt。三个读取端口在应用能力表中登记为 query，发布为 async；核对不等待原发布写响应。AgentPublishRequest 固定来源、修订摘要和预期最新指针，AgentPublishedRevision 固定策略正文及直接依赖快照，服务保持旧未发布配置兼容。UI 只在回执身份核验后解除该操作限制；不是 Kernel 执行状态的第二份副本。详见[Agent 独立发布](design/agent-session-connection-review.md#511-agent-独立发布的当前实施)。
+
+`InputAssetCommand.ImportFile/Inspect` 提供通用文件上传与只读核对，稳定 uploadId 绑定 name/MIME/bytes/SHA-256，正文经 ArrayBuffer 传输；Inspect 只报告 missing/preparing/ready。Flow 与 builtin.input 的 files 控件保存标准 file 资产块，validateCallAssets 注入根调用准备和队列实参编辑；原接纳核对不因文件后来丢失而重发。详见[通用文件输入协议](design/invocation-input-resolution.md#74-通用文件上传与结构化提交)。
+
+`HarnessInputAttachment` 为 `HarnessInlineAttachment | HarnessAssetAttachment`：前者保存可直接发送的文本/图片，后者保存不可变 `BinaryAssetReference`。`prepareHarnessInput` 只规范化消息和引用，实际宿主通过 `readTaskAsset` 使用消费 Effect 的真实身份读取并核验，在原生副作用前转换为内联附件；不把引用本身传给原生 turn。恢复已有 turn 只核对原操作，不要求再次读取资产。详见[Flow 资产准备](design/invocation-input-resolution.md#73-flow-资产引用与-harness-目标准备)。
+
+`IAgentManagementService` 暴露安全连接目录、已授权目标目录及CAS保存/删除，应用RPC按显式方法表开放。Agent的 `execution.kind=harness` 经本地Session、Flow节点和Composite成员共同分派；模型连接保持独立。设置页只从已授权项目/profile候选配置，不接受新的端点或凭据。持久交互、确认停止和epoch未知的边界见[远程执行连接](design/remote-harness-connections.md)。
+
+HarnessExecutionProvider.cancel 返回 ConnectionCancelResult；stopped/cleanup=confirmed 必须携带匹配当前 Session/Task/Effect 的停止证明。HarnessExecutionEffect 检查证明后继续等待本地 in-flight，才正常结束 Kernel 的 void cancel；其他结果保留 cleanupPending。宿主的 stateForCleanup 只访问原 journal；上下文调用另需 settleContextForCleanup，以固定 binding 收尾方法重读原持久凭据、检查归属和 CAS，不开放整个共享集合。两条路径均先验租约，再打开 Kernel Session，并在每次记录读写前复验。旧注入 Provider 的 void 返回需迁移；既有持久执行格式不变。详见[取消结果桥](design/invocation-control-state.md#84-connection-取消结果与-kernel-清理确认)。
+
+HarnessExecutionProvider.reconcile 返回 ConnectionReconcileResult；Effect 桥将 running/unknown 保留为 indeterminate，仅接受同一执行的 not-started 证明后映射 retry。原 journal 的恢复预算结束不能当作原生未执行，旧 Provider 返回 Kernel retry 的实现需迁移。详见[核对结果桥](design/invocation-control-state.md#85-连接核对结果与原执行观察)。
+
+### 远程项目会话展示端口
+
+`ui-common` 的 `ConversationControls` 由宿主注入，提供 read/refresh/subscribe/send/respond/interrupt/reconcile/close 及能力限定的 rename/archive，返回规范化历史、待交互卡片及操作可用状态。`cells-driver` 的 `HarnessConversation` 按结构实现；app-core 的 `ProjectRemoteMountService.projectConversation` 注入项目授权和持久回执 journal；llm-ui 只消费该端口。`RemoteAgentControls` 提供项目范围内目标列表及发送路由，远程选择不进入本地 SessionCommand.Send。原生会话引用、输入草稿和待确认回执位于 `/etc/fs/harness-conversations.seq`，不复制原生历史。 `ConversationSnapshot` 可携带 `canFork` / `hasEarlier`，对应可选 `fork` / `branches` / `loadEarlier`；分支切换仍由宿主导航处理。`HarnessHistory.nextCursor` 与 `HarnessHistoryOptions.cursor` 描述只读历史分页；`HarnessClient.inspect` 读取元信息，`fork` 是带 epoch/requestId 的原生修改。
+
+原生只读命令由 `capabilities.commandQueries` 协商 `HarnessClient.queryCommand` → `harness_query`，携带授权项目修订、原生会话、关联 requestId 和冻结定义；不占原生修改队列或创建执行 receipt。展示端口的 `queryCommand/reconcileQuery` 与 `canQueryCommand/queryReceipts` 将结果保存到既有恢复记录，独立于输入 pending/submission 和队列接纳。查询报告丢回复只核对报告，不拿查询 ID 调用 `harness_operation`；独立 llm-ui 在 CommandSubmission.execution 冻结分类并更新同一 OperationLedger。详细实现、DSH 目录不完整语义及 C4 见[控制协议 §8.6](design/invocation-control-state.md#86-原生只读命令与查询报告)。
+
+`capabilities.commandOutputs` 声明原生命令正文读取。新客户端仅在该能力存在时为 command/operation 回执请求指定 outputMode=reference，接收 64 KiB UTF-8 预览和 HarnessCommandOutputRef；缺省保持完整原结果。此展示选项不改变执行指纹或传入原生驱动。`HarnessClient.readCommandOutput` 与 ConversationControls 的 readCommandOutput/loadCommandOutput 均归只读 RPC，读取固定 epoch/requestId/摘要及范围，不建立接纳 fence、初始化原生执行或消费草稿。UI 按需逐页核验，读取失败只影响该产物；取消后不发后续页。原生命令没有 Kernel Task 时不伪造 TaskArtifact。公开 DTO 由各边界契约提供，详见[正文协议](design/invocation-presentation.md#73-原生命令正文与接纳事实)。
+
+匹配的 committed 回执之后，内容解码失败不再降为提交 unknown。有效执行封套保留接纳/终态并单独标正文不可用；执行身份或终态无效时保存原 operationId/epoch 的 resultError 派发屏障，不能以普通队列 retry 重放。未核对结果及运行中命令不受最近 64 条已结算展示窗口的淘汰影响；原回执修复后再解除。详见[结果校验与控制](design/invocation-control-state.md#89-已提交回执与结果校验)。
+
+原生控制使用 `interrupt({sessionId, turnId, operationId})` 冻结精确执行目标；可选 `reconcileControl(operationId)` 查询同一控制回执。`controls` 分别投影接纳 receipt 与实际停止 effect，不与输入 submission 混用，不消费草稿。原发送悬挂时仍可入队、编辑、读取、回应和取消；控制未知或 accepted 且无精确终态时阻止冲突派发。取消不自动修改队列 paused；复合停止先显式暂停队列。回执复用 HarnessRecovery，事务回复丢失先核对己方写前/写后值，真实并发冲突禁止旧实例覆盖。详细边界与验证见[控制协议](design/invocation-control-state.md#8-当前实施覆盖)。
+
+`ModelConfigurationCommands.inspectMCPDeletion` 返回配置和项目挂载引用的删除预览；`deleteMCPServers` 校验预览并要求有引用时显式 force。`MCPDeletionPort` 由 ProjectRemoteMountService 实现，预览由 ProjectService 提供远程项目与本地会话信息；经 SessionLifecycleService 清理以目标 MCP 为根来源的本地远程项目及其本地会话，再批量移除引用并释放视图。普通本地项目只解除附加挂载，服务器内容和原生会话保留。普通 MCP 删除仍禁止有引用的配置。
+
+`MCPRemoteConnections.diagnostic(connectionId)` 返回不含凭据和端点的 `MCPConnectionDiagnostic`（名称、验证原因、catalog revision、当前配置身份）。`ProjectRemoteMountService.resolveConnection` 在异步访问前恢复当前引用，缺失连接抛出 `RemoteConnectionUnavailableError`，保留 ENOENT 错误码并附带诊断及引用项目 ID。宿主本地化展示；`reportRemoteFailure` 记录 `cells` 模块日志和时间在前的控制台错误，按异常实例去重，只输出身份、阶段、结构化错误码。详见 [项目模型](design/cells-project-model.md)。
+
+
+`HarnessClient.search`、`ProjectClient.search` 是可选的能力协商读取端口，返回有界 matches/truncated/nextCursor；项目搜索默认仅当前项目。`ProjectSearch` 统一本地文件及 PI Agent 文件/原生会话检索，完整绑定身份随结果传播，在点击导航时再次核对。`ConversationSnapshot.observation` 与 driver 的 `HarnessObservation` 结构兼容；`conversationStatus` 为正文/侧栏/标签提供统一状态文案。`RemoteSessionStatus` 是按项目引用计数的只读观察用例；其 provider 在 driver 实现，无 app-core DOM/Node 依赖。`exportRemoteSession` 输出原生只读 JSON；`remoteSessionSources` 只匹配已注册且完整授权的附加项目来源。
+
+
+`HarnessProfile.capabilities` 可声明 rename/archive/unarchive 和 attachments（text/image）；`HarnessSession.archived` 表示原生归档。管理调用沿用 epoch/requestId/receipt，不以 VFS rename/delete 替代原生操作。`ConversationSnapshot` 暴露 canRename/canArchive/canUnarchive 与附件种类；`send` 和 `saveDraft` 接受有界内联附件，`draftAttachments` 只保存未发送的输入，不复制原生历史。未知 turn 回执确认后清空已提交草稿，保留后续编辑，不自动重发。`HarnessStatusRow` 带可选 title/archived/fileVersion，宿主通过共享订阅更新标签及有限目录刷新；普通文本 delta 不推进 fileVersion。
+
+
+`HarnessClient.subscribeDirectory` 和 `directorySnapshot` 分别提供项目目录通知与本地最近版本，`HarnessStatusPort.subscribe/refresh/fileVersion` 提供状态投影。节点发现的 events 元数据协商统一 fetch SSE，Harness、目录、进程共享节点与身份下的连接，仍核验项目 revision。`RemoteSessionStatus.fileVersion` 合并独立目录版本与原生文件事件，零会话仍可通知，授权变更失效。会话与侧栏保留 15 秒权威快照核对，实时事件不走轮询。旧事件/目录轮询接口已删除，需要配套升级节点和 driver。Claude 与 Codex 共用公共契约；单个 Claude 子进程断线只影响其 thread。
+
+## 数字分身宿主接口
+
+`DigitalTwinService.scannerTargets()` 列出可选发布目标；`TwinScanRuleInput` 支持文本 / 文件 input 与固定版本的 executor，普通参数仍由原目标契约校验。`workspaces()` 返回宿主授权空间描述，`openWorkspace(id)` 返回独立服务句柄；snapshot.workspace 显示归属与只读能力，界面切换不改变全局服务。内部会话绑定与执行装配方法不经 RPC 暴露。详见 [扫描器与共享空间](design/digital-twin-scanners.md)。
+
+扫描公开契约为 app-core 的 `TwinScanPlanInput`、`TwinScanPlan`、`TwinScanRun`、`TwinScanState`；命令由 `DigitalTwinService.saveScanPlan`、`setScanPlanEnabled`、`removeScanPlan`、`runScanPlan`、`cancelScanRun`、`waitScanRun`、`scanOnce` 提供。`snapshot().scans` 返回计划、运行、下次检查和宿主信息。UI 只调用服务，工具箱资源仍按原协议管理；扫描不注册绕过来源授权的通用工具。扫描守卫在预算预留、模型发送和结果提交核对计划版本、来源范围、提取类型、运行状态与宿主 fence，预算和检查点与结果原子提交。
+
+`DigitalTwinService.getSettings()` 仅读取设置及其 revision，供 UI 自动保存使用，不枚举来源、会话或运行记录。`configure(patch, revision)` 保持版本条件更新，UI 串行提交变更字段并在预算等后台写入冲突时重新读取版本。
+
+`DigitalTwinService.snapshot(progress?)` 只读取已保存的知识与任务状态，不触发来源校验或清理；可选回调用于诊断读取阶段，`diagnostics()` 返回初始化位置。后台扫描持有租约后恢复清理并校验来源，完成后通知视图读取新状态。
+
+`DigitalTwinService` 位于 `app-core/src/digital-twin/service.ts`，公开 `snapshot/addSource/analyze/review/retrieve/forget/forgetScope/linkExecution/selectionInfo/selectSource/removeSelection` 等宿主管理方法；`selectSource` 保存显式范围和分析类型后立即请求后台扫描，`selectionInfo` 返回来源状态/知识/任务，`removeSelection` 停用并清理来源提取结果且保留原文；配置支持提取模型与用户姓名/别名，snapshot.prompt 返回基础提取提示词。owner 和来源/消费权限不由模型参数提供。`TwinStore` 位于 `app-core/src/digital-twin/contracts.ts`，公开版本条件提交、固定页枚举、原子失效与可恢复清理，仍由 VFS 的同后端 SeqFile 事务承载。
+
+`KernelAdapterDiagnostics.authorizeLlm(request, context)` 位于 `kernel-adapters/src/ports/diagnostics.ts`：宿主可异步拒绝发送，或设置通用请求诊断 `_label`；LLM 适配器在持久请求事件前和实际发送前调用，发送参数在第二次校验后生成。底层不导入分身领域类型。该钩子是发送时授权校验，不能撤回已经发送的网络请求，也不代表跨网络/数据库的原子事务。
+
+数字分身新扫描入口：`DigitalTwinService.saveScanRule(id, revision, {name, include, exclude, intervalMinutes, enabled, focus?, kinds?})`，`previewScanRule({include, exclude})` 不提取/不新增来源；`TwinSourceReader.discover()` 返回资源、项目与完整范围，`probe()` 可提供文件版本。模型和全局排除通过 `configure` 保存；`budgetUnlimited?: boolean` 控制累计预算是否无限，不改变 `tokenLimit: 0` 的原语义。自动规则将无限标记写入运行记录，并在下一次预留/结算时核对最新全局预算，实际用量继续记账；旧 `saveScanPlan` 的独立额度保留兼容。
+
+`snapshot().graph` 返回由有效事实派生的 `TwinGraph`（节点、带类型的关系及记忆引用）。`mergePeople(from, to)` 保存显式人物身份映射，不改写来源证据；`previewScanRule` 返回匹配的 `resources` 与排除的 `excluded`。扫描 scope 固化 `focus`，同一来源按关注点复用或区分提取检查点。
+
+单用户知识消费默认对已接入的 Chat/Agent 开放，不再读取 grant 作为许可；使用总开关与全局忽略在检索及发送前生效。`local:` / `remote:` 匹配文件目录，`session-name:` 匹配会话名；规则级忽略不覆盖其他规则的包含范围。历史 grant 记录保留但不再生效。
+
+## 初始文件恢复
+
+`app-settings` 的 `InitialFilesPort` 注入 `list()` 与 `restore(ids)`；列表包含稳定 ID、分组、文件名、目标路径和存在状态，恢复返回逐文件 restored/preserved/failed。`app-core` 的 `NestosInitialFiles` 提供产品模板，宿主将当前笔记文件系统和 CommandBus 注入；笔记只创建缺失文件，Flow 复用 DraftLoad/DraftRestore。文件系统及系统恢复页复用 `InitialFilesSection`，默认全选、分组折叠，保留勾选和展开状态，不把文件恢复等同于覆盖或模型分析。 系统恢复页将初始文件与配置勾选统一计入顶部“恢复选中项”，确认时分别说明补缺失文件与覆盖内置配置的影响；“刷新全部状态”覆盖所有分组并保留勾选和展开状态；各折叠组标题旁的“全选”仅作用于本组。“重置全部内置配置”仅针对 Provider/Connection/Agent，不包含初始文件。
+
+数字分析的 selectionInfo 返回关联扫描 runs 与分析结果。用户修正将知识转为独立陈述，originSourceId 仅保留文档归属，不作为事实证据；对话框据此继续显示修正结果。显式 removeSelection 一并清理这些关联修正，普通来源变更不覆盖用户陈述。旧记录无需迁移。
+
+数字分身 job 与 scan-run 可选 errorDetail 保存经过凭证过滤和长度限制的失败原因，error 仍保留稳定错误码。提取任务分别报告失败、超时、取消、JSON 格式不符和输出截断；历史记录无详情时可重新扫描获取原因。UI 将任务状态与未确认用量分开显示，预算入口位于自动更新的通用设置“用量与预算”。
+
+分析 job 可选 createdAt/startedAt/finishedAt 记录创建、附着执行任务和终止时间；历史记录不伪造时间。Web Console 的 [DigitalTwin] 日志记录阶段、连接、任务 ID、字符数、耗时及过滤凭证后的错误摘要，模型输入和响应正文不进入该日志。诊断可按任务 ID 对照对话框中的任务详情。
+
+提取请求显式设置 thinking=false、maxTokens=8192、stream=false；预算预留包含输入字节数、8192 token 输出额度及提示词余量，并按返回的 total_tokens 结算。截断/格式错误带有已知 total_tokens 时，job、settings 和 scan-run 原子结算，失败不推进来源游标；重复结算不重复计费。无任务时间的历史记录仅展示其 scanScope.runId 对应扫描时间，并明确标注，不从其他任务或当前时间推断。
+
+数字分析当前使用非流式提取。通过 Kernel 公开任务事件记录 requestStartedAt、responseReceivedAt 和 responseCompletedAt；请求启动不代表服务端接收确认。驱动超时单独标记 TWIN_EXTRACTION_TIMEOUT；非流式未返回完整响应时不能推断网络链路或服务端生成的具体阶段。界面独立展示当前更新、下次调度与全部可展开的历史扫描/任务记录。
+
+`ApplicationBackend.openView` 返回 `OpenedApplicationView`（UI 文档、工作台、可选初始会话、事件水位与观察句柄）；由 app-core 的 host/open-view 实现，app-shell 的 lifecycle/opened-view 消费。`ApplicationViewObservation.observeView(after, listener)` 在登记时有界重放并持续分发；快照水位仅属于当前客户端，已有编辑器切换保留 openSessionView/activate 屏障。详见 [HTTP 打开与观察聚合](./http-app.md#打开与观察聚合已实现)。
+
+HTTP v15 的 bootstrap 可携带 OpenViewRequest 并返回 HostedApplicationClient.initialView，先登记观察再导出能力；HttpViewClient 将 SSE viewEvents 适配为本地 ApplicationViewObservation。纯数据按 SHA-256 校准，句柄每个连接独立，见 [一次打开同步握手](./http-app.md#一次打开同步握手与首帧v14)。
+
+`ApplicationViewObservation.getSessionBaseline` 返回成对快照/水位，调用者只读使用；传输按公开 `observeView` 的事件更新行投影，不读取具体宿主的内部会话源。`KernelInspectionPort` 仅供 `LocalApplicationServices` 的宿主聚合使用，不属于前端 `KernelViewPort`，也不注册为远程能力。
+
+工作台 `SessionBrowserPort.setSessionFilter(agentId?)` 只改变该观察实例的会话投影；RPC 显式登记此方法。项目会话列表在分页前匹配不可变 `ConversationManifest.createdWithAgentId`，`ProjectSearchQuery.agentId` 对会话搜索执行同一条件，文件检索不受影响。宿主 `EditorOptions.mountSettings` 挂载默认项目偏好并参与保存/销毁；`SessionDraftControls.scope` 为草稿提供项目选择候选及切换回调。
+
+`EditorOptions.onStartConversation` 是配置页打开聊天草稿的可选宿主回调。配置编辑器先完成 `flushPendingSave`，随后请求宿主导航，不直接依赖聊天组件或执行服务；失败保留配置与可操作原因。`mountCompactNavigation` 在手机配置页挂载返回和窗口导航，销毁时释放；工作台复用现有项目草稿并选择智能体，保留文本、附件和稳定身份。
+
+项目草稿原地转正：`ProjectDraftComposer.id` 提供草稿 UUID，显式 clear 返回替代 UUID（RPC 字段为句柄创建时的快照，宿主使用返回值更新身份），`ProjectDraftPromotion.remote` 携带已确认的原生会话引用。`projectConversation` 可接收草稿 UUID，并通过 `ProjectConversationPort.conversationId` 返回稳定的宿主身份；RPC 显式传递此字段。首次原生提交 journal 与正式重开使用相同 UUID，只有已确认首 turn 才推进草稿；原生创建和 unknown 不能替代接纳证据。`SessionDraftControls.inPlace` / materialize 的 container 将同一挂载点交给正式控制器，接纳后宿主原地更新标签。详见[项目会话导航](design/project-session-navigation.md)。
+
+`SessionDraftControls.scope.select` 的可选 SessionDraftPreferences 在项目切换前捕获当前输入偏好，导航层仅转交；目标草稿编辑器按当前候选验证智能体与连接/模型后应用，不携带源文本或附件。待接纳控制器及隐藏/关闭视图不接收迟到偏好，执行锁和 Flow 引用不跨项目复制。
+
+## 原生 Harness 斜杠命令
+
+原生执行的 `HarnessProgramInput.timeoutMs` 只表示显式总时限，省略或 `null` 均不设置 Effect 截止时间；不能用固定 30 分钟推断活跃 turn 失效。运行/完成按当前 Session 与 turn 的权威事件和终态判断，目录或历史文件更新时间仅是活跃证据，不是完成依据。缺少进展和断线保留可诊断的未知状态，不自动重新创建会话。显式总时限即使持续活跃也会到期，不能与无进展检测混用。
+
+`HarnessExecutionRequest.title` 是与 prompt 分离的宿主元数据（1–512 UTF-8 字节，无控制字符）。Session 准备从自身持久标题冻结并限制长度；支持 rename 的目标在新会话首次 turn 前通过已有原生操作回执命名，恢复只核对原操作，不新建 Session。续接或 fork 不覆盖既有名称；命名失败只记录元数据错误，不重派开发。VFS 与窗口列表共享最多 40 个字素的展示省略规则，保留完整搜索、编辑与可访问名称，窄屏继续按实际宽度单行省略。
+
+ConversationControls 的可选 commands/command 端口承接当前原生会话的命令目录和执行；snapshot.supportsSlashCommands 只在宿主声明能力时启用。cells-driver 通过 profile.capabilities.slashCommands 协商，目录为纯数据，具体命令名与原生 RPC 留在 cells 对应插件内。Claude 使用 SDK 目录及 slash prompt，Codex 将 compact/review 映射为专用控制调用，DSH 使用原生 commands/list 与 commands/execute。
+
+原生会话输入使用 NativeSlashCommandPlugin 提供候选，不混入本地 Kernel slash 操作；选择只填入输入，发送时再次验证当前目录。command 沿用 epoch、requestId、项目 revision、操作队列和 reconcile，可接纳但不产生 turnId；只有 prompt 类命令产生原生用户消息时才按该消息身份呈现。DSH command/run、command/done 以稳定 commandId 进入系统记录。未知操作跨视图保留，接纳不清除提交后的新草稿；关闭输入释放插件并拒绝迟到目录恢复弹层。
+
+
+## 原生 Harness 模型与推理能力
+
+`profile.capabilities.models` 协商可选的 `HarnessClient.models(profileId, sessionId?)` / `ConversationControls.models()`。目录只包含模型 ID、显示名称、该模型支持的 reasoningEfforts、可选默认值与已知当前选择；推理 ID 保留原生值，不映射为本地 Connection 的 modelTier。当前值未知时不伪造会话配置。旧节点不查询新工具，不提供选择入口。
+
+`harness_models` 是带项目/授权范围的只读查询；`harness_turn.selection` 为 `{modelId, reasoningEffort?}`。客户端和对应原生适配器均按模型目录校验，配置与提示词沿用同一次 epoch/requestId 提交及回执核对，禁止自动重放。Codex 使用 model/list 和 turn/start 的 model/effort；Claude 使用 SDK initialize.models、set_model 及只作用于本会话的 apply_flag_settings.effortLevel；DSH 使用 session/modelCatalog、session/selectModel，再 session/prompt。Claude 未附着会话的目录发现使用不持久化的临时 SDK 进程，不发送模型请求。
+
+模型菜单复用 ChatInput 的 PopupPanel，只有一个紧凑入口；先选模型，再展示这个模型的推理选项，也可以跟随原生配置。项目草稿的选择按 executorId 保存，切换执行器不继承过期选择；草稿转正前捕获配置并传入第一条消息。关闭或切换绑定拒绝迟到目录恢复弹层。发送后的配置修改只影响下一次提交。prompt 类原生命令可携带选择，action 类控制命令按原生语义执行，不强行覆盖模型。
+
+
+独立 llm-ui 输入新增 ConversationSnapshot.commands、ConversationActions.command 和 composeCommandCatalogs；命令的 source / commandId / id / revision 与 prompt/action 语义分开表示来源、路由目标和展示。NativeChatBindingOptions.commandProviders 聚合 UI、宿主与当前 harness 的有效贡献；SessionChatBindingOptions.composerCommands 接入应用命令目录及自己的操作核对。selectors.variants 支持按独立父选择器切换选项，模型改变时推理选择不跨模型遗留。当前工作台兼容输入与独立 ChatView 分别验收，迁移边界见 [独立模块设计](./design/llm-ui-independent-module.md#10-输入能力连接与命令聚合)。
+
+
+`ConversationControls.command(name, args?, selection?, inputText?)` 的 inputText 保留提交时的原始草稿，独立于用于执行的解析参数；两个输入入口共享 independent/native-command。`ProjectConversationPort.send` 同步传递 selection，command 同步传递 inputText。`ProjectRemoteMountService.projectModels(projectId, profileId)` 是只读应用用例，由 app-core 管理查询客户端，HTTP 传输登记为 query。
+
+`HarnessRecovery.draftRevision` 与 pending.draftRevision/inputText 共同限制接纳清理；commandResults 保存最近 64 条有 commandId 的本地系统结果，原生同 ID 历史优先。Claude 未接管的已有会话仍可发现目录和别名；compact 是不要求用户消息回显的 action。首条 prompt 命令与消息共用会话准备及草稿转正，会话级 action 在尚无会话的草稿中禁用。流程与 C4 职责见[原生提交与恢复](design/llm-ui-independent-module.md#104-原生提交与恢复的共同路径)。
+
+## 图片处理与会话草稿
+
+独立 llm-ui 的 `ImageEditingPort` 描述 File 预处理、上传后关联、按附件版本替换及宿主策略变化后的重新处理；getRevision/subscribe 驱动刷新，不依赖 image-parser。`llm-ui-adapter/independent` 的 `ImageChatOptions.images` 与绑定的 images 配置接入资源读写、原图元数据和 resize；兼容 ChatInput 复用同一图片端口。
+
+`ProjectConversationPort` 的可选 `readComposerDraft/saveComposerDraft/putComposerAsset/readComposerAsset` 属于应用宿主存储，HTTP 能力登记在 HarnessConversationPort 展示端口；它们不是远程 harness RPC。草稿 data 不透明，写入携带 expectedRevision 和 operationId；保存回执未知先查询 acceptedOperationIds，不自动重放。资源按会话授权隔离，原图与选区不进入模型附件。详情见 [图片设计](design/chat-image-editing.md)。
+
+远程输入使用 composer 存储时不双写原生 saveDraft。send 的第四参数和 command 的第五参数可携带 submissionId，HarnessConversation 持久化同 ID 的 submission 回执；UI 只依据该回执接纳或拒绝冻结提交。可编辑草稿与待核对提交分开保存，详细状态及 C4 边界见 [图片与草稿流程](design/chat-image-editing.md#11-审查后的流程收敛)。
+
+Flow 连接准入错误通过 `code` 和 `field`（槽位名）定位；RPC 只传递经过格式校验的字段标识，不传整个异常。`SessionCommand.CheckFlowConnectionSlots` 独立检查槽位配置，完整图准入继续使用 `SessionCommand.CheckFlowConnections`，二者共用连接选择和能力规则。
+
+## 执行产物读取
+
+[ExecutionArtifactReference / ArtifactCommand](../shared/app-contracts/src/session/artifacts.ts) 是宿主读取协议。app.artifacts.list 以 Session/Task 读取已提交输出，按 offset/limit 返回目录；app.artifacts.read 按不可变引用及字节范围返回 ArrayBuffer、总大小、SHA-256 和 nextOffset，单页最多 1 MiB。两者均只读，不激活会话或运行任务。
+
+[TaskArtifacts](../backend/app-core/src/session/task-artifacts.ts) 从既有 Kernel 输出派生引用，复用 TaskAssetReader 验证二进制归属与内容，不保存第二份执行状态。session.artifact.get 及 Context 装配通过 [ArtifactLoader](../backend/llm-session/src/contracts/artifacts.ts) 读取语义值；未导入的远端 file 明确不可读取。UI 的 [TaskArtifactBrowser](../ui/llm-ui-adapter/src/components/dag/TaskArtifactBrowser.ts) 只在用户操作时加载并校验分页，保持执行锚点及视图销毁边界。
+
+文档 AI Chat 的宿主回调、DocumentChatFile 端口与规范双向关系见 [文档 AI Chat](./design/document-ai-chat.md)。
+
+
+httpd 可通过 `http.editorSwap` 装配可选 `ApplicationBackend.editorSwaps`，默认不提供。
+`EditorSwapFactory.openEditorSwap({files,path})` 只接受调用者获准的文件能力并检查目标文件；返回该编辑器独立的 `EditorSwap`。
+`writeSwap/readSwap/clearSwap/closeSwap` 处理本编辑器私有副本，`dispose` 仅失效句柄，正常关闭由 `closeSwap` 删除；断线不自动删掉残留文件。
+Node 的目录、权限、原子写入和 48 小时清理由可信宿主实现，原始 `EditorSwapStore` 不进入 UI 服务图。
+能力调用不使文件/会话域失效，不把每次副本写入变成工作区重载。MDX 核心仍只消费宿主回调，不解释 httpd 或宿主路径。
+
+数字分身 `collectionTools()` 投影可直接采集的固定版本 Tool 及参数 Schema；`TwinCollectionExecutor` 兼容原发布 Flow 和新 Tool 目标。`mode=collect` 只采集，不要求模型。`triggerScanPlan(planId,eventId)` 是授权事件写入端口，与入队原子保存去重回执，RPC 不自动重放；`event` 触发不参与定时扫描。`authorizeTool` 是宿主注入的通用 Effect 授权门，能力获取前后及恢复时复验，不向 UI 暴露凭据。详见 [扫描器与共享空间](design/digital-twin-scanners.md)。
+
+Anki 创建的生成接口由宿主适配为正式 Session：`StudyGenerationRequest.draftId` 是不透明草稿身份，`onExecution` 仅提供展示文字和链接，不向 mdxeditor 引入 Session 类型；宿主 Workbench 在笔记持久化后通过应用自身的 `documentSaved` 更新会话标题，独立编辑器不感知该后处理。宿主将会话放入保留的个人项目，同一草稿的重新生成使用新的 operationId 追加轮次。`ApplicationBackend.generateText` 显式接收 sessionId、连接和模型，复用 Session Submit、队列及 Kernel，取消只作用于该提交。
+
+StudyCreation.sources 提供跨工作区文本来源查询和读取，mdxeditor 不解析 VFS 根或项目身份。NestOS 宿主按当前工作区/项目能力读取，选择结果仅填入待处理内容。生成请求把提示词与来源一并写入普通 Session 用户消息，确保会话正文和实际模型输入可核对。
+
+来源查询的可选 parent 是宿主分配的不透明目录 ID，目录候选通过 kind=directory 标记。NestOS 根层只返回项目/nav 位置；选定后才读取该文件空间。无关键词只列当前目录，关键词查询最多深入两级、20 个目录并显示 50 项，用户可逐层导航继续查询；Enter 选择首项，方向键可进入候选列表。
+
+## Session 响应正文读取与后台观察
+
+`ApplicationBackend.sessionResponse(sessionId, query?)` 是只读 query。省略选择器时读取当前分支最近一轮；`branch` 可选择已有分支，`operationId` 或 `roundId` 精确选择一轮，两者不能同时指定。未找到返回 undefined，不能退回其他回复。返回 roundId、operationId、status、text、finishReason；text 只包含 assistant 的文本块，排除思考、工具、附件及用户消息。读取不绑定 Session、不切分支、不启动执行。
+
+`app-core/host/conversation-observation` 将宿主持有的执行投影到浏览器/桌面的独立阅读视图，按 Session 和分支隔离；观察不创建新执行，释放视图会释放订阅。`ConversationContexts.subscribe` 只属于宿主，不作为独立 RPC 能力导出。
+
+Anki 创建通过该通用正文 API 按本次 operationId 读取 main 分支结果。生成回执断开后只核对原轮次，不重发生成请求；已存在的进行中轮次继续等待，未确认接纳的操作最多核对三十秒后报 TEXT_RESULT_UNCONFIRMED。成功仅回填草稿，保存仍由用户显式触发。回归覆盖后台流式思考/正文经真实 RpcPeer 传输、轮次选择、断线恢复、取消及草稿输入框正文回填。
+
+### 创建草稿的暂存与完成观察
+
+Anki 创建在提交后独立查询同一 operationId 的 Session 终态，以一秒间隔兜底；原生成 RPC 迟到、丢失或可选结束原因查询悬挂，不阻塞已有正文回填。读取有十秒等待边界，取消会释放观察计时器，不重发生成。Markdown 预览渲染与生成忙碌状态分离。
+
+mdxeditor 只暴露可选 `StudyCreation.recovery`、`StudyGeneration.resume` 和 `StudyCreationState`；宿主用已有 FileRecoveryStore 按认证用户、标签页、工作区隔离暂存输入。小草稿同步写入 sessionStorage，大草稿使用现有 IndexedDB 回退。原标签页刷新或异常中断后可恢复最近成功写入的草稿；取消/关闭、保存和清空新建会丢弃恢复记录。恢复进行中的生成只观察原操作，不重新调用模型。库中不依赖 NestOS、VFS、Session 或浏览器持久化实现。
+
+### 正文观察故障与客户端诊断
+
+正文辅助查询超过十秒或发生传输异常时，若原生成请求仍在等待确认，则记录 retrying 并继续观察，不将其抢先判为生成失败。悬挂查询保持单个进行中的请求；原请求正常返回仍可完成草稿回填。结束原因、空正文及真实任务失败继续独立处理。
+
+`ApplicationBackend.reportClientDiagnostic` 只接收 operation、operationId、sessionId、stage、code、result、durationMs、remoteCode、requestId 等限定元数据，校验长度/格式并拒绝额外字段。宿主输出带 `[ClientDiagnostic]` 和 source=client 的运行日志；HTTP 宿主写入既有 runtime log，审计日志仍记录该上报 RPC 的请求 ID 与认证用户。不会上传错误正文、堆栈、提示词、消息或令牌。客户端区分 TEXT_RESULT_QUERY_TIMEOUT、TRANSPORT_FAILED、REJECTED 和 CAPABILITY_UNAVAILABLE；上报失败不会再次触发上报或阻塞生成。
+
+### 保存目录与学习来源分离
+
+`StudyCreation.documents.directories.list(parent?, signal?)` 提供独立的保存目录枚举，不透明目录 ID 原样交回宿主。NestOS 的 mdx-adapter 从当前笔记文件空间按需读取目录元数据，包含空目录及尚未跟踪 cloze 的目录，隐藏目录排除；不读取或解析 Markdown 正文，也不改变学习索引的来源范围。选择器先显示顶层目录，再完成子目录提示；未提供该能力的独立宿主仍回退 StudyHost.list。文件名扩展名沿用宿主 VFSService 规则：无扩展名补当前空间默认扩展名，已有 .md/.mind 保留；笔记空间默认 .mind。
+
+### 连续创建的保存回执
+
+StudyCreation.documents.save 可返回 {label: string}，由宿主提供包含实际扩展名的保存位置。保存成功后创建窗口保持打开，提示实际保存结果，清空文件名、参考输入、输出与暂存草稿，保留目录、提示词和模型，并为下一份分配新身份；失败保留全部输入与原身份以便重试。按钮为“保存并继续”和“关闭”；状态固定在操作区，下一次编辑会清除上次提示。附加的生成会话改名不阻塞文件保存回执；暂存清理失败与文件保存失败分开提示。
+
+
+### 学习创建能力边界
+
+`StudyCreation` 按 `documents`（保存/目录）、`generation`（生成/恢复/取消/目标列表）、`prompts`（预设/默认提示/存储）和 `recovery`（草稿检查点）组合；跨空间来源查询单独使用只读 `sources`。`generation` 存在时必须提供 generate，resume/cancel 是可选扩展，不再支持顶层 generate/save/promptStore 等旧字段；当前 NestOS 宿主与适配层同步迁移。
+
+生成宿主通过 `StudyGenerationFailure.recovery = 'pending'` 明确标记结果待确认，独立编辑器不按错误码前缀判断可恢复性。重试优先 resume 原 operationId，避免重新提交。AbortSignal 只停止当前观察；显式关闭通过 generation.cancel 请求取消执行，页面中断保留检查点且不取消。NestOS 的 TEXT_RESULT 错误分类仅在 app-shell 适配边界解释。身份和生成状态转换由无 DOM 的 CreationState 管理，DOM 负责收集输入和展示结果。
+
+来源文件元数据采用浅合并 patch：省略字段保持原值，嵌套值整体替换，null 是显式值；该端口不支持字段删除或修订条件更新。`FSCapabilities.metadata` 表示元数据写入能力，旧驱动省略时为未知；file-only 来源从 updateMetadata 能力派生，支持时允许携带元数据创建，在线传输在目标明确不支持时于发布前拒绝。来源身份只在同一来源命名空间内比较：重命名保留，复制与删除重建分配新身份，视图投影不改写。
+
+### VFS 文件变更与操作生命周期
+
+`FSEventPayloadMap` 定义于 `libraries/vfs-core/src/interfaces/core/events.ts`。
+`operation:started/finished` 通过 `operation` 区分复制、移动、重命名、删除等操作，以 `operationId` 配对，结束携带 `outcome`、`durationMs` 和失败 `errorCode`。事务内事件提交后重放、回滚丢弃。
+`node:updated` 仅表示写入或元数据更新成功，不代表句柄操作完成；tags 更新归入 `reason: metadata`，以 `changedFields: ['tags']` 区分。
+`content:started/finished` 通过 `fs.on/onAny` 订阅，以 FileHandle 创建及显式 `close()` 为边界。关闭等待该句柄的在途主内容及附件 IO，幂等且拒绝后续内容 IO。未调用关闭不会发送完成通知；关闭不表示其他句柄关闭或底层 fsync。
+`seq:committed` 保留 `paths`，新增 `changes`（路径、记录键、`set/delete` 类型），提交成功后发送，回滚和 CAS 未命中不产生变化；不携带记录正文，也不推断业务记录类型。
+
+### Kanban 协调与执行端口
+
+`@itookit/kanban` 的 KanbanService/KanbanStore 与 DTO 位于独立库公开入口；createKanban 提供分组查询与轻量 Commit，createKanbanModule 提供服务接口。`/storage` 拥有本地/条件事务存储，`/discovery` 拥有来源扫描与原子检查点提交，`/activity` 拥有可选活动投影，`/ui` 通过实例端口接入文案、图标及导航；应用端口直接引用库自包含的 KanbanClient，DTO 和库 API 不在应用包代转出。核心只依赖 vfs-core，宿主注入 actor、authorize、verifyOutputs、onCommitted 和 log。execute 使用稳定 operationId/expectedRevision；workflow(boardId) 查询计划、派发与 ready，不启动任务。quiesce 拒绝新准入并等待已接纳操作。
+
+publish-plan → prepare-dispatch → observe-execution → accept-execution 表达已封闭计划的控制协议，状态、依赖产物引用、派发、事件/outbox 和幂等回执同 SeqFile 事务。KanbanExecutionPort 属于独立库 `/execution`，Session/Task/模型调用由 NestOS 的正式 IndependentCallService 适配；prepare 冻结可持久请求，start 仅在提交前日志 CAS 胜出时调用，inspect 只能核对原身份。unknown 不产生重派授权；产物需要内容核验，默认独立验收后解锁依赖。文件键、关闭与恢复边界见 [Kanban 设计](design/kanban-coordination.md)。
+
+应用 KanbanService.queryActivity / executionSession 投影 WorkItem 对应的执行 Session，DTO 只包含 Session 身份、状态、活动及观察时间，不暴露内部 Task。绑定使用通用 link-reference 的 nestos-execution-session 外部引用，业务解释和权限校验归 app-core。queryActivity 的执行筛选先过滤后分页；不把已认领或最近 10 分钟活跃当成执行仍运行。独立库继续仅依赖 vfs-core。
+
+## UI 契约与可选能力的归属
+
+独立 ui-common 只提供 DOM 布局、弹窗、Toast、确认框、剪贴板、带调用方 locale 的时间展示及通用菜单 DTO；无运行时依赖。ui-common-adapter 保留通用 EditorOptions / IEditor 与应用设置基础设施。llm-ui-adapter/contracts 的 ChatEditorOptions 扩展 conversation、remoteAgents、sessionDraft，ConversationControls / SessionDraftControls 同入口导出；conversationStatus 从 /presentation 轻量入口提供，不拉入聊天运行代码。旧 ISessionUI、列表和自动补全重复定义已移除，资源列表直接使用 vfs-ui 公共契约。
+
+ChatOptions.ocr 是独立 llm-ui 的可选识别端口，支持 recognize、read、prepare 与安全阶段诊断。进度、取消、失败重试、结果审阅及按附件稳定身份/修订插入与移除均由库负责；模型连接与提示词不进入库。应用 OcrControls/OcrSettingsState 属于 app-contracts/services，配置表单属于 llm-ui/settings；聊天设置不重复模型配置。
+
+历史与实时输出共用 ToolOutputGroups：连续工具消息、混合助手消息中相邻的工具 part 合并为一个默认折叠组；普通正文和用户消息分隔组。分组按稳定成员身份复用节点与展开状态，批量折叠和搜索定位仍可用。cells 保留完整事实，UI 折叠不改变日志、执行结果、历史分页或传输截断标记。
+
+## Kanban 工作资源
+
+`KanbanClient.workResources(boardId,itemId)` 返回通用 `KanbanWorkResource[]`：`id/kind/title/location/version/state/reasons/properties/canCleanup`。状态为 `in-use | retained | cleanup-ready | cleaned | unknown`。`cleanupWorkResource(boardId,{operationId,itemId,resourceId,version})` 是显式副作用端口，由宿主复验身份、检查版本、资源是否占用及交付是否保留。UI 延迟到展开资源区才查询；只读查询不获取 Session writer。HTTP 能力表分别声明为 query/async，CLI 的 `kanban work-resources` 与 `cleanup-work-resource --file` 复用同一接口，不允许浏览器提交 Git 命令或宿主路径。
+
+## 邮件归档查询
+
+`ApplicationBackend.mailView()` 返回宿主授权的 `@itookit/mail/contracts` 的 MailClient；接口与 DTO 由独立库拥有，应用契约不代转出。queryMail、readThread、refreshMail 在 RPC 中均为只读 query，dispose 释放当前视图租约。queryMail 固定每页 20 个主题，先对完整邮箱范围搜索再分组分页，不传邮件正文；正文搜索通过后端索引执行。readThread 支持旧 `.email` 路径和稳定主题引用，按修订有界读取正文；索引变化继续翻页返回 MAIL_THREAD_CHANGED。
+
+后端共享实例按用户 VFS 对象隔离，最后一个租约关闭才释放文件监听；SeqFile 派生索引位于该用户 `/var/lib/mail/archive.seq`，不能通过邮件视图或通用 UI 文件接口读取。详见 [模块协议](../libraries/mail/README.md)。

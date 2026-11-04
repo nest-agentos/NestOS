@@ -1,0 +1,43 @@
+version: 1
+name: deepseek-websearch
+goal: 验证 CLI 客户端 WebSearch 工具调用
+workspace:
+  root: .
+  state_dir: .nestos-websearch
+providers:
+  - id: deepseek
+    implementation: openai-compatible
+    base_url: https://api.deepseek.com
+    default_path: /chat/completions
+    api_key_env: DEEPSEEK_LLM_TOKEN
+    models:
+      - id: deepseek-v4-flash
+        name: DeepSeek V4 Flash
+        tier: standard
+        supports_tools: true
+connections:
+  - id: default
+    provider: deepseek
+    tiers:
+      standard: deepseek-v4-flash
+agents:
+  - id: worker
+    connection: default
+    model_tier: standard
+    max_tokens: 2048
+    # 显式启用客户端 WebSearch 工具（BUILTIN_TOOLS 已含 WebSearchTool）
+    tools: [WebSearch]
+    system_prompt: |
+      你是一个会联网搜索的助手。当用户问到最新 / 未知信息时，先调用 WebSearch 工具搜索，
+      再基于搜索结果回答，并附上来源链接。
+tasks:
+  - id: answer
+    agent: worker
+    description: 搜索 DeepSeek 最新 API 定价，给出摘要与来源
+    outputs:
+      result: text
+result:
+  task: answer
+  output: result
+sandbox:
+  mode: native

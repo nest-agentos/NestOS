@@ -1,0 +1,39 @@
+version: 1
+name: deepseek-smoke
+goal: 验证 CLI 与真实 DeepSeek 模型连通
+workspace:
+  root: .
+  state_dir: .nestos-deepseek
+providers:
+  - id: deepseek
+    implementation: openai-compatible
+    base_url: https://api.deepseek.com
+    default_path: /chat/completions
+    api_key_env: DEEPSEEK_LLM_TOKEN
+    models:
+      - id: deepseek-v4-flash
+        name: DeepSeek V4 Flash
+        tier: standard
+        supports_tools: true
+connections:
+  - id: default
+    provider: deepseek
+    tiers:
+      standard: deepseek-v4-flash
+agents:
+  - id: worker
+    connection: default
+    model_tier: standard
+    max_tokens: 2048
+    system_prompt: 你是简洁的助手，直接给出最终答案，不要解释过程。
+tasks:
+  - id: answer
+    agent: worker
+    description: 只回复数字：1+1 等于几？
+    outputs:
+      result: text
+result:
+  task: answer
+  output: result
+sandbox:
+  mode: native

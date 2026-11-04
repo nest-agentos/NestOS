@@ -1,0 +1,75 @@
+[submodule "tookit/cc-proxy"]
+	path = tookit/cc-proxy
+	url = git@github.com:nest-agentos/cc-proxy.git
+[submodule "tools/cells"]
+	path = tools/cells
+	url = https://github.com/nest-agentos/cells.git
+	branch = main
+[submodule "libraries/cells-driver"]
+	path = libraries/cells-driver
+	url = https://github.com/nest-agentos/cells-driver.git
+	branch = main
+[submodule "libraries/vfs-core"]
+	path = libraries/vfs-core
+	url = https://github.com/nest-agentos/vfs-core.git
+	branch = main
+[submodule "libraries/vfs-ui"]
+	path = libraries/vfs-ui
+	url = https://github.com/nest-agentos/vfs-ui.git
+	branch = main
+[submodule "libraries/vfsdriver-indexeddb"]
+	path = libraries/vfsdriver-indexeddb
+	url = https://github.com/nest-agentos/vfsdriver-indexeddb.git
+	branch = main
+[submodule "libraries/vfsdriver-local"]
+	path = libraries/vfsdriver-local
+	url = https://github.com/nest-agentos/vfsdriver-local.git
+	branch = main
+[submodule "libraries/vfs-sync"]
+	path = libraries/vfs-sync
+	url = https://github.com/nest-agentos/vfs-sync.git
+	branch = main
+[submodule "libraries/driver-llm"]
+	path = libraries/driver-llm
+	url = https://github.com/nest-agentos/driver-llm.git
+	branch = main
+[submodule "libraries/mdxeditor"]
+	path = libraries/mdxeditor
+	url = https://github.com/nest-agentos/mdxeditor.git
+	branch = main
+[submodule "libraries/image-parser"]
+	path = libraries/image-parser
+	url = https://github.com/nest-agentos/image-parser.git
+	branch = main
+[submodule "tools/anki-cli"]
+	path = tools/anki-cli
+	url = https://github.com/nest-agentos/anki-cli.git
+	branch = main
+[submodule "libraries/durable-kernel"]
+	path = libraries/durable-kernel
+	url = https://github.com/nest-agentos/durable-kernel.git
+	branch = main
+[submodule "libraries/llm-ui"]
+	path = libraries/llm-ui
+	url = https://github.com/nest-agentos/llm-ui.git
+	branch = main
+[submodule "libraries/device-tty"]
+	path = libraries/device-tty
+	url = https://github.com/nest-agentos/device-tty.git
+	branch = main
+[submodule "tools/fc-server"]
+	path = tools/fc-server
+	url = https://github.com/nest-agentos/fc-server.git
+	branch = main
+[submodule "tools/fc-hp"]
+	path = tools/fc-hp
+	url = https://github.com/nest-agentos/fc-hp.git
+	branch = main
+[submodule "tools/googlecli"]
+	path = tools/googlecli
+	url = https://github.com/nest-agentos/googlecli.git
+	branch = main
+[submodule "libraries/ui-common"]
+	path = libraries/ui-common
+	url = https://github.com/nest-agentos/ui-common.git
+	branch = main

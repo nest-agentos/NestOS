@@ -1,0 +1,34 @@
+{
+    "$schema": "../node_modules/@tauri-apps/cli/schema/desktop-schema.json",
+    "identifier": "default",
+    "description": "Default capability for X1 desktop app.",
+    "windows": ["main"],
+    "permissions": [
+        "core:default",
+        "core:window:allow-destroy",
+
+        "dialog:allow-open",
+        "dialog:allow-save",
+        "dialog:allow-message",
+        "dialog:allow-confirm",
+
+        "fs:allow-read-file",
+        "fs:allow-write-file",
+        "fs:allow-create",
+        "fs:allow-read-dir",
+        "fs:allow-mkdir",
+        "fs:allow-exists",
+        "fs:allow-stat",
+        "fs:allow-lstat",
+        "fs:allow-rename",
+        "fs:allow-remove",
+
+        "fs:scope-home-recursive",
+        "fs:scope-applocaldata-recursive",
+        "fs:scope-appdata-recursive",
+        "fs:scope-appconfig-recursive",
+        "fs:scope-temp-recursive",
+
+        "core:webview:allow-print"
+    ]
+}

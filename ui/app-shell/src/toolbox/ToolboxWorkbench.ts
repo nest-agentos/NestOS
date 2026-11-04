@@ -1,0 +1,438 @@
+import {withAssistantShortcut} from '../navigation/assistant-actions';
+import { presentationPersistence } from '../persistence/initial-navigation';
+import { defaultConnectionMenu } from './model-defaults';
+import { createNestOSVFSUI as createVFSUI, nestOSVFSPresentation } from '../browser/vfs-presentation';
+import { ToolboxDeletion, toolboxSelectionPaths } from './ToolboxDeletion';
+import { directorySnapshot } from '../browser/directory-snapshot';
+import { ConfigurationDeletionDialog } from '../configuration/delete-dialog';
+import type { ModelConfigurationCommands } from '@itookit/app-contracts/services';
+import { connectEditorLifecycle } from '../browser/editor-connector';
+import { DrawerActions } from './DrawerActions';
+import { DRAWER_KINDS, drawerKind, ungroupedId, type Drawer } from '@itookit/app-contracts';
+import { resourceDrawers } from './resource-drawers';
+import { resourceIcon } from './resource-icons';
+import { mcpStatusIcon } from './mcp-status';
+import { modelDrawers, compareModelItems, modelDrawerId, modelDrawerProvider } from './model-drawers';
+import { invalidConnectionsId, invalidConnectionPaths } from './model-orphans';
+import { CapabilityFilters, capabilityLabel, capabilityLabels } from './capability-filters';
+import { CategoryFilters } from './category-filters';
+import { NavigationFilters } from '../workbench/navigation-filters';
+import { type VFSUIShell, type VFSNodeUI, type VFSToolbarContext, type UIPersistencePort } from '@itookit/vfs-ui';
+import type { IFileSystem } from '@itookit/vfs-core';
+import { createModuleLogger, ENTITY_ICONS, t, type NavigationRequest } from '@itookit/common';
+import { editorResourceId, type EditorFactory, type MenuItem, type ContextMenuConfig } from '@itookit/ui-common-adapter';
+import type { WorkspaceController } from '@itookit/app-contracts';
+import { showToolboxCreationDialog } from './create-resource-dialog';
+import { configureCreatedModel } from './creation-model-setup';
+import {showToolPackages} from './ToolPackagesDialog';
+import {showFlowDependencies} from '../configuration/flow-dependencies-dialog';
+import { chooseArchive, downloadArchive } from '../files/archive-transfer';
+import type { ToolboxResources } from '@itookit/app-contracts/services';
+import { TOOLBOX_KINDS, TOOLBOX_FILTERS, toolboxFilter, toolboxKind, toolboxSourcePath, type ToolboxKind, type ToolboxFilter } from './routes';
+import type { ToolboxInventory } from '@itookit/app-contracts/services';
+import type { ToolboxNavigation } from '@itookit/app-contracts/services';
+
+interface Options {
+    ocr?: import('../configuration/ocr-controls').OcrConfigurationControls;
+    sidebar: HTMLElement; editor: HTMLElement; resources: ToolboxResources; inventory: ToolboxInventory;
+    files: IFileSystem;
+    initial?: ToolboxNavigation;
+    configuration: ModelConfigurationCommands;
+    projects?: Pick<import('@itookit/app-contracts/services').ProjectService,'list'>;
+    factories: Record<ToolboxKind, EditorFactory>; flowMenu: ContextMenuConfig<VFSNodeUI>;
+    navigate(request: NavigationRequest): Promise<void>; selected(path: string | null): void; onBeforeNavigate?(): void;
+    /** Host-owned snapshot storage; omitted means the toolbox restores nothing. */
+    uiPersistence?: UIPersistencePort;
+    /** Host-owned preference storage; omitted means the toolbox starts from defaults. */
+    uiPreferences?: ToolboxPreferencesPort;
+    executorUsage?: import('@itookit/ui-common-adapter').EditorOptions['executorUsage'];
+    agentsInWorkbench?: boolean;
+    workbenchState?: import('../workbench/state').WorkbenchStatePort;
+    windows?: import('../workbench/windows').WorkbenchWindowBinding;
+}
+export interface ToolboxPreferences { filter: ToolboxFilter; queries: Partial<Record<ToolboxFilter, string>> }
+/**
+ * The toolbox's own filter/query memory. `load` is synchronous because the workbench
+ * reads it at construction, so the host prefetches the document first.
+ */
+export interface ToolboxPreferencesPort { load(): unknown; save(preferences: ToolboxPreferences): void }
+/** Document name under `etc:/ui` for {@link ToolboxPreferences}. */
+export const TOOLBOX_PREFERENCES_DOC = 'mindos_toolbox_v1.preferences';
+/** Browser snapshot scope; kept separate from the preference document. */
+export const TOOLBOX_SCOPE = 'nestos:toolbox:v1';
+
+/** Tolerate a missing or hand-edited document: unknown fields fall back to defaults. */
+function preferences(data: unknown): ToolboxPreferences {
+    const record = data && typeof data === 'object' ? data as Record<string, unknown> : {};
+    const filter = record.filter;
+    return { filter: (TOOLBOX_FILTERS as readonly string[]).includes(filter as string) ? filter as ToolboxFilter : 'all',
+        queries: Object.fromEntries(Object.entries(record.queries && typeof record.queries === 'object' ? record.queries as Record<string, unknown> : {})
+            .filter(([kind, query]) => (TOOLBOX_FILTERS as readonly string[]).includes(kind) && typeof query === 'string')) };
+}
+
+/** One resource list; each editor receives its original, authorized source context. */
+export class ToolboxWorkbench implements WorkspaceController {
+    private invalidConnectionCount = 0;
+    private modelProjectionSequence = 0;
+    private deletion!: ConfigurationDeletionDialog;
+    private selectionDeletion!: ToolboxDeletion;
+    private ui!: VFSUIShell;
+    private view!: IFileSystem;
+    private readonly snapshot: ReturnType<typeof directorySnapshot>;
+    private drawerActions!: DrawerActions;
+    private titles = new Map<string, string>();
+    private readonly abort = new AbortController();
+    private readonly prefs: ToolboxPreferences;
+    private readonly searchFilters = document.createElement('div');
+    private readonly categories: CategoryFilters;
+    private readonly filterPanel = new NavigationFilters(t('toolbox.capability.filter'), {iconOnly: true});
+    private readonly capabilities = new CapabilityFilters(() => this.ui?.getQuery() ?? '', query => this.ui.setQuery(query), (tags, visible) => {
+        this.filterPanel.trigger.hidden = !visible;
+        this.filterPanel.update(tags.map(tag => ({label: capabilityLabel(tag), remove: () => this.capabilities.remove(tag)})));
+    });
+    private descriptions = new Map<string, { name: string; description?: string }>();
+    private editorLifecycle?: ReturnType<typeof connectEditorLifecycle>;
+    private restoring = false;
+    private cleanups: Array<() => void | Promise<void>> = [];
+    private readonly loadedDirectories = TOOLBOX_KINDS.map(kind => '/' + kind);
+    private closed = false;
+    private visible = true;
+    private dirty = false;
+    private refreshing = false;
+    private timer?: ReturnType<typeof setTimeout>;
+    private refreshTail: Promise<void> = Promise.resolve();
+    constructor(private readonly options: Options) {
+        this.prefs = preferences(this.options.uiPreferences?.load()); this.snapshot = directorySnapshot(options.files);
+        this.categories = new CategoryFilters(kind => this.setFilter(kind), options.agentsInWorkbench);
+        if (options.agentsInWorkbench && this.prefs.filter === 'agents') this.prefs.filter = 'all';
+    }
+    async start(): Promise<void> {
+        const { resources, sidebar } = this.options;
+        sidebar.classList.add('toolbox-navigation');
+        this.drawerActions = new DrawerActions({ groups: resources.drawers, signal: this.abort.signal,
+            kinds: DRAWER_KINDS.filter(kind => kind !== 'agents'),
+            remove: (paths, signal) => this.removeOrganized(paths, signal),
+            canRemove: paths => {const nodes = paths.flatMap(path => this.ui.getNode(path) ?? []);
+                return nodes.length === paths.length && this.selectionDeletion.allows(nodes);},
+            refresh: () => { this.ui.refreshList(); const active = this.ui.getSnapshot().activeId; if (active) this.revealDrawer(active); }, create: group => this.createResource({ drawerId: group.id }), title: path => this.titles.get(path) ?? path });
+        this.view = this.snapshot.files;
+        this.applyNavigation(this.options.initial ?? await resources.navigation());
+        this.buildFilters();
+        this.ui = createVFSUI({ sessionListContainer: sidebar, title: t('toolbox.title'), scopeId: TOOLBOX_SCOPE, persistence: presentationPersistence(this.options.uiPersistence), autoSelectFirst: false,
+            presentation: {...nestOSVFSPresentation, tagLabel: capabilityLabel},
+            appearance: { showTitle: false, showTimestamp: false, menuVisibility: 'always' },
+            searchPlaceholder: t('toolbox.search'),
+            navigationHeader: {layout: 'inline', filter: this.filterPanel.trigger, summary: this.searchFilters}, listItems: items => this.project(items),
+            alwaysLoadedDirectories: this.loadedDirectories,
+            hideGitignored: false,
+            defaultUiSettings: { showSummary: true, showTags: true, showBadges: false, sortBy: 'title' },
+            fileCreation: { resolveParent: path => path ?? (['agents', 'flows'].includes(this.prefs.filter) ? '/' + this.prefs.filter : null) },
+            sort: { by: 'title', direction: 'asc', directoriesFirst: true },
+            compareItems: compareModelItems,
+            contextMenu: { items: withAssistantShortcut((item, defaults) => this.menu(item, defaults), item => ({title: this.titles.get(item.id) || item.metadata.title || item.id, context: t('toolbox.title'), target: {kind: 'resource', workspace: 'toolbox', resource: item.id}})), bulkItems: (items, defaults) => this.bulkMenu(items, defaults) },
+        }, this.view);
+        this.connectSources();
+        const stopUsage = this.options.executorUsage?.subscribe?.(() => this.ui.refreshList());
+        if (stopUsage) this.cleanups.push(stopUsage);
+        await this.ui.start(); this.setFilter(this.prefs.filter, false);
+    }
+    private connectSources(): void {
+        const { resources, editor } = this.options;
+        this.deletion = new ConfigurationDeletionDialog(this.options.configuration, () => this.refresh(), this.options.ocr?.deletionImpact, this.options.projects);
+        this.selectionDeletion = new ToolboxDeletion({ resources, inventory: this.options.inventory, view: this.view, deletion: this.deletion,
+            completed: async () => { if (!this.closed) { this.ui.setSelection([]); await this.refresh(); } } });
+        this.cleanups.push(this.editorLifecycle = connectEditorLifecycle(this.ui, this.view, editor, undefined, { sidebarContainer: this.options.sidebar, workbenchState: this.options.workbenchState, windows: this.options.windows, navigationLabel: t('toolbox.title'), onBeforeNavigate: this.options.onBeforeNavigate, emptyMessage: t('toolbox.empty'), files: { fs: this.view, cwd: '/' }, resolveEditor: node => this.factory(toolboxKind(node.id)!),
+            hostContext: { navigate: this.options.navigate } }));
+        this.cleanups.push(this.ui.on('sessionSelected', ({ item }) => this.selected(item?.id ?? null)));
+        this.cleanups.push(this.ui.on('stateChanged', () => this.capabilities.sync()));
+        this.cleanups.push(resources.subscribe(() => this.scheduleRefresh()));
+        for (const [kind, source] of Object.entries(resources.sources)) if (drawerKind(kind as ToolboxKind)) {
+            const changed = (event: { payload: { nodes: Array<{ oldPath: string; newPath: string }> } }) => {
+                const moved = event.payload.nodes.filter(node => node.oldPath && node.newPath && node.oldPath !== node.newPath);
+                if (!moved.length) return;
+                void resources.drawers.relocate(kind as import('@itookit/app-contracts').DrawerKind, moved)
+                    .then(() => this.scheduleRefresh()).catch(error => alert(String(error)));
+            };
+            this.cleanups.push(source.on('node:renamed', changed), source.on('node:moved', changed));
+        }
+        for (const source of Object.values(resources.sources)) this.cleanups.push(source.on('node:updated', () => this.scheduleRefresh()),
+            source.on('node:created', () => this.scheduleRefresh()), source.on('node:deleted', () => this.scheduleRefresh()));
+    }
+
+    assertRecovery(): void { this.editorLifecycle?.assertRecovery(); this.restoring = false; }
+    captureRecovery(): unknown { return this.editorLifecycle?.captureRecovery(); }
+    restoreRecovery(state: unknown): void { this.restoring = true; this.editorLifecycle?.restoreRecovery(state); }
+    suspendForRecovery(): void { this.editorLifecycle?.suspendForRecovery(); }
+
+    private factory(kind: ToolboxKind): EditorFactory {
+        return async (container, options) => {
+            const original = editorResourceId(options) ?? '', path = toolboxSourcePath(original), source = this.options.resources.sources[kind];
+            const target = kind !== 'agents' && kind !== 'flows'
+                ? { kind: 'entity' as const, entityType: { prompts: 'system-prompt' as const, skills: 'skill' as const, mcp: 'mcp' as const, tools: 'tool' as const, providers: 'provider' as const, connections: 'connection' as const }[kind], id: decodeURIComponent(path.slice(1)) }
+                : { kind: 'file' as const, path };
+            const instance = await this.options.factories[kind](container, { ...options, target, files: { fs: source, cwd: '/' },
+                hostContext: { ...options.hostContext!, navigate: this.options.navigate, requestDelete: targets => this.deletion.request(targets), saveContent: (id, content) => source.driver.writeContent(toolboxSourcePath(id), content) } });
+            const update = instance.updateNodeId?.bind(instance);
+            if (update) instance.updateNodeId = id => update(toolboxSourcePath(id));
+            return instance;
+        };
+    }
+    private buildFilters(): void {
+        this.searchFilters.className = 'toolbox-search-filters'; this.searchFilters.append(this.categories.element, this.filterPanel.summary);
+        this.filterPanel.content.append(this.capabilities.root); this.updateScope();
+    }
+    private updateScope(): void {
+        this.categories.update(this.prefs.filter);
+    }
+    setFilter(filter: ToolboxFilter, remember = true): void {
+        if (this.ui && remember) this.prefs.queries[this.prefs.filter] = this.ui.getQuery();
+        this.prefs.filter = filter;
+        this.updateScope();
+        this.ui?.setSelection([]);
+        this.ui?.setQuery(this.prefs.queries[filter] ?? '');
+        this.ui?.refreshList(); this.updateToolbar(); this.persist();
+    }
+    private updateToolbar(): void {
+        this.ui?.setToolbar({ fileLabel: t('toolbox.new'), fileTitle: t('toolbox.create'),
+            secondary: this.prefs.filter === 'tools' && this.options.resources.toolPackages
+                ? {label: t('toolbox.packages.title'), run: () => {void showToolPackages(this.options.resources, this.abort.signal, () => this.refresh());}}
+                : this.prefs.filter === 'models' ? { label: t('modelDefaults.button'), run: () => { void this.options.navigate({ target: 'settings', resourceId: 'model-defaults' }); } } : { label: t('toolbox.organize'), run: () => { const group = this.selectedDrawer();
+                const kind = group?.kind ?? (drawerKind(this.prefs.filter as ToolboxKind) ? this.prefs.filter as import('@itookit/app-contracts').DrawerKind : 'flows');
+                void this.drawerActions.move(kind, group?.paths).catch(error => alert(String(error))); } },
+            hiddenActions: this.prefs.filter === 'tools' ? ['create-file', 'create-directory']
+                : ['create-directory'],
+            actions: { 'create-file': async () => { await this.createResource(); }, import: context => this.import(context), export: context => this.export(context) } });
+    }
+    private project(items: VFSNodeUI[]): VFSNodeUI[] {
+        this.capabilities.update([...this.options.inventory.providers.values()].flatMap(provider => provider.capabilityTags ?? []), this.prefs.filter === 'all' || this.prefs.filter === 'models');
+        const roots = items;
+        const decorate = (nodes: VFSNodeUI[]): VFSNodeUI[] => nodes.filter(node =>
+            !node.id.startsWith('/agents/system-prompts') && (node.type === 'directory' || toolboxKind(node.id) !== 'agents' || node.id.endsWith('.agent'))).map(node => {
+            const kind = toolboxKind(node.id)!;
+            const id = node.id.split('/').pop()!.replace(/\.(agent|flow)$/i, '');
+            const description = this.descriptions.get(kind + '/' + id);
+            const summary = description?.description ?? String(node.metadata.custom.description ?? '');
+            const source = String(node.metadata.custom.source ?? '');
+            const capabilities = (kind === 'providers' ? this.options.inventory.providers : kind === 'connections' ? this.options.inventory.connections : undefined)
+                ?.get(decodeURIComponent(id))?.capabilityTags ?? [];
+            this.titles.set(node.id, description?.name ?? node.metadata.title);
+            return { ...node, icon: this.itemIcon(node, kind), children: node.children && decorate(node.children),
+                metadata: { ...node.metadata, title: description?.name ?? node.metadata.title,
+                    tags: [...new Set([...node.metadata.tags, ...capabilities])], custom: { ...node.metadata.custom, toolboxKind: kind, navigationMenu: true,
+                        ...(kind === 'agents' ? {executorLastUsed: this.options.executorUsage?.lastUsed(decodeURIComponent(id)) ?? 0} : {}) } },
+                content: node.type === 'file' ? { ...node.content!, summary: [['connections', 'tools'].includes(kind) ? '' : source, summary.split('\n')[0].slice(0, 160)].filter(Boolean).join(' · '), searchableText: [source, summary, id, ...capabilities, ...capabilityLabels(capabilities)].join(' ') } : node.content };
+        });
+        const decorated = decorate(roots.flatMap(node => node.children ?? []).flatMap(node =>
+            node.id === '/agents/default' ? node.children ?? [] : [node]));
+        return this.groupResources(decorated);
+    }
+    private itemIcon(node: VFSNodeUI, kind: ToolboxKind): string | undefined {
+        if (node.metadata.custom.remoteHarnessAgent) return ENTITY_ICONS.remoteAgent;
+        if (node.type !== 'file') return node.icon;
+        return kind === 'mcp' ? mcpStatusIcon(node.metadata.custom) : resourceIcon(kind);
+    }
+    private groupResources(items: VFSNodeUI[]): VFSNodeUI[] {
+        this.reportInvalidConnections();
+        if (this.options.agentsInWorkbench && this.prefs.filter !== 'agents') items = items.filter(item => toolboxKind(item.id) !== 'agents');
+        const models = items.filter(item => ['providers', 'connections'].includes(toolboxKind(item.id)!));
+        return [...(this.prefs.filter === 'all' || this.prefs.filter === 'models' ? modelDrawers(models, this.options.inventory) : []),
+            ...resourceDrawers(items, this.options.resources.drawers, this.prefs.filter)
+                .filter(group => !this.options.agentsInWorkbench || this.prefs.filter === 'agents' || group.metadata.custom.toolboxKind !== 'agents')];
+    }
+
+    private reportInvalidConnections(): void {
+        const started = performance.now(), count = invalidConnectionPaths(this.options.inventory).length;
+        if (count === this.invalidConnectionCount) return;
+        this.invalidConnectionCount = count;
+        const log = createModuleLogger('toolbox-models');
+        const metadata = { operation: 'toolbox.models.project', operationId: ++this.modelProjectionSequence,
+            stage: 'references', outcome: count ? 'degraded' : 'success', code: count ? 'MODEL_PROVIDER_MISSING' : 'MODEL_REFERENCES_VALID',
+            count, durationMs: Math.round(performance.now() - started) };
+        if (count) log.warn('toolbox.models.references.invalid', metadata);
+        else log.info('toolbox.models.references.restored', metadata);
+    }
+
+    private applyNavigation(navigation: ToolboxNavigation): void {
+        this.descriptions = navigation.descriptions;
+        this.loadedDirectories.splice(0, this.loadedDirectories.length, ...navigation.loadedDirectories);
+        this.snapshot.seed(navigation.directories);
+    }
+    private exportMenu(ids: string[]): MenuItem<VFSNodeUI> {
+        return { id: 'export-json', label: t('toolbox.exportJSON'), onClick: async () => {
+            downloadArchive(await this.exportSelection(ids), 'toolbox.json');
+        } };
+    }
+    private menu(item: VFSNodeUI, defaults: MenuItem<VFSNodeUI>[]): MenuItem<VFSNodeUI>[] {
+        const kind = toolboxKind(item.id), provider = modelDrawerProvider(item.id);
+        const actions = [this.exportMenu([item.id])];
+        if (item.id === invalidConnectionsId) return [...actions, { id: 'delete-invalid-connections', label: t('action.delete'),
+            onClick: async () => { await this.selectionDeletion.run([item.id], this.abort.signal); } }];
+        if (provider !== undefined) return [...this.modelMenu(provider), ...actions];
+        if (kind === 'connections') {
+            const id = decodeURIComponent(toolboxSourcePath(item.id).slice(1));
+            actions.push(...defaultConnectionMenu(id, this.options.inventory, this.options.resources));
+        }
+        const drawers = this.drawerActions.menu(item);
+        if (kind === 'prompts' || kind === 'mcp' || kind === 'connections'
+            || kind === 'providers')
+            actions.push(this.deleteMenu(item.id));
+        if (!kind || ['prompts', 'mcp', 'tools', 'providers', 'connections'].includes(kind)) return [...drawers, ...actions];
+        const kept = defaults.filter(entry => 'id' in entry && ['rename', 'delete'].includes(entry.id));
+        const entries = [...drawers, ...actions, ...kept];
+        return kind === 'flows' ? this.options.flowMenu.items?.(item, entries) ?? entries : entries;
+    }
+    private modelMenu(id: string): MenuItem<VFSNodeUI>[] {
+        const provider = this.options.resources.hasProvider(id), path = '/providers/' + encodeURIComponent(id);
+        if (!provider) return [];
+        const menu: MenuItem<VFSNodeUI>[] = [{ id: 'provider-settings', label: t('toolbox.providerSettings'),
+            onClick: () => { void this.openResource(path).catch(error => alert(String(error))); } }];
+        menu.push(this.deleteMenu(path));
+        return menu;
+    }
+    private deleteMenu(path: string): MenuItem<VFSNodeUI> {
+        const kind = toolboxKind(path), entityType = kind === 'prompts' ? 'system-prompt' : kind === 'providers' ? 'provider' : kind === 'connections' ? 'connection' : 'mcp';
+        return { id: 'delete-resource', label: t(kind === 'providers' ? 'toolbox.deleteProvider' : 'action.delete'),
+            onClick: () => this.deletion.request([{ kind: 'entity', entityType, id: decodeURIComponent(toolboxSourcePath(path).slice(1)) }]) };
+    }
+    private bulkMenu(items: VFSNodeUI[], defaults: MenuItem<VFSNodeUI>[]): MenuItem<VFSNodeUI>[] {
+        const paths = items.map(item => item.id), kind = toolboxKind(paths[0] ?? '');
+        const menu = [this.exportMenu(paths)];
+        if (drawerKind(kind) && items.every(item => item.type === 'file' && toolboxKind(item.id) === kind))
+            menu.unshift({ id: 'moveDrawer', label: t('toolbox.moveDrawer'), onClick: () => {
+                void this.drawerActions.move(kind, paths).catch(error => alert(String(error)));
+            } });
+        if (items.some(item => item.kind === 'group') && this.selectionDeletion.allows(items)) {
+            menu.push({ id: 'bulk-delete', label: t('action.delete'), onClick: async () => { await this.selectionDeletion.run(paths, this.abort.signal); } });
+            return menu;
+        }
+        if (kind === 'prompts' && items.every(item => toolboxKind(item.id) === 'prompts'))
+            menu.push({ id: 'delete-resource', label: t('action.delete'), onClick: () => this.deletion.request(paths.map(path => ({
+                kind: 'entity', entityType: 'system-prompt', id: decodeURIComponent(toolboxSourcePath(path).slice(1)),
+            }))) });
+        if (items.every(item => item.type === 'file' && ['agents', 'skills', 'flows'].includes(toolboxKind(item.id) ?? '') && !item.metadata.custom._readOnly))
+            menu.push(...defaults.filter(item => 'id' in item && item.id === 'bulk-delete'));
+        return menu;
+    }
+    private selectedDrawer(): Drawer | undefined {
+        const state = this.ui.getSnapshot(), path = [...state.selectedIds][0] ?? state.activeId ?? '';
+        const group = this.options.resources.drawers.get(path) ?? this.options.resources.drawers.forPath(path);
+        return group && (this.prefs.filter === 'all' || this.prefs.filter === group.kind) ? group : undefined;
+    }
+    private async removeOrganized(paths: string[], signal: AbortSignal): Promise<import('@itookit/vfs-ui').DeleteResult> {
+        const nodes = paths.flatMap(path => this.ui.getNode(path) ?? []);
+        if (nodes.length !== paths.length || !this.selectionDeletion.allows(nodes))
+            throw Object.assign(new Error(t('toolbox.selectionChanged')), {code: 'TOOLBOX_SELECTION_UNAVAILABLE'});
+        try {return await this.selectionDeletion.run([...paths], signal);}
+        catch (error) {
+            if (!this.closed && !signal.aborted) await this.refresh().catch(() => {});
+            throw error;
+        }
+    }
+    private selected(path: string | null): void {
+        this.options.selected(path);
+    }
+    private persist(): void { this.options.uiPreferences?.save(this.prefs); }
+    private scheduleRefresh(): void {
+        if (this.closed) return;
+        this.dirty = true;
+        if (!this.visible) return;
+        clearTimeout(this.timer); this.timer = setTimeout(() => { void this.refresh().catch(error => alert(String(error))); }, 100);
+    }
+    invalidateFromEvents(): void {this.scheduleRefresh();}
+    private refresh(): Promise<void> {
+        const work = this.refreshTail.then(async () => {
+            if (this.closed) return;
+            this.dirty = false; this.refreshing = true;
+            try {
+                const navigation = await this.options.resources.navigation();
+                if (!this.closed) this.applyNavigation(navigation);
+                if (!this.closed) await this.ui.refresh();
+            } finally { this.refreshing = false; }
+        }).catch(error => { this.dirty = true; throw error; });
+        this.refreshTail = work.catch(() => {}); return work;
+    }
+    async setVisible(visible: boolean): Promise<void> {
+        if (this.closed || this.visible === visible) return;
+        this.visible = visible; this.ui?.setVisible?.(visible);
+        if (!visible) { clearTimeout(this.timer); if (this.refreshing) this.dirty = true; }
+        else if (this.dirty) await this.refresh();
+    }
+    async openResource(path: string): Promise<void> {
+        const kind = toolboxKind(path);
+        if (!kind) throw new Error('Invalid toolbox resource');
+        if (path === '/' + kind) {
+            this.setFilter(toolboxFilter(kind));
+            const layout = this.options.sidebar.closest<HTMLElement>('.mm-layout');
+            if (layout) layout.dataset.mobileView = 'list';
+            return;
+        }
+        if (toolboxFilter(kind) === 'models' && this.prefs.filter !== 'models') this.setFilter('models');
+        if (kind === 'agents' && this.options.agentsInWorkbench || this.prefs.filter !== 'all' && this.prefs.filter !== toolboxFilter(kind))
+            this.setFilter(toolboxFilter(kind));
+        this.ui.setQuery('');
+        this.revealDrawer(path);
+        await this.ui.selectPath(path);
+        if (this.restoring) await this.editorLifecycle?.whenReady();
+    }
+    private revealDrawer(path: string): void {
+        const id = decodeURIComponent(toolboxSourcePath(path).slice(1));
+        const kind = toolboxKind(path);
+        const provider = kind === 'providers' ? id : kind === 'connections' ? this.options.inventory.connections.get(id)?.providerId : undefined;
+        const folderId = provider ? this.options.inventory.providers.has(provider) ? modelDrawerId(provider) : invalidConnectionsId
+            : this.options.resources.drawers.forPath(path)?.id;
+        if (!folderId) return;
+        this.ui.setExpanded(folderId, true);
+    }
+    async createResource(options: { title?: string; parentPath?: string | null; content?: string; drawerId?: string } = {}): Promise<string> {
+        const drawer = (options.drawerId ? this.options.resources.drawers.get(options.drawerId) : undefined) ?? this.selectedDrawer();
+        const kind = options.drawerId && drawer && drawer.kind !== 'tools' ? drawer.kind : undefined;
+        const kinds = TOOLBOX_KINDS.filter(item => item !== 'tools'
+            && (item !== 'agents' || !this.options.agentsInWorkbench || this.prefs.filter === 'agents'));
+        return showToolboxCreationDialog({ kinds, initialKind: kind, initialName: options.title, drawer,
+            drawers: this.options.resources.drawers, providers: [...this.options.inventory.providers].map(([id, item]) => ({ id, name: item.name }))
+                .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')), providerId: this.creationProvider(),
+            templates: this.options.resources.providerTemplates, signal: this.abort.signal,
+            save: draft => this.options.resources.createInDrawer(draft.kind, draft.name, draft.drawer, draft.providerId, draft.providerTemplateId),
+            configure: (container, path, done) => configureCreatedModel(container, path, { factories: this.options.factories,
+                resources: this.options.resources, inventory: this.options.inventory, navigate: this.options.navigate,
+                requestDelete: targets => this.deletion.request(targets), done, signal: this.abort.signal }),
+            completed: () => this.refresh(),
+            open: async path => { await this.refresh(); if (!this.closed) await this.openResource(path); } });
+    }
+    private creationProvider(): string | undefined {
+        const state = this.ui.getSnapshot(), path = [...state.selectedIds][0] ?? state.activeId ?? '';
+        const id = decodeURIComponent(toolboxSourcePath(path).slice(1));
+        const selected = modelDrawerProvider(path) ?? (toolboxKind(path) === 'providers' ? id : this.options.inventory.connections.get(id)?.providerId);
+        return selected && this.options.inventory.providers.has(selected) ? selected : undefined;
+    }
+    private async export(context: VFSToolbarContext): Promise<void> {
+        downloadArchive(await this.exportSelection(context.selectedIds), 'toolbox.json');
+    }
+    async exportSelection(ids: string[]): Promise<string> {
+        if (!ids.length) throw new Error(t('toolbox.selectExport'));
+        const paths = toolboxSelectionPaths(ids, this.options.resources, this.options.inventory);
+        const drawers = ids.flatMap(id => { const group = this.options.resources.drawers.get(id);
+            return group && group.id !== ungroupedId(group.kind) ? [{ kind: group.kind, name: group.name }] : []; });
+        return this.options.resources.export(paths, drawers);
+    }
+    private async import(_context: VFSToolbarContext): Promise<void> {
+        const file = await chooseArchive(this.abort.signal); if (!file || this.closed) return;
+        const content = await file.text(); if (this.closed) return;
+        const imported = this.options.resources.importWithReport
+            ? await this.options.resources.importWithReport(content) : {paths: await this.options.resources.import(content), installations: []};
+        const {paths, installations} = imported;
+        await this.refresh(); if (!this.closed && paths[0]) await this.openResource(paths[0]);
+        const pending = installations.find(report => report.status !== 'ready');
+        if (!this.closed && pending && this.options.resources.flowInstallations)
+            await showFlowDependencies(this.options.resources.flowInstallations, pending.flowId, this.abort.signal, () => this.openResource('/tools'));
+    }
+    getActiveResourceId(): string | null { return this.ui?.getActiveSession()?.id ?? null; }
+    async destroy(): Promise<void> {
+        this.closed = true; clearTimeout(this.timer); this.abort.abort();
+        this.prefs.queries[this.prefs.filter] = this.ui?.getQuery() ?? ''; this.persist();
+        for (const close of this.cleanups.reverse()) await close();
+        await this.refreshTail; this.ui?.destroy();
+        this.filterPanel.destroy();
+        this.options.sidebar.classList.remove('toolbox-navigation');
+    }
+}

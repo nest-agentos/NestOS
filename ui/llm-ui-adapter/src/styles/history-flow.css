@@ -1,0 +1,62 @@
+.llm-ui-flow-window {
+    border: 1px solid var(--llm-border-color);
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 12px;
+    min-width: 0;
+}
+
+.llm-ui-node__req {
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+.llm-ui-node__req > summary {
+    cursor: pointer;
+}
+
+.llm-ui-node__req > pre {
+    max-height: 360px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    padding: 8px;
+    background: var(--llm-bg-secondary);
+}
+
+.llm-ui-flow-window.is-collapsed > .llm-ui-flow-window__body {
+    display: none;
+}
+
+.llm-ui-flow-window > .llm-ui-node__header .llm-ui-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+}
+
+.llm-ui-flow-window__body {
+    padding-top: 8px;
+}
+
+.llm-ui-flow-window:hover > .llm-ui-node__header .llm-ui-actions,
+.llm-ui-flow-window.is-collapsed > .llm-ui-node__header .llm-ui-actions,
+.llm-ui-flow-window:focus-within > .llm-ui-node__header .llm-ui-actions {
+    opacity: 1;
+}
+
+/* Standalone executions remain visible without a synthetic chat round. */
+.llm-session-runs { max-height: 260px; overflow: auto; padding: 8px 12px; flex-shrink: 0; }
+.llm-session-runs[hidden] { display: none; }
+.llm-session-runs p { margin: 0 0 6px; }
+.llm-session-runs button { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; width: 100%; text-align: start; margin: 4px 0; }
+.llm-session-runs button strong { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.llm-session-runs button small { color: var(--llm-text-secondary); }
+.llm-session-runs summary { cursor: pointer; }
+.llm-session-runs__error { color: var(--llm-color-error, #b91c1c); overflow-wrap: anywhere; }
+.llm-session-runs [data-status="failed"] { color: var(--llm-color-error, #b91c1c); }
+.llm-session-runs [data-status="succeeded"] { color: var(--llm-color-success, #15803d); }
+
+.flow-document { min-width: 0; margin: 8px 0; }
+.flow-document__body { box-sizing: border-box; min-width: 0; max-width: 100%; max-height: 65vh; overflow: auto; overscroll-behavior: contain; padding: 8px; }
+.flow-document__editor { min-width: 0; max-width: 100%; }
+.flow-document > summary { cursor: pointer; }

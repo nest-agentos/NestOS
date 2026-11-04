@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Itookit Portal</title>
+    
+    <!-- 引入 Font Awesome 图标库 (用于显示图标) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        /* 复用 Web App 的配色系统 */
+        :root {
+            --primary-color: #5B66F5;
+            --primary-hover: #4B55E3;
+            --text-primary: #111827;
+            --text-secondary: #4B5563;
+            --bg-secondary: #f1f5f9;
+            --bg-elevated: #FFFFFF;
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --border-radius: 12px;
+            --font-primary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-primary);
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        header {
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #1e293b;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* 卡片网格布局 */
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        /* 导航卡片样式 */
+        .nav-card {
+            background: var(--bg-elevated);
+            padding: 40px 30px;
+            border-radius: var(--border-radius);
+            text-decoration: none;
+            color: var(--text-primary);
+            box-shadow: var(--shadow-md);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-color);
+        }
+
+        .icon-wrapper {
+            width: 80px;
+            height: 80px;
+            background: #E8EAFF;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+
+        .nav-card:hover .icon-wrapper {
+            background: var(--primary-color);
+        }
+
+        .nav-card i {
+            font-size: 2rem;
+            color: var(--primary-color);
+            transition: color 0.3s;
+        }
+
+        .nav-card:hover i {
+            color: white;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .card-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .arrow {
+            margin-top: 20px;
+            font-weight: bold;
+            color: var(--primary-color);
+            opacity: 0;
+            transform: translateX(-10px);
+            transition: all 0.3s;
+        }
+
+        .nav-card:hover .arrow {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Itookit Portal</h1>
+            <p class="subtitle">Select a workspace to continue</p>
+        </header>
+
+        <div class="nav-grid">
+            <!-- 链接到 Web App -->
+            <a href="apps/web-app/index.html" class="nav-card">
+                <div class="icon-wrapper">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+                <div class="card-title">Main Application</div>
+                <div class="card-desc">
+                    Access the full multi-workspace environment with Sidebar, Prompts, Projects, and AI Agents.
+                </div>
+                <div class="arrow">Open App <i class="fas fa-arrow-right"></i></div>
+            </a>
+
+            <!-- 链接到 Demos -->
+            <a href="apps/demo/index.html" class="nav-card">
+                <div class="icon-wrapper">
+                    <i class="fas fa-flask"></i>
+                </div>
+                <div class="card-title">Demos & Tests</div>
+                <div class="card-desc">
+                    Development playground for individual components like Memory Manager, VFS, and Editors.
+                </div>
+                <div class="arrow">View Demos <i class="fas fa-arrow-right"></i></div>
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>

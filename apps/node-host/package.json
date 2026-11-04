@@ -1,0 +1,39 @@
+{
+  "name": "@itookit/node-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./http": "./src/http/index.ts",
+    "./runtime": "./src/runtime/index.ts",
+    "./storage": "./src/storage/index.ts",
+    "./authorization": "./src/authorization/index.ts",
+    "./logging": "./src/logging/index.ts",
+    "./client": "./src/client/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@itookit/tools": "workspace:*",
+    "zod": "^4.4.2",
+    "@itookit/app-core": "workspace:*",
+    "@itookit/app-contracts": "workspace:*",
+    "@itookit/app-transport": "workspace:*",
+    "@itookit/common": "workspace:*",
+    "@itookit/vfs-core": "workspace:*",
+    "@itookit/vfsdriver-local": "workspace:*",
+    "@itookit/cells-driver": "workspace:*",
+    "@itookit/kernel-adapters": "workspace:*",
+    "@itookit/driver-llm": "workspace:*",
+    "@itookit/image-tools": "workspace:*",
+    "js-yaml": "^4.3.2",
+    "node-pty": "^1.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^20.19.25",
+    "@types/js-yaml": "^4.0.9"
+  }
+}

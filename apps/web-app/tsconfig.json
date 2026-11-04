@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@itookit/common": ["../../shared/common/src/index.ts"],
+      "@itookit/common/*": ["../../shared/common/src/*"],
+      "@itookit/llm-session": ["../../backend/llm-session/src/index.ts"],
+      "@itookit/llm-ui-adapter": ["../../ui/llm-ui-adapter/src/index.ts"],
+      "@itookit/app-settings": ["../../ui/app-settings/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,423 @@
+/* @file: llm-ui/styles/workspace-titlebar.css */
+/* =========================================
+   Titlebar + Status Indicators + Branch Indicator
+   ========================================= */
+
+/* --- Titlebar --- */
+.llm-workspace-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background-color: var(--llm-bg-secondary);
+    border-bottom: 1px solid var(--llm-border-color);
+    min-height: 48px;
+    z-index: 10;
+}
+
+.llm-workspace-titlebar__left,
+.llm-workspace-titlebar__right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.llm-workspace-titlebar__left { min-width: 0; }
+.llm-workspace-titlebar__source {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    max-width: 140px;
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--llm-text-secondary);
+    font-size: 12px;
+}
+.llm-workspace-titlebar__source svg { display: block; width: 18px; height: 18px; }
+.llm-workspace-titlebar__compact-navigation { display: none; min-width: 0; flex: 1; }
+.llm-workspace-titlebar__right { flex-shrink: 0; }
+
+.llm-workspace-titlebar__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--llm-radius-md);
+    background: transparent;
+    color: var(--llm-text-secondary);
+    cursor: pointer;
+    transition: all var(--llm-transition-normal);
+}
+
+.llm-workspace-titlebar__btn.llm-workspace-titlebar__btn--text {
+    width: auto;
+    padding: 0 8px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.llm-workspace-titlebar__btn:hover {
+    background-color: var(--llm-bg-hover);
+    color: var(--llm-text-primary);
+}
+
+.llm-workspace-titlebar__btn:active {
+    background-color: var(--llm-bg-tertiary);
+}
+
+.llm-workspace-titlebar__btn svg {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+}
+
+.llm-workspace-titlebar__btn[aria-pressed="false"] {
+    color: var(--llm-text-muted);
+}
+
+.llm-workspace-titlebar__sep {
+    width: 1px;
+    height: 20px;
+    background-color: var(--llm-border-color);
+    margin: 0 4px;
+}
+
+.llm-workspace-titlebar__input {
+    border: 1px solid transparent;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--llm-text-primary);
+    padding: 4px 8px;
+    border-radius: var(--llm-radius-sm);
+    min-width: 150px;
+    max-width: min(400px, 50vw);
+    flex: 1;
+}
+
+.llm-workspace-titlebar__input:hover {
+    background-color: var(--llm-bg-primary);
+    border-color: var(--llm-border-color);
+}
+
+.llm-workspace-titlebar__input:focus {
+    outline: none;
+    background-color: var(--llm-bg-primary);
+    border-color: var(--llm-color-primary);
+    box-shadow: 0 0 0 2px rgba(var(--llm-color-primary-rgb), 0.3);
+}
+
+/* --- Status Indicators --- */
+.llm-workspace-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+    padding: 4px 8px;
+    border-radius: var(--llm-radius-sm);
+    background: var(--llm-bg-tertiary);
+    font-size: 12px;
+    color: var(--llm-text-secondary);
+}
+
+.llm-workspace-status__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--llm-text-muted);
+    transition: background-color var(--llm-transition-normal);
+}
+
+.llm-workspace-status__dot.--running {
+    background: var(--llm-color-primary);
+    animation: llm-ui-pulse 1.5s ease-in-out infinite;
+}
+
+.llm-workspace-status__dot.--completed {
+    background: var(--llm-color-success);
+}
+
+.llm-workspace-status__dot.--queued {
+    background: var(--llm-color-warning);
+}
+
+.llm-workspace-status__dot.--failed {
+    background: var(--llm-color-error);
+}
+
+.llm-workspace-titlebar__bg-indicator {
+    display: flex;
+    align-items: center;
+    margin-right: 8px;
+}
+
+.llm-bg-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--llm-color-primary);
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    animation: llm-ui-pulse 2s ease-in-out infinite;
+}
+
+/* --- Branch Indicator --- */
+.llm-branch-indicator-bar {
+    display: flex;
+    align-items: center;
+    position: relative;
+    margin-left: 8px;
+}
+
+.llm-workspace-titlebar__menu-actions .llm-branch-indicator-bar { margin-left: 0; }
+.llm-workspace-titlebar__menu-actions .llm-branch-dropdown { position: static; max-width: 100%; box-shadow: none; }
+.llm-workspace-titlebar__menu-actions .remote-conversation__branches { flex-direction: column; width: 100%; }
+
+.llm-branch-indicator-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(var(--llm-color-primary-rgb), 0.1);
+    border: 1px solid rgba(var(--llm-color-primary-rgb), 0.3);
+    border-radius: var(--llm-radius-md);
+    font-size: 12px;
+    color: var(--llm-color-primary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-branch-indicator-btn:hover {
+    background: rgba(var(--llm-color-primary-rgb), 0.15);
+    border-color: rgba(var(--llm-color-primary-rgb), 0.5);
+}
+
+.llm-branch-indicator-icon {
+    flex-shrink: 0;
+}
+
+.llm-branch-indicator-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.llm-branch-indicator-count {
+    background: var(--llm-color-primary);
+    color: white;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.llm-branch-indicator-chevron {
+    flex-shrink: 0;
+    transition: transform var(--llm-transition-fast);
+}
+
+.llm-branch-indicator-btn[aria-expanded="true"] .llm-branch-indicator-chevron {
+    transform: rotate(180deg);
+}
+
+/* Branch dropdown */
+.llm-branch-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    min-width: 200px;
+    max-width: 300px;
+    background: var(--llm-bg-primary);
+    border: 1px solid var(--llm-border-color);
+    border-radius: var(--llm-radius-lg);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    z-index: 100;
+    overflow: hidden;
+}
+
+.llm-branch-dropdown__empty {
+    padding: 12px 16px;
+    text-align: center;
+    color: var(--llm-text-muted);
+    font-size: 13px;
+}
+
+.llm-branch-dropdown__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background var(--llm-transition-fast);
+    font-size: 13px;
+    color: var(--llm-text-primary);
+}
+
+.llm-branch-dropdown__item:hover {
+    background: var(--llm-bg-secondary);
+}
+
+.llm-branch-dropdown__item.is-current {
+    background: var(--llm-color-primary-bg);
+    color: var(--llm-color-primary);
+}
+
+.llm-branch-dropdown__icon {
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.llm-branch-dropdown__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.llm-branch-dropdown__badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    background: var(--llm-color-primary);
+    color: white;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+/* --- 响应式：标题栏按钮折叠 --- */
+@media (max-width: 768px) {
+    .llm-workspace-titlebar__compact-navigation:not([hidden]) { display: flex; }
+    .llm-workspace-titlebar:has(> .llm-workspace-titlebar__compact-navigation:not([hidden])) > .llm-workspace-titlebar__left { display: none; }
+    .llm-workspace-titlebar {
+        padding: 0 6px;
+        min-height: 48px;
+    }
+    .llm-workspace-titlebar__right > .llm-workspace-titlebar__btn { width: 44px; height: 44px; }
+    .llm-workspace-titlebar__menu > summary { display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0; }
+
+    /* Secondary actions remain available in the overflow menu. */
+    #llm-btn-fold-current,
+    #llm-btn-prev-unfolded,
+    #llm-btn-next-unfolded,
+    #llm-btn-assets {
+        display: none;
+    }
+
+    /* 隐藏状态文字，只保留圆点 */
+    .llm-workspace-status__text { display: none; }
+
+    /* 分隔线按需隐藏 */
+    .llm-workspace-titlebar__sep { display: none; }
+
+    .llm-workspace-titlebar__input {
+        min-width: 80px;
+        font-size: 13px;
+    }
+
+    .llm-workspace-titlebar__btn {
+        width: var(--llm-titlebar-btn-size);
+        height: var(--llm-titlebar-btn-size);
+    }
+}
+
+@media (max-width: 480px) {
+    .llm-workspace-titlebar__right { gap: 2px; max-width: 48%; overflow-x: auto; scrollbar-width: none; }
+    .llm-workspace-titlebar__right::-webkit-scrollbar { display: none; }
+    .llm-workspace-titlebar__btn--text { max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
+    .llm-workspace-titlebar__input { max-width: none; min-width: 0; width: 100%; }
+    .llm-workspace-titlebar__left { flex: 1; }
+    .llm-branch-indicator-bar { margin-left: 0; }
+    .llm-workspace-status { display: none; }
+    .llm-branch-indicator-name { max-width: 70px; }
+}
+
+/* Dark mode overrides for titlebar */
+@media (prefers-color-scheme: dark) {
+    .llm-workspace-titlebar {
+        background-color: var(--llm-bg-secondary);
+        border-bottom-color: var(--llm-border-color);
+    }
+
+    .llm-workspace-titlebar__btn {
+        color: var(--llm-text-secondary);
+    }
+}
+
+.llm-branch-dropdown__delete {
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 4px;
+    padding: 4px 6px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.llm-branch-dropdown__delete:hover:not(:disabled),
+.llm-branch-dropdown__delete:focus-visible {
+    background: var(--llm-bg-secondary);
+}
+
+.llm-branch-dropdown__delete:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.llm-workspace-menu {
+    position: fixed;
+    z-index: 10000;
+    max-width: min(360px, 95vw);
+    padding: 6px;
+    border: 1px solid var(--llm-border-color);
+    border-radius: 8px;
+    color: var(--llm-text-primary);
+    background: var(--llm-bg-primary);
+    box-shadow: 0 4px 18px #0003;
+}
+.llm-workspace-menu button {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.llm-workspace-menu button:hover, .llm-workspace-menu button:focus-visible { background: var(--llm-bg-hover); }
+.llm-workspace-menu button:disabled { opacity: .5; cursor: default; }
+.llm-workspace-menu p { padding: 0 12px; font-size: 12px; color: var(--llm-text-secondary); }
+.llm-workspace-titlebar__btn[hidden] { display: none; }
+
+/* Secondary actions remain available without competing with the conversation title. */
+.llm-workspace-titlebar__left { flex: 1; }
+.llm-workspace-titlebar__input { min-width: 0; width: 100%; }
+.llm-workspace-titlebar__right { overflow: visible; max-width: none; }
+.llm-workspace-titlebar__menu { position: relative; }
+.llm-workspace-titlebar__menu > summary { list-style: none; cursor: pointer; padding: 4px 10px; font-size: 22px; border-radius: 6px; }
+.llm-workspace-titlebar__menu > summary:focus-visible { outline: 2px solid var(--llm-color-primary); }
+.llm-workspace-titlebar__menu-actions { position: absolute; top: 100%; right: 0; width: 250px; max-height: min(480px, 70vh); overflow: auto; padding: 6px; border: 1px solid var(--llm-border-color); border-radius: 8px; background: var(--llm-bg-primary); box-shadow: 0 8px 24px #0002; }
+.llm-workspace-titlebar__menu-actions .llm-workspace-titlebar__btn:not([hidden]) { display: flex; width: 100%; max-width: none; min-height: 36px; justify-content: flex-start; padding: 6px 10px; gap: 10px; text-align: left; }
+.llm-workspace-titlebar__menu-actions .llm-workspace-titlebar__btn:not(.llm-workspace-titlebar__btn--text)::after { content: attr(title); font-size: 13px; }
+.llm-workspace-titlebar__menu-actions .llm-workspace-titlebar__sep { display: block; height: 1px; width: auto; margin: 5px 0; }
+
+.llm-workspace-titlebar__primary { display: flex; align-items: center; gap: 4px; }
+.llm-workspace-titlebar__primary:empty { display: none; }
+.llm-workspace-titlebar__primary .llm-workspace-titlebar__btn { flex-shrink: 0; }
+.llm-branch-indicator-bar, .llm-workspace-status { flex-shrink: 0; }
+
+.llm-workspace-status[hidden] { display: none; }
+.llm-workspace-titlebar__mode-info:empty, .llm-workspace-titlebar__host-actions:empty { display: none; }
+@media (max-width: 768px) {
+    .llm-workspace-titlebar__menu-actions { width: min(300px, calc(100vw - 16px)); max-height: 70dvh; }
+    .llm-workspace-titlebar__menu-actions .llm-workspace-titlebar__btn:not([hidden]) { min-height: 44px; }
+}

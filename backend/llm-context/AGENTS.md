@@ -1,0 +1,23 @@
+# @itookit/llm-context
+
+独立的上下文领域包。类型、Profile、历史选择、窗口预算、Notes、压缩和检索的实现归本包，外部通过根入口使用上下文接口与工厂；纯 SHA-256 使用 /digest 公共入口。
+
+- 不依赖任何其他 workspace 包、VFS、Kernel、Provider SDK 或 UI；I/O 通过端口注入。
+- `IContextService.prepare` 先发布不可变内容，返回待提交 writes；不能自行推进共享 head。
+- 宿主把 writes、Task 状态和下一 Effect 放在同一事务。Notes 不能表达授权、执行完成或 Kernel checkpoint。
+- 原文先保存后截断；摘要与检索材料不能提升为 system policy；工具调用组不能被拆开。
+- 保留旧类型与工厂兼容入口；具体部署适配器放在 kernel-adapters，装配在 app-core。
+- 自动 GC 通过 `IContextGcStore` 执行：完整标记后才删除；与发布/根提交共享事务边界；运行中、未确认清理和扫描不完整时禁止删除。已保留的历史引用不能按年龄淘汰。
+- 默认只回收终态 Task 的过期孤立内容；旧文件不自动迁移/删除。估算预算不能宣称是 provider 精确 tokenizer。
+
+验证：`pnpm --filter @itookit/llm-context test`、`pnpm --filter @itookit/llm-context typecheck`、`pnpm --filter @itookit/llm-context build`。
+
+接口与存储说明见 [Context API](../../doc/context-api.md)，设计依据见 [模块设计](../../doc/design/context-module.md)。
+
+- `ContextEngineOptions` 注入窗口默认值与完整请求计量；服务后续预算校验经 `IContextEngine.measure`，不得绕回固定估算器。摘要请求在宿主使用同一计量。
+
+ContextAssemblerDeps.resolveMessage 是可选宿主材料解析端口，只处理经过 Profile/历史选择的消息；预算估算和最终 canonicalMessages 使用解析结果。核心不读取文件、不导入驱动或持有资产授权；解析失败必须保留，不能发送缺少材料的消息。
+
+/digest 只加载 contracts/digest 的纯算法，不经过 Context 运行时根入口；契约层及前端需要摘要时使用此入口。content/digest 仅保留包内兼容转发，不复制算法。新增入口同时维护源码与发布 exports、ESM/CJS 和声明构建。
+
+当前输入去重比较正文结构与附件身份，不使用拼接后的显示文本作为身份；附件也进入预算估算，禁止只因正文相同丢掉新材料。

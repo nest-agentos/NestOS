@@ -1,0 +1,7 @@
+/* NestOS execution-node placement; terminal presentation belongs to llm-ui. */
+.llm-ui-node__tty-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 4px 0;
+}

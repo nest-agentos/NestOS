@@ -1,0 +1,10 @@
+{
+  "id": "harness-mcp", "name": "Harness 验证：MCP 与审批", "draftVersion": 1, "updatedAt": 0,
+  "parameters": [{ "name": "topic", "type": "string", "required": true, "default": "release", "widget": "text", "label": "查询主题" }],
+  "nodes": [{ "id": "lookup", "name": "查询本地 MCP", "plugin": "builtin.agent", "pluginVersion": "1.0.0", "inputs": {},
+    "config": { "connectionId": "default", "toolIds": [], "mcpProfileIds": ["validation"], "approval": "external", "historyPolicy": "none", "stream": false, "maxExchanges": 4,
+      "prompt": "Call mcp__validation__lookup with topic=${param.topic}. Report the actual returned marker, topic and rule. If denied or failed, report that fact instead of inventing a result."
+    } }],
+  "edges": [], "outputs": { "result": { "value": "${nodes.lookup.outputs.result}" } },
+  "layout": { "nodes": { "lookup": { "x": 80, "y": 80 } } }
+}

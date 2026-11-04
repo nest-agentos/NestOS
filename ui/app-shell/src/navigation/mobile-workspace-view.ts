@@ -1,0 +1,37 @@
+import { VFS_DOM_EVENTS } from '@itookit/vfs-ui';
+
+function hasEditorContent(editor: HTMLElement): boolean {
+    if (editor.classList.contains('workbench-tabs') && editor.dataset.workbenchView)
+        return editor.dataset.workbenchView !== 'empty';
+    const containers = editor.classList.contains('workbench-tabs')
+        ? [...editor.querySelectorAll<HTMLElement>('.workbench-tabs__panel:not([hidden])')]
+        : [editor];
+    return containers.some(container => [...container.children].some(child =>
+        !child.hasAttribute('hidden') && !child.classList.contains('mm-placeholder') && !child.classList.contains('editor-placeholder')));
+}
+
+/** Keep list and editor as separate mobile screens within one workspace. */
+export function setupMobileWorkspaceView(layout: HTMLElement, sidebar: HTMLElement, editor: HTMLElement, initialDetail = false): () => void {
+    layout.dataset.mobileView = initialDetail ? 'detail' : 'list';
+    let hadContent = false;
+    let activation = editor.dataset.workbenchActivation;
+    const sync = () => {
+        const opening = layout.dataset.workspaceOpening === 'true';
+        const hasContent = opening || hasEditorContent(editor);
+        const active = editor.classList.contains('workbench-tabs')
+            ? editor.querySelector('.workbench-tabs__panel:not([hidden])') : editor;
+        layout.dataset.mobileHeader = active?.matches('[data-editor-mobile-navigation="embedded"]')
+            || active?.querySelector('[data-editor-mobile-navigation="embedded"]') ? 'embedded' : opening ? 'pending' : 'standalone';
+        if (hasContent !== hadContent || activation !== editor.dataset.workbenchActivation)
+            layout.dataset.mobileView = hasContent ? 'detail' : 'list';
+        hadContent = hasContent;
+        activation = editor.dataset.workbenchActivation;
+    };
+    const observer = new MutationObserver(sync);
+    observer.observe(editor, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'data-editor-mobile-navigation', 'data-workbench-view', 'data-workbench-activation'] });
+    observer.observe(layout, {attributes: true, attributeFilter: ['data-workspace-opening']});
+    const showDetail = () => { layout.dataset.mobileView = 'detail'; };
+    sidebar.addEventListener(VFS_DOM_EVENTS.resourceActivated, showDetail);
+    sync();
+    return () => { observer.disconnect(); sidebar.removeEventListener(VFS_DOM_EVENTS.resourceActivated, showDetail); };
+}

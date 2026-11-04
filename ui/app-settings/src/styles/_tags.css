@@ -1,0 +1,99 @@
+/* @file: app-settings/styles/_tags.css */
+/* 标签模块样式 */
+
+.settings-tags__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--st-space-xl);
+}
+
+.settings-tags__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--st-space-xl);
+    margin-bottom: var(--st-space-2xl);
+}
+
+.settings-stat-card {
+    background: var(--st-bg-primary);
+    border: 2px solid var(--st-border-color);
+    border-radius: var(--st-radius-lg);
+    padding: var(--st-space-xl);
+    text-align: center;
+}
+
+.settings-stat-card__value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--st-color-primary);
+    margin-bottom: var(--st-space-xs);
+}
+
+.settings-stat-card__label {
+    color: var(--st-text-secondary);
+    font-size: 0.875rem;
+}
+
+.settings-tag-card {
+    background: var(--st-bg-primary);
+    border: 2px solid var(--st-border-color);
+    border-radius: var(--st-radius-lg);
+    padding: var(--st-space-xl);
+    transition: all 0.2s;
+    --tag-color: var(--st-color-primary);
+}
+
+.settings-tag-card:hover {
+    border-color: var(--tag-color);
+    box-shadow: var(--st-shadow-md);
+    transform: translateY(-2px);
+}
+
+.settings-tag-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--st-space-md);
+}
+
+.settings-tag-card__name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--tag-color);
+}
+
+.settings-tag-card__desc {
+    color: var(--st-text-secondary);
+    margin: 0 0 var(--st-space-lg) 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.settings-tag-card__meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.settings-color-picker {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--st-border-color);
+    border-radius: var(--st-radius-sm);
+    cursor: pointer;
+    padding: 0;
+}
+
+@media (max-width: 768px) {
+    .settings-tags__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Tag card action row */
+.settings-tag-card__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--st-space-xs, 4px);
+}

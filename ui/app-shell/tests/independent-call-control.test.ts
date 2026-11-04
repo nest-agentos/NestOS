@@ -1,0 +1,392 @@
+// @vitest-environment jsdom
+import {afterEach, expect, it, vi} from 'vitest';
+import {t} from '@itookit/common';
+import {createOperationLedger, type OperationRecord} from '@itookit/llm-ui';
+import {IndependentCallCommand, type IndependentCallView, type IndependentCallCancelRequest} from '@itookit/llm-session/contracts';
+import {IndependentCallPanel} from '../../llm-ui-adapter/src/components/IndependentCallPanel';
+
+let panel: IndependentCallPanel | undefined;
+afterEach(() => {panel?.destroy(); panel = undefined; vi.useRealTimers(); document.body.replaceChildren();});
+function call(): IndependentCallView {
+    return {input: {title: 'Work', request: {expectedSessionId: 'parent', expectedBranch: 'main',
+        source: {kind: 'arguments', value: {}}, submission: {id: 'call', source: {kind: 'conversation', ownerId: 'parent', id: 'call'}}}},
+        createdAt: 1, head: null, status: 'running', receipt: {operationId: 'call', callerSessionId: 'parent', status: 'accepted', executionSessionId: 'child', execution: {taskId: 'task', role: 'primary'}},
+        controlCapabilities: {cancel: true}, executionState: {id: 'task', revision: 1, phase: 'running', control: {requested: 'run', acknowledged: true},
+            blockedBy: undefined, activeOperations: 1, stopped: false, settled: false, controlEpoch: 0}};
+}
+const button = () => document.querySelector<HTMLButtonElement>('[data-call-cancel]')!;
+function receipt(request: IndependentCallCancelRequest) {
+    const {expectedEpoch, ...query} = request;
+    return {...query, receipt: {requestId: request.requestId, taskId: request.taskId, expectedEpoch, controlEpoch: expectedEpoch, status: 'cancelled'}};
+}
+it('queries a hanging cancellation independently and restores it without dispatching twice', async () => {
+    let saved: readonly OperationRecord[] = [], request!: IndependentCallCancelRequest;
+    const execute = vi.fn(async (name: string, args?: unknown) => {
+        if (name === IndependentCallCommand.List) return [call()];
+        if (name === IndependentCallCommand.Cancel) {request = args as IndependentCallCancelRequest; return new Promise(() => {});}
+        if (name === IndependentCallCommand.CancellationReceipt) return receipt(request);
+        throw new Error(name);
+    });
+    const open = () => {
+        const operations = createOperationLedger({initial: saved, save: async records => {saved = structuredClone(records);}});
+        panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'}); return operations;
+    };
+    open(); await panel!.refresh(); button().click();
+    await vi.waitFor(() => expect(request?.requestId).toBeTruthy());
+    await vi.waitFor(() => expect(button().disabled).toBe(false)); button().click();
+    await vi.waitFor(() => expect(saved[0]?.status).toBe('accepted'));
+    expect(button().hidden).toBe(true); expect(document.body.textContent).not.toContain('已停止');
+    panel!.destroy(); document.body.replaceChildren(); open(); await panel!.refresh();
+    expect(button().hidden).toBe(true);
+    expect(execute.mock.calls.filter(([name]) => name === IndependentCallCommand.Cancel)).toHaveLength(1);
+});
+it('keeps missing receipt observation bounded and permits a fresh query after hiding a hung read', async () => {
+    const view = call(), request: IndependentCallCancelRequest = {sessionId: 'parent', branchId: 'main', callId: 'call', executionSessionId: 'child', taskId: 'task', requestId: 'cancel', expectedEpoch: 0};
+    const operations = createOperationLedger({initial: [{context: {viewId: 'control', operationId: 'cancel'}, conversationId: 'parent', kind: 'command', status: 'unknown', input: {protocol: 'independent-call-cancel-v1', request}}]});
+    let reads = 0;
+    const execute = vi.fn(async (name: string) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.CancellationReceipt) {reads++; return reads === 1 ? new Promise(() => {}) : receipt(request);}
+        throw new Error('No mutation allowed');
+    });
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'});
+    await panel.refresh(); expect(reads).toBe(1); panel.setVisible(false); panel.setVisible(true); await panel.refresh();
+    await vi.waitFor(() => expect(operations.getSnapshot()[0].status).toBe('accepted'));
+    expect(reads).toBe(2); expect(execute.mock.calls.some(([name]) => name === IndependentCallCommand.Cancel)).toBe(false);
+});
+it('does not dispatch after the view closes while its operation is being saved', async () => {
+    let finish!: () => void;
+    const operations = createOperationLedger({save: () => new Promise<void>(resolve => {finish = resolve;})});
+    const execute = vi.fn(async (name: string) => {if (name === IndependentCallCommand.List) return [call()]; throw new Error('Unexpected mutation');});
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'}); await panel.refresh();
+    button().click(); await vi.waitFor(() => expect(finish).toBeTypeOf('function')); panel.setVisible(false); finish();
+    await vi.waitFor(() => expect(operations.getSnapshot()[0]?.status).toBe('submitting')); finish();
+    await vi.waitFor(() => expect(operations.getSnapshot()[0]?.status).toBe('rejected'));
+    expect(execute.mock.calls.some(([name]) => name === IndependentCallCommand.Cancel)).toBe(false);
+});
+it('hides cancellation without declared host support or when the task is terminal', async () => {
+    const view = call(); delete view.controlCapabilities;
+    const execute = vi.fn(async () => [view]);
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations: createOperationLedger(), branch: () => 'main'});
+    await panel.refresh(); expect(button().hidden).toBe(true); expect(stateButton().hidden).toBe(true);
+    view.controlCapabilities = {cancel: true}; view.executionState!.phase = 'done'; await panel.refresh(); expect(button().hidden).toBe(true); expect(stateButton().hidden).toBe(true);
+});
+
+const stateButton = () => document.querySelector<HTMLButtonElement>('[data-call-state-control]')!;
+it('keeps cancellation independent of unknown pause and permits resume after receipt even while dispatch hangs', async () => {
+    const view = call(); view.controlCapabilities = {cancel: true, pause: 'boundary', resume: true, withdrawPause: true};
+    const operations = createOperationLedger(); let request: any, available = false;
+    const execute = vi.fn(async (name: string, args?: any) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.Control) {request = args; return new Promise(() => {});}
+        if (name === IndependentCallCommand.ControlReceipt) {
+            if (!available) return args;
+            return {...args, receipt: {requestId: args.requestId, expectedEpoch: request.expectedEpoch, action: request.action === 'resume' ? 'run' : request.action,
+                accepted: {requestId: args.requestId, mode: 'pause', epoch: 1}}};
+        }
+        if (name === IndependentCallCommand.Cancel) return receipt(args);
+        throw new Error(name);
+    });
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'});
+    await panel.refresh(); stateButton().click();
+    await vi.waitFor(() => expect(request?.action).toBe('pause'));
+    await vi.waitFor(() => expect(operations.getSnapshot()[0]?.status).toBe('unknown'));
+    expect(button().disabled).toBe(false); expect(button().hidden).toBe(false);
+    available = true; await panel.refresh();
+    await vi.waitFor(() => expect(operations.getSnapshot()[0]?.status).toBe('accepted'));
+    await panel.refresh(); expect(stateButton().disabled).toBe(true);
+    view.executionState!.controlEpoch = 1; view.executionState!.control = {requested: 'pause', acknowledged: true};
+    await panel.refresh(); expect(stateButton().disabled).toBe(false); stateButton().click();
+    await vi.waitFor(() => expect(request.action).toBe('resume'));
+    expect(request.expectedEpoch).toBe(1); expect(operations.getSnapshot().every(record => !record.draft)).toBe(true);
+    button().click(); await vi.waitFor(() => expect(execute.mock.calls.filter(([name]) => name === IndependentCallCommand.Cancel)).toHaveLength(1));
+});
+it('offers withdrawal only before acknowledgement and preserves controls through hidden view recovery', async () => {
+    const view = call(); view.controlCapabilities = {cancel: true, pause: 'boundary', resume: true, withdrawPause: true};
+    view.executionState!.control = {requested: 'pause', acknowledged: false}; view.executionState!.controlEpoch = 2;
+    const operations = createOperationLedger(); let request: any;
+    const execute = vi.fn(async (name: string, args?: any) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.Control) {request = args; return new Promise(() => {});}
+        if (name === IndependentCallCommand.ControlReceipt) return args;
+        throw new Error(name);
+    });
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'});
+    await panel.refresh(); stateButton().click(); await vi.waitFor(() => expect(request?.action).toBe('withdraw'));
+    panel.setVisible(false); expect(stateButton().disabled).toBe(true); panel.setVisible(true); await panel.refresh();
+    expect(execute.mock.calls.filter(([name]) => name === IndependentCallCommand.Control)).toHaveLength(1);
+    expect(operations.getSnapshot()[0].input).toMatchObject({request: {action: 'withdraw', expectedEpoch: 2}});
+});
+it('shows pending interactions outside collapsed details and opens the existing child without submitting an answer', async () => {
+    const view = call(); view.interactions = {total: 2, items: [{taskId: 'worker', interactionId: 'ask', kind: 'approval',
+        prompt: '<script>not executable</script>', promptTruncated: true, requestedAt: 1}]};
+    const execute = vi.fn(async (name: string) => {if (name === IndependentCallCommand.List) return [view]; throw new Error('No mutation');});
+    const openChild = vi.fn(); panel = new IndependentCallPanel({execute} as never, 'parent', document.body,
+        {operations: createOperationLedger(), branch: () => 'main', openChild});
+    await panel.refresh(); const pending = document.querySelector<HTMLElement>('[data-call-interactions]')!;
+    expect(pending.hidden).toBe(false); expect(pending.closest('details')).toBeNull(); expect(pending.querySelector('script')).toBeNull();
+    expect(pending.textContent).toContain('<script>not executable</script>');
+    pending.querySelector<HTMLButtonElement>('[data-open-interactions]')!.click(); await vi.waitFor(() => expect(openChild).toHaveBeenCalledWith('child'));
+    expect(execute.mock.calls.every(([name]) => name === IndependentCallCommand.List)).toBe(true);
+    view.interactions = {total: 0, items: []}; await panel.refresh(); expect(pending.hidden).toBe(true);
+});
+it('preserves an answer editor during refresh and reconciles it after the pending interaction disappears', async () => {
+    const view = call(); view.controlCapabilities!.respond = true;
+    view.interactions = {total: 1, items: [{taskId: 'worker', interactionId: 'ask', kind: 'input', prompt: 'Short', promptTruncated: true, requestedAt: 1}]};
+    let saved: readonly OperationRecord[] = [], answer: any, detailReads = 0;
+    const execute = vi.fn(async (name: string, args?: any) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.Interaction) {detailReads++; return {...args, interaction: {id: 'ask', kind: 'input', prompt: '<full prompt>', payload: {instructions: 'Full material'}, requestedAt: 1, status: 'pending'}};}
+        if (name === IndependentCallCommand.Respond) {answer = args; view.interactions = {total: 0, items: []}; return new Promise(() => {});}
+        if (name === IndependentCallCommand.ResponseReceipt) return {...args, receipt: {requestId: args.requestId, taskId: args.targetTaskId, interactionId: args.interactionId, resolvedAt: 2}};
+        throw new Error(name);
+    });
+    const operations = createOperationLedger({save: async records => {saved = structuredClone(records);}});
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'}); await panel.refresh();
+    document.querySelector<HTMLButtonElement>('[data-call-answer-action]')!.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-call-answer] textarea')).not.toBeNull());
+    const editor = document.querySelector<HTMLTextAreaElement>('[data-call-answer] textarea')!; editor.value = '{"literal":"text"}';
+    await panel.refresh(); expect(document.querySelector('[data-call-answer] textarea')).toBe(editor); expect(editor.value).toContain('literal'); expect(detailReads).toBe(1);
+    editor.closest('form')!.dispatchEvent(new Event('submit', {cancelable: true}));
+    await vi.waitFor(() => expect(answer?.value).toBe('{"literal":"text"}'));
+    await panel.refresh(); await vi.waitFor(() => expect(saved[0]?.status).toBe('accepted'));
+    expect(saved[0].draft).toBeUndefined(); expect(saved[0].input).toMatchObject({protocol: 'independent-call-response-v1', request: {value: '{"literal":"text"}'}});
+    expect(execute.mock.calls.filter(([name]) => name === IndependentCallCommand.Respond)).toHaveLength(1);
+});
+it('requires full details before approving and keeps JSON parse errors editable without dispatch', async () => {
+    const view = call(); view.controlCapabilities!.respond = true;
+    view.interactions = {total: 1, items: [{taskId: 'worker', interactionId: 'ask', kind: 'input', prompt: 'Input', promptTruncated: false, requestedAt: 1}]};
+    const execute = vi.fn(async (name: string, args?: any) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.Interaction) return {...args, interaction: {id: 'ask', kind: 'input', prompt: 'Input', requestedAt: 1, status: 'pending'}};
+        throw new Error('No answer expected');
+    });
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations: createOperationLedger(), branch: () => 'main'}); await panel.refresh();
+    expect(document.querySelector('[data-call-answer] form')).toBeNull(); document.querySelector<HTMLButtonElement>('[data-call-answer-action]')!.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-call-answer] textarea')).not.toBeNull());
+    const row = document.querySelector<HTMLElement>('[data-call-answer]')!; row.querySelector('select')!.value = 'json'; row.querySelector('textarea')!.value = '{invalid';
+    row.querySelector('form')!.dispatchEvent(new Event('submit', {cancelable: true}));
+    await vi.waitFor(() => expect(row.textContent).toContain('JSON')); expect(row.querySelector('textarea')!.disabled).toBe(false);
+    expect(execute.mock.calls.some(([name]) => name === IndependentCallCommand.Respond)).toBe(false);
+});
+it('shows complete approval material and persists the explicit rejection without affecting cancellation', async () => {
+    const view = call(); view.controlCapabilities!.respond = true;
+    view.interactions = {total: 1, items: [{taskId: 'worker', interactionId: 'approve', kind: 'approval', prompt: 'Preview', promptTruncated: true, requestedAt: 1}]};
+    const operations = createOperationLedger(); let sent: any;
+    const execute = vi.fn(async (name: string, args?: any) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.Interaction) return {...args, interaction: {id: 'approve', kind: 'approval', prompt: 'Approve full change', payload: {command: '<untrusted command>'}, requestedAt: 1, status: 'pending'}};
+        if (name === IndependentCallCommand.Respond) {sent = args; return {...args, receipt: {requestId: args.requestId, taskId: 'worker', interactionId: 'approve', resolvedAt: 2}};}
+        throw new Error(name);
+    });
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'}); await panel.refresh();
+    document.querySelector<HTMLButtonElement>('[data-call-answer-action]')!.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-call-answer] form')).not.toBeNull());
+    const row = document.querySelector('[data-call-answer]')!; expect(row.textContent).toContain('<untrusted command>');
+    expect(row.querySelector('untrusted')).toBeNull(); row.querySelector<HTMLTextAreaElement>('textarea')!.value = 'Do not proceed';
+    row.querySelectorAll<HTMLButtonElement>('form button')[1].click();
+    await vi.waitFor(() => expect(sent?.value).toEqual({approved: false, note: 'Do not proceed'}));
+    expect(button().disabled).toBe(false); expect(operations.getSnapshot()[0].draft).toBeUndefined();
+});
+it('restores an unknown answer after its interaction leaves the pending list without creating another editor or response', async () => {
+    const view = call(); view.interactions = {total: 0, items: []}; view.controlCapabilities!.respond = true;
+    const request = {sessionId: 'parent', branchId: 'main', callId: 'call', executionSessionId: 'child', taskId: 'task', targetTaskId: 'worker', interactionId: 'ask', requestId: 'answer-saved', value: 'Saved answer'};
+    const operations = createOperationLedger({initial: [{context: {operationId: 'answer-saved', viewId: 'test'}, conversationId: 'parent', kind: 'command', status: 'unknown', input: {protocol: 'independent-call-response-v1', request}}]});
+    const execute = vi.fn(async (name: string, args?: any) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.ResponseReceipt) return args;
+        throw new Error('No new mutation or detail read');
+    });
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'}); await panel.refresh();
+    await vi.waitFor(() => expect(execute.mock.calls.some(([name]) => name === IndependentCallCommand.ResponseReceipt)).toBe(true));
+    expect(document.querySelector('[data-saved-answer]')!.textContent).toContain('Saved answer');
+    expect(document.querySelector('[data-call-answer] form')).toBeNull();
+    panel.setVisible(false); panel.setVisible(true); await panel.refresh();
+    expect(execute.mock.calls.some(([name]) => name === IndependentCallCommand.Respond)).toBe(false);
+});
+it('shows descendant settlement after the root has ended and waits for the whole tree to stop', async () => {
+    const view = call(); view.status = 'completed'; view.executionState!.phase = 'done'; view.executionState!.settled = true;
+    view.executionTree = {taskId: 'task', asOfSequence: 10, tasks: 3, unsettledTasks: 1, activeOperations: 2, stopped: false, settled: false};
+    const execute = vi.fn(async () => [view]);
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations: createOperationLedger(), branch: () => 'main'});
+    await panel.refresh(); expect(document.querySelector('[data-execution-state]')!.textContent).toBe(t('callable.independent.execution.treeCleaning', {tasks: 1, count: 2}));
+    view.executionTree = {...view.executionTree, asOfSequence: 11, unsettledTasks: 0, activeOperations: 0, stopped: true, settled: true};
+    await panel.refresh(); expect(document.querySelector('[data-execution-state]')!.textContent).toBe('');
+    view.status = 'running'; view.executionState!.phase = 'waiting'; view.executionState!.settled = false;
+    view.executionState!.stopped = true; view.executionState!.control = {requested: 'pause', acknowledged: true};
+    view.executionTree = {...view.executionTree, settled: false, stopped: false};
+    await panel.refresh(); expect(document.querySelector('[data-execution-state]')!.textContent).toBe(t('callable.independent.execution.pausing'));
+    view.executionTree.stopped = true;
+    await panel.refresh(); expect(document.querySelector('[data-execution-state]')!.textContent).toBe(t('callable.independent.execution.paused'));
+});
+
+it('keeps descendant cancellation recovery separate from root and sibling controls in the shared ledger', async () => {
+    const {CallControlOperations} = await import('../../llm-ui-adapter/src/independent/call-control');
+    const operations = createOperationLedger(), request = {sessionId: 'parent', branchId: 'main', callId: 'call', executionSessionId: 'child', taskId: 'task', targetTaskId: 'leaf', requestId: 'cancel-leaf', expectedEpoch: 3};
+    const {expectedEpoch, ...query} = request;
+    const execute = vi.fn(async (name: string) => {
+        if (name === IndependentCallCommand.Cancel) throw new Error('Lost response');
+        return {...query, receipt: {requestId: request.requestId, taskId: 'leaf', expectedEpoch, controlEpoch: expectedEpoch, status: 'cancelled'}};
+    });
+    const controls = new CallControlOperations(operations, {execute} as never, 'parent');
+    await expect(controls.cancel(request, () => true)).rejects.toThrow('Lost response');
+    expect(controls.latest('main', 'call', 'task')).toBeUndefined();
+    expect(controls.latest('main', 'call', 'task', 'cancel', 'other')).toBeUndefined();
+    expect(controls.latest('main', 'call', 'task', 'cancel', 'leaf')?.status).toBe('unknown');
+    expect(await controls.reconcile(request.requestId)).toMatchObject({status: 'accepted'});
+    expect(execute.mock.calls.map(([name]) => name)).toEqual([IndependentCallCommand.Cancel, IndependentCallCommand.CancellationReceipt]);
+    expect(execute).toHaveBeenLastCalledWith(IndependentCallCommand.CancellationReceipt, query);
+    await expect(controls.cancel({...request, targetTaskId: 'other'}, () => true)).rejects.toMatchObject({code: 'CALL_CONTROL_IDENTITY_MISMATCH'});
+});
+
+it('cancels a descendant of a completed call and retains its unknown receipt after it leaves the activity list', async () => {
+    const view = call(); view.status = 'completed'; view.executionState!.phase = 'done'; view.executionState!.settled = true;
+    view.descendants = {total: 1, items: [{taskId: 'leaf', parentTaskId: 'task', cancel: true,
+        executionState: {...view.executionState!, id: 'leaf', phase: 'waiting', settled: false, controlEpoch: 7}}]};
+    const operations = createOperationLedger(); let sent: IndependentCallCancelRequest | undefined, available = false;
+    const execute = vi.fn(async (name: string, args?: unknown) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.Cancel) {sent = args as IndependentCallCancelRequest; return new Promise(() => {});}
+        if (name === IndependentCallCommand.CancellationReceipt) return available ? {...args as object, receipt: {
+            requestId: sent!.requestId, taskId: 'leaf', expectedEpoch: 7, controlEpoch: 7, status: 'cancelled',
+        }} : args;
+        throw new Error(name);
+    });
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'}); await panel.refresh();
+    expect(button().hidden).toBe(true);
+    document.querySelector<HTMLButtonElement>('[data-call-cancel-target="leaf"]')!.click();
+    await vi.waitFor(() => expect(sent).toMatchObject({taskId: 'task', targetTaskId: 'leaf', expectedEpoch: 7}));
+    await vi.waitFor(() => expect(operations.getSnapshot()[0]?.status).toBe('unknown'));
+    view.descendants = {total: 0, items: []}; panel.destroy();
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'}); await panel.refresh();
+    expect(document.querySelector('[data-call-descendant="leaf"]')).not.toBeNull();
+    available = true; await panel.refresh();
+    await vi.waitFor(() => expect(operations.getSnapshot()[0]?.status).toBe('accepted')); await panel.refresh();
+    expect(document.querySelector('[data-call-descendant="leaf"]')).toBeNull();
+    expect(execute.mock.calls.filter(([name]) => name === IndependentCallCommand.Cancel)).toHaveLength(1);
+    expect(view.executionState!.phase).toBe('done');
+});
+
+it('rejects descendant display identities that could bind controls to the wrong task', async () => {
+    const view = call(); view.descendants = {total: 1, items: [{taskId: 'leaf', parentTaskId: 'task', cancel: true, executionState: view.executionState!}]};
+    const execute = vi.fn(async () => [view]);
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations: createOperationLedger(), branch: () => 'main'}); await panel.refresh();
+    expect(document.body.textContent).toContain('CALL_VIEW_SCOPE_MISMATCH');
+    expect(document.querySelector('[data-call-cancel-target]')).toBeNull();
+});
+
+function pagedCall() {
+    const view = call(); view.status = 'completed'; view.executionState!.phase = 'done';
+    const item = (taskId: string) => ({taskId, parentTaskId: 'task', cancel: true,
+        executionState: {...view.executionState!, id: taskId, phase: 'waiting' as const, controlEpoch: 9}});
+    view.descendants = {total: 2, items: [item('leaf-00')], nextAfterTaskId: 'leaf-00'};
+    return {view, second: {total: 2, items: [item('leaf-01')]}};
+}
+it('pages descendants beyond the embedded list and cancels the selected task with its own epoch', async () => {
+    const {view, second} = pagedCall(); const sent: IndependentCallCancelRequest[] = [];
+    const execute = vi.fn(async (name: string, args?: any) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.Descendants) return {...args, asOfSequence: 5, descendants: second};
+        if (name === IndependentCallCommand.Cancel) {sent.push(args); const {expectedEpoch, ...query} = args; return {...query, receipt: {taskId: args.targetTaskId, requestId: args.requestId, expectedEpoch, controlEpoch: expectedEpoch, status: 'cancelled'}};}
+        throw new Error(name);
+    });
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations: createOperationLedger(), branch: () => 'main'}); await panel.refresh();
+    document.querySelector<HTMLDetailsElement>('[data-call-descendants]')!.open = true;
+    document.querySelector<HTMLButtonElement>('[data-call-descendants-next]')!.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-call-descendant="leaf-01"]')).not.toBeNull());
+    await panel.refresh(); expect(document.querySelector('[data-call-descendant="leaf-00"]')).toBeNull();
+    const details = document.querySelector<HTMLDetailsElement>('[data-call-descendants]')!; details.open = false;
+    const reads = execute.mock.calls.filter(([name]) => name === IndependentCallCommand.Descendants).length;
+    await panel.refresh(); expect(execute.mock.calls.filter(([name]) => name === IndependentCallCommand.Descendants)).toHaveLength(reads);
+    details.open = true;
+    document.querySelector<HTMLButtonElement>('[data-call-cancel-target="leaf-01"]')!.click();
+    await vi.waitFor(() => expect(sent).toHaveLength(1)); expect(sent[0]).toMatchObject({taskId: 'task', targetTaskId: 'leaf-01', expectedEpoch: 9});
+    document.querySelector<HTMLButtonElement>('[data-call-descendants-first]')!.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-call-descendant="leaf-00"]')).not.toBeNull());
+});
+it.each(['first', 'hide'] as const)('ignores a late page after %s navigation and keeps reads separate from mutations', async mode => {
+    const {view, second} = pagedCall(); let release!: (value: unknown) => void, firstQuery: any, reads = 0;
+    const execute = vi.fn(async (name: string, args?: any) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.Descendants) {reads++; if (reads === 1) {firstQuery = args; return new Promise(resolve => {release = resolve;});} return {...args, asOfSequence: 7, descendants: second};}
+        throw new Error('Unexpected mutation');
+    });
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations: createOperationLedger(), branch: () => 'main'}); await panel.refresh();
+    document.querySelector<HTMLDetailsElement>('[data-call-descendants]')!.open = true;
+    document.querySelector<HTMLButtonElement>('[data-call-descendants-next]')!.click(); await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    if (mode === 'first') document.querySelector<HTMLButtonElement>('[data-call-descendants-first]')!.click();
+    else {panel.setVisible(false); panel.setVisible(true); await panel.refresh();}
+    release({...firstQuery, taskId: 'wrong-root', asOfSequence: 6, descendants: second});
+    await vi.waitFor(() => expect(document.querySelector(`[data-call-descendant="${mode === 'first' ? 'leaf-00' : 'leaf-01'}"]`)).not.toBeNull());
+    expect(document.body.textContent).not.toContain('CALL_VIEW_SCOPE_MISMATCH');
+    expect(execute.mock.calls.every(([name]) => name === IndependentCallCommand.List || name === IndependentCallCommand.Descendants)).toBe(true);
+});
+it('rejects a non-advancing descendant cursor and recovers on a later read', async () => {
+    const {view, second} = pagedCall(); let invalid = true;
+    const execute = vi.fn(async (name: string, args?: any) => name === IndependentCallCommand.List ? [view]
+        : {...args, asOfSequence: 8, descendants: invalid ? {...second, nextAfterTaskId: 'leaf-00'} : second});
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations: createOperationLedger(), branch: () => 'main'}); await panel.refresh();
+    document.querySelector<HTMLDetailsElement>('[data-call-descendants]')!.open = true;
+    document.querySelector<HTMLButtonElement>('[data-call-descendants-next]')!.click();
+    await vi.waitFor(() => expect(document.body.textContent).toContain('CALL_VIEW_SCOPE_MISMATCH'));
+    expect(document.querySelector('[data-call-cancel-target="leaf-01"]')).toBeNull();
+    invalid = false; await panel.refresh();
+    await vi.waitFor(() => expect(document.querySelector('[data-call-cancel-target="leaf-01"]')).not.toBeNull());
+});
+
+const remainingButton = () => document.querySelector<HTMLButtonElement>('[data-call-cancel-remaining]')!;
+function completedCallWithRemaining(): IndependentCallView {
+    const view = call(); view.controlCapabilities!.cancelRemaining = true; view.executionState!.phase = 'done';
+    view.executionTree = {taskId: 'task', asOfSequence: 1, tasks: 3, unsettledTasks: 2, activeOperations: 1, stopped: false, settled: false};
+    return view;
+}
+function treeReceipt(request: IndependentCallCancelRequest) {
+    const {expectedEpoch, ...query} = request;
+    return {...query, receipt: {requestId: request.requestId, taskId: request.taskId, expectedEpoch, controlEpoch: expectedEpoch,
+        rootStatus: 'succeeded', acceptedAt: 1, taskCount: 3}};
+}
+it('offers remaining-task stop only for a supported completed root with an unsettled tree', async () => {
+    const view = completedCallWithRemaining();
+    const execute = vi.fn(async () => [view]);
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations: createOperationLedger(), branch: () => 'main'});
+    await panel.refresh(); expect(button().hidden).toBe(true); expect(remainingButton().hidden).toBe(false);
+    expect(remainingButton().closest('[hidden]')).toBeNull(); expect(remainingButton().textContent).toBe(t('callable.independent.cancelRemaining.action'));
+    view.executionTree!.settled = true; await panel.refresh(); expect(remainingButton().hidden).toBe(true);
+    view.executionTree!.settled = false; view.executionState!.phase = 'running'; await panel.refresh(); expect(remainingButton().hidden).toBe(true);
+    view.executionState!.phase = 'done'; delete view.controlCapabilities!.cancelRemaining; await panel.refresh(); expect(remainingButton().hidden).toBe(true);
+    expect(execute.mock.calls.every(([name]) => name === IndependentCallCommand.List)).toBe(true);
+});
+it('recovers a hanging remaining-task stop through its own persistent channel after reopening', async () => {
+    vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    let saved: readonly OperationRecord[] = [], request!: IndependentCallCancelRequest;
+    const view = completedCallWithRemaining(), execute = vi.fn(async (name: string, args?: any) => {
+        if (name === IndependentCallCommand.List) return [view];
+        if (name === IndependentCallCommand.CancelRemaining) {request = args; return new Promise(() => {});}
+        if (name === IndependentCallCommand.TreeCancellationReceipt) return treeReceipt(request);
+        throw new Error(name);
+    });
+    const open = () => {
+        const operations = createOperationLedger({initial: saved, save: async records => {saved = structuredClone(records);}});
+        panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'});
+    };
+    open(); await panel!.refresh(); remainingButton().click();
+    await vi.waitFor(() => expect(request?.requestId).toBeTruthy());
+    // Receipt observation is polled every second; advance it without racing the assertion deadline.
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(saved[0]?.status).toBe('accepted'));
+    expect(remainingButton().hidden).toBe(true); expect(view.executionTree!.settled).toBe(false);
+    expect(document.body.textContent).toContain(t('callable.independent.cancelRemaining.accepted'));
+    panel!.destroy(); document.body.replaceChildren(); open(); await panel!.refresh();
+    expect(remainingButton().hidden).toBe(true);
+    expect(execute.mock.calls.filter(([name]) => name === IndependentCallCommand.CancelRemaining)).toHaveLength(1);
+});
+it('does not send remaining-task stop after the panel closes during intent persistence', async () => {
+    let finish!: () => void;
+    const operations = createOperationLedger({save: () => new Promise<void>(resolve => {finish = resolve;})});
+    const execute = vi.fn(async (name: string) => {if (name === IndependentCallCommand.List) return [completedCallWithRemaining()]; throw new Error('Unexpected write');});
+    panel = new IndependentCallPanel({execute} as never, 'parent', document.body, {operations, branch: () => 'main'}); await panel.refresh();
+    remainingButton().click(); await vi.waitFor(() => expect(finish).toBeTypeOf('function')); panel.setVisible(false); finish();
+    await vi.waitFor(() => expect(operations.getSnapshot()[0]?.status).toBe('submitting')); finish();
+    await vi.waitFor(() => expect(operations.getSnapshot()[0]?.status).toBe('rejected'));
+    expect(execute.mock.calls.some(([name]) => name === IndependentCallCommand.CancelRemaining)).toBe(false);
+});

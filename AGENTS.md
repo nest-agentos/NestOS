@@ -1,0 +1,141 @@
+# AGENTS.md — AI 助手配置
+
+## 语言
+- 始终使用**中文**交流
+- 代码注释用英文，Git commit 用 Conventional Commits (`type(scope): description`)
+
+## 项目概览
+- **itookit**：pnpm monorepo，承载 **NestOS**（浏览器/桌面的个人知识 OS：虚拟文件系统 + Markdown 编辑器 + LLM 对话/Agent 执行）
+- 工具链：`pnpm@10.20.0`（`workspace:*`）、TypeScript 5.9 strict（`target: ES2022`、`moduleResolution: bundler`，见 `tsconfig.base.json`）
+- 无前端框架：原生 DOM + TypeScript
+- 18 个业务/共享 package（`ui/`、`backend/`、`shared/`）+ 14 个独立库源码工作区（`libraries/`）+ 5 个 app + 共享 Node 宿主适配包，详见 [包结构](./doc/pkgstructure.md)
+
+## 开发原则
+SOLID / DRY / KISS / YAGNI / CoC / LoD — 函数≤30行，圈复杂度≤10
+
+- 浏览器可达代码使用内部 ID 工具：应用层使用 `@itookit/common.randomUUID()`，独立包使用包内兼容工具；Session 内部沿用 `ulid`。禁止直接调用 `crypto.randomUUID()`（包括可选调用，它仍可能抛错）。`pnpm uuid:check` 已加入架构检查；Node 专用 `node:crypto` 不受此限制。
+
+- 非通用业务通过独立的外部 Tool 包与 Flow 定义接入；新增核心代码只提供通用机制，不内置具体业务的字段、提示词、模板、打包实现或按工具名分支。
+- Flow 可以确定性调用 Tool，Agent 模型调用只是另一入口。平台负责授权、版本、连接绑定及持久执行；工具负责业务规则与副作用核对。详见 [策略与机制边界](./doc/design/application-policy-boundaries.md)。
+
+## 常用命令
+
+```bash
+pnpm dev                              # Web app 源码联调
+pnpm cli <参数>                       # CLI 源码运行，例如 pnpm cli help
+pnpm cli:build                        # 构建 CLI
+pnpm cli:built <参数>                 # 验证已有 CLI 编译产物
+pnpm lib:build [库名]                  # 增量准备 HTTP 库快照，不改源码开发依赖
+pnpm httpd:build                      # 自动增量 lib:build，再隔离构建 HTTP release
+pnpm libraries:snapshot               # 强制全量准备 HTTP 库快照
+pnpm libraries:use <ID>               # 可选：整个工作区切到制品验收模式
+pnpm libraries:source                  # 恢复源码联调
+pnpm libraries:status                  # 检查当前模式与实际安装
+pnpm build:libs                       # 构建业务包；源码模式还构建 libraries
+pnpm typecheck                        # 当前消费模式的类型检查
+pnpm docs:check                       # 活文档与代码同步检查
+pnpm styles:check                     # markup 类名 ↔ CSS 规则一致性检查
+pnpm test                             # 全量测试矩阵（含 Rust 边界；crash-matrix 自动隔离）
+pnpm --filter @itookit/<pkg> test     # 单包测试（vitest）
+pnpm --filter @itookit/<pkg> typecheck
+```
+
+## 源码联调与库快照
+
+- 日常开发保持源码模式：`pnpm dev` 和 `pnpm cli` 直接使用本地 libraries 源码；修改库后无需先执行 `lib:build`。CLI 再次执行加载最新修改，已运行的 CLI 进程需要重启。
+- `pnpm lib:build` 首次准备全部库，之后仅更新有修改的库及需要重建的依赖方；`pnpm lib:build driver-llm`（也接受完整包名）仅更新指定库及必要依赖方，未选中的库复用原制品。无变化时复用已有快照。
+- 库构建摘要按每个库的锁文件依赖闭包计算；业务包依赖变化不触发全部库重建，根构建工具链与共享编译配置变化仍会全量重建。`stage=plan-library` 日志记录逐库重建原因；旧摘要算法首次迁移会重建一次。
+- `lib:build` 仅准备不可变本地库制品，不修改开发依赖或切换开发模式。`pnpm httpd:build` 先自动运行增量 `lib:build`，成功后在隔离目录使用该快照安装、编译，不受后续 libraries 源码修改影响；库构建失败不会继续构建 HTTP release。
+- `pnpm libraries:use <ID>` 是显式切换整个工作区的制品验收模式，会影响 dev、CLI 等命令；验收后用 `pnpm libraries:source` 恢复源码联调。`pnpm libraries:status` 可检查开发模式和 HTTP 已准备快照。
+- 快照、模式选择与 prepared 指针位于忽略的 `release/local-libraries/`，不随 Git 提交；构建不会重启运行中的 httpd。设计与 Mermaid C4 见 [独立库消费模式](./doc/design/npm-library-consumption.md)。
+- `_nestos/worktrees/` 中的验证先用 `pnpm typecheck`、单包测试与 `pnpm httpd:dev`；需要 release 时在 worktree 执行 `pnpm httpd:build --share-main --no-activate`，复用主检出的库快照基线、安装与编译缓存及 release 目录，只为改动模块和一次 deploy 付成本（详见 [HTTP 宿主](./doc/http-app.md#在-worktree-中验证)）。
+
+## 新功能诊断日志要求
+
+- 开发新功能或修改关键流程时，必须在关键步骤、跨层调用和失败路径记录足以定位具体错误原因的日志，优先复用现有日志通道；不得只输出笼统的“失败”或将不同原因合并成同一个错误。
+- 日志应包含操作名称、执行阶段、成功/失败结果、具体错误分类、耗时及可关联的 requestId/operationId；按需记录数量、格式、大小、约束等非敏感元数据，能区分前端校验、文件读取、网络传输、后端校验和持久化失败。HTTP 状态码不能代替业务执行结果。
+- 前端提示须保留可操作的具体原因；日志不得记录文件/图片正文、完整参数、用户消息、密钥或令牌。验证功能时同时覆盖失败场景，确认日志能定位原因且不泄露敏感数据。
+
+## httpd 日志与运行版本
+
+- 排查 httpd 默认查看 release 日志：运行日志 `/var/log/nestos/httpd.runtime.log`，审计日志 `/var/log/nestos/httpd.audit.jsonl`；轮转文件追加 `.1`、`.2`、`.3`。
+- `NESTOS_HTTPD_LOG_DIR` 可覆盖日志目录，`--audit-file` 可单独覆盖审计文件；以启动参数和启动输出为准。部署时需确保日志目录由运行用户拥有并可写。
+- 当前运行版本通过携带客户端证书请求 `GET /api/health` 的 `version` 字段核对；运行日志中的最新 `Version:` 为启动版本。`release/httpd/current.json` 仅表示下次启动选用的 release，不能代替运行版本核对。
+- 版本 ID 格式为 `<UTC构建时间 YYYYMMDDTHHmmss>-<Git提交前8位>[-dirty]`，文件名和日志目录不带版本。查询命令见 [HTTP 宿主发布与诊断](./doc/http-app.md#启动与认证)。
+
+## 构建
+
+| 类型 | 工具 |
+|---|---|
+| 逻辑包 (`common`, `llm-context`, `vfs-core`, `driver-llm`, `device-llm`, `device-tty`, `tools`, `kernel-adapters`, `durable-kernel`, `llm-tasks`, `llm-flow`, `llm-session`, `ui-common`, vfsdrivers) | **tsup** (CJS+ESM+.d.ts) |
+| UI 包 (`llm-ui`, `vfs-ui`, `mdx`, `app-settings`) | **vite build** |
+| 无构建脚本 (`app-core`, `app-shell`) | 由宿主 app（web-app / tauri-app / cli）打包 |
+
+## 项目文档
+
+| 文档 | 内容 |
+|---|---|
+| [包结构](./doc/pkgstructure.md) | 工作区包与独立 npm 库职责、LLM 四层分层 |
+| [架构设计](./doc/architecture.md) | 系统全貌 — VFS / LLM / Agent / Skill / Session / Flow / TTY |
+| [运行时架构](./doc/runtime-architecture.md) | `createApplicationRuntime` / `createKernelRuntime` 装配与端口 |
+| [集成链](./doc/integration-chains.md) | VFS / Chat / AppShell 端到端调用链 |
+| [接口契约](./doc/interface-contracts.md) | 跨包核心接口 + 实现/消费关系 |
+| [事件流](./doc/event-flows.md) | Agent / VFS / HITL / TTY 事件消费链 |
+| [开发模式](./doc/dev-patterns.md) | 新增 Provider/Connection/Agent/Tool/i18n 流程 |
+| [文件索引](./doc/file-index.md) | 场景 → 关键文件快速定位 |
+| [Kernel API](./doc/kernel-api.md) | 执行内核 API + 源码结构/存储路径 |
+| [Context API](./doc/context-api.md) | 独立上下文模块、持久窗口与 Agent/Chat v2 接入 |
+| [llm-tasks API](./doc/llm-tasks-api.md) | Durable Program 层 API + 文件结构 |
+| [llm-flow API](./doc/llm-flow-api.md) | DAG 编排层 API + 文件结构 |
+| [llm-session API](./doc/llm-session-api.md) | 会话语义/持久化 API + 文件结构/VFS 路径 |
+| [联网搜索](./doc/web-search.md) | 三态 WebSearchMode 决策 + citations[] 事件链 + Provider 适配 |
+| [CLI HTTP 模式](./doc/http-mode.md) | `-d/--http` 远程模式、`/api/*` 路由 |
+| [RunDefinition](./doc/run-definition.md) | CLI/`.flow` → RunDefinition → DagRunSpec |
+| [NestOS profile](./doc/nestos-profile.md) | `--profile` / 数据根 / Session lease |
+| [最小系统](./doc/minimal-system.md) | 两节点 YAML 与运行说明（含桌面操作教程） |
+| [最小系统验收记录](./doc/minimal-system-acceptance.md) | 当前工作树的构建/测试/桌面端到端验收记录 |
+| [TODO 与进度](./doc/todo.md) | 目标、已完成范围与待办（活文档） |
+| [设计文档](./doc/design/) | 当前设计规范（VFS / harness / flow / skill / session 浏览） |
+| [Durable 证据映射](./doc/design/durable-harness-evidence.md) | 五篇 Durable 设计的目标 → 实现 → 持久记录 → 故障证据 |
+| [Harness 通用原语](./doc/design/harness-borrowables.md) | 取自 RAPTOR 的可移植原语、当前实现位置、缺口与闭环方式 |
+| [文档导航](./doc/README.md) | 按架构、API、运行与设计主题查找当前文档 |
+| [协议历史背景](./doc/feat/README.md) | 当前协议仍引用的三份历史材料（不作为当前 API 依据） |
+
+> 上表为**活文档**（随代码更新）。改代码时按此表定位对应文档即可，无需全量扫描；`pnpm docs:check` 可校验活文档中的悬空路径与已删除符号。
+> 各包开发说明见 `ui/<pkg>/AGENTS.md`、`backend/<pkg>/AGENTS.md`、`shared/<pkg>/AGENTS.md`；目录边界见 [前后端模块](./doc/design/frontend-backend-modules.md)。
+
+## UI 约定
+
+- **技术栈**: 原生 DOM + 模板字符串 + `addEventListener` 委托绑定
+- **CSS**: BEM 命名 (`llm-input__xxx`), 变量在 `llm-ui-adapter/src/styles/variables.css`
+- **图标**: 从 `@itookit/common` import (`ENTITY_ICONS`, `ACTION_ICONS` 等), 禁止硬编码 emoji
+- **i18n**: `t('domain.section.item')`, key 在 `common/src/i18n/zh-CN.ts` 先加 → `en.ts` 同步
+
+## UUID 与稳定身份
+
+- 跨平台、浏览器及 WebView 代码禁止直接调用 `crypto.randomUUID()`；HTTP 局域网地址和部分 WebView 中该方法可能缺失或抛错。需要 UUID v4 时，从 `@itookit/common` 公开入口使用 `randomUUID()`，不要用 `generateUUID()`、时间戳或临时拼接代替 UUID v4。
+- 独立库保持既有依赖边界，复用库内兼容 UUID 工具或注入 ID 生成器，不为生成 UUID 引入应用包；涉及此类代码的修改应覆盖原生 `randomUUID` 缺失和抛错的回归场景。
+- 草稿首次提交复用已分配的 Session ID；同一次提交及其重试保留稳定身份，不在渲染、刷新或重试过程中重新生成会话或操作 ID。
+
+## LLM 子系统速查
+
+```
+LLMProvider (云厂商) → LLMConnection (tier→model) → AgentDefinition (system prompt)
+```
+
+- 关键类型: `https://github.com/nest-agentos/driver-llm/blob/main/src/types/`（通信）、`llm-context/src/domain/`（消息）、`kernel-adapters/src/llm-management/contracts/`（配置）、`llm-session/src/contracts/`（会话）；从各包公开入口导入
+- Provider 实现: `https://github.com/nest-agentos/driver-llm/blob/main/src/providers/`
+- 联网搜索: `resolveWebSearchStrategy` → `WebSearchMode`（详见 [联网搜索](./doc/web-search.md)）
+- 详见 [架构设计](./doc/architecture.md)
+
+## 项目身份约定
+
+- 新项目 ID 使用唯一、易读的字母数字标识，可含 `-`、`_`，以字母或数字开头，长度 1–64；禁止用 UUID、时间戳或随机十六进制串生成项目 ID。按名称生成时重名追加 `-2`、`-3`，唯一性比较不区分大小写。会话与操作 ID 继续遵循既有 UUID/ULID 规则。
+- 项目 ID 在创建时确定，创建后不可修改，删除后也不复用；项目名称可以修改。历史 ID 保持兼容，不为迁移名称改写既有身份。
+- 系统保留项目称为“本地”（Local），新安装默认 ID 为 `local`；用户可在设置中修改其名称。其身份独立于用户选择的默认项目，无论名称如何修改，都不可删除。
+
+## 临时验收进程
+
+- 临时测试/预览服务器、watcher 与测试驱动必须使用 `tools/temporary-process/node/index.mjs` 的 `withTemporaryScope`，或 `node tools/temporary-process/node/cli.mjs run --scope <operation-id> -- <command> [args]`；将服务和验收驱动放在同一有界作用域。禁止用裸 `node server &`、nohup 等方式在作用域外遗留临时进程。
+- 等待作用域清理回执后才报告验收完成；清理 unknown 不视为完成。该工具要求 Linux/bwrap，无保护回退不可用。对缺少该能力的远程项目，使用有界前台检查或明确报告缺失能力。正式部署和可续办 Session 沿用原生命周期。
+- owner/guardian 异常退出由 IPC 与 PID namespace 回收；仓库 httpd 启动器和已安装工具包初始化时核对持久记录。只处理登记的临时资源，不根据端口、进程名称或单独 PID 猜测所有权。

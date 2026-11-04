@@ -1,0 +1,103 @@
+import type {TaskStat} from '@itookit/durable-kernel/contracts';
+import type {SubmissionRequest, SubmissionReceipt} from './submission';
+import type {TransferReference} from './content-transfer';
+import type {ExecutionRef} from './conversation';
+
+export const IndependentCallCommand = {Submit: 'session.call.submit', Inspect: 'session.call.inspect', List: 'session.calls.list',
+    CancelRemaining: 'session.call.cancel-remaining', TreeCancellationReceipt: 'session.call.tree-cancellation.receipt',
+    Cancel: 'session.call.cancel', CancellationReceipt: 'session.call.cancellation.receipt',
+    Control: 'session.call.control', ControlReceipt: 'session.call.control.receipt',
+    Respond: 'session.call.respond', ResponseReceipt: 'session.call.response.receipt', Interaction: 'session.call.interaction', Descendants: 'session.call.descendants'} as const;
+/** Caller identity and selected materials; ancestry alone never imports conversation history. */
+export interface IndependentCallInput {request: SubmissionRequest; title: string; transfer?: TransferReference}
+export interface IndependentCallReceipt extends SubmissionReceipt {
+    /** Original Kernel caller admission; independent of target dispatch and history commit. */
+    callerExecution?: import('@itookit/durable-kernel/contracts').TaskRef;
+    callerSessionId: string;
+    executionSessionId?: string;
+    execution?: ExecutionRef;
+}
+
+export interface IndependentCallListQuery {sessionId: string; branchId?: string}
+/** Single Task facts only; not an aggregate stop/settlement acknowledgement for its children. */
+export type IndependentCallExecutionState = Pick<TaskStat, 'id' | 'revision' | 'phase' | 'control' | 'blockedBy' | 'activeOperations' | 'settled' | 'stopped'>
+    & {controlEpoch: number; exitStatus?: NonNullable<TaskStat['exit']>['status']};
+/** Atomic Kernel observation of this Task and same-Session descendants, not external rollback. */
+export interface IndependentCallExecutionTreeState {
+    taskId: string; asOfSequence: number; tasks: number; unsettledTasks: number;
+    activeOperations: number; stopped: boolean; settled: boolean;
+}
+export interface IndependentCallDescendant {
+    taskId: string; parentTaskId: string; executionState: IndependentCallExecutionState; cancel: boolean;
+}
+export interface IndependentCallView {
+    /** Caller and target are separate Task observations, not an atomic cross-Session snapshot. */
+    callerState?: IndependentCallExecutionState;
+    historyPending?: boolean;
+    input: IndependentCallInput;
+    receipt: IndependentCallReceipt;
+    createdAt: number;
+    head: string | null;
+    status?: import('./conversation').Round['status'];
+    executionState?: IndependentCallExecutionState;
+    executionTree?: IndependentCallExecutionTreeState;
+    /** Bounded unsettled descendants from the same execution snapshot. */
+    descendants?: IndependentCallDescendantPage;
+    /** Bounded pending interaction summaries belonging to this execution tree. */
+    interactions?: IndependentCallInteractions;
+    /** Protocol support only; current write permission is revalidated on control. */
+    controlCapabilities?: {cancel: boolean; cancelRemaining?: boolean; respond?: boolean; pause?: 'boundary' | 'none'; resume?: boolean; withdrawPause?: boolean};
+    /** Bounded display text only; execution consumers read the actual child output. */
+    summary?: string;
+}
+
+
+/** All identities are verified against the persisted call route and its primary execution. */
+export interface IndependentCallExecutionQuery {
+    sessionId: string; branchId: string; callId: string; executionSessionId: string; taskId: string;
+}
+export interface IndependentCallControlQuery extends IndependentCallExecutionQuery {requestId: string}
+export interface IndependentCallDescendantPage {total: number; items: IndependentCallDescendant[]; nextAfterTaskId?: string}
+/** A live keyset page, not a retained historical snapshot. */
+export interface IndependentCallDescendantsQuery extends IndependentCallExecutionQuery {afterTaskId?: string}
+export interface IndependentCallDescendantsResult extends IndependentCallDescendantsQuery {
+    asOfSequence: number; descendants: IndependentCallDescendantPage;
+}
+/** The primary taskId always identifies the call; an explicit descendant has its own control epoch. */
+export interface IndependentCallCancellationQuery extends IndependentCallControlQuery {targetTaskId?: string}
+export interface IndependentCallCancelRequest extends IndependentCallCancellationQuery {expectedEpoch: number}
+export interface IndependentCallCancellationReceipt extends IndependentCallCancellationQuery {
+    /** Admission evidence only; absence means unknown, never permission to resubmit. */
+    receipt?: import('@itookit/durable-kernel/contracts').TaskCancellationReceipt;
+}
+
+
+/** Remaining-tree control always targets the primary execution, never a caller-supplied descendant. */
+export interface IndependentCallCancelRemainingRequest extends IndependentCallControlQuery {expectedEpoch: number}
+export interface IndependentCallTreeCancellationReceipt extends IndependentCallControlQuery {
+    receipt?: import('@itookit/durable-kernel/contracts').TaskTreeCancellationReceipt;
+}
+
+export type IndependentCallControlAction = 'pause' | 'resume' | 'withdraw';
+export interface IndependentCallStateControlQuery extends IndependentCallControlQuery {action: IndependentCallControlAction}
+export interface IndependentCallStateControlRequest extends IndependentCallStateControlQuery {expectedEpoch: number}
+export interface IndependentCallStateControlReceipt extends IndependentCallStateControlQuery {
+    /** Original admission, distinct from the latest acknowledgement or active control. */
+    receipt?: import('@itookit/durable-kernel/contracts').TaskControlReceipt;
+}
+
+export interface IndependentCallInteractions {
+    total: number;
+    items: Array<{taskId: string; interactionId: string; kind: 'input' | 'approval'; prompt: string; promptTruncated: boolean; requestedAt: number}>;
+}
+
+export interface IndependentCallResponseQuery extends IndependentCallControlQuery {targetTaskId: string; interactionId: string}
+export interface IndependentCallResponseRequest extends IndependentCallResponseQuery {value: import('@itookit/durable-kernel/contracts').JsonValue}
+export interface IndependentCallResponseReceipt extends IndependentCallResponseQuery {
+    receipt?: import('@itookit/durable-kernel/contracts').InteractionResponseReceipt;
+}
+
+export interface IndependentCallInteractionDetail extends IndependentCallResponseQuery {
+    interaction: Pick<import('@itookit/durable-kernel/contracts').InteractionRecord<import('@itookit/durable-kernel/contracts').JsonValue>,
+        'id' | 'kind' | 'prompt' | 'payload' | 'requestedAt' | 'status'>;
+}

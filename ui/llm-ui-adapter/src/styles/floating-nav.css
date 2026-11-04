@@ -1,0 +1,968 @@
+/* @file: llm-ui/styles/floating-nav.css */
+/* =========================================
+   浮动导航面板 (Floating Nav Panel)
+   ========================================= */
+
+/* --- 基础面板 --- */
+.llm-nav-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.95);
+    width: 600px;
+    max-width: 90vw;
+    max-height: 80vh;
+    background: var(--vscode-editor-background, var(--llm-bg-primary));
+    border: 1px solid var(--vscode-panel-border, var(--llm-border-color));
+    border-radius: var(--llm-radius-xl);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity var(--llm-transition-normal), transform var(--llm-transition-normal);
+    font-family: var(--llm-font-family);
+}
+
+.llm-nav-panel--visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.llm-nav-panel--hiding {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+}
+
+/* --- Header --- */
+.llm-nav-panel__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--vscode-panel-border, var(--llm-border-color));
+    background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.1));
+    border-radius: var(--llm-radius-xl) var(--llm-radius-xl) 0 0;
+}
+
+.llm-nav-panel__title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--vscode-foreground, var(--llm-text-primary));
+    flex: 1;
+}
+
+.llm-nav-panel__workspace-switches {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px;
+    border: 1px solid var(--vscode-panel-border, var(--llm-border-color));
+    border-radius: var(--llm-radius-md);
+    background: var(--vscode-input-background, rgba(255, 255, 255, 0.04));
+}
+
+.llm-nav-panel__view-switch {
+    min-height: 26px;
+    padding: 3px 8px;
+    border: none;
+    border-radius: var(--llm-radius-sm);
+    background: transparent;
+    color: var(--vscode-descriptionForeground, var(--llm-text-muted));
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font: inherit;
+    font-size: 11px;
+}
+
+.llm-nav-panel__view-switch:hover {
+    background: var(--vscode-toolbar-hoverBackground, var(--llm-bg-hover));
+    color: var(--vscode-foreground, var(--llm-text-primary));
+}
+
+.llm-nav-panel__view-switch.is-active {
+    background: var(--vscode-button-background, var(--llm-color-primary));
+    color: var(--vscode-button-foreground, #fff);
+}
+
+.llm-nav-panel__counter {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground, var(--llm-text-muted));
+    background: var(--vscode-badge-background, var(--llm-bg-tertiary));
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: auto;
+}
+
+.llm-nav-panel__close {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--vscode-foreground, var(--llm-text-muted));
+    cursor: pointer;
+    border-radius: var(--llm-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-nav-panel__close:hover {
+    background: var(--vscode-toolbar-hoverBackground, var(--llm-bg-hover));
+    color: var(--vscode-foreground, var(--llm-text-primary));
+}
+
+/* --- Branch Bar --- */
+.llm-nav-panel__branch-bar {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--vscode-panel-border, var(--llm-border-color));
+    background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.05));
+}
+
+.llm-nav-panel__branch-selector-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.llm-nav-panel__branch-selector {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--vscode-input-background, rgba(255, 255, 255, 0.05));
+    border: 1px solid var(--vscode-input-border, var(--llm-border-color));
+    border-radius: var(--llm-radius-md);
+    flex: 1;
+    min-width: 0;
+}
+
+.llm-nav-panel__branch-selector--interactive {
+    cursor: pointer;
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-nav-panel__branch-selector--interactive:hover {
+    border-color: var(--llm-color-primary);
+    background: var(--vscode-list-hoverBackground, rgba(var(--llm-color-primary-rgb), 0.1));
+}
+
+.llm-nav-panel__branch-icon {
+    flex-shrink: 0;
+    color: var(--llm-color-primary);
+}
+
+.llm-nav-panel__branch-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--vscode-foreground, var(--llm-text-primary));
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.llm-nav-panel__branch-chevron {
+    flex-shrink: 0;
+    color: var(--vscode-descriptionForeground, var(--llm-text-muted));
+    transition: transform var(--llm-transition-fast);
+}
+
+/* Branch Dropdown */
+.llm-nav-panel__branch-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--vscode-dropdown-background, var(--llm-bg-primary));
+    border: 1px solid var(--vscode-dropdown-border, var(--llm-border-color));
+    border-radius: var(--llm-radius-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 1000;
+    padding: 4px 0;
+}
+
+.llm-nav-panel__branch-separator {
+    height: 1px;
+    background: var(--vscode-panel-border, var(--llm-border-color));
+    margin: 4px 0;
+}
+
+.llm-nav-panel__branch-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background var(--llm-transition-fast);
+}
+
+.llm-nav-panel__branch-item:hover {
+    background: var(--vscode-list-hoverBackground, var(--llm-bg-hover));
+}
+
+.llm-nav-panel__branch-item--current {
+    background: var(--vscode-list-activeSelectionBackground, rgba(var(--llm-color-primary-rgb), 0.15));
+}
+
+.llm-nav-panel__branch-item[data-branch-name="__all__"] {
+    font-weight: 500;
+}
+
+.llm-nav-panel__branch-item-dot {
+    font-size: 10px;
+    color: var(--llm-color-primary);
+    flex-shrink: 0;
+}
+
+.llm-nav-panel__branch-item-name {
+    flex: 1;
+    font-size: 12px;
+    color: var(--vscode-foreground, var(--llm-text-primary));
+    font-weight: 500;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.llm-nav-panel__branch-item-actions {
+    display: none;
+    gap: 4px;
+}
+
+.llm-nav-panel__branch-item:hover .llm-nav-panel__branch-item-actions {
+    display: flex;
+}
+
+.llm-nav-panel__branch-item-btn {
+    padding: 4px;
+    background: transparent;
+    border: none;
+    border-radius: var(--llm-radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--llm-transition-fast);
+    color: var(--vscode-foreground, var(--llm-text-muted));
+}
+
+.llm-nav-panel__branch-item-btn:hover {
+    background: var(--vscode-toolbar-hoverBackground, var(--llm-bg-hover));
+}
+
+.llm-nav-panel__branch-item-btn--danger:hover {
+    background: rgba(255, 107, 107, 0.15);
+    color: var(--llm-color-error);
+}
+
+/* Branch Rename */
+.llm-nav-panel__branch-rename {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.llm-nav-panel__branch-rename-input {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 12px;
+    border: 1px solid var(--llm-color-primary);
+    border-radius: var(--llm-radius-sm);
+    background: var(--vscode-input-background, var(--llm-bg-primary));
+    color: var(--vscode-input-foreground, var(--llm-text-primary));
+    outline: none;
+}
+
+.llm-nav-panel__branch-rename-btn {
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px solid var(--vscode-input-border, var(--llm-border-color));
+    border-radius: var(--llm-radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-nav-panel__branch-rename-btn:hover {
+    background: var(--vscode-button-secondaryHoverBackground, var(--llm-bg-hover));
+}
+
+.llm-nav-panel__branch-rename-btn[data-rename-action="confirm"] {
+    color: #059669;
+    border-color: #059669;
+}
+
+.llm-nav-panel__branch-rename-btn[data-rename-action="confirm"]:hover {
+    background: rgba(5, 150, 105, 0.1);
+}
+
+.llm-nav-panel__branch-rename-btn[data-rename-action="cancel"] {
+    color: var(--llm-color-error);
+    border-color: var(--llm-color-error);
+}
+
+.llm-nav-panel__branch-rename-btn[data-rename-action="cancel"]:hover {
+    background: rgba(255, 107, 107, 0.1);
+}
+
+/* --- Toolbar --- */
+.llm-nav-panel__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--vscode-panel-border, var(--llm-border-color));
+    background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.05));
+    min-height: 44px;
+}
+
+.llm-nav-panel__toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 批量操作组 */
+.llm-nav-panel__toolbar-group--actions {
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-8px);
+    transition: all var(--llm-transition-normal);
+}
+
+.llm-nav-panel__toolbar-group--actions.visible {
+    display: flex;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+/* 视图控制组 */
+.llm-nav-panel__toolbar-group--view {
+    margin-left: auto;
+    transition: opacity var(--llm-transition-normal);
+}
+
+.llm-nav-panel__toolbar-group--view.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.llm-nav-panel__toolbar-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--vscode-panel-border, var(--llm-border-color));
+    margin: 0 6px;
+}
+
+/* 工具栏按钮 */
+.llm-nav-panel__btn {
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+    border: none;
+    background: transparent;
+    color: var(--vscode-foreground, var(--llm-text-muted));
+    cursor: pointer;
+    border-radius: var(--llm-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-nav-panel__btn:hover {
+    background: var(--vscode-toolbar-hoverBackground, var(--llm-bg-hover));
+    color: var(--llm-color-primary);
+}
+
+.llm-nav-panel__btn:active {
+    transform: scale(0.95);
+}
+
+.llm-nav-panel__btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.llm-nav-panel__btn--danger:hover {
+    background: rgba(255, 107, 107, 0.15);
+    color: var(--llm-color-error);
+}
+
+.llm-nav-panel__btn--context-include,
+.llm-nav-panel__btn--context-exclude {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.llm-nav-panel__btn--context-include:hover { color: var(--vscode-testing-iconPassed, #3fb950); }
+.llm-nav-panel__btn--context-exclude:hover { color: var(--vscode-testing-iconFailed, #f85149); }
+
+.llm-nav-item--context-excluded {
+    opacity: 0.62;
+}
+
+.llm-nav-item__context-badge {
+    padding: 1px 5px;
+    border: 1px solid var(--vscode-testing-iconFailed, #f85149);
+    border-radius: 999px;
+    color: var(--vscode-testing-iconFailed, #f85149);
+    font-size: 9px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.llm-nav-item__context-toggle {
+    min-height: 22px;
+    padding: 1px 6px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--vscode-descriptionForeground, var(--llm-text-muted));
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font: inherit;
+    font-size: 10px;
+}
+
+.llm-nav-item__context-toggle:hover {
+    border-color: var(--vscode-focusBorder, var(--llm-color-primary));
+    color: var(--vscode-foreground, var(--llm-text-primary));
+}
+
+.llm-nav-item__context-toggle.is-included { color: var(--vscode-testing-iconPassed, #3fb950); }
+.llm-nav-item__context-toggle.is-excluded { color: var(--vscode-testing-iconFailed, #f85149); }
+
+.llm-nav-panel__btn--checkbox {
+    position: relative;
+}
+
+.llm-nav-panel__checkbox-icon {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--vscode-foreground, var(--llm-text-secondary));
+    border-radius: var(--llm-radius-sm);
+    background: transparent;
+    display: block;
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-nav-panel__btn--checkbox:hover .llm-nav-panel__checkbox-icon {
+    border-color: var(--llm-color-primary);
+}
+
+.llm-nav-panel__btn--checkbox.checked .llm-nav-panel__checkbox-icon {
+    background: var(--llm-color-primary);
+    border-color: var(--llm-color-primary);
+}
+
+.llm-nav-panel__btn--checkbox.checked .llm-nav-panel__checkbox-icon::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+
+/* 选择计数 */
+.llm-nav-panel__selection-count {
+    font-size: 12px;
+    color: var(--llm-color-primary);
+    font-weight: 500;
+    padding: 0 8px;
+    white-space: nowrap;
+    margin-left: 4px;
+}
+
+/* --- List --- */
+.llm-nav-panel__list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    min-height: 150px;
+    max-height: calc(80vh - 160px);
+}
+
+.llm-nav-panel__list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.llm-nav-panel__list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.llm-nav-panel__list::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background, #404050);
+    border-radius: var(--llm-radius-sm);
+}
+
+.llm-nav-panel__list::-webkit-scrollbar-thumb:hover {
+    background: var(--vscode-scrollbarSlider-hoverBackground, #505060);
+}
+
+.llm-nav-panel__empty {
+    text-align: center;
+    color: var(--vscode-descriptionForeground, var(--llm-text-muted));
+    padding: 40px 20px;
+    font-size: 13px;
+}
+
+/* --- Nav Item --- */
+.llm-nav-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--llm-radius-lg);
+    cursor: pointer;
+    transition: all var(--llm-transition-fast);
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+    position: relative;
+}
+
+.llm-nav-item:hover {
+    background: var(--vscode-list-hoverBackground, var(--llm-bg-tertiary));
+}
+
+.llm-nav-item--active {
+    background: var(--vscode-list-activeSelectionBackground, rgba(var(--llm-color-primary-rgb), 0.12));
+    border-color: var(--vscode-focusBorder, rgba(var(--llm-color-primary-rgb), 0.25));
+}
+
+.llm-nav-item--active .llm-nav-item__title {
+    color: var(--llm-color-primary);
+}
+
+.llm-nav-item.selected {
+    background: var(--vscode-list-inactiveSelectionBackground, rgba(var(--llm-color-primary-rgb), 0.18));
+    border-color: var(--vscode-focusBorder, rgba(var(--llm-color-primary-rgb), 0.3));
+}
+
+.llm-nav-item__checkbox {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    border: 2px solid var(--vscode-foreground, var(--llm-text-muted));
+    border-radius: var(--llm-radius-sm);
+    margin-top: 2px;
+    flex-shrink: 0;
+    position: relative;
+    transition: all var(--llm-transition-fast);
+    background: var(--vscode-input-background, rgba(0, 0, 0, 0.2));
+    cursor: pointer;
+}
+
+.llm-nav-item__checkbox:hover {
+    border-color: var(--llm-color-primary);
+    background: rgba(var(--llm-color-primary-rgb), 0.1);
+}
+
+.llm-nav-item__checkbox.checked {
+    background: var(--llm-color-primary);
+    border-color: var(--llm-color-primary);
+}
+
+.llm-nav-item__checkbox.checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 5px;
+    height: 9px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+/* Item 内容 */
+.llm-nav-item__fold {
+    width: 16px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 12px;
+    margin-top: 3px;
+    color: var(--vscode-descriptionForeground, var(--llm-text-secondary));
+    cursor: pointer;
+    transition: color var(--llm-transition-fast);
+}
+
+.llm-nav-item__fold:hover {
+    color: var(--llm-color-primary);
+}
+
+.llm-nav-item__icon {
+    font-size: 16px;
+    margin-top: 1px;
+    flex-shrink: 0;
+}
+
+.llm-nav-item__content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.llm-nav-item__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.llm-nav-item__title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--vscode-foreground, var(--llm-text-primary));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.llm-nav-item__time {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground, var(--llm-text-secondary));
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.llm-nav-item__preview {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground, var(--llm-text-muted));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+.llm-nav-item__index {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground, var(--llm-text-muted));
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+/* 折叠状态 */
+.llm-nav-item--collapsed {
+    opacity: 0.7;
+}
+
+.llm-nav-item--collapsed .llm-nav-item__preview {
+    font-style: italic;
+    color: var(--vscode-descriptionForeground, var(--llm-text-secondary));
+    opacity: 0.6;
+}
+
+/* 分支相关 */
+.llm-nav-item__branch-name {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    font-size: 10px;
+    background: rgba(var(--llm-color-primary-rgb), 0.1);
+    color: var(--llm-color-primary);
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.llm-nav-item__branch-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    font-size: 10px;
+    background: var(--vscode-badge-background, var(--llm-bg-tertiary));
+    color: var(--vscode-badge-foreground, var(--llm-text-primary));
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* Child Branches (Fork Points) */
+.llm-nav-item__child-branches {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(var(--llm-color-primary-rgb), 0.05);
+    border-radius: var(--llm-radius-md);
+    border-left: 3px solid var(--llm-color-primary);
+    flex-wrap: wrap;
+}
+
+.llm-nav-item__fork-icon {
+    font-size: 16px;
+    color: var(--llm-color-primary);
+    margin-right: 4px;
+    font-weight: bold;
+}
+
+.llm-nav-item__branch-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--vscode-input-background, white);
+    border: 1px solid var(--vscode-input-border, var(--llm-border-color));
+    border-radius: var(--llm-radius-sm);
+    cursor: pointer;
+    transition: all var(--llm-transition-fast);
+    white-space: nowrap;
+}
+
+.llm-nav-item__branch-tag:hover {
+    background: var(--llm-color-primary);
+    color: white;
+    border-color: var(--llm-color-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(var(--llm-color-primary-rgb), 0.2);
+}
+
+.llm-nav-item__branch-tag.is-current {
+    background: var(--llm-color-primary);
+    color: white;
+    border-color: var(--llm-color-primary);
+    font-weight: 600;
+    cursor: default;
+}
+
+.llm-nav-item__branch-tag.is-current:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Branch 操作按钮 */
+.llm-nav-item__branch-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+    opacity: 0;
+    transition: opacity var(--llm-transition-fast);
+}
+
+.llm-nav-item:hover .llm-nav-item__branch-actions {
+    opacity: 1;
+}
+
+.llm-nav-item__branch-btn {
+    background: var(--vscode-button-secondaryBackground, var(--llm-bg-tertiary));
+    border: none;
+    color: var(--vscode-button-secondaryForeground, var(--llm-text-primary));
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: var(--llm-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-nav-item__branch-btn:hover:not(:disabled) {
+    background: var(--vscode-button-secondaryHoverBackground, var(--llm-bg-hover));
+}
+
+.llm-nav-item__branch-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.llm-nav-item__branch-btn--create {
+    margin-left: auto;
+    padding: 4px 6px;
+    background: transparent;
+    border: 1px dashed var(--vscode-input-border, var(--llm-border-color));
+    border-radius: var(--llm-radius-sm);
+    cursor: pointer;
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-nav-item__branch-btn--create:hover {
+    background: var(--llm-color-primary);
+    border-color: var(--llm-color-primary);
+    border-style: solid;
+}
+
+.llm-nav-item__branch-btn--create:hover svg {
+    stroke: white;
+}
+
+/* --- Footer --- */
+.llm-nav-panel__footer {
+    padding: 8px 16px;
+    border-top: 1px solid var(--vscode-panel-border, var(--llm-border-color));
+    background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.1));
+    border-radius: 0 0 var(--llm-radius-xl) var(--llm-radius-xl);
+}
+
+.llm-nav-panel__hint {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground, var(--llm-text-secondary));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.llm-nav-panel__hint kbd {
+    background: var(--vscode-keybindingLabel-background, var(--llm-bg-tertiary));
+    color: var(--vscode-keybindingLabel-foreground, var(--llm-text-primary));
+    border: 1px solid var(--vscode-keybindingLabel-border, var(--llm-border-color));
+    border-radius: var(--llm-radius-sm);
+    padding: 2px 6px;
+    font-family: monospace;
+    font-size: 10px;
+}
+
+/* --- 响应式 --- */
+@media (max-width: 768px) {
+    .llm-nav-panel {
+        width: calc(100vw - 20px);
+        max-height: 70vh;
+    }
+
+    .llm-nav-panel__hint {
+        display: none;
+    }
+
+    .llm-nav-panel__toolbar {
+        flex-wrap: wrap;
+    }
+
+    .llm-nav-item__branch-actions {
+        opacity: 1;
+    }
+
+    /* 列表项增大触摸目标 */
+    .llm-nav-item {
+        padding: 12px;
+        min-height: 48px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* 手机全屏模式 */
+    .llm-nav-panel {
+        width: 100vw;
+        max-width: 100vw;
+        max-height: calc(100vh - env(safe-area-inset-top, 0px));
+        border-radius: 0;
+        top: 0;
+        left: 0;
+        transform: none;
+        border: none;
+    }
+
+    .llm-nav-panel--visible {
+        transform: none;
+        opacity: 1;
+    }
+
+    .llm-nav-panel--hiding {
+        transform: none;
+        opacity: 0;
+    }
+
+    .llm-nav-panel__header {
+        border-radius: 0;
+        padding-top: max(12px, env(safe-area-inset-top, 12px));
+    }
+
+    .llm-nav-panel__view-switch span:last-child {
+        display: none;
+    }
+
+    .llm-nav-item__context-toggle-label,
+    .llm-nav-item__context-badge {
+        display: none;
+    }
+
+    .llm-nav-panel__footer {
+        border-radius: 0;
+        padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    }
+
+    .llm-nav-panel__toolbar-sep {
+        display: none;
+    }
+
+    .llm-nav-panel__selection-count {
+        display: none;
+    }
+
+    .llm-nav-panel__list {
+        max-height: none;
+    }
+
+    .llm-nav-item__branch-tag {
+        font-size: 10px;
+        padding: 2px 6px;
+    }
+
+    /* 搜索框增大 */
+    .llm-nav-panel__search {
+        font-size: 16px;  /* 防止 iOS 缩放 */
+    }
+}
+.llm-nav-create-menu {
+    position: absolute;
+    z-index: 20;
+    right: 0;
+    display: grid;
+    width: 250px;
+    padding: 8px;
+    border: 1px solid var(--llm-border, #4b5563);
+    border-radius: 8px;
+    background: var(--llm-bg-primary, #111827);
+    box-shadow: 0 12px 30px rgb(0 0 0 / 35%);
+}
+
+.llm-nav-create-menu strong {
+    padding: 7px 8px 4px;
+    color: var(--llm-text-secondary, #9ca3af);
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.llm-nav-create-menu button {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 2px 6px;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: 5px;
+    color: inherit;
+    text-align: left;
+    background: transparent;
+}
+
+.llm-nav-create-menu button:hover {
+    background: var(--llm-bg-hover, #1f2937);
+}
+
+.llm-nav-create-menu button small {
+    grid-column: 2;
+    color: var(--llm-text-secondary, #9ca3af);
+}

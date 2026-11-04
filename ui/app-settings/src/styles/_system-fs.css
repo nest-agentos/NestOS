@@ -1,0 +1,54 @@
+/* ================================================
+   System FS Explorer  (debug read-only view)
+   ================================================ */
+
+/* Page-level tweaks — remove default padding so MemoryManager fills width */
+.sfe-page .settings-page__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+/* "debug / read-only" badge */
+.sfe-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 4px;
+}
+
+/* Mount point — give MemoryManager a fixed height so its flex layout works */
+.sfe-mount {
+    height: calc(100vh - 240px);
+    min-height: 400px;
+    border: 1px solid var(--settings-border, #e5e7eb);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+/* MemoryManager layout inside the mount */
+.sfe-mount .mm-layout {
+    height: 100%;
+}
+
+.sfe-mount .mm-sidebar {
+    min-width: 200px;
+    max-width: 280px;
+    border-right: 1px solid var(--settings-border, #e5e7eb);
+    overflow-y: auto;
+}
+
+.sfe-mount .mm-editor-area {
+    flex: 1;
+    overflow: auto;
+}

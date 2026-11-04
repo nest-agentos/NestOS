@@ -1,0 +1,57 @@
+# styles:check allowlist — 已接受的无样式类名（棘轮）
+#
+# 每条都代表 markup 引用了没有 CSS 规则的类。目的是阻止**新增**漂移，
+# 而不是把问题藏起来：带 “待补样式” 的分组需要逐步补齐规则后从本文件删除。
+# 补规则前先确认该类不是运行时注入样式（见 injectStyle）或行内样式。
+#
+# 生成方式：node scripts/check-styles.mjs --list
+#
+# JS 选择器 / 状态修饰（基类已有样式，无需规则）
+btn-del
+btn-del-snap
+btn-delete-pricing
+btn-down
+btn-download-snap
+btn-label
+btn-restore-snap
+btn-up
+dag-badge--history
+highlight-pulse
+llm-branch-indicator-btn--flash
+llm-input__badge-text
+llm-input__btn--attach
+llm-input__connection-select
+llm-input__flow-row
+llm-input__ocr-btn-cancel
+llm-input__ocr-btn-keep
+llm-input__ocr-btn-retry
+llm-input__ocr-title
+llm-input__reasoning-wrapper
+llm-input__setting-divider
+llm-input__stream-toggle
+llm-input__system-prompt-append
+llm-input__thinking-toggle
+llm-input__websearch-toggle
+llm-ui-banner
+llm-ui-bubble
+llm-ui-error-banner
+llm-ui-node__children
+llm-ui-node__input
+llm-ui-node__name
+llm-ui-session--highlight
+selectedEdgeId
+settings-btn__icon
+settings-btn--ghost
+settings-btn--icon
+settings-btn--text
+settings-btn--warning
+settings-btn--xs
+settings-btn-icon-small
+settings-list-item--selected
+settings-modal-cancel
+settings-modal-close
+settings-toast__icon
+settings-toast__message
+settings-toast--action
+t
+text-muted

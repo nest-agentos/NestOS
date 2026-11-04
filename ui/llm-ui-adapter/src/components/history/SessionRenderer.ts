@@ -1,0 +1,558 @@
+// @file: llm-ui/components/history/SessionRenderer.ts
+
+import { SessionGroup, ExecutionNode } from '@itookit/llm-session/contracts';
+import { MDxController, type MDxControllerOptions } from '../mdx/MDxController';
+import { NodeRenderer } from './NodeRenderer';
+import { NodeTemplates } from '../templates/NodeTemplates';
+import { LayoutTemplates } from '../templates/LayoutTemplates';
+import type { IFileSystem } from '@itookit/vfs-core';
+import { t } from '@itookit/common';
+import {TimerManager} from '@itookit/llm-ui';
+import {getPreviewText} from '@itookit/llm-ui';
+import { IconResolver } from '../../utils/iconResolver';
+import type { MDxPlugin } from '@itookit/mdxeditor';
+import {TaskArtifactBrowser} from '../dag/TaskArtifactBrowser';
+import type {ExecutionArtifactScope} from '@itookit/app-contracts';
+import type {ICommandBus} from '@itookit/llm-session/contracts';
+
+export interface RendererContext {
+    artifacts?: {commands: ICommandBus; scope(group: SessionGroup): ExecutionArtifactScope | undefined;};
+    readOnly?: boolean;
+    markdownPlugins?: MDxPlugin[];
+    messagePlugins?: (source: {messageId: string; role: string; roundId?: string}) => MDxPlugin[];
+    htmlPolicy?: MDxControllerOptions['htmlPolicy'];
+    codeBlockControls?: MDxControllerOptions['codeBlockControls'];
+    fs?: IFileSystem;
+    assets?: IFileSystem;
+    collapsedState?: (id: string, fallback: boolean) => boolean;
+}
+
+/**
+ * Session/Node 的 DOM 渲染与编辑器生命周期管理
+ *
+ * 职责：
+ * 1. 创建/销毁 session 和 node 的 DOM 结构
+ * 2. 管理 MDxController 实例（editorMap）
+ * 3. 管理 node 元素引用（nodeMap）
+ * 4. 提供内容预览工具
+ *
+ * 不负责：事件绑定、折叠逻辑、编辑模式、流式更新
+ */
+export class SessionRenderer {
+    private readonly disposals = new Set<Promise<void>>();
+    private readonly disposalFailures: unknown[] = [];
+    private timeline = new Map<HTMLElement, string | null>();
+    private flowWindows = new Map<string, HTMLElement>();
+    private nodeMap = new Map<string, HTMLElement>();
+    private editorMap = new Map<string, MDxController>();
+    private editorMounts = new Map<string, HTMLElement>();
+    private readonly renderedSessions = new Map<string, HTMLElement>();
+    private lastExecutionRoot: HTMLElement | null = null;
+    private timers = new TimerManager();
+    private snapshotContent = new Map<string, string>();
+    private readonly artifacts?: TaskArtifactBrowser;
+
+    constructor(
+        private container: HTMLElement,
+        private context: RendererContext,
+        private onContentChange?: (id: string, content: string, type: 'user' | 'node') => void,
+    ) {if (context.artifacts) this.artifacts = new TaskArtifactBrowser(container, context.artifacts.commands);}
+
+
+
+    // ================================================================
+    // 访问器（供其他 Controller 使用）
+    // ================================================================
+
+    mountInvocation(element: HTMLElement, head: string | null): () => void {
+        this.timeline.set(element, head); this.placeInvocations();
+        return () => { this.timeline.delete(element); element.remove(); };
+    }
+
+    private placeInvocations(): void {
+        const previous = new Map<string | null, HTMLElement>();
+        for (const [element, head] of this.timeline) {
+            const anchor = previous.get(head) ?? (head ? this.getSessionElement(`round-${head}-assistant`)
+                ?? this.getSessionElement(`round-${head}-user`) : null);
+            const before = anchor?.nextSibling ?? (head ? null : this.container.firstChild);
+            if (element.parentElement !== this.container || element.nextSibling !== before) this.container.insertBefore(element, before);
+            previous.set(head, element);
+        }
+        if (this.timeline.size) this.container.querySelector('.llm-ui-welcome')?.remove();
+    }
+
+    get editors(): Map<string, MDxController> { return this.editorMap; }
+
+    searchContents(): { id: string; element: HTMLElement }[] {
+        const mounts = [...this.editorMounts].filter(([, mount]) => this.container.contains(mount));
+        mounts.sort(([, a], [, b]) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+        return mounts.flatMap(([id, mount]) => {
+            const element = mount.querySelector<HTMLElement>('.mdx-editor-container__render-mode');
+            return element && !this.editorMap.get(id)?.isEditing() ? [{ id, element }] : [];
+        });
+    }
+
+    async prepareSearch(): Promise<void> {
+        await Promise.all([...this.editorMap.values()].map(editor => editor.waitUntilReady()));
+    }
+
+    getNode(nodeId: string): HTMLElement | null {
+        return this.nodeMap.get(nodeId) || null;
+    }
+
+    getEditor(nodeId: string): MDxController | undefined {
+        return this.editorMap.get(nodeId);
+    }
+
+    isEditorVisible(id: string): boolean {
+        const mount = this.editorMounts.get(id);
+        return !!mount && this.container.contains(mount) && !mount.closest('.is-collapsed');
+    }
+
+    activateVisibleEditors(root: HTMLElement = this.container): void {
+        for (const [id, mount] of this.editorMounts) {
+            if (root.contains(mount) && this.isEditorVisible(id)) this.editorMap.get(id)?.activate();
+        }
+    }
+
+    getSessionElement(sessionId: string): HTMLElement | null {
+        return this.renderedSessions.get(sessionId)
+            ?? [...this.renderedSessions.values(), ...this.flowWindows.values(), ...this.nodeMap.values()]
+                .find(element => element.dataset.historyId === sessionId && this.container.contains(element))
+            ?? null;
+    }
+
+    isRendered(sessionId: string): boolean {
+        return this.renderedSessions.has(sessionId);
+    }
+
+    // ================================================================
+    // Session 渲染
+    // ================================================================
+
+    appendSession(group: SessionGroup, isCollapsed: boolean): void {
+        if (this.renderedSessions.has(group.id)) {
+            console.warn(`[SessionRenderer] Duplicate session: ${group.id}`);
+            return;
+        }
+        this.container.querySelector('.llm-ui-welcome')?.remove();
+
+        const wrapper = document.createElement('div');
+        wrapper.className = `llm-ui-session llm-ui-session--${group.role}`;
+        wrapper.dataset.sessionId = group.id;
+        if (group.roundId) wrapper.dataset.roundId = group.roundId;
+        this.renderedSessions.set(group.id, wrapper);
+        if (this.context.readOnly) {
+            wrapper.dataset.role = group.executionRoot?.data.metaInfo?.nativeRole ?? group.role;
+            wrapper.dataset.historyId = group.executionRoot?.id ?? group.id;
+        }
+
+        // origin CSS class + label element
+        if (group.origin && group.origin !== 'user') {
+            wrapper.classList.add(`llm-ui-session--origin-${group.origin}`);
+        }
+        if (group.historyPolicy === 'exclude') {
+            wrapper.classList.add('llm-ui-session--ephemeral');
+        }
+
+        if (group.role === 'user') {
+            const preview = getPreviewText(group.content || '');
+            wrapper.innerHTML = NodeTemplates.renderUserBubble(group, preview, isCollapsed);
+            this.container.appendChild(wrapper);
+            this.mountUserEditor(wrapper, group);
+        } else {
+            // 修复：动态提取图标
+            const icon = group.executionRoot
+                ? IconResolver.getIcon(group.executionRoot)
+                : '🤖';
+
+            const originKey = group.origin === 'agent' || group.origin === 'system'
+                ? `chat.origin.${group.origin}` as const
+                : null;
+            const originLabelHtml = originKey
+                ? `<span class="llm-ui-session__origin-label">${t(originKey)}</span>`
+                : '';
+
+            wrapper.innerHTML = `
+                <div class="llm-ui-avatar">${icon}</div>
+                ${originLabelHtml}
+                <div class="llm-ui-execution-root" id="container-${group.id}"></div>
+            `;
+            this.container.appendChild(wrapper);
+            this.lastExecutionRoot = wrapper.querySelector('.llm-ui-execution-root');
+        }
+        this.restrictActions(wrapper);
+        this.syncArtifacts(group);
+        this.placeInvocations();
+    }
+
+    async reconcileSessions(groups: SessionGroup[]): Promise<void> {
+        if (!this.renderedSessions.size && groups.length) this.container.replaceChildren();
+        const retained = new Set(groups.map(group => group.id));
+        for (const id of this.renderedSessions.keys()) if (!retained.has(id)) {
+            this.removeMessages([...this.getEditorIdsForSession(id), id], false);
+            this.snapshotContent.delete(id);
+        }
+        for (const [index, group] of groups.entries()) {
+            if (!this.isRendered(group.id)) {
+                this.appendSession(group, false);
+                if (group.executionRoot) this.renderExecutionTree(group.executionRoot, false);
+            }
+            this.updateSnapshotContent(group);
+            const wrapper = this.getSessionElement(group.id)!;
+            const at = this.container.children[index];
+            if (at !== wrapper) this.container.insertBefore(wrapper, at ?? null);
+        }
+        if (!groups.length) this.renderWelcome();
+        await Promise.all([...this.editorMap.entries()].filter(([id]) => this.isEditorVisible(id)).map(([, editor]) => editor.waitUntilReady()));
+        this.placeInvocations();
+    }
+
+    private updateSnapshotContent(group: SessionGroup): void {
+        this.syncArtifacts(group);
+        const content = group.executionRoot?.data.output ?? group.content ?? '';
+        const id = group.executionRoot?.id ?? group.id;
+        if (this.snapshotContent.get(group.id) !== content) {
+            this.editorMap.get(id)?.setContent(content); this.snapshotContent.set(group.id, content);
+            const preview = this.getSessionElement(group.id)?.querySelector('.llm-ui-header-preview');
+            if (preview) preview.textContent = getPreviewText(content);
+        }
+        const node = group.executionRoot && this.getNode(id);
+        if (node && group.executionRoot) {
+            node.dataset.status = group.executionRoot.status;
+            const status = node.querySelector('.llm-ui-node__status');
+            if (status) { status.textContent = NodeTemplates.statusLabel(group.executionRoot.status); status.className = `llm-ui-node__status llm-ui-node__status--${group.executionRoot.status}`; }
+        }
+    }
+
+    setActive(active: boolean): void {this.artifacts?.setVisible(active);}
+
+    private syncArtifacts(group: SessionGroup): void {
+        if (!this.artifacts) return;
+        const wrapper = this.getSessionElement(group.id), scope = this.context.artifacts?.scope(group);
+        const target = wrapper?.querySelector<HTMLElement>('.llm-ui-execution-root');
+        let slot = target?.querySelector<HTMLElement>('[data-history-artifacts]');
+        if (!target || !scope) {if (slot) {slot.remove(); this.artifacts.prune();} return;}
+        const key = JSON.stringify([scope.sessionId, scope.taskId]);
+        if (slot?.dataset.historyArtifacts === key) {this.attachArtifactMenu(target); return;}
+        const replaced = !!slot;
+        if (!slot) {slot = document.createElement('div'); slot.hidden = true; target.append(slot);}
+        slot.dataset.historyArtifacts = key;
+        slot.innerHTML = this.artifacts.render(scope);
+        this.attachArtifactMenu(target);
+        if (replaced) this.artifacts.prune();
+    }
+
+    private attachArtifactMenu(target: HTMLElement): void {
+        const slot = target.querySelector<HTMLElement>('[data-history-artifacts]');
+        const footer = target.querySelector<HTMLElement>(':scope > .llm-ui-node > .llm-ui-message-footer');
+        if (!slot || !footer) return;
+        let menu = footer.querySelector<HTMLElement>('.llm-ui-message-more__items');
+        if (!menu) {
+            footer.querySelector('.llm-ui-actions')?.insertAdjacentHTML('beforeend', NodeTemplates.renderMoreMenu());
+            menu = footer.querySelector('.llm-ui-message-more__items');
+        }
+        if (menu) {menu.append(slot); slot.hidden = false;}
+    }
+
+    private restrictActions(element: HTMLElement): void {
+        if (!this.context.readOnly) return;
+        for (const button of element.querySelectorAll<HTMLElement>('[data-action]')) {
+            if (!['copy', 'collapse'].includes(button.dataset.action!)) button.remove();
+        }
+        element.querySelector('.llm-ui-edit-actions')?.remove();
+        element.querySelector('.llm-ui-message-more')?.remove();
+    }
+
+    /**
+     * 渲染执行树（递归）
+     */
+    renderExecutionTree(node: ExecutionNode, isCollapsed: boolean): void {
+        this.appendNode(node.parentId, node, isCollapsed);
+        node.children?.forEach(c => this.renderExecutionTree(c, isCollapsed));
+    }
+
+    appendNode(parentId: string | undefined, node: ExecutionNode, isCollapsed: boolean): void {
+        isCollapsed = this.context.collapsedState?.(node.id, isCollapsed) ?? isCollapsed;
+        if (this.nodeMap.has(node.id)) {
+            console.warn(`[SessionRenderer] Duplicate node: ${node.id}`);
+            return;
+        }
+
+        let parentEl: HTMLElement | null = null;
+        if (parentId) {
+            parentEl = this.nodeMap.get(parentId)?.querySelector('.llm-ui-node__children') || null;
+        }
+        if (!parentEl) {
+            if (!this.lastExecutionRoot || !this.container.contains(this.lastExecutionRoot)) {
+                const roots = this.container.querySelectorAll<HTMLElement>('.llm-ui-execution-root');
+                this.lastExecutionRoot = roots.item(roots.length - 1);
+            }
+            parentEl = this.lastExecutionRoot;
+        }
+
+        if (!parentEl) return;
+        if (node.data.metaInfo?.flowInteraction && parentId) parentEl = this.flowWindow(parentId, node, parentEl, isCollapsed);
+
+        const { element } = NodeRenderer.create(node);
+
+        if (isCollapsed) {
+            element.classList.add('is-collapsed');
+            element.querySelector('[data-action="collapse"]')?.setAttribute('aria-expanded', 'false');
+            const svg = element.querySelector('[data-action="collapse"] svg');
+            if (svg) svg.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
+        }
+
+        this.nodeMap.set(node.id, element);
+        parentEl.insertBefore(element, parentEl.querySelector(':scope > [data-history-artifacts]'));
+        this.mountNodeEditor(element, node);
+        this.restrictActions(element);
+        const target = parentEl.closest<HTMLElement>('.llm-ui-execution-root');
+        if (target) this.attachArtifactMenu(target);
+    }
+
+    private flowWindow(parentId: string, node: ExecutionNode, fallback: HTMLElement, collapsed: boolean): HTMLElement {
+        const root = this.nodeMap.get(parentId);
+        if (!root?.parentElement) return fallback;
+        const meta = node.data.metaInfo;
+        const taskKey = `${parentId}:task:${node.executorId}`;
+        const related = meta?.actor?.kind === 'tool' ? this.flowWindows.get(taskKey) : undefined;
+        if (related) return related.querySelector<HTMLElement>('.llm-ui-flow-window__body')!;
+        const key = `${parentId}:${meta?.parallelGroup ? `parallel:${meta.parallelGroup}` : `node:${node.id}`}`;
+        let window = this.flowWindows.get(key);
+        if (!window) {
+            window = document.createElement('section');
+            window.className = 'llm-ui-flow-window';
+            window.dataset.flowGroup = key;
+            window.dataset.historyId = `flow-window-${encodeURIComponent(meta?.parallelGroup ? `parallel:${meta.parallelGroup}` : `node:${node.id}`)}`;
+            collapsed = this.context.collapsedState?.(window.dataset.historyId, collapsed) ?? collapsed;
+            window.classList.toggle('is-collapsed', collapsed);
+            window.innerHTML = `<div class="llm-ui-node__header"><span class="llm-ui-node__name"></span>${NodeTemplates.renderReadActions(collapsed)}</div><div class="llm-ui-flow-window__body"></div>`;
+            root.dataset.historyId = root.dataset.id;
+            root.dataset.role = 'assistant';
+            window.dataset.role = node.messageRole ?? 'assistant';
+            root.parentElement.insertBefore(window, root);
+            this.flowWindows.set(key, window);
+        }
+        this.flowWindows.set(taskKey, window);
+        const title = window.querySelector('.llm-ui-node__name')!;
+        title.textContent = title.textContent ? `${title.textContent} · ${node.name}` : node.name;
+        return window.querySelector<HTMLElement>('.llm-ui-flow-window__body')!;
+    }
+
+    copyContent(id: string): string | undefined {
+        const editor = this.editorMap.get(id);
+        if (editor) return editor.content;
+        const window = this.getSessionElement(id);
+        if (!window?.classList.contains('llm-ui-flow-window')) return undefined;
+        return [...window.querySelectorAll<HTMLElement>('.llm-ui-node[data-id]')].map(node => {
+            const content = this.editorMap.get(node.dataset.id!)?.content ?? '';
+            const title = node.dataset.title ?? '';
+            return content ? `## ${title}\n\n${content}` : '';
+        }).filter(Boolean).join('\n\n');
+    }
+
+    updateRequests(nodeId: string, requests: unknown): void {
+        if (!Array.isArray(requests)) return;
+        const node = this.nodeMap.get(nodeId);
+        const panel = node?.querySelector<HTMLDetailsElement>('.llm-ui-node__req');
+        const pre = panel?.querySelector('pre');
+        if (pre) pre.textContent = JSON.stringify(requests, null, 2);
+    }
+
+    // ================================================================
+    // 编辑器挂载
+    // ================================================================
+
+    private mountUserEditor(wrapper: HTMLElement, group: SessionGroup): void {
+        const mountPoint = wrapper.querySelector(`#user-mount-${group.id}`) as HTMLElement;
+        if (!mountPoint) return;
+
+        const controller = new MDxController(mountPoint, group.content || '', {
+            readOnly: true,
+            editable: this.context.readOnly ? false : undefined,
+            plugins: [...(this.context.markdownPlugins ?? []), ...(this.context.messagePlugins?.({messageId: group.id, role: group.role, roundId: group.roundId}) ?? [])],
+            htmlPolicy: this.context.htmlPolicy,
+            codeBlockControls: this.context.codeBlockControls,
+            deferred: !!mountPoint.closest('.is-collapsed'),
+            onChange: (text) => {
+                this.onContentChange?.(group.id, text, 'user');
+                const previewEl = wrapper.querySelector('.llm-ui-header-preview');
+                if (previewEl) previewEl.textContent = getPreviewText(text);
+            },
+
+
+            fs: this.context.fs,
+            assets: this.context.assets,
+        });
+        this.editorMap.set(group.id, controller);
+        this.editorMounts.set(group.id, mountPoint);
+    }
+
+    private mountNodeEditor(element: HTMLElement, node: ExecutionNode): void {
+        const mountPoint = element.querySelector(`#mount-${node.id}`) as HTMLElement;
+        if (!mountPoint) return;
+
+        const sessionEl = element.closest('[data-session-id]');
+        const effectiveId = (sessionEl as HTMLElement)?.dataset.sessionId || node.id;
+
+        const isStreaming = node.status === 'running' || node.status === 'queued';
+
+        const controller = new MDxController(mountPoint, node.data.output || '', {
+            readOnly: true,
+            editable: this.context.readOnly ? false : undefined,
+            plugins: [...(this.context.markdownPlugins ?? []), ...(this.context.messagePlugins?.({messageId: effectiveId, role: 'assistant',
+                roundId: (sessionEl as HTMLElement | null)?.dataset.roundId}) ?? [])],
+            htmlPolicy: this.context.htmlPolicy,
+            codeBlockControls: this.context.codeBlockControls,
+            deferred: !!mountPoint.closest('.is-collapsed'),
+            streaming: isStreaming && !this.context.readOnly,
+            onChange: (text) => {
+                if (controller.isEditing()) {
+                    this.onContentChange?.(effectiveId, text, 'node');
+                }
+            },
+
+
+            fs: this.context.fs,
+            assets: this.context.assets,
+        });
+        this.editorMap.set(node.id, controller);
+        this.editorMounts.set(node.id, mountPoint);
+
+        const iconEl = element.querySelector('.llm-ui-node__icon--clickable');
+        if (iconEl && node.data.metaInfo?.agentId) {
+            (iconEl as HTMLElement).dataset.agentId = node.data.metaInfo.agentId;
+        }
+    }
+
+    // ================================================================
+    // 删除
+    // ================================================================
+
+    removeMessages(ids: string[], animated: boolean): string[] {
+        const removed: string[] = [];
+
+        for (const id of ids) {
+            const sessionEl = this.renderedSessions.get(id);
+            const nodeEl = this.nodeMap.get(id);
+
+            if (!sessionEl && !nodeEl) continue;
+
+            this.renderedSessions.delete(id);
+
+            if (sessionEl) this.removeElement(sessionEl as HTMLElement, animated);
+            if (nodeEl) {
+                this.removeElement(nodeEl, animated);
+                this.nodeMap.delete(id);
+            }
+
+            const editor = this.editorMap.get(id);
+            if (editor) {
+                this.releaseEditor(editor);
+                this.editorMap.delete(id);
+                this.editorMounts.delete(id);
+            }
+
+            removed.push(id);
+        }
+
+        this.artifacts?.prune();
+        const delay = animated ? 350 : 0;
+        this.timers.setTimeout(() => this.checkEmpty(), delay);
+
+        return removed;
+    }
+
+    private removeElement(el: HTMLElement, animated: boolean): void {
+        if (animated) {
+            el.classList.add('llm-ui-session--deleting');
+            el.addEventListener('animationend', () => el.remove(), { once: true });
+            this.timers.setTimeout(() => { if (el.parentNode) el.remove(); }, 350);
+        } else {
+            el.remove();
+        }
+    }
+
+    private checkEmpty(): void {
+        const remaining = this.container.querySelectorAll(
+            '.llm-ui-session:not(.llm-ui-session--deleting)'
+        );
+        if (remaining.length === 0) {
+            this.renderWelcome();
+        }
+    }
+
+    // ================================================================
+    // 简单渲染
+    // ================================================================
+
+    renderWelcome(): void {
+        this.clear();
+        this.container.innerHTML = LayoutTemplates.renderWelcome();
+        this.placeInvocations();
+    }
+
+    // ================================================================
+    // 工具方法
+    // ================================================================
+
+    /**
+     * 获取指定 session 关联的所有编辑器 ID
+     */
+    getEditorIdsForSession(sessionId: string): string[] {
+        const ids: string[] = [];
+        if (this.editorMap.has(sessionId)) ids.push(sessionId);
+
+        const sessionEl = this.getSessionElement(sessionId);
+        if (sessionEl) {
+            sessionEl.querySelectorAll('.llm-ui-node[data-id]').forEach(node => {
+                const nodeId = (node as HTMLElement).dataset.id;
+                if (nodeId && this.editorMap.has(nodeId)) ids.push(nodeId);
+            });
+        }
+        return ids;
+    }
+
+    // ================================================================
+    // 清理
+    // ================================================================
+
+    clear(): void {
+        this.artifacts?.clear();
+        this.editorMap.forEach(editor => this.releaseEditor(editor));
+        this.editorMap.clear();
+        this.editorMounts.clear();
+        this.nodeMap.clear();
+        this.flowWindows.clear();
+        this.snapshotContent.clear();
+        this.renderedSessions.clear();
+        this.lastExecutionRoot = null;
+        this.container.innerHTML = '';
+    }
+
+    private releaseEditor(editor: MDxController): void {
+        const disposal = Promise.resolve(editor.destroy()).catch(error => { this.disposalFailures.push(error); })
+            .finally(() => this.disposals.delete(disposal));
+        this.disposals.add(disposal);
+    }
+
+    async destroy(): Promise<void> {
+        this.artifacts?.dispose();
+        this.timers.destroy();
+        this.timeline.clear();
+        this.clear();
+        await Promise.all(this.disposals);
+        if (this.disposalFailures.length) throw new AggregateError(this.disposalFailures, 'History editor disposal failed');
+    }
+    updateCallInput(messageId: string, callInput: SessionGroup['callInput']): void {
+        const wrapper = this.getSessionElement(messageId);
+        const body = wrapper?.querySelector('.llm-ui-bubble__content');
+        if (!body || !callInput?.admitted) return;
+        const existing = body.querySelector('[data-call-arguments]');
+        if (existing) existing.querySelector('pre')!.textContent = JSON.stringify(callInput.admitted.parameters, null, 2);
+        else body.insertAdjacentHTML('beforeend', NodeTemplates.renderCallArguments(callInput.admitted.parameters));
+        const edit = wrapper?.querySelector<HTMLButtonElement>('[data-action="edit"]');
+        if (edit && callInput.source.kind === 'arguments') {edit.dataset.action = 'edit-arguments'; edit.title = t('callable.input.arguments'); edit.setAttribute('aria-label', edit.title);}
+    }
+}

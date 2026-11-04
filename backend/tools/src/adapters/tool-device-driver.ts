@@ -1,0 +1,359 @@
+// @file: tools/src/adapters/tool-device-driver.ts
+// ToolDeviceDriver — bridges Tool[] → IToolService + IDeviceDriver.
+// Platform-neutral Tool device driver used by KernelAdapters capability scopes.
+
+import { z } from 'zod/v4';
+import type {
+  IToolService,
+  ToolMeta,
+  ToolDefinition,
+  ToolInvokeRequest,
+  ToolInvokeResult,
+  ToolBatchResult,
+  ToolVFSContext,
+  ToolHandler,
+} from '../contracts';
+import type {
+  DeviceContext,
+  IDeviceDriver,
+} from '@itookit/vfs-core';
+import type { Tool } from '../core/Tool';
+import type { INativeShell, ToolUseContext } from '../core/types';
+import { ToolInputError } from '../core/tool-error';
+import { invocationSignal, prepareToolInput, prepareToolReconciliation, toolFailure, toolSuccess } from './tool-invocation';
+import { createBashTool } from '../tools/Bash/BashTool';
+
+function assertImplementationIdentity(tool: Tool, meta: ToolMeta): void {
+  if (tool.name !== meta.id || (tool.version ?? '1') !== (meta.version ?? '1'))
+    throw Object.assign(new Error('Bound implementation does not match the authorized logical tool'), {code: 'TOOL_IMPLEMENTATION_IDENTITY_MISMATCH'});
+}
+
+// ── Registry entry ──
+
+interface RegisteredTool {
+  meta: ToolMeta;
+  definition: ToolDefinition;
+  tool: Tool;
+}
+const admission = new WeakMap<ToolMeta, {allowed: boolean}>();
+
+// ── Meta/Definition builders ──
+
+function toolMetaFromTool(tool: Tool): ToolMeta {
+  return liveToolMeta({
+    id: tool.name,
+    version: tool.version ?? '1',
+    name: tool.userFacingName(undefined),
+    description: '',
+    sideEffect: tool.isReadOnly() ? 'none' : 'local',
+    timeoutMs: 30_000,
+    type: 'builtin',
+    enabled: tool.isEnabled(),
+    tags: tool.searchHint ? [tool.searchHint] : [],
+  }, tool);
+}
+
+/** Preserve explicit catalog disables while observing the host gate on every read. */
+function liveToolMeta(meta: ToolMeta, tool: Tool): ToolMeta {
+  const state = {allowed: true}; admission.set(meta, state);
+  Object.defineProperty(meta, 'enabled', {enumerable: true, configurable: true,
+    get: () => state.allowed && tool.isEnabled(), set: (value: boolean) => {state.allowed = value;}});
+  return meta;
+}
+
+function toolDefinitionFromTool(tool: Tool): ToolDefinition {
+  // Convert the tool's Zod input schema to a JSON Schema object for the LLM.
+  let parameters: Record<string, unknown> = { type: 'object', properties: {}, required: [] };
+  try {
+    const schema = tool.inputSchema;
+    if (schema) {
+      parameters = z.toJSONSchema(schema) as Record<string, unknown>;
+    }
+  } catch {
+    // Fall back to empty schema if conversion fails (e.g. no inputSchema defined).
+  }
+
+  return {
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: '', // filled in by init()
+      parameters,
+    },
+  };
+}
+
+// ── Driver ──
+
+export class ToolDeviceDriver implements IDeviceDriver, IToolService {
+  private assetStore?: import('../contracts').TaskAssetStore;
+  setAssetStore(store: import('../contracts').TaskAssetStore): void { this.assetStore = store; }
+  private assetReader?: import('../contracts').TaskAssetReader;
+  setAssetReader(reader: import('../contracts').TaskAssetReader): void { this.assetReader = reader; }
+  readonly handlerId = 'tools';
+  readonly description = 'Built-in tool execution device';
+  readonly writable = false;
+  readonly streamable = false;
+  readonly sessionable = false;
+
+  private registry = new Map<string, RegisteredTool>();
+  private vfsContext: ToolVFSContext | undefined = undefined;
+  private fileCwd: string | undefined;
+
+  setFileContext(ctx: ToolVFSContext, cwd: string): void {
+    this.vfsContext = ctx;
+    this.fileCwd = cwd;
+  }
+  private shellContext: INativeShell | undefined = undefined;
+
+  /**
+   * Session-scoped app state shared across all tool invocations.
+   * Provides isolation for stateful tools (Task, PlanMode) between sessions.
+   * Call clearSessionState() when starting a new agent session if isolation is needed.
+   */
+  private sessionAppState: Record<string, unknown> = {};
+
+  constructor(tools: Tool[]) {
+    for (const tool of tools) {
+      const meta = toolMetaFromTool(tool);
+      const definition = toolDefinitionFromTool(tool);
+      this.registry.set(tool.name, { meta, definition, tool });
+    }
+  }
+
+  /**
+   * Inject a native shell implemented by the owning application.
+   * When set, search tools (GrepTool, GlobTool) use rg/fd instead of manual FS walking,
+   * and BashTool can run in Tauri where node:child_process is unavailable.
+   *
+   * @example (Tauri)
+   *   const shell = await TauriNativeShell.create();
+   *   toolDriver.setNativeShell(shell);
+   */
+  setNativeShell(shell: INativeShell): void {
+    this.shellContext = shell;
+    // The built-in Bash tool ships disabled (no shell bound). An injected shell must
+    // re-register it, otherwise getToolDefinitions() filters it out and the model is
+    // never told the tool exists.
+    this.registerToolInstance(createBashTool(shell));
+  }
+
+  /** Clear session-scoped app state between agent sessions for full isolation. */
+  clearSessionState(): void {
+    this.sessionAppState = {};
+  }
+
+  /** Register an additional tool at runtime (e.g. from Skill loading). */
+  registerToolInstance(tool: Tool, prepared?: {meta: ToolMeta; definition: ToolDefinition}): void {
+    const meta = prepared ? liveToolMeta(prepared.meta, tool) : toolMetaFromTool(tool);
+    const definition = prepared?.definition ?? toolDefinitionFromTool(tool);
+    this.registry.set(meta.id, { meta, definition, tool });
+  }
+  /** Metadata refresh cannot lift an explicit, scope-local disable. */
+  replaceToolInstance(tool: Tool, prepared: {meta: ToolMeta; definition: ToolDefinition}): void {
+    const previous = this.registry.get(tool.name), allowed = previous && admission.get(previous.meta)?.allowed;
+    this.registerToolInstance(tool, prepared);
+    if (allowed === false) this.registry.get(tool.name)!.meta.enabled = false;
+  }
+
+  async init(): Promise<void> {
+    for (const entry of this.registry.values()) {
+      const desc = await entry.tool.description();
+      entry.meta.description = desc;
+      if (entry.definition.function) entry.definition.function.description = desc;
+      else entry.definition.description = desc;
+    }
+  }
+
+  async dispose(): Promise<void> {
+    this.registry.clear();
+  }
+
+  // ── IDeviceDriver ──
+
+  async read(_ctx: DeviceContext): Promise<string> {
+    return this.listTools().map((m) => `${m.id}: ${m.description}`).join('\n');
+  }
+
+  async write(_ctx: DeviceContext): Promise<void> {}
+
+  async ioctl(_ctx: DeviceContext, command: string, arg?: unknown): Promise<unknown> {
+    if (command === 'invoke' && arg) return this.invoke(arg as ToolInvokeRequest);
+    if (command === 'list') return this.listTools();
+    throw new Error(`Unknown ioctl command: ${command}`);
+  }
+
+  // ── IToolService ──
+
+  listTools(): ToolMeta[] {
+    return [...this.registry.values()].map((e) => e.meta);
+  }
+
+  getToolMeta(id: string): ToolMeta | undefined {
+    return this.registry.get(id)?.meta;
+  }
+
+  getToolDefaults(id: string): Record<string, unknown> {return structuredClone(this.registry.get(id)?.tool.inputDefaults?.() ?? {});}
+
+  getToolDefinition(id: string): ToolDefinition | undefined {
+    return this.registry.get(id)?.definition;
+  }
+
+  getToolDefinitions(): ToolDefinition[] {
+    return [...this.registry.values()]
+      .filter((e) => e.meta.enabled && e.tool.isEnabled())
+      .map((e) => e.definition);
+  }
+
+  async invoke(request: ToolInvokeRequest): Promise<ToolInvokeResult> {
+    const started = Date.now();
+    const entry = this.registry.get(request.toolId);
+    if (!entry) return toolFailure(request.toolId, new ToolInputError('TOOL_NOT_FOUND', `Tool not found: ${request.toolId}`), started);
+    if (!entry.meta.enabled || !entry.tool.isEnabled()) {
+      return toolFailure(request.toolId, new ToolInputError('TOOL_DISABLED', `Tool is disabled: ${request.toolId}`), started);
+    }
+    if (request.toolVersion && entry.meta.version !== request.toolVersion) return toolFailure(request.toolId, new ToolInputError('TOOL_VERSION_MISMATCH', 'Required tool version is unavailable'), started);
+    const timeoutMs = request.timeoutMs ?? entry.meta.timeoutMs;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
+      return toolFailure(request.toolId, new ToolInputError('INVALID_ARGUMENTS', 'Invalid tool timeout'), started);
+    }
+    const signal = invocationSignal(request.signal, timeoutMs);
+    let lease: {tool: Tool; release(): void} | undefined;
+    try {
+      const context = this.invocationContext(request, timeoutMs, signal.controller);
+      lease = await entry.tool.acquireExecution?.(context, 'invoke');
+      const tool = lease?.tool ?? entry.tool;
+      assertImplementationIdentity(tool, entry.meta);
+      const args = await prepareToolInput(tool, request.args, context);
+      if (!entry.meta.enabled || !this.registry.get(request.toolId)?.meta.enabled || !entry.tool.isEnabled() || !tool.isEnabled() || this.registry.get(request.toolId)?.tool !== entry.tool) {
+        throw new ToolInputError('TOOL_DISABLED', 'Tool was disabled or replaced before execution');
+      }
+      const activity = tool.getActivityDescription?.(args);
+      if (activity) await context.onProgress?.({ message: activity });
+      const result = await tool.call(args, context);
+      return await toolSuccess(tool, result.data, started, request.admitOutput, request.resultMode === 'structured');
+    } catch (error) {
+      const result = toolFailure(request.toolId, error, started);
+      return signal.controller.signal.aborted ? { ...result, errorCode: 'CANCELLED', recoverable: false } : result;
+    } finally {
+      lease?.release();
+      signal.dispose();
+    }
+  }
+
+  async reconcile(request: import('../contracts').ToolReconcileRequest): Promise<import('../contracts').ToolServiceReconcileResult> {
+    const started = Date.now();
+    const entry = this.registry.get(request.toolId);
+    if (!entry || !entry.meta.enabled || !entry.tool.isEnabled() || (request.toolVersion && request.toolVersion !== entry.meta.version)) throw new Error('Required tool version is unavailable');
+    const timeoutMs = request.timeoutMs ?? entry.meta.timeoutMs;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) throw new ToolInputError('INVALID_ARGUMENTS', 'Invalid tool timeout');
+    const signal = invocationSignal(request.signal, timeoutMs);
+    let lease: {tool: Tool; release(): void} | undefined;
+    try {
+      const { operationId, sessionId, taskId, effectId } = request;
+      const context = this.invocationContext({ ...request, executionIdentity: { operationId, sessionId, taskId, effectId } }, timeoutMs, signal.controller);
+      lease = await entry.tool.acquireExecution?.(context, 'reconcile');
+      const tool = lease?.tool ?? entry.tool;
+      assertImplementationIdentity(tool, entry.meta);
+      const args = await prepareToolReconciliation(tool, request.args, context);
+      if (!entry.meta.enabled || !this.registry.get(request.toolId)?.meta.enabled || !entry.tool.isEnabled() || !tool.isEnabled() || this.registry.get(request.toolId)?.tool !== entry.tool) throw new Error('Tool was disabled or replaced before reconciliation');
+      if (!tool.reconcile) return entry.meta.sideEffect === 'none' && tool.isReadOnly() ? { status: 'retry' }
+        : { status: 'indeterminate', error: { message: 'Tool outcome cannot be reconciled', code: 'TOOL_INDETERMINATE' } };
+      const result = await tool.reconcile(args, context);
+      signal.controller.signal.throwIfAborted();
+      if (result.status === 'indeterminate') return { ...result, error: result.error ?? { message: 'Tool outcome cannot be reconciled', code: 'TOOL_INDETERMINATE' } };
+      if (result.status !== 'completed') return result;
+      return { status: 'completed', result: await toolSuccess(tool, result.data, started, undefined, request.resultMode === 'structured') };
+    } finally { lease?.release(); signal.dispose(); }
+  }
+
+  private invocationContext(request: ToolInvokeRequest, timeoutMs: number, controller: AbortController): ToolUseContext {
+    const appState = this.sessionAppState;
+    const identity = () => {
+      if (!request.executionIdentity) throw new Error('Task asset access requires execution identity');
+      return request.executionIdentity;
+    };
+    return {
+      cwd: request.cwd ?? this.fileCwd ?? (typeof process !== 'undefined' ? process.cwd() : '/'),
+      signal: controller.signal, timeoutMs, vfs: this.vfsContext, shell: this.shellContext,
+      ...(this.assetReader ? { readAsset: (reference: import('../contracts').BinaryAssetReference) => {
+        if (!request.executionIdentity) throw new Error('Task asset access requires execution identity');
+        return this.assetReader!(reference, request.executionIdentity);
+      } } : {}),
+      ...(this.assetStore ? {
+        writeAsset: (data: Uint8Array, mime: string) => this.assetStore!.write(data, mime, identity(), controller.signal),
+        getAssetRecord: (key: string) => this.assetStore!.getRecord(key, identity()),
+        putAssetRecord: (key: string, value: unknown) => this.assetStore!.putRecord(key, value, identity(), controller.signal),
+      } : {}),
+      onProgress: request.onProgress, operationId: request.executionIdentity?.operationId, executionIdentity: request.executionIdentity,
+      abortController: controller, appState,
+      setAppState: (key, value) => { appState[key] = value; },
+    };
+  }
+
+  async invokeBatch(requests: ToolInvokeRequest[]): Promise<ToolBatchResult> {
+    const t0 = Date.now();
+    const indexed = requests.map((req, idx) => ({ req, idx }));
+    const reads = indexed.filter(({ req }) => {
+      const entry = this.registry.get(req.toolId);
+      return entry?.tool.isConcurrencySafe() ?? false;
+    });
+    const writes = indexed.filter(({ req }) => {
+      const entry = this.registry.get(req.toolId);
+      return !(entry?.tool.isConcurrencySafe() ?? false);
+    });
+
+    const slotted: ToolInvokeResult[] = new Array(requests.length);
+
+    // Reads in parallel
+    const readResults = await Promise.all(reads.map(({ req }) => this.invoke(req)));
+    for (let i = 0; i < reads.length; i++) {
+      slotted[reads[i].idx] = readResults[i];
+    }
+
+    // Writes serially
+    for (const { req, idx } of writes) {
+      slotted[idx] = await this.invoke(req);
+    }
+
+    return { results: slotted, totalDurationMs: Date.now() - t0 };
+  }
+
+  registerTool(meta: ToolMeta, definition: ToolDefinition, handler: ToolHandler): void {
+    meta = {...meta, version: meta.version ?? '1'};
+    const schema = definition.function?.parameters ?? definition.parameters ?? { type: 'object' };
+    // Wrap a ToolHandler as a Tool adapter for backward compatibility.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adapter = {
+      name: meta.id,
+      maxResultSizeChars: 50_000,
+      description() { return Promise.resolve(meta.description); },
+      prompt() { return Promise.resolve(meta.description); },
+      userFacingName() { return meta.name; },
+      inputSchema: z.fromJSONSchema(schema as Parameters<typeof z.fromJSONSchema>[0]),
+      isConcurrencySafe() { return meta.sideEffect === 'none'; },
+      isReadOnly() { return meta.sideEffect === 'none'; },
+      isEnabled() { return meta.enabled; },
+      async call(args: Record<string, unknown>, context: Record<string, unknown>) {
+        const result = await handler(args, context as unknown as Parameters<typeof handler>[1]);
+        return { data: meta.outputEncoding === 'json' ? JSON.parse(result) : result };
+      },
+      mapToolResultToToolResultBlockParam(data: unknown, toolUseId: string) {
+        return {
+          tool_use_id: toolUseId,
+          type: 'tool_result' as const,
+          content: typeof data === 'string' ? data : JSON.stringify(data),
+        };
+      },
+    } as unknown as Tool;
+    this.registry.set(meta.id, { meta, definition, tool: adapter });
+  }
+
+  unregisterTool(id: string): void {
+    this.registry.delete(id);
+  }
+
+  getService(): IToolService {
+    return this;
+  }
+}

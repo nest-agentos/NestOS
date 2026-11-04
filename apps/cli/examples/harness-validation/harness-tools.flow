@@ -1,0 +1,11 @@
+{
+  "id": "harness-tools", "name": "Harness 验证：文件工具", "draftVersion": 1, "updatedAt": 0,
+  "parameters": [{ "name": "keyword", "type": "string", "required": true, "default": "HARNESS_CHECK", "widget": "text", "label": "搜索关键词" }],
+  "nodes": [{ "id": "inspect", "name": "搜索并读取文件", "plugin": "builtin.agent", "pluginVersion": "1.0.0", "inputs": {},
+    "config": { "connectionId": "default", "toolIds": ["Grep", "Read"], "approval": "none", "historyPolicy": "none", "stream": false, "maxExchanges": 5,
+      "systemPrompt": ["Use the declared tools and report actual evidence. Do not claim a tool ran unless its result is available."],
+      "prompt": "Search the current workspace for ${param.keyword} using Grep, then read ./notes.txt using Read. Report the matching line and release owner."
+    } }],
+  "edges": [], "outputs": { "result": { "value": "${nodes.inspect.outputs.result}" } },
+  "layout": { "nodes": { "inspect": { "x": 80, "y": 80 } } }
+}

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>MDxEditor + VFS-UI 完整演示</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --sidebar-width: 320px;
+            --transition-speed: 0.3s;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #f0f2f5;
+        }
+
+        #app-container {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr;
+            height: 100%;
+            transition: grid-template-columns var(--transition-speed) ease-in-out;
+        }
+
+        #sidebar-container {
+            background-color: #ffffff;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e0e0e0;
+        }
+
+        #main-content {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #editor-container {
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        #app-container.sidebar-collapsed {
+            grid-template-columns: 0 1fr;
+        }
+
+        #app-container.sidebar-collapsed #sidebar-container {
+            transform: translateX(-100%);
+            opacity: 0;
+            pointer-events: none;
+            border: none;
+            padding: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-container" id="app-container">
+        <!-- 侧边栏：VFS-UI (NodeList) 组件的容器 -->
+        <aside id="sidebar-container"></aside>
+
+        <!-- 主内容区 -->
+        <main id="main-content">
+            <!-- MDxEditor 组件的容器 -->
+            <div id="editor-container"></div>
+        </main>
+    </div>
+
+    <!-- 为 VFS-UI 模态框提供一个挂载点 -->
+    <div id="vfs-modal-container"></div>
+
+    <!-- 依赖库 -->
+    <script src="https://fastly.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://fastly.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://fastly.jsdelivr.net/npm/immer/dist/immer.umd.production.min.js"></script>
+    <script>
+        // 确保 Immer 的 Map/Set 支持在任何模块脚本运行前被启用
+        if (window.immer) {
+            window.immer.enableMapSet();
+        } else {
+            document.addEventListener('DOMContentLoaded', function () {
+                if (window.immer) { window.immer.enableMapSet(); }
+            });
+        }
+    </script>
+    <script id="MathJax-script" async src="https://fastly.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- Demo 逻辑脚本 -->
+    <script type="module" src="vfs.js"></script>
+
+</body>
+
+</html>

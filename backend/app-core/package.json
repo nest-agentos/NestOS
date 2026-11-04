@@ -1,0 +1,67 @@
+{
+  "name": "@itookit/app-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./profile": {
+      "types": "./src/profile/nestos-profile.ts",
+      "import": "./src/profile/nestos-profile.ts",
+      "default": "./src/profile/nestos-profile.ts"
+    },
+    "./host": {
+      "types": "./src/host/index.ts",
+      "import": "./src/host/index.ts",
+      "default": "./src/host/index.ts"
+    },
+    "./contracts": {
+      "types": "./src/contracts/backend.ts",
+      "import": "./src/contracts/backend.ts",
+      "default": "./src/contracts/backend.ts"
+    },
+    "./kanban": {
+      "types": "./src/kanban/index.ts",
+      "import": "./src/kanban/index.ts",
+      "default": "./src/kanban/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@itookit/common": "workspace:*",
+    "@itookit/durable-kernel": "workspace:*",
+    "@itookit/kernel-adapters": "workspace:*",
+    "@itookit/llm-flow": "workspace:*",
+    "@itookit/llm-session": "workspace:*",
+    "@itookit/vfs-core": "workspace:*",
+    "@itookit/driver-llm": "workspace:*",
+    "@itookit/llm-context": "workspace:*",
+    "@itookit/llm-tasks": "workspace:*",
+    "@itookit/tools": "workspace:*",
+    "@itookit/vfs-sync": "workspace:*",
+    "@itookit/cells-driver": "workspace:*",
+    "@itookit/app-contracts": "workspace:*",
+    "js-yaml": "^4.1.1",
+    "@itookit/kanban": "workspace:*",
+    "@itookit/mail": "workspace:*"
+  },
+  "devDependencies": {
+    "@itookit/vfsdriver-indexeddb": "workspace:*",
+    "@types/node": "^20.19.25",
+    "fake-indexeddb": "^6.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "@itookit/vfs-ui": "workspace:*",
+    "@types/js-yaml": "^4.0.9"
+  }
+}

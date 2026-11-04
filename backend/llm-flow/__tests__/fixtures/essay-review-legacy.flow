@@ -1,0 +1,493 @@
+{
+  "id": "essay-review-isolated",
+  "name": "作文四维评审",
+  "draftVersion": 1,
+  "updatedAt": 0,
+  "layout": {
+    "nodes": {
+      "collect": {
+        "x": 20,
+        "y": 250
+      },
+      "review": {
+        "x": 320,
+        "y": 250
+      },
+      "check-content": {
+        "x": 640,
+        "y": 20
+      },
+      "check-structure": {
+        "x": 640,
+        "y": 200
+      },
+      "check-language": {
+        "x": 640,
+        "y": 380
+      },
+      "check-logic": {
+        "x": 640,
+        "y": 560
+      },
+      "aggregate": {
+        "x": 960,
+        "y": 250
+      },
+      "judge": {
+        "x": 1280,
+        "y": 250
+      },
+      "report": {
+        "x": 1630,
+        "y": 200
+      },
+      "rewrite": {
+        "x": 1280,
+        "y": 510
+      }
+    },
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 0.65
+    }
+  },
+  "parameters": [
+    {
+      "name": "requirements",
+      "type": "string",
+      "required": true,
+      "onMissing": "interact"
+    },
+    {
+      "name": "essay",
+      "type": "string",
+      "required": true,
+      "onMissing": "interact"
+    },
+    {
+      "name": "maxRounds",
+      "type": "number",
+      "required": true,
+      "default": 10,
+      "minimum": 1,
+      "maximum": 1000,
+      "integer": true,
+      "description": "最多评审轮数"
+    },
+    {
+      "name": "maxConcurrency",
+      "type": "number",
+      "required": true,
+      "default": 4,
+      "minimum": 1,
+      "maximum": 4,
+      "integer": true,
+      "description": "同时执行的检查数"
+    },
+    {
+      "name": "passScore",
+      "type": "number",
+      "required": true,
+      "default": 9,
+      "minimum": 0,
+      "maximum": 10,
+      "description": "各项达标分数"
+    },
+    {
+      "name": "maxExchanges",
+      "type": "number",
+      "required": true,
+      "default": 4,
+      "minimum": 2,
+      "maximum": 100,
+      "integer": true,
+      "description": "每个检查节点最多模型交互次数，包含工具调用后的续答和格式修复；与评审轮数独立"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "collect",
+      "name": "补全作文输入",
+      "plugin": "builtin.input",
+      "pluginVersion": "1.0.0",
+      "inputs": {},
+      "config": {
+        "prompt": "请补充以下缺失或无效的内容：",
+        "param": {
+          "requirements": {
+            "type": "string",
+            "label": "作文要求",
+            "nonBlank": true,
+            "widget": "textarea"
+          },
+          "essay": {
+            "type": "string",
+            "label": "作文内容",
+            "nonBlank": true,
+            "widget": "textarea"
+          },
+          "passScore": {
+            "type": "number",
+            "default": 9,
+            "widget": "number"
+          }
+        }
+      },
+      "outputPolicy": {
+        "includeInRunOutput": false,
+        "publishToHistory": false
+      }
+    },
+    {
+      "id": "review",
+      "name": "路由：选择待检查项",
+      "plugin": "builtin.route",
+      "pluginVersion": "3.0.0",
+      "inputs": {},
+      "config": {
+        "mode": "multicast",
+        "maxConcurrency": "${params.maxConcurrency}",
+        "context": {
+          "history": "none"
+        },
+        "requireNoHistory": true,
+        "invocationDefaults": {
+          "prompt": "作文要求：${param.requirements}\n作文内容：${vars.essay}\n请根据你的 system prompt 中的职责进行检查，返回 score、issues、suggestions。",
+          "context": {
+            "history": "none"
+          },
+          "outputContract": {
+            "format": "json",
+            "schema": {
+              "type": "object",
+              "required": [
+                "score",
+                "issues",
+                "suggestions"
+              ],
+              "properties": {
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 10
+                },
+                "issues": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "suggestions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "validate": {
+              "kind": "and",
+              "args": [
+                {
+                  "kind": "gte",
+                  "args": [
+                    {
+                      "kind": "path",
+                      "path": [
+                        "value",
+                        "score"
+                      ]
+                    },
+                    {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  ]
+                },
+                {
+                  "kind": "lte",
+                  "args": [
+                    {
+                      "kind": "path",
+                      "path": [
+                        "value",
+                        "score"
+                      ]
+                    },
+                    {
+                      "kind": "literal",
+                      "value": 10
+                    }
+                  ]
+                }
+              ]
+            },
+            "onInvalid": "repair",
+            "retries": 3
+          },
+          "connectionId": "default"
+        }
+      },
+      "outputPolicy": {
+        "includeInRunOutput": false,
+        "publishToHistory": false
+      }
+    },
+    {
+      "id": "check-content",
+      "name": "审题与内容检查",
+      "plugin": "builtin.check",
+      "pluginVersion": "1.0.0",
+      "inputs": {},
+      "capabilities": [],
+      "config": {
+        "approval": "none",
+        "maxExchanges": "${param.maxExchanges}",
+        "temperature": 0,
+        "key": "content",
+        "systemPrompt": "执行审题与内容检查。按作文要求评审作文，给出0到10分的score、具体issues和suggestions。只输出符合schema的JSON，不修改作文，不参考其他检查评分。"
+      }
+    },
+    {
+      "id": "check-structure",
+      "name": "结构主旨检查",
+      "plugin": "builtin.check",
+      "pluginVersion": "1.0.0",
+      "inputs": {},
+      "capabilities": [],
+      "config": {
+        "approval": "none",
+        "maxExchanges": "${param.maxExchanges}",
+        "temperature": 0,
+        "key": "structure",
+        "systemPrompt": "执行结构主旨检查。按作文要求评审作文，给出0到10分的score、具体issues和suggestions。只输出符合schema的JSON，不修改作文，不参考其他检查评分。"
+      }
+    },
+    {
+      "id": "check-language",
+      "name": "描写语言检查",
+      "plugin": "builtin.check",
+      "pluginVersion": "1.0.0",
+      "inputs": {},
+      "capabilities": [],
+      "config": {
+        "approval": "none",
+        "maxExchanges": "${param.maxExchanges}",
+        "temperature": 0,
+        "key": "language",
+        "systemPrompt": "执行描写语言检查。按作文要求评审作文，给出0到10分的score、具体issues和suggestions。只输出符合schema的JSON，不修改作文，不参考其他检查评分。"
+      }
+    },
+    {
+      "id": "check-logic",
+      "name": "逻辑一致性检查",
+      "plugin": "builtin.check",
+      "pluginVersion": "1.0.0",
+      "inputs": {},
+      "capabilities": [],
+      "config": {
+        "approval": "none",
+        "maxExchanges": "${param.maxExchanges}",
+        "temperature": 0,
+        "key": "logic",
+        "systemPrompt": "执行逻辑一致性检查。按作文要求评审作文，给出0到10分的score、具体issues和suggestions。只输出符合schema的JSON，不修改作文，不参考其他检查评分。"
+      }
+    },
+    {
+      "id": "aggregate",
+      "name": "汇总：保留各项最新结果",
+      "plugin": "builtin.aggregate",
+      "pluginVersion": "2.0.0",
+      "config": {
+        "strategy": "latest"
+      },
+      "inputs": {}
+    },
+    {
+      "id": "judge",
+      "name": "判断：达标或达到轮数上限",
+      "plugin": "builtin.judge",
+      "pluginVersion": "1.0.0",
+      "config": {
+        "maxRounds": "${params.maxRounds}",
+        "threshold": "${param.passScore}",
+        "metric": "score"
+      },
+      "inputs": {},
+      "outputPolicy": {
+        "includeInRunOutput": false,
+        "publishToHistory": false
+      }
+    },
+    {
+      "id": "rewrite",
+      "name": "根据评审意见修改作文",
+      "plugin": "builtin.revise",
+      "pluginVersion": "1.0.0",
+      "inputs": {},
+      "capabilities": [],
+      "config": {
+        "key": "rewrite",
+        "systemPrompt": "你是作文修改员。根据四维评审意见修改作文，保持原题意、事实和作者立场。只输出一个符合 schema 的 JSON 对象，essay 为完整修改稿。不得添加 Markdown 代码块或解释。essay 字符串内的换行、双引号、反斜杠必须按 JSON 规则转义，不得截断输出。",
+        "prompt": "作文要求：${param.requirements}\n当前作文：${vars.essay}\n本轮评审意见：${state.results}\n请针对这些意见改写作文，返回完整的 essay。",
+        "fields": {
+          "essay": {
+            "type": "string",
+            "required": true,
+            "nonBlank": true
+          }
+        },
+        "context": {
+          "history": "none"
+        },
+        "approval": "none",
+        "maxExchanges": "${param.maxExchanges}",
+        "outputContract": {
+          "format": "json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "essay": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "essay"
+            ],
+            "additionalProperties": false
+          },
+          "onInvalid": "repair",
+          "retries": 3
+        }
+      },
+      "assign": {
+        "essay": "${output.essay}"
+      }
+    },
+    {
+      "id": "report",
+      "name": "最终评审状态",
+      "plugin": "builtin.transform",
+      "pluginVersion": "1.0.0",
+      "inputs": {},
+      "config": {
+        "operation": "identity",
+        "type": "json"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "collect-review",
+      "from": "collect",
+      "to": "review",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "review-check-content",
+      "from": "review",
+      "to": "check-content",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "check-content-aggregate",
+      "from": "check-content",
+      "to": "aggregate",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "review-check-structure",
+      "from": "review",
+      "to": "check-structure",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "check-structure-aggregate",
+      "from": "check-structure",
+      "to": "aggregate",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "review-check-language",
+      "from": "review",
+      "to": "check-language",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "check-language-aggregate",
+      "from": "check-language",
+      "to": "aggregate",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "review-check-logic",
+      "from": "review",
+      "to": "check-logic",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "check-logic-aggregate",
+      "from": "check-logic",
+      "to": "aggregate",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "aggregate-judge",
+      "from": "aggregate",
+      "to": "judge",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "judge-rewrite",
+      "from": "judge",
+      "to": "rewrite",
+      "kind": "control",
+      "output": "repeat",
+      "input": "input"
+    },
+    {
+      "id": "judge-report",
+      "from": "judge",
+      "to": "report",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    },
+    {
+      "id": "rewrite-review",
+      "from": "rewrite",
+      "to": "review",
+      "kind": "data",
+      "output": "result",
+      "input": "input"
+    }
+  ],
+  "variables": {
+    "essay": {
+      "type": "string",
+      "initial": "${param.essay}"
+    }
+  }
+}

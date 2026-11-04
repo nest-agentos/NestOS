@@ -1,0 +1,10 @@
+version: 1
+title: 临时进程与验收服务
+steps:
+  - title: 运行条件
+    description: Linux、Node 和 /usr/bin/bwrap；需允许非特权 user/PID namespace。不可用时返回失败，不退回无保护运行。
+  - title: 运行临时验收
+    description: 工具包预装后默认停用，可在工具箱为当前用户启用。将预览服务和测试驱动放在同一次 temporary.run 内。测试结束、取消、超时或宿主异常退出都会回收整个临时执行容器。正式部署与可续办 Session 使用原有生命周期。
+    command: node tools/temporary-process/node/cli.mjs run --scope validation --timeout-ms 600000 -- bash -c 'node preview.mjs & node browser-check.mjs'
+  - title: 启动恢复
+    description: httpd 仓库启动器和已安装工具包初始化时核对持久记录。保留仍有存活所有者的有效执行，只回收已过期或孤立的受管临时资源。身份不明时保留 unknown 并报告，不按端口或进程名杀进程。

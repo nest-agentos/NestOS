@@ -1,0 +1,85 @@
+version: 1
+name: feature-development
+goal: 分析项目并产出实现建议
+
+workspace:
+  root: ../..
+  state_dir: .nestos
+
+providers:
+  - id: anthropic
+    name: Anthropic
+    implementation: anthropic
+    base_url: https://api.anthropic.com
+    api_key_env: ANTHROPIC_API_KEY
+    models:
+      - id: claude-sonnet-4-6
+        name: Claude Sonnet
+        tier: standard
+        supports_tools: true
+
+connections:
+  - id: default
+    provider: anthropic
+    tiers:
+      standard: claude-sonnet-4-6
+
+agents:
+  # Optional per-agent LLM controls:
+  #   temperature: 0.7            # sampling temperature (>= 0)
+  #   max_tokens: 4096            # max completion tokens
+  #   thinking: true              # enable extended thinking
+  #   reasoning_effort: medium    # low | medium | xhigh
+  #   stream: false               # non-streaming LLM calls
+  - id: analyst
+    name: Analyst
+    connection: default
+    model_tier: standard
+    system_prompt: 分析现有实现并给出有证据的结论。
+    tools: [file_read, glob_search, grep_search]
+
+  - id: developer
+    name: Developer
+    connection: default
+    model_tier: standard
+    system_prompt: 根据输入完成实现，并运行必要测试。
+    tools: [file_read, file_write, file_edit, glob_search, grep_search, bash]
+
+tasks:
+  # Optional per-task controls:
+  #   priority: 10                 # higher schedules first (>= 0)
+  #   budget: { tokens: 20000 }    # hard token limit per node (LLM usage)
+  - id: analyze
+    agent: analyst
+    description: 分析与目标相关的代码，输出实施建议。
+    workspace_access: read
+    outputs:
+      result: text
+
+  - id: implement
+    agent: developer
+    description: 根据分析建议完成目标并验证。
+    depends_on: [analyze]
+    inputs:
+      analysis: ${tasks.analyze.outputs.result}
+    workspace_access: write
+    outputs:
+      result: text
+
+result:
+  task: implement
+  output: result
+
+runtime:
+  max_concurrency: 4
+  max_duration: 1h
+
+sandbox:
+  mode: oci
+  engine: auto
+  image: nestos-sandbox:v1
+  network: none
+  limits:
+    cpus: 2
+    memory: 2g
+    pids: 256

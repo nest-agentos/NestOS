@@ -1,0 +1,156 @@
+import yaml from 'js-yaml';
+import { afterEach, expect, it } from 'vitest';
+import { MemoryBackend } from '@itookit/vfs-core';
+import { FlowCommand } from '@itookit/llm-flow/contracts';
+import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
+import { NestosInitialFiles } from '../src/presets/initial-files';
+import demo from '../src/presets/digital-twin-demo.json';
+import { FlowLibraryCommand } from '@itookit/app-contracts';
+import { createNestosFlowLibrary } from '../src/presets/flow-library';
+import { externalFlowLibrary } from './fixtures/flow-library';
+
+const cleanup: Array<() => Promise<void>> = [];
+afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
+async function setup() {
+    const runtime = await createApplicationRuntime({ backend: new MemoryBackend(), digitalTwinAutoStart: false });
+    cleanup.push(() => runtime.dispose());
+    const notes = await runtime.vfs.openFileSystem('/home/admin/notes');
+    return { runtime, notes, library: new NestosInitialFiles(runtime.commandBus, notes) };
+}
+it('lists exact files, restores only selected notes and preserves edits', async () => {
+    const { runtime, notes, library } = await setup();
+    await runtime.flowEngine.engine.driver.delete(['/essay-review.flow']);
+    const entries = await library.list();
+    expect(entries.map(entry => entry.name)).toEqual(['readme.md', 'person-agent-demo.md', 'flow文件格式说明.md', 'anki/学习示例-背单词.md', 'anki/学习示例-背概念.md', 'anki/学习示例-背古文.md', 'Anki 提示词模板', 'essay-review.flow', 'anki-generate.flow']);
+    expect(entries[1]).toMatchObject({ path: '/home/admin/notes/person-agent-demo.md', exists: false });
+    expect(await library.restore(['note:demo'])).toEqual([{ id: 'note:demo', status: 'restored' }]);
+    expect(await notes.driver.readContent('/person-agent-demo.md', { encoding: 'utf-8' })).toBe(demo.content);
+    expect(await runtime.commandBus.execute(FlowCommand.DraftLoad, { id: 'essay-review' })).toBeNull();
+    await notes.driver.writeContent('/person-agent-demo.md', 'Personal edit');
+    expect(await library.restore(['note:demo'])).toEqual([{ id: 'note:demo', status: 'preserved' }]);
+    expect(await notes.driver.readContent('/person-agent-demo.md', { encoding: 'utf-8' })).toBe('Personal edit');
+    await notes.driver.delete(['/person-agent-demo.md']);
+    expect(await library.restore(['note:demo'])).toEqual([{ id: 'note:demo', status: 'restored' }]);
+    expect(await notes.driver.readContent('/person-agent-demo.md', { encoding: 'utf-8' })).toBe(demo.content);
+});
+it('restores selected Flow templates through real commands and does not create unselected notes', async () => {
+    const { runtime, notes, library } = await setup();
+    await runtime.flowEngine.engine.driver.delete(['/essay-review.flow']);
+    expect(await library.restore(['flow:essay-review', 'flow:anki-generate'])).toEqual([
+        { id: 'flow:essay-review', status: 'restored' }, { id: 'flow:anki-generate', status: 'restored' },
+    ]);
+    expect(await runtime.commandBus.execute(FlowCommand.DraftLoad, { id: 'essay-review' })).toBeTruthy();
+    expect(await notes.driver.exists('/person-agent-demo.md')).toBe(false);
+    expect(await library.restore(['flow:essay-review'])).toEqual([{ id: 'flow:essay-review', status: 'restored' }]);
+});
+it('preserves existing external definitions without adding them to initial recovery', async () => {
+    const { runtime, notes, library } = await setup();
+    const [template] = externalFlowLibrary();
+    await runtime.commandBus.execute(FlowLibraryCommand.Restore, { templates: [template] });
+    const flow = await runtime.commandBus.execute<any>(FlowCommand.DraftLoad, { id: template.id });
+    await runtime.commandBus.execute(FlowCommand.DraftSave, { draft: { ...flow, name: 'Personal external flow' }, expectedDraftVersion: flow.draftVersion });
+    expect((await library.list()).some(entry => entry.id === 'flow:' + template.id)).toBe(false);
+    await expect(library.restore(['flow:' + template.id])).rejects.toThrow('INITIAL_FILE_UNKNOWN');
+    await library.restore(['flow:essay-review']);
+    expect(await runtime.commandBus.execute(FlowCommand.DraftLoad, { id: template.id })).toMatchObject({ name: 'Personal external flow' });
+    expect(await notes.driver.exists('/person-agent-demo.md')).toBe(false);
+});
+it('rejects unknown files before any write and reports per-file failures without hiding successful writes', async () => {
+    const { runtime, notes, library } = await setup();
+    await expect(library.restore(['note:demo', '../private'])).rejects.toThrow('INITIAL_FILE_UNKNOWN');
+    expect(await notes.driver.exists('/person-agent-demo.md')).toBe(false);
+    const failing = new NestosInitialFiles({ execute: async () => { throw new Error('Flow unavailable'); } } as typeof runtime.commandBus, notes);
+    expect(await failing.restore(['note:demo', 'flow:essay-review'])).toEqual([
+        { id: 'note:demo', status: 'restored' }, { id: 'flow:essay-review', status: 'failed', error: 'Flow unavailable' },
+    ]);
+});
+
+it('explicitly restores external definitions and publishes callable dependencies', async () => {
+    const { runtime } = await setup();
+    const templates = externalFlowLibrary();
+    expect(await runtime.commandBus.execute(FlowLibraryCommand.Restore, { templates })).toBe(3);
+    for (const entry of templates.slice(1)) {
+        const revision = await runtime.commandBus.execute(FlowCommand.RevisionGet, { id: entry.id });
+        expect(revision).toMatchObject({ dependencyLocks: { invoke: { flowId: 'shared-child', revision: expect.any(Number) } } });
+    }
+});
+it('allows concurrent explicit note recovery without overwriting the winning write', async () => {
+    const { runtime, notes, library } = await setup();
+    const other = new NestosInitialFiles(runtime.commandBus, notes);
+    const results = (await Promise.all([library.restore(['note:demo']), other.restore(['note:demo'])])).flat();
+    expect(results.map(result => result.status).sort()).toEqual(['preserved', 'restored']);
+    expect(await notes.driver.readContent('/person-agent-demo.md', { encoding: 'utf-8' })).toBe(demo.content);
+});
+
+it('owns publication in the application recovery command and leaves existing edits unpublished', async () => {
+    const { runtime } = await setup();
+    const template = createNestosFlowLibrary()[0];
+    await runtime.flowEngine.engine.driver.delete([`/${template.id}.flow`]);
+    expect(await runtime.commandBus.execute(FlowLibraryCommand.Restore, { templates: [template] })).toBe(1);
+    const before = await runtime.commandBus.execute(FlowCommand.RevisionGet, { id: template.id });
+    const draft = await runtime.commandBus.execute<any>(FlowCommand.DraftLoad, { id: template.id });
+    await runtime.commandBus.execute(FlowCommand.DraftSave, { draft: { ...draft, name: 'Personal changes' }, expectedDraftVersion: draft.draftVersion });
+    expect(await runtime.commandBus.execute(FlowLibraryCommand.Restore, { templates: [template] })).toBe(0);
+    expect(await runtime.commandBus.execute(FlowCommand.RevisionGet, { id: template.id })).toEqual(before);
+    expect(await runtime.commandBus.execute(FlowCommand.DraftLoad, { id: template.id })).toMatchObject({ name: 'Personal changes' });
+});
+
+it('replaces selected built-in drafts with current roles and steps and preserves published history', async () => {
+    const {runtime, library} = await setup();
+    const before = await runtime.commandBus.execute<any>(FlowCommand.RevisionGet, {id: 'essay-review'});
+    const draft = await runtime.commandBus.execute<any>(FlowCommand.DraftLoad, {id: 'essay-review'});
+    await runtime.commandBus.execute(FlowCommand.DraftSave, {draft: {...draft, name: 'Old custom version', layout: {},
+        parameters: draft.parameters.map(({role, inputSource, ...field}: any) => field)}, expectedDraftVersion: draft.draftVersion});
+    expect(await library.restore(['flow:essay-review'])).toEqual([{id: 'flow:essay-review', status: 'restored'}]);
+    const saved = await runtime.commandBus.execute<any>(FlowCommand.DraftLoad, {id: 'essay-review'});
+    expect(saved.layout.steps.length).toBeGreaterThan(0);
+    expect(saved.parameters.find((field: any) => field.name === 'essay')).toMatchObject({role: 'input', inputSource: 'composer.text'});
+    const after = await runtime.commandBus.execute<any>(FlowCommand.RevisionGet, {id: 'essay-review'});
+    expect(after.revision).toBeGreaterThan(before.revision);
+    expect(await runtime.commandBus.execute(FlowCommand.RevisionGet, {id: 'essay-review', revision: before.revision})).toEqual(before);
+});
+
+it('reports replacement failures without publishing or changing the existing draft', async () => {
+    const {runtime, notes} = await setup();
+    const before = await runtime.commandBus.execute(FlowCommand.RevisionGet, {id: 'essay-review'});
+    const draft = await runtime.commandBus.execute(FlowCommand.DraftLoad, {id: 'essay-review'});
+    const commands = {execute: async (command: string, args: unknown) => {
+        if (command === FlowCommand.DraftSave) throw new Error('FLOW_DRAFT_VERSION_CONFLICT');
+        return runtime.commandBus.execute(command, args);
+    }} as typeof runtime.commandBus;
+    const library = new NestosInitialFiles(commands, notes);
+    expect(await library.restore(['flow:essay-review'])).toEqual([
+        {id: 'flow:essay-review', status: 'failed', error: 'FLOW_DRAFT_VERSION_CONFLICT'},
+    ]);
+    expect(await runtime.commandBus.execute(FlowCommand.RevisionGet, {id: 'essay-review'})).toEqual(before);
+    expect(await runtime.commandBus.execute(FlowCommand.DraftLoad, {id: 'essay-review'})).toEqual(draft);
+});
+
+it('restores the Flow authoring guide as a note and validates its complete example', async () => {
+    const {runtime, notes, library} = await setup();
+    expect(await library.restore(['note:flow-format'])).toEqual([{id: 'note:flow-format', status: 'restored'}]);
+    const content = await notes.driver.readContent('/flow文件格式说明.md', {encoding: 'utf-8'});
+    expect(content).toContain('请依据这份 Flow 文件格式说明');
+    const example = JSON.parse(String(content).match(/```json\n([\s\S]*?)\n```/)![1]);
+    expect(await runtime.commandBus.execute(FlowCommand.DraftValidate, example)).toMatchObject({valid: true});
+    await notes.driver.writeContent('/flow文件格式说明.md', 'My additions');
+    expect(await library.restore(['note:flow-format'])).toEqual([{id: 'note:flow-format', status: 'preserved'}]);
+    expect(await notes.driver.readContent('/flow文件格式说明.md', {encoding: 'utf-8'})).toBe('My additions');
+});
+
+it('seeds study examples and prompts, preserves edits, and explicitly restores deleted notes', async () => {
+    const {notes, library} = await setup();
+    expect(await notes.driver.exists('/anki/学习示例-背概念.md')).toBe(true);
+    const prompts = yaml.load(String(await notes.driver.readContent('/.nestos/cloze/prompts.yaml', {encoding:'utf-8'}))) as Array<{id:string;name:string;content:string}>;
+    expect(prompts.map((item: {name:string}) => item.name)).toEqual(['背单词','背概念','背古文']);
+    await notes.driver.writeContent('/anki/学习示例-背概念.md', 'Personal');
+    expect(await library.restore(['note:study-concepts'])).toEqual([{id:'note:study-concepts',status:'preserved'}]);
+    await notes.driver.delete(['/anki/学习示例-背古文.md']);
+    const {seedStudyFiles} = await import('../src/presets/study-files'); await seedStudyFiles(notes);
+    expect(await notes.driver.exists('/anki/学习示例-背古文.md')).toBe(false);
+    expect(await library.restore(['note:study-classical-chinese'])).toEqual([{id:'note:study-classical-chinese',status:'restored'}]);
+    await notes.driver.writeContent('/.nestos/cloze/prompts.yaml', JSON.stringify([{id:'custom',name:'Mine',content:'Mine'}]));
+    expect(await library.restore(['note:study-prompts'])).toEqual([{id:'note:study-prompts',status:'restored'}]);
+    expect(yaml.load(String(await notes.driver.readContent('/.nestos/cloze/prompts.yaml',{encoding:'utf-8'})))).toEqual(prompts);
+    expect(await notes.driver.readContent('/anki/学习示例-背概念.md',{encoding:'utf-8'})).toBe('Personal');
+});

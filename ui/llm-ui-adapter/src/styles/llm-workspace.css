@@ -1,0 +1,196 @@
+/* @file: llm-ui/styles/llm-workspace.css */
+/* =========================================
+   Workspace layout, welcome, indicators, animations, streaming optimizations.
+   Sections extracted: titlebar/status/branch → workspace-titlebar.css
+                         sessions/nodes/errors → chat-nodes.css
+                         TTY panel            → tty-panel.css
+   ========================================= */
+
+/* --- Workspace Layout --- */
+.llm-ui-workspace {
+    --llm-chat-accent: var(--llm-color-primary, #4263eb);
+    --llm-chat-border: var(--llm-border-color, #d8dce3);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background-color: var(--llm-bg-primary);
+    color: var(--llm-text-primary);
+    font-family: var(--llm-font-family);
+    overflow: hidden;
+}
+
+.llm-ui-workspace__workbench {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.llm-ui-workspace__history {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-width: 0;
+    padding: 28px max(var(--llm-history-padding, 20px), calc((100% - var(--llm-content-width)) / 2));
+    scrollbar-width: thin;
+    overflow-anchor: none;
+    scroll-behavior: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    contain: layout style;
+    will-change: scroll-position;
+}
+
+
+.llm-ui-workspace__input {
+    flex-shrink: 0;
+    padding: var(--llm-input-padding-y, 16px) var(--llm-input-padding-x, 20px);
+    /* 键盘弹出时兼容 iOS 底部安全区 */
+    padding-bottom: max(var(--llm-input-padding-y, 16px), env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    width: 100%;
+    max-width: calc(var(--llm-content-width) + 2 * var(--llm-input-padding-x));
+    margin-inline: auto;
+    background: var(--llm-bg-primary);
+    z-index: 10;
+}
+
+@media (max-width: 480px) {
+    .llm-ui-workspace__history {
+        scroll-behavior: auto;
+    }
+}
+
+/* --- File Badges --- */
+.llm-ui-file-badge {
+    display: inline-block;
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: var(--llm-radius-sm);
+    margin-right: 6px;
+    margin-bottom: 4px;
+}
+
+/* --- Welcome --- */
+.llm-ui-welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 36px 20px;
+    color: var(--llm-text-secondary);
+    text-align: center;
+}
+
+.llm-ui-welcome__eyebrow {
+    color: var(--llm-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+}
+
+.llm-ui-welcome h2 {
+    margin: 10px 0;
+    font-size: clamp(25px, 3vw, 34px);
+    font-weight: 700;
+    letter-spacing: -.025em;
+    color: var(--llm-text-primary);
+}
+
+.llm-ui-welcome p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.llm-ui-welcome__prompts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    width: 100%;
+    margin-top: 34px;
+}
+
+.llm-ui-welcome__prompt {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 96px;
+    padding: 18px;
+    border: 1px solid var(--llm-border-color);
+    border-radius: 16px;
+    background: var(--llm-bg-primary);
+    color: var(--llm-text-primary);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.45;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: none;
+}
+
+.llm-ui-welcome__prompt:hover,
+.llm-ui-welcome__prompt:focus-visible {
+    border-color: var(--llm-text-muted);
+    background: var(--llm-bg-secondary);
+}
+
+.llm-ui-welcome__prompt:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+.llm-ui-welcome__prompt span { color: #6366f1; font-size: 18px; }
+
+@media (max-width: 600px) {
+    .llm-ui-welcome { padding: 24px 8px; }
+    .llm-ui-welcome__prompts { grid-template-columns: 1fr; gap: 8px; margin-top: 22px; }
+    .llm-ui-welcome__prompt { min-height: 52px; padding: 13px 15px; }
+}
+
+/* --- New Content Indicator --- */
+.llm-ui-new-content-indicator {
+    position: sticky;
+    bottom: 16px;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.llm-ui-new-content-btn {
+    pointer-events: auto;
+    background: var(--llm-color-primary);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    animation: llm-ui-btnBounce 0.5s ease-in-out;
+    transition: background var(--llm-transition-fast);
+}
+
+.llm-ui-new-content-btn:hover {
+    background: var(--llm-color-primary-hover);
+}
+
+/* --- Keyframe Animations --- */
+@keyframes llm-ui-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* --- Streaming Optimizations --- */
+.llm-ui-history--streaming .llm-ui-session,
+.llm-ui-history--streaming .llm-ui-node,
+.llm-ui-history--streaming .llm-ui-node__output {
+    transition: none !important;
+}
+
+.llm-ui-history--streaming .llm-ui-session {
+    animation: none !important;
+}

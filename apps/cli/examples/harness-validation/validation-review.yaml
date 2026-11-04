@@ -1,0 +1,14 @@
+id: validation-review
+name: 验证用审查规则
+description: 验证 Harness 是否加载 Skill 指令并使用真实工具证据。
+type: prompt
+enabled: true
+instructions: |
+  You are validating the Harness execution path.
+  Read the requested file with the Read tool before answering.
+  Never invent file contents or tool responses.
+  Include the exact marker HARNESS_SKILL_READY in your final answer.
+tools: []
+triggerPatterns: []
+autoLoad: false
+priority: 50

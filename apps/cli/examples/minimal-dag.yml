@@ -1,0 +1,25 @@
+version: 1
+name: child
+goal: Complete a two-node DAG
+workspace: {root: .}
+providers:
+  - id: local
+    implementation: openai-compatible
+    base_url: http://127.0.0.1:8080
+    default_path: /v1/chat/completions
+    api_key_env: MINIMAL_API_KEY
+    models: [{id: local-model}]
+connections: [{id: default, provider: local, tiers: {standard: local-model}}]
+agents: [{id: worker, connection: default}]
+tasks:
+  - id: first
+    agent: worker
+    description: List three checks for a small software change
+    outputs: {result: text}
+  - id: second
+    agent: worker
+    description: Summarize the upstream checks into a short review plan
+    depends_on: [first]
+    outputs: {result: text}
+result: {task: second, output: result}
+sandbox: {mode: native}

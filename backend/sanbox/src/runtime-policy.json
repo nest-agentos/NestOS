@@ -1,0 +1,11 @@
+{
+    "linux": {
+        "args": ["--die-with-parent", "--new-session", "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--cap-drop", "ALL"],
+        "runtimePaths": ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc/ld.so.cache", "/etc/localtime"],
+        "networkPaths": ["/etc/resolv.conf", "/etc/hosts", "/etc/ssl"]
+    },
+    "seatbelt": {
+        "rules": ["(version 1)", "(deny default)", "(allow process-exec)", "(allow process-fork)", "(allow signal (target self))", "(allow sysctl-read)", "(allow file-read-metadata)", "(allow file-write-data (literal \"/dev/null\"))"],
+        "runtimePaths": ["/System/Library", "/System/Cryptexes", "/System/Volumes/Preboot/Cryptexes", "/usr", "/bin", "/sbin", "/Library/Apple", "/private/var/db/dyld", "/private/etc/ld.so.cache", "/private/etc/localtime", "/dev/null", "/dev/zero", "/dev/random", "/dev/urandom"]
+    }
+}

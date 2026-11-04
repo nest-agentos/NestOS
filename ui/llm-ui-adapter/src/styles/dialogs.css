@@ -1,0 +1,253 @@
+/* @file: llm-ui/styles/dialogs.css */
+/* =========================================
+   对话框组件 (Dialogs)
+   ========================================= */
+
+/* --- Recovery 对话框 --- */
+.llm-recovery-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.llm-recovery-dialog__overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.llm-recovery-dialog__content {
+    position: relative;
+    background: var(--llm-bg-primary);
+    border-radius: var(--llm-radius-xl);
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    animation: llm-ui-slideIn 0.3s ease;
+}
+
+.llm-recovery-dialog__content h3 {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--llm-text-primary);
+}
+
+.llm-recovery-dialog__content p {
+    margin: 0 0 16px;
+    color: var(--llm-text-secondary);
+    font-size: 14px;
+}
+
+.llm-recovery-dialog__list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.llm-recovery-dialog__list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--llm-bg-secondary);
+    border-radius: var(--llm-radius-md);
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.llm-recovery-dialog__list .session-status {
+    color: var(--llm-color-primary);
+    font-weight: 500;
+}
+
+.llm-recovery-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.llm-recovery-dialog__actions .btn {
+    padding: 8px 16px;
+    border-radius: var(--llm-radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all var(--llm-transition-normal);
+}
+
+.llm-recovery-dialog__actions .btn--secondary {
+    background: var(--llm-bg-hover);
+    color: var(--llm-text-primary);
+}
+
+.llm-recovery-dialog__actions .btn--primary {
+    background: var(--llm-color-primary);
+    color: white;
+}
+
+.llm-recovery-dialog__actions .btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* --- Branch Name 对话框 --- */
+.llm-branch-name-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.llm-branch-name-dialog__overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.llm-branch-name-dialog__content {
+    position: relative;
+    background: var(--llm-bg-primary);
+    border-radius: var(--llm-radius-xl);
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    animation: llm-ui-slideIn 0.3s ease;
+}
+
+.llm-branch-name-dialog__content h4 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--llm-text-primary);
+}
+
+.llm-branch-name-dialog__content p {
+    margin: 0 0 16px;
+    color: var(--llm-text-secondary);
+    font-size: 13px;
+}
+
+.llm-branch-name-dialog__content .llm-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--llm-border-color);
+    border-radius: var(--llm-radius-md);
+    font-size: 14px;
+    background: var(--llm-bg-primary);
+    color: var(--llm-text-primary);
+    margin-bottom: 16px;
+    outline: none;
+    transition: border-color var(--llm-transition-fast);
+    /* 覆盖 .llm-input 容器样式：此处是 input 元素 */
+    display: block;
+    flex-direction: unset;
+    box-shadow: none;
+    overflow: visible;
+}
+
+.llm-branch-name-dialog__content .llm-input:focus {
+    border-color: var(--llm-color-primary);
+    box-shadow: 0 0 0 3px rgba(var(--llm-color-primary-rgb), 0.1);
+}
+
+.llm-branch-name-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ≤480px：对话框改为底部 Sheet */
+@media (max-width: 480px) {
+    .llm-recovery-dialog,
+    .llm-branch-name-dialog,
+    .llm-confirm-dialog {
+        align-items: flex-end;
+    }
+
+    .llm-recovery-dialog__content,
+    .llm-branch-name-dialog__content,
+    .llm-confirm-dialog__content {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 16px 16px 0 0;
+        padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+    }
+}
+
+/* --- Confirm 对话框 --- */
+.llm-confirm-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.llm-confirm-dialog__overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.llm-confirm-dialog__content {
+    position: relative;
+    background: var(--llm-bg-primary);
+    border-radius: var(--llm-radius-xl);
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    animation: llm-ui-slideIn 0.3s ease;
+}
+
+.llm-confirm-dialog__content h4 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--llm-text-primary);
+}
+
+.llm-confirm-dialog__content p {
+    margin: 0 0 16px;
+    color: var(--llm-text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.llm-confirm-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}

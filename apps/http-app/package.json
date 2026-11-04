@@ -1,0 +1,49 @@
+{
+  "name": "@itookit/http-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "create:certs": "bash scripts/create-certificates.sh",
+    "dev": "node ../../scripts/httpd.mjs dev",
+    "build:ui": "vite build",
+    "build": "pnpm build:ui && tsup src/server/main.ts --format esm --platform node --out-dir dist-server --splitting",
+    "start": "node ../../scripts/httpd.mjs start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "node-pty": "^1.1.0",
+    "@itookit/common": "workspace:*",
+    "@itookit/app-core": "workspace:*",
+    "@itookit/app-shell": "workspace:*",
+    "@itookit/llm-ui-adapter": "workspace:*",
+    "@itookit/mdxeditor": "workspace:*",
+    "@itookit/ui-common-adapter": "workspace:*",
+    "@itookit/vfs-core": "workspace:*",
+    "@itookit/cells-driver": "workspace:*",
+    "@itookit/vfsdriver-local": "workspace:*",
+    "nestos-web": "workspace:*",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.8",
+    "@itookit/mdx-adapter": "workspace:*",
+    "@itookit/app-contracts": "workspace:*",
+    "@itookit/kernel-adapters": "workspace:*",
+    "@itookit/llm-flow": "workspace:*",
+    "@itookit/node-host": "workspace:*",
+    "@itookit/app-transport": "workspace:*",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "tsx": "^4.20.6",
+    "tsup": "^8.5.1",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

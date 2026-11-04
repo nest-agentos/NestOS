@@ -1,0 +1,36 @@
+{
+  "name": "@itookit/demo",
+  "private": true,
+  "version": "0.4.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.0",
+    "@codemirror/commands": "^6.10.0",
+    "@codemirror/lang-javascript": "^6.2.4",
+    "@codemirror/language": "^6.11.3",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.8",
+    "@itookit/app-settings": "workspace:*",
+    "@itookit/common": "workspace:*",
+    "@itookit/driver-llm": "workspace:*",
+    "@itookit/llm-ui-adapter": "workspace:*",
+    "@itookit/mdx-adapter": "workspace:*",
+    "@itookit/mdxeditor": "workspace:*",
+    "@itookit/ui-common-adapter": "workspace:*",
+    "@itookit/vfs-ui": "workspace:*",
+    "dexie": "^4.2.1",
+    "immer": "^10.2.0",
+    "marked": "^16.4.2",
+    "mermaid": "^11.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21"
+  }
+}

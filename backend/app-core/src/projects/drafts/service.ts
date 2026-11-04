@@ -1,0 +1,105 @@
+import {preparedTitle} from './title';
+import { FSError } from '@itookit/vfs-core';
+import type { ISessionRepository } from '@itookit/llm-session';
+import { type SessionSubmission } from '@itookit/llm-flow/contracts';
+import { hasCommittedSubmission } from '@itookit/llm-session';
+import type { ProjectDraftPromotion, ProjectDraftRecord, ProjectDraftComposer, DraftStore } from './contracts';
+
+/** Reconcile from durable evidence; notifications never create successor drafts. */
+export class ProjectDraftService {
+    private readonly listeners = new Set<(event: ProjectDraftPromotion) => void>();
+    constructor(private readonly store: (projectId: string) => DraftStore, private readonly sessions: Pick<ISessionRepository, 'ensureSession' | 'readDocument' | 'getManifest' | 'saveSessionSettings'>,
+        private readonly projectIds: () => Promise<string[]>, private readonly assertLocal?: (projectId: string, request?: Parameters<ProjectDraftComposer['prepare']>[0]) => Promise<string | void>,
+        private readonly remoteReceipt?: (projectId: string, record: ProjectDraftRecord) => Promise<ProjectDraftPromotion['remote'] | undefined>,
+        private readonly initializeExecution?: (sessionId: string) => Promise<void>,
+        private readonly assertResettable?: (projectId: string, record: ProjectDraftRecord) => Promise<void>) {}
+    async open(projectId: string, folder: string): Promise<ProjectDraftComposer> {
+        await this.reconcile(projectId);
+        const store = this.store(projectId), record = await store.load();
+        let identity = record.id;
+        let resumeOnly = record.state === 'submitting';
+        let locked = resumeOnly;
+        return {
+            get id() {return identity;},
+            get locked() {return locked;},
+            initialData: record.data,
+            refresh: async () => {
+                await this.reconcile(projectId);
+                const current = await this.store(projectId).load();
+                return current.id !== identity || (current.state === 'submitting') !== locked || await store.wasPromoted() ? this.open(projectId, folder) : undefined;
+            },
+            attachments: { put: content => store.putAttachment(content), read: id => store.readAttachment(id) },
+            move: async targetProjectId => {
+                if (!(await this.projectIds()).includes(targetProjectId)) throw new FSError('ENOENT', 'Target project not found');
+                const current = await this.store(projectId).load();
+                if (current.id === identity) await this.assertResettable?.(projectId, current);
+                if (!store.moveTo) throw new FSError('ECAPABILITY', 'Draft project switching is unavailable');
+                await store.moveTo(targetProjectId);
+            },
+            save: data => store.saveData(data), clear: async () => {
+                const current = await this.store(projectId).load();
+                if (current.id !== identity) throw new FSError('ECONFLICT', 'Project draft identity changed');
+                await this.assertResettable?.(projectId, current);
+                await store.reset(); identity = (await store.load()).id; resumeOnly = false; locked = false; return identity;
+            },
+            prepare: async request => {
+                const harnessConnectionId = await this.assertLocal?.(projectId, request) || undefined;
+                const intent = await store.begin(preparedTitle(request?.title), undefined, harnessConnectionId);
+                locked = true;
+                await this.sessions.ensureSession(intent.sessionId!, intent.title!, 'tauri', folder, null, {agentId: draftAgent(intent.data)});
+                if (harnessConnectionId) await this.sessions.saveSessionSettings(intent.sessionId!, {harnessConnectionId});
+                await this.initializeExecution?.(intent.sessionId!);
+                return { sessionId: intent.sessionId!, resumeOnly, submission: submissionOf(projectId, intent) };
+            },
+        };
+    }
+    async ensure(projectId: string): Promise<void> { await this.store(projectId).load(); }
+    onPromoted(listener: (event: ProjectDraftPromotion) => void): () => void {
+        this.listeners.add(listener); return () => this.listeners.delete(listener);
+    }
+    async submissionForSession(projectId: string, sessionId: string) {
+        await this.reconcile(projectId, sessionId);
+        const record = await this.store(projectId).load();
+        return record.state === 'submitting' && record.sessionId === sessionId && record.submissionId
+            ? submissionOf(projectId, record) : undefined;
+    }
+    async submitted(event: { sessionId: string; roundId: string; submission?: SessionSubmission }): Promise<void> {
+        if (event.submission?.source.kind !== 'project-draft' || event.submission.id !== event.roundId) return;
+        await this.reconcile(event.submission.source.ownerId, event.sessionId, event.roundId);
+    }
+    async recover(sessionId?: string, roundId?: string): Promise<void> {
+        for (const projectId of await this.projectIds()) await this.reconcile(projectId, sessionId, roundId);
+    }
+    async reconcile(projectId: string, sessionId?: string, roundId?: string): Promise<void> {
+        const draft = this.store(projectId), record = await draft.load();
+        const remote = await this.remoteReceipt?.(projectId, record);
+        if (remote) {this.publish(await draft.promote(remote)); return;}
+        if (record.remoteTarget || record.state !== 'submitting' || !record.sessionId || !record.submissionId) return;
+        if (sessionId && record.sessionId !== sessionId || roundId && record.submissionId !== roundId) return;
+        try {
+            if (!await hasCommittedSubmission(this.sessions, record.sessionId, submissionOf(projectId, record)!)) return;
+            const event = await draft.promote();
+            this.publish(event);
+        } catch (error) {
+            if (!(error instanceof FSError) || !['ENOENT', 'ECONFLICT'].includes(error.code)) throw error;
+        }
+    }
+    private publish(event?: ProjectDraftPromotion): void {
+        if (event) for (const listener of this.listeners) {
+            try {listener(event);} catch (error) {console.warn('Project draft notification failed', error);}
+        }
+    }
+}
+
+function submissionOf(projectId: string, record: ProjectDraftRecord): SessionSubmission | undefined {
+    return record.submissionId ? { id: record.submissionId, source: { kind: 'project-draft', ownerId: projectId, id: record.id } } : undefined;
+}
+function draftAgent(data: string): string | undefined {
+    try {
+        const config = JSON.parse(data).config;
+        if (config?.target?.kind === 'flow') return;
+        const id: unknown = config?.agentId;
+        return typeof id === 'string' && !!id.trim() && !id.startsWith('remote:') ? id : undefined;
+    }
+    catch { return undefined; }
+}

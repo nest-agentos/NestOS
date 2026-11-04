@@ -1,0 +1,227 @@
+/* ============================================
+   存储概览 - Storage Overview
+   ============================================ */
+.settings-storage-overview {
+    background: var(--st-bg-primary);
+    border: 2px solid var(--st-border-color);
+    border-radius: var(--st-radius-lg);
+    padding: var(--st-space-3xl);
+    margin-bottom: var(--st-space-2xl);
+}
+
+.settings-storage-visual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--st-space-3xl);
+}
+
+@media (max-width: 768px) {
+    .settings-storage-visual {
+        flex-direction: column;
+    }
+}
+
+/* 环形图表 */
+.settings-circular-chart {
+    display: block;
+    margin: 0 auto;
+    max-width: 80%;
+    max-height: 250px;
+}
+
+.settings-chart-bg {
+    fill: none;
+    stroke: var(--st-bg-tertiary);
+    stroke-width: 3.8;
+}
+
+.settings-chart-fill {
+    fill: none;
+    stroke: var(--st-color-primary);
+    stroke-width: 2.8;
+    stroke-linecap: round;
+    animation: settings-progress 1s ease-out forwards;
+}
+
+.settings-chart-text {
+    fill: var(--st-text-primary);
+    font-family: sans-serif;
+    font-size: 0.5em;
+    font-weight: bold;
+    text-anchor: middle;
+}
+
+@keyframes settings-progress {
+    0% { stroke-dasharray: 0 100; }
+}
+
+/* 存储统计 */
+.settings-stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-stat-item__label {
+    font-size: 0.85em;
+    color: var(--st-text-secondary);
+}
+
+.settings-stat-item__value {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--st-text-primary);
+}
+
+
+
+/* 冲突列表 */
+
+/* 高级操作区 */
+
+/* 模块选择器 */
+
+/* ============================================
+   快照列表 - Snapshots
+   ============================================ */
+.settings-snapshot-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.snapshot-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    background: var(--st-bg-tertiary);
+    border-radius: var(--st-radius-md);
+    border: 1px solid transparent;
+    transition: all 0.15s;
+}
+
+.snapshot-item:hover {
+    border-color: var(--st-border-color);
+    background: var(--st-bg-secondary);
+}
+
+.snapshot-item__icon {
+    font-size: 1.5rem;
+    margin-right: 12px;
+}
+
+.snapshot-item__info {
+    flex: 1;
+    min-width: 0;
+}
+
+.snapshot-item__title {
+    font-weight: 500;
+    margin: 0 0 4px 0;
+}
+
+.snapshot-item__meta {
+    font-size: 0.8rem;
+    color: var(--st-text-secondary);
+    margin: 0;
+}
+
+.settings-snapshot-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+/* ============================================
+   操作卡片 - Action Cards
+   ============================================ */
+.settings-storage-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--st-space-lg);
+    margin-bottom: var(--st-space-2xl);
+}
+
+.settings-action-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: var(--st-bg-tertiary);
+    border-radius: var(--st-radius-lg);
+    border: 1px solid var(--st-border-color);
+    transition: all 0.2s;
+}
+
+.settings-action-card:hover {
+    border-color: var(--st-color-primary);
+    box-shadow: var(--st-shadow-sm);
+}
+
+.settings-action-card__icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.settings-action-card__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-action-card__content h3 {
+    margin: 0 0 5px 0;
+    font-size: 1em;
+}
+
+.settings-action-card__content p {
+    margin: 0;
+    font-size: 0.8em;
+    color: var(--st-text-secondary);
+}
+
+.settings-action-card--danger {
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+}
+
+.settings-action-card--danger h3 {
+    color: #991b1b;
+}
+
+/* ============================================
+   连接状态卡片 - Connection Status
+   ============================================ */
+
+/* ============================================
+   文件队列 - File Queue
+   ============================================ */
+
+/* ============================================
+   响应式调整
+   ============================================ */
+@media (max-width: 768px) {
+    .settings-storage-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================
+   暗色模式补充
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    .settings-action-card--danger {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+}
+
+/* Storage overview stat grid */
+.settings-storage-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--st-space-md, 12px);
+}
+.modal-content-warning { padding: 12px; border-left: 3px solid var(--st-color-warning); background: var(--st-bg-secondary); line-height: 1.6; overflow-wrap: anywhere; }

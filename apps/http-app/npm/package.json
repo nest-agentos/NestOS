@@ -1,0 +1,44 @@
+{
+  "name": "nestos",
+  "version": "0.1.1",
+  "description": "NestOS: the NestOS HTTPS workspace for AI chat, agents, flows, Markdown documents and project files.",
+  "type": "module",
+  "bin": {
+    "nestos": "./bin/nestos.mjs"
+  },
+  "files": [
+    "bin",
+    "server",
+    "dist",
+    "release.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nest-agentos/NestOS.git",
+    "directory": "apps/http-app"
+  },
+  "homepage": "https://github.com/nest-agentos/NestOS/tree/main/apps/http-app",
+  "bugs": {
+    "url": "https://github.com/nest-agentos/NestOS/issues"
+  },
+  "keywords": [
+    "nestos",
+    "nestos",
+    "ai",
+    "chat",
+    "agents",
+    "markdown",
+    "https",
+    "workspace"
+  ],
+  "license": "ISC",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

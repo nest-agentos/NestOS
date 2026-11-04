@@ -1,0 +1,1253 @@
+/* @file: llm-ui/styles/llm-input.css */
+.llm-input__connection-notice {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    padding: 10px 12px 4px;
+    color: var(--llm-text-secondary);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.llm-input__connection-notice[hidden], .llm-input__connection-notice [hidden] { display: none; }
+.llm-input__connection-notice > span { flex: 1 1 220px; }
+.llm-input__connection-notice > button {
+    border: 0;
+    background: transparent;
+    padding: 2px 0;
+    color: var(--llm-color-primary);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.llm-input__connection-notice > button:focus-visible { outline: 2px solid var(--llm-color-primary); outline-offset: 3px; }
+/* =========================================
+   输入组件 (Input Component)
+   ========================================= */
+
+/* --- 主容器 --- */
+.llm-input {
+    display: flex;
+    flex-direction: column;
+    background: var(--llm-bg-primary);
+    border: 1px solid var(--llm-border-color);
+    border-radius: var(--llm-input-radius);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    transition: box-shadow var(--llm-transition-normal), border-color var(--llm-transition-normal);
+    position: relative;
+    overflow: visible;
+}
+
+.llm-input:focus-within {
+    border-color: var(--llm-text-muted);
+    box-shadow: 0 4px 12px -2px #0000000a;
+}
+
+/* --- 设置面板 --- */
+.llm-input__settings-panel {
+    background: var(--llm-settings-bg);
+    border-bottom: 1px solid var(--llm-border-color);
+    padding: 12px 16px;
+    overflow-y: auto;
+    max-height: min(520px, 65vh);
+    animation: llm-ui-slideDown 0.2s ease-out;
+}
+
+.llm-input__settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.llm-input__settings-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--llm-text-secondary);
+}
+
+.llm-input__settings-close {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--llm-text-muted);
+    border-radius: var(--llm-radius-sm);
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-input__settings-close:hover {
+    background: var(--llm-bg-hover);
+    color: var(--llm-text-primary);
+}
+
+.llm-input__settings-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.llm-input__setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.llm-input__flow-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+}
+
+.llm-input__flow-id,
+.llm-input__branch-mode,
+.llm-input__retention-mode {
+    min-height: 30px;
+    border: 1px solid var(--llm-border, #d0d7de);
+    border-radius: 6px;
+    background: var(--llm-bg, #fff);
+    color: inherit;
+    padding: 4px 8px;
+}
+
+.llm-input__retention-mode { grid-column: 1 / -1; }
+
+/* Inline variant: toggle + label + optional sub-control on a single row */
+.llm-input__setting-row--inline {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.llm-input__setting-spacer {
+    flex: 1;
+    min-width: 12px;
+}
+
+.llm-input__setting-sub {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: var(--llm-text-secondary);
+}
+
+.llm-input__setting-sub .llm-input__cwd-input {
+    width: 130px;
+    padding: 3px 6px;
+    font-size: 0.8rem;
+    border: 1px solid var(--llm-border);
+    border-radius: 4px;
+    background: var(--llm-bg-input);
+    color: var(--llm-text-primary);
+}
+
+.llm-input__setting-sub .llm-input__reasoning-select {
+    font-size: 0.8rem;
+    padding: 2px 4px;
+}
+
+.llm-input__setting-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--llm-text-primary);
+}
+
+.llm-input__setting-icon {
+    font-size: 1rem;
+}
+
+.llm-input__setting-hint {
+    font-size: 0.75rem;
+    color: var(--llm-text-muted);
+    margin-top: 2px;
+}
+
+/* Model Select */
+.llm-input__model-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--llm-border-color);
+    border-radius: var(--llm-radius-lg);
+    font-size: 0.9rem;
+    background: var(--llm-bg-primary);
+    color: var(--llm-text-primary);
+    cursor: pointer;
+    transition: border-color var(--llm-transition-fast);
+}
+
+.llm-input__model-select:hover {
+    border-color: var(--llm-bg-hover);
+}
+
+.llm-input__model-select:focus {
+    outline: none;
+    border-color: var(--llm-color-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* History Slider */
+.llm-input__history-value {
+    margin-left: auto;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--llm-color-primary);
+    background: var(--llm-color-primary-bg);
+    padding: 2px 8px;
+    border-radius: var(--llm-radius-sm);
+}
+
+.llm-input__slider-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.llm-input__history-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--llm-bg-hover);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.llm-input__history-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--llm-color-primary);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform var(--llm-transition-fast), box-shadow var(--llm-transition-fast);
+}
+
+.llm-input__history-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.llm-input__history-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--llm-color-primary);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.llm-input__slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--llm-text-muted);
+}
+
+/* Preset Buttons */
+.llm-input__presets {
+    flex-direction: row !important;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.llm-input__presets .llm-input__setting-label {
+    font-size: 0.8rem;
+    color: var(--llm-text-secondary);
+    margin-right: 8px;
+}
+
+.llm-input__preset-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.llm-input__preset-btn {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    border: 1px solid var(--llm-border-color);
+    border-radius: 16px;
+    background: var(--llm-bg-primary);
+    color: var(--llm-text-secondary);
+    cursor: pointer;
+    transition: all var(--llm-transition-fast);
+}
+
+.llm-input__preset-btn:hover {
+    border-color: var(--llm-color-primary);
+    color: var(--llm-color-primary);
+}
+
+.llm-input__preset-btn.active {
+    background: var(--llm-color-primary);
+    border-color: var(--llm-color-primary);
+    color: white;
+}
+
+/* ── Tier Cards (settings panel, shows tier name + model name) ── */
+.llm-input__tier-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.llm-input__tier-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px;
+    border: 1px solid var(--llm-border-color);
+    border-radius: var(--llm-radius-md);
+    background: var(--llm-bg-primary);
+    color: var(--llm-text-secondary);
+    cursor: pointer;
+    transition: all var(--llm-transition-fast);
+    min-width: 0;
+    text-align: center;
+}
+
+.llm-input__tier-card:hover {
+    border-color: var(--llm-color-primary);
+    color: var(--llm-color-primary);
+    background: var(--llm-color-primary-bg);
+}
+
+.llm-input__tier-card.active {
+    border-color: var(--llm-color-primary);
+    background: var(--llm-color-primary);
+    color: white;
+}
+
+.llm-input__tier-card.active .llm-input__tier-card-model {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.llm-input__tier-card-name {
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.llm-input__tier-card-model {
+    font-size: 0.68rem;
+    color: var(--llm-text-muted);
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+/* --- 主输入区域 --- */
+.llm-input__main {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 10px 10px 6px;
+}
+
+/* ─── 底部工具栏（Claude.ai 风格）─────────────────────────────────────── */
+.llm-input__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 2px 2px;
+    gap: 4px;
+}
+
+.llm-input__toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+
+.llm-input__tool-execution-setting { margin-bottom: 10px; }
+.llm-input__tool-execution-setting[hidden] { display: none; }
+.llm-input__tools-enabled-toggle:focus-visible { outline: 2px solid var(--llm-color-primary); }
+
+.llm-input__execution-hint {
+    padding: 2px 4px;
+    color: var(--llm-text-secondary);
+    font-size: 11px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.llm-input__toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    gap: 4px;
+}
+
+/* ─── Agent Picker (custom combobox) ─────────────────────────────────────── */
+
+.llm-input__agent-picker {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.llm-input__agent-trigger {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--llm-text-secondary);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    min-width: 0;
+    max-width: 160px;
+}
+
+.llm-input__agent-trigger:hover {
+    background: var(--llm-bg-hover);
+}
+
+.llm-input__agent-trigger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.llm-input__agent-icon {
+    flex-shrink: 0;
+    font-size: 0.9em;
+}
+
+.llm-input__agent-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+}
+
+.llm-input__agent-meta {
+    display: none !important;
+}
+
+.llm-input__agent-chevron {
+    flex-shrink: 0;
+    font-size: 0.7em;
+    color: var(--llm-text-tertiary);
+    margin-left: 1px;
+}
+
+/* Agent dropdown is managed by PopupPanel (mounted on body, position:fixed) */
+
+/* ─── Prompt Picker (preset prompts quick-insert) ──────────────────────────── */
+
+.llm-input__prompt-picker-wrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.llm-input__prompt-picker {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 7px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--llm-radius-md);
+    font-size: 0.8rem;
+    color: var(--llm-text-secondary);
+    cursor: pointer;
+    transition: background var(--llm-transition-fast), color var(--llm-transition-fast);
+    white-space: nowrap;
+}
+
+.llm-input__prompt-picker:hover {
+    background: var(--llm-bg-hover);
+    color: var(--llm-text-primary);
+}
+
+.llm-input__prompt-picker:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.llm-input__prompt-picker-icon {
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.llm-input__prompt-picker-label {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.llm-input__prompt-picker-chevron {
+    font-size: 0.7em;
+    color: var(--llm-text-tertiary);
+}
+
+/* Prompt dropdown is managed by PopupPanel (mounted on body, position:fixed) */
+
+/* 输入框区域 */
+.llm-input__field-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.llm-input__field-wrapper--drag-active {
+    background: var(--llm-color-primary-bg);
+    border-radius: var(--llm-radius-lg);
+}
+
+/* 活动设置指示器 */
+.llm-input__active-settings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.llm-input__active-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    background: var(--llm-color-primary-bg);
+    color: var(--llm-color-primary-hover);
+    border-radius: var(--llm-radius-xl);
+    border: 1px solid var(--llm-color-primary-light);
+}
+
+.llm-input__active-badge[data-type="history"] {
+    background: var(--llm-color-warning-bg);
+    color: #92400e;
+    border-color: #fcd34d;
+}
+
+.llm-input__active-badge[data-type="connection"] {
+    cursor: pointer;
+}
+.llm-input__active-badge[data-type="connection"]:hover {
+    filter: brightness(0.95);
+}
+
+.llm-input__badge-clear {
+    background: none;
+    border: none;
+    padding: 0 2px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity var(--llm-transition-fast);
+    line-height: 1;
+}
+
+.llm-input__badge-clear:hover {
+    opacity: 1;
+}
+
+.llm-input__textarea {
+    width: 100%;
+    border: none;
+    background: transparent;
+    resize: none;
+    padding: 4px 0;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--llm-text-primary);
+    outline: none;
+    /* 2行起始，最大8行（约 200px） */
+    min-height: calc(1.5em * 2 + 8px);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.llm-input__textarea::placeholder {
+    color: var(--llm-text-placeholder);
+}
+
+/* 附件预览 */
+.llm-input__attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.llm-input__attachment-tag {
+    font-size: 0.75rem;
+    background: var(--llm-color-primary-bg);
+    color: var(--llm-color-primary-hover);
+    padding: 2px 8px;
+    border-radius: var(--llm-radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.llm-input__remove-btn {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity var(--llm-transition-fast);
+}
+
+.llm-input__remove-btn:hover {
+    opacity: 1;
+}
+
+/* OCR「提取文字」按钮(图片 chip 上) */
+.llm-input__ocr-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 0 2px;
+    font-size: 0.8rem;
+    line-height: 1;
+    transition: opacity var(--llm-transition-fast);
+}
+
+.llm-input__ocr-btn:hover {
+    opacity: 1;
+}
+
+/* 批量 OCR 按钮 — 附件区尾部，仅 ≥2 张图时出现 */
+.llm-input__ocr-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    border: 1px solid var(--llm-border-color);
+    border-radius: 4px;
+    background: none;
+    color: var(--llm-text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--llm-transition-fast), color var(--llm-transition-fast);
+    align-self: center;
+}
+
+.llm-input__ocr-all-btn:hover {
+    background: var(--llm-bg-tertiary);
+    color: var(--llm-text-primary);
+}
+
+/* Keep the active OCR connection readable without expanding the input width. */
+.llm-input__ocr-settings {
+    display: block;
+    max-width: 100%;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* More 按钮激活态 */
+.llm-input__btn--more.active {
+    background-color: var(--llm-bg-tertiary);
+    color: var(--llm-text-primary);
+}
+
+.llm-input__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--llm-radius-md);
+    background: transparent;
+    color: var(--llm-text-secondary);
+    cursor: pointer;
+    transition: all var(--llm-transition-normal);
+    position: relative;
+}
+
+.llm-input__btn:hover {
+    background-color: var(--llm-bg-tertiary);
+    color: var(--llm-text-primary);
+}
+
+.llm-input__btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.llm-input__btn--settings.active {
+    background-color: var(--llm-color-primary-bg);
+    color: var(--llm-color-primary);
+}
+
+.llm-input__btn--websearch {
+    position: relative;
+}
+
+.llm-input__btn--settings.has-overrides::after {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    background: var(--llm-color-warning);
+    border-radius: 50%;
+    border: 1px solid white;
+}
+
+.llm-input__btn--send {
+    background-color: var(--llm-color-primary);
+    color: white;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+}
+
+.llm-input__btn--send:hover {
+    background-color: var(--llm-color-primary-hover);
+    color: white;
+}
+
+.llm-input__btn--send:disabled {
+    background-color: #93c5fd;
+    cursor: not-allowed;
+}
+
+.llm-input__btn--stop {
+    background-color: var(--llm-color-error);
+    color: white;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+}
+
+.llm-input__btn--stop:hover {
+    background-color: var(--llm-color-error-hover);
+    color: white;
+}
+
+/* --- 响应式 --- */
+@media (max-width: 600px) {
+    .llm-input__settings-body {
+        gap: 12px;
+    }
+
+    .llm-input__presets {
+        flex-direction: column !important;
+        align-items: flex-start;
+    }
+
+    .llm-input__preset-buttons {
+        width: 100%;
+    }
+
+    .llm-input__preset-btn {
+        flex: 1;
+        text-align: center;
+    }
+
+    .llm-input__executor-select {
+        max-width: 90px;
+    }
+}
+
+/* ≤768px：平板适配 */
+@media (max-width: 768px) {
+    .llm-input__textarea {
+        min-height: calc(1lh + 8px);
+        max-height: min(160px, calc(var(--app-visible-height, 100dvh) * 0.22));
+        font-size: 16px;
+    }
+    /* Agent meta 隐藏，降低噪音 */
+    .llm-input__agent-meta { display: none; }
+
+    /* 设置面板限高 */
+    .llm-input__settings-panel,
+    .llm-input__help-panel {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+}
+
+/* ≤480px：手机激进优化 */
+@media (max-width: 480px) {
+    /* 主输入区内边距缩小 */
+    .llm-input__main { padding: 8px 8px 4px; }
+
+    /* 所有输入操作按钮满足 44px 触摸目标（工具栏按钮除外） */
+    .llm-input__btn--send,
+    .llm-input__btn--stop {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* Agent 名称截断，meta 隐藏 */
+    .llm-input__agent-name { max-width: 72px; }
+
+    /* 附件 chips：横向单行滚动，避免纵向堆叠占屏幕空间 */
+    .llm-input__attachments {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+    }
+    .llm-input__attachments::-webkit-scrollbar { display: none; }
+
+    /* 设置面板和帮助面板：底部 Sheet 模式 */
+    .llm-input__settings-panel,
+    .llm-input__help-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 65vh;
+        border-radius: 16px 16px 0 0;
+        border: none;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+        z-index: 200;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* 拖拽指示条 */
+    .llm-input__settings-panel::before,
+    .llm-input__help-panel::before {
+        content: '';
+        display: block;
+        width: 36px;
+        height: 4px;
+        margin: 10px auto 6px;
+        border-radius: 2px;
+        background: var(--llm-border-color);
+        flex-shrink: 0;
+    }
+}
+/* ── Enable / Disable toggle (shared by Provider & Connection cards) ── */
+.llm-enable-toggle {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.llm-enable-toggle__track {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    border-radius: 999px;
+    background: var(--st-text-disabled, #ccc);
+    transition: background 0.2s;
+    display: inline-block;
+}
+
+.llm-enable-toggle__track--on {
+    background: var(--st-color-success, #10b981);
+}
+
+.llm-enable-toggle__thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+
+.llm-enable-toggle__track--on .llm-enable-toggle__thumb {
+    transform: translateX(14px);
+}
+
+/* =========================================
+   Help Panel (moved from ChatInputView inline CSS)
+   ========================================= */
+.llm-input__btn--help { opacity: 0.6; font-size: 13px; }
+.llm-input__btn--help:hover, .llm-input__btn--help.active { opacity: 1; }
+
+.llm-input__help-panel {
+    border-radius: 8px 8px 0 0;
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-bottom: none;
+    background: var(--bg-primary, #fff);
+    max-height: 420px;
+    overflow-y: auto;
+    box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+}
+.llm-input__help-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
+    position: sticky;
+    top: 0;
+    background: var(--bg-primary, #fff);
+    z-index: 1;
+}
+.llm-input__help-title { font-weight: 600; font-size: 13px; color: var(--text-primary, #333); }
+.llm-input__help-close {
+    background: none; border: none; cursor: pointer;
+    font-size: 18px; line-height: 1; color: var(--text-secondary, #888);
+    padding: 0 2px;
+}
+.llm-input__help-close:hover { color: var(--text-primary, #333); }
+.llm-input__help-body { padding: 4px 0 8px; }
+
+.llm-input__help-section { padding: 8px 14px 4px; }
+.llm-input__help-section + .llm-input__help-section {
+    border-top: 1px solid var(--border-color-subtle, #f0f0f0);
+}
+.llm-input__help-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-tertiary, #aaa);
+    margin: 0 0 6px;
+}
+.llm-input__help-section-desc {
+    font-size: 12px;
+    color: var(--text-secondary, #666);
+    margin: 0 0 6px;
+}
+
+.llm-input__help-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.llm-input__help-table tr { vertical-align: top; }
+.llm-input__help-table td {
+    padding: 2px 6px 2px 0;
+    color: var(--text-primary, #333);
+    white-space: nowrap;
+}
+.llm-input__help-table td:last-child { white-space: normal; color: var(--text-secondary, #666); }
+.llm-input__help-group {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-tertiary, #bbb);
+    padding-top: 8px !important;
+    padding-bottom: 2px !important;
+}
+
+.llm-input__help-panel kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 11px;
+    font-family: monospace;
+    background: var(--bg-secondary, #f5f5f5);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 3px;
+    color: var(--text-primary, #333);
+    white-space: nowrap;
+}
+.llm-input__help-panel code {
+    font-size: 11px;
+    font-family: monospace;
+    background: var(--bg-secondary, #f5f5f5);
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.llm-input__help-hint {
+    font-size: 11px;
+    color: var(--text-tertiary, #aaa);
+    margin: 4px 0 0;
+}
+.llm-input__help-hint code { background: none; padding: 0; }
+.llm-input__help-dim { font-size: 10px; color: var(--text-tertiary, #aaa); }
+
+.llm-input__help-footer {
+    font-size: 11px;
+    color: var(--text-tertiary, #aaa);
+    padding: 6px 14px 4px;
+    border-top: 1px solid var(--border-color-subtle, #f0f0f0);
+    margin: 0;
+}
+
+/* ── Inline tool output panel (ToolOutputPanel) ──────────────────────────── */
+/* Shown between the executor row and the textarea for direct tool invocations. */
+.llm-input__tool-output {
+    border: 1px solid var(--llm-border-color);
+    border-radius: var(--llm-radius-md, 6px);
+    background: var(--llm-bg-secondary);
+    margin: 0 0 8px;
+    overflow: hidden;
+}
+
+.llm-input__tool-output-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--llm-border-color);
+    font-size: 11px;
+}
+
+.llm-input__tool-output-cmd {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--llm-font-mono, monospace);
+    color: var(--llm-text-secondary);
+}
+
+.llm-input__tool-output-meta {
+    flex-shrink: 0;
+    color: var(--llm-text-tertiary, var(--llm-text-muted));
+    font-variant-numeric: tabular-nums;
+}
+
+.llm-input__tool-output-close {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: var(--llm-radius-sm, 4px);
+    background: transparent;
+    color: var(--llm-text-muted);
+    cursor: pointer;
+    line-height: 1;
+    font-size: 14px;
+}
+
+.llm-input__tool-output-close:hover {
+    background: var(--llm-bg-hover);
+    color: var(--llm-text-primary);
+}
+
+.llm-input__tool-output-body {
+    margin: 0;
+    padding: 8px 10px;
+    max-height: 200px;
+    overflow: auto;
+    font-family: var(--llm-font-mono, monospace);
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--llm-text-primary);
+}
+
+/* ── Skill panel (chat settings) ─────────────────────────────────────────── */
+.llm-input__skill-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.llm-input__skills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.llm-input__skills-empty {
+    display: block;
+    padding: 8px 0;
+    font-size: 12px;
+    color: var(--llm-text-muted);
+}
+
+.llm-input__skills-refresh {
+    align-self: flex-start;
+    padding: 4px 10px;
+    border: 1px solid var(--llm-border-color);
+    border-radius: var(--llm-radius-sm, 4px);
+    background: transparent;
+    color: var(--llm-text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.llm-input__skills-refresh:hover {
+    background: var(--llm-bg-hover);
+    color: var(--llm-text-primary);
+}
+
+.llm-input__skill-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--llm-border-color);
+    border-radius: var(--llm-radius-md, 6px);
+    background: var(--llm-bg-primary);
+}
+
+.llm-input__skill-item--loaded {
+    border-color: var(--llm-color-primary);
+    background: var(--llm-color-primary-bg, var(--llm-bg-secondary));
+}
+
+.llm-input__skill-icon {
+    flex-shrink: 0;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.llm-input__skill-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: var(--llm-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.llm-input__skill-desc {
+    flex-shrink: 1;
+    min-width: 0;
+    font-size: 11px;
+    color: var(--llm-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.llm-input__skill-toggle {
+    flex-shrink: 0;
+}
+
+.llm-input__skill-btn {
+    /* Visually hidden: the .llm-input__toggle-slider renders the switch. */
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* Group frequent settings and reveal advanced controls on demand. */
+.llm-input__settings-group { display: grid; gap: 12px; min-width: 0; }
+.llm-input__settings-group h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: .8rem; color: var(--llm-text-secondary); }
+.llm-input__settings-group h3 svg { width: 16px; height: 16px; }
+.llm-input__settings-toggles { display: flex; gap: 12px 24px; flex-wrap: wrap; align-items: center; }
+.llm-input__settings-toggles .llm-input__setting-row { flex: 1 1 180px; }
+.llm-input__settings-advanced { border-top: 1px solid var(--llm-border-color); padding-top: 12px; }
+.llm-input__settings-advanced summary { cursor: pointer; font-size: .85rem; color: var(--llm-text-secondary); }
+.llm-input__settings-advanced[open] summary { margin-bottom: 12px; }
+.llm-input__ocr-preferences { border-top: 1px solid var(--llm-border-color); padding-top: 12px; }
+.llm-input__ocr-preferences[hidden] { display: none; }
+.llm-input__ocr-preferences .settings-form { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.llm-input__ocr-preferences .settings-form__group { flex: 1 1 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.llm-input__ocr-preferences .settings-form__label { grid-column: 1 / -1; font-size: .8rem; }
+.llm-input__ocr-preferences .settings-form__select { width: 100%; min-width: 0; }
+.llm-input__ocr-preferences .settings-form__help { flex-basis: 100%; margin: 0; font-size: .75rem; color: var(--llm-text-secondary); }
+.llm-input__ocr-preferences .settings-form__help:empty { display: none; }
+.llm-input__ocr-preferences .settings-btn { padding: 4px 8px; font-size: .75rem; }
+@media (max-width: 480px) {
+    .llm-input__ocr-preferences .settings-form__group { grid-template-columns: minmax(0, 1fr); }
+    .llm-input__ocr-preferences .settings-btn { justify-self: start; }
+    .llm-input__settings-toggles { gap: 10px; }
+}
+
+/* Model and secondary menus share the composer's quiet visual language. */
+.llm-input__native-model,
+.llm-input__model-trigger,
+.llm-input__options > summary { display: flex; align-items: center; justify-content: center; gap: 3px; padding: 4px 6px; min-height: 32px; box-sizing: border-box; border: 0; border-radius: 6px; background: transparent; color: var(--llm-text-secondary); font: inherit; font-size: 12px; cursor: pointer; list-style: none; }
+.llm-input__model-trigger { min-width: 0; max-width: 240px; }
+.llm-input__native-model { display: block; min-width: 0; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.llm-input__model-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.llm-input__model-trigger > svg,
+.llm-input__agent-chevron > svg { width: 12px; height: 12px; flex-shrink: 0; }
+.llm-input__options > summary { width: 32px; }
+.llm-input__options > summary::-webkit-details-marker { display: none; }
+.llm-input__native-model:hover,
+.llm-input__model-trigger:hover,
+.llm-input__options > summary:hover { background: var(--llm-bg-tertiary); }
+.llm-input__native-model:disabled,
+.llm-input__model-trigger:disabled { opacity: .5; cursor: default; }
+.llm-input__options { position: relative; flex-shrink: 0; }
+.llm-input__execution-info:not([hidden]) { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px; border-bottom: 1px solid var(--llm-border-color); font-size: 13px; }
+.llm-input__execution-info strong { font-weight: 500; }
+.llm-input__execution-info small { grid-column: 1 / -1; font-size: 11px; line-height: 1.5; color: var(--llm-text-secondary); white-space: normal; }
+.llm-input__options-body { position: absolute; bottom: calc(100% + 8px); z-index: 30; width: 220px; box-sizing: border-box; padding: 8px; background: var(--llm-bg-primary); border: 1px solid var(--llm-border-color); border-radius: 12px; box-shadow: 0 6px 24px #00000018; }
+.llm-input__options-body { right: 0; }
+.llm-input__options-body .llm-input__btn,
+.llm-input__options-body .llm-input__prompt-picker { display: flex; align-items: center; gap: 8px; width: 100%; height: auto; min-height: 36px; padding: 8px; border: 0; border-radius: 6px; background: transparent; color: var(--llm-text-primary); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.llm-input__options-body button { justify-content: flex-start; }
+.llm-input__options-body button:hover { background: var(--llm-bg-tertiary); }
+.llm-input__options-body svg { width: 16px; height: 16px; flex-shrink: 0; }
+.llm-input__options-body .llm-input__btn--websearch::after { content: ''; margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--llm-border-color); }
+.llm-input__options-body .llm-input__btn--websearch[aria-pressed="true"]::after { background: var(--llm-color-primary); }
+.llm-input__options-body [hidden] { display: none; }
+.llm-input__options-body .llm-input__btn--settings.has-overrides::after { display: none; }
+.llm-input__settings-panel { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; z-index: 40; box-sizing: border-box; border: 1px solid var(--llm-border-color); border-radius: 12px; box-shadow: 0 6px 24px #00000018; }
+.llm-input__help-panel { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; z-index: 40; background: var(--llm-bg-primary); border-color: var(--llm-border-color); }
+.llm-input__execution-hint { margin-top: 6px; }
+.llm-input__btn--send,
+.llm-input__btn--stop { flex-shrink: 0; }
+.llm-input__textarea { line-height: 1.65; }
+.llm-input__options[hidden],
+.llm-input__native-model[hidden],
+.llm-input__model-trigger[hidden] { display: none; }
+.llm-input__execution-source,
+.llm-input__flow-configure { padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--llm-text-secondary); font: inherit; font-size: 12px; white-space: nowrap; }
+.llm-input__flow-configure { cursor: pointer; }
+.llm-input__flow-configure:hover { background: var(--llm-bg-tertiary); }
+.llm-input__execution-source[hidden],
+.llm-input__flow-configure[hidden],
+.llm-input__agent-picker[hidden] { display: none; }
+.llm-input__toolbar :focus-visible { outline: 2px solid var(--llm-color-primary); outline-offset: 2px; }
+
+@media (max-width: 480px) {
+    .llm-input__native-model,
+    .llm-input__model-trigger { max-width: 110px; }
+    .llm-input__agent-name { max-width: 64px; }
+    .llm-input__toolbar-left,
+    .llm-input__toolbar-right { gap: 2px; }
+    .llm-input__settings-panel,
+    .llm-input__help-panel { position: fixed; bottom: 0; left: 0; right: 0; max-height: 65vh; border-radius: 16px 16px 0 0; }
+    .llm-input__options-body button { min-height: 44px; }
+}
+dialog.llm-image-dialog { width:min(960px,94vw); height:min(820px,90dvh); max-width:100vw; max-height:100dvh; border:1px solid var(--border-color,#ccc); border-radius:12px; padding:12px; color:var(--text-primary); background:var(--bg-primary,#fff); }
+dialog.llm-image-dialog[open] { display:flex; flex-direction:column; gap:10px; }
+.llm-image-dialog::backdrop { background:#0009; }
+.llm-image-dialog header { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.llm-image-dialog header strong { flex:1; }
+.llm-image-dialog header button { min-height:44px; padding:8px 16px; cursor:pointer; }
+.llm-image-dialog__content { flex:1; min-height:0; }
+.llm-input__image-edit { cursor:pointer; background:none; color:inherit; border:1px solid var(--border-color,#ccc); border-radius:4px; display:inline-flex; align-items:center; justify-content:center; min-width:52px; min-height:44px; padding:2px; flex-shrink:0; }
+.llm-input__image-status { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--text-secondary,#666); }
+@media (max-width:600px) { dialog.llm-image-dialog { width:100vw; height:100dvh; margin:0; border:0; border-radius:0; box-sizing:border-box; padding:calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom)); } }
+
+.llm-input__image-edit img { display:block; width:52px; height:44px; object-fit:contain; border-radius:4px; }
+.llm-input__image-edited { font-size:11px; color:var(--text-secondary,#666); white-space:nowrap; }
+
+.llm-image-dialog [data-action=finish-images] { background:var(--llm-color-primary,#3b82f6); color:#fff; border:1px solid transparent; border-radius:8px; }
+.llm-image-dialog [data-action=finish-images]:disabled { opacity:0.6; cursor:wait; }

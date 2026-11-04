@@ -1,0 +1,115 @@
+import type { IFileSystem, OperationOptions } from '@itookit/vfs-core';
+import type { ConfigurationImportPort, IConnectionService, IAgentManagementService } from '@itookit/kernel-adapters/contracts';
+import type { ISessionRepository, SessionManagementPort, ICommandBus } from '@itookit/llm-session/contracts';
+import type { KernelViewPort } from '@itookit/durable-kernel/contracts';
+import type { IToolService } from '@itookit/tools/contracts';
+import type { HarnessSession, HarnessConversationSnapshot } from '@itookit/cells-driver/harness';
+import type { SessionFilesPort, DirectoryMountPort, FileSystemsPort } from './files';
+import type { ProjectService, ProjectSessions, NativeSessionCommand, ResolvedProjectFavorite } from './projects';
+import type { SessionExport, WorkbenchView, SessionOpenView, WorkbenchArchiveExporter, WorkbenchArchiveImporter, NestosInitialFiles } from './session';
+import type { SettingsPort, SettingsWorkspaceSource } from '../settings';
+import type { ToolboxInventory, ToolboxResources, OcrService, ModelConfigurationCommands } from './configuration';
+import type { DigitalTwinService } from './digital-twin';
+import type { ProjectSyncService } from './sync';
+import type { TaskDetail, TaskEventQuery, TaskEventView, SessionTaskQuery, SessionTaskPage } from './task-view';
+
+/** Frontend consumers receive capabilities, never backend construction dependencies. */
+export interface ApplicationServices {
+    vfs: FileSystemsPort;
+    llmDriver: IConnectionService & ConfigurationImportPort;
+    agentService: IAgentManagementService & ConfigurationImportPort & { getAgentResourceId(id: string): string | undefined };
+    configuration: ModelConfigurationCommands;
+    sessionRepository: ISessionRepository;
+    sessionFiles: SessionFilesPort;
+    directoryMounts: DirectoryMountPort;
+    projects: ProjectService;
+    flowEngine: { engine: IFileSystem };
+    kernel: { kernel: KernelViewPort; toolCatalog: Pick<IToolService, 'getToolDefinitions' | 'listTools'> & {
+        describeTools?(): Promise<import('@itookit/llm-session/contracts').ToolCommandOption[]>;
+    } };
+    sessionManager: Omit<SessionManagementPort, 'getSessionRuntime'>;
+    commandBus: ICommandBus;
+    projectSync?: ProjectSyncService;
+    digitalTwin?: DigitalTwinService;
+    kanban?: import('@itookit/kanban/contracts').KanbanClient;
+    startBackground?(): void;
+    prepareSession?(sessionId: string): Promise<boolean>;
+}
+export interface ToolboxView {
+    inventory: ToolboxInventory;
+    resources: ToolboxResources;
+    files: IFileSystem;
+    initial: import('./configuration').ToolboxNavigation;
+    dispose(): Promise<void>;
+}
+/** Boundary operations are asynchronous; synchronous selectors belong to loaded snapshots. */
+export interface ApplicationBackend {
+    serverTerminals?: import('./server-terminal').ServerTerminals;
+    events?: import('./events').ApplicationEvents;
+    diagnostics?: import('./diagnostics').ApplicationDiagnostics;
+    flowInstallations?: import('./flow-installation').FlowInstallations;
+    reportClientDiagnostic?(diagnostic: ClientDiagnostic): Promise<void>;
+    sessionResponse(sessionId: string, query?: SessionResponseQuery): Promise<SessionResponse | undefined>;
+    studyPromptPresets(): Promise<Array<{id: string; name: string; content: string}>>;
+    listTextModels(): Promise<Array<{id: string; name: string; model?: string; models: Array<{id: string; name: string}>; available: boolean; reason?: string; default: boolean}>>;
+    generateText(request: {sessionId: string; modelId?: string; connectionId?: string; operationId: string; prompt: string; source: string; previousDraft: string}): Promise<string>;
+    cancelTextGeneration(operationId: string): Promise<void>;
+    assistantOverview?(): Promise<import('./assistant').AssistantOverview>;
+    editorSwaps?: import('./editor-swap').EditorSwapFactory;
+    documentChatFile(request: import('./document-chat').DocumentChatFileRequest): Promise<import('./document-chat').DocumentChatFile>;
+    documentChatBacklinks(sessionId: string, branch: string): Promise<import('./document-chat').DocumentChatLink[]>;
+    openView(request: import('./open-view').OpenViewRequest): Promise<import('./open-view').OpenedApplicationView>;
+    prepareSessionBranch(request: import('@itookit/llm-session/contracts').SubmissionRequest): Promise<import('@itookit/llm-session/contracts').SubmissionRequest>;
+    submitSession(request: import('@itookit/llm-session/contracts').SubmissionRequest): Promise<import('@itookit/llm-session/contracts').SubmissionReceipt>;
+    createSessionDraft(request: SessionDraftRequest): Promise<string>;
+    mailView(): Promise<import('@itookit/mail/contracts').MailClient>;
+    navigationView(options: { root: string; scope: string }): Promise<import('./navigation').NavigationView>;
+    warmNavigation(roots: string[]): Promise<void>;
+    workbenchView(options?: { displayedFilesPolicy?: 'gitignore' | 'all'; chatControls?: boolean; initialNavigation?: boolean; initialSessionId?: string }): Promise<WorkbenchView>;
+    openSessionView(sessionId: string): Promise<SessionOpenView>;
+    readUiDocuments(names: string[]): Promise<Record<string, unknown>>;
+    writeUiDocuments(documents: Record<string, unknown>): Promise<void>;
+    settings(sources: readonly SettingsWorkspaceSource[]): Promise<SettingsPort>;
+    ocr(): Promise<OcrService>;
+    initialFiles(): Promise<NestosInitialFiles>;
+    projectSessions(): Promise<ProjectSessions>;
+    skillsFiles(): Promise<IFileSystem>;
+    toolboxView(): Promise<ToolboxView>;
+    archiveExporter(): Promise<WorkbenchArchiveExporter>;
+    archiveImporter(): Promise<WorkbenchArchiveImporter>;
+    exportSession(sessionId: string): Promise<SessionExport>;
+    exportRemoteSession(folder: string, profileId: string, sessionId: string, options?: OperationOptions): Promise<SessionExport>;
+    resolveFavorite(folder: string, favoriteId: string): Promise<ResolvedProjectFavorite>;
+    manageRemoteSession(folder: string, profileId: string, sessionId: string, command: NativeSessionCommand, options?: OperationOptions): Promise<HarnessConversationSnapshot>;
+    unmountProject(projectId: string): Promise<void>;
+    conversationBranches(folder: string, profileId: string, sessionId: string, options?: OperationOptions): Promise<HarnessSession[]>;
+    taskDetails(sessionId: string, taskId: string): Promise<TaskDetail>;
+    taskAttachment: import('@itookit/durable-kernel/contracts').ReadTaskAttachment;
+    sessionTasks(sessionId: string, options?: SessionTaskQuery): Promise<SessionTaskPage>;
+    taskEvents(sessionId: string, taskId: string, options?: TaskEventQuery): Promise<TaskEventView>;
+}
+/** Client-reported metadata only; no message, stack, input or arbitrary details. */
+export interface ClientDiagnostic {
+    operation: string; operationId: string; sessionId?: string; stage: string;
+    code: string; result: 'retrying' | 'failure'; durationMs: number;
+    remoteCode?: string; requestId?: string;
+}
+
+/** Omit selectors to read the latest round in the selected (or current) branch. */
+export interface SessionResponseQuery {branch?: string; operationId?: string; roundId?: string}
+export interface SessionResponse {
+    roundId: string;
+    operationId?: string;
+    status: import('@itookit/llm-session/contracts').Round['status'];
+    text: string;
+    finishReason?: string;
+}
+export interface SessionDraftRequest {
+    sessionId?: string;
+    branchName?: string;
+    inputTarget?: import('@itookit/llm-flow/contracts').TargetRef;
+    title: string;
+    inputText: string;
+    source?: { projectFolder?: string; sessionId?: string };
+}
+export interface ApplicationClient { services: ApplicationServices; backend: ApplicationBackend }

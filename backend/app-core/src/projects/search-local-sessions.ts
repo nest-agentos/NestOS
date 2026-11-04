@@ -1,0 +1,83 @@
+import { checkOperation, FSError, matchesKeywords, searchKeywords, type OperationOptions } from '@itookit/vfs-core';
+import { folderBrowserPath } from '@itookit/app-contracts';
+import type { ProjectSearchQuery, ProjectSearchMatch, ProjectSearchResult } from '@itookit/app-contracts/services';
+import type { ISessionRepository, SessionSummary, SessionFolder, Round, ConversationManifest } from '@itookit/llm-session/contracts';
+
+type SearchRound = Round & {_deleted?: boolean};
+interface Budget { matches: ProjectSearchMatch[]; bytes: number; rounds: number; truncated: boolean }
+const full = (budget: Budget) => budget.matches.length >= 100 || budget.bytes >= 16 * 1024 * 1024 || budget.rounds >= 2000;
+
+/** Repository reads work across local/browser stores without a filesystem-specific search API. */
+export async function searchLocalSessions(repository: ISessionRepository, folder: string, projectId: string,
+    query: ProjectSearchQuery, options: OperationOptions): Promise<ProjectSearchResult> {
+    const budget: Budget = {matches: [], bytes: 0, rounds: 0, truncated: false};
+    const keywords = searchKeywords(query.query);
+    if (query.archived) return {matches: [], truncated: false, nextCursor: null};
+    const groups = projectGroups(folder, await repository.listFolders());
+    const rows = repository.listSummariesInFolder && groups.length <= 16 ? (await Promise.all(groups.map(group => repository.listSummariesInFolder!(group)))).flat()
+        : (await (repository.listSummaries?.() ?? repository.list())).filter(row => groups.includes(row.folder ?? ''));
+    const selected = query.agentId ? rows.filter(row => row.createdWithAgentId === query.agentId) : rows;
+    selected.sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
+    for (const [index, row] of selected.entries()) {
+        checkOperation(options);
+        if (full(budget) || index >= 2000) { budget.truncated = true; break; }
+        if (query.scope === 'session-title') {
+            if (matchesKeywords(row.title, keywords)) budget.matches.push({...base(row, folder, projectId), summary: row.title});
+        } else await searchHistory(repository, row, folder, projectId, query, keywords, budget, options);
+    }
+    checkOperation(options);
+    return {matches: budget.matches, truncated: budget.truncated, nextCursor: null};
+}
+function projectGroups(folder: string, folders: SessionFolder[]): string[] {
+    const inside = (path: string, root: string) => path === root || path.startsWith(root + '/');
+    const nested = folders.filter(row => row.project && row.path !== folder && inside(row.path, folder));
+    return [folder, ...folders.filter(row => row.path !== folder && inside(row.path, folder)
+        && !nested.some(project => inside(row.path, project.path))).map(row => row.path)];
+}
+function base(row: SessionSummary, folder: string, projectId: string): Omit<ProjectSearchMatch, 'summary'> {
+    return {kind: 'session', projectId, folder, sessionId: row.id, title: row.title, updatedAt: row.updatedAt,
+        resourcePath: folderBrowserPath(row.folder ?? null) + '/' + row.id};
+}
+async function searchHistory(repository: ISessionRepository, row: SessionSummary, folder: string, projectId: string,
+    query: ProjectSearchQuery, keywords: readonly string[], budget: Budget, options: OperationOptions): Promise<void> {
+    const manifest = await repository.getManifest(row.id), payloads = new Map<string, SearchRound | null>();
+    if ((manifest.folder ?? null) !== (row.folder ?? null)) throw new FSError('ECONFLICT', 'Session project changed');
+    const branches = new Map([[manifest.currentBranch, manifest.currentHead], ...Object.entries(manifest.branches)]);
+    for (const [branch, head] of branches) {
+        let id = head; const visited = new Set<string>();
+        const overrides = manifest.branchMeta[branch]?.roundOverrides;
+        while (id && !visited.has(id)) {
+            checkOperation(options);
+            if (full(budget)) { budget.truncated = true; return; }
+            visited.add(id); ++budget.rounds;
+            const documentId = overrides?.[id] ?? id, cached = payloads.has(documentId);
+            const round = cached ? payloads.get(documentId) : await readRound(repository, manifest, id, budget, documentId);
+            if (!round) break;
+            payloads.set(documentId, round);
+            if (!cached && !round._deleted && round.exposure !== 'internal') recordRound(round, {...base(row, folder, projectId), branch}, query, keywords, budget);
+            id = round.historyParentIds[0] ?? null;
+        }
+    }
+    if ((await repository.getManifest(row.id)).folder !== manifest.folder) throw new FSError('ECONFLICT', 'Session project changed');
+}
+async function readRound(repository: ISessionRepository, manifest: ConversationManifest, id: string, budget: Budget, documentId = id): Promise<SearchRound | null> {
+    if (![id, documentId].every(value => /^[a-zA-Z0-9_-]+$/.test(value))) throw new FSError('EIO', 'Invalid history identity');
+    const recordText = await repository.readDocument(manifest.id, `round-${documentId}.json`);
+    if (!recordText) { budget.truncated = true; return null; }
+    budget.bytes += recordText.length * 2;
+    if (full(budget) || recordText.length > 2 * 1024 * 1024) { budget.truncated = true; return null; }
+    const round = JSON.parse(recordText) as SearchRound;
+    if (round.id !== documentId || !Array.isArray(round.input) || !Array.isArray(round.output) || !Array.isArray(round.historyParentIds)) throw new FSError('EIO', 'Invalid session history');
+    return documentId === id ? round : {...round, id};
+}
+function recordRound(round: SearchRound, base: Omit<ProjectSearchMatch, 'summary'>, query: ProjectSearchQuery, keywords: readonly string[], budget: Budget): void {
+    const messages = query.scope === 'session-prompt' ? round.input.filter(message => message.role === 'user')
+        : [...round.input, ...round.output].filter(message => message.role === 'user' || message.role === 'assistant');
+    for (const message of messages) {
+        const text = typeof message.content === 'string' ? message.content : message.content.filter(part => part.type === 'text').map(part => part.text).join('\n');
+        if (!matchesKeywords(text, keywords)) continue;
+        const index = text.toLowerCase().indexOf(keywords[0]!);
+        budget.matches.push({...base, turnId: round.id, itemId: `round-${round.id}-${message.role}`, summary: text.slice(Math.max(0, index - 80), index + 420)});
+        if (full(budget)) return;
+    }
+}

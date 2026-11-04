@@ -1,0 +1,2 @@
+export { resolveModelId, toConnectionMeta, toProviderMeta, resolveModelForTier, resolveTemperature, aggregateProviderCosts, getNextLowerTier, resolveWebSearchStrategy, type DefaultConnectionDef, type WebSearchMode } from '@itookit/kernel-adapters/contracts';
+export type { ModelCategory, LLMModel, DailyCost, ModelTier, ApiProtocol, LLMProviderImplementation, LLMProvider, LLMConnection, ConnectionMeta, ConnectionTestResult, ProviderConnectionTestParams } from '@itookit/driver-llm/contracts';

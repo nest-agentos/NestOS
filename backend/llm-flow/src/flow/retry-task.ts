@@ -1,0 +1,27 @@
+import { isSchedulerOwnershipLost } from './scheduler-lease';
+import type { SessionHandle, TaskHandle } from '@itookit/durable-kernel';
+import { prepareFlowTaskRetry, readFlowRunMembers } from './run-members';
+import { startFlowTask } from './task-capabilities';
+
+/** Execute a fresh Task attempt; historical root output and downstream Tasks remain immutable. */
+export async function retryFlowTask(session: SessionHandle, rootId: string, sourceId: string, requestId: string,
+    mode: 'task' | 'graph' = 'task'): Promise<TaskHandle> {
+    const retry = await prepareFlowTaskRetry(session, rootId, sourceId, requestId, mode);
+    const task = (await retry.status()).task;
+    if (task.status !== 'created') return retry;
+    const root = (await (await session.attachTask(rootId)).status()).task;
+    if (['succeeded', 'failed', 'cancelled'].includes(root.status)) {
+        await retry.cancel('Owning invocation finished before this attempt started');
+        return retry;
+    }
+    const member = (await readFlowRunMembers(session, root)).find(entry => entry.taskId === retry.id)!;
+    const input = task.input as { allowedToolIds?: unknown } | undefined;
+    const allowed = Array.isArray(input?.allowedToolIds) ? input.allowedToolIds.filter((id): id is string => typeof id === 'string') : [];
+    try {
+        await startFlowTask(session, retry, task.program.kind, allowed, member.budget);
+    } catch (error) {
+        if (isSchedulerOwnershipLost(error)) throw error;
+        if ((await retry.status()).task.status === 'created') throw error;
+    }
+    return retry;
+}

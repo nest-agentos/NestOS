@@ -1,0 +1,251 @@
+/* @file: llm-ui/styles/base.css */
+/* =========================================
+   基础样式与通用组件
+   ========================================= */
+
+/* --- 通用按钮 --- */
+.llm-btn {
+    padding: 6px 12px;
+    border-radius: var(--llm-radius-sm);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--llm-transition-fast);
+    border: 1px solid var(--llm-border-color);
+    background: var(--llm-bg-secondary);
+    color: var(--llm-text-primary);
+}
+
+.llm-btn:hover {
+    background: var(--llm-bg-hover);
+}
+
+.llm-btn--primary {
+    background: var(--llm-color-primary);
+    color: white;
+    border-color: var(--llm-color-primary);
+}
+
+.llm-btn--primary:hover {
+    background: var(--llm-color-primary-hover);
+}
+
+.llm-btn--danger {
+    background: var(--llm-color-error);
+    color: white;
+    border-color: var(--llm-color-error);
+}
+
+.llm-btn--danger:hover {
+    background: var(--llm-color-error-hover);
+}
+
+.llm-btn--ghost {
+    background: transparent;
+    color: var(--llm-text-secondary);
+    border: none;
+}
+
+.llm-btn--ghost:hover {
+    color: var(--llm-text-primary);
+    background: var(--llm-bg-hover);
+}
+
+/* --- 通用图标按钮 --- */
+.llm-icon-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: inherit;
+    border-radius: var(--llm-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    opacity: 0.6;
+    transition: all var(--llm-transition-normal);
+}
+
+.llm-icon-btn:hover {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.llm-icon-btn:disabled,
+.llm-icon-btn[disabled] {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.llm-icon-btn svg {
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+}
+
+.llm-icon-btn[data-action="delete"]:hover {
+    color: var(--llm-color-error);
+    background-color: var(--llm-color-error-bg);
+}
+
+/* --- 分隔符 --- */
+.llm-ui-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--llm-border-color);
+    margin: 0 4px;
+}
+
+/* --- 时间显示 --- */
+.llm-ui-time {
+    font-size: 0.75rem;
+    color: var(--llm-text-secondary);
+    opacity: 0.7;
+    white-space: nowrap;
+    margin-right: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- 操作按钮组 --- */
+.llm-ui-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity var(--llm-transition-normal);
+}
+
+/* 触摸设备：操作按钮始终可见（hover 在触摸屏无效） */
+@media (hover: none), (pointer: coarse) {
+    .llm-ui-actions {
+        opacity: 1 !important;
+    }
+}
+
+/* --- 动画 --- */
+@keyframes llm-ui-fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes llm-ui-slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes llm-ui-slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes llm-ui-fadeOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateX(-20px);
+        height: 0;
+        margin: 0;
+        padding: 0;
+    }
+}
+
+@keyframes llm-ui-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.6;
+        transform: scale(1.1);
+    }
+}
+
+@keyframes llm-ui-bounce {
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0);
+    }
+
+    40% {
+        transform: scale(1);
+    }
+}
+
+@keyframes llm-ui-checkmark {
+    0% {
+        transform: rotate(45deg) scale(0);
+    }
+
+    50% {
+        transform: rotate(45deg) scale(1.2);
+    }
+
+    100% {
+        transform: rotate(45deg) scale(1);
+    }
+}
+
+@keyframes llm-ui-btnBounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+/* --- 打印模式 --- */
+@media print {
+
+    .llm-workspace-titlebar,
+    .llm-ui-workspace__input {
+        display: none !important;
+    }
+
+    .llm-ui-workspace__history {
+        overflow: visible !important;
+        height: auto !important;
+    }
+
+    .is-collapsed .llm-ui-node__body,
+    .is-collapsed .llm-ui-bubble__content {
+        display: block !important;
+    }
+}

@@ -1,0 +1,107 @@
+import {mountFileMenu} from './file-menu';
+import {StudyTrackingPlugin} from './study-tracking';
+import {studyIndex} from './study-index';
+import { createMDxEditor as createEditor, defaultEditorFactory as createDefaultEditor, fileReference,
+    type MDxEditor, type PluginConfig, type MDxEditorFactoryConfig } from '@itookit/mdxeditor';
+import { t, createModuleLogger, randomUUID } from '@itookit/common';
+import { installNavigationButtonPresentation, editorFilePath, normalizeEditorOptions, type EditorOptions } from '@itookit/ui-common-adapter';
+import { createAdapterStore } from './srs-store';
+import { createAssetProvider } from './assets';
+import { createDocumentHost } from './document-host';
+import { AssetManagerPlugin } from './asset-manager.plugin';
+
+export interface MDxAdapterOptions extends EditorOptions, Pick<MDxEditorFactoryConfig, 'htmlPolicy' | 'scrollMode'> { onSave?: (content: string) => Promise<void>; }
+export type AdaptedMDxEditor = MDxEditor & { updateNodeId(path: string): void };
+
+export function resolveDocumentFormat(options: EditorOptions): 'markdown' | 'text' {
+    const path = editorFilePath(options);
+    return options.contentFormat ?? (!path || /\.(md|markdown|mdx)$/i.test(path) ? 'markdown' : 'text');
+}
+
+function isPluginConfig(value: unknown): value is PluginConfig {
+    if (typeof value === 'string') return true;
+    if (Array.isArray(value)) return typeof value[0] === 'string';
+    return typeof value === 'object' && value !== null && ('name' in value || 'install' in value);
+}
+
+/** More-menu order for the document editor; only order is declared, buttons stay core-owned. */
+const MORE_MENU_ORDER = ['copy-content', 'print-action', 'save-action', 'ai-action', 'toggle-line-wrapping', 'asset-manager'];
+
+function pluginDefaults(options: MDxAdapterOptions, path?: string, getPath: () => string | undefined = () => path): Record<string, Record<string, any> | undefined> {
+    const defaults: Record<string, Record<string, any> | undefined> = {};
+    for (const [key, value] of Object.entries(options.defaultPluginOptions ?? {})) {
+        if (typeof value === 'object' && value !== null) defaults[key] = value as Record<string, any>;
+    }
+    defaults['codeblock-controls'] = {wrapText: t('editor.wrap.label'), ...defaults['codeblock-controls']};
+    defaults['interaction:codeblock-controls'] = {wrapText: t('editor.wrap.label'), ...defaults['interaction:codeblock-controls']};
+    const titlebar = (defaults['core:titlebar'] ?? {}) as Record<string, unknown>;
+    defaults['core:titlebar'] = { ...titlebar,
+        mountTitleBar: titlebar.mountTitleBar ?? options.mountTitleBar,
+        aiCallback: titlebar.aiCallback ?? (path && options.hostContext?.chatFromFile ? async (editor: MDxEditor) => {
+            const reference = fileReference(editor); await editor.flushPendingSave();
+            await options.hostContext!.chatFromFile!(reference);
+        } : undefined),
+        onSidebarToggle: titlebar.onSidebarToggle ?? (options.hostContext ? () => options.hostContext!.toggleSidebar() : undefined),
+        saveCallback: async (editor: MDxEditor) => { await editor.save(); },
+        overflowActions: titlebar.overflowActions ?? true,
+        // Public ordering contract: the panel keeps its buttons, the host only declares order.
+        actionOrder: titlebar.actionOrder ?? MORE_MENU_ORDER,
+        mountMoreMenu: (container: HTMLElement, editor: MDxEditor, primary: HTMLElement) => {
+            const provided = typeof titlebar.mountMoreMenu === 'function' ? titlebar.mountMoreMenu(container, editor, primary) : undefined;
+            const file = mountFileMenu(container, editor, options, getPath, primary);
+            return () => {file(); if (typeof provided === 'function') provided();};
+        },
+        presentButton: (id: string, button: HTMLButtonElement) => {
+            const provided = typeof titlebar.presentButton === 'function' ? titlebar.presentButton(id, button) : undefined;
+            const navigation = id === 'toggle-sidebar' ? installNavigationButtonPresentation(button) : undefined;
+            if (!navigation && typeof provided !== 'function') return;
+            return () => {navigation?.(); if (typeof provided === 'function') provided();};
+        },
+        mountActions: titlebar.mountActions ?? (!options.mountTitleBar && options.mountWindowList ? (container: HTMLElement) => {
+            container.dataset.editorMobileNavigation = 'embedded';
+            const cleanup = options.mountWindowList!(container);
+            return () => {cleanup(); delete container.dataset.editorMobileNavigation;};
+        } : undefined),
+    };
+    return defaults;
+}
+
+/** Validation happens before any editor DOM, asset access or save callback is constructed. */
+export function adaptEditorOptions(options: MDxAdapterOptions): MDxEditorFactoryConfig {
+    normalizeEditorOptions(options);
+    let path = editorFilePath(options);
+    const host = createDocumentHost(options);
+    const rename = host.renameDocument;
+    if (rename) host.renameDocument = async (current, title) => {
+        const result = await rename(current, title); path = result.path; return result;
+    };
+    const defaults = pluginDefaults(options, path, () => path);
+    const titlebar = defaults['core:titlebar']!;
+    const assets = createAssetProvider(options.files?.fs, () => path, options.assets);
+    const plugins = (options.plugins ?? []).filter(isPluginConfig);
+    if (options.files && path && !options.readOnly && plugins.some(plugin => plugin === 'cloze:cloze' || Array.isArray(plugin) && plugin[0] === 'cloze:cloze')) plugins.push(new StudyTrackingPlugin(options.files.fs));
+    if (assets && titlebar.enableAssetManager !== false && !plugins.includes('-ui:asset-manager')) plugins.push(new AssetManagerPlugin(options.files?.fs, () => path, options.assets, defaults['ui:asset-manager']));
+    const save = options.onSave ?? (path && options.hostContext?.saveContent ? (content: string) => options.hostContext!.saveContent!(path!, content) : undefined);
+    return { htmlPolicy: options.htmlPolicy, scrollMode: options.scrollMode, signal: options.signal, documentPath: path, title: options.title, language: options.language,
+        initialContent: options.initialContent, initialMode: options.initialMode, contentFormat: resolveDocumentFormat(options),
+        onDocumentPathChange: next => { path = next; },
+        readOnly: options.readOnly, plugins, defaultPluginOptions: defaults, host, assets, translate: key => t(key as Parameters<typeof t>[0]),
+        onSave: save ? async content => {
+            await save(content);
+            try {if (options.files && path) await studyIndex(options.files.fs).update(path);}
+            catch (error) {const code = (error as {code?: string})?.code;
+                createModuleLogger('study-index').warn('study.index', {operationId: randomUUID(), stage: 'after-save', result: 'failure',
+                    code: code && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'CLOZE_INDEX_FAILED'});}
+        } : undefined,
+        storeFactory: options.files && path ? plugin => createAdapterStore(options.files!.fs, path!, plugin) : undefined,
+    };
+}
+
+async function construct(container: HTMLElement, options: MDxAdapterOptions, standard: boolean): Promise<AdaptedMDxEditor> {
+    const config = adaptEditorOptions(options);
+    const editor = await (standard ? createDefaultEditor : createEditor)(container, config) as AdaptedMDxEditor;
+    editor.updateNodeId = path => editor.updateDocumentPath(path);
+    return editor;
+}
+export const createMDxEditor = (container: HTMLElement, options: MDxAdapterOptions = {}) => construct(container, options, false);
+export const defaultEditorFactory = (container: HTMLElement, options: MDxAdapterOptions) => construct(container, options, true);

@@ -1,0 +1,10 @@
+{
+  "id": "harness-skill", "name": "Harness 验证：Skill 与工具", "draftVersion": 1, "updatedAt": 0,
+  "parameters": [{ "name": "file", "type": "string", "required": true, "default": "./notes.txt", "widget": "text", "label": "文件路径" }],
+  "nodes": [{ "id": "review", "name": "按 Skill 规则审查", "plugin": "builtin.agent", "pluginVersion": "1.0.0", "inputs": {},
+    "config": { "connectionId": "default", "toolIds": ["Read"], "skillIds": ["validation-review"], "approval": "none", "historyPolicy": "none", "stream": false, "maxExchanges": 4,
+      "prompt": "Read ${param.file} and review the release requirements using the explicitly selected Skill. Include its required marker and the file evidence."
+    } }],
+  "edges": [], "outputs": { "result": { "value": "${nodes.review.outputs.result}" } },
+  "layout": { "nodes": { "review": { "x": 80, "y": 80 } } }
+}

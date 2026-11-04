@@ -1,0 +1,109 @@
+/* @file: app-settings/styles/_contacts.css */
+/* 通讯录模块样式 */
+
+.settings-contact-toolbar {
+    margin-bottom: var(--st-space-2xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--st-space-lg);
+}
+
+.settings-contact-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--st-space-xl);
+}
+
+.settings-contact-card {
+    display: flex;
+    gap: var(--st-space-lg);
+    align-items: start;
+    background: var(--st-bg-primary);
+    border: 2px solid var(--st-border-color);
+    border-radius: var(--st-radius-lg);
+    padding: var(--st-space-xl);
+    transition: all 0.2s;
+}
+
+.settings-contact-card:hover {
+    border-color: var(--st-color-primary);
+    box-shadow: var(--st-shadow-md);
+    transform: translateY(-2px);
+}
+
+.settings-contact-card__avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--st-radius-full);
+    background: var(--st-color-primary);
+    color: var(--st-text-on-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.settings-contact-card__info {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-contact-card__name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0 0 var(--st-space-xs) 0;
+}
+
+.settings-contact-card__detail {
+    font-size: 0.875rem;
+    color: var(--st-text-secondary);
+    margin: var(--st-space-xs) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--st-space-sm);
+}
+
+.settings-contact-card__detail i {
+    width: 16px;
+    text-align: center;
+    color: var(--st-text-tertiary);
+}
+
+.settings-contact-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--st-space-xs);
+    margin-top: var(--st-space-sm);
+}
+
+.settings-contact-card__actions {
+    display: flex;
+    gap: var(--st-space-sm);
+    margin-top: var(--st-space-md);
+}
+
+@media (max-width: 768px) {
+    .settings-contact-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .settings-contact-card {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .settings-contact-card__detail {
+        justify-content: center;
+    }
+    
+    .settings-contact-card__tags {
+        justify-content: center;
+    }
+    
+    .settings-contact-card__actions {
+        justify-content: center;
+    }
+}

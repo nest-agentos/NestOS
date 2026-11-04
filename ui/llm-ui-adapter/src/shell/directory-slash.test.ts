@@ -1,0 +1,22 @@
+import { expect, it, vi } from 'vitest';
+vi.mock('@itookit/llm-ui', async () => ({...await vi.importActual('@itookit/llm-ui'), PopupPanel: class { destroy() {} }}));
+vi.mock('@itookit/ui-common-adapter', () => ({ Toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() }, showConfirmDialog: vi.fn() }));
+import { SlashCommandPlugin } from '../components/input/plugins/SlashCommandPlugin';
+import { buildSlashCallbacks, type SlashCommandRouterDeps } from './SlashCommandRouter';
+import type { InputPluginContext } from '../components/input/plugins/InputPlugin';
+it('handles mounting as explicit UI commands without sending them to the model', async () => {
+    const addDirectory = vi.fn(async () => 'mounted'), setHome = vi.fn(async () => 'saved');
+    const callbacks = buildSlashCallbacks({ hostContext: { directoryCommands: { addDirectory, setHome } } } as unknown as SlashCommandRouterDeps);
+    const plugin = new SlashCommandPlugin(callbacks);
+    const input = {textarea: {closest: () => null}, setText: vi.fn(), focus: vi.fn()};
+    plugin.activate(input as unknown as InputPluginContext);
+    expect(plugin.onBeforeSend('/add-dir "~/my project"')).toBe(false);
+    await vi.waitFor(() => expect(addDirectory).toHaveBeenCalledWith('~/my project', 'rw'));
+    expect(plugin.onBeforeSend('/add-dir ~/notes r')).toBe(false);
+    await vi.waitFor(() => expect(addDirectory).toHaveBeenCalledWith('~/notes', 'ro'));
+    expect(plugin.onBeforeSend('/set-home ~/projects')).toBe(false);
+    await vi.waitFor(() => expect(setHome).toHaveBeenCalledWith('~/projects'));
+    expect(plugin.onBeforeSend('/add-dir')).toBe(false);
+    await vi.waitFor(() => expect(addDirectory).toHaveBeenCalledWith(undefined, 'rw'));
+    plugin.deactivate();
+});

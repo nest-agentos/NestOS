@@ -1,0 +1,160 @@
+/* @file: llm-ui/styles/variables.css */
+/* =========================================
+   统一设计令牌 (Design Tokens)
+   ========================================= */
+:root {
+    /* 颜色 - 主色 */
+    --llm-color-primary: #3b82f6;
+    --llm-color-primary-hover: #2563eb;
+    --llm-color-primary-light: #dbeafe;
+    --llm-color-primary-bg: #eff6ff;
+    --llm-color-primary-rgb: 59, 130, 246;
+
+    /* 颜色 - 语义 */
+    --llm-color-success: #10b981;
+    --llm-color-success-bg: #d1fae5;
+    --llm-color-error: #ef4444;
+    --llm-color-error-hover: #dc2626;
+    --llm-color-error-bg: #fee2e2;
+    --llm-color-error-border: #fecaca;
+    --llm-color-warning: #f59e0b;
+    --llm-color-warning-bg: #fef3c7;
+    --llm-system-text: #7359a5;
+    --llm-system-bg: #f3eff9;
+
+    /* 背景 */
+    --llm-bg-primary: #ffffff;
+    --llm-bg-secondary: #f9fafb;
+    --llm-bg-tertiary: #f3f4f6;
+    --llm-bg-hover: #e5e7eb;
+
+    /* 文本 */
+    --llm-text-primary: #333333;
+    --llm-text-secondary: #666666;
+    --llm-text-muted: #9ca3af;
+    --llm-text-placeholder: #9ca3af;
+
+    /* 边框 */
+    --llm-border-color: #e5e7eb;
+    --llm-border-light: #f3f4f6;
+
+    /* 字体 */
+    --llm-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* 圆角 */
+    --llm-radius-sm: 4px;
+    --llm-radius-md: 6px;
+    --llm-radius-lg: 8px;
+    --llm-radius-xl: 12px;
+
+    /* 过渡 */
+    --llm-transition-fast: 0.15s ease;
+    --llm-transition-normal: 0.2s ease;
+
+    /* 输入框专用 */
+    --llm-input-radius: 12px;
+    --llm-input-padding: 12px;
+    --llm-settings-bg: #f8fafc;
+
+    /* ── 响应式布局变量（桌面默认值）── */
+    --llm-history-padding: 20px;
+    --llm-input-padding-x: 20px;
+    --llm-input-padding-y: 16px;
+    --llm-bubble-max-width: 80%;
+    --llm-bubble-min-width: 0px;
+    --llm-content-width: 780px;
+    --llm-titlebar-btn-size: 32px;
+    --llm-avatar-size: 32px;
+    --llm-textarea-max-height: 200px;
+}
+
+@media (max-width: 768px) {
+    :root {
+        --llm-history-padding: 12px;
+        --llm-input-padding-x: 10px;
+        --llm-input-padding-y: 10px;
+        --llm-bubble-max-width: 92%;
+        --llm-bubble-min-width: 0px;
+        --llm-titlebar-btn-size: 28px;
+        --llm-avatar-size: 28px;
+        --llm-textarea-max-height: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --llm-history-padding: 8px;
+        --llm-input-padding-x: 6px;
+        --llm-input-padding-y: 8px;
+        --llm-bubble-max-width: 95%;
+        --llm-titlebar-btn-size: 26px;
+        --llm-avatar-size: 24px;
+        --llm-textarea-max-height: 120px;
+    }
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --llm-system-text: #c4b5e5;
+        --llm-system-bg: #282137;
+        --llm-bg-primary: #0d1117;
+        --llm-bg-secondary: #161b22;
+        --llm-bg-tertiary: #1e2530;
+        --llm-bg-hover: #30363d;
+        --llm-text-primary: #c9d1d9;
+        --llm-text-secondary: #8b949e;
+        --llm-text-muted: #6e7681;
+        --llm-text-placeholder: #6b6b6b;
+        --llm-border-color: #30363d;
+        --llm-border-light: #21262d;
+        --llm-settings-bg: #252525;
+    }
+}
+
+/* The app theme is explicit and must override the operating-system preference. */
+:root[data-theme="light"] {
+    color-scheme: light;
+    --llm-system-text: #7359a5;
+    --llm-system-bg: #f3eff9;
+    --llm-color-primary-light: #dbeafe;
+    --llm-color-primary-bg: #eff6ff;
+    --llm-color-success-bg: #d1fae5;
+    --llm-color-error-bg: #fee2e2;
+    --llm-color-error-border: #fecaca;
+    --llm-color-warning-bg: #fef3c7;
+    --llm-bg-primary: #ffffff;
+    --llm-bg-secondary: #f9fafb;
+    --llm-bg-tertiary: #f3f4f6;
+    --llm-bg-hover: #e5e7eb;
+    --llm-text-primary: #333333;
+    --llm-text-secondary: #666666;
+    --llm-text-muted: #9ca3af;
+    --llm-text-placeholder: #9ca3af;
+    --llm-border-color: #e5e7eb;
+    --llm-border-light: #f3f4f6;
+    --llm-settings-bg: #f8fafc;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --llm-system-text: #c4b5e5;
+    --llm-system-bg: #282137;
+    --llm-color-primary-light: #1e3a5f;
+    --llm-color-primary-bg: #172554;
+    --llm-color-success-bg: #143c2b;
+    --llm-color-error-bg: #451a1a;
+    --llm-color-error-border: #7f1d1d;
+    --llm-color-warning-bg: #422006;
+    --llm-bg-primary: #0d1117;
+    --llm-bg-secondary: #161b22;
+    --llm-bg-tertiary: #1e2530;
+    --llm-bg-hover: #30363d;
+    --llm-text-primary: #c9d1d9;
+    --llm-text-secondary: #8b949e;
+    --llm-text-muted: #6e7681;
+    --llm-text-placeholder: #6b7280;
+    --llm-border-color: #30363d;
+    --llm-border-light: #21262d;
+    --llm-settings-bg: #252525;
+}
