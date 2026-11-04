@@ -22,10 +22,10 @@ function graph(entry) {
 
 for (const format of ['js', 'cjs']) {
     const codec = graph(`llm-config.${format}`);
-    assert.doesNotMatch([...codec.values()].join('\n'), /LLMDeviceDriver|HostMCPTransport|LLM_PROVIDERS|@itookit\/vfs-core|@modelcontextprotocol/,
+    assert.doesNotMatch([...codec.values()].join('\n'), /LLMDeviceDriver|HostMCPTransport|LLM_PROVIDERS|@nestos\/vfs-core|@modelcontextprotocol/,
         `${format}: config entry must not load management runtime or product catalogs`);
     const core = graph(`llm-core.${format}`);
-    assert.doesNotMatch([...core.values()].join('\n'), /LLM_PROVIDERS|DEFAULT_AGENTS|MODEL_PRICING|@itookit\/common/,
+    assert.doesNotMatch([...core.values()].join('\n'), /LLM_PROVIDERS|DEFAULT_AGENTS|MODEL_PRICING|@nestos\/common/,
         `${format}: core entry must not load product catalogs or application globals`);
     const host = graph(`llm-mcp-host.${format}`);
     assert.doesNotMatch([...host.values()].join('\n'), /hostFactory|registerMCPStdioHost|snapshotMCPStdioHost/, `${format}: host bridges must remain instance scoped`);
@@ -33,7 +33,7 @@ for (const format of ['js', 'cjs']) {
         `${format}: core must not load the legacy host registry`);
     const contracts = graph(`contracts.${format}`);
     assert.doesNotMatch([...contracts.values()].join('\n'),
-        /LLM_PROVIDERS|MODEL_PRICING|DOUBAO_SPEECH_REFERENCE|MODEL_PRICE_CATALOG|@itookit\/vfs-core/,
+        /LLM_PROVIDERS|MODEL_PRICING|DOUBAO_SPEECH_REFERENCE|MODEL_PRICE_CATALOG|@nestos\/vfs-core/,
         `${format}: contracts entry must not load product catalogs, price snapshots or VFS`);
 }
 const manifest = JSON.parse(readFileSync(new URL('../backend/kernel-adapters/package.json', import.meta.url), 'utf8'));

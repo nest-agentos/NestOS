@@ -64,8 +64,8 @@ test('incremental builds reuse artifacts, rebuild dependents, and freeze unselec
     assert.doesNotMatch(result.stdout, /stage=install/);
     writeFileSync(join(root, 'libraries/core/src/index.cjs'), 'module.exports={value:2};');
     result = build(root); assert.equal(result.status, 0, result.stdout + result.stderr);
-    assert.match(result.stdout, /library=@itookit\/core reasons=source-changed/);
-    assert.match(result.stdout, /library=@itookit\/parent reasons=dependency-rebuilt/);
+    assert.match(result.stdout, /library=@nestos\/core reasons=source-changed/);
+    assert.match(result.stdout, /library=@nestos\/parent reasons=dependency-rebuilt/);
     const second = preparedSnapshot(root);
     assert.notEqual(second.id, first.id);
     assert.deepEqual(lines(root).slice(4), ['core:2', 'parent:2', 'leaf:2']);

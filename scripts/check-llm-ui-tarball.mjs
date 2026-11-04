@@ -21,7 +21,7 @@ writeFileSync(resolve(consumer, 'package.json'), JSON.stringify({ private: true,
 }, devDependencies: { typescript: '5.9.3', vite: '5.4.21', jsdom: '27.2.0' } }, null, 2));
 writeFileSync(resolve(consumer, 'pnpm-workspace.yaml'), 'packages: ["."]\noverrides:\n  "@nestos/mdxeditor": "file:../artifacts/mdxeditor.tgz"\n');
 run('pnpm', ['install', '--ignore-scripts', ...(process.argv.includes('--online') ? [] : ['--offline'])], consumer);
-for (const name of ['llm-ui', 'mdxeditor']) assert.ok(realpathSync(resolve(consumer, 'node_modules/@itookit', name)).startsWith(consumer + '/'));
+for (const name of ['llm-ui', 'mdxeditor']) assert.ok(realpathSync(resolve(consumer, 'node_modules/@nestos', name)).startsWith(consumer + '/'));
 writeFileSync(resolve(consumer, 'main.ts'), `
 import { createChatView, createOperationLedger, type ChatOptions } from '@nestos/llm-ui';
 import { createFlowView, type FlowSnapshot } from '@nestos/llm-ui/flow';

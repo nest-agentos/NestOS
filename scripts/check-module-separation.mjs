@@ -96,7 +96,7 @@ function splitLibraryChunkRole(path, root, library) {
 
 export function moduleRole(path, root = repository) {
     const file = relative(root, path).replaceAll('\\', '/');
-    const installed = /(?:^|\/)node_modules\/@itookit\/([^/]+)\/dist\/(.*)$/.exec(file);
+    const installed = /(?:^|\/)node_modules\/@nestos\/([^/]+)\/dist\/(.*)$/.exec(file);
     if (installed) {
         if (['kanban', 'mail'].includes(installed[1]) && /(?:^|\/)chunk-[\w-]+\.(?:cjs|js)$/.test(installed[2])) return splitLibraryChunkRole(path, root, installed[1]);
         const tail = installed[2].replace(/^(processing|policy|validation|contracts)-[\w-]+\./, '$1.').replace(/\.(?:cjs|js)$/, '.ts');

@@ -5,7 +5,7 @@ export default defineConfig({
     // The host bundles portable workspace capabilities for plain Node startup.
     banner: { js: "import { createRequire as createNodeRequire } from 'node:module'; const require = createNodeRequire(import.meta.url);" },
     external: ['better-sqlite3', 'node-pty', 'sharp'],
-    noExternal: [/^@itookit\//],
+    noExternal: [/^@nestos\//],
     esbuildOptions(options) {
         options.metafile = true;
     },

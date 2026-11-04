@@ -64,7 +64,7 @@ test('domain contracts and codecs are shared while host factories and independen
 });
 
 test('installed library artifacts retain frontend, backend and shared boundaries', () => {
-    const base = '/repo/release/local-libraries/locks/id/node_modules/.pnpm/artifact/node_modules/@itookit';
+    const base = '/repo/release/local-libraries/locks/id/node_modules/.pnpm/artifact/node_modules/@nestos';
     assert.equal(moduleRole(base + '/llm-ui/dist/llm-ui.js', '/repo'), 'frontend');
     assert.equal(moduleRole(base + '/vfs-core/dist/index.cjs', '/repo'), 'shared');
     assert.equal(moduleRole(base + '/durable-kernel/dist/index.js', '/repo'), 'backend');

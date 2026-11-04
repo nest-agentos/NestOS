@@ -1,6 +1,6 @@
 {
   "name": "@nestos/llm-ui-adapter",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "description": "NestOS conversation, settings and execution adapters for llm-ui",
   "type": "module",
   "main": "./src/index.ts",

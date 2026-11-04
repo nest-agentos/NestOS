@@ -18,3 +18,5 @@ export { runHttpHost } from './entry';
 export {importLegacyUser} from './import-legacy-user';
 
 export {createUserCertificate} from './create-user-certificate';
+
+export {reportHttpStartupFailure} from './startup-error';

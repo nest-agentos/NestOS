@@ -39,7 +39,7 @@ export function prepareRegistryWorkspace(repository, destination, catalog = libr
 
 function writeRegistryConfig(repository, destination, catalog) {
     const workspace = readFileSync(join(repository, 'pnpm-workspace.yaml'), 'utf8').replace('  - libraries/*\n', '');
-    const pinned = workspace.replace(/^(\s+)"(@itookit\/[^\"]+)": "workspace:\*"$/gm, (line, indent, name) => {
+    const pinned = workspace.replace(/^(\s+)"(@nestos\/[^\"]+)": "workspace:\*"$/gm, (line, indent, name) => {
         const library = catalog.find(library => library.name === name);
         return library ? `${indent}"${name}": "${library.version}"` : line;
     });

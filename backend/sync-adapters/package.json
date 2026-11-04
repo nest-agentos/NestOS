@@ -1,6 +1,6 @@
 {
   "name": "@nestos/sync-adapters",
-  "version": "1.0.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",

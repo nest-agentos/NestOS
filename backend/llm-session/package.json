@@ -1,6 +1,6 @@
 {
   "name": "@nestos/llm-session",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "description": "Conversation rounds, sessions, persistence, and UI projections (DAG flow orchestration lives in @nestos/llm-flow)",
   "type": "module",
   "main": "./src/index.ts",

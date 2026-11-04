@@ -1,6 +1,6 @@
 {
   "name": "@nestos/ui-common-adapter",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "description": "NestOS editor contracts and host adapters for the independent UI foundation.",
   "type": "module",
   "main": "./src/index.ts",

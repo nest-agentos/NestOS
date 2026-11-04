@@ -52,7 +52,7 @@ test('internal peers are reported when no application provides them', t => {
     packageAt(root, 'ui', 'ui-common', { name: '@nestos/ui-common-adapter' });
     packageAt(root, 'ui', 'app-settings', settings());
     packageAt(root, 'apps', 'web-app', { name: 'nestos-web', dependencies: { '@nestos/app-settings': 'workspace:*' } });
-    assert.match(checkWorkspace(root, { catalog: [] })[0], /@itookit\/ui-common-adapter: peer of @itookit\/app-settings is provided by no app/);
+    assert.match(checkWorkspace(root, { catalog: [] })[0], /@nestos\/ui-common-adapter: peer of @nestos\/app-settings is provided by no app/);
     packageAt(root, 'ui', 'app-settings', settings({ peerDependenciesMeta: { '@nestos/ui-common-adapter': { optional: true } } }));
     assert.deepEqual(checkWorkspace(root, { catalog: [] }), []);
     packageAt(root, 'ui', 'app-settings', { name: '@nestos/app-settings', peerDependencies: { react: '^19.0.0' } });
@@ -66,7 +66,7 @@ test('a host that declares the peer satisfies every declaring package once', t =
     packageAt(root, 'ui', 'app-shell', { name: '@nestos/app-shell', peerDependencies: peers });
     packageAt(root, 'apps', 'http-app', { name: '@nestos/http-app', dependencies: {
         '@nestos/app-settings': 'workspace:*', '@nestos/app-shell': 'workspace:*' } });
-    assert.match(checkWorkspace(root, { catalog: [] }).join('\n'), /@itookit\/ui-common-adapter: peer of @itookit\/app-settings, @itookit\/app-shell is provided by no app/);
+    assert.match(checkWorkspace(root, { catalog: [] }).join('\n'), /@nestos\/ui-common-adapter: peer of @nestos\/app-settings, @nestos\/app-shell is provided by no app/);
     packageAt(root, 'apps', 'web-app', { name: 'nestos-web', dependencies: { '@nestos/ui-common-adapter': 'workspace:*' } });
     assert.deepEqual(checkWorkspace(root, { catalog: [] }), []);
 });

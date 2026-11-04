@@ -1,6 +1,6 @@
 {
   "name": "@nestos/mail",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "description": "Portable indexed VFS mail archive with paginated threads and a host-injected reader.",
   "type": "module",
   "main": "./src/index.ts",
@@ -17,10 +17,10 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@nestos/vfs-core": "^5.3.4"
+    "@nestos/vfs-core": "^0.5.1"
   },
   "dependencies": {
-    "@nestos/ui-common": "^0.1.0"
+    "@nestos/ui-common": "^0.5.1"
   },
   "devDependencies": {
     "@nestos/vfs-core": "workspace:*",

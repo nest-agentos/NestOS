@@ -1,3 +1,5 @@
+import {performance} from 'node:perf_hooks';
+import {storageStartupError} from './startup-error';
 import { RECORD_PAGE_SQL, recordPageValues, decodeRecordPage, type RecordPageRow } from '@nestos/vfsdriver-local';
 import type { ISidecarDb, MetaExtRow } from '@nestos/vfsdriver-local';
 import { DDL, SCHEMA_VERSION, PATH_DATA_EXISTS, movePathStatements } from '@nestos/vfsdriver-local';
@@ -33,15 +35,22 @@ export class NodeSqliteSidecarDb implements ISidecarDb {
         assertNodeVersion();
         const moduleName = 'node:sqlite';
         const sqlite = await import(moduleName) as unknown as { DatabaseSync: DatabaseSyncConstructor };
-        const db = new sqlite.DatabaseSync(filePath);
-        db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+        const started = performance.now(); let db: DatabaseSync | undefined;
+        try {
+        db = new sqlite.DatabaseSync(filePath);
+        db.exec('PRAGMA busy_timeout = 5000;');
+        db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON;');
         const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as Array<{ name: string }>;
         if (tables.length) {
             const versions = tables.some(table => table.name === '_schema_version') ? db.prepare('SELECT version FROM _schema_version').all() as Array<{ version: number }> : [];
-            if (versions.length !== 1 || versions[0].version !== SCHEMA_VERSION) { db.close(); throw new Error('Filesystem database version incompatible'); }
+            if (versions.length !== 1 || versions[0].version !== SCHEMA_VERSION) { db.close(); throw Object.assign(new Error('Filesystem database version incompatible'), {code: 'DATABASE_SCHEMA_INCOMPATIBLE'}); }
         }
         db.exec(DDL);
         return new NodeSqliteSidecarDb(db);
+        } catch (error) {
+            try {db?.close();} catch { /* Preserve the initialization failure. */ }
+            throw await storageStartupError(error, filePath, 'storage.sidecar.initialize', started);
+        }
     }
 
     async getMetaExt(itemPath: string): Promise<MetaExtRow | null> {

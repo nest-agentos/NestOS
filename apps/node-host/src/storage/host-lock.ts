@@ -1,13 +1,21 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import {performance} from 'node:perf_hooks';
+import {storageStartupError} from './startup-error';
 
 /** OS-backed SQLite locks survive neither crashes nor process exits. */
 export async function acquireHostLock(directory: string): Promise<() => void> {
     await mkdir(directory, { recursive: true, mode: 0o700 });
     const moduleName = 'node:sqlite';
     const { DatabaseSync } = await import(moduleName) as { DatabaseSync: new (file: string) => { exec(sql: string): void; close(): void } };
-    const database = new DatabaseSync(path.join(directory, 'httpd-host-lock.sqlite'));
-    try { database.exec('PRAGMA busy_timeout=0; BEGIN EXCLUSIVE;'); }
-    catch { database.close(); throw Object.assign(new Error('This data or credential directory is already owned by another application host'), {code: 'HOST_LOCK_BUSY'}); }
-    return () => database.close();
+    const file = path.join(directory, 'httpd-host-lock.sqlite'), started = performance.now();
+    let database: InstanceType<typeof DatabaseSync> | undefined;
+    try {
+        database = new DatabaseSync(file);
+        database.exec('PRAGMA busy_timeout=0; BEGIN EXCLUSIVE;');
+    } catch (error) {
+        try {database?.close();} catch { /* Preserve the acquisition failure. */ }
+        throw await storageStartupError(error, file, 'storage.host-lock.acquire', started, true);
+    }
+    return () => database!.close();
 }

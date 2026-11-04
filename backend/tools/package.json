@@ -1,6 +1,6 @@
 {
   "name": "@nestos/tools",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "description": "Built-in LLM tools — File, Search, Shell, Task, Agent with buildTool() factory pattern",
   "type": "module",
   "main": "./src/index.ts",

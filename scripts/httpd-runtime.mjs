@@ -33,6 +33,25 @@ export function pinSnapshotDependencies(file, snapshot) {
     manifest.dependencies = { ...manifest.dependencies, ...libraryState.snapshotOverrides(snapshot) };
     writeFileSync(file, JSON.stringify(manifest, null, 2) + '\n');
 }
+/** Materialize local edges before pnpm deploy reconstructs peer dependencies across the workspace. */
+export function pinSnapshotManifests(root, snapshot, files) {
+    const overrides = libraryState.snapshotOverrides(snapshot), versions = new Map(snapshot.packages.map(item => [item.name, item.version]));
+    for (const relative of files.filter(file => /(^|\/)package\.json$/.test(file))) {
+        const file = path.join(root, relative), manifest = JSON.parse(readFileSync(file, 'utf8'));
+        let changed = false;
+        if (/^apps\/[^/]+\/package\.json$/.test(relative)) {manifest.dependencies = {...manifest.dependencies, ...overrides}; changed = true;}
+        for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+            for (const name of Object.keys(manifest[field] ?? {})) if (overrides[name]) {manifest[field][name] = overrides[name]; changed = true;}
+        }
+        for (const name of Object.keys(manifest.peerDependencies ?? {})) {
+            if (!overrides[name]) continue;
+            manifest.peerDependencies[name] = versions.get(name);
+            const field = manifest.peerDependenciesMeta?.[name]?.optional ? 'optionalDependencies' : 'dependencies';
+            (manifest[field] ??= {})[name] = overrides[name]; changed = true;
+        }
+        if (changed) writeFileSync(file, JSON.stringify(manifest, null, 2) + '\n');
+    }
+}
 /** Deployment skips lifecycle scripts; preserve the verified host-native build outputs. */
 export function copyNativeRuntimes(source, destination, names = ['better-sqlite3', 'node-pty']) {
     for (const name of names) {

@@ -23,7 +23,7 @@ export function buildEnvironment(env = process.env) {
 }
 export function dependencyInputs(files) {
     return files.filter(file => /(^|\/)package\.json$/.test(file) || /(^|\/)(?:pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.cjs)$/.test(file)
-        || file.startsWith('scripts/local-library-state.'));
+        || file.startsWith('scripts/local-library-state.') || ['scripts/httpd-runtime.mjs', 'scripts/httpd-build.mjs'].includes(file));
 }
 export function artifactContext(source, files, dependencyKey, environment) {
     const configuration = files.filter(file => file.startsWith('scripts/') || /(^|\/)(?:package\.json|tsconfig[^/]*\.json|[^/]*(?:vite|tsup)\.config\.[^/]+)$/.test(file)

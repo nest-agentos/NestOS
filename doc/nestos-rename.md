@@ -18,7 +18,7 @@
 
 产品显示名、Web/PWA 标题、桌面 productName、证书新生成时的显示名统一为 NestOS。
 通用独立库的 repo 名称不改：mdxeditor、vfs-core、llm-ui 等仍保持独立身份。
-`@itookit` 是现有 npm 发布组织，不是产品显示名，本次不迁移 npm scope。
+`@nestos` 是现有 npm 发布组织，不是产品显示名，本次不迁移 npm scope。
 HTTP 发行包已使用 `nestos`，命令为 `nestos httpd`；完整 CLI 仍是源码中的独立入口，不额外安装另一份同名全局命令。
 
 旧库快照包含旧包名时不会直接用于新构建；下一次 `pnpm lib:build` 会因目录清单变化准备完整的新快照。

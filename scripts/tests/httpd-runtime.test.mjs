@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { execFile, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { promisify } from 'node:util';
-import { hostArguments, hostEnvironment, runtimePaths, releaseDirectory, releasesRoot, verifyRelease, runtimeLog, freezeWorkspaceDependencies, sourceFingerprint, copySource, copyNativeRuntimes } from '../httpd-runtime.mjs';
+import { pinSnapshotManifests, hostArguments, hostEnvironment, runtimePaths, releaseDirectory, releasesRoot, verifyRelease, runtimeLog, freezeWorkspaceDependencies, sourceFingerprint, copySource, copyNativeRuntimes } from '../httpd-runtime.mjs';
 import {captureSourceGuard} from '../httpd-build.mjs';
 
 test('deployment retains native runtime files and rejects incompatible package builds', t => {
@@ -136,7 +136,7 @@ test('freezes workspace links to the deployment copy rather than the development
     const directory = mkdtempSync(path.join(tmpdir(), 'httpd-dependencies-'));
     try {
         const source = path.join(directory, 'source'), snapshot = path.join(directory, 'snapshot');
-        const nested = path.join(snapshot, 'node_modules/.pnpm/parent/node_modules/@itookit');
+        const nested = path.join(snapshot, 'node_modules/.pnpm/parent/node_modules/@nestos');
         const copied = path.join(snapshot, 'node_modules/.pnpm/pkg/node_modules/@nestos/core');
         mkdirSync(source, { recursive: true }); mkdirSync(nested, { recursive: true }); mkdirSync(copied, { recursive: true });
         writeFileSync(path.join(snapshot, 'package.json'), JSON.stringify({ name: '@nestos/http-app', version: '1' }));
@@ -158,4 +158,16 @@ test('bounds runtime log rotation and protects the log file', () => {
         assert.ok(statSync(file).size <= 16); assert.ok(statSync(file + '.3').size <= 16);
         assert.equal(statSync(file).mode & 0o077, 0);
     } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('deployment materializes snapshot edges for every workspace peer without changing unrelated dependencies', t => {
+    const root = mkdtempSync(path.join(tmpdir(), 'httpd-peers-')); t.after(() => rmSync(root, {recursive:true,force:true}));
+    const file = path.join(root,'package.json');
+    writeFileSync(file,JSON.stringify({peerDependencies:{'@nestos/example':'^1.0.0','external':'^2.0.0'},peerDependenciesMeta:{'@nestos/example':{optional:true}},dependencies:{external:'^2.0.0'}}));
+    const directory = path.join(root,'artifacts'); mkdirSync(directory);
+    const snapshot={directory,packages:[{name:'@nestos/example',version:'0.5.1',file:'example.tgz'}]};
+    pinSnapshotManifests(root,snapshot,['package.json']);
+    const actual=JSON.parse(readFileSync(file));
+    assert.equal(actual.peerDependencies['@nestos/example'],'0.5.1');assert.equal(actual.peerDependencies.external,'^2.0.0');assert.equal(actual.dependencies.external,'^2.0.0');
+    assert.match(actual.optionalDependencies['@nestos/example'],/^file:/);assert.ok(actual.optionalDependencies['@nestos/example'].endsWith('/artifacts/example.tgz'));
 });

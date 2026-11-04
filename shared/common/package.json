@@ -1,6 +1,6 @@
 {
   "name": "@nestos/common",
-  "version": "0.4.1",
+  "version": "0.5.1",
   "description": "Common utilities and types for the itookit ecosystem (UI-free).",
   "type": "module",
   "main": "./src/index.ts",

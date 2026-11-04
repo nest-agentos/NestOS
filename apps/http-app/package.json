@@ -1,7 +1,7 @@
 {
   "name": "@nestos/http-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "create:certs": "bash scripts/create-certificates.sh",

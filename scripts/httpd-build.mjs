@@ -3,7 +3,7 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { copyLibrarySnapshot, copyNativeRuntimes, copySource, freezeWorkspaceDependencies, sourceFiles, sourceFingerprint, verifyRelease } from './httpd-runtime.mjs';
+import { pinSnapshotManifests, copyLibrarySnapshot, copyNativeRuntimes, copySource, freezeWorkspaceDependencies, sourceFiles, sourceFingerprint, verifyRelease } from './httpd-runtime.mjs';
 import { acquireBuildLock, artifactContext, buildEnvironment, dependencyInputs, digest, fileHash, graphInputs, readJSON, restoreArtifact, storeArtifact, treeRecords } from './httpd-build-cache.mjs';
 import state from './local-library-state.mjs';
 import { preparedSnapshot } from './local-library-plan.mjs';
@@ -105,7 +105,7 @@ function workspace(context) {
     const source = path.join(directory, 'source'), hit = cache && installationHit(directory, dependencyKey);
     if (!hit) rmSync(directory, {recursive: true, force: true});
     stage('capture', () => { capture(root, source, inputs); if (!hit) copyLibrarySnapshot(root, source, snapshot); });
-    state.readSelection(source);
+    pinSnapshotManifests(source, state.readSelection(source), inputs);
     const manifest = path.join(source, 'apps/http-app/package.json');
     const pkg = readJSON(manifest); pkg.dependencies = {...pkg.dependencies, ...state.snapshotOverrides(state.readSelection(source))};
     writeFileSync(manifest, JSON.stringify(pkg, null, 2) + '\n');

@@ -1,6 +1,6 @@
 {
   "name": "@nestos/llm-flow",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "description": "DAG flow orchestration: dynamic graph scheduling, builtin plugins, flow programs, and flow definition persistence",
   "type": "module",
   "main": "./src/index.ts",

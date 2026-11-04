@@ -1,6 +1,6 @@
 {
   "name": "@nestos/kernel-adapters",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "description": "Kernel capability adapters for LLM, tools, skills, Bash, and TTY",
   "type": "module",
   "main": "./src/index.ts",

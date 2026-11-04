@@ -47,7 +47,7 @@ test('registry build staging excludes sources and secrets without changing devel
     assert.equal(JSON.parse(readFileSync(join(root, 'package.json'))).dependencies['@nestos/core'], 'workspace:*');
     assert.equal(JSON.parse(readFileSync(join(destination, 'package.json'))).scripts.preinstall, undefined);
     assert.ok(workspaceAliases(join(destination, 'apps/web-app')).every(alias => !alias.find.test('@nestos/core')));
-    assert.match(readFileSync(join(destination, 'pnpm-workspace.yaml'), 'utf8'), /"@itookit\/core": "1\.0\.0"/);
+    assert.match(readFileSync(join(destination, 'pnpm-workspace.yaml'), 'utf8'), /"@nestos\/core": "1\.0\.0"/);
 });
 
 
