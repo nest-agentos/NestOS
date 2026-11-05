@@ -2,7 +2,7 @@ import {FSError} from '@nestos/vfs-core';
 import {randomUUID} from '@nestos/common';
 import type {RemoteProcessHandle} from './remote-mounts';
 
-export interface PreparedWorktree {id: string; directory: string; branch: string; baseCommit: string; phase: 'prepared' | 'creating' | 'ready'; claim?: string}
+export interface PreparedWorktree {archivedAt?:number;archiveOperationId?:string;id: string; directory: string; branch: string; baseCommit: string; phase: 'prepared' | 'creating' | 'ready'; claim?: string}
 interface Journal {get<T>(key: string): Promise<T | undefined>; update<T>(key: string, change: (old: T | undefined) => T): Promise<T>}
 
 /** Relative Git metadata survives the process and native-session namespace change. */

@@ -5,6 +5,10 @@
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    'kanban.recordRestartHelp': '将结算并归档旧决策版本、任务、会话和工作区关联，再从原始决策新建会话重新澄清。不会沿用旧回答或规划。',
+    'kanban.previousDecisionRuns': '已归档的决策执行版本',
+    'kanban.subtaskOf': '子任务 · 所属任务',
+    'kanban.aggregateTask': '汇总任务 · 进度由子任务汇总',
     'kanban.includeArchivedRecords': '包含已归档决策',
     'kanban.restartDecision': '重新执行决策',
     'kanban.archiveDecision': '归档决策及任务',

@@ -170,6 +170,8 @@ Cells 在消息首次持久化的事务记录 sessionId、turnId、operationId�
 
 `controlRecord` 的 `restart/archive/delete` 是持久协调意图：先禁止新的派发，逐层请求取消并核对回执；未知结果持续保留处理中，不假定已经停止。重启继续同一操作。归档/删除同时处理生成任务及其全部子任务，跨目标看板保持原归属；无关根事项不在控制范围。归档使用既有事项归档存储，删除使用逻辑墓碑，原生会话通过宿主 archiveSession 端口按稳定操作身份归档，未知回执只核对，不重复发送；不删除会话历史或未满足安全条件的 worktree。决策列表可包含已归档项。
 
-重新执行在旧轮结算后归档旧事项，记录新的 executionEpoch 并创建新 Run、新任务与新会话，保留原记录与追溯链接。新规划输入携带 priorPlanning 作为上一轮已确认范围，不能将它当作本轮开发完成。同一操作重试复用原 epoch，不创建第三轮。UI 菜单确认后携带所见决策 revision；CLI `kanban record-control <board> --file <request.json>` 复用同一服务入口，冻结请求包含 recordId、operationId、action 与 expectedRevision。
+重新执行在旧轮结算后归档旧事项，记录新的 executionEpoch 并创建新 Run、新任务与新会话，保留原记录与追溯链接。新规划只读取原始决策要求，不继承上一轮澄清或规划结果。旧决策执行快照具有 archivedAt 标记，在界面历史中折叠；worktree 只归档关联元数据，保留目录、分支和安全清理约束。同一操作重试复用原 epoch，不创建第三轮。UI 菜单确认后携带所见决策 revision；CLI `kanban record-control <board> --file <request.json>` 复用同一服务入口，冻结请求包含 recordId、operationId、action 与 expectedRevision。
 
 规划拒绝回执携带 pendingQuestionIds，明确列出尚未结算的历史问题；有效 resolved 也具有 validated 回执。已验证的最终规划保持冻结，后续会话轮次不能使其退回等待。
+
+子任务卡片与详情顶部显示父事项编号及名称，并提供父任务入口；汇总父项明确标注由子任务汇总进度。澄清尚未 ready 时，宿主不得采纳拆分或创建开发子任务。

@@ -39,7 +39,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
 function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanAutomationOptions|undefined,events:UserEventService,log:ReturnType<typeof personalOptions>['log'],setOperations:(value:ReturnType<typeof import('./item-operations').createItemOperations>|undefined)=>void):KanbanRuntimeExtension[] {
     const {service,journal,workLog,fs,serviceFor}=context;
     const operations=options?.itemOperations?.({service,journal,workLog,log});setOperations(operations);
-    const resources=options?.workResources?.({service,journal,workLog});
+    const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,...resources}=resourcePorts??{};
     const automation=options?createPersonalKanbanAutomation({...options,fs,service,journal,workLog,log,serviceFor}):undefined;
     const fixes=options?.projects?.openWorkspace&&options.prepareWork?createTaskFix({fs,service,journal,events,automation:options,log,prepareSession:async id=>{
         await options.ensureReady?.();await options.sessions.ensureSession(id,'Fix');
@@ -48,7 +48,7 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
     const planning=options?planningSessionReader(service,journal,options):undefined;
-    return [{capabilities:{...(planning?{planningSession:planning,queryActivity:async(board,query)=>{
+    return [{archiveItemResources,capabilities:{...(planning?{planningSession:planning,queryActivity:async(board,query)=>{
         const page=await service.queryActivity(board,query);
         const items=await mapConcurrent(page.items,4,async item=>!item.execution&&item.analysis?{...item,planningSession:await planning(board,item.id)}:item);
         return {...page,items};

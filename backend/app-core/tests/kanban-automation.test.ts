@@ -275,3 +275,12 @@ it('recovers clarification projection conflicts without restarting the planning 
     expect(f.executions()).toHaveLength(0);
     await f.service.scan();expect((await f.service.item('board','first')).task?.phase).toBe('waiting-input');
 });
+it('does not create development subtasks from an unclarified planning result',async()=>{
+    const tasks=['one','two'].map(key=>({key,title:key,responsibility:'Work '+key,acceptance:'Verify '+key,dependsOn:[]}));
+    const f=await fixture(false,{ready:false,reason:'Confirm product scope',dependencies:[],subtasks:tasks});
+    await f.item('first');await f.service.scan();await f.service.scan();
+    expect((await f.service.item('board','first')).task?.phase).toBe('waiting-input');
+    expect((await f.service.query('board',{view:'all',parentId:'first'})).total).toBe(0);
+    expect(Object.keys((await f.service.workflow('board')).plans)).toHaveLength(0);
+    expect(f.executions()).toHaveLength(0);
+});

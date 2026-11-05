@@ -25,7 +25,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
     sessionExecutionResources?(id: string): Promise<Array<{label: string; value: string}>>;
     continuation?: Pick<ContinueWorkOptions, 'submission' | 'prepare'>;
-    workResources?(context: {service: KanbanService; workLog: KanbanWorkLog; journal: KanbanAutomationJournal}): Pick<import('@nestos/kanban/contracts').KanbanClient, 'workResources' | 'cleanupWorkResource'>;
+    workResources?(context: {service: KanbanService; workLog: KanbanWorkLog; journal: KanbanAutomationJournal}): Pick<import('@nestos/kanban/contracts').KanbanClient, 'workResources' | 'cleanupWorkResource'> & {archiveItemResources?(boardId:string,itemId:string,operationId:string):Promise<void>};
     enqueueTaskReply?(request:import('@nestos/llm-session/contracts').SubmissionRequest):Promise<void>;
     registerInstructionGate?(gate:(sessionId:string,input:import('@nestos/llm-session/contracts').SessionInstruction)=>Promise<boolean>):()=>void;
     executionResource?(sessionId:string,branch:string):Promise<string|undefined>;

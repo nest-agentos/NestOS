@@ -162,3 +162,12 @@ it('retains a worktree referenced by another board before inspecting or removing
     await expect(f.api.cleanupWorkResource('board',{itemId:'item',resourceId:'ready',version:resource.version,operationId:'shared-cleanup'})).rejects.toMatchObject({code:'WORKTREE_SHARED'});
     expect(await stat(f.physical)).toBeDefined();
 });
+it('archives workspace associations without removing directories or running Git cleanup',async()=>{
+    const f=await fixture(),before=f.commands.length;
+    await f.api.archiveItemResources('board','item','archive-generation');
+    await f.api.archiveItemResources('board','item','archive-generation');
+    const rows=await f.api.workResources('board','item',{inspect:false});
+    expect(rows[0].archivedAt).toBeTypeOf('number');
+    expect((await stat(f.physical)).isDirectory()).toBe(true);
+    expect(f.commands).toHaveLength(before);
+});

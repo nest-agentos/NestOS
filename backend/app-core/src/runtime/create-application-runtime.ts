@@ -622,7 +622,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 prepare: input => developmentOperations.run(() => continueDevelopment(input))} : undefined,
             workResources: developmentBindings ? context => {
                 const resources = developmentWorkResources({...developmentBindings, ...context, calls: independentCalls, kernel: kernelCore});
-                return {workResources: (boardId, itemId, query) => developmentOperations.run(() => resources.workResources(boardId, itemId, query)),
+                return {archiveItemResources:resources.archiveItemResources,workResources: (boardId, itemId, query) => developmentOperations.run(() => resources.workResources(boardId, itemId, query)),
                     cleanupWorkResource: (boardId, request) => developmentOperations.run(() => resources.cleanupWorkResource(boardId, request))};
             } : undefined,
             enqueueTaskReply:async request=>{

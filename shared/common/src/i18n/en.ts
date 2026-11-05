@@ -4,6 +4,10 @@
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    'kanban.recordRestartHelp': 'Settle and archive the previous decision run, tasks, sessions and workspace associations, then start a new session from the original decision. Prior answers and plans are not reused.',
+    'kanban.previousDecisionRuns': 'Archived decision runs',
+    'kanban.subtaskOf': 'Subtask · Parent',
+    'kanban.aggregateTask': 'Summary task · Progress from subtasks',
     'kanban.includeArchivedRecords': 'Include archived decisions',
     'kanban.restartDecision': 'Restart decision',
     'kanban.archiveDecision': 'Archive decision and tasks',

@@ -29,7 +29,7 @@ interface Cleanup {operationId: string; boardId: string; itemId: string; version
 interface ResourceScope {id: string; item: Awaited<ReturnType<KanbanService['item']>>['item']; record: DevelopmentWorkspaceRecord; tree: PreparedWorktree}
 
 export function developmentWorkResources(options: Options) {
-    return {workResources: async (boardId: string, itemId: string, query?: import('@nestos/kanban/contracts').KanbanWorkResourceQuery) => {
+    return {archiveItemResources:(board:string,item:string,operation:string)=>archiveAssociations(options,board,item,operation),workResources: async (boardId: string, itemId: string, query?: import('@nestos/kanban/contracts').KanbanWorkResourceQuery) => {
         const started = Date.now(), operationId = randomUUID(), stage = query?.inspect === false ? 'associations' : 'inspect';
         try {
             requireValue(query === undefined || !!query && typeof query === 'object' && !Array.isArray(query) && Object.keys(query).every(key => key === 'inspect')
@@ -46,7 +46,7 @@ async function associations(options: Options, boardId: string, itemId: string): 
     const refs = await references(options, boardId, itemId), rows: KanbanWorkResource[] = [];
     for (let offset = 0; offset < refs.length; offset += 8) rows.push(...await Promise.all(refs.slice(offset, offset + 8).map(async (ref): Promise<KanbanWorkResource> => {
         const [tree, cleanup] = await Promise.all([options.journal.get<PreparedWorktree>('worktree:' + ref.id), options.journal.get<Cleanup>('worktree-cleanup:' + ref.id)]);
-        return {id: ref.id, kind: 'git-worktree', title: tree?.branch ?? ref.id, location: tree?.directory ?? ref.id, version: '',
+        return {archivedAt:tree?.archivedAt,id: ref.id, kind: 'git-worktree', title: tree?.branch ?? ref.id, location: tree?.directory ?? ref.id, version: '',
             state: cleanup?.phase === 'cleaned' ? 'cleaned' : 'associated', reasons: [], canCleanup: false,
             properties: tree ? [{label: t('kanban.workResourceBranch'), value: tree.branch}] : []};
     })));
@@ -100,7 +100,7 @@ async function inspect(options: Options, boardId: string, resource: ResourceScop
     const {id, item, record, tree} = resource, saved = await options.journal.get<Cleanup>('worktree-cleanup:' + id);
     const context = record.context as {board?: {id?: string}; task?: {id?: string}} | undefined;
     const ownership = context?.board?.id && context?.task?.id ? context.board.id === boardId && context.task.id === item.id ? 'current' as const : 'other' as const : 'unknown' as const;
-    const base = {id, ownership, kind: 'git-worktree', title: 'Git worktree', location: record.directory,
+    const base = {id,archivedAt:tree.archivedAt, ownership, kind: 'git-worktree', title: 'Git worktree', location: record.directory,
         properties: [{label: t('kanban.workResourceBranch'), value: tree.branch}, {label: t('kanban.workResourceProject'), value: (await options.projects.get(record.projectId)).name}]};
     if (saved) return {...base, properties: [...base.properties, ...(saved.archive ? [{label: t('kanban.workResourceArchive'), value: saved.archive}] : [])], version: saved.version, state: saved.phase === 'cleaned' ? 'cleaned' : 'unknown', canCleanup: false,
         reasons: saved.phase === 'cleaned' ? [] : ['WORKTREE_CLEANUP_UNCONFIRMED']};
@@ -184,4 +184,12 @@ async function sharedReference(options: Options, ownerBoard: string, id: string,
         if (board !== ownerBoard && page.total > 0 || board === ownerBoard && (page.total > 1 || page.items.some(item=>item.id!==ownerItem))) return true;
     }
     return false;
+}
+
+async function archiveAssociations(options:Options,board:string,itemId:string,operationId:string):Promise<void> {
+    const started=Date.now(),{item}=await options.service.item(board,itemId);
+    requireValue(['completed','cancelled'].includes(item.status),'WORKTREE_TASK_UNFINISHED');
+    const refs=await references(options,board,itemId);
+    for(const ref of refs)if(await options.journal.get<PreparedWorktree>('worktree:'+ref.id))await options.journal.update<PreparedWorktree>('worktree:'+ref.id,old=>({...old!,archivedAt:old!.archivedAt??Date.now(),archiveOperationId:old!.archiveOperationId??operationId}));
+    log.info('work-resource.archive',{operation:'work-resource.archive',operationId,stage:'archive-associations',result:'success',count:refs.length,durationMs:Date.now()-started});
 }
