@@ -429,7 +429,7 @@ DagWorkbench 在 Run 未终态时为终态成员提供「重试并重算下游�
 
 `builtin.route@2.0.0` 是普通 DAG 节点：显式 branches 模板、input/prompt/history 策略、maxRounds/maxConcurrency 和 until；每轮通过 Kernel spawn 独立 Task，校验后按 key 保留各类型最新结果。默认不继承上下文，也不发布子 Task 事件到主会话。输出端口为 result。
 
-`builtin.aggregate@1.0.0` 将 previous/updates 按键合并输出 result。节点 outputPolicy 可分别配置 includeInRunOutput/publishToHistory。完整参数与限制见 [结构化派发](design/essay-review-flow.md)；可运行示例见 [作文评审 .flow](../backend/app-core/src/presets/essay-review.json)。旧 route@1 和回边循环行为保留。
+`builtin.aggregate@1.0.0` 将 previous/updates 按键合并输出 result。节点 outputPolicy 可分别配置 includeInRunOutput/publishToHistory。完整参数与限制见 [结构化派发](design/essay-review-flow.md)；可运行示例见 [作文评审 .flow](../backend/app-core/src/resources/flows/essay-review.json)。旧 route@1 和回边循环行为保留。
 
 运行参数支持 `minimum` / `maximum` / `integer`。`flowToDag` 将参数声明保存为 `DagRunSpec.parameterSchema`；`prepareFlowParameters` 合并默认值并校验，执行器在创建 Task 前调用。route@2 的 maxRounds/maxConcurrency 可使用完整参数模板，运行时保持 number 类型。详见 [参数契约](design/essay-review-flow.md)。
 

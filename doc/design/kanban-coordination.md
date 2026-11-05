@@ -113,7 +113,7 @@ workflow(boardId) 读取计划、派发、ready 和 completedPlans。核心只�
 
 个人看板的更多菜单提供「AI 协作」：选择已发布的规划与执行 Agent/Flow 后启用。默认关闭，不因绑定执行 Session 或打开页面启动模型；启用会处理该看板已有及新增的可执行待办。看板配置保存冻结的发布版本与摘要、协调/执行主体及验收模式，RPC 公开 automationCatalog 和 analysisStatus；核心只保存通用外部引用，不导入模型或 Session。
 
-规划调用通过现有 IndependentCallService 执行。产品分析默认值位于 `backend/app-core/src/presets/kanban-development-prompts.json` 的 planning.md，通过全局 `/etc/kanban/<profile>/planning.md` 或项目 `_nestos/etc/kanban/<profile>/planning.md` 覆盖；新执行重新读取，旧执行使用冻结快照，改文件无需重新编译。MCP planning section 投影冻结的 planning.md，不另保留 TypeScript 内联规则。候选目录按需读取，不反复传送整个看板正文；上下文超过 200 项明确报 AUTOMATION_CONTEXT_LIMIT。规划的 clarification 通过 MCP 持久化，具体问题、选项和简短建议同时出现在可见会话中；收到后续答复并解决全部问题后才发布 ready=true 的 result payload，宿主核验并采纳。不得把报告成功或轮次结束当成规划或任务完成。规划结果只能增加前置依赖，不能移除人工依赖；引用、自依赖、环路、估算及来源校验失败保留具体错误。提示词不能替代正式授权和校验。
+规划调用通过现有 IndependentCallService 执行。产品分析默认值位于 `backend/app-core/src/resources/kanban/kanban-development-prompts.json` 的 planning.md，通过全局 `/etc/kanban/<profile>/planning.md` 或项目 `_nestos/etc/kanban/<profile>/planning.md` 覆盖；新执行重新读取，旧执行使用冻结快照，改文件无需重新编译。MCP planning section 投影冻结的 planning.md，不另保留 TypeScript 内联规则。候选目录按需读取，不反复传送整个看板正文；上下文超过 200 项明确报 AUTOMATION_CONTEXT_LIMIT。规划的 clarification 通过 MCP 持久化，具体问题、选项和简短建议同时出现在可见会话中；收到后续答复并解决全部问题后才发布 ready=true 的 result payload，宿主核验并采纳。不得把报告成功或轮次结束当成规划或任务完成。规划结果只能增加前置依赖，不能移除人工依赖；引用、自依赖、环路、估算及来源校验失败保留具体错误。提示词不能替代正式授权和校验。
 
 分析记录位于用户 `/var/lib/kanban/automation.seq`，冻结调用身份、原输入、事项修订、规划快照签名、阶段与结果。先保存 prepared，再原子取得 submitting，才提交模型调用；响应丢失及重启仅核对同一身份，不重新发送。事项或规划快照变化时拒绝迟到结果，再按新修订分析。已在途的原分析优先观察，不同时为同一事项启动替代分析。分析依据由 analysisStatus 返回，不写入诊断正文。
 
@@ -300,7 +300,7 @@ suggest 是已授权看板上的只读元数据查询，支持 item/parent/depen
 
 ## 教学看板、启动初始化与恢复
 
-产品内容源为 `backend/app-core/src/presets/kanban-demo.json`，初始化/恢复适配为 `KanbanExamples`。数据含使用指南、可认领入门项、依赖、会话关联、完成/归档、目标与工作组拆解和阻塞示例。已完成卡片明确标注教学状态，不伪装为真实开发交付；不伪造活动负责人或 Session，超时通知对示例关闭。
+产品内容源为 `backend/app-core/src/resources/kanban/kanban-demo.json`，初始化/恢复适配为 `KanbanExamples`。数据含使用指南、可认领入门项、依赖、会话关联、完成/归档、目标与工作组拆解和阻塞示例。已完成卡片明确标注教学状态，不伪装为真实开发交付；不伪造活动负责人或 Session，超时通知对示例关闭。
 
 首次初始化在同一看板事务内经通用 reducer 创建全部卡片、事件及归档，失败全部回滚。并发启动复验当前数据，稳定看板 ID 与初始化回执防止重复创建。安装版本随同一事务保存；同版本后续启动直接跳过，不补齐用户移除的旧示例。升级仅添加新版本引入的练习、记录和建议，不覆盖已修改的正文、确认/拒绝状态或归档；显式恢复才补全缺失资源。
 
@@ -653,7 +653,7 @@ sequenceDiagram
 
 Agent 读取项目 AGENTS.md、README、包脚本和现有构建／部署文档，选择并执行命令。用户确认验收、服务替换与冲突方案。operation-input.json 保存候选版本或已批准方案、版本和逐项选择，manifest 保存其路径与摘要；提示词不能扩大实际部署或沙箱权限。缺少能力时输出 blocked 和具体原因，宿主保留说明及原会话链接。构建成功还须提供实际构建清单或简要构建回执的项目相对路径及 SHA-256，宿主检查文件；服务替换核对实际运行版本；合并核对交付源未变、真实目标 HEAD 及目标祖先关系，禁止仅以聊天文本宣称成功。
 
-系统恢复与维护的看板组包含一个「看板构建、服务替换与合并提示词」条目，显式恢复 task-build-pre/post.md、task-deploy-pre/post.md、task-integrate-pre/post.md 六份全局模板；已有自定义文件不会被普通运行覆盖。项目的 `_nestos/etc/kanban/<profile>/` 同名文件优先。每次操作冻结并上传本次实际提示词；恢复模板不执行 Agent，也不自动构建、替换、合并或改写历史发布。
+系统恢复与维护的看板组包含一个「看板全局配置与提示词」条目（kanban:global-configuration），显式恢复资源目录内全部默认提示词、profile.json 和版本标记，覆盖全局自定义内容。恢复与首次安装、升级调用同一安装器；普通同版本重启保留调试修改。项目定制保留。项目的 `_nestos/etc/kanban/<profile>/` 同名文件优先。每次操作冻结并上传本次实际提示词；恢复模板不执行 Agent，也不自动构建、替换、合并或改写历史发布。
 
 当前由原 Session 内的 Agent 执行命令，通过通道返回结果；没有新增「Session 生成任意脚本后由 Kanban 代调用」通道。若将来加入宿主代执行，应由通用且授权的 Cells 进程端口承担，冻结脚本摘要、参数、执行范围、批准及稳定 requestId，并查询原回执恢复；不能把任意文件写入视为执行授权。
 
@@ -784,6 +784,6 @@ KanbanClient 是两包之间的调用契约，本地服务和 HTTP/RPC 客户端
 
 ### 全局配置的安装与调试
 
-HTTP 将物理 `<nestos>/etc/kanban` 挂到每个用户运行时的 `/etc/kanban`，管理员读写，普通用户只读。默认组位于 development/，包括 profile.json、bootstrap.md、planning.md、decision.md、task.md、fix/续办与维护阶段模板。启动比较 `.defaults.json` 的发布内容摘要；摘要改变时替换发布的全局模板及清单，最后提交版本标记，中断后下次启动重做安装。同一摘要的普通重启保留人工调试改动。此目录按产品升级替换，长期项目定制放项目 `_nestos/etc/kanban/<profile>/`。
+HTTP 将物理 `<nestos>/etc/kanban` 挂到每个用户运行时的 `/etc/kanban`，管理员读写，普通用户只读。默认组位于 development/，包括 profile.json、bootstrap.md、planning.md、decision.md、task.md、fix/续办与维护阶段模板。启动比较 `.defaults.json` 的发布内容摘要；摘要改变时替换发布的全局模板及清单，写入前保存 pending 标记，完成后提交版本和代次；中断后下次启动重做安装。同版本显式恢复也更新代次，读取前后核对标记，拒绝恢复中的读取和跨代次混合快照。同一摘要的普通重启保留人工调试改动。此目录按产品升级替换，长期项目定制放项目 `_nestos/etc/kanban/<profile>/`。
 
 新执行重新读取配置清单及文件，以项目同名覆盖优先；每次执行冻结实际正文、来源和摘要并传送到 Cells。直接改全局文件后不需要重新编译或重启，既有会话仍使用旧快照。bootstrap.md 的 sections、commit 占位符由宿主仅作文本替换，无脚本求值。密钥、权限授权、状态机和回执校验不能由配置文件改写。

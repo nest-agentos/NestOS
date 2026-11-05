@@ -13,12 +13,12 @@
     "backend/llm-flow/src/flow/to-dag.ts": "6c55555672d7e69e45146a6ccd0673ed423788d5a4ab4717771e6606c061a5d1",
     "backend/app-core/src/run/run-definition.ts": "2274ba15429bb9aeefd1b8a9cd581b0505958338ec211c991e950d6a25e041d7",
     "apps/cli/examples/parameter-batches.flow": "f77f49b3279c1b4cb58b0230257a1333aa975b8d65dc47ba48abb7471f0f83f4",
-    "backend/app-core/src/presets/anki-generate.json": "a9e255836adcb9647fbef7b1d2689fe27af9e04aa19321c35fb9a9e44a6e4502",
+    "backend/app-core/src/resources/flows/anki-generate.json": "a9e255836adcb9647fbef7b1d2689fe27af9e04aa19321c35fb9a9e44a6e4502",
     "backend/llm-flow/src/flow/structured/references.ts": "c68b80f28b3376b1831a275c9bb23f56194df6b92093879e3c8b26d51e166f9c"
   },
   "sourceRelocation": {
     "from": "tools/anki-cli/flows/anki-generate.flow",
-    "to": "backend/app-core/src/presets/anki-generate.json",
+    "to": "backend/app-core/src/resources/flows/anki-generate.json",
     "reason": "Byte-identical move after this baseline to restore the single application Flow to System Recovery; earlier validation counts remain historical"
   },
   "contracts": {

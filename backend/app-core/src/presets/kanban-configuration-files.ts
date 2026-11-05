@@ -1,14 +1,16 @@
+import {kanbanConfigurationDefaults} from '../resources/catalog';
 import type {IFileSystem} from '@nestos/vfs-core';
 import {LIFECYCLE_PROMPT_SUFFIXES} from '../run/prompt-lifecycle';
 import {createModuleLogger,randomUUID,sha256HexSync} from '@nestos/common';
 import {readPrompt,failure,type PromptFile} from '../run/prompt-bundle';
-import {KANBAN_CONFIGURATION_DIRECTORY,kanbanConfigurationDefaults} from './kanban-global-configuration';
+import {KANBAN_CONFIGURATION_DIRECTORY,kanbanConfigurationRevision} from './kanban-global-configuration';
 const log=createModuleLogger('kanban-configuration');
 const validName=(name:unknown):name is string=>typeof name==='string'&&/^[a-zA-Z0-9_-]+\.(md|json|yaml|yml|txt)$/.test(name)&&name!=='profile.json';
 /** A bounded manifest selects data files; no file can authorize execution or escape its profile. */
 export async function resolveKanbanConfiguration(fs:IFileSystem,project:IFileSystem,profile:string):Promise<PromptFile[]> {
     const operationId=randomUUID(),started=Date.now();
-    try{const files=await resolveFiles(fs,project,profile);
+    try{const revision=await kanbanConfigurationRevision(fs),files=await resolveFiles(fs,project,profile);
+        if(await kanbanConfigurationRevision(fs)!==revision)throw failure('KANBAN_CONFIGURATION_CHANGED');
         log.info('Configuration resolved',{operation:'kanban.configuration',operationId,stage:'resolve',result:'success',profile,count:files.length,durationMs:Date.now()-started});return files;
     }catch(error){const value=error as {code?:string;file?:string};
         log.warn('Configuration unavailable',{operation:'kanban.configuration',operationId,stage:'resolve',result:'failure',profile,file:value.file,code:value.code??'KANBAN_CONFIGURATION_READ_FAILED',durationMs:Date.now()-started});throw error;
@@ -44,7 +46,10 @@ async function selected(fs:IFileSystem,project:IFileSystem,global:string,local:s
 export async function readGlobalPlanningPrompt(fs:IFileSystem,profile:string):Promise<string> {
     if(!/^[a-zA-Z0-9_-]{1,64}$/.test(profile))throw failure('DEVELOPMENT_POLICY_INVALID');
     const path=KANBAN_CONFIGURATION_DIRECTORY+'/'+profile+'/planning.md';
-    if(await fs.driver.exists(path))return readPrompt(fs,path);
+    if(await fs.driver.exists(path)){
+        const revision=await kanbanConfigurationRevision(fs),content=await readPrompt(fs,path);
+        if(await kanbanConfigurationRevision(fs)!==revision)throw failure('KANBAN_CONFIGURATION_CHANGED');return content;
+    }
     if(profile!=='development'||await fs.driver.exists(KANBAN_CONFIGURATION_DIRECTORY+'/.defaults.json'))throw failure('KANBAN_PROFILE_FILE_MISSING');
     return kanbanConfigurationDefaults['planning.md'];
 }

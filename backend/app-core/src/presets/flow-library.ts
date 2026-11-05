@@ -1,5 +1,5 @@
-import essayReview from './essay-review.json';
-import ankiGenerate from './anki-generate.json';
+import {essayReview} from '../resources/catalog';
+import {ankiGenerate} from '../resources/catalog';
 import type { FlowDraft } from '@nestos/llm-flow/contracts';
 import type { Drawer } from '@nestos/app-contracts';
 

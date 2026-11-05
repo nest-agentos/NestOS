@@ -1,4 +1,4 @@
-import defaultSettings from './default-profile.json';
+import defaultSettings from '../resources/runtime/default-profile.json';
 
 export const DEFAULT_NESTOS_SETTINGS: Readonly<NestOSProfileSettings> = Object.freeze(defaultSettings);
 

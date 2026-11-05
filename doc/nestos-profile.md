@@ -22,7 +22,7 @@ CLI（desktop profile）、Tauri 和 HTTP 存储宿主启动时，如果配置�
 }
 ```
 
-三个宿主共用 `backend/app-core/src/profile/default-profile.json`，均将 `XDG_CONFIG_HOME` 视为配置基目录，并在其下使用 `nestos/`。可选的 `homeDir` 只在用户希望固定项目目录时填写。
+三个宿主共用 `backend/app-core/src/resources/runtime/default-profile.json`，均将 `XDG_CONFIG_HOME` 视为配置基目录，并在其下使用 `nestos/`。可选的 `homeDir` 只在用户希望固定项目目录时填写。
 
 HTTP 存储宿主通过 `@nestos/app-core/profile` 公开子入口复用配置默认值和数据根解析；该入口可独立打包，无需加载应用 Runtime。
 

@@ -41,7 +41,7 @@
 
 此前 llm-flow 全包 36 文件 458 测试、llm-tasks 73 测试、llm-context 35 测试通过。真实图片执行与最终 312 笔记/624 复习卡证据见 [Anki 验收](anki-flow.md)；18 个动态补全任务的实测并发峰值为 4，校对恢复和终态恢复均没有重复模型请求。
 
-随后解耦修订曾将 Anki 初始恢复项一并移除；按用户要求已纠正：单一声明源回到 `app-core/src/presets/anki-generate.json`，产品目录和系统恢复提供一个 `anki-generate.flow`，业务 Tool 仍在外部包且核心没有业务分支。多组输入建模为同一 Flow 函数的多组实参；分批由通用 transform 完成，新定义不依赖 `anki.batch`。调用模板、参数作用域与运行图通过同一 Kernel 检查点恢复，损坏的参数组索引或输入结构明确拒绝，不能回退默认参数继续执行。
+随后解耦修订曾将 Anki 初始恢复项一并移除；按用户要求已纠正：单一声明源回到 `app-core/src/resources/flows/anki-generate.json`，产品目录和系统恢复提供一个 `anki-generate.flow`，业务 Tool 仍在外部包且核心没有业务分支。多组输入建模为同一 Flow 函数的多组实参；分批由通用 transform 完成，新定义不依赖 `anki.batch`。调用模板、参数作用域与运行图通过同一 Kernel 检查点恢复，损坏的参数组索引或输入结构明确拒绝，不能回退默认参数继续执行。
 
 最终核心全包 42 文件 529 项通过，覆盖函数串/并行、按序返回、多命名参数、内联词法定义与 digest、嵌套调用、变量隔离、循环、路由、动态 spawn、整批校验、模板冻结和恢复。应用层 114 文件 709 项通过；CLI 通用调用、混合图片文本及实际 SIGKILL 恢复共 5 项通过。外部单文件新定义的 16 项集成和孤立目录完整模拟 CLI 验收通过，实际生成媒体及 Rust 包，验证 combined/grouped 与恢复不重复请求；此前真实模型证据仍对应其当时冻结的定义。命令、范围和源码摘要见[验收记录](fixtures/flow-parameter-calls-evidence.json)。
 
@@ -76,7 +76,7 @@
 
 ## 2. 当前定义哪些 Flow
 
-本包提供通用定义、编译和执行设施，并提供可配置的 [作文评审示例](../../backend/app-core/src/presets/essay-review.json)。示例使用通用节点配置，不在运行器中硬编码作文业务。
+本包提供通用定义、编译和执行设施，并提供可配置的 [作文评审示例](../../backend/app-core/src/resources/flows/essay-review.json)。示例使用通用节点配置，不在运行器中硬编码作文业务。
 
 ### 2.1 三种表示与运行身份
 

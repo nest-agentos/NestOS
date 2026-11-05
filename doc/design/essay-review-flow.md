@@ -4,7 +4,7 @@
 
 ## 1. 当前定义与执行图
 
-唯一声明源是 [essay-review.json](../../backend/app-core/src/presets/essay-review.json)，安装为 `essay-review.flow`。原新版文件名 `essay-review-isolated.flow` 已统一为此名称，检查和修改任务仍使用隔离上下文。它使用 12 个普通图节点：输入补全、循环、任务组、四项检查、汇合、汇总、判断、修改和最终报告。
+唯一声明源是 [essay-review.json](../../backend/app-core/src/resources/flows/essay-review.json)，安装为 `essay-review.flow`。原新版文件名 `essay-review-isolated.flow` 已统一为此名称，检查和修改任务仍使用隔离上下文。它使用 12 个普通图节点：输入补全、循环、任务组、四项检查、汇合、汇总、判断、修改和最终报告。
 
 ```mermaid
 flowchart LR
@@ -143,7 +143,7 @@ join 配置 failure=fail；任一检查失败时不会把部分新结果当作�
 
 | 范围 | 实现与证据 |
 |---|---|
-| 唯一产品定义 | [essay-review.json](../../backend/app-core/src/presets/essay-review.json) |
+| 唯一产品定义 | [essay-review.json](../../backend/app-core/src/resources/flows/essay-review.json) |
 | 任务组、汇合与循环 | [control/graph.ts](../../backend/llm-flow/src/flow/control/graph.ts)、[control/join-program.ts](../../backend/llm-flow/src/flow/control/join-program.ts) |
 | 输入补齐 | [structured/input.ts](../../backend/llm-flow/src/flow/structured/input.ts) |
 | 模板引用与变量 | [flow-templates.ts](../../backend/llm-flow/src/contracts/flow-templates.ts)、[variables.ts](../../backend/llm-flow/src/flow/variables.ts) |

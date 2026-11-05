@@ -24,7 +24,7 @@ join 的 mode 支持 all/any/first-success/quorum。any 等待首个终态；fir
 
 动态汇合允许新增节点回连 spawn 的直接下游，但目标必须尚未启动且未被跳过；existing → existing、无关目标及新增闭环均拒绝，整批绑定校验后才发布。组合函数返回会补齐同作用域动态成员的依赖，失败/取消不得先返回成功再由根聚合补报；显式 continue、委派容错和 detached 保留各自语义。相关恢复与失败回归见 `dynamic-return.test.ts`、`dynamic-call-failure.test.ts`。
 
-[作文评审模板](../../backend/app-core/src/presets/essay-review.json) 已迁移为 loop → taskGroup → 四个普通 Agent → join → aggregate → route，改写也使用普通 Agent。Agent 的隔离调用保留 system 指令并排除会话历史。评审与改写使用 JSON Schema 和三次输出修复；达到评分条件或轮数上限后转入报告。
+[作文评审模板](../../backend/app-core/src/resources/flows/essay-review.json) 已迁移为 loop → taskGroup → 四个普通 Agent → join → aggregate → route，改写也使用普通 Agent。Agent 的隔离调用保留 system 指令并排除会话历史。评审与改写使用 JSON Schema 和三次输出修复；达到评分条件或轮数上限后转入报告。
 
 实现：[控制图编译](../../backend/llm-flow/src/flow/control/graph.ts)、[插件](../../backend/llm-flow/src/flow/control/plugins.ts)、[join Program](../../backend/llm-flow/src/flow/control/join-program.ts)、[并发调度](../../backend/llm-flow/src/flow/control/scheduling.ts)。
 

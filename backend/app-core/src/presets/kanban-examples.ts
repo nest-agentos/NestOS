@@ -3,7 +3,7 @@ import {createModuleLogger, randomUUID} from '@nestos/common';
 import {installKanbanContent, inspectKanbanContent, type KanbanStore} from '@nestos/kanban/storage';
 import type {KanbanContent, KanbanClient, KanbanWorkType, KanbanNotificationPolicy} from '@nestos/kanban/contracts';
 import type {InitialFileEntry, InitialResourceProvider} from './initial-files';
-import demo from './kanban-demo.json';
+import {kanbanDemo as demo} from '../resources/catalog';
 const log = createModuleLogger('kanban-examples');
 const resourceId = 'kanban:nestos-demo';
 const actor = {kind: 'human' as const, id: 'admin'};

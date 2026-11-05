@@ -1,4 +1,4 @@
-import preset from './essay-review.json';
+import {essayReview as preset} from '../resources/catalog';
 import { createNestosFlowLibrary } from './flow-library';
 import type { FlowDraft } from '@nestos/llm-flow/contracts';
 import type { FlowDefinitionStore } from '@nestos/llm-flow';

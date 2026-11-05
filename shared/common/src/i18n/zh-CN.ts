@@ -394,7 +394,7 @@ export const zhCN = {
     "kanban.errors.FILE_EXCHANGE_ORIGIN_UNAVAILABLE": "未找到原执行会话关联，无法自动续办。",
     "kanban.errors.PROMPT_MANIFEST_LIMIT": "任务清单超过 64 KiB，请缩小上下文或将正文拆分为引用文件。",
     "kanban.errors.COMMIT_CONTEXT_SCOPE_CHANGED": "提交上下文的项目或任务归属变化，已拒绝复用。",
-    'kanban.maintenancePrompts': '看板构建、服务替换与合并提示词',
+    'kanban.globalConfiguration': '看板全局配置与提示词',
     'kanban.errors.OPERATION_RESULT_AGENT_BLOCKED': 'Agent 发现缺少必要能力，详情见操作说明和原会话。',
     'kanban.errors.OPERATION_RESULT_AGENT_FAILED': 'Agent 执行未通过，详情见操作说明和原会话。',
     'kanban.reviewHelpTitle': '等待验收',

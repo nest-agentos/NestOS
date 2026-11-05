@@ -1,6 +1,6 @@
 import {planningSections} from './kanban-planning-sections';
 import {kanbanJournalOptions} from '../kanban/host-policy';
-import defaults from './kanban-development-prompts.json';
+import {developmentPrompts as defaults} from '../resources/catalog';
 import {freezeCommitContext, type CommitContext} from './kanban-commit-context';
 import {publishImmutableFile} from '../run/prompt-bundle';
 import {lifecyclePromptFiles} from '../run/prompt-lifecycle';

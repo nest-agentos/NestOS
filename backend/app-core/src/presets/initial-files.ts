@@ -1,3 +1,4 @@
+import {noteResources} from '../resources/catalog';
 import {t, createModuleLogger, randomUUID} from '@nestos/common';
 const log = createModuleLogger('initial-files');
 import {studyFiles, writeMissingStudyFile} from './study-files';
@@ -5,14 +6,11 @@ import type { IFileSystem } from '@nestos/vfs-core';
 import type {FlowInstallations, FlowInstallationReport} from '@nestos/app-contracts/services';
 import type { ICommandBus } from '@nestos/llm-session/contracts';
 import { FlowCommand } from '@nestos/llm-flow/contracts';
-import demo from './digital-twin-demo.json';
-import readme from './notes-readme.json';
-import flowGuide from './flow-format-guide.json';
 import { createNestosFlowLibrary } from './flow-library';
 import { restoreAndPublishFlow } from './restore-flows';
 
 const noteWrites = new WeakMap<IFileSystem, Promise<boolean>>();
-const noteTemplates = [{id: 'note:readme', ...readme}, {id: 'note:demo', ...demo}, {id: 'note:flow-format', ...flowGuide}, ...studyFiles];
+const noteTemplates = [...noteResources,...studyFiles];
 
 export interface InitialFileEntry { id: string; group: 'notes' | 'flows' | 'kanban'; name: string; path: string; exists: boolean; overwrite?: boolean; }
 export interface InitialFileResult { id: string; status: 'restored' | 'preserved' | 'failed'; error?: string; dependencies?: FlowInstallationReport; }

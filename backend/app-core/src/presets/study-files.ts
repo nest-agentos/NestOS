@@ -1,8 +1,8 @@
 import yaml from 'js-yaml';
 import type {IFileSystem} from '@nestos/vfs-core';
 import {createModuleLogger, randomUUID} from '@nestos/common';
-import prompts from './study-prompts.json';
-import notes from './study-notes.json';
+import {studyPrompts as prompts} from '../resources/catalog';
+import {studyNotes as notes} from '../resources/catalog';
 const log = createModuleLogger('study-files');
 const receipt = '/.nestos/cloze/examples-v1.installed';
 export const studyFiles = [...notes, {id: 'note:study-prompts', name: '.nestos/cloze/prompts.yaml', content: yaml.dump(prompts, {lineWidth: -1, noRefs: true})}];

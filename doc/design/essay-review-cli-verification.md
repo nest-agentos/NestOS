@@ -38,7 +38,7 @@
 
 ```bash
 pnpm --filter @nestos/cli build
-cp backend/app-core/src/presets/essay-review.json /tmp/nestos-essay-review.flow
+cp backend/app-core/src/resources/flows/essay-review.json /tmp/nestos-essay-review.flow
 node apps/cli/dist/cli.js run \
   -f /tmp/nestos-essay-review.flow \
   --params doc/design/fixtures/essay-review-input.json \

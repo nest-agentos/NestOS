@@ -4,7 +4,7 @@ import { MemoryBackend } from '@nestos/vfs-core';
 import { FlowCommand } from '@nestos/llm-flow/contracts';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { NestosInitialFiles } from '../src/presets/initial-files';
-import demo from '../src/presets/digital-twin-demo.json';
+import demo from '../src/resources/notes/digital-twin-demo.json';
 import { FlowLibraryCommand } from '@nestos/app-contracts';
 import { createNestosFlowLibrary } from '../src/presets/flow-library';
 import { externalFlowLibrary } from './fixtures/flow-library';

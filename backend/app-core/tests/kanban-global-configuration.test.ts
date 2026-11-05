@@ -1,4 +1,4 @@
-import {afterEach,it,expect} from 'vitest';
+import {afterEach,it,expect,vi} from 'vitest';
 import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {readPrompt} from '../src/run/prompt-bundle';
 import {ensureKanbanConfiguration} from '../src/presets/kanban-global-configuration';
@@ -35,4 +35,19 @@ it('reports missing or malformed configurations instead of silently replacing th
     await expect(resolveKanbanConfiguration(fs,fs,'development')).rejects.toMatchObject({code:'KANBAN_PROFILE_FILE_MISSING'});
     await fs.driver.writeContent('/etc/kanban/development/profile.json','not json');
     await expect(resolveKanbanConfiguration(fs,fs,'development')).rejects.toMatchObject({code:'KANBAN_PROFILE_INVALID'});
+});
+
+it('rejects pending and racing same-version configuration replacements',async()=>{
+    const fs=await fixture(),marker='/etc/kanban/.defaults.json';await ensureKanbanConfiguration(fs);
+    const originalMarker=JSON.parse(await readPrompt(fs,marker));
+    await fs.driver.writeContent(marker,JSON.stringify({...originalMarker,version:'pending'}));
+    await expect(resolveKanbanConfiguration(fs,fs,'development')).rejects.toMatchObject({code:'KANBAN_CONFIGURATION_UPDATE_PENDING'});
+    await fs.driver.writeContent(marker,JSON.stringify(originalMarker));
+    const read=fs.driver.readContent.bind(fs.driver);
+    const spy=vi.spyOn(fs.driver,'readContent').mockImplementation(async(...args)=>{
+        const result=await read(...args);
+        if(args[0].endsWith('/planning.md'))await fs.driver.writeContent(marker,JSON.stringify({...originalMarker,generation:'replacement'}));
+        return result;
+    });
+    await expect(resolveKanbanConfiguration(fs,fs,'development')).rejects.toMatchObject({code:'KANBAN_CONFIGURATION_CHANGED'});spy.mockRestore();
 });

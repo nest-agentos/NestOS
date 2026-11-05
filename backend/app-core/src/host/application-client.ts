@@ -1,8 +1,8 @@
 import {mailView} from './mail-view';
-import {maintenanceResources} from '../presets/kanban-maintenance';
+import {kanbanConfigurationResources} from '../presets/kanban-configuration-resources';
 import {KanbanExamples} from '../presets/kanban-examples';
 import {openPersonalKanbanStore} from '../kanban/store';
-import studyPrompts from '../presets/study-prompts.json';
+import {studyPrompts} from '../resources/catalog';
 import {createTextGeneration, listTextModels} from '../configuration/text-generation';
 import {sessionResponse} from '../session/session-response';
 import {reportClientDiagnostic} from './client-diagnostic';
@@ -125,7 +125,7 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
         cancelTextGeneration: async id => (await textGeneration).cancelTextGeneration(id),
         ocr: async () => new OcrService(await vfs.openFileSystem('/etc'), agentService, kernel.llmService, options.configurationReadonly),
         initialFiles: async () => new NestosInitialFiles(commandBus, await vfs.openFileSystem('/home/admin/notes'), services.flowInstallations,
-            maintenanceResources(await vfs.openFileSystem('/'), services.kanban ? new KanbanExamples(await openPersonalKanbanStore(await vfs.openFileSystem('/')), services.kanban) : undefined)),
+            kanbanConfigurationResources(await vfs.openFileSystem('/'), services.kanban ? new KanbanExamples(await openPersonalKanbanStore(await vfs.openFileSystem('/')), services.kanban) : undefined)),
         projectSessions: async () => projects?.sessions ?? new ProjectSessions(repository),
         skillsFiles: () => scope.own(new SkillsEngine(agentService)),
         toolboxView: () => toolboxView(services, scope),

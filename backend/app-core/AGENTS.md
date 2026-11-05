@@ -2,7 +2,7 @@
 
 Kanban 的实际执行者按 WorkItem ↔ Session 关联，执行绑定通过 nestos-execution-session 外部引用与核心状态同事务保存；Dispatch 记录尝试身份，自动适配使用真实 executionSessionId。queryActivity/executionSession 只投影 Session 状态与活动，不向看板暴露内部 Task；普通 participants 不触发执行标记。Session 状态取授权来源的冷摘要，lastActivityAt 不能使用读取、心跳或 manifest.updatedAt 补齐；过期/不可达不计活跃。源端授权和只读核对留在应用集成层。
 
-Kanban 通用规则、契约与 SeqFile 存储位于独立库 `@nestos/kanban`（仅依赖 vfs-core）。本包 kanban/ 仅承担授权 Session 来源读取、远程客户端绑定、正式发布 Agent/Flow 调用、Kernel 回执核对和 UserEventService 投影。扫描状态机、远程事务编码、执行日志与恢复及活动投影归独立库；应用仅提供端口，不改写 reducer、不代转出库 API。示例配置保留在 presets，借助库 installKanbanContent 安装。独立执行桥先保存冻结请求及 submitting 标记再调用执行入口，重启只核对原身份；unknown 不重派。Runtime 关停先停止准入和监听、排空事务与观察，再关闭 VFS；恢复错误通过现有 global event/notify 去重报告。个人看板显式启用 AI 协作后复用正式发布调用分析与执行，默认关闭；项目接线仍使用 configureKanban，见 [协调设计](../../doc/design/kanban-coordination.md)。
+Kanban 通用规则、契约与 SeqFile 存储位于独立库 `@nestos/kanban`（仅依赖 vfs-core）。本包 kanban/ 仅承担授权 Session 来源读取、远程客户端绑定、正式发布 Agent/Flow 调用、Kernel 回执核对和 UserEventService 投影。扫描状态机、远程事务编码、执行日志与恢复及活动投影归独立库；应用仅提供端口，不改写 reducer、不代转出库 API。资源声明保留在 resources，安装与适配代码位于 presets，借助库 installKanbanContent 安装。独立执行桥先保存冻结请求及 submitting 标记再调用执行入口，重启只核对原身份；unknown 不重派。Runtime 关停先停止准入和监听、排空事务与观察，再关闭 VFS；恢复错误通过现有 global event/notify 去重报告。个人看板显式启用 AI 协作后复用正式发布调用分析与执行，默认关闭；项目接线仍使用 configureKanban，见 [协调设计](../../doc/design/kanban-coordination.md)。
 
 远程原生队列启动恢复由 projects/remote-conversation-recovery 扫描当前用户已有 journal，重验连接、项目、principal 与稳定会话身份后挂入 ConversationRegistry。恢复只建立观察和读取基线，不直接重发原指令；失效绑定或不可用远端保留 deferred 与原记录。所有存储沿注入 IFileSystem 的 SeqFile CAS，不创建跨用户全局 events.seq，也不把会话恢复策略放进 vfs-core。
 
@@ -129,17 +129,17 @@ pnpm --filter @nestos/app-core typecheck
 
 - `browser-routes.ts` 是路由语义唯一来源；显式的 Session manifest `folder: null` 表示根目录，不回退到陈旧路由前缀。远程 provider 的实例方法必须保留 receiver，不能取出后无绑定调用。
 
-- 作文业务预设统一位于 `src/presets/essay-review.json`，以声明数据保存提示词与参数；`presets/default-flows.ts` 只负责复制和播种。旧用户文件与发布版本保留，产品文案不得混入通用 Session 机制。
+- 作文业务预设统一位于 `src/resources/flows/essay-review.json`，以声明数据保存提示词与参数；`presets/default-flows.ts` 只负责复制和播种。旧用户文件与发布版本保留，产品文案不得混入通用 Session 机制。
 - `contextEngineOptions` 与 `agentResolution` 由应用装配透传；Conversation 系统的清理使用返回实例的 dispose，不重置进程单例。
 
-- 产品 Flow 库包含 `src/presets/essay-review.json` 和 `src/presets/anki-generate.json`，公共 `createNestosFlowLibrary()` 返回副本；宿主共用安装、系统恢复和菜单机制。二合一 Anki Flow 只有此一份声明源，三个内联函数随主版本发布，不单独安装。`tools/anki-cli` 维护业务 Tool 实现，其集成验收读取应用声明源，不保留 Flow 副本；产品提示词不进入 llm-ui 包。已有用户文件、发布版本及手动分组保留，通用核心不按业务 ID 分支。
+- 产品 Flow 库包含 `src/resources/flows/essay-review.json` 和 `src/resources/flows/anki-generate.json`，公共 `createNestosFlowLibrary()` 返回副本；宿主共用安装、系统恢复和菜单机制。二合一 Anki Flow 只有此一份声明源，三个内联函数随主版本发布，不单独安装。`tools/anki-cli` 维护业务 Tool 实现，其集成验收读取应用声明源，不保留 Flow 副本；产品提示词不进入 llm-ui 包。已有用户文件、发布版本及手动分组保留，通用核心不按业务 ID 分支。
 - `presets/flow-library.ts` 保留 Flow 默认逻辑分组入口（当前为空），host 可向 ToolboxResources 显式注入通用分组；配置机制不按业务 Flow ID 分支。用户抽屉归属优先于产品默认，导出/导入先准备分组目录，归档保存实际分组名；分组不移动文件或改变调用身份。
 - 外部 Flow 可用通用 `functions` 数组携带内联函数；显式恢复、发布、导入与归档只创建主 Flow 资源，不把内联函数加入全局库。工具箱递归收集及重映射内联函数的提示词依赖，保持局部函数 ID 和调用引用不变；回归见 inline-flow-library。
 - Agent 可通过通用 `execution.kind=flow` 引用任意内部 Flow；app-core 注入资源存在、发布版本及语法观察，`availability` 只作投影，不写回 Agent 文件。Flow 删除后禁用新调用，恢复或重新发布后重检；运行准入与已接纳快照由 Session 层负责。Agent 归档携带发布 Flow 及跨文件依赖，导入先发布依赖再创建 Agent 并重映射全局身份，内联函数 ID 保留。
 
 NestOS 默认工具列表属于 `src/presets/harness-tools.ts`，通过 app-core 公共出口供 app-shell 装配聊天与 Agent 设置 UI；禁止从公共配置契约读取产品默认授权。
 
-NestOS Agent 默认执行策略位于 `src/presets/direct-agent.json`，createNestosDirectAgentPolicy 返回副本；ApplicationRuntimeOptions.directAgentPolicy 可替换整个策略（包括空对象），会话装配显式注入，不在 Session 机制中保留产品指令。
+NestOS Agent 默认执行策略位于 `src/resources/agents/direct-agent.json`，createNestosDirectAgentPolicy 返回副本；ApplicationRuntimeOptions.directAgentPolicy 可替换整个策略（包括空对象），会话装配显式注入，不在 Session 机制中保留产品指令。
 
 - `projects/sync` 封装项目同步策略与绑定生命周期，`ApplicationRuntimeOptions.sync` 注入宿主 provider/coordinator 后开放 `runtime.projectSync`；默认不创建连接。文件机制归 `vfs-sync`，具体 HTTP 与 IndexedDB 不进入本包。
 
@@ -249,6 +249,6 @@ projects/project-environment 将本地普通环境按项目 ID 存在 settings.s
 
 session/directory-view 在既有授权 Session 浏览器文件视图内聚合节点、透明容器条目和项目导航，浏览器不再逐层请求虚拟会话分组。普通文件目录保持惰性；透明容器拒绝循环，读取中 revision 改变则将种子标 stale。查询不打开 Session 或持有执行租约，错误保留具体分类，日志只含操作标识、阶段、数量、结果与耗时。
 
-个人看板 AI 联动由 kanban/personal-automation 与 analysis-adapter 装配，规划指令归 presets/kanban-development-prompts.json 的 planning.md，经全局/项目同名文件覆盖并冻结到每次执行；代码只发送简短上下文读取入口。automation.seq 的稳定调用身份先持久再提交，unknown 只核对不重派；事项修订和规划签名过期则拒绝迟到结果。产物须核对派发归属、正文摘要及字节数，默认独立验收后才解锁依赖。库内不放 NestOS 目标、提示词或调用实现。
+个人看板 AI 联动由 kanban/personal-automation 与 analysis-adapter 装配，规划指令归 resources/kanban/kanban-development-prompts.json 的 planning.md，经全局/项目同名文件覆盖并冻结到每次执行；代码只发送简短上下文读取入口。automation.seq 的稳定调用身份先持久再提交，unknown 只核对不重派；事项修订和规划签名过期则拒绝迟到结果。产物须核对派发归属、正文摘要及字节数，默认独立验收后才解锁依赖。库内不放 NestOS 目标、提示词或调用实现。
 
 工作台聚合查询通过 BrowserReadContext 复用本次项目目录、组织记录、收藏与工作区；文件准备不能等待导航查询。范围不跨查询缓存，失败后排空读取并释放全部借用句柄；项目根不读取不会展示的完整本地摘要。

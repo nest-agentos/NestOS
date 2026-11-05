@@ -201,7 +201,7 @@ function libraryCommands() {
     const handlers = new Map<string, (args: any) => Promise<any>>();
     new DagCommandService({ kernel: {} as never, plugins, flowStore: store })
         .register({ register: (name: string, handler: any) => handlers.set(name, handler) } as never);
-    const template: FlowDraft = JSON.parse(readFileSync(new URL('../../app-core/src/presets/essay-review.json', import.meta.url), 'utf8'));
+    const template: FlowDraft = JSON.parse(readFileSync(new URL('../../app-core/src/resources/flows/essay-review.json', import.meta.url), 'utf8'));
     return { store, files, template, execute: (name: string, args: unknown) => handlers.get(name)!(args) };
 }
 

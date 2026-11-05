@@ -1,5 +1,5 @@
 import {KanbanCollaboration} from '@nestos/kanban/integration';
-import fixPolicy from '../presets/kanban-fix.json';
+import {kanbanFixPolicy as fixPolicy} from '../resources/catalog';
 import {sha256HexSync} from '@nestos/common';
 import type {SessionInstruction} from '@nestos/llm-session/contracts';
 import type {Options} from './task-fix-contracts';

@@ -542,7 +542,7 @@ TTY 首次结束信息保持不变，后续结束通知与输出不覆盖；已�
 
 `prepareSessionDeletion(id)` 记录可恢复意图并提升直接子会话；`pendingSessionDeletions()` 提供待清理 ID。宿主仍应通过 `SessionLifecycleService` 先停止执行再删除。删除意图在物理清理完成后移除，重启可以继续处理。此字段属于 `session.seq` 元信息，不写入 `history.seq` 的 Round 索引，也不编码成物理子目录。详见 [项目抽屉与子会话导航](design/project-session-navigation.md)。
 
-会话工厂接受实例级 `hostPorts` 与 `agentResolution`，返回独立 SessionManager 和幂等异步 dispose。UI 必须接入返回实例；不再提供全局单例入口。业务预设移到 `backend/app-core/src/presets/default-flows.ts` 与 `backend/app-core/src/presets/essay-review.json`；默认安装和系统恢复仅提供这一版作文模板，已有旧文件保留。
+会话工厂接受实例级 `hostPorts` 与 `agentResolution`，返回独立 SessionManager 和幂等异步 dispose。UI 必须接入返回实例；不再提供全局单例入口。业务预设移到 `backend/app-core/src/presets/default-flows.ts` 与 `backend/app-core/src/resources/flows/essay-review.json`；默认安装和系统恢复仅提供这一版作文模板，已有旧文件保留。
 
 
 会话领域存储支持项目定位：`setStorageDirectoryResolver` 为新会话选择数据目录，`indexProjectSessions` 从项目目录重建会话位置索引；索引位于 `/var/lib/sessions/folders.seq`。本地项目使用 `.nestos/sessions/<sessionId>/`，只读远程项目使用本地 `.nestos/readonly/<项目名>/sessions/<sessionId>/`。没有设置定位器的独立仓库继续使用原默认路径。运行控制文件与执行内核存储不随领域目录移动。移动日志位于 `/var/lib/sessions/storage-moves.seq`，恢复完成前相关领域记录报告 EBUSY；来源与目标同时存在时保留双方并报告冲突，不猜测或清理正文。

@@ -393,7 +393,7 @@ export const en: LocaleStrings = {
     "kanban.errors.FILE_EXCHANGE_ORIGIN_UNAVAILABLE": "The original execution association is missing. Automatic continuation is unavailable.",
     "kanban.errors.PROMPT_MANIFEST_LIMIT": "The manifest exceeds 64 KiB. Reduce context or reference separate content files.",
     "kanban.errors.COMMIT_CONTEXT_SCOPE_CHANGED": "The commit context project or task changed. Reuse was refused.",
-    'kanban.maintenancePrompts': 'Kanban build, service replacement and integration prompts',
+    'kanban.globalConfiguration': 'Global Kanban configuration and prompts',
     'kanban.errors.OPERATION_RESULT_AGENT_BLOCKED': 'The agent found a missing prerequisite. See the operation summary and original session.',
     'kanban.errors.OPERATION_RESULT_AGENT_FAILED': 'The agent operation failed. See the summary and original session.',
     'kanban.reviewHelpTitle': 'Awaiting acceptance',

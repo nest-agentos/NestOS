@@ -10,7 +10,7 @@ import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallInput} from '@nestos/llm-session/contracts';
 import type {TargetRef} from '@nestos/llm-flow/contracts';
 import {requireValue} from './validation';
-import defaults from '../presets/kanban-development-prompts.json';
+import {developmentPrompts as defaults} from '../resources/catalog';
 export interface AnalysisOptions {
     readPlanningPrompt?(board:KanbanBoard):Promise<string>;
     readAnalysisOutput?(id:string):Promise<KanbanAnalysisObservation|undefined>;

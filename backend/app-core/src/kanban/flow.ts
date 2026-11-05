@@ -1,5 +1,5 @@
 import type {FlowDraft, JsonValue} from '@nestos/llm-flow/contracts';
-import template from '../presets/kanban-discovery.json';
+import {kanbanDiscovery as template} from '../resources/catalog';
 import {requireValue} from './validation';
 
 /** Explicit product resource, published by the existing Flow service. */
