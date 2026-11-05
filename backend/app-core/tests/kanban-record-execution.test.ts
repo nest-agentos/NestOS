@@ -202,3 +202,13 @@ it('cancels a decision with no execution without materializing work or contactin
     expect((await f.service.read('source')).items).toEqual([]);
     expect(await f.service.record('source','decision')).toMatchObject({status:'cancelled'});
 });
+it('projects unresolved planning clarification as a blocked decision and clears it only after the status changes',async()=>{
+    const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});const execution=f.open();
+    const run=await execution.runRecord('source',{operationId:'clarification-run',recordId:'decision',expectedRevision:2});
+    const itemId=run.itemIds![0];
+    await f.command({type:'report-analysis',itemId,operationId:'analysis',status:{itemId,state:'clarification',reason:'Please confirm the scope'}});
+    await execution.scan();expect(await execution.recordExecutions('source','decision')).toContainEqual(expect.objectContaining({state:'blocked',code:'DECISION_INPUT_REQUIRED'}));
+    expect(Object.values((await f.service.workflow('source')).dispatches)).toHaveLength(0);
+    await f.command({type:'report-analysis',itemId,operationId:'clarified',status:{itemId,state:'ready',reason:'Confirmed'}});
+    await execution.scan();const resumed=(await execution.recordExecutions('source','decision'))[0];expect(resumed.state).toBe('running');expect(resumed.code).toBeUndefined();
+});

@@ -219,6 +219,7 @@ export const en: LocaleStrings = {
     'kanban.taskReason.DEPENDENCY_UNFINISHED': 'Waiting for a prerequisite task',
     'kanban.taskReason.EDIT_LEASE_ACTIVE': 'Editing; save before starting',
     'kanban.taskReason.DIAGNOSTIC_REQUIRED': 'Action needed; see diagnostic details',
+    'kanban.errors.DECISION_INPUT_REQUIRED': 'Waiting for clarification; development has not been dispatched',
     'kanban.taskStartAt': 'Starts at',
     'kanban.editLeaseHelp': 'Editing expires after five minutes. Saving, cancelling or lease expiry rechecks admission without changing the deadline.',
     'kanban.taskPhase.waiting-start': 'Waiting to start',

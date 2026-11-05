@@ -220,6 +220,7 @@ export const zhCN = {
     'kanban.taskReason.DEPENDENCY_UNFINISHED': '等待前置任务完成',
     'kanban.taskReason.EDIT_LEASE_ACTIVE': '正在编辑，保存后才能启动',
     'kanban.taskReason.DIAGNOSTIC_REQUIRED': '需要处理，详情请查看诊断信息',
+    'kanban.errors.DECISION_INPUT_REQUIRED': '等待用户澄清，尚未派发开发任务',
     'kanban.taskStartAt': '计划启动于',
     'kanban.editLeaseHelp': '编辑租约持续五分钟。保存或取消后重新核对启动；断线或超时后租约释放，原启动截止时间不变。',
     'kanban.taskPhase.waiting-start': '等待启动',

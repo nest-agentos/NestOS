@@ -1,3 +1,4 @@
+import {planningSections} from './kanban-planning-sections';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import planning from './kanban-planning.json';
 import {freezeCommitContext, type CommitContext} from './kanban-commit-context';
@@ -96,7 +97,8 @@ async function recordPublication(journal: KanbanAutomationJournal, id: string, d
 }
 
 export function channelInstruction(policy: DevelopmentPolicy, entry: string, pre: string[]): string {
-    return `Use cells_session. Read identity, policy, instructions, ${[...pre, entry].join(', ')} via session_context; task/context on demand. `
+    return `Use cells_session. Read ${entry==='decision.md'?'instructions, decision.md, planning, planning-input':`identity, policy, instructions, ${[...pre, entry].join(', ')}`} via session_context; task/context on demand. `
+        + (entry==='decision.md'?'planning-input is sufficient for initial planning; read candidate section details only when needed; avoid reading the full context repeatedly. ':'')
         + `Assigned worktrees/repos only; commit=${policy.commit}; never merge/push. `
         + `session_report({id:<stable-id>,message:{type:progress|clarification|error|result|resolved,content:<summary>,payload:<optional evidence>,replyTo:<resolved-message-id>}}); omit absent fields. Results request host verification. `
         + `Live commit context: session_request kanban.context.resolve {repository,commits:[SHA],include:[task,decisions,acceptance]}; read session_response. `
@@ -108,7 +110,7 @@ export async function openDevelopmentChannel(remote: Pick<ProjectRemoteMountServ
     identity: {runId: string; itemId: string; attemptId: string}, task: unknown, binding?: {previousScopeId: string; previousSessionId: string; sessionId?: string}): Promise<void> {
     requireValue(record.channelId === id, 'SESSION_CHANNEL_SCOPE_REQUIRED');
     await remote.sessionChannel(record.projectId, 'open', {scopeId: id, cwd: record.directory, ...binding,
-        snapshot: {identity, task, instructions: record.instructions ?? '', planning: planning.instruction, context: record.context ?? null,
+        snapshot: {identity, task, instructions: record.instructions ?? '', planning: planning.instruction, ...planningSections(record.context),
             policy: {commit: record.policy.commit, repositories: record.repositories, availableRepositories: record.availableRepositories},
             ...Object.fromEntries(record.policy.prompts.files.map(file => [file.name, {content: file.content, sha256: file.sha256}]))}});
 }
