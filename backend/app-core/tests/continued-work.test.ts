@@ -17,8 +17,9 @@ function fixture() {
     return {primary, original, submission, options, dispatch, item, executor: withContinuedWork(primary as any, options)};
 }
 it('continues the original execution Session with explicit context selection and a fresh stable submission', async () => {
-    const f = fixture(); context.bindings = {binding: {id: 'binding', branchId: 'main', validity: 'valid', revision: 3, generation: 1}};
+    const f = fixture(); context.bindings = {binding: {id: 'binding', branchId: 'main', validity: 'valid', revision: 3, generation: 1, nativeRef:{sessionId:'native-original'}}};
     const frozen = await f.executor.prepareContinuation!(f.dispatch as any, f.item as any, f.original) as any;
+    expect(f.options.prepare).toHaveBeenCalledWith(expect.objectContaining({sessionId:'original-execution',nativeSessionId:'native-original'}));
     expect(frozen.request).toMatchObject({expectedSessionId: 'original-execution', submission: {id: 'continuation'},
         overrides: {harnessConversation: {mode: 'resume', bindingId: 'binding', expectedBindingRevision: 3}}});
     expect(await f.executor.start(frozen)).toMatchObject({executionSessionId: 'original-execution', outcome: 'running'});

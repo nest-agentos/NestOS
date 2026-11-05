@@ -13,7 +13,7 @@ interface Continued {schema: 2; dispatch: KanbanDispatch; origin: Origin; reques
 export interface ContinueWorkOptions {
     submission: ReturnType<typeof sessionSubmission>; calls: Pick<IndependentCallService, 'inspectTaskCallSubmission' | 'list'>;
     kernel: Pick<Kernel, 'inspectSession' | 'sessionActivity'>;
-    prepare?(input: {dispatch: KanbanDispatch; item: KanbanItem; originalDispatch: KanbanDispatch; sessionId: string; target: TargetRef}): Promise<string>;
+    prepare?(input: {dispatch: KanbanDispatch; item: KanbanItem; originalDispatch: KanbanDispatch; sessionId: string; nativeSessionId?: string; target: TargetRef}): Promise<string>;
     observe?(dispatch: KanbanDispatch, result: import('@nestos/kanban/execution').KanbanExecutionObservation): Promise<import('@nestos/kanban/execution').KanbanExecutionObservation>;
 }
 /** The predecessor remains terminal; a new request runs in its original execution Session. */
@@ -42,7 +42,7 @@ async function prepare(options: ContinueWorkOptions, dispatch: KanbanDispatch, i
     const bindings = Object.values(catalog.value.bindings).filter(binding => binding.branchId === branch);
     requireValue(bindings.length <= 1 && bindings.every(binding => binding.validity === 'valid' && !binding.activeOperation), 'CONTINUATION_CONTEXT_AMBIGUOUS');
     const binding = bindings[0], target = original.expectedTarget!;
-    const instruction = await options.prepare?.({dispatch, item, originalDispatch: origin.dispatch, sessionId, target})
+    const instruction = await options.prepare?.({dispatch, item, originalDispatch: origin.dispatch, sessionId, nativeSessionId: binding?.nativeRef?.sessionId, target})
         ?? dispatch.continuation?.instruction;
     requireValue(instruction, 'CONTINUATION_INSTRUCTION_REQUIRED');
     const request: SubmissionRequest = {expectedSessionId: sessionId, expectedBranch: branch, expectedTarget: target,

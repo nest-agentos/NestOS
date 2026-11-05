@@ -21,6 +21,7 @@ export function developmentContinuation(options: Options): NonNullable<ContinueW
         const journal = options.journal, id = input.originalDispatch.id;
         const original = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + id);
         const tree = await journal.get<PreparedWorktree>('worktree:' + id);
+        requireValue(input.nativeSessionId, 'CONTINUATION_NATIVE_SESSION_UNKNOWN');
         requireValue(original && tree && !await journal.get('worktree-cleanup:' + id), 'CONTINUATION_WORKSPACE_UNAVAILABLE');
         requireValue(input.item.externalRefs?.some(ref => ref.system === 'nestos-remote-project' && ref.id === original.projectId), 'WORKTREE_PROJECT_CHANGED');
         const reasons = await workResourceExecution(options, id, original.projectId);
@@ -57,6 +58,6 @@ async function publishContinuation(options: Options, input: Parameters<NonNullab
     await publishPromptBundle(fs, record.communicationDirectory!, record.policy.prompts, {...scope, entry: 'prompts/task.md', commit: policy.commit,
         repositories: record.repositories, availableRepositories: record.availableRepositories, input: record.context});
     await openDevelopmentChannel(options.remote, dispatch.id, record, scope, item,
-        await currentChannelBinding(options.remote,record,input.sessionId));
+        await currentChannelBinding(options.remote,record,input.nativeSessionId));
     return record;
 }
