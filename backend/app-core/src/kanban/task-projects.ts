@@ -5,8 +5,13 @@ import {requireValue} from './validation';
 
 type Projects=Pick<ProjectService,'get'>;
 const projectRefs=(refs:KanbanExternalReference[]=[])=>(refs.filter(ref=>ref.system===REMOTE_PROJECT_REFERENCE));
+export const inheritWorkReferences = (refs:readonly KanbanExternalReference[]) => refs.filter(ref=>[REMOTE_PROJECT_REFERENCE,'nestos-decision-run'].includes(ref.system));
 /** Project cardinality belongs to NestOS policy; Kanban only stores opaque references. */
 export async function validateWorkProjects(projects:Projects,board:KanbanBoard,command:KanbanCommand,required:boolean):Promise<void> {
+    if(command.type==='restart-item') {
+        const previous=board.items.find(item=>item.id===command.itemId);
+        if(previous)await validate(projects,board,inheritWorkReferences(previous.externalRefs??[]),previous.planning?.kind,previous.planning?.parentId,required);
+    }
     if(command.type==='create-item')return validate(projects,board,command.item.externalRefs,command.planning?.kind,command.planning?.parentId,required);
     if(command.type==='save-edit'||command.type==='plan-item') {
         const previous=board.items.find(item=>item.id===command.itemId);

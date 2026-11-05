@@ -184,3 +184,5 @@ call-submit 明确提交原文件身份，由宿主创建独立子 Session。调
 
 
 `task reopen` 只允许人类显式恢复已取消且从未进入执行计划的任务，保留取消事件，恢复为手工待启动；随后 task run 经正式准入再启动。已经派发过或具有子任务的取消事项不能通过该入口清空执行历史，也不能直接设置 running。
+
+`nestos kanban task restart <board-id> <cancelled-item-id> <new-item-id> --submission-file request.json` 为已完成取消的任务创建关联新任务，不复用旧计划或会话。新任务为手工待启动，可继续用 `kanban task run` 启动；旧 worktree 通过资源检查与清理 API 独立处理，存在运行占用、未合入改动或未知状态时拒绝清理。

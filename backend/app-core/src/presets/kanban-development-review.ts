@@ -30,7 +30,7 @@ import {workResourceExecution} from './kanban-work-resource-execution';
 interface Options {
     submission?: ReturnType<typeof sessionSubmission>; wake?(): void;
     fs: IFileSystem; journal: KanbanAutomationJournal; service: KanbanService; calls: Pick<IndependentCallService, 'list'>;
-    kernel: Pick<Kernel, 'sessionActivity' | 'inspectSession'>; remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
+    kernel: Pick<Kernel, 'sessionActivity' | 'inspectSession' | 'task'>; remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
     projects: Pick<ProjectService, 'get' | 'openWorkspace'>; runningVersion?: string;
 }
 interface MaintenanceInput {id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot; action?: Exclude<import('../kanban/item-operation-types').ReviewAction, 'accept'>; context?: unknown}

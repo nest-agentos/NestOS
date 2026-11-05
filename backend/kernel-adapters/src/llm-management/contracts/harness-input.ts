@@ -1,3 +1,4 @@
+import {formatPromptMessages} from '@nestos/llm-context';
 import type {HarnessInputAttachment, HarnessInlineAttachment, HarnessAssetAttachment} from './harness-execution';
 import {sha256HexSync} from '@nestos/llm-context/digest';
 
@@ -30,7 +31,7 @@ function uniqueAttachments(attachments: HarnessInputAttachment[]): HarnessInputA
 }
 
 function formatPrompt(messages: Array<{role: string; content: string}>, attachments: HarnessInputAttachment[]): string {
-    const prompt = messages.length === 1 && messages[0].role === 'user' ? messages[0].content : JSON.stringify({messages});
+    const prompt = formatPromptMessages(messages);
     return !prompt.trim() && attachments.length ? `Attachments: ${attachments.map(file => file.name).join(', ')}` : prompt;
 }
 

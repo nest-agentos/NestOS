@@ -4,18 +4,18 @@ import {HarnessContextBindings} from '../src/projects/harness-context-bindings';
 import {durableState, request} from './harness-execution-fixture';
 import {context, operation} from './harness-context-fixture';
 
-async function fixture() {
+async function fixture(release = true) {
     const saved = durableState(), store = new HarnessContextBindings(saved.state, 'child');
     await store.claim('binding', context, {...request.connection, id: 'work-ready'}, operation);
     await store.attach('binding', operation.operationId, {nodeConnectionId: 'node', profileId: 'codex', workspaceId: 'workspace', epoch: 'epoch', sessionId: 'native'});
-    const staged = await store.prepareSettlement('binding', operation.operationId, {operationId: operation.operationId, kind: 'terminal', knownHeadRef: 'turn'});
-    await store.release('binding', operation.operationId, staged.revision + 1);
-    const snapshot = {active: false, pending: undefined, requests: [], draft: '', controls: [], instructionQueue: {items: []},
+    if (release) {const staged = await store.prepareSettlement('binding', operation.operationId, {operationId: operation.operationId, kind: 'terminal', knownHeadRef: 'turn'});
+    await store.release('binding', operation.operationId, staged.revision + 1);}
+    const snapshot = {writerLock:{status:'not-held'},active: false, pending: undefined, requests: [], draft: '', controls: [], instructionQueue: {items: []},
         observation: {stale: false, connection: 'online', receiptUnknown: false, execution: 'idle'}};
     const view = {read: vi.fn(async () => {}), snapshot: () => snapshot, close: vi.fn(async () => {})};
     const call = {callerState: {settled: true}, executionTree: {settled: true}, receipt: {executionSessionId: 'child'}};
     const options = {journal: {get: vi.fn(async () => undefined)}, calls: {list: vi.fn(async () => [call])},
-        kernel: {inspectSession: vi.fn(async () => ({getShared: saved.state.get}))}, remote: {projectConversation: vi.fn(async () => view)}} as never;
+        kernel: {task:vi.fn(async()=>({id:'task-1',effects:{},exit:{status:'failed'}})),inspectSession: vi.fn(async () => ({getShared: saved.state.get}))}, remote: {projectConversation: vi.fn(async () => view)}} as never;
     return {options, snapshot, view, call};
 }
 it('requires native terminal evidence and uses a read-only view without acquiring a writer', async () => {
@@ -34,4 +34,18 @@ it('fails closed for missing calls or unsettled execution trees without opening 
     expect((f.options as any).remote.projectConversation).not.toHaveBeenCalled();
     (f.options as any).calls.list.mockResolvedValue([]);
     expect(await workResourceExecution(f.options, 'ready', 'project')).toContain('WORKTREE_EXECUTION_UNKNOWN');
+});
+
+it('checks the real writer before cleaning a settled call whose context ownership was left behind', async () => {
+    const f = await fixture(false);
+    expect(await workResourceExecution(f.options,'ready','project')).toEqual([]);
+    f.snapshot.writerLock.status = 'held';
+    expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_IN_USE');
+    f.snapshot.writerLock.status = 'unknown';
+    expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_EXECUTION_UNKNOWN');
+    f.snapshot.writerLock.status = 'not-held';
+    (f.options as any).kernel.task.mockResolvedValue({id:'other-owner',effects:{},status:'running'});
+    expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_IN_USE');
+    f.call.executionTree.settled = false;
+    expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_IN_USE');
 });

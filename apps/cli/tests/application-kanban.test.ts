@@ -68,3 +68,13 @@ it('does not dispatch when freezing fails or a frozen task/action does not match
     await expect(kanbanCommand(client, ['task', 'resume', 'board', 'task'], {file})).rejects.toThrow('does not match');
     expect(execute).not.toHaveBeenCalled();
 });
+
+it('freezes a restart into a distinct successor and rejects replay against another successor', async () => {
+    const directory = await mkdtemp(join(tmpdir(),'kanban-restart-')); paths.push(directory);
+    const file = join(directory,'request.json'), execute = vi.fn(async () => ({id:'board'}));
+    const client = {services:{kanban:{read:async()=>({revision:7,items:[{id:'old'}]}),execute}}} as unknown as ApplicationClient;
+    await kanbanCommand(client,['task','restart','board','old','fresh'],{submissionFile:file});
+    expect(execute).toHaveBeenCalledWith('board',expect.objectContaining({expectedRevision:7,command:{type:'restart-item',itemId:'old',replacementId:'fresh'}}));
+    await expect(kanbanCommand(client,['task','restart','board','old','other'],{file})).rejects.toThrow('replacement task');
+    expect(execute).toHaveBeenCalledTimes(1);
+});

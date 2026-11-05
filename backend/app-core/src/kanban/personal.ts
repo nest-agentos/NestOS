@@ -4,7 +4,7 @@ import {workLogOptions} from './work-log-policy';
 import {kanbanJournalOptions} from './host-policy';
 import {taskReplies} from './task-replies';
 import {createTaskFix} from './task-fix';
-import {validateWorkProjects} from './task-projects';
+import {validateWorkProjects,inheritWorkReferences} from './task-projects';
 import {validateRemoteReferences,projectResourceCatalog} from './resource-catalog';
 import {createPersonalKanbanAutomation,type PersonalKanbanAutomationOptions} from './personal-automation';
 import {authorizeAutomation} from './automation-authority';
@@ -75,7 +75,7 @@ function personalOptions({store, journal, events, diagnostics, sessions, kernel,
                 .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)).slice(0, limit)
                 .map(row => ({id: row.id, label: row.title.slice(0, 256), detail: row.folder?.slice(0, 256) ?? ''}));
         },
-        store, verifyOutputs: async ({board, itemId, dispatchId, outputs}: Parameters<NonNullable<import('./module').NestOSKanbanOptions['verifyOutputs']>>[0]) => {
+        store, restartReferences:inheritWorkReferences, verifyOutputs: async ({board, itemId, dispatchId, outputs}: Parameters<NonNullable<import('./module').NestOSKanbanOptions['verifyOutputs']>>[0]) => {
             const state = await store.read(board.id);
             const dispatch = dispatchId ? state?.workflow?.dispatches[dispatchId] : undefined;
             if (dispatch?.itemId !== itemId || !await journal.verify(outputs, dispatch.id)) return false;

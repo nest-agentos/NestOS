@@ -1,3 +1,4 @@
+import {promptData} from './helpers/prompt-data';
 import {expect, it, vi} from 'vitest';
 import type {IndependentCallView, IndependentCallInput} from '@nestos/llm-session/contracts';
 import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
@@ -77,6 +78,6 @@ it('passes only the frozen context reference without eagerly reading dependency 
     const executor=createPublishedKanbanWorkExecutor({calls:f.calls,kernel:{task:f.task},prepareSession:f.prepareSession,context,
         binding:async()=>({target:{kind:'agent',id:'worker',version:'1',digest:'b'.repeat(64)},contextRef})});
     const prepared=await executor.prepare(dispatch,{id:'item',title:'Task',responsibility:'large task body'.repeat(1000)} as KanbanItem) as {input:IndependentCallInput};
-    expect(JSON.parse((prepared.input.request.source as {text:string}).text)).toEqual({contextRef});
+    expect(promptData((prepared.input.request.source as {text:string}).text,'Context reference')).toEqual(contextRef);
     expect(context).not.toHaveBeenCalled();
 });

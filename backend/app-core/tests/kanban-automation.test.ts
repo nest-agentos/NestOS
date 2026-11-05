@@ -1,3 +1,4 @@
+import {promptData} from './helpers/prompt-data';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {readChannelResult} from '../src/run/channel-results';
 import {memoryChannels} from './helpers/session-channels';
@@ -29,7 +30,7 @@ async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: E
         submitPreparedTaskCall: vi.fn(async (input: IndependentCallInput) => {
             submitted.set(input.request.submission!.id, input);
             if(input.request.expectedTarget!.id==='planner') {
-                const item=JSON.parse(input.request.source.text).snapshot.item,id=input.request.submission!.id;
+                const item=promptData(input.request.source.text,'Snapshot').item,id=input.request.submission!.id;
                 const payload=invalid?{}:analysis??{ready:true,dependencies:item.id==='second'?['first']:[],reason:'Uses the prerequisite result',estimate:{complexity:1,workUnits:1,durationMs:60000,confidence:'high'}};
                 channels.report(id,'result',{type:'result',content:'Planning result',payload});
             }
@@ -43,7 +44,7 @@ async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: E
     } as unknown as Calls;
     const kernel = {task: vi.fn(async (_session: string, id: string) => {
         const input = submitted.get(id)!, planner = input.request.expectedTarget!.id === 'planner';
-        const item = planner ? JSON.parse(input.request.source.text).snapshot.item : undefined;
+        const item = planner ? promptData(input.request.source.text,'Snapshot').item : undefined;
         const output = planner ? {message: {content: invalid ? 'INVALID PRIVATE' : JSON.stringify(analysis??{ready: true, dependencies: item.id === 'second' ? ['first'] : [], reason: 'Uses the prerequisite result',
             estimate: {complexity: 1, workUnits: 1, durationMs: 60000, confidence: 'high'}})}} : {message: {content: 'Verified result'}};
         return {id, sessionId: _session, version: 1, effects: {}, exit: {status: 'succeeded', output: {exit: {status: 'succeeded', output}}}} as unknown as TaskRecord;
@@ -75,7 +76,7 @@ it('analyzes newly added work, waits for independent acceptance and passes prere
     expect(f.executions()).toHaveLength(1);
     await f.command({type: 'accept-execution', dispatchId: first, accept: true});
     await f.service.scan(); expect(f.executions()).toHaveLength(2);
-    const second = f.executions()[1], request = JSON.parse(second[1].request.source.text);
+    const second = f.executions()[1], request = promptData(second[1].request.source.text,'Task');
     expect(request.dependencies[0].outputs[0].value).toEqual({file:'result.yaml',content:'Verified result'});
     expect((await f.service.item('board', 'first')).item.id).toBe('first');
     f.completed.add(second[0]); await f.service.scan();

@@ -1,3 +1,4 @@
+import {taskStat, type Kernel} from '@nestos/durable-kernel';
 import {jobKey, reviewKey, type ReviewJob, type ReviewSettings} from '../kanban/item-operation-types';
 import {readContextCatalog, type ContextInspector} from '../projects/harness-context-catalog';
 import type {IndependentCallService} from '@nestos/llm-session';
@@ -8,7 +9,7 @@ import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 
 export interface ResourceExecutionOptions {
-    calls: Pick<IndependentCallService, 'list'>; kernel: ContextInspector;
+    calls: Pick<IndependentCallService, 'list'>; kernel: ContextInspector & Pick<Kernel,'task'>;
     remote: ProjectRemoteMountService; journal: KanbanAutomationJournal;
 }
 type NativeState = ReturnType<ProjectConversationPort['snapshot']>;
@@ -41,22 +42,28 @@ async function inspectCall(options: ResourceExecutionOptions, call: IndependentC
     const bindings = Object.values(catalog.value.bindings).filter(row => row.connectionId === 'work-' + id && row.nativeRef);
     if (!bindings.length) return ['WORKTREE_EXECUTION_UNKNOWN'];
     const reasons: string[] = [];
-    for (const binding of bindings) reasons.push(...await inspectNative(options.remote, binding, projectId));
+    for (const binding of bindings) {
+        if (binding.activeOperation) {
+            const owner = await options.kernel.task(child, binding.activeOperation.executionRef.taskId).catch(() => undefined);
+            if (!owner) {reasons.push('WORKTREE_EXECUTION_UNKNOWN');continue;}
+            if (!taskStat(owner).settled) {reasons.push('WORKTREE_IN_USE');continue;}
+        }
+        reasons.push(...await inspectNative(options.remote, binding, projectId));
+    }
     return reasons;
 }
 async function inspectNative(remote: ProjectRemoteMountService, binding: ContextBinding, projectId: string): Promise<string[]> {
-    if (binding.activeOperation) return ['WORKTREE_IN_USE'];
     if (binding.validity !== 'valid') return ['WORKTREE_EXECUTION_UNKNOWN'];
     const native = binding.nativeRef!, view = await remote.projectConversation(projectId, native.profileId, native.sessionId, undefined, true);
     try {
         await view.read(); const state = view.snapshot(), reasons: string[] = [];
         if (nativeBusy(state)) reasons.push('WORKTREE_IN_USE');
-        if (nativeUnknown(state)) reasons.push('WORKTREE_EXECUTION_UNKNOWN');
+        if (nativeUnknown(state) || binding.activeOperation && state.writerLock?.status !== 'not-held') reasons.push('WORKTREE_EXECUTION_UNKNOWN');
         return reasons;
     } finally {await view.close();}
 }
 function nativeBusy(state: NativeState): boolean {
-    return !!(state.active || state.pending || state.requests?.length || state.instructionQueue?.items.length || state.draft?.trim()
+    return !!(state.writerLock?.status === 'held' || state.active || state.pending || state.requests?.length || state.instructionQueue?.items.length || state.draft?.trim()
         || state.controls?.some(control => control.receipt === 'unknown' || control.receipt === 'accepted' && control.effect === 'unconfirmed'));
 }
 function nativeUnknown(state: NativeState): boolean {

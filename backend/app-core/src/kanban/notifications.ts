@@ -10,7 +10,7 @@ export interface KanbanNotifications {
     sourceId: string;
     journal: Pick<SeqEventJournal<ApplicationEventFact>, 'transaction'>;
 }
-const retained = new Set(['report-analysis', 'control-receipt', 'report-issue', 'resolve-issue', 'request-run', 'admit-item', 'publish-plan','prepare-dispatch','observe-execution','accept-execution','create-item', 'message', 'plan-item', 'set-stage', 'publish-proposal', 'claim', 'accept-transfer', 'request-transfer',
+const retained = new Set(['restart-item','report-analysis', 'control-receipt', 'report-issue', 'resolve-issue', 'request-run', 'admit-item', 'publish-plan','prepare-dispatch','observe-execution','accept-execution','create-item', 'message', 'plan-item', 'set-stage', 'publish-proposal', 'claim', 'accept-transfer', 'request-transfer',
     'submit', 'review', 'escalated', 'apply-discovery', 'cancel-item', 'close-plan', 'archive-items', 'items.archived', 'restore-item', 'block-item', 'unblock-item', 'link-reference', 'release-item', 'review-amendment', 'append-record', 'review-record', 'link-record']);
 
 /** Source fact publication and its checkpoint commit together in the authenticated system journal. */

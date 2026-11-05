@@ -1,3 +1,5 @@
+import {inheritWorkReferences} from './task-projects';
+import {formatPromptSections} from '@nestos/llm-context';
 import {DEFAULT_KANBAN_WORK_TYPES,type KanbanBoard,type KanbanItem,type KanbanService} from '@nestos/kanban/contracts';
 import {analyzeItem as coordinateAnalysis,safeCode,type KanbanAutomationJournal,type KanbanAnalysisObservation} from '@nestos/kanban/integration';
 import {t} from '@nestos/common';
@@ -18,7 +20,7 @@ export interface AnalysisOptions {
 /** Only NestOS request construction and execution observation live in this adapter. */
 export function analyzeItem(options:AnalysisOptions,board:KanbanBoard,item:KanbanItem,target:TargetRef|undefined,service:KanbanService):Promise<void> {
     return coordinateAnalysis<TargetRef,IndependentCallInput>({journal:options.journal,active:options.active,log:options.log,
-        inheritReferences:refs=>refs.filter(ref=>['nestos-remote-project','nestos-decision-run'].includes(ref.system)),
+        inheritReferences:inheritWorkReferences,
         onSettled:options.onAnalysis?async input=>options.onAnalysis!({...input,target:input.request.request.expectedTarget!}):undefined,
         port:{
             prepare:async ({id,board,item,target})=>{
@@ -35,7 +37,7 @@ function analysisInput(board:KanbanBoard,item:KanbanItem,target:TargetRef,id:str
     const items=board.items.map(({id,title,responsibility,acceptance,planning,status})=>({id,title,responsibility,acceptance,planning,status}));
     return {title:`${t('kanban.automationAnalysis')} · ${item.number?'#'+item.number+' · ':''}${item.title}`,
         request:{expectedSessionId:id,expectedBranch:'main',expectedTarget:target,target:{kind:target.kind,id:target.id,version:target.version},
-            source:{kind:'composer',text:JSON.stringify(contextRef===undefined?{instruction,snapshot:{item,items,workTypes:board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:board.defaultWorkType??'task'}}:{instruction,contextRef}),attachments:[],values:{}},
+            source:{kind:'composer',text:formatPromptSections([{title:'Instructions',content:instruction},{title:contextRef===undefined?'Snapshot':'Context reference',content:contextRef??{item,items,workTypes:board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:board.defaultWorkType??'task'}}]),attachments:[],values:{}},
             submission:{id,source:{kind:'conversation',ownerId:id,id}}}};
 }
 async function inspectAnalysis(options:AnalysisOptions,id:string,input:IndependentCallInput):Promise<KanbanAnalysisObservation> {

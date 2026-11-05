@@ -638,6 +638,7 @@ export const zhCN = {
     'kanban.newBoard': '新建看板',
     'kanban.newItem': '新建事项',
     'kanban.boardName': '看板名称',
+    'kanban.restartedFrom': '重新执行来源',
     'kanban.boardId': '看板 ID',
     'kanban.boardIdHelp': '1–64 位字母、数字、- 或 _，以字母或数字开头。用于稳定链接，创建后不可修改。',
     'kanban.name': '标题',

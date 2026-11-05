@@ -65,9 +65,9 @@ function integer(value: string): number {
 
 
 async function taskCommand(service: Service, args: string[], options: CommandOptions): Promise<unknown> {
-    const [action, boardId, itemId] = args;
-    if (!['run', 'pause', 'resume', 'cancel', 'reopen'].includes(action) || !boardId || !itemId || args.length !== 3)
-        throw new Error('kanban task run|pause|resume|cancel|reopen <board-id> <item-id> --submission-file request.json (or --file to submit the frozen request)');
+    const [action, boardId, itemId, replacementId] = args;
+    if (!['run', 'pause', 'resume', 'cancel', 'reopen', 'restart'].includes(action) || !boardId || !itemId || args.length !== (action === 'restart' ? 4 : 3))
+        throw new Error('kanban task run|pause|resume|cancel|reopen|restart <board-id> <item-id> [replacement-id for restart] --submission-file request.json (or --file to submit the frozen request)');
     if (options.file && options.submissionFile) throw new Error('Choose --file or --submission-file');
     let request: Parameters<Service['execute']>[1];
     if (options.file) request = await jsonFile(options.file);
@@ -76,11 +76,12 @@ async function taskCommand(service: Service, args: string[], options: CommandOpt
         const board = await service.read(boardId);
         if (!board.items.some(item => item.id === itemId)) throw new Error('Kanban task was not found');
         request = {operationId: randomUUID(), expectedRevision: board.revision, command: action === 'run'
-            ? {type: 'request-run', itemId} : action === 'reopen' ? {type: 'reopen-item', itemId, reopenId: randomUUID()} : {type: 'request-control', itemId, controlId: randomUUID(), action: action as 'pause' | 'resume' | 'cancel'}};
+            ? {type: 'request-run', itemId} : action === 'restart' ? {type:'restart-item',itemId,replacementId} : action === 'reopen' ? {type: 'reopen-item', itemId, reopenId: randomUUID()} : {type: 'request-control', itemId, controlId: randomUUID(), action: action as 'pause' | 'resume' | 'cancel'}};
         await writeCallJson(options.submissionFile, request, request.operationId, 'kanban.task.' + action);
     }
     const command = request.command;
-    if (command?.type !== (action === 'run' ? 'request-run' : action === 'reopen' ? 'reopen-item' : 'request-control') || !('itemId' in command) || command.itemId !== itemId
-        || !['run', 'reopen'].includes(action) && (!('action' in command) || command.action !== action)) throw new Error('Frozen task request does not match the requested task or action');
+    if (command?.type !== (action === 'run' ? 'request-run' : action === 'reopen' ? 'reopen-item' : action === 'restart' ? 'restart-item' : 'request-control') || !('itemId' in command) || command.itemId !== itemId
+        || !['run', 'reopen', 'restart'].includes(action) && (!('action' in command) || command.action !== action)) throw new Error('Frozen task request does not match the requested task or action');
+    if (action === 'restart' && (command.type !== 'restart-item' || command.replacementId !== replacementId)) throw new Error('Frozen restart request does not match the replacement task');
     return service.execute(boardId, request);
 }

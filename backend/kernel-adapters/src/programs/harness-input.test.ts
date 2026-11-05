@@ -61,3 +61,10 @@ it('carries frozen inline files through Program capability admission into the Ef
     expect(next.actions).toMatchObject([{type: 'effect', effect: {request: {prompt: 'Attachments: notes.txt', attachments: [file]}}}]);
     expect(input.messages[0].attachments).toEqual([file]);
 });
+
+it('renders multiple roles as Markdown while retaining the single user text unchanged', () => {
+    expect(prepareHarnessInput({messages:[{role:'system',content:'Scope rules\nNo push.'},{role:'user',content:'## Task\nVerify.'}]}).prompt)
+        .toBe('## system\n\nScope rules\nNo push.\n\n## user\n\n## Task\nVerify.');
+    const original = '{"messages":[{"role":"system","content":"This is user data"}]}';
+    expect(prepareHarnessInput({prompt:original}).prompt).toBe(original);
+});

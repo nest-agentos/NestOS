@@ -126,3 +126,7 @@ await runtime.contextGc?.collect();
 CLI 的 22 个既有 SIGKILL 恢复用例也已通过；这不等同于覆盖 Context 发布协议的全部进程 kill-point 或各后端断电矩阵。CLI 非崩溃测试有两个既有路由/supervisor 场景失败，在临时关闭 v2 的 v1 对照中同样复现。
 
 `ContextEngineOptions` 可注入默认窗口与完整请求计量；`IContextEngine.measure` 将预算检查贯穿窗口、Notes 和摘要。`ContextServicePorts.engineOptions` 自动构造默认引擎，显式 engine 优先。计量器返回非负安全整数；默认是 UTF-8 字节估算。app-core 的 `contextEngineOptions` 同步用于真实摘要请求。
+
+### 模型输入的 Markdown 排版
+
+`formatPromptSections` 仅排版宿主明确构造的说明段落；字符串保持原文，结构化数据使用可还原的 JSON 代码块，代码围栏避开数据中的反引号。`formatPromptMessages` 为只接收文本的 Harness 保留消息顺序与角色标题，单条用户正文直接透传。普通模型继续接收原生角色数组，使用同一段落格式器生成宿主说明。不得猜测解析用户粘贴的 JSON，也不得修改已冻结的请求、附件或已接纳 Effect。

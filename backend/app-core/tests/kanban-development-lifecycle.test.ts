@@ -1,3 +1,4 @@
+import {promptData} from './helpers/prompt-data';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {memoryChannels} from './helpers/session-channels';
 import {afterEach, expect, it, vi} from 'vitest';
@@ -40,7 +41,7 @@ it('runs cancellation finalization independently and reconciles a lost response 
     const input = calls.submitPreparedTaskCall.mock.calls[0][0];
     expect(input.request.expectedSessionId).toBe(hookId);
     expect(input.request.source.text).toContain('postload.cancelled');
-    expect(JSON.parse(input.request.source.text).contextRef.scopeId).toBe(hookId);
+    expect(promptData(input.request.source.text,'Context reference').scopeId).toBe(hookId);
     expect(channels.channel.mock.calls.some(([,operation,args])=>operation==='open'&&args.scopeId===hookId)).toBe(true);
     expect(input.request.source.text).toContain('Do not implement, commit');
     expect(await second.settled('attempt', 'cancelled')).toBe(true);

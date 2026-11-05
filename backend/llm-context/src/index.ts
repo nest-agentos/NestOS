@@ -19,3 +19,5 @@ export { createContextGc } from './gc/collector';
 export { scheduleContextGc, validateContextGcSchedule, type ContextGcScheduleOptions } from './gc/scheduler';
 
 export { simpleHash } from './content/fingerprint';
+
+export {formatPromptSections, formatPromptMessages, type PromptSection} from './assembly/prompt-markdown';

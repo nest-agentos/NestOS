@@ -637,6 +637,7 @@ export const en: LocaleStrings = {
     'kanban.newBoard': 'New board',
     'kanban.newItem': 'New item',
     'kanban.boardName': 'Board name',
+    'kanban.restartedFrom': 'Restarted from',
     'kanban.boardId': 'Board ID',
     'kanban.boardIdHelp': '1–64 letters, digits, - or _, starting with a letter or digit. Used in stable links and cannot be changed after creation.',
     'kanban.name': 'Title',

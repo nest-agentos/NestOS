@@ -1,3 +1,4 @@
+import {formatPromptSections} from '@nestos/llm-context';
 import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallInput, IndependentCallView} from '@nestos/llm-session/contracts';
 import type {TargetRef} from '@nestos/llm-flow/contracts';
@@ -27,7 +28,7 @@ export function createPublishedKanbanWorkExecutor(options: PublishedKanbanWorkOp
             const binding=await options.binding(dispatch, item);
             const input: IndependentCallInput={title:options.title?.(dispatch, item) ?? `${item.number ? '#' + item.number + ' · ' : ''}${item.title}`, request:{expectedSessionId:sessionId,expectedBranch:'main',expectedTarget:binding.target,
                 target:{kind:binding.target.kind,id:binding.target.id,version:binding.target.version},overrides:binding.overrides,
-                source:{kind:'composer',text:JSON.stringify(binding.contextRef === undefined ? {item,inputs:dispatch.inputs,dependencies:await options.context?.(dispatch,item),planId:dispatch.planId,planRevision:dispatch.planRevision} : {contextRef:binding.contextRef,...(binding.instruction?{instruction:binding.instruction}:{}),...(binding.dependencies?{dependencies:binding.dependencies}:{})}),attachments:[],values:{}},
+                source:{kind:'composer',text:formatPromptSections(binding.contextRef === undefined ? [{title:'Task',content:{item,inputs:dispatch.inputs,dependencies:await options.context?.(dispatch,item),planId:dispatch.planId,planRevision:dispatch.planRevision}}] : [{title:'Instructions',content:binding.instruction},{title:'Context reference',content:binding.contextRef},{title:'Dependencies',content:binding.dependencies}]),attachments:[],values:{}},
                 submission:{id:dispatch.id,source:{kind:'conversation',ownerId:sessionId,id:dispatch.id}}}};
             return {schema:1,dispatch:structuredClone(dispatch),input,policy:structuredClone(options.executionPolicy ?? {maxDepth:4, timeoutMs: null})};
         },

@@ -1,3 +1,4 @@
+import {formatPromptSections} from '@nestos/llm-context';
 import type {KanbanClient} from '@nestos/kanban/contracts';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import {taskReplies as createReplies,type KanbanAutomationJournal,type FrozenReply as Reply} from '@nestos/kanban/integration';
@@ -19,6 +20,6 @@ export function taskReplies(service:KanbanClient,journal:KanbanAutomationJournal
 async function transferReply(options:PersonalKanbanAutomationOptions,frozen:FrozenReply):Promise<void> {
     const {request,target,sessionId}=frozen;
     await options.enqueueTaskReply!({expectedSessionId:sessionId,expectedBranch:'main',expectedTarget:target,
-        target:{kind:target.kind,id:target.id,version:target.version},source:{kind:'composer',text:JSON.stringify({dependencies:{channelReply:{scopeId:request.attemptId,replyTo:request.replyTo,operationId:request.operationId}},instruction:request.content}),attachments:[],values:{}},
+        target:{kind:target.kind,id:target.id,version:target.version},source:{kind:'composer',text:formatPromptSections([{title:'User reply',content:request.content},{title:'Reply binding',content:{scopeId:request.attemptId,replyTo:request.replyTo,operationId:request.operationId}}]),attachments:[],values:{}},
         submission:{id:request.operationId,source:{kind:'conversation',ownerId:sessionId,id:request.operationId}}});
 }

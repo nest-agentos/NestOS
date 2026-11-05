@@ -1,3 +1,4 @@
+import {promptData} from './helpers/prompt-data';
 import {kanbanControlOptions} from '../src/kanban/control-adapter';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {taskReplies} from '../src/kanban/task-replies';
@@ -70,7 +71,8 @@ it('transfers a linked answer through the original Session queue, retaining a re
     const replies=taskReplies(f.service,f.journal,options as never),request={itemId:'t',attemptId:'original',replyTo:'question',operationId:'answer',content:'Use the verified input'};
     await replies('b',request);
     const source=(enqueue.mock.calls[0][0] as {source:{text:string}}).source;
-    expect(JSON.parse(source.text)).toEqual({dependencies:{channelReply:{scopeId:'original',replyTo:'question',operationId:'answer'}},instruction:request.content});
+    expect(promptData(source.text,'Reply binding')).toEqual({scopeId:'original',replyTo:'question',operationId:'answer'});
+    expect(source.text).toContain('## User reply\n\n'+request.content);
     expect(enqueue.mock.calls[0][0]).toMatchObject({expectedSessionId:'original-session',submission:{id:'answer'}});
     await f.run({type:'resolve-issue',itemId:'t',attemptId:'original',issueId:'question',resolvedBy:'done'});
     await replies('b',request);await replies.scan();expect(enqueue).toHaveBeenCalledTimes(1);
