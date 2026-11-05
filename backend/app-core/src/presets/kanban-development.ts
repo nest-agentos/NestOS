@@ -59,7 +59,7 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
     finally {await harness.close();}
     const folder = await options.projects.get(projectId), view = await options.projects.openWorkspace(folder.path);
     try {
-        const policy = await developmentStage(input.dispatch.id, 'policy.freeze', () => developmentPolicy(journal, options.fs, view.fs, input.dispatch.id, input.options));
+        const policy = await developmentStage(input.dispatch.id, 'policy.freeze', () => developmentPolicy(journal,options.fs,view.fs,input.dispatch.id,{...input.options,...(input.stage===undefined&&(input.context as {decision?:{snapshot?:{completion?:string}}})?.decision?.snapshot?.completion==='automatic'?{commit:'worktree'}:{})}));
         const record = await developmentWorkspace(options.remote, options.provider, projectId, async process => {
             const tree = await developmentStage(input.dispatch.id, 'worktree.prepare', () => prepareWorktree(journal, input.dispatch.id, '/workspace/' + directory, process));
             const repositories = await developmentStage(input.dispatch.id, 'modules.prepare', () => prepareWorktreeModules(journal, tree, policy.modules, process));

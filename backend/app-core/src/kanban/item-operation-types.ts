@@ -12,12 +12,16 @@ export interface MergePlan {
 export interface ReviewJob {
     id: string; boardId: string; itemId: string; action: ReviewAction; fingerprint: string; snapshot: ReviewSnapshot;
     phase: 'prepared' | 'submitting' | 'settled'; state: OperationObservation['state']; code?: string; sessionId?: string;
+    managed?:import('../runtime/service-control').ServiceSwitchRequest;
     operationContext?: unknown; input?: IndependentCallInput; request?: SubmissionRequest; result?: unknown; createdAt: number;
     followUp?:{action:'deploy';state:'queued'|'started'|'failed';code?:string;request?:import('@nestos/kanban/contracts').KanbanItemOperationRequest};
     command?: import('@nestos/kanban/contracts').KanbanCommand; acceptanceVersion?: string;
 }
 export interface ReviewSettings {revision: number; bindings: Partial<Record<ReviewAction, KanbanExternalReference>>; jobs: string[]; receipts: Record<string, string>}
 export interface ReviewAdapter {
+    managed?:{prepare(input:{id:string;board:KanbanBoard;item:KanbanItem;snapshot:ReviewSnapshot;context:unknown}):Promise<import('../runtime/service-control').ServiceSwitchRequest|undefined>;
+        submit(request:import('../runtime/service-control').ServiceSwitchRequest):Promise<void>;
+        inspect(job:ReviewJob):Promise<import('../run/published-operation').OperationObservation>};
     supports?(board: KanbanBoard, item: KanbanItem): boolean;
     runningVersion?(): string | undefined;
     snapshot(board: KanbanBoard, item: KanbanItem): Promise<ReviewSnapshot>;
@@ -29,6 +33,9 @@ export interface ReviewAdapter {
     readAnalysis(job: ReviewJob): Promise<unknown | undefined>;
 }
 export interface ReviewOperationsOptions {
+    automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;
+    cleanup?(board:string,item:string,id:string):Promise<boolean>;
+    reportAutomatic?(state:{id:string;boardId:string;itemId:string;step:number;code?:string;done?:boolean}):Promise<void>;
     report?(job: ReviewJob): Promise<void>;
     sessionResource?(sessionId: string): Promise<string | undefined>;
     service: KanbanService; journal: KanbanAutomationJournal;

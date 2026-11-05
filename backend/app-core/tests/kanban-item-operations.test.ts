@@ -150,3 +150,12 @@ it('recovers replacement success from verified evidence when the old host lost t
     expect(f.submission.start).toHaveBeenCalledTimes(2);
     await f.api.scan();expect(f.submission.start).toHaveBeenCalledTimes(2);
 });
+
+it('uses the trusted service controller once and validates its deployment result without a model request',async()=>{
+ const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.itemOperations('board','task');
+ const managed={operationId:'managed-deploy',serviceId:'host',expectedVersion:'old',targetVersion:'candidate'};
+ const submit=vi.fn(async()=>{});f.options.adapter.managed={prepare:async()=>managed,submit,inspect:async()=>({state:'succeeded',output:{...f.result('managed-deploy'),status:'succeeded'}})};
+ await f.run('deploy','managed-deploy',{confirmed:true});await f.api.scan();
+ expect(submit).toHaveBeenCalledOnce();expect(f.published.start).toHaveBeenCalledOnce();expect(f.submission.start).not.toHaveBeenCalled();
+ expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='deploy')).toMatchObject({state:'succeeded'});
+});

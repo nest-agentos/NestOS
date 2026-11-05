@@ -59,7 +59,7 @@ test('restart waits for the former host to exit and registers exactly one replac
     const entry = path.join(releases, 'fixture/server/main.js'), registry = path.join(root, 'release/httpd-processes/release.json');
     const runners = [];
     async function spawnRunner(command) {
-        const child = spawn(process.execPath, ['scripts/httpd.mjs', command], {cwd: root, stdio: 'ignore'}); runners.push(child); return child;
+        const child = spawn(process.execPath, ['scripts/httpd.mjs', command], {cwd:root,stdio:'ignore',env:{...process.env,NESTOS_HTTPD_CONTROL_DIR:path.join(root,'control')}}); runners.push(child); return child;
     }
     async function registered(previous = 0) {
         const deadline = Date.now() + 5000;
@@ -74,8 +74,9 @@ test('restart waits for the former host to exit and registers exactly one replac
         await mkdir(path.dirname(entry), {recursive: true}); await mkdir(path.join(root, 'scripts'));
         await mkdir(path.join(root, 'tools/temporary-process/node'), {recursive: true});
         await writeFile(path.join(root, 'package.json'), '{"type":"module"}');
-        for (const name of ['httpd.mjs', 'httpd-process.mjs']) await writeFile(path.join(root, 'scripts', name), await readFile(new URL('../' + name, import.meta.url)));
+        for (const name of ['httpd.mjs','httpd-process.mjs','httpd-launcher.mjs','httpd-launch-state.mjs','httpd-child.mjs']) await writeFile(path.join(root, 'scripts', name), await readFile(new URL('../' + name, import.meta.url)));
         await writeFile(path.join(root, 'scripts/httpd-runtime.mjs'), `export const hostArguments=()=>[],hostEnvironment=()=>process.env,runtimePaths=()=>({runtime:'unused'}),runtimeLog=()=>({write(){},close(){}}),releaseDirectory=(r,id)=>r+'/'+id,releasesRoot=root=>root+'/release/httpd',verifyRelease=()=>{};`);
+        await writeFile(path.join(root,'scripts/httpd-launch-health.mjs'),'export const launchHealth=()=>async()=>true;');
         await writeFile(path.join(root, 'scripts/httpd-build.mjs'), 'export function buildHttpRelease() {}');
         await writeFile(path.join(root, 'tools/temporary-process/node/index.mjs'), 'export async function recover() {}');
         await writeFile(path.join(releases, 'current.json'), '{"id":"fixture"}');
@@ -84,8 +85,9 @@ test('restart waits for the former host to exit and registers exactly one replac
         await spawnRunner('restart'); const second = await registered(first.pid);
         assert.equal(await processIdentity(first.pid), undefined);
         assert.deepEqual((await runningHttpd(root, 'release', releases)).map(row => row.pid), [second.pid]);
-        await withHttpdControl(root, () => stopHttpd(root, 'release', releases));
-        assert.equal(await processIdentity(second.pid), undefined);
+        const stop=await spawnRunner('stop');await once(stop,'exit');
+        assert.equal(await processIdentity(second.pid),undefined);await new Promise(resolve=>setTimeout(resolve,300));
+        assert.deepEqual(await runningHttpd(root,'release',releases),[]);
     } finally {
         for (const child of runners) {if (child.exitCode === null && !child.signalCode) child.kill('SIGKILL');}
         const row = await readFile(registry, 'utf8').then(JSON.parse).catch(() => null);

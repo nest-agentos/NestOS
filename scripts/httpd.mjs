@@ -84,7 +84,7 @@ async function supervise(child, mode, entry, args, output) {
     } catch (error) {child.kill('SIGTERM'); throw error;}
 }
 function prepareLifecycleLog(command, args) {
-    if (!['start', 'stop', 'restart', 'dev'].includes(command)) return;
+    if (!['start','stop','restart','switch','status','dev'].includes(command)) return;
     const mode = command === 'dev' || args.includes('--dev') ? 'dev' : 'release';
     try {
         const output = runtimeLog(runtimePaths(mode).runtime);
@@ -96,7 +96,7 @@ try {
     prepareLifecycleLog(command, args);
     if (command === 'build') build(args);
     else if (command === 'dev') await withHttpdControl(root, () => serve('dev', args));
-    else if (command === 'start') await withHttpdControl(root, () => serve('release', args));
+    else if(['start','switch','status'].includes(command)||['stop','restart'].includes(command)&&!args.includes('--dev'))await (await import('./httpd-launcher.mjs')).launcherCommand(root,releases,command,args);
     else if (command === 'stop' || command === 'restart') await withHttpdControl(root, async () => {
         const mode = args.includes('--dev') ? 'dev' : 'release';
         const timeoutAt = args.indexOf('--timeout-ms'), timeoutMs = timeoutAt < 0 ? undefined : Number(args[timeoutAt + 1]);
@@ -108,7 +108,7 @@ try {
     else if (command === 'list') {
         for (const entry of readdirSync(releases)) if (!entry.startsWith('.') && entry !== 'current.json') console.log(entry);
     }
-    else throw new Error('Usage: httpd.mjs build [--share-main] [--no-cache] [--no-activate] | start [httpd options] | dev [httpd options] | stop [--dev] | restart [--dev] [httpd options] | list | activate <release-id>');
+    else throw new Error('Usage: httpd.mjs build [--share-main] [--no-cache] [--no-activate] | start [httpd options] | dev [httpd options] | stop [--dev] | restart [--dev] [httpd options] | switch <release-id> [--expected-current <id>] [--operation-id <id>] [--service-id <id>] | status | list | activate <release-id>');
 } catch (error) {
     lifecycleLog({operationId: randomUUID(), stage: command, result: 'failure', code: error.code ?? 'HTTPD_COMMAND_FAILED', durationMs: Date.now() - commandStarted});
     console.error(error.code === 'ENOENT' && command === 'start' ? 'No HTTP release found. Run pnpm httpd:build first.' : error.message); process.exitCode = 1;

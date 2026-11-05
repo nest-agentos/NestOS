@@ -63,3 +63,9 @@ it('excludes only the admitted operation itself from workspace occupation checks
     expect(await workResourceExecution(f.options,'ready','project',{purpose:'resume'})).toContain('WORKTREE_IN_USE');
     expect(await workResourceExecution(f.options,'ready','project',{purpose:'resume',operationId:'build'})).toEqual([]);
 });
+
+it('allows cleanup only after the native session is archived and all execution evidence is idle',async()=>{
+ const f=await fixture();f.snapshot.writerLock.status='held';Object.assign(f.snapshot,{archived:true});
+ expect(await workResourceExecution(f.options,'ready','project')).toEqual([]);
+ f.snapshot.active=true;expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_IN_USE');
+});

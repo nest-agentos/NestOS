@@ -1,3 +1,4 @@
+import {managedServiceDeployment} from './managed-service-deployment';
 import {operationReceipt} from '../run/operation-receipt';
 import {maintenanceInstruction} from './kanban-maintenance';
 import {journalCommand} from '@nestos/kanban/integration';
@@ -29,6 +30,7 @@ import {readChannelResult, channelResultInstruction} from '../run/channel-result
 import {workResourceExecution} from './kanban-work-resource-execution';
 
 interface Options {
+    serviceControl?:import('../runtime/service-control').RuntimeServiceControl;
     submission?: ReturnType<typeof sessionSubmission>; wake?(): void;
     fs: IFileSystem; journal: KanbanAutomationJournal; service: KanbanService; calls: Pick<IndependentCallService, 'list'>;
     kernel: Pick<Kernel, 'sessionActivity' | 'inspectSession' | 'task'>; remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
@@ -47,7 +49,7 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
             return async () => {stop?.(); await client.close();};});
         return record;
     };
-    return {runningVersion: () => options.runningVersion, supports: (_board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree'),
+    return {managed:managedServiceDeployment(options.serviceControl,async item=>{const project=item.externalRefs?.find(ref=>ref.system==='nestos-remote-project');requireValue(project,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(project.id)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');}),runningVersion: () => options.runningVersion, supports: (_board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree'),
         snapshot: (board, item) => snapshot(options, board, item), close: () => watches.dispose(),
         prepareAnalysis: input => prepareAnalysis(options, input), prepareOperation: input => prepareAnalysis(options, input),
         exchange: options.submission ? async (job, observation) => {

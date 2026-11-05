@@ -1,3 +1,5 @@
+import {sha256HexSync} from '@nestos/common';
+import {workContext} from './work-context';
 import {KanbanError} from '@nestos/kanban';
 import {assembleKanbanRuntime,KanbanAutomationJournal,type KanbanRuntimeContext,type KanbanRuntimeExtension} from '@nestos/kanban/integration';
 import {kanbanControlOptions} from './control-adapter';
@@ -38,10 +40,23 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
 }
 function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanAutomationOptions|undefined,events:UserEventService,log:ReturnType<typeof personalOptions>['log'],setOperations:(value:ReturnType<typeof import('./item-operations').createItemOperations>|undefined)=>void):KanbanRuntimeExtension[] {
     const {service,journal,workLog,fs,serviceFor}=context;
-    const operations=options?.itemOperations?.({service,journal,workLog,log});setOperations(operations);
     const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,...resources}=resourcePorts??{};
+    const operations=options?.itemOperations?.({service,journal,workLog,log,automatic:async(board,item)=>{
+        const context=await workContext(journal,board,item);if((context.decision?.snapshot as {completion?:string})?.completion!=='automatic')return false;
+        return (await service.record(context.decision!.sourceBoardId,context.decision!.recordId)).status==='confirmed';
+    },cleanup:async(board,item,id)=>{
+        const execution=await service.executionSession(board,item,{includeRelated:true});
+        for(const session of new Set([execution.current?.sessionId,...execution.sessions?.map(row=>row.sessionId)??[],...execution.history.map(row=>row.sessionId)].filter((id):id is string=>!!id))){try{await options.archiveSession?.(session,id+'-archive-'+sha256HexSync(session).slice(0,12));}catch(error){if(['SESSION_ARCHIVE_STILL_RUNNING','SESSION_ARCHIVE_OUTCOME_UNKNOWN'].includes((error as {code:string}).code))return false;throw error;}}
+        const rows=await resources.workResources?.(board,item,{inspect:true})??[];
+        if(rows.length&&!resources.cleanupWorkResource)return false;
+        for(const row of rows){if(row.state==='cleaned')continue;if(!row.canCleanup)return false;await resources.cleanupWorkResource?.(board,{itemId:item,resourceId:row.id,version:row.version,operationId:id+'-cleanup-'+sha256HexSync(row.id).slice(0,12)});}
+        return true;
+    },reportAutomatic:async state=>{
+        await workLog.append(service,state.boardId,state.itemId,{stage:state.done?'automatic.completed':'automatic.blocked',result:state.code?'failure':'success',dispatchId:state.id,code:state.code});
+        if(state.code)await events.journal.append('automatic:'+state.id+':'+state.code,{type:'kanban.automatic.blocked',operationId:state.id,resourceId:'kanban:'+JSON.stringify(['personal:user-store',state.boardId,state.itemId]),notification:'error'});
+    }});setOperations(operations);
     const fixes=options?.collaboration?createTaskFix({service,journal,events,automation:options,log}):undefined;
-    const automation=options?createPersonalKanbanAutomation({...options,fs,service,journal,workLog,log,serviceFor,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
+    const automation=options?createPersonalKanbanAutomation({...options,fs,service,journal,workLog,log,serviceFor,deliveryReady:operations?.deliveryReady,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
     const planning=options?planningSessionReader(service,journal,options):undefined;

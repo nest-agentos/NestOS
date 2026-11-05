@@ -14,6 +14,7 @@ export function developmentSessionOperation(options:Options):NonNullable<Persona
     return input=>developmentStage(input.id,'session-operation.prepare',async()=>{
         const original=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+input.originId);
         requireValue(original&&input.nativeSessionId,'CONTINUATION_WORKSPACE_UNAVAILABLE');
+        const cleanup=await options.journal.get<{phase:string}>('worktree-cleanup:'+input.originId);requireValue(cleanup?.phase!=='cleaned','CONTINUATION_WORKSPACE_UNAVAILABLE');
         const current=await options.remote.sessionChannel(original.projectId,'current',{cwd:original.directory}) as {scopeId?:string};
         if(current.scopeId&&current.scopeId!==input.id) {
             const envelope=await options.remote.sessionChannel(original.projectId,'messages',{scopeId:current.scopeId}) as {execution?:{status?:string}};

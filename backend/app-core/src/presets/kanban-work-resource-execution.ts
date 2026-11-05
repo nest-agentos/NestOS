@@ -62,13 +62,13 @@ async function inspectNative(remote: ProjectRemoteMountService, binding: Context
     try {
         await view.read(); const state = view.snapshot(), reasons: string[] = [];
         if (nativeBusy(state,resume)) reasons.push('WORKTREE_IN_USE');
-        if (nativeUnknown(state) || binding.activeOperation&&state.writerLock?.status!=='not-held'&&!(resume&&state.observation?.owned&&state.observation.execution==='idle')) reasons.push('WORKTREE_EXECUTION_UNKNOWN');
+        if (nativeUnknown(state) || binding.activeOperation&&state.writerLock?.status!=='not-held'&&!((state.archived||resume&&state.observation?.owned)&&state.observation.execution==='idle')) reasons.push('WORKTREE_EXECUTION_UNKNOWN');
         if(operationId&&reasons.length)log.warn('Native session blocks workspace operation',{operation:'kanban.worktree.inspect',operationId,stage:'native.observe',result:'failure',code:reasons[0],writer:state.writerLock?.status,execution:state.observation?.execution,owned:state.observation?.owned,active:!!state.active,pending:!!state.pending,queued:state.instructionQueue?.items.length??0,draftPresent:!!state.draft?.trim(),durationMs:Date.now()-started});
         return reasons;
     } finally {await view.close();}
 }
 function nativeBusy(state: NativeState,resume=false): boolean {
-    const idleOwner=resume&&state.observation?.owned===true&&state.observation.execution==='idle'&&!nativeUnknown(state);
+    const idleOwner=(state.archived||resume&&state.observation?.owned===true)&&state.observation?.execution==='idle'&&!nativeUnknown(state);
     return !!(state.writerLock?.status === 'held'&&!idleOwner || state.active || state.pending || state.requests?.length || state.instructionQueue?.items.length || state.draft?.trim()
         || state.controls?.some(control => control.receipt === 'unknown' || control.receipt === 'accepted' && control.effect === 'unconfirmed'));
 }

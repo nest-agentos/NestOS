@@ -13,7 +13,7 @@ import { json } from './http-response';
 export interface HttpServerOptions {
     multiUser?: boolean;
     userAudit?(userId: string): AuditPort;
-    build?: { mode: string; version?: string };
+    build?: { mode: string; version?: string;serviceId?:string };
     application?: HostedApi;
     certificates: CertificateAuth; staticDir: string; audit: AuditPort;
 }

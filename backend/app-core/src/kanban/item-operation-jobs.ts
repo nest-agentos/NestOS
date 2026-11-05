@@ -16,6 +16,7 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
         const evidence = context as {sourceVersion?: string; targetVersion?: string};
         requireValue(evidence?.sourceVersion === snapshot.sourceVersion && evidence.targetVersion === snapshot.targetVersion, 'OPERATION_SOURCE_CHANGED_REANALYZE');
     }
+    if(action==='deploy'&&options.adapter.managed){const managed=await options.adapter.managed.prepare({id:base.id,board,item,snapshot,context});if(managed)return {...base,operationContext:context,managed};}
     if (options.adapter.prepareOperation) {
         requireValue(action !== 'accept', 'OPERATION_REQUEST_INVALID');
         const request = await options.adapter.prepareOperation({id: base.id, action, context, board, item, snapshot});
@@ -32,8 +33,9 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
 export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
     if(job.action==='accept')return acceptReview(options,job);
     return coordinateOperation({service:options.service,journal:options.journal,key:jobKey(job.id),record:job,port:{
-        start:async record=>{if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
+        start:async record=>{if(record.managed){await options.adapter.managed!.submit(record.managed);return;}if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
         inspect:async record=>{
+            if(record.managed)return options.adapter.managed!.inspect(record);
             const observation=await observeReview(options,record);
             const recoverReplacement=record.action==='deploy'&&record.request&&observation.state==='unknown';
             const output=(observation.state==='succeeded'||recoverReplacement)&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
@@ -89,7 +91,7 @@ function validateOperationResult(job: ReviewJob, output: unknown): void {
         throw Object.assign(new Error('Agent operation did not complete'), {code: agent.status === 'blocked' ? 'OPERATION_RESULT_AGENT_BLOCKED' : 'OPERATION_RESULT_AGENT_FAILED', result: output});
     }
     if (job.action === 'build' || job.action === 'deploy') requireValue(typeof value.version === 'string' && /^[\w.+-]{1,128}$/.test(value.version), 'OPERATION_RESULT_VERSION_REQUIRED');
-    if (job.action === 'deploy') requireValue(value.version === (job.request ? (job.operationContext as {version: string}).version : JSON.parse((job.input!.request.source as {values: Record<string, string>}).values.context).input.version), 'OPERATION_RESULT_VERSION_MISMATCH');
+    if (job.action === 'deploy') requireValue(value.version === (job.request || job.managed ? (job.operationContext as {version: string}).version : JSON.parse((job.input!.request.source as {values: Record<string, string>}).values.context).input.version), 'OPERATION_RESULT_VERSION_MISMATCH');
 }
 export function validateMergePlan(value: unknown, job: ReviewJob): asserts value is MergePlan {
     const plan = value as MergePlan;

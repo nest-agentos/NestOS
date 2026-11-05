@@ -36,7 +36,7 @@ export async function startHost(options: HttpHostOptions) {
         const application = new ViewApi(Promise.resolve(host.runtime), audit, false);
         cleanup.push(namedCleanup('views.close', () => application.close()));
         const server = createHttpServer({ certificates: options.certificates, staticDir: options.staticDir, audit, application,
-            build: { mode: options.logMode ?? process.env.NESTOS_HTTPD_MODE ?? 'standalone', version: process.env.NESTOS_HTTPD_VERSION } });
+            build: { mode: options.logMode ?? process.env.NESTOS_HTTPD_MODE ?? 'standalone', version:process.env.NESTOS_HTTPD_VERSION,serviceId:process.env.NESTOS_HTTPD_SERVICE_ID } });
         cleanup.push(namedCleanup('server.close', async () => {
             application.endStreams(); await stopServer(server);
             audit.write({ event: 'server.stopped' });

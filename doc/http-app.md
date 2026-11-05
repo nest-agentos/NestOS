@@ -643,3 +643,11 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 提取检查点和结果续办详见[扫描器安全停止](design/digital-twin-scanners.md#提取批次的安全停止与续办)。
 
 长耗时外部请求需要按其能力处理。已经持久接纳且支持核对/续办的执行保留原身份；不具备安全取消或结果查询能力的外部调用，不能仅因停止标志改变就丢弃结果并重试。此时保留进程和锁，日志显示当前等待阶段，普通 stop 不虚报成功或自动强杀。小安全点不等于可在任意网络字节之间中止具有副作用的操作。
+
+### 持久启动器与服务替换
+
+`pnpm httpd` 常驻启动器管理 release 子进程。`pnpm httpd:status` 返回服务 ID、当前版本和切换回执；`pnpm httpd:switch <release-id> --operation-id <id> --expected-current <version>` 请求版本切换。`httpd:restart` 选取构建后的 release，不重新构建。旧宿主在安全点退出后才启动候选版本，健康检查失败自动回退原版本。
+
+控制状态位于 `$XDG_CONFIG_HOME/nestos/httpd-launchers/<项目路径摘要>/release.json`（默认 `~/.config`），可用 `NESTOS_HTTPD_CONTROL_DIR` 覆盖；文件权限 0600，独立于 worktree 和 release。状态保存服务 ID、目标版本、进程身份和幂等回执；启动器重启接管已登记的候选进程，继续核对。显式 stop 持久化停止意图，不会被守护循环复活；未到安全点仍等待，只有显式 `--force` 可升级停止。
+
+健康配置在 `nestos.json` 的 `http.launcher.health`：可选 `url`、`ca`、`cert`、`key`、`timeoutMs`；默认使用本机 `/api/health` 和 http.certDir 下的客户端证书，验证实际 version 与目标一致。`/api/health` 另返回稳定 serviceId 供显式项目目标配置使用，它不是授权凭据。

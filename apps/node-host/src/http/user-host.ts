@@ -71,7 +71,7 @@ export async function startUserHost(options: HttpHostOptions) {
             await users.get(userId);
         }
         const server = createHttpServer({certificates: options.certificates, staticDir: options.staticDir, audit, application: users, multiUser: true,
-            userAudit: id => userAudit(audit, id), build: {mode: options.logMode ?? 'standalone', version: process.env.NESTOS_HTTPD_VERSION}});
+            userAudit: id => userAudit(audit, id), build: {mode: options.logMode ?? 'standalone', version:process.env.NESTOS_HTTPD_VERSION,serviceId:process.env.NESTOS_HTTPD_SERVICE_ID}});
         let serverClosing: Promise<void> | undefined;
         const stopServer = () => serverClosing ??= (async () => {users.endStreams(); await stopUserServer(server);})();
         cleanup.push(namedCleanup('server.close', stopServer));

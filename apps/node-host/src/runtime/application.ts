@@ -1,3 +1,4 @@
+import {localServiceControl} from './service-control';
 import {namedCleanup} from './host-cleanup';
 import {NodeToolConnections} from './tool-connections';
 import {ToolOAuthApplications} from './tool-oauth-applications';
@@ -53,7 +54,7 @@ export async function createNodeRuntime(source: IStorageBackend, root?: string, 
         await packages.initialize();
         const additionalTools = mergeNodePackageTools(packages.userTools([...createStandardNodeTools(), ...await loadNodeToolModules(undefined, options.toolConnections),
             ...options.kernelPlatform?.additionalTools ?? []]), packages.initialTools(), BUILTIN_TOOLS);
-        const runtime = await createApplicationRuntime({remoteSourceProvider: createCellsDriver(), ownerKind: 'cli', runningVersion: process.env.NESTOS_HTTPD_VERSION, ...options, backend: borrowed,
+        const runtime = await createApplicationRuntime({remoteSourceProvider: createCellsDriver(), ownerKind:'cli',runningVersion:process.env.NESTOS_HTTPD_VERSION,...options,serviceControl:options.configurationReadonly?undefined:options.serviceControl??localServiceControl(),backend: borrowed,
             toolDependencies: options.toolDependencies ?? packages,
             kernelPlatform: { ...options.kernelPlatform, additionalTools, configure: async (kernel, services) => {
                 await packages.bind(kernel); await options.kernelPlatform?.configure?.(kernel, services);

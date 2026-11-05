@@ -19,10 +19,12 @@ import {automationCatalog,automationTarget} from './automation-targets';
 import {requireValue} from './validation';
 import {withContinuedWork,type ContinueWorkOptions} from './continued-work';
 export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
+    deliveryReady?(boardId:string,item:KanbanItem):Promise<boolean>;
     notifyCoordination?(job:import('@nestos/kanban/integration').CoordinationOperation):Promise<void>;
     archiveSession?(sessionId:string,operationId:string):Promise<void>;
     sessionChannel?: import('@nestos/app-contracts/services').ProjectRemoteMountPort['sessionChannel'];
     itemOperations?(context: {service: KanbanService; journal: KanbanAutomationJournal; workLog: KanbanWorkLog;
+        automatic?:import('./item-operation-types').ReviewOperationsOptions['automatic'];cleanup?:import('./item-operation-types').ReviewOperationsOptions['cleanup'];reportAutomatic?:import('./item-operation-types').ReviewOperationsOptions['reportAutomatic'];
         log: import('./item-operation-types').ReviewOperationsOptions['log']}): ReturnType<typeof import('./item-operations').createItemOperations>;
     relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
     sessionExecutionResources?(id: string): Promise<Array<{label: string; value: string}>>;

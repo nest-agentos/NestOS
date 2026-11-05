@@ -161,6 +161,7 @@ export interface ApplicationRuntime {
 export interface ApplicationRuntimeOptions {
     /** Trusted build identity of the running host, independent of a next-start release pointer. */
     runningVersion?: string;
+    serviceControl?:import('./service-control').RuntimeServiceControl;
     /** Optional host integrations own bindings and execution, never the portable board library. */
     configureKanban?(context: {fs: import('@nestos/vfs-core').IFileSystem; service: import('@nestos/kanban').KanbanModuleHandle;
         kernel: import('@nestos/durable-kernel').Kernel; calls?: import('@nestos/llm-session').IndependentCallService;
@@ -607,7 +608,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         cleanupFns.push(() => developmentMessages.dispose());
         const kanban = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,kernelCore, independentCalls ? {
             itemOperations: developmentBindings ? context => createItemOperations({...context,
-                adapter: developmentReviewAdapter({...developmentBindings, ...context, calls: independentCalls, kernel: kernelCore, runningVersion: options.runningVersion, submission: fileSubmission, wake: () => wakeKanban()}),
+                adapter: developmentReviewAdapter({...developmentBindings, ...context, calls: independentCalls, kernel: kernelCore, runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission, wake: () => wakeKanban()}),
                 published: publishedOperation({calls: independentCalls, kernel: kernelCore, ensureSession: (id, title) => sessionRepository.ensureSession(id, title),
                     prepareSession: async id => {await initializeProjects(); await prepareChildExecution(id); return recovery.acquireLater(id);}}),
                 submission: sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore, ensureWritable: conversationOptions.ensureWritable}),

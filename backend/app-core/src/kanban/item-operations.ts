@@ -1,3 +1,4 @@
+import {automaticDelivery,automaticDeliveryStatus} from './automatic-delivery';
 import {safeCode} from '@nestos/kanban/integration';
 import {sha256HexSync, t} from '@nestos/common';
 import type {KanbanItemOperations, KanbanItemOperation, KanbanItemOperationRequest, KanbanItemOperationBinding, KanbanBoard, KanbanItem, KanbanSessionAssociation} from '@nestos/kanban/contracts';
@@ -16,7 +17,8 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         const pending = (tails.get(key) ?? Promise.resolve()).catch(() => {}).then(() => {requireValue(!stopped, 'SERVICE_STOPPING'); return work();}); tails.set(key, pending);
         void pending.finally(() => {if (tails.get(key) === pending) tails.delete(key);}).catch(() => {}); return pending;
     };
-    return {itemOperations: (board: string, item: string) => queue(board, item, async () => view(options, await load(options, board, item, true))),
+    const automatic=automaticDelivery({...options,active:()=>!stopped,report:options.reportAutomatic,view:(board,item)=>queue(board,item,async()=>view(options,await load(options,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(options,board,request))});
+    return {deliveryReady:automatic.ready,itemOperations: (board: string, item: string) => queue(board, item, async () => view(options, await load(options, board, item, true))),
         bindItemOperation: (board: string, request: KanbanItemOperationBinding) => {validateRequest(request); return queue(board, request.itemId, () => bind(options, board, request));},
         runItemOperation: (board: string, request: KanbanItemOperationRequest) => {validateRequest(request); return queue(board, request.itemId, () => run(options, board, request));},
         async scan() {
@@ -26,6 +28,7 @@ export function createItemOperations(options: ReviewOperationsOptions) {
                     for (const job of context.jobs) {if (stopped) return; if (job.phase !== 'settled') await advanceReviewJob(options, job); else await options.report?.(job);}
                     if(!stopped)await followUp(options,scope.board,scope.item);});
             }
+            if(!stopped)await automatic.scan();
         },
         guardResource: <T>(board: string, item: string, work: () => Promise<T>) => queue(board, item, async () => {
             requireValue(!(await load(options, board, item, false)).jobs.some(job => job.phase !== 'settled'), 'WORKTREE_IN_USE');
@@ -57,9 +60,10 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
         if (entry.sessionId) entry.sessionId = await options.sessionResource?.(entry.sessionId) ?? entry.sessionId;
         return entry;
     }));
-    if (options.adapter.prepareOperation) return {revision: revision(context), operations};
+    const automatic=await automaticDeliveryStatus(options.journal,context.board.id,context.item.id);
+    if(options.adapter.prepareOperation)return {revision:revision(context),operations,automatic};
     const catalog = await options.catalog(), flows = catalog.entries.filter(entry => entry.target.kind === 'flow' && entry.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'));
-    return {revision: revision(context), operations, targets: automationCatalog({...catalog, entries: flows}).targets};
+    return {revision: revision(context),operations,automatic,targets: automationCatalog({...catalog, entries: flows}).targets};
 }
 function operation(context: Context, action: ReviewAction, active: boolean, supported: boolean, agent = false): KanbanItemOperation {
     const job = latest(context, action), binding = context.settings.bindings[action], plan = latest(context, 'analyze')?.result as MergePlan | undefined;
