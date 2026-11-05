@@ -17,7 +17,7 @@ it('resolves project overrides, freezes original contents and verifies remote pu
     await fs.driver.createFile({parentPath: '/workspace/_nestos/kanban/policies/development', name: 'task.md', content: '# Project task', recursive: true});
     const first = await developmentPolicy(journal, fs, fs, 'attempt', {commit: 'changes', modules: 'libraries/editor'});
     expect(first.prompts.files.find(file => file.name === 'task.md')).toMatchObject({content: '# Project task', source: expect.stringContaining('project:')});
-    expect(first.prompts.files.find(file => file.name === 'decision.md')?.source).toContain('nestos:');
+    expect(first.prompts.files.find(file => file.name === 'decision.md')?.source).toBe('builtin:decision.md');
     const directory = '/workspace/work/_nestos/kanban';
     const digest = await publishPromptBundle(fs, directory, first.prompts, {commit: first.commit});
     await fs.driver.writeContent('/workspace/_nestos/kanban/policies/development/task.md', 'New task');
@@ -50,7 +50,8 @@ it('uses current defaults for new authoring and freezes explicit user prompts wi
     const {fs,journal}=await fixture();
     const fresh=await developmentPolicy(journal,fs,fs,'fresh');
     expect(fresh.prompts.files.find(file=>file.name==='task.md')?.content).toBe(defaults['task.md']);
-    await fs.driver.writeContent('/var/lib/kanban/policies/development/task.md','User task policy');
+    expect(await fs.driver.exists('/var/lib/kanban/policies/development/task.md')).toBe(false);
+    await fs.driver.createFile({parentPath:'/var/lib/kanban/policies/development',name:'task.md',content:'User task policy',recursive:true});
     expect((await developmentPolicy(journal,fs,fs,'custom')).prompts.files.find(file=>file.name==='task.md')?.content).toBe('User task policy');
     expect(await developmentPolicy(journal,fs,fs,'fresh')).toEqual(fresh);
 });

@@ -41,13 +41,10 @@ async function resolvePrompts(fs: IFileSystem, project: IFileSystem, profile: st
         const global = '/var/lib/kanban/policies/' + profile + '/' + name;
         const local = '/workspace/_nestos/kanban/policies/' + profile + '/' + name;
         const projectOverride = await project.driver.exists(local);
-        if (!projectOverride && !await fs.driver.exists(global)) {
-            if (profile !== 'development') throw failure('PROMPT_PROFILE_NOT_FOUND');
-            try {await fs.driver.createFile({parentPath: global.slice(0, global.lastIndexOf('/')), name, content: defaults[name], recursive: true});}
-            catch (error) {if ((error as {code?: string}).code !== 'EEXIST') throw error;}
-        }
-        const content = projectOverride ? await readPrompt(project,local) : await readPrompt(fs,global);
-        files.push({name, content, source: projectOverride ? 'project:' + local : 'nestos:' + global, sha256: sha256HexSync(content)});
+        const globalOverride = !projectOverride && await fs.driver.exists(global);
+        if (!projectOverride && !globalOverride && profile !== 'development') throw failure('PROMPT_PROFILE_NOT_FOUND');
+        const content = projectOverride ? await readPrompt(project,local) : globalOverride ? await readPrompt(fs,global) : defaults[name];
+        files.push({name, content, source: projectOverride ? 'project:' + local : globalOverride ? 'nestos:' + global : 'builtin:' + name, sha256: sha256HexSync(content)});
     }
     files.push(...await resolveLifecyclePrompts(fs,project,profile));
     return files;
@@ -64,14 +61,12 @@ async function resolveLifecyclePrompts(fs:IFileSystem,project:IFileSystem,profil
         const local='/workspace/_nestos/kanban/policies/'+profile+'/'+name;
         const global='/var/lib/kanban/policies/'+profile+'/'+name;
         const projectOverride=await project.driver.exists(local),source=projectOverride?project:fs,path=projectOverride?local:global;
-        if (!projectOverride && (Object.hasOwn(maintenancePrompts, name) || ['task-fix-pre.md', 'task-continue-pre.md', 'task-merge-pre.md', 'task-merge-post.md'].includes(name)) && !await fs.driver.exists(global)) {
-            try {await fs.driver.createFile({parentPath: global.slice(0, global.lastIndexOf('/')), name,
-                content: Object.hasOwn(maintenancePrompts, name) ? maintenancePrompts[name as keyof typeof maintenancePrompts] : defaults[name as keyof typeof defaults], recursive: true});}
-            catch (error) {if ((error as {code?: string}).code !== 'EEXIST') throw error;}
-        }
         if(await source.driver.exists(path)) {
             const content=await readPrompt(source,path);
             files.push({name,content,source:(projectOverride?'project:':'nestos:')+path,sha256:sha256HexSync(content)});
+        } else {
+            const content=Object.hasOwn(maintenancePrompts,name) ? maintenancePrompts[name as keyof typeof maintenancePrompts] : defaults[name as keyof typeof defaults];
+            if(content) files.push({name,content,source:'builtin:'+name,sha256:sha256HexSync(content)});
         }
     }
     return files;

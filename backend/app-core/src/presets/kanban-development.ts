@@ -98,7 +98,7 @@ async function recordPublication(journal: KanbanAutomationJournal, id: string, d
 export function channelInstruction(policy: DevelopmentPolicy, entry: string, pre: string[]): string {
     return `Use cells_session. Read identity, policy, instructions, ${[...pre, entry].join(', ')} via session_context; task/context on demand. `
         + `Assigned worktrees/repos only; commit=${policy.commit}; never merge/push. `
-        + `session_report: progress/clarification/error/result/resolved; resolved needs replyTo; results request host verification. `
+        + `session_report({id:<stable-id>,message:{type:progress|clarification|error|result|resolved,content:<summary>,payload:<optional evidence>,replyTo:<resolved-message-id>}}); omit absent fields. Results request host verification. `
         + `Live commit context: session_request kanban.context.resolve {repository,commits:[SHA],include:[task,decisions,acceptance]}; read session_response. `
         + `End turn on clarification, fatal error or pending request; never poll. Run only the given lifecycle stage. Bound reads; keep large evidence in artifacts.`;
 
