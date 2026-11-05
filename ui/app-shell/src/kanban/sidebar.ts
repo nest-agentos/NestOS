@@ -11,6 +11,7 @@ interface Options {
     navigate(path: string): Promise<void>;
     create(): Promise<void>;
     report(error: unknown): void;
+    catalogChanged?(boards: readonly KanbanBoardSummary[]): void;
     windowManagement?: WindowManagementOptions;
 }
 const log = createModuleLogger('kanban-sidebar');
@@ -28,6 +29,7 @@ export class KanbanSidebar {
     private closed = false;
     private started = false;
     private selected = '';
+    private generation = 0;
     constructor(private readonly options: Options) {
         if (options.service) this.controls = new KanbanSidebarControls(options.service, () => this.reload(), error => this.failure(error));
         this.list.className = 'kanban-sidebar__list'; this.status.setAttribute('role', 'alert'); this.status.hidden = true;
@@ -53,7 +55,7 @@ export class KanbanSidebar {
         this.selected = path.split('/').slice(0, 3).join('/');
         this.browser.select(this.nodes.some(node => node.id === this.selected) ? [this.selected] : []);
     }
-    invalidate(): void {this.refresh.mark('kanban.committed');}
+    invalidate(): void {this.generation++; this.refresh.mark('kanban.committed');}
     setVisible(visible: boolean): void {
         this.visible = visible;
         if (!visible) this.refresh.pause(); else if (this.refresh.dirty) void this.refresh.flush();
@@ -71,13 +73,13 @@ export class KanbanSidebar {
             state: context => {const board = this.targetBoard(context.target); return {visible: !!this.controls && !!board && !!board.executionControl?.paused === (action === 'resume'), enabled: !!board && !['pausing', 'resuming'].includes(board.executionPhase ?? '')};},
             run: async context => {const board = this.targetBoard(context.target); if (board) await this.controls?.toggle(board);}}));
     }
-    private reload(): Promise<void> {this.refresh.mark('manual', false); return this.refresh.flush();}
+    private reload(): Promise<void> {this.generation++; this.refresh.mark('manual', false); return this.refresh.flush();}
     private async load(): Promise<void> {
-        const operationId = randomUUID(), started = performance.now();
+        const operationId = randomUUID(), started = performance.now(), generation = this.generation;
         try {
             const boards = await this.options.service?.catalog() ?? [];
-            if (this.closed || !this.visible) {this.refresh.mark('interrupted', false); return;}
-            this.boards = boards; this.controls?.update(boards);
+            if (this.closed || !this.visible || generation !== this.generation) {this.refresh.mark('interrupted'); return;}
+            this.boards = boards; this.controls?.update(boards); this.options.catalogChanged?.(boards);
             this.nodes = boards.map(board => nodeForBoard(board, !!this.options.service?.previewDeletion && !!this.options.service?.deleteBoard));
             if (this.started) await this.browser.refresh();
             if (this.closed) return;

@@ -522,6 +522,8 @@ export const zhCN = {
     'kanban.noRelatedSessions': '暂无相关会话',
     'kanban.sessionRelationsIncomplete': '部分会话信息读取失败，可刷新重试',
     'kanban.sessionExecutions': '执行记录',
+    'kanban.resourceUnavailable': '此看板已删除或当前账号已无权访问。未保存内容已保留，请先复制需要的内容；无法继续提交。',
+    'kanban.returnToBoards': '返回看板列表',
     'kanban.sessionContinuation': '续办',
     'kanban.sessionExecutionId': '执行编号',
     'kanban.sessionRoundId': 'Round ID',

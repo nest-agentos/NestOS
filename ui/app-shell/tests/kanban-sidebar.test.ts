@@ -9,12 +9,20 @@ const cleanups: Array<() => void> = [];
 afterEach(() => {cleanups.splice(0).forEach(close => close()); document.body.replaceChildren();});
 const board = (id: string): KanbanBoardSummary => ({id, title: id, number: 1, items: []} as unknown as KanbanBoardSummary);
 async function fixture() {
-    const catalog = vi.fn(async () => [board('Initial')]), report = vi.fn(), navigate = vi.fn(async () => {});
+    const catalog = vi.fn(async () => [board('Initial')]), report = vi.fn(), navigate = vi.fn(async () => {}), catalogChanged = vi.fn();
     const container = document.createElement('aside'); document.body.append(container);
-    const sidebar = new KanbanSidebar({container, service: {catalog} as unknown as KanbanClient, navigate, create: vi.fn(), report});
+    const sidebar = new KanbanSidebar({container, service: {catalog} as unknown as KanbanClient, navigate, create: vi.fn(), report, catalogChanged});
     cleanups.push(() => sidebar.destroy()); await sidebar.start();
-    return {sidebar, container, catalog, report, navigate};
+    return {sidebar, container, catalog, report, navigate, catalogChanged};
 }
+it('does not reconcile windows against a catalog response invalidated while it was loading',async () => {
+    const f = await fixture(); let finish!: (rows: KanbanBoardSummary[]) => void;
+    f.catalogChanged.mockClear(); f.catalog.mockImplementationOnce(() => new Promise(resolve => {finish = resolve;}));
+    f.sidebar.invalidate(); await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    f.catalog.mockResolvedValue([board('Latest')]); f.sidebar.invalidate(); finish([]);
+    await vi.waitFor(() => expect(f.container.textContent).toContain('Latest'));
+    expect(f.catalogChanged).toHaveBeenCalledExactlyOnceWith([board('Latest')]);
+});
 it('retains the list and safe error cause after failure, then retries and refreshes it', async () => {
     const f = await fixture(); f.catalog.mockRejectedValueOnce(Object.assign(new Error('PRIVATE_BODY'), {code: 'EIO'}));
     f.sidebar.invalidate();

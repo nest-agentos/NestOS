@@ -17,6 +17,9 @@ export class KanbanWindowWorkbench {
     private readonly navigation: KanbanSidebar;
     private visible = true;
     private disposing = false;
+    private availableBoards?: Set<string>;
+    private reconcile?: Promise<void>;
+    private reconcileAgain = false;
     constructor(private readonly options: KanbanWorkspaceOptions) {
         this.tabs = new WorkbenchTabs(options.editor, {
             navigation: t('kanban.title'), activate: id => this.navigate(id),
@@ -25,7 +28,8 @@ export class KanbanWindowWorkbench {
             error: error => this.report(error), changed: () => this.syncVisibility(),
         }, undefined, options.windows);
         this.navigation = new KanbanSidebar({container: options.sidebar, service: options.service, navigate: path => this.navigate(path), windowManagement: this.tabs.windowManagement,
-            create: () => this.openBoardCreation(), report: error => this.report(error)});
+            create: () => this.openBoardCreation(), report: error => this.report(error),
+            catalogChanged: boards => {this.availableBoards = new Set(boards.map(board => board.id)); this.scheduleReconcile();}});
         const host = document.createElement('div'); host.hidden = true; host.append(this.tabs.opened); options.sidebar.append(host);
     }
     async start(): Promise<void> {await Promise.all([this.navigation.start(), this.openResource(this.options.initialResource ?? '/')]);}
@@ -48,7 +52,7 @@ export class KanbanWindowWorkbench {
         }
     }
     getActiveResourceId(): string {return this.tabs.current?.id ?? '/';}
-    invalidateFromEvents(): void {this.navigation.invalidate(); for (const tab of this.tabs.values()) tab.value?.view.invalidateFromEvents();}
+    invalidateFromEvents(): void {this.availableBoards = undefined; this.navigation.invalidate(); for (const tab of this.tabs.values()) tab.value?.view.invalidateFromEvents();}
     setVisible(visible: boolean): void {this.visible = visible; this.navigation.setVisible(visible); this.syncVisibility();}
     captureRecovery(): unknown {
         for (const tab of this.tabs.values()) tab.value?.view.captureRecovery();
@@ -59,14 +63,14 @@ export class KanbanWindowWorkbench {
         this.navigation.setVisible(false); this.tabs.suspendForRecovery();
         for (const tab of this.tabs.values()) tab.value?.view.suspendForRecovery();
     }
-    async destroy(): Promise<void> {this.disposing = true; this.navigation.destroy(); await this.tabs.destroy(); this.options.sidebar.replaceChildren();}
+    async destroy(): Promise<void> {this.disposing = true; this.navigation.destroy(); await this.reconcile; await this.tabs.destroy(); this.options.sidebar.replaceChildren();}
     private createPage(tab: WorkbenchTab<Page>): void {
         const editor = document.createElement('div'); tab.panel.append(editor);
         const view = new KanbanView({...this.options, sidebar: undefined, editor, initialResource: tab.id,
             itemOperationsAvailable: (_board, item) => !!item.externalRefs?.some(ref => ref.system === "nestos-worktree"),
             presentation: kanbanPresentation, executionReference: executionSessionReference, reviewGuidance: this.options.reviewGuidance ?? kanbanReviewGuidance,
             navigate: path => this.navigate(path), changed: () => this.updatePage(tab),
-            selected: () => this.updatePage(tab), committed: () => this.navigation.invalidate(),
+            selected: () => this.updatePage(tab), committed: () => {this.availableBoards = undefined; this.navigation.invalidate();},
             mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts),
         });
         tab.value = {view, ready: Promise.resolve()}; this.tabs.setIcon(tab.id, ACTION_ICONS.kanbanView);
@@ -82,6 +86,35 @@ export class KanbanWindowWorkbench {
         this.tabs.title(tab.id, state.title ?? t('kanban.title')); this.tabs.context(tab.id, state.context); this.tabs.location(tab.id, path);
         if (dirtyChanged) this.tabs.keep(tab.id);
         if (this.tabs.current === tab) {this.navigation.select(tab.id); if (renamed) this.options.selected(tab.id);}
+        this.scheduleReconcile();
+    }
+    private scheduleReconcile(): void {
+        if (this.disposing || !this.availableBoards) return;
+        this.reconcileAgain = true;
+        this.reconcile ??= Promise.resolve().then(async () => {
+            while (this.reconcileAgain && !this.disposing) {this.reconcileAgain = false; await this.reconcileResources();}
+        }).catch(error => {
+            const code = (error as {code?: unknown})?.code;
+            log.warn('window.invalidate', {operationId: randomUUID(), stage: 'catalog-reconcile', result: 'failure',
+                code: typeof code === 'string' && /^[A-Z_]{1,80}$/.test(code) ? code : 'KANBAN_RECONCILE_FAILED', durationMs: 0});
+            this.report(error);
+        }).finally(() => {this.reconcile = undefined; if (this.reconcileAgain) this.scheduleReconcile();});
+    }
+    private async reconcileResources(): Promise<void> {
+        for (const tab of this.tabs.values()) {
+            if (this.disposing || !this.availableBoards) return;
+            const board = tab.id.split('/')[2], page = tab.value;
+            if (!board || this.availableBoards?.has(decodeURIComponent(board)) || !page) continue;
+            const state = page.view.getViewState();
+            if (state.busy) continue;
+            page.view.setResourceUnavailable();
+            if (state.dirty) continue;
+            const active = this.tabs.current === tab;
+            const started = performance.now(), operationId = randomUUID();
+            await this.tabs.close(tab.id,false);
+            if (active && !this.disposing) await this.navigate('/');
+            log.debug('window.invalidate', {operationId, stage: 'catalog-reconcile', result: 'success', count: 1, durationMs: Math.round(performance.now()-started)});
+        }
     }
     private syncVisibility(): void {
         if (!this.tabs) return;

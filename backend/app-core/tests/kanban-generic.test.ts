@@ -84,6 +84,29 @@ it('publishes overdue work to the existing system notifications and does not dup
     await f.events.setNotificationRead(notifications.items[0].event.id, true);
     expect((await f.events.listNotifications()).items[0].read).toBe(true);
 });
+it('publishes board deletion as a replayable invalidation even when notifications are muted', async () => {
+    const f = await fixture({members: [{kind:'human',id:'alice',responsibility:'Manage',roles:['coordinator']}],
+        notifications: {rules: {'delete-board':'none'}}}, true);
+    const board = await f.service.create(f.input), before = await f.events.eventBaseline();
+    await f.service.execute(board.id,{operationId:'delete-board',expectedRevision:board.revision,command:{type:'delete-board'}});
+    await projectKanbanEvents(f.options.notifications!,f.service,board.id);
+    const first = await f.events.readEvents(before), second = await f.events.readEvents(before);
+    expect(first.events).toHaveLength(1); expect(second.events).toEqual(first.events);
+    expect(first.events[0].value).toMatchObject({type:'kanban.delete-board',operationId:'delete-board'});
+    expect(first.events[0].value.notification).toBeUndefined();
+    expect((await f.service.catalog()).map(board => board.id)).not.toContain(board.id);
+});
+it('recovers a deleted board event after journal failure without reviving the board', async () => {
+    const f = await fixture({members:[{kind:'human',id:'alice',responsibility:'Manage',roles:['coordinator']}]},true);
+    const board = await f.service.create(f.input), baseline = await f.events.eventBaseline();
+    vi.spyOn(f.events.journal,'transaction').mockRejectedValueOnce(Object.assign(new Error('private-error'),{code:'EIO'}));
+    await f.service.execute(board.id,{operationId:'delete',expectedRevision:board.revision,command:{type:'delete-board'}});
+    expect((await f.events.readEvents(baseline)).events).toHaveLength(0);
+    const recovered = f.serviceFor(); await recovered.scan(); await recovered.scan();
+    const events = (await f.events.readEvents(baseline)).events;
+    expect(events.filter(event => event.value.type === 'kanban.delete-board')).toHaveLength(1);
+    expect(await recovered.catalog()).toEqual([]);
+});
 it('does not roll back committed domain work when the system event journal fails, then catches up', async () => {
     const f = await fixture({}, true), transact = vi.spyOn(f.events.journal, 'transaction');
     transact.mockRejectedValueOnce(Object.assign(new Error('PRIVATE_ERROR'), {code: 'EIO'}));

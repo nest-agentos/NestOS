@@ -38,7 +38,7 @@ export async function projectKanbanEvents(target: KanbanNotifications, source: K
 }
 function project(event: KanbanEvent, board: KanbanBoard, sourceId: string, now: number): ApplicationEventFact | undefined {
     const rule = board.notifications?.rules?.[`${event.kind}.${event.data.reason ?? ''}`] ?? board.notifications?.rules?.[event.kind];
-    if (!retained.has(event.kind) && !rule) return undefined;
+    if (event.kind !== 'delete-board' && !retained.has(event.kind) && !rule) return undefined;
     if (event.kind === 'apply-discovery' && !event.data.itemIds?.length && !event.data.recordIds?.length) return undefined;
     const reason = event.kind === 'escalated' && /^[a-z][a-z0-9-]{0,79}$/.test(event.data.reason ?? '') ? `.${event.data.reason}` : '';
     const level = rule === 'none' ? undefined : rule ?? defaultLevel(event);

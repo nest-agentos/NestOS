@@ -521,6 +521,8 @@ export const en: LocaleStrings = {
     'kanban.noRelatedSessions': 'No related sessions',
     'kanban.sessionRelationsIncomplete': 'Some session details could not be read; refresh to retry',
     'kanban.sessionExecutions': 'Execution records',
+    'kanban.resourceUnavailable': 'This board was deleted or is no longer accessible. Unsaved content is preserved; copy anything you need. Further submissions are blocked.',
+    'kanban.returnToBoards': 'Return to boards',
     'kanban.sessionContinuation': 'Continuation',
     'kanban.sessionExecutionId': 'Execution ID',
     'kanban.sessionRoundId': 'Round ID',
