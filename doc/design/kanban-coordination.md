@@ -78,7 +78,7 @@ planning 携带类型、父项、area、milestone、priority（0 最高，4 最�
 
 手工 create-item 和 publish-proposal 默认进入 backlog。显式 set-stage(open) 后才开始领取计时。未来事项不会因为暂时没有负责人而触发无人领取告警。backlogReviewMs 可产生独立的定期梳理提醒；dueAt 是真实业务截止时间，不依赖是否提供执行估算。
 
-默认 Ready 上限 20、WIP 上限 3、每主体 WIP 上限 1；maxInProgressPerAssignee 是新配置，旧 maxInProgressPerAgent 兼容但不能与之冲突。review 计入 WIP；领取和接受转交都复验额度。依赖必须已完成，缺失、自引用和循环均拒绝；取消不满足依赖。
+默认 Ready 上限 20、执行并发上限 3、每主体执行并发上限 1；未显式配置时仅 claimed 占执行名额，review 等待验收不占默认执行并发。用户显式设置 maxInProgress 或 maxInProgressPerAssignee/maxInProgressPerAgent 时，对应范围采用业务 WIP，claimed 与 review 都计入；两级额度分别判断，领取和接受转交都复验额度。依赖必须已完成，缺失、自引用和循环均拒绝；取消不满足依赖。
 
 领取绑定主体及 token/租约。Agent 还复验 Session/Task 身份；不同人或服务不会因为缺少 agentId 而共享身份或额度。request-transfer 保留原负责人，接收者接受才原子切换；拒绝、超时或接收者满负荷都不丢弃原责任。咨询使用消息或关联子项。
 
