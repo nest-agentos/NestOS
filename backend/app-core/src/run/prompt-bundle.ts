@@ -22,7 +22,7 @@ export async function freezePrompts(journal: PromptJournal, key: string, resolve
     const files = await resolve();
     if (files.length > 32 || new Set(files.map(file => file.name)).size !== files.length) throw failure('PROMPT_BUNDLE_INVALID');
     for (const file of files) {
-        if (!/^[a-zA-Z0-9_-]+\.md$/.test(file.name) || file.sha256 !== sha256HexSync(file.content)
+        if (!/^[a-zA-Z0-9_-]+\.(md|json|yaml|yml|txt)$/.test(file.name) || file.sha256 !== sha256HexSync(file.content)
             || new TextEncoder().encode(file.content).byteLength > 65536) throw failure('PROMPT_BUNDLE_INVALID');
     }
     return journal.update<PromptBundle>(key, old => old ?? {version: 1, files});

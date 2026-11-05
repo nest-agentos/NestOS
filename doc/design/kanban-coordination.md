@@ -113,7 +113,7 @@ workflow(boardId) 读取计划、派发、ready 和 completedPlans。核心只�
 
 个人看板的更多菜单提供「AI 协作」：选择已发布的规划与执行 Agent/Flow 后启用。默认关闭，不因绑定执行 Session 或打开页面启动模型；启用会处理该看板已有及新增的可执行待办。看板配置保存冻结的发布版本与摘要、协调/执行主体及验收模式，RPC 公开 automationCatalog 和 analysisStatus；核心只保存通用外部引用，不导入模型或 Session。
 
-规划调用通过现有 IndependentCallService 执行，产品分析指令位于 `backend/app-core/src/presets/kanban-planning.json`。输入包含当前事项及最多 200 项的活动看板快照；超过上限明确报告 AUTOMATION_CONTEXT_LIMIT，不静默截断后声称已分析全部依赖。规划者应返回 JSON `{ready, dependencies, reason, estimate?, subtasks?}`；Flow 可从返回节点的 analysis/result 输出此对象，Agent 使用消息正文。ready=false 保留待澄清原因，不派发；格式、引用、自依赖、环路和估算失败保留具体错误。规划结果只能增加前置依赖，不能移除人工依赖。角色提示要求只分析，所选发布目标仍使用其正式授权与工具配置，宿主不把提示词当作权限隔离。
+规划调用通过现有 IndependentCallService 执行。产品分析默认值位于 `backend/app-core/src/presets/kanban-development-prompts.json` 的 planning.md，通过全局 `/etc/kanban/<profile>/planning.md` 或项目 `_nestos/etc/kanban/<profile>/planning.md` 覆盖；新执行重新读取，旧执行使用冻结快照，改文件无需重新编译。MCP planning section 投影冻结的 planning.md，不另保留 TypeScript 内联规则。候选目录按需读取，不反复传送整个看板正文；上下文超过 200 项明确报 AUTOMATION_CONTEXT_LIMIT。规划的 clarification 通过 MCP 持久化，具体问题、选项和简短建议同时出现在可见会话中；收到后续答复并解决全部问题后才发布 ready=true 的 result payload，宿主核验并采纳。不得把报告成功或轮次结束当成规划或任务完成。规划结果只能增加前置依赖，不能移除人工依赖；引用、自依赖、环路、估算及来源校验失败保留具体错误。提示词不能替代正式授权和校验。
 
 分析记录位于用户 `/var/lib/kanban/automation.seq`，冻结调用身份、原输入、事项修订、规划快照签名、阶段与结果。先保存 prepared，再原子取得 submitting，才提交模型调用；响应丢失及重启仅核对同一身份，不重新发送。事项或规划快照变化时拒绝迟到结果，再按新修订分析。已在途的原分析优先观察，不同时为同一事项启动替代分析。分析依据由 analysisStatus 返回，不写入诊断正文。
 
@@ -372,19 +372,19 @@ CLI 提供 `kanban list/create/show/targets/resources/execute/record/records/run
 
 | 层级 | 职责 | 优先关系 |
 | --- | --- | --- |
-| NestOS 默认 | 产品携带的默认 Markdown、通信协议和生命周期约定 | 默认内容从当前产品版本读取，不写成永久覆盖；用户策略文件优先；每次执行另行冻结快照 |
-| 用户全局 | `/var/lib/kanban/policies/<profile>/decision.md`、`task.md` | 当前用户 VFS；用户之间保持隔离 |
-| 项目 | `_nestos/kanban/policies/<profile>/decision.md`、`task.md` | 项目同名文件整体覆盖全局文件；自定义 profile 必须能解析两份文件 |
+| NestOS 默认 | 产品携带的默认 Markdown、通信协议和生命周期约定 | 默认配置摘要升级时替换全局文件；同版本重启保留调试修改；每次执行另行冻结快照 |
+| NestOS 全局 | `/etc/kanban/<profile>/decision.md`、`task.md` | 物理 `<nestos>/etc/kanban/`，HTTP 多用户共用；管理员可写，普通用户只读 |
+| 项目 | `_nestos/etc/kanban/<profile>/decision.md`、`task.md` | 项目同名文件整体覆盖全局文件；自定义 profile 必须能解析两份文件 |
 | 看板 | 选择 profile、提交方式和提前准备的模块 | 保存通用选项；决策运行冻结绑定，已开始的运行不跟随修改 |
 | Agent | 正式发布的角色和能力配置 | 角色指导追加；不能授予 Markdown 未获授权的能力 |
 | 任务 | 本次责任、验收与依赖材料 | 不得覆盖本次冻结的提交策略 |
 
-源 Markdown 可纳入版本控制；`.gitignore` 仅忽略 `_nestos` 的运行目录，保留 `kanban/policies/` 可跟踪。默认模板正文声明源为产品资源 `kanban-development-prompts.json`，执行时解析得到真实 MD 文件。
+源 Markdown 可纳入版本控制；`.gitignore` 仅忽略 `_nestos` 的运行目录，保留 `_nestos/etc/kanban/` 可跟踪。默认模板正文声明源为产品资源 `kanban-development-prompts.json`，执行时解析得到真实 MD 文件。
 
 ### 执行路径与快照
 
 ```text
-<项目>/_nestos/kanban/policies/<profile>/   # 可编辑的项目策略源
+<项目>/_nestos/etc/kanban/<profile>/   # 可编辑的项目策略源
   decision.md
   task.md
 
@@ -511,7 +511,7 @@ C4Container
 
 每种入口共用同一命名规则：`decision.md` / `task.md` 为基础提示词；可选 `decision-pre.md`、`decision-post.md`、`decision-succ.md`、`decision-fail.md`、`decision-cancel.md`、`decision-clear.md`，任务对应 `task-*.md`。子任务复用 task 入口。文件只提供 Agent 提示，不授权工具或改变提交策略。
 
-全局位置 `/var/lib/kanban/policies/<profile>/`，项目位置 `/workspace/_nestos/kanban/policies/<profile>/`；逐文件项目优先，缺失则继承全局。基础默认内置，可选文件不存在就不运行该定制。所有选中文件在尝试开始前冻结、计算摘要，传送至工作树 `_nestos/kanban/prompts/` 并列入 manifest；执行中的源文件改动只影响新尝试。14 个基础和可选文件落在既有 16 文件限制内。
+全局位置 `/etc/kanban/<profile>/`，项目位置 `/workspace/_nestos/etc/kanban/<profile>/`；逐文件项目优先，缺失则继承全局。基础默认内置，可选文件不存在就不运行该定制。所有选中文件在尝试开始前冻结、计算摘要，传送至工作树 `_nestos/kanban/prompts/` 并列入 manifest；执行中的源文件改动只影响新尝试。profile.json 明确列出额外配置文件，可携带 MD、JSON、YAML、TXT；目录穿越、未知格式、缺失必需文件、重复文件名和超过 32 个冻结文件均明确拒绝。
 
 主 Session 先读取基础文件和 pre 文件；正式执行结束后，以独立且稳定身份的 Session 调用按 `post → succ/fail/cancel → clear` 读取文件，禁止重新执行原任务。clear 用于总结和非破坏性清理，不删除工作树、历史或绕过冻结的 commit 策略。已有基础 Markdown 的 preload/postload 状态章节继续使用同一生命周期执行器。聊天内容仅供阅读，业务交付仍需写入协议指定文件。
 
@@ -556,7 +556,7 @@ C4Container
 
 准入前先取得原 Session writer。只有宿主明确确认未启动且可重试的拒绝（如写租约暂不可用）才将同一冻结请求恢复为 prepared 并退避重试；该状态持久化后重启仍可接着准入。提交结果未知、网络丢响应和未确认的外部副作用保持 submitting，只查询原回执。普通状态观察不得重新发送 continue。
 
-开发预设冻结原 commit/modules 约束，核验原调用、收尾调用和原生会话已停止，拒绝已清理/变更的工作区。保留未提交修改，将本轮 prompt、manifest 审计副本发布到原工作树 `_nestos/kanban/continuations/<dispatch-id>/`。以新 attemptId 原子切换 Cells scope，核对前驱 scope 与原生 Session，旧 token 立即失效；原逻辑／原生会话及工作树不变。项目级 `_nestos/kanban/policies/<profile>/task-continue-pre.md` 优先于 NestOS 用户策略，task-continue-post.md 可选；冻结后重启不重新读取作者文件。沿用 task.md 的交付与 succ/fail/cancel/clear 收尾规则。prompt bundle 最多 32 个文件，单文件仍限 64 KiB。
+开发预设冻结原 commit/modules 约束，核验原调用、收尾调用和原生会话已停止，拒绝已清理/变更的工作区。保留未提交修改，将本轮 prompt、manifest 审计副本发布到原工作树 `_nestos/kanban/continuations/<dispatch-id>/`。以新 attemptId 原子切换 Cells scope，核对前驱 scope 与原生 Session，旧 token 立即失效；原逻辑／原生会话及工作树不变。项目级 `_nestos/etc/kanban/<profile>/task-continue-pre.md` 优先于 NestOS 用户策略，task-continue-post.md 可选；冻结后重启不重新读取作者文件。沿用 task.md 的交付与 succ/fail/cancel/clear 收尾规则。prompt bundle 最多 32 个文件，单文件仍限 64 KiB。
 
 UI 的“续办原任务”只对宿主声明的可续办前驱显示，CLI `kanban continue <board-id> --file request.json` 使用相同的正式命令。续办请求进入看板日志；会话仍沿用原始深链，执行历史保留各次派发关联。重启恢复不自动把所有失败事项重新派发；已登记的续办请求由原执行桥和 Session 恢复链继续处理，成功必须经过原生终态、文件结果和交付验证后进入验收。
 
@@ -653,7 +653,7 @@ sequenceDiagram
 
 Agent 读取项目 AGENTS.md、README、包脚本和现有构建／部署文档，选择并执行命令。用户确认验收、服务替换与冲突方案。operation-input.json 保存候选版本或已批准方案、版本和逐项选择，manifest 保存其路径与摘要；提示词不能扩大实际部署或沙箱权限。缺少能力时输出 blocked 和具体原因，宿主保留说明及原会话链接。构建成功还须提供实际构建清单或简要构建回执的项目相对路径及 SHA-256，宿主检查文件；服务替换核对实际运行版本；合并核对交付源未变、真实目标 HEAD 及目标祖先关系，禁止仅以聊天文本宣称成功。
 
-系统恢复与维护的看板组包含一个「看板构建、服务替换与合并提示词」条目，显式恢复 task-build-pre/post.md、task-deploy-pre/post.md、task-integrate-pre/post.md 六份全局模板；已有自定义文件不会被普通运行覆盖。项目的 `_nestos/kanban/policies/<profile>/` 同名文件优先。每次操作冻结并上传本次实际提示词；恢复模板不执行 Agent，也不自动构建、替换、合并或改写历史发布。
+系统恢复与维护的看板组包含一个「看板构建、服务替换与合并提示词」条目，显式恢复 task-build-pre/post.md、task-deploy-pre/post.md、task-integrate-pre/post.md 六份全局模板；已有自定义文件不会被普通运行覆盖。项目的 `_nestos/etc/kanban/<profile>/` 同名文件优先。每次操作冻结并上传本次实际提示词；恢复模板不执行 Agent，也不自动构建、替换、合并或改写历史发布。
 
 当前由原 Session 内的 Agent 执行命令，通过通道返回结果；没有新增「Session 生成任意脚本后由 Kanban 代调用」通道。若将来加入宿主代执行，应由通用且授权的 Cells 进程端口承担，冻结脚本摘要、参数、执行范围、批准及稳定 requestId，并查询原回执恢复；不能把任意文件写入视为执行授权。
 
@@ -781,3 +781,9 @@ Kanban 向宿主请求的能力应限定为：事务存储、平台访问校验�
 `@nestos/kanban` 提供平台中立的领域服务、持久化、协调运行时和 contracts，不包含 UI/CSS，不依赖 ui-common。`@nestos/kanban-ui` 独立构建与发布 DOM 界面和 style.css，生产源码仅消费 @nestos/kanban/contracts 和 ui-common。共享状态投影是 contracts 下的纯函数；前台不能深层导入后台文件。
 
 KanbanClient 是两包之间的调用契约，本地服务和 HTTP/RPC 客户端可以直接替换。app-core 装配服务与宿主能力，app-shell 挂载 UI 并提供窗口、导航、图标、翻译与事件接入。独立 UI 的远程客户端回归不依赖 VFS 或后台工厂；架构检查和浏览器打包同时禁止前台引入后台实现。
+
+### 全局配置的安装与调试
+
+HTTP 将物理 `<nestos>/etc/kanban` 挂到每个用户运行时的 `/etc/kanban`，管理员读写，普通用户只读。默认组位于 development/，包括 profile.json、bootstrap.md、planning.md、decision.md、task.md、fix/续办与维护阶段模板。启动比较 `.defaults.json` 的发布内容摘要；摘要改变时替换发布的全局模板及清单，最后提交版本标记，中断后下次启动重做安装。同一摘要的普通重启保留人工调试改动。此目录按产品升级替换，长期项目定制放项目 `_nestos/etc/kanban/<profile>/`。
+
+新执行重新读取配置清单及文件，以项目同名覆盖优先；每次执行冻结实际正文、来源和摘要并传送到 Cells。直接改全局文件后不需要重新编译或重启，既有会话仍使用旧快照。bootstrap.md 的 sections、commit 占位符由宿主仅作文本替换，无脚本求值。密钥、权限授权、状态机和回执校验不能由配置文件改写。

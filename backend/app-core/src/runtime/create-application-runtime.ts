@@ -1,3 +1,4 @@
+import {ensureKanbanConfiguration} from '../presets/kanban-global-configuration';
 import {controlCall} from '../kanban/call-lifecycle';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {developmentWorkExchange} from '../presets/kanban-channel-exchange';
@@ -233,6 +234,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         sourceCleanupFns.push(() => vfs.dispose());
         await diagnostics.attach(systemFS);
         sourceCleanupFns.push(() => diagnostics.dispose());
+        await ensureKanbanConfiguration(systemFS,options.configurationReadonly);
         if (closeCodexTransport) cleanupFns.push(closeCodexTransport);
         if (policy.mcp === 'before-ready') await traceBoot('mcp.startup', () => llmDriver.waitForMCPStartup());
 

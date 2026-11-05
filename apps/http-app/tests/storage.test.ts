@@ -41,3 +41,15 @@ it('serves a read snapshot while another Node connection has an uncommitted writ
         expect(backend.sidecarStats.readTransaction).toBe(1);
     } finally {await writer.rollback(); await writer.close();}
 });
+
+it('reads externally edited global Kanban files without rebuilding or reopening the filesystem',async()=>{
+    const {createVFS}=await import('@nestos/vfs-core');
+    const {ensureKanbanConfiguration}=await import('../../../backend/app-core/src/presets/kanban-global-configuration');
+    const {resolveKanbanConfiguration}=await import('../../../backend/app-core/src/presets/kanban-configuration-files');
+    const {manager}=await createVFS({rootBackend:backend});
+    try{
+        const fs=await manager.openFileSystem('/');await ensureKanbanConfiguration(fs);
+        await writeFile(path.join(directory,'data/etc/kanban/development/planning.md'),'Externally tuned planning prompt');
+        expect((await resolveKanbanConfiguration(fs,fs,'development')).find(file=>file.name==='planning.md')?.content).toBe('Externally tuned planning prompt');
+    }finally{await manager.dispose();}
+});

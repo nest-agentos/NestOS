@@ -14,13 +14,13 @@ async function fixture() {
 }
 it('resolves project overrides, freezes original contents and verifies remote publication on recovery', async () => {
     const {fs, journal} = await fixture();
-    await fs.driver.createFile({parentPath: '/workspace/_nestos/kanban/policies/development', name: 'task.md', content: '# Project task', recursive: true});
+    await fs.driver.createFile({parentPath: '/workspace/_nestos/etc/kanban/development', name: 'task.md', content: '# Project task', recursive: true});
     const first = await developmentPolicy(journal, fs, fs, 'attempt', {commit: 'changes', modules: 'libraries/editor'});
     expect(first.prompts.files.find(file => file.name === 'task.md')).toMatchObject({content: '# Project task', source: expect.stringContaining('project:')});
     expect(first.prompts.files.find(file => file.name === 'decision.md')?.source).toBe('builtin:decision.md');
     const directory = '/workspace/work/_nestos/kanban';
     const digest = await publishPromptBundle(fs, directory, first.prompts, {commit: first.commit});
-    await fs.driver.writeContent('/workspace/_nestos/kanban/policies/development/task.md', 'New task');
+    await fs.driver.writeContent('/workspace/_nestos/etc/kanban/development/task.md', 'New task');
     const restored = await developmentPolicy(journal, fs, fs, 'attempt', {commit: 'worktree'});
     expect(restored).toEqual(first);
     expect(await publishPromptBundle(fs, directory, restored.prompts, {commit: restored.commit})).toBe(digest);
@@ -36,7 +36,7 @@ it('defaults to uncommitted changes and rejects invalid paths and options', asyn
 });
 it('publishes the manifest only after all files and rejects oversized authoring content', async () => {
     const {fs, journal} = await fixture();
-    await fs.driver.createFile({parentPath: '/workspace/_nestos/kanban/policies/development', name: 'task.md', content: 'x'.repeat(65537), recursive: true});
+    await fs.driver.createFile({parentPath: '/workspace/_nestos/etc/kanban/development', name: 'task.md', content: 'x'.repeat(65537), recursive: true});
     await expect(developmentPolicy(journal, fs, fs, 'large')).rejects.toMatchObject({code: 'PROMPT_FILE_INVALID'});
     expect(await fs.driver.exists('/workspace/work/_nestos/kanban/manifest.json')).toBe(false);
 });
@@ -50,14 +50,14 @@ it('uses current defaults for new authoring and freezes explicit user prompts wi
     const {fs,journal}=await fixture();
     const fresh=await developmentPolicy(journal,fs,fs,'fresh');
     expect(fresh.prompts.files.find(file=>file.name==='task.md')?.content).toBe(defaults['task.md']);
-    expect(await fs.driver.exists('/var/lib/kanban/policies/development/task.md')).toBe(false);
-    await fs.driver.createFile({parentPath:'/var/lib/kanban/policies/development',name:'task.md',content:'User task policy',recursive:true});
+    expect(await fs.driver.exists('/etc/kanban/development/task.md')).toBe(false);
+    await fs.driver.createFile({parentPath:'/etc/kanban/development',name:'task.md',content:'User task policy',recursive:true});
     expect((await developmentPolicy(journal,fs,fs,'custom')).prompts.files.find(file=>file.name==='task.md')?.content).toBe('User task policy');
     expect(await developmentPolicy(journal,fs,fs,'fresh')).toEqual(fresh);
 });
 it('freezes project pre/post overrides and global status hooks and publishes them with the manifest',async()=>{
     const {fs,journal}=await fixture();
-    const global='/var/lib/kanban/policies/development',local='/workspace/_nestos/kanban/policies/development';
+    const global='/etc/kanban/development',local='/workspace/_nestos/etc/kanban/development';
     for(const [parentPath,name,content] of [[global,'task-pre.md','Global pre'],[local,'task-pre.md','Project pre'],[local,'task-post.md','Project post'],[global,'task-succ.md','Global success']])
         await fs.driver.createFile({parentPath,name,content,recursive:true});
     const policy=await developmentPolicy(journal,fs,fs,'hooks');
@@ -72,11 +72,24 @@ it('freezes project pre/post overrides and global status hooks and publishes the
 it('freezes the default and project-overridden fix pre prompt at the canonical manifest path',async()=>{
     const {fs,journal}=await fixture();const first=await developmentPolicy(journal,fs,fs,'fix-default');
     expect(first.prompts.files.find(file=>file.name==='task-fix-pre.md')?.content).toBe(defaults['task-fix-pre.md']);
-    await fs.driver.createFile({parentPath:'/workspace/_nestos/kanban/policies/development',name:'task-fix-pre.md',content:'Project fix interaction',recursive:true});
+    await fs.driver.createFile({parentPath:'/workspace/_nestos/etc/kanban/development',name:'task-fix-pre.md',content:'Project fix interaction',recursive:true});
     const custom=await developmentPolicy(journal,fs,fs,'fix-project');
     expect(custom.prompts.files.find(file=>file.name==='task-fix-pre.md')?.source).toContain('project:');
     await publishPromptBundle(fs,'/workspace/fix/_nestos/kanban',custom.prompts,{entry:'prompts/task-fix-pre.md'});
     expect(await fs.driver.readContent('/workspace/fix/_nestos/kanban/prompts/task-fix-pre.md',{encoding:'utf-8'})).toBe('Project fix interaction');
-    await fs.driver.writeContent('/workspace/_nestos/kanban/policies/development/task-fix-pre.md','Later changes');
+    await fs.driver.writeContent('/workspace/_nestos/etc/kanban/development/task-fix-pre.md','Later changes');
     expect(await developmentPolicy(journal,fs,fs,'fix-project')).toEqual(custom);
+});
+
+it('loads edited planning files for new executions without changing frozen conversations',async()=>{
+    const {fs,journal}=await fixture(),name='planning.md';
+    const first=await developmentPolicy(journal,fs,fs,'planning-before');
+    expect(first.prompts.files.find(file=>file.name===name)?.content).toBe(defaults[name]);
+    const global='/etc/kanban/development';
+    await fs.driver.createFile({parentPath:global,name,content:'Global planning instructions',recursive:true});
+    expect((await developmentPolicy(journal,fs,fs,'planning-after')).prompts.files.find(file=>file.name===name)).toMatchObject({content:'Global planning instructions',source:'nestos:'+global+'/'+name});
+    expect(await developmentPolicy(journal,fs,fs,'planning-before')).toEqual(first);
+    const project='/workspace/_nestos/etc/kanban/development';
+    await fs.driver.createFile({parentPath:project,name,content:'Project planning instructions',recursive:true});
+    expect((await developmentPolicy(journal,fs,fs,'planning-project')).prompts.files.find(file=>file.name===name)).toMatchObject({content:'Project planning instructions',source:'project:'+project+'/'+name});
 });

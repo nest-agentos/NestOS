@@ -7,7 +7,6 @@ import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {developmentPreparation,type DevelopmentWorkspaceRecord} from './kanban-development';
 import {readPlanningChannel} from '../run/planning-channel';
-import {planningConversationInstruction} from './kanban-planning-conversation';
 
 type Options = Parameters<typeof developmentPreparation>[0];
 export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
@@ -23,7 +22,7 @@ export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
         const workspace=await journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+input.id);
         requireValue(workspace,'SESSION_CHANNEL_WORKSPACE_REQUIRED');
         await watch(input.id,workspace.projectId);
-        return {target:prepared.target,contextRef:{scopeId:input.id,section:'planning-input'},instruction:'Read decision.md, planning and planning-input through session_context. Candidate section names expose details on demand; do not repeat full context reads. '+planningConversationInstruction};
+        return {target:prepared.target,contextRef:{scopeId:input.id,section:'planning-input'},instruction:'Read decision.md, planning and planning-input through session_context. Candidate section names expose details on demand; do not repeat full context reads.'};
     };
     async function watch(id:string,projectId:string) {
         await watches.ensure(id,async()=>{

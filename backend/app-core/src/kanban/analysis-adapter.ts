@@ -10,8 +10,9 @@ import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallInput} from '@nestos/llm-session/contracts';
 import type {TargetRef} from '@nestos/llm-flow/contracts';
 import {requireValue} from './validation';
-import preset from '../presets/kanban-planning.json';
+import defaults from '../presets/kanban-development-prompts.json';
 export interface AnalysisOptions {
+    readPlanningPrompt?(board:KanbanBoard):Promise<string>;
     readAnalysisOutput?(id:string):Promise<KanbanAnalysisObservation|undefined>;
     onAnalysis?: import('./personal-automation').PersonalKanbanAutomationOptions['onAnalysis'];
     prepareAnalysis?: import('./personal-automation').PersonalKanbanAutomationOptions['prepareAnalysis'];
@@ -27,7 +28,7 @@ export function analyzeItem(options:AnalysisOptions,board:KanbanBoard,item:Kanba
         port:{
             prepare:async ({id,board,item,target})=>{
                 const prepared=await options.prepareAnalysis?.({id,board,item,target});
-                return analysisInput(board,item,prepared?.target??target,id,prepared?.instruction,prepared?.contextRef);
+                return analysisInput(board,item,prepared?.target??target,id,prepared?.instruction??await options.readPlanningPrompt?.(board),prepared?.contextRef);
             },
             prepareExecution:async(id,input)=>{await options.prepareSession(id);await options.calls.prepareTaskCall(input,{maxDepth:4,timeoutMs:null});},
             submit:async input=>{await options.calls.submitPreparedTaskCall(input);},
@@ -35,7 +36,7 @@ export function analyzeItem(options:AnalysisOptions,board:KanbanBoard,item:Kanba
         },
     },board,item,target,service);
 }
-function analysisInput(board:KanbanBoard,item:KanbanItem,target:TargetRef,id:string,instruction=preset.instruction,contextRef?:unknown):IndependentCallInput {
+function analysisInput(board:KanbanBoard,item:KanbanItem,target:TargetRef,id:string,instruction=defaults['planning.md'],contextRef?:unknown):IndependentCallInput {
     const items=board.items.map(({id,title,responsibility,acceptance,planning,status})=>({id,title,responsibility,acceptance,planning,status}));
     return {title:`${t('kanban.automationAnalysis')} · ${item.number?'#'+item.number+' · ':''}${item.title}`,
         request:{expectedSessionId:id,expectedBranch:'main',expectedTarget:target,target:{kind:target.kind,id:target.id,version:target.version},

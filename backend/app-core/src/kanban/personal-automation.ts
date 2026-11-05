@@ -1,3 +1,4 @@
+import {readGlobalPlanningPrompt} from '../presets/kanban-configuration-files';
 import {kanbanControlOptions} from './control-adapter';
 import {drainBoardAnalyses} from '@nestos/kanban/integration';
 import {scanTaskControls} from '@nestos/kanban/integration';
@@ -59,7 +60,7 @@ export function createPersonalKanbanAutomation(options:Options) {
         drain:(board,service)=>drainBoardAnalyses(kanbanControlOptions(options,options.journal),options.journal,board,service),
         analyze:async(board,item,service,active)=>{
             const target=board.automation!.enabled?automationTarget(board.automation!.planner,await options.catalog()):undefined;
-            await analyzeItem({...options,prepareSession,active,prepareAnalysis:options.prepareAnalysis?async input=>options.prepareAnalysis!({...input,
+            await analyzeItem({...options,prepareSession,active,readPlanningPrompt:board=>readGlobalPlanningPrompt(options.fs,board.automation?.preparationOptions?.profile??'development'),prepareAnalysis:options.prepareAnalysis?async input=>options.prepareAnalysis!({...input,
                 context:await workContext(options.journal,board,item),
                 reportActivity:fact=>options.workLog?.append(options.service,board.id,item.id,{...fact,actor:fact.actor??board.automation?.coordinator,dispatchId:input.id})??Promise.resolve()}) : undefined},board,item,target,service);
         },executor:context=>createExecutor(options,context,prepareSession)});

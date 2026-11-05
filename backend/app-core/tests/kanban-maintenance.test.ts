@@ -8,6 +8,6 @@ it('offers one recoverable prompt set, restores missing files and explicitly rep
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/');
     const api = maintenanceResources(fs), id = 'kanban:maintenance-prompts'; expect((await api.list())[0]).toMatchObject({id, exists: false, overwrite: true, group: 'kanban'});
     await api.restore(id); expect((await api.list())[0].exists).toBe(true);
-    const path = '/var/lib/kanban/policies/development/task-build-pre.md'; await fs.driver.writeContent(path, 'Custom');
+    const path = '/etc/kanban/development/task-build-pre.md'; await fs.driver.writeContent(path, 'Custom');
     expect(await readPrompt(fs, path)).toBe('Custom'); await api.restore(id); expect(await readPrompt(fs, path)).toBe(maintenancePrompts['task-build-pre.md']);
 });

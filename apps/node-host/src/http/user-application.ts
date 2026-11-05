@@ -72,9 +72,9 @@ export async function validateUserHostPaths(options: HttpHostOptions): Promise<v
 
 async function sharedMounts(options: HttpHostOptions, userId: string, cleanup: HostCleanup): Promise<NonNullable<HttpRuntimeMounts>> {
     const mounts: NonNullable<HttpRuntimeMounts> = [];
-    for (const name of ['llm', 'agents', 'flows']) {
+    for (const name of ['llm', 'agents', 'flows', 'kanban']) {
         const backend = await openBackend(path.join(options.root, 'etc', name), path.join(options.root, 'etc', '_meta', name), cleanup, options.strictPathChecks ?? false);
-        mounts.push({path: name === 'llm' ? '/etc/llm' : `/home/admin/${name}`, backend,
+        mounts.push({path: ['llm','kanban'].includes(name) ? `/etc/${name}` : `/home/admin/${name}`, backend,
             options: {readonly: userId !== 'admin', crossMountStrategy: 'deny'}});
     }
     return mounts;

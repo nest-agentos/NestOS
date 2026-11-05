@@ -46,9 +46,9 @@ prompt.md
 release/
 .nestos/
 _nestos/*
-!_nestos/kanban/
-_nestos/kanban/*
-!_nestos/kanban/policies/
+!_nestos/etc/
+_nestos/etc/*
+!_nestos/etc/kanban/
 .nestos-http/
 .nestos-prompt/
 .nestos-websearch/

@@ -1,10 +1,8 @@
-import {maintenancePrompts} from './kanban-maintenance';
-import {LIFECYCLE_PROMPT_SUFFIXES} from '../run/prompt-lifecycle';
-import {sha256HexSync, t} from '@nestos/common';
+import {resolveKanbanConfiguration} from './kanban-configuration-files';
+import {t} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {KanbanAutomationTarget, KanbanBoard} from '@nestos/kanban/contracts';
-import {freezePrompts, readPrompt, failure, type PromptJournal, type PromptBundle} from '../run/prompt-bundle';
-import defaults from './kanban-development-prompts.json';
+import {freezePrompts, failure, type PromptJournal, type PromptBundle} from '../run/prompt-bundle';
 
 export interface DevelopmentPolicy {
     version: 1; profile: string; commit: 'changes' | 'worktree'; modules: string[]; prompts: PromptBundle;
@@ -21,7 +19,7 @@ export async function developmentPolicy(journal: PromptJournal, fs: IFileSystem,
     options: Record<string, string> = {}): Promise<DevelopmentPolicy> {
     const key = 'development-policy:' + id, old = await journal.get<DevelopmentPolicy>(key); if (old) return old;
     const {profile, commit, modules} = validateDevelopmentOptions(options);
-    const prompts = await freezePrompts(journal, 'development-prompts:' + id, () => resolvePrompts(fs, project, profile));
+    const prompts = await freezePrompts(journal, 'development-prompts:' + id, () => resolveKanbanConfiguration(fs, project, profile));
     return journal.update<DevelopmentPolicy>(key, previous => previous ?? {version: 1, profile, commit: commit as DevelopmentPolicy['commit'], modules, prompts});
 }
 export function validateDevelopmentOptions(options: Record<string, string> = {}) {
@@ -35,39 +33,6 @@ export function validateDevelopmentOptions(options: Record<string, string> = {})
 export function validModulePath(path: string): boolean {
     return path.length <= 512 && path.split('/').every(part => /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(part));
 }
-async function resolvePrompts(fs: IFileSystem, project: IFileSystem, profile: string) {
-    const files = [];
-    for (const name of ['decision.md', 'task.md'] as const) {
-        const global = '/var/lib/kanban/policies/' + profile + '/' + name;
-        const local = '/workspace/_nestos/kanban/policies/' + profile + '/' + name;
-        const projectOverride = await project.driver.exists(local);
-        const globalOverride = !projectOverride && await fs.driver.exists(global);
-        if (!projectOverride && !globalOverride && profile !== 'development') throw failure('PROMPT_PROFILE_NOT_FOUND');
-        const content = projectOverride ? await readPrompt(project,local) : globalOverride ? await readPrompt(fs,global) : defaults[name];
-        files.push({name, content, source: projectOverride ? 'project:' + local : globalOverride ? 'nestos:' + global : 'builtin:' + name, sha256: sha256HexSync(content)});
-    }
-    files.push(...await resolveLifecyclePrompts(fs,project,profile));
-    return files;
-}
-
 export function requiresDevelopmentProject(board:KanbanBoard):boolean {
     return board.automation?.preparation?.system==='nestos-work-preparation'&&board.automation.preparation.id==='git-worktree';
-}
-
-async function resolveLifecyclePrompts(fs:IFileSystem,project:IFileSystem,profile:string) {
-    const files=[];
-    const names=[...['decision','task'].flatMap(entry=>LIFECYCLE_PROMPT_SUFFIXES.map(suffix=>entry+'-'+suffix+'.md')),'task-fix-pre.md'];
-    for(const name of names) {
-        const local='/workspace/_nestos/kanban/policies/'+profile+'/'+name;
-        const global='/var/lib/kanban/policies/'+profile+'/'+name;
-        const projectOverride=await project.driver.exists(local),source=projectOverride?project:fs,path=projectOverride?local:global;
-        if(await source.driver.exists(path)) {
-            const content=await readPrompt(source,path);
-            files.push({name,content,source:(projectOverride?'project:':'nestos:')+path,sha256:sha256HexSync(content)});
-        } else {
-            const content=Object.hasOwn(maintenancePrompts,name) ? maintenancePrompts[name as keyof typeof maintenancePrompts] : defaults[name as keyof typeof defaults];
-            if(content) files.push({name,content,source:'builtin:'+name,sha256:sha256HexSync(content)});
-        }
-    }
-    return files;
 }

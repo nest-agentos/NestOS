@@ -249,6 +249,6 @@ projects/project-environment 将本地普通环境按项目 ID 存在 settings.s
 
 session/directory-view 在既有授权 Session 浏览器文件视图内聚合节点、透明容器条目和项目导航，浏览器不再逐层请求虚拟会话分组。普通文件目录保持惰性；透明容器拒绝循环，读取中 revision 改变则将种子标 stale。查询不打开 Session 或持有执行租约，错误保留具体分类，日志只含操作标识、阶段、数量、结果与耗时。
 
-个人看板 AI 联动由 kanban/personal-automation 与 analysis-adapter 装配，规划指令归 presets/kanban-planning.json。automation.seq 的稳定调用身份先持久再提交，unknown 只核对不重派；事项修订和规划签名过期则拒绝迟到结果。产物须核对派发归属、正文摘要及字节数，默认独立验收后才解锁依赖。库内不放 NestOS 目标、提示词或调用实现。
+个人看板 AI 联动由 kanban/personal-automation 与 analysis-adapter 装配，规划指令归 presets/kanban-development-prompts.json 的 planning.md，经全局/项目同名文件覆盖并冻结到每次执行；代码只发送简短上下文读取入口。automation.seq 的稳定调用身份先持久再提交，unknown 只核对不重派；事项修订和规划签名过期则拒绝迟到结果。产物须核对派发归属、正文摘要及字节数，默认独立验收后才解锁依赖。库内不放 NestOS 目标、提示词或调用实现。
 
 工作台聚合查询通过 BrowserReadContext 复用本次项目目录、组织记录、收藏与工作区；文件准备不能等待导航查询。范围不跨查询缓存，失败后排空读取并释放全部借用句柄；项目根不读取不会展示的完整本地摘要。

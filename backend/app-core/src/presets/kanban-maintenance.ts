@@ -16,7 +16,7 @@ export function maintenanceInstruction(input: {id: string; action: ReviewAction;
 }
 /** Settings restores product prompts, not executable commands or user-specific Flow bindings. */
 export function maintenanceResources(fs: IFileSystem, existing?: InitialResourceProvider): InitialResourceProvider {
-    const id = 'kanban:maintenance-prompts', directory = '/var/lib/kanban/policies/development';
+    const id = 'kanban:maintenance-prompts', directory = '/etc/kanban/development';
     return {async list() {const present = await Promise.all(Object.keys(prompts).map(name => fs.driver.exists(directory + '/' + name)));
         return [...await existing?.list() ?? [], {id, group: 'kanban' as const, name: t('kanban.maintenancePrompts'), path: directory, overwrite: true, exists: present.every(Boolean)}];},
         async restore(value) {
