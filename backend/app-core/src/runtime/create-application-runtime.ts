@@ -1,3 +1,4 @@
+import {nativeSessionArchive} from '../projects/session-archive';
 import {ensureKanbanConfiguration} from '../presets/kanban-global-configuration';
 import {controlCall} from '../kanban/call-lifecycle';
 import {kanbanJournalOptions} from '../kanban/host-policy';
@@ -613,6 +614,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 sessionResource: remoteConnections ? id => nativeSessionResource(kernelCore, projects, developmentBindings!.remote)(id, 'main') : undefined,
                 report: itemOperationReporter(context),
             }) : undefined,
+            archiveSession:remoteConnections?nativeSessionArchive(kernelCore,projects,remoteConnections,new KanbanAutomationJournal(systemFS,kanbanJournalOptions)):undefined,
             relatedSessions: lifecycle ? (boardId, itemId) => lifecycle.sessions(boardId, itemId) : undefined,
             sessionExecutionResources: id => developmentSessionResources(new KanbanAutomationJournal(systemFS, kanbanJournalOptions), id),
             continuation: continueDevelopment ? {submission: sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore,

@@ -46,6 +46,7 @@ export async function kanbanCommand(client: ApplicationClient, args: string[], o
     }
     if (action === 'record' && itemId) return service.record(boardId, itemId);
     if (action === 'runs' && itemId && service.recordExecutions) return service.recordExecutions(boardId, itemId);
+    if (action === 'record-control' && service.controlRecord) return service.controlRecord(boardId,await jsonFile<Parameters<NonNullable<Service['controlRecord']>>[1]>(options.file));
     if (action === 'run' && service.runRecord) return service.runRecord(boardId, await jsonFile<Parameters<NonNullable<Service['runRecord']>>[1]>(options.file));
     throw new Error('kanban requires list/principal/create/targets/show/workflow/records/events/execute/item/record');
 }

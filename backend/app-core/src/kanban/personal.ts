@@ -29,7 +29,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
         relatedSessions:async(board,item)=>[...await automationOptions.relatedSessions?.(board,item)??[],...await operations?.sessions(board,item)??[]]}:undefined});
     const runtime=await assembleKanbanRuntime({...base,fs,store,journal,directory:'/var/lib/kanban',actor:{kind:'human',id:'admin'},
         workLog:workLogOptions(events,base.log),resources:automationOptions?.projects?projectResourceCatalog(automationOptions.projects):undefined,
-        requiresItemResource:automationOptions?.requiresItemResource,
+        requiresItemResource:automationOptions?.requiresItemResource,archiveSession:automationOptions?.archiveSession,
         control:kanbanControlOptions(automationOptions??{calls:{list:async()=>[]}},journal),
         createService:options=>createNestOSKanban({...options,notifications:base.notifications}),
         extensions:context=>personalExtensions(context,automationOptions,events,base.log,value=>{operations=value;})});

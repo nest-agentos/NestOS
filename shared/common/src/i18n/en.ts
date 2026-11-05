@@ -4,6 +4,10 @@
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    'kanban.includeArchivedRecords': 'Include archived decisions',
+    'kanban.restartDecision': 'Restart decision',
+    'kanban.archiveDecision': 'Archive decision and tasks',
+    'kanban.recordCleanupHelp': 'Linked work is stopped and reconciled before archiving or deleting tasks and subtasks. Sessions are archived, and retained workspaces remain associated.',
     'kanban.pendingControl': 'Unconfirmed operation',
     'kanban.unassigned': 'Unassigned',
     'kanban.itemCreatedAt': 'Created',

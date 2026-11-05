@@ -4,7 +4,7 @@ import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import type {KanbanAnalysisObservation} from '@nestos/kanban/integration';
 interface Origin {sessionId:string;turnId:string;operationId?:string;revision?:number}
 interface Message {id:string;message:{type:string;content:string;replyTo?:string;payload?:{ready?:boolean;reason?:string}};origin?:Origin|null}
-interface State {seen:Record<string,string>;questions:Record<string,Origin>;resolved:string[];acknowledged?:string[];rejected?:Record<string,string>;final?:{id:string;digest:string}}
+interface State {seen:Record<string,string>;questions:Record<string,Origin>;resolved:string[];acknowledged?:string[];rejected?:Record<string,string>;blockingQuestions?:Record<string,string[]>;final?:{id:string;digest:string}}
 interface Envelope {messages:Message[];execution?:Origin & {status?:string}}
 type Remote=Pick<ProjectRemoteMountService,'sessionChannel'>;
 
@@ -18,7 +18,8 @@ export async function readPlanningChannel(remote:Remote,projectId:string,scopeId
     for(const row of value.messages){
         if(state.acknowledged?.includes(row.id))continue;
         if(state.questions[row.id])await acknowledge(remote,projectId,scopeId,row.id,'waiting-input');
-        else if(state.rejected?.[row.id])await remote.sessionChannel(projectId,'acknowledge',{scopeId,id:row.id,ack:{status:'rejected',code:state.rejected[row.id]}});
+        else if(state.rejected?.[row.id])await remote.sessionChannel(projectId,'acknowledge',{scopeId,id:row.id,ack:{status:'rejected',code:state.rejected[row.id],...(state.blockingQuestions?.[row.id]?{pendingQuestionIds:state.blockingQuestions[row.id]}:{})}});
+        else if(row.message.type==='resolved'&&state.resolved.includes(row.message.replyTo??''))await acknowledge(remote,projectId,scopeId,row.id,'validated');
         else continue;
         state=await journal.update<State>(key,old=>({...old!,acknowledged:[...new Set([...old?.acknowledged??[],row.id])]}));
     }
@@ -28,7 +29,7 @@ export async function readPlanningChannel(remote:Remote,projectId:string,scopeId
     if(final.length>1)throw failure('CHANNEL_RESULT_INVALID');
     if(final.length){const row=final[0];
         if(Object.keys(state.questions).some(id=>!state.resolved.includes(id)))return clarification(value,state);
-        if(!terminal(value,row))return {state:'running'};
+        if(!state.final&&!terminal(value,row))return {state:'running'};
         const digest=channelDigest(row.message.payload);
         state=await journal.update<State>(key,old=>{if(old?.final&&(old.final.id!==row.id||old.final.digest!==digest))throw failure('CHANNEL_RESULT_CHANGED');return {...old!,final:{id:row.id,digest}};});
         await acknowledge(remote,projectId,scopeId,row.id,'validated');
@@ -54,7 +55,7 @@ function freezePublications(state:State,value:Envelope):State {
                 ||!row.origin.turnId||!row.origin.operationId){next.rejected??={};next.rejected[row.id]='PLANNING_REPLY_UNVERIFIED';continue;}
             if(!next.resolved.includes(row.message.replyTo!))next.resolved.push(row.message.replyTo!);
         }
-        if(row.message.type==='result'&&row.message.payload?.ready===true && Object.keys(next.questions).some(id=>!next.resolved.includes(id))){next.rejected??={};next.rejected[row.id]='PLANNING_CLARIFICATION_UNRESOLVED';}
+        if(row.message.type==='result'&&row.message.payload?.ready===true && Object.keys(next.questions).some(id=>!next.resolved.includes(id))){next.rejected??={};next.rejected[row.id]='PLANNING_CLARIFICATION_UNRESOLVED';next.blockingQuestions??={};next.blockingQuestions[row.id]=Object.keys(next.questions).filter(id=>!next.resolved.includes(id));}
     }
     return next;
 }

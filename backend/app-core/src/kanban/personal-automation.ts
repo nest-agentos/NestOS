@@ -18,6 +18,7 @@ import {automationCatalog,automationTarget} from './automation-targets';
 import {requireValue} from './validation';
 import {withContinuedWork,type ContinueWorkOptions} from './continued-work';
 export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
+    archiveSession?(sessionId:string,operationId:string):Promise<void>;
     sessionChannel?: import('@nestos/app-contracts/services').ProjectRemoteMountPort['sessionChannel'];
     itemOperations?(context: {service: KanbanService; journal: KanbanAutomationJournal; workLog: KanbanWorkLog;
         log: import('./item-operation-types').ReviewOperationsOptions['log']}): ReturnType<typeof import('./item-operations').createItemOperations>;

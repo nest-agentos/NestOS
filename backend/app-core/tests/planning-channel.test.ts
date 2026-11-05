@@ -43,6 +43,21 @@ describe('planning conversation reports',()=>{
         f.report('corrected','result','a',{payload:{ready:true,reason:'Scope',dependencies:[]}});
         expect(await f.read()).toMatchObject({state:'succeeded'});
     });
+    it('identifies every unresolved historical report and acknowledges resolutions',async()=>{
+        const f=fixture();f.report('legacy','result','q',{payload:{ready:false,reason:'Scope'}});
+        f.report('new-question','clarification','q');await f.read();
+        f.report('new-answer','resolved','a',{replyTo:'new-question'});
+        f.report('early','result','a',{payload:{ready:true}});f.envelope.execution={...f.origin('a'),status:'completed'};
+        expect(await f.read()).toMatchObject({state:'clarification'});
+        expect(f.acks.get('early')).toMatchObject({code:'PLANNING_CLARIFICATION_UNRESOLVED',pendingQuestionIds:['legacy']});
+        expect(f.acks.get('new-answer')).toMatchObject({status:'validated'});
+        f.report('old-answer','resolved','b',{replyTo:'legacy'});f.report('final','result','b',{payload:{ready:true,reason:'Confirmed',dependencies:[]}});
+        f.envelope.execution={...f.origin('b'),status:'completed'};
+        expect(await f.read()).toMatchObject({state:'succeeded'});
+        // A later conversational turn cannot erase already validated planning evidence.
+        f.envelope.execution={...f.origin('later'),status:'running'};
+        expect(await f.read()).toMatchObject({state:'succeeded'});
+    });
     it('does not accept a final result without trusted publication origin',async()=>{
         const f=fixture();f.envelope.messages.push({id:'x',message:{type:'result',content:'ok',payload:{ready:true}}});
         expect(await f.read()).toEqual({state:'running'});

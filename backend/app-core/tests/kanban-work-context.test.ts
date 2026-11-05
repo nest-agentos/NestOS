@@ -17,3 +17,15 @@ it('recovers same-board historical provenance and never invents a decision for m
     expect((await workContext(journal,board,item)).decision?.recordId).toBe('decision');
     expect((await workContext(journal,board,{...item,externalRefs:[]})).decision).toBeNull();
 });
+it('passes prior approved clarification scope to a new run without treating it as current completion',async()=>{
+    const data=new Map<string,unknown>([
+        ['record-context:run',{sourceBoardId:'development',recordId:'decision',recordRevision:4,runId:'run',previousRunId:'old'}],
+        ['record-runs:development',[{id:'run',boardId:'development',itemIds:['child'],record:{}},{id:'old',boardId:'old-board',itemIds:['old-task'],record:{}}]],
+        ['analysis-current:'+JSON.stringify(['old-board','old-task']),'old-analysis'],
+        ['old-analysis',{id:'prior-plan',status:{state:'ready'},result:{ready:true,reason:'Confirmed scope',dependencies:[]}}],
+    ]);
+    const journal={get:async(key:string)=>data.get(key)} as KanbanAutomationJournal;
+    const context=await workContext(journal,board,item);
+    expect(context.priorPlanning).toMatchObject({id:'prior-plan',result:{reason:'Confirmed scope'}});
+    expect(context.planning).toBeUndefined();
+});

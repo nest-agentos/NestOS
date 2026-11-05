@@ -29,3 +29,25 @@ it('does not guess when multiple contexts or no authorized project match',async(
     expect(await f.resolve('s','main')).toBeUndefined();
     await f.add('two');expect(await f.resolve('s','main')).toBeUndefined();
 });
+
+it('archives the original native session with one stable operation and recovers a lost reply',async()=>{
+    const {nativeSessionArchive}=await import('../src/projects/session-archive');
+    const f=await fixture(),data=new Map<string,unknown>();
+    const journal={get:async<T>(key:string)=>structuredClone(data.get(key)) as T|undefined,update:async<T>(key:string,change:(old:T|undefined)=>T)=>{const value=change(structuredClone(data.get(key)) as T|undefined);data.set(key,value);return value;}};
+    const archive=vi.fn(async()=>{throw Object.assign(new Error('Reply lost'),{code:'CONNECTION_LOST'});});
+    const client={profiles:async()=>({epoch:'epoch'}),inspect:async()=>({session:{id:'native-one',status:'idle',owned:true,archiveAllowed:true}}),archive,operation:vi.fn(async()=>({outcome:'committed'})),close:vi.fn(async()=>{})};
+    const remote=Object.assign(f.remote,{projectHarness:vi.fn(async()=>client)});
+    const run=nativeSessionArchive(f.kernel,f.projects,remote as unknown as ProjectRemoteMountService,journal);
+    await expect(run('s','archive-op')).rejects.toMatchObject({code:'CONNECTION_LOST'});
+    await run('s','archive-op');await run('s','archive-op');
+    expect(archive).toHaveBeenCalledExactlyOnceWith('codex','native-one',true,{requestId:'archive-op',epoch:'epoch'});
+    expect(client.operation).toHaveBeenCalledOnce();
+    expect(JSON.stringify([...data.values()])).not.toContain('Reply lost');
+});
+it('does not archive a native session which is still running',async()=>{
+    const {nativeSessionArchive}=await import('../src/projects/session-archive');const f=await fixture(),data=new Map<string,unknown>();
+    const journal={get:async<T>(key:string)=>data.get(key) as T|undefined,update:async<T>(key:string,change:(old:T|undefined)=>T)=>{const value=change(data.get(key) as T|undefined);data.set(key,value);return value;}};
+    const archive=vi.fn(),remote=Object.assign(f.remote,{projectHarness:async()=>({profiles:async()=>({epoch:'epoch'}),inspect:async()=>({session:{id:'native-one',status:'running',activeTurnId:'turn'}}),archive,close:async()=>{}})});
+    await expect(nativeSessionArchive(f.kernel,f.projects,remote as unknown as ProjectRemoteMountService,journal)('s','archive-op')).rejects.toMatchObject({code:'SESSION_ARCHIVE_STILL_RUNNING'});
+    expect(archive).not.toHaveBeenCalled();
+});

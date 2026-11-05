@@ -14,7 +14,7 @@ export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
     const prepareAnalysis:NonNullable<PersonalKanbanAutomationOptions['prepareAnalysis']>=async input => {
         const preparation=input.board.automation?.preparation;
         requireValue(preparation,'SESSION_CHANNEL_WORKSPACE_REQUIRED');
-        const prepared=await prepare({context:{...input.context as object, snapshot:{item:input.item,items:input.board.items.map(({id,title,responsibility,acceptance,planning,status})=>({id,title,responsibility,acceptance,planning,status})),workTypes:input.board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:input.board.defaultWorkType??'task'}},reportActivity:input.reportActivity,target:input.target,preparation,item:input.item,
+        const prepared=await prepare({context:{...input.context as object, snapshot:{...((input.context as {priorPlanning?:unknown})?.priorPlanning?{priorPlanning:(input.context as {priorPlanning:unknown}).priorPlanning}:{}),item:input.item,items:input.board.items.map(({id,title,responsibility,acceptance,planning,status})=>({id,title,responsibility,acceptance,planning,status})),workTypes:input.board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:input.board.defaultWorkType??'task'}},reportActivity:input.reportActivity,target:input.target,preparation,item:input.item,
             options:{...input.board.automation?.preparationOptions,commit:'changes',modules:''},stage:'decision',
             dispatch:{id:input.id,itemId:input.item.id,itemRevision:input.item.revision,planId:input.id,planRevision:1,
                 principal:input.board.automation!.coordinator,definitionDigest:input.target.digest,attempt:1,fence:input.id,

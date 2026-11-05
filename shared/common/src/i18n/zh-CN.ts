@@ -5,6 +5,10 @@
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    'kanban.includeArchivedRecords': '包含已归档决策',
+    'kanban.restartDecision': '重新执行决策',
+    'kanban.archiveDecision': '归档决策及任务',
+    'kanban.recordCleanupHelp': '将先停止并核对关联任务，再归档或删除任务及子任务。会话归档保留；未安全清理的工作区保留关联。',
     'kanban.pendingControl': '待确认操作',
     'kanban.unassigned': '未分配',
     'kanban.itemCreatedAt': '创建时间',

@@ -212,3 +212,46 @@ it('projects unresolved planning clarification as a blocked decision and clears 
     await f.command({type:'report-analysis',itemId,operationId:'clarified',status:{itemId,state:'ready',reason:'Confirmed'}});
     await execution.scan();const resumed=(await execution.recordExecutions('source','decision'))[0];expect(resumed.state).toBe('running');expect(resumed.code).toBeUndefined();
 });
+
+async function settleCancellation(f:Awaited<ReturnType<typeof fixture>>) {
+    const {scanTaskControls}=await import('@nestos/kanban/integration');
+    for(let pass=0;pass<3;pass++)await scanTaskControls(kanbanControlOptions({calls:{list:async()=>[]}},f.journal),f.journal,await f.service.read('source'),f.service);
+    await f.open().scan();
+}
+it('archives generated tasks with the decision and deletes archived descendants on a later request',async()=>{
+    const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+    const run=await f.open().runRecord('source',{recordId:'decision',operationId:'run',expectedRevision:2});
+    await f.command({type:'create-item',item:{id:'unrelated',title:'Unrelated',responsibility:'Keep',acceptance:'Keep'}});
+    await f.open().controlRecord('source',{recordId:'decision',operationId:'archive',action:'archive'});await settleCancellation(f);
+    expect((await f.service.record('source','decision')).archivedAt).toBeTypeOf('number');
+    expect((await f.service.records('source')).items).toHaveLength(0);
+    expect((await f.service.query('source',{view:'archive'})).total).toBe(3);
+    expect((await f.service.read('source')).items.map(item=>item.id)).toEqual(['unrelated']);
+    await f.open().controlRecord('source',{recordId:'decision',operationId:'delete',action:'delete'});await f.open().scan();
+    expect((await f.service.record('source','decision')).deletedAt).toBeTypeOf('number');
+    await f.open().controlRecord('source',{recordId:'decision',operationId:'delete',action:'delete'});
+    for(const id of [run.rootItemId!,...run.itemIds!])expect((await f.service.item('source',id)).item.deletedAt).toBeTypeOf('number');
+    expect((await f.service.item('source','unrelated')).item.deletedAt).toBeUndefined();
+});
+it('restarts a decision after settlement with a new run and retains replay identity across reopening',async()=>{
+    const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+    const old=await f.open().runRecord('source',{recordId:'decision',operationId:'run',expectedRevision:2});
+    const request={recordId:'decision',operationId:'restart',action:'restart' as const};
+    await f.open().controlRecord('source',request);await settleCancellation(f);
+    const runs=await f.open().recordExecutions('source','decision');
+    expect(runs).toHaveLength(2);expect(runs[0]).toMatchObject({id:old.id,state:'cancelled'});
+    expect(runs[1].id).not.toBe(old.id);expect(runs[1].state).toBe('running');
+    expect((await f.service.record('source','decision')).status).toBe('confirmed');
+    await f.open().controlRecord('source',request);await f.open().scan();
+    expect(await f.open().recordExecutions('source','decision')).toHaveLength(2);
+    expect((await f.service.query('source',{view:'archive'})).total).toBe(3);
+});
+it('keeps decision deletion pending when task cancellation has no confirmed receipt',async()=>{
+    const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+    await f.open().runRecord('source',{recordId:'decision',operationId:'run',expectedRevision:2});
+    await f.open().controlRecord('source',{recordId:'decision',operationId:'delete',action:'delete'});
+    for(const item of (await f.service.read('source')).items)await f.command({type:'control-receipt',itemId:item.id,controlId:item.control!.id,state:'unknown',code:'CONNECTION_LOST'});
+    await f.open().scan();
+    const record=await f.service.record('source','decision');expect(record.status).toBe('cancelling');expect(record.deletedAt).toBeUndefined();
+    expect((await f.service.read('source')).items.every(item=>item.deletedAt===undefined)).toBe(true);
+});
