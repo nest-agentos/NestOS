@@ -787,3 +787,5 @@ KanbanClient 是两包之间的调用契约，本地服务和 HTTP/RPC 客户端
 HTTP 将物理 `<nestos>/etc/kanban` 挂到每个用户运行时的 `/etc/kanban`，管理员读写，普通用户只读。默认组位于 development/，包括 profile.json、bootstrap.md、planning.md、decision.md、task.md、fix/续办与维护阶段模板。启动比较 `.defaults.json` 的发布内容摘要；摘要改变时替换发布的全局模板及清单，写入前保存 pending 标记，完成后提交版本和代次；中断后下次启动重做安装。同版本显式恢复也更新代次，读取前后核对标记，拒绝恢复中的读取和跨代次混合快照。同一摘要的普通重启保留人工调试改动。此目录按产品升级替换，长期项目定制放项目 `_nestos/etc/kanban/<profile>/`。
 
 新执行重新读取配置清单及文件，以项目同名覆盖优先；每次执行冻结实际正文、来源和摘要并传送到 Cells。直接改全局文件后不需要重新编译或重启，既有会话仍使用旧快照。bootstrap.md 的 sections、commit 占位符由宿主仅作文本替换，无脚本求值。密钥、权限授权、状态机和回执校验不能由配置文件改写。
+
+开发仓库范围区分 prepared 与 available：`policy.repositories` 为宿主已准备的仓库，`policy.availableRepositories` 为已授权、可在当前任务工作树内按需初始化的注册子仓库。Agent 不得把后者未展开误报为待用户授权。初始化必须核对冻结 baseCommit 和任务分支，不修改共享主目录或持久全局 Git 配置；只有两个清单之外的新仓库才需要范围授权，真实准备失败走技术错误报告。
