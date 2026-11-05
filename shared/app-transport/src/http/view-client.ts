@@ -94,9 +94,12 @@ export class HttpViewClient {
             dispose: () => remote.dispose(),
         };
     }
-    private async post(body: object): Promise<Reply & { replies?: Reply[] }> {
+    private async post(body: {kind: string; [key: string]: unknown}): Promise<Reply & { replies?: Reply[] }> {
         const response = await this.request(this.url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...body, clientId: this.clientId, version: RPC_VERSION }), signal: this.abort.signal });
+            body: JSON.stringify({ ...body, clientId: this.clientId, version: RPC_VERSION }), signal: this.abort.signal }).catch(error => {
+                if (body.kind === 'call' && (error as {code?:string})?.code === 'HTTP_CONNECTION_LOST') Object.assign(error, {outcome:'unknown'});
+                throw error;
+            });
         const reply = await response.json() as Reply & { replies?: Reply[] };
         if (!response.ok) throw Object.assign(new Error(reply.error?.message ?? 'View request failed'), reply.error);
         return reply;
@@ -104,8 +107,11 @@ export class HttpViewClient {
     private async request(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
         if (this.expired) throw this.expired;
         const response = await this.fetcher(input, init).catch(error => {
-            if (!this.abort.signal.aborted && !init?.signal?.aborted) this.showDisconnected(error);
-            throw error;
+            if (this.abort.signal.aborted || init?.signal?.aborted) throw error;
+            const network = error instanceof TypeError || (error as {name?:string})?.name === 'NetworkError';
+            const failure = network ? Object.assign(new Error('Application connection interrupted'), {code:'HTTP_CONNECTION_LOST',stage:'transport.fetch',cause:error}) : error;
+            this.showDisconnected(failure);
+            throw failure;
         });
         if ((response.headers.get('X-NestOS-View-Expired') ?? response.headers.get('X-MindOS-View-Expired')) === '1') {
             await response.body?.cancel(); this.expire(); throw this.expired;

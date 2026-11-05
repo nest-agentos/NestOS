@@ -13,6 +13,7 @@ export async function kanbanCommand(client: ApplicationClient, args: string[], o
     if (args[0] === 'task') return taskCommand(service, args.slice(1), options);
     const [action, boardId, itemId] = args;
     if (action === 'list') return service.catalog();
+    if (action === 'resolve' && boardId) return service.resolve(boardId);
     if (action === 'principal') return service.currentPrincipal();
     if (action === 'resources' && service.recordResources) return service.recordResources();
     if (action === 'create') return service.create(await jsonFile<Parameters<Service['create']>[0]>(options.file));

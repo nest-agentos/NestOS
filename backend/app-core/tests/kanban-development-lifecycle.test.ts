@@ -22,9 +22,9 @@ it('runs cancellation finalization independently and reconciles a lost response 
         inspectTaskCallSubmission: vi.fn(async () => ({executionSessionId: 'hook-child', submission: {task: {sessionId: hookId, taskId: 'caller'}}})),
         list: vi.fn(async () => [{input: {request: {submission: {id: hookId}}}, callerState: {settled: true}, executionTree: {settled: true}}])};
     const events = await UserEventService.open(fs);
-    let authorized = false;
+    let authorized = false, cancelled = false; const stop = vi.fn(async () => true);
     const channels=memoryChannels(),remote={sessionChannel:channels.channel};
-    const options = {remote,journal, events, authorize: async () => authorized, calls: calls as never, prepareSession: vi.fn(async (id: string) => id), kernel: {
+    const options = {remote,journal, events, authorize: async () => cancelled ? 'cancelled' as const : authorized, stop, calls: calls as never, prepareSession: vi.fn(async (id: string) => id), kernel: {
         task: async () => ({id: 'caller', sessionId: hookId, version: 1, effects: {}, exit: {status: 'succeeded', output: {exit: {status: 'succeeded'}}}}) as unknown as TaskRecord}};
     const first = developmentLifecycle(options);
     const item = {id: 'item', title: 'Task'} as KanbanItem;
@@ -66,4 +66,17 @@ it('runs cancellation finalization independently and reconciles a lost response 
     const custom=calls.submitPreparedTaskCall.mock.calls.at(-1)![0].request.source.text;
     expect(custom).toContain('task-post.md, task-succ.md, task-clear.md');
     expect(custom).not.toContain('Custom post body');
+    const count = calls.submitPreparedTaskCall.mock.calls.length;
+    await journal.update('development-lifecycle:late',()=>({id:'late',boardId:'board',dispatch:{...dispatch,id:'late'},stage:'postload.succeeded',request:null,phase:'prepared'}));
+    await journal.update<string[]>('development-lifecycle-index',old=>[...old??[],'development-lifecycle:late']);
+    cancelled = true; await second.scan();
+    expect((await journal.get<{done:boolean}>('development-lifecycle:late'))?.done).toBe(true);
+    expect(stop).not.toHaveBeenCalledWith('late','cancel-finalizer:late'); expect(calls.submitPreparedTaskCall).toHaveBeenCalledTimes(count);
+    await journal.update('development-lifecycle:racing',()=>({id:'racing',boardId:'board',dispatch:{...dispatch,id:'racing'},stage:'postload.succeeded',request:null,phase:'submitting'}));
+    await journal.update<string[]>('development-lifecycle-index',old=>[...old??[],'development-lifecycle:racing']);
+    stop.mockResolvedValueOnce(false); await second.scan();
+    expect((await journal.get<{done?:boolean}>('development-lifecycle:racing'))?.done).not.toBe(true);
+    await second.scan(); expect((await journal.get<{done:boolean}>('development-lifecycle:racing'))?.done).toBe(true);
+    expect(stop).toHaveBeenCalledWith('racing','cancel-finalizer:racing');
+
 });

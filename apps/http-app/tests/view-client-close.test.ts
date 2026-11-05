@@ -69,3 +69,10 @@ it('waits for an asynchronous unsubscribe before sending a single close request'
     expect(f.stopped).toHaveBeenCalledOnce(); expect(f.cancelled).toHaveBeenCalledOnce();
     expect(f.requests.filter(request => request.kind === 'close')).toHaveLength(1);
 });
+
+it('classifies fetch failures at the transport boundary and never replays an uncertain write', async () => {
+    const f = await connection(async request => {if (request.kind === 'call') throw new TypeError('Failed to fetch');});
+    await expect(f.root.backend.workbenchView()).rejects.toMatchObject({code:'HTTP_CONNECTION_LOST',outcome:'unknown'});
+    expect(f.requests.filter(request => request.kind === 'call')).toHaveLength(1);
+    expect(f.workbenchView).not.toHaveBeenCalled();
+});

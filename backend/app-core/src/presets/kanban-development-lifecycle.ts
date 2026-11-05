@@ -12,7 +12,7 @@ import {currentChannelBinding,openDevelopmentChannel,type DevelopmentWorkspaceRe
 import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import {failure, hasMarkdownSection} from '../run/prompt-bundle';
 
-interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'kernel' | 'prepareSession'> {remote?:Pick<ProjectRemoteMountService,'sessionChannel'>;authorize?(boardId: string): Promise<boolean>; journal: KanbanAutomationJournal; events: UserEventService}
+interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'kernel' | 'prepareSession'> {remote?:Pick<ProjectRemoteMountService,'sessionChannel'>;authorize?(boardId: string, itemId: string): Promise<boolean|'cancelled'>; stop?(executionId: string, operationId: string): Promise<boolean>; journal: KanbanAutomationJournal; events: UserEventService}
 interface Job {id: string; boardId: string; dispatch: KanbanDispatch; stage: string; request: unknown; phase: 'prepared' | 'submitting' | 'settled'; done?: boolean; observation?: KanbanExecutionObservation}
 /** Terminal hooks are independent calls; cancellation never sends into the stopped turn. */
 interface State {stopped: boolean; pending?: Promise<void>; executor: ReturnType<typeof createPublishedKanbanWorkExecutor>}
@@ -62,7 +62,9 @@ async function advance(options: Options, state: State) {
             if (state.stopped) return;
             const job = await options.journal.get<Job>(key); if (!job) continue;
             if (job.done) {if (job.observation) await report(options.events, job, job.observation); continue;}
-            if (job.phase === 'prepared' && options.authorize && !await options.authorize(job.boardId)) continue;
+            const authorization = await options.authorize?.(job.boardId, job.dispatch.itemId) ?? true;
+            if (authorization === 'cancelled') {await stopCancelledJob(options, key);continue;}
+            if (job.phase === 'prepared' && !authorization) continue;
             if (state.stopped) return;
             const claimed = job.phase === 'prepared' && await options.journal.claim(key);
             if (state.stopped) return;
@@ -77,6 +79,14 @@ async function advance(options: Options, state: State) {
             if (done) await report(options.events, job, observation);
         }
     }
+async function stopCancelledJob(options: Options, key: string): Promise<void> {
+    const saved = await options.journal.update<Job>(key, old => old!.phase === 'prepared'
+        ? {...old!,phase:'settled',done:true,observation:{outcome:'cancelled',code:'USER_CANCELLED'}} : old!);
+    if (saved.done) return;
+    if (!options.stop) throw failure('LIFECYCLE_CANCEL_UNAVAILABLE');
+    if (!await options.stop(saved.id, 'cancel-finalizer:' + saved.id)) return;
+    await options.journal.update<Job>(key, old => ({...old!,phase:'settled',done:true,observation:{outcome:'cancelled',code:'USER_CANCELLED'}}));
+}
 async function enqueue(options: Options, state: State, boardId: string, dispatch: KanbanDispatch, item: KanbanItem, observation: KanbanExecutionObservation, kind: 'task' | 'decision', target?: TargetRef) {
         if (state.stopped || !['succeeded', 'failed', 'cancelled'].includes(observation.outcome)) return;
         const workspace = await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + dispatch.id);

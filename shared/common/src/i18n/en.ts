@@ -7,6 +7,7 @@ export const en: LocaleStrings = {
     'kanban.workResourceReason.WORKTREE_SHARED': 'Another board still references this worktree; retain it without blocking logical deletion of the current board',
 
     'kanban.deleteCleanupDeferred': 'After settlement, clean eligible worktrees with verified ownership; retain the rest',
+    'kanban.errors.HTTP_CONNECTION_LOST': 'Server connection interrupted. Reconnecting; check your network or reload if the problem continues.',
     'kanban.errors.BOARD_CONTROL_UNSETTLED': 'Task cancellation is not settled; the original control request will continue to be inspected',
 
     'kanban.cancelBoard': 'Stop and cancel board work',
@@ -724,6 +725,7 @@ export const en: LocaleStrings = {
     'kanban.activity': 'Recent events',
     'kanban.message': 'Message',
     'kanban.send': 'Send message',
+    'kanban.itemIdHelp': 'Optional and immutable. Leave blank for an ID such as task-003. A separate reference number is always assigned.',
     'kanban.itemId': 'Item ID',
     'kanban.goal': 'Goal',
     'kanban.group': 'Group',

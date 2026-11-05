@@ -24,7 +24,8 @@ export async function workResourceExecution(options: ResourceExecutionOptions, i
         }
     }
     for (const key of await options.journal.get<string[]>('development-lifecycle-index') ?? []) {
-        const job = await options.journal.get<{dispatch: {id: string}; request: {input: {request: {expectedSessionId: string}}}}>(key);
+        const job = await options.journal.get<{done?:boolean;observation?:{outcome:string};dispatch: {id: string}; request: {input: {request: {expectedSessionId: string}}}}>(key);
+        if (job?.done && job.observation?.outcome === 'cancelled') continue;
         if (job?.dispatch.id.startsWith(id + '-postload-')) callers.push(job.request.input.request.expectedSessionId);
     }
     for (const sessionId of new Set(callers)) {

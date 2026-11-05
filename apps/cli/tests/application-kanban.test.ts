@@ -78,3 +78,10 @@ it('freezes a restart into a distinct successor and rejects replay against anoth
     await expect(kanbanCommand(client,['task','restart','board','old','other'],{file})).rejects.toThrow('replacement task');
     expect(execute).toHaveBeenCalledTimes(1);
 });
+
+it('resolves a board-scoped human reference without mutating work', async () => {
+    const resolve=vi.fn(async()=>({boardId:'development',itemId:'meaningful-task',reference:'KB-3#12'}));
+    const client={services:{kanban:{resolve}}} as unknown as ApplicationClient;
+    expect(await kanbanCommand(client,['resolve','KB-3#12'],{})).toMatchObject({itemId:'meaningful-task'});
+    expect(resolve).toHaveBeenCalledExactlyOnceWith('KB-3#12');
+});

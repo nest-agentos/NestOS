@@ -179,6 +179,7 @@ function help(): string {
         `  nestos kanban item|record <board-id> <id> | execute <board-id> --file request.json\n` +
         `  nestos kanban work-resources <board-id> <item-id> | cleanup-work-resource <board-id> --file request.json\n` +
         `  nestos kanban continue <board-id> --file request.json  (continue-execution with stable operation/dispatch IDs)\n` +
+        `  nestos kanban resolve <KB-board#item>\n` +
         `  nestos kanban task run|pause|resume|cancel|reopen|restart <board-id> <item-id> [replacement-id for restart] --submission-file request.json (retry: --file request.json)\n` +
         `  nestos kanban sessions <board-id> <item-id>  (related Sessions and execution history)\n` +
         `  nestos kanban fix|reply <board-id> --file request.json\n` +

@@ -8,6 +8,7 @@ export const zhCN = {
     'kanban.workResourceReason.WORKTREE_SHARED': '其他看板仍引用此 worktree，保留资源，不影响当前看板逻辑删除',
 
     'kanban.deleteCleanupDeferred': '结算后清理归属明确且符合安全条件的 worktree，其余保留',
+    'kanban.errors.HTTP_CONNECTION_LOST': '服务连接中断，正在尝试重连；若持续失败，请检查网络或重新加载页面',
     'kanban.errors.BOARD_CONTROL_UNSETTLED': '任务取消尚未结算，系统会继续核对原控制请求',
 
     'kanban.cancelBoard': '停止并取消看板工作',
@@ -725,6 +726,7 @@ export const zhCN = {
     'kanban.activity': '最近事件',
     'kanban.message': '讨论内容',
     'kanban.send': '发送讨论',
+    'kanban.itemIdHelp': '可选，创建后不可修改；留空由系统生成 task-003 这样的 ID。自定义 ID 的事项也会分配独立编号。',
     'kanban.itemId': '事项 ID',
     'kanban.goal': '目标',
     'kanban.group': '工作组',

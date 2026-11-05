@@ -1,3 +1,4 @@
+import {controlCall} from '../kanban/call-lifecycle';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {developmentWorkExchange} from '../presets/kanban-channel-exchange';
 import {cleanupStep, cleanupStage, type CleanupStep} from './cleanup-stage';
@@ -580,8 +581,14 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const verifyDevelopment = developmentBindings ? developmentDelivery(systemFS, developmentBindings.remote, developmentBindings.provider) : undefined;
         const continueDevelopment = developmentBindings && independentCalls ? developmentContinuation({...developmentBindings,
             journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), calls: independentCalls, kernel: kernelCore}) : undefined;
-        const lifecycle = independentCalls ? developmentLifecycle({remote:developmentBindings?.remote,journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), events, calls: independentCalls, kernel: kernelCore,
-            authorize: async (boardId): Promise<boolean> => (await kanban.read(boardId)).automation?.enabled === true,
+        const lifecycleJournal = new KanbanAutomationJournal(systemFS, kanbanJournalOptions);
+        const lifecycle = independentCalls ? developmentLifecycle({remote:developmentBindings?.remote,journal: lifecycleJournal, events, calls: independentCalls, kernel: kernelCore,
+            authorize: async (boardId, itemId): Promise<boolean|'cancelled'> => {
+                const board = await kanban.read(boardId), item = board.items.find(item => item.id === itemId);
+                return item?.status === 'cancelled' || item?.control?.action === 'cancel' ? 'cancelled' : board.automation?.enabled === true;
+            },
+            stop: async (id, operationId) => await controlCall({calls:independentCalls,callCancel:(command,request)=>commandBus.execute(command,request)},
+                lifecycleJournal,id,operationId,'cancel') === 'cancelled',
             prepareSession: async id => {
                 await initializeProjects(); await sessionRepository.ensureSession(id, t('kanban.automationTitle'));
                 await prepareChildExecution(id);
