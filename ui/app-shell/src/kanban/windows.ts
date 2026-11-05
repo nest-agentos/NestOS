@@ -1,4 +1,4 @@
-import {KanbanWorkbench as KanbanView, type KanbanUIOptions} from '@nestos/kanban/ui';
+import {KanbanWorkbench as KanbanView, type KanbanUIOptions} from '@nestos/kanban-ui';
 import {executionSessionReference} from '@nestos/app-contracts';
 import {ACTION_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
 import {WorkbenchTabs, type WorkbenchTab} from '../workbench/tabs';

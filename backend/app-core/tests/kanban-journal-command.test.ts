@@ -1,8 +1,8 @@
 import {expect, it, vi} from 'vitest';
 import {KanbanError} from '@nestos/kanban';
 import type {KanbanService} from '@nestos/kanban/contracts';
-import type {KanbanAutomationJournal} from '../src/kanban/automation-journal';
-import {journalCommand} from '../src/kanban/journal-command';
+import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {journalCommand} from '@nestos/kanban/integration';
 
 it('rebases only a definite rejection and preserves the exact request after an unknown response', async () => {
     const rows = new Map<string, unknown>();

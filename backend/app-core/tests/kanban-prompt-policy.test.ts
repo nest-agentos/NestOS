@@ -1,14 +1,15 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import defaults from '../src/presets/kanban-development-prompts.json';
 import {afterEach, expect, it} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {developmentPolicy} from '../src/presets/kanban-development-policy';
 import {publishPromptBundle, hasMarkdownSection} from '../src/run/prompt-bundle';
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0)) await close();});
 async function fixture() {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
-    const fs = await manager.openFileSystem('/'), journal = new KanbanAutomationJournal(fs); await journal.open();
+    const fs = await manager.openFileSystem('/'), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     return {fs, journal};
 }
 it('resolves project overrides, freezes original contents and verifies remote publication on recovery', async () => {

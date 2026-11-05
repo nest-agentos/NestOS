@@ -1,6 +1,6 @@
 import {expect,it} from 'vitest';
 import type {KanbanBoard,KanbanItem} from '@nestos/kanban/contracts';
-import type {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {workContext} from '../src/kanban/work-context';
 const board={id:'development',title:'开发'} as KanbanBoard;
 const item={id:'child',title:'Swipe',responsibility:'Implement swipe',acceptance:'Two clicks',planning:{parentId:'parent',dependencies:['before']},

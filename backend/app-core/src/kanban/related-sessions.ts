@@ -1,9 +1,10 @@
+import type {IndependentCallInput} from '@nestos/llm-session/contracts';
 import {createModuleLogger, randomUUID} from '@nestos/common';
 import type {IndependentCallService} from '@nestos/llm-session';
 import type {KanbanBoard, KanbanItem, KanbanWorkflowState, KanbanSessionAssociation, KanbanSessionExecution} from '@nestos/kanban/contracts';
 import type {KanbanSessionSource} from '@nestos/kanban/activity';
-import type {KanbanAutomationJournal} from './automation-journal';
-import {analysisHistory, safeCode} from './automation-analysis';
+import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {collaborationRelations, safeCode} from '@nestos/kanban/integration';
 import {relatedExecutionReader, type SessionExecutionOptions} from './related-session-executions';
 import {requireValue} from './validation';
 
@@ -39,13 +40,15 @@ async function collect(options: Options, board: KanbanBoard, item: KanbanItem, w
             else rows.push({sessionId: ref.id, purpose: 'fix'});
         }
     }
-    for (const job of await analysisHistory(options.journal, board.id, item.id)) {
-        requireValue(job.input.request.expectedSessionId === job.id, 'SESSION_RELATION_SCOPE_MISMATCH');
+    const relations=await collaborationRelations<IndependentCallInput>(options.journal,board.id,item.id);
+    for (const job of relations.planning) {
+        requireValue(job.request.request.expectedSessionId === job.id, 'SESSION_RELATION_SCOPE_MISMATCH');
         pending.push(async () => {
-            const admission = await options.calls.inspectTaskCallSubmission(job.input);
+            const admission = await options.calls.inspectTaskCallSubmission(job.request);
             if (admission?.executionSessionId) await append(admission.executionSessionId, {id: job.id, purpose: 'planning'});
         });
     }
+    for (const reply of relations.replies)pending.push(()=>append(reply.executionId,{id:reply.operationId,purpose:'execution'}));
     for (const row of await options.related?.(board.id, item.id) ?? []) {
         if (row.execution) pending.push(() => append(row.sessionId, row.execution!));
         else rows.push(row);

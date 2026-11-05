@@ -84,6 +84,12 @@
     "workspace": true
   },
   {
+    "directory": "kanban-ui",
+    "name": "@nestos/kanban-ui",
+    "version": "0.5.1",
+    "workspace": true
+  },
+  {
     "directory": "mail",
     "name": "@nestos/mail",
     "version": "0.5.1",

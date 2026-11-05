@@ -248,7 +248,7 @@ createKanbanDiscoveryFlow() 提供本地 analysis 槽；远程使用 createKanba
 
 Web、HTTP 浏览器界面和 Tauri 的桌面侧栏及手机导航都有「看板」入口，对应 `kanban-workspace`，路由为 `#/kanban`；事项资源路径为 `/board/<boardId>/<itemId>`，由 Shell 对完整资源路径编码后生成可分享的 hash 深链。启动时创建「NestOS 示例看板 · 从这里开始」，包含 17 张教学卡片、3 条日志/决策记录和 1 条教学修改建议；旧版示例增量补入新练习，已有内容不覆盖。用户也可点击「新建看板」创建正式看板。
 
-独立界面位于 `libraries/kanban/src/ui/`，`ui/app-shell/src/kanban/` 装配共享导航、窗口与展示端口，通过共享契约消费 `ApplicationServices.kanban`，不直接导入 app-core。左侧选择看板，右侧在「工作看板／工作日志／决策记录」间切换；支持工作/归档视图、搜索、领域/里程碑筛选和每页 50 项。详情显示工作内容、验收条件、负责人、阻塞、关联会话及有界事件记录；可以规划、认领、续租、提交结果、验收、归档和恢复，关联会话复用原工作台导航。
+独立界面位于 `libraries/kanban-ui/src/`，`ui/app-shell/src/kanban/` 装配共享导航、窗口与展示端口，通过共享契约消费 `ApplicationServices.kanban`，不直接导入 app-core。左侧选择看板，右侧在「工作看板／工作日志／决策记录」间切换；支持工作/归档视图、搜索、领域/里程碑筛选和每页 50 项。详情显示工作内容、验收条件、负责人、阻塞、关联会话及有界事件记录；可以规划、认领、续租、提交结果、验收、归档和恢复，关联会话复用原工作台导航。
 
 默认创建的是当前用户的个人看板，位于 `/var/lib/kanban/boards.seq`。宿主绑定当前单用户布局的 admin 人员身份，前端通过 currentPrincipal 读取，不从命令中接受操作者身份。个人存储拒绝 project scope 和未绑定的 apply-discovery；项目看板仍须使用项目存储及授权适配，界面不会静默降级存到个人数据。每用户独立 Runtime，sourceId 仅在该用户 journal 内稳定。
 
@@ -724,3 +724,60 @@ NestOS/cells-driver 使用 `/v1/capabilities` 和 `/v1/api/{harness|projects}/{o
 开发预设要求 Harness 正向声明 `sessionChannels`，不支持时明确拒绝。规划、开发、fix、续办、合并分析和维护均走 `/v1/channel/mcp`（MCP 2.0，2026-07-28），没有文件通信回退。scope token 仅访问本 scope，不能访问固定 API，且每次请求重验项目所有者授权；token 不进入 prompt 或日志。Cells 私有 SQLite 保存上下文、消息、请求／响应、业务 acknowledge 和精确 Session/turn 状态。
 
 Codex thread 使用扁平配置 `features.mcp_2026_07_28=true` 和 `mcp_servers.cells_session`。scope 切换时先核对原 turn 已终结，原子撤销旧 token；对已加载 thread 执行 unsubscribe、等待 closed，再 resume 同一 thread 以刷新 MCP 连接。app-server 设置 `thread_unload_delay_secs=0`，不关闭原生历史或更换 Session。测试 `tools/cells/src/plugin/harness/tests/real_channel.py` 使用真实 Codex app-server 验证工具发现、上下文、请求响应、卸载续办和原 turn 历史；模型请求仅到本地拒绝 fixture，不调用外部模型。
+
+### 看板删除与资源归属
+
+资源的 ownership 由宿主投影为 current/other/unknown，和执行占用分开判断。worktree 的冻结上下文能够证明属于其他事项或看板时，保留资源，不读取 Git 状态、不提供清理；归属记录缺失或检查失败时保留 unknown 及错误码。两者都不单独阻止当前看板逻辑删除，也不会被删除时的可选清理顺带删除。当前看板的认领、派发、规划、决策、fix、回复和原执行仍须结算；“无法确认归属”不能当作“当前执行已停止”。
+
+相关会话中的 discussion 可以继续存在。共享 Session 有新的其他轮次时，以当前看板关联的具体执行记录判定；没有具体记录时仍保留保守的 Session 核对。资源保留和墓碑保留原关联，后续通过原看板链接诊断及清理。取消和单项逻辑删除的状态、回执与恢复约束见 [Task 执行规范](kanban-task-execution.md#取消删除和收尾)。
+
+删除确认遇到未结项时，可通过宿主 `requestBoardDeletion` 接纳持久的等待删除请求，默认等待已运行工作收尾，也可显式选择取消现有工作。看板 `lifecycle` 屏障阻止全部新执行，重启保留；阻塞项处理完后沿同一删除独占屏障自动预检、按选择清理安全资源并逻辑删除。界面必须明确告知后续无需再次确认，保留待删除看板可见，不能把已接纳请求显示成已经删除。`cancelBoard` 只执行整体停止与取消，不授权删除。
+
+worktree 清理还会显式查询同用户可访问的活跃看板资源引用（包含归档/已删除事项的保留引用）。其他事项或看板仍引用同一 worktree 时，返回 WORKTREE_SHARED，仅保留资源、不阻塞当前看板逻辑删除；清理提交前再次核对引用，显式清理也沿用删除独占屏障，防止新的看板操作并发准入。
+
+## 独立运行时与数据边界
+
+`@nestos/kanban/runtime` 的 `createKanbanRuntime` 统一装配持久 journal、工作日志、决策物化、生命周期校验、执行控制与安全删除。NestOS 的个人看板消费该入口，只接入授权来源、正式执行回执、项目目录、会话通道和应用事件。通用扫描、父子计划汇总与拆解、幂等命令以及取消/删除恢复不再由 app-core 实现。
+
+运行时不安装调度器；宿主在已有调度或失效事件中调用 scan，退出时调用 quiesce/dispose。扩展的扫描和关停统一排空，失败包含具体阶段和安全错误码。低层核心、存储、执行桥和 UI 入口仍可单独使用。
+
+### 公开接口与执行数据契约
+
+普通消费者从 `/runtime` 导入 `createKanbanRuntime({fs,actor,authorize,execution?})`，直接获得看板服务实例。入口的运行时导出仅有该工厂；实例不暴露 store、journal、fs、serviceFor 或底层装配上下文。可选资源、活动、事件和日志分别通过 resources/activity/onCommitted/log 注入。
+
+执行接入统一为 catalog/prepare/submit/inspect/control。`KanbanExecutionIntent` 保存稳定意图身份、事项作用域、目标及上下文，purpose 区分 planning/work；`KanbanExecutionHandle` 保存适配器可解释的持久绑定；`KanbanExecutionReceipt` 表达正式执行观察与结果。运行时持久化句柄并索引意图，取消和恢复按原身份查句柄，不要求普通适配器提供 call/submission 或内部存储键。
+
+运行时先核对宿主授权，再核对配置目标与执行目录及协调/执行主体。准备不会提交外部执行；提交前冻结绑定，响应丢失后只 inspect。控制仅有接受意图不足以结算，必须收到 paused/resumed/cancelled 的对应回执。不支持控制时保存 TASK_CONTROL_UNSUPPORTED，不宣称任务已取消。结果由运行时保存、摘要校验并核对派发归属；results 查询先校验看板作用域。执行成功但结果未到达时保持 unknown，无正文结果显式返回 null。
+
+正文在当前事项上下文中出现一次。决策仅传来源身份及修订，相关事项仅传摘要，依赖结果限于直接依赖及已有的体积约束；额外数据由宿主按授权查询按需读取。恢复所需的 opaque data 可放在 handle.data；库不解释也不打印其正文。
+
+### 业务适配与高级装配
+
+`/integration` 是受信任宿主的显式高级接入入口，导出 assembleKanbanRuntime、自定义协调器和语义状态接口，普通消费者无需使用。NestOS 使用该入口接入其现有交互预设、正式调用和通知机制。集成端口不代表远程授权，不可将整个集成上下文透传至 HTTP/MCP。
+
+`KanbanCollaboration` 拥有修复身份冻结、确认冻结、定义持久化和新任务接纳；NestOS 只判断用户确认、选择项目资源、调用 Cells 通道及投影通知。决策快照与修复查询、关联分析/回复投影均通过语义接口读取，宿主的这些适配不再读取 fix、record-runs 或 task-reply 的内部持久键。具体开发操作继续使用 KanbanOperationRecord/coordinateOperation 协调，构建、部署、合并的业务约束由业务预设提供。
+
+看板状态与执行宿主状态分别由其所属方负责。执行事实通过稳定执行标识、作用域和版本核对后投影到看板，不能反向覆盖执行宿主。已提交事件带游标/修订用于 UI 失效和补读；事件用于通知，持久记录用于恢复。unknown 不代表失败或离线，不释放责任、不重新派发。适配器的执行观察不得用心跳或读取时间伪造进度。
+
+验收以独立宿主为准：只注入存储、可信身份和授权即可运行基本看板；接入统一执行适配器后具备规划、执行、恢复、控制、结果核验和删除协调。`libraries/kanban/tests/public-runtime.test.ts` 直接消费普通入口，覆盖上述边界，不依赖 NestOS Session/Kernel/Flow 或 journal 布局。
+
+### app-core 与 Kanban 的最终职责契约
+
+普通运行时的接口已收拢，但 NestOS 当前仍通过 integration 装配，item-operations 中也仍有操作准入、绑定、状态投影与具体开发流程规则；不能把剩余代码统称为 DTO 转换。目标是让 NestOS 消费与其他宿主相同的功能门面，高级装配不成为日常调用路径。
+
+app-core 消费的功能应分为：工作查询与编辑（boards/items）、决策与上下文（decisions/context）、动态操作（actions）、协作输入（collaboration）、执行历史与结果（executions）、资源删除预检（resources）、事件补读与生命周期（events/recover/close）。这些接口返回看板自己生成的可用操作、前置条件、禁用原因、确认要求和当前版本；app-core 不自行重算部署/验收是否可用，也不拼接底层命令序列。
+
+Kanban 向宿主请求的能力应限定为：事务存储、平台访问校验、资源目录/版本核验、执行目标目录与 prepare/submit/inspect/control、可选协作通道、提交后事件投影。Session、Kernel、Cells、Flow、连接密钥和实际工作区均由宿主适配器管理，库只使用不透明引用与正式回执。
+
+共享数据优先复用现有 WorkItem、ExternalReference、ArtifactReference、Command/Event；新增核心契约聚焦 ActionDefinition（操作身份、目标、输入/结果契约及必要前置条件）、ActionInvocation（作用域、稳定 operationId、expectedRevision、输入与确认）、ExecutionIntent/Handle/Receipt、ResourceSnapshot（资源身份与不可变版本）以及 ContextReference（作用域、版本和分段引用）。上下文/结果正文只保存一次，引用必须经过权限和归属校验。
+
+操作的通用并发、幂等、绑定冻结、确认、持久提交、恢复和投影由 Kanban 管理。具体构建/部署/Git 合并规则由开发流程预设与外部 Tool/Flow 提供；复杂编排沿用现有 Flow，不在 app-core 或 Kanban 核心再实现一套工作流引擎。app-core 的剩余适配只解释资源引用、构造正式宿主请求、归一化回执和投影应用事件。
+
+最终验收不能只统计普通入口参数数量：NestOS 本身必须迁移到功能门面；业务调用代码不出现 journal、store、serviceFor、scanTaskControls 等内部概念；增加执行后端无需修改领域状态机；从最小独立宿主到 NestOS 都通过同一组功能级用例验证。
+
+
+### 前后台独立包
+
+`@nestos/kanban` 提供平台中立的领域服务、持久化、协调运行时和 contracts，不包含 UI/CSS，不依赖 ui-common。`@nestos/kanban-ui` 独立构建与发布 DOM 界面和 style.css，生产源码仅消费 @nestos/kanban/contracts 和 ui-common。共享状态投影是 contracts 下的纯函数；前台不能深层导入后台文件。
+
+KanbanClient 是两包之间的调用契约，本地服务和 HTTP/RPC 客户端可以直接替换。app-core 装配服务与宿主能力，app-shell 挂载 UI 并提供窗口、导航、图标、翻译与事件接入。独立 UI 的远程客户端回归不依赖 VFS 或后台工厂；架构检查和浏览器打包同时禁止前台引入后台实现。

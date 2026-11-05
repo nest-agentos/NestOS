@@ -17,3 +17,16 @@ it('uses task names, groups shared resources, translates reasons and separates t
     expect(preview.message).not.toMatch(/opaque-id|WORKTREE_TASK_UNFINISHED|\/private\//);
     expect(preview.details?.text).toContain('opaque-id'); expect(preview.details?.text).toContain('/private/tree-id');
 });
+
+it('offers persistent deferred deletion, explains automatic completion and keeps the pending board visible',async()=>{
+    const data={boardId:'board',title:'Pending',revision:3,version:'version',pendingItems:1,itemTitles:{task:'Task'},blockers:[{code:'BOARD_FIX_UNSETTLED',itemId:'task'}],resources:[]} as KanbanDeletionPreview;
+    const requestBoardDeletion=vi.fn(),removed=vi.fn(),scheduled=vi.fn();
+    const service={previewDeletion:vi.fn(async()=>data),deleteBoard:vi.fn(),requestBoardDeletion} as unknown as KanbanClient;
+    const port=kanbanSidebarDeletion(service,removed,scheduled)!;
+    const node={id:'/board/board',label:'Pending',kind:'file' as const,parentId:null},signal=new AbortController().signal;
+    const preview=await port.preview(node,signal);
+    expect(preview.blocked).toBe(false);expect(preview.message).toContain(t('kanban.deleteDeferredDescription'));
+    await port.remove(node,preview,new Set(),signal);
+    expect(requestBoardDeletion).toHaveBeenCalledWith('board',expect.objectContaining({mode:'drain',expectedRevision:3}));
+    expect(removed).not.toHaveBeenCalled();expect(scheduled).toHaveBeenCalledOnce();expect(service.deleteBoard).not.toHaveBeenCalled();
+});

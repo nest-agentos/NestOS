@@ -51,3 +51,5 @@ overrides:
   "@nestos/vfsdriver-local": "workspace:*"
   "@nestos/durable-kernel": "workspace:*"
   "@nestos/ui-common": "workspace:*"
+  "@nestos/kanban": "workspace:*"
+  "@nestos/kanban-ui": "workspace:*"

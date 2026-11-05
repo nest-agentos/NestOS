@@ -37,7 +37,8 @@ export function dependencyError(source, target) {
     if (source === '@nestos/mdxeditor' && target.startsWith('@nestos/') && target !== '@nestos/ui-common') return 'mdxeditor must receive host capabilities through its public ports';
     if (source === '@nestos/vfs-ui' && target !== '@nestos/vfs-core') return 'vfs-ui must not depend on host packages; use its public ports';
     if (source === '@nestos/mail' && !['@nestos/vfs-core', '@nestos/ui-common', '@nestos/mdxeditor'].includes(target)) return 'mail only depends on VFS and UI ports';
-    if (source === '@nestos/kanban' && !['@nestos/vfs-core', '@nestos/ui-common'].includes(target)) return 'kanban may only depend on vfs-core and ui-common; execution and application policy require host ports';
+    if (source === '@nestos/kanban' && target !== '@nestos/vfs-core') return 'kanban may only depend on vfs-core; execution and application policy require host ports';
+    if (source === '@nestos/kanban-ui' && !['@nestos/kanban','@nestos/ui-common'].includes(target)) return 'kanban-ui may only depend on Kanban contracts and ui-common';
     if (source === '@nestos/app-core' && !coreDependencies.has(target)) return 'app-core may only depend on its platform-neutral capabilities';
     if (source !== '@nestos/app-shell' && application.has(target)) return 'capability packages must not depend on application packages';
 }
@@ -66,8 +67,8 @@ export function importError(source, file, specifier, packages) {
         return 'independent llm-ui may only import mdxeditor and ui-common';
     if (source.name === '@nestos/mail' && specifier.startsWith('@nestos/ui-common') && !file.startsWith(resolve(source.dir, 'src/ui') + sep))
         return 'mail backend must not load UI';
-    if (source.name === '@nestos/kanban' && specifier.startsWith('@nestos/ui-common') && !file.startsWith(resolve(source.dir, 'src/ui') + sep))
-        return 'kanban backend must not import UI; ui-common belongs to the optional ui entry';
+    if (source.name === '@nestos/kanban-ui' && (specifier === '@nestos/kanban' || specifier.startsWith('@nestos/kanban/')) && specifier !== '@nestos/kanban/contracts')
+        return 'kanban-ui must consume only the public contracts entry, never backend implementations';
     if ((source.host || source.name === '@nestos/app-transport') && file.startsWith(resolve(source.dir, 'src/rpc') + sep)) {
         const local = specifier.startsWith('.') && resolve(file, '..', specifier).startsWith(resolve(source.dir, 'src/rpc') + sep);
         if (!local && specifier !== '@nestos/vfs-core') return 'RPC mechanisms must receive application metadata through injection';

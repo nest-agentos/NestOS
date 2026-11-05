@@ -1,14 +1,15 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
-import {boardIndexPath} from '../src/kanban/automation-board-index';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {boardIndexPath} from '../src/kanban/host-policy';
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0)) await close();});
 async function fixture() {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/');
     await fs.driver.createFile({parentPath: '/var/lib/kanban', name: 'automation.seq', type: 'seqfile', recursive: true});
-    return {fs, journal: new KanbanAutomationJournal(fs)};
+    return {fs, journal: new KanbanAutomationJournal(fs, kanbanJournalOptions)};
 }
 it('migrates legacy records once and reads only references belonging to the requested board', async () => {
     const {fs, journal} = await fixture();
@@ -23,7 +24,7 @@ it('migrates legacy records once and reads only references belonging to the requ
     expect(await journal.findForBoard('review-operation:', 'a', () => true)).toEqual([{key: 'review-operation:a', value: {boardId: 'a', itemId: 'task', phase: 'prepared'}}]);
     expect(await fs.meta.seq!.getEntry(boardIndexPath, 'version')).toBe('1');
     expect(await journal.findForBoard('record-runs:', 'child', () => true)).toHaveLength(1);
-    await new KanbanAutomationJournal(fs).open();
+    await new KanbanAutomationJournal(fs, kanbanJournalOptions).open();
     expect(await journal.findForBoard('review-operation:', 'a', () => true)).toHaveLength(1);
 });
 it('updates references atomically, including in-place changes, and rolls back failed writes', async () => {

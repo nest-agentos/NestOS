@@ -22,7 +22,8 @@
 | 未知 `unknown` | 准入、观察或控制结果未知 | 只核对原持久身份，不自动重派；缺通道结果也显示未知 |
 | 待验收 `review` | 原执行已终结、result 消息及交付核验通过 | 独立审核通过才完成；拒绝保留 `EXECUTION_REJECTED` |
 | 完成 `completed` | 宿主验收成功；显式配置 autoAccept 的看板沿既有规则处理 | 无 run；允许新 fix 澄清 |
-| 取消 `cancelled` | 未开始工作由宿主取消 | 不再 run；执行中不能通过取消后新 Session 伪装恢复 |
+| 取消中 `cancelling` | 人工请求 `request-control action=cancel`，调度与派发被持久屏障阻止 | 宿主核对原调用和执行树；接纳不等于停止，丢回执转 unknown，只查原请求 |
+| 取消 `cancelled` | 未开始工作取消，或原调用及执行树已结算且子事项均终结 | 不再 run；释放认领、移交和阻塞，可逻辑删除；历史与身份保留 |
 
 `analysis`、dispatch、控制和责任状态都不是 Agent 可写的调度命令。Agent 只报告业务进度、问题、错误与交付申请。业务 error 不等于原生进程已经退出；`result`、Session idle、进程正常退出和聊天“完成”均不能单独证明验收通过。
 
@@ -32,7 +33,7 @@
 
 人工 `request-run` 保存 requestedAt；定时与人工经过同一 `admit-item` 和 `prepare-dispatch` 存储事务。事务重验编辑租约、暂停、阻塞、前置验收及 WIP。并发客户端通过 expectedRevision/CAS 竞争；原 execution journal 先冻结请求，再取得唯一 submitting 权。重启只 inspect 原身份。Unknown 不产生新 Session。
 
-`begin-edit` 接纳 editId、可信操作者及 1 秒至 5 分钟租约。`save-edit` 原子保存标题、责任、验收、项目引用和 planning；`end-edit` 取消编辑，保留定义。两者须匹配操作者/editId 和有效租约。断线不取消 task；租约到期后宿主可重新准入。编辑不重置 createdAt/startAt；到期仍编辑则等待，结束编辑再核对。实际准入后拒绝修改冻结定义。API 同样校验，UI 禁用仅用于提示。未开始事项可取消，开始分析后不支持借普通 cancel 跳过原执行控制。
+`begin-edit` 接纳 editId、可信操作者及 1 秒至 5 分钟租约。`save-edit` 原子保存标题、责任、验收、项目引用和 planning；`end-edit` 取消编辑，保留定义。两者须匹配操作者/editId 和有效租约。断线不取消 task；租约到期后宿主可重新准入。编辑不重置 createdAt/startAt；到期仍编辑则等待，结束编辑再核对。实际准入后拒绝修改冻结定义。API 同样校验，UI 禁用仅用于提示。未开始事项可通过普通 cancel-item 取消；已准入、分析中、运行中和待验收事项通过 request-control action=cancel 核对原执行后取消，不得借普通 cancel 跳过执行控制。
 
 暂停/恢复冻结 original call route、taskId、epoch 和 requestId，通过 `session.call.control` 执行，之后只查询 `session.call.control.receipt`。传输错误保留 unknown，不把 cancel 当 pause，也不调用执行桥重新 start。
 
@@ -102,3 +103,27 @@ create-item 支持原子 `launch: {mode: 'manual', paused: true}`：事项首次
 暂停同一事务为尚未暂停的活跃派发创建 request-control，controls 保存本次看板拥有的请求 ID。状态由真实 control-receipt 投影为暂停中、已暂停、恢复中或错误；不支持的执行器明确失败。继续只作用于这些请求，不恢复用户独立暂停的任务；尚未确定的请求拒绝继续，等待查明回执。任务交付或终止后不再阻塞看板控制状态。
 
 sidebar 复用 vfs-ui 动作：外部只显示图标，菜单含图标和文字，设置明确选择当前看板或全部现有看板。行中显示状态图标及文字，设置弹窗触摸目标至少 44px。全部现有看板逐个进行版本校验，列出部分失败而不宣称原子成功，不影响以后新建看板。首屏状态只投影已有看板元数据，不枚举远程会话。界面事件刷新回执状态，关闭时释放弹窗。
+
+## 取消、删除和收尾
+
+`request-control` 支持 pause/resume/cancel。取消中和取消结果未知持续阻止新准入；取消可以取代尚未确认的暂停，但同一取消请求保持稳定身份。暂停/恢复回执优先于业务澄清或错误投影，避免已暂停任务没有恢复入口。父项取消在同一事务为未终结后代登记取消请求，父项只有在子项终结后才能进入 cancelled。执行桥在自己的 SeqFile 事务中对取消屏障与 submitting 领取进行竞争，确定尚未提交才产生 CANCELLED_BEFORE_START；已提交任务继续核对原身份。
+
+NestOS 的 task-controls 核对原规划调用、原 dispatch 或原 Session 续办的具体 round。call-lifecycle 先冻结路由和 epoch，再提交一次控制；丢回执只查询原请求。历史 task-control 记录沿用原路由和提交阶段，不因升级重新发出控制。续办使用 submission-control 校验原 round、primary Task 和执行树，不能通过缺少独立调用路由推断其他 Session 已停止。原调用路由丢失保留 unknown，不释放认领。
+
+执行终态与业务通道分别核对。真实失败或取消不因 SESSION_CHANNEL_REQUIRED 再次变为未知；用户取消不启动新的 postload 模型调用。可选收尾准备失败保留具体诊断，不能覆盖已确认的停止事实。已完成事项保留的历史负责人不再单独构成看板执行占用；相关执行仍须通过原回执及 Session 检查。
+
+`delete-item` 仅对完成或取消事项保存 deletedAt 墓碑；宿主先检查关联执行、规划、fix、回复及维护操作。默认 query、catalog 和 overview 隐藏墓碑；includeDeleted 显式包含，item 和 events 保留历史，不复用 ID。删除看板预检也包含已删除事项，不能借单项删除绕过执行屏障。
+
+决策的审核状态与执行控制分开。request-record-cancellation 保存 cancelling，cancel-record 在关联事项终结后保存 cancelled；delete-record 只删除已取消、已拒绝或已替代的决策并保留墓碑。宿主 controlRecord 持久保存 pause/resume/cancel 意图，取消只处理已物化的根事项及后代，不创建缺失工作；暂停控制登记属于本次决策的请求，恢复不解除用户独立暂停。原执行记录结算后再结束决策，重启继续同一控制。无执行的草稿也可直接取消并删除。
+
+修复澄清可通过 taskFixes 查询、cancelFix 放弃，状态为 cancelling/cancelled。确认、恢复与放弃在同一 fix 串行；放弃后不再接纳迟到确认。已经创建但通知/ack 尚未完成的新 fix 任务也要取消并结算，才完成放弃；已正式 accepted 的 fix 引导用户处理已创建任务。放弃不修改原主执行，不要求业务通道重新就绪。
+
+## 看板等待删除与整体取消
+
+看板的 `lifecycle` 为持久执行屏障，和每个 task 的执行阶段分开。`request-board-stop` 原子保存 operationId、intent=cancel/delete、mode=drain/cancel、phase=waiting/ready/blocked，并将既有执行控制置为 manual + paused、关闭自动化；后续新事项、计划、准入、派发、续办和重新启用调度均由 reducer 拒绝。手工 claim 也复验屏障，不能靠其他客户端绕过。整体取消为未终结事项原子登记原执行取消请求；整体取消完成不会自动删除看板。
+
+`requestBoardDeletion` 在预览确认后保存删除请求及清理选择。默认 drain 保留已提交执行，继续核对原回执和必要验收/答复；执行桥在原日志事务证明尚未提交时取消准备中的派发，不启动新执行。已提交的规划调用只观察到结算，不再接纳新计划。未确认 fix、未知执行、待投递回复及维护操作继续作为具体阻塞项供用户处理。显式 cancel 模式同时取消关联任务、修复澄清、回复、维护及 postload；已准备但未提交的操作沿原 journal 冻结，已提交的操作只取消并核对原身份。
+
+看板显示“等待删除：处理完阻塞事项后自动删除”。删除请求跨重启恢复，先恢复屏障再运行共享扫描；扫描完成后，自动删除进入同一独占屏障，等待已准入操作退出，再重新预检当前资源及修订。全部阻塞解除后无需再次确认，按既定选择只清理归属明确、原执行已结算且 Git 状态符合安全条件的资源，然后写看板墓碑。已完成和已取消的事项均可参与安全资源清理；脏改动、未合并、归属未知及其他归属仍保留。任何取消、核对或清理未知都不伪造停止结果。
+
+等待删除时仍允许读取、原执行观察、独立验收、相关答复、取消和资源清理；构建/部署/合并等新的维护执行入口禁用。讨论会话及共享 Session 的无关新轮次不因看板停止而被全局中断，原 task 的回复轮次单独登记并核对。删除后的会话、历史和资源关联继续保留。

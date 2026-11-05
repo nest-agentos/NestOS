@@ -1,7 +1,8 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {sha256HexSync} from '@nestos/common';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createItemOperations} from '../src/kanban/item-operations';
 import {jobKey, reviewKey, type ReviewOperationsOptions, type ReviewJob} from '../src/kanban/item-operation-types';
 
@@ -9,7 +10,7 @@ const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});
 async function fixture() {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
-    const journal = new KanbanAutomationJournal(await manager.openFileSystem('/')); await journal.open();
+    const journal = new KanbanAutomationJournal(await manager.openFileSystem('/'), kanbanJournalOptions); await journal.open();
     const item = {id: 'task', title: 'Task', revision: 1, status: 'review'}, snapshot = {version: 'scope', sourceVersion: 'source', targetVersion: 'target', context: {worktreeId: 'original'}};
     const board = {id: 'board', members: [{kind: 'human', id: 'admin', roles: ['coordinator']}]};
     const target = {kind: 'flow', id: 'project-operation', version: '1', digest: 'digest'}, reference = {system: 'nestos-published-flow', id: target.id, revision: JSON.stringify([target.version, target.digest])};

@@ -1,9 +1,10 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {memoryChannels} from './helpers/session-channels';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import type {TaskRecord} from '@nestos/durable-kernel';
 import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {UserEventService} from '../src/events/service';
 import {developmentLifecycle} from '../src/presets/kanban-development-lifecycle';
 const closes: Array<() => Promise<void>> = [];
@@ -12,7 +13,7 @@ const dispatch: KanbanDispatch = {id: 'attempt', itemId: 'item', itemRevision: 1
     principal: {kind: 'service', id: 'worker'}, definitionDigest: 'a'.repeat(64), attempt: 1, fence: 'fence', preparedAt: 1, outcome: 'running', inputs: {}};
 it('runs cancellation finalization independently and reconciles a lost response without resubmitting', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
-    const fs = await manager.openFileSystem('/'), journal = new KanbanAutomationJournal(fs); await journal.open();
+    const fs = await manager.openFileSystem('/'), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     await journal.update('managed-agent:work-attempt', () => ({target: {kind: 'agent', id: 'work-attempt', version: '1', digest: 'a'.repeat(64)}}));
     await journal.update('development-workspace:attempt', () => ({projectId:'project',directory:'_nestos/worktrees/attempt',channelId:'attempt',repositories:[],availableRepositories:[],policy: {commit:'changes',prompts: {files: [{name: 'task.md', content: '## postload.cancelled\nSummarize only'}]}}}));
     const hookId = 'attempt-postload-cancelled';

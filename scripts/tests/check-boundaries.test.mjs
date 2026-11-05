@@ -256,3 +256,15 @@ test('mail permits its documented shared reader dependency while retaining appli
     assert.equal(manifestDependencyError('@nestos/mail','@nestos/mdxeditor'),undefined);
     assert.match(manifestDependencyError('@nestos/mail','@nestos/app-core'),/mail only depends/);
 });
+
+ test('Kanban UI consumes only contracts and the backend rejects UI dependencies',()=>{
+    const ui={name:'@nestos/kanban-ui',dir:'/repo/libraries/kanban-ui'};
+    for(const target of ['@nestos/ui-common','@nestos/kanban-ui'])assert.match(dependencyError('@nestos/kanban',target),/only depend on vfs-core/);
+    assert.equal(dependencyError(ui.name,'@nestos/kanban'),undefined);
+    assert.equal(dependencyError(ui.name,'@nestos/ui-common'),undefined);
+    assert.match(dependencyError(ui.name,'@nestos/vfs-core'),/only depend on Kanban contracts/);
+    const inspect=text=>sourceErrors(ui,ui.dir+'/src/index.ts',text,[]);
+    assert.deepEqual(inspect("import type {KanbanClient} from '@nestos/kanban/contracts';"),[]);
+    for(const entry of ['@nestos/kanban','@nestos/kanban/storage','@nestos/kanban/runtime'])
+        assert.ok(inspect(`import {factory} from '${entry}';`).some(error=>/never backend/.test(error)));
+});

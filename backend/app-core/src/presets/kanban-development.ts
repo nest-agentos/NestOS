@@ -1,3 +1,4 @@
+import {kanbanJournalOptions} from '../kanban/host-policy';
 import planning from './kanban-planning.json';
 import {freezeCommitContext, type CommitContext} from './kanban-commit-context';
 import {publishImmutableFile} from '../run/prompt-bundle';
@@ -10,9 +11,9 @@ import type {HarnessConnectionService} from '../projects/harness-connections';
 import {publishManagedAgent} from '../configuration/managed-agent';
 import {prepareWorktree} from '../projects/worktree-preparation';
 import {prepareWorktreeModules, availableWorktreeModules, type WorktreeRepository} from '../projects/worktree-modules';
-import {KanbanAutomationJournal} from '../kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
-import {REMOTE_PROJECT_REFERENCE} from '../kanban/record-execution';
+import {REMOTE_PROJECT_REFERENCE} from '../kanban/resource-catalog';
 import type {PersonalKanbanAutomationOptions} from '../kanban/personal-automation';
 import {publishPromptBundle} from '../run/prompt-bundle';
 import {developmentPolicy, type DevelopmentPolicy} from './kanban-development-policy';
@@ -26,7 +27,7 @@ export interface DevelopmentWorkspaceRecord {projectId: string; directory: strin
 
 /** Product policy selects resources; generic Kanban persists opaque preparation options. */
 export function developmentPreparation(options: Options): NonNullable<PersonalKanbanAutomationOptions['prepareWork']> {
-    const journal = new KanbanAutomationJournal(options.fs);
+    const journal = new KanbanAutomationJournal(options.fs, kanbanJournalOptions);
     return async input => {
         requireValue(input.preparation.system === 'nestos-work-preparation' && input.preparation.id === 'git-worktree' && input.preparation.revision === '1', 'WORK_PREPARATION_UNSUPPORTED');
         requireValue(input.target.kind === 'agent', 'NATIVE_AGENT_REQUIRED');

@@ -31,7 +31,8 @@
     "@nestos/kanban": "workspace:*",
     "@nestos/ui-common": "workspace:*",
     "@nestos/llm-ui-adapter": "workspace:*",
-    "@nestos/mail": "workspace:*"
+    "@nestos/mail": "workspace:*",
+    "@nestos/kanban-ui": "workspace:*"
   },
   "peerDependencies": {
     "@nestos/app-settings": "workspace:*",

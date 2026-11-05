@@ -1,6 +1,6 @@
 import type {IndependentCallInput, SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {KanbanExternalReference, KanbanItem, KanbanBoard, KanbanService} from '@nestos/kanban/contracts';
-import type {KanbanAutomationJournal} from './automation-journal';
+import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {publishedOperation, OperationObservation} from '../run/published-operation';
 import type {sessionSubmission} from '../run/session-submission';
 export type ReviewAction = 'build' | 'deploy' | 'accept' | 'analyze' | 'merge';

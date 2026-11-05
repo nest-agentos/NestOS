@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { workspacePackages, sourceExports } from './workspace-packages.mjs';
 
 const repository = fileURLToPath(new URL('..', import.meta.url));
-const frontend = ['app-shell', 'app-settings', 'llm-ui', 'llm-ui-adapter', 'mdx-adapter', 'ui-common', 'ui-common-adapter', 'vfs-ui', 'image-parser', 'mdxeditor'];
+const frontend = ['app-shell', 'app-settings', 'llm-ui', 'llm-ui-adapter', 'mdx-adapter', 'ui-common', 'kanban-ui', 'ui-common-adapter', 'vfs-ui', 'image-parser', 'mdxeditor'];
 const backend = ['app-core', 'llm-context', 'llm-session', 'llm-flow', 'llm-tasks', 'durable-kernel', 'kernel-adapters', 'tools', 'device-tty', 'sanbox', 'sync-adapters'];
 const shared = ['app-contracts', 'common', 'app-transport'];
 
@@ -55,7 +55,7 @@ function contractErrors(roots, role, root) {
 }
 
 export function directoryErrors(root = repository) {
-    const groups = new Map([...frontend.map(name => [name, ['vfs-ui', 'image-parser', 'mdxeditor', 'llm-ui', 'ui-common'].includes(name) ? 'libraries' : 'ui']), ...backend.map(name => [name, ['durable-kernel', 'device-tty'].includes(name) ? 'libraries' : 'backend']), ...shared.map(name => [name, 'shared'])]);
+    const groups = new Map([...frontend.map(name => [name, ['vfs-ui', 'image-parser', 'mdxeditor', 'llm-ui', 'ui-common', 'kanban-ui'].includes(name) ? 'libraries' : 'ui']), ...backend.map(name => [name, ['durable-kernel', 'device-tty'].includes(name) ? 'libraries' : 'backend']), ...shared.map(name => [name, 'shared'])]);
     const legacy = resolve(root, 'packages');
     const misplaced = existsSync(legacy) ? readdirSync(legacy).filter(name => existsSync(resolve(legacy, name, 'package.json'))) : [];
     return [...misplaced.map(name => `packages/${name} must move to ui/, backend/, shared/ or apps/`), ...workspacePackages(root).flatMap(pkg => {
@@ -113,10 +113,10 @@ export function moduleRole(path, root = repository) {
     if (group === 'tools') return name === 'image-tools' && tail === 'browser.ts' ? 'host' : tail === 'contract.ts' ? 'shared' : 'backend';
     if (group === 'libraries') {
         if (name === 'image-parser' && /^(processing|policy|validation|contracts)\.ts$/.test(tail)) return 'shared';
-        if (['vfs-ui', 'image-parser', 'mdxeditor', 'llm-ui', 'ui-common'].includes(name)) return 'frontend';
+        if (['vfs-ui', 'image-parser', 'mdxeditor', 'llm-ui', 'ui-common', 'kanban-ui'].includes(name)) return 'frontend';
         if (name === 'vfs-core') return 'shared';
         if (['kanban', 'mail'].includes(name)) {
-            if (tail.startsWith('ui/')) return 'frontend';
+            if (name === 'mail' && tail.startsWith('ui/')) return 'frontend';
             return tail.startsWith('contracts/') || tail.startsWith('utils/') ? 'shared' : 'backend';
         }
         if (name === 'durable-kernel') return tail === 'contracts.ts' ? 'shared' : 'backend';
@@ -171,8 +171,8 @@ export function separationErrors(root = repository) {
         const roots = workspacePackages(root)
             .filter(pkg => moduleRole(resolve(pkg.directory, 'src/index.ts'), root) === role)
             .flatMap(pkg => sourceFiles(resolve(pkg.directory, 'src')).filter(file => moduleRole(file, root) !== 'host'
-                && !(['@nestos/kanban', '@nestos/mail'].includes(pkg.name) && role === 'backend' && moduleRole(file, root) === 'frontend')));
-        if (role === 'frontend') for (const name of ['kanban', 'mail']) roots.push(...sourceFiles(resolve(root, `libraries/${name}/src/ui`)));
+                && !(pkg.name === '@nestos/mail' && role === 'backend' && moduleRole(file, root) === 'frontend')));
+        if (role === 'frontend') for (const name of ['mail']) roots.push(...sourceFiles(resolve(root, `libraries/${name}/src/ui`)));
         if (role === 'frontend') roots.push(...sourceFiles(resolve(root, 'apps/http-app/src/client')));
         if (role === 'backend') roots.push(...sourceFiles(resolve(root, 'apps/http-app/src/server')), ...sourceFiles(resolve(root, 'apps/cli/src')));
         errors.push(...contractErrors(roots, role, root));

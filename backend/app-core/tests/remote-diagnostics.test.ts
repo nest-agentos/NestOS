@@ -21,12 +21,13 @@ it('records the missing binding and its project without remapping it to another 
         await remote.init();
         const diagnostic=remote.connectionDiagnostic('office');expect(diagnostic.reason).toBe('ready');
         diagnostic.configured[0].name='Changed';expect(remote.connectionDiagnostic('office').connectionName).toBe('Office');
-        await expect(remote.resolveConnection('old-office')).rejects.toMatchObject({code: 'ENOENT', projectIds: [],
+        await expect(remote.resolveConnection('old-office')).rejects.toMatchObject({code: 'ENOENT', projectIds: ['notes'],
             diagnostic: {connectionId: 'old-office', reason: 'cells-not-found', configured: [{id: 'office', name: 'Office', reason:'ready'}]}});
         expect(source.open).not.toHaveBeenCalled();
-        const logs = getLogger().query({modules: ['cells']}); expect(logs).toHaveLength(1);
+        const logs = getLogger().query({modules: ['cells']}); expect(logs).toHaveLength(2);
+        expect(logs.some(log => (log.data as {projectId?:string}).projectId === 'notes')).toBe(true);
         expect(JSON.stringify(logs)).not.toMatch(/private-|https:/);
-        expect(consoleError).toHaveBeenCalledOnce();
+        expect(consoleError).toHaveBeenCalledTimes(2);
         expect(consoleError.mock.calls[0][0]).toMatch(/^\d{4}-\d\d-\d\dT.* \[itookit\/cells\]/);
     } finally {await remote.dispose(); await runtime.dispose();}
 });

@@ -36,7 +36,7 @@ export class KanbanSidebar {
         options.container.classList.add('kanban-sidebar'); options.container.append(this.status, this.list);
         this.browser = createVFSBrowser({container: this.list, title: t('kanban.title'), searchPlaceholder: t('kanban.search'),
             presentation: nestOSVFSPresentation, appearance: {showTimestamp: false}, selection: false, windowManagement: options.windowManagement,
-            deletion: kanbanSidebarDeletion(options.service, async node => {await this.reload(); if (this.selected === node.id) await options.navigate('/');}),
+            deletion: kanbanSidebarDeletion(options.service, async node => {await this.reload(); if (this.selected === node.id) await options.navigate('/');}, () => this.reload()),
             source: {get: async id => this.nodes.find(node => node.id === id), children: async parent => parent === null ? this.nodes : [], subscribe: () => () => {}},
             onActivate: node => {void options.navigate(node.id).catch(error => this.failure(error));}, onError: error => this.failure(error),
             actions: [
@@ -70,7 +70,7 @@ export class KanbanSidebar {
     }
     private executionActions(): import('@nestos/vfs-ui').BrowserAction[] {
         return (['pause', 'resume'] as const).map(action => ({id: 'execution-' + action, label: controlLabel(action), iconHTML: action === 'pause' ? ACTION_ICONS.pause : ACTION_ICONS.run, placements: ['toolbar', 'menu'],
-            state: context => {const board = this.targetBoard(context.target); return {visible: !!this.controls && !!board && !!board.executionControl?.paused === (action === 'resume'), enabled: !!board && !['pausing', 'resuming'].includes(board.executionPhase ?? '')};},
+            state: context => {const board = this.targetBoard(context.target); return {visible: !!this.controls && !!board && !board.lifecycle && !!board.executionControl?.paused === (action === 'resume'), enabled: !!board && !['pausing', 'resuming'].includes(board.executionPhase ?? '')};},
             run: async context => {const board = this.targetBoard(context.target); if (board) await this.controls?.toggle(board);}}));
     }
     private reload(): Promise<void> {this.generation++; this.refresh.mark('manual', false); return this.refresh.flush();}

@@ -1,10 +1,11 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanItem, KanbanBoard, KanbanWorkflowState} from '@nestos/kanban/contracts';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {relatedKanbanSessions} from '../src/kanban/related-sessions';
-import {analysisHistory} from '../src/kanban/automation-analysis';
+import {analysisHistory} from '@nestos/kanban/integration';
 import {relatedExecutionReader} from '../src/kanban/related-session-executions';
 import {developmentSessionResources} from '../src/presets/kanban-work-resources';
 import {harnessExecutionJournalKey} from '../src/projects/harness-execution-journal';
@@ -14,7 +15,7 @@ const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});
 async function fixture() {
     const {manager} = await createVFS({rootBackend:new MemoryBackend()}); closes.push(()=>manager.dispose());
-    const fs = await manager.openFileSystem('/'), journal = new KanbanAutomationJournal(fs); await journal.open();
+    const fs = await manager.openFileSystem('/'), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     const bodies = new Map<string,string>(), shared = new Map<string,unknown>(), tasks = new Map<string,unknown[]>();
     const repository = {readDocument:vi.fn(async (session: string, path: string)=>bodies.get(session+'/'+path))};
     const kernel = {inspectSession:vi.fn(async (session:string)=>({snapshot:async()=>({tasks:tasks.get(session)??[]}),
@@ -48,7 +49,7 @@ it('recovers all legacy planning Sessions within board/item scope and keeps only
     expect(JSON.stringify(rows)).not.toContain('PRIVATE_PROMPT');
     expect(rows.some(row=>row.sessionId==='planner-1'||row.sessionId==='foreign')).toBe(false);
     expect(await f.journal.get('analysis-history:'+JSON.stringify(['b','work']))).toEqual({keys:[key1,key2].sort(),indexed:true});
-    const reopened=new KanbanAutomationJournal(f.fs); await reopened.open();
+    const reopened=new KanbanAutomationJournal(f.fs, kanbanJournalOptions); await reopened.open();
     expect((await analysisHistory(reopened,'b','work')).map(row=>row.id).sort()).toEqual(['planner-1','planner-2']);
 });
 it('projects each Round and native turn separately, using Kernel facts while preserving retained resource associations',async()=>{

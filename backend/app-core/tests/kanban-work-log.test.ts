@@ -1,16 +1,17 @@
+import {workLogOptions} from '../src/kanban/work-log-policy';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {createKanbanModule} from '@nestos/kanban';
 import {SeqKanbanStore} from '@nestos/kanban/storage';
 import type {KanbanCommand, KanbanRecordQuery} from '@nestos/kanban/contracts';
-import {KanbanWorkLog} from '../src/kanban/work-log';
+import {KanbanWorkLog} from '@nestos/kanban/integration';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});
 async function fixture(review: 'independent' | 'assignee' = 'independent') {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs); let time = 1000, sequence = 0;
-    const diagnostic = vi.fn(), logs = new KanbanWorkLog(fs, undefined, diagnostic); await logs.open();
+    const diagnostic = vi.fn(), logs = new KanbanWorkLog(fs, workLogOptions(undefined,diagnostic)); await logs.open();
     const service = createKanbanModule({store, actor: {kind: 'human', id: 'admin'}, now: () => time++, authorize: async () => {}, log: vi.fn()});
     await service.create({id: 'board', title: 'Development', policy: {review}, scope: {kind: 'system'}, members: [{kind: 'human', id: 'admin', responsibility: 'Manage', roles: ['coordinator','worker','reviewer']}, {kind: 'human', id: 'reviewer', responsibility: 'Review', roles: ['coordinator','reviewer']}]});
     const command = async (command: KanbanCommand) => service.execute('board', {operationId: 'request-' + ++sequence, expectedRevision: (await service.read('board')).revision, command});
@@ -28,7 +29,7 @@ it('persists created, cancelled and blocked logs and aggregates child work under
     expect(page.items.map(row => row.activity?.stage)).toEqual(['task.cancelled', 'task.blocked', 'task.created', 'task.created']);
     expect(page.items[0].itemIds).toEqual(['child','feature']);
     await f.logs.synchronize('board', f.service); expect((await f.records({kind: 'log'})).total).toBe(4);
-    const reopened = new KanbanWorkLog(f.fs); await reopened.open();
+    const reopened = new KanbanWorkLog(f.fs, workLogOptions(undefined,undefined)); await reopened.open();
     expect(await reopened.record(f.service, 'board', page.items[0].id)).toMatchObject({activity: {stage: 'task.cancelled'}, status: 'confirmed'});
 });
 it('logs real execution transitions and bindings while omitting unchanged renewals', async () => {
@@ -82,7 +83,7 @@ it('retries projection after a transactional persistence failure without repeati
             if (key === 'setEntry') return async (path: string, key: string, value: string) => {await target.setEntry(path, key, value); if (key.startsWith('checkpoint/')) throw Object.assign(new Error('PRIVATE_STORAGE_BODY'), {code: 'EIO'});};
             const value = Reflect.get(target, key); return typeof value === 'function' ? value.bind(target) : value;
         }}))),
-    }}} as typeof f.fs, undefined, f.diagnostic);
+    }}} as typeof f.fs, workLogOptions(undefined,f.diagnostic));
     await expect(broken.synchronize('board', f.service)).rejects.toMatchObject({code: 'EIO'});
     expect((await f.records({kind: 'log'})).total).toBe(1); expect((await f.service.read('board')).items).toHaveLength(1);
     expect(JSON.stringify(f.diagnostic.mock.calls)).not.toContain('PRIVATE_STORAGE_BODY');
@@ -139,7 +140,7 @@ it('repairs a legacy completion projection once without changing board state or 
     const before=await f.logs.records(legacy,'board',{kind:'log'});expect(before.items.some(row=>row.activity?.stage==='task.completed')).toBe(false);
     await f.fs.meta.seq!.setEntry(path,key,'1');
     const board=await f.service.read('board'),workflow=await f.service.workflow('board'),execute=vi.spyOn(f.service,'execute');
-    const reopened=new KanbanWorkLog(f.fs);await reopened.open();
+    const reopened=new KanbanWorkLog(f.fs, workLogOptions(undefined,undefined));await reopened.open();
     const after=await reopened.records(legacy,'board',{kind:'log'}),completed=after.items.filter(row=>row.activity?.stage==='task.completed');
     expect(after.total).toBe(before.total+1);expect(completed).toHaveLength(1);
     expect(completed[0]).toMatchObject({createdAt:board.items[0].closedAt,activity:{dispatchId:'dispatch',fields:{evidence:'accepted-dispatch'}}});

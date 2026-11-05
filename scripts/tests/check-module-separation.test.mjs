@@ -52,7 +52,7 @@ test('domain contracts and codecs are shared while host factories and independen
     assert.equal(moduleRole('/repo/libraries/device-tty/src/contracts.ts', '/repo'), 'shared');
     assert.equal(moduleRole('/repo/libraries/device-tty/src/index.ts', '/repo'), 'backend');
     assert.equal(moduleRole('/repo/libraries/kanban/src/index.ts', '/repo'), 'backend');
-    assert.equal(moduleRole('/repo/libraries/kanban/src/ui/index.ts', '/repo'), 'frontend');
+    assert.equal(moduleRole('/repo/libraries/kanban-ui/src/index.ts', '/repo'), 'frontend');
     assert.equal(moduleRole('/repo/libraries/kanban/src/contracts/index.ts', '/repo'), 'shared');
     assert.equal(moduleRole('/repo/libraries/kanban/src/utils/random.ts', '/repo'), 'shared');
     assert.equal(moduleRole('/repo/libraries/driver-llm/src/types/provider.ts', '/repo'), 'shared');
@@ -65,6 +65,7 @@ test('domain contracts and codecs are shared while host factories and independen
 
 test('installed library artifacts retain frontend, backend and shared boundaries', () => {
     const base = '/repo/release/local-libraries/locks/id/node_modules/.pnpm/artifact/node_modules/@nestos';
+    assert.equal(moduleRole(base + '/kanban-ui/dist/index.js', '/repo'), 'frontend');
     assert.equal(moduleRole(base + '/llm-ui/dist/llm-ui.js', '/repo'), 'frontend');
     assert.equal(moduleRole(base + '/vfs-core/dist/index.cjs', '/repo'), 'shared');
     assert.equal(moduleRole(base + '/durable-kernel/dist/index.js', '/repo'), 'backend');
@@ -128,16 +129,17 @@ test('portable transport cannot load the Node host, and Node host cannot load UI
     assert.ok(errors.some(error => /backend loads frontend/.test(error)));
 });
 
-test('mixed Kanban entries keep the UI and persistence graphs separate', t => {
-    const {root} = fixture(t), directory = join(root, 'libraries/kanban');
-    mkdirSync(join(directory, 'src/ui'), {recursive: true});
-    writeFileSync(join(directory, 'package.json'), JSON.stringify({name: '@nestos/kanban', exports: {'.': './src/index.ts', './ui': './src/ui/index.ts'}}));
-    writeFileSync(join(directory, 'src/index.ts'), 'export const store = 1;');
-    writeFileSync(join(directory, 'src/ui/index.ts'), "export {store} from '../index';");
-    assert.ok(separationErrors(root).some(error => error.startsWith('frontend loads backend')));
-    writeFileSync(join(directory, 'src/ui/index.ts'), 'export const view = 1;');
-    writeFileSync(join(directory, 'src/index.ts'), "export {view} from './ui/index';");
-    assert.ok(separationErrors(root).some(error => error.startsWith('backend loads frontend')));
+test('separate Kanban packages reject implementation imports in both directions',t=>{
+    const {root}=fixture(t),backend=join(root,'libraries/kanban'),frontend=join(root,'libraries/kanban-ui');
+    for(const dir of [backend,frontend])mkdirSync(join(dir,'src'),{recursive:true});
+    writeFileSync(join(backend,'package.json'),JSON.stringify({name:'@nestos/kanban',exports:{'.':'./src/index.ts'}}));
+    writeFileSync(join(frontend,'package.json'),JSON.stringify({name:'@nestos/kanban-ui',exports:{'.':'./src/index.ts'}}));
+    writeFileSync(join(backend,'src/index.ts'),'export const store=1;');
+    writeFileSync(join(frontend,'src/index.ts'),"export {store} from '@nestos/kanban';");
+    assert.ok(separationErrors(root).some(error=>error.startsWith('frontend loads backend')));
+    writeFileSync(join(frontend,'src/index.ts'),'export const view=1;');
+    writeFileSync(join(backend,'src/index.ts'),"export {view} from '@nestos/kanban-ui';");
+    assert.ok(separationErrors(root).some(error=>error.startsWith('backend loads frontend')));
 });
 
 test('split Kanban artifacts follow their owned sourcemap sources and fail closed without evidence', t => {
@@ -154,7 +156,7 @@ test('split Kanban artifacts follow their owned sourcemap sources and fail close
     save(['../src/store.ts', '../src/utils/random.ts']);
     assert.equal(moduleRole(chunk, root), 'backend');
     save(['../src/ui/view.ts', '../src/utils/random.ts']);
-    assert.equal(moduleRole(chunk, root), 'frontend');
+    assert.equal(moduleRole(chunk, root), 'backend');
     save(['../../another-package/src/contracts.ts']);
     assert.equal(moduleRole(chunk, root), 'backend');
     writeFileSync(chunk + '.map', 'invalid JSON');
@@ -165,7 +167,7 @@ test('split Kanban artifacts follow their owned sourcemap sources and fail close
 });
 
 test('bundler guard accepts neutral split artifacts and rejects backend or mixed code in frontend builds', t => {
-    const {root} = fixture(t), directory = join(root, 'node_modules/@nestos/kanban/dist');
+    const {root} = fixture(t), directory = join(root, 'node_modules/@nestos/mail/dist');
     mkdirSync(directory, {recursive: true});
     const chunk = join(directory, 'chunk-GUARD.js'), context = {
         getModuleIds: () => [chunk], error: message => {throw new Error(message);},

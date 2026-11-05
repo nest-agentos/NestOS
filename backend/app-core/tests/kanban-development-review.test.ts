@@ -1,8 +1,9 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {memoryChannels} from './helpers/session-channels';
 import {sha256HexSync} from '@nestos/common';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {readPrompt} from '../src/run/prompt-bundle';
 import {developmentReviewAdapter} from '../src/presets/kanban-development-review';
 const mock = vi.hoisted(() => ({dirty: false, busy: false, context: true, process: {}}));
@@ -15,7 +16,7 @@ const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); mock.dirty = mock.busy = false; mock.context = true;});
 async function fixture(withExchange = false) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/');
-    const journal = new KanbanAutomationJournal(fs); await journal.open();
+    const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     await journal.update('worktree:original', () => ({id: 'original', directory: '/workspace/_nestos/worktrees/original', branch: 'work/original', phase: 'ready'}));
     await journal.update('development-workspace:original', () => ({directory: '/workspace/_nestos/worktrees/original', projectId: 'project', context: {board: {id: 'board'}, task: {id: 'task'}}, policy: {profile: 'development', commit: 'changes', modules: []}}));
     const item = {id: 'task', title: 'Task', responsibility: 'Work', acceptance: 'Verify', externalRefs: [{system: 'nestos-worktree', id: 'original'}, {system: 'nestos-remote-project', id: 'project'}]}, board = {id: 'board'};

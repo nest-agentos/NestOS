@@ -4,7 +4,7 @@ import type {KanbanBoardSummary, KanbanClient, KanbanCommand} from '@nestos/kanb
 const log = createModuleLogger('kanban-sidebar-controls');
 export const controlLabel = (key: string) => t(`kanban.boardControl.${key}` as Parameters<typeof t>[0]);
 type Command = Extract<KanbanCommand, {type: 'set-board-control'}>;
-export const controlIcon = (phase: string) => ['paused', 'pausing'].includes(phase) ? ACTION_ICONS.pause : phase === 'manual' ? CHAT_ICONS.edit : phase === 'error' ? ACTION_ICONS.info : ACTION_ICONS.run;
+export const controlIcon = (phase: string) => ['paused', 'pausing', 'waiting-deletion', 'cancelling', 'cancelled'].includes(phase) ? ACTION_ICONS.pause : phase === 'manual' ? CHAT_ICONS.edit : phase === 'error' ? ACTION_ICONS.info : ACTION_ICONS.run;
 
 /** Scope is explicit; each board is revision checked and partial failures are retained. */
 export class KanbanSidebarControls {
@@ -55,7 +55,7 @@ export class KanbanSidebarControls {
             buttons.querySelectorAll<HTMLButtonElement>('[data-board-control]').forEach(button => {
                 const key = button.dataset.boardControl;
                 button.hidden = key === 'pause' ? paused : key === 'resume' ? !targets.some(board => board.executionControl?.paused) : false;
-                button.disabled = this.busy || !targets.length || targets.some(board => ['pausing', 'resuming'].includes(board.executionPhase ?? '')) && (key === 'pause' || key === 'resume');
+                button.disabled = this.busy || !targets.length || targets.some(board => !!board.lifecycle) || targets.some(board => ['pausing', 'resuming'].includes(board.executionPhase ?? '')) && (key === 'pause' || key === 'resume');
             });
         };
         scope.onchange = () => this.render?.(boards); this.render(boards);

@@ -3,7 +3,7 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {createNestOSKanban} from '@nestos/app-core/kanban';
 import {SeqKanbanStore} from '@nestos/kanban/storage';
-import {KanbanWorkbench} from '@nestos/kanban/ui';
+import {KanbanWorkbench} from '@nestos/kanban-ui';
 import {executionSessionReference} from '@nestos/app-contracts';
 import {kanbanPresentation} from '../src/kanban/host';
 import {t} from '@nestos/common';

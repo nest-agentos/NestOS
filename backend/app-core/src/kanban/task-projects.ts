@@ -1,6 +1,6 @@
 import {DEFAULT_KANBAN_WORK_TYPES, type KanbanBoard, type KanbanCommand, type KanbanExternalReference} from '@nestos/kanban/contracts';
 import type {ProjectService} from '@nestos/app-contracts/services';
-import {REMOTE_PROJECT_REFERENCE, validateRemoteReferences} from './record-execution';
+import {REMOTE_PROJECT_REFERENCE, validateRemoteReferences} from './resource-catalog';
 import {requireValue} from './validation';
 
 type Projects=Pick<ProjectService,'get'>;

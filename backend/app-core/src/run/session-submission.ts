@@ -1,3 +1,4 @@
+import {hasFlowControlTree} from '@nestos/llm-flow/contracts';
 import {SessionCommand, type SubmissionRequest, type Round, type ISessionRepository} from '@nestos/llm-session/contracts';
 import {taskStat, type Kernel} from '@nestos/durable-kernel';
 import type {ConversationContexts} from '../runtime/conversation-contexts';
@@ -6,7 +7,7 @@ import {failure} from './prompt-bundle';
 interface Options {contexts: Pick<ConversationContexts, 'open'>; repository: Pick<ISessionRepository, 'readDocument'>;
     kernel: Pick<Kernel, 'task' | 'inspectSession'>; ensureWritable?(sessionId: string): Promise<boolean>}
 function requireValue(value: unknown, code: string): asserts value {if (!value) throw failure(code);}
-export interface SessionSubmissionObservation {sessionId: string; outcome: 'running' | 'unknown' | 'succeeded' | 'failed' | 'cancelled'; code?: string}
+export interface SessionSubmissionObservation {controlCapabilities?: {pause:'boundary'|'none';resume:boolean}; sessionId: string; outcome: 'running' | 'unknown' | 'succeeded' | 'failed' | 'cancelled'; code?: string}
 /** Recover the admitted Session and inspect durable facts without activating a view or replaying input. */
 export function sessionSubmission(options: Options) {
     const inspect = async (request: SubmissionRequest): Promise<SessionSubmissionObservation> => {
@@ -45,10 +46,12 @@ async function inspectSubmission(options: Options, request: SubmissionRequest): 
     const task = await options.kernel.task(sessionId, primary.taskId);
     requireValue(task.labels?.roundId === id, 'SUBMISSION_EXECUTION_CONFLICT');
     const snapshot = await (await options.kernel.inspectSession(sessionId)).snapshot();
+    const supported = task.program?.kind !== 'flow.aggregate' && task.labels?.kind !== 'flow-root' || hasFlowControlTree(task);
+    const controlCapabilities = {pause:supported ? 'boundary' as const : 'none' as const, resume:supported};
     const tree = snapshot.tasks.filter(row => row.rootTaskId === task.rootTaskId);
-    if (!taskStat(task).settled || tree.some(row => !taskStat(row).settled)) return {sessionId, outcome: 'running'};
-    if (!task.exit || !['completed', 'failed', 'cancelled'].includes(round.status)) return {sessionId, outcome: 'unknown', code: 'SUBMISSION_SETTLEMENT_PENDING'};
+    if (!taskStat(task).settled || tree.some(row => !taskStat(row).settled)) return {sessionId, controlCapabilities, outcome: 'running'};
+    if (!task.exit || !['completed', 'failed', 'cancelled'].includes(round.status)) return {sessionId, controlCapabilities, outcome: 'unknown', code: 'SUBMISSION_SETTLEMENT_PENDING'};
     const outcome = task.exit.status === 'succeeded' ? 'succeeded' : task.exit.status === 'cancelled' ? 'cancelled' : 'failed';
     const code = (task.exit.error as {code?: string})?.code;
-    return {sessionId, outcome, ...(outcome === 'failed' ? {code: code && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'SUBMISSION_EXECUTION_FAILED'} : {})};
+    return {sessionId, controlCapabilities, outcome, ...(outcome === 'failed' ? {code: code && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'SUBMISSION_EXECUTION_FAILED'} : {})};
 }

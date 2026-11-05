@@ -3,23 +3,28 @@ import type {KanbanClient, KanbanDeletionPreview} from '@nestos/kanban/contracts
 import type {BrowserDeletion, BrowserNode} from '@nestos/vfs-ui';
 
 /** The sidebar exposes logical resources; lifecycle and Git validation remain on the server. */
-export function kanbanSidebarDeletion(service: KanbanClient | undefined, removed: (node: BrowserNode) => Promise<void>): BrowserDeletion | undefined {
+export function kanbanSidebarDeletion(service: KanbanClient | undefined, removed: (node: BrowserNode) => Promise<void>, scheduled?: () => Promise<void>): BrowserDeletion | undefined {
     if (!service?.previewDeletion || !service.deleteBoard) return undefined;
     return {label: t('kanban.deleteBoard'), cancelLabel: t('kanban.deleteCancel'), iconHTML: ACTION_ICONS.delete,
         preview: async node => {
             const data = await service.previewDeletion!(boardId(node));
-            const lines = [t('kanban.deleteDescription'), `${data.title} · ${t('kanban.deletePending')}: ${data.pendingItems}`];
+            const deferred = !!service.requestBoardDeletion && data.blockers.length > 0;
+            const lines = [t(data.pendingDeletion ? 'kanban.deleteAlreadyScheduled' : deferred ? 'kanban.deleteDeferredDescription' : 'kanban.deleteDescription'), `${data.title} · ${t('kanban.deletePending')}: ${data.pendingItems}`];
             lines.push(...blockerSummaries(data));
             const resources = uniqueResources(data);
             for (const rows of resources.values()) lines.push(resourceSummary(data, rows));
-            if (data.blockers.length) lines.push(t('kanban.deleteResolveHint'));
+            if (data.blockers.length) lines.push(t(deferred ? 'kanban.deleteDeferredResolveHint' : 'kanban.deleteResolveHint'));
             const ready = [...resources.values()].filter(rows => rows.every(row => row.resource.canCleanup)).length;
-            return {message: lines.join('\n\n'), blocked: data.blockers.length > 0,
+            return {message: lines.join('\n\n'), blocked: !!data.pendingDeletion || data.blockers.length > 0 && !deferred,
                 details: {label: t('kanban.deleteDiagnostics'), text: diagnostics(data)}, data: {...data, operationId: randomUUID()},
-                choices: ready ? [{id: 'cleanup', label: `${t('kanban.deleteCleanup')} (${ready})`, checked: true}] : []};
+                choices: [...(deferred ? [{id:'cleanup',label:t('kanban.deleteCleanupDeferred'),checked:true}] : ready ? [{id:'cleanup',label:`${t('kanban.deleteCleanup')} (${ready})`,checked:true}] : []), ...(deferred ? [{id:'cancel-work',label:t('kanban.deleteCancelWork'),checked:false}] : [])]};
         },
         remove: async (node, preview, choices) => {
             const data = preview.data as KanbanDeletionPreview & {operationId: string};
+            if (data.blockers.length && service.requestBoardDeletion) {
+                await service.requestBoardDeletion(boardId(node), {operationId:data.operationId,expectedRevision:data.revision,version:data.version,cleanup:choices.has('cleanup'),mode:choices.has('cancel-work')?'cancel':'drain'});
+                await scheduled?.();return;
+            }
             await service.deleteBoard!(boardId(node), {operationId: data.operationId, expectedRevision: data.revision, version: data.version, cleanup: choices.has('cleanup')});
             await removed(node);
         }};

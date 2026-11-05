@@ -1,3 +1,4 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it, vi} from 'vitest';
 import {mkdtemp, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -5,7 +6,7 @@ import {join} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {freezeCommitContext, verifyCommitContexts, parseCommitTrailers} from '../src/presets/kanban-commit-context';
 import {resolveCommitRequest, preloadCommitContexts} from '../src/presets/kanban-commit-query';
 const closes: Array<() => Promise<void>> = [], exec = promisify(execFile);
@@ -16,7 +17,7 @@ async function fixture() {
     await git(root, ['init', '-b', 'main']); await git(root, ['config', 'user.name', 'Fixture']); await git(root, ['config', 'user.email', 'fixture@example.invalid']);
     await writeFile(join(root, '.gitignore'), '/_nestos/\n'); await writeFile(join(root, 'file'), 'Base'); await git(root, ['add', '.']); await git(root, ['commit', '-m', 'test: base']);
     const base = await git(root, ['rev-parse', 'HEAD']), physical = join(root, '_nestos/worktrees/task'); await git(root, ['worktree', 'add', '-b', 'work/task', physical]);
-    const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/'); const journal = new KanbanAutomationJournal(fs); await journal.open();
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/'); const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     const source = {projectId: 'project', boardId: 'board', itemId: 'task', itemRevision: 2, executionId: 'execution', context: {board: {id: 'board'}, task: {id: 'task', revision: 2, acceptance: 'Original criterion'}, decision: {sourceBoardId: 'board', recordId: 'decision', snapshot: {revision: 1, content: 'Original decision'}}}};
     const context = await freezeCommitContext(journal, source);
     await writeFile(join(physical, 'file'), 'Delivery'); await git(physical, ['add', 'file']); await git(physical, ['commit', '-m', 'feat(test): delivery', '-m', context.trailers]);

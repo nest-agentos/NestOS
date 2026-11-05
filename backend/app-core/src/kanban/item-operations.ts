@@ -51,6 +51,7 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     const active = context.jobs.some(job => job.phase !== 'settled'), supported = ['review', 'completed'].includes(context.item.status);
     const operations = await Promise.all(actions.map(async action => {
         const entry = operation(context, action, active, supported, !!options.adapter.prepareOperation);
+        if (context.board.lifecycle && action !== 'accept') {entry.enabled=false;entry.reason=t('kanban.errors.BOARD_STOPPING');}
         if (entry.sessionId) entry.sessionId = await options.sessionResource?.(entry.sessionId) ?? entry.sessionId;
         return entry;
     }));
@@ -84,6 +85,8 @@ async function authorize(options: ReviewOperationsOptions, context: Context): Pr
 }
 async function bind(options: ReviewOperationsOptions, board: string, request: KanbanItemOperationBinding) {
     const context = await load(options, board, request.itemId, true); await authorize(options, context);
+    requireValue(!context.board.lifecycle || request.action === 'accept','BOARD_STOPPING');
+    requireValue(context.item.deletedAt === undefined && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
     requireValue(['build', 'deploy', 'merge'].includes(request.action), 'OPERATION_BINDING_FORBIDDEN');
     requireValue(!context.jobs.some(job => job.phase !== 'settled'), 'OPERATION_IN_USE');
     const catalog = await options.catalog(), target = automationTarget(request.target, catalog); requireValue(target.kind === 'flow', 'OPERATION_FLOW_REQUIRED');
@@ -99,6 +102,8 @@ async function bind(options: ReviewOperationsOptions, board: string, request: Ka
 }
 async function run(options: ReviewOperationsOptions, board: string, request: KanbanItemOperationRequest): Promise<KanbanItemOperations> {
     const context = await load(options, board, request.itemId, true); await authorize(options, context);
+    requireValue(!context.board.lifecycle || request.action === 'accept','BOARD_STOPPING');
+    requireValue(context.item.deletedAt === undefined && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
     requireValue(/^[\w-]{1,128}$/.test(request.operationId) && actions.includes(request.action as ReviewAction), 'OPERATION_REQUEST_INVALID');
     const prior = await options.journal.get<ReviewJob>(jobKey(request.operationId));
     requireValue(!prior || prior.boardId === board && prior.itemId === request.itemId && prior.fingerprint === sha256HexSync(JSON.stringify(request)), 'IDEMPOTENCY_CONFLICT');

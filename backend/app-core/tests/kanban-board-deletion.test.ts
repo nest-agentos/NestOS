@@ -1,15 +1,17 @@
+import {kanbanControlOptions} from '../src/kanban/control-adapter';
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {createKanbanModule} from '@nestos/kanban';
 import {SeqKanbanStore} from '@nestos/kanban/storage';
 import type {KanbanClient, KanbanDeletionRequest, KanbanWorkResource} from '@nestos/kanban/contracts';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
-import {createBoardDeletion, withBoardDeletion} from '../src/kanban/board-deletion';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {createBoardDeletion, withBoardDeletion} from '@nestos/kanban/integration';
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0)) await close();});
 async function fixture() {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
-    const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs); await journal.open();
+    const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     let check: () => Promise<void> = async () => {};
     const core = createKanbanModule({store, actor: {kind: 'human', id: 'admin'}, authorize: async () => {}, verifyDeletion: () => check(), log: vi.fn()});
     await core.create({id: 'b', title: 'PRIVATE_TITLE', scope: {kind: 'system'}, members: [{kind: 'human', id: 'admin', responsibility: 'Manage', roles: ['coordinator', 'worker']}], policy: {requireEstimate: false}});
@@ -124,4 +126,75 @@ it('signals an active scanner before waiting for its acknowledgement and never d
     await api.quiesce(); await pending;
     expect(quiesce).toHaveBeenCalledOnce(); expect(settled).toBe(true); expect(dispose).not.toHaveBeenCalled();
     await api.dispose(); expect(dispose).toHaveBeenCalledOnce(); expect(quiesce).toHaveBeenCalledOnce();
+});
+
+it('retains unknown and foreign resources without blocking logical deletion or cleaning them', async () => {
+    const f=await fixture();
+    f.resources.push({...resource('unknown',false),ownership:'unknown',state:'unknown',reasons:['WORKTREE_ASSOCIATION_UNKNOWN']},
+        {...resource('foreign',true),ownership:'other',state:'in-use',reasons:['WORKTREE_OTHER_OWNER']});
+    expect((await f.api.previewDeletion('b')).blockers).toEqual([]);
+    await f.api.deleteBoard('b',await f.request());
+    expect(f.cleanup).not.toHaveBeenCalled();
+    expect((await f.api.read('b')).deletedAt).toBeTypeOf('number');
+    expect((await f.journal.get<{preview:{resources:unknown[]}}>('board-deletion:b'))?.preview.resources).toHaveLength(2);
+});
+it('still blocks unsettled execution when all resource ownership is unknown', async () => {
+    const f=await fixture();f.resources.push({...resource('unknown',false),ownership:'unknown',state:'unknown'});
+    await f.core.execute('b',{operationId:'claim',expectedRevision:2,command:{type:'claim',itemId:'t'}}).catch(async () => {
+        await f.core.execute('b',{operationId:'ready',expectedRevision:2,command:{type:'set-stage',itemId:'t',stage:'open'}});
+        await f.core.execute('b',{operationId:'claim-ready',expectedRevision:3,command:{type:'claim',itemId:'t'}});
+    });
+    const preview=await f.api.previewDeletion('b');expect(preview.blockers).toContainEqual({code:'BOARD_EXECUTION_ACTIVE',itemId:'t'});
+    await expect(f.api.deleteBoard('b',await f.request())).rejects.toMatchObject({code:'BOARD_EXECUTION_ACTIVE'});
+});
+it('does not treat unrelated discussion or a shared Session new turn as this board execution', async () => {
+    const f=await fixture();
+    f.session.mockResolvedValue({history:[],sessions:[{sessionId:'discussion',state:'running',stale:false,purposes:['discussion'],executions:[]},
+        {sessionId:'shared',state:'running',stale:false,purposes:['execution'],executions:[{id:'original',purpose:'execution',state:'completed'}]}]} as never);
+    expect((await f.api.previewDeletion('b')).blockers).toEqual([]);
+    await f.api.deleteBoard('b',await f.request());
+    expect((await f.api.read('b')).deletedAt).toBeTypeOf('number');
+});
+
+it('persists pending deletion, freezes new work and automatically deletes only after the original blocker settles across restart',async()=>{
+    const f=await fixture();f.resources.push({...resource('unknown',false),ownership:'unknown',state:'unknown'});
+    f.session.mockResolvedValue({history:[],sessions:[{sessionId:'original',state:'running',stale:false,executions:[]}]} as never);
+    const request={...await f.request(),mode:'drain' as const};
+    await f.api.requestBoardDeletion!('b',request);
+    expect((await f.api.read('b')).lifecycle).toMatchObject({intent:'delete',mode:'drain',phase:'waiting'});
+    expect((await f.api.read('b')).executionControl).toMatchObject({paused:true,mode:'manual'});
+    await expect(f.api.execute('b',{operationId:'new-work',expectedRevision:(await f.api.read('b')).revision,command:{type:'request-run',itemId:'t'}})).rejects.toMatchObject({code:'BOARD_STOPPING'});
+    const restored=withBoardDeletion(f.service,createBoardDeletion({service:f.service,journal:f.journal}));
+    await restored.scan();expect((await restored.read('b')).deletedAt).toBeUndefined();
+    expect((await restored.previewDeletion('b')).pendingDeletion).toMatchObject({operationId:request.operationId,phase:'blocked'});
+    f.session.mockResolvedValue({history:[],sessions:[{sessionId:'original',state:'completed',stale:false,executions:[]}]} as never);
+    await restored.scan();
+    expect((await restored.read('b')).deletedAt).toBeTypeOf('number');
+    expect(f.cleanup).not.toHaveBeenCalled();expect(await restored.catalog()).toEqual([]);
+    expect(await f.journal.get('board-stop:b')).toMatchObject({phase:'done'});
+});
+it('whole-board cancellation freezes scheduling and cancels original tasks without deleting the board',async()=>{
+    const f=await fixture();
+    await f.core.execute('b',{operationId:'plan',expectedRevision:2,command:{type:'publish-plan',plan:{schema:'kanban.plan/1',id:'p',revision:1,sealed:true,items:[{id:'t',expectedRevision:1,title:'Task',responsibility:'Work',acceptance:'Done',assignee:{kind:'human',id:'admin'},dependsOn:[]}]}}});
+    await f.core.execute('b',{operationId:'dispatch',expectedRevision:(await f.core.read('b')).revision,command:{type:'prepare-dispatch',itemId:'t',dispatchId:'original'}});
+    await f.api.cancelBoard!('b',{operationId:'cancel-board',expectedRevision:(await f.api.read('b')).revision});
+    expect((await f.api.item('b','t')).item.control?.action).toBe('cancel');
+    const {scanTaskControls}=await import('@nestos/kanban/integration');
+    await scanTaskControls(kanbanControlOptions({calls:{list:async()=>[{input:{request:{submission:{id:'original'}}},callerState:{settled:true},executionTree:{settled:true}}] as never}},f.journal),f.journal,await f.core.read('b'),f.core);
+    await f.api.scan();
+    const board=await f.api.read('b');
+    expect(board.lifecycle).toMatchObject({intent:'cancel',phase:'ready'});expect(board.deletedAt).toBeUndefined();
+    expect(board.items[0].status).toBe('cancelled');
+});
+
+it('upgrades a cancelled board to deferred deletion without allowing its old stop receipt to discard the delete request',async()=>{
+    const f=await fixture();
+    await f.api.cancelBoard!('b',{operationId:'cancel-board',expectedRevision:(await f.api.read('b')).revision});
+    const control=(await f.api.item('b','t')).item.control!;
+    await f.core.execute('b',{operationId:'cancelled',expectedRevision:(await f.core.read('b')).revision,command:{type:'control-receipt',itemId:'t',controlId:control.id,state:'cancelled'}});
+    await f.api.scan();expect((await f.api.read('b')).deletedAt).toBeUndefined();
+    const preview=await f.api.previewDeletion('b');
+    await f.api.requestBoardDeletion!('b',{operationId:'delete-later',expectedRevision:preview.revision,version:preview.version,cleanup:false,mode:'drain'});
+    expect(await f.journal.get('board-stop:b')).toMatchObject({request:{operationId:'delete-later'},phase:'admitted'});
+    await f.api.scan();expect((await f.api.read('b')).deletedAt).toBeTypeOf('number');
 });

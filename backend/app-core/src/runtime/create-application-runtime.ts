@@ -1,3 +1,4 @@
+import {kanbanJournalOptions} from '../kanban/host-policy';
 import {developmentWorkExchange} from '../presets/kanban-channel-exchange';
 import {cleanupStep, cleanupStage, type CleanupStep} from './cleanup-stage';
 import {nativeSessionResource} from '../projects/session-resource';
@@ -5,6 +6,7 @@ import {OperationLifetime} from '../run/operation-lifetime';
 import {developmentAnalysis} from '../presets/kanban-development-analysis';
 import {developmentDelivery} from '../presets/kanban-development-delivery';
 import {developmentContinuation} from '../presets/kanban-development-continuation';
+import {submissionControl} from '../run/submission-control';
 import {sessionSubmission} from '../run/session-submission';
 import {developmentLifecycle} from '../presets/kanban-development-lifecycle';
 import {developmentWorkResources, developmentSessionResources} from '../presets/kanban-work-resources';
@@ -12,7 +14,7 @@ import {developmentReviewAdapter} from '../presets/kanban-development-review';
 import {itemOperationReporter} from '../kanban/item-operation-log';
 import {createItemOperations} from '../kanban/item-operations';
 import {publishedOperation} from '../run/published-operation';
-import {KanbanAutomationJournal} from '../kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {developmentCatalog, validateDevelopmentOptions, requiresDevelopmentProject} from '../presets/kanban-development-policy';
 import {prepareHarnessDraftConnection} from '../projects/harness-draft-connection';
 import {reportKanbanHealth, kanbanFailureCode} from '../kanban/health-events';
@@ -578,8 +580,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         if(analyzeDevelopment)cleanupFns.push(()=>analyzeDevelopment.dispose());
         const verifyDevelopment = developmentBindings ? developmentDelivery(systemFS, developmentBindings.remote, developmentBindings.provider) : undefined;
         const continueDevelopment = developmentBindings && independentCalls ? developmentContinuation({...developmentBindings,
-            journal: new KanbanAutomationJournal(systemFS), calls: independentCalls, kernel: kernelCore}) : undefined;
-        const lifecycle = independentCalls ? developmentLifecycle({remote:developmentBindings?.remote,journal: new KanbanAutomationJournal(systemFS), events, calls: independentCalls, kernel: kernelCore,
+            journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), calls: independentCalls, kernel: kernelCore}) : undefined;
+        const lifecycle = independentCalls ? developmentLifecycle({remote:developmentBindings?.remote,journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), events, calls: independentCalls, kernel: kernelCore,
             authorize: async (boardId): Promise<boolean> => (await kanban.read(boardId)).automation?.enabled === true,
             prepareSession: async id => {
                 await initializeProjects(); await sessionRepository.ensureSession(id, t('kanban.automationTitle'));
@@ -589,7 +591,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             }}) : undefined;
         const fileSubmission = sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore, ensureWritable: conversationOptions.ensureWritable});
         const developmentMessages = developmentObserver({exchange: developmentBindings && independentCalls ? developmentWorkExchange({...developmentBindings,
-            journal: new KanbanAutomationJournal(systemFS), kernel: kernelCore, calls: independentCalls, submission: fileSubmission}) : undefined, kernel: kernelCore, fs: systemFS, events, projects, remote: remoteConnections, lifecycle,
+            journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), kernel: kernelCore, calls: independentCalls, submission: fileSubmission}) : undefined, kernel: kernelCore, fs: systemFS, events, projects, remote: remoteConnections, lifecycle,
             verifyDelivery: verifyDevelopment ? id => developmentOperations.run(() => verifyDevelopment(id)) : undefined,
             wake: () => wakeKanban()});
         cleanupFns.push(() => developmentMessages.dispose());
@@ -604,7 +606,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 report: itemOperationReporter(context),
             }) : undefined,
             relatedSessions: lifecycle ? (boardId, itemId) => lifecycle.sessions(boardId, itemId) : undefined,
-            sessionExecutionResources: id => developmentSessionResources(new KanbanAutomationJournal(systemFS), id),
+            sessionExecutionResources: id => developmentSessionResources(new KanbanAutomationJournal(systemFS, kanbanJournalOptions), id),
             continuation: continueDevelopment ? {submission: sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore,
                 ensureWritable: conversationOptions.ensureWritable}),
                 prepare: input => developmentOperations.run(() => continueDevelopment(input))} : undefined,
@@ -640,6 +642,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             preparations: remoteConnections ? developmentCatalog() : [],
             prepareWork: prepareDevelopment ? input => developmentOperations.run(() => prepareDevelopment(input)) : undefined,
             callControl: (command, request) => commandBus.execute(command, request),
+            callCancel: (command, request) => commandBus.execute(command, request),
+            submissionControl: submissionControl({contexts:conversationContexts, repository:sessionRepository, kernel:kernelCore, ensureWritable:conversationOptions.ensureWritable}),
             calls: independentCalls, kernel: kernelCore, sessions: sessionRepository,
             ensureReady: initializeProjects,
             prepareSession: async id => {await prepareChildExecution(id); return recovery.acquireLater(id);},

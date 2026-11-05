@@ -1,9 +1,10 @@
+import {coordinateOperation} from '@nestos/kanban/integration';
 import type {KanbanBoard, KanbanItem, KanbanItemOperationRequest} from '@nestos/kanban/contracts';
 import {sha256HexSync} from '@nestos/common';
 import {automationTarget} from './automation-targets';
 import {requireValue} from './validation';
-import {safeCode} from './automation-analysis';
-import {journalCommand} from './journal-command';
+import {safeCode} from '@nestos/kanban/integration';
+import {journalCommand} from '@nestos/kanban/integration';
 import {jobKey, type ReviewJob, type ReviewOperationsOptions, type ReviewSettings, type ReviewAction, type MergePlan} from './item-operation-types';
 
 export async function prepareReviewJob(options: ReviewOperationsOptions, board: KanbanBoard, item: KanbanItem,
@@ -28,36 +29,26 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
             action, boardId: board.id, itemId: item.id, sourceVersion: snapshot.sourceVersion, targetVersion: snapshot.targetVersion, resources: snapshot.context, input: context})}},
         submission: {id: base.id, source: {kind: 'conversation', ownerId: base.id, id: base.id}}}}};
 }
-export async function advanceReviewJob(options: ReviewOperationsOptions, job: ReviewJob): Promise<ReviewJob> {
-    if (job.phase === 'settled') return job;
-    const started = Date.now();
-    try {
-        if (job.action === 'accept') return await acceptReview(options, job);
-        if (job.phase === 'prepared') {
-            if (!await options.journal.claim(jobKey(job.id))) return (await options.journal.get<ReviewJob>(jobKey(job.id)))!;
-            job = {...job, phase: 'submitting'};
-            if (job.request) await options.submission.start(job.request); else await options.published.start(job.input!);
-        }
-        if (job.phase === 'settled') return job;
-        const observation = await observeReview(options, job);
-        if (!['succeeded', 'failed'].includes(observation.state)) return save(options, job, {...job, state: observation.state, sessionId: observation.sessionId, code: observation.code});
-        const output = observation.state === 'succeeded' ? job.request ? await (options.adapter.readOperation ?? options.adapter.readAnalysis)(job) : observation.output : undefined;
-        if (observation.state === 'succeeded' && output === undefined) return save(options, job, {...job, state: 'unknown', code: 'OPERATION_RESULT_PENDING', sessionId: observation.sessionId});
-        if (observation.state === 'succeeded') validateOperationResult(job, output);
-        if (observation.state === 'succeeded' && job.action === 'deploy')
-            requireValue(options.adapter.runningVersion?.() === (output as {version: string}).version, 'OPERATION_RESULT_RUNNING_VERSION_MISMATCH');
-        const next = {...job, phase: 'settled' as const, state: observation.state as 'succeeded' | 'failed', result: output, sessionId: observation.sessionId, code: observation.code};
-        const saved = await save(options, job, next);
-        options.log({operationId: job.id, stage: 'review.' + job.action, result: saved.state === 'succeeded' ? 'success' : 'failure', code: saved.code, durationMs: Date.now() - started});
-        return saved;
-    } catch (error) {
-        const code = safeCode(error, 'OPERATION_OBSERVATION_FAILED'), notStarted = (error as {executionOutcome?: string})?.executionOutcome === 'not-started';
-        const retry = notStarted && (error as {retryable?: boolean}).retryable === true || code === 'REVISION_CONFLICT';
-        const terminal = ['FILE_EXCHANGE_SCOPE_INVALID', 'FILE_EXCHANGE_REQUEST_CHANGED', 'FILE_EXCHANGE_RESPONSE_CHANGED', 'FILE_EXCHANGE_RESULT_CONFLICT', 'FILE_EXCHANGE_LIMIT', 'FILE_EXCHANGE_CONTEXT_CHANGED'].includes(code) || notStarted && !retry || code.startsWith('OPERATION_RESULT_') || code.startsWith('MERGE_PLAN_') || code.startsWith('OPERATION_SOURCE_CHANGED') || code === 'OPERATION_RUNNING_VERSION_MISMATCH';
-        if (job.code !== code || terminal && job.phase !== 'settled' || retry && job.phase !== 'prepared')
-            options.log({operationId: job.id, stage: 'review.' + job.action, result: 'failure', code, durationMs: Date.now() - started});
-        return save(options, job, {...job, phase: retry ? 'prepared' : terminal ? 'settled' : job.phase, state: terminal ? 'failed' : 'unknown', code, ...((error as {result?: unknown})?.result ? {result: (error as {result: unknown}).result} : {})});
-    }
+export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
+    if(job.action==='accept')return acceptReview(options,job);
+    return coordinateOperation({service:options.service,journal:options.journal,key:jobKey(job.id),record:job,port:{
+        start:async record=>{if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
+        inspect:async record=>{
+            const observation=await observeReview(options,record);
+            const output=observation.state==='succeeded'&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
+            return {...observation,executionId:observation.sessionId,output};
+        },validate:(record,output)=>{
+            validateOperationResult(record,output);
+            if(record.action==='deploy')requireValue(options.adapter.runningVersion?.()===(output as {version:string}).version,'OPERATION_RESULT_RUNNING_VERSION_MISMATCH');
+        },classify:reviewFailure,report:options.report}});
+}
+function reviewFailure(error:unknown):import('@nestos/kanban/integration').KanbanOperationFailure {
+    const code=safeCode(error,'OPERATION_OBSERVATION_FAILED'),receipt=error as {executionOutcome?:string;retryable?:boolean;result?:unknown};
+    const unstarted=receipt?.executionOutcome==='not-started';
+    const retry=unstarted&&receipt.retryable===true;
+    const terminal=['FILE_EXCHANGE_SCOPE_INVALID','FILE_EXCHANGE_REQUEST_CHANGED','FILE_EXCHANGE_RESPONSE_CHANGED','FILE_EXCHANGE_RESULT_CONFLICT','FILE_EXCHANGE_LIMIT','FILE_EXCHANGE_CONTEXT_CHANGED'].includes(code)
+        ||unstarted&&!retry||code.startsWith('OPERATION_RESULT_')||code.startsWith('MERGE_PLAN_')||code.startsWith('OPERATION_SOURCE_CHANGED')||code==='OPERATION_RUNNING_VERSION_MISMATCH';
+    return {code,disposition:retry?'retry-unstarted':terminal?'terminal':'unknown',result:receipt?.result};
 }
 async function observeReview(options: ReviewOperationsOptions, job: ReviewJob) {
     if (!job.request) return options.published.inspect(job.input!);

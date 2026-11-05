@@ -1,8 +1,9 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import canonicalFixture from '../../../tools/cells/src/plugin/projects/tests/channel-canonical.json';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import type {SubmissionRequest} from '@nestos/llm-session/contracts';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {advanceChannelExchange, type ChannelExchangeOptions} from '../src/run/channel-exchange';
 import {channelDigest, channelRequests, type ChannelRequest} from '../src/run/channel-protocol';
 import {memoryChannels} from './helpers/session-channels';
@@ -10,7 +11,7 @@ const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); vi.restoreAllMocks();});
 async function fixture() {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/');
-    const journal = new KanbanAutomationJournal(fs); await journal.open(); const directory = '/work/_nestos/kanban';
+    const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open(); const directory = '/work/_nestos/kanban';
     const channels = memoryChannels();
     const request: ChannelRequest = {id: 'question', scopeId: 'operation', method: 'kanban.context.resolve', params: {repository: '.', commits: ['a'.repeat(40)]}};
     const publish = async (value = request) => channels.request(value.scopeId, value.id, value.method, value.params);
@@ -41,7 +42,7 @@ it('survives a lost submission reply and a new coordinator instance without repl
     const f = await fixture(); await f.publish();
     f.submission.start.mockRejectedValueOnce(Object.assign(new Error('Lost reply'), {code: 'TRANSPORT_DISCONNECTED'}));
     expect(await advanceChannelExchange(f.options, f.initial)).toMatchObject({outcome: 'unknown'});
-    const restored = {...f.options, journal: new KanbanAutomationJournal(f.fs)};
+    const restored = {...f.options, journal: new KanbanAutomationJournal(f.fs, kanbanJournalOptions)};
     expect(await advanceChannelExchange(restored, f.initial)).toMatchObject({outcome: 'running'});
     f.complete(); await advanceChannelExchange(restored, f.initial);
     expect(f.submission.start).toHaveBeenCalledOnce(); expect(f.resolve).toHaveBeenCalledOnce();
@@ -50,7 +51,7 @@ it('keeps the frozen response when Cells disconnects during publication and resu
     const f = await fixture(); await f.publish(); f.publishResponse.mockRejectedValueOnce(Object.assign(new Error('offline'), {code: 'ECONNRESET'}));
     await expect(advanceChannelExchange(f.options, f.initial)).rejects.toMatchObject({code: 'ECONNRESET'});
     expect(f.submission.start).not.toHaveBeenCalled(); 
-    await advanceChannelExchange({...f.options, journal: new KanbanAutomationJournal(f.fs)}, f.initial);
+    await advanceChannelExchange({...f.options, journal: new KanbanAutomationJournal(f.fs, kanbanJournalOptions)}, f.initial);
     expect(f.resolve).toHaveBeenCalledOnce(); expect(f.submission.start).toHaveBeenCalledOnce();
 });
 it('rejects changed requests, wrong scopes and changed channel responses', async () => {
@@ -99,7 +100,7 @@ it('recovers a prepared continuation after the coordinator stops before submissi
     await expect(advanceChannelExchange(f.options, f.initial)).rejects.toThrow('Coordinator stopped');
     const saved = await f.journal.get<{phase: string; request: SubmissionRequest}>('channel-exchange:operation');
     expect(saved!.phase).toBe('prepared'); expect(f.submission.start).not.toHaveBeenCalled();
-    await advanceChannelExchange({...f.options, journal: new KanbanAutomationJournal(f.fs)}, f.initial);
+    await advanceChannelExchange({...f.options, journal: new KanbanAutomationJournal(f.fs, kanbanJournalOptions)}, f.initial);
     expect(f.submission.start).toHaveBeenCalledWith(saved!.request); expect(f.resolve).toHaveBeenCalledOnce();
 });
 it('publishes a bounded error response for oversized answers without leaking arbitrary error text', async () => {

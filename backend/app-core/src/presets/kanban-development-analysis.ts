@@ -1,14 +1,15 @@
+import {kanbanJournalOptions} from '../kanban/host-policy';
 import {DEFAULT_KANBAN_WORK_TYPES} from '@nestos/kanban/contracts';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
 import type {PersonalKanbanAutomationOptions} from '../kanban/personal-automation';
-import {KanbanAutomationJournal} from '../kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {developmentPreparation,type DevelopmentWorkspaceRecord} from './kanban-development';
 import {readChannelResult,channelResultInstruction} from '../run/channel-results';
 
 type Options = Parameters<typeof developmentPreparation>[0];
 export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
-    const prepare = developmentPreparation(options), journal = new KanbanAutomationJournal(options.fs),watches=new DirectorySubscriptions();
+    const prepare = developmentPreparation(options), journal = new KanbanAutomationJournal(options.fs, kanbanJournalOptions),watches=new DirectorySubscriptions();
     const prepareAnalysis:NonNullable<PersonalKanbanAutomationOptions['prepareAnalysis']>=async input => {
         const preparation=input.board.automation?.preparation;
         requireValue(preparation,'SESSION_CHANNEL_WORKSPACE_REQUIRED');

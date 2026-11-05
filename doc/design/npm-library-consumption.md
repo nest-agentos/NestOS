@@ -1,6 +1,6 @@
 # 独立库本地快照、源码开发与 npm 构建
 
-MindOS 日常开发默认使用源码，HTTP 发布构建单独消费固定本地制品快照；可选的全工作区快照模式用于制品验收。十五个独立库均位于 `libraries/`（包括 mdxeditor、vfs-ui、durable-kernel、device-tty、kanban），保留 npm 发布能力；既有库使用各自独立仓库与 Git 子模块；kanban 与 mail 已分别接入 nest-agentos 组织的独立 Git 子模块，支持独立构建、打包与本地快照。GitHub 上传和 npm 发布分开执行；本次仅要求上传，新的 npm 版本及其依赖未全部发布前，注册表模式仍须等待发布后验收。libraries 下的子模块目录是唯一开发工作树，不维护另一份发布源码。业务包按前端、后端、共享职责位于 `ui/`、`backend/`、`shared/`；`apps/` 保存宿主。所有目录统一由 pnpm workspace 安装、排序和链接。
+MindOS 日常开发默认使用源码，HTTP 发布构建单独消费固定本地制品快照；可选的全工作区快照模式用于制品验收。十六个独立库均位于 `libraries/`（包括 mdxeditor、vfs-ui、durable-kernel、device-tty、kanban），保留 npm 发布能力；既有库使用各自独立仓库与 Git 子模块；kanban、kanban-ui 与 mail 已分别接入 nest-agentos 组织的独立 Git 子模块，支持独立构建、打包与本地快照。GitHub 上传和 npm 发布分开执行；本次仅要求上传，新的 npm 版本及其依赖未全部发布前，注册表模式仍须等待发布后验收。libraries 下的子模块目录是唯一开发工作树，不维护另一份发布源码。业务包按前端、后端、共享职责位于 `ui/`、`backend/`、`shared/`；`apps/` 保存宿主。所有目录统一由 pnpm workspace 安装、排序和链接。
 
 | 库 | 源码目录 | npm 构建版本 |
 |---|---|---|

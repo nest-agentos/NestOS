@@ -20,7 +20,7 @@ export interface ContinueWorkOptions {
 export function withContinuedWork(executor: KanbanExecutionPort, options: ContinueWorkOptions): KanbanExecutionPort {
     const observe = async (value: Continued, start: boolean) => {
         const result = await options.submission[start ? 'start' : 'inspect'](value.request);
-        const observation = {executionSessionId: result.sessionId, outcome: result.outcome, code: result.code, ...(result.outcome === 'succeeded' ? {outputs: []} : {})};
+        const observation = {controlCapabilities:result.controlCapabilities, executionSessionId: result.sessionId, outcome: result.outcome, code: result.code, ...(result.outcome === 'succeeded' ? {outputs: []} : {})};
         return options.observe ? options.observe(value.dispatch, observation) : observation;
     };
     return {...executor, prepareContinuation: (dispatch, item, previous) => prepare(options, dispatch, item, previous),

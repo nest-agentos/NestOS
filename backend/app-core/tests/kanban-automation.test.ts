@@ -1,6 +1,7 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {readChannelResult} from '../src/run/channel-results';
 import {memoryChannels} from './helpers/session-channels';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {afterEach, expect, it, vi} from 'vitest';
 import {randomUUID} from '@nestos/common';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
@@ -10,7 +11,7 @@ import type {TaskRecord} from '@nestos/durable-kernel';
 import {UserEventService} from '../src/events/service';
 import {DiagnosticJournal} from '../src/diagnostics/journal';
 import {createPersonalKanban} from '../src/kanban/personal';
-import {parseAnalysis} from '../src/kanban/automation-analysis';
+import {parseAnalysis} from '@nestos/kanban/integration';
 import type {PersonalKanbanAutomationOptions} from '../src/kanban/personal-automation';
 
 const disposers: Array<() => Promise<void>> = [];
@@ -47,7 +48,7 @@ async function fixture(autoAccept = false, analysis?:unknown) {
             estimate: {complexity: 1, workUnits: 1, durationMs: 60000, confidence: 'high'}})}} : {message: {content: 'Verified result'}};
         return {id, sessionId: _session, version: 1, effects: {}, exit: {status: 'succeeded', output: {exit: {status: 'succeeded', output}}}} as unknown as TaskRecord;
     })} as unknown as PersonalKanbanAutomationOptions['kernel'];
-    const fileJournal=new KanbanAutomationJournal(fs);await fileJournal.open();
+    const fileJournal=new KanbanAutomationJournal(fs, kanbanJournalOptions);await fileJournal.open();
     const options: PersonalKanbanAutomationOptions = {observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:id=>readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
         prepareSession: vi.fn(async () => true), catalog: vi.fn(async () => targets)};
     const diagnostics = new DiagnosticJournal();

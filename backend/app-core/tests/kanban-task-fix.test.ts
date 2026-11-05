@@ -1,3 +1,5 @@
+import {kanbanControlOptions} from '../src/kanban/control-adapter';
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {memoryChannels} from './helpers/session-channels';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
@@ -6,7 +8,7 @@ import {SeqKanbanStore} from '@nestos/kanban/storage';
 import type {KanbanCommand} from '@nestos/kanban/contracts';
 import type {SessionInstruction, IndependentCallInput} from '@nestos/llm-session/contracts';
 import {createTaskFix} from '../src/kanban/task-fix';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {UserEventService} from '../src/events/service';
 import type {PersonalKanbanAutomationOptions} from '../src/kanban/personal-automation';
 
@@ -14,7 +16,7 @@ const closes:Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});
 async function fixture() {
     const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());
-    const fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs),journal=new KanbanAutomationJournal(fs);await journal.open();
+    const fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs),journal=new KanbanAutomationJournal(fs, kanbanJournalOptions);await journal.open();
     const service=createKanbanModule({store,actor:{kind:'human',id:'admin'},authorize:async()=>{},log(){}});
     await service.create({id:'development',title:'开发',scope:{kind:'system'},policy:{requireEstimate:false},members:[{kind:'human',id:'admin',responsibility:'Manage',roles:['coordinator','worker','reviewer']}]});
     let serial=0;const command=async(command:KanbanCommand)=>service.execute('development',{operationId:'op-'+ ++serial,expectedRevision:(await service.read('development')).revision,command});
@@ -50,7 +52,7 @@ it('creates nothing before exact confirmation, freezes once and roundtrips the f
     expect((await f.service.read('development')).items).toHaveLength(1);
     expect(await f.fix.intercept(fix.sessionId,f.instruction())).toBe(true);
     const file=await f.journal.get<Record<string,unknown>>('fix-definition:'+fix.id);
-    expect(file).toMatchObject({schema:'kanban.fix/1',sourceSessionId:fix.sessionId,confirmation:{messageId:'confirm',content:'完成'},board:{id:'development'},project:{id:'x1'},type:'fix',dependencies:['original']});
+    expect(file).toMatchObject({schema:'kanban.fix/1',sourceSessionId:fix.sessionId,confirmation:{messageId:'confirm',content:'完成'},board:{id:'development'},resource:{id:'x1'},type:'fix',dependencies:['original']});
     const created=(await f.service.read('development')).items.find(item=>item.planning?.kind==='fix')!;
     expect(created).toMatchObject({status:'backlog',title:f.proposal.title,planning:{dependencies:['original']}});
     expect(created.launch!.startAt-created.createdAt).toBe(300000);expect('fixOf' in created).toBe(false);
@@ -99,4 +101,34 @@ it('consumes fix clarifications through the channel and repairs their receipts w
     expect((await f.service.item('development','original')).item.blocked).toBeUndefined();
     expect(f.channels.ensure(fix.id).acks.has('fix-question')).toBe(true);
     expect((await f.events.listNotifications()).items.filter(row=>row.event.value.type==='kanban.fix.clarification')).toHaveLength(1);
+});
+
+it('abandons an unconfirmed fix without creating a task, preserves the original execution and rejects late confirmation after restart',async()=>{
+    const f=await fixture(),fix=await f.run();await f.publish(fix.id);
+    const original=(await f.service.item('development','original')).item;
+    f.calls.list.mockResolvedValue([{input:{request:{submission:{id:fix.id}}},callerState:{settled:true},executionTree:{settled:true}}] as never);
+    expect(await f.fix.cancelFix('development',{fixId:fix.id,operationId:'abandon'})).toMatchObject({state:'cancelled'});
+    await createTaskFix(f.options).scan();
+    expect((await f.service.read('development')).items).toHaveLength(1);
+    expect((await f.service.item('development','original')).item).toEqual(original);
+    await expect(createTaskFix(f.options).intercept(fix.sessionId,f.instruction())).rejects.toMatchObject({code:'FIX_INPUT_CLOSED'});
+    expect(await f.fix.taskFixes('development','original')).toMatchObject([{id:fix.id,state:'cancelled'}]);
+});
+
+it('cancels an already created fix after interrupted acceptance instead of leaving it eligible to start',async()=>{
+    const f=await fixture(),fix=await f.run();await f.publish(fix.id);
+    const original=f.events.journal.transaction.bind(f.events.journal);
+    f.events.journal.transaction=async fn=>original(async tx=>fn({...tx,append:async()=>{throw new Error('Notify unavailable');}}));
+    await expect(f.fix.intercept(fix.sessionId,f.instruction())).rejects.toThrow('Notify unavailable');
+    f.events.journal.transaction=original;
+    f.calls.list.mockResolvedValue([{input:{request:{submission:{id:fix.id}}},callerState:{settled:true},executionTree:{settled:true}}] as never);
+    expect(await f.fix.cancelFix('development',{fixId:fix.id,operationId:'abandon-partial'})).toMatchObject({state:'cancelling'});
+    const created=(await f.service.read('development')).items.find(item=>item.id!=='original')!;
+    expect(created.control?.action).toBe('cancel');
+    const {scanTaskControls}=await import('@nestos/kanban/integration');
+    await scanTaskControls(kanbanControlOptions({calls:{list:async()=>[]}},f.journal),f.journal,await f.service.read('development'),f.service);
+    await createTaskFix(f.options).scan();
+    expect((await f.fix.taskFixes('development','original'))[0].state).toBe('cancelled');
+    expect((await f.service.item('development',created.id)).item.status).toBe('cancelled');
+    expect((await f.service.read('development')).items).toHaveLength(2);
 });

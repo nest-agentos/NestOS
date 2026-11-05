@@ -1,7 +1,7 @@
 import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {KanbanService, KanbanWorkResource, KanbanWorkResourceCleanup, KanbanExternalReference} from '@nestos/kanban/contracts';
-import type {KanbanWorkLog} from '../kanban/work-log';
+import type {KanbanWorkLog} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {developmentWorkspace} from './kanban-development-workspace';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
@@ -14,7 +14,7 @@ import type {RemoteFileSourceProvider} from '../projects/remote-mounts';
 
 const log = createModuleLogger('kanban-work-resources');
 /** Display persisted associations without inspecting Git or contacting a node. */
-export async function developmentSessionResources(journal: import('../kanban/automation-journal').KanbanAutomationJournal, executionId: string) {
+export async function developmentSessionResources(journal: import('@nestos/kanban/integration').KanbanAutomationJournal, executionId: string) {
     const id = executionId.replace(/-postload-(succeeded|failed|cancelled)$/, '');
     const tree = await journal.get<PreparedWorktree>('worktree:' + id);
     if (!tree) return [];
@@ -93,19 +93,23 @@ async function inspectReference(options: Options, boardId: string, itemId: strin
             result: 'failure', code: safeCode(error), resourceId: /^[\w-]{1,128}$/.test(ref.id) ? ref.id : undefined, durationMs: Date.now() - started});
         const tree = /^[\w-]{1,128}$/.test(ref.id) ? await options.journal.get<PreparedWorktree>('worktree:' + ref.id) : undefined;
         return {id: ref.id, kind: 'git-worktree', title: 'Git worktree', location: tree?.directory ?? ref.id, version: '',
-            state: 'unknown', canCleanup: false, reasons: [safeCode(error)], properties: tree ? [{label: t('kanban.workResourceBranch'), value: tree.branch}] : []};
+            ownership: 'unknown', state: 'unknown', canCleanup: false, reasons: [safeCode(error)], properties: tree ? [{label: t('kanban.workResourceBranch'), value: tree.branch}] : []};
     }
 }
 async function inspect(options: Options, boardId: string, resource: ResourceScope): Promise<KanbanWorkResource> {
     const {id, item, record, tree} = resource, saved = await options.journal.get<Cleanup>('worktree-cleanup:' + id);
-    const base = {id, kind: 'git-worktree', title: 'Git worktree', location: record.directory,
+    const context = record.context as {board?: {id?: string}; task?: {id?: string}} | undefined;
+    const ownership = context?.board?.id && context?.task?.id ? context.board.id === boardId && context.task.id === item.id ? 'current' as const : 'other' as const : 'unknown' as const;
+    const base = {id, ownership, kind: 'git-worktree', title: 'Git worktree', location: record.directory,
         properties: [{label: t('kanban.workResourceBranch'), value: tree.branch}, {label: t('kanban.workResourceProject'), value: (await options.projects.get(record.projectId)).name}]};
     if (saved) return {...base, properties: [...base.properties, ...(saved.archive ? [{label: t('kanban.workResourceArchive'), value: saved.archive}] : [])], version: saved.version, state: saved.phase === 'cleaned' ? 'cleaned' : 'unknown', canCleanup: false,
         reasons: saved.phase === 'cleaned' ? [] : ['WORKTREE_CLEANUP_UNCONFIRMED']};
+    if (ownership !== 'current') return {...base, version: sha256HexSync(JSON.stringify([id, ownership, item.revision])), state: 'retained', canCleanup: false, reasons: [ownership === 'other' ? 'WORKTREE_OTHER_OWNER' : 'WORKTREE_ASSOCIATION_UNVERIFIED']};
+    if (await sharedReference(options, boardId, id, item.id)) return {...base,version:sha256HexSync(JSON.stringify([id,'shared',item.revision])),state:'retained',canCleanup:false,reasons:['WORKTREE_SHARED']};
     const state = await developmentWorkspace(options.remote, options.provider, record.projectId, process => inspectWorktree(process, tree, '_nestos/kanban/'));
-    const reasons = worktreeBlockers(state), context = record.context as {board?: {id?: string}; task?: {id?: string}} | undefined;
+    const reasons = worktreeBlockers(state);
     if (context?.board?.id !== boardId || context?.task?.id !== item.id) reasons.push('WORKTREE_ASSOCIATION_UNVERIFIED');
-    if (item.status !== 'completed') reasons.push('WORKTREE_TASK_UNFINISHED');
+    if (!['completed','cancelled'].includes(item.status)) reasons.push('WORKTREE_TASK_UNFINISHED');
     const dispatch = (await options.service.workflow(boardId)).dispatches[id];
     if (dispatch && ['prepared', 'running', 'unknown', 'succeeded'].includes(dispatch.outcome)) reasons.push('WORKTREE_IN_USE');
     if (!reasons.length) reasons.push(...await workResourceExecution(options, id, record.projectId));
@@ -155,8 +159,9 @@ async function remove(options: Options, resource: ResourceScope, key: string, bo
         await developmentWorkspace(options.remote, options.provider, record.projectId, async process => {
             const state = await inspectWorktree(process, tree, '_nestos/kanban/');
             requireValue(!worktreeBlockers(state).length, worktreeBlockers(state)[0] ?? 'WORKTREE_STATE_CHANGED');
+            requireValue(!await sharedReference(options,boardId,id,resource.item.id),'WORKTREE_SHARED');
             const latest = (await options.service.item(boardId, resource.item.id)).item;
-            requireValue(latest.status === 'completed' && sha256HexSync(JSON.stringify([state.version, latest.revision, latest.status, []])) === version, 'WORKTREE_STATE_CHANGED');
+            requireValue(['completed','cancelled'].includes(latest.status) && sha256HexSync(JSON.stringify([state.version, latest.revision, latest.status, []])) === version, 'WORKTREE_STATE_CHANGED');
             requireValue(!(await workResourceExecution(options, id, record.projectId)).length, 'WORKTREE_IN_USE');
             await archiveWorktree(view.fs, options.fs, record.directory, id);
             await options.journal.update<Cleanup>(key, old => ({...old!, phase: 'removing'}));
@@ -170,4 +175,13 @@ function safeCode(error: unknown): string {
     const value = error as {code?: unknown; remoteCode?: unknown}, code = value?.remoteCode ?? value?.code;
     if (code === 'EBUSY') return 'WORK_RESOURCE_NODE_BUSY';
     return typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'WORK_RESOURCE_CHECK_FAILED';
+}
+
+async function sharedReference(options: Options, ownerBoard: string, id: string, ownerItem: string): Promise<boolean> {
+    const boards = new Set([ownerBoard,...(await options.service.catalog()).map(board=>board.id)]);
+    for (const board of boards) {
+        const page = await options.service.query(board,{view:'all',includeDeleted:true,reference:{system:'nestos-worktree',id},limit:2});
+        if (board !== ownerBoard && page.total > 0 || board === ownerBoard && (page.total > 1 || page.items.some(item=>item.id!==ownerItem))) return true;
+    }
+    return false;
 }

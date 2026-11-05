@@ -1,4 +1,5 @@
-import type {Options,SavedFix} from './task-fix-contracts';
+import type {Options} from './task-fix-contracts';
+import type {SavedFix} from '@nestos/kanban/integration';
 import {fixMessages} from './task-fix-channel';
 import {consumeChannelMessages} from '../run/channel-messages';
 /** Clarification notifications belong to the fix Session, never the original execution's blocking state. */
@@ -12,5 +13,5 @@ export async function observeFixMessages(options:Options,fix:SavedFix):Promise<v
                     ...(['clarification','error'].includes(message.type)?{notification:message.type==='error'?'error' as const:'info' as const}:{})},Date.now());
                 await tx.setState(key,'delivered');
             });
-        },async message=>{await options.automation.sessionChannel!(fix.projectId,'acknowledge',{scopeId:fix.id,id:message.id,ack:{status:'delivered'}});});
+        },async message=>{await options.automation.sessionChannel!(fix.resourceId,'acknowledge',{scopeId:fix.id,id:message.id,ack:{status:'delivered'}});});
 }

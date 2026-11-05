@@ -43,6 +43,8 @@ overrides:
   '@nestos/vfsdriver-local': workspace:*
   '@nestos/durable-kernel': workspace:*
   '@nestos/ui-common': workspace:*
+  '@nestos/kanban': workspace:*
+  '@nestos/kanban-ui': workspace:*
 
 pnpmfileChecksum: sha256-uQ0d3PQ0+pbddyWXfxfVRlNdIWzrxNYCQkNeykIDrrU=
 
@@ -1039,7 +1041,28 @@ importers:
         version: 1.6.1(@types/node@20.19.43)(jsdom@27.4.0)
 
   libraries/kanban:
+    devDependencies:
+      '@nestos/vfs-core':
+        specifier: workspace:*
+        version: link:../vfs-core
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.1(@microsoft/api-extractor@7.55.1(@types/node@25.2.3))(jiti@1.21.7)(postcss@8.5.16)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.2)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@25.2.3)(jiti@1.21.7)(jsdom@27.4.0)(tsx@4.20.6)(yaml@2.8.2)
+
+  libraries/kanban-ui:
     dependencies:
+      '@nestos/kanban':
+        specifier: workspace:*
+        version: link:../kanban
       '@nestos/ui-common':
         specifier: workspace:*
         version: link:../ui-common
@@ -1053,9 +1076,6 @@ importers:
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(@microsoft/api-extractor@7.55.1(@types/node@25.2.3))(jiti@1.21.7)(postcss@8.5.16)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.2)
-      tsx:
-        specifier: ^4.20.6
-        version: 4.20.6
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -1487,6 +1507,9 @@ importers:
       '@nestos/kanban':
         specifier: workspace:*
         version: link:../../libraries/kanban
+      '@nestos/kanban-ui':
+        specifier: workspace:*
+        version: link:../../libraries/kanban-ui
       '@nestos/llm-ui-adapter':
         specifier: workspace:*
         version: link:../llm-ui-adapter

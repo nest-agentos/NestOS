@@ -1,5 +1,5 @@
 import {maintenanceInstruction} from './kanban-maintenance';
-import {journalCommand} from '../kanban/journal-command';
+import {journalCommand} from '@nestos/kanban/integration';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
 import {preloadCommitContexts} from './kanban-commit-query';
 import {developmentChannelExchange} from './kanban-channel-exchange';
@@ -11,7 +11,7 @@ import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {Kernel} from '@nestos/durable-kernel';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {ReviewAdapter, ReviewSnapshot, ReviewJob} from '../kanban/item-operation-types';
-import {KanbanAutomationJournal} from '../kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {readContextCatalog} from '../projects/harness-context-catalog';
 import {inspectWorktree} from '../projects/worktree-status';

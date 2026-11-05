@@ -1,10 +1,11 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {memoryChannels} from './helpers/session-channels';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {createKanbanModule} from '@nestos/kanban';
 import {SeqKanbanStore} from '@nestos/kanban/storage';
 import type {KanbanCommand, KanbanService} from '@nestos/kanban/contracts';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {UserEventService} from '../src/events/service';
 import {publishPromptBundle} from '../src/run/prompt-bundle';
 import {developmentObserver} from '../src/presets/kanban-development-observer';
@@ -13,7 +14,7 @@ const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});
 async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, lifecycle?: Parameters<typeof developmentObserver>[0]['lifecycle'], exchange?: Parameters<typeof developmentObserver>[0]['exchange']) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
-    const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs);
+    const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions);
     await journal.open();
     const actor = {kind: 'human' as const, id: 'admin'}, principal = {kind: 'service' as const, id: 'worker'};
     const service = createKanbanModule({store, actor, authorize: async () => {}});
@@ -38,7 +39,7 @@ async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, l
         projects: {get: async () => ({path: '/project'}) as never, openWorkspace: async () => ({fs, dispose: async () => {}}) as never}, wake() {}});
     closes.push(() => observer.dispose());
     const publish = async(id: string,type:string)=>{channels.report('attempt',id,{type,content:'Business message'});};
-    return {fs, directory, scope, publish, channels, service, events, journal, observe: (outcome: 'running' | 'succeeded') => observer.observe({boardId: 'board', dispatch,
+    return {fs, directory, scope, publish, channels, service, events, journal, observe: (outcome: 'running' | 'succeeded' | 'failed' | 'cancelled') => observer.observe({boardId: 'board', dispatch,
         service, worker, observation: {outcome, ...(outcome === 'succeeded' ? {outputs: []} : {})}})};
 }
 it('requires a result and native completion before returning a reviewable observation', async () => {
@@ -127,4 +128,10 @@ it('repairs notification failure from the durable message receipt without changi
     expect(f.channels.ensure('attempt').acks.has('question')).toBe(false);
     fail=false;await f.observe('running');await f.observe('running');
     expect(f.channels.ensure('attempt').acks.has('question')).toBe(true);expect((await f.events.listNotifications()).items.filter(row=>row.event.value.type==='kanban.workspace.clarification')).toHaveLength(1);
+});
+
+it('preserves real cancellation when the legacy business channel is missing',async()=>{
+    const f=await fixture();
+    await f.journal.update('development-workspace:attempt',()=>({projectId:'project'}));
+    expect(await f.observe('cancelled')).toMatchObject({outcome:'cancelled'});
 });

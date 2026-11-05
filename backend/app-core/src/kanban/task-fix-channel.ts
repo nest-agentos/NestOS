@@ -1,4 +1,5 @@
-import type {Definition,Options,SavedFix} from './task-fix-contracts';
+import type {Options} from './task-fix-contracts';
+import type {Definition,SavedFix} from '@nestos/kanban/integration';
 import {requireValue} from './validation';
 import type {ChannelMessage} from '../run/channel-results';
 export function parseDefinition(input:unknown,originalId:string):Definition {
@@ -10,7 +11,7 @@ export function parseDefinition(input:unknown,originalId:string):Definition {
 }
 export async function fixMessages(options:Options,fix:SavedFix):Promise<ChannelMessage[]> {
     requireValue(options.automation.sessionChannel,'SESSION_CHANNEL_REQUIRED');
-    const value=await options.automation.sessionChannel(fix.projectId,'messages',{scopeId:fix.id}) as {messages?:ChannelMessage[]};
+    const value=await options.automation.sessionChannel(fix.resourceId,'messages',{scopeId:fix.id}) as {messages?:ChannelMessage[]};
     requireValue(Array.isArray(value?.messages)&&value.messages.length<=200,'CHANNEL_MESSAGES_INVALID');
     return value.messages;
 }

@@ -1,3 +1,4 @@
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it, vi} from 'vitest';
 import {mkdtemp, mkdir, writeFile, rm, stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -5,7 +6,7 @@ import {join} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {developmentWorkResources} from '../src/presets/kanban-work-resources';
 import {inspectWorktree, worktreeBlockers} from '../src/projects/worktree-status';
 
@@ -30,11 +31,11 @@ async function fixture() {
     }}} as never;
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/');
     await fs.driver.createFile({parentPath: directory + '/_nestos/kanban/inbox', name: 'result.yaml', content: 'Retained evidence', recursive: true});
-    const journal = new KanbanAutomationJournal(fs); await journal.open();
+    const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     await journal.update('worktree:ready', () => tree);
     await journal.update('development-workspace:ready', () => ({directory, projectId: 'project', context: {board: {id: 'board'}, task: {id: 'item'}}}));
     const item = {id: 'item', status: 'completed', revision: 1, externalRefs: [{system: 'nestos-remote-project', id: 'project'}, {system: 'nestos-worktree', id: 'ready'}]};
-    const service = {item: async () => ({item}), read: async () => ({members: [{kind: 'human', id: 'admin', roles: ['coordinator']}]}),
+    const service = {catalog:async()=>[],query:async()=>({items:[],total:0}),item: async () => ({item}), read: async () => ({members: [{kind: 'human', id: 'admin', roles: ['coordinator']}]}),
         currentPrincipal: async () => ({kind: 'human', id: 'admin'}), workflow: async () => ({dispatches: {}})} as never;
     const workLog = {records: vi.fn(async () => ({items: []})), append: vi.fn(async () => {})};
     const mount = {at: '/', access: 'rw', connectionId: 'connection', serverProjectId: 'server-project', serverProjectRevision: 1, serverId: 'server'};
@@ -136,4 +137,28 @@ it('retries only a busy admission that the node confirms did not start', async (
     const f = await fixture(), shell = (f.process as any).nativeShell, original = shell.exec;
     shell.exec = vi.fn().mockRejectedValueOnce(Object.assign(new Error('busy'), {code: 'EIO', remoteCode: 'EBUSY', outcome: 'not-committed'})).mockImplementation(original);
     expect((await f.api.workResources('board', 'item'))[0]).toMatchObject({state: 'cleanup-ready'});
+});
+
+it('retains a resource owned by another board before contacting Git and refuses cleanup', async () => {
+    const f=await fixture();
+    const journal=new KanbanAutomationJournal(f.fs, kanbanJournalOptions);await journal.open();
+    await journal.update('development-workspace:ready',()=>({directory:f.tree.directory,projectId:'project',context:{board:{id:'another-board'},task:{id:'another-task'}}}));
+    f.commands.splice(0);
+    const rows=await f.api.workResources('board','item');
+    expect(rows[0]).toMatchObject({ownership:'other',state:'retained',canCleanup:false,reasons:['WORKTREE_OTHER_OWNER']});
+    expect(f.commands).toEqual([]);
+    await expect(f.api.cleanupWorkResource('board',{itemId:'item',resourceId:'ready',version:rows[0].version,operationId:'foreign-cleanup'})).rejects.toMatchObject({code:'WORKTREE_OTHER_OWNER'});
+    expect(await stat(f.physical)).toBeDefined();expect(f.commands).toEqual([]);
+});
+
+it('retains a worktree referenced by another board before inspecting or removing Git state',async()=>{
+    const f=await fixture(),service=f.service as unknown as {catalog():Promise<Array<{id:string}>>;query:ReturnType<typeof vi.fn>};
+    service.catalog=async()=>[{id:'another-board'}];service.query=vi.fn(async(board:string)=>board==='another-board'?({items:[{id:'other-task'}],total:1}):({items:[],total:0}));
+    f.commands.splice(0);
+    const [resource]=await f.api.workResources('board','item');
+    expect(resource).toMatchObject({state:'retained',canCleanup:false,reasons:['WORKTREE_SHARED']});
+    expect(service.query).toHaveBeenCalledWith('another-board',expect.objectContaining({reference:{system:'nestos-worktree',id:'ready'},includeDeleted:true}));
+    expect(f.commands).toEqual([]);
+    await expect(f.api.cleanupWorkResource('board',{itemId:'item',resourceId:'ready',version:resource.version,operationId:'shared-cleanup'})).rejects.toMatchObject({code:'WORKTREE_SHARED'});
+    expect(await stat(f.physical)).toBeDefined();
 });

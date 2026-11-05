@@ -1,16 +1,17 @@
+import {kanbanJournalOptions} from '../kanban/host-policy';
 import {consumeChannelMessages} from '../run/channel-messages';
 import {createModuleLogger} from '@nestos/common';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 import {readContextCatalog, type ContextInspector} from '../projects/harness-context-catalog';
 import type {PreparedWorktree} from '../projects/worktree-preparation';
-import {journalCommand} from '../kanban/journal-command';
+import {journalCommand} from '@nestos/kanban/integration';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {ProjectService} from '@nestos/app-contracts/services';
 import type {KanbanCommand} from '@nestos/kanban/contracts';
 import {unresolvedWorkIssues, type WorkMessage} from '@nestos/kanban/execution';
-import {KanbanAutomationJournal} from '../kanban/automation-journal';
-import {REMOTE_PROJECT_REFERENCE} from '../kanban/record-execution';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {REMOTE_PROJECT_REFERENCE} from '../kanban/resource-catalog';
 import type {PersonalKanbanAutomationOptions} from '../kanban/personal-automation';
 import type {UserEventService} from '../events/service';
 
@@ -22,13 +23,24 @@ interface Options {exchange?: ReturnType<typeof import('./kanban-channel-exchang
     remote?: Pick<import('../projects/remote-mounts').ProjectRemoteMountService, 'projectHarness' | 'sessionChannel'>; wake(): void}
 
 export function developmentObserver(options: Options) {
-    const journal = new KanbanAutomationJournal(options.fs);
+    const journal = new KanbanAutomationJournal(options.fs, kanbanJournalOptions);
     const watches = new DirectorySubscriptions(); let stopped = false;
     const observe: NonNullable<PersonalKanbanAutomationOptions['observeWork']> = async input => {
         if (stopped) return input.observation;
         const worktree = await journal.get<PreparedWorktree>('worktree:' + input.dispatch.id);
         if (!worktree) return input.observation;
         const {item} = await input.service.item(input.boardId, input.dispatch.itemId);
+        const stopping = (await input.service.read(input.boardId)).lifecycle !== undefined;
+        if (['failed', 'cancelled'].includes(input.observation.outcome)) {
+            const started=Date.now();
+            if (!stopping && item.control?.action !== 'cancel') try {await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);}
+            catch (error) {
+                const code = (error as {code?: string}).code;
+                createModuleLogger('kanban').warn('Stopped execution postload unavailable', {operation:'kanban.observe', operationId:input.dispatch.id, stage:'lifecycle.enqueue', result:'failure',
+                    code:code && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'LIFECYCLE_PREPARATION_FAILED', durationMs:Date.now()-started});
+            }
+            await close(input.dispatch.id); return input.observation;
+        }
         const projectId = item.externalRefs?.find(ref => ref.system === REMOTE_PROJECT_REFERENCE)?.id;
         if (!projectId) throw Object.assign(new Error('Missing workspace project binding'), {code: 'WORKSPACE_PROJECT_MISSING'});
         const workspace = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id);
@@ -53,13 +65,13 @@ export function developmentObserver(options: Options) {
             if (options.exchange && !unresolved.length) input = {...input, observation: await options.exchange({id: input.dispatch.id, record: workspace, service: input.service, observation: input.observation,
                 finalPublished: messages.some(message => message.type === 'result')})};
             if (['failed', 'cancelled'].includes(input.observation.outcome)) {
-                await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);
+                if (!stopping) await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);
                 await close(input.dispatch.id);
             }
             if (input.observation.outcome !== 'succeeded') return input.observation;
             if (unresolved.some(message => message.type === 'error')) {
                 const failed = {...input.observation, outcome: 'failed' as const, outputs: undefined, code: 'WORKSPACE_ERROR_REPORTED'};
-                await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, failed);
+                if (!stopping) await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, failed);
                 await close(input.dispatch.id); return failed;
             }
             if (unresolved.some(message => message.type === 'clarification')) return {...input.observation, outcome: 'running', outputs: undefined, code: 'WORKSPACE_INPUT_REQUIRED'};
@@ -75,8 +87,8 @@ export function developmentObserver(options: Options) {
             const {item: current} = await input.worker.item(input.boardId, input.dispatch.itemId);
             if (current.blocked?.reason === 'WORKSPACE_ERROR_REPORTED' && await journal.get('delivery-blocked:' + input.dispatch.id))
                 await once(journal, input, 'delivery-unblock', {type: 'unblock-item', itemId: current.id, token: input.dispatch.fence});
-            await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);
-            if (options.lifecycle && !await options.lifecycle.settled(input.dispatch.id, input.observation.outcome))
+            if (!stopping) await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);
+            if (!stopping && options.lifecycle && !await options.lifecycle.settled(input.dispatch.id, input.observation.outcome))
                 return {...input.observation, outcome: 'running', outputs: undefined, code: 'LIFECYCLE_PENDING'};
             const outputs=await journal.artifact(input.dispatch.id,messages.filter(message=>message.type==='result'));
             await close(input.dispatch.id); return {...input.observation,outputs};

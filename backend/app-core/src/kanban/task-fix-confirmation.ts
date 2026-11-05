@@ -1,7 +1,9 @@
+import {KanbanCollaboration} from '@nestos/kanban/integration';
 import fixPolicy from '../presets/kanban-fix.json';
 import {sha256HexSync} from '@nestos/common';
 import type {SessionInstruction} from '@nestos/llm-session/contracts';
-import type {Options,SavedFix,Snapshot} from './task-fix-contracts';
+import type {Options} from './task-fix-contracts';
+import type {SavedFix,Snapshot} from '@nestos/kanban/integration';
 import {parseDefinition,fixMessages} from './task-fix-channel';
 import {acceptSnapshot} from './task-fix-acceptance';
 import {requireValue} from './validation';
@@ -18,9 +20,6 @@ export async function confirmFix(options:Options,fix:SavedFix,input:SessionInstr
     requireValue(proposal,'FIX_PROPOSAL_REQUIRED');
     const definition=parseDefinition(proposal.message.payload,fix.item.id);
     const snapshot:Snapshot={proposalId:proposal.id,messageId:input.id,content:fixPolicy.confirmation,definition,digest,operationId:'fix-'+sha256HexSync(JSON.stringify([id,input.id])).slice(0,48)};
-    const frozen=await options.journal.update<SavedFix>('fix:'+id,old=>{
-        requireValue(!old?.snapshot||old.snapshot.messageId===snapshot.messageId&&old.snapshot.digest===digest,'FIX_INPUT_CLOSED');
-        return old?.snapshot?old:{...old!,snapshot,state:'frozen'};
-    });
+    const frozen=await new KanbanCollaboration(options.service,options.journal).confirmFix(id,snapshot);
     await acceptSnapshot(options,frozen);return true;
 }

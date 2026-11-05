@@ -1,17 +1,20 @@
+import {kanbanControlOptions} from '../src/kanban/control-adapter';
+import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {createKanbanModule} from '@nestos/kanban';
 import {SeqKanbanStore} from '@nestos/kanban/storage';
 import type {KanbanCommand, KanbanWorkType} from '@nestos/kanban/contracts';
 import type {ProjectService} from '@nestos/app-contracts/services';
-import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
-import {createRecordExecution, validateRemoteReferences} from '../src/kanban/record-execution';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {createRecordExecution} from '@nestos/kanban/integration';
+import {validateRemoteReferences, projectResourceCatalog} from '../src/kanban/resource-catalog';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close();});
 async function fixture(enabled = true, workTypes?: KanbanWorkType[]) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); cleanup.push(() => manager.dispose());
-    const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs);
+    const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions);
     await journal.open();
     const actor = {kind: 'human' as const, id: 'admin'}, log = vi.fn();
     const service = createKanbanModule({store, actor, authorize: async () => {}, log});
@@ -28,7 +31,7 @@ async function fixture(enabled = true, workTypes?: KanbanWorkType[]) {
         coordinator: {kind: 'service', id: 'planner'}, worker: {kind: 'service', id: 'worker'}}});
     await command({type: 'append-record', record: {id: 'decision', kind: 'decision', title: 'Goal', content: 'PRIVATE_REQUIREMENT', rationale: 'Acceptance criteria', itemIds: [], sources: [],
         externalRefs: ['one', 'two'].map(id => ({system: 'nestos-remote-project', id}))}});
-    const open = () => createRecordExecution({service, journal, projects, log});
+    const open = () => createRecordExecution({service, journal, resources: projectResourceCatalog(projects), log});
     return {service, command, open, projects, log, journal};
 }
 
@@ -176,4 +179,26 @@ it('quiesces at a committed decision boundary and reopens with the same run and 
     const receipt = await f.journal.get<Record<string, unknown>>('record-operation:safe-restart');
     expect(receipt).toMatchObject({schema: 2, id: before.id, sourceBoardId: 'source'});
     expect(receipt).not.toHaveProperty('state'); expect(receipt).not.toHaveProperty('record');
+});
+
+it('cancels all decision descendants, resumes cancellation after restart and permits logical record deletion',async()=>{
+    const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+    const run=await f.open().runRecord('source',{operationId:'run',recordId:'decision',expectedRevision:2});
+    await f.open().controlRecord('source',{recordId:'decision',operationId:'cancel-decision',action:'cancel'});
+    const board=await f.service.read('source');expect(board.items.every(item=>item.control?.action==='cancel')).toBe(true);
+    const {scanTaskControls}=await import('@nestos/kanban/integration');
+    for(let pass=0;pass<3;pass++)await scanTaskControls(kanbanControlOptions({calls:{list:async()=>[]}},f.journal),f.journal,await f.service.read('source'),f.service);
+    await f.open().scan();
+    expect((await f.service.read('source')).items.every(item=>item.status==='cancelled')).toBe(true);
+    expect(await f.service.record('source','decision')).toMatchObject({status:'cancelled'});
+    expect((await f.open().recordExecutions('source','decision')).find(row=>row.id===run.id)?.state).toBe('cancelled');
+    await f.command({type:'delete-record',recordId:'decision'});
+    expect((await f.service.records('source',{kind:'decision'})).items).toEqual([]);
+    expect((await f.service.record('source','decision')).deletedAt).toBeTypeOf('number');
+});
+it('cancels a decision with no execution without materializing work or contacting project resources',async()=>{
+    const f=await fixture();
+    await f.open().controlRecord('source',{recordId:'decision',operationId:'cancel-draft',action:'cancel'});
+    expect((await f.service.read('source')).items).toEqual([]);
+    expect(await f.service.record('source','decision')).toMatchObject({status:'cancelled'});
 });

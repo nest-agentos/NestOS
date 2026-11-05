@@ -5,7 +5,7 @@ import type {IndependentCallView} from '@nestos/llm-session/contracts';
 import type {ProjectConversationPort} from '@nestos/app-contracts/services';
 import type {ContextBinding} from '@nestos/kernel-adapters/contracts';
 import type {ProjectRemoteMountService} from '../projects/remote-mounts';
-import type {KanbanAutomationJournal} from '../kanban/automation-journal';
+import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 
 export interface ResourceExecutionOptions {
     calls: Pick<IndependentCallService, 'list'>; kernel: ContextInspector;

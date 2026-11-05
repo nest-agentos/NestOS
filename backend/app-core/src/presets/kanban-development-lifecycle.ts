@@ -6,14 +6,14 @@ import type {KanbanDispatch, KanbanItem, KanbanSessionAssociation} from '@nestos
 import type {KanbanExecutionObservation} from '@nestos/kanban/execution';
 import type {UserEventService} from '../events/service';
 import {createPublishedKanbanWorkExecutor, type PublishedKanbanWorkOptions} from '../kanban/published-work';
-import {KanbanAutomationJournal} from '../kanban/automation-journal';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {DevelopmentPolicy} from './kanban-development-policy';
 import {currentChannelBinding,openDevelopmentChannel,type DevelopmentWorkspaceRecord} from './kanban-development';
 import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import {failure, hasMarkdownSection} from '../run/prompt-bundle';
 
 interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'kernel' | 'prepareSession'> {remote?:Pick<ProjectRemoteMountService,'sessionChannel'>;authorize?(boardId: string): Promise<boolean>; journal: KanbanAutomationJournal; events: UserEventService}
-interface Job {id: string; boardId: string; dispatch: KanbanDispatch; stage: string; request: unknown; phase: 'prepared' | 'submitting'; done?: boolean; observation?: KanbanExecutionObservation}
+interface Job {id: string; boardId: string; dispatch: KanbanDispatch; stage: string; request: unknown; phase: 'prepared' | 'submitting' | 'settled'; done?: boolean; observation?: KanbanExecutionObservation}
 /** Terminal hooks are independent calls; cancellation never sends into the stopped turn. */
 interface State {stopped: boolean; pending?: Promise<void>; executor: ReturnType<typeof createPublishedKanbanWorkExecutor>}
 export function developmentLifecycle(options: Options) {

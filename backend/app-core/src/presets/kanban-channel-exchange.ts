@@ -2,7 +2,7 @@ import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {Kernel} from '@nestos/durable-kernel';
 import type {KanbanService} from '@nestos/kanban/contracts';
 import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../projects/remote-mounts';
-import type {KanbanAutomationJournal} from '../kanban/automation-journal';
+import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {sessionSubmission, SessionSubmissionObservation} from '../run/session-submission';
 import {failure} from '../run/prompt-bundle';
 import {advanceChannelExchange} from '../run/channel-exchange';
