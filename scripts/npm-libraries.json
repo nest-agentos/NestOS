@@ -86,7 +86,7 @@
   {
     "directory": "kanban-ui",
     "name": "@nestos/kanban-ui",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
