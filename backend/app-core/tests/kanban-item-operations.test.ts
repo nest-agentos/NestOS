@@ -125,6 +125,7 @@ it('retains the agent prerequisite explanation when an operation reports blocked
 it('persists build-time replacement consent and starts the replacement once across restart',async()=>{
     const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build','build-auto',{followUp:'deploy'});
     expect(f.published.start).toHaveBeenCalledOnce();f.complete('build-auto');
+    const queued=await f.api.itemOperations('board','task');expect(queued.operations.find(op=>op.id==='deploy')).toMatchObject({state:'running',hideRun:true});expect(f.published.start).toHaveBeenCalledOnce();
     await f.api.quiesce();const restored=createItemOperations(f.options);closes.push(()=>restored.quiesce());await restored.scan();
     expect(f.published.start).toHaveBeenCalledTimes(2);
     const settings=await f.journal.get<any>(reviewKey('board','task')),id=settings.jobs.at(-1);
