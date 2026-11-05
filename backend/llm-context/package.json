@@ -15,6 +15,11 @@
       "types": "./src/contracts/digest.ts",
       "import": "./src/contracts/digest.ts",
       "default": "./src/contracts/digest.ts"
+    },
+    "./prompt": {
+      "types": "./src/contracts/prompt-markdown.ts",
+      "import": "./src/contracts/prompt-markdown.ts",
+      "default": "./src/contracts/prompt-markdown.ts"
     }
   },
   "scripts": {
@@ -57,6 +62,16 @@
         "require": {
           "types": "./dist/digest.d.cts",
           "default": "./dist/digest.cjs"
+        }
+      },
+      "./prompt": {
+        "import": {
+          "types": "./dist/prompt.d.ts",
+          "default": "./dist/prompt.js"
+        },
+        "require": {
+          "types": "./dist/prompt.d.cts",
+          "default": "./dist/prompt.cjs"
         }
       }
     }

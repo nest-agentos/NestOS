@@ -20,4 +20,4 @@ export { scheduleContextGc, validateContextGcSchedule, type ContextGcScheduleOpt
 
 export { simpleHash } from './content/fingerprint';
 
-export {formatPromptSections, formatPromptMessages, type PromptSection} from './assembly/prompt-markdown';
+export {formatPromptSections, formatPromptMessages, type PromptSection} from './contracts/prompt-markdown';

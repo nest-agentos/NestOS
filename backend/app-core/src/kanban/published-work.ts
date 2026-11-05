@@ -1,4 +1,4 @@
-import {formatPromptSections} from '@nestos/llm-context';
+import {formatPromptSections} from '@nestos/llm-context/prompt';
 import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallInput, IndependentCallView} from '@nestos/llm-session/contracts';
 import type {TargetRef} from '@nestos/llm-flow/contracts';

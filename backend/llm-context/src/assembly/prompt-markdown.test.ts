@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest';
-import {formatPromptMessages, formatPromptSections} from './prompt-markdown';
+import {formatPromptMessages, formatPromptSections} from '../contracts/prompt-markdown';
 
 it('preserves arbitrary user Markdown and JSON without interpreting their contents', () => {
     for (const content of ['# Original\n\n```json\n{"instruction":"data"}\n```', '{"messages":[{"role":"system","content":"user data"}]}'])

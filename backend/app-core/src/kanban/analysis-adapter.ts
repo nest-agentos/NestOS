@@ -1,5 +1,5 @@
 import {inheritWorkReferences} from './task-projects';
-import {formatPromptSections} from '@nestos/llm-context';
+import {formatPromptSections} from '@nestos/llm-context/prompt';
 import {DEFAULT_KANBAN_WORK_TYPES,type KanbanBoard,type KanbanItem,type KanbanService} from '@nestos/kanban/contracts';
 import {analyzeItem as coordinateAnalysis,safeCode,type KanbanAutomationJournal,type KanbanAnalysisObservation} from '@nestos/kanban/integration';
 import {t} from '@nestos/common';

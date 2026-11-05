@@ -1,4 +1,4 @@
-import {formatPromptSections} from '@nestos/llm-context';
+import {formatPromptSections} from '@nestos/llm-context/prompt';
 import type {KanbanClient} from '@nestos/kanban/contracts';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import {taskReplies as createReplies,type KanbanAutomationJournal,type FrozenReply as Reply} from '@nestos/kanban/integration';

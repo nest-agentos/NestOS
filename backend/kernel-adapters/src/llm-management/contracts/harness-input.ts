@@ -1,4 +1,4 @@
-import {formatPromptMessages} from '@nestos/llm-context';
+import {formatPromptMessages} from '@nestos/llm-context/prompt';
 import type {HarnessInputAttachment, HarnessInlineAttachment, HarnessAssetAttachment} from './harness-execution';
 import {sha256HexSync} from '@nestos/llm-context/digest';
 
