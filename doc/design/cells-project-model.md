@@ -567,3 +567,7 @@ DSH 展示投影不将明确来源为 agent-instructions、runtime-context、too
 `session_report` 提供 progress、clarification、resolved、result 等不可变业务消息；MCP 发布成功仅证明消息持久化。消息发布事务同时将当前 sessionId、turnId、operationId、revision 保存到 publications 表，固定 API 返回服务端来源。重复相同消息 ID 不覆盖正文或来源，重启保留来源。`session_context` 的 channel-status 只返回报告 ID、类型、replyTo 与宿主回执，不重复输出正文。
 
 业务状态的解释归调用方，Cells 继续提供原生执行状态；两者不能相互替代。条件关闭通道在事务中核对 expectedExecutionRevision 与空闲状态，避免检查后新轮次启动造成错误释放。
+
+### 远程会话客户端状态
+
+`projectClientState: 1` 声明固定 API `project_client_state`，按获授权的项目、principal 和私有 key 保存不透明值。读取和 CAS 均核对项目 revision，写入要求 rw；此能力不暴露给 agent MCP。客户端状态用于远程输入草稿、发送回执与指令队列，原生聊天历史仍只由 harness 保存。小记录原位保存，大记录按唯一代次分块并核验摘要；NestOS 本机只保留会话定位和是否需要恢复的索引，不保存正文。旧本机记录先复制并核验远端结果，再移除本机当前正文；迁移失败保留原输入以便继续核对。

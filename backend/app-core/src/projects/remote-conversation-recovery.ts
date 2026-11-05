@@ -56,8 +56,8 @@ async function recoverTarget(target: RemoteConversationRecoveryTarget,
 }
 
 function recoveryTarget(key: string, value: string): RemoteConversationRecoveryTarget | undefined {
-    const record = JSON.parse(value) as HarnessRecovery;
-    const work = record.instructionQueue?.items.length || record.pending || record.responses?.length
+    const record = JSON.parse(value) as HarnessRecovery & {remote?:boolean;needsRecovery?:boolean};
+    const work = record.remote&&record.needsRecovery||record.instructionQueue?.items.length || record.pending || record.responses?.length
         || record.controls?.some(item => item.receipt === 'pending' || item.receipt === 'accepted' && !item.terminal);
     if (!work) return;
     const parts: unknown = JSON.parse(key);

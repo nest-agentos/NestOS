@@ -6,7 +6,7 @@ Kanban 通用规则、契约与 SeqFile 存储位于独立库 `@nestos/kanban`�
 
 远程原生队列启动恢复由 projects/remote-conversation-recovery 扫描当前用户已有 journal，重验连接、项目、principal 与稳定会话身份后挂入 ConversationRegistry。恢复只建立观察和读取基线，不直接重发原指令；失效绑定或不可用远端保留 deferred 与原记录。所有存储沿注入 IFileSystem 的 SeqFile CAS，不创建跨用户全局 events.seq，也不把会话恢复策略放进 vfs-core。
 
-projects/remote-conversation-retry 对暂时性观察接线失败按 15 至 60 秒退避，仅重试失败目标并重新读取原 journal；授权变化/身份冲突不自动放行。原 journal 是跨重启索引，重试集合只用于进程内调度；dispose 先关闭重试循环并等待当前扫描，再释放 Registry。
+projects/remote-conversation-retry 对暂时性观察接线失败按 15 至 60 秒退避，仅重试失败目标并重新读取原 journal；授权变化/身份冲突不自动放行。NestOS 本机只存不含正文的恢复索引；会话草稿、操作台账及队列正文由 Cells 私有项目状态存储持有。原生历史始终归 harness。旧本机状态经远端确认后移除当前正文。该索引用于跨重启恢复，重试集合只用于进程内调度；dispose 先关闭重试循环并等待当前扫描，再释放 Registry。
 
 平台无关的**应用用例与装配层**：封装项目组织、配置关联操作等应用策略，并把 VFS / LLM 设备驱动 / durable-kernel / kernel-adapters / llm-session / llm-flow 装配成运行时，供 Tauri、Web 与 CLI 共用。详见 [运行时架构](../../doc/runtime-architecture.md)、[包结构](../../doc/pkgstructure.md)。
 

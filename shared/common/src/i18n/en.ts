@@ -4289,6 +4289,8 @@ export const en: LocaleStrings = {
     'chatInput.draft.conflict': 'Another view changed this branch draft. Your input is preserved; choose how to proceed.',
     'chatInput.draft.changed': 'The input or saved draft changed during recovery. Review and choose again.',
     'chatInput.draft.unavailable': 'The host does not support conditional draft saves. Update the host and retry.',
+    'chatInput.remoteSaveUnknown': 'Remote input saving is unconfirmed. Keep this page and retry.',
+    'chatInput.remoteSaveConflict': 'Remote input changed in another window. Copy your current input before reopening the conversation.',
     'chatInput.draft.saveFailed': 'The draft has not been safely saved. Keep this page and retry.',
     'chatInput.draft.load': 'Load saved draft',
     'chatInput.draft.replace': 'Replace with current draft',

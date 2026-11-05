@@ -4302,6 +4302,8 @@ export const zhCN = {
     'chatInput.draft.conflict': '另一视图修改了此分支草稿。当前输入已保留，请选择如何处理。',
     'chatInput.draft.changed': '处理期间输入或已保存草稿又有变化，请重新选择。',
     'chatInput.draft.unavailable': '当前宿主不支持草稿条件保存，请更新宿主后重试。',
+    'chatInput.remoteSaveUnknown': '远程输入保存尚未确认，请保留当前页面并重试。',
+    'chatInput.remoteSaveConflict': '远程输入已在其他窗口发生变化。请先复制当前输入，再重新打开会话。',
     'chatInput.draft.saveFailed': '草稿尚未安全保存，请保留当前页面并重试。',
     'chatInput.draft.load': '加载已保存草稿',
     'chatInput.draft.replace': '用当前草稿替换',

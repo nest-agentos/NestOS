@@ -41,3 +41,26 @@ it('retains both the processed attachment and its original image across a host h
     expect(new Uint8Array(await (await image.read(metadata.original, {signal: new AbortController().signal})).arrayBuffer())).toEqual(new Uint8Array([2, 3]));
     expect(restored.draft.attachments[0]).toEqual(draft.attachments[0]);
 });
+
+it('recovers an uncommitted draft write with its original ID instead of getting stuck in SAVE_UNKNOWN',async()=>{
+    const f=fixture(),original=f.controls.saveComposerDraft!,calls:Array<{id:string;revision:string}>=[];
+    f.controls.saveComposerDraft=async(data,revision,id)=>{calls.push({id,revision});if(calls.length===1)throw Error('Offline before commit');return original(data,revision,id);};
+    const store=(await NativeChatStore.open(f.controls))!,draft={...store.draft,revision:1,textRevision:1,text:'Clarification'};
+    await store.saveDraft(draft);expect(calls).toHaveLength(2);expect(calls[0]).toEqual(calls[1]);
+    expect(store.draft.text).toBe('Clarification');expect(f.send).not.toHaveBeenCalled();
+});
+it('reconciles a lost committed reply without saving or sending again',async()=>{
+    const f=fixture(),original=f.controls.saveComposerDraft!,save=vi.fn(async(data:string,revision:string,id:string)=>{await original(data,revision,id);throw Error('Lost response');});
+    f.controls.saveComposerDraft=save;
+    const store=(await NativeChatStore.open(f.controls))!;
+    await store.saveDraft({...store.draft,revision:1,text:'Saved remotely'});
+    expect(save).toHaveBeenCalledTimes(1);expect(store.draft.text).toBe('Saved remotely');expect(f.send).not.toHaveBeenCalled();
+});
+it('preserves later typing while reconciling the exact uncertain write before the next save',async()=>{
+    const f=fixture(),original=f.controls.saveComposerDraft!,ids:string[]=[];
+    f.controls.saveComposerDraft=async(data,revision,id)=>{ids.push(id);if(ids.length<=2)throw Error('Offline');return original(data,revision,id);};
+    const store=(await NativeChatStore.open(f.controls))!,draft=store.draft;
+    await expect(store.saveDraft({...draft,revision:1,text:'First'})).rejects.toThrow('Offline');
+    await store.saveDraft({...draft,revision:2,textRevision:2,text:'Later typing'});
+    expect(new Set(ids.slice(0,3)).size).toBe(1);expect(store.draft.text).toBe('Later typing');expect(f.send).not.toHaveBeenCalled();
+});

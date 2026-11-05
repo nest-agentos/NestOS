@@ -1,8 +1,8 @@
 import type {ConversationComposerDraft, ConversationControls} from '../contracts';
 import {StoredChatImages} from './stored-chat-images';
 import type {ImageEditingHost} from './image-editing';
-import {createModuleLogger, randomUUID} from '@nestos/common';
-import {createOperationLedger, type AttachmentRef, type ComposerDraft, type OperationRecord} from '@nestos/llm-ui';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import {createOperationLedger, mergeOperationRecords, type AttachmentRef, type ComposerDraft, type OperationRecord} from '@nestos/llm-ui';
 
 import {readDraftFiles} from '../services/DraftFilesCodec';
 import {draftFileId} from '../domain/draft-file-identity';
@@ -15,7 +15,7 @@ interface StoredChat {version: 1; draft: ComposerDraft; operations: readonly Ope
 export class NativeChatStore {
     readonly images: StoredChatImages;
     private tail: Promise<unknown> = Promise.resolve();
-    private uncertain?: {id: string; data: string};
+    private uncertain?: {id: string; data: string; revision:string};
     private suspended = false;
     private value!: StoredChat;
     private document: Record<string, unknown> = {};
@@ -53,12 +53,17 @@ export class NativeChatStore {
     }
     get draft(): ComposerDraft {return structuredClone(this.value.draft);}
     ledger() {
-        return createOperationLedger({initial: this.value.operations, save: records => this.enqueue(async () => {
-            const added = records.find(record => !this.value.operations.some(previous => previous.context.operationId === record.context.operationId));
-            const draft = added?.draft && added.draft.revision >= this.value.draft.revision ? added.draft : this.value.draft;
-            await this.write({...this.value, draft: structuredClone(draft), operations: structuredClone(records)});
-        })});
+        return createOperationLedger({initial:this.value.operations,save:async records=>{
+            await this.enqueue(async()=>{
+                const merged=mergeOperationRecords(this.value.operations,records);
+                const added=merged.find(record=>!this.value.operations.some(previous=>previous.context.operationId===record.context.operationId));
+                const draft=added?.draft&&added.draft.revision>=this.value.draft.revision?added.draft:this.value.draft;
+                await this.write({...this.value,draft:structuredClone(draft),operations:merged});
+            });
+            return structuredClone(this.value.operations);
+        }});
     }
+
     saveDraft(draft: ComposerDraft): Promise<void> {
         const captured = structuredClone(draft);
         return this.enqueue(async () => {if (captured.revision >= this.value.draft.revision) await this.write({...this.value, draft: captured});});
@@ -121,36 +126,41 @@ export class NativeChatStore {
         this.value = {...this.value, operations: [...this.value.operations, operation]};
     }
     private enqueue(work: () => Promise<void>): Promise<void> {
-        const pending = this.tail.catch(() => {}).then(work); this.tail = pending; return pending;
+        const pending = this.tail.catch(() => {}).then(async()=>{if(this.uncertain)await this.reconcile();return work();}); this.tail = pending; return pending;
     }
     private async write(next: StoredChat): Promise<void> {
         if (this.suspended) throw Object.assign(new Error('Chat storage binding expired'), {code: 'STALE_VIEW'});
         if (this.uncertain) await this.reconcile();
         const document = {...this.document}, marker = document.remoteSubmission as {id?: string} | undefined;
         if (marker && next.operations.some(record => record.context.operationId === marker.id && ['accepted', 'rejected'].includes(record.status))) delete document.remoteSubmission;
-        const data = JSON.stringify({...document, independentChat: next, chatImages: this.images.snapshot()}), id = randomUUID(), started = Date.now();
+        const data = JSON.stringify({...document, independentChat: next, chatImages: this.images.snapshot()}), id = randomUUID(), started = Date.now(),revision=this.state.revision;
         try {
-            this.state = await this.controls.saveComposerDraft!(data, this.state.revision, id);
+            this.state = await this.controls.saveComposerDraft!(data, revision, id);
             if (this.state.data !== data) throw Object.assign(new Error('Saved chat differs from the proposed state'), {code: 'ECONFLICT'});
         } catch (error) {
             const failure = error as {outcome?: string; code?: string; remoteCode?: string};
             if (failure.outcome === 'not-committed' || ['ECONFLICT', 'EACCES', 'EINVAL'].includes(failure.remoteCode ?? failure.code ?? '')) {
                 report(id, 'save', started, error); throw error;
             }
-            this.uncertain = {id, data};
-            try {await this.reconcile();} catch {report(id, 'save-unknown', started, error); throw error;}
+            this.uncertain = {id, data,revision};
+            try {await this.reconcile();} catch (reconcileError) {report(id,'save-unknown',started,reconcileError);throw reconcileError;}
         }
         this.value = next; this.document = JSON.parse(data); this.savedDraft = JSON.stringify(next.draft);
         report(id, 'save', started);
     }
     private async reconcile(): Promise<void> {
         const pending = this.uncertain!;
-        const observed = await this.controls.readComposerDraft!();
-        if (!observed.acceptedOperationIds.includes(pending.id))
-            throw Object.assign(new Error('Chat save outcome is unknown; retry saving to query its receipt'), {code: 'SAVE_UNKNOWN'});
+        let observed = await this.controls.readComposerDraft!();
+        if(!observed.acceptedOperationIds.includes(pending.id)){
+            if(observed.revision!==pending.revision){this.uncertain=undefined;this.suspended=true;
+                throw Object.assign(new Error(t('chatInput.remoteSaveConflict')),{code:'ECONFLICT'});}
+            // Retry only the same conditional draft write; this never resends a harness message.
+            observed=await this.controls.saveComposerDraft!(pending.data,pending.revision,pending.id);
+        }
+        if(!observed.acceptedOperationIds.includes(pending.id))throw Object.assign(new Error(t('chatInput.remoteSaveUnknown')),{code:'SAVE_UNKNOWN'});
         this.uncertain = undefined;
-        if (observed.data !== pending.data) throw Object.assign(new Error('Chat changed in another view; reopen to load the saved draft'), {code: 'ECONFLICT'});
-        this.state = observed;
+        if(observed.data!==pending.data){this.suspended=true;throw Object.assign(new Error(t('chatInput.remoteSaveConflict')),{code:'ECONFLICT'});}
+        this.state = observed;this.document=JSON.parse(pending.data);this.value=structuredClone(this.document.independentChat as StoredChat);this.savedDraft=JSON.stringify(this.value.draft);
     }
 }
 function report(operationId: string, stage: string, started: number, error?: unknown, bytes?: number): void {

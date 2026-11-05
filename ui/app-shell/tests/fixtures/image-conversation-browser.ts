@@ -1,3 +1,4 @@
+import {memoryClientState} from '../../../../backend/app-core/tests/helpers/client-state';
 import type {ConversationControls, ConversationSnapshot} from '@nestos/llm-ui-adapter/contracts';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 
@@ -16,7 +17,7 @@ async function photo(): Promise<File> {
 }
 async function checks() {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}), fs = await manager.openFileSystem('/');
-    const store = new ConversationComposerStore(fs, 'project', 'stable-conversation-uuid', true, () => {});
+    const store = new ConversationComposerStore(memoryClientState(),true,()=>{});
     let snapshot: ConversationSnapshot = {sessionId: 'native', title: 'Fixture', messages: [], requests: [], attachments: ['image'],
         canSend: true, canRespond: false, canInterrupt: false, pending: false, disconnected: false, gap: false};
     const sent: NonNullable<Parameters<ConversationControls['send']>[1]>[] = [];

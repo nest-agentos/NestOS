@@ -1,3 +1,4 @@
+import {memoryClientState} from '../../../backend/app-core/tests/helpers/client-state';
 import {expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {RpcPeer} from '@nestos/app-transport/application';
@@ -39,7 +40,7 @@ it('carries composer originals, conditional updates and receipt queries through 
     const client = new RpcPeer('client', call => server.handle(call), error => {throw error;});
     server = new RpcPeer('server', call => client.handle(call), error => {throw error;});
     try {
-        const fs = await manager.openFileSystem('/'), store = new ConversationComposerStore(fs, 'project', 'conversation', true, () => {});
+        const fs = await manager.openFileSystem('/'), store = new ConversationComposerStore(memoryClientState(),true,()=>{});
         const controls = {kind: 'fixture', snapshot: () => ({title: 'Fixture', messages: [], requests: []}), respond: async () => {},
             readComposerDraft: () => store.readComposerDraft(), saveComposerDraft: store.saveComposerDraft.bind(store),
             putComposerAsset: store.putComposerAsset.bind(store), readComposerAsset: store.readComposerAsset.bind(store)};

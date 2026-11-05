@@ -1,3 +1,5 @@
+import type {ClientStatePort} from './remote-client-state';
+import {randomUUID} from '@nestos/common';
 import { FSError, type IFileSystem } from '@nestos/vfs-core';
 import type { HarnessAttachment, HarnessRecovery } from '@nestos/cells-driver';
 export interface RemoteConversationRecovery extends HarnessRecovery { submittedTurnId?: string }
@@ -9,12 +11,13 @@ export class RemoteConversationStore {
     private uncertainWrite?: {before: string | null; after: string};
     private conflicted = false;
     private writes: Promise<void> = Promise.resolve();
-    constructor(private readonly fs: IFileSystem, private readonly key: string) {}
+    constructor(private readonly fs: IFileSystem, private readonly key: string,private readonly remote?:ClientStatePort) {}
     private readonly path = remoteConversationRecoveryPath;
     load(): Promise<RemoteConversationRecovery | undefined> {
         return this.serialize(() => this.read());
     }
     private async read(): Promise<RemoteConversationRecovery | undefined> {
+        if(this.remote)return this.readRemote();
         if (!await this.fs.driver.exists(this.path)) { this.record = {}; this.raw = null; return; }
         this.raw = await this.fs.meta.seq!.getEntry(this.path, this.key);
         if (!this.raw) { this.record = {}; return; }
@@ -58,6 +61,7 @@ export class RemoteConversationStore {
             catch (error) { if ((error as {code?: string}).code !== 'EEXIST') throw error; }
         }
         const value = JSON.stringify(record);
+        if(this.remote)return this.writeRemote(record,value);
         const before = this.raw, started = Date.now();
         try {
             await this.fs.meta.seq!.transaction!(async tx => {
@@ -69,6 +73,31 @@ export class RemoteConversationStore {
         }
         this.raw = value;
         this.record = record;
+    }
+    private async readRemote():Promise<RemoteConversationRecovery|undefined>{
+        const legacy=await this.fs.driver.exists(this.path)?await this.fs.meta.seq!.getEntry(this.path,this.key):null;
+        let raw=await this.remote!.read('recovery');
+        if(legacy&&!(JSON.parse(legacy) as {remote?:boolean}).remote){
+            if(raw===null){await this.remote!.compare('recovery',null,legacy);raw=await this.remote!.read('recovery');}
+            // Preserve any legacy pending input before removing its local copy.
+            if(raw!==legacy){const old=await this.remote!.read('legacy-recovery');
+                if(old===null)await this.remote!.compare('legacy-recovery',null,legacy);
+                if(await this.remote!.read('legacy-recovery')!==legacy)throw new FSError('ECONFLICT','Remote recovery migration is unconfirmed');}
+            const value=raw?JSON.parse(raw) as RemoteConversationRecovery:{};
+            await this.fs.meta.seq!.transaction!(tx=>tx.compareAndSet(this.path,this.key,{expected:legacy,value:JSON.stringify(remoteIndex(value))}));
+        }
+        this.raw=raw;this.record=raw?JSON.parse(raw):{};validateSubmissions(this.record);return raw?structuredClone(this.record):undefined;
+    }
+    private async writeRemote(record:RemoteConversationRecovery,value:string):Promise<void>{
+        const token=randomUUID(),pending=JSON.stringify({...remoteIndex(record),needsRecovery:true,indexOperation:token});
+        await this.fs.meta.seq!.setEntry(this.path,this.key,pending);
+        const started=Date.now(),before=this.raw;
+        try{if(!await this.remote!.compare('recovery',before,value))throw new FSError('ECONFLICT','Remote conversation changed on its harness node');}
+        catch(error){this.uncertainWrite={before,after:value};this.log('remote-persist',started,record,error);throw error;}
+        this.raw=value;this.record=record;
+        try{await this.fs.meta.seq!.transaction!(tx=>tx.compareAndSet(this.path,this.key,{expected:pending,value:JSON.stringify(remoteIndex(record))}));}
+        catch(error){this.log('recovery-index',started,record,error);}
+        this.log('remote-persist',started,record);
     }
     private checkQueueRevision(record: RemoteConversationRecovery): void {
         const before = this.record.instructionQueue, after = record.instructionQueue;
@@ -84,7 +113,7 @@ export class RemoteConversationStore {
         if (this.conflicted) throw new FSError('ECONFLICT', 'Remote conversation recovery conflicts with another writer');
         if (!this.uncertainWrite) return;
         const started = Date.now(), {before, after} = this.uncertainWrite;
-        const actual = await this.fs.meta.seq!.getEntry(this.path, this.key);
+        const actual = this.remote?await this.remote.read('recovery'):await this.fs.meta.seq!.getEntry(this.path, this.key);
         if (actual !== before && actual !== after) {
             this.conflicted = true;
             const error = new FSError('ECONFLICT', 'Remote conversation recovery conflicts with another writer');
@@ -145,4 +174,9 @@ function validateAttachments(value: unknown): asserts value is HarnessAttachment
             throw new FSError('EINVAL', 'Invalid native image attachment');
     }
     if (total > 512 * 1024) throw new FSError('EFBIG', 'Native attachment draft too large');
+}
+
+function remoteIndex(record:RemoteConversationRecovery){
+    return {remote:true,sessionId:record.sessionId,needsRecovery:!!(record.pending||record.responses?.length||record.instructionQueue?.items.length
+        ||record.controls?.some(row=>row.receipt==='pending'||row.receipt==='accepted'&&!row.terminal))};
 }
