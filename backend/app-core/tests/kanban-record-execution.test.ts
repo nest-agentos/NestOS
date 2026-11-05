@@ -264,3 +264,12 @@ it('keeps unclarified decision planning out of development lists and counts atte
     expect((await f.service.records('source',{kind:'decision'})).items[0].attention).toBe('waiting-input');
     expect((await f.service.catalog())[0].attention?.decision).toBe(1);
 });
+
+it('recovers restart finalization after new run creation changed the live decision revision',async()=>{
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});await f.open().runRecord('source',{recordId:'decision',operationId:'run',expectedRevision:2});
+ await f.open().controlRecord('source',{recordId:'decision',operationId:'restart-receipt',action:'restart'});await settleCancellation(f);
+ const controls=await f.journal.find<any>('record-control:',row=>row.operationId==='restart-receipt');
+ await f.journal.update(controls[0].key,old=>({...old as any,settled:false}));
+ await f.open().scan();expect(await f.open().recordExecutions('source','decision')).toHaveLength(2);
+ expect((await f.journal.get<any>(controls[0].key)).settled).toBe(true);
+});
