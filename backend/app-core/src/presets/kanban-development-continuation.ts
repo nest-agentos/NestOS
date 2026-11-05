@@ -24,7 +24,7 @@ export function developmentContinuation(options: Options): NonNullable<ContinueW
         requireValue(input.nativeSessionId, 'CONTINUATION_NATIVE_SESSION_UNKNOWN');
         requireValue(original && tree && !await journal.get('worktree-cleanup:' + id), 'CONTINUATION_WORKSPACE_UNAVAILABLE');
         requireValue(input.item.externalRefs?.some(ref => ref.system === 'nestos-remote-project' && ref.id === original.projectId), 'WORKTREE_PROJECT_CHANGED');
-        const reasons = await workResourceExecution(options, id, original.projectId);
+        const reasons = await workResourceExecution(options,id,original.projectId,{purpose:'resume',operationId:input.dispatch.id});
         requireValue(!reasons.length, reasons[0] ?? 'CONTINUATION_IN_USE');
         await developmentWorkspace(options.remote, options.provider, original.projectId, async process => {
             requireValue((await inspectWorktree(process, tree, '_nestos/kanban/')).exists, 'WORKTREE_MISSING');

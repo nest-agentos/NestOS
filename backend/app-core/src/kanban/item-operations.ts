@@ -1,3 +1,4 @@
+import {safeCode} from '@nestos/kanban/integration';
 import {sha256HexSync, t} from '@nestos/common';
 import type {KanbanItemOperations, KanbanItemOperation, KanbanItemOperationRequest, KanbanItemOperationBinding, KanbanBoard, KanbanItem, KanbanSessionAssociation} from '@nestos/kanban/contracts';
 import {automationTarget, automationCatalog} from './automation-targets';
@@ -22,7 +23,8 @@ export function createItemOperations(options: ReviewOperationsOptions) {
             for (const scope of await options.journal.get<Array<{board: string; item: string}>>('review-operation-scopes') ?? []) {
                 if (stopped) return;
                 await queue(scope.board, scope.item, async () => {const context = await load(options, scope.board, scope.item, false);
-                    for (const job of context.jobs) {if (stopped) return; if (job.phase !== 'settled') await advanceReviewJob(options, job); else await options.report?.(job);}});
+                    for (const job of context.jobs) {if (stopped) return; if (job.phase !== 'settled') await advanceReviewJob(options, job); else await options.report?.(job);}
+                    if(!stopped)await followUp(options,scope.board,scope.item);});
             }
         },
         guardResource: <T>(board: string, item: string, work: () => Promise<T>) => queue(board, item, async () => {
@@ -45,7 +47,7 @@ async function load(options: ReviewOperationsOptions, board: string, item: strin
     return {board: definition, item: entry.item, archived: !!entry.archive, settings, jobs};
 }
 const latest = (context: Context, action: ReviewAction) => context.jobs.filter(job => job.action === action).at(-1);
-function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision, context.jobs.map(job => [job.id, job.phase, job.state, job.code, job.result])]));}
+function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision, context.jobs.map(job => [job.id, job.phase, job.state, job.code,job.result,job.followUp?.state,job.followUp?.code])]));}
 async function view(options: ReviewOperationsOptions, context: Context): Promise<KanbanItemOperations> {
     if (context.archived || options.adapter.supports?.(context.board, context.item) === false) return {revision: revision(context), operations: []};
     const active = context.jobs.some(job => job.phase !== 'settled'), supported = ['review', 'completed'].includes(context.item.status);
@@ -66,9 +68,10 @@ function operation(context: Context, action: ReviewAction, active: boolean, supp
         || action === 'merge' && !!plan && latest(context, 'analyze')?.state === 'succeeded' && context.item.status === 'completed';
     const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && context.item.status === 'completed' || action === 'merge' && job?.state === 'succeeded';
     const enabled = supported && !context.archived && !finished && !active && ready && (!configurable || !!binding);
-    return {id: action, label: t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
-        state: action === 'accept' && context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
-        code: job?.code === 'WORKSPACE_CONTEXT_PENDING' ? undefined : job?.code, runId: job?.id, sessionId: job?.sessionId, configurable, binding, openSessionOnRun: agent || action === 'analyze',
+    const built=latest(context,'build'),auto=built?.followUp;
+    return {...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
+        state:action==='deploy'&&auto?.state==='failed'?'failed':action === 'accept' && context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
+        code:action==='deploy'&&auto?.state==='failed'?auto.code:job?.code==='WORKSPACE_CONTEXT_PENDING'?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId, configurable, binding, openSessionOnRun: agent || action === 'analyze',
         reason: job?.code === 'WORKSPACE_CONTEXT_PENDING' ? t('kanban.contextPending') : enabled || finished ? undefined : t(!supported ? 'kanban.operationNeedsDelivery' : active ? 'kanban.operationBusy' : configurable && !binding ? 'kanban.operationNeedsFlow' : 'kanban.operationNeedsPrevious'),
         summary: (action === 'analyze' || action === 'merge') && plan ? plan.summary + '\n' + t('kanban.operationVersions', {source: plan.sourceVersion, target: plan.targetVersion}) : resultSummary(job?.result),
         fields: action === 'merge' && plan ? plan.conflicts.map(conflict => ({id: conflict.id, label: conflict.path + ' · ' + conflict.reason, choices: conflict.options})) : undefined,
@@ -112,6 +115,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     const entry = operation(context, request.action as ReviewAction, context.jobs.some(job => job.phase !== 'settled'), options.adapter.supports?.(context.board, context.item) !== false && ['review', 'completed'].includes(context.item.status), !!options.adapter.prepareOperation);
     requireValue(entry.enabled, 'OPERATION_PREREQUISITE_REQUIRED');
     if (entry.confirmation) requireValue(request.confirmed === true, 'OPERATION_CONFIRMATION_REQUIRED');
+    requireValue(request.followUp===undefined||request.action==='build'&&request.followUp==='deploy','OPERATION_REQUEST_INVALID');
     const input = await operationInput(options, context, request), job = prior ?? (request.action === 'accept' ? await acceptanceJob(options, context, request)
         : await prepareReviewJob(options, context.board, context.item, context.settings, request, input));
     await options.journal.update<Array<{board: string; item: string}>>('review-operation-scopes', old => old?.some(row => row.board === board && row.item === request.itemId) ? old : [...old ?? [], {board, item: request.itemId}]);
@@ -120,7 +124,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
         const saved = old ?? initial(); requireValue(saved.revision === context.settings.revision, 'OPERATION_STALE_REFRESH'); requireValue(saved.jobs.length < 64, 'OPERATION_HISTORY_LIMIT');
         return {...saved, revision: saved.revision + 1, jobs: [...saved.jobs, job.id]};
     });
-    await options.report?.(job); await advanceReviewJob(options, job); return view(options, await load(options, board, request.itemId, false));
+    await options.report?.(job); await advanceReviewJob(options,job);if(request.action==='build')await followUp(options,board,request.itemId);return view(options,await load(options,board,request.itemId,false));
 }
 async function operationInput(options: ReviewOperationsOptions, context: Context, request: KanbanItemOperationRequest): Promise<unknown> {
     if (request.action === 'deploy') {
@@ -151,9 +155,30 @@ function validateRequest(request: KanbanItemOperationRequest | KanbanItemOperati
     requireValue(request && typeof request === 'object' && typeof request.itemId === 'string' && request.itemId.length > 0 && request.itemId.length <= 256
         && typeof request.operationId === 'string' && /^[\w-]{1,128}$/.test(request.operationId) && !['__proto__', 'constructor', 'prototype'].includes(request.operationId)
         && actions.includes(request.action as ReviewAction) && typeof request.expectedRevision === 'string' && /^[a-f0-9]{64}$/.test(request.expectedRevision), 'OPERATION_REQUEST_INVALID');
+    if('followUp' in request&&request.followUp!==undefined)requireValue(request.action==='build'&&request.followUp==='deploy','OPERATION_REQUEST_INVALID');
     if ('selections' in request && request.selections !== undefined) requireValue(request.selections && typeof request.selections === 'object'
         && !Array.isArray(request.selections) && Object.keys(request.selections).length <= 100
         && Object.values(request.selections).every(value => typeof value === 'string' && value.length <= 128), 'OPERATION_REQUEST_INVALID');
     if ('target' in request) requireValue(request.target && typeof request.target.system === 'string' && typeof request.target.id === 'string'
         && typeof request.target.revision === 'string', 'OPERATION_REQUEST_INVALID');
+}
+
+/** The user's build-time approval is frozen; restart resumes this exact replacement request. */
+async function followUp(options:ReviewOperationsOptions,board:string,item:string):Promise<void> {
+    const started=Date.now(),context=await load(options,board,item,false),build=latest(context,'build');
+    if(build?.state!=='succeeded'||build.phase!=='settled'||build.followUp?.state!=='queued')return;
+    const id='deploy-'+sha256HexSync(build.id).slice(0,48),deployed=latest(context,'deploy');
+    if(deployed&&deployed.createdAt>=build.createdAt){await markFollowUp(options,build,'started');return;}
+    if(context.jobs.some(job=>job.phase!=='settled'))return;
+    const request=build.followUp.request??{operationId:id,itemId:item,action:'deploy',expectedRevision:revision(context),confirmed:true};
+    await options.journal.update<ReviewJob>(jobKey(build.id),old=>({...old!,followUp:{...old!.followUp!,request:old!.followUp!.request??request}}));
+    try{await run(options,board,request);await markFollowUp(options,build,'started');}
+    catch(error){
+        if(await options.journal.get<ReviewJob>(jobKey(id)))return;
+        const code=safeCode(error,'OPERATION_AUTO_DEPLOY_FAILED');await markFollowUp(options,build,'failed',code);
+        options.log({operationId:id,stage:'operation.auto-deploy.prepare',result:'failure',code,durationMs:Date.now()-started});
+    }
+}
+async function markFollowUp(options:ReviewOperationsOptions,build:ReviewJob,state:'started'|'failed',code?:string) {
+    await options.journal.update<ReviewJob>(jobKey(build.id),old=>({...old!,followUp:{...old!.followUp!,state,code}}));
 }

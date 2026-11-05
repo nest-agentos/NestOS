@@ -5,6 +5,12 @@
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    'kanban.errors.WORKTREE_IN_USE': '工作树仍有执行或未确认操作，请检查执行会话后重试。',
+    'kanban.errors.WORKTREE_EXECUTION_UNKNOWN': '无法确认执行是否已结束，请检查远程连接和会话状态。',
+    'kanban.errors.OPERATION_RESULT_RECEIPT_INVALID': '执行结果文件格式不正确，请查看该操作的执行会话。',
+    'kanban.errors.OPERATION_RESULT_RECEIPT_CONFLICT': '执行结果文件发生变化或与 MCP 结果冲突，请检查该操作的回执。',
+    'kanban.operationRebuild': '重新构建',
+    'kanban.operationAutoDeploy': '构建成功后自动替换当前服务',
     'kanban.coordinationSession': '协调会话',
     'kanban.pendingEvents': '待处理事件',
     'kanban.waiting': '等待启动或依赖',

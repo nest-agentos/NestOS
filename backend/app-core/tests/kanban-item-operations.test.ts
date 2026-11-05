@@ -122,3 +122,30 @@ it('retains the agent prerequisite explanation when an operation reports blocked
     const view = await f.run('build'); expect(view.operations.find(op => op.id === 'build')).toMatchObject({state: 'failed', code: 'OPERATION_RESULT_AGENT_BLOCKED', summary: expect.stringContaining('missing SDK')});
     expect(f.published.start).not.toHaveBeenCalled();
 });
+it('persists build-time replacement consent and starts the replacement once across restart',async()=>{
+    const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build','build-auto',{followUp:'deploy'});
+    expect(f.published.start).toHaveBeenCalledOnce();f.complete('build-auto');
+    await f.api.quiesce();const restored=createItemOperations(f.options);closes.push(()=>restored.quiesce());await restored.scan();
+    expect(f.published.start).toHaveBeenCalledTimes(2);
+    const settings=await f.journal.get<any>(reviewKey('board','task')),id=settings.jobs.at(-1);
+    expect((await f.journal.get<ReviewJob>(jobKey('build-auto')))?.followUp).toMatchObject({state:'started',request:{operationId:id,confirmed:true}});
+    await restored.scan();expect(f.published.start).toHaveBeenCalledTimes(2);
+    const view=await restored.itemOperations('board','task');expect(view.operations.find(op=>op.id==='build')?.runLabel).toBeTruthy();
+});
+it('retains the successful build and reveals manual replacement when automatic preparation fails',async()=>{
+    const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build','build-auto-fail',{followUp:'deploy'});f.complete('build-auto-fail');
+    f.snapshot.version='changed';await f.api.scan();const view=await f.api.itemOperations('board','task');
+    expect(view.operations.find(op=>op.id==='build')).toMatchObject({state:'succeeded'});
+    expect(view.operations.find(op=>op.id==='deploy')).toMatchObject({hideRun:false,code:'OPERATION_SOURCE_CHANGED_REBUILD'});
+    expect(f.published.start).toHaveBeenCalledOnce();
+});
+it('recovers replacement success from verified evidence when the old host lost the submission outcome',async()=>{
+    const f=await fixture();f.options.adapter.prepareOperation=vi.fn(async()=>({expectedSessionId:'original'}) as never);
+    f.options.adapter.readOperation=vi.fn(async(job)=>({...f.result(job.id),status:'succeeded'}));
+    await f.run('build','build-receipt');
+    f.submission.inspect.mockResolvedValue({sessionId:'original',outcome:'unknown'});
+    const view=await f.run('deploy','replace-receipt',{confirmed:true});
+    expect(view.operations.find(op=>op.id==='deploy')).toMatchObject({state:'succeeded'});
+    expect(f.submission.start).toHaveBeenCalledTimes(2);
+    await f.api.scan();expect(f.submission.start).toHaveBeenCalledTimes(2);
+});

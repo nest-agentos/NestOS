@@ -4,6 +4,12 @@
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    'kanban.errors.WORKTREE_IN_USE': 'The workspace has active or unconfirmed operations. Check its execution session before retrying.',
+    'kanban.errors.WORKTREE_EXECUTION_UNKNOWN': 'Execution completion cannot be verified. Check the remote connection and session.',
+    'kanban.errors.OPERATION_RESULT_RECEIPT_INVALID': 'The operation receipt is malformed. Check its execution session.',
+    'kanban.errors.OPERATION_RESULT_RECEIPT_CONFLICT': 'The operation receipt changed or conflicts with the MCP result. Check the operation evidence.',
+    'kanban.operationRebuild': 'Rebuild',
+    'kanban.operationAutoDeploy': 'Automatically replace the current service after building',
     'kanban.coordinationSession': 'Coordination session',
     'kanban.pendingEvents': 'Needs attention',
     'kanban.waiting': 'Waiting for start or dependencies',

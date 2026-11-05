@@ -1,3 +1,4 @@
+import {operationReceipt} from '../run/operation-receipt';
 import {maintenanceInstruction} from './kanban-maintenance';
 import {journalCommand} from '@nestos/kanban/integration';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
@@ -90,7 +91,7 @@ async function snapshot(options: Options, board: KanbanBoard, item: KanbanItem):
 }
 async function prepareAnalysis(options: Options, input: MaintenanceInput): Promise<SubmissionRequest> {
     const current = await resource(options, input.item, input.board.id), calls = await options.calls.list({sessionId: current.id});
-    const reasons = await workResourceExecution(options, current.id, current.record.projectId); requireValue(!reasons.length, reasons[0] ?? 'OPERATION_ORIGINAL_SESSION_BUSY');
+    const reasons = await workResourceExecution(options,current.id,current.record.projectId,{purpose:'resume',operationId:input.id}); requireValue(!reasons.length, reasons[0] ?? 'OPERATION_ORIGINAL_SESSION_BUSY');
     const original = calls.find(row => row.receipt.executionSessionId && row.input.request.expectedTarget);
     requireValue(original?.receipt.executionSessionId && calls.every(row => row.callerState?.settled && row.executionTree?.settled), 'OPERATION_ORIGINAL_SESSION_UNAVAILABLE');
     const sessionId = original.receipt.executionSessionId, activity = await options.kernel.sessionActivity(sessionId);
@@ -119,11 +120,11 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
         await publishImmutableFile(view.fs, directory, 'commit-contexts.json', contextText);
         const approvalText = input.context === undefined ? undefined : JSON.stringify(input.context);
         if (approvalText) await publishImmutableFile(view.fs, directory, 'operation-input.json', approvalText);
-        await publishPromptBundle(view.fs, directory, policy.prompts, {operationId: input.id, phase: input.action ?? 'analyze', approval: approvalText ? {path: 'operation-input.json', sha256: sha256HexSync(approvalText)} : null, boardId: input.board.id,
+        await publishPromptBundle(view.fs, directory, policy.prompts, {operationId: input.id, phase:input.action??'analyze',receiptPath:directory+'/result.json',approval: approvalText ? {path: 'operation-input.json', sha256: sha256HexSync(approvalText)} : null, boardId: input.board.id,
             itemId: input.item.id, sessionId, input: current.record.context, commitContexts: {path: 'commit-contexts.json', sha256: sha256HexSync(contextText)}, sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, resources: input.snapshot.context});
         await options.journal.update('worktree:' + input.id, old => old ?? current.tree);
         const record = await options.journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.id, old => old ?? {...current.record, channelId: input.id, worktreeId: current.id, communicationDirectory: directory, policy,
-            context: {...current.record.context as object, operation: {operationId: input.id, phase: input.action ?? 'analyze', approval: input.context ?? null,
+            context: {...current.record.context as object, operation: {operationId: input.id, phase:input.action??'analyze',receiptPath:directory+'/result.json',approval: input.context ?? null,
                 sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, commitContexts: context, resources: input.snapshot.context}}});
         await openDevelopmentChannel(options.remote, input.id, record, {runId: input.id, itemId: input.item.id, attemptId: input.id}, input.item,
             await currentChannelBinding(options.remote,record,sessionId));
@@ -151,7 +152,7 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
     const board = await options.service.read(job.boardId), item = (await options.service.item(job.boardId, job.itemId)).item;
     const current = await resource(options, item, board.id), folder = await options.projects.get(current.record.projectId), view = await options.projects.openWorkspace(folder.path);
     let result: unknown;
-    try {result = await readChannelResult(options.remote, current.record.projectId, job.id, options.journal);
+    try {result=await operationReceipt(view.fs,current.record.directory+'/_nestos/kanban/review/'+job.id,await readChannelResult(options.remote,current.record.projectId,job.id,options.journal),options.journal,job.id);
         if (job.action === 'build' && result && (result as {status?: string}).status === 'succeeded') await verifyBuildEvidence(view.fs, current.record.directory, result);}
     finally {await view.dispose();}
     if (result === undefined || ['blocked', 'failed'].includes((result as {status: string})?.status)) return result;

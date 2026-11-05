@@ -49,3 +49,17 @@ it('checks the real writer before cleaning a settled call whose context ownershi
     f.call.executionTree.settled = false;
     expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_IN_USE');
 });
+it('permits an owned idle harness writer for continuation but keeps cleanup and active writers protected',async()=>{
+    const f=await fixture();Object.assign(f.snapshot.observation,{owned:true});f.snapshot.writerLock.status='held';
+    expect(await workResourceExecution(f.options,'ready','project',{purpose:'resume',operationId:'build'})).toEqual([]);
+    expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_IN_USE');
+    f.snapshot.active=true;expect(await workResourceExecution(f.options,'ready','project',{purpose:'resume'})).toContain('WORKTREE_IN_USE');
+    f.snapshot.active=false;Object.assign(f.snapshot.observation,{owned:false});
+    expect(await workResourceExecution(f.options,'ready','project',{purpose:'resume'})).toContain('WORKTREE_IN_USE');
+});
+it('excludes only the admitted operation itself from workspace occupation checks',async()=>{
+    const f=await fixture(),get=(f.options as any).journal.get;
+    get.mockImplementation(async(key:string)=>key==='review-operation-scopes'?[{board:'b',item:'i'}]:key.startsWith('review-operations:')?{jobs:['build']}:key==='review-operation:build'?{id:'build',phase:'prepared',snapshot:{context:{worktreeId:'ready'}}}:undefined);
+    expect(await workResourceExecution(f.options,'ready','project',{purpose:'resume'})).toContain('WORKTREE_IN_USE');
+    expect(await workResourceExecution(f.options,'ready','project',{purpose:'resume',operationId:'build'})).toEqual([]);
+});

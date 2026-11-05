@@ -11,7 +11,7 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
     settings: ReviewSettings, request: KanbanItemOperationRequest, context?: unknown): Promise<ReviewJob> {
     const snapshot = await options.adapter.snapshot(board, item), action = request.action as ReviewAction;
     const base: ReviewJob = {id: request.operationId, boardId: board.id, itemId: item.id, action, snapshot,
-        fingerprint: sha256HexSync(JSON.stringify(request)), phase: 'prepared', state: 'running', createdAt: Date.now()};
+        fingerprint: sha256HexSync(JSON.stringify(request)), phase:'prepared',state:'running',createdAt:Date.now(),...(request.followUp==='deploy'?{followUp:{action:'deploy' as const,state:'queued' as const}}:{})};
     if (action === 'deploy' || action === 'merge') {
         const evidence = context as {sourceVersion?: string; targetVersion?: string};
         requireValue(evidence?.sourceVersion === snapshot.sourceVersion && evidence.targetVersion === snapshot.targetVersion, 'OPERATION_SOURCE_CHANGED_REANALYZE');
@@ -35,8 +35,10 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
         start:async record=>{if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
         inspect:async record=>{
             const observation=await observeReview(options,record);
-            const output=observation.state==='succeeded'&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
-            return {...observation,executionId:observation.sessionId,output};
+            const recoverReplacement=record.action==='deploy'&&record.request&&observation.state==='unknown';
+            const output=(observation.state==='succeeded'||recoverReplacement)&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
+            const receipt=output as {status?:string;version?:string}|undefined;
+            return {...observation,...(recoverReplacement&&receipt?.status==='succeeded'&&options.adapter.runningVersion?.()===receipt.version?{state:'succeeded' as const}:{}),executionId:observation.sessionId,output};
         },validate:(record,output)=>{
             validateOperationResult(record,output);
             if(record.action==='deploy')requireValue(options.adapter.runningVersion?.()===(output as {version:string}).version,'OPERATION_RESULT_RUNNING_VERSION_MISMATCH');
