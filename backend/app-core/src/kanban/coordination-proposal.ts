@@ -23,7 +23,7 @@ export function coordinationProposal(input:unknown,fix:SavedFix,board:KanbanBoar
     return {title:fix.item.title,responsibility:fix.item.responsibility,acceptance:fix.item.acceptance,type:'append',dependencies:[],children};
 }
 function validateTask(task:Task,estimate:boolean) {
-    requireValue(task&&/^[a-zA-Z0-9_-]{1,64}$/.test(task.key)&&[task.title,task.responsibility,task.acceptance].every(text=>typeof text==='string'&&text.trim().length>0&&text.length<=8000),'COORDINATION_PROPOSAL_INVALID');
+    requireValue(task&&typeof task.key==='string'&&/^[a-zA-Z0-9_-]{1,64}$/.test(task.key)&&[task.title,task.responsibility,task.acceptance].every(text=>typeof text==='string'&&text.trim().length>0&&text.length<=8000),'COORDINATION_PROPOSAL_INVALID');
     requireValue(Array.isArray(task.dependsOn)&&task.dependsOn.length<=100&&new Set(task.dependsOn).size===task.dependsOn.length,'AUTOMATION_SUBTASK_DEPENDENCY_INVALID');
     requireValue(!estimate||task.estimate,'ESTIMATE_REQUIRED');
     if(task.estimate)requireValue(['low','medium','high'].includes(task.estimate.confidence)&&[task.estimate.complexity,task.estimate.workUnits,task.estimate.durationMs].every(value=>Number.isFinite(value)&&value>0),'AUTOMATION_ESTIMATE_INVALID');

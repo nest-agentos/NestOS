@@ -149,6 +149,10 @@ it('continues the group planning Session and appends confirmed children without 
     expect(fix.sessionId).toBe('original-main');
     f.channels.report(fix.id,'addition',{type:'proposal',content:'Append one task',payload:{schema:'kanban.coordination-proposal/1',type:'append',tasks:[{key:'mail',title:'Mail',responsibility:'Integrate mail',acceptance:'Verified',dependsOn:['existing-child']}]}});
     expect((await f.service.query('development',{view:'all',parentId:original.id})).total).toBe(1);
+    const {coordinationProposal}=await import('../src/kanban/coordination-proposal');
+    const saved=await f.journal.get<any>('fix:'+fix.id);
+    const currentBoard=await f.service.read('development');
+    expect(()=>coordinationProposal({schema:'kanban.coordination-proposal/1',type:'append',tasks:[{key:undefined,title:'Bad',responsibility:'Bad',acceptance:'Bad',dependsOn:[]}]},saved,currentBoard)).toThrow();
     await f.fix.intercept(fix.sessionId,f.instruction());
     const page=await f.service.query('development',{view:'all',parentId:original.id});expect(page.total).toBe(2);
     expect((await f.service.item('development','existing-child')).item).toEqual(before);
