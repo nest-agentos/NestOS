@@ -1,4 +1,5 @@
-import {readSessionFileResult} from '../src/run/session-file-result';
+import {readChannelResult} from '../src/run/channel-results';
+import {memoryChannels} from './helpers/session-channels';
 import {KanbanAutomationJournal} from '../src/kanban/automation-journal';
 import {afterEach, expect, it, vi} from 'vitest';
 import {randomUUID} from '@nestos/common';
@@ -17,6 +18,7 @@ afterEach(async () => {for (const close of disposers.splice(0)) await close();})
 async function fixture(autoAccept = false, analysis?:unknown) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); disposers.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/'), events = await UserEventService.open(fs);
+    const channels=memoryChannels();
     const submitted = new Map<string, IndependentCallInput>(), completed = new Set<string>();
     const targets: RootTargetCatalog = {entries: ['planner', 'executor'].map(id => ({name: id,
         target: {kind: 'agent', id, version: '1', digest: id === 'planner' ? 'a'.repeat(64) : 'b'.repeat(64)}})), issues: []};
@@ -28,7 +30,7 @@ async function fixture(autoAccept = false, analysis?:unknown) {
             if(input.request.expectedTarget!.id==='planner') {
                 const item=JSON.parse(input.request.source.text).snapshot.item,id=input.request.submission!.id;
                 const payload=invalid?{}:analysis??{ready:true,dependencies:item.id==='second'?['first']:[],reason:'Uses the prerequisite result',estimate:{complexity:1,workUnits:1,durationMs:60000,confidence:'high'}};
-                await fs.driver.createFile({parentPath:'/results',name:id+'.yaml',recursive:true,content:JSON.stringify({schema:'nestos.file-result/1',operationId:id,payload})});
+                channels.report(id,'result',{type:'result',content:'Planning result',payload});
             }
             if (loseReply) {loseReply = false; throw new Error('reply lost PRIVATE');}
             return {};
@@ -46,7 +48,7 @@ async function fixture(autoAccept = false, analysis?:unknown) {
         return {id, sessionId: _session, version: 1, effects: {}, exit: {status: 'succeeded', output: {exit: {status: 'succeeded', output}}}} as unknown as TaskRecord;
     })} as unknown as PersonalKanbanAutomationOptions['kernel'];
     const fileJournal=new KanbanAutomationJournal(fs);await fileJournal.open();
-    const options: PersonalKanbanAutomationOptions = {observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:id=>readSessionFileResult(fs,'/results/'+id+'.yaml',id,fileJournal),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
+    const options: PersonalKanbanAutomationOptions = {observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:id=>readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
         prepareSession: vi.fn(async () => true), catalog: vi.fn(async () => targets)};
     const diagnostics = new DiagnosticJournal();
     const open = () => createPersonalKanban(fs, events, diagnostics, options.sessions, kernel, options);

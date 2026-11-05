@@ -1,8 +1,8 @@
 import { vi } from 'vitest';
-import { CELLS_EXTENSION } from '../../src/projects/mcp-remote-connections';
+const CELLS_EXTENSION = 'test/cells-descriptor';
 
 /** Exercise the real SDK without a network listener or a second driver discovery. */
-export function mockCellsDiscovery(descriptor: Record<string, unknown>) {
+export function mockMCPDiscovery(descriptor: Record<string, unknown>) {
     return vi.spyOn(globalThis,'fetch').mockImplementation(async (_url,init) => {
         if (init?.method !== 'POST') return new Response(null,{status:405});
         const message = JSON.parse(String(init.body));

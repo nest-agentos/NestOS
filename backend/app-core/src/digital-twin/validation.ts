@@ -49,6 +49,8 @@ function validateSettings(data: Data): void {
     booleans(data, ['paused', 'useEnabled']); integers(data, ['tokenLimit', 'reservedTokens', 'spentTokens']);
 }
 function validateJob(data: Data): void {
+    for (const key of ['sourceIncarnation', 'sourceConnectionFingerprint']) if (data[key] !== undefined) strings(data, [key]);
+    if (data.executionPhase !== undefined) oneOf(data.executionPhase, ['prepared', 'submitted', 'dispatching', 'executing', 'result-ready']);
     validateOutputLimit(data);
     scannerExecutor(data.executor as import('@nestos/app-contracts').TwinScannerExecutor | undefined);
     if (data.meterPeriod !== undefined && (typeof data.meterPeriod !== 'string' || !/^\d{4}-\d{2}$/.test(data.meterPeriod))) invalid();

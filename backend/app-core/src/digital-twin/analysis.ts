@@ -1,7 +1,8 @@
+import {extractionStep, requireActive, TwinSafePoint, TwinResultPending, type TwinExtractionLifecycle} from './analysis-lifecycle';
 import {meterPeriod, reserveMeter, settleMeter} from './metering';
 import { TWIN_EXTRACTION_OUTPUT_ESTIMATE, TWIN_EXTRACTION_PROMPT_RESERVE } from './extraction-estimates';
 import { settleFailedJob } from './failure-accounting';
-import { diagnosticDetail, traceAnalysis } from './diagnostics';
+import { diagnosticDetail, traceAnalysis, TwinDiagnosticError } from './diagnostics';
 import { userIdentity, identityKey } from './identity';
 import { extractionEnd } from './chunking';
 import { randomUUID } from '@nestos/common';
@@ -19,10 +20,10 @@ export class TwinAnalysis {
     constructor(private readonly records: TwinRecords, private readonly sources: TwinSources, private readonly extractor: TwinExtractionPort,
         private readonly changed: () => void = () => {}, private readonly scanGuard?: TwinScanGuardPort) {}
 
-    async run(sourceId: string, scope?: TwinScanScope): Promise<void> {
+    async run(sourceId: string, scope?: TwinScanScope, active: () => boolean = () => true): Promise<void> {
         const existing = this.running.get(sourceId);
         if (existing) return existing;
-        const run = this.execute(sourceId, scope).finally(() => { this.running.delete(sourceId); });
+        const run = this.execute(sourceId, scope, active).finally(() => { this.running.delete(sourceId); });
         this.running.set(sourceId, run);
         return run;
     }
@@ -63,18 +64,21 @@ export class TwinAnalysis {
     }
 
     async recoverCleanup(active: () => boolean = () => true): Promise<void> {
+        if (!active()) return;
         for (const job of await this.records.list<TwinAnalysisJob>('job')) {
             if (!active()) return;
             if (!job.data.cleaned && !this.running.has(job.data.sourceId) && ['committed', 'failed', 'cancelled'].includes(job.data.state)) {
                 if (job.data.state === 'cancelled' && !job.data.cancelConfirmed) await this.extractor.cancel(job.data);
-                await this.cleanup(job);
+                await this.cleanup(job, active);
             }
         }
     }
 
-    private async cleanup(job: TwinDataRecord<TwinAnalysisJob>): Promise<void> {
+    private async cleanup(job: TwinDataRecord<TwinAnalysisJob>, active: () => boolean = () => true): Promise<void> {
+        if (!active()) {traceAnalysis(job.data, 'cleanup.deferred', {jobId: job.id}); return;}
         try {
-            await this.extractor.cleanup(job.data);
+            const complete = await extractionStep(job.data, 'cleanup', () => this.extractor.cleanup(job.data, active));
+            if (complete === false) {traceAnalysis(job.data, 'cleanup.deferred', {jobId: job.id}); return;}
             await this.records.save('job', job.id, { ...job.data, cleaned: true, cancelConfirmed: job.data.state === 'cancelled', cleanupError: '' }, job.revision);
         } catch (error) {
             const current = await this.records.get<TwinAnalysisJob>('job', job.id);
@@ -93,27 +97,65 @@ export class TwinAnalysis {
             complete: checkpointId ? checkpoint?.data.complete ?? false : source.data.analyzedHash === source.data.hash };
     }
 
-    private async execute(sourceId: string, scope?: TwinScanScope): Promise<void> {
+    private async execute(sourceId: string, scope: TwinScanScope | undefined, active: () => boolean): Promise<void> {
+        requireActive(active);
         const { source, content } = await this.sources.readCurrent(sourceId);
         const progress = await this.progress(source, scope);
         if (progress.complete) return;
         if ((await this.records.list('memory')).length > 480) throw new Error('TWIN_MEMORY_LIMIT');
         const pending = (await this.records.list<TwinAnalysisJob>('job')).find(item => item.data.sourceId === sourceId
             && ['queued', 'running'].includes(item.data.state) && item.data.scanScope?.runId === scope?.runId);
-        const job = pending ?? await retry(() => this.reserve(source, content.text, scope, progress));
+        requireActive(active);
+        let job = pending ?? await retry(() => this.reserve(source, content.text, scope, progress));
         const text = content.text.slice(job.data.start ?? Math.max(0, job.data.offset - 256), job.data.end);
         try {
-            const result = await this.extractor.run(job.data, text, id => this.attach(job.id, id), progress => this.requestProgress(job.id, progress));
+            requireActive(active);
+            if (pending) job = await this.resumeJob(pending, source, scope);
+            const result = await this.extractor.run(job.data, text, id => this.attach(job.id, id), progress => this.requestProgress(job.id, progress), this.lifecycle(job.id, active));
             traceAnalysis(job.data, 'committing', { jobId: job.id, candidates: result.candidates.length });
-            await retry(() => this.commitResult(job.id, source, result));
+            await this.settleResult(job, source, result);
             traceAnalysis(job.data, 'committed', { jobId: job.id });
         } catch (error) {
-            await this.fail(job.id, error);
+            if (error instanceof TwinSafePoint || error instanceof TwinResultPending) {traceAnalysis(job.data, 'checkpoint', {jobId: job.id}); throw error;}
+            await extractionStep(job.data, 'failure.settle', () => this.fail(job.id, error));
             throw error;
         } finally {
             const latest = await this.records.get<TwinAnalysisJob>('job', job.id);
-            if (latest && ['committed', 'failed', 'cancelled'].includes(latest.data.state)) await this.cleanup(latest);
+            if (latest && ['committed', 'failed', 'cancelled'].includes(latest.data.state)) await this.cleanup(latest, active);
         }
+    }
+
+    private async settleResult(job: TwinDataRecord<TwinAnalysisJob>, source: TwinDataRecord<TwinSourceData>, result: Awaited<ReturnType<TwinExtractionPort['run']>>) {
+        try {await extractionStep(job.data, 'result.commit', () => retry(() => this.commitResult(job.id, source, result)));}
+        catch (error) {
+            if (error instanceof Error && /^TWIN_[A-Z_]+$/.test(error.message)) throw new TwinDiagnosticError(error.message, error,
+                result.usageKind === 'reported' ? result.tokens : undefined);
+            throw new TwinResultPending(error);
+        }
+    }
+
+    private lifecycle(id: string, active: () => boolean): TwinExtractionLifecycle {
+        return {active, checkpoint: phase => retry(async () => {
+            const job = await this.records.get<TwinAnalysisJob>('job', id);
+            if (!job || !['queued', 'running'].includes(job.data.state)) throw new Error('TWIN_ANALYSIS_CANCELLED');
+            const phases = ['prepared', 'submitted', 'dispatching', 'executing', 'result-ready'];
+            if (phases.indexOf(job.data.executionPhase ?? '') < phases.indexOf(phase)) await this.records.save('job', id, {...job.data, executionPhase: phase}, job.revision);
+        })};
+    }
+    private async resumeJob(job: TwinDataRecord<TwinAnalysisJob>, source: TwinDataRecord<TwinSourceData>, scope?: TwinScanScope) {
+        const original = job.data;
+        const refreshed = original.sourceRevision !== source.revision;
+        if (original.sourceHash !== source.data.hash || original.connectionId !== source.data.connectionId || (refreshed && (
+            !original.sourceIncarnation || original.sourceIncarnation !== source.data.incarnation
+            || original.sourceConnectionFingerprint !== source.data.connectionFingerprint))) throw new Error('TWIN_ANALYSIS_PERMISSION_STALE');
+        if (refreshed || (original.scanScope && scope && original.scanScope.fence !== scope.fence)) {
+            const guard = await this.guard(scope);
+            await this.records.save('job', job.id, {...original, sourceRevision: source.revision,
+                ...(original.scanScope && scope ? {scanScope: {...original.scanScope, fence: scope.fence}} : {})}, job.revision,
+                [...guard.conditions, {family: 'source', id: source.id, expectedRevision: source.revision}]);
+            return (await this.records.get<TwinAnalysisJob>('job', job.id))!;
+        }
+        return job;
     }
 
     private async requestProgress(id: string, progress: import('./extraction-progress').TwinRequestProgress): Promise<void> {
@@ -137,7 +179,7 @@ export class TwinAnalysis {
         if (!settings.data.budgetUnlimited && settings.data.spentTokens + settings.data.reservedTokens + reservedTokens > settings.data.tokenLimit) throw new Error('TWIN_BUDGET_EXHAUSTED');
         const id = randomUUID(), epoch = (await this.records.store.inspect()).forgetEpoch;
         const guard = await this.guard(scope, { reserve: reservedTokens });
-        const data: TwinAnalysisJob = { ...(scope?.maxOutputTokens !== undefined ? {maxOutputTokens: scope.maxOutputTokens} : {}), meterPeriod: meterPeriod(), ...(scope?.executor ? {executor: scope.executor} : {}), sourceId: source.id, sourceRevision: source.revision, sourceHash: source.data.hash,
+        const data: TwinAnalysisJob = { ...(scope?.maxOutputTokens !== undefined ? {maxOutputTokens: scope.maxOutputTokens} : {}), meterPeriod: meterPeriod(), ...(scope?.executor ? {executor: scope.executor} : {}), sourceId: source.id, sourceRevision: source.revision, sourceHash: source.data.hash, sourceIncarnation: source.data.incarnation, sourceConnectionFingerprint: source.data.connectionFingerprint,
             ...userIdentity(settings.data), offset, start: offset, end, connectionId: source.data.connectionId, sessionId: `twin-analysis-${id}`, taskId: '', epoch,
             reservedTokens, createdAt: Date.now(), state: 'queued', error: '', ...(scope ? { scanScope: scope } : {}),
             checkpointId: progress.checkpointId, checkpointRevision: progress.checkpointRevision };

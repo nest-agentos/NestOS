@@ -328,7 +328,7 @@ it('classifies nested remote mounts using their remote directory rather than the
     const projects = { list: async () => [project], openFiles: async () => ({ fs, dispose: async () => {} }),
         remoteMounts: { list: () => [{ at: '/linked', root: '/archive' }] } } as unknown as ProjectService;
     const { TwinProjectCatalog } = await import('../src/digital-twin/project-catalog');
-    const catalog = await new TwinProjectCatalog(projects, { list: async () => [] } as any).discover();
+    const catalog = await new TwinProjectCatalog(projects, { list: async () => [], walkSummaries: async () => {} } as any).discover();
     const local = catalog.resources.find(resource => resource.path === 'docs/a.md')!;
     const remote = catalog.resources.find(resource => resource.path === 'linked/private/b.md')!;
     expect(local).toMatchObject({ location: 'local', directoryPath: '/home/me/project/docs/a.md' });

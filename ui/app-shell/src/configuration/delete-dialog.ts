@@ -1,14 +1,13 @@
 import type { DeleteResult } from '@nestos/vfs-ui';
-import { t, escapeHTML, randomUUID } from '@nestos/common';
+import { t, escapeHTML } from '@nestos/common';
 import { Modal, Toast, type EditorTarget } from '@nestos/ui-common-adapter';
-import type { ProviderDeletionImpact, MCPDeletionImpact, ProjectService } from '@nestos/app-contracts/services';
+import type { ProviderDeletionImpact, MCPDeletionImpact } from '@nestos/app-contracts/services';
 import type { ModelConfigurationCommands } from '@nestos/app-contracts/services';
 
 /** Confirmation UI consumes domain plans; it never creates an editor to delete. */
 export class ConfigurationDeletionDialog {
     constructor(private readonly commands: ModelConfigurationCommands, private readonly changed: () => Promise<void> = async () => {},
-        private readonly additionalImpact: (targets: readonly EditorTarget[]) => Promise<string> = async () => '',
-        private readonly projects?: Pick<ProjectService,'list'>) {}
+        private readonly additionalImpact: (targets: readonly EditorTarget[]) => Promise<string> = async () => '') {}
     async request(targets: readonly EditorTarget[]): Promise<void> {
         await this.requestResult(targets);
     }
@@ -38,27 +37,14 @@ export class ConfigurationDeletionDialog {
         }).show());
     }
     private async showMCPImpact(impact: MCPDeletionImpact, warning: string, signal?: AbortSignal): Promise<DeleteResult> {
-        const projects = await this.projects?.list() ?? [], checkbox = `mcp-delete-${randomUUID()}`;
         if (signal?.aborted) { this.commands.discardPlan(impact.revision); return 'cancelled'; }
-        const rows = impact.references.map(ref => {
-            const project = projects.find(item => item.project.id === ref.projectId);
-            const action = impact.projects.some(item => item.id === ref.projectId) ? t('remote.mcpDeleteProjectAction') : t('remote.mcpUnlinkAction');
-            const server = impact.servers.find(item => item.id === ref.connectionId)?.name || t('remote.mcpUnnamedServer');
-            return `<li>${escapeHTML(project?.displayName ?? project?.name ?? t('remote.mcpMissingProject'))} — ${escapeHTML(server)} — <code>${escapeHTML(ref.at)}</code> — ${escapeHTML(action)}</li>`;
-        }).join('');
-        const sessions = impact.projects.flatMap(project => project.localSessions.map(session => `<li>${escapeHTML(project.name)}: ${escapeHTML(session.title)}</li>`)).join('');
         const servers = impact.ids.map(id => `<li>${escapeHTML(impact.servers.find(server => server.id === id)?.name || t('remote.mcpUnnamedServer'))}</li>`).join('');
-        const body = escapeHTML(t('configuration.deleteConfirm',{count:impact.ids.length})) + `<ul>${servers}</ul>` + (warning ? ` ${escapeHTML(warning)}` : '')
-            + (rows ? `<p>${escapeHTML(t('remote.mcpDeleteReferences'))}</p><ul>${rows}</ul><p>${escapeHTML(t('remote.mcpDeletePreserve'))}</p>
-                ${sessions ? `<p>${escapeHTML(t('remote.mcpDeleteLocalSessions'))}</p><ul>${sessions}</ul>` : ''}
-                <label><input id="${checkbox}" type="checkbox"> ${escapeHTML(t('remote.mcpForceDelete'))}</label>` : '');
+        const body = escapeHTML(t('configuration.deleteConfirm',{count:impact.ids.length})) + `<ul>${servers}</ul>` + (warning ? ` ${escapeHTML(warning)}` : '');
         return new Promise<DeleteResult>(resolve => new Modal(t('dialog.delete.title'),body,{
             type:'danger',onCancel:() => {this.commands.discardPlan(impact.revision); resolve('cancelled');},
             onConfirm:async () => {
                 if (signal?.aborted) {this.commands.discardPlan(impact.revision); resolve('cancelled'); return;}
-                const force = (document.getElementById(checkbox) as HTMLInputElement | null)?.checked ?? false;
-                if (impact.references.length && !force) {Toast.error(t('remote.mcpForceRequired')); return false;}
-                await this.commands.deleteMCPServers({revision:impact.revision,force});
+                await this.commands.deleteMCPServers({revision:impact.revision});
                 await this.changed(); resolve('completed');
             },
         }).show());

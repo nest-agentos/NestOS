@@ -4,21 +4,25 @@ import { documentPath } from './project-catalog';
 
 const WORKSPACES = ['emails', 'calendar', 'notes', 'home', 'projects'];
 /** Ordinary workspace documents are discoverable; rules decide which ones may be read. */
-export async function discoverWorkspaces(fs: IFileSystem, catalog: TwinSourceCatalog): Promise<void> {
+export async function discoverWorkspaces(fs: IFileSystem, catalog: TwinSourceCatalog, active: () => boolean = () => true): Promise<void> {
     for (const name of WORKSPACES) {
+        if (!active()) return;
         const root = `/home/admin/${name}`, projectId = `@workspace/${name}`;
         catalog.projects.push(projectId);
         try {
             const node = await fs.driver.getNode(root);
-            if (node && !node.metadata.isProtected && !node.tags.includes('private')) await walk(fs, root, projectId, catalog);
+            if (node && !node.metadata.isProtected && !node.tags.includes('private')) await walk(fs, root, projectId, catalog, active);
+            if (!active()) return;
             catalog.completeScopes.push(`${projectId}/file`);
         } catch { catalog.errors.push(`${projectId}/file`); }
     }
 }
-async function walk(fs: IFileSystem, root: string, projectId: string, catalog: TwinSourceCatalog): Promise<void> {
+async function walk(fs: IFileSystem, root: string, projectId: string, catalog: TwinSourceCatalog, active: () => boolean): Promise<void> {
     const queue = [root]; let visited = 0;
-    while (queue.length) {
+    while (queue.length && active()) {
         for (const node of await fs.driver.getChildren(queue.shift()!)) {
+            if (visited % 128 === 0) await new Promise<void>(resolve => setTimeout(resolve, 0));
+            if (!active()) return;
             if (++visited > 100000 || catalog.resources.length >= 10000) throw new Error('TWIN_SOURCE_COUNT_LIMIT');
             if (node.metadata.isProtected || node.tags.includes('private') || node.name.startsWith('.') || node.name === 'node_modules') continue;
             if (node.type === 'directory') queue.push(node.path);

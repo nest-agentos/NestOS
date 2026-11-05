@@ -156,8 +156,9 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const chatFromFile = createFileChatHandler(backend, request => handleNavigationRequest(request));
     const ocr = createOcrControls(() => backend.ocr(), agentService, request => handleNavigationRequest(request));
     cleanupFns.push(() => ocr.dispose());
-    const deletionDialog = new ConfigurationDeletionDialog(services.configuration, undefined, ocr.deletionImpact, services.projects);
+    const deletionDialog = new ConfigurationDeletionDialog(services.configuration, undefined, ocr.deletionImpact);
     const settings = createSettingsAccess(backend, () => workspaces, {
+        cells: services.projects.remoteMounts,
         ocr,
         agentService, connectionService: llmDriver, llmUiEditors: options.ui.llmUiEditors,
         excludedPages: toolboxId ? ['providers', 'connections', 'mcp-servers', 'system-prompts'] : [],

@@ -33,7 +33,7 @@ export interface TwinSourceData extends TwinSourceSpec {
 export interface TwinSourceContent { text: string; hash: string; nativeIdentity: string; }
 export interface TwinSourceReader {
     read(spec: TwinSourceSpec): Promise<TwinSourceContent>;
-    discover?(): Promise<TwinSourceCatalog>;
+    discover?(active?: () => boolean): Promise<TwinSourceCatalog>;
     probe?(spec: TwinSourceSpec): Promise<string>;
     sessions(): Promise<Array<{ id: string; title: string }>>;
 }
@@ -45,6 +45,8 @@ export interface TwinSettings extends TwinUserIdentity {
 }
 export interface TwinGrantData { sessionId: string; agentId: string; connectionId: string; enabled: boolean; project: string; connectionFingerprint?: string; }
 export interface TwinAnalysisJob extends TwinUserIdentity {
+    executionPhase?: 'prepared' | 'submitted' | 'dispatching' | 'executing' | 'result-ready';
+    sourceIncarnation?: string; sourceConnectionFingerprint?: string;
     maxOutputTokens?: number;
     executor?: import('./scanner').TwinScannerExecutor;
     meterPeriod?: string;

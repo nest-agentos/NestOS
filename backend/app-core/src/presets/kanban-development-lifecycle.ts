@@ -8,10 +8,11 @@ import type {UserEventService} from '../events/service';
 import {createPublishedKanbanWorkExecutor, type PublishedKanbanWorkOptions} from '../kanban/published-work';
 import {KanbanAutomationJournal} from '../kanban/automation-journal';
 import type {DevelopmentPolicy} from './kanban-development-policy';
-import type {DevelopmentWorkspaceRecord} from './kanban-development';
+import {currentChannelBinding,openDevelopmentChannel,type DevelopmentWorkspaceRecord} from './kanban-development';
+import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import {failure, hasMarkdownSection} from '../run/prompt-bundle';
 
-interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'kernel' | 'prepareSession'> {authorize?(boardId: string): Promise<boolean>; journal: KanbanAutomationJournal; events: UserEventService}
+interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'kernel' | 'prepareSession'> {remote?:Pick<ProjectRemoteMountService,'sessionChannel'>;authorize?(boardId: string): Promise<boolean>; journal: KanbanAutomationJournal; events: UserEventService}
 interface Job {id: string; boardId: string; dispatch: KanbanDispatch; stage: string; request: unknown; phase: 'prepared' | 'submitting'; done?: boolean; observation?: KanbanExecutionObservation}
 /** Terminal hooks are independent calls; cancellation never sends into the stopped turn. */
 interface State {stopped: boolean; pending?: Promise<void>; executor: ReturnType<typeof createPublishedKanbanWorkExecutor>}
@@ -42,14 +43,20 @@ export async function developmentLifecycleSessions(options: Pick<Options, 'journ
     return rows;
 }
 function lifecycleExecutor(options: Options) {
-    return createPublishedKanbanWorkExecutor({...options, title: (dispatch, item) => `${t('kanban.lifecycleTitle', {stage: dispatch.id.split('-postload-').at(-1) ?? ''})} · ${item.number ? '#' + item.number : item.title}`, binding: async dispatch => {
-        const id = dispatch.id.replace(/-postload-(succeeded|failed|cancelled)$/, '');
-        const override = await options.journal.get<TargetRef>('lifecycle-target:' + dispatch.id);
-        if (override) return {target: override};
-        const managed = await options.journal.get<{target?: TargetRef}>('managed-agent:work-' + id);
-        if (!managed?.target) throw failure('LIFECYCLE_TARGET_MISSING'); return {target: managed.target};
-    }, context: async dispatch => ({lifecycle: {stage: 'postload.' + dispatch.id.split('-postload-').at(-1)}})});
+    return createPublishedKanbanWorkExecutor({...options, title: (dispatch, item) => `${t('kanban.lifecycleTitle', {stage: dispatch.id.split('-postload-').at(-1) ?? ''})} · ${item.number ? '#' + item.number : item.title}`,
+        binding: async (dispatch,item) => {
+            const id=dispatch.id.replace(/-postload-(succeeded|failed|cancelled)$/,'');
+            const override=await options.journal.get<TargetRef>('lifecycle-target:'+dispatch.id);
+            const managed=await options.journal.get<{target?:TargetRef}>('managed-agent:work-'+id);
+            const target=override??managed?.target;
+            if(!target)throw failure('LIFECYCLE_TARGET_MISSING');
+            const record=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+dispatch.id);
+            if(!record?.channelId)throw failure('LIFECYCLE_CHANNEL_REQUIRED');
+            return {target,contextRef:{scopeId:record.channelId,sections:['task','context']},instruction:item.responsibility,
+                dependencies:{lifecycle:{stage:'postload.'+dispatch.id.split('-postload-').at(-1)}}};
+        }});
 }
+
 async function advance(options: Options, state: State) {
         for (const key of await options.journal.get<string[]>('development-lifecycle-index') ?? []) {
             if (state.stopped) return;
@@ -84,9 +91,13 @@ async function enqueue(options: Options, state: State, boardId: string, dispatch
         if (!await options.journal.get<Job>(key)) {
             if (target) await options.journal.update<TargetRef>('lifecycle-target:' + id, old => old ?? target);
             const hookDispatch = {...dispatch, id};
-            const directory = workspace?.communicationDirectory?.replace('/workspace/', '') ?? '_nestos/kanban';
-            const hookItem = {...item, responsibility: `Execute ONLY ${stage} and the non-destructive cleanup guidance in ${directory}/prompts/${file}. The original task is terminal. Do not implement, commit, merge, push, or publish primary result. Report retained work and recovery information. Original code: ${observation.code ?? 'NONE'}. Read the frozen prompts from the manifest, followed by these optional files in order: ${hooks.map(name=>directory+'/prompts/'+name).join(', ')||'(none)'}.`,
-                acceptance: 'Return a concise lifecycle summary. Preserve repository state and mailbox history.'};
+            const hookItem = {...item, responsibility: `Execute ONLY ${stage} and the non-destructive cleanup guidance in ${file} through session_context. The original task is terminal. Do not implement, commit, merge, push, or publish primary result. Report retained work and recovery information. Original code: ${observation.code ?? 'NONE'}. Read the frozen sections through session_context, followed by these optional sections in order: ${hooks.join(', ')||'(none)'}.`,
+                acceptance: 'Return a concise lifecycle summary. Preserve repository state and communication history.'};
+            if(!workspace||!options.remote)throw failure('LIFECYCLE_CHANNEL_REQUIRED');
+            const record=await options.journal.update<DevelopmentWorkspaceRecord>('development-workspace:'+id,old=>old??{...workspace,channelId:id,
+                context:{...workspace.context as object,lifecycle:{stage,originalDispatchId:dispatch.id,code:observation.code??null}}});
+            await openDevelopmentChannel(options.remote,id,record,{runId:dispatch.planId,itemId:item.id,attemptId:id},hookItem,
+                await currentChannelBinding(options.remote,record));
             const request = await state.executor.prepare(hookDispatch, hookItem);
             await options.journal.update<Job>(key, old => old ?? {id, boardId, dispatch: hookDispatch, stage, request, phase: 'prepared'});
         }

@@ -9,7 +9,7 @@ it('exposes user-bound Kanban commands, queries and system notifications through
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'web', startupMode: 'interactive', digitalTwinAutoStart: false});
     const operationView = {revision: 'snapshot', operations: [{id: 'merge', label: 'Merge', state: 'waiting-confirmation', enabled: true, fields: [{id: 'file', label: 'File', choices: [{id: 'keep', label: 'Keep'}]}]}]};
     const operationPorts = {itemOperations: vi.fn(async () => operationView), runItemOperation: vi.fn(async () => operationView), bindItemOperation: vi.fn(async () => operationView)};
-    Object.assign(runtime.kanban, operationPorts);
+    Object.assign(runtime.kanban!, operationPorts);
     const view = await openApplicationView(runtime), report = vi.fn();
     let server!: RpcPeer;
     const client = new RpcPeer('client', call => server.handle(call), report, installViewProjections);

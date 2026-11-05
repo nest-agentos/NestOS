@@ -689,13 +689,14 @@ sequenceDiagram
 
 `ApplicationRuntimeOptions.sync` 注入 `ProjectSyncProvider` 和 `Coordinator`，运行时提供可选 `projectSync`。默认不初始化云端连接。app-core 用例负责范围策略和解绑，provider 按本地项目返回同一持久绑定的同步 session；HTTP、凭据及 IndexedDB 实现由宿主装配。关闭运行时先等待已接受用例，再释放 provider 与存储。契约与实施边界见 [项目同步设计](design/project-sync.md#22-实施工作清单与完成标准)。
 
-项目侧栏经 `createProjectModule` 透传 runtime.projectSync。app-shell 的 `projects/sync` 提供菜单、预览和服务器／同步目录选择面板；`AppOptions.projectSyncSetup` 注入宿主首次绑定。Web 的 [WebProjectSync](../apps/web-app/src/sync.ts) 复用 MCPRemoteConnections 投影出的 cells 配置和 cells-driver 的运行期凭据，按同步能力开放已有目录绑定或新目录创建；控制记录仍在 IndexedDB 的 state.seq，刷新后恢复。它只支持受管本地项目，不把 export 远程视图当本地扫描来源。未提供同步端口的宿主点击时显示未接入说明。
+项目侧栏经 `createProjectModule` 透传 runtime.projectSync。app-shell 的 `projects/sync` 提供菜单、预览和服务器／同步目录选择面板；`AppOptions.projectSyncSetup` 注入宿主首次绑定。Web 的 [WebProjectSync](../apps/web-app/src/sync.ts) 复用 独立 Cells 目录中的节点配置和 cells-driver 的运行期凭据，按同步能力开放已有目录绑定或新目录创建；控制记录仍在 IndexedDB 的 state.seq，刷新后恢复。它只支持受管本地项目，不把 export 远程视图当本地扫描来源。未提供同步端口的宿主点击时显示未接入说明。
 
 ## 外部 harness 的宿主装配
 
 三个宿主统一创建 cells-driver 并作为远程文件来源注入。外部 Codex 控制由远程连接服务创建 HarnessClient，app-shell 控制面板负责关闭该客户端；服务端持续监管 app-server。此链路独立于 NestOS Kernel 的模型设备与 llm-session 恢复，复用连接和运行期凭据，不把外部线程转为内部 Task。同步存储/协调器仍由 sync-adapters 提供，HTTP 同步 transport 由 cells-driver 封装。
 
-外部 cells 配置统一位于工具箱 MCP，基础设施为 MCP 注入运行期凭据解析和配置变更钩子。ProjectRemoteMountService 从 MCPRemoteConnections 读取连接；初始化先幂等迁移旧连接，再移除 `/etc/fs` 中的旧描述与密码。配置改名只刷新展示，不失效正在使用的文件来源；删除/改地址或账号受到项目引用保护。
+外部 Cells 配置位于设置 → Cells，支持多个节点。ProjectRemoteMountService 独立保存连接与凭据，启动直接恢复；不依赖 MCP 初始化，也不导入 MCP 配置。普通 MCP 删除不修改 Cells 项目或会话。连接改名刷新展示，被引用节点删除、改端点或改变授权身份明确拒绝。
+
 
 ## 本地数字分身装配
 
@@ -772,3 +773,5 @@ createApplicationRuntime 返回初始化时创建的 independentCalls 服务；�
 准备器复用普通对话的目标、连接与 Context 机制，持久服务仍归 llm-session，Kernel 持有实际执行和资源事实；app-core 只接线，不增加目标编译器或调度器。Flow 实现尚未具备完整 Kernel 工作区收尾，当前明确拒绝裸 Task 准备。旧 session.call.submit 路径和正式入口迁移、历史恢复的剩余范围见[功能合入计划第 91 节](design/functional-merge-plan.md#91-已发布目标复用普通对话准备进入可信宿主调用)。
 
 启动恢复会扫描已接纳且仍 `awaitingSchedule` 的 Flow 根，通过既有 `FlowCommand.RunResume` 重挂原冻结调度器，覆盖没有 invocation journal 的直接运行与重跑。继续使用原检查点、回答与 Task 身份，不重新提交已完成业务步骤；只读 Session、终态根不接管。仍有效的调度租约通过有界退避等待，不强夺所有权；宿主销毁释放恢复重试定时器。回归见 [重启后输入继续](../backend/app-core/tests/flow-scheduler-recovery.test.ts)与[恢复策略](../backend/app-core/tests/flow-scheduler-recovery-policy.test.ts)。
+
+Runtime 关闭先停止上游准入，再排空内核原子步骤；只读子调用观察退出本地等待，保留原持久 Effect 与子任务供原身份恢复，不取消子任务。上游 quiesce 失败不会跳过其余资源释放；所有清理阶段执行后汇总错误。未能确认内核空闲时仍保留存储与租约，不以超时冒充关闭完成。

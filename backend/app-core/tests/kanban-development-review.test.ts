@@ -1,3 +1,4 @@
+import {memoryChannels} from './helpers/session-channels';
 import {sha256HexSync} from '@nestos/common';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
@@ -22,10 +23,11 @@ async function fixture(withExchange = false) {
     const calls = {list: vi.fn(async () => [{receipt: {executionSessionId: 'original-session'}, callerState: {settled: true}, executionTree: {settled: true}, input: {request: {expectedTarget: target, expectedBranch: 'main', overrides: {connection: 'original-connection'}}}}])};
     let outcome: 'running' | 'succeeded' = 'running';
     const submission = {start: vi.fn(async () => ({sessionId: 'original-session', outcome})), inspect: vi.fn(async () => ({sessionId: 'original-session', outcome}))};
-    const stop = vi.fn(), close = vi.fn(async () => {}), remote = {projectHarness: async () => ({subscribeDirectoryPath: () => stop, close})};
+    const channels=memoryChannels();
+    const stop = vi.fn(), close = vi.fn(async () => {}), remote = {sessionChannel:channels.channel,projectHarness: async () => ({subscribeChannel: () => stop, close})};
     const api = developmentReviewAdapter({fs, journal, calls, remote, submission: withExchange ? submission : undefined, kernel: {sessionActivity: async () => ({counts: {}})}, projects: {get: async () => ({path: '/project'}), openWorkspace: async () => ({fs, dispose: async () => {}})}, runningVersion: 'running', service: {execute: async () => {}, workflow: async () => ({dispatches: {}}), read: async () => board, item: async () => ({item})}} as never);
     closes.push(() => api.close!());
-    return {api, journal, fs, submission, stop, close, complete: () => {outcome = 'succeeded';}, item: item as never, board: board as never, target, calls};
+    return {api, journal, fs, channels, submission, stop, close, complete: () => {outcome = 'succeeded';}, item: item as never, board: board as never, target, calls};
 }
 it('prepares merge analysis in the original logical Session and exact native context without executing it', async () => {
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
@@ -50,10 +52,9 @@ it('publishes context replies and resumes merge analysis in the original Session
     const f = await fixture(true), snapshot = await f.api.snapshot(f.board, f.item);
     const request = await f.api.prepareAnalysis({id: 'analysis', board: f.board, item: f.item, snapshot});
     const job = {id: 'analysis', boardId: 'board', itemId: 'task', request, snapshot} as never;
-    const path = '/workspace/_nestos/worktrees/original/_nestos/kanban/review/analysis';
-    await f.fs.driver.createFile({parentPath: path + '/inbox', name: 'request.yaml', content: JSON.stringify({schema: 'work-message/2', id: 'request', scopeId: 'analysis', type: 'request', waitForResponse: true, method: 'unsupported.context', params: {}})});
+    f.channels.request('analysis','request','unsupported.context',{});
     expect(await f.api.exchange!(job, {sessionId: 'original-session', outcome: 'succeeded'})).toMatchObject({outcome: 'running', code: 'WORKSPACE_CONTEXT_PENDING'});
-    expect(JSON.parse(await readPrompt(f.fs, path + '/outbox/request.yaml'))).toMatchObject({replyTo: 'request', status: 'error', error: {code: 'FILE_EXCHANGE_METHOD_UNSUPPORTED'}});
+    expect(f.channels.ensure('analysis').requests[0].response).toMatchObject({id:'request',status:'error',error:{code:'CHANNEL_METHOD_UNSUPPORTED'}});
     expect(f.submission.start).toHaveBeenCalledWith(expect.objectContaining({expectedSessionId: 'original-session', overrides: expect.objectContaining({harnessConversation: expect.objectContaining({mode: 'resume', bindingId: 'binding', expectedGeneration: 2})})}));
     f.complete(); expect(await f.api.exchange!(job, {sessionId: 'original-session', outcome: 'succeeded'})).toMatchObject({outcome: 'succeeded'});
     await f.api.exchange!(job, {sessionId: 'original-session', outcome: 'succeeded'}); expect(f.submission.start).toHaveBeenCalledOnce();
@@ -66,17 +67,17 @@ it('prepares project-discovered builds in the original Session and freezes maint
     const manifest = JSON.parse(await readPrompt(f.fs, path + '/manifest.json'));
     expect(manifest.context.phase).toBe('build'); expect(manifest.files.map(row => row.name)).toContain('task-build-pre.md');
     const job = {id: 'build', action: 'build', boardId: 'board', itemId: 'task', request, snapshot} as never;
-    await f.fs.driver.createFile({parentPath: path, name: 'result.yaml', content: JSON.stringify({schema: 'nestos.file-result/1', operationId: 'build', payload: {status: 'succeeded'}})});
+    f.channels.report('build','result',{type:'result',content:'Build result',payload:{status:'succeeded'}});
     await expect(f.api.readOperation!(job)).rejects.toMatchObject({code: 'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
 });
 
 it('reads a successful original-session build only with a matching immutable artifact receipt', async () => {
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
     const request = await f.api.prepareOperation!({id: 'build-ok', action: 'build', board: f.board, item: f.item, snapshot});
-    const directory = '/workspace/_nestos/worktrees/original', path = directory + '/_nestos/kanban/review/build-ok';
+    const directory = '/workspace/_nestos/worktrees/original';
     const receipt = JSON.stringify({version: 'candidate', checks: ['project build completed']});
     await f.fs.driver.createFile({parentPath: directory, name: 'build-receipt.json', content: receipt});
     const payload = {schema: 'nestos.kanban.operation-result/1', operationId: 'build-ok', status: 'succeeded', sourceVersion: snapshot.sourceVersion, targetVersion: snapshot.targetVersion, version: 'candidate', evidence: {path: 'build-receipt.json', sha256: sha256HexSync(receipt)}};
-    await f.fs.driver.createFile({parentPath: path, name: 'result.yaml', content: JSON.stringify({schema: 'nestos.file-result/1', operationId: 'build-ok', payload})});
+    f.channels.report('build-ok','result',{type:'result',content:'Build result',payload});
     expect(await f.api.readOperation!({id: 'build-ok', action: 'build', boardId: 'board', itemId: 'task', request, snapshot} as never)).toEqual(payload);
 });

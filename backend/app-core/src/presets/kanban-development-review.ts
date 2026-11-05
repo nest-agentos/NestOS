@@ -1,9 +1,8 @@
 import {maintenanceInstruction} from './kanban-maintenance';
 import {journalCommand} from '../kanban/journal-command';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
-import {initializeDevelopmentExchange} from './kanban-file-exchange-protocol';
 import {preloadCommitContexts} from './kanban-commit-query';
-import {developmentFileExchange} from './kanban-file-exchange';
+import {developmentChannelExchange} from './kanban-channel-exchange';
 import type {sessionSubmission} from '../run/session-submission';
 import {t, sha256HexSync} from '@nestos/common';
 import type {KanbanBoard, KanbanItem, KanbanService} from '@nestos/kanban/contracts';
@@ -18,14 +17,14 @@ import {readContextCatalog} from '../projects/harness-context-catalog';
 import {inspectWorktree} from '../projects/worktree-status';
 import {verifyWorktreeDelivery, gitWorkspace} from '../projects/worktree-modules';
 import type {PreparedWorktree} from '../projects/worktree-preparation';
-import type {DevelopmentWorkspaceRecord} from './kanban-development';
+import {currentChannelBinding, openDevelopmentChannel, type DevelopmentWorkspaceRecord} from './kanban-development';
 import {developmentWorkspace} from './kanban-development-workspace';
 import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../projects/remote-mounts';
 import type {ProjectService} from '@nestos/app-contracts/services';
 import {developmentPolicy} from './kanban-development-policy';
 import {publishPromptBundle} from '../run/prompt-bundle';
 import {readPrompt, publishImmutableFile} from '../run/prompt-bundle';
-import {readSessionFileResult, sessionFileResultPrompt} from '../run/session-file-result';
+import {readChannelResult, channelResultInstruction} from '../run/channel-results';
 import {workResourceExecution} from './kanban-work-resource-execution';
 
 interface Options {
@@ -41,9 +40,9 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
     const watch = async (job: ReviewJob) => {
         const record = await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + job.id);
         requireValue(record?.communicationDirectory, 'OPERATION_WORKSPACE_UNAVAILABLE');
-        if (record.exchangeVersion !== 2) return record;
         await watches.ensure(job.id, async () => {const client = await options.remote.projectHarness(record.projectId);
-            const stop = client.subscribeDirectoryPath?.(record.communicationDirectory!.replace('/workspace/', '') + '/inbox', () => options.wake?.());
+            requireValue(client.subscribeChannel, 'SESSION_CHANNEL_REQUIRED');
+            const stop = client.subscribeChannel(job.id, () => options.wake?.());
             return async () => {stop?.(); await client.close();};});
         return record;
     };
@@ -52,8 +51,8 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
         prepareAnalysis: input => prepareAnalysis(options, input), prepareOperation: input => prepareAnalysis(options, input),
         exchange: options.submission ? async (job, observation) => {
             const record = await watch(job);
-            return developmentFileExchange({...options, submission: options.submission!}, {id: job.id, record, service: options.service,
-                base: job.request!, observation, resultFile: job.action === 'analyze' ? 'analysis.yaml' : 'result.yaml', targetHead: job.snapshot.targetVersion,
+            return developmentChannelExchange({...options, submission: options.submission!}, {id: job.id, record, service: options.service,
+                base: job.request!, observation, targetHead: job.snapshot.targetVersion,
                 beforeResume: async () => {requireValue((await snapshot(options, await options.service.read(job.boardId), (await options.service.item(job.boardId, job.itemId)).item)).version === job.snapshot.version, 'MERGE_PLAN_SOURCE_CHANGED');},
                 report: (stage, id, code) => journalCommand(options.journal, options.service, job.boardId, 'review-context-log:' + job.id + ':' + stage + ':' + id,
                     {type: 'message', itemId: job.itemId, message: t(('kanban.fileExchange.' + stage) as Parameters<typeof t>[0]) + (code ? ': ' + code : ''), recipientSessionIds: []})});
@@ -120,30 +119,31 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
         await publishImmutableFile(view.fs, directory, 'commit-contexts.json', contextText);
         const approvalText = input.context === undefined ? undefined : JSON.stringify(input.context);
         if (approvalText) await publishImmutableFile(view.fs, directory, 'operation-input.json', approvalText);
-        await initializeDevelopmentExchange(view.fs, directory, input.id);
         await publishPromptBundle(view.fs, directory, policy.prompts, {operationId: input.id, phase: input.action ?? 'analyze', approval: approvalText ? {path: 'operation-input.json', sha256: sha256HexSync(approvalText)} : null, boardId: input.board.id,
             itemId: input.item.id, sessionId, input: current.record.context, commitContexts: {path: 'commit-contexts.json', sha256: sha256HexSync(contextText)}, sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, resources: input.snapshot.context});
         await options.journal.update('worktree:' + input.id, old => old ?? current.tree);
-        await options.journal.update('development-workspace:' + input.id, old => old ?? {...current.record, exchangeVersion: 2, worktreeId: current.id, communicationDirectory: directory, policy});
+        const record = await options.journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.id, old => old ?? {...current.record, channelId: input.id, worktreeId: current.id, communicationDirectory: directory, policy,
+            context: {...current.record.context as object, operation: {operationId: input.id, phase: input.action ?? 'analyze', approval: input.context ?? null,
+                sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, commitContexts: context, resources: input.snapshot.context}}});
+        await openDevelopmentChannel(options.remote, input.id, record, {runId: input.id, itemId: input.item.id, attemptId: input.id}, input.item,
+            await currentChannelBinding(options.remote,record,sessionId));
     } finally {await view.dispose();}
 }
-function mergeInstruction(input: {id: string; item: KanbanItem; snapshot: ReviewSnapshot}, directory: string): string {
-    const relative = directory.replace('/workspace/', '');
+function mergeInstruction(input: {id: string; item: KanbanItem; snapshot: ReviewSnapshot}, _directory: string): string {
     return JSON.stringify({dependencies: {lifecycle: {stage: 'postload.succeeded'}}, operation: {phase: 'merge-analysis', operationId: input.id},
         instruction: `The original development task is terminal. Continue in this SAME Session for READ-ONLY integration analysis; do not rerun development, create another Session or worktree, commit, merge, push, or modify source/main files. `
-            + `Read ${relative}/manifest.json, commit-contexts.json (verify its manifest sha256; distinguish historical/current context), exchange.json and prompts/task-merge-pre.md when present. Compare the retained delivery with the target branch. `
+            + `Read the identity, context and task-merge-pre.md sections through session_context. Context.operation contains frozen commit contexts and approved source/target versions. Compare the retained delivery with the target branch. `
             + `Return a plan payload {sourceVersion,targetVersion,summary,conflicts:[{id,path,reason,options:[{id,label,detail}]}]}. Every conflict needs explicit user-selectable alternatives; no choices are approved yet. `
             + `Use exactly sourceVersion ${input.snapshot.sourceVersion} and targetVersion ${input.snapshot.targetVersion}; report changed inputs instead of guessing. `
-            + `If context is insufficient, follow exchange.json to publish a work-message/2 request and end this turn WITHOUT analysis.yaml, task result or lifecycle completion; the host resumes this SAME Session after writing replies. Never poll for replies. After final analysis read optional prompts/task-merge-post.md. Keep original commit policy and published delivery files unchanged. `
-            + sessionFileResultPrompt(relative + '/analysis.yaml', input.id),
+            + `If context is insufficient use session_request and yield without a final result; the host resumes this SAME Session. Never poll. Read task-merge-post.md through session_context after analysis. `
+            + channelResultInstruction,
         task: {id: input.item.id, title: input.item.title, responsibility: input.item.responsibility, acceptance: input.item.acceptance}});
 }
 async function readAnalysis(options: Options, job: ReviewJob): Promise<unknown | undefined> {
     const board = await options.service.read(job.boardId), item = (await options.service.item(job.boardId, job.itemId)).item;
     requireValue((await snapshot(options, board, item)).version === job.snapshot.version, 'MERGE_PLAN_SOURCE_CHANGED');
-    const current = await resource(options, item, board.id), folder = await options.projects.get(current.record.projectId), view = await options.projects.openWorkspace(folder.path);
-    try {return await readSessionFileResult(view.fs, current.record.directory + '/_nestos/kanban/review/' + job.id + '/analysis.yaml', job.id, options.journal);}
-    finally {await view.dispose();}
+    const current = await resource(options, item, board.id);
+    return readChannelResult(options.remote, current.record.projectId, job.id, options.journal);
 }
 
 async function readOperation(options: Options, job: ReviewJob): Promise<unknown | undefined> {
@@ -151,7 +151,7 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
     const board = await options.service.read(job.boardId), item = (await options.service.item(job.boardId, job.itemId)).item;
     const current = await resource(options, item, board.id), folder = await options.projects.get(current.record.projectId), view = await options.projects.openWorkspace(folder.path);
     let result: unknown;
-    try {result = await readSessionFileResult(view.fs, current.record.directory + '/_nestos/kanban/review/' + job.id + '/result.yaml', job.id, options.journal);
+    try {result = await readChannelResult(options.remote, current.record.projectId, job.id, options.journal);
         if (job.action === 'build' && result && (result as {status?: string}).status === 'succeeded') await verifyBuildEvidence(view.fs, current.record.directory, result);}
     finally {await view.dispose();}
     if (result === undefined || ['blocked', 'failed'].includes((result as {status: string})?.status)) return result;

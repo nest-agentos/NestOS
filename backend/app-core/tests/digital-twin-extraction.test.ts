@@ -80,3 +80,60 @@ it('identifies invalid candidate fields without including private model text', (
     expect(() => parseCandidates(JSON.stringify({ candidates: [{ ...candidate, quote: 'source', project: null }] }), 'source'))
         .toThrow('TWIN_INVALID_EXTRACTION');
 });
+
+it('checkpoints after session preparation without submitting when the owner stops', async () => {
+    let active = true;
+    const submit = vi.fn(), checkpoint = vi.fn(async () => {});
+    const kernel = {openSession: async () => {active = false; return {submit};}} as unknown as Kernel;
+    await expect(new KernelTwinExtractor(kernel).run(job, 'private source', async () => {}, undefined,
+        {active: () => active, checkpoint})).rejects.toThrow('TWIN_SAFE_POINT');
+    expect(submit).not.toHaveBeenCalled(); expect(checkpoint).toHaveBeenCalledWith('prepared');
+});
+it('retains the submitted task and stops before starting its external call', async () => {
+    let active = true;
+    const start = vi.fn(), createResource = vi.fn(), wait = vi.fn();
+    const task = {id: 'original-task', status: async () => ({task: {status: 'created'}}), start, createResource, wait};
+    const submit = vi.fn(async () => task), checkpoint = vi.fn(async () => {}), attached = vi.fn(async () => {active = false;});
+    const kernel = {openSession: async () => ({submit})} as unknown as Kernel;
+    await expect(new KernelTwinExtractor(kernel).run(job, 'private source', attached, undefined,
+        {active: () => active, checkpoint})).rejects.toThrow('TWIN_SAFE_POINT');
+    expect(attached).toHaveBeenCalledWith('original-task'); expect(start).not.toHaveBeenCalled();
+    expect(createResource).not.toHaveBeenCalled(); expect(wait).not.toHaveBeenCalled();
+});
+it('can stop after capability acquisition and resume the same created task', async () => {
+    let active = true;
+    const start = vi.fn(async () => {}), submit = vi.fn();
+    const createResource = vi.fn(async () => {active = false; return {handle: {id: 'resource'}};});
+    const task = {id: 'original-task', status: async () => ({task: {status: 'created'}}), start, createResource,
+        wait: async () => ({status: 'succeeded', output: {message: {content: '{"candidates":[]}'}}})};
+    const attachTask = vi.fn(async () => task), checkpoint = vi.fn(async () => {});
+    const kernel = {attachTask, openSession: async () => ({submit})} as unknown as Kernel;
+    const run = new KernelTwinExtractor(kernel), original = {...job, taskId: task.id};
+    await expect(run.run(original, 'source', async () => {}, undefined, {active: () => active, checkpoint})).rejects.toThrow('TWIN_SAFE_POINT');
+    expect(start).not.toHaveBeenCalled(); expect(submit).not.toHaveBeenCalled();
+    active = true; createResource.mockImplementation(async () => ({handle: {id: 'resource'}}));
+    await expect(run.run(original, 'source', async () => {}, undefined, {active: () => active, checkpoint})).resolves.toMatchObject({candidates: []});
+    expect(start).toHaveBeenCalledOnce(); expect(submit).not.toHaveBeenCalled();
+    expect(attachTask).toHaveBeenLastCalledWith(job.sessionId, task.id);
+});
+it('replays a persisted terminal output after stopping before result parsing', async () => {
+    let active = true;
+    const task = {id: 'original-task', status: async () => ({task: {status: 'succeeded'}}), wait: vi.fn(async () => ({status: 'succeeded',
+        output: {usage: {total_tokens: 123}, message: {content: '{"candidates":[]}'}}}))};
+    const start = vi.fn(), submit = vi.fn(), attachTask = vi.fn(async () => ({...task, start}));
+    const checkpoint = vi.fn(async phase => {if (phase === 'result-ready') active = false;});
+    const run = new KernelTwinExtractor({attachTask, openSession: async () => ({submit})} as unknown as Kernel);
+    const original = {...job, taskId: task.id};
+    await expect(run.run(original, 'source', async () => {}, undefined, {active: () => active, checkpoint})).rejects.toThrow('TWIN_SAFE_POINT');
+    active = true;
+    await expect(run.run(original, 'source', async () => {})).resolves.toMatchObject({candidates: [], tokens: 123});
+    expect(submit).not.toHaveBeenCalled(); expect(start).not.toHaveBeenCalled(); expect(task.wait).toHaveBeenCalledTimes(2);
+});
+it('defers removal when the owner stops during session close', async () => {
+    let active = true;
+    const removeSession = vi.fn(), closeSession = vi.fn(async () => {active = false;});
+    const run = new KernelTwinExtractor({closeSession, removeSession} as unknown as Kernel);
+    expect(await run.cleanup(job, () => active)).toBe(false); expect(removeSession).not.toHaveBeenCalled();
+    active = true; closeSession.mockImplementation(async () => {});
+    expect(await run.cleanup(job, () => active)).toBe(true); expect(removeSession).toHaveBeenCalledOnce();
+});

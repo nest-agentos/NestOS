@@ -564,10 +564,10 @@ export class DigitalTwinService {
         const scanStore = new TwinScanStore(records, this.deps.scanHost?.kind ?? 'local', this.deps.scanHost?.now, this.deps.scanHost?.leaseMs);
         const guard = createScanGuard(scanStore);
         const extraction: TwinExtractionPort = {
-            run: (job, text, attached, progress) => job.executor
-                ? this.requireScanner().run(job, text, attached, progress) : this.deps.extractor.run(job, text, attached, progress),
+            run: (job, text, attached, progress, lifecycle) => job.executor
+                ? this.requireScanner().run(job, text, attached, progress, lifecycle) : this.deps.extractor.run(job, text, attached, progress, lifecycle),
             cancel: job => job.executor ? this.requireScanner().cancel(job) : this.deps.extractor.cancel(job),
-            cleanup: job => job.executor ? this.requireScanner().cleanup(job) : this.deps.extractor.cleanup(job),
+            cleanup: (job, active) => job.executor ? this.requireScanner().cleanup(job, active) : this.deps.extractor.cleanup(job, active),
         };
         const analysis = new TwinAnalysis(records, sources, extraction, () => this.notify(), async (scope, charge) => {
             await this.authorizeWorkspace();

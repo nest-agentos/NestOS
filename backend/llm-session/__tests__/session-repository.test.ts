@@ -414,3 +414,18 @@ it.each(['private fixture summary', JSON.stringify({id: 'bad', title: 'private f
     expect(JSON.stringify(logger.error.mock.calls)).not.toContain('private fixture');
     await reader.dispose();
 });
+
+it('stops cold summary traversal before reading the next storage batch', async () => {
+    for (let i = 0; i < 65; i++) await repository.createSession(`Summary ${i}`);
+    const read = vi.fn(fs.meta.seq!.getEntriesMany.bind(fs.meta.seq)), visit = vi.fn(async () => false);
+    const seq = new Proxy(fs.meta.seq!, {get: (target, key) => key === 'getEntriesMany' ? read : Reflect.get(target, key)});
+    const reader = new SessionRepository({...fs, meta: {...fs.meta, seq}});
+    try {await reader.walkSummaries(visit);} finally {await reader.dispose();}
+    expect(visit).toHaveBeenCalledTimes(1); expect(read).toHaveBeenCalledTimes(1);
+    expect(read.mock.calls[0][0]).toHaveLength(64);
+    expect(await repository.listSummaries()).toHaveLength(65);
+});
+it('propagates a summary visitor failure without reading further batches', async () => {
+    await repository.createSession('Summary');
+    await expect(repository.walkSummaries(async () => {throw new Error('VISITOR_FAILED');})).rejects.toThrow('VISITOR_FAILED');
+});

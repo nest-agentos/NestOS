@@ -1,3 +1,6 @@
+import {SeqTwinStore} from '../src/digital-twin/seq-twin-store';
+import {TwinRecords} from '../src/digital-twin/records';
+import {KernelTwinExtractor} from '../src/digital-twin/extraction';
 import {buildTool, TaskListTool, type Tool} from '@nestos/tools';
 import {afterEach, expect, it, vi} from 'vitest';
 import {MemoryBackend} from '@nestos/vfs-core';
@@ -53,7 +56,7 @@ async function setup(withOrganization = false, additionalTools: Tool[] = []) {
     const runtime = await createApplicationRuntime({backend, kernelPlatform: {additionalTools}, ownerKind: 'cli', digitalTwinAutoStart: false, ...(withOrganization ? {digitalTwinWorkspaces: [{twinId: 'team', ownerId: 'organization:team', name: 'Team', kind: 'organization' as const, authorize: async () => {}}]} : {})}); cleanup.push(() => runtime.dispose());
     const twin = runtime.digitalTwin!;
     await twin.configure({connectionId: 'default'}, (await twin.getSettings()).revision);
-    return {runtime, twin, requests};
+    return {runtime, twin, requests, backend};
 }
 it('runs a published Flow from a text snapshot and accepts its supported result only after review', async () => {
     const {runtime, twin, requests} = await setup();
@@ -264,4 +267,61 @@ it('collects and learns directly from a Tool, then skips model work for unchange
     await twin.waitScanRun(await twin.runScanPlan(id));
     expect(collected).toHaveBeenCalledTimes(2); expect(requests).toHaveBeenCalledTimes(1);
     expect((await twin.snapshot()).memories).toHaveLength(1);
+}, 30000);
+
+
+it.each(['prepared', 'submitted', 'result-ready'] as const)('reopens the full runtime from %s without a second model request', async phase => {
+    const {runtime, twin, requests, backend} = await setup();
+    cleanup.unshift(backend.close.bind(backend)); backend.close = async () => {};
+    let entered!: () => void, release!: () => void;
+    const reached = new Promise<void>(resolve => {entered = resolve;}), gate = new Promise<void>(resolve => {release = resolve;});
+    const original = KernelTwinExtractor.prototype.run;
+    const intercept = vi.spyOn(KernelTwinExtractor.prototype, 'run').mockImplementationOnce(function(this: KernelTwinExtractor, job, input, attached, progress, lifecycle) {
+        return original.call(this, job, input, attached, progress, {...lifecycle!, checkpoint: async current => {
+            await lifecycle!.checkpoint(current); if (current === phase) {entered(); await gate;}
+        }});
+    });
+    try {
+        const plan = await twin.saveScanRule(null, null, {name: 'Checkpoint', include: [], exclude: [], intervalMinutes: 30,
+            enabled: true, trigger: 'manual', input: {kind: 'text', text}});
+        const id = await twin.runScanPlan(plan); await reached;
+        const stopping = runtime.quiesce(); release(); await stopping;
+        const before = (await twin.snapshot()).jobs[0];
+        if (phase === 'submitted') {
+            const records = new TwinRecords(await SeqTwinStore.open(await runtime.vfs.openFileSystem('/'), 'personal', 'admin'));
+            const run = (await records.get<Record<string, unknown>>('scan-run', id))!;
+            await records.save('scan-run', id, {...run.data, state: 'running', owner: 'previous-host'}, run.revision);
+        }
+        expect(requests).toHaveBeenCalledTimes(phase === 'result-ready' ? 1 : 0);
+        await runtime.dispose();
+        const other = await createApplicationRuntime({backend, ownerKind: 'cli', digitalTwinAutoStart: false});
+        cleanup.push(() => other.dispose());
+        await other.digitalTwin!.waitScanRun(id);
+        const after = await other.digitalTwin!.snapshot();
+        expect(after.jobs).toHaveLength(1);
+        expect(after.jobs[0]).toMatchObject({id: before.id, data: {sessionId: before.data.sessionId, state: 'committed', actualTokens: 100}});
+        if (before.data.taskId) expect(after.jobs[0].data.taskId).toBe(before.data.taskId);
+        expect(requests).toHaveBeenCalledOnce(); expect(after.settings.data.spentTokens).toBe(100);
+    } finally {release(); intercept.mockRestore();}
+}, 30000);
+
+
+it('retries result persistence without discarding the terminal task or requesting the model again', async () => {
+    const {twin, requests} = await setup();
+    const original = SeqTwinStore.prototype.commit; let failures = 0;
+    const commit = vi.spyOn(SeqTwinStore.prototype, 'commit').mockImplementation(function(this: SeqTwinStore, operation) {
+        if (!failures && operation.writes.some(write => write.family === 'job' && write.payload.state === 'committed')) {
+            failures++; throw Object.assign(new Error('Storage temporarily unavailable'), {code: 'EIO'});
+        }
+        return original.call(this, operation);
+    });
+    try {
+        const plan = await twin.saveScanRule(null, null, {name: 'Retry commit', include: [], exclude: [], intervalMinutes: 30,
+            enabled: true, trigger: 'manual', input: {kind: 'text', text}});
+        await twin.waitScanRun(await twin.runScanPlan(plan));
+        const state = await twin.snapshot();
+        expect(failures).toBe(1); expect(requests).toHaveBeenCalledOnce(); expect(state.jobs).toHaveLength(1);
+        expect(state.jobs[0].data).toMatchObject({state: 'committed', actualTokens: 100, reservedTokens: 0});
+        expect(state.settings.data.spentTokens).toBe(100);
+    } finally {commit.mockRestore();}
 }, 30000);

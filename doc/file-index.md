@@ -94,7 +94,7 @@
 | 事件总线（EventBus/FSEventBus） | `https://github.com/nest-agentos/vfs-core/blob/main/src/eventbus/`、`impl/event/` |
 | IndexedDB 后端 | `https://github.com/nest-agentos/vfsdriver-indexeddb/blob/main/src/` |
 | HTTP 外挂驱动 | `https://github.com/nest-agentos/cells-driver/blob/main/src/files/` |
-| 远程连接与项目 | `app-core/src/projects/remote-mounts.ts`、`app-core/src/projects/remote-mount-store.ts`、`app-core/src/projects/remote-connections.ts`、`app-core/src/projects/mcp-remote-connections.ts`、`app-shell/src/toolbox/cells-controls.ts`、`app-shell/src/files/remote-project-fields.ts` |
+| 远程连接与项目 | `app-core/src/projects/remote-mounts.ts`、`app-core/src/projects/remote-mount-store.ts`、`app-core/src/projects/remote-connections.ts`、`app-settings/src/editors/CellsSettingsEditor.ts`、`app-shell/src/files/remote-project-fields.ts` |
 | LocalFS 后端 | `https://github.com/nest-agentos/vfsdriver-local/blob/main/src/localfs-backend.ts` |
 
 ## CLI（@nestos/cli）

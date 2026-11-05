@@ -71,14 +71,14 @@ describe('host application startup', () => {
         }
     });
 
-    it('defers remote configuration refresh until background startup', async () => {
-        const refresh = vi.spyOn(ProjectRemoteMountService.prototype, 'refreshMCPConnections');
+    it('loads Cells configuration independently of model background startup', async () => {
+        const refresh = vi.spyOn(ProjectRemoteMountService.prototype, 'init');
         const runtime = await createApplicationRuntime({ backend: new MemoryBackend(), ownerKind: 'web',
             startupMode: 'interactive', digitalTwinAutoStart: false,
             remoteSourceProvider: { setCredential() {}, dispose: async () => {}, open: async () => { throw new Error('not connected'); } } });
         try {
             await runtime.llmDriver.ensureReady();
-            expect(refresh).not.toHaveBeenCalled();
+            expect(refresh).toHaveBeenCalledOnce();
             runtime.startBackground?.();
             await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
         } finally { await runtime.dispose(); refresh.mockRestore(); }

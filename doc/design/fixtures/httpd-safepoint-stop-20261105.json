@@ -1,0 +1,83 @@
+{
+  "date": "2026-11-05",
+  "version": "20261105T001657-6ba2c566-dirty",
+  "readyBeforeStop": true,
+  "safeStop": {
+    "durationMs": 506,
+    "forced": false,
+    "scannerStageAtRequest": "discovery",
+    "scannerQuiesceMs": 22,
+    "hostLockReleased": true,
+    "userLocksReleased": true
+  },
+  "startupStop": {
+    "durationMs": 8935,
+    "forced": false,
+    "hostLockReleased": true,
+    "waitsForAcceptedInitialization": true
+  },
+  "checks": {
+    "businessTests": 98,
+    "sessionRepositoryTests": 33,
+    "processControlTests": 10,
+    "appCoreTypecheck": "passed",
+    "sessionTypecheck": "passed",
+    "docsCheck": "passed"
+  },
+  "recoveryCoverage": "The original scan run resumes without redoing committed extraction chunks on memory and indexeddb backends.",
+  "restartDuringAcceptedExtraction": {
+    "defaultWaitMs": 15002,
+    "result": "HTTPD_SAFE_STOP_PENDING",
+    "forced": false,
+    "scannerQuiesceMs": 32737,
+    "completedSafely": true,
+    "shutdownResults": [
+      {
+        "operation": "scanner.quiesce",
+        "stage": "idle",
+        "durationMs": 7
+      },
+      {
+        "operation": "scanner.quiesce",
+        "stage": "idle",
+        "durationMs": 7
+      },
+      {
+        "operation": "scanner.quiesce",
+        "stage": "idle",
+        "durationMs": 32737
+      },
+      {
+        "operation": "http.shutdown",
+        "stage": "host.close",
+        "durationMs": 33239
+      }
+    ]
+  },
+  "finalHealth": {
+    "version": "20261105T001657-6ba2c566-dirty",
+    "ready": true
+  },
+  "phaseImplementation": {
+    "version": "20261105T003401-6ba2c566-dirty",
+    "digitalTwinTests": 213,
+    "testFiles": 23,
+    "typecheck": "passed",
+    "docsCheck": "passed",
+    "runtimeRecovery": [
+      "prepared",
+      "submitted",
+      "result-ready"
+    ],
+    "requestCountPerRecoveredRun": 1,
+    "resultPersistenceFailureReplay": "passed",
+    "safeStageRecoveryFromOldOwner": "passed",
+    "terminalCleanupDeferral": "passed",
+    "realRestartStopMs": 205,
+    "forced": false,
+    "health": {
+      "version": "20261105T003401-6ba2c566-dirty",
+      "ready": true
+    }
+  }
+}

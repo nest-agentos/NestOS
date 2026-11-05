@@ -53,13 +53,13 @@ async function device(endpoint: string) {
     const sync = new WebProjectSync(backend, http); sync.projects = projects;
     return { backend, http, sync, project, projects, close: async () => { await sync.dispose(); await http.dispose(); await backend.close(); } };
 }
-it('reads stale sync status locally and unbinds it without resolving its deleted MCP', async () => {
+it('reads stale sync status locally and unbinds it without resolving its deleted Cells node', async () => {
     const a = await device('https://unused.test'), state = initialState();
     state.binding = {...state.binding, root: a.project.project.directory, sourceId: a.backend.storageAccess().identity,
         connectionId: '5776bbb8-649b-44ab-9f5f-aeeabf54f78e'};
     const store = new IndexedDBSyncStore(a.backend.storageAccess(), state.binding.bindingId); await store.initialize(state);
     await a.backend.write(state.binding.root + '/keep.md', new TextEncoder().encode('local content'));
-    const missing = new RemoteConnectionUnavailableError({connectionId: state.binding.connectionId!, reason: 'mcp-not-found', revision: 1, configured: []}, []);
+    const missing = new RemoteConnectionUnavailableError({connectionId: state.binding.connectionId!, reason: 'cells-not-found', revision: 1, configured: []}, []);
     const resolve = vi.spyOn(a.projects.remoteMounts!, 'resolveConnection').mockRejectedValue(missing);
     const transport = vi.spyOn(a.http, 'sync'), service = new ProjectSyncService(a.sync, a.sync.coordinator);
     try {
@@ -77,10 +77,10 @@ it('retains unknown cloud receipts when offline unbinding cannot cancel an admit
         opSeq: '1', authorityId: state.binding.authorityId, historyEpoch: state.binding.historyEpoch}}};
     state.nextSeq = '2';
     const store = new IndexedDBSyncStore(a.backend.storageAccess(), state.binding.bindingId); await store.initialize(state);
-    const resolve = vi.spyOn(a.projects.remoteMounts!, 'resolveConnection').mockRejectedValue(new Error('MCP missing'));
+    const resolve = vi.spyOn(a.projects.remoteMounts!, 'resolveConnection').mockRejectedValue(new Error('Cells node missing'));
     const service = new ProjectSyncService(a.sync, a.sync.coordinator);
     try {
-        await expect(service.unbind('local')).rejects.toThrow('MCP missing');
+        await expect(service.unbind('local')).rejects.toThrow('Cells node missing');
         const after = await service.status('local'); expect(after.binding.state).toBe('detached'); expect(after.pending).toEqual(state.pending);
         expect(resolve).toHaveBeenCalledOnce(); expect(after.nextSeq).toBe(state.nextSeq);
     } finally {await service.dispose(); await a.close(); vi.restoreAllMocks();}
@@ -100,31 +100,22 @@ it('only resolves a sync client when an operation needs it and preserves its met
         expect(resolve).toHaveBeenCalledOnce(); expect(receiver).toBeInstanceOf(HttpSyncClient);
     } finally {await service.dispose(); await a.close(); vi.restoreAllMocks();}
 });
-it('discovers cells on the generic MCP connection without extra verification and binds its native project',async()=>{
-    const running = await server(true,true);
-    const backend = new IndexedDBBackend({dbName:'mcp-cells-'+randomId()}), originalFetch = globalThis.fetch;
-    const methods:string[] = [];
-    const fetch = vi.spyOn(globalThis,'fetch').mockImplementation(async (input,init) => {
-        if (String(input).endsWith('/mcp') && typeof init?.body === 'string') methods.push(JSON.parse(init.body).method);
-        return originalFetch(input,init);
-    });
-    const driver = createCellsDriver();
-    const runtime = await createApplicationRuntime({backend,ownerKind:'web',remoteSourceProvider:driver});
+it('discovers a Cells node through its fixed API and binds its project independently of MCP',async()=>{
+    const running=await server(true,true),backend=new IndexedDBBackend({dbName:'cells-node-'+randomId()}),originalFetch=globalThis.fetch;
+    const requests:string[]=[];
+    const fetch=vi.spyOn(globalThis,'fetch').mockImplementation(async(input,init)=>{requests.push(new URL(String(input)).pathname);return originalFetch(input,init);});
+    const driver=createCellsDriver(),runtime=await createApplicationRuntime({backend,ownerKind:'web',remoteSourceProvider:driver});
     try {
-        const draft = {id:'office',name:'Office',transport:'http' as const,endpoint:running.endpoint+'/mcp',apiKey:'fixed-network-api-key-at-least-24-bytes'};
-        const discovery = await runtime.agentService.testMCPServer(draft);
-        expect(discovery.extensions?.['itookit/cells']).toMatchObject({serverId:'web-directory-test',projects:true});
-        await runtime.agentService.saveMCPServer({...draft,...discovery});
-        await runtime.agentService.saveMCPServer({...draft,...discovery,name:'Personal server'});
-        expect(methods).toEqual(['server/discover','tools/list','resources/list']);
-        expect(discovery.resources).toMatchObject([{uri:'cells://web-directory-test/directories',mimeType:'application/json'}]);
-        const contents = await runtime.agentService.readMCPResource(draft.id,discovery.resources[0].uri) as {contents:Array<{text:string}>};
-        expect(JSON.parse(contents.contents[0].text)).toMatchObject({serverId:'web-directory-test',exports:[{alias:'home',virtualPath:'/home'}]});
-        const remote = await runtime.projects.createRemote('Notes',null,draft.id,'/home/target','rw');
-        expect(runtime.projects.remoteMounts!.list(remote.project.id)[0]).toMatchObject({connectionId:draft.id,root:'/target',access:'rw'});
-        expect(runtime.projects.remoteMounts!.connection(draft.id)).toMatchObject({name:'Personal server',credentialRef:'mcp-office'});
-        expect((await runtime.projects.list()).some(item=>item.project.id===remote.project.id)).toBe(true);
-    } finally {await runtime.dispose();await driver.dispose();fetch.mockRestore();await backend.close();await running.close();}
+        const nodes=runtime.projects.remoteMounts!,credential='fixed-network-api-key-at-least-24-bytes';
+        const id=await nodes.saveConnection({name:'Office',endpoint:running.endpoint},credential);
+        expect(nodes.connection(id)).toMatchObject({serverId:'web-directory-test',projects:true});
+        await nodes.saveConnection({name:'Personal server',endpoint:running.endpoint},'',id);
+        const remote=await runtime.projects.createRemote('Notes',null,id,'/home/target','rw');
+        expect(nodes.list(remote.project.id)[0]).toMatchObject({connectionId:id,root:'/target',access:'rw'});
+        expect(nodes.connection(id).name).toBe('Personal server');
+        expect(await runtime.agentService.getMCPServers()).toEqual([]);
+        expect(requests).toContain('/v1/capabilities');expect(requests.some(path=>path.endsWith('/mcp'))).toBe(false);
+    }finally{await runtime.dispose();await driver.dispose();fetch.mockRestore();await backend.close();await running.close();}
 },90000);
 it('binds and syncs two devices without Web Locks, SubtleCrypto or randomUUID and restores bindings after reload', async () => {
     vi.stubGlobal('navigator', {});

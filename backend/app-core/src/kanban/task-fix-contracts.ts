@@ -4,7 +4,7 @@ import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import type {KanbanAutomationJournal} from './automation-journal';
 import type {UserEventService} from '../events/service';
 export interface Definition {title:string; responsibility:string; acceptance:string; type:'fix'; dependencies:string[]}
-export interface Snapshot {messageId:string; content:'完成'; definition:Definition; digest:string; operationId:string}
+export interface Snapshot {proposalId:string; messageId:string; content:string; definition:Definition; digest:string; operationId:string}
 export interface SavedFix extends KanbanFixSession {
     phase:'prepared'|'submitting'; dispatch:KanbanDispatch; item:KanbanItem; projectId:string; context:unknown; request:unknown;
     snapshot?:Snapshot; code?:string; accepted?:boolean;

@@ -22,6 +22,6 @@ export function scannerInputReader(records: TwinRecords, reader: TwinSourceReade
         if (!entry || sha256HexSync(entry.data.text) !== id) throw new Error('TWIN_SCANNER_INPUT_MISSING');
         return {text: entry.data.text, hash: id, nativeIdentity: spec.target};
     };
-    return {read, sessions: () => reader.sessions(), ...(reader.discover ? {discover: () => reader.discover!()} : {}),
+    return {read, sessions: () => reader.sessions(), ...(reader.discover ? {discover: active => reader.discover!(active)} : {}),
         probe: spec => spec.target.startsWith(prefix) ? read(spec).then(result => result.hash) : reader.probe?.(spec) ?? Promise.resolve('')};
 }

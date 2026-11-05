@@ -19,7 +19,7 @@ function fixture(remote: boolean) {
     const personal = vi.fn(() => {throw new Error('Must not read the reserved project');});
     const projects = {get:vi.fn(async () => project),personal,localExecutionSettings,setLocalExecution,
         renameProject:vi.fn(async (_from:string,to:string) => {project = {...project,path:to,name:to.slice(1)};}),
-        remoteMounts:{executionSettings,setExecution,projectOffline:() => false,list:() => remote?[{at:'/',connectionId:'r1'}]:[],onChange:() => () => {}},
+        remoteMounts:{executionSettings,setExecution,projectOffline:() => false,connections:() => [{id:'r1'}],list:() => remote?[{at:'/',connectionId:'r1',serverProjectId:'node-x1'}]:[],onChange:() => () => {}},
         navigation:async () => ({project,projects:[project],path:project.path,pendingDeletions:0,offlineProjectIds:[],loadPaths:[]})};
     return {projects,id,executionSettings,setExecution,localExecutionSettings,setLocalExecution,personal};
 }
@@ -60,5 +60,43 @@ it('keeps the selected remote identity visible when an old node lacks environmen
     expect(document.querySelector('dialog')!.getAttribute('aria-label')).toContain('r1:x1');
     expect(document.querySelector('dialog')!.textContent).toContain('ECAPABILITY');
     expect(f.personal).not.toHaveBeenCalled(); expect(f.localExecutionSettings).not.toHaveBeenCalled();
+    controller.abort(); await pending;
+});
+
+it('offers Cells configuration rather than remount for a missing connection',async () => {
+    const f = fixture(true), controller = new AbortController(), configureConnection = vi.fn(async () => {}), remount = vi.fn(async () => {});
+    cleanup.push(() => controller.abort()); f.projects.remoteMounts.connections = () => [];
+    f.executionSettings.mockRejectedValueOnce({code:'ENOENT'});
+    const pending = showProjectSettings(f.projects as never,'x1',controller.signal,async () => {},undefined,undefined,{configureConnection,remount});
+    await vi.waitFor(() => expect(document.querySelector('dialog')).not.toBeNull());
+    const dialog = document.querySelector('dialog')!;
+    expect(dialog.textContent).toContain('Cells 连接配置不存在');
+    expect(dialog.textContent).not.toContain('升级节点');
+    const button = [...dialog.querySelectorAll('button')].find(item => item.textContent === '配置 Cells 连接')!;
+    button.click(); await pending;
+    expect(configureConnection).toHaveBeenCalledOnce(); expect(remount).not.toHaveBeenCalled();
+});
+
+it('reloads and saves remote environment settings after a successful remount',async () => {
+    const f = fixture(true), controller = new AbortController(), remount = vi.fn(async () => {});
+    cleanup.push(() => controller.abort()); f.executionSettings.mockRejectedValueOnce({code:'ECONFLICT'});
+    const pending = showProjectSettings(f.projects as never,'x1',controller.signal,async () => {},undefined,undefined,{remount});
+    await vi.waitFor(() => expect(document.querySelector('dialog')).not.toBeNull());
+    const dialog = document.querySelector('dialog')!;
+    [...dialog.querySelectorAll('button')].find(item => item.textContent === '重新挂载并检查')!.click();
+    await vi.waitFor(() => expect(dialog.querySelector('textarea')).not.toBeNull());
+    dialog.querySelector('textarea')!.value = 'KEY=value';
+    dialog.querySelector('form')!.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true})); await pending;
+    expect(remount).toHaveBeenCalledOnce(); expect(f.executionSettings).toHaveBeenCalledTimes(2); expect(f.setExecution).toHaveBeenCalledOnce();
+});
+
+it('keeps recovery controls available and hides private remount errors on failure',async () => {
+    const f = fixture(true), controller = new AbortController(), remount = vi.fn(async () => {throw Object.assign(new Error('private-secret'),{code:'EACCES'});});
+    cleanup.push(() => controller.abort()); f.executionSettings.mockRejectedValueOnce({code:'ECONFLICT'});
+    const pending = showProjectSettings(f.projects as never,'x1',controller.signal,async () => {},undefined,undefined,{remount});
+    await vi.waitFor(() => expect(document.querySelector('dialog')).not.toBeNull());
+    const dialog = document.querySelector('dialog')!, button = [...dialog.querySelectorAll('button')].find(item => item.textContent === '重新挂载并检查')!;
+    button.click(); await vi.waitFor(() => {expect(remount).toHaveBeenCalledOnce();expect(button.disabled).toBe(false);});
+    expect(dialog.textContent).not.toContain('private-secret'); expect(dialog.querySelector('textarea')).toBeNull();
     controller.abort(); await pending;
 });

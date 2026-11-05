@@ -1,9 +1,9 @@
 import { t } from '@nestos/common';
-import type { MCPConnectionDiagnostic } from '@nestos/app-contracts';
+import type { CellsConnectionDiagnostic } from '@nestos/app-contracts';
 import type { SyncState } from '@nestos/vfs-sync';
 import { localizeConnectionReason } from '../../files/localize-mount-error';
 
-export interface SyncConnectionStatus extends Pick<MCPConnectionDiagnostic, 'reason' | 'connectionName'> {offline?: boolean}
+export interface SyncConnectionStatus extends Pick<CellsConnectionDiagnostic, 'reason' | 'connectionName'> {offline?: boolean}
 export interface ProjectSyncIndicator {
     state: 'configured' | 'pending' | 'error'; label: string; target?: string; direction?: string; issues: string[];
 }
@@ -23,7 +23,7 @@ function visibleBinding(state: SyncState): boolean {
 }
 function connectionIssues(connection?: SyncConnectionStatus): string[] {
     const issues: string[] = [];
-    if (connection?.reason === 'mcp-not-found') issues.push(t('project.sync.issue.connectionMissing'));
+    if (connection?.reason === 'cells-not-found') issues.push(t('project.sync.issue.connectionMissing'));
     else if (connection && connection.reason !== 'ready') issues.push(localizeConnectionReason(connection));
     if (connection?.offline) issues.push(t('project.sync.issue.connectionOffline'));
     return issues;

@@ -1,7 +1,5 @@
 import {maintenancePrompts} from './kanban-maintenance';
 import {LIFECYCLE_PROMPT_SUFFIXES} from '../run/prompt-lifecycle';
-import {developmentStage} from './kanban-development-log';
-import migrations from './kanban-development-prompt-migrations.json';
 import {sha256HexSync, t} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {KanbanAutomationTarget, KanbanBoard} from '@nestos/kanban/contracts';
@@ -23,7 +21,7 @@ export async function developmentPolicy(journal: PromptJournal, fs: IFileSystem,
     options: Record<string, string> = {}): Promise<DevelopmentPolicy> {
     const key = 'development-policy:' + id, old = await journal.get<DevelopmentPolicy>(key); if (old) return old;
     const {profile, commit, modules} = validateDevelopmentOptions(options);
-    const prompts = await freezePrompts(journal, 'development-prompts:' + id, () => resolvePrompts(fs, project, profile, id));
+    const prompts = await freezePrompts(journal, 'development-prompts:' + id, () => resolvePrompts(fs, project, profile));
     return journal.update<DevelopmentPolicy>(key, previous => previous ?? {version: 1, profile, commit: commit as DevelopmentPolicy['commit'], modules, prompts});
 }
 export function validateDevelopmentOptions(options: Record<string, string> = {}) {
@@ -37,7 +35,7 @@ export function validateDevelopmentOptions(options: Record<string, string> = {})
 export function validModulePath(path: string): boolean {
     return path.length <= 512 && path.split('/').every(part => /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(part));
 }
-async function resolvePrompts(fs: IFileSystem, project: IFileSystem, profile: string, operationId:string) {
+async function resolvePrompts(fs: IFileSystem, project: IFileSystem, profile: string) {
     const files = [];
     for (const name of ['decision.md', 'task.md'] as const) {
         const global = '/var/lib/kanban/policies/' + profile + '/' + name;
@@ -48,7 +46,7 @@ async function resolvePrompts(fs: IFileSystem, project: IFileSystem, profile: st
             try {await fs.driver.createFile({parentPath: global.slice(0, global.lastIndexOf('/')), name, content: defaults[name], recursive: true});}
             catch (error) {if ((error as {code?: string}).code !== 'EEXIST') throw error;}
         }
-        const content = projectOverride ? await readPrompt(project,local) : await defaultPrompt(fs,global,name,profile,operationId);
+        const content = projectOverride ? await readPrompt(project,local) : await readPrompt(fs,global);
         files.push({name, content, source: projectOverride ? 'project:' + local : 'nestos:' + global, sha256: sha256HexSync(content)});
     }
     files.push(...await resolveLifecyclePrompts(fs,project,profile));
@@ -57,17 +55,6 @@ async function resolvePrompts(fs: IFileSystem, project: IFileSystem, profile: st
 
 export function requiresDevelopmentProject(board:KanbanBoard):boolean {
     return board.automation?.preparation?.system==='nestos-work-preparation'&&board.automation.preparation.id==='git-worktree';
-}
-
-async function defaultPrompt(fs:IFileSystem,path:string,name:'decision.md'|'task.md',profile:string,operationId:string):Promise<string> {
-    let revision: string | undefined;
-    const before=await fs.driver.getNode(path),content=await readPrompt(fs,path,value=>{revision=value;}),after=await fs.driver.getNode(path);
-    if(before?.revision!==after?.revision)throw failure('PROMPT_READ_CONFLICT');
-    if(profile!=='development'||!migrations[name].includes(sha256HexSync(content)))return content;
-    if(before?.type!=='file'||after?.type!=='file'||before.modifiedAt!==after.modifiedAt||before.size!==after.size)throw failure('PROMPT_READ_CONFLICT');
-    // Legacy storage cannot replace conditionally; freeze the upgraded default without overwriting authoring files.
-    if(revision)await developmentStage(operationId,'prompts.default-upgrade',()=>fs.driver.writeContent(path,defaults[name],{ifRevision:revision}));
-    return defaults[name];
 }
 
 async function resolveLifecyclePrompts(fs:IFileSystem,project:IFileSystem,profile:string) {

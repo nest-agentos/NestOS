@@ -15,11 +15,11 @@ it('identifies configured sync without implying that the server has been probed'
     const detached = initialState(); detached.binding.state = 'detached';
     expect(projectSyncIndicator(detached, {})).toBeUndefined(); expect(projectSyncIndicator(null, {})).toBeUndefined();
 });
-it('lists missing MCP, incomplete setup, unknown operations, plan and conflict issues together', () => {
+it('lists missing Cells, incomplete setup, unknown operations, plan and conflict issues together', () => {
     const state = initialState(); state.setupPending = true; state.activePlanId = 'plan';
     state.pending = {terminalExpired: true, command: {target: 'publish', body: {operationId: 'op', opSeq: '1', replicaId: 'r', authorityId: 'a', historyEpoch: 'e'}}};
     state.ackError = {code: 'SYNC_ACK_FAILED'};
-    const value = projectSyncIndicator(state, {connection: {reason: 'mcp-not-found'}, conflicts: 2})!;
+    const value = projectSyncIndicator(state, {connection: {reason: 'cells-not-found'}, conflicts: 2})!;
     expect(value.state).toBe('error'); expect(value.issues).toHaveLength(6);
     expect(value.issues).toContain(t('project.sync.issue.connectionMissing'));
     state.binding.state = 'detached'; expect(projectSyncIndicator(state, {})?.issues).toContain(t('project.sync.issue.detached'));
@@ -29,7 +29,7 @@ it('keeps local status read errors distinct from an unconfigured project', () =>
     expect(value.state).toBe('error'); expect(value.issues[0]).toContain('control unavailable');
 });
 it('opens a safe issue list on hover or focus and opens the selected project status on click', () => {
-    const value = projectSyncIndicator(initialState(), {connection: {reason: 'endpoint-mismatch', connectionName: '<script>Office</script>'}})!;
+    const value = projectSyncIndicator(initialState(), {connection: {reason: 'cells-not-found', connectionName: '<script>Office</script>'}})!;
     const opened = vi.fn(), widget = new ProjectSyncStatusIndicator(opened); document.body.append(widget.element); widget.update(value);
     const tooltip = widget.element.querySelector<HTMLElement>('[role="tooltip"]')!, button = widget.element.querySelector('button')!;
     expect(tooltip.hidden).toBe(true); widget.element.dispatchEvent(new MouseEvent('mouseenter'));
@@ -55,7 +55,7 @@ it('decorates only project icons and immediately updates project selector labels
     expect(navigation.navigationItems([projectNode, rootNode])[0].icon).toContain('project-sync-icon');
     expect(navigation.navigationItems([projectNode, rootNode])[1].icon).toBe('folder');
     privateView.project = project;
-    value = projectSyncIndicator(initialState(), {connection: {reason: 'mcp-not-found'}}); navigation.refreshSyncIndicators();
+    value = projectSyncIndicator(initialState(), {connection: {reason: 'cells-not-found'}}); navigation.refreshSyncIndicators();
     expect(navigation.header.querySelector('select')?.textContent).toContain('Notes ' + FEEDBACK_ICONS.warning);
     expect(navigation.header.querySelector('[role="tooltip"]')?.textContent).toContain(t('project.sync.issue.connectionMissing'));
     navigation.header.querySelector<HTMLButtonElement>('.project-sync-status__button')!.click();

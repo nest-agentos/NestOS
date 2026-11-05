@@ -45,7 +45,7 @@ export class TwinScanStore {
     }
     async release(): Promise<void> {
         const lease = await this.lease();
-        if (lease?.data.owner === this.owner) await this.records.save('checkpoint', lease.id, { ...lease.data, until: 0 }, lease.revision);
+        if (lease?.data.owner === this.owner && lease.data.until !== 0) await this.records.save('checkpoint', lease.id, { ...lease.data, until: 0 }, lease.revision);
     }
     async fence(fence: number): Promise<Condition> {
         let lease = await this.lease();

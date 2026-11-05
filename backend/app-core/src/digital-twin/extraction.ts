@@ -1,3 +1,4 @@
+import {extractionStep, requireActive, TwinSafePoint, type TwinExtractionLifecycle} from './analysis-lifecycle';
 import { TwinDiagnosticError, diagnosticDetail, traceAnalysis } from './diagnostics';
 import { userIdentity } from './identity';
 import { TWIN_EXTRACTION_OUTPUT_LIMIT } from './extraction-estimates';
@@ -8,24 +9,26 @@ import type { DurableChatOutput } from '@nestos/llm-tasks';
 import { validateRelation, TWIN_KINDS, type TwinAnalysisJob, type TwinCandidate } from './domain';
 
 export interface TwinExtractionPort {
-    run(job: TwinAnalysisJob, text: string, attached: (taskId: string) => Promise<void>, progress?: (progress: TwinRequestProgress) => Promise<void>): Promise<{ candidates: TwinCandidate[]; tokens: number; usageKind?: 'reported' | 'estimated' }>;
+    run(job: TwinAnalysisJob, text: string, attached: (taskId: string) => Promise<void>, progress?: (progress: TwinRequestProgress) => Promise<void>, lifecycle?: TwinExtractionLifecycle): Promise<{ candidates: TwinCandidate[]; tokens: number; usageKind?: 'reported' | 'estimated' }>;
     cancel(job: TwinAnalysisJob): Promise<void>;
-    cleanup(job: TwinAnalysisJob): Promise<void>;
+    cleanup(job: TwinAnalysisJob, active?: () => boolean): Promise<void | boolean>;
 }
 
 export class KernelTwinExtractor implements TwinExtractionPort {
     constructor(private readonly kernel: Kernel) {}
 
-    async run(job: TwinAnalysisJob, text: string, attached: (taskId: string) => Promise<void>, progress?: (progress: TwinRequestProgress) => Promise<void>) {
+    async run(job: TwinAnalysisJob, text: string, attached: (taskId: string) => Promise<void>, progress?: (progress: TwinRequestProgress) => Promise<void>, lifecycle?: TwinExtractionLifecycle) {
         const startedAt = Date.now();
         let tokens: number | undefined;
         const state = { stage: 'preparing', taskId: '' };
         traceAnalysis(job, state.stage, { inputCharacters: text.length, outputTokenLimit: job.maxOutputTokens ?? TWIN_EXTRACTION_OUTPUT_LIMIT, thinking: false, stream: false });
         try {
-            const task = await this.prepare(job, text, attached, state);
+            const task = await this.prepare(job, text, attached, state, lifecycle);
             state.stage = 'waiting';
             traceAnalysis(job, state.stage, { taskId: task.id });
-            const output = await this.observedOutput(task, job, progress);
+            const output = await extractionStep(job, 'kernel.wait', () => this.observedOutput(task, job, progress));
+            await lifecycle?.checkpoint('result-ready');
+            if (lifecycle) requireActive(lifecycle.active);
             tokens = output.usage?.total_tokens || undefined;
             state.stage = 'parsing';
             traceAnalysis(job, state.stage, { taskId: task.id, finishReason: output.finishReason ?? '', outputCharacters: typeof output.message?.content === 'string' ? output.message.content.length : 0 });
@@ -33,6 +36,7 @@ export class KernelTwinExtractor implements TwinExtractionPort {
             traceAnalysis(job, 'completed', { taskId: task.id, candidates: result.candidates.length, tokens: result.tokens, durationMs: Date.now() - startedAt });
             return result;
         } catch (error) {
+            if (error instanceof TwinSafePoint) throw error;
             const code = error instanceof Error && /^TWIN_[A-Z_]+$/.test(error.message) ? error.message : 'TWIN_EXTRACTION_FAILED';
             const failure = new TwinDiagnosticError(code, { message: `${state.stage}: ${diagnosticDetail(error) || 'No underlying failure message available'}` }, error instanceof TwinDiagnosticError ? error.tokens ?? tokens : tokens);
             traceAnalysis(job, 'failed', { taskId: state.taskId, failedStage: state.stage, durationMs: Date.now() - startedAt, errorCode: code, errorDetail: failure.detail });
@@ -59,23 +63,38 @@ export class KernelTwinExtractor implements TwinExtractionPort {
         } finally { state.stopped = true; await observer; }
     }
 
-    private async prepare(job: TwinAnalysisJob, text: string, attached: (taskId: string) => Promise<void>, state: { stage: string; taskId: string }) {
+    private async prepare(job: TwinAnalysisJob, text: string, attached: (taskId: string) => Promise<void>, state: {stage: string; taskId: string}, lifecycle?: TwinExtractionLifecycle) {
         state.stage = 'submitting';
-        const session = await this.session(job.sessionId);
-        const task = await session.submit<unknown, DurableChatOutput>({ program: { kind: 'llm.chat', version: '1' },
-            requestId: 'extract', deferStart: true, input: { sessionId: job.sessionId, roundId: 'extract',
-                connectionId: job.connectionId, temperature: 0, stream: false, thinking: false, maxTokens: job.maxOutputTokens ?? TWIN_EXTRACTION_OUTPUT_LIMIT,
-                llmRetry: { retries: 0, backoffMs: 0 },
-                messages: [{ role: 'system', content: extractionPrompt(job) }, { role: 'user', content: text }] } });
+        if (lifecycle) requireActive(lifecycle.active);
+        const task = job.taskId
+            ? await extractionStep(job, 'kernel.attach', () => this.kernel.attachTask<DurableChatOutput>(job.sessionId, job.taskId))
+            : await this.submit(job, text, lifecycle);
         state.taskId = task.id;
-        traceAnalysis(job, 'submitted', { taskId: task.id });
+        traceAnalysis(job, 'submitted', {taskId: task.id});
         await attached(task.id);
-        state.stage = 'binding';
         const status = (await task.status()).task;
-        traceAnalysis(job, state.stage, { taskId: task.id, taskStatus: status.status });
-        if (!['succeeded', 'failed', 'cancelled'].includes(status.status)) await bindCapabilities(task,
-            [{ kind: 'llm', uri: `llm://${job.connectionId}`, rights: ['execute', 'write'], signalKey: 'llmHandleId' }]);
+        if (status.status === 'created') {
+            state.stage = 'binding';
+            traceAnalysis(job, state.stage, {taskId: task.id, taskStatus: status.status});
+            await lifecycle?.checkpoint('submitted');
+            if (lifecycle) requireActive(lifecycle.active);
+            await lifecycle?.checkpoint('dispatching');
+            if (lifecycle) requireActive(lifecycle.active);
+            await extractionStep(job, 'kernel.bind-and-start', () => bindCapabilities(task,
+                [{kind: 'llm', uri: `llm://${job.connectionId}`, rights: ['execute', 'write'], signalKey: 'llmHandleId'}],
+                async () => {if (lifecycle) requireActive(lifecycle.active);}));
+            await lifecycle?.checkpoint('executing');
+        }
         return task;
+    }
+    private async submit(job: TwinAnalysisJob, text: string, lifecycle?: TwinExtractionLifecycle) {
+        const session = await extractionStep(job, 'kernel.session', () => this.session(job.sessionId));
+        await lifecycle?.checkpoint('prepared');
+        if (lifecycle) requireActive(lifecycle.active);
+        return extractionStep(job, 'kernel.submit', () => session.submit<unknown, DurableChatOutput>({program: {kind: 'llm.chat', version: '1'},
+            requestId: 'extract', deferStart: true, input: {sessionId: job.sessionId, roundId: 'extract', connectionId: job.connectionId,
+                temperature: 0, stream: false, thinking: false, maxTokens: job.maxOutputTokens ?? TWIN_EXTRACTION_OUTPUT_LIMIT,
+                llmRetry: {retries: 0, backoffMs: 0}, messages: [{role: 'system', content: extractionPrompt(job)}, {role: 'user', content: text}]}}));
     }
 
     private async output(task: { wait(options: { timeoutMs: number }): Promise<ExitRecord<DurableChatOutput>> }): Promise<DurableChatOutput> {
@@ -99,12 +118,16 @@ export class KernelTwinExtractor implements TwinExtractionPort {
     async cancel(job: TwinAnalysisJob) {
         if (job.taskId) await (await this.kernel.openTask(job.taskId)).cancel();
     }
-    async cleanup(job: TwinAnalysisJob) {
+    async cleanup(job: TwinAnalysisJob, active: () => boolean = () => true): Promise<boolean> {
+        if (!active()) return false;
         try {
-            await this.kernel.closeSession(job.sessionId, true);
-            await this.kernel.removeSession(job.sessionId);
+            await extractionStep(job, 'cleanup.close-session', () => this.kernel.closeSession(job.sessionId, true));
+            if (!active()) return false;
+            await extractionStep(job, 'cleanup.remove-session', () => this.kernel.removeSession(job.sessionId));
+            return true;
         } catch (error) {
-            if (!(error instanceof KernelError && error.code === KernelErrorCode.SESSION_NOT_FOUND)) throw error;
+            if (error instanceof KernelError && error.code === KernelErrorCode.SESSION_NOT_FOUND) return true;
+            throw error;
         }
     }
 }

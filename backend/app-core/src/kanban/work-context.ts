@@ -2,7 +2,7 @@ import type {KanbanBoard,KanbanItem} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from './automation-journal';
 
 export interface DecisionContext {sourceBoardId:string;recordId:string;recordRevision:number;runId:string}
-/** The host resolves business identity; execution transports receive an opaque file context. */
+/** The host resolves business identity; execution transports receive opaque structured context. */
 export async function workContext(journal:KanbanAutomationJournal,board:KanbanBoard,item:KanbanItem) {
     const runId=item.externalRefs?.find(ref=>ref.system==='nestos-decision-run')?.id;
     let decision=runId?await journal.get<DecisionContext>('record-context:'+runId):undefined;

@@ -31,6 +31,7 @@ import { ENTITY_ICONS, TOOLBOX_ICONS, t } from '@nestos/common';
 export const SETTINGS_PAGES: Record<string, { name: string, icon: string }> = {
     'appearance':  { name: '外观',           icon: '🎨' },
     'model-defaults': { get name() { return t('modelDefaults.title'); }, icon: ENTITY_ICONS.model },
+    'cells': { get name() { return t('cells.title'); }, icon: ENTITY_ICONS.model },
     'cost':        { name: '费用统计',      icon: '💰' },
     'storage':     { name: '文件系统',     icon: '💾' },
     'recovery':    { name: '系统恢复',      icon: '🚑' },

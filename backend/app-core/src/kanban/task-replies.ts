@@ -2,12 +2,11 @@ import type {KanbanClient} from '@nestos/kanban/contracts';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import type {KanbanAutomationJournal} from './automation-journal';
 import type {TargetRef} from '@nestos/llm-flow/contracts';
-import {publishFile} from '../run/prompt-bundle';
 import {requireValue} from './validation';
 
 export interface KanbanTaskReply {itemId:string;attemptId:string;replyTo:string;operationId:string;content:string}
 interface FrozenReply {boardId:string;request:KanbanTaskReply;sessionId:string;target:TargetRef;projectId:string;directory:string;runId:string}
-/** Files carry correlation; the existing Session input queue owns user input admission. */
+/** The durable Session queue carries correlated user input without a workspace mailbox. */
 export function taskReplies(service:KanbanClient,journal:KanbanAutomationJournal,options:PersonalKanbanAutomationOptions) {
     const replyTask=async(boardId:string,request:KanbanTaskReply):Promise<void>=>{
         requireValue(/^[\w-]{1,96}$/.test(request.operationId)&&typeof request.content==='string'&&!!request.content.trim()&&request.content.length<=8000,'WORKSPACE_REPLY_INVALID');
@@ -31,7 +30,7 @@ async function freezeReply(service:KanbanClient,journal:KanbanAutomationJournal,
     const {item}=await service.item(boardId,request.itemId),workflow=await service.workflow(boardId),dispatch=workflow.dispatches[request.attemptId];
     requireValue(dispatch?.itemId===item.id&&item.owner?.token===dispatch.fence&&['prepared','running','unknown'].includes(dispatch.outcome),'STALE_EXECUTION_RESULT');
     requireValue(item.issues?.some(issue=>issue.id===request.replyTo&&issue.attemptId===request.attemptId&&!issue.resolvedBy),'ISSUE_NOT_FOUND');
-    requireValue(options.enqueueTaskReply&&options.projects?.openWorkspace&&dispatch.executionSessionId,'WORKSPACE_REPLY_UNAVAILABLE');
+    requireValue(options.enqueueTaskReply&&options.sessionChannel&&dispatch.executionSessionId,'WORKSPACE_REPLY_UNAVAILABLE');
     const workspace=await journal.get<{projectId:string;directory:string}>('development-workspace:'+dispatch.id);
     const target=await journal.get<{target:TargetRef}>('managed-agent:work-'+dispatch.id);requireValue(workspace&&target,'WORKSPACE_REPLY_UNAVAILABLE');
     return journal.update<FrozenReply>('task-reply:'+request.operationId,old=>{
@@ -41,12 +40,8 @@ async function freezeReply(service:KanbanClient,journal:KanbanAutomationJournal,
     });
 }
 async function transferReply(options:PersonalKanbanAutomationOptions,frozen:FrozenReply):Promise<void> {
-    const {request,target,sessionId}=frozen,project=await options.projects!.get(frozen.projectId),view=await options.projects!.openWorkspace!(project.path);
-    try {
-        await publishFile(view.fs,frozen.directory+'/_nestos/kanban/outbox','reply-'+request.operationId+'.yaml',JSON.stringify({schema:'work-reply/1',runId:frozen.runId,
-            itemId:request.itemId,attemptId:request.attemptId,id:'reply-'+request.operationId,type:'user-response',replyTo:request.replyTo,content:request.content}));
-    }finally{await view.dispose();}
+    const {request,target,sessionId}=frozen;
     await options.enqueueTaskReply!({expectedSessionId:sessionId,expectedBranch:'main',expectedTarget:target,
-        target:{kind:target.kind,id:target.id,version:target.version},source:{kind:'composer',text:request.content,attachments:[],values:{}},
+        target:{kind:target.kind,id:target.id,version:target.version},source:{kind:'composer',text:JSON.stringify({dependencies:{channelReply:{scopeId:request.attemptId,replyTo:request.replyTo,operationId:request.operationId}},instruction:request.content}),attachments:[],values:{}},
         submission:{id:request.operationId,source:{kind:'conversation',ownerId:sessionId,id:request.operationId}}});
 }

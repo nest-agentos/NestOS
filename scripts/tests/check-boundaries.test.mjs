@@ -251,3 +251,8 @@ test('Kanban adapters export their bindings rather than duplicate the library su
     assert.ok(inspect(core, "export {SeqKanbanStore} from '@nestos/kanban/storage';", '/repo/backend/app-core/src/kanban/index.ts').some(error => error.includes('must not forward')));
     assert.deepEqual(inspect(core, "export {createKanbanModule} from './module';", '/repo/backend/app-core/src/kanban/index.ts'), []);
 });
+
+test('mail permits its documented shared reader dependency while retaining application isolation',()=>{
+    assert.equal(manifestDependencyError('@nestos/mail','@nestos/mdxeditor'),undefined);
+    assert.match(manifestDependencyError('@nestos/mail','@nestos/app-core'),/mail only depends/);
+});

@@ -8,25 +8,13 @@ const catalog: RemoteMountCatalog = { version: 1, revision: 4, connections: [con
     { ...connection, connectionId: connection.id, mountId: 'mount-1', alias: 'docs', root: '/a', at: '/', access: 'ro' },
 ] } };
 
-it('migrates legacy settings once, preserves stable IDs and ignores the old backup after migration', async () => {
-    const { manager } = await createVFS({ rootBackend: new MemoryBackend() }), fs = await manager.openFileSystem('/');
-    const legacy = '/etc/project-remote-mounts.seq';
-    await fs.driver.createFile({ parentPath: '/etc', name: 'project-remote-mounts.seq', type: 'seqfile', recursive: true });
-    await fs.meta.seq!.setEntry(legacy, 'catalog', JSON.stringify(catalog));
-    const provider = { setCredential: vi.fn(), async dispose() {}, async open(): Promise<never> { throw new Error('No network during migration'); } };
-    const service = new ProjectRemoteMountService(fs, provider, async () => {}, async () => {});
+it('roundtrips independent node connections and project grants in the current catalog', async () => {
+    const {manager}=await createVFS({rootBackend:new MemoryBackend()}),fs=await manager.openFileSystem('/');
     try {
-        await service.init();
-        expect(service.connections()).toEqual([connection]);
-        expect(service.findRemoteProject(connection.id, '/docs/a')).toBe('project-1');
-        expect(JSON.parse((await fs.meta.seq!.getEntry('/etc/fs/remote/connection-1.seq', 'config'))!)).toEqual(connection);
-        expect(JSON.parse((await fs.meta.seq!.getEntry('/etc/fs/projects/project-1.seq', 'config'))!)).toEqual(catalog.projects['project-1']);
-        expect(await fs.meta.seq!.getEntry(legacy, 'catalog')).toBe(JSON.stringify(catalog));
-        await fs.meta.seq!.setEntry(legacy, 'catalog', 'bad old data');
-        const reloaded = new RemoteMountStore(fs);
-        expect((await reloaded.load())?.connections).toEqual([connection]);
-        expect(reloaded.needsMigration).toBe(false); expect(provider.setCredential).not.toHaveBeenCalled();
-    } finally { await service.dispose(); await manager.dispose(); }
+        await new RemoteMountStore(fs).save(catalog);
+        expect(await new RemoteMountStore(fs).load()).toEqual(catalog);
+        expect(JSON.parse((await fs.meta.seq!.getEntry('/etc/fs/remote/connection-1.seq','config'))!)).toEqual(connection);
+    } finally {await manager.dispose();}
 });
 
 it('rolls back partial record changes and rejects stale writers; removing records cannot resurrect them', async () => {

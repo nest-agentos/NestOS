@@ -59,15 +59,16 @@ it('withdraws a pending boundary pause through the original control route instea
     expect(Object.keys((await f.service.workflow('b')).dispatches)).toEqual(['original']);
 });
 
-it('transfers a linked answer through files and the original Session queue, retaining a receipt after resolution',async()=>{
+it('transfers a linked answer through the original Session queue, retaining a receipt after resolution',async()=>{
     const f=await fixture();await f.run({type:'observe-execution',dispatchId:'original',fence:(await f.service.workflow('b')).dispatches.original.fence,outcome:'running',executionSessionId:'original-session'});
     await f.run({type:'report-issue',itemId:'t',issue:{id:'question',attemptId:'original',type:'clarification'}});
     await f.journal.update('development-workspace:original',()=>({projectId:'x1',directory:'/workspace/work'}));
     await f.journal.update('managed-agent:work-original',()=>({target:{kind:'agent',id:'worker',version:'1',digest:'a'.repeat(64)}}));
-    const enqueue=vi.fn(async()=>{}),options={projects:{get:async()=>({path:'/x1'}),openWorkspace:async()=>({fs:f.fs,dispose:async()=>{}})},enqueueTaskReply:enqueue};
+    const enqueue=vi.fn(async()=>{}),options={sessionChannel:vi.fn(),projects:{get:async()=>({path:'/x1'}),openWorkspace:async()=>({fs:f.fs,dispose:async()=>{}})},enqueueTaskReply:enqueue};
     const replies=taskReplies(f.service,f.journal,options as never),request={itemId:'t',attemptId:'original',replyTo:'question',operationId:'answer',content:'Use the verified input'};
     await replies('b',request);
-    expect(JSON.parse(await f.fs.driver.readContent('/workspace/work/_nestos/kanban/outbox/reply-answer.yaml',{encoding:'utf-8'}))).toMatchObject({schema:'work-reply/1',replyTo:'question',content:request.content});
+    const source=(enqueue.mock.calls[0][0] as {source:{text:string}}).source;
+    expect(JSON.parse(source.text)).toEqual({dependencies:{channelReply:{scopeId:'original',replyTo:'question',operationId:'answer'}},instruction:request.content});
     expect(enqueue.mock.calls[0][0]).toMatchObject({expectedSessionId:'original-session',submission:{id:'answer'}});
     await f.run({type:'resolve-issue',itemId:'t',attemptId:'original',issueId:'question',resolvedBy:'done'});
     await replies('b',request);await replies.scan();expect(enqueue).toHaveBeenCalledTimes(1);

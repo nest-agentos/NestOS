@@ -129,24 +129,6 @@ export interface ProviderDeletionImpact {
     connections: ConnectionMeta[];
 }
 
-export interface MCPDeletedProject {
-    id: string;
-    name: string;
-    path: string;
-    localSessions: Array<{
-        id: string;
-        title: string;
-    }>;
-}
-
-export interface MCPDeletionReference {
-    connectionId: string;
-    projectId: string;
-    mountId: string;
-    at: string;
-    revision: number;
-}
-
 export interface OcrService {
     readSettings(): Promise<OcrSettings>;
     prepareConfiguration(): Promise<void>;
@@ -173,13 +155,11 @@ export interface OcrConnection {
 }
 
 export interface ModelConfigurationCommands {
-    mcpDeletion?: MCPDeletionPort;
     inspectProviderDeletion(ids: readonly string[]): Promise<ProviderDeletionImpact>;
     discardPlan(revision: string): void;
     inspectMCPDeletion(ids: readonly string[]): Promise<MCPDeletionImpact>;
     deleteMCPServers(input: {
         revision: string;
-        force: boolean;
     }): Promise<void>;
     deleteProviders(input: {
         revision: string;
@@ -198,15 +178,6 @@ export interface MCPDeletionImpact {
         id: string;
         name: string;
     }>;
-    references: MCPDeletionReference[];
-    projects: MCPDeletedProject[];
-}
-
-export interface MCPDeletionPort {
-    reconcileMCPReferences?(): Promise<void>;
-    mcpReferences(ids: readonly string[]): MCPDeletionReference[] | Promise<MCPDeletionReference[]>;
-    inspectRemoteProjects?(ids: readonly string[]): Promise<MCPDeletedProject[]>;
-    removeMCPReferences(ids: readonly string[], expected: readonly MCPDeletionReference[], projectIds?: readonly string[]): Promise<void>;
 }
 
 export interface Catalog {

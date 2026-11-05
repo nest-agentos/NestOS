@@ -7,18 +7,15 @@ export interface RemoteMountCatalog {
 }
 interface Index { version: 1; revision: number; connections: string[]; projects: string[]; }
 const indexPath = '/etc/fs/catalog.seq';
-const legacyPath = '/etc/project-remote-mounts.seq';
 const key = 'config';
 
 /** The small index and changed records commit together; empty files from interrupted preparation are harmless. */
 export class RemoteMountStore {
     private indexRaw: string | null = null;
-    private legacyRaw: string | null = null;
     private passwords = new Map<string, string | null>();
     private records = new Map<string, string | null>();
     constructor(private readonly fs: IFileSystem) {}
     password(id: string): string | null { return this.passwords.get(recordPath('remote', id)) ?? null; }
-    get needsMigration(): boolean { return this.indexRaw === null && this.legacyRaw !== null; }
     async load(): Promise<RemoteMountCatalog | null> {
         if (await this.fs.driver.exists(indexPath)) {
             const saved = await this.transaction(async tx => {
@@ -39,9 +36,7 @@ export class RemoteMountStore {
             });
             if (saved) return saved;
         }
-        if (!await this.fs.driver.exists(legacyPath)) return null;
-        this.legacyRaw = await this.fs.meta.seq!.getEntry(legacyPath, 'catalog');
-        return this.legacyRaw === null ? null : parse(this.legacyRaw) as RemoteMountCatalog;
+        return null;
     }
     async save(catalog: RemoteMountCatalog, credential?: { id: string; password: string }): Promise<void> {
         const records = new Map<string, string>();
@@ -57,7 +52,6 @@ export class RemoteMountStore {
         for (const path of records.keys()) if (!this.records.has(path)) await this.ensureFile(path);
         await this.transaction(async tx => {
             if (!await tx.compareAndSet(indexPath, 'index', { expected: this.indexRaw, value: raw })) throw conflict();
-            if (this.needsMigration && !await tx.compareAndSet(legacyPath, 'catalog', { expected: this.legacyRaw, value: this.legacyRaw! })) throw conflict();
             await this.writeRecords(tx, records);
             for (const path of new Set([...this.passwords.keys(), ...passwords.keys()])) {
                 const before = this.passwords.get(path) ?? null, after = passwords.get(path) ?? null;

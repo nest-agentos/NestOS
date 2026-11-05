@@ -11,10 +11,10 @@ const MAX_BYTES = 1024 * 1024;
 /** Read ordinary project documents and visible conversations through existing application services. */
 export class NestosTwinSourceReader implements TwinSourceReader {
     constructor(private readonly fs: IFileSystem, private readonly sessionsRepository: SessionRepository, private readonly projects?: ProjectService) {}
-    async discover() {
+    async discover(active: () => boolean = () => true) {
         if (!this.projects) throw new Error('TWIN_PROJECT_CATALOG_UNAVAILABLE');
-        const catalog = await new TwinProjectCatalog(this.projects, this.sessionsRepository).discover();
-        await discoverWorkspaces(this.fs, catalog); return catalog;
+        const catalog = await new TwinProjectCatalog(this.projects, this.sessionsRepository).discover(active);
+        await discoverWorkspaces(this.fs, catalog, active); return catalog;
     }
     async sessions() { return (await this.sessionsRepository.list()).filter(session => !/^twin-(analysis|collection)-/.test(session.id))
         .map(session => ({ id: session.id, title: session.title })); }

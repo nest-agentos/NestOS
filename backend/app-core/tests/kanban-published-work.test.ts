@@ -70,3 +70,13 @@ it('distinguishes an unsubmitted shutdown from a committed receipt whose reply w
     expect(await f.executor.inspect(f.frozen)).toMatchObject({outcome: 'succeeded'});
     expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(2); expect(f.prepareSession).toHaveBeenCalledOnce();
 });
+
+it('passes only the frozen context reference without eagerly reading dependency bodies',async()=>{
+    const f=await fixture(),context=vi.fn(async()=>({large:'sensitive body'.repeat(10000)}));
+    const contextRef={scopeId:dispatch.id,sections:['task','context']};
+    const executor=createPublishedKanbanWorkExecutor({calls:f.calls,kernel:{task:f.task},prepareSession:f.prepareSession,context,
+        binding:async()=>({target:{kind:'agent',id:'worker',version:'1',digest:'b'.repeat(64)},contextRef})});
+    const prepared=await executor.prepare(dispatch,{id:'item',title:'Task',responsibility:'large task body'.repeat(1000)} as KanbanItem) as {input:IndependentCallInput};
+    expect(JSON.parse((prepared.input.request.source as {text:string}).text)).toEqual({contextRef});
+    expect(context).not.toHaveBeenCalled();
+});

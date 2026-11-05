@@ -73,7 +73,7 @@ async function loadJob(options: AnalysisOptions, board: KanbanBoard, item: Kanba
         requireValue(target, 'AUTOMATION_TARGET_CHANGED');
         const id = await options.journal.update<string>('analysis-identity:' + key, old => old ?? randomUUID());
         const prepared = await options.prepareAnalysis?.({id, board, item, target});
-        const candidate = newJob(board, item, prepared?.target ?? target, signature, id, prepared?.instruction);
+        const candidate = newJob(board, item, prepared?.target ?? target, signature, id, prepared?.instruction, prepared?.contextRef);
         job = await options.journal.update<Job>(key, previous => previous ?? candidate);
     }
     if (!options.active()) return;
@@ -96,12 +96,12 @@ export async function analysisHistory(journal: KanbanAutomationJournal, boardId:
     const jobs = await journal.getMany<Job>(saved.keys);
     return jobs.filter((job): job is Job => !!job);
 }
-function newJob(board: KanbanBoard, item: KanbanItem, target: TargetRef, signature: string, id = randomUUID(), instruction = preset.instruction): Job {
+function newJob(board: KanbanBoard, item: KanbanItem, target: TargetRef, signature: string, id = randomUUID(), instruction = preset.instruction, contextRef?: unknown): Job {
     const context = board.items.map(({id, title, responsibility, acceptance, planning, status}) => ({id, title, responsibility, acceptance, planning, status}));
     return {id, signature, itemRevision: item.revision, phase: 'prepared', status: {itemId: item.id, state: 'analyzing'},
         input: {title: `${t('kanban.automationAnalysis')} · ${item.number ? '#' + item.number + ' · ' : ''}${item.title}`, request: {expectedSessionId: id, expectedBranch: 'main', expectedTarget: target,
             target: {kind: target.kind, id: target.id, version: target.version},
-            source: {kind: 'composer', text: JSON.stringify({instruction, snapshot: {item, items: context, workTypes:board.workTypes??DEFAULT_KANBAN_WORK_TYPES, defaultWorkType:board.defaultWorkType??'task'}}), attachments: [], values: {}},
+            source: {kind: 'composer', text: JSON.stringify(contextRef === undefined ? {instruction, snapshot: {item, items: context, workTypes:board.workTypes??DEFAULT_KANBAN_WORK_TYPES, defaultWorkType:board.defaultWorkType??'task'}} : {instruction,contextRef}), attachments: [], values: {}},
             submission: {id, source: {kind: 'conversation', ownerId: id, id}}}}};
 }
 async function submitAnalysis(options: AnalysisOptions, key: string, job: Job): Promise<Job> {
@@ -129,9 +129,9 @@ async function observeAnalysis(options: AnalysisOptions, key: string, job: Job):
     const result = record.exit?.output as TaskCallResult | undefined;
     if (record.exit?.status !== 'succeeded' || result?.exit.status !== 'succeeded') return saveFailure(options, key, job, safeCode(result?.exit.error ?? record.exit?.error, 'AUTOMATION_ANALYSIS_FAILED'), record.exit?.status === 'cancelled' || result?.exit.status === 'cancelled' ? 'cancelled' : 'failed');
     try {
-        requireValue(options.readAnalysisOutput,'SESSION_FILE_RESULT_UNAVAILABLE');
+        requireValue(options.readAnalysisOutput,'SESSION_CHANNEL_RESULT_UNAVAILABLE');
         const output=await options.readAnalysisOutput(job.id);
-        if(output===undefined)return options.journal.update<Job>(key,current=>({...current!,status:{...current!.status,state:'unknown',code:'SESSION_FILE_RESULT_PENDING'}}));
+        if(output===undefined)return options.journal.update<Job>(key,current=>({...current!,status:{...current!.status,state:'unknown',code:'SESSION_CHANNEL_RESULT_PENDING'}}));
         const analysis = parseAnalysis(output);
         return options.journal.update<Job>(key, current => ({...current!, phase: 'settled', result: analysis,
             status: {itemId: job.status.itemId, state: analysis.ready ? 'ready' : 'clarification', reason: analysis.reason, dependencies: analysis.dependencies}}));

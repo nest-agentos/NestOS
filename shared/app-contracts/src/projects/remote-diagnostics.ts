@@ -1,11 +1,10 @@
 import { createModuleLogger, getLogger, LogLevel } from '@nestos/common';
 import { FSError } from '@nestos/vfs-core';
 
-export type MCPConnectionReason = 'ready' | 'catalog-not-loaded' | 'mcp-not-found' | 'unsupported-transport'
-    | 'auth-missing' | 'extension-missing' | 'invalid-descriptor' | 'endpoint-mismatch' | 'invalid-endpoint';
-export interface MCPConnectionDiagnostic {
-    connectionId: string; connectionName?: string; reason: MCPConnectionReason; revision: number;
-    configured: {id: string; name: string; reason: MCPConnectionReason}[];
+export type CellsConnectionReason = 'ready' | 'cells-not-found';
+export interface CellsConnectionDiagnostic {
+    connectionId: string; connectionName?: string; reason: CellsConnectionReason; revision: number;
+    configured: {id: string; name: string; reason: CellsConnectionReason}[];
 }
 interface RemoteFailureContext {
     stage: string; projectId?: string; profileId?: string; sessionId?: string; connectionId?: string;
@@ -15,8 +14,8 @@ const reported = new WeakSet<object>();
 
 /** Only catalog identities and fixed reason codes cross the diagnostic boundary. */
 export class RemoteConnectionUnavailableError extends FSError {
-    constructor(readonly diagnostic: MCPConnectionDiagnostic, readonly projectIds: string[]) {
-        super('ENOENT', 'Project MCP connection unavailable', 'remote-connection');
+    constructor(readonly diagnostic: CellsConnectionDiagnostic, readonly projectIds: string[]) {
+        super('ENOENT', 'Project Cells connection unavailable', 'remote-connection');
         this.name = 'RemoteConnectionUnavailableError';
     }
 }

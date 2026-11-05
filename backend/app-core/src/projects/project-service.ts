@@ -4,7 +4,6 @@ import {ProjectEnvironmentStore} from './project-environment';
 import {PersonalProject} from './personal-project';
 import { projectFileSource, projectWorkspaceAccess, projectNavigation } from '@nestos/app-contracts';
 import { trackFavoriteFiles } from './favorites/lifecycle';
-import type { MCPDeletedProject } from '../configuration/model-commands';
 import { overlappingProjectRoots, projectFileLocation, type ProjectFileRoot } from './file-location';
 import { ProjectSessionMoves } from './session-moves';
 import { recoverProjectDirectories } from './project-directory-recovery';
@@ -216,25 +215,6 @@ export class ProjectService {
     }
     async storedProjectIds(): Promise<string[]> {
         return (await this.projectRepository.list()).map(project => project.id);
-    }
-    async inspectRemoteProjectRemoval(ids: readonly string[]): Promise<MCPDeletedProject[]> {
-        const records = (await this.projectRepository.list()).filter(record => record.kind === 'remote' && ids.includes(record.id));
-        const sessions = await this.repository.list();
-        const projects = await this.list();
-        return records.map(record => {
-            const project = projects.find(item => item.project.id === record.id)!;
-            return {id:record.id,name:record.name,path:project.path,localSessions:sessions
-                .filter(session => session.folder === project.path || session.folder?.startsWith(project.path + '/'))
-                .map(session => ({id:session.id,title:session.title})).sort((a,b) => a.id.localeCompare(b.id))};
-        }).sort((a,b) => a.id.localeCompare(b.id));
-    }
-    async removeRemoteProjectRecord(id: string, deleteFolder: (path: string) => Promise<void>): Promise<void> {
-        const record = (await this.projectRepository.list()).find(project => project.id === id);
-        if (!record) return;
-        if (record.kind !== 'remote') throw new FSError('EACCES','Cannot delete a local project through an MCP configuration');
-        const project = await this.get(id);
-        await deleteFolder(project.path);
-        await this.projectRepository.remove(record);
     }
     async get(id: string): Promise<ProjectFolder> {
         const project = (await this.list()).find(item => item.project.id === id);

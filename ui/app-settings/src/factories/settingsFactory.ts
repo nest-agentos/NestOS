@@ -1,4 +1,5 @@
 import { TerminalSettingsEditor } from '../editors/TerminalSettingsEditor';
+import { CellsSettingsEditor } from '../editors/CellsSettingsEditor';
 import type { InitialFilesPort } from '../editors/initial-files';
 import type { MCPServer, MCPDiscovery } from '@nestos/tools/mcp-contracts';
 import type {ConfigurationFormControls} from '@nestos/ui-common-adapter';
@@ -45,6 +46,7 @@ function resolveSettingsSlug(nodeId: string): string {
 }
 
 export interface SettingsFactoryOptions {
+    cells?: import('@nestos/app-contracts/services').ProjectRemoteMountPort;
     serverTerminals?: import('@nestos/app-contracts/services').ServerTerminals;
     diagnostics?: import('@nestos/app-contracts/services').ApplicationDiagnostics;
     mediaProbeExamples?: MediaProbeExamples;
@@ -59,7 +61,7 @@ export interface SettingsFactoryOptions {
     requestDelete?: import('@nestos/ui-common-adapter').EditorHostContext['requestDelete'];
 }
 export const createSettingsFactory = ({ settingsService, agentService, connectionService, llmUiEditors,
-    connectBrowser, restoreFlows, initialFiles, requestDelete, ocr, mediaProbeExamples, diagnostics, serverTerminals }: SettingsFactoryOptions): EditorFactory => {
+    connectBrowser, restoreFlows, initialFiles, requestDelete, ocr, mediaProbeExamples, diagnostics, serverTerminals, cells }: SettingsFactoryOptions): EditorFactory => {
     return async (container: HTMLElement, options: EditorOptions) => {
         if (requestDelete) options = { ...options, hostContext: { toggleSidebar: () => {}, navigate: async () => {}, ...options.hostContext, requestDelete } };
         const nodeId = resolveSettingsSlug(editorResourceId(options) || '');
@@ -67,6 +69,7 @@ export const createSettingsFactory = ({ settingsService, agentService, connectio
         let editor: IEditor | null = null;
 
         switch (nodeId) {
+            case 'cells': editor = new CellsSettingsEditor(container, cells, options); break;
             case 'terminal': editor = new TerminalSettingsEditor(container, serverTerminals, options); break;
             case 'model-defaults': editor = new llmUiEditors.ModelDefaultsEditor(container, connectionService, options, ocr); break;
             case 'storage':     editor = new StorageSettingsEditor(container, settingsService, options); break;

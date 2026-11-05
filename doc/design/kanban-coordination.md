@@ -343,12 +343,11 @@ NestOS 工作区通过 vfs-ui BrowserSource 共享一份侧栏，只读取 catal
 
 工作树内使用 `_nestos/kanban/`，不使用 Cells 内部保留的 `.nestos`：
 
-- `protocol.json`：work-message/1、runId、itemId、attemptId 和容量规则。
-- `inbox/<id>.json`：Agent 向宿主发布的不可变 progress、clarification、error、result 消息；临时文件写完后原子重命名。protocol.json 提供完整消息示例，正文使用 content；兼容初版未声明正文字段时写入的 body，但两者不能同时出现。每条消息使用不同 id，正文最多 8000 字符、单文件最多 64 KiB、目录最多 200 项。
-- `outbox/`：宿主发布 `work-message/2` 上下文响应；按下文文件交换协议续办原会话。旧版用户澄清回复仍不自动续发。
-- `artifacts/`：开发产物位置；result 只是交付申请，完成仍需真实执行终态、产物核验与独立 accept-execution。
+- `prompts/`、`manifest.json`：本次提示词与输入的审计副本；不参与 Session 通信。
+- `commit-trailers.txt`：冻结的提交来源，供 Git 交付核验。
+- `artifacts/`：开发产物；完成仍需真实执行终态、产物核验与独立 accept-execution。
 
-Cells 的作用域目录订阅通过现有 SSE/inotify 唤醒；旧节点或丢失事件时保留宿主扫描作为补偿。消息以持久收据去重，校验文件名、schema 与运行作用域；改写已发布消息报冲突。clarification/error 写入看板消息日志、阻塞事项并发全局通知。用户澄清后的自动回复仍未闭环；上下文查询另走下文的持久请求／响应协议，收到响应或续办轮次结束都不代表任务完成。诊断仅包含阶段、安全错误码、耗时和关联 ID；消息正文只进入业务记录。
+通信使用 Cells scope MCP 2.0。`session_report` 发布 progress、clarification、error、resolved 或 result；宿主通过固定 API 消费，持久提交业务与通知后写 acknowledge。问题须由同 scope 的 resolved/replyTo 解决。用户答复通过原 Session 正式队列传递，保留 replyTo 与稳定 operationId。通道订阅只发送失效版本，宿主扫描补漏；日志只包含安全身份、阶段、错误分类与耗时。
 
 CLI 提供 `kanban list/create/show/targets/resources/execute/record/records/run/runs/workflow/events`、`agent list/show/save/status/publish/receipt/connections/bind` 和 `notify list`。写入命令从 `--file` 读取冻结 JSON；核对沿用原操作身份，未知结果不自动换 ID 重发。
 
@@ -387,17 +386,14 @@ CLI 提供 `kanban list/create/show/targets/resources/execute/record/records/run
 
 <工作树>/_nestos/kanban/                   # 本次执行的冻结副本
   manifest.json
-  protocol.json
   prompts/decision.md
   prompts/task.md
-  inbox/
-  outbox/
   artifacts/
 ```
 
 工作树仍是 `_nestos/worktrees/<dispatch-id>`。宿主进程通过 `/workspace` 使用授权文件系统，Cells 原生会话使用其项目命名空间；Agent 从工作树读取相对路径，不依赖宿主物理路径。
 
-策略先写持久 journal，然后逐文件临时写入、完整读取核对、原子重命名，最后发布 manifest。manifest 保存入口、scope、每个文件的来源与 SHA-256、提交模式、仓库基础提交与任务分支。发布摘要另外入账；全部成功后才发布受管 Agent 并允许调用。恢复重新传送原快照，不读取最新源 MD；已存在文件必须逐字匹配。执行观察也核对已发布快照，改写提示或 manifest 不能改变当前授权。
+策略先写持久 journal，然后逐文件临时写入、完整读取核对、原子重命名，最后发布 manifest。manifest 保存入口、scope、每个文件的来源与 SHA-256、提交模式、仓库基础提交与任务分支。发布摘要另外入账；全部成功后才发布受管 Agent 并允许调用。恢复重新传送原快照，不读取最新源 MD；已存在文件必须逐字匹配。Cells scope 同时保存不可变快照；执行时只读取通道，改写审计副本不能改变当前授权。
 
 `decision.md` 用于规划/依赖分析调用。普通模型从冻结输入读取正文；选择原生规划 Agent 时，同样先准备独立工作树并把 MD 同步到 Cells。规划调用强制使用 changes 模式。`task.md` 用于开发执行；两份文件都随开发工作树上传。
 
@@ -474,40 +470,38 @@ NestOS 将已提交的看板事件投影到独立的 `/var/lib/kanban/work-log.s
 
 默认层级包含 goal、group、task、subtask。复杂任务的分析结果可返回 2–16 个 subtasks，各项包含局部 key、title、responsibility、acceptance、dependsOn 和可选 estimate；估算策略启用时每项均须估算。宿主校验依赖闭环，生成稳定子任务身份，继承项目并原子发布计划。模型不能为子任务指定其他项目。父任务持久保存 `planning.execution: children`，不再领取或执行；只对依赖满足的叶子任务创建 Agent、worktree 和 Session。所有子任务独立验收完成后自动汇总关闭父任务；失败、取消、待验收均不冒充完成，重启不重新执行父任务。
 
-新的执行尝试使用更新后的内置默认提示词；仅识别原始内置内容摘要，保留用户和项目覆盖及已冻结尝试。支持条件替换的存储通过 revision 安全升级原文件；旧存储只冻结有效的新默认内容，不覆盖原文件。通信继续使用工作树下 `_nestos/kanban`，实际路径写入 protocol 与 manifest。
+新任务使用当前内置默认提示词或显式作者覆盖，并冻结本次实际内容；不自动迁移旧作者文件。工作树保留审计 manifest 与提示词副本，实际通信与上下文位于 Cells scope。
 
-### Session 文件交付边界（迁移中）
+### Session 通道交付边界
 
-Agent 不直接调用 Kanban 命令或承担协调职责。宿主通过 Session prompt 指定授权工作区、输入、输出路径和协议；规划交付读取 `_nestos/kanban/analysis.yaml`，信封为 `schema: nestos.file-result/1`、`operationId` 和 `payload`。Session 终态只证明执行结束，聊天正文不再作为规划结果。缺少文件保留 pending；格式、范围和不可变摘要分别校验，拒绝异任务结果及发布后改写。平台通用读取位于 `run/session-file-result.ts`，不认识 Agent、Kanban 任务或具体工具。
+Agent 不直接调用 Kanban 命令或承担协调职责。规划结果通过 `session_report` 的 result/payload 返回，宿主以冻结 scope 关联操作并验证结构和摘要。Session 终态只证明执行结束；没有结果保持 pending/unknown，正文不能代替结构化结果。读取机制位于 `run/channel-results.ts`，不依赖工作区文件。
 
-规划 payload 的业务校验与原子 publish-plan 仍归 Kanban 宿主；文件可由 Agent、CLI 或其他已授权进程生成。规划与执行产物均以文件为准，发布调用回执仅用于确认执行终态。规划和执行消息都使用受限 YAML，信封分别描述结果和消息业务；历史 JSON 由同一个解析器兼容，没有第二套解析实现。目录订阅的并发接纳、释放和关闭由 `run/directory-subscriptions.ts` 统一管理；项目授权、路径选择和唤醒仍由宿主注入。部署与完整端到端验收仍需独立完成。
 
-### C4：文件交付与业务协调边界
+规划 payload 校验与原子 publish-plan 归 Kanban 宿主；Cells 只提供通用持久通道。事件只负责唤醒，消息、业务回执及正式执行终态决定推进。`run/directory-subscriptions` 统一管理订阅释放，适配器只注入通道与唤醒回调。
+
+### C4：通道交付与业务协调边界
 
 ```mermaid
 C4Container
   Person(user, "用户", "确认决策与独立验收")
-  System_Ext(executor, "文件执行者", "Agent、CLI 或其他授权进程")
+  System_Ext(executor, "Agent", "原生 Harness Session")
   System_Boundary(nestos, "NestOS") {
-    Container(session, "Session", "通用执行机制", "传递 prompt、绑定会话、观察终态")
-    Container(exchange, "文件读取与回执", "run", "限定读取、范围校验、摘要核对")
-    Container(adapter, "文件观察适配", "presets", "绑定项目、目录订阅与业务消息")
+    Container(session, "Session", "通用执行机制", "传递指令和引用、绑定会话、核对终态")
+    Container(adapter, "通道适配", "presets/run", "范围、摘要与业务结构校验")
     Container(coordinator, "Kanban 协调", "应用策略", "接纳计划、调度、日志与通知")
     Container(core, "Kanban 核心", "独立库", "原子命令、依赖、验收与幂等")
-    ContainerDb(files, "授权工作区", "VFS / Cells", "输入、prompt、计划与结果文件")
   }
+  ContainerDb(channel, "Cells scope", "私有 SQLite", "冻结上下文、消息、交换及原生状态")
   Rel(user, coordinator, "确认与验收")
-  Rel(coordinator, session, "准备执行及 prompt")
-  Rel(session, executor, "运行并观察终态")
-  Rel(executor, files, "只通过文件交付业务数据")
-  Rel(files, adapter, "目录变化唤醒")
-  Rel(adapter, exchange, "读取并核对")
-  Rel(exchange, files, "受限读取")
-  Rel(adapter, coordinator, "已验证文件")
-  Rel(coordinator, core, "提交协调命令")
+  Rel(coordinator, session, "正式提交及回执核对")
+  Rel(session, executor, "执行及观察")
+  Rel(executor, channel, "MCP 2.0")
+  Rel(channel, adapter, "固定 HTTP API 和失效通知")
+  Rel(adapter, coordinator, "已验证业务结果")
+  Rel(coordinator, core, "协调命令")
 ```
 
-执行者没有指向 Kanban 的 API 关系；文件读取机制不导入 Agent 或 Kanban。业务判断保留在适配/协调层，核心不调用 Session。图中的目录变化只作唤醒，持久文件、回执及正式执行终态共同决定推进，事件次数不等于命令次数。通用目录订阅资源管理归 run/directory-subscriptions；业务适配仅注入授权目录、传输及唤醒回调，不实现另一套监听生命周期。
+通道不导入 Kanban 业务类型，执行者不能直接调用调度 API。独立终态 hook 使用自己的 scope 和 Session，报告不写回主任务；切换同样核对精确前驱及已结束的 turn。后续 review/续办显式选择原开发 native Session，不能把 hook 的会话当作主执行。
 
 ### Kanban Markdown 生命周期定制
 
@@ -521,7 +515,8 @@ C4Container
 
 决策创建、确认、运行与项目选择由 Kanban 宿主持久化；Agent 不负责查询这些身份。`work-context.ts` 从看板事实和决策运行记录组装 board（id/title）、decision（sourceBoardId/recordId/recordRevision/runId）、task（id/parentId/title/responsibility/acceptance/dependencies）、projects。规划和开发共用该上下文构造器，子任务通过同一 runId 继承决策来源。
 
-准备工作区时将上下文随执行策略冻结，写入 `_nestos/kanban/manifest.json` 的 `context.input`。同一 manifest 还包含 runId、itemId、attemptId 及协议与仓库范围；重启核对完整 manifest，不能在旧尝试中替换当前看板或决策。Session prompt 只要求读取该文件并遵循文件协议。来源身份由宿主负责，VFS 和通用文件交换不识别 Kanban 字段，Agent 无须调用 Kanban API。
+准备工作区时将上下文随执行策略冻结到 Cells scope 的 identity/task/context/policy/instructions 与各提示词 section。首条 Session 消息仅含上下文引用，受管 Agent 只注入当前执行的通道指令；任务、来源决策、依赖结果和作者提示词按需读取。工作树的 manifest 仅为审计副本。来源身份由宿主负责，通用通道不识别 Kanban 业务字段。
+
 
 看板任务卡片的「执行会话」为独立锚点，任务标题按钮仍打开详情；会话入口和任务按钮是兄弟节点，避免在按钮内嵌套链接。详情标题中的「执行会话」同样支持打开当前会话；普通点击通过宿主回调在 NestOS 内打开持久标签，已打开的同一会话只激活、不重复创建；移除重复的浏览器“新标签页打开”链接。修饰键保留锚点的浏览器语义。任务详情诊断区分 load/render/session/references/children 阶段，不将所有问题合并为 ui.render。
 
@@ -557,7 +552,7 @@ C4Container
 
 准入前先取得原 Session writer。只有宿主明确确认未启动且可重试的拒绝（如写租约暂不可用）才将同一冻结请求恢复为 prepared 并退避重试；该状态持久化后重启仍可接着准入。提交结果未知、网络丢响应和未确认的外部副作用保持 submitting，只查询原回执。普通状态观察不得重新发送 continue。
 
-开发预设冻结原 commit/modules 约束，核验原调用、收尾调用和原生会话已停止，拒绝已清理/变更的工作区。保留未提交修改，将本轮 prompt、manifest 和协议发布到原工作树 `_nestos/kanban/continuations/<dispatch-id>/`。该目录的 inbox/outbox 使用新 attemptId；旧邮箱仅供查看，不参与本轮状态判定。项目级 `_nestos/kanban/policies/<profile>/task-continue-pre.md` 优先于 NestOS 用户策略，task-continue-post.md 可选；冻结后重启不重新读取作者文件。沿用 task.md 的交付与 succ/fail/cancel/clear 收尾规则。prompt bundle 最多 32 个文件，单文件仍限 64 KiB。
+开发预设冻结原 commit/modules 约束，核验原调用、收尾调用和原生会话已停止，拒绝已清理/变更的工作区。保留未提交修改，将本轮 prompt、manifest 审计副本发布到原工作树 `_nestos/kanban/continuations/<dispatch-id>/`。以新 attemptId 原子切换 Cells scope，核对前驱 scope 与原生 Session，旧 token 立即失效；原逻辑／原生会话及工作树不变。项目级 `_nestos/kanban/policies/<profile>/task-continue-pre.md` 优先于 NestOS 用户策略，task-continue-post.md 可选；冻结后重启不重新读取作者文件。沿用 task.md 的交付与 succ/fail/cancel/clear 收尾规则。prompt bundle 最多 32 个文件，单文件仍限 64 KiB。
 
 UI 的“续办原任务”只对宿主声明的可续办前驱显示，CLI `kanban continue <board-id> --file request.json` 使用相同的正式命令。续办请求进入看板日志；会话仍沿用原始深链，执行历史保留各次派发关联。重启恢复不自动把所有失败事项重新派发；已登记的续办请求由原执行桥和 Session 恢复链继续处理，成功必须经过原生终态、文件结果和交付验证后进入验收。
 
@@ -605,7 +600,7 @@ prepared/removing/cleaned 回执持久化。进入移除前的失败释放该次
 
 合并阶段的设计要求是继续**原主执行 Session**，追加独立的合并分析轮次，保留原 Session、原生上下文和历史，不重新运行已完成的开发任务，也不改写旧轮次的终态。Agent 只读分析源工作区与主分支，输出文件清单、冲突原因、候选处理方案、影响与验证建议；分析阶段不修改主目录、不提交、不合并。原 Session 不可恢复时阻塞并明确报告原因，不自动创建替代会话。该阶段不能冒用仅接受 failed/cancelled 前驱的 `continue-execution` 开发续办命令。
 
-由用户决定方案并明确确认后，才继续对应的处理与合入。确认记录须绑定本次源版本、目标版本和方案摘要，任一变化必须重新分析、重新确认；合入与其结果写入任务日志。原任务的冻结提交策略保持有效，不能靠新提示词扩大执行权限或覆盖旧验收证据。实际主目录操作由宿主授权的外部 Tool／Flow 核验确认、版本与副作用后执行，Agent 仍通过原 Session 的文件协议给出分析与处理建议；不把 Git 冲突策略加入通用 Kanban 核心。界面提供原会话分析入口、逐项冲突选择及确认合并；开发预设的构建、替换和合并默认继续原 Session，由 Agent 阅读项目文档、脚本和部署约束确定具体命令，不要求用户编写 Flow。旧 Flow 绑定与已提交调用保留兼容，不是开发预设的前置要求。
+由用户决定方案并明确确认后，才继续对应的处理与合入。确认记录须绑定本次源版本、目标版本和方案摘要，任一变化必须重新分析、重新确认；合入与其结果写入任务日志。原任务的冻结提交策略保持有效，不能靠新提示词扩大执行权限或覆盖旧验收证据。实际主目录操作由宿主授权的外部 Tool／Flow 核验确认、版本与副作用后执行，Agent 仍通过原 Session 的 MCP 2.0 通道给出分析与处理建议；不把 Git 冲突策略加入通用 Kanban 核心。界面提供原会话分析入口、逐项冲突选择及确认合并；开发预设的构建、替换和合并默认继续原 Session，由 Agent 阅读项目文档、脚本和部署约束确定具体命令，不要求用户编写 Flow。旧 Flow 绑定与已提交调用保留兼容，不是开发预设的前置要求。
 
 工作区默认查询 `workResources(boardId, itemId, {inspect: false})`，只显示持久关联及可复制的名称、路径、分支；不会查询远程 Git、原生会话或把“已关联”当成可清理证据。展开时只读取一次，后台事件保留当前内容和在途请求；显式刷新重新读取关联，“检查清理条件”才执行检查。原无 query 的检查接口保持兼容，所有清理操作仍在后端重新核验版本和安全条件。手工“关联已有讨论会话”可多次添加，登记为观察者与状态订阅，不启动 AI、不合并对话历史、不替代主执行绑定。
 
@@ -618,64 +613,45 @@ prepared/removing/cleaned 回执持久化。进入移除前的失败释放该次
 
 操作意图先保存在原 automation journal，再提交原 Session 或独立 Flow 调用。重启或丢失响应后，只核对原提交身份；只有明确未接纳的所有权拒绝可以重试。相同健康状态不追加日志；变化的阶段与具体错误写任务日志。操作会话加入既有会话关系投影。活动操作阻止工作区清理，显式清理与同任务操作共用串行边界。
 
-合并分析核对主工作区干净、保留交付与原冻结提交策略，继续原逻辑 Session 和原生 binding，不能新建替代会话。任务专用目录为 `_nestos/kanban/review/<operationId>/`，冻结 manifest 和项目/全局覆盖的 `task-merge-pre.md`、`task-merge-post.md`；Agent 通过 `analysis.yaml` 的 `nestos.file-result/1` 信封返回版本绑定的分析。每个冲突提供有限命名候选项，界面初始不代选。合并调用携带确认 ID、分析 ID/摘要、源/目标版本和用户逐项选择；发送前重新核对版本，实际合入工具必须在副作用前再次核验。验收通过要求构建/替换回执与宿主实际运行版本匹配，再使用既有 `accept-execution`，不自动合并或清理。
+合并分析核对主工作区干净、保留交付与原冻结提交策略，继续原逻辑 Session 和原生 binding，不能新建替代会话。任务专用目录为 `_nestos/kanban/review/<operationId>/`，冻结 manifest 和项目/全局覆盖的 `task-merge-pre.md`、`task-merge-post.md`；Agent 通过 `session_report` 的 result/payload 返回版本绑定的分析。每个冲突提供有限命名候选项，界面初始不代选。合并调用携带确认 ID、分析 ID/摘要、源/目标版本和用户逐项选择；发送前重新核对版本，实际合入工具必须在副作用前再次核验。验收通过要求构建/替换回执与宿主实际运行版本匹配，再使用既有 `accept-execution`，不自动合并或清理。
 
 
-### 提交来源与双向文件上下文
+### 提交来源与双向通道上下文
 
 新建开发工作区通过 `presets/kanban-commit-context` 冻结提交来源：用户存储的稳定 scope、项目、看板、事项及修订、执行身份和 workContext（包括来源决策的已保存运行快照）。上下文按 SHA-256 保存于原 automation journal，准备阶段发布 `commit-trailers.txt`。Conventional Commits 标题保持不变；允许 worktree 提交时，每个新提交附加 NestOS-Scope / NestOS-Board / NestOS-Task / NestOS-Execution / NestOS-Context trailer。changes 模式仍禁止提交。交付核验逐仓库读取真实 Git trailer，与冻结身份核对，再将提交列表关联到原派发；不自动 amend、合并或提交用户改动。历史无元数据的工作区继续沿用旧契约，不伪造来源。
 
 合并分析开始前，宿主有界读取源／目标对称差的最近提交，验证提交可达性及元数据所属用户存储和项目，读取冻结任务／决策与当前修订。`commit-contexts.json` 保存预载数据，manifest 仅保存其路径与摘要，避免重复正文挤占 manifest 容量；历史缺失、外部提交或范围超限明确进入 unresolved，不推断其他 task。独立仓库查询仅接受已登记模块；引用必须为完整提交 SHA，Git 参数不接收任意修订表达式。
 
-通用机制在 `run/file-exchange-protocol`、`run/file-exchange` 与 `run/file-session-continuation`，业务方法声明和 Git／看板查询在 presets。Cells 不识别 task、decision 或 merge，也不新增 MCP 通道。旧 `protocol.json` 与 work-message/1 保留；新增 `exchange.json` 声明本次 scopeId（派发或合并操作 ID）、可调用方法和请求例子。这个通信 scopeId 与 Git trailer 中的用户存储 scope 是不同身份。
+通用机制位于 `run/channel-protocol`、`run/channel-exchange` 和 `run/channel-session-continuation`；业务查询归 presets。Agent 使用 `session_request({id,method:"kanban.context.resolve",params:{repository,commits,include}})`。pending 必须结束本轮，不轮询、不同时发布最终结果。宿主待真实原生 turn 结束后冻结请求摘要与查询结果，通过固定 API respond 发布不可变响应，再持久领取唯一 submitting 身份，继续同一 Session、分支、原生 binding 和 generation。续办消息只携带响应 id/requestDigest/sha256；Agent 用 `session_response` 读取并核验。
 
-```yaml
-# inbox/<request-id>.yaml
-schema: work-message/2
-id: "<request-id>"
-type: request
-scopeId: "<exchange.json 中的 scopeId>"
-method: kanban.context.resolve
-waitForResponse: true
-params:
-  repository: "."
-  commits: ["<完整提交 SHA>"]
-  include: [task, decisions, acceptance]
-```
-
-最终响应位于 `outbox/<request-id>.yaml`，包含 schema、独立响应 id、type=response、scopeId、replyTo、规范化请求的 requestDigest、status=ok/error，以及 payload 或安全错误码。Agent 先发布临时文件再原子重命名，然后结束本轮；禁止同时发布完成结果、轮询等待或写 outbox。响应不修改已发布文件，刷新上下文必须使用新的请求 ID。请求 ID 相同而内容不同、作用域不符、响应改写或同时发布最终结果与待处理请求都拒绝。单文件最多 64 KiB；单批最多 16 个请求，单次交换最多 128 个请求，沿用邮箱最多 200 项及有界 YAML 解析。
-
-现有目录事件负责唤醒，宿主定时扫描补漏。原生 turn 运行期间仅登记请求，待正式执行回执证明已结束后，才解析 Git 查询并写响应，避开 Cells 的外部写入保护。查询结果先持久化再发布，网络／存储故障保留待恢复；只有明确的应用拒绝才发布 error 响应。之后冻结续办请求并先持久化 submitting，再提交同一逻辑 Session、分支、原生 binding 和 generation；消息引用响应路径与 SHA-256。等待上下文保持事项未完成，不触发成功／失败收尾；仍需最终结果、原生终态、交付核验和独立验收。
+同 ID 内容变化、作用域不符、响应改写、结果与新请求冲突均拒绝。单次响应最多 64 KiB，单批最多 16 个请求、scope 最多 128 个请求。网络／存储故障保留原快照，只有明确应用拒绝才发布 error 响应。宿主重启只核对原提交，丢失准入回执不重发；明确未准入的所有权拒绝才允许按原身份再试。Cells 重启把运行／提交中标为 unknown，按精确 turn ID 核对原生历史，不用 idle 推断完成。
 
 ```mermaid
 sequenceDiagram
     participant A as 原 Session 中的 Agent
-    participant F as worktree 文件邮箱
+    participant C as Cells scope 通道
     participant H as NestOS 协调器
-    participant J as 既有持久 journal
-    A->>F: 原子发布 request，结束本轮
-    F-->>H: 目录事件／扫描补漏
-    H->>J: 冻结请求身份与查询响应
-    H->>F: 原子发布不可变 response
-    H->>J: 冻结原 Session 续办请求并领取 submitting
-    H->>A: 原 Session 续办，携带文件路径与摘要
-    A->>F: 最终结果或新请求
+    participant J as 持久 journal
+    A->>C: session_request，结束本轮
+    C-->>H: 版本失效事件
+    H->>J: 冻结请求及查询响应
+    H->>C: 固定 API respond
+    H->>J: 冻结续办并领取 submitting
+    H->>A: 原 Session 续办，仅携带响应引用
+    A->>C: session_response / session_report
 ```
 
-httpd 退出后从原 journal 和文件重新核对：已冻结响应不重新查询，响应已发布而续办回执丢失时只 inspect 原提交，不换 ID 重发。只有明确未接纳的所有权拒绝允许沿原身份再试。Cells 退出时保留等待／unknown；恢复文件连接后继续核对，不能用新 epoch 下旧收据缺失证明未执行。原生上下文代次变化、执行归属不可确认或恢复能力不足时明确阻塞，不创建替代会话。协议文件跟随既有安全工作区归档，活动／未知派发仍阻止清理。正常核对不重复追加业务日志；上下文响应和续办变化通过稳定消息身份进入任务日志，正文与凭据不进入诊断日志。
-
-验证包含真实 Git trailer／可达性／历史与当前决策查询，内存 VFS + SeqFile 的请求与响应改写、双端协调实例恢复、发布中断、丢失提交回执、批量和多轮续办、显式错误、取消以及等待期间禁止交付／收尾。此类故障通过确定性端口注入覆盖，未为测试向用户原生会话发送诊断提示，也未声称已执行真实 Cells 杀进程验收。
-
+交付仍须最终结果、真实执行终态、Git 交付核验及独立验收。scope 消息与工作区文件门闩分离，运行中可报告进度；活动／未知执行继续阻止清理。验证覆盖请求／响应改写、双端重启、发布中断、丢回执、批量多轮续办、显式错误、取消和等待时禁止交付。
 
 ### Agent 驱动维护与导航滚动
 
-开发预设为 `ReviewAdapter` 提供 prepareOperation/readOperation。构建、替换服务和确认合并使用原逻辑／原生会话、独立操作 ID、冻结 manifest 和 `result.yaml`，复用既有 file exchange 与提交回执；合并分析继续使用 analysis.yaml。正常详情不查询 Flow 目录，也不显示必须配置 Flow 的表单；已持久化的旧 Flow 请求仍按原身份核对，其他宿主可以继续使用可选的 Flow 端口。
+开发预设为 `ReviewAdapter` 提供 prepareOperation/readOperation。构建、替换服务和确认合并使用原逻辑／原生会话、独立操作 ID、冻结 scope 和 result/payload，复用通道交换与正式提交回执。正常详情不查询 Flow 目录，也不显示必须配置 Flow 的表单；已持久化的旧 Flow 请求仍按原身份核对，其他宿主可以继续使用可选的 Flow 端口。
 
 Agent 读取项目 AGENTS.md、README、包脚本和现有构建／部署文档，选择并执行命令。用户确认验收、服务替换与冲突方案。operation-input.json 保存候选版本或已批准方案、版本和逐项选择，manifest 保存其路径与摘要；提示词不能扩大实际部署或沙箱权限。缺少能力时输出 blocked 和具体原因，宿主保留说明及原会话链接。构建成功还须提供实际构建清单或简要构建回执的项目相对路径及 SHA-256，宿主检查文件；服务替换核对实际运行版本；合并核对交付源未变、真实目标 HEAD 及目标祖先关系，禁止仅以聊天文本宣称成功。
 
 系统恢复与维护的看板组包含一个「看板构建、服务替换与合并提示词」条目，显式恢复 task-build-pre/post.md、task-deploy-pre/post.md、task-integrate-pre/post.md 六份全局模板；已有自定义文件不会被普通运行覆盖。项目的 `_nestos/kanban/policies/<profile>/` 同名文件优先。每次操作冻结并上传本次实际提示词；恢复模板不执行 Agent，也不自动构建、替换、合并或改写历史发布。
 
-当前由原 Session 内的 Agent 执行命令，通过文件返回结果；没有新增「Session 生成任意脚本后由 Kanban 代调用」通道。若将来加入宿主代执行，应由通用且授权的 Cells 进程端口承担，冻结脚本摘要、参数、执行范围、批准及稳定 requestId，并查询原回执恢复；不能把任意文件写入视为执行授权。
+当前由原 Session 内的 Agent 执行命令，通过通道返回结果；没有新增「Session 生成任意脚本后由 Kanban 代调用」通道。若将来加入宿主代执行，应由通用且授权的 Cells 进程端口承担，冻结脚本摘要、参数、执行范围、批准及稳定 requestId，并查询原回执恢复；不能把任意文件写入视为执行授权。
 
 看板的列内滚动仅在纵向限制 overscroll，允许横向手势传递到外层看板；移动布局移除横向吸附，保留浏览器原生双轴平移。窗口导航不捕获卡片横向滑动，不增加自定义拖拽执行器。
 
@@ -691,7 +667,7 @@ Agent 读取项目 AGENTS.md、README、包脚本和现有构建／部署文档�
 
 ## 临时验收资源的释放与异常恢复
 
-临时进程监督独立实现为 `tools/temporary-process` 外部 Tool 包。核心看板不解析命令、进程名或端口；`temporary.run`、Node `withTemporaryScope` 与 CLI 复用同一机制。默认任务策略要求将测试驱动和预览服务放在同一个有界作用域，等待释放回执后发布终态。缺少受管入口时使用有界前台检查或报告缺失能力，不启动未登记的后台服务。已冻结任务提示不改写；已知默认模板通过原迁移机制升级新任务，项目定制保持原样。
+临时进程监督独立实现为 `tools/temporary-process` 外部 Tool 包。核心看板不解析命令、进程名或端口；`temporary.run`、Node `withTemporaryScope` 与 CLI 复用同一机制。默认任务策略要求将测试驱动和预览服务放在同一个有界作用域，等待释放回执后发布终态。缺少受管入口时使用有界前台检查或报告缺失能力，不启动未登记的后台服务。已冻结任务提示不改写；新任务使用当前默认模板或显式作者覆盖，不迁移旧文件协议。
 
 ```mermaid
 flowchart LR
@@ -718,7 +694,7 @@ worker 的启动身份先持久化，随后才允许执行实际命令，消除�
 临时进程退出不删除 worktree、分支、Session 或验收文件。正式服务替换与可续办 Agent Session 保持原生命周期，不使用该入口。故障回归使用真实 HTTP listener、setsid 后代、SIGKILL、同时丢失监督器及新进程恢复，并检查无关进程仍存活。
 ## Task 执行与 fix
 
-五分钟准入、编辑租约、统一状态来源/转换表、执行控制、版本化文件通知与 fix 确认见 [task 执行规范](kanban-task-execution.md)。
+五分钟准入、编辑租约、统一状态来源/转换表、执行控制、通道通知与 fix 确认见 [task 执行规范](kanban-task-execution.md)。
 
 ### 删除预检的按看板索引
 
@@ -736,3 +712,11 @@ Journal 首次打开时以一个跨 seq 事务迁移已有记录，最后写版�
 `record-runs:<sourceBoardId>` 中的执行记录是决策运行状态的唯一来源；`record-operation:<operationId>` 的 v2 回执只保存运行引用与冻结请求版本，不再复制可变状态和决策正文。读取旧回执时校验引用，更新为 v2 并从原运行记录恢复；引用丢失必须报错，不能依据旧快照新建一次执行。状态与错误码未变化时不写新的 updatedAt；Journal 内容相同也不重写或广播。
 
 停止须先给扫描器与自动化协调层发送 quiesce，再等待已有 scan 安全结束，不能颠倒顺序。多个子协调器同时停止准入，然后等待全部确认；新执行在退出后从原冻结操作继续。提交前收到 SERVICE_STOPPING/DISPOSED 时，只有确认尚无提交回执才标记为可重试的 not-started；执行桥将同一个冻结请求恢复为 prepared，重启复用原身份。已有提交回执或响应丢失保持原提交与未知核对路径，不因停止而重复派发、创建新 Session 或标成功。正常停止不取消决策与任务；强制停止仍需核对外部结果。
+
+### Cells 固定 API 与渐进式会话上下文
+
+NestOS/cells-driver 使用 `/v1/capabilities` 和 `/v1/api/{harness|projects}/{operation}`。设置 → Cells 保存多个独立节点与凭据，和普通 MCP 配置没有投影、迁移或别名关系；被项目引用的节点拒绝删除和更改端点／授权身份。文件、同步、事件使用各自固定 HTTP 接口。
+
+开发预设要求 Harness 正向声明 `sessionChannels`，不支持时明确拒绝。规划、开发、fix、续办、合并分析和维护均走 `/v1/channel/mcp`（MCP 2.0，2026-07-28），没有文件通信回退。scope token 仅访问本 scope，不能访问固定 API，且每次请求重验项目所有者授权；token 不进入 prompt 或日志。Cells 私有 SQLite 保存上下文、消息、请求／响应、业务 acknowledge 和精确 Session/turn 状态。
+
+Codex thread 使用扁平配置 `features.mcp_2026_07_28=true` 和 `mcp_servers.cells_session`。scope 切换时先核对原 turn 已终结，原子撤销旧 token；对已加载 thread 执行 unsubscribe、等待 closed，再 resume 同一 thread 以刷新 MCP 连接。app-server 设置 `thread_unload_delay_secs=0`，不关闭原生历史或更换 Session。测试 `tools/cells/src/plugin/harness/tests/real_channel.py` 使用真实 Codex app-server 验证工具发现、上下文、请求响应、卸载续办和原 turn 历史；模型请求仅到本地拒绝 fixture，不调用外部模型。

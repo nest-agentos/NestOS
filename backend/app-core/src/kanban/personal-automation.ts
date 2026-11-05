@@ -19,6 +19,7 @@ import {requireValue} from './validation';
 import {withContinuedWork, type ContinueWorkOptions} from './continued-work';
 
 export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
+    sessionChannel?: import('@nestos/app-contracts/services').ProjectRemoteMountPort['sessionChannel'];
     itemOperations?(context: {service: KanbanService; journal: KanbanAutomationJournal; workLog: KanbanWorkLog;
         log: import('./item-operation-types').ReviewOperationsOptions['log']}): ReturnType<typeof import('./item-operations').createItemOperations>;
     relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
@@ -31,14 +32,14 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     requiresItemResource?(board:KanbanBoard):boolean;
     readAnalysisOutput?(id:string):Promise<unknown|undefined>;
     onAnalysis?(input: {boardId: string; id: string; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef; outcome: 'succeeded' | 'failed' | 'cancelled'; code?: string}): Promise<void>;
-    prepareAnalysis?(input: {context?:unknown;reportActivity?(fact: WorkLogFact): Promise<void>; id: string; board: KanbanBoard; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target: import('@nestos/llm-flow/contracts').TargetRef; instruction: string}>;
+    prepareAnalysis?(input: {context?:unknown;reportActivity?(fact: WorkLogFact): Promise<void>; id: string; board: KanbanBoard; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target: import('@nestos/llm-flow/contracts').TargetRef; instruction: string; contextRef?: unknown}>;
     validatePreparation?(reference: import('@nestos/kanban/contracts').KanbanExternalReference, options?: Record<string, string>): void;
     verifyWork?(dispatchId: string): Promise<void>;
     preparations?: import('@nestos/kanban/contracts').KanbanAutomationTarget[];
     observeWork?(input: {boardId: string; dispatch: import('@nestos/kanban/contracts').KanbanDispatch;
         observation: import('@nestos/kanban/execution').KanbanExecutionObservation; service: KanbanService; worker: KanbanService}): Promise<import('@nestos/kanban/execution').KanbanExecutionObservation>;
     prepareWork?(input: {context?:unknown;dispatch: import('@nestos/kanban/contracts').KanbanDispatch; item: KanbanItem;
-        reportActivity?(fact: WorkLogFact): Promise<void>; stage?: 'decision' | 'task' | 'fix'; options?: Record<string, string>; preparation: import('@nestos/kanban/contracts').KanbanExternalReference; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<import('@nestos/llm-flow/contracts').TargetRef>;
+        reportActivity?(fact: WorkLogFact): Promise<void>; stage?: 'decision' | 'task' | 'fix'; options?: Record<string, string>; preparation: import('@nestos/kanban/contracts').KanbanExternalReference; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target:import('@nestos/llm-flow/contracts').TargetRef;contextRef?:unknown}>;
     projects?: Pick<import('@nestos/app-contracts/services').ProjectService, 'list' | 'get'> & Partial<Pick<import('@nestos/app-contracts/services').ProjectService,'openWorkspace'>>;
     calls: IndependentCallService; kernel: Kernel; sessions: SessionRepository;
     prepareSession(id: string): Promise<boolean>; catalog(): Promise<RootTargetCatalog>;
@@ -137,10 +138,10 @@ async function createBridge(options: Options, boardId: string, prepareSession: (
         binding: async (dispatch, item) => {
             const board = await options.service.read(boardId);
             requireValue(board.automation?.enabled, 'AUTOMATION_PAUSED');
-            let target = automationTarget(board.automation.executor, await options.catalog());
+            const target = automationTarget(board.automation.executor, await options.catalog());
             if (board.automation.preparation) {
                 requireValue(options.prepareWork, 'WORK_PREPARATION_UNAVAILABLE');
-                target = await options.prepareWork({context:await workContext(options.journal,board,item),dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
+                return options.prepareWork({context:{...await workContext(options.journal,board,item),inputs:dispatch.inputs,dependencies:await dependencyResults(options,boardId,item)},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
                     reportActivity: fact => options.workLog?.append(options.service, boardId, item.id, {...fact, actor: fact.actor ?? dispatch.principal, dispatchId: dispatch.id}) ?? Promise.resolve()});
             }
             return {target};

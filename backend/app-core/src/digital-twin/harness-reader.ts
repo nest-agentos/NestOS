@@ -5,17 +5,22 @@ import type { TwinSourceCatalog, TwinSourceContent } from './domain';
 import { sha256HexSync } from '@nestos/llm-context';
 
 export const harnessTarget = (project: string, profile: string, session: string) => JSON.stringify([project, profile, session]);
-export async function discoverHarness(projects: ProjectService, project: ProjectFolder, catalog: TwinSourceCatalog): Promise<void> {
-    if (!projects.remoteMounts?.list(project.project.id).some(mount => mount.at === '/' && mount.connectionId && mount.serverProjectId)) return;
+export async function discoverHarness(projects: ProjectService, project: ProjectFolder, catalog: TwinSourceCatalog, active: () => boolean = () => true): Promise<void> {
+    if (!active() || !projects.remoteMounts?.list(project.project.id).some(mount => mount.at === '/' && mount.connectionId && mount.serverProjectId)) return;
     let client: HarnessClient | undefined;
     try {
         client = await projects.remoteMounts.projectHarness(project.project.id, { timeoutMs: 5000 });
+        if (!active()) return;
         const resources: TwinSourceCatalog['resources'] = [];
         for (const profile of (await client.profiles({ timeoutMs: 5000 })).profiles.filter(item => item.capabilities.history && item.projectRuntime)) {
+            if (!active()) return;
             for (const archived of [false, true]) {
+                if (!active()) return;
                 let cursor: string | undefined; const seen = new Set<string>();
                 do {
-                    const page = await client.list(profile.id, { archived, cursor }, { timeoutMs: 5000 });
+                    if (!active()) return;
+                    const page = await client.list(profile.id, { archived, cursor, limit: 100 }, { timeoutMs: 5000 });
+                    if (!active()) return;
                     for (const session of page.sessions) resources.push({ kind: 'harness-session', location: 'remote', projectId: project.project.id, projectName: project.name, profileId: profile.id,
                         sessionId: session.id, target: harnessTarget(project.project.id, profile.id, session.id), label: session.title, version: String(session.updatedAt) });
                     if (resources.length > 10000 || (page.nextCursor && seen.has(page.nextCursor))) throw new Error('TWIN_SOURCE_LIMIT');
@@ -23,6 +28,7 @@ export async function discoverHarness(projects: ProjectService, project: Project
                 } while (cursor);
             }
         }
+        if (!active()) return;
         catalog.resources.push(...resources); catalog.completeScopes.push(`${project.project.id}/harness-session`);
     } catch { catalog.errors.push(`${project.project.id}/harness-session`); }
     finally { await client?.close(); }

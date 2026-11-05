@@ -28,15 +28,15 @@ itookit 保存自己的项目 ID 与服务端项目引用，显示「服务器�
 
 服务端导出 `rw` 是授权上限；NestOS 创建远程项目默认保存 `ro` 绑定，修改服务端配置不会自动升权。远程项目菜单只提供重命名、重新挂载和卸载等项目管理操作，不提供根项目的复制/移动/删除入口；项目内文件保留其文件操作。重新挂载使用 `remountProject` 用例：切为 `rw` 时读取服务端登记，必要时调用带 revision 的 `project_remount`；切为 `ro` 只收窄客户端视图，不下调其他客户端的服务端授权。持久绑定更新后撤销旧视图及会话授权，释放旧来源，保留项目 ID、文件和原生会话。切换前保存并关闭本项目编辑视图，本地在途任务由应用层拒绝，服务端权限修改由文件执行门拒绝；响应丢失后重读登记核对，不盲目重放。
 
-卸载经独立 `ApplicationBackend.unmountProject` 用例，仅撤销客户端挂载、移除本地项目接入和本地 Session；离线仍可卸载，不遍历远端树，不调用服务端 `project_forget` 或原生删除。MCP 详情将 ProjectRemoteMountService 的挂载、客户端权限与连通状态投影为列表，不把挂载记录复制进 MCP 配置。cells 启动日志单独展示实际导出权限，避免将导出上限与项目绑定混为一谈。
+卸载经独立 `ApplicationBackend.unmountProject` 用例，仅撤销客户端挂载、移除本地项目接入和本地 Session；离线仍可卸载，不遍历远端树，不调用服务端 `project_forget` 或原生删除。项目状态展示 ProjectRemoteMountService 的挂载、客户端权限与连通状态；节点配置独立于挂载。cells 启动日志单独展示实际导出权限，避免将导出上限与项目绑定混为一谈。
 
 ## 同一项目授权用于三种访问
 
 | 能力 | 授权来源 | 传输 |
 |---|---|---|
 | 文件、结构修改、SeqFile | projectId + revision + alias/path，读写权限可衰减 | 原 HTTP 文件协议，增加项目上下文 headers |
-| bash / tools | 服务端项目根与 mounts，客户端不能自带更多目录 | MCP `project_exec`；HTTP 查询、取消与回收沿用进程协议 |
-| Codex 会话 | 同一项目授权、profile 与策略 revision | MCP harness 工具携带 projectId/revision；native stdio 留在服务端 |
+| bash / tools | 服务端项目根与 mounts，客户端不能自带更多目录 | 固定 API `projects/exec`；HTTP 查询、取消与回收沿用进程协议 |
+| Codex 会话 | 同一项目授权、profile 与策略 revision | 固定 API harness 操作携带 projectId/revision；native stdio 留在服务端 |
 | sync | sync principal/namespace/dataset/replica 授权 | 原 sync HTTP 协议 |
 
 文件请求携带 `x-fsagent-project`、`x-fsagent-project-revision`，只读视图还携带 `x-fsagent-project-readonly`。服务端检查批量 stat、列表、内容读写、重命名两端和 SeqFile 路径；只允许项目根与已配置挂载来源。初始化允许必要的祖先目录 stat，不开放祖先目录列表或内容。根目录或挂载身份变化、策略 revision 过期均拒绝访问。未带项目上下文的旧文件接口仍受安装级导出授权约束，是兼容的管理接口，不作为项目的执行授权。
@@ -53,7 +53,7 @@ itookit 保存自己的项目 ID 与服务端项目引用，显示「服务器�
 
 默认隔离网络；`projects.network=true` 明确允许联网，并只读提供解析器和证书文件。命令和运行时 home 来自部署配置，远程请求不能修改。没有可用的 bubblewrap/user namespaces 时执行拒绝启动，不能退回直接宿主执行。
 
-进程执行和 Codex turn 与文件访问共用 FileGate。Codex 收到完成事件后失效文件 revision 并释放 gate；中断需确认原生完成，断开控制面板不会被当作完成。清理不能确认时保留未知/拒绝状态。原生 turn 只排斥文件修改；stat、目录、内容、SeqFile 查询、项目搜索和 MCP 目录读取可并发进行，只读请求不再使新 turn 准入失败。写保护仍是安装级，其他项目的修改可能收到 EBUSY；project_exec 和挂载变更保留完整排他，未知进程回收仍封闭两类访问。并发读取不是内容快照；弱 revision 额外核对大小、mtime 和 ctime，防止原地修改继续复用旧校验值。项目级写保护、强跨进程 lease 和 VMM guest 回收属于后续工作。
+进程执行和 Codex turn 与文件访问共用 FileGate。Codex 收到完成事件后失效文件 revision 并释放 gate；中断需确认原生完成，断开控制面板不会被当作完成。清理不能确认时保留未知/拒绝状态。原生 turn 只排斥文件修改；stat、目录、内容、SeqFile 查询、项目搜索和目录元数据读取可并发进行，只读请求不再使新 turn 准入失败。写保护仍是安装级，其他项目的修改可能收到 EBUSY；project_exec 和挂载变更保留完整排他，未知进程回收仍封闭两类访问。并发读取不是内容快照；弱 revision 额外核对大小、mtime 和 ctime，防止原地修改继续复用旧校验值。项目级写保护、强跨进程 lease 和 VMM guest 回收属于后续工作。
 
 客户端根目录探测收到 `EBUSY` 时保留连接可达，项目状态显示“远程文件暂时忙碌”，不将其投影为离线或阻止新会话草稿；文件操作仍遵守远端 FileGate，任务结束后重试。诊断保存 `root-probe`、`EBUSY`、`busy`、操作关联 ID 与耗时，成功探测清除当前忙碌状态，保留历史日志。项目侧栏的新会话与状态入口使用带 title/aria-label 的图标按钮，为项目选择框保留宽度。项目状态弹窗固定顶部标题和底部操作栏，关闭按钮位于底部右侧，仅内容区随长挂载列表及日志滚动。
 
@@ -110,19 +110,19 @@ HTTP 关系经过授权 VFS 视图；图中的组件关系不是 UI 绕过 VFS �
 
 已知目录的正文路径为：获取授权视图 → 并行目录 stat / entries / 项目投影 → 并行祖先规则 → 节点映射 → 渲染。首次来源初始化与非在线连接的有界探测仍需要等待；大目录仍按协议读完分页，不伪造完成。`projectDirectory.read` 记录正文总耗时，`projectFile.navigation` 记录后台导航耗时。测试验证源获取次数、规则请求数量与并行启动、修改后的刷新、取消与故障、只读创建限制以及侧栏刷新不会打开旧资源；真实远程网络的耗时需现场观测，不能由单元测试推断。
 
-远程项目持久保存 `connectionId`，运行时从工具箱 MCP 配置投影连接。原来的 `[ENOENT] fs: Remote file system not found` 来自本地连接查询，不能据此判断 cells 上的目录或原生 session 已丢失。配置存在但未通过 cells 能力验证时也不会进入连接投影。
+远程项目持久保存 `connectionId`，运行时从独立 Cells 连接目录读取。连接缺失是本地绑定错误，不能据此判断服务端目录或原生 Session 已丢失。节点保存通过固定 HTTP 能力发现验证。
 
-连接访问现使用结构化 `RemoteConnectionUnavailableError`，区分 `mcp-not-found`、`catalog-not-loaded`、`auth-missing`、`extension-missing`、`invalid-descriptor`、`endpoint-mismatch`、`invalid-endpoint` 和 `unsupported-transport`。界面显示配置名称与修复提示；目录说明及菜单生成容忍暂不可用的连接。异步 harness、连接检测、能力查询和目录浏览会先恢复当前引用的 MCP 配置，不按名称或服务器地址猜测并重绑项目。
+连接缺失使用结构化 `RemoteConnectionUnavailableError` 和 `cells-not-found` 原因；网络、授权、能力、版本和持久化失败分别保留具体错误码。界面显示连接名称与修复提示。异步请求前后核对当前绑定，不按名称或地址猜测重绑，也不依赖 MCP 初始化。
 
-远程项目在项目选择器旁与项目菜单提供“项目状态”。状态窗口独立于远端目录打开，项目离线时仍可查看本地后端记录、重新检查及复制日志。项目菜单及工作台的状态窗口另提供“刷新授权与项目绑定”：以已保存的 MCP 身份重新发现运行时授权，再以原访问级别更新原项目绑定并检查连接，不重写共享 MCP 配置；权限由服务端授予，服务端拒绝时保留原绑定并明确提示管理员处理。相同原生故障只在错误分类变化时发布状态失效通知，避免导航刷新重试形成循环；每次操作的诊断仍可查询。状态区分尚未检查、检查中、已连接、无法连接与部分功能不可用；文件根探测和原生会话目录分别提供证据。原生 profiles/list 失败按 profile 分别保留，只有对应读取成功才清除，不能用 MCP 握手成功或其他 profile 恢复覆盖。项目菜单先打开，不等待同步状态查询成功。
+远程项目在项目选择器旁与项目菜单提供“项目状态”。状态窗口独立于远端目录打开，项目离线时仍可查看本地后端记录、重新检查及复制日志。项目菜单及工作台的状态窗口另提供“刷新授权与项目绑定”：以已保存的 Cells 身份重新发现运行时授权，再以原访问级别更新原项目绑定并检查连接，不切换连接身份；权限由服务端授予，服务端拒绝时保留原绑定并明确提示管理员处理。相同原生故障只在错误分类变化时发布状态失效通知，避免导航刷新重试形成循环；每次操作的诊断仍可查询。状态区分尚未检查、检查中、已连接、无法连接与部分功能不可用；文件根探测和原生会话目录分别提供证据。原生 profiles/list 失败按 profile 分别保留，只有对应读取成功才清除，不能用节点能力发现成功或其他 profile 恢复覆盖。项目菜单先打开，不等待同步状态查询成功。
 
-“设置 → 系统日志”首先通过 `ApplicationBackend.diagnostics` 查询当前用户 Runtime 的事件；工具箱所有 MCP 详情均有“连接状态与日志”，cells 详情中的挂载项目可直接打开项目状态。工具箱 MCP 徽标同时参考关联项目状态：握手成功但项目失败/部分不可用时显示异常，待检查时不显示全绿；提示分别说明协议状态和项目数量。HTTP 使用显式 query/subscribe 能力，不读取或转发 Node 进程的全局 MemoryLogger，日志读取失败会显示错误并可重试，不显示为空日志。
+“设置 → 系统日志”通过 `ApplicationBackend.diagnostics` 查询当前用户 Runtime 的事件；项目状态提供本项目诊断，设置 → Cells 管理独立节点。普通 MCP 的状态和日志独立显示，不聚合 Cells 挂载状态。HTTP 使用显式 query/subscribe 能力，不读取或转发 Node 全局 MemoryLogger；查询失败显示原因及重试入口。
 
 `DiagnosticJournal` 在各 Runtime 内按来源合并连续相同事件：记录首次/最近发生时间、次数、恢复或结束时间、耗时范围及最多五个近期关联操作样本；阶段、项目、挂载、profile、会话或错误分类不同不会混合。其他来源插入不打断本来源，恢复、分类改变、超过五分钟间隔或运行时重启会结束旧分组。最多保留 500 组且不超过 512 KiB，单次查询最多返回 200 组，界面每页 20 组，支持项目、连接、模块、级别、关键字及时间范围筛选。事件经用户系统文件能力持久化到 `/var/log/application-diagnostics.seq`，每组使用独立 `event:<id>` entry，以版本化索引及 SeqFile 事务原子提交本次变化和淘汰记录；旧 `events` 整体数组在成功事务中迁移并删除。正常关闭排空写入；刷新或重启后可重读保留事件，但当前可用性仍需要重新检查。初始化/写入失败明确显示仅内存状态。挂载、刷新绑定、卸载、根探测、MCP 连接与能力发现、原生目录失败与恢复均记录重要事件，包含 operationId、阶段、结果、具体错误码、耗时及适用的项目/连接/profile/会话/requestId。MCP JSON-RPC 的数字错误码单独保留 rpcCode；异常原因只提取安全分类与错误链，不记录正文、凭据、认证引用、请求头、端点地址或原始堆栈。
 
 根探测共享一个超时预算，超时记录为无法连接并保留 ETIMEDOUT；主动取消恢复原状态。离线占位保留最初的诊断，不能以笼统 EIO 覆盖授权变化等原始错误。原有 `cells` / `llm:mcp` 内存日志和开发者控制台仍可用于当前进程调试，日志页将浏览器日志与服务端持久事件明确区分；浏览器日志级别设置只影响当前页面，不修改服务端记录策略。状态窗口进一步分开展示协议握手、请求身份认证、当前导出/项目权限和本地绑定版本。授权探测只读 `project_roots` / `project_read`，导出未开放时显示“未获项目授权”，不泛化为网络连接失败；该身份的全局授权 revision 变化不能直接证明某个导出撤权。状态页提供 MCP 配置、remount、绑定刷新及按导出/身份生成的服务端授权修复命令；命令仅供管理员确认执行，不把普通 MCP 连接当作授权管理接口。表单草稿及展开的日志详情在刷新期间保留。显式 MCP 刷新会建立新连接和握手，避免 SDK 缓存旧授权元数据。
 
-同步控制记录也独立保存 MCP `connectionId`。旧同步绑定的失效引用不属于原生 harness session；状态读取只读本地记录，不能因刷新项目菜单而创建远程客户端并抛 ENOENT。项目同步图标、当前项目状态按钮及悬停异常列表展示失效原因，保留显式解绑；实际同步操作才恢复当前引用。未发送命令的绑定可离线解除，结果未知的命令及序号继续保留，不推断为未提交。
+同步控制记录也独立保存 Cells `connectionId`。旧同步绑定的失效引用不属于原生 harness session；状态读取只读本地记录，不能因刷新项目菜单而创建远程客户端并抛 ENOENT。项目同步图标、当前项目状态按钮及悬停异常列表展示失效原因，保留显式解绑；实际同步操作才恢复当前引用。未发送命令的绑定可离线解除，结果未知的命令及序号继续保留，不推断为未提交。
 
 工具箱的 MCP 图标显示管理器实际观测的未连接、连接中、已连接或异常状态，悬停显示失败阶段、原因与观测时间。配置刷新不发起网络探测；未连接不能推断为服务器异常。连接与能力发现失败保留诊断，显式测试成功清除旧异常；主动断开显示未连接，意外断开显示异常。状态属于运行时，不随 MCP 配置保存，也不包含凭据或原始错误正文。
 
@@ -226,17 +226,11 @@ Codex 会话从显式配置的 home 通过原生 `thread/list` 发现，再以�
 
 验证包括纯驱动事件/回执恢复测试、项目投影/分页/离线/参考挂载测试、只读工具箱投影，以及应用运行时 → 项目工作台 → llm-ui → 原生会话端口的集成测试。该集成使用可控 harness fixture，没有调用真实模型。
 
-### MCP API Key 认证
+### Cells 节点认证与配置
 
-服务配置使用 `api_key` 或 `api_key_env`，以 Bearer 认证（兼容旧 `token`/`token_env`）。启动连接提示在 console 输出实际 API Key；结构化事件和 HTTP 响应不携带密钥。itookit 只需填写 MCP endpoint 和 API Key；通用 MCP 发现后，app-core 注册的扩展验证 `server/discover._meta['itookit/cells']` 中的能力描述，同源端点和项目协议符合要求才生成远程连接。旧服务通过同一连接调用已声明的能力工具。名称或 API Key 本身不授予项目绑定资格。
+设置 → Cells 保存多个独立节点。输入节点根地址及凭据，无 username 时使用 Bearer，有 username 时使用 Basic。固定 HTTP 能力发现验证 node/api/version，节点身份及授权快照随连接冻结；已引用节点不能直接改端点或切换授权身份。密钥单独持久化，挂载只保存 credentialRef。普通 MCP 配置与 Cells 目录完全独立，不迁移或投影。
 
-API Key 通过既有 MCP 配置持久保存，启动时恢复到 cells-driver 的凭据解析器；文件、sync、bash 与 harness 共用 Bearer。项目挂载记录只保留 credentialRef，不复制密钥。旧 Basic 连接仍兼容；已被项目引用的连接不能直接改变认证身份，需先解除绑定。
-
-连接 ID 是项目引用，endpoint 是可替换的网络位置。修改已引用连接的地址时，通用 MCP 管理器先对新地址重新发现并验证能力；只有 serverId、principalId 和资源授权 revision 均与原连接一致，且认证模式与凭据引用不变，才允许保留原 ID 保存。旧协议没有授权快照时，只允许保留原凭据和认证头、相同 serverId，并在新地址明确发现为 owner 的兼容迁移；不能同时更换凭据或切换身份。缺少服务器身份时不自动迁移。保存前检查受影响项目的运行保护，保存后释放旧文件来源与派生视图，后续访问使用新地址；不删除项目、会话，也不自动重放操作。httpd 模式下的 127.0.0.1 指 httpd 所在主机。
-
-旧 owner 连接补齐授权快照时，项目挂载也在既有 SeqFile 事务中保存该快照；只有相同 serverId、凭据引用、用户名与认证模式的无授权旧挂载可升级，保留项目 ID、路径与读写权限。已有授权挂载不随目录刷新改写。授权持久化失败保留旧挂载并报告具体存储错误，后续刷新可重试；成功后释放旧文件来源，防止查找项目时一侧仍按凭据、一侧已按 principal 比较而丢失匹配。回归见 [MCP 改址测试](../../backend/app-core/tests/mcp-connection-readdress.test.ts)，包含换凭据拒绝及持久化失败重试。
-
-通用 MCP 管理器负责认证、协议协商、扩展注册及验证缓存。普通 MCP 只执行标准发现；cells 测试后的保存和改名不再单独调用 driver 验证。地址、API Key 或 headers 变化重新验证，错误描述不生成绑定。UI 只按已验证扩展显示控制中心。多个 harness 共用一个 cells MCP 连接，原生协议适配留在服务端插件内。
+Agent scope token 仅用于 `/v1/channel/mcp`，不能访问固定管理 API。服务每次核验 scope 与项目所有者的当前授权，关闭或切换 scope 后旧 token 立即失效。MCP 2.0 细节见[看板通道设计](kanban-coordination.md#cells-固定-api-与渐进式会话上下文)。
 
 ### Harness 内置插件
 
@@ -246,19 +240,9 @@ API Key 通过既有 MCP 配置持久保存，启动时恢复到 cells-driver �
 
 当前采用可信进程内、编译时注册的插件，不提供动态加载或外部插件进程协议。测试用独立 fixture 插件证明配置识别、非 Codex 调用路由、项目作用域、回执去重与关闭；Claude Code 已提供独立 SDK 驱动；DeepSeek CLI 尚未实现。
 
-### 删除被项目引用的 MCP 配置
+### 节点引用与删除
 
-工作台删除项目时先检查运行保护并持久移除挂载引用，再删除本地会话、导航及项目身份。引用清理失败时保留可见项目，允许重试。启动和 MCP 删除预览会核对本地项目身份，自动清除身份已不存在的远程根项目全部挂载残留；不会因为服务器离线或导航隐藏而清除仍存在的项目，也不自动清除本地项目附加挂载。身份存储读取失败时终止核对，不把读取失败当成项目已删除。清理只修改本地绑定，不访问或删除服务器数据。
-
-删除弹窗基于应用命令生成预览，列出引用的项目与挂载路径；存在引用时必须显式勾选强制移除所有引用。提交重新核对 MCP 配置及挂载 catalog revision，引用变化则要求重新预览。强制操作先检查所有受影响项目的运行保护，再清理确认过的本地远程项目和会话，一次持久提交本地引用移除，释放文件视图并删除 MCP 配置及其运行时凭据。
-
-预览显示 MCP 名称、项目名称、挂载路径和会话标题，不以 UUID 作为展示名称。以目标 MCP 为根目录来源的本地远程项目及其 itookit 本地会话一并删除，其他本地项目只移除相关附加挂载。预览同时包含将删除的本地会话，提交后才经 SessionLifecycleService 关闭并清理；新增会话会使预览失效。服务器目录和原生 harness 会话保留，不调用服务端 project_forget 或文件删除。普通直接删除仍以 EBUSY 阻止遗漏引用；强制路径只处理用户确认过的预览。跨配置删除失败会报告已完成的挂载和配置操作，不能宣称跨文件事务。
-
-
-## 命名兼容
-
-服务及工具目录为 cells（NestOS 节点），统一接入包为 cells-driver，公开创建函数为 createCellsDriver。标准发现增加 itookit/cells；持久配置扩展键仍为 itookit/cells；读取旧 itookit/fs-agent 配置时保留 serverId、项目、挂载与凭据引用。能力描述优先随标准发现返回，主能力工具为 cells_capabilities，piagent_capabilities 和 fsagent_capabilities 作为兼容别名保留；无标准元数据的旧服务使用工具发现。共享文件／项目协议标识、HTTP 授权头和 fs-agent.files／fs-agent.bundle 规范编码保持原值，避免使已有内容摘要、回执或上游同步库失效。升级继续沿用原配置数据根及原生会话 home。
-
+项目卸载先检查运行保护并持久移除绑定，再删除本地导航及身份；存储失败保留可见项目供重试。启动通过 reconcileReferences 清理身份确已删除的远程根挂载；离线、隐藏或读取失败不代表项目已删除，本地项目的附加挂载保留。被引用节点 removeConnection 返回 EBUSY，须先显式卸载项目；普通 MCP 删除不关联 Cells 项目和会话，也不提供强制清理入口。
 
 ## 原生状态观察与项目检索
 
@@ -268,7 +252,7 @@ API Key 通过既有 MCP 配置持久保存，启动时恢复到 cells-driver �
 
 `harness_session_search` 通过 Codex 插件遍历授权会话与解析后的用户/assistant 文本及命令摘要，不全扫 home。查询限定 profile/project/archived，最多 20 页会话、每会话 64 页历史、16 MiB、100 条命中、15 秒及 2 个并发。结果保留 sessionId/turnId/itemId；授权和 revision 在返回前再核对。旧服务不支持时返回能力不可用。
 
-工作台共用侧栏搜索输入框，默认筛选已加载树；非空查询时显示范围选项，可切换异步项目检索，清空即收起。异步搜索视图区分文件路径、文件正文、原生标题、原生正文及归档范围，取消旧查询、丢弃旧响应、返回身份校验后导航；较早原生命中自动加载历史并定位。已注册项目的附加挂载通过完整远程身份匹配提供来源导航，普通目录挂载不授予原生控制。远程收藏包含 MCP/server/project/profile/session 身份，失效绑定不回退到同名服务器。归档视图只读；导出 `nestos-native-history` v1 JSON 保留原生来源和摘要历史，executable=false，不是本地 Kernel bundle。侧栏提供只读原生家族导航。Codex 已声明 rename/archive/unarchive/delete 和 text/image 附件能力。原生标题直接通过 thread/name/set 修改；归档允许本服务持有且明确 idle 的会话或 notLoaded 原生历史；未加载不等于外部执行空闲，归档不会停止独立 CLI。运行中的受控会话显示禁用的归档菜单。归档前检查派生子会话的授权与状态，归档后释放所有权；恢复归档不 resume、不发送 turn。以上操作共享 epoch/requestId 回执与客户端 CAS journal，未知结果只核对回执。归档与恢复同步已有收藏的路由和标题。永久删除调用原生 thread/delete，要求受控 idle 或已归档 notLoaded，前置有界检查全部派生子会话的项目授权及可删除状态；保留项目文件，移除原生历史/元数据及对应已有收藏，关闭被删除会话的标签。客户端保存删除 tombstone；丢失响应后先核对 receipt，不读取已删除的历史，不重新提交删除。Claude 尚未声明归档或删除能力。共享观察记录将标题通知用于侧栏及标签；fileChange 完成、turn 完成和重连快照修复触发项目目录有限刷新，文本 delta 不刷新。独立 CLI 的文件变化通过项目目录 watcher 刷新；Claude Code 已接入，DeepSeek CLI 和 VMM 尚未实现。
+工作台共用侧栏搜索输入框，默认筛选已加载树；非空查询时显示范围选项，可切换异步项目检索，清空即收起。异步搜索视图区分文件路径、文件正文、原生标题、原生正文及归档范围，取消旧查询、丢弃旧响应、返回身份校验后导航；较早原生命中自动加载历史并定位。已注册项目的附加挂载通过完整远程身份匹配提供来源导航，普通目录挂载不授予原生控制。远程收藏包含 connection/server/project/profile/session 身份，失效绑定不回退到同名服务器。归档视图只读；导出 `nestos-native-history` v1 JSON 保留原生来源和摘要历史，executable=false，不是本地 Kernel bundle。侧栏提供只读原生家族导航。Codex 已声明 rename/archive/unarchive/delete 和 text/image 附件能力。原生标题直接通过 thread/name/set 修改；归档允许本服务持有且明确 idle 的会话或 notLoaded 原生历史；未加载不等于外部执行空闲，归档不会停止独立 CLI。运行中的受控会话显示禁用的归档菜单。归档前检查派生子会话的授权与状态，归档后释放所有权；恢复归档不 resume、不发送 turn。以上操作共享 epoch/requestId 回执与客户端 CAS journal，未知结果只核对回执。归档与恢复同步已有收藏的路由和标题。永久删除调用原生 thread/delete，要求受控 idle 或已归档 notLoaded，前置有界检查全部派生子会话的项目授权及可删除状态；保留项目文件，移除原生历史/元数据及对应已有收藏，关闭被删除会话的标签。客户端保存删除 tombstone；丢失响应后先核对 receipt，不读取已删除的历史，不重新提交删除。Claude 尚未声明归档或删除能力。共享观察记录将标题通知用于侧栏及标签；fileChange 完成、turn 完成和重连快照修复触发项目目录有限刷新，文本 delta 不刷新。独立 CLI 的文件变化通过项目目录 watcher 刷新；Claude Code 已接入，DeepSeek CLI 和 VMM 尚未实现。
 
 
 ## Claude Code 与目录 watcher
@@ -329,7 +313,7 @@ DSH 原生 workspace 还会按原 cwd 的规范化结果过滤成员；仅将项
 
 cells 0.3.2 的 `access` CLI 管理 `principals`、exports、grants 与 public，复用运行时授权编译器。CLI 参数与输出归 cli，配置修改用例和安全文件替换归 admin；HTTP 文件访问和原生执行仍在既有机制内校验，不引入在线 ACL 写入口。旧单用户配置通过显式 init 迁到 owner，保留凭据、目录权限、项目身份与会话归属；修改后需重启。
 
-`list` / `validate` / `check` 针对磁盘上的配置，不对运行中进程宣称已应用；只读打开 export 避免争抢运行服务的写锁，且不会初始化项目、同步库或启动模型。itookit 无需复制目录授权管理策略，继续通过 MCP 能力发现读取 principal/grant revision 与有效权限。
+`list` / `validate` / `check` 针对磁盘上的配置，不对运行中进程宣称已应用；只读打开 export 避免争抢运行服务的写锁，且不会初始化项目、同步库或启动模型。itookit 无需复制目录授权管理策略，通过固定 HTTP 能力发现读取 principal/grant revision 与有效权限。
 
 ## 工作台提交与观察的恢复边界
 
@@ -350,7 +334,7 @@ C4Component
     Rel(ui, policy, "命令与观察")
     Rel(policy, profile, "持久化应用状态")
     Rel(policy, driver, "原生会话端口")
-    Rel(driver, auth, "MCP 请求")
+    Rel(driver, auth, "固定 HTTP 请求")
     Rel(auth, ledger, "查询或准入操作")
     Rel(auth, runtime, "按当前授权执行新操作")
     Rel(runtime, ledger, "记录操作结果")
@@ -411,7 +395,7 @@ C4Container
         }
         ContainerDb(shared, "公共定义", "etc/llm、agents、flows", "管理员写入，普通用户只读")
     }
-    System_Ext(node, "远程 cells / Codex", "按 MCP principal 和项目授权控制；原生会话保留写者约束")
+    System_Ext(node, "远程 cells / Codex", "按 Cells principal 和项目授权控制；原生会话保留写者约束")
     Rel(alice, tls, "mTLS")
     Rel(bob, tls, "mTLS")
     Rel(tls, runtimeA, "证书属于 A")
@@ -426,7 +410,7 @@ C4Container
 
 多用户模式通过 `http.usersDir` 启用。userId 只来自已登记证书，不从 body、query、clientId 或自报身份请求头选取；启动先初始化 admin/公共定义，再恢复所有已登记用户，完成后监听。用户配置、队列、恢复记录与诊断按 Runtime 和私有文件系统隔离。
 
-NestOS 用户隔离不等于远端身份隔离：公共 MCP 配置若复用同一凭据，两个用户在远端仍可能代表同一 principal，并可观察同一个授权的原生会话。原生写锁、当前执行与审批约束仍生效；遇到占用不能通过放行队列或删除锁绕过。需要远端主体隔离时应使用不同的已授权连接身份。
+NestOS 用户隔离不等于远端身份隔离：不同用户的 Cells 连接若复用同一远端凭据，两个用户在远端仍可能代表同一 principal，并可观察同一个授权的原生会话。原生写锁、当前执行与审批约束仍生效；遇到占用不能通过放行队列或删除锁绕过。需要远端主体隔离时应使用不同的已授权连接身份。
 
 ### 哪些记录需要持久化
 
@@ -548,6 +532,8 @@ target = "/home/li/.gitconfig"
 新建项目使用唯一、易读 ID，规则为 1–64 位字母、数字、短横线或下划线，以字母或数字开头；UUID 不作为新项目 ID。创建对话框允许手填 ID，留空按名称生成 `notes`、`notes-2`，非拉丁名称缺省使用 `project` 及序号。应用项目目录与节点项目 catalog 分别保证大小写不敏感的唯一性。ID 创建后不可修改；重命名仅修改名称及导航路径，不修改文件根和执行身份。
 
 应用 `/etc/project-identities.seq` 事务保留已分配 ID，防止并发创建或删除后重新绑定旧引用；节点 catalog 的 `retired_ids` 记录已撤销身份，重新登记目录分配新 ID。已有项目 ID（包括历史 UUID）保持不变，不批量迁移身份。
+
+启动加载远程挂载时，缺少 Cells 连接的合法绑定仍保留，标记离线并记录 `project.binding.load` / `connection-lookup` 诊断；不得将其静默过滤或当作本地项目。项目设置区分缺少连接、缺少注册绑定与环境读取失败：前两种引导配置 Cells，连接及注册绑定存在时提供重新挂载并重新读取环境。重新挂载只刷新已有连接上的项目授权和修订，不能补建连接，也不恢复或转换旧 MCP 配置；能力错误本身不作为必须升级节点的证据。
 
 系统保留项目由“个人项目”改称“本地”（Local），新安装默认 ID 为 `local`。`/etc/system-local-project.json` 保存保留身份，兼容读取旧 `/etc/system-personal-project.json`；`/etc/personal-project.json` 继续只保存用户选择的默认项目。各项目设置展示所选项目的只读 ID，并允许修改其名称；名称、默认项目选择均不改变其不可删除约束。旧系统保留项目仅迁移显示名称与身份记录位置，不改变 ID、文件或会话。
 

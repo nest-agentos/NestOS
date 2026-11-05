@@ -667,7 +667,7 @@ export class SessionWorkbench implements WorkspaceController {
     private showProjectStatus(projectId: string, container?: HTMLElement, signal = this.dialogs.signal): Promise<void> {
         return showDiagnostics({diagnostics: this.backend.diagnostics, remote: this.projects?.remoteMounts,
             projectId, container, title: t('diagnostics.projectStatus'), signal, refreshBinding: () => this.refreshProjectBinding(projectId), remount: () => this.remountProjectDialog(projectId),
-            configureConnection: async id => {await this.hostContext?.navigate({target: 'mcp', resourceId: '/' + encodeURIComponent(id)});}});
+            configureConnection: async () => {await this.hostContext?.navigate({target: 'settings', resourceId: 'cells'});}});
     }
     private projectHarnessMenu(id: string) {
         const remote=this.projects?.remoteMounts;
@@ -736,7 +736,10 @@ export class SessionWorkbench implements WorkspaceController {
             if (projectFileSource(project,this.projects!.remoteMounts).kind === 'remote') {
                 await this.projects!.remoteMounts!.assertUnmountable(id); await this.closeProjectTabs(project.path);
             }
-        }, (container,signal) => {if (this.projects?.remoteMounts?.list(id).length) void this.showProjectStatus(id,container,signal);});
+        }, (container,signal) => {if (this.projects?.remoteMounts?.list(id).length) void this.showProjectStatus(id,container,signal);}, {
+            configureConnection: this.hostContext ? async () => {await this.hostContext!.navigate({target: 'settings', resourceId: 'cells'});} : undefined,
+            remount: () => this.refreshProjectBinding(id),
+        });
     }
     private async remountProjectDialog(id: string): Promise<void> {
         const project = await this.projects!.get(id), remote = this.projects!.remoteMounts!;

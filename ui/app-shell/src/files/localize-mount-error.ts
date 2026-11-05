@@ -1,14 +1,10 @@
 import { t, type LocaleKey } from '@nestos/common';
-import { DirectorySourceUnavailableError, SessionUnfinishedTasksError, RemoteConnectionUnavailableError, type MCPConnectionReason, type MCPConnectionDiagnostic } from '@nestos/app-contracts';
+import { DirectorySourceUnavailableError, SessionUnfinishedTasksError, RemoteConnectionUnavailableError, type CellsConnectionReason, type CellsConnectionDiagnostic } from '@nestos/app-contracts';
 
-const connectionReasons: Record<MCPConnectionReason, LocaleKey> = {
-    'ready': 'remote.connectionReason.ready', 'catalog-not-loaded': 'remote.connectionReason.notLoaded',
-    'mcp-not-found': 'remote.connectionReason.missing', 'unsupported-transport': 'remote.connectionReason.transport',
-    'auth-missing': 'remote.connectionReason.auth', 'extension-missing': 'remote.connectionReason.extension',
-    'invalid-descriptor': 'remote.connectionReason.descriptor', 'endpoint-mismatch': 'remote.connectionReason.endpoint',
-    'invalid-endpoint': 'remote.connectionReason.invalidEndpoint',
+const connectionReasons: Record<CellsConnectionReason, LocaleKey> = {
+    'ready': 'remote.connectionReason.ready', 'cells-not-found': 'remote.connectionReason.missing',
 };
-export function localizeConnectionReason(diagnostic: Pick<MCPConnectionDiagnostic, 'reason' | 'connectionName'>): string {
+export function localizeConnectionReason(diagnostic: Pick<CellsConnectionDiagnostic, 'reason' | 'connectionName'>): string {
     return t(connectionReasons[diagnostic.reason], {name: diagnostic.connectionName ?? ''});
 }
 

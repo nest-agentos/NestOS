@@ -64,7 +64,7 @@ describe('Session workbench lifecycle', () => {
     it('retains an unavailable MCP binding when restoring a route instead of replacing it as stale', async () => {
         const f = setup(); await f.workbench.start();
         const error = new RemoteConnectionUnavailableError({connectionId: 'missing', connectionName: 'Office',
-            reason: 'mcp-not-found', revision: 1, configured: []}, ['project']);
+            reason: 'cells-not-found', revision: 1, configured: []}, ['project']);
         const open = vi.spyOn(f.workbench, 'openResource').mockRejectedValue(error);
         f.onSelect.mockClear();
         try { await expect(f.workbench.restoreResource('/remote')).resolves.toBeUndefined(); expect(f.onSelect).not.toHaveBeenCalled(); }

@@ -13,10 +13,7 @@ import type {RemoteConversationRecoveryTarget} from './remote-conversation-recov
 import {RemoteConversationRecoveryLoop} from './remote-conversation-retry';
 import {draftHarness, draftConversation, remoteConversationJournal} from './remote-draft-conversation';
 import { RemoteSessionStatus } from '../session/remote-session-status';
-import type { MCPServer } from '@nestos/tools/mcp-contracts';
-import type { MCPDeletedProject, MCPDeletionReference } from '../configuration/model-commands';
-import { MCPRemoteConnections, remoteMCPConnection } from './mcp-remote-connections';
-import { RemoteConnectionUnavailableError, reportRemoteFailure, remoteLog, type MCPConnectionDiagnostic } from './remote-diagnostics';
+import { RemoteConnectionUnavailableError, reportRemoteFailure, remoteLog, type CellsConnectionDiagnostic } from './remote-diagnostics';
 import type { ExecutionCapabilities, ProjectExecutionContext } from './execution/contracts';
 import { RemoteMountStore, type RemoteMountCatalog as Catalog } from './remote-mount-store';
 import { randomUUID } from '@nestos/common';
@@ -65,6 +62,8 @@ export interface ProjectRemoteMount extends RemoteFileConnection {
     serverProjectId?: string; serverProjectRevision?: number; serverId?: string; mountId: string; at: string; root: string; access: 'ro' | 'rw'; connectionId?: string;
 }
 export type RemoteConnectionStatus = 'unknown' | 'checking' | 'online' | 'offline';
+type ChannelOperation='open'|'messages'|'close'|'requests'|'respond'|'current'|'acknowledge';
+const channelOperations:ChannelOperation[]=['open','messages','close','requests','respond','current','acknowledge'];
 
 /** Project-owned grants; credentials stay in the injected host provider. */
 export class ProjectRemoteMountService {
@@ -79,8 +78,6 @@ export class ProjectRemoteMountService {
         const client = await this.projectHarness(id, options), root = this.list(id).find(m => m.at === '/')!;
         return this.provider.observeHarness(this.guardHarness(client, id, JSON.stringify(this.list(id)), root.connectionId!), root.access === 'rw', {watchFiles: true});
     });
-    inspectRemoteProjects?: (ids: readonly string[]) => Promise<MCPDeletedProject[]>;
-    removeRemoteProjects?: (ids: readonly string[]) => Promise<void>;
     existingProjectIds?: () => Promise<readonly string[]>;
     rootValidator?: (projectId: string, mount: ProjectRemoteMount) => Promise<void>;
     private catalog: Catalog = { version: 1, revision: 0, projects: {} };
@@ -103,10 +100,10 @@ export class ProjectRemoteMountService {
     readonly loadWarnings: string[] = [];
     constructor(private readonly store: IFileSystem, private readonly provider: RemoteFileSourceProvider,
         private readonly beforeChange: (projectId: string) => Promise<void>,
-        private readonly afterChange: (projectId: string) => Promise<void>, private readonly mcpConnections?: MCPRemoteConnections, readonly eventLog = new DiagnosticJournal()) { this.catalogStore = new RemoteMountStore(store); }
-    async init(deferMCP = false): Promise<void> {
+        private readonly afterChange: (projectId: string) => Promise<void>, readonly eventLog = new DiagnosticJournal()) { this.catalogStore = new RemoteMountStore(store); }
+    async init(): Promise<void> {
         const saved = await this.catalogStore.load();
-        if (!saved) { if (!deferMCP) await this.mcpConnections?.refresh(); return; }
+        if (!saved) return;
         if (!saved || saved.version !== 1 || (!Number.isSafeInteger(saved.revision) || saved.revision < 0) || !saved.projects || typeof saved.projects !== 'object') throw new FSError('EINVAL', 'Invalid remote mount catalog');
         // Validate per record: a single damaged entry must not stop the whole application from
         // starting, and the surviving grants stay usable.
@@ -117,27 +114,59 @@ export class ProjectRemoteMountService {
                 return true;
             } catch { this.loadWarnings.push(`INVALID_CONNECTION:${(connection as { id?: string })?.id ?? 'unknown'}`); return false; }
         });
-        if (connections.length || !deferMCP) await this.mcpConnections?.migrate(connections,id => this.catalogStore.password(id));
-        const known = new Set([...connections, ...(this.mcpConnections?.list() ?? [])].map(connection => connection.id));
+        const known = new Set(connections.map(connection => connection.id));
         const projects: Record<string, ProjectRemoteMount[]> = {};
         for (const [projectId, mounts] of Object.entries(saved.projects)) {
             if (!/^[a-zA-Z0-9_-]{1,128}$/.test(projectId) || !Array.isArray(mounts)) { this.loadWarnings.push(`INVALID_PROJECT:${projectId}`); continue; }
             const valid = mounts.filter(mount => {
                 try {
                     validateMount(mount);
-                    if (mount.connectionId && !known.has(mount.connectionId) && !this.mcpConnections) throw new FSError('EINVAL', 'Missing remote connection');
                     return true;
                 } catch { this.loadWarnings.push(`INVALID_MOUNT:${projectId}`); return false; }
             });
             if (valid.length) projects[projectId] = valid;
         }
         this.catalog = { ...saved, projects, connections };
-        if (this.mcpConnections && (connections.length || this.catalogStore.needsMigration)) await this.persist({ ...this.catalog, connections: [] });
-        else if (this.catalogStore.needsMigration) await this.persist(this.catalog);
+        for (const [projectId, mounts] of Object.entries(projects)) {
+            for (const mount of mounts) {
+                if (!mount.connectionId || known.has(mount.connectionId)) continue;
+                this.loadWarnings.push(`MISSING_CONNECTION:${projectId}:${mount.connectionId}`);
+                this.setStatus(mount.mountId, 'offline');
+                const failure = this.recordFailure(new RemoteConnectionUnavailableError(this.connectionDiagnostic(mount.connectionId), [projectId]),
+                    {operation: 'project.binding.load', stage: 'connection-lookup', projectId, connectionId: mount.connectionId,
+                        mountId: mount.mountId, operationId: randomUUID(), durationMs: 0});
+                this.observations.set(mount.mountId, {checkedAt: Date.now(), failure});
+            }
+        }
         for (const connection of connections) {
             const password = this.catalogStore.password(connection.id);
             if (password) this.provider.setCredential(connection.credentialRef, password);
         }
+    }
+    async sessionChannel(projectId:string,operation:ChannelOperation,input:Record<string,unknown>):Promise<unknown> {
+        const started=Date.now(),operationId=typeof input?.scopeId==='string'&&/^[\w-]{1,128}$/.test(input.scopeId)?input.scopeId:randomUUID();
+        const stage=channelOperations.includes(operation)?operation:'validate';
+        try {
+            if(stage==='validate')throw new FSError('EINVAL','Unknown session channel operation');
+            const value=await this.invokeSessionChannel(projectId,operation,input);
+            remoteLog.debug('channel.operation',{operation:'session.channel',stage,operationId,projectId,result:'success',durationMs:Date.now()-started});
+            return value;
+        }catch(error){this.recordFailure(error,{operation:'session.channel',stage,operationId,projectId,durationMs:Date.now()-started});throw error;}
+    }
+    private async invokeSessionChannel(projectId:string,operation:ChannelOperation,input:Record<string,unknown>):Promise<unknown> {
+        const root = this.list(projectId).find(mount => mount.at === '/');
+        if (!root?.connectionId || !root.serverProjectId || !this.provider.projects) throw new FSError('ECAPABILITY', 'Session channel requires a registered Cells project');
+        if(!['messages','requests','current'].includes(operation)&&root.access!=='rw')throw new FSError('EROFS','Session channel binding is read-only');
+        const fingerprint=JSON.stringify(this.list(projectId));
+        const connection = await this.resolveConnection(root.connectionId), client = this.provider.projects(connection);
+        try {
+            const project = await client.read(root.serverProjectId);
+            this.checkHarnessAccess(projectId,fingerprint,root.connectionId);
+            if (!client.channel || project.revision !== root.serverProjectRevision) throw new FSError('ECAPABILITY', 'Session channel binding unavailable');
+            return await client.channel(project, operation, {...input,
+                ...(['open', 'current'].includes(operation) ? {cwd: '/projects/' + project.id + '/' + String(input.cwd).replace(/^\/workspace\//, ''),
+                    endpoint: connection.endpoint.replace(/\/$/, '') + '/v1/channel/mcp'} : {})});
+        } finally {await client.close();}
     }
     async executionCapabilities(connectionId: string, options?: OperationOptions): Promise<ExecutionCapabilities> {
         if (!this.provider.capabilities) throw new FSError('ECAPABILITY', 'Remote capability discovery is unavailable');
@@ -148,18 +177,17 @@ export class ProjectRemoteMountService {
         return structuredClone((this.catalog.projects[projectId] ?? []).map(mount => {
             const connection = mount.connectionId && this.connections().find(item => item.id === mount.connectionId);
             if (connection) return { ...mount, endpoint:connection.endpoint, username:connection.username, credentialRef:connection.credentialRef,serverId:connection.serverId };
-            return mount.connectionId && this.mcpConnections ? { ...mount, endpoint:'',credentialRef:'' } : mount;
+            return mount.connectionId ? { ...mount, endpoint:'',credentialRef:'' } : mount;
         }));
     }
-    connections(): RemoteFileSystemConfig[] { return this.mcpConnections?.list() ?? structuredClone(this.catalog.connections ?? []); }
+    connections(): RemoteFileSystemConfig[] { return structuredClone(this.catalog.connections ?? []); }
     connectionName(id: string): string | undefined {
-        return this.connections().find(connection => connection.id === id)?.name ?? this.mcpConnections?.diagnostic(id).connectionName;
+        return this.connections().find(connection => connection.id === id)?.name;
     }
-    connectionDiagnostic(id: string): MCPConnectionDiagnostic {
-        if (this.mcpConnections) return this.mcpConnections.diagnostic(id);
+    connectionDiagnostic(id: string): CellsConnectionDiagnostic {
         const configured = this.connections().map(connection => ({id: connection.id, name: connection.name, reason: 'ready' as const}));
         const connection = configured.find(connection => connection.id === id);
-        return {connectionId: id, connectionName: connection?.name, reason: connection ? 'ready' : 'mcp-not-found',
+        return {connectionId: id, connectionName: connection?.name, reason: connection ? 'ready' : 'cells-not-found',
             revision: this.catalog.revision, configured};
     }
     harness(connectionId: string): HarnessClient {
@@ -176,9 +204,9 @@ export class ProjectRemoteMountService {
         return connection;
     }
     async resolveConnection(id: string, options?: OperationOptions): Promise<RemoteFileSystemConfig> {
-        try { await this.mcpConnections?.ensure(id, options); return this.connection(id); }
+        try { checkOperation(options); return this.connection(id); }
         catch (error) {
-            if (!options?.signal?.aborted) this.recordFailure(error, {stage: 'mcp-connection-recovery', connectionId: id});
+            if (!options?.signal?.aborted) this.recordFailure(error, {stage: 'cells-connection-lookup', connectionId: id});
             throw error;
         }
     }
@@ -218,18 +246,22 @@ export class ProjectRemoteMountService {
     saveConnection(input: RemoteFileSystemInput, password: string, id?: string): Promise<string> {
         return this.serial(async () => {
             const value = normalizeConnection(input), existing = id ? this.connection(id) : undefined;
-            if (!existing && !password) throw new FSError('EINVAL', 'Password required');
+            if (!existing && !password && !value.anonymous) throw new FSError('EINVAL', 'Password required');
             const connections = this.connections();
             if (connections.some(item => item.id !== id && (item.name === value.name || (!!value.username && item.endpoint === value.endpoint && item.username === value.username))))
                 throw new FSError('EEXIST', 'Remote file system already configured');
             const affected = this.connectionProjects(id);
             if (affected.length && existing?.endpoint !== value.endpoint) throw new FSError('EBUSY', 'Referenced endpoint cannot change');
             for (const projectId of affected) await this.beforeChange(projectId);
-            const next = { ...value, id: id ?? randomUUID(), credentialRef: existing?.credentialRef ?? randomUUID() };
+            let next: RemoteFileSystemConfig = { ...value, id: id ?? randomUUID(), credentialRef: existing?.credentialRef ?? randomUUID() };
             const restore = password ? this.provider.setCredential(next.credentialRef, password) : undefined;
             try {
-                if (this.mcpConnections) await this.mcpConnections.save(value,password,next.id,next.credentialRef);
-                else await this.persist({ ...this.catalog,connections:[...connections.filter(item => item.id !== id),next] },password ? {id:next.id,password} : undefined);
+                if (this.provider.discover) {
+                    const descriptor = await this.provider.discover(next, {timeoutMs: 10_000});
+                    next = {...next, endpoint: descriptor.httpEndpoint, serverId: descriptor.serverId ?? undefined, projects: descriptor.projects, authorization: descriptor.authorization};
+                    if (affected.length && existing && !canReaddressConnection(existing, next)) throw new FSError('EBUSY', 'Referenced Cells identity or authorization changed');
+                }
+                await this.persist({ ...this.catalog,connections:[...connections.filter(item => item.id !== id),next] },password ? {id:next.id,password} : undefined);
             }
             catch (error) { restore?.(); throw error; }
             for (const projectId of affected) {
@@ -245,39 +277,13 @@ export class ProjectRemoteMountService {
         return this.serial(async () => {
             if (this.connectionProjects(id).length) throw new FSError('EBUSY', 'Remote file system is referenced by projects');
             const credentialRef = this.connection(id).credentialRef;
-            if (this.mcpConnections) await this.mcpConnections.remove(id);
-            else await this.persist({ ...this.catalog, connections:this.connections().filter(item => item.id !== id) });
+            await this.persist({ ...this.catalog, connections:this.connections().filter(item => item.id !== id) });
             this.provider.clearCredential?.(credentialRef);
             this.connectionStates.delete(id);
             for (const listener of this.listeners) listener();
         });
     }
-    async beforeMCPChange(server: MCPServer, previous?: MCPServer): Promise<void> {
-        if (!previous || !this.connectionProjects(server.id).length) return;
-        const before = remoteMCPConnection(previous), after = remoteMCPConnection(server);
-        if (!before && after && this.recoversMCP(server, previous, after)) return;
-        const legacyCredentialUnchanged = !!previous.apiKey && previous.apiKey === server.apiKey
-            && JSON.stringify(previous.headers) === JSON.stringify(server.headers);
-        if (!before || !after || before.endpoint !== after.endpoint && !canReaddressConnection(before, after, legacyCredentialUnchanged)
-            || before.username !== after.username || before.credentialRef !== after.credentialRef || before.anonymous !== after.anonymous
-            || !before.authorization && !!after.authorization && !canReaddressConnection(before, after, legacyCredentialUnchanged)
-            || !!before.authorization && before.authorization.principalId !== after.authorization?.principalId
-            || !!before.serverId && before.serverId !== after.serverId)
-            throw new FSError('EBUSY', 'Referenced cells connection cannot be retargeted or disabled');
-        if (before.endpoint !== after.endpoint || JSON.stringify(before.authorization) !== JSON.stringify(after.authorization) || JSON.stringify(previous.auth) !== JSON.stringify(server.auth) || previous.apiKey !== server.apiKey)
-            for (const id of this.connectionProjects(server.id)) await this.beforeChange(id);
-    }
-    private recoversMCP(server: MCPServer, previous: MCPServer, after: RemoteFileSystemConfig): boolean {
-        if (server.transport !== previous.transport || server.endpoint !== previous.endpoint || server.apiKey !== previous.apiKey
-            || JSON.stringify(server.auth) !== JSON.stringify(previous.auth) || JSON.stringify(server.headers) !== JSON.stringify(previous.headers)) return false;
-        const mounts = Object.values(this.catalog.projects).flat().filter(mount => mount.connectionId === server.id);
-        return mounts.length > 0 && mounts.every(mount => mount.endpoint === after.endpoint && mount.username === after.username
-            && mount.credentialRef === after.credentialRef && (!mount.serverId || mount.serverId === after.serverId));
-    }
-    beforeMCPDelete(id: string): void {
-        if (this.connectionProjects(id).length) throw new FSError('EBUSY', 'MCP configuration is referenced by remote projects');
-    }
-    reconcileMCPReferences(): Promise<void> {
+    reconcileReferences(): Promise<void> {
         return this.serial(async () => {
             if (!this.existingProjectIds) return;
             const existing = new Set(await this.existingProjectIds());
@@ -292,70 +298,6 @@ export class ProjectRemoteMountService {
             for (const mount of mounts) await this.releaseSource(mount.mountId);
             for (const id of missing) { this.diagnostics.delete(id); await this.changed(id); }
         });
-    }
-    mcpReferences(ids: readonly string[]): MCPDeletionReference[] {
-        return Object.entries(this.catalog.projects).flatMap(([projectId,mounts]) => mounts
-            .filter(mount => !!mount.connectionId && ids.includes(mount.connectionId))
-            .map(mount => ({connectionId:mount.connectionId!,projectId,mountId:mount.mountId,at:mount.at,revision:this.catalog.revision})))
-            .sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-    }
-    removeMCPReferences(ids: readonly string[], expected: readonly MCPDeletionReference[], projectIds: readonly string[] = []): Promise<void> {
-        return this.serial(async () => {
-            const references = this.mcpReferences(ids);
-            if (JSON.stringify(references) !== JSON.stringify(expected)) throw new FSError('EBUSY', 'Remote references changed; review deletion again');
-            if (projectIds.some(id => !references.some(ref => ref.projectId === id && ref.at === '/')) || projectIds.length && !this.removeRemoteProjects)
-                throw new FSError('EINVAL','Invalid remote project deletion');
-            const affected = [...new Set(references.map(item => item.projectId))];
-            const removed = affected.flatMap(id => this.catalog.projects[id].filter(mount => projectIds.includes(id) || !!mount.connectionId && ids.includes(mount.connectionId)));
-            for (const id of affected) await this.beforeChange(id);
-            if (projectIds.length) await this.removeRemoteProjects!(projectIds);
-            const projects = {...this.catalog.projects};
-            for (const id of affected) projects[id] = projectIds.includes(id) ? [] : projects[id].filter(mount => !mount.connectionId || !ids.includes(mount.connectionId));
-            await this.persist({...this.catalog,projects});
-            for (const mount of removed) await this.releaseSource(mount.mountId);
-            for (const id of affected) await this.changed(id);
-        });
-    }
-    async refreshMCPConnections(): Promise<void> {
-        if (!this.mcpConnections || this.closed) return;
-        const previous = this.connections();
-        const before = new Map(previous.map(item => [item.id,JSON.stringify([item.endpoint,item.username,item.credentialRef,item.anonymous,item.authorization])]));
-        await this.mcpConnections.refresh();
-        const upgraded = await this.upgradeLegacyGrants(previous);
-        for (const projectId of Object.keys(this.catalog.projects)) {
-            const mounts = this.list(projectId).filter(mount => mount.connectionId && (upgraded.has(projectId) || before.get(mount.connectionId)
-                !== (() => { const next = this.connections().find(item => item.id === mount.connectionId); return next ? JSON.stringify([next.endpoint,next.username,next.credentialRef,next.anonymous,next.authorization]) : undefined; })()));
-            for (const mount of mounts) await this.releaseSource(mount.mountId);
-            if (mounts.length) await this.changed(projectId);
-        }
-        for (const listener of this.listeners) listener();
-    }
-    private async upgradeLegacyGrants(previous: RemoteFileSystemConfig[]): Promise<Set<string>> {
-        const started = Date.now(), operationId = randomUUID(), projects = {...this.catalog.projects};
-        let count = 0; const upgraded = new Set<string>();
-        for (const [projectId, mounts] of Object.entries(projects)) projects[projectId] = mounts.map(mount => {
-            if (mount.authorization || !mount.connectionId) return mount;
-            const before = previous.find(item => item.id === mount.connectionId);
-            const after = this.connections().find(item => item.id === mount.connectionId);
-            if (!legacyGrantMatches(mount, before, after)) return mount;
-            count++; upgraded.add(projectId);
-            return {...mount, authorization: structuredClone(after!.authorization)};
-        });
-        if (!count) return upgraded;
-        try {
-            await this.persist({...this.catalog, projects});
-            remoteLog.info('project.mount.authorization.upgrade', {operationId, stage: 'persist', result: 'success', count, durationMs: Date.now() - started});
-            return upgraded;
-        } catch (error) {
-            remoteLog.warn('project.mount.authorization.upgrade', {operationId, stage: 'persist', result: 'failure', count,
-                code: error instanceof FSError ? error.code : 'GRANT_UPGRADE_FAILED', durationMs: Date.now() - started});
-            throw error;
-        }
-    }
-    setMCPCredential(reference: string, password: string): void | (() => void) { return this.provider.setCredential(reference,password); }
-    async discoverMCP(endpoint: string, username: string | undefined, credentialRef: string, options?: OperationOptions) {
-        if (!this.provider.discover) throw new FSError('ECAPABILITY', 'cells discovery unavailable');
-        return this.provider.discover({endpoint,username,credentialRef},options);
     }
     forgetProject(projectId: string): Promise<void> {
         return this.trackProject('project.unmount', projectId, () => this.serial(async () => {
@@ -494,7 +436,6 @@ export class ProjectRemoteMountService {
         if (!root?.connectionId) throw new FSError('ECAPABILITY', 'Registered project binding unavailable');
         await this.trackProject('project.binding.refresh', projectId, async () => {
             await this.beforeChange(projectId);
-            await this.mcpConnections?.revalidate(root.connectionId!, options);
             checkOperation(options);
             await this.remountProject(projectId, root.access, options);
             await this.checkConnections(projectId, options);
@@ -627,7 +568,7 @@ export class ProjectRemoteMountService {
         const guarded = new Proxy(client, {get: (target, key) => {
             const value = Reflect.get(target, key);
             if (key === 'close' || typeof value !== 'function') return typeof value === 'function' ? value.bind(target) : value;
-            if (key === 'subscribe' || key === 'subscribeDirectory' || key === 'subscribeDirectoryPath' || key === 'directorySnapshot') return (...args: unknown[]) => {
+            if (key === 'subscribe' || key === 'subscribeChannel' || key === 'subscribeDirectory' || key === 'subscribeDirectoryPath' || key === 'directorySnapshot') return (...args: unknown[]) => {
                 this.checkHarnessAccess(projectId, fingerprint, connectionId); return value.apply(target, args);
             };
             return (...args: unknown[]) => this.callHarness(() => value.apply(target, args), String(key), args, projectId, fingerprint, connectionId);
@@ -743,7 +684,7 @@ export class ProjectRemoteMountService {
             const authorization = proof?.fingerprint === fingerprint ? proof.value : undefined;
             const principalId = authorization?.principalId ?? connection?.authorization?.principalId;
             const revision = authorization?.authorizationRevision ?? connection?.authorization?.revision;
-            return {...(mount.connectionId ? this.mcpConnections?.evidence(mount.connectionId) : {}), mountId: mount.mountId, connectionId: mount.connectionId, connectionName: connection?.name, alias: mount.alias, root: mount.root,
+            return {mountId: mount.mountId, connectionId: mount.connectionId, connectionName: connection?.name, alias: mount.alias, root: mount.root,
                 access: mount.access, serverId: mount.serverId, serverProjectId: mount.serverProjectId, boundProjectRevision: mount.serverProjectRevision,
                 boundPrincipalId: mount.authorization?.principalId, principalId, boundAuthorizationRevision: mount.authorization?.revision, authorizationRevision: revision,
                 authorizationChanged: !!mount.authorization && (mount.authorization.principalId !== principalId || mount.authorization.revision !== revision), authorization: authorization ? structuredClone(authorization) : undefined,
@@ -965,13 +906,6 @@ function validateMount(mount: ProjectRemoteMount): void {
     const url = new URL(mount.endpoint);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash
         || !/^[a-zA-Z0-9_-]+$/.test(mount.alias)) throw new FSError('EINVAL', 'Invalid remote connection');
-}
-
-/** Only the implicit legacy owner on the same node and credential may acquire an ACL snapshot. */
-function legacyGrantMatches(mount: ProjectRemoteMount, before?: RemoteFileSystemConfig, after?: RemoteFileSystemConfig): boolean {
-    if (!before || !after || mount.authorization || after.authorization?.principalId !== 'owner') return false;
-    return canReaddressConnection(before, after, true) && [before, mount].every(item => item.credentialRef === after.credentialRef
-        && item.username === after.username && item.serverId === after.serverId && !!item.anonymous === !!after.anonymous);
 }
 
 function cancelledByCaller(options?: OperationOptions): boolean {

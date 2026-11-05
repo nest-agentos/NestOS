@@ -53,7 +53,7 @@ async function remoteFixture(open: (options?: OperationOptions) => ReturnType<ty
     await store.save({version: 1, revision: 0, connections: [{id: 'office', name: 'Office', endpoint: 'https://private.test', username: 'user', credentialRef: 'PRIVATE_REF'}],
         projects: {'project-a': [{serverProjectId: projects ? 'server-a' : undefined, serverProjectRevision: projects ? 1 : undefined, mountId: 'mount-a', at: '/', root: '/', alias: 'docs', access: 'ro', connectionId: 'office', endpoint: 'https://private.test', credentialRef: 'PRIVATE_REF'}]}});
     const remote = new ProjectRemoteMountService(fs, {setCredential() {}, dispose: async () => {}, projects, open: (_connection, options) => open(options)},
-        async () => {}, async () => {}, undefined, runtime.diagnostics);
+        async () => {}, async () => {}, runtime.diagnostics);
     await remote.init(); cleanup.push(() => remote.dispose());
     return {remote, journal: runtime.diagnostics};
 }

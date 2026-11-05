@@ -18,12 +18,12 @@ export async function freezeFix(options:Options,boardId:string,request:{itemId:s
 async function newFix(options:Options,id:string,board:KanbanBoard,item:KanbanItem):Promise<SavedFix> {
     const boardId=board.id;
     const refs=item.externalRefs?.filter(ref=>ref.system==='nestos-remote-project')??[];
-    requireValue(refs.length===1&&options.automation.projects?.openWorkspace,'SINGLE_PROJECT_TASK_REQUIRED');
+    requireValue(refs.length===1&&options.automation.sessionChannel,'SINGLE_PROJECT_TASK_REQUIRED');
     const context=await workContext(options.journal,board,item);
     const decision=await decisionSnapshot(options,context.decision);
     const parent=item.planning?.parentId?(await options.service.item(board.id,item.planning.parentId)).item:null;
     const input={...context,parent,task:structuredClone(item),decision,fix:{id,sourceSessionId:id,
-        directory:'_nestos/kanban/fix/'+id,proposalPath:'_nestos/kanban/fix/'+id+'/proposal.yaml',definitionPath:'_nestos/kanban/fix/'+id+'/kanban.yaml'}};
+        scopeId:id}};
     const dispatch:KanbanDispatch={id,itemId:item.id,itemRevision:item.revision,planId:id,planRevision:1,principal:board.automation!.worker,
         definitionDigest:sha256HexSync(JSON.stringify(input)),attempt:1,fence:id,preparedAt:Date.now(),outcome:'prepared',inputs:{}};
     // Persist context before worktree/Session preparation and before any external submission.

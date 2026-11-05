@@ -34,9 +34,9 @@ it('exports real TaskHandles via openTask and keeps notification refreshes resum
         expect(handle.id).toBe(task.id);
         expect(handle.snapshot).toBeUndefined();
         expect(await handle.status()).toMatchObject({task: {id: task.id, status: 'created'}});
-        queue.enqueueView({sequence: 1, topic: 'files', value: undefined});
+        queue.enqueueView({sequence: 1, topic: 'files', value: {}});
         await vi.waitFor(() => expect(stream.write).toHaveBeenCalled());
-        queue.enqueueView({sequence: 2, topic: 'files', value: undefined});
+        queue.enqueueView({sequence: 2, topic: 'files', value: {}});
         await vi.waitFor(() => expect(stream.write).toHaveBeenCalledTimes(2));
         expect(journal.destroyed).toBe(false); expect(journal.canResume(1)).toBe(true);
         expect(report).not.toHaveBeenCalled(); expect(stream.end).not.toHaveBeenCalled();

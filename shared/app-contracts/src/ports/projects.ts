@@ -4,13 +4,11 @@ import type * as VfsContracts from '@nestos/vfs-core';
 import type { IFileSystem, FileSystemSourceOwner, OperationOptions } from '@nestos/vfs-core';
 import type * as HarnessContracts from '@nestos/cells-driver';
 import type { HarnessObservation, HarnessStatusRow, HarnessProfile, HarnessConversationPort, HarnessConversationSnapshot } from '@nestos/cells-driver';
-import type { MCPServer } from '@nestos/tools/mcp-contracts';
 import type { HarnessClient } from '@nestos/cells-driver/harness';
 import type { ISessionRepository, SessionFolder, SessionSummary, ConversationManifest } from '@nestos/llm-session/contracts';
 import type * as FlowContracts from '@nestos/llm-flow/contracts';
 import type { SessionSubmission } from '@nestos/llm-flow/contracts';
-import type { MCPConnectionDiagnostic } from '../index';
-import type { MCPDeletedProject, MCPDeletionReference } from './configuration';
+import type { CellsConnectionDiagnostic } from '../index';
 
 export type ProjectConversationSnapshot = HarnessConversationSnapshot & {usageEstimate?: import('@nestos/kernel-adapters/contracts').UsageCostEstimate};
 export interface ConversationComposerDraft {revision: string; data: string; acceptedOperationIds: readonly string[]}
@@ -122,8 +120,6 @@ export interface ProjectService {
     renameProject(from: string, to: string): Promise<void>;
     removeProjectSource(project: ProjectFolder): Promise<void>;
     storedProjectIds(): Promise<string[]>;
-    inspectRemoteProjectRemoval(ids: readonly string[]): Promise<MCPDeletedProject[]>;
-    removeRemoteProjectRecord(id: string, deleteFolder: (path: string) => Promise<void>): Promise<void>;
     get(id: string): Promise<ProjectFolder>;
     forFolder(path: string | null | undefined, folders?: readonly SessionFolder[]): Promise<ProjectFolder | undefined>;
     current(): Promise<ProjectFolder | undefined>;
@@ -293,18 +289,16 @@ export interface ProjectDraftComposer {
 export interface ProjectRemoteMountService {
     mountedProjectIds(): string[];
     readonly sessionStatus: RemoteSessionStatus;
-    inspectRemoteProjects?: (ids: readonly string[]) => Promise<MCPDeletedProject[]>;
-    removeRemoteProjects?: (ids: readonly string[]) => Promise<void>;
     existingProjectIds?: () => Promise<readonly string[]>;
     rootValidator?: (projectId: string, mount: ProjectRemoteMount) => Promise<void>;
     readonly diagnostics: Map<string, string[]>;
     readonly loadWarnings: string[];
-    init(deferMCP?: boolean): Promise<void>;
+    init(): Promise<void>;
     executionCapabilities(connectionId: string, options?: OperationOptions): Promise<ExecutionCapabilities>;
     list(projectId: string): ProjectRemoteMount[];
     connections(): RemoteFileSystemConfig[];
     connectionName(id: string): string | undefined;
-    connectionDiagnostic(id: string): MCPConnectionDiagnostic;
+    connectionDiagnostic(id: string): CellsConnectionDiagnostic;
     harness(connectionId: string): HarnessClient | Promise<HarnessClient>;
     connection(id: string): RemoteFileSystemConfig;
     resolveConnection(id: string, options?: OperationOptions): Promise<RemoteFileSystemConfig>;
@@ -316,14 +310,8 @@ export interface ProjectRemoteMountService {
     }>;
     saveConnection(input: RemoteFileSystemInput, password: string, id?: string): Promise<string>;
     removeConnection(id: string): Promise<void>;
-    beforeMCPChange(server: MCPServer, previous?: MCPServer): Promise<void>;
-    beforeMCPDelete(id: string): void;
-    reconcileMCPReferences(): Promise<void>;
-    mcpReferences(ids: readonly string[]): MCPDeletionReference[] | Promise<MCPDeletionReference[]>;
-    removeMCPReferences(ids: readonly string[], expected: readonly MCPDeletionReference[], projectIds?: readonly string[]): Promise<void>;
-    refreshMCPConnections(): Promise<void>;
-    setMCPCredential(reference: string, password: string): void | (() => void);
-    discoverMCP(endpoint: string, username: string | undefined, credentialRef: string, options?: OperationOptions): Promise<HarnessContracts.CellsDescriptor>;
+    sessionChannel(projectId: string, operation: 'open' | 'messages' | 'close' | 'requests' | 'respond' | 'current' | 'acknowledge', input: Record<string, unknown>): Promise<unknown>;
+    reconcileReferences(): Promise<void>;
     forgetProject(projectId: string): Promise<void>;
     findRemoteProject(connectionId: string, path: string): string | undefined | Promise<string | undefined>;
     bindProject(projectId: string, connectionId: string, path: string, access: 'ro' | 'rw', options?: OperationOptions & {

@@ -173,6 +173,7 @@ class SessionRepository implements ISessionRepository {
     getLoadState(sessionId: string): Promise<SessionLoadState>;
     list(): Promise<ConversationManifest[]>;
     listSummaries(): Promise<SessionSummary[]>;
+    walkSummaries(visit: (summary: SessionSummary) => boolean | void | Promise<boolean | void>): Promise<void>;
     listSummaryPage(folder: string | null, options: {cursor?: string; limit: number; agentId?: string}): Promise<{items: SessionSummary[]; nextCursor?: string}>;
     deleteSession(sessionId: string): Promise<void>;
 

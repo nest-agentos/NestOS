@@ -1,7 +1,6 @@
-import {t} from '@nestos/common';
+import {consumeChannelMessages} from '../run/channel-messages';
 import {createModuleLogger} from '@nestos/common';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
-import {verifyPromptBundle} from '../run/prompt-bundle';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 import {readContextCatalog, type ContextInspector} from '../projects/harness-context-catalog';
 import type {PreparedWorktree} from '../projects/worktree-preparation';
@@ -9,18 +8,18 @@ import {journalCommand} from '../kanban/journal-command';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {ProjectService} from '@nestos/app-contracts/services';
 import type {KanbanCommand} from '@nestos/kanban/contracts';
-import {consumeWorkspaceMessages, unresolvedWorkspaceIssues, type WorkspaceMessage} from '../run/workspace-messages';
+import {unresolvedWorkIssues, type WorkMessage} from '@nestos/kanban/execution';
 import {KanbanAutomationJournal} from '../kanban/automation-journal';
 import {REMOTE_PROJECT_REFERENCE} from '../kanban/record-execution';
 import type {PersonalKanbanAutomationOptions} from '../kanban/personal-automation';
 import type {UserEventService} from '../events/service';
 
 type Input = Parameters<NonNullable<PersonalKanbanAutomationOptions['observeWork']>>[0];
-interface Options {exchange?: ReturnType<typeof import('./kanban-file-exchange').developmentWorkExchange>;
+interface Options {exchange?: ReturnType<typeof import('./kanban-channel-exchange').developmentWorkExchange>;
     verifyDelivery?(dispatchId: string): Promise<void>;
     lifecycle?: Pick<ReturnType<typeof import('./kanban-development-lifecycle').developmentLifecycle>, 'enqueue' | 'scan' | 'dispose' | 'settled'>;
     kernel: ContextInspector; fs: IFileSystem; events: UserEventService; projects: Pick<ProjectService, 'get' | 'openWorkspace'>;
-    remote?: Pick<import('../projects/remote-mounts').ProjectRemoteMountService, 'projectHarness'>; wake(): void}
+    remote?: Pick<import('../projects/remote-mounts').ProjectRemoteMountService, 'projectHarness' | 'sessionChannel'>; wake(): void}
 
 export function developmentObserver(options: Options) {
     const journal = new KanbanAutomationJournal(options.fs);
@@ -33,28 +32,26 @@ export function developmentObserver(options: Options) {
         const projectId = item.externalRefs?.find(ref => ref.system === REMOTE_PROJECT_REFERENCE)?.id;
         if (!projectId) throw Object.assign(new Error('Missing workspace project binding'), {code: 'WORKSPACE_PROJECT_MISSING'});
         const workspace = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id);
-        const directory = workspace?.communicationDirectory ?? worktree.directory + '/_nestos/kanban';
+        if (!workspace?.channelId || !options.remote) throw Object.assign(new Error('Session channel required'), {code: 'SESSION_CHANNEL_REQUIRED'});
         if(options.remote)await watches.ensure(input.dispatch.id,async()=>{
             const client=await options.remote!.projectHarness(projectId);
             try {
-                const stop=client.subscribeDirectoryPath?.(directory.replace('/workspace/', '') + '/inbox',options.wake);
+                if (!client.subscribeChannel) throw Object.assign(new Error('Channel subscription unavailable'), {code: 'SESSION_CHANNEL_REQUIRED'});
+                const stop=client.subscribeChannel(workspace.channelId!,options.wake);
                 return async()=>{stop?.();await client.close();};
             }catch(error){await client.close();throw error;}
         });
         await linkReference(journal, input, {system: 'nestos-worktree', id: workspace?.worktreeId ?? worktree.id ?? input.dispatch.id,
             revision: JSON.stringify({projectId, directory: worktree.directory, branch: worktree.branch, baseCommit: worktree.baseCommit})});
         await linkResult(options, journal, input, projectId);
-        const folder = await options.projects.get(projectId), view = await options.projects.openWorkspace(folder.path);
-        try {
-            const scope = {runId: item.externalRefs?.find(ref => ref.system === 'nestos-decision-run')?.id ?? input.dispatch.planId,
-                itemId: item.id, attemptId: input.dispatch.id};
-            if (workspace) await verifyPromptBundle(view.fs, directory, workspace.policy.prompts,
-                {...scope, entry: 'prompts/task.md', commit: workspace.policy.commit, repositories: workspace.repositories, availableRepositories: workspace.availableRepositories,...(workspace.context===undefined?{}:{input:workspace.context})});
-            const messages = await consumeWorkspaceMessages(view.fs, directory, scope, journal,
-                message => deliver(options, journal, input, message));
-            const unresolved = unresolvedWorkspaceIssues(messages);
+        const scope = {runId: item.externalRefs?.find(ref => ref.system === 'nestos-decision-run')?.id ?? input.dispatch.planId,
+            itemId: item.id, attemptId: input.dispatch.id};
+        const messages = await consumeChannelMessages(await options.remote.sessionChannel(projectId, 'messages', {scopeId: workspace.channelId}), scope, journal,
+            message => deliver(options, journal, input, message), async message => {await options.remote!.sessionChannel(projectId, 'acknowledge', {scopeId: workspace.channelId, id: message.id, ack: {status: 'delivered'}});});
+            const unresolved = unresolvedWorkIssues(messages);
             await reconcileIssues(journal, input, messages);
-            if (workspace && options.exchange && !unresolved.length) input = {...input, observation: await options.exchange({id: input.dispatch.id, record: workspace, service: input.service, observation: input.observation, finalPublished: async () => (await consumeWorkspaceMessages(view.fs, directory, scope, journal, message => deliver(options, journal, input, message))).some(message => message.type === 'result'), report: async (stage, id, code) => {await deliver(options, journal, input, {schema: 'work-message/1', ...scope, id: 'context-' + stage + '-' + id, type: 'progress', content: t(('kanban.fileExchange.' + stage) as Parameters<typeof t>[0]) + (code ? ': ' + code : '')});}})};
+            if (options.exchange && !unresolved.length) input = {...input, observation: await options.exchange({id: input.dispatch.id, record: workspace, service: input.service, observation: input.observation,
+                finalPublished: messages.some(message => message.type === 'result')})};
             if (['failed', 'cancelled'].includes(input.observation.outcome)) {
                 await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);
                 await close(input.dispatch.id);
@@ -83,7 +80,6 @@ export function developmentObserver(options: Options) {
                 return {...input.observation, outcome: 'running', outputs: undefined, code: 'LIFECYCLE_PENDING'};
             const outputs=await journal.artifact(input.dispatch.id,messages.filter(message=>message.type==='result'));
             await close(input.dispatch.id); return {...input.observation,outputs};
-        } finally {await view.dispose();}
     };
     async function close(id:string){await watches.close(id);}
     return {observe, scan: () => options.lifecycle?.scan(), async quiesce() {stopped = true; await options.lifecycle?.dispose();}, async dispose() {stopped = true; await options.lifecycle?.dispose(); await watches.dispose();}};
@@ -107,7 +103,7 @@ async function linkReference(journal: KanbanAutomationJournal, input: Input, ref
     await journalCommand(journal, input.service, input.boardId, key, {type: 'link-reference', itemId: item.id, reference});
 }
 
-async function deliver(options: Options, journal: KanbanAutomationJournal, input: Input, message: WorkspaceMessage): Promise<void|{pending:true}> {
+async function deliver(options: Options, journal: KanbanAutomationJournal, input: Input, message: WorkMessage): Promise<void|{pending:true}> {
     await once(journal, input, message.id + ':log', {type: 'message', itemId: message.itemId, message: message.content, recipientSessionIds: []});
     if(message.type==='resolved') {
         await journalCommand(journal,input.service,input.boardId,'workspace-resolved:'+input.dispatch.id+':'+message.id,{type:'resolve-issue',itemId:message.itemId,attemptId:message.attemptId,issueId:message.replyTo!,resolvedBy:message.id});return;
@@ -136,7 +132,7 @@ async function once(journal: KanbanAutomationJournal, input: Input, suffix: stri
     await journalCommand(journal, input.worker, input.boardId, key, command);
 }
 
-async function reconcileIssues(journal: KanbanAutomationJournal, input: Input, messages: WorkspaceMessage[]): Promise<void> {
+async function reconcileIssues(journal: KanbanAutomationJournal, input: Input, messages: WorkMessage[]): Promise<void> {
     for (const message of messages.filter(m => m.type === 'clarification' || m.type === 'error'))
         await journalCommand(journal,input.service,input.boardId,'workspace-issue:'+input.dispatch.id+':'+message.id,
             {type:'report-issue',itemId:message.itemId,issue:{id:message.id,attemptId:message.attemptId,type:message.type as 'clarification'|'error'}});
@@ -144,7 +140,7 @@ async function reconcileIssues(journal: KanbanAutomationJournal, input: Input, m
         await journalCommand(journal,input.service,input.boardId,'workspace-resolved:'+input.dispatch.id+':'+message.id,
             {type:'resolve-issue',itemId:message.itemId,attemptId:message.attemptId,issueId:message.replyTo!,resolvedBy:message.id});
     const {item}=await input.service.item(input.boardId,input.dispatch.itemId);
-    if (!unresolvedWorkspaceIssues(messages).length && ['WORKSPACE_INPUT_REQUIRED','WORKSPACE_ERROR_REPORTED'].includes(item.blocked?.reason ?? '')
+    if (!unresolvedWorkIssues(messages).length && ['WORKSPACE_INPUT_REQUIRED','WORKSPACE_ERROR_REPORTED'].includes(item.blocked?.reason ?? '')
         && !await journal.get('delivery-blocked:'+input.dispatch.id))
         await journalCommand(journal,input.worker,input.boardId,'workspace-resolution-unblock:'+input.dispatch.id+':'+messages.filter(m=>m.type==='resolved').map(m=>m.id).join(':'),
             {type:'unblock-item',itemId:item.id,token:input.dispatch.fence});

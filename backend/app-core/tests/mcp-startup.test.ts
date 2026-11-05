@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { MemoryBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
-import { mockCellsDiscovery } from './helpers/mcp-discovery';
+import { mockMCPDiscovery } from './helpers/mcp-discovery';
 
 async function startupFixture() {
     const backend = new MemoryBackend();
@@ -10,7 +10,7 @@ async function startupFixture() {
         transport: 'http', endpoint: 'https://office.test/mcp', apiKey: 'test-key' })));
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
-    const fetch = mockCellsDiscovery({ version: 1, httpEndpoint: 'https://office.test', serverId: 'office',
+    const fetch = mockMCPDiscovery({ version: 1, httpEndpoint: 'https://office.test', serverId: 'office',
         fileProtocol: 'fs-agent-http-v1', harness: true, projects: true, projectProtocol: 'fs-agent-project-v1' });
     const transport = fetch.getMockImplementation()!;
     fetch.mockImplementation(async (...args) => { await gate; return transport(...args); });
@@ -19,7 +19,7 @@ async function startupFixture() {
     return { runtime, fetch, release };
 }
 
-it('prepares remote project capabilities after MCP discovery without toolbox UI or blocking host readiness', async () => {
+it('keeps Cells configuration independent of MCP discovery', async () => {
     const { runtime, fetch, release } = await startupFixture();
     const remote = runtime.projects.remoteMounts!, changed = vi.fn();
     const stop = remote.onChange(changed);
@@ -28,8 +28,7 @@ it('prepares remote project capabilities after MCP discovery without toolbox UI 
         await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
         expect(remote.connections()).toEqual([]);
         release();
-        await vi.waitFor(() => expect(remote.connections()).toEqual([expect.objectContaining({ id: 'remote', serverId: 'office', projects: true })]));
-        expect(changed).toHaveBeenCalled();
-        expect(await runtime.llmDriver.getMCPServers()).toEqual([expect.objectContaining({ id: 'remote', status: 'connected' })]);
+        await vi.waitFor(async()=>expect(await runtime.llmDriver.getMCPServers()).toEqual([expect.objectContaining({id:'remote',status:'connected'})]));
+        expect(remote.connections()).toEqual([]);expect(changed).not.toHaveBeenCalled();
     } finally { release(); stop(); await runtime.dispose(); fetch.mockRestore(); }
 });

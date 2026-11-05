@@ -21,13 +21,14 @@ class TaskFix {
         const {options}=this,fix=(await options.journal.get<SavedFix>('fix:'+dispatch.id))!;
         const board=await options.service.read(fix.boardId);
         requireValue(board.automation?.preparation&&options.automation.prepareWork,'FIX_PREPARATION_UNAVAILABLE');
-        const target=await options.automation.prepareWork({stage:'fix',context:fix.context,dispatch,item:fix.item,
+        const prepared=await options.automation.prepareWork({stage:'fix',context:fix.context,dispatch,item:fix.item,
             target:automationTarget(board.automation.executor,await options.automation.catalog()),preparation:board.automation.preparation,options:board.automation.preparationOptions});
-        return {target};
+        requireValue(prepared.contextRef,'FIX_CHANNEL_REQUIRED');
+        return prepared;
     }
     private async prepare(fix:SavedFix):Promise<SavedFix> {
         if(fix.request)return fix;
-        const work=await this.executor.prepare(fix.dispatch,{...fix.item,responsibility:'Clarify a new fix task. Read _nestos/kanban/prompts/task-fix-pre.md and frozen context.input. Do not develop or rerun the original task.'});
+        const work=await this.executor.prepare(fix.dispatch,{...fix.item,responsibility:'Clarify a new fix task. Read task-fix-pre.md and context sections through session_context. Do not develop or rerun the original task.'});
         return this.options.journal.update<SavedFix>('fix:'+fix.id,old=>({...old!,request:old!.request??work}));
     }
     private async advance(fix:SavedFix):Promise<KanbanFixSession> {

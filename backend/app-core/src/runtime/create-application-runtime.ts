@@ -1,3 +1,4 @@
+import {developmentWorkExchange} from '../presets/kanban-channel-exchange';
 import {cleanupStep, cleanupStage, type CleanupStep} from './cleanup-stage';
 import {nativeSessionResource} from '../projects/session-resource';
 import {OperationLifetime} from '../run/operation-lifetime';
@@ -7,7 +8,6 @@ import {developmentContinuation} from '../presets/kanban-development-continuatio
 import {sessionSubmission} from '../run/session-submission';
 import {developmentLifecycle} from '../presets/kanban-development-lifecycle';
 import {developmentWorkResources, developmentSessionResources} from '../presets/kanban-work-resources';
-import {developmentWorkExchange} from '../presets/kanban-file-exchange';
 import {developmentReviewAdapter} from '../presets/kanban-development-review';
 import {itemOperationReporter} from '../kanban/item-operation-log';
 import {createItemOperations} from '../kanban/item-operations';
@@ -44,9 +44,6 @@ import { conversationIdle } from './conversation-idle';
 import { ConversationViews } from './conversation-views';
 import { recoverInstructionQueues } from '../session/instruction-queue-recovery';
 import { StartupCoordinator } from './startup-coordinator';
-import { SessionLifecycleService } from '../session/session-lifecycle';
-import { MCPRemoteConnections } from '../projects/mcp-remote-connections';
-import { createCellsMCPExtension } from '../projects/cells-mcp-extension';
 import { ProjectSyncService, type ProjectSyncProvider } from '../projects/sync/service';
 import type { Coordinator } from '@nestos/vfs-sync';
 import { seedDefaultFlows } from '../presets/default-flows';
@@ -219,11 +216,11 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             diagnostics.record({...event, module: 'mcp', operation: 'mcp.connection', level: event.result === 'failure' ? 'error' : 'info'});
             injectedMCP?.diagnostic?.(event);
         },
-        extensions:[...(injectedMCP?.extensions ?? []),...(options.remoteSourceProvider ? [createCellsMCPExtension()] : [])],
+        extensions:[...(injectedMCP?.extensions ?? [])],
         resolveCredential:injectedMCP?.resolveCredential ?? options.remoteSourceProvider?.resolveCredential?.bind(options.remoteSourceProvider),
-        beforeSave:async (server,previous) => { await injectedMCP?.beforeSave?.(server,previous); await remoteConnections?.beforeMCPChange(server,previous); },
-        beforeDelete:async id => { await injectedMCP?.beforeDelete?.(id); remoteConnections?.beforeMCPDelete(id); },
-        configurationChanged:async () => { await injectedMCP?.configurationChanged?.(); await remoteConnections?.refreshMCPConnections(); },
+        beforeSave:async (server,previous) => { await injectedMCP?.beforeSave?.(server,previous);  },
+        beforeDelete:async id => { await injectedMCP?.beforeDelete?.(id);  },
+        configurationChanged:async () => { await injectedMCP?.configurationChanged?.();  },
     } };
     const logStep = (label: string) => { console.log(`[Boot] ${label}`); options.onProgress?.(label); };
     try {
@@ -292,7 +289,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         });
         cleanupFns.push(cleanupStep('projects.dispose', () => projects.dispose()));
         let remoteGuard = async (id: string) => mountGuard(id);
-        let initializeRemoteConfiguration: () => Promise<void> = () => Promise.resolve();
+        const initializeRemoteConfiguration: () => Promise<void> = () => Promise.resolve();
         if (options.remoteSourceProvider) {
             const affected = async (projectId: string) => {
                 const result: string[] = [];
@@ -304,16 +301,13 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             };
             const remote = new ProjectRemoteMountService(systemFS, options.remoteSourceProvider,
                 async projectId => { for (const id of await affected(projectId)) await remoteGuard(id); },
-                async projectId => { for (const id of await affected(projectId)) { await sessionFiles.invalidate(id); await mountChanged(id); } }, new MCPRemoteConnections(agentService,options.remoteSourceProvider), diagnostics);
+                async projectId => { for (const id of await affected(projectId)) { await sessionFiles.invalidate(id); await mountChanged(id); } }, diagnostics);
             remote.estimateUsage = createUsageCostEstimator(() => agentService.getPricingConfig());
             sourceCleanupFns.push(() => remote.dispose());
-            await remote.init(true); remoteConnections = remote; projects.remoteMounts = remote;
-            initializeRemoteConfiguration = startup.task('remote.configuration', async () => {
-                await llmDriver.ensureReady(); await remote.refreshMCPConnections();
-            });
+            await remote.init(); remoteConnections = remote; projects.remoteMounts = remote;
             remote.existingProjectIds = () => projects.storedProjectIds();
 
-            configuration.mcpDeletion = remote;
+
             projects.execution = new ProjectExecutionService(remote,
                 options.projectExecutionProvider ?? createRemoteExecutionProvider(sessionFiles, options.remoteSourceProvider));
         }
@@ -322,7 +316,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const initializeProjects = startup.task('projects.initialize', async () => {
             await Promise.all([repositoryReady, directoryReady]);
             await initializeRemoteConfiguration();
-            await traceBoot('projects.remoteReferences', async () => remoteConnections?.reconcileMCPReferences());
+            await traceBoot('projects.remoteReferences', async () => remoteConnections?.reconcileReferences());
             await traceBoot('projects.sources', () => projects.initializeSources());
             await traceBoot('projects.init', () => projects.ensureStartup(options.defaultSessionDirectory));
         });
@@ -573,14 +567,6 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         await traceBoot('seedDefaultFlows', () => seedDefaultFlows(new FlowDefinitionStore(flowEngine, kernel.dagPlugins), id => installations.ensure(id)));
 
         const runCatalog = new RunCatalog(sessionRepository, kernel.kernel);
-        if (remoteConnections) {
-            const lifecycle = new SessionLifecycleService({repository:sessionRepository,kernel:kernel.kernel});
-            remoteConnections.inspectRemoteProjects = ids => projects.inspectRemoteProjectRemoval(ids);
-            remoteConnections.removeRemoteProjects = async ids => {
-                for (const id of ids) await projects.removeRemoteProjectRecord(id,path => lifecycle.deleteFolder(path,true));
-            };
-        }
-
         const events = await UserEventService.open(systemFS);
         let wakeKanban = () => {};
         const developmentOperations = new OperationLifetime();
@@ -593,7 +579,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const verifyDevelopment = developmentBindings ? developmentDelivery(systemFS, developmentBindings.remote, developmentBindings.provider) : undefined;
         const continueDevelopment = developmentBindings && independentCalls ? developmentContinuation({...developmentBindings,
             journal: new KanbanAutomationJournal(systemFS), calls: independentCalls, kernel: kernelCore}) : undefined;
-        const lifecycle = independentCalls ? developmentLifecycle({journal: new KanbanAutomationJournal(systemFS), events, calls: independentCalls, kernel: kernelCore,
+        const lifecycle = independentCalls ? developmentLifecycle({remote:developmentBindings?.remote,journal: new KanbanAutomationJournal(systemFS), events, calls: independentCalls, kernel: kernelCore,
             authorize: async (boardId): Promise<boolean> => (await kanban.read(boardId)).automation?.enabled === true,
             prepareSession: async id => {
                 await initializeProjects(); await sessionRepository.ensureSession(id, t('kanban.automationTitle'));
@@ -633,6 +619,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             },
             registerInstructionGate: gate=>executionActivity.registerInstructionGate(gate),
             executionResource:remoteConnections?nativeSessionResource(kernelCore,projects,remoteConnections):undefined,
+            sessionChannel: remoteConnections?.sessionChannel.bind(remoteConnections),
             projects, requiresItemResource:requiresDevelopmentProject,
             validatePreparation: (reference, settings) => {
                 if (reference.system !== 'nestos-work-preparation' || reference.id !== 'git-worktree' || reference.revision !== '1')
@@ -673,7 +660,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const eventSources = await attachRuntimeEvents(events, {kernel, sessionRepository, digitalTwin}, notesFiles);
         cleanupFns.push(() => eventSources.dispose());
         cleanupFns.push(async () => {await kanbanMonitor?.dispose();});
-        let quiescing: Promise<void> | undefined, disposal: Promise<void> | undefined;
+        let quiescing: Promise<void> | undefined, disposal: Promise<void> | undefined, kernelQuiescent=false;
         const cleanupOperationId = randomUUID();
         const stop = <T>(stage: string, run: () => T | Promise<T>) => cleanupStage(cleanupOperationId, stage, run);
         const quiesce = () => quiescing ??= (async () => {
@@ -691,7 +678,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             const admitted = Promise.allSettled(requests);
             const consumers = (async () => {
                 await stop('kernel.await-producers', () => admitted);
-                await stop('kernel.quiesce', async () => {while (!(await kernelCore.quiesce({timeoutMs: 5000})).localIdle) { /* Wait for the current atomic step. */ }});
+                await stop('kernel.quiesce', async () => {while (!(await kernelCore.quiesce({timeoutMs: 5000,detachObservations:true})).localIdle) { /* Wait for the current atomic step. */ }kernelQuiescent=true;});
             })();
             const leases = (async () => {
                 await stop('recovery.await-kernel', () => consumers);
@@ -702,8 +689,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             if (failures.length) throw new AggregateError(failures, 'Application quiescence failed');
         })();
         const dispose = () => disposal ??= (async () => {
-            await quiesce();
             const errors: unknown[] = [];
+            try {await quiesce();}catch(error){if(!kernelQuiescent)throw error;errors.push(error);}
             try {await stop('executionActivity.dispose', () => executionActivity.dispose());} catch(error) {errors.push(error);}
             for (const [index, close] of [...cleanupFns].reverse().concat([...sourceCleanupFns].reverse()).entries()) {
                 try { await stop((close as CleanupStep).cleanupStage ?? `resource-${index + 1}`, close); } catch (error) { errors.push(error); }

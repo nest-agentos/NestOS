@@ -187,10 +187,7 @@ HTTP 外挂的条件写入、取消与项目授权见 [HTTP VFS 设计](design/v
 
 `MCPServer.auth` 保存 basic/bearer 类型、username 和 credentialRef，密钥由 `MCPConnectionOptions.resolveCredential` 在每次请求解析。`beforeSave/beforeDelete/configurationChanged` 由应用注入授权与投影刷新；机制不依赖 app-core。`MCPConnectionOptions.extensions` 注册 `MCPConfigurationExtension`，其 `matches` 本地筛选标准发现结果，`discover` 通过 `MCPConfigurationExtensionContext` 消费 `MCPDiscovery.metadata` 或复用当前连接的 `callTool`。验证结果放入 `MCPDiscovery.extensions`，管理器负责测试/保存复用与连接身份变更后的重新验证。
 
-cells 可直接使用标准 `MCPServer.apiKey`（Bearer，无 username）。app-core 注册的扩展优先验证 `server/discover._meta['itookit/cells']`（兼容旧 `itookit/cells`）；旧服务通过已声明的能力工具验证，不为普通 MCP 发专用探测。结果保存于 `MCPServer.extensions['itookit/cells']`，绑定须匹配当前 MCP endpoint 及已知 fileProtocol。`MCPRemoteConnections` 从已验证配置恢复驱动凭据，API Key 不复制到项目挂载记录。旧 basic/bearer credentialRef 仍支持。配置展示名自由修改，不用名称判断能力；设置 UI 控件只呈现已识别扩展。
-
-`ProjectFolder.displayName` 是当前服务器名与项目名的组合；持久身份 name 与可选 navigationName 区分人类名称和稳定路由。`MCPRemoteConnections` 是 MCP 目录的只读投影及旧连接迁移适配，不在挂载目录保存第二份连接配置。
-
+Cells 配置位于设置的独立连接目录。cells-driver 从 `GET /v1/capabilities` 的 node/api 描述发现能力，经固定 `/v1/api/{harness|projects}/{operation}` 调用；不使用 MCP 配置扩展、工具发现、别名或旧配置迁移。密钥独立持久化并恢复到驱动凭据解析器，项目挂载只保留引用。`ProjectFolder.displayName` 组合节点名与项目名，身份和路由保持稳定。
 
 `CellsDriver.projects` 暴露 ProjectClient/RemoteProject/ProjectMount/RegisterProject；服务端目录项目与 sync 数据项目是不同身份。项目文件请求使用项目 ID、revision 与只读衰减 headers，project_exec/harness 从服务端同一份授权获取 mounts。ProjectLauncher 是进程/harness 共用启动端口，当前 bubblewrap，VMM 尚未实现。详见 [项目模型](design/cells-project-model.md)。
 
@@ -226,7 +223,7 @@ HarnessExecutionProvider.reconcile 返回 ConnectionReconcileResult；Effect 桥
 
 `ModelConfigurationCommands.inspectMCPDeletion` 返回配置和项目挂载引用的删除预览；`deleteMCPServers` 校验预览并要求有引用时显式 force。`MCPDeletionPort` 由 ProjectRemoteMountService 实现，预览由 ProjectService 提供远程项目与本地会话信息；经 SessionLifecycleService 清理以目标 MCP 为根来源的本地远程项目及其本地会话，再批量移除引用并释放视图。普通本地项目只解除附加挂载，服务器内容和原生会话保留。普通 MCP 删除仍禁止有引用的配置。
 
-`MCPRemoteConnections.diagnostic(connectionId)` 返回不含凭据和端点的 `MCPConnectionDiagnostic`（名称、验证原因、catalog revision、当前配置身份）。`ProjectRemoteMountService.resolveConnection` 在异步访问前恢复当前引用，缺失连接抛出 `RemoteConnectionUnavailableError`，保留 ENOENT 错误码并附带诊断及引用项目 ID。宿主本地化展示；`reportRemoteFailure` 记录 `cells` 模块日志和时间在前的控制台错误，按异常实例去重，只输出身份、阶段、结构化错误码。详见 [项目模型](design/cells-project-model.md)。
+`ProjectRemoteMountService.connectionDiagnostic(connectionId)` 返回不含凭据和端点的 `CellsConnectionDiagnostic`（名称、验证原因、catalog revision、当前配置身份）。`ProjectRemoteMountService.resolveConnection` 在访问前检查当前连接目录，缺失连接抛出 `RemoteConnectionUnavailableError`，保留 ENOENT 错误码并附带诊断及引用项目 ID。宿主本地化展示；`reportRemoteFailure` 记录 `cells` 模块日志和时间在前的控制台错误，按异常实例去重，只输出身份、阶段、结构化错误码。详见 [项目模型](design/cells-project-model.md)。
 
 
 `HarnessClient.search`、`ProjectClient.search` 是可选的能力协商读取端口，返回有界 matches/truncated/nextCursor；项目搜索默认仅当前项目。`ProjectSearch` 统一本地文件及 PI Agent 文件/原生会话检索，完整绑定身份随结果传播，在点击导航时再次核对。`ConversationSnapshot.observation` 与 driver 的 `HarnessObservation` 结构兼容；`conversationStatus` 为正文/侧栏/标签提供统一状态文案。`RemoteSessionStatus` 是按项目引用计数的只读观察用例；其 provider 在 driver 实现，无 app-core DOM/Node 依赖。`exportRemoteSession` 输出原生只读 JSON；`remoteSessionSources` 只匹配已注册且完整授权的附加项目来源。

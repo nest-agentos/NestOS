@@ -305,3 +305,40 @@ it('observes the stop flag between source checks instead of draining the entire 
         expect(calls).toHaveBeenCalledOnce(); expect(host.extractor.run).not.toHaveBeenCalled();
     } finally {release(); date.mockRestore(); calls.mockRestore();}
 });
+
+it.each(['memory', 'indexeddb'] as const)('resumes a prepared job with the same identity and reservation on %s', async kind => {
+    const {requireActive} = await import('../src/digital-twin/analysis-lifecycle');
+    const host = await setup(kind); let entered!: () => void, release!: () => void;
+    const prepared = new Promise<void>(resolve => {entered = resolve;}), gate = new Promise<void>(resolve => {release = resolve;});
+    const original = vi.mocked(host.extractor.run).getMockImplementation()!;
+    vi.mocked(host.extractor.run).mockImplementationOnce(async (_job, _text, _attached, _progress, lifecycle) => {
+        await lifecycle!.checkpoint('prepared'); entered(); await gate; requireActive(lifecycle!.active);
+        return {candidates: [], tokens: 0};
+    });
+    const plan = await host.service.saveScanPlan(null, null, host.input([host.a]));
+    const id = await host.service.runScanPlan(plan); await prepared;
+    const stopping = host.service.quiesce(); release(); await stopping;
+    const store = await SeqTwinStore.open(host.fs, 'personal', 'admin'), records = new TwinRecords(store);
+    const before = (await records.list<import('../src/digital-twin/domain').TwinAnalysisJob>('job'))[0];
+    expect(before.data).toMatchObject({state: 'queued', executionPhase: 'prepared'});
+    expect((await records.get('scan-run', id))!.data).toMatchObject({state: 'queued'});
+    expect(host.extractor.cancel).not.toHaveBeenCalled(); expect(host.extractor.cleanup).not.toHaveBeenCalled();
+    vi.mocked(host.extractor.run).mockImplementation(original);
+    const other = host.reopen(); await other.waitScanRun(id);
+    const jobs = await records.list<import('../src/digital-twin/domain').TwinAnalysisJob>('job');
+    expect(jobs).toHaveLength(1); expect(jobs[0]).toMatchObject({id: before.id, data: {sessionId: before.data.sessionId, state: 'committed', reservedTokens: 0}});
+    expect((await other.snapshot()).settings.data.spentTokens).toBe(2000);
+});
+it('defers terminal-job garbage collection until the next active host', async () => {
+    const host = await setup('memory'); let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => {entered = resolve;}), gate = new Promise<void>(resolve => {release = resolve;});
+    const original = vi.mocked(host.extractor.run).getMockImplementation()!;
+    vi.mocked(host.extractor.run).mockImplementationOnce(async (...args) => {entered(); await gate; return original(...args);});
+    const plan = await host.service.saveScanPlan(null, null, host.input([host.a]));
+    const id = await host.service.runScanPlan(plan); await started;
+    const stopping = host.service.quiesce(); release(); await stopping;
+    expect(host.extractor.cleanup).not.toHaveBeenCalled();
+    const other = host.reopen(); await other.waitScanRun(id);
+    expect(host.extractor.cleanup).toHaveBeenCalledOnce(); expect(host.extractor.run).toHaveBeenCalledOnce();
+    await other.scanOnce(); expect(host.extractor.cleanup).toHaveBeenCalledOnce();
+});

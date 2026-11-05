@@ -1,4 +1,3 @@
-import previousDefaults from './fixtures/kanban-default-prompts-v1.json';
 import defaults from '../src/presets/kanban-development-prompts.json';
 import {afterEach, expect, it} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
@@ -46,15 +45,13 @@ it('ignores lifecycle headings inside fenced Markdown examples', () => {
     expect(hasMarkdownSection('```md\n## fake\n```\n## postload.cancelled\nSummary', 'postload.cancelled')).toBe(true);
 });
 
-it('upgrades only unchanged shipped defaults for new attempts and preserves user prompt edits',async()=>{
+it('uses current defaults for new authoring and freezes explicit user prompts without migration',async()=>{
     const {fs,journal}=await fixture();
-    for(const name of ['decision.md','task.md'] as const)await fs.driver.createFile({parentPath:'/var/lib/kanban/policies/development',name,content:previousDefaults[name],recursive:true});
-    const policy=await developmentPolicy(journal,fs,fs,'upgraded');
-    expect(policy.prompts.files.find(file=>file.name==='decision.md')?.content).toBe(defaults['decision.md']);
-    expect(policy.prompts.files.find(file=>file.name==='task.md')?.content).toBe(defaults['task.md']);
-    await fs.driver.writeContent('/var/lib/kanban/policies/development/decision.md','User planning policy');
-    expect((await developmentPolicy(journal,fs,fs,'custom')).prompts.files.find(file=>file.name==='decision.md')?.content).toBe('User planning policy');
-    expect(await developmentPolicy(journal,fs,fs,'upgraded')).toEqual(policy);
+    const fresh=await developmentPolicy(journal,fs,fs,'fresh');
+    expect(fresh.prompts.files.find(file=>file.name==='task.md')?.content).toBe(defaults['task.md']);
+    await fs.driver.writeContent('/var/lib/kanban/policies/development/task.md','User task policy');
+    expect((await developmentPolicy(journal,fs,fs,'custom')).prompts.files.find(file=>file.name==='task.md')?.content).toBe('User task policy');
+    expect(await developmentPolicy(journal,fs,fs,'fresh')).toEqual(fresh);
 });
 it('freezes project pre/post overrides and global status hooks and publishes them with the manifest',async()=>{
     const {fs,journal}=await fixture();

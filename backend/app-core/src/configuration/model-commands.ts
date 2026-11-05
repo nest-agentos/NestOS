@@ -9,15 +9,7 @@ export interface ConfigurationStore extends Pick<IConnectionService, 'getProvide
     deleteMCPServer(id: string): Promise<void>;
     getMCPServers?(): Promise<unknown[]>;
 }
-export interface MCPDeletionReference { connectionId: string; projectId: string; mountId: string; at: string; revision: number; }
-export interface MCPDeletedProject { id: string; name: string; path: string; localSessions: Array<{id: string; title: string}>; }
-export interface MCPDeletionImpact { revision: string; ids: string[]; servers: Array<{id: string; name: string}>; references: MCPDeletionReference[]; projects: MCPDeletedProject[]; }
-export interface MCPDeletionPort {
-    reconcileMCPReferences?(): Promise<void>;
-    mcpReferences(ids: readonly string[]): MCPDeletionReference[] | Promise<MCPDeletionReference[]>;
-    inspectRemoteProjects?(ids: readonly string[]): Promise<MCPDeletedProject[]>;
-    removeMCPReferences(ids: readonly string[], expected: readonly MCPDeletionReference[], projectIds?: readonly string[]): Promise<void>;
-}
+export interface MCPDeletionImpact { revision: string; ids: string[]; servers: Array<{id: string; name: string}>; }
 export interface ProviderDeletionImpact {
     revision: string;
     providers: LLMProvider[];
@@ -32,7 +24,6 @@ export class ConfigurationMutationError extends Error {
 
 /** Cross-resource operations are shared by every host; UI only chooses a policy. */
 export class ModelConfigurationCommands {
-    mcpDeletion?: MCPDeletionPort;
     private readonly mcpPlans = new Map<string, { ids: string[]; signature: string }>();
     private readonly plans = new Map<string, { ids: string[]; signature: string }>();
     private closed = false;
@@ -51,31 +42,25 @@ export class ModelConfigurationCommands {
         return { ...impact, revision };
     }
     discardPlan(revision: string): void { this.plans.delete(revision); this.mcpPlans.delete(revision); }
-    private async mcpImpact(ids: string[]): Promise<{references: MCPDeletionReference[]; projects: MCPDeletedProject[]; servers: Array<{id: string; name: string}>; signature: string}> {
-        await this.mcpDeletion?.reconcileMCPReferences?.();
-        const references = await this.mcpDeletion?.mcpReferences(ids) ?? [];
-        const roots = [...new Set(references.filter(ref => ref.at === '/').map(ref => ref.projectId))];
-        const projects = await this.mcpDeletion?.inspectRemoteProjects?.(roots) ?? [];
+    private async mcpImpact(ids: string[]) {
         const servers = (await this.store.getMCPServers?.() ?? []).filter(server => !!server && typeof server === 'object' && 'id' in server && ids.includes(String(server.id)));
         const names = servers.map(server => { const value = server as {id: string; name?: string}; return {id:value.id,name:value.name ?? ''}; });
-        return {references,projects,servers:names,signature:JSON.stringify([servers.map(server => mcpConfiguration(server as MCPServer)),references,projects])};
+        return {servers:names,signature:JSON.stringify(servers.map(server => mcpConfiguration(server as MCPServer)))};
     }
     async inspectMCPDeletion(ids: readonly string[]): Promise<MCPDeletionImpact> {
         if (this.closed) throw new FSError('EBUSY', 'Configuration service is closed');
         const selected = [...new Set(ids)], impact = await this.mcpImpact(selected), revision = randomUUID();
         this.mcpPlans.set(revision,{ids:selected,signature:impact.signature});
-        return {revision,ids:selected,servers:structuredClone(impact.servers),references:structuredClone(impact.references),projects:structuredClone(impact.projects)};
+        return {revision,ids:selected,servers:structuredClone(impact.servers)};
     }
-    deleteMCPServers(input: {revision: string; force: boolean}): Promise<void> {
+    deleteMCPServers(input: {revision: string}): Promise<void> {
         return this.serial(async () => {
             const plan = this.mcpPlans.get(input.revision);
             if (!plan) throw new FSError('EINVAL', 'Deletion preview expired');
             const impact = await this.mcpImpact(plan.ids);
             if (impact.signature !== plan.signature) throw new FSError('EBUSY', 'Configuration changed; review deletion again');
-            if (impact.references.length && !input.force) throw new FSError('EBUSY', 'Confirm removal of remote project references');
-            if (impact.references.length) await this.mcpDeletion!.removeMCPReferences(plan.ids,impact.references,impact.projects.map(project => project.id));
             this.mcpPlans.delete(input.revision);
-            const completed: string[] = [...impact.references.map(ref => `mount:${ref.projectId}:${ref.mountId}`),...impact.projects.map(project => `project:${project.id}`)];
+            const completed: string[] = [];
             try { for (const id of plan.ids) { await this.store.deleteMCPServer(id); completed.push(`mcp:${id}`); } }
             catch (error) { throw new ConfigurationMutationError(completed,error); }
         });

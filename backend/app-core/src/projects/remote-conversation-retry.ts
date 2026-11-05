@@ -54,6 +54,6 @@ export class RemoteConversationRecoveryLoop {
     }
 }
 function canRetry(error: unknown): boolean {
-    const failure = error as {code?: string; diagnostic?: {reason?: string}};
-    return transient.has(failure?.code ?? '') || failure?.diagnostic?.reason === 'catalog-not-loaded';
+    const failure = error as {code?: string};
+    return transient.has(failure?.code ?? '');
 }

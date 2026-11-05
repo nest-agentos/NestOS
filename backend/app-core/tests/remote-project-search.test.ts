@@ -17,37 +17,34 @@ async function fixture() {
     const project: RemoteProject = {id: 'native', name: 'Native', alias: 'docs', path: 'a', access: 'ro', revision: 1, mounts: []};
     const calls: Array<{name: string; arguments: Record<string, unknown>}> = [];
     const fetch = vi.fn(async (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => {
-        if (String(input) !== 'https://files.test/mcp') return new Response(null, {status: 404});
-        if (init?.method !== 'POST') return new Response(null, {status: 405});
-        const message = JSON.parse(String(init.body));
-        if (message.method === 'tools/call') calls.push({name: message.params.name, arguments: message.params.arguments});
-        return response(message.id, message.method, message.params, project);
+        const path=new URL(String(input)).pathname;
+        if(path==='/v1/capabilities')return Response.json({node:{api:{version:1},fileSearch:true,fileSearchVersion:2}});
+        const match=/^\/v1\/api\/(harness|projects)\/(.+)$/.exec(path);
+        if(!match)return new Response(null,{status:404});
+        const name=(match[1]==='projects'?'project':'harness')+'_'+match[2];
+        calls.push({name,arguments:JSON.parse(String(init?.body))});
+        return response(name,project);
     });
-    const driver = createCellsDriver(() => 'token', fetch), remote = new ProjectRemoteMountService(fs, driver);
+    const driver = createCellsDriver(() => 'token', fetch), remote = new ProjectRemoteMountService(fs, driver,async()=>{},async()=>{});
     await remote.init();
     const search = new ProjectSearch({forFolder: async () => ({path: '/P', project: {id: 'project'}}), remoteMounts: remote} as unknown as ProjectService);
     return {search, remote, project, calls, fetch, async dispose() {await remote.dispose(); await runtime.dispose();}};
 }
 
-function response(id: unknown, method: string, params: {name: string}, project: RemoteProject): Response {
-    const structuredContent = params?.name === 'project_read' ? {project} : params?.name === 'harness_profiles'
-        ? {epoch: 'e', profiles: [{id: 'native', kind: 'codex', projectRuntime: true, workspaces: [],
-            capabilities: {history: true, create: true, resume: true, interrupt: true, interactions: true, search: true, searchPrompts: true}}]}
-        : {matches: [], truncated: false, nextCursor: null};
-    const result = method === 'server/discover'
-        ? {supportedVersions: ['2026-07-28'], capabilities: {tools: {}}, _meta: {'itookit/cells': {fileSearch: true, fileSearchVersion: 2}}}
-        : {content: [], structuredContent};
-    return new Response(JSON.stringify({jsonrpc: '2.0', id, result: {resultType: 'complete', ttlMs: 0, cacheScope: 'private', ...result}}),
-        {headers: {'content-type': 'application/json'}});
+function response(name:string,project:RemoteProject):Response {
+    const value=name==='project_read'?{project}:name==='harness_profiles'
+        ?{epoch:'e',profiles:[{id:'native',kind:'codex',projectRuntime:true,workspaces:[],capabilities:{history:true,create:true,resume:true,interrupt:true,interactions:true,search:true,searchPrompts:true}}]}
+        :{matches:[],truncated:false,nextCursor:null};
+    return Response.json({ok:true,value});
 }
 
-it.each(['file-name', 'file-path', 'file-content'] as const)('searches %s through the project MCP transport without rediscovering the HTTP root', async scope => {
+it.each(['file-name', 'file-path', 'file-content'] as const)('searches %s through the fixed project API', async scope => {
     const f = await fixture();
     try {
         expect(await f.search.search('/P', {query: 'needle', scope, directory: 'nested'})).toMatchObject({matches: [], truncated: false});
         expect(f.calls).toEqual([{name: 'project_read', arguments: {projectId: 'native'}},
             {name: 'project_search', arguments: {projectId: 'native', revision: 1, query: 'needle', mode: scope.slice(5), directory: 'nested'}}]);
-        expect(f.fetch.mock.calls.every(([url]) => String(url) === 'https://files.test/mcp')).toBe(true);
+        expect(f.fetch.mock.calls.every(([url]) => new URL(String(url)).pathname.startsWith('/v1/'))).toBe(true);
     } finally {await f.dispose();}
 });
 
@@ -57,7 +54,7 @@ it.each(['session-title', 'session-content', 'session-prompt'] as const)('search
         expect(await f.search.search('/P', {query: 'needle', scope})).toMatchObject({matches: [], truncated: false});
         expect(f.calls.find(call => call.name === 'harness_session_search')?.arguments).toEqual({projectId: 'native', revision: 1,
             profileId: 'native', query: 'needle', mode: scope.slice(8), readOnly: true});
-        expect(f.fetch.mock.calls.every(([url]) => String(url) === 'https://files.test/mcp')).toBe(true);
+        expect(f.fetch.mock.calls.every(([url]) => new URL(String(url)).pathname.startsWith('/v1/'))).toBe(true);
     } finally {await f.dispose();}
 });
 

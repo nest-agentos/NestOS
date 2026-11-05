@@ -138,7 +138,7 @@ export class ToolboxWorkbench implements WorkspaceController {
     }
     private connectSources(): void {
         const { resources, editor } = this.options;
-        this.deletion = new ConfigurationDeletionDialog(this.options.configuration, () => this.refresh(), this.options.ocr?.deletionImpact, this.options.projects);
+        this.deletion = new ConfigurationDeletionDialog(this.options.configuration, () => this.refresh(), this.options.ocr?.deletionImpact);
         this.selectionDeletion = new ToolboxDeletion({ resources, inventory: this.options.inventory, view: this.view, deletion: this.deletion,
             completed: async () => { if (!this.closed) { this.ui.setSelection([]); await this.refresh(); } } });
         this.cleanups.push(this.editorLifecycle = connectEditorLifecycle(this.ui, this.view, editor, undefined, { sidebarContainer: this.options.sidebar, workbenchState: this.options.workbenchState, windows: this.options.windows, navigationLabel: t('toolbox.title'), onBeforeNavigate: this.options.onBeforeNavigate, emptyMessage: t('toolbox.empty'), files: { fs: this.view, cwd: '/' }, resolveEditor: node => this.factory(toolboxKind(node.id)!),

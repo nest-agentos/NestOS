@@ -86,3 +86,29 @@ Node 应用宿主提供 `ToolConnections`：外部包声明连接字段，界面
 - [界面空间切换](../../ui/app-shell/tests/digital-twin-workspaces.test.ts) 与 [真实 RPC](../../ui/app-shell/tests/digital-twin-scanner-transport.test.ts)：空间句柄和执行器目录可传输，选择不改变其他客户端。
 
 外部副作用行动自动执行、完整事件编排、匿名 Webhook、任意 URL 抓取、金额计费和完整组织后台暂不增加。当前闭环是配置扫描器、授权运行、检查证据、接纳知识和查看用量。
+
+
+## 提取批次的安全停止与续办
+
+宿主停止只设置内存中的停止意图，不改写用户暂停配置，也不把业务 Job 标成取消。扫描器将该意图通过 `TwinExtractionLifecycle` 传给内置提取与已发布扫描器；底层 Kernel/VFS 不读取扫描器状态。
+
+```mermaid
+flowchart LR
+    A[保存 Job 和预算] --> B[prepared]
+    B --> C[submitted：原 Task 已关联]
+    C --> D[dispatching：准备启动]
+    D --> E[executing：执行已接纳]
+    E --> F[result-ready：Kernel 已持久保存输出]
+    F --> G[原事务提交知识、偏移与费用]
+    G --> H[cleaned：临时资源回收完成]
+```
+
+`executionPhase` 是 Job 上的单一续办检查点，不复制 Kernel 的执行终态或模型输出。Job 冻结来源 incarnation、连接指纹、内容 hash 和原身份；普通来源检查引起的记录 revision 更新，在重新校验当前权限与来源身份后可重新绑定。续办只更新当前宿主 fence，保留原 Job、Session、Task、预算及偏移。
+
+- 准备、提交和能力资源取得之后均可停止；停止检查位于应用调用链，能力绑定复用 Kernel 已有通用回调，尚未接纳的模型请求不继续启动。
+- 已发出的外部执行按原协议等待或核对，不把未知结果当成未执行。结果读取后先记录 `result-ready`；若停止，下一宿主读取原 Task 的持久输出，继续解析与结算，不重新提交 Task。
+- 结果事务的存储异常保留原 Job 和 Task，扫描 run 回到原队列，后续重试结果落盘；权限撤销、来源变化和无效模型结果仍是具体业务失败，不能用续办绕过。
+- 启动发现旧 owner 的 running run 时，仅对无采集副作用且所有相关 Job 都已提交，或处于 prepared/submitted/result-ready 的情况恢复原 run。dispatching/executing 等结果不确定阶段保持原中断与核对语义，不盲目重发。
+- 业务结果结算与资源回收分离。停止时不新开终态清理，`cleaned` 未完成记录保留；清理过程中在关闭 Session 和删除 Session 之间也检查停止，下一宿主通过既有 recoverCleanup 幂等补做。
+
+诊断事件以 Session 身份关联，细分 kernel.session、kernel.submit、kernel.bind-and-start、kernel.wait、result.commit、failure.settle、cleanup.close-session、cleanup.remove-session，记录阶段、结果、安全错误码和耗时，不记录提示词、模型输出或来源正文。完整 Runtime 回归覆盖三个检查点重建、模型请求仅一次、原预算结算，以及结果持久化失败后的同 Task 重试，见 [扫描器集成测试](../../backend/app-core/tests/digital-twin-published-scanner.test.ts)。

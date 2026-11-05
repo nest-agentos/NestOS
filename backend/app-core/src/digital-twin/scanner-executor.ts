@@ -1,3 +1,5 @@
+import {extractionStep, requireActive, TwinSafePoint, type TwinExtractionLifecycle} from './analysis-lifecycle';
+import type {TwinRequestProgress} from './extraction-progress';
 import type {TwinScannerExecutor} from '@nestos/app-contracts';
 import type {ICommandBus, IndependentCallInput, RootTargetCatalog} from '@nestos/llm-session/contracts';
 import {SessionCommand} from '@nestos/llm-session/contracts';
@@ -25,32 +27,40 @@ export class PublishedScannerExecutor implements TwinScannerExecutionPort {
         const catalog = await this.catalog();
         if (!catalog.entries.some(item => item.target.kind === executor.target.kind && item.target.id === executor.target.id && item.target.version === executor.target.version && item.target.digest === executor.target.digest)) throw new Error('TWIN_SCANNER_TARGET_CHANGED');
     }
-    async run(job: TwinAnalysisJob, text: string, attached: (id: string) => Promise<void>) {
+    async run(job: TwinAnalysisJob, text: string, attached: (id: string) => Promise<void>, _progress?: (progress: TwinRequestProgress) => Promise<void>, lifecycle?: TwinExtractionLifecycle) {
         const started = Date.now();
         traceAnalysis(job, 'scanner.prepare', {targetKind: job.executor?.target.kind, targetId: job.executor?.target.id, inputCharacters: text.length});
         try {
-            const result = await this.execute(job, text, attached);
+            const result = await this.execute(job, text, attached, lifecycle);
             traceAnalysis(job, 'scanner.completed', {candidates: result.candidates.length, tokens: result.tokens, durationMs: Date.now() - started});
             return result;
         }
         catch (error) {
+            if (error instanceof TwinSafePoint) throw error;
             const count = await this.options.exchanges?.(job).catch(() => undefined);
             throw new TwinDiagnosticError(error instanceof Error && /^TWIN_[A-Z_]+$/.test(error.message) ? error.message : 'TWIN_SCANNER_EXECUTION_FAILED',
                 error, error instanceof TwinDiagnosticError && error.tokens !== undefined ? error.tokens : count === 0 ? 0 : undefined);
         }
     }
-    private async execute(job: TwinAnalysisJob, text: string, attached: (id: string) => Promise<void>) {
+    private async execute(job: TwinAnalysisJob, text: string, attached: (id: string) => Promise<void>, lifecycle?: TwinExtractionLifecycle) {
+        if (lifecycle) requireActive(lifecycle.active);
         const kernel = this.options.kernel, calls = this.options.ready().calls;
-        const {request, ready} = await this.prepare(job, text);
-        const admission = await calls.submitPreparedTaskCall(request);
-        try { await attached(admission.submission.task.taskId); }
+        const {request, ready} = await extractionStep(job, 'scanner.prepare-call', () => this.prepare(job, text, lifecycle));
+        await lifecycle?.checkpoint('prepared');
+        if (lifecycle) requireActive(lifecycle.active);
+        if (!job.taskId) {await lifecycle?.checkpoint('dispatching'); if (lifecycle) requireActive(lifecycle.active);}
+        const taskId = job.taskId || (await extractionStep(job, 'scanner.submit', () => calls.submitPreparedTaskCall(request))).submission.task.taskId;
+        try { await attached(taskId); }
         catch (error) {
-            await (await kernel.attachTask(job.sessionId, admission.submission.task.taskId)).cancel(undefined, {requestId: 'scanner-cancel'});
+            await (await kernel.attachTask(job.sessionId, taskId)).cancel(undefined, {requestId: 'scanner-cancel'});
             throw error;
         }
-        traceAnalysis(job, 'scanner.wait', {taskId: admission.submission.task.taskId});
-        const caller = await kernel.attachTask(job.sessionId, admission.submission.task.taskId);
-        const exit = await caller.wait({until: 'settled', timeoutMs: 150000});
+        await lifecycle?.checkpoint('executing');
+        traceAnalysis(job, 'scanner.wait', {taskId});
+        const caller = await kernel.attachTask(job.sessionId, taskId);
+        const exit = await extractionStep(job, 'scanner.wait-result', () => caller.wait({until: 'settled', timeoutMs: 150000}));
+        await lifecycle?.checkpoint('result-ready');
+        if (lifecycle) requireActive(lifecycle.active);
         const result = exit.output as TaskCallResult | undefined;
         if (exit.status !== 'succeeded' || result?.exit.status !== 'succeeded') {
             const cause = result?.exit.error ?? exit.error ?? {message: 'Published scanner execution did not succeed'};
@@ -61,16 +71,18 @@ export class PublishedScannerExecutor implements TwinScannerExecutionPort {
         }
         return this.acceptResult(job, text, result.exit.output, ready.executionSessionId);
     }
-    private async prepare(job: TwinAnalysisJob, text: string) {
+    private async prepare(job: TwinAnalysisJob, text: string, lifecycle?: TwinExtractionLifecycle) {
         const {repository, bind} = this.options, calls = this.options.ready().calls;
         const executor = job.executor!;
         await repository.ensureSession(job.sessionId, 'Scanner execution');
+        if (lifecycle) requireActive(lifecycle.active);
         const request: IndependentCallInput = {title: 'Scanner result', request: {
             expectedSessionId: job.sessionId, expectedBranch: 'main', expectedTarget: executor.target,
             target: {kind: executor.target.kind, id: executor.target.id, version: executor.target.version}, source: {kind: 'composer', text, attachments: [], values: executor.values ?? {}},
             submission: {id: 'scan', source: {kind: 'conversation', ownerId: job.sessionId, id: 'scan'}},
         }};
         const ready = await calls.prepareTaskCall(request, {maxDepth: 4, timeoutMs: 120000});
+        if (lifecycle) requireActive(lifecycle.active);
         assertScannerPlan(ready.plan.task);
         await bind(job, ready.executionSessionId);
         return {request, ready};
@@ -104,7 +116,7 @@ export class PublishedScannerExecutor implements TwinScannerExecutionPort {
         await task.cancel(undefined, {requestId: 'scanner-cancel'});
         await task.wait({until: 'settled', timeoutMs: 150000});
     }
-    async cleanup(_job: TwinAnalysisJob): Promise<void> {
+    async cleanup(_job: TwinAnalysisJob, _active?: () => boolean): Promise<void> {
         // Keep published-call history and task receipts available for run inspection.
     }
 }

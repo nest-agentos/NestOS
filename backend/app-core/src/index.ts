@@ -80,7 +80,7 @@ export { ToolboxResources } from './configuration/toolbox-resources';
 export { ToolboxDrawers, DRAWER_KINDS, drawerKind, ungroupedId } from './configuration/toolbox-drawers';
 export type { Drawer, DrawerKind } from './configuration/toolbox-drawers';
 export { ModelConfigurationCommands, ConfigurationMutationError } from './configuration/model-commands';
-export type { ConfigurationStore, ProviderDeletionImpact, ConfigurationDeletionTarget, MCPDeletionImpact, MCPDeletedProject, MCPDeletionReference, MCPDeletionPort } from './configuration/model-commands';
+export type { ConfigurationStore, ProviderDeletionImpact, ConfigurationDeletionTarget, MCPDeletionImpact } from './configuration/model-commands';
 export { toolGrant } from './configuration/tool-grants';
 export type { ToolGrantTarget } from './configuration/tool-grants';
 export { ProjectSessions } from './projects/project-sessions';
@@ -93,13 +93,12 @@ export { OcrService, type OcrSettings, type OcrConnection } from './configuratio
 
 export { ProjectRemoteMountService } from './projects/remote-mounts';
 export { HarnessConnectionService } from './projects/harness-connections';
-export { createCellsMCPExtension } from './projects/cells-mcp-extension';
 export type { HarnessConnectionAcquisition } from './projects/harness-connections';
 export type { HarnessConnectionRecord } from './projects/harness-connection-store';
 export { createHarnessExecutionProvider, harnessExecutionJournalKey } from './projects/harness-execution';
 export { createHarnessCleanupState } from './projects/harness-cleanup-state';
 export { RemoteConnectionUnavailableError, reportRemoteFailure } from './projects/remote-diagnostics';
-export type { MCPConnectionDiagnostic, MCPConnectionReason } from './projects/remote-diagnostics';
+export type { CellsConnectionDiagnostic, CellsConnectionReason } from './projects/remote-diagnostics';
 export type { RemoteFileSystemConfig, RemoteFileSystemInput } from './projects/remote-connections';
 export type { ProjectRemoteMount, RemoteFileSourceProvider, RemoteFileConnection, RemoteConnectionStatus } from './projects/remote-mounts';
 
@@ -131,8 +130,6 @@ export { prepareProjectSync } from './projects/sync/prepare';
 export type { ProjectSyncPreparationRemote } from './projects/sync/prepare';
 export type { HarnessClient, HarnessProfile, HarnessSession, HarnessPage, HarnessHistory, HarnessEvent, HarnessEvents, HarnessReceipt } from '@nestos/cells-driver/harness';
 
-export { MCPRemoteConnections, CELLS_EXTENSION, remoteMCPConnection, cellsConfiguration, isCellsTool } from './projects/mcp-remote-connections';
-export type { CellsConfiguration, MCPConfigurationStore } from './projects/mcp-remote-connections';
 
 export { listRemoteHarnessAgents } from './projects/remote-agent-catalog';
 export type { RemoteHarnessAgent } from './projects/remote-agent-catalog';

@@ -23,7 +23,7 @@ it('transports a contract-only observation and preserves the cursor returned wit
     const {server, client, root} = await pair(observation);
     expect(observation.observeView).toHaveBeenCalledWith(3, expect.any(Function));
     expect(root.getSessionBaseline()).toEqual({cursor: 2, snapshot});
-    cursor = 4; listener({sequence: cursor, topic: 'files', value: undefined});
+    cursor = 4; listener({sequence: cursor, topic: 'files', value: {}});
     client.applyUpdates(await server.refresh());
     expect(root.getViewCursor()).toBe(4); expect(root.getSessionBaseline().cursor).toBe(2);
     await server.close(); expect(stop).toHaveBeenCalledOnce();

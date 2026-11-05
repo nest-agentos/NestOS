@@ -42,8 +42,6 @@ import {
     HarnessConnectionService,
     createHarnessExecutionProvider,
     createHarnessCleanupState,
-    createCellsMCPExtension,
-    MCPRemoteConnections,
     ProjectExecutionService,
     createRemoteExecutionProvider,
     SessionFilesService,
@@ -160,12 +158,9 @@ export async function createCliRuntime(
         .map(path => ({path, backend: new MemoryBackend()}));
     const { manager: vfs } = await openCliVfs(root, sidecarDir, additionalMounts);
     const remoteProvider = createCellsDriver(ref => process.env[`NESTOS_REMOTE_${ref.replace(/-/g, '_')}`] ?? '');
-    let remoteConnections: ProjectRemoteMountService | undefined;
     const llmDriver = new LLMDeviceDriver(vfs, {
         presets: createNestosLlmPresets(), providerConnectionPolicy: firstChatModelConnection,
-        mcp: { clientInfo: { name:'nestos-cli',version:'1.0.0' }, extensions: [createCellsMCPExtension()], resolveCredential:ref => remoteProvider.resolveCredential(ref),
-            beforeSave:(server,previous) => remoteConnections?.beforeMCPChange(server,previous),
-            beforeDelete:id => remoteConnections?.beforeMCPDelete(id),configurationChanged:() => remoteConnections?.refreshMCPConnections() },
+        mcp: {clientInfo: {name:'nestos-cli',version:'1.0.0'}, resolveCredential:ref => remoteProvider.resolveCredential(ref)},
     });
     await traceRuntimeStage('runtime.llm', () => initializeLlmQuietly(llmDriver));
     if (!hostOptions.useProfileConfig) await configureLlm(llmDriver, workflow);
@@ -201,8 +196,8 @@ export async function createCliRuntime(
     const projects = new ProjectService(systemFS, sessionRepository, directoryMounts, sessionFiles);
     const remoteMounts = new ProjectRemoteMountService(systemFS,
         remoteProvider,
-        async () => { throw new Error('Change project mounts from the workbench while the CLI is stopped'); }, async () => {}, new MCPRemoteConnections(llmDriver,remoteProvider));
-    await remoteMounts.init(); remoteConnections = remoteMounts;
+        async () => { throw new Error('Change project mounts from the workbench while the CLI is stopped'); }, async () => {});
+    await remoteMounts.init();
     const executionConnections = new HarnessConnectionService(systemFS, remoteMounts);
     const agentService = hostOptions.useProfileConfig ? new VFSAgentService(await vfs.openFileSystem(workspaceRoot('agents')), llmDriver) : undefined;
     agentService?.configureHarnessConnections(id => executionConnections.freeze(id), async () =>

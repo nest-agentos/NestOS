@@ -53,8 +53,8 @@ it('preloads related contexts and distinguishes the original decision from curre
 });
 it('refuses invalid repositories, malformed hashes and unreachable commits before consulting task data', async () => {
     const f = await fixture(); f.service.item.mockClear();
-    await expect(resolveCommitRequest(f.options, {...f.request, params: {...f.request.params, repository: '..'}} as never)).rejects.toMatchObject({code: 'COMMIT_QUERY_REPOSITORY_FORBIDDEN', fileResponse: true});
-    await expect(resolveCommitRequest(f.options, {...f.request, params: {...f.request.params, commits: ['--all']}} as never)).rejects.toMatchObject({code: 'COMMIT_QUERY_INVALID', fileResponse: true});
+    await expect(resolveCommitRequest(f.options, {...f.request, params: {...f.request.params, repository: '..'}} as never)).rejects.toMatchObject({code: 'COMMIT_QUERY_REPOSITORY_FORBIDDEN', channelResponse: true});
+    await expect(resolveCommitRequest(f.options, {...f.request, params: {...f.request.params, commits: ['--all']}} as never)).rejects.toMatchObject({code: 'COMMIT_QUERY_INVALID', channelResponse: true});
     const tree = await f.git(f.root, ['rev-parse', 'HEAD^{tree}']), outside = await f.git(f.root, ['commit-tree', tree, '-p', f.base, '-m', 'test: unreachable', '-m', f.context.trailers]);
     expect(await resolveCommitRequest(f.options, {...f.request, params: {...f.request.params, commits: [outside]}} as never)).toMatchObject({contexts: [], unresolved: [{commit: outside, code: 'COMMIT_NOT_REACHABLE'}]});
     expect(f.service.item).not.toHaveBeenCalled();

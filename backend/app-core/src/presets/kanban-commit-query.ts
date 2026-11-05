@@ -2,16 +2,16 @@ import {sha256HexSync} from '@nestos/common';
 import type {KanbanService, KanbanItem} from '@nestos/kanban/contracts';
 import type {PromptJournal} from '../run/prompt-bundle';
 import {failure} from '../run/prompt-bundle';
-import type {FileRequest} from '../run/file-exchange-protocol';
+import type {ChannelRequest} from '../run/channel-protocol';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 import {parseCommitTrailers, type CommitContext} from './kanban-commit-context';
 import {gitWorkspace} from '../projects/worktree-modules';
 import type {RemoteProcessHandle} from '../projects/remote-mounts';
 export interface CommitQueryOptions {journal: PromptJournal; service: KanbanService; record: DevelopmentWorkspaceRecord; process: RemoteProcessHandle; targetHead?: string}
-const queryFailure = (code: string) => Object.assign(failure(code), {fileResponse: true});
-export async function resolveCommitRequest(options: CommitQueryOptions, request: FileRequest): Promise<unknown> {
+const queryFailure = (code: string) => Object.assign(failure(code), {channelResponse: true});
+export async function resolveCommitRequest(options: CommitQueryOptions, request: ChannelRequest): Promise<unknown> {
     const {repository, commits, include} = request.params;
-    if (request.method !== 'kanban.context.resolve') throw queryFailure('FILE_EXCHANGE_METHOD_UNSUPPORTED');
+    if (request.method !== 'kanban.context.resolve') throw queryFailure('CHANNEL_METHOD_UNSUPPORTED');
     if (typeof repository !== 'string' || !Array.isArray(commits) || !commits.length || commits.length > 16
         || commits.some(sha => typeof sha !== 'string' || !/^[a-f0-9]{40,64}$/.test(sha))
         || include !== undefined && (!Array.isArray(include) || include.some(field => !['task', 'decisions', 'acceptance'].includes(field)))) throw queryFailure('COMMIT_QUERY_INVALID');

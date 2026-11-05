@@ -113,7 +113,7 @@ it('exposes an invalid sync MCP as a project issue while retaining status and of
     const bound = state(); bound.binding.connectionId = 'deleted';
     const service = {status: vi.fn(async () => bound)} as unknown as ProjectSyncService;
     const controller = new AbortController(), changed = vi.fn();
-    const menu = new ProjectSyncMenu({service, connection: () => ({reason: 'mcp-not-found'})}, controller.signal, vi.fn(), vi.fn(), changed);
+    const menu = new ProjectSyncMenu({service, connection: () => ({reason: 'cells-not-found'})}, controller.signal, vi.fn(), vi.fn(), changed);
     await menu.refresh('p'); await menu.refresh('p'); expect(changed).toHaveBeenCalledOnce();
     expect(menu.indicator('p')?.issues).toContain(t('project.sync.issue.connectionMissing'));
     expect(action(menu, 'now').disabled).toBe(true); expect(action(menu, 'unbind').disabled).toBe(false);

@@ -353,7 +353,11 @@ export class SessionRepository implements ISessionRepository {
         return items.map(item => item.parentSessionId ? {...item, parentTitle: titles.get(item.parentSessionId)} : item);
     }
     listSummaries(): Promise<SessionSummary[]> { return this.scanSummaries(); }
-    private async scanSummaries(includeMoving = false): Promise<SessionSummary[]> {
+    /** Visit cold summaries in storage batches; returning false stops before further reads. */
+    async walkSummaries(visit: (summary: SessionSummary) => boolean | void | Promise<boolean | void>): Promise<void> {
+        await this.scanSummaries(false, visit);
+    }
+    private async scanSummaries(includeMoving = false, visit?: (summary: SessionSummary) => boolean | void | Promise<boolean | void>): Promise<SessionSummary[]> {
         if (this.closed) throw new FSError('EACCES', 'Session repository is closed');
         if (!await this.fs.driver.exists('/var/lib/sessions')) return [];
         const entries = await this.fs.driver.getChildren('/var/lib/sessions', { fields: 'entry' });
@@ -368,13 +372,15 @@ export class SessionRepository implements ISessionRepository {
             const rows = await this.fs.meta.seq!.getEntriesMany(batch.map(id => ({
                 fileIdOrPath: `${locations.get(id) ?? sessionStorageRoot(id)}/session.seq`, key: 'session',
             })));
-            rows.forEach((raw, index) => {
-                if (raw === null) return;
+            for (const [index, raw] of rows.entries()) {
+                if (raw === null) continue;
                 const session = JSON.parse(raw);
                 if (session.storageVersion !== 1 || session.id !== batch[index]) throw new Error('Session storage version incompatible');
                 const { id, title, summary, origin, createdAt, updatedAt, folder, parentSessionId, createdWithAgentId } = session;
-                summaries.push({ id, title, summary, origin, createdAt, updatedAt, folder, parentSessionId, createdWithAgentId });
-            });
+                const item = { id, title, summary, origin, createdAt, updatedAt, folder, parentSessionId, createdWithAgentId };
+                if (visit) { if (await visit(item) === false) return []; }
+                else summaries.push(item);
+            }
         }
         return summaries.sort((a, b) => b.updatedAt - a.updatedAt);
     }

@@ -162,13 +162,7 @@ function isMissingSession(error: unknown): boolean {
 async function toolboxView(services: LocalApplicationServices, scope: ViewScope): Promise<ToolboxView> {
     const { agentService, kernel, vfs, projects } = services;
     const inventory = new ToolboxInventory(() => agentService.getMCPServers(), kernel.toolCatalog, agentService,
-        () => agentService.listSystemPrompts(), () => listRemoteHarnessAgents(projects?.remoteMounts), async connectionId => {
-            const remote = projects?.remoteMounts;
-            const ids = [...new Set((await remote?.mcpReferences([connectionId]) ?? []).map(reference => reference.projectId))];
-            const states = await Promise.all(ids.map(id => remote!.projectStatus(id)));
-            return {total: ids.length, offline: states.filter(state => state.status === 'offline').length, degraded: states.filter(state => state.status === 'degraded').length,
-                unknown: states.filter(state => ['unknown', 'checking'].includes(state.status)).length};
-        });
+        () => agentService.listSystemPrompts(), () => listRemoteHarnessAgents(projects?.remoteMounts), async () => ({total: 0, offline: 0, degraded: 0, unknown: 0}));
     const resources = new ViewScope(); await resources.own(inventory);
     try {
         await inventory.init();

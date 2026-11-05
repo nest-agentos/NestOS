@@ -25,7 +25,7 @@ export class TwinSourceIndex {
     }
     async preview(rules: import('./scan-rules').TwinScanRules) {
         if (!this.sources.reader.discover) throw new Error('TWIN_PROJECT_CATALOG_UNAVAILABLE');
-        const catalog = await this.sources.reader.discover(), settings = await this.records.get<TwinSettings>('settings', 'pot');
+        const catalog = await this.sources.reader.discover(this.active), settings = await this.records.get<TwinSettings>('settings', 'pot');
         const allowed = (resource: TwinDiscoveredSource) => matchesRules(resource, rules)
             && !(settings?.data.globalExclude ?? []).some(line => matchesLine(resource, line));
         return { resources: catalog.resources.filter(allowed), excluded: catalog.resources.filter(resource => !allowed(resource)), errors: catalog.errors };
@@ -35,7 +35,7 @@ export class TwinSourceIndex {
         const [allPlans, existing] = await Promise.all([this.records.list<TwinScanPlan>('scan-plan'), this.records.list<TwinSourceData>('source')]);
         const plans = allPlans.filter(plan => plan.data.rules && plan.data.mode !== 'collect');
         if (!this.active() || (!plans.length && !existing.some(source => source.data.managed))) return;
-        const catalog = await this.sources.reader.discover(); if (!this.active()) return;
+        const catalog = await this.sources.reader.discover(this.active); if (!this.active()) return;
         this.errors = catalog.errors;
         const settings = (await this.records.get<TwinSettings>('settings', 'pot'))!.data;
         const fingerprint = settings.connectionId ? await this.sources.fingerprint(settings.connectionId).catch(() => {
