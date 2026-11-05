@@ -1,3 +1,4 @@
+import {startViewHeartbeat,responseOpen} from './view-heartbeat';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { TLSSocket } from 'node:tls';
 import { randomUUID } from 'node:crypto';
@@ -203,16 +204,18 @@ export class ViewApi {
         if (!client.events.canResume(after)) {
             this.expire(response, 'VIEW_HISTORY_EXPIRED', 'View event history expired; reconnect the page');
         }
+        if(!responseOpen(response))return;
         client.lastSeen = Date.now(); client.stream = response;
+        const operationId=randomUUID();
+        startViewHeartbeat(response,{authorize,current:()=>client.stream===response,seen:()=>{client.lastSeen=Date.now();},
+            failed:(stage,error,durationMs)=>{const code=(error as {code?:unknown})?.code;
+                this.audit?.write({event:'view.stream.failed',operation:'view.stream',operationId,stage,result:'failure',durationMs,
+                    code:typeof code==='string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'VIEW_STREAM_FAILED'});}});
+        response.once('close', () => { if (client.stream === response) client.stream = undefined; });
+        response.once('finish', () => { if (client.stream === response) client.stream = undefined; });
         response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-NestOS-View-Resume': '1', 'X-MindOS-View-Resume': '1' });
-        response.write(': connected\n\n');
         client.events.attach(response, after, resume || url.searchParams.get('resume') === '1');
-        const timer = setInterval(() => {
-            void (authorize?.() ?? Promise.resolve(true)).then(accepted => {
-                if (!accepted) { response.end(); return; } client.lastSeen = Date.now(); response.write(': heartbeat\n\n');
-            }).catch(() => response.end());
-        }, 15000);
-        response.once('close', () => { clearInterval(timer); if (client.stream === response) client.stream = undefined; });
+        if(responseOpen(response))response.write(': connected\n\n');
     }
     private async releaseIdle(): Promise<void> {
         for (const [id, ready] of this.clients) {
