@@ -17,7 +17,7 @@ export function taskCoordinator(options:Options) {
             requireValue(result?.schema==='kanban.coordination/1'&&typeof result.summary==='string'&&result.summary.length<=8000&&Array.isArray(result.suggestions)&&result.suggestions.length<=16,'COORDINATION_RESULT_INVALID');
             const children=new Set(_job.snapshot.children.map(child=>child.id));
             requireValue(result.suggestions.every(raw=>{const suggestion=raw as {itemId?:string;action?:string;reason?:string};return typeof suggestion.itemId==='string'&&children.has(suggestion.itemId)&&typeof suggestion.action==='string'&&['analyze','build','deploy','accept','merge'].includes(suggestion.action)&&typeof suggestion.reason==='string'&&suggestion.reason.length<=2000;}),'COORDINATION_RESULT_INVALID');},
-        classify:error=>({code:safeCode(error,'COORDINATION_FAILED'),disposition:(error as {executionOutcome?:string}).executionOutcome==='not-started'?'retry-unstarted':'unknown'}),
+        classify:error=>({code:safeCode(error,'COORDINATION_FAILED'),disposition:(error as {executionOutcome?:string}).executionOutcome==='not-started'?'retry-unstarted':['COORDINATION_RESULT_INVALID','CHANNEL_RESULT_INVALID','CHANNEL_RESULT_CHANGED'].includes(safeCode(error,''))?'terminal':'unknown'}),
         report:async job=>{await options.notifyCoordination?.(job);if(job.phase!=='settled')return;const key='coordination-reported:'+job.id;if(await options.journal.get(key))return;
             await options.workLog?.append(options.service,job.boardId,job.itemId,{stage:'coordination.'+job.state,result:job.state==='succeeded'?'success':'failure',dispatchId:job.id,code:job.code,
                 references:job.sessionId?[{system:'nestos-coordination-session',id:job.sessionId,revision:job.id}]:[]});
