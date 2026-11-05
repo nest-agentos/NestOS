@@ -230,7 +230,7 @@ Codex 会话从显式配置的 home 通过原生 `thread/list` 发现，再以�
 
 工具箱 → Cells 保存多个独立节点。输入节点根地址及凭据，无 username 时使用 Bearer，有 username 时使用 Basic。固定 HTTP 能力发现验证 node/api/version，节点身份及授权快照随连接冻结；已引用节点不能直接改端点或切换授权身份。密钥单独持久化，挂载只保存 credentialRef。普通 MCP 配置与 Cells 目录完全独立，不迁移或投影。
 
-Agent scope token 仅用于 `/v1/channel/mcp`，不能访问固定管理 API。服务每次核验 scope 与项目所有者的当前授权，关闭或切换 scope 后旧 token 立即失效。MCP 2.0 细节见[看板通道设计](kanban-coordination.md#cells-固定-api-与渐进式会话上下文)。
+Agent scope token 仅用于 `/v1/channel/mcp`，不能访问固定管理 API。原生配置仅为该绑定通道的五种上下文、消息与回执工具预授权，并显式限定工具列表；不修改全局审批策略或其他 MCP 服务器。服务每次核验 scope 与项目所有者的当前授权，关闭或切换 scope 后旧 token 立即失效。MCP 2.0 细节见[看板通道设计](kanban-coordination.md#cells-固定-api-与渐进式会话上下文)。
 
 ### Harness 内置插件
 
