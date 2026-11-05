@@ -58,10 +58,12 @@ export function developmentObserver(options: Options) {
         await linkResult(options, journal, input, projectId);
         const scope = {runId: item.externalRefs?.find(ref => ref.system === 'nestos-decision-run')?.id ?? input.dispatch.planId,
             itemId: item.id, attemptId: input.dispatch.id};
-        const messages = await consumeChannelMessages(await options.remote.sessionChannel(projectId, 'messages', {scopeId: workspace.channelId}), scope, journal,
+        const envelope=await options.remote.sessionChannel(projectId,'messages',{scopeId:workspace.channelId}) as {messages?:unknown;execution?:{status?:string;sessionId?:string;turnId?:string}};
+        const messages = await consumeChannelMessages(envelope,scope,journal,
             message => deliver(options, journal, input, message), async message => {await options.remote!.sessionChannel(projectId, 'acknowledge', {scopeId: workspace.channelId, id: message.id, ack: {status: 'delivered'}});});
             const unresolved = unresolvedWorkIssues(messages);
             await reconcileIssues(journal, input, messages);
+            if(envelope.execution?.sessionId&&['running','submitting'].includes(envelope.execution.status??''))return {...input.observation,outcome:'running',outputs:undefined,code:unresolved.some(message=>message.type==='clarification')?'WORKSPACE_INPUT_REQUIRED':undefined};
             if (options.exchange && !unresolved.length) input = {...input, observation: await options.exchange({id: input.dispatch.id, record: workspace, service: input.service, observation: input.observation,
                 finalPublished: messages.some(message => message.type === 'result')})};
             if (['failed', 'cancelled'].includes(input.observation.outcome)) {

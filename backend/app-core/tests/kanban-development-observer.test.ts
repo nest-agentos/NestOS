@@ -135,3 +135,15 @@ it('preserves real cancellation when the legacy business channel is missing',asy
     await f.journal.update('development-workspace:attempt',()=>({projectId:'project'}));
     expect(await f.observe('cancelled')).toMatchObject({outcome:'cancelled'});
 });
+it('accepts repeated linked resolutions without overwriting the first closure or blocking a later native turn',async()=>{
+    const f=await fixture();await f.publish('question','clarification');await f.observe('succeeded');
+    f.channels.report('attempt','answer',{type:'resolved',replyTo:'question',content:'Scope confirmed'});
+    f.channels.report('attempt','prepared',{type:'resolved',replyTo:'question',content:'Repository ready'});
+    f.channels.ensure('attempt').execution={sessionId:'original-native',turnId:'later-turn',status:'running'};
+    expect(await f.observe('succeeded')).toMatchObject({outcome:'running',code:undefined});
+    const item=(await f.service.item('board','item')).item;
+    expect(item.issues?.[0].resolvedBy).toBe('answer');expect(item.blocked).toBeUndefined();
+    expect(f.channels.ensure('attempt').acks.get('prepared')).toEqual({status:'delivered'});
+    await f.publish('result','result');expect(await f.observe('succeeded')).toMatchObject({outcome:'running'});
+    f.channels.ensure('attempt').execution!.status='completed';expect(await f.observe('succeeded')).toMatchObject({outcome:'succeeded'});
+});

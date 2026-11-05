@@ -4,6 +4,10 @@
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    'kanban.pendingEvents': 'Needs attention',
+    'kanban.waiting': 'Waiting for start or dependencies',
+    'kanban.taskReason.REVISION_CONFLICT': 'State synchronization conflicted; checking the original execution',
+    'kanban.taskReason.GROUP_CHILD_UNCONFIRMED': 'A subtask state is unconfirmed; check the attention items',
     'kanban.taskReason.GROUP_CHILD_PAUSED': 'Subtasks are paused; resume from the decision',
     'kanban.errors.TASK_GROUP_CONTROL_UNSUPPORTED': 'Task groups have no independent execution. Control subtasks through their decision.',
     'kanban.groupExecution': 'Executed by subtasks',

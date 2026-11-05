@@ -5,6 +5,10 @@
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    'kanban.pendingEvents': '待处理事件',
+    'kanban.waiting': '等待启动或依赖',
+    'kanban.taskReason.REVISION_CONFLICT': '状态同步发生版本冲突，正在核对原执行',
+    'kanban.taskReason.GROUP_CHILD_UNCONFIRMED': '有子任务的状态尚未确认，请查看待处理事件',
     'kanban.taskReason.GROUP_CHILD_PAUSED': '子任务已暂停，请通过决策继续执行',
     'kanban.errors.TASK_GROUP_CONTROL_UNSUPPORTED': '任务组没有独立执行，请通过决策控制子任务。',
     'kanban.groupExecution': '由子任务执行',
