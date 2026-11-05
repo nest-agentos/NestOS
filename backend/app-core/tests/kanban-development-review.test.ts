@@ -63,7 +63,8 @@ it('publishes context replies and resumes merge analysis in the original Session
 it('prepares project-discovered builds in the original Session and freezes maintenance prompts', async () => {
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
     const request = await f.api.prepareOperation!({id: 'build', action: 'build', board: f.board, item: f.item, snapshot});
-    expect(request.expectedSessionId).toBe('original-session'); expect((request.source as {text: string}).text).toContain('Discover project commands');
+    expect(request.expectedSessionId).toBe('original-session'); expect((request.source as {text:string}).text).toContain('operation.md');
+    expect(f.channels.channel).toHaveBeenCalledWith('project','open',expect.objectContaining({scopeId:'build',sessionId:'original-native'}));
     const path = '/workspace/_nestos/worktrees/original/_nestos/kanban/review/build';
     const manifest = JSON.parse(await readPrompt(f.fs, path + '/manifest.json'));
     expect(manifest.context.phase).toBe('build'); expect(manifest.files.map(row => row.name)).toContain('task-build-pre.md');

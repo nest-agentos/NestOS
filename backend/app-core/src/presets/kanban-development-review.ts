@@ -100,7 +100,8 @@ async function prepareAnalysis(options: Options, input: MaintenanceInput): Promi
     const bindings = Object.values(catalog.value.bindings).filter(row => row.branchId === branch && row.connectionId === 'work-' + current.id);
     requireValue(bindings.length === 1 && bindings[0].validity === 'valid' && !bindings[0].activeOperation, 'OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE');
     const binding = bindings[0], target = original.input.request.expectedTarget!, directory = current.record.directory + '/_nestos/kanban/review/' + input.id;
-    await freezeAnalysis(options, current, input, sessionId, directory);
+    requireValue(binding.nativeRef?.sessionId,'OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE');
+    await freezeAnalysis(options,current,input,sessionId,directory,binding.nativeRef.sessionId);
     return {expectedSessionId: sessionId, expectedBranch: branch, expectedTarget: target, target: {kind: target.kind, id: target.id, version: target.version},
         source: {kind: 'composer', text: !input.action || input.action === 'analyze' ? mergeInstruction(input, directory) : maintenanceInstruction({...input, action: input.action}, directory), attachments: [], values: {}},
         submission: {id: input.id, source: {kind: 'conversation', ownerId: sessionId, id: input.id}},
@@ -108,7 +109,7 @@ async function prepareAnalysis(options: Options, input: MaintenanceInput): Promi
             harnessConversation: {mode: 'resume', bindingId: binding.id, expectedBindingRevision: binding.revision, expectedGeneration: binding.generation}}};
 }
 async function freezeAnalysis(options: Options, current: ReviewResource,
-    input: MaintenanceInput, sessionId: string, directory: string): Promise<void> {
+    input: MaintenanceInput, sessionId: string, directory: string,nativeSessionId:string): Promise<void> {
     const folder = await options.projects.get(current.record.projectId), view = await options.projects.openWorkspace(folder.path);
     try {
         const policy = await developmentPolicy(options.journal, options.fs, view.fs, input.id,
@@ -127,7 +128,7 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
             context: {...current.record.context as object, operation: {operationId: input.id, phase:input.action??'analyze',receiptPath:directory+'/result.json',approval: input.context ?? null,
                 sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, commitContexts: context, resources: input.snapshot.context}}});
         await openDevelopmentChannel(options.remote, input.id, record, {runId: input.id, itemId: input.item.id, attemptId: input.id}, input.item,
-            await currentChannelBinding(options.remote,record,sessionId));
+            await currentChannelBinding(options.remote,record,nativeSessionId));
     } finally {await view.dispose();}
 }
 function mergeInstruction(input: {id: string; item: KanbanItem; snapshot: ReviewSnapshot}, _directory: string): string {
