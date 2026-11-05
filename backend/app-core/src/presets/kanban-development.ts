@@ -85,6 +85,7 @@ function workerDefinition(source: AgentDefinition, input: Input, connectionId: s
     const entry = input.stage === 'decision' ? 'decision.md' : input.stage === 'fix' ? 'task-fix-pre.md' : 'task.md';
     const pre=lifecyclePromptFiles(policy.prompts,input.stage==='decision'?'decision':input.stage==='fix'?'task-fix':'task','pre');
     return {...source, id: 'work-' + input.dispatch.id, name: input.item.title,
+        memoryPolicy: {namespaceId: source.memoryPolicy?.namespaceId ?? 'agent', readScopes: [], writeScopes: [], retrievalLimit: 0},
         config: {...source.config, systemPromptId: undefined, systemPrompt: channelInstruction(policy, entry, pre)}, execution: {kind: 'harness', connectionId}};
 }
 
@@ -95,12 +96,11 @@ async function recordPublication(journal: KanbanAutomationJournal, id: string, d
 }
 
 export function channelInstruction(policy: DevelopmentPolicy, entry: string, pre: string[]): string {
-    return `Use cells_session MCP. Read identity, policy, instructions, then ${[...pre, entry].join(', ')} via session_context; task/context only as needed. `
-        + `Commit: ${policy.commit}; assigned worktree/repositories only; never merge/push. `
-        + `session_report types: progress/clarification/error/result/resolved; content: nonempty summary <=8000 characters; resolved needs replyTo. Results request host verification. `
-        + `Live context: session_request method kanban.context.resolve, params {repository,commits:[full SHA],include:[task,decisions,acceptance]}. Read replies with session_response. `
-        + `After clarification, unrecoverable error or pending request, end the turn; never poll. Run only dependencies.lifecycle.stage when given. `
-        + `Search before bounded file/log reads; keep large evidence as artifacts.`;
+    return `Use cells_session. Read identity, policy, instructions, ${[...pre, entry].join(', ')} via session_context; task/context on demand. `
+        + `Assigned worktrees/repos only; commit=${policy.commit}; never merge/push. `
+        + `session_report: progress/clarification/error/result/resolved; resolved needs replyTo; results request host verification. `
+        + `Live commit context: session_request kanban.context.resolve {repository,commits:[SHA],include:[task,decisions,acceptance]}; read session_response. `
+        + `End turn on clarification, fatal error or pending request; never poll. Run only the given lifecycle stage. Bound reads; keep large evidence in artifacts.`;
 
 }
 

@@ -101,7 +101,7 @@ export class ConversationContextBuilder {
                 return resolved.get(message)!;
             },
             loadArtifact: id => this.options.loadArtifact(execution.task.sessionId, id),
-            retrieveMemory: includeMemory && this.options.retrieveMemory ? (plan, agent) => this.options.retrieveMemory!(plan, agent, {
+            retrieveMemory: includeMemory && execution.config.memoryPolicy?.retrievalLimit !== 0 && this.options.retrieveMemory ? (plan, agent) => this.options.retrieveMemory!(plan, agent, {
                 sessionId: execution.task.sessionId, policy: structuredClone(execution.config.memoryPolicy),
             }) : undefined,
         });

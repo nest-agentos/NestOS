@@ -6,7 +6,7 @@ import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { ConversationRunCoordinator } from '../src/session/conversation-run-coordinator';
 import { skillContextResolver } from '../src/session/direct-conversation';
 
-it.each([false, true])('persists selected Skill and scoped memory in direct chat Task input (memory: %s)', async withMemory => {
+it.each([{withMemory:false,limit:3},{withMemory:true,limit:3},{withMemory:false,limit:0}])('persists selected Skill and scoped memory in direct chat Task input ($withMemory, limit $limit)', async ({withMemory,limit}) => {
     const { manager } = await createVFS({ rootBackend: new MemoryBackend() });
     const fs = await manager.openFileSystem('/module/test');
     const kernel = new Kernel({ catalog: { fs } });
@@ -43,14 +43,17 @@ it.each([false, true])('persists selected Skill and scoped memory in direct chat
         vi.spyOn(internal, 'completeRound').mockResolvedValue(undefined);
         const execution = { task: { id: 'run', sessionId: 'session', input: { text: 'Please review' }, abortController: new AbortController() },
             config: { id: 'agent', systemPrompt: ['Agent identity'], defaultContextPolicy: { tokenBudget: withMemory ? 10000 : 1 },
-                memoryPolicy: { namespaceId: 'agent-memory', readScopes: ['project'], writeScopes: [], retrievalLimit: 3 },
+                memoryPolicy: { namespaceId: 'agent-memory', readScopes: ['project'], writeScopes: [], retrievalLimit: limit },
                 capabilityPolicy: { skillIds: ['review', 'silent', 'disabled', 'manual'], toolIds: ['inspect'] } },
             log: { loadManifest: async () => ({ currentBranch: 'main', branches: { main: null }, branchMeta: {} }) },
             roundId: 'round', finalize: async () => {}, contextFiles: [] };
         await coordinator.executeDirect(execution as never);
-        expect(retrieveMemory).toHaveBeenCalledWith(expect.objectContaining({ pendingUserMessage: expect.anything() }),
-            { id: 'agent', version: 'unversioned' }, { sessionId: 'session', policy: execution.config.memoryPolicy });
-        expect((retrieveMemory.mock.calls[0] as unknown as any[])[2].policy).not.toBe(execution.config.memoryPolicy);
+        if (limit === 0) expect(retrieveMemory).not.toHaveBeenCalled();
+        else {
+            expect(retrieveMemory).toHaveBeenCalledWith(expect.objectContaining({ pendingUserMessage: expect.anything() }),
+                { id: 'agent', version: 'unversioned' }, { sessionId: 'session', policy: execution.config.memoryPolicy });
+            expect((retrieveMemory.mock.calls[0] as unknown as any[])[2].policy).not.toBe(execution.config.memoryPolicy);
+        }
         expect(resolveSkills).toHaveBeenCalledWith(['review', 'silent', 'disabled', 'manual'], 'session');
         selected.instructions = 'Later edit';
         selected.compact.rawContent = 'Later rules';
