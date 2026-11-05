@@ -1,4 +1,3 @@
-import {migrateCellsConnections} from '../configuration/migrate-cells-connections';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {developmentWorkExchange} from '../presets/kanban-channel-exchange';
 import {cleanupStep, cleanupStage, type CleanupStep} from './cleanup-stage';
@@ -292,7 +291,6 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         });
         cleanupFns.push(cleanupStep('projects.dispose', () => projects.dispose()));
         let remoteGuard = async (id: string) => mountGuard(id);
-        let initializeRemoteConfiguration: () => Promise<void> = () => Promise.resolve();
         if (options.remoteSourceProvider) {
             const affected = async (projectId: string) => {
                 const result: string[] = [];
@@ -309,25 +307,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             sourceCleanupFns.push(() => remote.dispose());
             await remote.init(); remoteConnections = remote; projects.remoteMounts = remote;
             remote.existingProjectIds = () => projects.storedProjectIds();
-            if (remote.loadWarnings.some(warning => warning.startsWith('MISSING_CONNECTION:'))) initializeRemoteConfiguration = startup.task('cells.configuration.migrate', async () => {
-                const started = Date.now(), operationId = randomUUID();
-                try {
-                    const imported = await migrateCellsConnections(systemFS, await agentService.getMCPServers(), options.remoteSourceProvider!.resolveCredential?.bind(options.remoteSourceProvider));
-                    if (imported.length) await remote.init();
-                    for (const id of imported) {
-                        try {await agentService.deleteMCPServer(id);}
-                        catch {diagnostics.record({module: 'cells', operation: 'cells.configuration.migrate', operationId,
-                            stage: 'legacy-retire', result: 'failure', level: 'warn', code: 'CELLS_LEGACY_RETIREMENT_PENDING'});}
-                    }
-                    const missing = remote.loadWarnings.some(warning => warning.startsWith('MISSING_CONNECTION:'));
-                    diagnostics.record({module: 'cells', operation: 'cells.configuration.migrate', operationId, stage: 'legacy-import',
-                        result: missing ? 'failure' : 'success', level: missing ? 'warn' : 'info', code: missing ? 'CELLS_LEGACY_CONFIGURATION_UNRESOLVED' : undefined, durationMs: Date.now() - started});
-                } catch (error) {
-                    diagnostics.record({module: 'cells', operation: 'cells.configuration.migrate', operationId, stage: 'legacy-import', result: 'failure',
-                        level: 'error', code: (error as {code?: string})?.code ?? 'CELLS_MIGRATION_FAILED', durationMs: Date.now() - started});
-                    throw error;
-                }
-            });
+
 
 
             projects.execution = new ProjectExecutionService(remote,
@@ -337,7 +317,6 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         projects.navigationFromIndex = policy.navigation === 'index';
         const initializeProjects = startup.task('projects.initialize', async () => {
             await Promise.all([repositoryReady, directoryReady]);
-            await initializeRemoteConfiguration();
             await traceBoot('projects.remoteReferences', async () => remoteConnections?.reconcileReferences());
             await traceBoot('projects.sources', () => projects.initializeSources());
             await traceBoot('projects.init', () => projects.ensureStartup(options.defaultSessionDirectory));

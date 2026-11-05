@@ -228,7 +228,7 @@ Codex 会话从显式配置的 home 通过原生 `thread/list` 发现，再以�
 
 ### Cells 节点认证与配置
 
-设置 → Cells 保存多个独立节点。输入节点根地址及凭据，无 username 时使用 Bearer，有 username 时使用 Basic。固定 HTTP 能力发现验证 node/api/version，节点身份及授权快照随连接冻结；已引用节点不能直接改端点或切换授权身份。密钥单独持久化，挂载只保存 credentialRef。普通 MCP 配置与 Cells 目录完全独立，不迁移或投影。
+工具箱 → Cells 保存多个独立节点。输入节点根地址及凭据，无 username 时使用 Bearer，有 username 时使用 Basic。固定 HTTP 能力发现验证 node/api/version，节点身份及授权快照随连接冻结；已引用节点不能直接改端点或切换授权身份。密钥单独持久化，挂载只保存 credentialRef。普通 MCP 配置与 Cells 目录完全独立，不迁移或投影。
 
 Agent scope token 仅用于 `/v1/channel/mcp`，不能访问固定管理 API。服务每次核验 scope 与项目所有者的当前授权，关闭或切换 scope 后旧 token 立即失效。MCP 2.0 细节见[看板通道设计](kanban-coordination.md#cells-固定-api-与渐进式会话上下文)。
 
@@ -548,10 +548,6 @@ DSH 展示投影不将明确来源为 agent-instructions、runtime-context、too
 远程会话的单项菜单、侧栏多选和右侧目录多选统一经宿主确认与原生管理端口处理，不使用普通文件删除。所选会话不能删除但全部允许归档时，明确询问是否改为归档并说明保留历史和项目文件，确认前不执行。存在既不可删除又不可归档的项时显示原因，不自动删除子集或归档；批量部分成功后保留进度，显式重试跳过已完成项，原生结果未知仍沿用原 journal 核对。
 
 
-### Cells 配置入口与旧连接迁移
+### Cells 配置入口
 
-Cells 配置位于工具箱，分类顺序为 MCP → Cells → 技能。`/cells/manage` 是只读导航资源，打开共享的 CellsSettingsEditor；连接的增删改查仍只走 ProjectRemoteMountService，不将凭据写入工具箱文件或再实现一份连接表单。旧 settings/cells 地址转到同一工具箱资源。
-
-移除 MCP→Cells 运行时映射前，旧部署可能只在 MCP 配置保存节点，项目目录中仅有引用。启动检查到缺失引用时，`configuration/migrate-cells-connections` 一次性核对旧已验证描述与挂载的服务器、账号、授权修订，再把原连接 ID 和凭据保存到 Cells 权威目录。普通运行不调用 MCP 发现来获取 Cells 能力。既有 Cells 记录不覆盖，迁移重复执行不推进 revision；不匹配项保留离线并报告明确的迁移未完成代码。
-
-连接缺失是 cells-not-found/ENOENT，认证与项目授权失败另行分类；诊断刷新提示不再把所有失败都解释为管理员未授权。Cells 故障只令看板分析/执行报错，不能生成用户取消命令。
+工具箱按 MCP、Cells、技能的顺序展示。Cells 使用独立连接配置和固定 HTTP API，复用现有管理编辑器；MCP 仅管理供 Agent 使用的服务器。旧 Cells MCP 记录已迁移并清理，运行时不再读取旧配置或执行兼容迁移。
