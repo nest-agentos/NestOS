@@ -41,6 +41,7 @@ async function inspect(options:Options,job:CoordinationOperation) {
     requireValue(resource&&options.sessionChannel,'SESSION_CHANNEL_REQUIRED');
     const result=await readPlanningChannel({sessionChannel:options.sessionChannel},resource.id,job.id,options.journal);
     if(result?.state==='succeeded')return {state:'succeeded' as const,executionId:request.expectedSessionId,output:result.output};
+    if(result?.state==='failed'||result?.state==='cancelled')return {state:'failed' as const,executionId:request.expectedSessionId,code:result.code??'COORDINATION_FAILED'};
     if(result?.state==='clarification')return {state:'running' as const,executionId:request.expectedSessionId,code:'WORKSPACE_INPUT_REQUIRED'};
     const state=await options.collaboration!.submission.inspect(request);
     return {state:state.outcome==='cancelled'?'failed' as const:state.outcome==='succeeded'?'unknown' as const:state.outcome,executionId:state.sessionId,code:state.code??(state.outcome==='succeeded'?'COORDINATION_RESULT_PENDING':undefined)};
