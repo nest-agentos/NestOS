@@ -1,17 +1,17 @@
 
 ## Workspace Structure
 
-pnpm monorepo：前端包位于 `ui/`，后端包位于 `backend/`，共享应用契约与基础工具位于 `shared/`，宿主位于 `apps/`（`apps/web-app` = `nestos-web`）。十四个独立库（包括 llm-ui、mdxeditor、vfs-ui、kanban）均位于 `libraries/`。ui-common 为零运行时依赖的独立 UI 基础库；通用应用编辑器契约位于 ui-common-adapter，会话及草稿契约归 llm-ui-adapter/contracts。
+pnpm monorepo：前端包位于 `ui/`，后端包位于 `backend/`，共享应用契约与基础工具位于 `shared/`，宿主位于 `apps/`（`apps/web-app` = `nestos-web`）。十五个独立库（包括 llm-ui、mdxeditor、vfs-ui、kanban）均位于 `libraries/`。ui-common 为零运行时依赖的独立 UI 基础库；通用应用编辑器契约位于 ui-common-adapter，会话及草稿契约归 llm-ui-adapter/contracts。
 
 | 目录 | 模块 |
 |---|---|
 | `ui/` | app-shell、app-settings、llm-ui-adapter、mdx-adapter、ui-common-adapter |
 | `backend/` | app-core、llm-context、llm-session、llm-flow、llm-tasks、kernel-adapters、tools、sanbox、sync-adapters |
 | `shared/` | app-contracts、common、app-transport |
-| `libraries/` | driver-llm、cells-driver、vfs-core、vfs-sync、vfsdriver-indexeddb、vfsdriver-local、vfs-ui、mdxeditor、llm-ui、image-parser、durable-kernel、device-tty、kanban、ui-common |
+| `libraries/` | driver-llm、cells-driver、vfs-core、vfs-sync、vfsdriver-indexeddb、vfsdriver-local、vfs-ui、mdxeditor、llm-ui、image-parser、durable-kernel、device-tty、kanban、mail、ui-common |
 | `apps/` | web-app、tauri-app、cli、http-app、demo、node-host（共享 Node 宿主适配包） |
 
-18 个业务/共享包 + 14 个独立库 + 5 个应用 + 1 个共享 Node 宿主适配包；另有 `tools/cells` Rust 工具子模块（包名与命令为 `cells`），寓意蜂房中的单个巢室，将信息与 Agent 集成为 NestOS 的单个智能节点。原 `packages/` 已清理，不再使用。目录和加载规则见 [前后端模块边界](design/frontend-backend-modules.md)。
+18 个业务/共享包 + 15 个独立库 + 5 个应用 + 1 个共享 Node 宿主适配包；另有 `tools/cells` Rust 工具子模块（包名与命令为 `cells`），寓意蜂房中的单个巢室，将信息与 Agent 集成为 NestOS 的单个智能节点。原 `packages/` 已清理，不再使用。目录和加载规则见 [前后端模块边界](design/frontend-backend-modules.md)。
 
 ### LLM 子系统分层（单向依赖）
 
@@ -68,7 +68,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 
 ### 独立 npm 库与同步接入
 
-独立库均位于 `libraries/`，参与 pnpm workspace；既有库以 Git 子模块固定提交，包括 [durable-kernel](https://github.com/nest-agentos/durable-kernel)、[llm-ui](https://github.com/nest-agentos/llm-ui) 与 [device-tty](https://github.com/nest-agentos/device-tty)。新拆出的 kanban、mail 目前为本仓库源码工作区，尚未创建外部仓库或发布。libraries 下的目录就是唯一开发工作树；子模块先向各自远端提交，再由主仓库记录子模块提交；npm 发布独立进行。日常开发通过源码 exports 联调；`pnpm lib:build [库名]` 增量准备本地 tarball 快照，供 `pnpm httpd:build` 在隔离目录消费。`pnpm libraries:use <ID>` 可显式将整个工作区切到制品验收模式，`pnpm libraries:source` 恢复源码。各库保留独立 npm 发布能力，`pnpm build:registry` 在隔离目录构建固定 npm 版本。原 HTTP 驱动并入 cells-driver，文件与进程实现位于其 src/files。目录、安装和发布流程见 [独立库接入](design/npm-library-consumption.md)。
+独立库均位于 `libraries/`，参与 pnpm workspace；既有库以 Git 子模块固定提交，包括 [durable-kernel](https://github.com/nest-agentos/durable-kernel)、[llm-ui](https://github.com/nest-agentos/llm-ui) 与 [device-tty](https://github.com/nest-agentos/device-tty)。[kanban](https://github.com/nest-agentos/kanban) 与 [mail](https://github.com/nest-agentos/mail) 也已拥有独立仓库并以子模块接入；仓库上传不代表 npm 发布完成。libraries 下的目录就是唯一开发工作树；子模块先向各自远端提交，再由主仓库记录子模块提交；npm 发布独立进行。日常开发通过源码 exports 联调；`pnpm lib:build [库名]` 增量准备本地 tarball 快照，供 `pnpm httpd:build` 在隔离目录消费。`pnpm libraries:use <ID>` 可显式将整个工作区切到制品验收模式，`pnpm libraries:source` 恢复源码。各库保留独立 npm 发布能力，`pnpm build:registry` 在隔离目录构建固定 npm 版本。原 HTTP 驱动并入 cells-driver，文件与进程实现位于其 src/files。目录、安装和发布流程见 [独立库接入](design/npm-library-consumption.md)。
 
 VFS 驱动和 vfs-ui 的内部运行依赖仅为 vfs-core；本地驱动另依赖 better-sqlite3。vfs-sync、driver-llm 没有运行时包依赖。`backend/sync-adapters` 负责宿主同步接入，调用 vfs-sync 与驱动公共端口；同步范围和项目绑定由应用决定。
 

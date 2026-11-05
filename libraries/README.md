@@ -1,6 +1,8 @@
 # 独立库源码
 
-本目录的八个库各自保留 Git 仓库，通过 submodule 固定提交，统一参与主仓库的 pnpm workspace。业务包位于 `packages/`，应用宿主位于 `apps/`。
+本目录的十五个库各自在 `nest-agentos` 组织下维护独立 Git 仓库，通过 submodule 固定提交，统一参与主仓库的 pnpm workspace。业务包位于 `ui/`、`backend/`、`shared/`，应用宿主位于 `apps/`。
+
+`kanban` 与 `mail` 已拆分为独立子模块。GitHub 上传与 npm 发布分别进行；源码、构建、类型声明及 tarball 可独立验证，不将上传仓库视为 npm 已发布。`tools/temporary-process` 保留在 NestOS 主仓库，作为通用进程管理工具。
 
 ```bash
 git submodule update --init --recursive -- libraries

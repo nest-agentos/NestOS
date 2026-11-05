@@ -667,6 +667,12 @@ importers:
 
   backend/kernel-adapters:
     dependencies:
+      '@modelcontextprotocol/client':
+        specifier: 2.0.0
+        version: 2.0.0
+      '@modelcontextprotocol/core':
+        specifier: 2.0.0
+        version: 2.0.0
       '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
@@ -682,12 +688,6 @@ importers:
       '@nestos/vfs-core':
         specifier: workspace:*
         version: link:../../libraries/vfs-core
-      '@modelcontextprotocol/client':
-        specifier: 2.0.0
-        version: 2.0.0
-      '@modelcontextprotocol/core':
-        specifier: 2.0.0
-        version: 2.0.0
       js-yaml:
         specifier: ^4.1.1
         version: 4.3.2
@@ -1109,6 +1109,9 @@ importers:
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(@microsoft/api-extractor@7.55.1(@types/node@25.2.3))(jiti@1.21.7)(postcss@8.5.16)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.2)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

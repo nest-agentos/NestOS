@@ -73,3 +73,9 @@
 	path = libraries/ui-common
 	url = https://github.com/nest-agentos/ui-common.git
 	branch = main
+[submodule "libraries/kanban"]
+	path = libraries/kanban
+	url = https://github.com/nest-agentos/kanban.git
+[submodule "libraries/mail"]
+	path = libraries/mail
+	url = https://github.com/nest-agentos/mail.git

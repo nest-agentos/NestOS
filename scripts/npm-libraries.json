@@ -80,7 +80,7 @@
   {
     "directory": "kanban",
     "name": "@nestos/kanban",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
