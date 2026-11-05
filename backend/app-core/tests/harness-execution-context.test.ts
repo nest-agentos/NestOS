@@ -82,10 +82,11 @@ it('refuses native continuation before acquiring a connection when conditional w
     await expect(f.make().execute(continuation, f.context)).rejects.toMatchObject({code: 'CONTEXT_NATIVE_WRITE_UNSUPPORTED', executionOutcome: 'not-started'});
     expect(f.connections.acquire).not.toHaveBeenCalled(); expect(f.client.turn).not.toHaveBeenCalled(); expect(f.records.size).toBe(0);
 });
-async function resumeFixture() {
-    const f = fixture(); complete(f); await f.make().execute(call, f.context);
+async function resumeFixture(directory?: string, contextId?: string) {
+    const f = fixture(); f.profile.contextId=contextId; if(directory)f.session.cwd='/workspace/'+directory;
+    const initial = {...call,connection:{...call.connection,...(directory?{directory}:{})}}; complete(f); await f.make().execute(initial, f.context);
     const binding = (await store(f).list())[0]; f.session.activeTurnId = ''; f.session.status = 'idle';
-    const next = {...call, context: {...context, invocationId: 'resume-call', input: {mode: 'native-continuation' as const, inputRef: 'increment', digest: 'hash'},
+    const next = {...initial, context: {...context, invocationId: 'resume-call', input: {mode: 'native-continuation' as const, inputRef: 'increment', digest: 'hash'},
         conversation: {mode: 'resume' as const, bindingId: binding.id, expectedBindingRevision: binding.revision, expectedGeneration: binding.generation}}};
     const owner = {...f.context, taskId: 'resume-task', effectId: 'resume-effect'};
     vi.mocked(f.client.turn).mockImplementation(async (_profile, _session, _prompt, options) => f.committed(options, {turnId: 'resumed-turn'}) as {turnId: string});
@@ -148,4 +149,33 @@ it('rejects a corrupted binding receipt before replaying a saved result or conta
     f.records.set(entry.key, {...entry, value: data}); f.connections.acquire.mockClear();
     expect(await f.make().reconcile(call, f.context)).toMatchObject({status: 'unknown', code: 'JOURNAL_CONFLICT'});
     expect(f.connections.acquire).not.toHaveBeenCalled(); expect(f.client.turn).toHaveBeenCalledOnce();
+});
+
+it('recovers a fresh resume across process epochs only after verifying the idle original native head', async () => {
+    const {f,next,owner,binding}=await resumeFixture('work'); f.data.epoch='replacement';
+    Object.assign(f.session,{cwd:'/workspace/work',lastTurnId:binding.knownHeadRef,writerLock:{status:'not-held'}});
+    f.push('item/completed',{threadId:'native-session',turnId:'resumed-turn',item:{id:'new-answer',type:'agentMessage',text:'Done'}});
+    f.push('turn/completed',{threadId:'native-session',turn:{id:'resumed-turn',status:'completed'}});
+    expect(await f.make().execute(next,owner)).toMatchObject({sessionId:'native-session',turnId:'resumed-turn'});
+    const recovered=(await store(f).get(binding.id))!;
+    expect(recovered.nativeRef?.epoch).toBe('replacement'); expect(recovered.generation).toBe(binding.generation+1);
+    expect(f.client.create).toHaveBeenCalledOnce(); expect(f.client.turn).toHaveBeenCalledTimes(2);
+});
+it.each(['head','workspace','lock'] as const)('refuses epoch recovery when the %s evidence differs', async reason => {
+    const {f,next,owner,binding}=await resumeFixture('work'); f.data.epoch='replacement';
+    Object.assign(f.session,{cwd:reason==='workspace'?'/workspace/other':'/workspace/work',lastTurnId:reason==='head'?'foreign-turn':binding.knownHeadRef,writerLock:{status:reason==='lock'?'unknown':'not-held'}});
+    await expect(f.make().execute(next,owner)).rejects.toMatchObject({code:'CONTEXT_NATIVE_EPOCH_CHANGED',executionOutcome:'not-started'});
+    expect(f.client.turn).toHaveBeenCalledOnce(); expect((await store(f).get(binding.id))?.nativeRef?.epoch).toBe(binding.nativeRef?.epoch);
+});
+
+it('keeps the fixed native mapping across a Cells restart while using a fresh process epoch for writes', async () => {
+    const {f,next,owner,binding}=await resumeFixture('work','persistent-context');
+    f.data.epoch='new-process';
+    f.push('turn/completed',{threadId:'native-session',turn:{id:'resumed-turn',status:'completed'}});
+    await f.make().execute(next,owner);
+    const resumed=(await store(f).get(binding.id))!;
+    expect(resumed.nativeRef?.epoch).toBe('persistent-context'); expect(resumed.nativeRef?.sessionId).toBe('native-session');
+    expect(resumed.generation).toBe(binding.generation);
+    expect(f.client.create).toHaveBeenCalledOnce(); expect(f.client.turn).toHaveBeenCalledTimes(2);
+    expect(f.client.turn).toHaveBeenLastCalledWith(expect.anything(),'native-session',expect.anything(),expect.objectContaining({epoch:'new-process'}));
 });

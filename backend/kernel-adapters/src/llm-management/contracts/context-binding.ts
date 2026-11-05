@@ -23,6 +23,7 @@ export interface NativeContextRef {
     profileId: string;
     workspaceId: string;
     sessionId: string;
+    /** Durable native-context namespace, not the current process epoch. */
     epoch: string;
 }
 

@@ -551,3 +551,11 @@ DSH 展示投影不将明确来源为 agent-instructions、runtime-context、too
 ### Cells 配置入口
 
 工具箱按 MCP、Cells、技能的顺序展示。Cells 使用独立连接配置和固定 HTTP API，复用现有管理编辑器；MCP 仅管理供 Agent 使用的服务器。旧 Cells MCP 记录已迁移并清理，运行时不再读取旧配置或执行兼容迁移。
+
+### 持久会话映射与进程身份
+
+`profiles[].contextId` 标识原生会话存储命名空间，按规范 profile ID 和驱动种类在配置 home 下的 `.cells/context-identities/` 首次生成并持久保存。普通 Cells 重启、原生运行时回收、HTTP 宿主重启均复用该映射；不从进程 PID、启动时间或每次启动的随机值生成。固定映射文件先同步后对外使用，损坏时明确报错，不静默生成替代身份。
+
+`harness_profiles.epoch` 仍是本次服务进程的操作回执边界，事件流也保留独立 epoch。它们用于识别过期连接、游标和未确认请求，不能成为已保存会话的生命周期。原生绑定中的 `NativeContextRef.epoch` 保存 `contextId` 命名空间；新执行 journal 保存当前进程 epoch，二者分别校验。相同持久映射的续办保留原生 Session、分支和绑定 generation，所有新操作使用当前进程 epoch。原进程中结果未知的操作继续查询原回执，无法核实时保持 unknown，不重新提交。
+
+首次接管旧进程身份绑定时，仅在显式续办的新执行中核对原 Session ID、项目工作区、worktree、最后已确认轮次及无写入者，再以 CAS 更新映射和 generation。缺少证据、原生忙碌、上下文变化或映射冲突均拒绝；不放宽已提交执行的 epoch 防重规则。

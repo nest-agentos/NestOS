@@ -38,7 +38,7 @@ export function qualifyContextSource(binding: ContextBinding, query: ContextOpti
 function nativeReferenceIssues(binding: ContextBinding, inspection: HarnessConnectionInspection): string[] {
     const ref = binding.nativeRef;
     if (!ref) return [];
-    if (ref.epoch !== inspection.epoch) return ['CONTEXT_NATIVE_EPOCH_CHANGED'];
+    if (ref.epoch !== (inspection.profile.contextId ?? inspection.epoch)) return ['CONTEXT_NATIVE_EPOCH_CHANGED'];
     return ref.nodeConnectionId === inspection.snapshot.nodeConnectionId && ref.profileId === inspection.profile.id
         && ref.workspaceId === inspection.workspaceId ? [] : ['CONTEXT_NATIVE_REFERENCE_CHANGED'];
 }

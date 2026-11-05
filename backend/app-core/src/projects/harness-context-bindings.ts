@@ -51,6 +51,19 @@ export class HarnessContextBindings {
         });
     }
 
+    /** A fresh, explicitly requested resume may adopt a restarted process after native identity verification. */
+    async recoverEpoch(id: string, operationId: string, previous: NativeContextRef, epoch: string): Promise<ContextBinding> {
+        return this.update(id, (current, collection) => {
+            requireOwner(current, operationId);
+            if (canonical(current.nativeRef) !== canonical(previous)) throw executionError('CONTEXT_NATIVE_REFERENCE_CONFLICT');
+            const nativeRef = {...previous, epoch};
+            if (Object.values(collection.bindings).some(other => other.id !== id && other.nativeRef
+                && other.nativeRef.nodeConnectionId === previous.nodeConnectionId && other.nativeRef.profileId === previous.profileId
+                && other.nativeRef.sessionId === previous.sessionId)) throw executionError('CONTEXT_NATIVE_ALIAS_CONFLICT');
+            return {...current, nativeRef, generation: current.generation + 1};
+        });
+    }
+
     async prepareSettlement(id: string, operationId: string, settlement: NonNullable<ContextBinding['settlement']>): Promise<ContextBinding> {
         return this.update(id, current => {
             requireOwner(current, operationId);

@@ -372,7 +372,7 @@ CLI 提供 `kanban list/create/show/targets/resources/execute/record/records/run
 
 | 层级 | 职责 | 优先关系 |
 | --- | --- | --- |
-| NestOS 默认 | 产品携带的默认 Markdown、通信协议和生命周期约定 | 默认内容首次使用时写入当前用户的策略资源，不覆盖用户修改 |
+| NestOS 默认 | 产品携带的默认 Markdown、通信协议和生命周期约定 | 默认内容从当前产品版本读取，不写成永久覆盖；用户策略文件优先；每次执行另行冻结快照 |
 | 用户全局 | `/var/lib/kanban/policies/<profile>/decision.md`、`task.md` | 当前用户 VFS；用户之间保持隔离 |
 | 项目 | `_nestos/kanban/policies/<profile>/decision.md`、`task.md` | 项目同名文件整体覆盖全局文件；自定义 profile 必须能解析两份文件 |
 | 看板 | 选择 profile、提交方式和提前准备的模块 | 保存通用选项；决策运行冻结绑定，已开始的运行不跟随修改 |

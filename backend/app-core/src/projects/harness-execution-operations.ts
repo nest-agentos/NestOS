@@ -94,7 +94,7 @@ function assertPreparedAttachments(run: NativeExecution): void {
 async function prepareForkSession(run: NativeExecution): Promise<void> {
     const source = run.journal.data.forkSource;
     if (!source || !run.acquired.client.fork) throw executionError('CONTEXT_CHECKPOINT_FORK_UNSUPPORTED');
-    if (source.nativeRef.epoch !== run.acquired.epoch || source.nativeRef.profileId !== run.acquired.profile.id)
+    if (source.nativeRef.epoch !== (run.acquired.profile.contextId ?? run.acquired.epoch) || source.nativeRef.profileId !== run.acquired.profile.id)
         throw executionError('CONTEXT_NATIVE_EPOCH_CHANGED');
     if (run.journal.data.sessionId && run.journal.data.operations.fork?.outcome !== 'committed') throw executionError('JOURNAL_CONFLICT');
     const result = await nativeMutation(run, 'fork', options => run.acquired.client.fork!(run.acquired.profile.id,

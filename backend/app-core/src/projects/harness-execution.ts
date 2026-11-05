@@ -83,7 +83,7 @@ class NativeHarnessExecutionProvider implements HarnessExecutionProvider {
             : await this.prepareInput(request, context, journal, acquired, startedAt);
         if (request.context?.conversation.mode === 'fork' && (!acquired.profile.capabilities.checkpointFork || !acquired.client.fork))
             throw executionError('CONTEXT_CHECKPOINT_FORK_UNSUPPORTED');
-        await claimExecutionContext(journal, request);
+        await claimExecutionContext(journal, request, acquired, context.abortSignal);
         const correlation = executionCorrelation(request, journal);
         if (request.context) await diagnose(context, 'context-binding', 'claimed', startedAt, undefined, correlation);
         const run: NativeExecution = {acquired, journal, request, attachments, signal: context.abortSignal};

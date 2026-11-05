@@ -1,3 +1,4 @@
+import type {HarnessConnectionAcquisition} from './harness-connections';
 import type {ContextBinding, ContextBindingRef, HarnessExecutionRequest} from '@nestos/kernel-adapters/contracts';
 import {assertHarnessContextRequest} from '@nestos/kernel-adapters/contracts';
 import {HarnessContextBindings} from './harness-context-bindings';
@@ -21,14 +22,15 @@ export function validateExecutionContext(request: HarnessExecutionRequest): void
     } catch (error) {throw Object.assign(error as Error, {executionOutcome: 'not-started'});}
 }
 
-export async function claimExecutionContext(journal: ExecutionJournal, request: HarnessExecutionRequest): Promise<void> {
+export async function claimExecutionContext(journal: ExecutionJournal, request: HarnessExecutionRequest, acquired?: HarnessConnectionAcquisition, signal?: AbortSignal): Promise<void> {
     if (!request.context) return;
     const store = bindings(journal);
     if ((journal.data.operations.create || journal.data.operations.fork) && !await store.get(journal.data.bindingId!)) throw executionError('CONTEXT_BINDING_NOT_FOUND');
-    const binding = await store.claim(journal.data.bindingId!, request.context, request.connection, journal.contextOperation());
+    let binding = await store.claim(journal.data.bindingId!, request.context, request.connection, journal.contextOperation());
     if (request.context.conversation.mode === 'resume') {
+        if (binding.nativeRef?.epoch !== (acquired?.profile.contextId ?? journal.data.epoch) && acquired) binding = await recoverEpoch(store,binding,journal,request,acquired,signal);
         const native = binding.nativeRef;
-        if (!native || native.epoch !== journal.data.epoch || native.nodeConnectionId !== request.connection.nodeConnectionId
+        if (!native || native.epoch !== (acquired?.profile.contextId ?? journal.data.epoch) || native.nodeConnectionId !== request.connection.nodeConnectionId
             || native.profileId !== request.connection.profileId) throw executionError('CONTEXT_NATIVE_EPOCH_CHANGED');
         if (journal.data.sessionId && journal.data.sessionId !== native.sessionId) throw executionError('JOURNAL_CONFLICT');
         if (!journal.data.sessionId) await journal.save({sessionId: native.sessionId});
@@ -38,11 +40,25 @@ export async function claimExecutionContext(journal: ExecutionJournal, request: 
     if (binding.forkedFrom && !journal.data.forkSource) await journal.save({forkSource: binding.forkedFrom});
 }
 
+async function recoverEpoch(store: HarnessContextBindings, binding: ContextBinding, journal: ExecutionJournal,
+    request: HarnessExecutionRequest, acquired: HarnessConnectionAcquisition, signal?: AbortSignal): Promise<ContextBinding> {
+    const native = binding.nativeRef, directory = request.connection.directory;
+    if (!native || native.nodeConnectionId !== request.connection.nodeConnectionId || native.profileId !== acquired.profile.id
+        || native.workspaceId !== acquired.workspaceId || !binding.knownHeadRef || !directory
+        || Object.keys(journal.data.operations).length) throw executionError('CONTEXT_NATIVE_EPOCH_CHANGED');
+    const {session} = await acquired.client.read(native.profileId,native.sessionId,{signal});
+    if (session.id !== native.sessionId || !session.cwd?.endsWith('/'+directory) || !session.resumable
+        || session.activeTurnId || ['running','busy','inProgress'].includes(session.status ?? '')
+        || session.writerLock?.status !== 'not-held' || session.lastTurnId !== binding.knownHeadRef)
+        throw executionError('CONTEXT_NATIVE_EPOCH_CHANGED');
+    return store.recoverEpoch(binding.id,operationId(journal),native,acquired.profile.contextId ?? acquired.epoch);
+}
+
 export async function attachExecutionContext(run: NativeExecution): Promise<void> {
     if (!run.journal.data.bindingId || !run.journal.data.sessionId) return;
     await bindings(run.journal).attach(run.journal.data.bindingId, operationId(run.journal), {
         nodeConnectionId: run.request.connection.nodeConnectionId, profileId: run.acquired.profile.id,
-        workspaceId: run.acquired.workspaceId, epoch: run.journal.data.epoch, sessionId: run.journal.data.sessionId,
+        workspaceId: run.acquired.workspaceId, epoch: run.acquired.profile.contextId ?? run.journal.data.epoch, sessionId: run.journal.data.sessionId,
     }, run.journal.data.forkRejected);
 }
 
