@@ -14,9 +14,9 @@ const log = createModuleLogger('toolbox-catalog');
 
 /** Read-only navigation metadata; configuration remains in its owning services. */
 export class ToolboxInventory {
-    private readonly backends = { remoteAgents: new MemoryBackend(), mcp: new MemoryBackend(), tools: new MemoryBackend(), providers: new MemoryBackend(), connections: new MemoryBackend(), prompts: new MemoryBackend() };
+    private readonly backends = { remoteAgents: new MemoryBackend(), cells: new MemoryBackend(), mcp: new MemoryBackend(), tools: new MemoryBackend(), providers: new MemoryBackend(), connections: new MemoryBackend(), prompts: new MemoryBackend() };
     private readonly contents = new Map<string, string>();
-    private owners: Partial<Record<'remoteAgents' | 'mcp' | 'tools' | 'providers' | 'connections' | 'prompts', FileSystemSourceOwner>> = {};
+    private owners: Partial<Record<'remoteAgents' | 'cells' | 'mcp' | 'tools' | 'providers' | 'connections' | 'prompts', FileSystemSourceOwner>> = {};
     readonly remoteAgents = new Map<string, RemoteHarnessAgent>();
     get remoteAgentSource() { return this.owners.remoteAgents!.fs; }
     readonly providers = new Map<string, { id: string; name: string; icon?: string; enabled: boolean; configured: boolean; capabilityTags?: string[]; authentication?: 'chatgpt'; authorizationAvailable?: boolean }>();
@@ -27,14 +27,15 @@ export class ToolboxInventory {
     constructor(private readonly servers: () => Promise<MCPServer[]>, private readonly catalog: Catalog, private readonly models?: IConnectionService, private readonly prompts?: () => Promise<SystemPromptDefinition[]>, private readonly harnesses?: () => Promise<RemoteHarnessAgent[]>, private readonly projectHealth?: (id: string) => Promise<{total: number; offline: number; unknown: number; degraded: number}>) {}
     async init(): Promise<void> {
         try {
-            for (const kind of ['remoteAgents', 'mcp', 'tools', 'providers', 'connections', 'prompts'] as const) this.owners[kind] = await createFileSystemSource({
+            for (const kind of ['remoteAgents', 'cells', 'mcp', 'tools', 'providers', 'connections', 'prompts'] as const) this.owners[kind] = await createFileSystemSource({
                 backend: this.backends[kind], viewId: 'toolbox:' + kind, access: 'ro' });
             await this.refresh();
         } catch (error) { await this.dispose(); throw error; }
     }
-    get sources() { return { prompts: this.owners.prompts!.fs, mcp: this.owners.mcp!.fs, tools: this.owners.tools!.fs, providers: this.owners.providers!.fs, connections: this.owners.connections!.fs }; }
+    get sources() { return { cells: this.owners.cells!.fs, prompts: this.owners.prompts!.fs, mcp: this.owners.mcp!.fs, tools: this.owners.tools!.fs, providers: this.owners.providers!.fs, connections: this.owners.connections!.fs }; }
 
     async refresh(): Promise<void> {
+        await this.replace('cells', [{id: 'manage', name: t('cells.title'), description: t('cells.description'), source: '', icon: ENTITY_ICONS.model}]);
         const servers = await this.servers();
         const harnesses = await this.harnesses?.() ?? [];
         this.remoteAgents.clear();
@@ -102,7 +103,7 @@ export class ToolboxInventory {
                 serverId: server.id, enabled: server.status === 'connected', parameters: item.inputSchema });
         }
     }
-    private async replace(kind: 'remoteAgents' | 'mcp' | 'tools' | 'providers' | 'connections' | 'prompts', entries: Array<{ id: string; name: string; description: string; source: string; icon: string; status?: MCPServer['status']; connectionState?: MCPConnectionState; projectHealth?: {total: number; offline: number; unknown: number; degraded: number} }>): Promise<void> {
+    private async replace(kind: 'remoteAgents' | 'cells' | 'mcp' | 'tools' | 'providers' | 'connections' | 'prompts', entries: Array<{ id: string; name: string; description: string; source: string; icon: string; status?: MCPServer['status']; connectionState?: MCPConnectionState; projectHealth?: {total: number; offline: number; unknown: number; degraded: number} }>): Promise<void> {
         const backend = this.backends[kind], paths = new Set(entries.map(item => '/' + encodeURIComponent(item.id) + (kind === 'remoteAgents' ? '.agent' : '')));
         for (const old of await backend.list('/')) if (!paths.has(old.path)) { await backend.delete(old.path); this.contents.delete(kind + ':' + old.path); }
         for (const item of entries) {

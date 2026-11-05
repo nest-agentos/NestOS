@@ -102,6 +102,7 @@ export class ProjectRemoteMountService {
         private readonly beforeChange: (projectId: string) => Promise<void>,
         private readonly afterChange: (projectId: string) => Promise<void>, readonly eventLog = new DiagnosticJournal()) { this.catalogStore = new RemoteMountStore(store); }
     async init(): Promise<void> {
+        this.loadWarnings.length = 0;
         const saved = await this.catalogStore.load();
         if (!saved) return;
         if (!saved || saved.version !== 1 || (!Number.isSafeInteger(saved.revision) || saved.revision < 0) || !saved.projects || typeof saved.projects !== 'object') throw new FSError('EINVAL', 'Invalid remote mount catalog');
@@ -245,21 +246,24 @@ export class ProjectRemoteMountService {
     }
     saveConnection(input: RemoteFileSystemInput, password: string, id?: string): Promise<string> {
         return this.serial(async () => {
-            const value = normalizeConnection(input), existing = id ? this.connection(id) : undefined;
+            const value = normalizeConnection(input), existing = id ? this.connections().find(connection => connection.id === id) : undefined;
             if (!existing && !password && !value.anonymous) throw new FSError('EINVAL', 'Password required');
             const connections = this.connections();
             if (connections.some(item => item.id !== id && (item.name === value.name || (!!value.username && item.endpoint === value.endpoint && item.username === value.username))))
                 throw new FSError('EEXIST', 'Remote file system already configured');
             const affected = this.connectionProjects(id);
-            if (affected.length && existing?.endpoint !== value.endpoint) throw new FSError('EBUSY', 'Referenced endpoint cannot change');
+            if (id && !existing && !affected.length) throw new FSError('ENOENT', 'Cells connection not found');
+            if (affected.length && existing && existing.endpoint !== value.endpoint) throw new FSError('EBUSY', 'Referenced endpoint cannot change');
             for (const projectId of affected) await this.beforeChange(projectId);
             let next: RemoteFileSystemConfig = { ...value, id: id ?? randomUUID(), credentialRef: existing?.credentialRef ?? randomUUID() };
             const restore = password ? this.provider.setCredential(next.credentialRef, password) : undefined;
             try {
+                if (affected.length && !existing && !this.provider.discover) throw new FSError('ECAPABILITY', 'Cells discovery is required to recover a referenced connection');
                 if (this.provider.discover) {
                     const descriptor = await this.provider.discover(next, {timeoutMs: 10_000});
                     next = {...next, endpoint: descriptor.httpEndpoint, serverId: descriptor.serverId ?? undefined, projects: descriptor.projects, authorization: descriptor.authorization};
                     if (affected.length && existing && !canReaddressConnection(existing, next)) throw new FSError('EBUSY', 'Referenced Cells identity or authorization changed');
+                    if (affected.length && !existing) this.assertRecoveredConnection(id!, next);
                 }
                 await this.persist({ ...this.catalog,connections:[...connections.filter(item => item.id !== id),next] },password ? {id:next.id,password} : undefined);
             }
@@ -272,6 +276,14 @@ export class ProjectRemoteMountService {
             for (const listener of this.listeners) listener();
             return next.id;
         });
+    }
+    private assertRecoveredConnection(id: string, next: RemoteFileSystemConfig): void {
+        const mounts = Object.values(this.catalog.projects).flat().filter(mount => mount.connectionId === id);
+        const valid = !!next.serverId && !!next.authorization && mounts.every(mount => mount.serverId === next.serverId
+            && mount.authorization?.principalId === next.authorization!.principalId
+            && mount.authorization?.anonymous === next.authorization!.anonymous
+            && mount.authorization?.revision === next.authorization!.revision);
+        if (!valid) throw new FSError('EBUSY', 'Missing Cells connection must retain the bound server identity and authorization');
     }
     removeConnection(id: string): Promise<void> {
         return this.serial(async () => {

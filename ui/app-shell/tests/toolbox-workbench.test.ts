@@ -1,3 +1,4 @@
+import {CellsSettingsEditor} from '@nestos/app-settings';
 import {ASSISTANT_ADD_EVENT} from '../src/navigation/assistant-actions';
 import { SystemPromptSettingsEditor } from '@nestos/llm-ui-adapter/settings';
 // @vitest-environment jsdom
@@ -47,7 +48,7 @@ async function setup(ocr?: import('../src/configuration/ocr-controls').OcrConfig
         flows: runtime.flowEngine.engine, ...inventory.sources }, runtime.agentService, runtime.commandBus, await runtime.vfs.openFileSystem('/etc'), inventory, createNestosFlowDrawers(), createNestosProviderTemplates());
     const sidebar = document.createElement('div'), main = document.createElement('div'); document.body.append(sidebar, main);
     const factory = vi.fn(async (container: HTMLElement, options: EditorOptions) => { const editor = new Editor(container, {}, options); await editor.init(container); return editor; });
-    const factories = { prompts: async (container: HTMLElement, options: EditorOptions) => { const editor = new SystemPromptSettingsEditor(container, runtime.agentService, options); await editor.init(container); return editor; }, agents: factory, skills: factory, flows: factory,
+    const factories = { cells: async (container: HTMLElement, options: EditorOptions) => {const editor = new CellsSettingsEditor(container, undefined, options); await editor.init(container); return editor;}, prompts: async (container: HTMLElement, options: EditorOptions) => { const editor = new SystemPromptSettingsEditor(container, runtime.agentService, options); await editor.init(container); return editor; }, agents: factory, skills: factory, flows: factory,
         providers: async (container: HTMLElement, options: EditorOptions) => { const editor = new ProviderSettingsEditor(container, runtime.agentService, options, mediaProbeExamples); await editor.init(container); return editor; },
         connections: async (container: HTMLElement, options: EditorOptions) => { const editor = new ConnectionSettingsEditor(container, runtime.agentService, options); await editor.init(container); return editor; },
         mcp: async (container: HTMLElement, options: EditorOptions) => { const editor = new MCPSettingsEditor(container, runtime.agentService, options); await editor.init(container); return editor; },
@@ -201,7 +202,7 @@ it('copies editable definitions and resolves tool references without installing 
 });
 it('creates resources at paths that their owning editors can reopen', async () => {
     const f = await setup();
-    for (const kind of TOOLBOX_KINDS.filter(kind => kind !== 'tools')) {
+    for (const kind of TOOLBOX_KINDS.filter(kind => kind !== 'tools' && kind !== 'cells')) {
         const path = await f.resources.create(kind, 'Created ' + kind);
         expect(await f.resources.sources[kind].driver.exists(path.slice(kind.length + 1))).toBe(!['prompts', 'mcp', 'providers', 'connections'].includes(kind));
         await f.inventory.refresh();
@@ -517,7 +518,7 @@ it('keeps the original toolbar and all resource types available from model creat
     const pending = f.workbench.createResource();
     const dialog = document.querySelector('.project-dialog')!;
     expect(dialog.querySelector('fieldset')?.hidden).toBe(true);
-    expect([...dialog.querySelectorAll<HTMLButtonElement>('[data-create-kind]')].map(button => button.dataset.createKind)).toEqual(TOOLBOX_KINDS.filter(kind => kind !== 'tools'));
+    expect([...dialog.querySelectorAll<HTMLButtonElement>('[data-create-kind]')].map(button => button.dataset.createKind)).toEqual(TOOLBOX_KINDS.filter(kind => kind !== 'tools' && kind !== 'cells'));
     expect(dialog.querySelector('[data-create-kind="providers"]')?.textContent).toBe('模型服务商');
     expect(dialog.querySelector('[data-create-kind="connections"]')?.textContent).toBe('模型连接');
     dialog.querySelector<HTMLButtonElement>('[data-create-kind="providers"]')!.click();
@@ -812,7 +813,7 @@ it('exports shared prompts with their Agent and remaps references on import', as
 it('orders categories consistently and deletes prompts through the configuration menu', async () => {
     const f = await setup();
     const order = [...f.sidebar.querySelectorAll<HTMLButtonElement>('[data-toolbox-filter]')].map(button => button.dataset.toolboxFilter);
-    expect(order).toEqual(['all', 'models', 'flows', 'tools', 'mcp', 'skills', 'prompts', 'agents']);
+    expect(order).toEqual(['all', 'models', 'flows', 'tools', 'mcp', 'cells', 'skills', 'prompts', 'agents']);
     expect(f.sidebar.querySelector('[data-toolbox-filter="all"]')?.getAttribute('aria-pressed')).toBe('true');
     f.sidebar.querySelector<HTMLButtonElement>('[data-toolbox-filter="skills"]')!.click();
     expect(f.sidebar.querySelector('[data-toolbox-filter="skills"]')?.getAttribute('aria-pressed')).toBe('true');
@@ -1092,4 +1093,15 @@ it('shows only the primary model capabilities below the connection name and reta
     expect(summary.querySelector('[aria-label="'+t('toolbox.capability.tools')+'"]')).not.toBeNull();
     expect(summary.querySelector('[aria-label="'+t('toolbox.capability.vision')+'"]')).toBeNull();
     expect(row.querySelector('.vfs-node-item__summary')).toBeNull();
+});
+
+it('offers Cells immediately before Skills and opens its shared configuration resource', async () => {
+    const f = await setup();
+    const categories = [...f.sidebar.querySelectorAll<HTMLButtonElement>('[data-toolbox-filter]')].map(node => node.dataset.toolboxFilter);
+    expect(categories.indexOf('cells') + 1).toBe(categories.indexOf('skills'));
+    f.workbench.setFilter('cells');
+    await vi.waitFor(() => expect(f.sidebar.querySelector('[data-item-id="/cells/manage"]')).not.toBeNull());
+    await f.workbench.openResource('/cells/manage');
+    await vi.waitFor(() => expect(f.main.querySelector('[data-cells-form]')).not.toBeNull());
+    expect(toolboxSettingsRoute('cells')).toBe('/cells/manage');
 });

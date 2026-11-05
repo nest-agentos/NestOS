@@ -5,5 +5,5 @@ import { TOOLBOX_KINDS, type ToolboxKind } from '@nestos/app-contracts';
 export function createToolboxFiles(sources: Record<ToolboxKind, IFileSystem>) {
     return createFileSystemView({ viewId: 'toolbox:admin', mounts: TOOLBOX_KINDS.map(kind => ({
         mountId: kind, at: '/' + kind, fs: sources[kind],
-        access: ['prompts', 'mcp', 'tools', 'providers', 'connections'].includes(kind) ? 'ro' : 'rw' })) });
+        access: ['cells', 'prompts', 'mcp', 'tools', 'providers', 'connections'].includes(kind) ? 'ro' : 'rw' })) });
 }

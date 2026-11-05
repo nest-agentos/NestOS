@@ -1,3 +1,4 @@
+import {CellsSettingsEditor} from '@nestos/app-settings';
 import {MCPDiagnosticsControls} from './mcp-diagnostics';
 import { RemoteAgentDetailsEditor } from './RemoteAgentDetailsEditor';
 import { MCPConfigurationControlsRegistry } from './mcp-controls';
@@ -46,7 +47,9 @@ function configurationFactories(options: Options, inventory: ToolboxInventory, r
     const create = (Editor: new (element: HTMLElement, service: typeof agentService, options: import('@nestos/ui-common-adapter').EditorOptions, examples?: MediaProbeExamples) => import('@nestos/ui-common-adapter').IEditor, examples?: MediaProbeExamples): EditorFactory => async (element, config) => {
         const editor = new Editor(element, agentService, config, examples); await editor.init(element); return editor;
     };
-    return { ...options.factories, agents: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
+    return { ...options.factories, cells: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
+        const editor = new CellsSettingsEditor(element, options.services.projects?.remoteMounts, config); await editor.init(element); return editor;
+    }, agents: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
         if (config.target?.kind === 'file' && config.target.path.startsWith('/@remote/')) {
             const editor = new RemoteAgentDetailsEditor(element, inventory, config, options.services.projects); await editor.init(element); return editor;
         }

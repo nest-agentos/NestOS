@@ -161,7 +161,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         cells: services.projects.remoteMounts,
         ocr,
         agentService, connectionService: llmDriver, llmUiEditors: options.ui.llmUiEditors,
-        excludedPages: toolboxId ? ['providers', 'connections', 'mcp-servers', 'system-prompts'] : [],
+        excludedPages: toolboxId ? ['cells', 'providers', 'connections', 'mcp-servers', 'system-prompts'] : [],
         connectBrowser: (browser, fs, container, factory) => connectEditorLifecycle(browser, fs, container, factory, { readOnly: true }),
         restoreFlows: options.ui.restoreFlowLibrary ? () => options.ui.restoreFlowLibrary!(commandBus) : undefined,
         requestDelete: targets => deletionDialog.request(targets),

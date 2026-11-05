@@ -546,3 +546,12 @@ target = "/home/li/.gitconfig"
 DSH 展示投影不将明确来源为 agent-instructions、runtime-context、tool-jobs 的注入消息当作用户提问；原生日志与接纳核对仍保留完整事件。reasoning 经驱动标记为 assistant.reasoning，由默认聊天视图作为助手思考默认折叠展示，不再显示为系统正文。命令结果、错误、审批及未知来源记录继续沿用原展示。
 
 远程会话的单项菜单、侧栏多选和右侧目录多选统一经宿主确认与原生管理端口处理，不使用普通文件删除。所选会话不能删除但全部允许归档时，明确询问是否改为归档并说明保留历史和项目文件，确认前不执行。存在既不可删除又不可归档的项时显示原因，不自动删除子集或归档；批量部分成功后保留进度，显式重试跳过已完成项，原生结果未知仍沿用原 journal 核对。
+
+
+### Cells 配置入口与旧连接迁移
+
+Cells 配置位于工具箱，分类顺序为 MCP → Cells → 技能。`/cells/manage` 是只读导航资源，打开共享的 CellsSettingsEditor；连接的增删改查仍只走 ProjectRemoteMountService，不将凭据写入工具箱文件或再实现一份连接表单。旧 settings/cells 地址转到同一工具箱资源。
+
+移除 MCP→Cells 运行时映射前，旧部署可能只在 MCP 配置保存节点，项目目录中仅有引用。启动检查到缺失引用时，`configuration/migrate-cells-connections` 一次性核对旧已验证描述与挂载的服务器、账号、授权修订，再把原连接 ID 和凭据保存到 Cells 权威目录。普通运行不调用 MCP 发现来获取 Cells 能力。既有 Cells 记录不覆盖，迁移重复执行不推进 revision；不匹配项保留离线并报告明确的迁移未完成代码。
+
+连接缺失是 cells-not-found/ENOENT，认证与项目授权失败另行分类；诊断刷新提示不再把所有失败都解释为管理员未授权。Cells 故障只令看板分析/执行报错，不能生成用户取消命令。

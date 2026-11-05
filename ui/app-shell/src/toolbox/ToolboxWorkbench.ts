@@ -167,7 +167,7 @@ export class ToolboxWorkbench implements WorkspaceController {
     private factory(kind: ToolboxKind): EditorFactory {
         return async (container, options) => {
             const original = editorResourceId(options) ?? '', path = toolboxSourcePath(original), source = this.options.resources.sources[kind];
-            const target = kind !== 'agents' && kind !== 'flows'
+            const target = kind !== 'agents' && kind !== 'flows' && kind !== 'cells'
                 ? { kind: 'entity' as const, entityType: { prompts: 'system-prompt' as const, skills: 'skill' as const, mcp: 'mcp' as const, tools: 'tool' as const, providers: 'provider' as const, connections: 'connection' as const }[kind], id: decodeURIComponent(path.slice(1)) }
                 : { kind: 'file' as const, path };
             const instance = await this.options.factories[kind](container, { ...options, target, files: { fs: source, cwd: '/' },
@@ -236,6 +236,7 @@ export class ToolboxWorkbench implements WorkspaceController {
         if (this.options.agentsInWorkbench && this.prefs.filter !== 'agents') items = items.filter(item => toolboxKind(item.id) !== 'agents');
         const models = items.filter(item => ['providers', 'connections'].includes(toolboxKind(item.id)!));
         return [...(this.prefs.filter === 'all' || this.prefs.filter === 'models' ? modelDrawers(models, this.options.inventory) : []),
+            ...items.filter(item => toolboxKind(item.id) === 'cells' && ['all', 'cells'].includes(this.prefs.filter)),
             ...resourceDrawers(items, this.options.resources.drawers, this.prefs.filter)
                 .filter(group => !this.options.agentsInWorkbench || this.prefs.filter === 'agents' || group.metadata.custom.toolboxKind !== 'agents')];
     }
@@ -264,6 +265,7 @@ export class ToolboxWorkbench implements WorkspaceController {
     }
     private menu(item: VFSNodeUI, defaults: MenuItem<VFSNodeUI>[]): MenuItem<VFSNodeUI>[] {
         const kind = toolboxKind(item.id), provider = modelDrawerProvider(item.id);
+        if (kind === 'cells') return [];
         const actions = [this.exportMenu([item.id])];
         if (item.id === invalidConnectionsId) return [...actions, { id: 'delete-invalid-connections', label: t('action.delete'),
             onClick: async () => { await this.selectionDeletion.run([item.id], this.abort.signal); } }];
@@ -295,6 +297,7 @@ export class ToolboxWorkbench implements WorkspaceController {
             onClick: () => this.deletion.request([{ kind: 'entity', entityType, id: decodeURIComponent(toolboxSourcePath(path).slice(1)) }]) };
     }
     private bulkMenu(items: VFSNodeUI[], defaults: MenuItem<VFSNodeUI>[]): MenuItem<VFSNodeUI>[] {
+        if (items.some(item => toolboxKind(item.id) === 'cells')) return [];
         const paths = items.map(item => item.id), kind = toolboxKind(paths[0] ?? '');
         const menu = [this.exportMenu(paths)];
         if (drawerKind(kind) && items.every(item => item.type === 'file' && toolboxKind(item.id) === kind))
@@ -384,9 +387,10 @@ export class ToolboxWorkbench implements WorkspaceController {
         this.ui.setExpanded(folderId, true);
     }
     async createResource(options: { title?: string; parentPath?: string | null; content?: string; drawerId?: string } = {}): Promise<string> {
+        if (this.prefs.filter === 'cells') {await this.options.navigate({target: 'toolbox', resourceId: '/cells/manage'}); return '/cells/manage';}
         const drawer = (options.drawerId ? this.options.resources.drawers.get(options.drawerId) : undefined) ?? this.selectedDrawer();
         const kind = options.drawerId && drawer && drawer.kind !== 'tools' ? drawer.kind : undefined;
-        const kinds = TOOLBOX_KINDS.filter(item => item !== 'tools'
+        const kinds = TOOLBOX_KINDS.filter(item => item !== 'cells' && item !== 'tools'
             && (item !== 'agents' || !this.options.agentsInWorkbench || this.prefs.filter === 'agents'));
         return showToolboxCreationDialog({ kinds, initialKind: kind, initialName: options.title, drawer,
             drawers: this.options.resources.drawers, providers: [...this.options.inventory.providers].map(([id, item]) => ({ id, name: item.name }))

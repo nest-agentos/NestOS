@@ -92,6 +92,7 @@ export class ToolboxResources {
     async create(kind: ToolboxKind, name: string, providerId?: string, providerTemplateId?: string): Promise<string> {
         if (!name.trim()) throw new Error(t('toolbox.nameRequired'));
         name = name.trim();
+        if (kind === 'cells') throw Object.assign(new Error('Use the Cells configuration editor to manage node connections'), {code: 'ECAPABILITY'});
         if (kind === 'tools') throw new Error(t('toolbox.toolsCreate'));
         const id = randomUUID();
         if (kind === 'providers' || kind === 'connections') return this.createModel(kind, id, name, providerId, providerTemplateId);

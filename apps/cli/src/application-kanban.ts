@@ -1,3 +1,5 @@
+import {randomUUID} from '@nestos/common';
+import {writeCallJson} from './application-submission';
 import {readFile} from 'node:fs/promises';
 import type {ApplicationClient} from '@nestos/app-contracts/services';
 import type {CommandOptions} from './commands';
@@ -8,6 +10,7 @@ type Service = NonNullable<ApplicationClient['services']['kanban']>;
 export async function kanbanCommand(client: ApplicationClient, args: string[], options: CommandOptions): Promise<unknown> {
     const service = client.services.kanban;
     if (!service) throw Object.assign(new Error('Kanban is unavailable on this host'), {code: 'ECAPABILITY'});
+    if (args[0] === 'task') return taskCommand(service, args.slice(1), options);
     const [action, boardId, itemId] = args;
     if (action === 'list') return service.catalog();
     if (action === 'principal') return service.currentPrincipal();
@@ -58,4 +61,26 @@ function integer(value: string): number {
     const number = Number(value);
     if (!Number.isSafeInteger(number) || number < 0) throw new Error('Invalid event sequence');
     return number;
+}
+
+
+async function taskCommand(service: Service, args: string[], options: CommandOptions): Promise<unknown> {
+    const [action, boardId, itemId] = args;
+    if (!['run', 'pause', 'resume', 'cancel', 'reopen'].includes(action) || !boardId || !itemId || args.length !== 3)
+        throw new Error('kanban task run|pause|resume|cancel|reopen <board-id> <item-id> --submission-file request.json (or --file to submit the frozen request)');
+    if (options.file && options.submissionFile) throw new Error('Choose --file or --submission-file');
+    let request: Parameters<Service['execute']>[1];
+    if (options.file) request = await jsonFile(options.file);
+    else {
+        if (!options.submissionFile) throw new Error('Missing --submission-file; save a stable task control request before dispatch');
+        const board = await service.read(boardId);
+        if (!board.items.some(item => item.id === itemId)) throw new Error('Kanban task was not found');
+        request = {operationId: randomUUID(), expectedRevision: board.revision, command: action === 'run'
+            ? {type: 'request-run', itemId} : action === 'reopen' ? {type: 'reopen-item', itemId, reopenId: randomUUID()} : {type: 'request-control', itemId, controlId: randomUUID(), action: action as 'pause' | 'resume' | 'cancel'}};
+        await writeCallJson(options.submissionFile, request, request.operationId, 'kanban.task.' + action);
+    }
+    const command = request.command;
+    if (command?.type !== (action === 'run' ? 'request-run' : action === 'reopen' ? 'reopen-item' : 'request-control') || !('itemId' in command) || command.itemId !== itemId
+        || !['run', 'reopen'].includes(action) && (!('action' in command) || command.action !== action)) throw new Error('Frozen task request does not match the requested task or action');
+    return service.execute(boardId, request);
 }

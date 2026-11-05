@@ -43,3 +43,28 @@ it('uses the shared task projection query and keeps fix/reply operation identiti
     await kanbanCommand(client,['reply','development'],{file});expect(replyTask).toHaveBeenCalledExactlyOnceWith('development',request);
     expect(await kanbanCommand(client,['query','development'],{})).toMatchObject({items:[{task:{phase:'waiting-start'}}]});
 });
+
+it('freezes task resume identity before dispatch and supports replaying that exact request', async () => {
+    const {readFile, stat} = await import('node:fs/promises');
+    const directory = await mkdtemp(join(tmpdir(), 'kanban-resume-')); paths.push(directory);
+    const file = join(directory, 'resume.json'), read = vi.fn(async () => ({revision: 7, items: [{id: 'task'}]}));
+    const execute = vi.fn(async (_board: string, request: unknown) => {
+        expect(JSON.parse(await readFile(file, 'utf8'))).toEqual(request); return {accepted: true};
+    });
+    const client = {services: {kanban: {read, execute}}} as unknown as ApplicationClient;
+    await kanbanCommand(client, ['task', 'resume', 'board', 'task'], {submissionFile: file});
+    const request = JSON.parse(await readFile(file, 'utf8'));
+    expect(request).toMatchObject({expectedRevision: 7, command: {type: 'request-control', action: 'resume', itemId: 'task'}});
+    expect((await stat(file)).mode & 0o777).toBe(0o600);
+    await kanbanCommand(client, ['task', 'resume', 'board', 'task'], {file});
+    expect(read).toHaveBeenCalledOnce(); expect(execute).toHaveBeenLastCalledWith('board', request);
+});
+it('does not dispatch when freezing fails or a frozen task/action does not match', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'kanban-task-frozen-')); paths.push(directory);
+    const file = join(directory, 'existing.json'); await writeFile(file, JSON.stringify({command: {type: 'request-control', itemId: 'other', action: 'pause'}}));
+    const execute = vi.fn(), read = vi.fn(async () => ({revision: 7, items: [{id: 'task'}]}));
+    const client = {services: {kanban: {read, execute}}} as unknown as ApplicationClient;
+    await expect(kanbanCommand(client, ['task', 'resume', 'board', 'task'], {submissionFile: file})).rejects.toThrow('already exists');
+    await expect(kanbanCommand(client, ['task', 'resume', 'board', 'task'], {file})).rejects.toThrow('does not match');
+    expect(execute).not.toHaveBeenCalled();
+});

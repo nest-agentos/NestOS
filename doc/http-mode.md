@@ -176,3 +176,11 @@ call-submit 明确提交原文件身份，由宿主创建独立子 Session。调
 本地提交默认等待该子调用完成或进入人工交互/待派发/待核对状态；失败/取消沿用 CLI 退出码 2，等待输入为 3。远程 --connect 默认返回接纳及 executionSessionId；添加 --follow 在 CLI 自身观察作用域打开该子 Session，等待其真实执行，不以父级状态判断。回执查询不打开视图，--follow 仅适用于 call-submit。CLI 本地进程退出不承诺继续后台调度，需要后台执行时使用持续运行的远程宿主。
 
 `session calls` 是只读查询，不准备或提交新调用，也不打开会话视图。独立调用的执行观察与 Web 调用卡片共用 `session.calls.list`：接纳回执、目标 Task、交互、子树清理、调用方结算和历史提交分别核对。`session.call.inspect` 只核对原始接纳，不等待目标派发；不能通过普通指令队列中没有记录推断独立执行未知或完成。本地 CLI 与 `--connect --follow` 使用同一投影，只有传输与宿主生命周期不同。
+
+
+## Kanban 任务控制
+
+`kanban task run|pause|resume|cancel|reopen <board-id> <item-id> --submission-file request.json` 使用与 UI 相同的 request-run/request-control。首次提交前读取看板 revision，将操作和 control ID 独占保存为 0600 文件并同步，再调用宿主；已存在文件不会覆盖，也不发送。需要明确重试时使用同一命令加 `--file request.json`，沿用原身份，不自动重试 unknown。任务 resume 解除原暂停；手工启动且尚未接纳的任务仍需 task run，不能把恢复暂停误当成新一轮执行。
+
+
+`task reopen` 只允许人类显式恢复已取消且从未进入执行计划的任务，保留取消事件，恢复为手工待启动；随后 task run 经正式准入再启动。已经派发过或具有子任务的取消事项不能通过该入口清空执行历史，也不能直接设置 running。

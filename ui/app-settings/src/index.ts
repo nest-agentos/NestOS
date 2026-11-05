@@ -13,3 +13,5 @@ export function createSettingsNavigation(options: { excludedPages?: readonly str
 }
 
 export {DiagnosticLogView, diagnosticReasonText} from './editors/log/DiagnosticLogView';
+
+export {CellsSettingsEditor} from './editors/CellsSettingsEditor';

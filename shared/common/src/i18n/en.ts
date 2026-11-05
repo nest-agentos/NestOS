@@ -852,6 +852,8 @@ export const en: LocaleStrings = {
     'diagnostics.refreshBinding': 'Refresh authorization and project binding',
     'diagnostics.refreshBindingHint': 'Rediscover MCP authorization and update the existing binding using server-granted permissions.',
     'diagnostics.refreshingBinding': 'Rediscovering authorization and updating the project binding…',
+    'diagnostics.bindingConnectionMissing': 'Cells connection configuration is missing. Restore it in Toolbox → Cells.',
+    'diagnostics.bindingAccessDenied': 'The server denied project access. Ask an administrator to check the account and project grant.',
     'diagnostics.bindingRefreshed': 'Project binding refreshed. Review the current status.',
     'diagnostics.bindingRefreshFailed': 'Refresh failed. See the logs. Access denial requires a server administrator to grant project access.',
 
@@ -4127,6 +4129,7 @@ export const en: LocaleStrings = {
     'toolbox.deleteSelected': 'Delete selected ({count})',
     'toolbox.selectionChanged': 'Selected items changed or cannot be deleted. Refresh and select again.',
     'toolbox.itemMenu': 'More actions',
+    'toolbox.cells': 'Cells',
     'toolbox.title': 'Toolbox',
     'toolbox.all': 'All',
     'toolbox.agents': 'Agents',

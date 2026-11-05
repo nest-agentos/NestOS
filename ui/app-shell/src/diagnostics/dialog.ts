@@ -100,7 +100,10 @@ class DiagnosticDialog {
         if (this.binding.disabled || !this.options.refreshBinding) return;
         this.binding.disabled = this.check.disabled = true; this.hint.textContent = t('diagnostics.refreshingBinding');
         try {await this.options.refreshBinding(); if (!this.closed) this.hint.textContent = t('diagnostics.bindingRefreshed');}
-        catch {if (!this.closed) this.hint.textContent = t('diagnostics.bindingRefreshFailed');}
+        catch (error) {if (!this.closed) {
+            const code = (error as {code?: string; remoteCode?: string})?.remoteCode ?? (error as {code?: string})?.code;
+            this.hint.textContent = t(code === 'ENOENT' ? 'diagnostics.bindingConnectionMissing' : ['EACCES', 'FORBIDDEN', 'UNAUTHENTICATED'].includes(code ?? '') ? 'diagnostics.bindingAccessDenied' : 'diagnostics.bindingRefreshFailed');
+        }}
         finally {
             if (!this.closed) {this.binding.disabled = this.check.disabled = false; await this.refresh(); await this.logs.refresh();}
         }

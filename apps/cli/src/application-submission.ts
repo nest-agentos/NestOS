@@ -166,14 +166,14 @@ async function saveSubmission(file: string, request: SubmissionRequest): Promise
     return writeCallJson(file, request, request.submission!.id);
 }
 
-export async function writeCallJson(file: string, value: unknown, operationId: string): Promise<void> {
+export async function writeCallJson(file: string, value: unknown, operationId: string, operation = 'session.prepare'): Promise<void> {
     const started = Date.now(), bytes = JSON.stringify(value, null, 2) + '\n';
     if (Buffer.byteLength(bytes) > MAX_CALL_BYTES) throw failure('CLI_CALL_FILE_LIMIT', 'Frozen submission exceeds 1 MiB');
     try {
         const handle = await open(file, 'wx', 0o600);
         try {await handle.writeFile(bytes, 'utf8'); await handle.sync(); await syncParent(file);} finally {await handle.close();}
     } catch (error) {
-        recordFailure('session.prepare', operationId, 'file-write', error, started);
+        recordFailure(operation, operationId, 'file-write', error, started);
         throw failure('CLI_CALL_FILE_WRITE_FAILED', safeCode(error) === 'EEXIST'
             ? 'Submission file already exists; use the matching receipt or submit command with that frozen file'
             : 'Cannot save frozen submission before dispatch: ' + safeCode(error));

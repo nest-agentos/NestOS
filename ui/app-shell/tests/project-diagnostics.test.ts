@@ -92,7 +92,7 @@ it('offers a binding refresh independently of checking and keeps authorization e
     const refreshBinding = vi.fn().mockRejectedValueOnce(Object.assign(new Error('PRIVATE_BODY'), {code: 'EACCES'})).mockResolvedValue(undefined);
     const pending = showDiagnostics({title: 'Project status', projectId: 'project-a', diagnostics: d.port, refreshBinding, signal: controller.signal});
     click(t('diagnostics.refreshBinding'));
-    await vi.waitFor(() => expect(document.querySelector('dialog')?.textContent).toContain(t('diagnostics.bindingRefreshFailed')));
+    await vi.waitFor(() => expect(document.querySelector('dialog')?.textContent).toContain(t('diagnostics.bindingAccessDenied')));
     expect(document.body.textContent).not.toContain('PRIVATE_BODY');
     click(t('diagnostics.refreshBinding'));
     await vi.waitFor(() => expect(document.querySelector('dialog')?.textContent).toContain(t('diagnostics.bindingRefreshed')));
@@ -140,4 +140,15 @@ it('embeds project diagnostics without a second modal and releases subscriptions
     expect(HTMLDialogElement.prototype.showModal).not.toHaveBeenCalled();
     controller.abort(); await closed;
     expect(d.stop).toHaveBeenCalled(); expect(container.childElementCount).toBe(0);
+});
+
+it('explains a missing Cells connection without blaming project authorization', async () => {
+    const d = diagnostics(), controller = new AbortController(); controllers.push(controller);
+    const refreshBinding = vi.fn(async () => {throw Object.assign(new Error('PRIVATE_DETAIL'), {code: 'ENOENT'});});
+    const pending = showDiagnostics({title: 'Missing Cells', diagnostics: d.port, signal: controller.signal, refreshBinding});
+    click(t('diagnostics.refreshBinding'));
+    await vi.waitFor(() => expect(document.querySelector('dialog')?.textContent).toContain(t('diagnostics.bindingConnectionMissing')));
+    expect(document.querySelector('dialog')?.textContent).not.toContain('PRIVATE_DETAIL');
+    expect(document.querySelector('dialog')?.textContent).not.toContain(t('diagnostics.bindingAccessDenied'));
+    click(t('action.close')); await pending;
 });

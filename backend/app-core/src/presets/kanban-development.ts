@@ -95,14 +95,13 @@ async function recordPublication(journal: KanbanAutomationJournal, id: string, d
 }
 
 export function channelInstruction(policy: DevelopmentPolicy, entry: string, pre: string[]): string {
-    return `Use the cells_session MCP 2.0 tools. Read session_context sections identity, policy and instructions, then ${[...pre, entry].join(', ')} before execution. `
-        + `Load task, context and other sections only when needed. Frozen commit policy: ${policy.commit}; never merge or push. Work only in the assigned worktree and declared repositories. `
-        + `Report using session_report({id,message:{type,content}}), types progress/clarification/error/result; content is a nonempty summary of at most 8000 characters. `
-        + `Reuse the same id and unchanged message after a lost receipt; session_receipt checks durable acceptance. Use resolved with replyTo to resolve a prior question/error. `
-        + `Communicate only through these tools. Artifacts remain files. A result is an application for host verification, not task completion. `
-        + `For live task/decision context call session_request with method kanban.context.resolve and params {repository,commits:[full SHA],include:[task,decisions,acceptance]}. If pending, end the turn without a result; the host resumes this SAME Session. Read replies through session_response, never poll. `
-        + `On clarification, end the turn and wait. On unrecoverable error, report the specific reason and end. Execute only the requested lifecycle stage when dependencies.lifecycle.stage is supplied. `
-        + `Do not print full files or logs: search symbols first, read bounded ranges, and retain large evidence as artifacts.`;
+    return `Use cells_session MCP. Read identity, policy, instructions, then ${[...pre, entry].join(', ')} via session_context; task/context only as needed. `
+        + `Commit: ${policy.commit}; assigned worktree/repositories only; never merge/push. `
+        + `session_report types: progress/clarification/error/result/resolved; content: nonempty summary <=8000 characters; resolved needs replyTo. Results request host verification. `
+        + `Live context: session_request method kanban.context.resolve, params {repository,commits:[full SHA],include:[task,decisions,acceptance]}. Read replies with session_response. `
+        + `After clarification, unrecoverable error or pending request, end the turn; never poll. Run only dependencies.lifecycle.stage when given. `
+        + `Search before bounded file/log reads; keep large evidence as artifacts.`;
+
 }
 
 export async function openDevelopmentChannel(remote: Pick<ProjectRemoteMountService, 'sessionChannel'>, id: string, record: DevelopmentWorkspaceRecord,

@@ -279,6 +279,7 @@ export const CHAT_ICONS = {
     search: toolboxIcon('<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>'),
 } as const;
 export const TOOLBOX_ICONS = {
+    cells: ENTITY_ICONS.model,
     prompts: toolboxIcon('<path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/>'),
     providers: toolboxIcon('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M8 6h.01M8 12h.01M8 18h.01"/>'),
     connections: toolboxIcon('<path d="m10 13 4-4m-6 7-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 10a4 4 0 0 0 6 0l4-4a4 4 0 0 0-6-6l-1 1"/>'),

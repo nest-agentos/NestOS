@@ -16,7 +16,7 @@ import type {PersonalKanbanAutomationOptions} from '../src/kanban/personal-autom
 
 const disposers: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of disposers.splice(0)) await close();});
-async function fixture(autoAccept = false, analysis?:unknown) {
+async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: Error) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); disposers.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/'), events = await UserEventService.open(fs);
     const channels=memoryChannels();
@@ -49,7 +49,7 @@ async function fixture(autoAccept = false, analysis?:unknown) {
         return {id, sessionId: _session, version: 1, effects: {}, exit: {status: 'succeeded', output: {exit: {status: 'succeeded', output}}}} as unknown as TaskRecord;
     })} as unknown as PersonalKanbanAutomationOptions['kernel'];
     const fileJournal=new KanbanAutomationJournal(fs, kanbanJournalOptions);await fileJournal.open();
-    const options: PersonalKanbanAutomationOptions = {observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:id=>readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
+    const options: PersonalKanbanAutomationOptions = {prepareAnalysis: prepareFailure ? async () => {throw prepareFailure;} : undefined, observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:id=>readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
         prepareSession: vi.fn(async () => true), catalog: vi.fn(async () => targets)};
     const diagnostics = new DiagnosticJournal();
     const open = () => createPersonalKanban(fs, events, diagnostics, options.sessions, kernel, options);
@@ -230,4 +230,15 @@ it('projects two explicit EFFECT_TIMEOUT analysis attempts to the root task, wor
     expect(f.calls.prepareTaskCall.mock.calls[0][1]).toMatchObject({timeoutMs:null});
     expect((await f.events.listNotifications()).items.filter(row=>row.event.value.type==='kanban.report-analysis')).toHaveLength(2);
     expect((await f.service.records('board',{itemId:'timeout'})).items.some(row=>row.activity?.code==='EFFECT_TIMEOUT')).toBe(true);
+});
+
+
+it.each(['ENOENT', 'EACCES', 'ETIMEDOUT'])('keeps a Cells preparation fault %s as an error without cancelling the task', async code => {
+    const f = await fixture(false, undefined, Object.assign(new Error('Cells unavailable'), {code}));
+    await f.item('unavailable'); await f.service.scan(); await f.service.scan();
+    const item = await f.service.item('board', 'unavailable');
+    expect(item.item.status).toBe('backlog'); expect(item.task).toMatchObject({phase: 'error', reason: code});
+    expect(item.item.analysis).toMatchObject({state: 'failed', code});
+    expect(item.item.control).toBeUndefined(); expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
+    expect((await f.service.events('board')).some(event => event.kind === 'control-receipt')).toBe(false);
 });
