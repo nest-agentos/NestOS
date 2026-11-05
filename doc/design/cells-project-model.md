@@ -561,3 +561,9 @@ DSH 展示投影不将明确来源为 agent-instructions、runtime-context、too
 首次接管旧进程身份绑定时，仅在显式续办的新执行中核对原 Session ID、项目工作区、worktree、最后已确认轮次及无写入者，再以 CAS 更新映射和 generation。缺少证据、原生忙碌、上下文变化或映射冲突均拒绝；不放宽已提交执行的 epoch 防重规则。
 
 持久映射有效但原生运行时尚未加载时，宿主先通过 `resume` 加载同一原生 Session，再提交新 turn。加载操作使用单独的稳定 requestId 和持久执行 journal，丢失响应时查询原回执，不创建替代 Session，也不重发已经接纳的 turn。冷历史第一页补全最后终态轮次；更早分页、活动或未完成轮次不能冒充当前终态会话头。
+
+### 会话业务状态与原生执行证据
+
+`session_report` 提供 progress、clarification、resolved、result 等不可变业务消息；MCP 发布成功仅证明消息持久化。消息发布事务同时将当前 sessionId、turnId、operationId、revision 保存到 publications 表，固定 API 返回服务端来源。重复相同消息 ID 不覆盖正文或来源，重启保留来源。`session_context` 的 channel-status 只返回报告 ID、类型、replyTo 与宿主回执，不重复输出正文。
+
+业务状态的解释归调用方，Cells 继续提供原生执行状态；两者不能相互替代。条件关闭通道在事务中核对 expectedExecutionRevision 与空闲状态，避免检查后新轮次启动造成错误释放。

@@ -50,7 +50,7 @@ async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: E
         return {id, sessionId: _session, version: 1, effects: {}, exit: {status: 'succeeded', output: {exit: {status: 'succeeded', output}}}} as unknown as TaskRecord;
     })} as unknown as PersonalKanbanAutomationOptions['kernel'];
     const fileJournal=new KanbanAutomationJournal(fs, kanbanJournalOptions);await fileJournal.open();
-    const options: PersonalKanbanAutomationOptions = {prepareAnalysis: prepareFailure ? async () => {throw prepareFailure;} : undefined, observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:id=>readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
+    const options: PersonalKanbanAutomationOptions = {prepareAnalysis: prepareFailure ? async () => {throw prepareFailure;} : undefined, observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:vi.fn(async id=>{const output=await readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal);return output===undefined?undefined:{state:'succeeded',output};}),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
         prepareSession: vi.fn(async () => true), catalog: vi.fn(async () => targets)};
     const diagnostics = new DiagnosticJournal();
     const open = () => createPersonalKanban(fs, events, diagnostics, options.sessions, kernel, options);
@@ -61,7 +61,7 @@ async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: E
     const settings: KanbanAutomationSettings = {enabled: true, autoAccept, planner: catalog.targets[0].reference, executor: catalog.targets[1].reference, coordinator: catalog.coordinator, worker: catalog.worker};
     await command({type: 'configure-automation', settings});
     const item = async (id: string) => {await command({type: 'create-item', item: {id, title: id, responsibility: 'Deliver ' + id, acceptance: 'Evidence verified'}});return command({type:'request-run',itemId:id});};
-    return {events,service, command, item, calls, kernel, submitted, completed, settings, open, diagnostics,
+    return {events,service, command, item, calls, kernel, analysisOutput:options.readAnalysisOutput!, submitted, completed, settings, open, diagnostics,
         lose: () => {loseReply = true; hideAdmission = true;}, reveal: () => {hideAdmission = false;}, invalid: () => {invalid = true;},
         executions: () => [...submitted.entries()].filter(([, input]) => input.request.expectedTarget!.id === 'executor')};
 }
@@ -242,4 +242,22 @@ it.each(['ENOENT', 'EACCES', 'ETIMEDOUT'])('keeps a Cells preparation fault %s a
     expect(item.item.analysis).toMatchObject({state: 'failed', code});
     expect(item.item.control).toBeUndefined(); expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
     expect((await f.service.events('board')).some(event => event.kind === 'control-receipt')).toBe(false);
+});
+
+it('retains one planning session while waiting for clarification and resumes the approved plan after host recovery',async()=>{
+    const f=await fixture(false,{ready:false,reason:'Confirm scope',dependencies:[]});
+    await f.item('first');await f.service.scan();
+    const firstInput=[...f.submitted.values()][0],planningId=firstInput.request.submission!.id;
+    expect(await f.service.analysisStatus!('board','first')).toMatchObject({state:'clarification'});
+    expect(await f.service.planningSession!('board','first')).toMatchObject({analysisId:planningId,state:'waiting-input',sessionId:'execution-'+planningId});
+    await expect(f.command({type:'retry-analysis',itemId:'first',retryId:randomUUID()})).rejects.toMatchObject({code:'ANALYSIS_CLARIFICATION_PENDING'});
+    await f.service.scan();expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);expect(f.executions()).toHaveLength(0);
+    await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());
+    await reopened.scan();expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
+    // Unrelated work must not invalidate this item's frozen planning definition.
+    await f.command({type:'create-item',item:{id:'unrelated',title:'Other',responsibility:'Other',acceptance:'Other'}},reopened);
+    vi.mocked(f.analysisOutput).mockResolvedValue({state:'succeeded',output:{ready:true,reason:'Confirmed scope',dependencies:[],estimate:{complexity:1,workUnits:1,durationMs:60000,confidence:'high'}}});
+    await reopened.scan();expect(f.executions()).toHaveLength(1);
+    expect(await reopened.planningSession!('board','first')).toMatchObject({analysisId:planningId,state:'completed'});
+    await reopened.scan();expect(f.executions()).toHaveLength(1);
 });

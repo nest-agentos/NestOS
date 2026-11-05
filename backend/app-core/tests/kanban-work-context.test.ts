@@ -8,8 +8,8 @@ const item={id:'child',title:'Swipe',responsibility:'Implement swipe',acceptance
 it('resolves board, decision, task lineage and project identities from host facts',async()=>{
     const decision={sourceBoardId:'development',recordId:'decision',recordRevision:2,runId:'run'};
     const journal={get:async(key:string)=>key==='record-context:run'?decision:undefined} as KanbanAutomationJournal;
-    expect(await workContext(journal,board,item)).toEqual({board:{id:'development',title:'开发'},decision,
-        task:{id:'child',parentId:'parent',title:'Swipe',responsibility:'Implement swipe',acceptance:'Two clicks',dependencies:['before']},
+    expect(await workContext(journal,board,item)).toEqual({board:{id:'development',title:'开发',revision:undefined,reference:'development'},decision,
+        task:{id:'child',revision:undefined,reference:'development/child',parentId:'parent',title:'Swipe',responsibility:'Implement swipe',acceptance:'Two clicks',dependencies:['before']},
         projects:[{system:'nestos-remote-project',id:'x1'}]});
 });
 it('recovers same-board historical provenance and never invents a decision for manual work',async()=>{

@@ -642,6 +642,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 {outcome: input.outcome, code: input.code}, 'decision', input.target);
             }) : undefined,
             prepareAnalysis: analyzeDevelopment ? input => developmentOperations.run(() => analyzeDevelopment.prepare(input)) : undefined,
+            controlConversation: analyzeDevelopment ? input => developmentOperations.run(() => analyzeDevelopment.control(input)) : undefined,
             readAnalysisOutput: analyzeDevelopment ? id => developmentOperations.run(() => analyzeDevelopment.read(id)) : undefined,
             observeWork: input => developmentOperations.run(() => developmentMessages.observe(input)),
             verifyWork: verifyDevelopment ? id => developmentOperations.run(() => verifyDevelopment(id)) : undefined,

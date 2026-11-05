@@ -41,7 +41,7 @@ function parseMessages(rows:Row[],scope:WorkMessageScope):WorkMessage[] {
     return messages.sort((a,b)=>Number(a.type==='resolved')-Number(b.type==='resolved'));
 }
 async function freezeMessage(journal:PromptJournal,scope:WorkMessageScope,row:Row):Promise<void> {
-    const digest=channelDigest(row);
+    const digest=channelDigest({id:row.id,message:row.message});
     await journal.update<Receipt>(messageKey(scope,row.id),old=>{
         if(old&&old.digest!==digest)throw failure('CHANNEL_MESSAGE_CHANGED');
         return old??{digest,delivered:false};

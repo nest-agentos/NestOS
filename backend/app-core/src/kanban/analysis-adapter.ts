@@ -1,3 +1,5 @@
+import {workContext} from './work-context';
+import type {KanbanProjectRecord} from '@nestos/kanban/contracts';
 import {inheritWorkReferences} from './task-projects';
 import {formatPromptSections} from '@nestos/llm-context/prompt';
 import {DEFAULT_KANBAN_WORK_TYPES,type KanbanBoard,type KanbanItem,type KanbanService} from '@nestos/kanban/contracts';
@@ -10,7 +12,7 @@ import type {TargetRef} from '@nestos/llm-flow/contracts';
 import {requireValue} from './validation';
 import preset from '../presets/kanban-planning.json';
 export interface AnalysisOptions {
-    readAnalysisOutput?(id:string):Promise<unknown|undefined>;
+    readAnalysisOutput?(id:string):Promise<KanbanAnalysisObservation|undefined>;
     onAnalysis?: import('./personal-automation').PersonalKanbanAutomationOptions['onAnalysis'];
     prepareAnalysis?: import('./personal-automation').PersonalKanbanAutomationOptions['prepareAnalysis'];
     journal: KanbanAutomationJournal; calls: IndependentCallService; kernel: Pick<Kernel, 'task'>;
@@ -29,7 +31,7 @@ export function analyzeItem(options:AnalysisOptions,board:KanbanBoard,item:Kanba
             },
             prepareExecution:async(id,input)=>{await options.prepareSession(id);await options.calls.prepareTaskCall(input,{maxDepth:4,timeoutMs:null});},
             submit:async input=>{await options.calls.submitPreparedTaskCall(input);},
-            inspect:(id,input)=>inspectAnalysis(options,id,input),
+            inspect:(id,input)=>inspectAnalysis(options,id,input,board,item,service),
         },
     },board,item,target,service);
 }
@@ -40,7 +42,10 @@ function analysisInput(board:KanbanBoard,item:KanbanItem,target:TargetRef,id:str
             source:{kind:'composer',text:formatPromptSections([{title:'Instructions',content:instruction},{title:contextRef===undefined?'Snapshot':'Context reference',content:contextRef??{item,items,workTypes:board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:board.defaultWorkType??'task'}}]),attachments:[],values:{}},
             submission:{id,source:{kind:'conversation',ownerId:id,id}}}};
 }
-async function inspectAnalysis(options:AnalysisOptions,id:string,input:IndependentCallInput):Promise<KanbanAnalysisObservation> {
+async function inspectAnalysis(options:AnalysisOptions,id:string,input:IndependentCallInput,board:KanbanBoard,item:KanbanItem,service:KanbanService):Promise<KanbanAnalysisObservation> {
+    const observed=await options.readAnalysisOutput?.(id);
+    if(observed?.state==='clarification')return observed;
+    if(observed?.state==='succeeded')await validateSource(options,board,item,service);
     const pending={state:'running' as const},admission=await options.calls.inspectTaskCallSubmission(input);
     if(!options.active())return pending;
     if(!admission)return {state:'unknown',code:'AUTOMATION_ADMISSION_UNKNOWN'};
@@ -51,6 +56,13 @@ async function inspectAnalysis(options:AnalysisOptions,id:string,input:Independe
     const result=record.exit?.output as TaskCallResult|undefined;
     if(record.exit?.status!=='succeeded'||result?.exit.status!=='succeeded')return {state:record.exit?.status==='cancelled'||result?.exit.status==='cancelled'?'cancelled':'failed',code:safeCode(result?.exit.error??record.exit?.error,'AUTOMATION_ANALYSIS_FAILED')};
     requireValue(options.readAnalysisOutput,'SESSION_CHANNEL_RESULT_UNAVAILABLE');
-    const output=await options.readAnalysisOutput(id);
-    return output===undefined?{state:'unknown',code:'SESSION_CHANNEL_RESULT_PENDING'}:{state:'succeeded',output};
+    return observed??{state:'running'};
+}
+
+async function validateSource(options:AnalysisOptions,board:KanbanBoard,item:KanbanItem,service:KanbanService):Promise<void> {
+    const context=await workContext(options.journal,board,item),source=context.decision;
+    if(!source)return;
+    const current=await service.record(source.sourceBoardId,source.recordId),snapshot=source.snapshot as KanbanProjectRecord|undefined;
+    const definition=(record:KanbanProjectRecord)=>JSON.stringify([record.title,record.content,record.rationale,record.externalRefs]);
+    requireValue(current.status==='confirmed'&&snapshot&&definition(current)===definition(snapshot),'PLANNING_DECISION_STALE');
 }

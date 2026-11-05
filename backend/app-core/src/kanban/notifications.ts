@@ -47,7 +47,7 @@ function project(event: KanbanEvent, board: KanbanBoard, sourceId: string, now: 
         operationId: event.operationId, sourceSequence: event.sequence, ...(notification ? {notification} : {})};
 }
 function defaultLevel(event: KanbanEvent): 'info' | 'error' | undefined {
-    if (event.kind === 'report-analysis') return ['analysis-failed','analysis-unknown'].includes(event.data.reason ?? '') ? 'error' : event.data.reason === 'analysis-clarification' ? 'info' : undefined;
+    if (event.kind === 'report-analysis') return ['analysis-failed','analysis-unknown'].includes(event.data.reason ?? '') ? 'error' : ['analysis-clarification','analysis-ready'].includes(event.data.reason??'') ? 'info' : undefined;
     if (event.kind === 'control-receipt' && ['control-failed','control-unknown'].includes(event.data.reason ?? '')) return 'error';
     if (event.kind === 'escalated' || event.kind === 'observe-execution' && ['execution-unknown','execution-failed','execution-cancelled'].includes(event.data.reason ?? '')) return 'error';
     if (event.kind === 'observe-execution' && event.data.reason === 'execution-succeeded') return 'info';

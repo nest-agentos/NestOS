@@ -28,7 +28,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     registerInstructionGate?(gate:(sessionId:string,input:import('@nestos/llm-session/contracts').SessionInstruction)=>Promise<boolean>):()=>void;
     executionResource?(sessionId:string,branch:string):Promise<string|undefined>;
     requiresItemResource?(board:KanbanBoard):boolean;
-    readAnalysisOutput?(id:string):Promise<unknown|undefined>;
+    readAnalysisOutput?(id:string):Promise<import('@nestos/kanban/integration').KanbanAnalysisObservation|undefined>;
     onAnalysis?(input: {boardId: string; id: string; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef; outcome: 'succeeded' | 'failed' | 'cancelled'; code?: string}): Promise<void>;
     prepareAnalysis?(input: {context?:unknown;reportActivity?(fact: WorkLogFact): Promise<void>; id: string; board: KanbanBoard; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target: import('@nestos/llm-flow/contracts').TargetRef; instruction: string; contextRef?: unknown}>;
     validatePreparation?(reference: import('@nestos/kanban/contracts').KanbanExternalReference, options?: Record<string, string>): void;

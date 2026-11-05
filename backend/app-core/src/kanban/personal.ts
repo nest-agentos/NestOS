@@ -17,6 +17,7 @@ import {openPersonalKanbanStore} from './store';
 import {KanbanExamples} from '../presets/kanban-examples';
 import {KanbanError} from '@nestos/kanban';
 import {createLocalKanbanSessionSource} from './session-source';
+import {planningSessionReader} from './planning-sessions';
 import {relatedKanbanSessions} from './related-sessions';
 /** The authenticated runtime owns this user store; project boards require their own binding. */
 export async function createPersonalKanban(fs: IFileSystem, events: UserEventService, diagnostics: DiagnosticJournal, sessions?: Pick<import('@nestos/llm-session/contracts').ISessionRepository, 'listSummaries'|'getManifest'>, kernel?: Pick<import('@nestos/durable-kernel').Kernel,'sessionActivity'>, automationOptions?: PersonalKanbanAutomationOptions) {
@@ -45,7 +46,7 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
     }}):undefined;
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
-    return [{capabilities:{...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
+    return [{capabilities:{...(options?{planningSession:planningSessionReader(service,journal,options)}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
         ...(resources?.cleanupWorkResource&&operations?{cleanupWorkResource:(board,request)=>operations.guardResource(board,request.itemId,()=>resources.cleanupWorkResource!(board,request))}:{}),
         ...(options?.continuation?{executionSession:async(board,item,query)=>{
             const detail=await service.executionSession(board,item,query),current=(await service.item(board,item)).item;

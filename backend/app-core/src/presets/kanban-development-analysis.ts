@@ -1,3 +1,4 @@
+import {planningConversationControl} from './kanban-planning-control';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {DEFAULT_KANBAN_WORK_TYPES} from '@nestos/kanban/contracts';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
@@ -5,7 +6,8 @@ import type {PersonalKanbanAutomationOptions} from '../kanban/personal-automatio
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {developmentPreparation,type DevelopmentWorkspaceRecord} from './kanban-development';
-import {readChannelResult,channelResultInstruction} from '../run/channel-results';
+import {readPlanningChannel} from '../run/planning-channel';
+import {planningConversationInstruction} from './kanban-planning-conversation';
 
 type Options = Parameters<typeof developmentPreparation>[0];
 export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
@@ -21,7 +23,7 @@ export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
         const workspace=await journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+input.id);
         requireValue(workspace,'SESSION_CHANNEL_WORKSPACE_REQUIRED');
         await watch(input.id,workspace.projectId);
-        return {target:prepared.target,contextRef:{scopeId:input.id,section:'planning-input'},instruction:'Read decision.md, planning and planning-input through session_context. Candidate section names expose details on demand; do not repeat full context reads. '+channelResultInstruction};
+        return {target:prepared.target,contextRef:{scopeId:input.id,section:'planning-input'},instruction:'Read decision.md, planning and planning-input through session_context. Candidate section names expose details on demand; do not repeat full context reads. '+planningConversationInstruction};
     };
     async function watch(id:string,projectId:string) {
         await watches.ensure(id,async()=>{
@@ -31,12 +33,12 @@ export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
             catch(error){await client.close();throw error;}
         });
     }
-    return {prepare:prepareAnalysis,dispose:()=>watches.dispose(),async read(id:string) {
+    return {prepare:prepareAnalysis,control:planningConversationControl(options,journal),dispose:()=>watches.dispose(),async read(id:string) {
         const workspace=await journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+id);
         requireValue(workspace,'SESSION_CHANNEL_WORKSPACE_REQUIRED');
         await watch(id,workspace.projectId);
-        const result=await readChannelResult(options.remote,workspace.projectId,id,journal);
-        if(result!==undefined)await watches.close(id);
+        const result=await readPlanningChannel(options.remote,workspace.projectId,id,journal);
+        if(result&&['succeeded','failed','cancelled'].includes(result.state))await watches.close(id);
         return result;
     }};
 }
