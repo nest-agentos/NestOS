@@ -5,6 +5,21 @@
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    'kanban.pendingControl': '待确认操作',
+    'kanban.unassigned': '未分配',
+    'kanban.itemCreatedAt': '创建时间',
+    'kanban.itemUpdatedAt': '事项更新',
+    'kanban.itemActions': '更多事项操作',
+    'kanban.clarificationNext': '请打开“继续澄清”，在原会话中回答问题。收到确认前不会启动开发。',
+    'kanban.unknownNext': '尚未取得操作结果的可靠回执，不代表执行失败或已取消。请检查关联会话与诊断；确认执行已结束后才能删除，避免遗留运行中的任务。',
+    'kanban.errorNext': '查看下方具体原因和关联会话，处理后继续；不会自动重复启动。',
+    'kanban.reviewNext': '执行已提交结果，等待验收。请检查产物和运行版本，再决定是否接受。',
+    'kanban.cancelledNext': '事项已取消，不会自动执行。会话保留供查阅，可从右上角菜单归档或删除。',
+    'kanban.completedNext': '事项已完成。后续修改请创建修订事项；可从菜单归档或删除。',
+    'kanban.taskReason.ENOENT': '关联的执行记录不存在，暂时无法核对操作结果（ENOENT）',
+    'kanban.taskReason.IDEMPOTENCY_CONFLICT': '状态同步请求冲突，尚未更新看板；不是澄清回答失败（IDEMPOTENCY_CONFLICT）',
+    'kanban.taskReason.PLANNING_INPUT_REQUIRED': '请在规划会话中回答澄清问题',
+
     'kanban.workResourceReason.WORKTREE_SHARED': '其他看板仍引用此 worktree，保留资源，不影响当前看板逻辑删除',
 
     'kanban.deleteCleanupDeferred': '结算后清理归属明确且符合安全条件的 worktree，其余保留',
@@ -233,11 +248,11 @@ export const zhCN = {
     'kanban.taskPhase.paused': '已暂停',
     'kanban.taskPhase.resuming': '恢复请求中',
     'kanban.taskPhase.waiting-input': '需要用户澄清',
-    'kanban.taskPhase.error': '出错/启动失败',
+    'kanban.taskPhase.error': '需要处理',
     'kanban.taskPhase.review': '待验收',
     'kanban.taskPhase.completed': '已完成',
     'kanban.taskPhase.cancelled': '已取消',
-    'kanban.taskPhase.unknown': '结果未知',
+    'kanban.taskPhase.unknown': '操作结果待确认',
     'kanban.taskAction.cancel': '取消事项',
     'kanban.taskAction.run': '立即运行',
     'kanban.taskAction.pause': '暂停原执行',

@@ -4,6 +4,21 @@
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    'kanban.pendingControl': 'Unconfirmed operation',
+    'kanban.unassigned': 'Unassigned',
+    'kanban.itemCreatedAt': 'Created',
+    'kanban.itemUpdatedAt': 'Item updated',
+    'kanban.itemActions': 'More item actions',
+    'kanban.clarificationNext': 'Open Continue clarification and answer in the original session. Development stays blocked until confirmation.',
+    'kanban.unknownNext': 'The operation receipt is unconfirmed; this does not mean failure or cancellation. Check the linked session and diagnostics. Deletion requires confirmed settlement.',
+    'kanban.errorNext': 'Check the specific reason and linked session before continuing. Execution will not restart automatically.',
+    'kanban.reviewNext': 'Execution submitted a result for review. Check the output and running version before accepting.',
+    'kanban.cancelledNext': 'This item is cancelled and will not run automatically. Sessions remain available. Archive or delete from the top-right menu.',
+    'kanban.completedNext': 'This item is complete. Create a follow-up for further changes, or archive or delete from the menu.',
+    'kanban.taskReason.ENOENT': 'The linked execution record is missing; the operation outcome cannot be verified (ENOENT)',
+    'kanban.taskReason.IDEMPOTENCY_CONFLICT': 'A state synchronization request conflicted. This does not mean the clarification answer failed (IDEMPOTENCY_CONFLICT)',
+    'kanban.taskReason.PLANNING_INPUT_REQUIRED': 'Answer the clarification questions in the planning session',
+
     'kanban.workResourceReason.WORKTREE_SHARED': 'Another board still references this worktree; retain it without blocking logical deletion of the current board',
 
     'kanban.deleteCleanupDeferred': 'After settlement, clean eligible worktrees with verified ownership; retain the rest',
@@ -236,7 +251,7 @@ export const en: LocaleStrings = {
     'kanban.taskPhase.review': 'Awaiting acceptance',
     'kanban.taskPhase.completed': 'Completed',
     'kanban.taskPhase.cancelled': 'Cancelled',
-    'kanban.taskPhase.unknown': 'Outcome unknown',
+    'kanban.taskPhase.unknown': 'Operation unconfirmed',
     'kanban.taskAction.cancel': 'Cancel task',
     'kanban.taskAction.run': 'Run now',
     'kanban.taskAction.pause': 'Pause execution',

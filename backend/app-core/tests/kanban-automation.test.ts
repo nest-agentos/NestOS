@@ -261,3 +261,17 @@ it('retains one planning session while waiting for clarification and resumes the
     expect(await reopened.planningSession!('board','first')).toMatchObject({analysisId:planningId,state:'completed'});
     await reopened.scan();expect(f.executions()).toHaveLength(1);
 });
+
+it('recovers clarification projection conflicts without restarting the planning session',async()=>{
+    const f=await fixture(false,{ready:false,reason:'Confirm scope',dependencies:[]});
+    await f.item('first');await f.service.scan();
+    const session=await f.service.planningSession!('board','first');
+    // The same durable report must be applicable again after an interrupted synchronization.
+    await f.command({type:'report-analysis',itemId:'first',operationId:'sync-fault',status:{itemId:'first',state:'failed',code:'IDEMPOTENCY_CONFLICT'}});
+    await f.service.scan();
+    expect((await f.service.item('board','first')).task?.phase).toBe('waiting-input');
+    expect(await f.service.planningSession!('board','first')).toMatchObject({sessionId:session!.sessionId,state:'waiting-input'});
+    expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
+    expect(f.executions()).toHaveLength(0);
+    await f.service.scan();expect((await f.service.item('board','first')).task?.phase).toBe('waiting-input');
+});
