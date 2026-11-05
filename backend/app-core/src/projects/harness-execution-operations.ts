@@ -84,6 +84,7 @@ async function prepareResumedSession(run: NativeExecution): Promise<void> {
     if (!session.resumable || session.activeTurnId || ['running', 'busy', 'inProgress'].includes(session.status ?? '')
         || session.writerLock?.status === 'unknown' || session.writerLock?.status === 'held' && !session.owned)
         throw executionError('CONTEXT_NATIVE_BUSY');
+    if (!session.owned) await nativeMutation(run,'resume',options => run.acquired.client.resume(run.acquired.profile.id,session.id,options));
 }
 
 function assertPreparedAttachments(run: NativeExecution): void {

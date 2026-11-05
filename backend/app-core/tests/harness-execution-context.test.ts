@@ -179,3 +179,13 @@ it('keeps the fixed native mapping across a Cells restart while using a fresh pr
     expect(f.client.create).toHaveBeenCalledOnce(); expect(f.client.turn).toHaveBeenCalledTimes(2);
     expect(f.client.turn).toHaveBeenLastCalledWith(expect.anything(),'native-session',expect.anything(),expect.objectContaining({epoch:'new-process'}));
 });
+
+it('loads the retained cold native Session before submitting its next turn and never creates another Session', async () => {
+    const {f,next,owner}=await resumeFixture('work','persistent-context');f.session.owned=false;
+    vi.mocked(f.client.resume).mockImplementation(async (_profile,_session,options)=>f.committed(options,{session:{...f.session,owned:true}}) as any);
+    f.push('turn/completed',{threadId:'native-session',turn:{id:'resumed-turn',status:'completed'}});
+    await f.make().execute(next,owner);
+    expect(f.client.resume).toHaveBeenCalledOnce();expect(f.client.create).toHaveBeenCalledOnce();expect(f.client.turn).toHaveBeenCalledTimes(2);
+    expect(f.client.resume).toHaveBeenCalledWith('claude','native-session',expect.objectContaining({requestId:expect.any(String)}));
+    await f.make().reconcile(next,owner);expect(f.client.resume).toHaveBeenCalledOnce();
+});

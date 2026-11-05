@@ -559,3 +559,5 @@ DSH 展示投影不将明确来源为 agent-instructions、runtime-context、too
 `harness_profiles.epoch` 仍是本次服务进程的操作回执边界，事件流也保留独立 epoch。它们用于识别过期连接、游标和未确认请求，不能成为已保存会话的生命周期。原生绑定中的 `NativeContextRef.epoch` 保存 `contextId` 命名空间；新执行 journal 保存当前进程 epoch，二者分别校验。相同持久映射的续办保留原生 Session、分支和绑定 generation，所有新操作使用当前进程 epoch。原进程中结果未知的操作继续查询原回执，无法核实时保持 unknown，不重新提交。
 
 首次接管旧进程身份绑定时，仅在显式续办的新执行中核对原 Session ID、项目工作区、worktree、最后已确认轮次及无写入者，再以 CAS 更新映射和 generation。缺少证据、原生忙碌、上下文变化或映射冲突均拒绝；不放宽已提交执行的 epoch 防重规则。
+
+持久映射有效但原生运行时尚未加载时，宿主先通过 `resume` 加载同一原生 Session，再提交新 turn。加载操作使用单独的稳定 requestId 和持久执行 journal，丢失响应时查询原回执，不创建替代 Session，也不重发已经接纳的 turn。冷历史第一页补全最后终态轮次；更早分页、活动或未完成轮次不能冒充当前终态会话头。
