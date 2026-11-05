@@ -1,4 +1,3 @@
-import {mapConcurrent} from '../utils/map-concurrent';
 import {assembleKanbanRuntime,KanbanAutomationJournal,type KanbanRuntimeContext,type KanbanRuntimeExtension} from '@nestos/kanban/integration';
 import {kanbanControlOptions} from './control-adapter';
 import {workLogOptions} from './work-log-policy';
@@ -48,11 +47,7 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
     const planning=options?planningSessionReader(service,journal,options):undefined;
-    return [{archiveItemResources,capabilities:{...(planning?{planningSession:planning,queryActivity:async(board,query)=>{
-        const page=await service.queryActivity(board,query);
-        const items=await mapConcurrent(page.items,4,async item=>!item.execution&&item.analysis?{...item,planningSession:await planning(board,item.id)}:item);
-        return {...page,items};
-    }}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
+    return [{archiveItemResources,capabilities:{...(planning?{planningSession:planning}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
         ...(resources?.cleanupWorkResource&&operations?{cleanupWorkResource:(board,request)=>operations.guardResource(board,request.itemId,()=>resources.cleanupWorkResource!(board,request))}:{}),
         ...(options?.continuation?{executionSession:async(board,item,query)=>{
             const detail=await service.executionSession(board,item,query),current=(await service.item(board,item)).item;

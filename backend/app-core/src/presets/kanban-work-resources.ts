@@ -1,7 +1,7 @@
 import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {KanbanService, KanbanWorkResource, KanbanWorkResourceCleanup, KanbanExternalReference} from '@nestos/kanban/contracts';
-import type {KanbanWorkLog} from '@nestos/kanban/integration';
+import {analysisHistory,type KanbanWorkLog} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {developmentWorkspace} from './kanban-development-workspace';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
@@ -52,7 +52,7 @@ async function associations(options: Options, boardId: string, itemId: string): 
     })));
     return rows;
 }
-async function references(options: Options, boardId: string, itemId: string): Promise<KanbanExternalReference[]> {
+async function references(options: Options, boardId: string, itemId:string,includePlanning=false):Promise<KanbanExternalReference[]> {
     const {item} = await options.service.item(boardId, itemId), refs = [...item.externalRefs ?? []]; let cursor: string | undefined;
     const workflow = await options.service.workflow(boardId);
     for (const dispatch of Object.values(workflow.dispatches)) if (dispatch.itemId === itemId) {
@@ -64,7 +64,8 @@ async function references(options: Options, boardId: string, itemId: string): Pr
         refs.push(...page.items.flatMap(row => row.externalRefs ?? [])); cursor = page.nextCursor;
         requireValue(refs.length <= 10000, 'WORK_RESOURCE_LIMIT');
     } while (cursor);
-    return [...new Map(refs.filter(ref => ref.system === 'nestos-worktree').map(ref => [ref.id, ref])).values()];
+    const planning=new Set(includePlanning?[]:(await analysisHistory(options.journal,boardId,itemId)).map(job=>job.id));
+    return [...new Map(refs.filter(ref=>ref.system==='nestos-worktree'&&!planning.has(ref.id)).map(ref => [ref.id, ref])).values()];
 }
 async function scope(options: Options, boardId: string, itemId: string, id: string, known?: KanbanExternalReference[]): Promise<ResourceScope> {
     requireValue(/^[\w-]{1,128}$/.test(id), 'WORKTREE_SCOPE_INVALID');
@@ -189,7 +190,7 @@ async function sharedReference(options: Options, ownerBoard: string, id: string,
 async function archiveAssociations(options:Options,board:string,itemId:string,operationId:string):Promise<void> {
     const started=Date.now(),{item}=await options.service.item(board,itemId);
     requireValue(['completed','cancelled'].includes(item.status),'WORKTREE_TASK_UNFINISHED');
-    const refs=await references(options,board,itemId);
+    const refs=await references(options,board,itemId,true);
     for(const ref of refs)if(await options.journal.get<PreparedWorktree>('worktree:'+ref.id))await options.journal.update<PreparedWorktree>('worktree:'+ref.id,old=>({...old!,archivedAt:old!.archivedAt??Date.now(),archiveOperationId:old!.archiveOperationId??operationId}));
     log.info('work-resource.archive',{operation:'work-resource.archive',operationId,stage:'archive-associations',result:'success',count:refs.length,durationMs:Date.now()-started});
 }

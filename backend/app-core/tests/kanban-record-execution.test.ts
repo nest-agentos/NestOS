@@ -255,3 +255,12 @@ it('keeps decision deletion pending when task cancellation has no confirmed rece
     const record=await f.service.record('source','decision');expect(record.status).toBe('cancelling');expect(record.deletedAt).toBeUndefined();
     expect((await f.service.read('source')).items.every(item=>item.deletedAt===undefined)).toBe(true);
 });
+it('keeps unclarified decision planning out of development lists and counts attention once per decision',async()=>{
+    const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+    const run=await f.open().runRecord('source',{recordId:'decision',operationId:'run',expectedRevision:2});
+    expect((await f.service.query('source',{view:'all',excludePlanning:true})).total).toBe(0);
+    for(const itemId of run.itemIds!)await f.command({type:'report-analysis',itemId,operationId:'clarify-'+itemId,status:{itemId,state:'clarification',reason:'Confirm scope'}});
+    expect((await f.service.overview('source')).attention).toMatchObject({decision:1,board:0,log:0});
+    expect((await f.service.records('source',{kind:'decision'})).items[0].attention).toBe('waiting-input');
+    expect((await f.service.catalog())[0].attention?.decision).toBe(1);
+});
