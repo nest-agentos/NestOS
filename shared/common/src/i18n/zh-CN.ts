@@ -5,6 +5,7 @@
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    'kanban.coordinationSession': '协调会话',
     'kanban.pendingEvents': '待处理事件',
     'kanban.waiting': '等待启动或依赖',
     'kanban.taskReason.REVISION_CONFLICT': '状态同步发生版本冲突，正在核对原执行',

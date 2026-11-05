@@ -1,9 +1,11 @@
+import {KanbanError} from '@nestos/kanban';
 import {assembleKanbanRuntime,KanbanAutomationJournal,type KanbanRuntimeContext,type KanbanRuntimeExtension} from '@nestos/kanban/integration';
 import {kanbanControlOptions} from './control-adapter';
 import {workLogOptions} from './work-log-policy';
 import {kanbanJournalOptions} from './host-policy';
 import {taskReplies} from './task-replies';
-import {createTaskFix} from './task-fix';
+import {createTaskFix,cancelItemFixes} from './task-fix';
+import {coordinationNotifications} from './task-coordinator';
 import {validateWorkProjects,inheritWorkReferences} from './task-projects';
 import {validateRemoteReferences,projectResourceCatalog} from './resource-catalog';
 import {createPersonalKanbanAutomation,type PersonalKanbanAutomationOptions} from './personal-automation';
@@ -15,7 +17,6 @@ import type {DiagnosticJournal} from '../diagnostics/journal';
 import {createNestOSKanban} from './module';
 import {openPersonalKanbanStore} from './store';
 import {KanbanExamples} from '../presets/kanban-examples';
-import {KanbanError} from '@nestos/kanban';
 import {createLocalKanbanSessionSource} from './session-source';
 import {planningSessionReader} from './planning-sessions';
 import {relatedKanbanSessions} from './related-sessions';
@@ -39,11 +40,8 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
     const {service,journal,workLog,fs,serviceFor}=context;
     const operations=options?.itemOperations?.({service,journal,workLog,log});setOperations(operations);
     const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,...resources}=resourcePorts??{};
-    const automation=options?createPersonalKanbanAutomation({...options,fs,service,journal,workLog,log,serviceFor}):undefined;
-    const fixes=options?.projects?.openWorkspace&&options.prepareWork?createTaskFix({fs,service,journal,events,automation:options,log,prepareSession:async id=>{
-        await options.ensureReady?.();await options.sessions.ensureSession(id,'Fix');
-        if(!await options.prepareSession(id))throw new KanbanError('AUTOMATION_SESSION_OWNED');return id;
-    }}):undefined;
+    const fixes=options?.collaboration?createTaskFix({service,journal,events,automation:options,log}):undefined;
+    const automation=options?createPersonalKanbanAutomation({...options,fs,service,journal,workLog,log,serviceFor,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
     const planning=options?planningSessionReader(service,journal,options):undefined;

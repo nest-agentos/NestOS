@@ -4,7 +4,7 @@ import {kanbanReferences} from './work-log-policy';
 import {requireValue} from './validation';
 
 export function kanbanControlOptions(options:CallLifecyclePorts,journal:KanbanAutomationJournal):KanbanTaskControlOptions {
-    return {references:kanbanReferences,finalizerPrefix:'development-lifecycle:',control:{
+    return {beforeCancel:options.beforeCancel,references:kanbanReferences,finalizerPrefix:'development-lifecycle:',control:{
         control:async input=>{
             const route=executionRoute(input);
             if(input.kind==='conversation'){

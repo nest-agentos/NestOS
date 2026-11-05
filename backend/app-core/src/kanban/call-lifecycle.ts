@@ -6,6 +6,7 @@ import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from './validation';
 
 export interface CallLifecyclePorts {
+    beforeCancel?:import('@nestos/kanban/integration').KanbanTaskControlOptions['beforeCancel'];
     controlConversation?(input:{scopeId:string;operationId:string;action:'pause'|'resume'|'cancel'}):Promise<import('../run/submission-control').SubmissionControlState>;
     calls: Pick<IndependentCallService, 'list'>;
     submissionControl?(input: import('../run/submission-control').SubmissionControlRequest, journal: import('../run/submission-control').ControlJournal): Promise<import('../run/submission-control').SubmissionControlState>;

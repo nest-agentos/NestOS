@@ -1,3 +1,4 @@
+import {developmentSessionOperation} from '../presets/kanban-session-operation';
 import {nativeSessionArchive} from '../projects/session-archive';
 import {ensureKanbanConfiguration} from '../presets/kanban-global-configuration';
 import {controlCall} from '../kanban/call-lifecycle';
@@ -617,6 +618,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             archiveSession:remoteConnections?nativeSessionArchive(kernelCore,projects,remoteConnections,new KanbanAutomationJournal(systemFS,kanbanJournalOptions)):undefined,
             relatedSessions: lifecycle ? (boardId, itemId) => lifecycle.sessions(boardId, itemId) : undefined,
             sessionExecutionResources: id => developmentSessionResources(new KanbanAutomationJournal(systemFS, kanbanJournalOptions), id),
+            collaboration:developmentBindings?{submission:fileSubmission,prepare:input=>developmentOperations.run(()=>developmentSessionOperation({...developmentBindings,journal:lifecycleJournal})(input))}:undefined,
             continuation: continueDevelopment ? {submission: sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore,
                 ensureWritable: conversationOptions.ensureWritable}),
                 prepare: input => developmentOperations.run(() => continueDevelopment(input))} : undefined,

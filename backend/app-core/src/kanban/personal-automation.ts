@@ -1,3 +1,4 @@
+import {taskCoordinator} from './task-coordinator';
 import {readGlobalPlanningPrompt} from '../presets/kanban-configuration-files';
 import {kanbanControlOptions} from './control-adapter';
 import {drainBoardAnalyses} from '@nestos/kanban/integration';
@@ -18,12 +19,15 @@ import {automationCatalog,automationTarget} from './automation-targets';
 import {requireValue} from './validation';
 import {withContinuedWork,type ContinueWorkOptions} from './continued-work';
 export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
+    notifyCoordination?(job:import('@nestos/kanban/integration').CoordinationOperation):Promise<void>;
     archiveSession?(sessionId:string,operationId:string):Promise<void>;
     sessionChannel?: import('@nestos/app-contracts/services').ProjectRemoteMountPort['sessionChannel'];
     itemOperations?(context: {service: KanbanService; journal: KanbanAutomationJournal; workLog: KanbanWorkLog;
         log: import('./item-operation-types').ReviewOperationsOptions['log']}): ReturnType<typeof import('./item-operations').createItemOperations>;
     relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
     sessionExecutionResources?(id: string): Promise<Array<{label: string; value: string}>>;
+    collaboration?: {submission:ReturnType<typeof import('../run/session-submission').sessionSubmission>;
+        prepare(input:{id:string;originId:string;sessionId:string;nativeSessionId?:string;context:unknown;item:KanbanItem;board:KanbanBoard}):Promise<string>};
     continuation?: Pick<ContinueWorkOptions, 'submission' | 'prepare'>;
     workResources?(context: {service: KanbanService; workLog: KanbanWorkLog; journal: KanbanAutomationJournal}): Pick<import('@nestos/kanban/contracts').KanbanClient, 'workResources' | 'cleanupWorkResource'> & {archiveItemResources?(boardId:string,itemId:string,operationId:string):Promise<void>};
     enqueueTaskReply?(request:import('@nestos/llm-session/contracts').SubmissionRequest):Promise<void>;
@@ -57,6 +61,7 @@ export function createPersonalKanbanAutomation(options:Options) {
     };
     return createKanbanAutomation({...options,directory:'/var/lib/kanban/automation',executionReference:executionSessionReference,
         catalog:async()=>({...automationCatalog(await options.catalog()),preparations:options.preparations}),
+        coordinate:taskCoordinator(options),
         controls:(board,service)=>scanTaskControls(kanbanControlOptions(options,options.journal),options.journal,board,service),
         drain:(board,service)=>drainBoardAnalyses(kanbanControlOptions(options,options.journal),options.journal,board,service),
         analyze:async(board,item,service,active)=>{

@@ -1,5 +1,5 @@
 import type {KanbanService, KanbanPlanningSession} from '@nestos/kanban/contracts';
-import {currentAnalysis, type KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {currentCoordination,currentAnalysis, type KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {IndependentCallInput} from '@nestos/llm-session/contracts';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 
@@ -15,6 +15,8 @@ export function planningSessionReader(service: KanbanService, journal: KanbanAut
         const resourceId = await options.executionResource?.(sessionId,'main');
         const state = job.status.state === 'clarification' ? 'waiting-input' : job.status.state === 'ready' ? 'completed'
             : job.status.state === 'failed' ? 'failed' : job.status.state === 'analyzing' ? 'running' : 'unknown';
-        return {itemId,analysisId:job.id,sessionId,resourceId,title:item.title,state,stale:false,recent:false};
+        const operation=item.planning?.coordination?await currentCoordination(journal,board,itemId):undefined;
+        const result=operation?.result as {summary?:string;suggestions?:Array<{itemId:string;action:string;reason:string}>}|undefined;
+        return {...(operation?{coordination:{id:operation.id,state:operation.state,code:operation.code,...result}}:{}),itemId,analysisId:job.id,sessionId,resourceId,title:item.title,state,stale:false,recent:false};
     };
 }

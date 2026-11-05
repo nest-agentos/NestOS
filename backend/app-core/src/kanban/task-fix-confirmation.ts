@@ -1,3 +1,4 @@
+import {coordinationProposal} from './coordination-proposal';
 import {KanbanCollaboration} from '@nestos/kanban/integration';
 import {kanbanFixPolicy as fixPolicy} from '../resources/catalog';
 import {sha256HexSync} from '@nestos/common';
@@ -9,7 +10,7 @@ import {acceptSnapshot} from './task-fix-acceptance';
 import {requireValue} from './validation';
 export async function confirmFix(options:Options,fix:SavedFix,input:SessionInstruction):Promise<boolean> {
     const id=fix.id;
-    await options.service.read(fix.boardId);
+    const board=await options.service.read(fix.boardId);
     const digest=sha256HexSync(JSON.stringify({id:input.id,text:input.text,files:input.files,source:input.source}));
     if(fix.snapshot) {
         requireValue(fix.snapshot.messageId===input.id&&fix.snapshot.digest===digest,'FIX_INPUT_CLOSED');
@@ -18,7 +19,7 @@ export async function confirmFix(options:Options,fix:SavedFix,input:SessionInstr
     if(input.text.trim()!==fixPolicy.confirmation||input.files.length||input.origin&&input.origin!=='user'||input.source&&(input.source.kind!=='composer'||input.source.attachments.length>0))return false;
     const proposal=(await fixMessages(options,fix)).filter(row=>row.message.type==='proposal').at(-1);
     requireValue(proposal,'FIX_PROPOSAL_REQUIRED');
-    const definition=parseDefinition(proposal.message.payload,fix.item.id);
+    const definition=fix.item.planning?.execution==='children'?coordinationProposal(proposal.message.payload,fix,board):parseDefinition(proposal.message.payload,fix.item.id);
     const snapshot:Snapshot={proposalId:proposal.id,messageId:input.id,content:fixPolicy.confirmation,definition,digest,operationId:'fix-'+sha256HexSync(JSON.stringify([id,input.id])).slice(0,48)};
     const frozen=await new KanbanCollaboration(options.service,options.journal).confirmFix(id,snapshot);
     await acceptSnapshot(options,frozen);return true;

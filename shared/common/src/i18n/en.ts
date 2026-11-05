@@ -4,6 +4,7 @@
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    'kanban.coordinationSession': 'Coordination session',
     'kanban.pendingEvents': 'Needs attention',
     'kanban.waiting': 'Waiting for start or dependencies',
     'kanban.taskReason.REVISION_CONFLICT': 'State synchronization conflicted; checking the original execution',
