@@ -37,3 +37,9 @@ it('waits for a user-confirmed conflict resolution and cleans only after its ver
  expect(f.options.cleanup).toHaveBeenCalledOnce();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);
  expect(f.run.mock.calls.some(call=>call[1].action==='merge')).toBe(false);
 });
+
+it('adopts a verified manual rebuild after a failure without replaying the failed automatic request',async()=>{
+ const f=await fixture();await automaticDelivery(f.options).scan();f.jobs.get('build').state='failed';await automaticDelivery(f.options).scan();
+ f.jobs.set('build',{id:'build',runId:'confirmed-manual-rebuild',state:'succeeded',enabled:true});await automaticDelivery(f.options).scan();
+ expect(f.run.mock.calls.map(call=>call[1].action)).toEqual(['build','deploy']);
+});

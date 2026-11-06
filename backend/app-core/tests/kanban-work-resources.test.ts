@@ -14,14 +14,19 @@ const native = vi.hoisted(() => ({reasons: [] as string[]}));
 vi.mock('../src/presets/kanban-work-resource-execution', () => ({workResourceExecution: vi.fn(async () => native.reasons)}));
 const exec = promisify(execFile), closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); vi.restoreAllMocks(); native.reasons = [];});
-async function fixture() {
+async function fixture(withModule=false) {
     const root = await mkdtemp(join(tmpdir(), 'nestos-resource-')); closes.push(() => rm(root, {recursive: true, force: true}));
     const git = async (cwd: string, args: string[]) => exec('git', args, {cwd});
     await git(root, ['init', '-b', 'main']); await git(root, ['config', 'user.name', 'Fixture']); await git(root, ['config', 'user.email', 'fixture@example.invalid']);
     await writeFile(join(root, '.gitignore'), '/_nestos/\n/cache/\n'); await writeFile(join(root, 'file.txt'), 'Original');
     await git(root, ['add', '.']); await git(root, ['commit', '-m', 'test: base']);
+    if(withModule){const module=await mkdtemp(join(tmpdir(),'nestos-module-'));closes.push(()=>rm(module,{recursive:true,force:true}));
+        await git(module,['init','-b','main']);await git(module,['config','user.name','Fixture']);await git(module,['config','user.email','fixture@example.invalid']);
+        await writeFile(join(module,'file.txt'),'Module');await writeFile(join(module,'.gitignore'),'cache/\n');await git(module,['add','.']);await git(module,['commit','-m','test: module']);
+        await git(root,['-c','protocol.file.allow=always','submodule','add',module,'library']);await git(root,['commit','-am','test: register module']);}
     const directory = '/workspace/_nestos/worktrees/ready', physical = join(root, '_nestos/worktrees/ready');
     await git(root, ['worktree', 'add', '-b', 'work/ready', physical]);
+    if(withModule)await git(physical,['-c','protocol.file.allow=always','submodule','update','--init']);
     const tree = {id: 'ready', directory, branch: 'work/ready', baseCommit: (await git(root, ['rev-parse', 'HEAD'])).stdout.trim(), phase: 'ready' as const};
     const commands: string[][] = [];
     const process = {release: vi.fn(async () => {}), nativeShell: {exec: async (_name: string, args: string[], options: {cwd: string}) => {
@@ -33,7 +38,7 @@ async function fixture() {
     await fs.driver.createFile({parentPath: directory + '/_nestos/kanban/inbox', name: 'result.yaml', content: 'Retained evidence', recursive: true});
     const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     await journal.update('worktree:ready', () => tree);
-    await journal.update('development-workspace:ready', () => ({directory, projectId: 'project', context: {board: {id: 'board'}, task: {id: 'item'}}}));
+    await journal.update('development-workspace:ready', () => ({directory, projectId: 'project',availableRepositories:withModule?[{path:'library'}]:[], context: {board: {id: 'board'}, task: {id: 'item'}}}));
     const item = {id: 'item', status: 'completed', revision: 1, externalRefs: [{system: 'nestos-remote-project', id: 'project'}, {system: 'nestos-worktree', id: 'ready'}]};
     const service = {catalog:async()=>[],query:async()=>({items:[],total:0}),item: async () => ({item}), read: async () => ({members: [{kind: 'human', id: 'admin', roles: ['coordinator']}]}),
         currentPrincipal: async () => ({kind: 'human', id: 'admin'}), workflow: async () => ({dispatches: {}})} as never;
@@ -178,4 +183,16 @@ it('exposes the current coordination workspace for group cleanup while retaining
  await f.journal.update('analysis:old',()=>({id:'old-plan'}));await f.journal.update('analysis:current',()=>({id:'ready'}));
  await f.journal.update('analysis-current:'+JSON.stringify(['board','item']),()=>'analysis:current');
  expect((await f.api.workResources('board','item',{inspect:false})).map(row=>row.id)).toEqual(['ready']);
+});
+
+it('removes populated modules only after proving clean files and integration into their main repositories',async()=>{
+ const f=await fixture(true),resource=(await f.api.workResources('board','item'))[0];expect(resource.canCleanup).toBe(true);
+ await f.api.cleanupWorkResource('board',{operationId:'module-clean',itemId:'item',resourceId:'ready',version:resource.version});
+ expect(f.commands).toContainEqual(['worktree','remove','--force',f.tree.directory]);await expect(stat(f.physical)).rejects.toMatchObject({code:'ENOENT'});
+ expect((await f.git(join(f.root,'library'),['status','--porcelain'])).stdout).toBe('');
+});
+it('retains ignored files inside populated modules instead of treating a clean parent as disposable',async()=>{
+ const f=await fixture(true);await mkdir(join(f.physical,'library/cache'));await writeFile(join(f.physical,'library/cache/private'),'Retain');
+ const resource=(await f.api.workResources('board','item'))[0];expect(resource).toMatchObject({canCleanup:false,reasons:expect.arrayContaining(['WORKTREE_UNTRACKED_IGNORED'])});
+ expect(f.commands.some(args=>args[0]==='worktree'&&args[1]==='remove')).toBe(false);
 });

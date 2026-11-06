@@ -1,3 +1,4 @@
+import {inspectRemovalModules} from '../projects/worktree-removal-modules';
 import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {KanbanService, KanbanWorkResource, KanbanWorkResourceCleanup, KanbanExternalReference} from '@nestos/kanban/contracts';
@@ -108,14 +109,13 @@ async function inspect(options: Options, boardId: string, resource: ResourceScop
         reasons: saved.phase === 'cleaned' ? [] : ['WORKTREE_CLEANUP_UNCONFIRMED']};
     if (ownership !== 'current') return {...base, version: sha256HexSync(JSON.stringify([id, ownership, item.revision])), state: 'retained', canCleanup: false, reasons: [ownership === 'other' ? 'WORKTREE_OTHER_OWNER' : 'WORKTREE_ASSOCIATION_UNVERIFIED']};
     if (await sharedReference(options, boardId, id, item.id)) return {...base,version:sha256HexSync(JSON.stringify([id,'shared',item.revision])),state:'retained',canCleanup:false,reasons:['WORKTREE_SHARED']};
-    const state = await developmentWorkspace(options.remote, options.provider, record.projectId, process => inspectWorktree(process, tree, '_nestos/kanban/'));
-    const reasons = worktreeBlockers(state);
+    const {state,modules,reasons}=await developmentWorkspace(options.remote,options.provider,record.projectId,process=>removalState(process,resource));
     if (context?.board?.id !== boardId || context?.task?.id !== item.id) reasons.push('WORKTREE_ASSOCIATION_UNVERIFIED');
     if (!['completed','cancelled'].includes(item.status)) reasons.push('WORKTREE_TASK_UNFINISHED');
     const dispatch = (await options.service.workflow(boardId)).dispatches[id];
     if (dispatch && ['prepared', 'running', 'unknown', 'succeeded'].includes(dispatch.outcome)) reasons.push('WORKTREE_IN_USE');
     if (!reasons.length) reasons.push(...await workResourceExecution(options, id, record.projectId));
-    const version = sha256HexSync(JSON.stringify([state.version, item.revision, item.status, reasons]));
+    const version = sha256HexSync(JSON.stringify([state.version,modules?.version,item.revision,item.status,reasons]));
     return {...base, version, reasons, state: reasons.includes('WORKTREE_IN_USE') ? 'in-use' : reasons.length ? 'retained' : 'cleanup-ready',
         canCleanup: reasons.length === 0, properties: [...base.properties, {label: t('kanban.workResourceTarget'), value: state.targetBranch},
             ...(state.head ? [{label: 'HEAD', value: state.head.slice(0, 12)}] : [])]};
@@ -159,19 +159,25 @@ async function remove(options: Options, resource: ResourceScope, key: string, bo
         const archive = await archiveWorktree(view.fs, options.fs, record.directory, id);
         await options.journal.update<Cleanup>(key, old => ({...old!, archive}));
         await developmentWorkspace(options.remote, options.provider, record.projectId, async process => {
-            const state = await inspectWorktree(process, tree, '_nestos/kanban/');
-            requireValue(!worktreeBlockers(state).length, worktreeBlockers(state)[0] ?? 'WORKTREE_STATE_CHANGED');
+            const {state,modules,reasons}=await removalState(process,resource);
+            requireValue(!reasons.length,reasons[0]??'WORKTREE_STATE_CHANGED');
             requireValue(!await sharedReference(options,boardId,id,resource.item.id),'WORKTREE_SHARED');
             const latest = (await options.service.item(boardId, resource.item.id)).item;
-            requireValue(['completed','cancelled'].includes(latest.status) && sha256HexSync(JSON.stringify([state.version, latest.revision, latest.status, []])) === version, 'WORKTREE_STATE_CHANGED');
+            requireValue(['completed','cancelled'].includes(latest.status) && sha256HexSync(JSON.stringify([state.version,modules?.version,latest.revision,latest.status,[]])) === version, 'WORKTREE_STATE_CHANGED');
             requireValue(!(await workResourceExecution(options, id, record.projectId)).length, 'WORKTREE_IN_USE');
             await archiveWorktree(view.fs, options.fs, record.directory, id);
             await options.journal.update<Cleanup>(key, old => ({...old!, phase: 'removing'}));
-            await gitWorkspace(process, '/workspace', ['worktree', 'remove', tree.directory]);
+            await gitWorkspace(process, '/workspace', ['worktree','remove',...(modules?['--force']:[]),tree.directory]);
             await gitWorkspace(process, '/workspace', ['branch', '-d', tree.branch]);
             await options.journal.update<Cleanup>(key, old => ({...old!, phase: 'cleaned'}));
         });
     } finally {await view.dispose();}
+}
+async function removalState(process:import('../projects/remote-mounts').RemoteProcessHandle,resource:ResourceScope) {
+    const state=await inspectWorktree(process,resource.tree,'_nestos/kanban/');
+    const modules=state.initializedModules?await inspectRemovalModules(process,resource.tree.directory,[...resource.record.repositories??[],...resource.record.availableRepositories??[]]):undefined;
+    const reasons=[...worktreeBlockers(state).filter(reason=>reason!=='WORKTREE_INITIALIZED_MODULES'||!modules),...modules?.reasons??[]];
+    return {state,modules,reasons:[...new Set(reasons)]};
 }
 function safeCode(error: unknown): string {
     const value = error as {code?: unknown; remoteCode?: unknown}, code = value?.remoteCode ?? value?.code;

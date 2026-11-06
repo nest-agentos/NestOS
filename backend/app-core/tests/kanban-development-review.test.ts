@@ -19,6 +19,7 @@ async function fixture(withExchange = false) {
     const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     await journal.update('worktree:original', () => ({id: 'original', directory: '/workspace/_nestos/worktrees/original', branch: 'work/original', phase: 'ready'}));
     await journal.update('development-workspace:original', () => ({directory: '/workspace/_nestos/worktrees/original', projectId: 'project', context: {board: {id: 'board'}, task: {id: 'task'}}, policy: {profile: 'development', commit: 'changes', modules: []}}));
+    const workflow={dispatches:{}};
     const item = {id: 'task', title: 'Task', responsibility: 'Work', acceptance: 'Verify', externalRefs: [{system: 'nestos-worktree', id: 'original'}, {system: 'nestos-remote-project', id: 'project'}]}, board = {id: 'board'};
     const target = {kind: 'agent', id: 'original-agent', version: '1', digest: 'original-digest'};
     const calls = {list: vi.fn(async () => [{receipt: {executionSessionId: 'original-session'}, callerState: {settled: true}, executionTree: {settled: true}, input: {request: {expectedTarget: target, expectedBranch: 'main', overrides: {connection: 'original-connection'}}}}])};
@@ -26,9 +27,9 @@ async function fixture(withExchange = false) {
     const submission = {start: vi.fn(async () => ({sessionId: 'original-session', outcome})), inspect: vi.fn(async () => ({sessionId: 'original-session', outcome}))};
     const channels=memoryChannels();
     const stop = vi.fn(), close = vi.fn(async () => {}), remote = {sessionChannel:channels.channel,projectHarness: async () => ({subscribeChannel: () => stop, close})};
-    const api = developmentReviewAdapter({fs, journal, calls, remote, submission: withExchange ? submission : undefined, kernel: {sessionActivity: async () => ({counts: {}})}, projects: {get: async () => ({path: '/project'}), openWorkspace: async () => ({fs, dispose: async () => {}})}, runningVersion: 'running', service: {execute: async () => {}, workflow: async () => ({dispatches: {}}), read: async () => board, item: async () => ({item})}} as never);
+    const api = developmentReviewAdapter({fs, journal, calls, remote, submission: withExchange ? submission : undefined, kernel: {sessionActivity: async () => ({counts: {}})}, projects: {get: async () => ({path: '/project'}), openWorkspace: async () => ({fs, dispose: async () => {}})}, runningVersion: 'running', service: {execute: async () => {}, workflow: async () => workflow, read: async () => board, item: async () => ({item})}} as never);
     closes.push(() => api.close!());
-    return {api, journal, fs, channels, submission, stop, close, complete: () => {outcome = 'succeeded';}, item: item as never, board: board as never, target, calls};
+    return {api, journal, fs, workflow, channels, submission, stop, close, complete: () => {outcome = 'succeeded';}, item: item as never, board: board as never, target, calls};
 }
 it('prepares merge analysis in the original logical Session and exact native context without executing it', async () => {
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
@@ -67,7 +68,7 @@ it('prepares project-discovered builds in the original Session and freezes maint
     expect(f.channels.channel).toHaveBeenCalledWith('project','open',expect.objectContaining({scopeId:'build',sessionId:'original-native'}));
     const path = '/workspace/_nestos/worktrees/original/_nestos/kanban/review/build';
     const manifest = JSON.parse(await readPrompt(f.fs, path + '/manifest.json'));
-    expect(manifest.context.phase).toBe('build'); expect(manifest.files.map(row => row.name)).toContain('task-build-pre.md');
+    expect(manifest.context.phase).toBe('build');expect(manifest.context.receiptPath).toBe('_nestos/kanban/review/build/result.json'); expect(manifest.files.map(row => row.name)).toContain('task-build-pre.md');
     const job = {id: 'build', action: 'build', boardId: 'board', itemId: 'task', request, snapshot} as never;
     f.channels.report('build','result',{type:'result',content:'Build result',payload:{status:'succeeded'}});
     await expect(f.api.readOperation!(job)).rejects.toMatchObject({code: 'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
@@ -91,4 +92,21 @@ it('accepts already-integrated delivery without inventing a target commit and re
  const job={id:'merge-confirm',action:'merge',boardId:'board',itemId:'task',request,snapshot} as never;
  expect(await f.api.readOperation!(job)).toEqual(payload);mock.ancestry=1;
  await expect(f.api.readOperation!(job)).rejects.toMatchObject({code:'OPERATION_RESULT_MERGE_UNCONFIRMED'});
+});
+
+it('resolves the canonical dispatch workspace without requiring a duplicate card reference',async()=>{
+ const f=await fixture();(f.item as any).externalRefs=(f.item as any).externalRefs.filter(row=>row.system!=='nestos-worktree');
+ (f.board as any).automation={preparation:{system:'nestos-work-preparation',id:'git-worktree'}};
+ (f.workflow.dispatches as any).original={id:'original',itemId:'task',attempt:1};
+ expect(f.api.supports!(f.board,f.item)).toBe(true);expect((await f.api.snapshot(f.board,f.item)).context).toMatchObject({worktreeId:'original'});
+});
+
+it('accepts archived artifact evidence but refuses protocol receipts as build evidence',async()=>{
+ const f=await fixture(),snapshot=await f.api.snapshot(f.board,f.item),request=await f.api.prepareOperation!({id:'archive-build',action:'build',board:f.board,item:f.item,snapshot});
+ const content='real artifact manifest',path='_nestos/kanban/artifacts/build/manifest.json';await f.fs.driver.createFile({parentPath:'/workspace/_nestos/worktrees/original/_nestos/kanban/artifacts/build',name:'manifest.json',content,recursive:true});
+ const payload={status:'succeeded',evidence:{path,sha256:sha256HexSync(content)}};f.channels.report('archive-build','proof',{type:'result',content:'Build',payload});
+ expect(await f.api.readOperation!({id:'archive-build',action:'build',boardId:'board',itemId:'task',request,snapshot} as never)).toEqual(payload);
+ const bad=await f.api.prepareOperation!({id:'protocol-proof',action:'build',board:f.board,item:f.item,snapshot});
+ f.channels.report('protocol-proof','proof',{type:'result',content:'Protocol is not an artifact',payload:{status:'succeeded',evidence:{path:'_nestos/kanban/review/protocol-proof/result.json',sha256:sha256HexSync(content)}}});
+ await expect(f.api.readOperation!({id:'protocol-proof',action:'build',boardId:'board',itemId:'task',request:bad,snapshot} as never)).rejects.toMatchObject({code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
 });

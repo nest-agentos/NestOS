@@ -23,7 +23,7 @@ import {currentChannelBinding, openDevelopmentChannel, type DevelopmentWorkspace
 import {developmentWorkspace} from './kanban-development-workspace';
 import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../projects/remote-mounts';
 import type {ProjectService} from '@nestos/app-contracts/services';
-import {developmentPolicy} from './kanban-development-policy';
+import {developmentPolicy,requiresDevelopmentProject} from './kanban-development-policy';
 import {publishPromptBundle} from '../run/prompt-bundle';
 import {readPrompt, publishImmutableFile} from '../run/prompt-bundle';
 import {readChannelResult, channelResultInstruction} from '../run/channel-results';
@@ -49,7 +49,7 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
             return async () => {stop?.(); await client.close();};});
         return record;
     };
-    return {managed:managedServiceDeployment(options.serviceControl,async item=>{const project=item.externalRefs?.find(ref=>ref.system==='nestos-remote-project');requireValue(project,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(project.id)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');}),runningVersion: () => options.runningVersion, supports: (_board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree'),
+    return {managed:managedServiceDeployment(options.serviceControl,async item=>{const project=item.externalRefs?.find(ref=>ref.system==='nestos-remote-project');requireValue(project,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(project.id)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');}),runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
         snapshot: (board, item) => snapshot(options, board, item), close: () => watches.dispose(),
         prepareAnalysis: input => prepareAnalysis(options, input), prepareOperation: input => prepareAnalysis(options, input),
         exchange: options.submission ? async (job, observation) => {
@@ -67,7 +67,7 @@ async function resource(options: Options, item: KanbanItem, boardId: string): Pr
     const refs = item.externalRefs?.filter(row => row.system === 'nestos-worktree') ?? [];
     const dispatch = Object.values((await options.service.workflow(boardId)).dispatches).filter(row => row.itemId === item.id).sort((a, b) => b.attempt - a.attempt)[0];
     const primary = dispatch ? await options.journal.get<PreparedWorktree>('worktree:' + dispatch.id) : undefined;
-    const ref = primary ? refs.find(row => row.id === primary.id) : refs.length === 1 ? refs[0] : undefined;
+    const ref = primary ? {system:'nestos-worktree',id:primary.id} : refs.length === 1 ? refs[0] : undefined;
     requireValue(ref, 'OPERATION_WORKSPACE_REQUIRED');
     const [tree, record, cleanup] = await Promise.all([options.journal.get<PreparedWorktree>('worktree:' + ref.id),
         options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + ref.id), options.journal.get('worktree-cleanup:' + ref.id)]);
@@ -123,11 +123,11 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
         await publishImmutableFile(view.fs, directory, 'commit-contexts.json', contextText);
         const approvalText = input.context === undefined ? undefined : JSON.stringify(input.context);
         if (approvalText) await publishImmutableFile(view.fs, directory, 'operation-input.json', approvalText);
-        await publishPromptBundle(view.fs, directory, policy.prompts, {operationId: input.id, phase:input.action??'analyze',receiptPath:directory+'/result.json',approval: approvalText ? {path: 'operation-input.json', sha256: sha256HexSync(approvalText)} : null, boardId: input.board.id,
+        await publishPromptBundle(view.fs, directory, policy.prompts, {operationId: input.id, phase:input.action??'analyze',receiptPath:'_nestos/kanban/review/'+input.id+'/result.json',approval: approvalText ? {path: 'operation-input.json', sha256: sha256HexSync(approvalText)} : null, boardId: input.board.id,
             itemId: input.item.id, sessionId, input: current.record.context, commitContexts: {path: 'commit-contexts.json', sha256: sha256HexSync(contextText)}, sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, resources: input.snapshot.context});
         await options.journal.update('worktree:' + input.id, old => old ?? current.tree);
         const record = await options.journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.id, old => old ?? {...current.record, channelId: input.id, worktreeId: current.id, communicationDirectory: directory, policy,
-            context: {...current.record.context as object, operation: {operationId: input.id, phase:input.action??'analyze',receiptPath:directory+'/result.json',approval: input.context ?? null,
+            context: {...current.record.context as object, operation: {operationId: input.id, phase:input.action??'analyze',receiptPath:'_nestos/kanban/review/'+input.id+'/result.json',approval: input.context ?? null,
                 sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, commitContexts: context, resources: input.snapshot.context}}});
         await openDevelopmentChannel(options.remote, input.id, record, {runId: input.id, itemId: input.item.id, attemptId: input.id}, input.item,
             await currentChannelBinding(options.remote,record,nativeSessionId));
@@ -176,6 +176,6 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
 async function verifyBuildEvidence(fs: IFileSystem, directory: string, value: unknown): Promise<void> {
     const evidence = (value as {evidence?: {path?: string; sha256?: string}})?.evidence;
     requireValue(typeof evidence?.path === 'string' && evidence.path.length <= 512 && evidence.path.split('/').every(part => /^[a-zA-Z0-9_.-]+$/.test(part) && part !== '.' && part !== '..')
-        && !evidence.path.startsWith('_nestos/kanban/') && typeof evidence.sha256 === 'string' && /^[a-f0-9]{64}$/.test(evidence.sha256), 'OPERATION_RESULT_ARTIFACT_UNVERIFIED');
+        && (!evidence.path.startsWith('_nestos/kanban/')||evidence.path.startsWith('_nestos/kanban/artifacts/')) && typeof evidence.sha256 === 'string' && /^[a-f0-9]{64}$/.test(evidence.sha256), 'OPERATION_RESULT_ARTIFACT_UNVERIFIED');
     requireValue(sha256HexSync(await readPrompt(fs, directory + '/' + evidence.path)) === evidence.sha256, 'OPERATION_RESULT_ARTIFACT_UNVERIFIED');
 }
