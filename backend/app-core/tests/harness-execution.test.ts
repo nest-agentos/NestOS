@@ -298,3 +298,11 @@ it('does not release another Effect connection when cancelling an unrelated owne
     expect(f.release).toHaveBeenCalledOnce();
     await provider.cancel(request, f.context); expect(f.release).toHaveBeenCalledTimes(2);
 });
+
+it('yields native observation at a shutdown safe point and resumes the original turn',async()=>{
+ const f=fixture(),reason=Object.assign(new Error('Worker observation drained'),{code:'WORKER_OBSERVATION_DRAINED'});
+ f.context.waitForObservation=vi.fn(async()=>{throw reason;});
+ await expect(f.make().execute(request,f.context)).rejects.toBe(reason);expect(f.client.turn).toHaveBeenCalledOnce();expect(f.client.interrupt).not.toHaveBeenCalled();
+ complete(f);delete f.context.waitForObservation;
+ expect(await f.make().reconcile(request,f.context)).toMatchObject({status:'completed'});expect(f.client.turn).toHaveBeenCalledOnce();
+});

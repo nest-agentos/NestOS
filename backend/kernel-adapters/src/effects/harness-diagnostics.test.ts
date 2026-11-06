@@ -49,3 +49,10 @@ it('keeps unconfirmed cleanup pending even when its diagnostic cannot be recorde
     vi.mocked(f.provider.cancel).mockResolvedValue({status: 'unknown', code: 'NATIVE_EPOCH_CHANGED'});
     await expect(f.effect.cancel(request, context)).rejects.toMatchObject({code: 'CONNECTION_STOP_UNKNOWN', nativeCode: 'NATIVE_EPOCH_CHANGED'});
 });
+
+it('preserves the kernel observation drain identity without turning it into an execution failure',async()=>{
+ const f=fixture(),reason=Object.assign(new Error('Worker observation drained'),{code:'WORKER_OBSERVATION_DRAINED'});
+ vi.mocked(f.provider.execute).mockRejectedValue(reason);vi.mocked(f.provider.reconcile).mockRejectedValue(reason);
+ await expect(f.effect.execute(request,context)).rejects.toBe(reason);await expect(f.effect.reconcile(request,context)).rejects.toBe(reason);
+ expect(reason).not.toHaveProperty('effectOutcome');expect(f.provider.cancel).not.toHaveBeenCalled();
+});

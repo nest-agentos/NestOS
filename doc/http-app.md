@@ -651,3 +651,5 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 控制状态位于 `$XDG_CONFIG_HOME/nestos/httpd-launchers/<项目路径摘要>/release.json`（默认 `~/.config`），可用 `NESTOS_HTTPD_CONTROL_DIR` 覆盖；文件权限 0600，独立于 worktree 和 release。状态保存服务 ID、目标版本、进程身份和幂等回执；启动器重启接管已登记的候选进程，继续核对。显式 stop 持久化停止意图，不会被守护循环复活；未到安全点仍等待，只有显式 `--force` 可升级停止。
 
 健康配置在 `nestos.json` 的 `http.launcher.health`：可选 `url`、`ca`、`cert`、`key`、`timeoutMs`；默认使用本机 `/api/health` 和 http.certDir 下的客户端证书，验证实际 version 与目标一致。`/api/health` 另返回稳定 serviceId 供显式项目目标配置使用，它不是授权凭据。
+
+原生 Harness 的等待输出也通过 Kernel `waitForObservation` 让出本地执行权。安全退出只中止观察等待，保留原 Effect 租约和原生 turn journal；重启核对同一 turn，不取消远程任务、不新建 turn。`WORKER_OBSERVATION_DRAINED` 在宿主与能力适配器之间保留原始身份，不映射成业务失败或 unknown 结果。

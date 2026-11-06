@@ -49,6 +49,7 @@ export class HarnessExecutionEffect implements EffectAdapter<HarnessExecutionReq
                 reconciled?.status === 'indeterminate' ? failureCode(reconciled.error) : undefined);
             return result as T extends true ? EffectReconcileResult<HarnessExecutionResult> : HarnessExecutionResult;
         } catch (error) {
+            if(failureCode(error)==='WORKER_OBSERVATION_DRAINED'){this.diagnostic(request,context,stage,started,'drained','WORKER_OBSERVATION_DRAINED');throw error;}
             const failure = classifyExecutionFailure(error, executing, context.abortSignal.aborted);
             this.diagnostic(request, context, stage, started, this.failureOutcome(failure) === 'indeterminate' ? 'indeterminate' : 'failure',
                 context.abortSignal.aborted ? 'cancelled' : failureCode(failure));

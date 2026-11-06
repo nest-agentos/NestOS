@@ -118,7 +118,10 @@ export async function observeNativeTurn(run: NativeExecution, context: EffectExe
             run.signal.throwIfAborted();
             const page = await observeNativePage(run);
             if (!run.journal.data.terminal) await driveNativeInteractions(run, context, page);
-            if (!run.journal.data.terminal) await waitForNativeChange(run, pollMs);
+            if (!run.journal.data.terminal) {
+                if(context.waitForObservation)await context.waitForObservation(signal=>waitForNativeChange({...run,signal},pollMs));
+                else await waitForNativeChange(run,pollMs);
+            }
         }
         if (run.journal.data.terminal === 'completed' && !run.journal.data.outputChecked) {
             await observeNativePage(run);
@@ -144,7 +147,7 @@ export function waitForNativeChange(run: NativeExecution, milliseconds: number):
     return new Promise((resolve, reject) => {
         let stop = () => {};
         const finish = () => { clearTimeout(timer); stop(); run.signal.removeEventListener('abort', abort); resolve(); };
-        const abort = () => { clearTimeout(timer); stop(); run.signal.removeEventListener('abort', abort); reject(executionError('OBSERVATION_ABORTED')); };
+        const abort = () => { clearTimeout(timer); stop(); run.signal.removeEventListener('abort', abort); reject(run.signal.reason??executionError('OBSERVATION_ABORTED'));  };
         const timer = setTimeout(finish, milliseconds);
         stop = run.acquired.client.subscribe(run.acquired.profile.id, finish);
         run.signal.addEventListener('abort', abort, { once: true });

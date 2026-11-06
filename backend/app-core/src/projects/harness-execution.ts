@@ -39,6 +39,7 @@ class NativeHarnessExecutionProvider implements HarnessExecutionProvider {
             return { status: 'completed', result: await this.track(context, this.run(request, context)) };
         } catch (error) {
             const code = safeCode(error);
+            if(code==='WORKER_OBSERVATION_DRAINED')throw error;
             if ((error as { executionOutcome?: string })?.executionOutcome === 'not-started'
                 || code === 'NATIVE_TURN_FAILED' || code === 'NATIVE_TURN_CANCELLED') throw error;
             await diagnose(context, 'reconcile', 'unknown', startedAt, code);
@@ -95,6 +96,7 @@ class NativeHarnessExecutionProvider implements HarnessExecutionProvider {
     }
     private async failExecution(error: unknown, request: HarnessExecutionRequest, context: EffectExecutionContext,
         journal: ExecutionJournal, startedAt: number): Promise<never> {
+        if(safeCode(error)==='WORKER_OBSERVATION_DRAINED'){await diagnose(context,'observe','drained',startedAt,'WORKER_OBSERVATION_DRAINED');throw error;}
         const failure = classifyExecutionFailure(error, journal, request.context?.conversation.mode === 'resume'), correlation = executionCorrelation(request, journal);
         try {
             if ((failure as {executionOutcome?: string})?.executionOutcome === 'not-started') await settleExecutionContext(journal, true);
