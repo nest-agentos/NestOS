@@ -1,3 +1,4 @@
+import {promptWindowName} from './history/window-outline-name';
 // @file: llm-ui/components/HistoryView.ts
 
 import type { SessionGroup, SessionEventEnvelope, ExecutionNode } from '@nestos/llm-session/contracts';
@@ -83,6 +84,8 @@ export class HistoryView implements IHistoryPresenter {
         this.onHistoryActivity = options.onHistoryActivity;
 
         const ctx: RendererContext = {
+            windowName: promptWindowName,
+            revealWindow: id => {this.toggleSessionCollapse(id, false);},
             artifacts: options.artifacts,
 
 
@@ -326,6 +329,8 @@ export class HistoryView implements IHistoryPresenter {
     getSessionElement(sessionId: string): HTMLElement | null {
         return this.renderer.getSessionElement(sessionId);
     }
+
+    getWindowOutline(): readonly import('@nestos/ui-common').OutlineItem[] {return this.renderer.getWindowOutline();}
 
     revealSession(sessionId: string): HTMLElement | null {
         this.scrollController.pauseAutoScroll();

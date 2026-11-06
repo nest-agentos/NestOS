@@ -14,10 +14,10 @@ function fixture() {
     const container = document.createElement('div'), primary = document.createElement('header'); document.body.append(primary, container);
     const stop = mountFileMenu(container, editor as unknown as MDxEditor, {target: {kind: 'file', path: '/note.md'}, files: {fs: {driver: {getNode: read}}} as any,
         hostContext: {reloadContent: async (_path, accept) => {if (await accept(disk)) committed++;},
-            reloadRecovery: {preserve: async value => {backup.push(value);}, read: async () => backup.at(-1)}} as any}, () => '/note.md', primary);
+            reloadRecovery: {preserve: async value => {backup.push(value);}, read: async () => backup.at(-1)}} as any}, () => '/note.md');
     cleanups.push(stop);
     return {container, primary, editor, read, backup, stop, text: () => text, committed: () => committed, edit: (value: string) => {text = value; dirty = true;}, disk: (value: string) => {disk = value;},
-        refresh: () => primary.querySelector<HTMLButtonElement>('[data-file-refresh]')!.click()};
+        refresh: () => container.querySelector<HTMLButtonElement>('[data-file-refresh]')!.click()};
 }
 it('reads file times only when information expands and does not poll or read AI state', async () => {
     const f = fixture(); expect(f.read).not.toHaveBeenCalled();
@@ -54,8 +54,8 @@ it('cancels the compare dialog when the editor closes', async () => {
     f.stop(); expect(document.querySelector('dialog')).toBeNull(); await Promise.resolve(); expect(f.committed()).toBe(0);
 });
 
-it('places reload in the primary toolbar and keeps labelled file details in the menu',()=>{
-    const f=fixture();expect(f.primary.querySelector('[data-file-refresh]')).not.toBeNull();
-    expect(f.container.querySelector('[data-file-refresh]')).toBeNull();
+it('keeps labelled reload and file details in More',()=>{
+    const f=fixture();expect(f.primary.querySelector('[data-file-refresh]')).toBeNull();
+    expect(f.container.querySelector('[data-file-refresh]')).not.toBeNull();
     const info=f.container.querySelector('summary')!;expect(info.querySelector('svg')).not.toBeNull();expect(info.querySelector('span')?.textContent).toBeTruthy();
 });

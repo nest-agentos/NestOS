@@ -140,7 +140,8 @@
     "@nestos/kernel-adapters": "workspace:*",
     "@nestos/llm-tasks": "workspace:*",
     "@nestos/tools": "workspace:*",
-    "@nestos/image-parser": "workspace:*"
+    "@nestos/image-parser": "workspace:*",
+    "@nestos/ui-common": "workspace:*"
   },
   "peerDependencies": {
     "@nestos/mdx-adapter": "workspace:*",

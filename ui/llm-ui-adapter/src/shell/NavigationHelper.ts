@@ -1,3 +1,4 @@
+import {promptWindowName} from '../components/history/window-outline-name';
 // @file: llm-ui/shell/NavigationHelper.ts
 // Navigation + floating panel logic — extracted from LLMWorkspaceEditor.
 // Handles: viewport-aware session finding, scroll-to navigation, and the floating nav panel.
@@ -54,7 +55,7 @@ export class NavigationHelper {
     updatePrompts(sessions: SessionGroup[]): void {
         if (this.destroyed) return;
         this.historyRevision++; this.historyDirty = false; this.sessions = sessions;
-        this.prompts.update(sessions.filter(session => session.role === 'user').map(session => ({id: session.id, text: session.content ?? ''})));
+        this.prompts.update(sessions.flatMap(session => {const text = promptWindowName(session); return text ? [{id: session.id, name: text, text: session.content ?? ''}] : [];}));
     }
 
     private invalidateHistory(): void { this.historyRevision++; this.historyDirty = true; }
