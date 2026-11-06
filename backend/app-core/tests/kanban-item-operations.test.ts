@@ -106,6 +106,16 @@ it('reconciles canonical accepted state after an acceptance reply was lost witho
     f.item.status = 'completed'; f.snapshot.version = 'now-changed'; f.service.workflow = async () => ({dispatches: {execution: {id: 'execution', itemId: 'task', attempt: 1, outcome: 'accepted'}}});
     await f.api.scan(); expect((await f.journal.get<ReviewJob>(jobKey(job.id)))!.state).toBe('succeeded'); expect(f.service.execute).not.toHaveBeenCalled();
 });
+it('settles a stale pending acceptance before sending any business command', async () => {
+    const f = await fixture();
+    const job: ReviewJob = {id: 'stale', action: 'accept', boardId: 'board', itemId: 'task', fingerprint: 'fingerprint', snapshot: {...f.snapshot}, phase: 'prepared', state: 'running', createdAt: 0, acceptanceVersion: 'candidate', command: {type: 'accept-execution', dispatchId: 'execution', accept: true}};
+    await f.journal.update(jobKey(job.id), () => job);
+    await f.journal.update(reviewKey('board', 'task'), () => ({revision: 1, bindings: {}, receipts: {}, jobs: [job.id]}));
+    await f.journal.update('review-operation-scopes', () => [{board: 'board', item: 'task'}]);
+    f.snapshot.version = 'changed'; await f.api.scan();
+    expect(await f.journal.get(jobKey(job.id))).toMatchObject({phase: 'settled', state: 'failed', code: 'OPERATION_SOURCE_CHANGED_REBUILD'});
+    expect(f.service.execute).not.toHaveBeenCalled();
+});
 it('uses the original Session for project maintenance without a Flow selection or catalog lookup', async () => {
     const f = await fixture();
     f.options.adapter.prepareOperation = vi.fn(async () => ({expectedSessionId: 'original', expectedBranch: 'main', submission: {id: 'build', source: {kind: 'conversation', ownerId: 'original', id: 'build'}}}) as never);

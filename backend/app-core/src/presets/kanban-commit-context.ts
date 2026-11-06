@@ -36,16 +36,28 @@ export async function verifyCommitContexts(process: RemoteProcessHandle, directo
     const records = [];
     for (const repo of repositories) {
         const cwd = repo.path === '.' ? directory : directory + '/' + repo.path;
+        const integrated = await integratedCommits(process, repo);
         const text = (await gitWorkspace(process, cwd, ['log', '--max-count=257', '--format=%H%x00%(trailers:only,unfold)%x00', repo.baseCommit + '..' + repo.head, '--'])).stdout;
-        const parts = text.split('\0'), commits: string[] = [];
+        const parts = text.split('\0'), commits: string[] = []; let inspected = 0;
         for (let index = 0; index + 1 < parts.length; index += 2) {
             const sha = parts[index].trim(); if (!sha) continue;
+            if (++inspected > 256) throw failure('COMMIT_CONTEXT_LIMIT');
+            if (integrated.has(sha)) continue;
             const actual = parseCommitTrailers(parts[index + 1]);
             for (const [key, value] of Object.entries(parseCommitTrailers(context.trailers))) if (actual[key] !== value) throw failure('COMMIT_TASK_CONTEXT_MISMATCH');
             if (!/^[a-f0-9]{40,64}$/.test(sha)) throw failure('COMMIT_CONTEXT_INVALID'); commits.push(sha);
         }
-        if (commits.length > 256) throw failure('COMMIT_CONTEXT_LIMIT');
         records.push({repository: repo.path, commits});
     }
     return records;
+}
+/** Imported target history belongs to the project, not to the current task. */
+async function integratedCommits(process: RemoteProcessHandle, repo: RepositoryEvidence): Promise<Set<string>> {
+    const cwd = repo.path === '.' ? '/workspace' : '/workspace/' + repo.path;
+    const target = repo.path === '.' ? 'HEAD' : /^160000 commit ([a-f0-9]{40,64})\t/.exec(
+        (await gitWorkspace(process, '/workspace', ['ls-tree', 'HEAD', '--', repo.path])).stdout)?.[1];
+    if (!target) throw failure('COMMIT_TARGET_REPOSITORY_MISSING');
+    const rows = (await gitWorkspace(process, cwd, ['log', '--max-count=257', '--format=%H', repo.baseCommit + '..' + target, '--'])).stdout.trim().split('\n').filter(Boolean);
+    if (rows.length > 256) throw failure('COMMIT_CONTEXT_LIMIT');
+    return new Set(rows);
 }

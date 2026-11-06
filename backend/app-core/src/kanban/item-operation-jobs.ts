@@ -65,8 +65,10 @@ async function acceptReview(options: ReviewOperationsOptions, job: ReviewJob): P
     requireValue(command.type === 'accept-execution', 'OPERATION_REQUEST_INVALID');
     const accepted = (await options.service.workflow(job.boardId)).dispatches[command.dispatchId]?.outcome === 'accepted';
     if (!(item.status === 'completed' && accepted)) {
-        requireValue((await options.adapter.snapshot(await options.service.read(job.boardId), item)).version === job.snapshot.version, 'OPERATION_SOURCE_CHANGED_REBUILD');
-        requireValue(options.adapter.runningVersion?.() === job.acceptanceVersion, 'OPERATION_RUNNING_VERSION_MISMATCH');
+        const current = await options.adapter.snapshot(await options.service.read(job.boardId), item);
+        const code = current.version !== job.snapshot.version ? 'OPERATION_SOURCE_CHANGED_REBUILD'
+            : options.adapter.runningVersion?.() !== job.acceptanceVersion ? 'OPERATION_RUNNING_VERSION_MISMATCH' : undefined;
+        if (code) return save(options, job, {...job, phase: 'settled', state: 'failed', code});
         await journalCommand(options.journal, options.service, job.boardId, 'review-accept:' + job.id, command);
     }
     return save(options, job, {...job, phase: 'settled', state: 'succeeded'});

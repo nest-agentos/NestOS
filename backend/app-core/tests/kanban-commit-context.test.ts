@@ -47,6 +47,21 @@ it('verifies actual Git trailers and rejects an unassociated commit without rewr
     await expect(verifyCommitContexts(f.process, f.record.directory, [{...f.evidence[0], head: next}], f.context)).rejects.toMatchObject({code: 'COMMIT_TASK_CONTEXT_MISMATCH'});
     expect(await f.git(f.physical, ['rev-parse', 'HEAD'])).toBe(next);
 });
+it('excludes imported project history while verifying the task merge and delivery commits', async () => {
+    const f = await fixture();
+    await writeFile(join(f.root, 'platform'), 'Platform fix'); await f.git(f.root, ['add', 'platform']);
+    await f.git(f.root, ['commit', '-m', 'fix(platform): independent change']);
+    await f.git(f.physical, ['merge', '--no-ff', 'main', '-m', 'chore(task): synchronize project', '-m', f.context.trailers]);
+    const merged = await f.git(f.physical, ['rev-parse', 'HEAD']);
+    expect(await verifyCommitContexts(f.process, f.record.directory, [{...f.evidence[0], head: merged}], f.context))
+        .toEqual([{repository: '.', commits: [merged, f.head]}]);
+    await f.git(f.physical, ['checkout', '-b', 'unassociated']);
+    await writeFile(join(f.physical, 'foreign'), 'Foreign change'); await f.git(f.physical, ['add', 'foreign']);
+    await f.git(f.physical, ['commit', '-m', 'feat(other): unassociated change']);
+    const unassociated = await f.git(f.physical, ['rev-parse', 'HEAD']);
+    await expect(verifyCommitContexts(f.process, f.record.directory, [{...f.evidence[0], head: unassociated}], f.context))
+        .rejects.toMatchObject({code: 'COMMIT_TASK_CONTEXT_MISMATCH'});
+});
 it('preloads related contexts and distinguishes the original decision from current revisions', async () => {
     const f = await fixture(), result = await resolveCommitRequest(f.options, f.request as never) as {contexts: Array<{historical: unknown; current: unknown}>};
     expect(result.contexts).toHaveLength(1); expect(result.contexts[0]).toMatchObject({historical: {task: {revision: 2, acceptance: 'Original criterion'}, decision: {snapshot: {content: 'Original decision'}}}, current: {task: {revision: 3, acceptance: 'Current criterion'}, decision: {revision: 2, content: 'Updated decision'}}});
