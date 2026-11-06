@@ -42,9 +42,11 @@ it('prepares merge analysis in the original logical Session and exact native con
     expect(await f.fs.driver.exists('/workspace/_nestos/worktrees/original/_nestos/kanban/review/analysis/manifest.json')).toBe(true);
     expect(f.calls.list).toHaveBeenCalledWith({sessionId: 'original'});
 });
-it('refuses a dirty target, busy original session and invalid native binding', async () => {
-    const f = await fixture(); mock.dirty = true; await expect(f.api.snapshot(f.board, f.item)).rejects.toMatchObject({code: 'OPERATION_TARGET_DIRTY'});
-    mock.dirty = false; const snapshot = await f.api.snapshot(f.board, f.item);
+it('allows unrelated target changes while refusing a busy original session or invalid native binding', async () => {
+    const f = await fixture(), clean = await f.api.snapshot(f.board, f.item); mock.dirty = true;
+    const snapshot = await f.api.snapshot(f.board, f.item);
+    expect(snapshot.version).toBe(clean.version);expect(snapshot.sourceVersion).toBe(clean.sourceVersion);
+    expect(snapshot.context).toMatchObject({targetWorktree:{dirty:true,statusDigest:expect.any(String)}});
     mock.busy = true; await expect(f.api.prepareAnalysis({id: 'busy', board: f.board, item: f.item, snapshot})).rejects.toMatchObject({code: 'OPERATION_ORIGINAL_SESSION_BUSY'});
     mock.busy = false; mock.context = false; await expect(f.api.prepareAnalysis({id: 'invalid', board: f.board, item: f.item, snapshot})).rejects.toMatchObject({code: 'OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE'});
     expect(await f.journal.get('worktree:busy')).toBeUndefined();
@@ -74,7 +76,7 @@ it('prepares project-discovered builds in the original Session and freezes maint
     await expect(f.api.readOperation!(job)).rejects.toMatchObject({code: 'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
 });
 
-it('reads a successful original-session build only with a matching immutable artifact receipt', async () => {
+it('accepts a verified build receipt despite unrelated target edits', async () => {
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
     const request = await f.api.prepareOperation!({id: 'build-ok', action: 'build', board: f.board, item: f.item, snapshot});
     const directory = '/workspace/_nestos/worktrees/original';
@@ -83,6 +85,7 @@ it('reads a successful original-session build only with a matching immutable art
     await f.fs.driver.createFile({parentPath: directory, name: 'build-receipt.json', content: receipt});
     const payload = {schema: 'nestos.kanban.operation-result/1', operationId: 'build-ok', status: 'succeeded', sourceVersion: snapshot.sourceVersion, targetVersion: snapshot.targetVersion, version: 'candidate', evidence: {path: 'build-receipt.json', sha256: sha256HexSync(receipt)}};
     f.channels.report('build-ok','result',{type:'result',content:'Build result',payload});
+    mock.dirty = true;
     expect(await f.api.readOperation!({id: 'build-ok', action: 'build', boardId: 'board', itemId: 'task', request, snapshot} as never)).toEqual(payload);
 });
 

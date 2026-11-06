@@ -86,14 +86,14 @@ async function snapshot(options: Options, board: KanbanBoard, item: KanbanItem):
     return developmentWorkspace(options.remote, options.provider, record.projectId, async process => {
         const status = await inspectWorktree(process, tree, '_nestos/kanban/'); requireValue(status.exists, 'WORKTREE_MISSING');
         const targetChanges = await gitWorkspace(process, '/workspace', ['status', '--porcelain', '--untracked-files=normal', '--ignore-submodules=none']);
-        requireValue(!targetChanges.stdout.trim(), 'OPERATION_TARGET_DIRTY');
+        const targetWorktree = {dirty:!!targetChanges.stdout.trim(), statusDigest:sha256HexSync(targetChanges.stdout)};
         const repositories = await verifyWorktreeDelivery(process, record.directory, record.repositories, record.policy.commit, record.availableRepositories);
         verifyReadOnlyDelivery(record,repositories,options.runningVersion);
         const {input: _input, ...commitContext} = record.commitContext ?? {};
         const sourceVersion = sha256HexSync(JSON.stringify([record.projectId, tree.id, repositories])), targetVersion = status.targetHead;
         return {sourceVersion, targetVersion, version: sha256HexSync(JSON.stringify([sourceVersion, status.targetBranch, targetVersion])),
             context: {...(record.commitContext ? {commitContext} : {}), commitPolicy: record.policy.commit, projectId: record.projectId, worktreeId: tree.id, directory: tree.directory, branch: tree.branch, sourceHead: status.head,
-                targetBranch: status.targetBranch, targetHead: targetVersion, repositories}};
+                targetBranch: status.targetBranch, targetHead: targetVersion, targetWorktree, repositories}};
     });
 }
 async function prepareAnalysis(options: Options, input: MaintenanceInput): Promise<SubmissionRequest> {
@@ -141,7 +141,7 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
 function mergeInstruction(input: {id: string; item: KanbanItem; snapshot: ReviewSnapshot}, _directory: string): string {
     return JSON.stringify({dependencies: {lifecycle: {stage: 'postload.succeeded'}}, operation: {phase: 'merge-analysis', operationId: input.id},
         instruction: `The original development task is terminal. Continue in this SAME Session for READ-ONLY integration analysis; do not rerun development, create another Session or worktree, commit, merge, push, or modify source/main files. `
-            + `Read the identity, context and task-merge-pre.md sections through session_context. Context.operation contains frozen commit contexts and approved source/target versions. Compare the retained delivery with the target branch. `
+            + `Read the identity, context and task-merge-pre.md sections through session_context. Context.operation contains frozen commit contexts and approved source/target versions. Compare the retained delivery with the target branch and inspect current target working changes read-only. A dirty target is not itself a conflict. Identify actual overlapping files/modules or functional interactions; unrelated changes must not block this workflow. Preserve all existing user changes. `
             + `Return a plan payload {sourceVersion,targetVersion,summary,conflicts:[{id,path,reason,options:[{id,label,detail}]}]}. Every conflict needs explicit user-selectable alternatives; no choices are approved yet. `
             + `Use exactly sourceVersion ${input.snapshot.sourceVersion} and targetVersion ${input.snapshot.targetVersion}; report changed inputs instead of guessing. `
             + `If context is insufficient use session_request and yield without a final result; the host resumes this SAME Session. Never poll. Read task-merge-post.md through session_context after analysis. `
