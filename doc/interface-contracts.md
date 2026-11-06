@@ -412,3 +412,11 @@ ChatOptions.ocr 是独立 llm-ui 的可选识别端口，支持 recognize、read
 `ApplicationBackend.mailView()` 返回宿主授权的 `@nestos/mail/contracts` 的 MailClient；接口与 DTO 由独立库拥有，应用契约不代转出。queryMail、readThread、refreshMail 在 RPC 中均为只读 query，dispose 释放当前视图租约。queryMail 固定每页 20 个主题，先对完整邮箱范围搜索再分组分页，不传邮件正文；正文搜索通过后端索引执行。readThread 支持旧 `.email` 路径和稳定主题引用，按修订有界读取正文；索引变化继续翻页返回 MAIL_THREAD_CHANGED。
 
 后端共享实例按用户 VFS 对象隔离，最后一个租约关闭才释放文件监听；SeqFile 派生索引位于该用户 `/var/lib/mail/archive.seq`，不能通过邮件视图或通用 UI 文件接口读取。详见 [模块协议](../libraries/mail/README.md)。
+
+### 通用文内与窗口目录
+
+`@nestos/ui-common` 的 `OutlineItem`（不透明 `id`、显示 `label`、可选 `level`）、`OutlineView`、`mountOutlinePopup` 和 `WindowOutline` 提供同一套目录数据、展示、键盘和生命周期机制。公共层只接受名称与定位回调，不包含 LLM 或邮件策略；安全诊断只记录操作身份、阶段、结果、分类和耗时。
+
+`@nestos/mdxeditor` 标题栏依次为复制、目录、up、更多，保存等次要操作保留在更多。H1–H3 使用与渲染相同的 Markdown 语法，重复标题 ID 带出现序号，源码位置保留代码块和 CRLF 偏移。`ContentListView` 的 `ContentListItem.outlineName` 可选；`getOutline()` 与 `reveal(id)` 管理命名窗口并展开定位目标。
+
+`SessionRenderer` 通过 `RendererContext.windowName` 接受可选名称，`getWindowOutline()`/`revealWindow(id)` 使用同一注册表。LLM 宿主仅给用户窗口配置时间与提问摘要，回复不配置；邮件给正文窗口配置时间与发件人。稳定消息/邮件 ID 不随显示名称、内容更新或重渲染改变，移除和卸载撤销引用。

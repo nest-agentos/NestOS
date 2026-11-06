@@ -25,7 +25,8 @@ export class ConversationHistoryNavigation {
     }
     update(groups: SessionGroup[], prompts?: PromptNavigationItem[]): void {
         this.groups = groups;
-        this.prompts.update(prompts ?? groups.filter(group => group.role === 'user').map(group => ({id: group.id, text: group.content ?? ''})));
+        const texts = new Map((prompts ?? groups.map(group => ({id: group.id, text: group.content ?? ''}))).map(item => [item.id, item.text]));
+        this.prompts.update(this.view.getWindowOutline().map(item => ({id: item.id, name: item.label, text: texts.get(item.id) ?? ''})));
         if (this.panel.isVisible) this.refresh();
     }
     private refresh(): void {

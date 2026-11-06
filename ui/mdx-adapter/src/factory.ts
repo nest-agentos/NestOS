@@ -48,7 +48,7 @@ function pluginDefaults(options: MDxAdapterOptions, path?: string, getPath: () =
         actionOrder: titlebar.actionOrder ?? MORE_MENU_ORDER,
         mountMoreMenu: (container: HTMLElement, editor: MDxEditor, primary: HTMLElement) => {
             const provided = typeof titlebar.mountMoreMenu === 'function' ? titlebar.mountMoreMenu(container, editor, primary) : undefined;
-            const file = mountFileMenu(container, editor, options, getPath, primary);
+            const file = mountFileMenu(container, editor, options, getPath);
             return () => {file(); if (typeof provided === 'function') provided();};
         },
         presentButton: (id: string, button: HTMLButtonElement) => {

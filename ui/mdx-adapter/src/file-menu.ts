@@ -5,7 +5,7 @@ import type {EditorOptions} from '@nestos/ui-common-adapter';
 
 const log = createModuleLogger('file-menu');
 /** Read file details only when requested; explicit reload never writes or replaces a dirty draft. */
-export function mountFileMenu(container: HTMLElement, editor: MDxEditor, options: EditorOptions, getPath: () => string | undefined, primary: HTMLElement = container): () => void {
+export function mountFileMenu(container: HTMLElement, editor: MDxEditor, options: EditorOptions, getPath: () => string | undefined): () => void {
     const fs = options.files?.fs;
     if (options.target?.kind !== 'file' || !fs) return () => {};
     const lifetime = new AbortController(); let busy = false, generation = 0;
@@ -44,7 +44,8 @@ export function mountFileMenu(container: HTMLElement, editor: MDxEditor, options
         refresh.dataset.mdxMenuKeepOpen = '';
         refresh.className = 'mdx-editor-titlebar__button mdx-file-menu__icon'; refresh.innerHTML = FILE_BROWSER_ICONS.refresh;
         refresh.title = t('editor.file.refresh'); refresh.setAttribute('aria-label', refresh.title);
-        primary.append(refresh);
+        const refreshLabel = document.createElement('span'); refreshLabel.className = 'mdx-editor-titlebar__action-label'; refreshLabel.textContent = refresh.title;
+        refresh.append(refreshLabel); container.append(refresh);
         refresh.addEventListener('click', async () => {
             if (busy || lifetime.signal.aborted) return;
             const path = getPath(), original = editor.getText(), operationId = randomUUID(), started = Date.now(); if (!path) return;

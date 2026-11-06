@@ -1,3 +1,4 @@
+import {WindowOutline, type OutlineItem} from '@nestos/ui-common';
 // @file: llm-ui/components/history/SessionRenderer.ts
 
 import { SessionGroup, ExecutionNode } from '@nestos/llm-session/contracts';
@@ -16,6 +17,8 @@ import type {ExecutionArtifactScope} from '@nestos/app-contracts';
 import type {ICommandBus} from '@nestos/llm-session/contracts';
 
 export interface RendererContext {
+    windowName?: (group: SessionGroup) => string | undefined;
+    revealWindow?: (id: string) => void;
     artifacts?: {commands: ICommandBus; scope(group: SessionGroup): ExecutionArtifactScope | undefined;};
     readOnly?: boolean;
     markdownPlugins?: MDxPlugin[];
@@ -39,6 +42,8 @@ export interface RendererContext {
  * 不负责：事件绑定、折叠逻辑、编辑模式、流式更新
  */
 export class SessionRenderer {
+    private readonly windowOutline = new WindowOutline();
+    private readonly windowLeases = new Map<string, () => void>();
     private readonly disposals = new Set<Promise<void>>();
     private readonly disposalFailures: unknown[] = [];
     private timeline = new Map<HTMLElement, string | null>();
@@ -79,6 +84,23 @@ export class SessionRenderer {
             previous.set(head, element);
         }
         if (this.timeline.size) this.container.querySelector('.llm-ui-welcome')?.remove();
+    }
+
+    getWindowOutline(): readonly OutlineItem[] {return this.windowOutline.items();}
+
+    revealWindow(id: string): HTMLElement {return this.windowOutline.reveal(id);}
+
+    private indexWindow(group: SessionGroup): void {
+        this.windowLeases.get(group.id)?.();
+        this.windowLeases.set(group.id, this.windowOutline.register(group.id,
+            () => this.context.windowName?.({...group, content: this.editorMap.get(group.id)?.content ?? this.snapshotContent.get(group.id) ?? group.content}),
+            () => {
+                const element = this.getSessionElement(group.id); if (!element) return null;
+                this.context.revealWindow?.(group.id);
+                element.classList.remove('is-collapsed');
+                element.querySelector<HTMLElement>('.llm-ui-bubble--user, .llm-ui-node, .llm-ui-flow-window')?.classList.remove('is-collapsed');
+                this.activateVisibleEditors(element); return element;
+            }));
     }
 
     get editors(): Map<string, MDxController> { return this.editorMap; }
@@ -181,6 +203,7 @@ export class SessionRenderer {
             this.container.appendChild(wrapper);
             this.lastExecutionRoot = wrapper.querySelector('.llm-ui-execution-root');
         }
+        this.indexWindow(group);
         this.restrictActions(wrapper);
         this.syncArtifacts(group);
         this.placeInvocations();
@@ -209,6 +232,7 @@ export class SessionRenderer {
     }
 
     private updateSnapshotContent(group: SessionGroup): void {
+        this.indexWindow(group);
         this.syncArtifacts(group);
         const content = group.executionRoot?.data.output ?? group.content ?? '';
         const id = group.executionRoot?.id ?? group.id;
@@ -434,6 +458,7 @@ export class SessionRenderer {
         const removed: string[] = [];
 
         for (const id of ids) {
+            this.windowLeases.get(id)?.(); this.windowLeases.delete(id);
             const sessionEl = this.renderedSessions.get(id);
             const nodeEl = this.nodeMap.get(id);
 
@@ -519,6 +544,7 @@ export class SessionRenderer {
     // ================================================================
 
     clear(): void {
+        this.windowOutline.clear(); this.windowLeases.clear();
         this.artifacts?.clear();
         this.editorMap.forEach(editor => this.releaseEditor(editor));
         this.editorMap.clear();
