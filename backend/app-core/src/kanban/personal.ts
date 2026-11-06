@@ -1,3 +1,5 @@
+import {restartBarrier} from './restart-barrier';
+import type {KanbanClient} from '@nestos/kanban/contracts';
 import {sha256HexSync} from '@nestos/common';
 import {workContext} from './work-context';
 import {KanbanError} from '@nestos/kanban';
@@ -26,19 +28,22 @@ import {relatedKanbanSessions} from './related-sessions';
 export async function createPersonalKanban(fs: IFileSystem, events: UserEventService, diagnostics: DiagnosticJournal, sessions?: Pick<import('@nestos/llm-session/contracts').ISessionRepository, 'listSummaries'|'getManifest'>, kernel?: Pick<import('@nestos/durable-kernel').Kernel,'sessionActivity'>, automationOptions?: PersonalKanbanAutomationOptions) {
     const store=await openPersonalKanbanStore(fs);await new KanbanExamples(store).seed();
     const journal=new KanbanAutomationJournal(fs,{...kanbanJournalOptions,diagnostic:event=>diagnostics.record({...event,module:'application',operation:'kanban.operation',level:event.result==='failure'?'warn':'info'})});
+    let client:KanbanClient;
+    const assertRestartIdle=restartBarrier(()=>client);
     let operations:ReturnType<typeof import('./item-operations').createItemOperations>|undefined;
     const base=personalOptions({store,journal,events,diagnostics,sessions,kernel,automationOptions:automationOptions?{...automationOptions,
         relatedSessions:async(board,item)=>[...await automationOptions.relatedSessions?.(board,item)??[],...await operations?.sessions(board,item)??[]]}:undefined});
-    const runtime=await assembleKanbanRuntime({...base,fs,store,journal,directory:'/var/lib/kanban',actor:{kind:'human',id:'admin'},
+    const runtime=await assembleKanbanRuntime({...base,assertRestartIdle,fs,store,journal,directory:'/var/lib/kanban',actor:{kind:'human',id:'admin'},
         workLog:workLogOptions(events,base.log),resources:automationOptions?.projects?projectResourceCatalog(automationOptions.projects):undefined,
         requiresItemResource:automationOptions?.requiresItemResource,archiveSession:automationOptions?.archiveSession,
         control:kanbanControlOptions(automationOptions??{calls:{list:async()=>[]}},journal),
         createService:options=>createNestOSKanban({...options,notifications:base.notifications}),
-        extensions:context=>personalExtensions(context,automationOptions,events,base.log,value=>{operations=value;})});
+        extensions:context=>personalExtensions(context,automationOptions,events,base.log,value=>{operations=value;},()=>client)});
+    client=runtime.service;
     try{await runtime.service.scan();await reportKanbanHealth(events);}catch(error){await reportKanbanHealth(events,error);}
     return runtime.service;
 }
-function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanAutomationOptions|undefined,events:UserEventService,log:ReturnType<typeof personalOptions>['log'],setOperations:(value:ReturnType<typeof import('./item-operations').createItemOperations>|undefined)=>void):KanbanRuntimeExtension[] {
+function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanAutomationOptions|undefined,events:UserEventService,log:ReturnType<typeof personalOptions>['log'],setOperations:(value:ReturnType<typeof import('./item-operations').createItemOperations>|undefined)=>void,client:()=>KanbanClient):KanbanRuntimeExtension[] {
     const {service,journal,workLog,fs,serviceFor}=context;
     const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,...resources}=resourcePorts??{};
     const operations=options?.itemOperations?.({service,journal,workLog,log,automaticTarget:(_board,item)=>item.externalRefs?.find(ref=>ref.system==='nestos-remote-project')?.id,automatic:async(board,item)=>{
@@ -52,21 +57,24 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
         for(const row of rows){if(row.state==='cleaned')continue;if(!row.canCleanup){const code=row.reasons.find(reason=>['WORKTREE_DIRTY','WORKTREE_UNTRACKED_IGNORED','WORKTREE_NOT_INTEGRATED','WORKTREE_MISSING'].includes(reason));if(code)throw Object.assign(new KanbanError(code),{cleanupPrecondition:true});return false;}await resources.cleanupWorkResource?.(board,{itemId:item,resourceId:row.id,version:row.version,operationId:id+'-cleanup-'+sha256HexSync(row.id).slice(0,12)});}
         return true;
     },reportAutomatic:async state=>{
-        await workLog.append(service,state.boardId,state.itemId,{stage:state.done?'automatic.completed':'automatic.blocked',result:state.code?'failure':'success',dispatchId:state.id,code:state.code});
+        await workLog.append(service,state.boardId,state.itemId,{stage:state.done?'automatic.completed':state.waitingForUser?'automatic.waiting-review':'automatic.blocked',result:state.code?'failure':'success',dispatchId:state.id,code:state.code});
+        if(state.waitingForUser)await events.journal.append('automatic-review:'+state.id,{type:'kanban.automatic.waiting-review',operationId:state.id,resourceId:'kanban:'+JSON.stringify(['personal:user-store',state.boardId,state.itemId]),notification:'info'});
         if(state.code)await events.journal.append('automatic:'+state.id+':'+state.code,{type:'kanban.automatic.blocked',operationId:state.id,resourceId:'kanban:'+JSON.stringify(['personal:user-store',state.boardId,state.itemId]),notification:'error'});
     }});setOperations(operations);
+    const recovery=options?.taskRecovery?.({service,client,journal,log});
+    const conversations=options?.decisionConversations?.({service,client,journal,log});
     const fixes=options?.collaboration?createTaskFix({service,journal,events,automation:options,log}):undefined;
     const automation=options?createPersonalKanbanAutomation({...options,fs,service,journal,workLog,log,serviceFor,deliveryReady:operations?.deliveryReady,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
     const planning=options?planningSessionReader(service,journal,options):undefined;
-    return [{archiveItemResources,capabilities:{...(planning?{planningSession:planning}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
+    return [{archiveItemResources,capabilities:{...(recovery?{taskRecovery:recovery.taskRecovery,recoverTask:recovery.recoverTask,openTaskRecovery:recovery.openTaskRecovery}:{}),...(conversations?{startRecordConversation:conversations.startRecordConversation,recordConversations:conversations.recordConversations}:{}),...(planning?{planningSession:planning}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
         ...(resources?.cleanupWorkResource&&operations?{cleanupWorkResource:(board,request)=>operations.guardResource(board,request.itemId,()=>resources.cleanupWorkResource!(board,request))}:{}),
         ...(options?.continuation?{executionSession:async(board,item,query)=>{
             const detail=await service.executionSession(board,item,query),current=(await service.item(board,item)).item;
             const previous=Object.values((await service.workflow(board)).dispatches).filter(row=>row.itemId===item).sort((a,b)=>b.attempt-a.attempt)[0];
             return {...detail,...(['backlog','open'].includes(current.status)&&previous&&['failed','cancelled'].includes(previous.outcome)?{continuation:{previousDispatchId:previous.id}}:{})};
-        }}:{}),...(fixes?{fixTask:fixes.fixTask,taskFixes:fixes.taskFixes,cancelFix:fixes.cancelFix}:{}),...(replies?{replyTask:replies}:{})},quiesce:async()=>{release?.();}},
+        }}:{}),...(fixes?{fixTask:fixes.fixTask,taskFixes:fixes.taskFixes,cancelFix:fixes.cancelFix}:{}),...(replies?{replyTask:replies}:{})},scan:async()=>{await conversations?.scan();await recovery?.scan();},quiesce:async()=>{await conversations?.quiesce();await recovery?.quiesce();release?.();}},
         ...operations?[operations]:[],...automation?[{...automation,capabilities:{automationCatalog:automation.automationCatalog,analysisStatus:automation.analysisStatus}}]:[],...fixes?[fixes]:[],...replies?[replies]:[]];
 }
 

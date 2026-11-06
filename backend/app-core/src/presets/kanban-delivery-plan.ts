@@ -7,7 +7,7 @@ import {requireValue} from '../kanban/validation';
 import type {DevelopmentPolicy} from './kanban-development-policy';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 interface Profile extends DeliveryPlan {id:string;label:string;readOnly?:boolean}
-interface Policy {verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source';preferenceInstruction?:string;requireSplitJustification?:boolean;schema:1;profiles:Profile[];instruction:string}
+interface Policy {verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build';preferenceInstruction?:string;requireSplitJustification?:boolean;schema:1;profiles:Profile[];instruction:string}
 const system='nestos-work-delivery';
 export function deliveryPolicy(policy:DevelopmentPolicy):Policy|undefined {
     const content=policy.prompts.files.find(file=>file.name==='delivery-policy.json')?.content;if(!content)return;
@@ -25,9 +25,10 @@ export function deliveryProfile(policy:DevelopmentPolicy,item:KanbanItem):Profil
 /** Frozen decision choices override the default release-and-independent-verifier shape. */
 export function decisionDeliveryPolicy(policy:DevelopmentPolicy,context:unknown):Policy|undefined {
     const base=deliveryPolicy(policy);if(!base)return;
-    const snapshot=(context as {decision?:{snapshot?:{verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'}}})?.decision?.snapshot;
+    const snapshot=(context as {decision?:{snapshot?:{verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'}}})?.decision?.snapshot;
     const verificationLevel=snapshot?.verificationLevel??'full',deliveryMode=snapshot?.deliveryMode??'release';
-    requireValue(['full','quick','none'].includes(verificationLevel)&&['release','source'].includes(deliveryMode),'DELIVERY_PREFERENCES_INVALID');
+    requireValue(['full','quick','none'].includes(verificationLevel)&&['release','source','build'].includes(deliveryMode),'DELIVERY_PREFERENCES_INVALID');
+    requireValue(verificationLevel==='none'?deliveryMode==='source'||deliveryMode==='build':deliveryMode==='release','DELIVERY_PREFERENCES_INVALID');
     return {...base,verificationLevel,deliveryMode,instruction:base.preferenceInstruction??base.instruction};
 }
 export function validateDeliveryDecomposition(policy:DevelopmentPolicy,output:unknown,context?:unknown):void {
@@ -36,7 +37,7 @@ export function validateDeliveryDecomposition(policy:DevelopmentPolicy,output:un
     const snapshot=(context as {decision?:{snapshot?:{verificationLevel?:string;deliveryMode?:string}}})?.decision?.snapshot;
     if(value?.ready&&(snapshot?.verificationLevel||snapshot?.deliveryMode))requireValue(!!value.subtasks?.length,'DELIVERY_PROFILE_REQUIRED');
     if(!value?.subtasks||!selected)return;
-    const tasks=value.subtasks,mode=selected.deliveryMode!,full=selected.verificationLevel==='full';
+    const tasks=value.subtasks,mode=selected.deliveryMode==='build'?'release':selected.deliveryMode!,full=selected.verificationLevel==='full';
     requireValue(Array.isArray(tasks)&&tasks.length>0&&tasks.every(task=>task.executionProfile?.system===system&&task.executionProfile.revision==='1'&&selected.profiles.some(profile=>profile.id===task.executionProfile!.id)),'DELIVERY_PROFILE_REQUIRED');
     const integrations=tasks.filter(task=>task.executionProfile!.id===mode),verifiers=tasks.filter(task=>task.executionProfile!.id==='verification');
     requireValue((mode==='release'?integrations.length===1:integrations.length>0&&!tasks.some(task=>task.executionProfile!.id==='release'))&&(full?verifiers.length===1:verifiers.length===0),'DELIVERY_CHAIN_INVALID');
@@ -46,6 +47,10 @@ export function validateDeliveryDecomposition(policy:DevelopmentPolicy,output:un
     if(selected.requireSplitJustification)requireValue(tasks.every(task=>task.executionProfile!.id!=='source'||task===terminal[0]&&mode==='source'||typeof task.splitJustification==='string'&&task.splitJustification.trim().length>=30&&task.splitJustification.length<=2000),'DELIVERY_SPLIT_JUSTIFICATION_REQUIRED');
     const source=ancestors(terminal[0].key);
     requireValue(tasks.every(task=>task.executionProfile!.id!=='source'||task===terminal[0]||source.has(task.key))&&verifiers.every(task=>task.dependsOn.includes(terminal[0].key)),'DELIVERY_CHAIN_INVALID');
+}
+export function selectedDeliveryProfile(policy:DevelopmentPolicy,item:KanbanItem,context:unknown):Profile|undefined {
+    const profile=deliveryProfile(policy,item),selected=decisionDeliveryPolicy(policy,context);
+    return profile?.id==='release'&&selected?.deliveryMode==='build'?{...profile,manualAfter:'build'}:profile;
 }
 export function developmentDeliveryPlan(journal:KanbanAutomationJournal,service:{workflow(board:string):Promise<import('@nestos/kanban/contracts').KanbanWorkflowState>}) {
     return async(board:KanbanBoard,item:KanbanItem):Promise<DeliveryPlan>=>{
@@ -72,5 +77,5 @@ export function verifyReadOnlyDelivery(record:DevelopmentWorkspaceRecord,reposit
     requireValue(repositories.every(repository=>repository.head===repository.baseCommit&&!repository.dirty),'VERIFICATION_CHANGED_SOURCE');
     if((delivery?.evidence as {action?:string})?.action==='merge')return;
     const expected=delivery.evidence?.result?.version;
-    requireValue(typeof expected==='string'&&runningVersion===expected,'VERIFICATION_RUNNING_VERSION_MISMATCH');
+    if(typeof expected!=='string'||runningVersion!==expected)throw Object.assign(new Error('Running version does not match the frozen verification target'),{code:'VERIFICATION_RUNNING_VERSION_MISMATCH',expectedVersion:expected,actualVersion:runningVersion});
 }

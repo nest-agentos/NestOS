@@ -9,7 +9,8 @@ it('exposes user-bound Kanban commands, queries and system notifications through
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'web', startupMode: 'interactive', digitalTwinAutoStart: false});
     const operationView = {revision: 'snapshot', operations: [{id: 'merge', label: 'Merge', state: 'waiting-confirmation', enabled: true, fields: [{id: 'file', label: 'File', choices: [{id: 'keep', label: 'Keep'}]}]}]};
     const operationPorts = {itemOperations: vi.fn(async () => operationView), runItemOperation: vi.fn(async () => operationView), bindItemOperation: vi.fn(async () => operationView)};
-    Object.assign(runtime.kanban!, operationPorts);
+    const recoveryPorts={taskRecovery:vi.fn(async()=>({itemId:'card',revision:'r',related:[],canRetry:true,canSelectCurrentVersion:false})),recoverTask:vi.fn(async()=>({operationId:'retry',state:'pending'})),startRecordConversation:vi.fn(async()=>({id:'discussion',boardId:'rpc-board',state:'clarifying',createdAt:1,resourceId:'/native/original'})),recordConversations:vi.fn(async()=>[]),previewTaskRestart:vi.fn(async()=>({itemId:'card',version:'v',affected:[{id:'card',title:'Card',status:'cancelled',started:true}]})),restartTask:vi.fn(async()=>({operationId:'restart',itemId:'card',state:'stopping',affectedIds:['card']}))};
+    Object.assign(runtime.kanban!, operationPorts,recoveryPorts);
     const view = await openApplicationView(runtime), report = vi.fn();
     let server!: RpcPeer;
     const client = new RpcPeer('client', call => server.handle(call), report, installViewProjections);
@@ -17,6 +18,13 @@ it('exposes user-bound Kanban commands, queries and system notifications through
     try {
         const boot = await server.bootstrap({services: view.services, backend: view.backend}); client.applyUpdates(boot.updates);
         const remote = client.decode(boot.value!), kanban = remote.services.kanban;
+        expect(await kanban.taskRecovery('rpc-board','card')).toMatchObject({itemId:'card',canRetry:true});
+        expect(await kanban.recoverTask('rpc-board',{operationId:'retry',itemId:'card',action:'retry',expectedRevision:'r'})).toMatchObject({state:'pending'});
+        expect(await kanban.startRecordConversation('rpc-board',{operationId:'discussion'})).toMatchObject({resourceId:'/native/original'});
+        expect(await kanban.recordConversations('rpc-board')).toEqual([]);
+        expect(await kanban.previewTaskRestart('rpc-board','card')).toMatchObject({version:'v'});
+        const restart={operationId:'restart',itemId:'card',version:'v',confirmed:true};
+        expect(await kanban.restartTask('rpc-board',restart)).toMatchObject({state:'stopping'});expect(recoveryPorts.restartTask).toHaveBeenCalledWith('rpc-board',restart);
         const initial = await remote.backend.initialFiles();
         expect((await initial.list()).find((entry: {id: string}) => entry.id === 'kanban:nestos-demo')).toMatchObject({group: 'kanban', exists: true});
         expect(await initial.restore(['kanban:nestos-demo'])).toEqual([{id: 'kanban:nestos-demo', status: 'preserved'}]);

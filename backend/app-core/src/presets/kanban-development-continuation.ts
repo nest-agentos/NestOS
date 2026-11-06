@@ -33,7 +33,7 @@ export function developmentContinuation(options: Options): NonNullable<ContinueW
         try {
             const record = await publishContinuation(options, input, original, tree, view.fs);
             return `Continue the original task in this SAME Session and worktree. The host admitted scope ${input.dispatch.id}; previous attempts are historical. `
-                + channelInstruction(record.policy, 'task.md', ['task-continue-pre.md'])
+                + channelInstruction(record.policy, 'task.md', ['task-continue-pre.md','task-recovery-pre.md'])
                 + (input.dispatch.continuation?.instruction ?? 'Inspect retained work and finish the original acceptance criteria.');
         } finally {await view.dispose();}
     };
@@ -43,9 +43,13 @@ async function publishContinuation(options: Options, input: Parameters<NonNullab
     const {dispatch, item} = input, journal = options.journal;
     const policy = await developmentPolicy(journal, options.fs, fs, dispatch.id,
         {profile: original.policy.profile, commit: original.policy.commit, modules: original.policy.modules.join(',')});
+    const recovery=await journal.get<{approved:boolean;itemId:string;previousDispatchId:string;operationId:string;version:string;serviceId:string}>('task-recovery-evidence:'+dispatch.id);
+    if(recovery)requireValue(recovery.approved&&recovery.itemId===item.id&&recovery.previousDispatchId===dispatch.continuation!.previousDispatchId,'RECOVERY_EVIDENCE_SCOPE_MISMATCH');
+    const delivery=(original.context as {delivery?:{readOnly?:boolean;evidence?:object}})?.delivery;
+    if(recovery)requireValue(delivery?.readOnly,'RECOVERY_EVIDENCE_SCOPE_MISMATCH');
     const record = await journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + dispatch.id, old => old ?? {...original, channelId: dispatch.id, policy,
         worktreeId: tree.id, communicationDirectory: original.directory + '/_nestos/kanban/continuations/' + dispatch.id,
-        context: {...original.context as object, task: {id: item.id, parentId: item.planning?.parentId ?? null, title: item.title,
+        context: {...original.context as object,...(recovery?{recovery,delivery:{...delivery,evidence:{...delivery?.evidence,operationId:recovery.operationId,result:{version:recovery.version},recovery:true}}}:{}), task: {id: item.id, parentId: item.planning?.parentId ?? null, title: item.title,
             responsibility: item.responsibility, acceptance: item.acceptance, dependencies: item.planning?.dependencies ?? []},
             continuation: {dispatchId: dispatch.id, previousDispatchId: dispatch.continuation!.previousDispatchId,
             originalDispatchId: input.originalDispatch.id, sessionId: input.sessionId}}});

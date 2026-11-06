@@ -1,5 +1,5 @@
 import {initializeResourceIndex} from '../kanban/resource-operation-index';
-import {decisionDeliveryPolicy,deliveryProfile,deliveryEvidence} from './kanban-delivery-plan';
+import {decisionDeliveryPolicy,selectedDeliveryProfile,deliveryEvidence} from './kanban-delivery-plan';
 import {planningSections} from './kanban-planning-sections';
 import {readGitCommitIdentity, type GitCommitIdentity} from './kanban-git-identity';
 import {kanbanJournalOptions} from '../kanban/host-policy';
@@ -66,7 +66,7 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
         const selected=await developmentStage(input.dispatch.id,'delivery.policy',async()=>decisionDeliveryPolicy(policy,context));
         developmentDeliveryChoice(input.dispatch.id,selected);
         if(input.stage==='decision'&&context)context={...context as object,snapshot:{...(context as {snapshot?:object}).snapshot,delivery:selected}};
-        const profile=input.stage===undefined?deliveryProfile(policy,input.item):undefined;
+        const profile=input.stage===undefined?selectedDeliveryProfile(policy,input.item,context):undefined;
         if(profile)context={...context as object,delivery:{...profile,verificationLevel:selected?.verificationLevel,deliveryMode:selected?.deliveryMode,...(profile.readOnly?{evidence:await deliveryEvidence(journal,context)}:{})}};
         const record = await developmentWorkspace(options.remote, options.provider, projectId, async process => {
             const existing = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id);

@@ -7,6 +7,7 @@ import {safeCode} from '@nestos/kanban/integration';
 export async function acceptSnapshot(options:Options,fix:SavedFix):Promise<void> {
     const started=Date.now();
     try {
+    if(fix.snapshot?.definition.repair)await options.journal.update('repair-resumption:'+fix.id,old=>old??{fixId:fix.id,boardId:fix.boardId,itemId:fix.snapshot!.definition.repair!.itemId,done:false});
     for(const child of fix.snapshot?.definition.children??[]) {
         if(child.estimate)await options.journal.update('decomposition-estimate:'+JSON.stringify([fix.boardId,child.id]),old=>old??child.estimate);
         await options.journal.update('decomposition-status:'+JSON.stringify([fix.boardId,child.id]),old=>old??{itemId:child.id,state:'ready',dependencies:child.dependsOn});

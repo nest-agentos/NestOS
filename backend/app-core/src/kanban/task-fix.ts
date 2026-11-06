@@ -34,6 +34,8 @@ export function createTaskFix(options:Options) {
         freeze:(board,request)=>freezeFix(options,board,request),confirm:(fix,input)=>confirmFix(options,fix,input),
         observe:fix=>observeFixMessages(options,fix),accept:fix=>acceptSnapshot(options,fix),log:options.log});
     return {...runtime,fixTask:async(boardId:string,request:{itemId:string;operationId:string})=>{
+        const item=(await options.service.item(boardId,request.itemId)).item;
+        if(item.planning?.parentId){const parent=(await options.service.item(boardId,item.planning.parentId)).item;if(parent.planning?.execution==='children')request={...request,itemId:parent.id};}
         const current=await currentCoordination(options.journal,boardId,request.itemId),input=current?.request as SubmissionRequest|undefined;
         if(current&&current.phase!=='settled'&&input?.expectedSessionId)return {id:current.id,boardId,itemId:request.itemId,sessionId:input.expectedSessionId,state:'clarifying' as const,code:current.code};
         return runtime.fixTask(boardId,request);

@@ -10,6 +10,7 @@ export async function developmentStage<T>(operationId: string, stage: string, wo
         const raw = (error as {code?: unknown})?.code;
         const code = typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'DEVELOPMENT_STAGE_FAILED';
         const fields = {operation: 'kanban.development', operationId, stage, result: 'failure', code, causeCodes: failureCodes(error), gitStage: /^[a-z-]{1,40}$/.test(String((error as {stage?: unknown})?.stage)) ? (error as {stage: string}).stage : undefined,
+            expectedVersion: (error as {expectedVersion?:string})?.expectedVersion, actualVersion: (error as {actualVersion?:string})?.actualVersion,
             exitCode: Number.isInteger((error as {exitCode?: number})?.exitCode) ? (error as {exitCode: number}).exitCode : undefined, durationMs: Date.now() - started};
         log.warn('Development stage', fields); console.warn('[KanbanDevelopment]', fields);
         throw error;

@@ -85,3 +85,12 @@ it('resolves a board-scoped human reference without mutating work', async () => 
     expect(await kanbanCommand(client,['resolve','KB-3#12'],{})).toMatchObject({itemId:'meaningful-task'});
     expect(resolve).toHaveBeenCalledExactlyOnceWith('KB-3#12');
 });
+
+it('freezes a dependency restart against the reviewed scope and reuses the operation after response loss',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'kanban-dag-restart-'));paths.push(directory);const file=join(directory,'request.json');
+ const previewTaskRestart=vi.fn(async()=>({itemId:'source',version:'scope-version',affected:[{id:'source'},{id:'verify'}]})),restartTask=vi.fn(async()=>({state:'stopping'}));
+ const client={services:{kanban:{previewTaskRestart,restartTask}}} as unknown as ApplicationClient;
+ await kanbanCommand(client,['task','restart','board','source'],{submissionFile:file});const first=restartTask.mock.calls[0];
+ await kanbanCommand(client,['task','restart','board','source'],{file});expect(restartTask.mock.calls[1]).toEqual(first);
+ expect(first).toEqual(['board',expect.objectContaining({itemId:'source',version:'scope-version',confirmed:true})]);expect(previewTaskRestart).toHaveBeenCalledTimes(1);
+});

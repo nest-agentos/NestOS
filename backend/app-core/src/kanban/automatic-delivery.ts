@@ -2,9 +2,9 @@ import {claimDeliveryTarget,releaseDeliveryTarget} from './automatic-delivery-ta
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanItemOperationRequest,KanbanItemOperations,KanbanService,KanbanWorkflowState} from '@nestos/kanban/contracts';
 import {safeCode,type KanbanAutomationJournal} from '@nestos/kanban/integration';
-interface State {id:string;boardId:string;itemId:string;executionId:string;target?:string;waitingForTarget?:boolean;step:number;steps?:string[];code?:string;cleanupPrecondition?:boolean;done?:boolean;resolvedBy?:string;requests:Record<string,KanbanItemOperationRequest>}
+interface State {id:string;boardId:string;itemId:string;executionId:string;target?:string;waitingForTarget?:boolean;manualAfter?:string;waitingForUser?:boolean;step:number;steps?:string[];code?:string;cleanupPrecondition?:boolean;done?:boolean;resolvedBy?:string;requests:Record<string,KanbanItemOperationRequest>}
 interface Options {service:KanbanService;journal:KanbanAutomationJournal;active():boolean;
-    plan?(board:KanbanBoard,item:KanbanItem):Promise<{steps:string[]}>;
+    plan?(board:KanbanBoard,item:KanbanItem):Promise<{steps:string[];manualAfter?:string}>;
     target?(board:KanbanBoard,item:KanbanItem):string|undefined;automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;cleanup?(board:string,item:string,id:string):Promise<boolean>;
     view(board:string,item:string):Promise<KanbanItemOperations>;run(board:string,request:KanbanItemOperationRequest):Promise<KanbanItemOperations>;
     report?(state:State):Promise<void>}
@@ -43,13 +43,16 @@ async function prepareState(options:Options,board:KanbanBoard,item:KanbanItem,wo
     const dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===item.id).sort((a,b)=>b.attempt-a.attempt)[0];
     if(!group&&(!dispatch||!['succeeded','accepted'].includes(dispatch.outcome)))return;
     const id='auto-'+sha256HexSync(JSON.stringify([board.id,item.id,dispatch?.id??item.externalRefs?.find(ref=>ref.system==='nestos-decision-run')?.id])).slice(0,48);
-    const target=options.target?.(board,item),selected=group?['cleanup']:(await options.plan?.(board,item))?.steps??steps;
-    return options.journal.update<State>(key(board.id,item.id),old=>old?old.target||!target?old:{...old,target}:{id,target,boardId:board.id,itemId:item.id,executionId:dispatch?.id??item.id,step:0,steps:selected,requests:{}});
+    const target=options.target?.(board,item),plan=group?undefined:await options.plan?.(board,item),selected=group?['cleanup']:plan?.steps??steps;
+    const previous=await options.journal.get<State>(key(board.id,item.id)),executionId=dispatch?.id??item.id;
+    if(previous&&previous.executionId!==executionId){await options.journal.update('automatic-delivery-history:'+previous.id,old=>old??previous);await releaseDeliveryTarget(options,previous);}
+    return options.journal.update<State>(key(board.id,item.id),old=>old?.executionId===executionId?old.target||!target?old:{...old,target}:{id,target,boardId:board.id,itemId:item.id,executionId,step:0,steps:selected,manualAfter:plan?.manualAfter,requests:{}});
 }
 async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workflow:KanbanWorkflowState) {
     let state=await prepareState(options,board,item,workflow);if(!state)return;
     if(state.done){await releaseDeliveryTarget(options,state);return;}
-    if(!await claimDeliveryTarget(options,state)){if(!state.waitingForTarget)await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:true}));return;}
+    if(state.manualAfter&&state.step>actions(state).indexOf(state.manualAfter))await releaseDeliveryTarget(options,state);
+    else if(!await claimDeliveryTarget(options,state)){if(!state.waitingForTarget)await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:true}));return;}
     if(state.waitingForTarget)state=await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:false}));
     try {
         if(state.code&&!(actions(state)[state.step]==='cleanup'&&state.cleanupPrecondition)){state=await resumeConfirmedOperation(options,state);if(state.code)return;}
@@ -79,7 +82,11 @@ async function advance(options:Options,state:State) {
     const view=await options.view(state.boardId,state.itemId);if(!options.active())return;
     const id=state.id+'-'+action,entry=view.operations.find(row=>row.id===action);
     if(entry?.state==='succeeded'&&(entry.runId||action==='accept')){
-        await options.journal.update<State>(storageKey,old=>({...old!,step:old!.step+1,...(entry.runId!==id?{resolvedBy:entry.runId}:{})}));return;
+        await options.journal.update<State>(storageKey,old=>({...old!,waitingForUser:false,step:old!.step+1,...(entry.runId!==id?{resolvedBy:entry.runId}:{})}));return;
+    }
+    if(state.manualAfter&&state.step>actions(state).indexOf(state.manualAfter)) {
+        if(!state.waitingForUser){const waiting=await options.journal.update<State>(storageKey,old=>({...old!,waitingForUser:true}));await options.report?.(waiting);}
+        return;
     }
     if(entry?.runId===id) {
         if(entry.state==='failed')throw Object.assign(new Error('Automatic step failed'),{code:entry.code??'AUTOMATIC_STEP_FAILED'});
@@ -93,5 +100,5 @@ async function advance(options:Options,state:State) {
 }
 export async function automaticDeliveryStatus(journal:KanbanAutomationJournal,board:string,item:string):Promise<NonNullable<KanbanItemOperations['automatic']>|undefined> {
     const state=await journal.get<State>(key(board,item));
-    return state?{state:state.done?'completed':state.code?'blocked':'running',stage:actions(state)[state.step]??'completed',code:state.code,...(state.waitingForTarget?{waitingForTarget:true}:{})}:undefined;
+    return state?{state:state.done?'completed':state.code?'blocked':state.waitingForUser?'waiting-confirmation':'running',waitingForUser:state.waitingForUser,stage:actions(state)[state.step]??'completed',code:state.code,...(state.waitingForTarget?{waitingForTarget:true}:{})}:undefined;
 }

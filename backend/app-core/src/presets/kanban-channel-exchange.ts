@@ -16,6 +16,7 @@ export interface DevelopmentExchangeOptions {
     remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
     kernel: Pick<Kernel, 'inspectSession' | 'sessionActivity'>; journal: KanbanAutomationJournal;
     submission: ReturnType<typeof sessionSubmission>;
+    recovery?(boardId:string,itemId:string):Promise<unknown>;
 }
 /** Product context resolution plugs into a generic, channel-based request/response mechanism. */
 export async function developmentChannelExchange(options: DevelopmentExchangeOptions, input: {id: string; record: DevelopmentWorkspaceRecord;
@@ -29,8 +30,15 @@ export async function developmentChannelExchange(options: DevelopmentExchangeOpt
         publishResponse: async response => await channel('respond', {...response}) as ChannelResponse,
         submission: options.submission, report: input.report,
         finalPublished: input.finalPublished ?? (async () => (await channelMessages(options.remote, input.record.projectId, input.id)).some(row => row.message.type === 'result')),
-        resolve: request => developmentWorkspace(options.remote, options.provider, input.record.projectId,
-            process => resolveCommitRequest({...options, service: input.service, record: input.record, targetHead: input.targetHead, process}, request)),
+        resolve: request => {
+            if(request.method.startsWith('kanban.recovery.')) {
+                const scope=input.record.context as {board?:{id:string};task?:{id:string}};
+                if(request.method!=='kanban.recovery.inspect'||!options.recovery||!scope.board?.id||!scope.task?.id)throw Object.assign(failure('RECOVERY_FINISH_ATTEMPT_FIRST'),{channelResponse:true});
+                if(request.params.itemId!==undefined&&request.params.itemId!==scope.task.id)throw Object.assign(failure('RECOVERY_SCOPE_MISMATCH'),{channelResponse:true});
+                return options.recovery(scope.board.id,scope.task.id);
+            }
+            return developmentWorkspace(options.remote,options.provider,input.record.projectId,process=>resolveCommitRequest({...options,service:input.service,record:input.record,targetHead:input.targetHead,process},request));
+        },
         prepare: async (id, replies) => {await input.beforeResume?.(); return prepareChannelContinuation({kernel: options.kernel, base: input.base,
             sessionId: input.observation.sessionId, connectionId: 'work-' + (input.record.worktreeId ?? input.id), id, replies});},
     }, input.observation);

@@ -5,8 +5,8 @@ import {requireValue} from './validation';
 interface Task {key:string;title:string;responsibility:string;acceptance:string;dependsOn:string[];estimate?:KanbanEstimate}
 /** The model provides local keys. The host assigns IDs and confines dependencies and project scope. */
 export function coordinationProposal(input:unknown,fix:SavedFix,board:KanbanBoard):Definition {
-    const value=input as {schema:string;type:string;tasks:Task[]};
-    requireValue(value?.schema==='kanban.coordination-proposal/1'&&value.type==='append'&&Array.isArray(value.tasks)&&value.tasks.length>0&&value.tasks.length<=16,'COORDINATION_PROPOSAL_INVALID');
+    const value=input as {schema:string;type:string;repairItemId?:string;tasks:Task[]};
+    requireValue(value?.schema==='kanban.coordination-proposal/1'&&['append','repair'].includes(value.type)&&Array.isArray(value.tasks)&&value.tasks.length>0&&value.tasks.length<=16,'COORDINATION_PROPOSAL_INVALID');
     const keys=new Map(value.tasks.map(task=>[task?.key,'sub-'+sha256HexSync(JSON.stringify([fix.id,task?.key])).slice(0,40)]));
     requireValue(keys.size===value.tasks.length,'COORDINATION_PROPOSAL_INVALID');
     const existing=new Set(board.items.filter(item=>item.planning?.parentId===fix.itemId&&!item.deletedAt).map(item=>item.id));
@@ -20,7 +20,9 @@ export function coordinationProposal(input:unknown,fix:SavedFix,board:KanbanBoar
             assignee:board.automation!.worker,dependsOn:task.dependsOn.map(key=>keys.get(key)??key),outputs:['result'],estimate:task.estimate,
             externalRefs:fix.item.externalRefs?.filter(ref=>['nestos-remote-project','nestos-decision-run'].includes(ref.system))};
     });
-    return {title:fix.item.title,responsibility:fix.item.responsibility,acceptance:fix.item.acceptance,type:'append',dependencies:[],children};
+    const target=value.type==='repair'?board.items.find(item=>item.id===value.repairItemId&&item.planning?.parentId===fix.itemId&&!item.deletedAt):undefined;
+    requireValue(value.type!=='repair'||target&&children.length===1&&!children[0].dependsOn.includes(target.id),'REPAIR_TARGET_INVALID');
+    return {...(target?{repair:{itemId:target.id,revision:target.revision}}:{}),title:fix.item.title,responsibility:fix.item.responsibility,acceptance:fix.item.acceptance,type:'append',dependencies:[],children};
 }
 function validateTask(task:Task,estimate:boolean) {
     requireValue(task&&typeof task.key==='string'&&/^[a-zA-Z0-9_-]{1,64}$/.test(task.key)&&[task.title,task.responsibility,task.acceptance].every(text=>typeof text==='string'&&text.trim().length>0&&text.length<=8000),'COORDINATION_PROPOSAL_INVALID');

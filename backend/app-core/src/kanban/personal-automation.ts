@@ -20,6 +20,8 @@ import {automationCatalog,automationTarget} from './automation-targets';
 import {requireValue} from './validation';
 import {withContinuedWork,type ContinueWorkOptions} from './continued-work';
 export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
+    taskRecovery?(context:{service:import('@nestos/kanban/contracts').KanbanClient;client():import('@nestos/kanban/contracts').KanbanClient;journal:KanbanAutomationJournal;log:import('./task-recovery-ports').TaskRecoveryOptions['log']}):ReturnType<typeof import('./task-recovery').createTaskRecovery>;
+    decisionConversations?(context:{service:import('@nestos/kanban/contracts').KanbanClient;client():import('@nestos/kanban/contracts').KanbanClient;journal:KanbanAutomationJournal;log:import('./decision-conversation-ports').DecisionConversationOptions['log']}):ReturnType<typeof import('./decision-conversations').decisionConversations>;
     deliveryReady?(boardId:string,item:KanbanItem):Promise<boolean>;
     notifyCoordination?(job:import('@nestos/kanban/integration').CoordinationOperation):Promise<void>;
     archiveSession?(sessionId:string,operationId:string):Promise<void>;
@@ -71,7 +73,7 @@ export function createPersonalKanbanAutomation(options:Options) {
             await recoverAnalysis(options,board,item,service,active,async()=>{
             const target=board.automation!.enabled?automationTarget(board.automation!.planner,await options.catalog()):undefined;
             await analyzeItem({...options,prepareSession,active,readPlanningPrompt:board=>readGlobalPlanningPrompt(options.fs,board.automation?.preparationOptions?.profile??'development'),prepareAnalysis:options.prepareAnalysis?async input=>options.prepareAnalysis!({...input,
-                context:await workContext(options.journal,board,item),
+                context:await workContext(options.journal,board,item,options.service),
                 reportActivity:fact=>options.workLog?.append(options.service,board.id,item.id,{...fact,actor:fact.actor??board.automation?.coordinator,dispatchId:input.id})??Promise.resolve()}) : undefined},board,item,target,service);
             });
         },executor:context=>createExecutor(options,context,prepareSession)});
@@ -91,7 +93,7 @@ async function createExecutor(options:Options,context:KanbanExecutorContext,prep
             const target = automationTarget(board.automation.executor, await options.catalog());
             if (board.automation.preparation) {
                 requireValue(options.prepareWork, 'WORK_PREPARATION_UNAVAILABLE');
-                return options.prepareWork({context:{...await workContext(options.journal,board,item),inputs:dispatch.inputs,dependencies:await context.dependencies(item)},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
+                return options.prepareWork({context:{...await workContext(options.journal,board,item,options.service),inputs:dispatch.inputs,dependencies:await context.dependencies(item)},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
                     reportActivity: fact => options.workLog?.append(options.service, boardId, item.id, {...fact, actor: fact.actor ?? dispatch.principal, dispatchId: dispatch.id}) ?? Promise.resolve()});
             }
             return {target};

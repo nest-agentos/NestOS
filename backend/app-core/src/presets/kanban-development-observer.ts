@@ -84,6 +84,11 @@ export function developmentObserver(options: Options) {
                 const code = typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'DELIVERY_VERIFICATION_FAILED';
                 await journal.update('delivery-blocked:' + input.dispatch.id, () => ({code}));
                 await deliver(options, journal, input, {schema: 'work-message/1', ...scope, id: 'delivery-' + code, type: 'error', content: code});
+                if(['VERIFICATION_RUNNING_VERSION_MISMATCH','VERIFICATION_CHANGED_SOURCE'].includes(code)){
+                    const failed={...input.observation,outcome:'failed' as const,outputs:undefined,code};
+                    if(!stopping)await options.lifecycle?.enqueue(input.boardId,input.dispatch,item,failed);
+                    await close(input.dispatch.id);return failed;
+                }
                 return {...input.observation, outcome: 'unknown', outputs: undefined, code};
             }
             const {item: current} = await input.worker.item(input.boardId, input.dispatch.itemId);

@@ -1,3 +1,6 @@
+import {createTaskRecovery} from '../kanban/task-recovery';
+import {managedServiceDeployment} from '../presets/managed-service-deployment';
+import {decisionConversations} from '../kanban/decision-conversations';
 import {kanbanSessionResource} from '../kanban/session-resource';
 import {developmentDeliveryPlan} from '../presets/kanban-delivery-plan';
 import {developmentSessionOperation} from '../presets/kanban-session-operation';
@@ -603,12 +606,18 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 return id;
             }}) : undefined;
         const fileSubmission = sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore, ensureWritable: conversationOptions.ensureWritable});
+        let recoveryClient:import('@nestos/kanban/contracts').KanbanClient|undefined;
         const developmentMessages = developmentObserver({exchange: developmentBindings && independentCalls ? developmentWorkExchange({...developmentBindings,
-            journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), kernel: kernelCore, calls: independentCalls, submission: fileSubmission}) : undefined, kernel: kernelCore, fs: systemFS, events, projects, remote: remoteConnections, lifecycle,
+            journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), kernel: kernelCore, calls: independentCalls, submission: fileSubmission,
+            recovery:async(board,item)=>{if(!recoveryClient?.taskRecovery)throw Object.assign(new Error('Recovery service is starting'),{code:'RECOVERY_SERVICE_STARTING'});return recoveryClient.taskRecovery(board,item);}}) : undefined, kernel: kernelCore, fs: systemFS, events, projects, remote: remoteConnections, lifecycle,
             verifyDelivery: verifyDevelopment ? id => developmentOperations.run(() => verifyDevelopment(id)) : undefined,
             wake: () => wakeKanban()});
         cleanupFns.push(() => developmentMessages.dispose());
+        const executionResource=remoteConnections?kanbanSessionResource(projects,nativeSessionResource(kernelCore,projects,remoteConnections)):undefined;
         const kanban = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,kernelCore, independentCalls ? {
+            taskRecovery:developmentBindings?context=>createTaskRecovery({...developmentBindings,...context,executionResource:executionResource!,
+                describe:async item=>{if(!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'))return;const managed=managedServiceDeployment(options.serviceControl,async selected=>projects.openWorkspace((await projects.get(selected.externalRefs!.find(ref=>ref.system==='nestos-remote-project')!.id)).path),async()=>{});return managed?.describe?.(item);}}):undefined,
+            decisionConversations:developmentBindings?context=>decisionConversations({...developmentBindings,...context,executionResource}):undefined,
             itemOperations: developmentBindings ? context => createItemOperations({...context,deliveryPlan:developmentDeliveryPlan(context.journal,context.service),
                 adapter: developmentReviewAdapter({...developmentBindings, ...context, calls: independentCalls, kernel: kernelCore, runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission, wake: () => wakeKanban()}),
                 published: publishedOperation({calls: independentCalls, kernel: kernelCore, ensureSession: (id, title) => sessionRepository.ensureSession(id, title),
@@ -635,7 +644,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 try {await lease.commandBus.execute('session.submit',request);} finally {await lease.dispose();}
             },
             registerInstructionGate: gate=>executionActivity.registerInstructionGate(gate),
-            executionResource:remoteConnections?kanbanSessionResource(projects,nativeSessionResource(kernelCore,projects,remoteConnections)):undefined,
+            executionResource,
             sessionChannel: remoteConnections?.sessionChannel.bind(remoteConnections),
             projects, requiresItemResource:requiresDevelopmentProject,
             validatePreparation: (reference, settings) => {
@@ -668,6 +677,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             try {await reportKanbanHealth(events,error);} catch { /* Preserve the initialization failure. */ }
             throw error;
         });
+        recoveryClient=kanban;
         cleanupFns.push(cleanupStep('kanban.dispose', () => kanban.dispose()));
         const kanbanIntegrations = await options.configureKanban?.({fs:systemFS,service:kanban,kernel:kernelCore,calls:independentCalls,
             sessions:sessionRepository,prepareSession:id=>recovery.acquireLater(id)}) ?? [];

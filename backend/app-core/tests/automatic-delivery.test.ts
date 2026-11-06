@@ -97,3 +97,14 @@ it('rechecks pause after asynchronous preparation before admitting the next step
  await automaticDelivery(f.options).scan();expect(f.run).not.toHaveBeenCalled();expect(f.options.report).not.toHaveBeenCalled();
  (f.board as any).executionControl={paused:false};f.options.view=view;await automaticDelivery(f.options).scan();expect(f.run).toHaveBeenCalledOnce();
 });
+it('builds once then waits for manual receipts across restarts without deploy, merge or premature cleanup',async()=>{
+ const f=await fixture();f.options.plan=async()=>({steps:['build','deploy','analyze','merge','accept','cleanup'],manualAfter:'build'});f.options.target=()=> 'project';
+ for(let n=0;n<6;n++)await automaticDelivery(f.options).scan();
+ expect(f.run.mock.calls.map(call=>call[1].action)).toEqual(['build']);expect(f.options.cleanup).not.toHaveBeenCalled();
+ expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(false);
+ expect(f.options.report).toHaveBeenCalledOnce();expect(f.options.report).toHaveBeenCalledWith(expect.objectContaining({waitingForUser:true}));
+ expect(await f.journal.get('automatic-target:'+JSON.stringify('project'))).toBeNull();
+ for(const action of ['deploy','analyze','merge','accept']){f.jobs.set(action,{id:action,runId:'human-'+action,state:'succeeded',enabled:true});await automaticDelivery(f.options).scan();}
+ f.item.status='completed';await automaticDelivery(f.options).scan();expect(f.options.cleanup).toHaveBeenCalledOnce();
+ expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);expect(f.run).toHaveBeenCalledOnce();
+});

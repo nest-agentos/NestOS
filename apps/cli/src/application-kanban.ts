@@ -68,6 +68,8 @@ function integer(value: string): number {
 
 async function taskCommand(service: Service, args: string[], options: CommandOptions): Promise<unknown> {
     const [action, boardId, itemId, replacementId] = args;
+    if(action==='preview-restart'&&boardId&&itemId&&service.previewTaskRestart)return service.previewTaskRestart(boardId,itemId);
+    if(action==='restart'&&boardId&&itemId&&!replacementId)return restartTask(service,boardId,itemId,options);
     if (!['run', 'pause', 'resume', 'cancel', 'reopen', 'restart'].includes(action) || !boardId || !itemId || args.length !== (action === 'restart' ? 4 : 3))
         throw new Error('kanban task run|pause|resume|cancel|reopen|restart <board-id> <item-id> [replacement-id for restart] --submission-file request.json (or --file to submit the frozen request)');
     if (options.file && options.submissionFile) throw new Error('Choose --file or --submission-file');
@@ -86,4 +88,19 @@ async function taskCommand(service: Service, args: string[], options: CommandOpt
         || !['run', 'reopen', 'restart'].includes(action) && (!('action' in command) || command.action !== action)) throw new Error('Frozen task request does not match the requested task or action');
     if (action === 'restart' && (command.type !== 'restart-item' || command.replacementId !== replacementId)) throw new Error('Frozen restart request does not match the replacement task');
     return service.execute(boardId, request);
+}
+
+async function restartTask(service:Service,boardId:string,itemId:string,options:CommandOptions):Promise<unknown> {
+    if(!service.previewTaskRestart||!service.restartTask)throw Object.assign(new Error('Task restart requires a newer host'),{code:'ECAPABILITY'});
+    if(options.file&&options.submissionFile)throw new Error('Choose --file or --submission-file');
+    let request:Parameters<NonNullable<Service['restartTask']>>[1];
+    if(options.file)request=await jsonFile(options.file);
+    else {
+        if(!options.submissionFile)throw new Error('Missing --submission-file');
+        const preview=await service.previewTaskRestart(boardId,itemId);
+        request={operationId:randomUUID(),itemId,version:preview.version,confirmed:true};
+        await writeCallJson(options.submissionFile,request,request.operationId,'kanban.task.restart');
+    }
+    if(request.itemId!==itemId||request.confirmed!==true)throw new Error('Frozen restart request does not match the task');
+    return service.restartTask(boardId,request);
 }

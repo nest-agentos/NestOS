@@ -24,7 +24,7 @@ export async function controlCall(options: CallLifecyclePorts, journal: KanbanAu
     const view = views.find(v => v.input.request.submission?.id === callId);
     if (!view && directSubmission && options.submissionControl) return options.submissionControl({sessionId, submissionId:callId, requestId, action}, journal);
     requireValue(view, 'TASK_CONTROL_ROUTE_MISSING');
-    if (action === 'cancel' && callSettled(view)) return 'cancelled';
+    if(callSettled(view))return action==='cancel'?'cancelled':action==='pause'?'paused':'resumed';
     const key = 'call-lifecycle:' + JSON.stringify([sessionId, requestId]);
     let frozen = await journal.get<Frozen>(key);
     const legacy = !frozen && legacyKey ? await journal.get<Frozen>(legacyKey) : undefined;

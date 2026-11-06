@@ -160,3 +160,22 @@ it('continues the group planning Session and appends confirmed children without 
     expect(child.externalRefs).toContainEqual({system:'nestos-remote-project',id:'x1'});
     expect(await f.fix.intercept(fix.sessionId,f.instruction('continue discussion','later'))).toBe(false);
 });
+
+it('creates a repair only from the confirmed group Session proposal and atomically gates the failed child',async()=>{
+ const f=await fixture(true),parent=(await f.service.item('development','original')).item;
+ await f.command({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'children',revision:1,sealed:true,rootItemId:parent.id,items:[{id:'failed-child',title:'Verify delivery',responsibility:'Check release',acceptance:'Expected version',workType:'subtask',assignee:{kind:'human',id:'admin'},dependsOn:[]}]}});
+ await f.command({type:'prepare-dispatch',itemId:'failed-child',dispatchId:'failed-child-run'});const dispatch=(await f.service.workflow('development')).dispatches['failed-child-run'];
+ await f.command({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:'failed',code:'VERIFICATION_FAILED'});
+ await f.journal.update('analysis-current:'+JSON.stringify(['development',parent.id]),()=> 'group-analysis');
+ const originalInput=(await f.calls.list())[0].input;await f.journal.update('group-analysis',()=>({id:'main-attempt',input:originalInput,status:{state:'ready',itemId:parent.id}}));
+ const fix=await f.run();expect(fix.sessionId).toBe('original-main');
+ f.channels.report(fix.id,'repair-proposal',{type:'proposal',content:'Repair delivery before recheck',payload:{schema:'kanban.coordination-proposal/1',type:'repair',repairItemId:'failed-child',tasks:[{key:'delivery',title:'Repair delivery',responsibility:'Correct delivery evidence',acceptance:'Formal receipt',dependsOn:[]}]}});
+ expect((await f.service.query('development',{view:'all',parentId:parent.id})).total).toBe(1);
+ await f.fix.intercept(fix.sessionId,f.instruction());
+ const page=await f.service.query('development',{view:'all',parentId:parent.id}),repair=page.items.find(row=>row.id!=='failed-child')!;
+ expect(page.total).toBe(2);expect(repair.planning.parentId).toBe(parent.id);
+ expect((await f.service.item('development','failed-child')).item).toMatchObject({planning:{dependencies:[repair.id]},repairPending:{itemId:repair.id,previousDispatchId:dispatch.id}});
+ expect((await f.service.workflow('development')).dispatches[dispatch.id].outcome).toBe('failed');
+ expect(await f.journal.get('repair-resumption:'+fix.id)).toMatchObject({boardId:'development',itemId:'failed-child',done:false});
+ await f.fix.intercept(fix.sessionId,f.instruction());expect((await f.service.query('development',{view:'all',parentId:parent.id})).total).toBe(2);
+});

@@ -32,13 +32,13 @@ export interface ReviewAdapter {
     close?(): Promise<void>;
     readAnalysis(job: ReviewJob): Promise<unknown | undefined>;
 }
-export interface DeliveryPlan {steps:string[];acceptance:'source'|'runtime';acceptanceLabel?:string;acceptanceConfirmation?:string}
+export interface DeliveryPlan {manualAfter?:string;steps:string[];acceptance:'source'|'runtime';acceptanceLabel?:string;acceptanceConfirmation?:string}
 export interface ReviewOperationsOptions {
     deliveryPlan?(board:KanbanBoard,item:KanbanItem):Promise<DeliveryPlan>;
     automaticTarget?(board:KanbanBoard,item:KanbanItem):string|undefined;
     automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;
     cleanup?(board:string,item:string,id:string):Promise<boolean>;
-    reportAutomatic?(state:{id:string;boardId:string;itemId:string;step:number;code?:string;done?:boolean}):Promise<void>;
+    reportAutomatic?(state:{id:string;boardId:string;itemId:string;step:number;waitingForUser?:boolean;code?:string;done?:boolean}):Promise<void>;
     report?(job: ReviewJob): Promise<void>;
     sessionResource?(sessionId: string): Promise<string | undefined>;
     service: KanbanService; journal: KanbanAutomationJournal;
