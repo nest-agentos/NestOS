@@ -870,3 +870,5 @@ createFlowInvocationSessions(fs, "independent") 提供独立调用恢复索引�
 `assistantResponseText(round)` 从 `@nestos/llm-session/contracts` 导出，只拼接 assistant 的文本内容，不包含 reasoning/thinking、工具、图片或用户输入。生成回填与应用层的 `ApplicationBackend.sessionResponse` 共用此实现，后者提供按分支、轮次或提交操作选择结果的只读 API。
 
 `listSummaryPage` 使用 navigation-version=2 的目录/来源/修改时间有序摘要索引，在底层限制返回行数；不加载 history、UI 草稿或完整 manifest。索引随权威摘要原子维护，升级时重建。仅为可见项按需批量补充 `parentTitle`；完整组织检查仍使用原有仓储接口。
+
+智能体定义目录完整加载，不以交互搜索默认 50 条作为注册边界。优先在注入的定义文件视图中遍历元数据；仅支持搜索的视图读取全部分页。正文读取最多八路并发，坏记录单独分类并脱敏记录，扫描完成后统一替换内存索引；发布身份继续读取既有修订存储。队列接纳前的精确目标解析失败携带 `executionOutcome: not-started`，不得将该确定拒绝归为提交回执未知；接纳后的传输或执行结果未知仍沿原身份核对，不重发。

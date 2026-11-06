@@ -128,7 +128,12 @@ export class SessionRunCoordinator {
     }
 
     async bindQueuedInstruction(sessionId: string, item: import('../contracts/instruction-queue').SessionInstruction) {
-        const identity = await this.resolveSelectedIdentity({...item, sessionId});
+        let identity: ExecutorConfig;
+        try {identity = await this.resolveSelectedIdentity({...item, sessionId});}
+        catch (error) {
+            if (error instanceof Error) throw Object.assign(error, {executionOutcome: 'not-started'});
+            throw error;
+        }
         return this.bindSelectedInstruction(sessionId, item, identity);
     }
 

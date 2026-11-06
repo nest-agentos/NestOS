@@ -24,6 +24,17 @@ async function request(runtime: Runtime, operationId = 'publish-one'): Promise<A
     return {agentId: 'published', operationId, expectedSourceDigest: state.sourceDigest, expectedRevisionDigest: state.draftDigest,
         expectedPublishedVersion: state.latest?.target.version ?? null};
 }
+
+it('reports exact target resolution rejection before queue admission as not started', async () => {
+    const {runtime} = await setup(), sessionId = await runtime.sessionRepository.createSession('Target rejection');
+    await runtime.commandBus.execute(SessionCommand.Bind, {sessionId});
+    await expect(runtime.commandBus.execute(SessionCommand.Submit, {
+        expectedSessionId: sessionId, expectedBranch: 'main', target: {kind: 'agent', id: 'missing', version: 'ap1_' + 'a'.repeat(64)},
+        source: {kind: 'composer', text: 'Request', attachments: [], values: {}},
+        submission: {id: 'missing-target', source: {kind: 'conversation', ownerId: sessionId, id: 'missing-target'}},
+    })).rejects.toMatchObject({code: 'AGENT_NOT_FOUND', executionOutcome: 'not-started'});
+    expect((await runtime.commandBus.execute<SessionInstructionQueue>(SessionCommand.GetInstructionQueue)).items).toEqual([]);
+});
 const flow = (): FlowDraft => ({id: 'implementation' as never, name: 'Implementation', draftVersion: 1, updatedAt: 0,
     parameters: [{name: 'request', type: 'string', required: true}, {name: 'mode', type: 'string', default: 'flow-default'}],
     nodes: [{id: 'value' as never, name: 'Value', plugin: 'builtin.transform', pluginVersion: '1.0.0', inputs: {},

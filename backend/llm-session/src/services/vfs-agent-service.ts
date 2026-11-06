@@ -16,11 +16,11 @@ import type { SystemPromptDefinition } from '@nestos/llm-tasks/contracts';
 
 import { IAgentManagementService } from './agent-service';
 import { createSessionHost, type SessionHost } from '../utils/host-ports';
-import { isModelDefaults } from '@nestos/kernel-adapters/contracts';
 import { validateAgentModelDefaults } from './agent-model-defaults';
 import { ulid } from '../persistence/ulid';
 import { callableExposure } from '@nestos/llm-flow/contracts';
 import {AgentPublications, type AgentPublicationDependencies} from './agent-publications';
+import {readAgentSources} from './agent-source-files';
 import {publicationError} from '../persistence/agent-revisions';
 
 // Agent 默认存储目录（VFS module-relative path）
@@ -733,78 +733,37 @@ export class VFSAgentService extends FileBackedService implements IAgentManageme
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private async scanAgentFiles(): Promise<AgentDefinition[]> {
-        const agents: AgentDefinition[] = [];
-        this._agentNodeIds.clear();
-        this._duplicatePaths.clear();
-        try {
-            const result = await this.engine.driver.search({ name: { contains: '.agent' }, type: 'file' });
-
-            const scanned = await Promise.all(Array.from(result.nodes).map(async (node) => {
-                if (!node.name.endsWith('.agent')) return null;
-                const started = Date.now(), operationId = ulid();
-                try {
-                    const content = await this.engine.driver.readContent(node.path, { representation: 'bytes' });
-                    if (!content) return null;
-                    const jsonStr = typeof content === 'string' ? content : new TextDecoder().decode(content as ArrayBuffer);
-                    const data = agentSource(JSON.parse(jsonStr) as AgentDefinition);
-                    if (data.modelDefaults !== undefined && !isModelDefaults(data.modelDefaults)) {
-                        this.host.logger.warn('Agent model defaults skipped', { operation: 'agent.load', stage: 'validation',
-                            operationId, result: 'failure', agentId: data.id, errorCode: 'AGENT_MODEL_DEFAULT_INPUT', elapsedMs: Date.now() - started });
-                        return null;
-                    }
-                    if (data.id) {
-                        return { ...data, tags: node.tags, _scanPath: node.path } as AgentDefinition & { _scanPath: string };
-                    }
-                    return null;
-                } catch { return null; }
-            }));
-
-            // Group by agent ID, detect and clean up duplicates
-            const byId = new Map<string, Array<AgentDefinition & { _scanPath: string }>>();
-            for (const item of scanned) {
-                if (!item) continue;
-                const group = byId.get(item.id) || [];
-                group.push(item);
-                byId.set(item.id, group);
-            }
-
-            for (const [agentId, group] of byId) {
-                const { _scanPath, ...clean } = group[0];
-                if (group.length === 1) {
-                    this._agentNodeIds.set(agentId, _scanPath);
-                    agents.push(clean);
-                } else {
-                    // Duplicates detected: prefer /default/ path, delete others
-                    const defaultItem = group.find(g => g._scanPath.includes('/default/')) || group[0];
-                    const duplicates = group.filter(g => g !== defaultItem);
-
-                    const { _scanPath: _sp, ...canonical } = defaultItem;
-                    this._agentNodeIds.set(agentId, _sp);
-                    agents.push(canonical);
-
-                    const dupPaths = duplicates.map(d => d._scanPath);
-                    this._duplicatePaths.set(agentId, dupPaths);
-
-                    this.host.logger.warn('Duplicate agent files detected — merging', {
-                        agentId, kept: _sp, removed: dupPaths,
-                    });
-
-                    // Delete duplicate files
-                    for (const dup of duplicates) {
-                        try {
-                            await this.engine.driver.delete([dup._scanPath]);
-                        } catch (e) {
-                            this.host.logger.error('Failed to delete duplicate agent file', {
-                                path: dup._scanPath, error: e,
-                            });
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.error('[VFSAgentService] Failed to scan agents:', e);
+        const agents: AgentDefinition[] = [], paths = new Map<string, string>(), duplicatesById = new Map<string, string[]>();
+        const scanned = await readAgentSources(this.engine, this.host.logger);
+        const groups = new Map<string, typeof scanned>();
+        for (const item of scanned) {
+            const group = groups.get(item.id) ?? []; group.push(item); groups.set(item.id, group);
         }
+        for (const [id, group] of groups) {
+            const {definition, path, duplicates} = await this.resolveAgentCopies(group);
+            paths.set(id, path); agents.push(definition);
+            if (duplicates.length) duplicatesById.set(id, duplicates);
+        }
+        this._agentNodeIds = paths; this._duplicatePaths = duplicatesById;
         return agents;
+    }
+
+    private async resolveAgentCopies(group: Array<AgentDefinition & {_scanPath: string}>) {
+        const chosen = group.find(agent => agent._scanPath.includes('/default/')) ?? group[0];
+        const {_scanPath: path, ...definition} = chosen, duplicates = group.filter(agent => agent !== chosen).map(agent => agent._scanPath);
+        if (duplicates.length) this.host.logger.warn('Duplicate agent files detected', {operation: 'agent.load', operationId: ulid(),
+            stage: 'duplicates', result: 'detected', agentId: definition.id, count: duplicates.length});
+        for (const duplicate of duplicates) {
+            const started = Date.now(), operationId = ulid();
+            try {await this.engine.driver.delete([duplicate]);}
+            catch (error) {
+                const raw = (error as {code?: unknown})?.code;
+                this.host.logger.warn('Duplicate agent cleanup failed', {operation: 'agent.load', operationId,
+                    stage: 'duplicates.delete', result: 'failure', durationMs: Date.now() - started,
+                    code: typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'AGENT_DUPLICATE_DELETE_FAILED'});
+            }
+        }
+        return {definition, path, duplicates};
     }
 
     async dispose(): Promise<void> {
