@@ -1,9 +1,11 @@
+import {diagnosticContext} from '@nestos/common';
 import { mkdir, open, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 export interface AuditEvent {
+    traceId?: string; spanId?: string; parentSpanId?: string; browserSessionId?: string;
     userId?: string; operationId?: string; stage?: string; result?: string; count?: number; bytes?: number;
     event: string; requestId?: string; remoteAddress?: string; method?: string; route?: string;
     status?: number; durationMs?: number; operation?: string; code?: string; certificate?: string; parentRequestId?: string;
@@ -43,7 +45,7 @@ export class AuditLog implements AuditPort {
         if (this.queued >= 1000) { this.dropped++; return; }
         this.queued++;
         const dropped = this.dropped; this.dropped = 0;
-        const line = JSON.stringify({ time: new Date().toISOString(), ...event, ...(dropped ? { droppedEvents: dropped } : {}) }) + '\n';
+        const line = JSON.stringify({ time: new Date().toISOString(), ...diagnosticContext(), ...event, ...(dropped ? { droppedEvents: dropped } : {}) }) + '\n';
         this.pending = this.pending.then(async () => {
             await mkdir(path.dirname(this.file), { recursive: true, mode: 0o700 });
             const size = await stat(this.file).then(value => value.size).catch(() => 0);
@@ -67,7 +69,8 @@ export class AuditLog implements AuditPort {
 }
 
 export function auditRequest(audit: AuditPort, request: IncomingMessage, response: ServerResponse, route: string): string {
-    const requestId = randomUUID(), startedAt = Date.now(), remoteAddress = request.socket.remoteAddress;
+    const context = diagnosticContext();
+    const requestId = context?.requestId ?? randomUUID(), startedAt = Date.now(), remoteAddress = request.socket.remoteAddress;
     const pathname = new URL(request.url ?? '/', 'https://localhost').pathname;
     const asset = /^\/assets\/[\w.-]+-[\w-]{8,}\.(?:js|css)$/.test(pathname) ? pathname.slice('/assets/'.length) : undefined;
     response.setHeader('X-Request-ID', requestId);
@@ -76,7 +79,7 @@ export function auditRequest(audit: AuditPort, request: IncomingMessage, respons
         if (finished) return; finished = true;
         const parent = request.headers['x-parent-request-id'];
         const timing = requestTimings.get(response);
-        audit.write({ event: response.writableFinished ? 'request.complete' : 'request.aborted', requestId,
+        audit.write({ ...context, event: response.writableFinished ? 'request.complete' : 'request.aborted', requestId,
             ...timing?.phases, ...(timing?.queuedAt !== undefined ? {responseFlushMs: Date.now() - timing.queuedAt} : {}),
             ...(typeof parent === 'string' && /^[a-f0-9-]{36}$/.test(parent) ? { parentRequestId: parent } : {}),
             remoteAddress, method: request.method, route, ...(asset ? {asset} : {}),

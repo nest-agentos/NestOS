@@ -1,3 +1,4 @@
+import {traceRequest} from '../logging/request-trace';
 import { createServer, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { TLSSocket } from 'node:tls';
@@ -20,7 +21,7 @@ export interface HttpServerOptions {
 /** Every public resource requires both TLS client validation and explicit certificate enrollment. */
 export function createHttpServer(options: HttpServerOptions): Server {
     const server = createServer(options.certificates.tls, (request, response) => {
-        void serve(request, response, options).catch(error => sendError(response, error));
+        void traceRequest(request, response, () => serve(request, response, options).catch(error => sendError(response, error)));
     });
     server.on('secureConnection', socket => { void validateConnection(socket, options); });
     server.on('tlsClientError', (error, socket) => options.audit.write({ event: 'auth.rejected', remoteAddress: socket.remoteAddress,

@@ -1,3 +1,4 @@
+import {diagnosticContext} from '@nestos/common';
 import type {ClientDiagnostic} from '@nestos/app-contracts/services';
 
 const identity = /^[a-zA-Z0-9_-]{1,160}$/;
@@ -12,7 +13,7 @@ export function reportClientDiagnostic(value: ClientDiagnostic): void {
     const record = value as unknown as Record<string, unknown>;
     if (!record || typeof record !== 'object' || Object.keys(record).some(key => !allowed.has(key)) || !validTokens(record) || !validOutcome(record))
         throw Object.assign(new Error('Invalid client diagnostic metadata'), {code: 'CLIENT_DIAGNOSTIC_INVALID'});
-    console.warn('[ClientDiagnostic]', {source: 'client', operation: value.operation, operationId: value.operationId,
+    console.warn('[ClientDiagnostic]', {...diagnosticContext(), source: 'client', operation: value.operation, operationId: value.operationId,
         sessionId: value.sessionId, stage: value.stage, code: value.code, result: value.result, durationMs: value.durationMs,
         remoteCode: value.remoteCode, requestId: value.requestId});
 }

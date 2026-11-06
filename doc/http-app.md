@@ -245,6 +245,10 @@ llm-ui 通过可选 `readTaskAttachment` 回调消费该能力，没有注入时
 
 JSON 应用请求的 `request.complete` 新增可选 `bodyReadMs`（请求体接收及解析）、`viewReadyMs`（等待应用视图）、`rpcMs`（能力执行、快照及 JSON 响应生成）和 `responseFlushMs`（响应提交至 Node finish/close）。`application.complete.durationMs` 保留原含义，通过 requestId 关联。flush 不代表浏览器收到或渲染完成，客户端证书验证也不计入这些阶段；日志不记录文档、命令参数、共享键或用户内容。部署新版本后可据此区分此前 1 秒级 HTTP 请求与毫秒级 RPC 之间的差异。
 
+浏览器每次连接分配 `browserSessionId`，初始加载及每次 hash 导航建立独立 `traceId`；导航中的并发请求各有 `spanId`，通过经过校验的 W3C `traceparent` 传递。Node 为每次 HTTP 请求生成独立 `requestId`，`AsyncLocalStorage` 隔离并发请求；批量 RPC 各自拥有子 span，审计、业务诊断和模块日志继承关联字段。错误响应同时返回 requestId/traceId，响应头提供 `X-Request-ID`/`X-Trace-ID`。这些字段只用于诊断，不参与身份认证或授权。
+
+Node 调用 Cells 时传递 traceparent、browserSessionId 和父 requestId；`cells.request` 审计记录固定协议路由、响应头接收耗时和远端 requestId，不记录导出路径、查询串、参数或正文。Cells 在 HTTP 层生成自己的 requestId/spanId，以 Tokio task-local 传递到业务日志，文件阻塞 worker 显式继承。业务回执由 `api.operation` 的 result/code 判定，HTTP 200 或收到响应头不是业务成功；SSE 的 response.headers 也不是整条流结束耗时。自主后台任务没有浏览器请求时生成独立 trace，继续使用原 operationId/sessionId，不伪造浏览器父请求。
+
 `application.complete` 还记录注册命令目录确认的 `rpcCommands`、业务回复的 `rpcErrorCount/rpcErrorCodes`；HTTP 200 不能代替业务成功。图片上传只额外记录声明的 MIME 与字节数 `uploads`，不写文件名、data URL 或异常正文。上传错误区分 `INPUT_ASSET_FORMAT`、`INPUT_ASSET_TOO_LARGE`、`INPUT_ASSET_PERSISTENCE`，存储错误保留安全错误码；业务错误回复附加 HTTP requestId，前端 flow-images 日志可据此关联。当前宿主输入暂存单文件预算为 20 MiB，与 Flow 自行声明的总字节/数量限制分别校验。
 
 ### RPC 与往返的生命周期边界

@@ -33,7 +33,10 @@ export function sendError(response: ServerResponse, error: unknown): void {
     const code = error instanceof FSError ? error.code : errorCode(error, raw);
     response.setHeader('X-VFS-Error', code);
     const status = code === 'ENOENT' ? 404 : code === 'EACCES' ? 403 : code === 'ECONFLICT' ? 409 : code === 'EFBIG' ? 413 : code === 'EIO' ? 500 : 400;
-    json(response, status, { error: { code, message: error instanceof FSError ? raw : code } });
+    const requestId = response.getHeader('X-Request-ID'), traceId = response.getHeader('X-Trace-ID');
+    json(response, status, {error: {code, message: error instanceof FSError ? raw : code,
+        ...(typeof requestId === 'string' && /^[a-f0-9-]{36}$/.test(requestId) ? {requestId} : {}),
+        ...(typeof traceId === 'string' && /^[a-f0-9]{32}$/.test(traceId) ? {traceId} : {})}});
 }
 function errorCode(error: unknown, message: string): FSErrorCode {
     const code = (error as NodeJS.ErrnoException)?.code ?? message.match(/\b(E[A-Z]+)\b/)?.[1];

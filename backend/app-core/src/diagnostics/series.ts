@@ -1,7 +1,7 @@
 import type {DiagnosticEvent, DiagnosticSeries} from '@nestos/app-contracts/services';
 
 const maxGapMs = 5 * 60 * 1000;
-const scope = (v: DiagnosticEvent) => JSON.stringify([v.module, v.stage, v.projectId, v.connectionId, v.mountId, v.profileId, v.sessionId]);
+const scope = (v: DiagnosticEvent) => JSON.stringify([v.traceId, v.browserSessionId, v.module, v.stage, v.projectId, v.connectionId, v.mountId, v.profileId, v.sessionId]);
 const signature = (v: DiagnosticEvent) => JSON.stringify([v.operation, v.result, v.level, v.code, v.reason, v.rpcCode, v.causeCodes]);
 const attempt = (v: DiagnosticEvent) => JSON.stringify([scope(v), v.operation, v.operationId]);
 type Change = (event: DiagnosticEvent, removed?: boolean) => void;

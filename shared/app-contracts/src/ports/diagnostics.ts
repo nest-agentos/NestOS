@@ -19,6 +19,10 @@ export interface DiagnosticEvent {
     profileId?: string;
     sessionId?: string;
     requestId?: string;
+    traceId?: string;
+    spanId?: string;
+    parentSpanId?: string;
+    browserSessionId?: string;
     durationMs?: number;
     series?: DiagnosticSeries;
 }

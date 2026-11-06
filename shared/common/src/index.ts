@@ -60,3 +60,5 @@ export { FILE_ICONS, FILE_BROWSER_ICONS, fileTypeIcon } from './i18n/file-icons'
 export { HARNESS_STATE_ICONS } from './i18n/icons';
 
 export {SETTINGS_ICON_CHOICES} from './i18n/icons';
+
+export {diagnosticContext, setDiagnosticContextProvider, type DiagnosticContext} from './utils/diagnostic-context';

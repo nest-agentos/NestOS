@@ -1,4 +1,4 @@
-import {createModuleLogger, randomUUID} from '@nestos/common';
+import {createModuleLogger, diagnosticContext, randomUUID} from '@nestos/common';
 import {type IFileSystem} from '@nestos/vfs-core';
 import type {ApplicationDiagnostics, DiagnosticEvent, DiagnosticPage, DiagnosticQuery} from '@nestos/app-contracts/services';
 
@@ -22,7 +22,7 @@ export class DiagnosticJournal implements ApplicationDiagnostics {
     private closed = false;
 
     record(input: Input): DiagnosticEvent {
-        const event = clean({...input, id: randomUUID(), operationId: input.operationId ?? randomUUID(), timestamp: Date.now()});
+        const event = clean({...input, ...diagnosticContext(), id: randomUUID(), operationId: input.operationId ?? randomUUID(), timestamp: Date.now()});
         const aggregated = this.tracker.add(this.events, event, (entry, removed) => this.changes.set(entry.id, removed ? null : JSON.stringify(entry)));
         this.trim(); this.dirty = true;
         const data = {...aggregated};

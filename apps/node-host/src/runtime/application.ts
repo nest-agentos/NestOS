@@ -1,3 +1,4 @@
+import {tracedCellsFetch} from '../logging/request-trace';
 import {localServiceControl} from './service-control';
 import {namedCleanup} from './host-cleanup';
 import {NodeToolConnections} from './tool-connections';
@@ -36,14 +37,14 @@ export async function openNodeApplication(options: NodeApplicationOptions): Prom
             applications: new ToolOAuthApplications(applicationDirectory),
             manageApplications: options.runtime?.configurationReadonly !== true});
         const ownedConnections = connections;
-        const runtime = await createNodeRuntime(resources.backend, resources.root, {...options.runtime, providerAuthorization: resources.authorization, toolConnections: connections}, {preferencesFile: path.join(options.authDir, 'tool-preferences', 'preferences.json'), ...options.toolPackages}, options.strictPathChecks ?? true);
+        const runtime = await createNodeRuntime(resources.backend, resources.root, {...options.runtime, providerAuthorization: resources.authorization, toolConnections: connections}, {preferencesFile: path.join(options.authDir, 'tool-preferences', 'preferences.json'), ...options.toolPackages}, options.strictPathChecks ?? true, resources.audit);
         let closing: Promise<void> | undefined;
         return {runtime, audit: resources.audit, close: () => closing ??= closeHostResources([namedCleanup('resources.close', resources.close), namedCleanup('connections.close', () => ownedConnections.close()), namedCleanup('application.dispose', () => runtime.dispose())])};
     } catch (error) { await connections?.close(); await resources.close(); throw error; }
 }
 
 /** Backend ownership remains with the resource host; this factory never closes borrowed storage. */
-export async function createNodeRuntime(source: IStorageBackend, root?: string, options: Omit<ApplicationRuntimeOptions, 'backend'> = {}, toolPackages?: NodeToolPackageOptions, strictPathChecks = true) {
+export async function createNodeRuntime(source: IStorageBackend, root?: string, options: Omit<ApplicationRuntimeOptions, 'backend'> = {}, toolPackages?: NodeToolPackageOptions, strictPathChecks = true, traceAudit?: AuditPort) {
     const backend = root ? guardHostStorage(source, root, strictPathChecks) : source;
     const borrowed = new Proxy(backend, {get(target, key) {
         if (key === 'close') return async () => {};
@@ -54,7 +55,7 @@ export async function createNodeRuntime(source: IStorageBackend, root?: string, 
         await packages.initialize();
         const additionalTools = mergeNodePackageTools(packages.userTools([...createStandardNodeTools(), ...await loadNodeToolModules(undefined, options.toolConnections),
             ...options.kernelPlatform?.additionalTools ?? []]), packages.initialTools(), BUILTIN_TOOLS);
-        const runtime = await createApplicationRuntime({remoteSourceProvider: createCellsDriver(), ownerKind:'cli',runningVersion:process.env.NESTOS_HTTPD_VERSION,...options,serviceControl:options.configurationReadonly?undefined:options.serviceControl??localServiceControl(),backend: borrowed,
+        const runtime = await createApplicationRuntime({remoteSourceProvider: createCellsDriver(undefined, tracedCellsFetch(undefined,event=>traceAudit?.write(event))), ownerKind:'cli',runningVersion:process.env.NESTOS_HTTPD_VERSION,...options,serviceControl:options.configurationReadonly?undefined:options.serviceControl??localServiceControl(),backend: borrowed,
             toolDependencies: options.toolDependencies ?? packages,
             kernelPlatform: { ...options.kernelPlatform, additionalTools, configure: async (kernel, services) => {
                 await packages.bind(kernel); await options.kernelPlatform?.configure?.(kernel, services);

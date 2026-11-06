@@ -1,3 +1,4 @@
+import {diagnosticContext} from './diagnostic-context';
 /**
  * @file common/utils/MemoryLogger.ts
  * @description 基于环形缓冲区的内存日志实现
@@ -54,6 +55,8 @@ export class MemoryLogger implements ILogger {
             return;
         }
 
+        const context = diagnosticContext();
+        if (context) data = {...(data && typeof data === 'object' && !Array.isArray(data) ? data : {detail: data}), ...context};
         const entry: LogEntry = {
             timestamp: Date.now(),
             module,

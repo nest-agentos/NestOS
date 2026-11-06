@@ -16,6 +16,11 @@ export function clean(value: unknown): DiagnosticEvent {
         operation: v.operation, stage: v.stage, result: v.result, level: v.level};
     if (typeof v.startedAt === 'number' && Number.isFinite(v.startedAt) && v.startedAt >= 0 && v.startedAt <= v.timestamp) event.startedAt = v.startedAt;
     for (const key of fields) if (typeof v[key] === 'string' && identity.test(v[key]!)) event[key] = v[key];
+    for (const key of ['traceId', 'spanId', 'parentSpanId'] as const) {
+        const raw = v[key], length = key === 'traceId' ? 32 : 16;
+        if (typeof raw === 'string' && new RegExp(`^[a-f0-9]{${length}}$`).test(raw) && !/^0+$/.test(raw)) event[key] = raw;
+    }
+    if (typeof v.browserSessionId === 'string' && /^[a-f0-9-]{36}$/.test(v.browserSessionId)) event.browserSessionId = v.browserSessionId;
     if (Array.isArray(v.causeCodes)) event.causeCodes = v.causeCodes.filter(code => typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code)).slice(0, 8);
     if (typeof v.rpcCode === 'number' && Number.isSafeInteger(v.rpcCode)) event.rpcCode = v.rpcCode;
     if (typeof v.durationMs === 'number' && Number.isFinite(v.durationMs)) event.durationMs = Math.max(0, Math.round(v.durationMs));

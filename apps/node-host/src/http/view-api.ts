@@ -1,3 +1,5 @@
+import {diagnosticContext} from '@nestos/common';
+import {traceSpan} from '../logging/request-trace';
 import {startViewHeartbeat,responseOpen} from './view-heartbeat';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { TLSSocket } from 'node:tls';
@@ -73,12 +75,12 @@ export class ViewApi {
             const port = (await this.runtime).toolConnections;
             if (!port?.completeAuthorization) throw Object.assign(new Error('Unsupported authorization host'), {code: 'TOOL_AUTH_UNSUPPORTED'});
             await port.completeAuthorization({state: url.searchParams.get('state') ?? '', code: url.searchParams.get('code') ?? undefined, error: url.searchParams.get('error') ?? undefined});
-            this.audit?.write({event: operation, operation, stage: 'callback', result: 'success', durationMs: Date.now() - started});
+            this.audit?.write({...diagnosticContext(),event: operation, operation, stage: 'callback', result: 'success', durationMs: Date.now() - started});
         } catch (error) {
             const code = (error as {code?: unknown})?.code;
             const safe = typeof code === 'string' && /^TOOL_(AUTH|CONNECTION)_[A-Z_]+$/.test(code) ? code : 'TOOL_AUTH_CALLBACK_FAILED';
             response.setHeader('X-VFS-Error', safe);
-            this.audit?.write({event: operation, operation, stage: 'callback', result: 'failure', code: safe, durationMs: Date.now() - started});
+            this.audit?.write({...diagnosticContext(),event: operation, operation, stage: 'callback', result: 'failure', code: safe, durationMs: Date.now() - started});
         }
         response.writeHead(303, {Location: '/api/tool-connections/result'}); response.end();
     }
@@ -96,7 +98,7 @@ export class ViewApi {
         catch (error) {if (!existing) await this.release(identity); throw error;}
         finally {
             recordRequestPhase(response, 'rpcMs', Date.now() - started);
-            this.audit?.write({event: 'application.complete', requestId: String(response.getHeader('X-Request-ID') ?? ''),
+            this.audit?.write({...diagnosticContext(),event: 'application.complete', requestId: String(response.getHeader('X-Request-ID') ?? ''),
                 rpcKind: 'bootstrap', rpcBatchSize: body.initialView ? 1 : 0,
                 rpcOperations: body.initialView ? ['ApplicationBackend.openView'] : [], durationMs: Date.now() - started});
         }
@@ -109,16 +111,20 @@ export class ViewApi {
         const operations = calls.map(call => client.peer.operationName(call));
         let replies: Reply[] = [];
         try {
-            const result = ['queries', 'bindings'].includes(body.kind!) ? await this.queries(client, body.calls, body.kind === 'bindings', response) : await client.peer.handle(body.call!);
+            const result = ['queries', 'bindings'].includes(body.kind!) ? await this.queries(client, body.calls, body.kind === 'bindings', response) : await traceSpan(() => client.peer.handle(body.call!));
             replies = 'replies' in result ? result.replies : [result];
             const requestId = String(response.getHeader('X-Request-ID') ?? '');
-            for (const reply of replies) if (reply.error && !reply.error.requestId && /^[a-f0-9-]{36}$/.test(requestId)) reply.error.requestId = requestId;
+            for (const reply of replies) if (reply.error) {
+                if (!reply.error.requestId && /^[a-f0-9-]{36}$/.test(requestId)) reply.error.requestId = requestId;
+                const traceId = String(response.getHeader('X-Trace-ID') ?? '');
+                if (/^[a-f0-9]{32}$/.test(traceId)) reply.error.traceId = traceId;
+            }
             json(response, 200, result);
         }
         finally {
             client.active--; client.lastSeen = Date.now();
             recordRequestPhase(response, 'rpcMs', Date.now() - started);
-            this.audit?.write({ event: 'application.complete', requestId: String(response.getHeader('X-Request-ID') ?? ''),
+            this.audit?.write({...diagnosticContext(), event: 'application.complete', requestId: String(response.getHeader('X-Request-ID') ?? ''),
                 rpcKind: body.kind, rpcBatchSize: calls.length, rpcOperations: operations,
                 ...callDiagnostics(calls, operations, new Set(client.view.root.services.commandBus.list().map(command => command.name))), ...replyDiagnostics(replies),
                 durationMs: Date.now() - started });
@@ -150,16 +156,16 @@ export class ViewApi {
     private async queries(client: Client, calls: Call[] | undefined, bindings = false, response?: ServerResponse): Promise<{ replies: Reply[]; updates: Reply['updates'] }> {
         if (!Array.isArray(calls) || !calls.length || calls.length > 32 || calls.some(call => !validCall(call) || !(bindings ? client.peer.binding(call) : client.peer.query(call))))
             throw new FSError('EINVAL', 'Only bounded read queries may be batched');
-        const replies = await Promise.all(calls.map(async call => {
+        const replies = await Promise.all(calls.map(call => traceSpan(async () => {
             const started = Date.now();
             const reply = await client.peer.handle(call, false);
-            if (Date.now() - started >= 1000 || reply.error) this.audit?.write({event: 'application.call',
+            if (diagnosticContext() || Date.now() - started >= 1000 || reply.error) this.audit?.write({...diagnosticContext(),event: 'application.call',
                 requestId: String(response?.getHeader('X-Request-ID') ?? ''), operation: client.peer.operationName(call), stage: 'invoke',
                 result: reply.error ? 'failure' : 'success', ...replyDiagnostics([reply]), durationMs: Date.now() - started});
             return reply;
-        }));
+        })));
         const started = Date.now(), updates = await client.peer.refresh();
-        if (Date.now() - started >= 1000) this.audit?.write({event: 'application.call', requestId: String(response?.getHeader('X-Request-ID') ?? ''),
+        if (Date.now() - started >= 1000) this.audit?.write({...diagnosticContext(),event: 'application.call', requestId: String(response?.getHeader('X-Request-ID') ?? ''),
             stage: 'snapshots', result: 'success', durationMs: Date.now() - started});
         return { replies, updates };
     }
@@ -179,7 +185,7 @@ export class ViewApi {
     }
     private expire(response: ServerResponse, code: string, message: string): never {
         response.setHeader('X-NestOS-View-Expired', '1'); response.setHeader('X-MindOS-View-Expired', '1');
-        this.audit?.write({event: 'view.expired', requestId: String(response.getHeader('X-Request-ID') ?? ''),
+        this.audit?.write({...diagnosticContext(),event: 'view.expired', requestId: String(response.getHeader('X-Request-ID') ?? ''),
             operation: 'view.resume', code, durationMs: 0});
         throw new FSError('ECAPABILITY', message);
     }
@@ -219,7 +225,7 @@ export class ViewApi {
         const operationId=randomUUID();
         startViewHeartbeat(response,{authorize,current:()=>client.stream===response,seen:()=>{client.lastSeen=Date.now();},
             failed:(stage,error,durationMs)=>{const code=(error as {code?:unknown})?.code;
-                this.audit?.write({event:'view.stream.failed',operation:'view.stream',operationId,stage,result:'failure',durationMs,
+                this.audit?.write({...diagnosticContext(),event:'view.stream.failed',operation:'view.stream',operationId,stage,result:'failure',durationMs,
                     code:typeof code==='string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'VIEW_STREAM_FAILED'});}});
         response.once('close', () => { if (client.stream === response) client.stream = undefined; });
         response.once('finish', () => { if (client.stream === response) client.stream = undefined; });

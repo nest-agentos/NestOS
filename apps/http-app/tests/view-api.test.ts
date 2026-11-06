@@ -1,3 +1,4 @@
+import {BrowserRequestTrace} from '../src/client/request-trace';
 import { RPC_VERSION } from '@nestos/app-transport/rpc';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -548,4 +549,19 @@ it('runs server Bash through authenticated terminal capabilities without auditin
         await expect(terminal.resizeTerminal(1, 30)).rejects.toMatchObject({code: 'EINVAL'});
         expect(JSON.stringify(auditEvents)).not.toContain('PRIVATE_SERVER_TERMINAL_OUTPUT');
     } finally {await terminal.dispose();}
+});
+
+it('preserves navigation trace through authenticated RPC audit and business failure replies',async()=>{
+    const tracing=new BrowserRequestTrace(),responses:Response[]=[];
+    const fetcher=tracing.wrap(async(input,init)=>{const response=await auth.fetcher(input,init);responses.push(response);return response;});
+    const transport=new HttpViewClient('trace-e2e',server.origin+'/api/application',fetcher);clients.push(transport);
+    const root=await transport.start();let failure:any;
+    try {await root.services.commandBus.execute('not.a.registered.command');}catch(error){failure=error;}
+    expect(failure).toMatchObject({requestId:expect.any(String),traceId:expect.stringMatching(/^[a-f0-9]{32}$/)});
+    const response=responses.find(value=>value.headers.get('X-Request-ID')===failure.requestId);
+    expect(response?.headers.get('X-Trace-ID')).toBe(failure.traceId);
+    const rpc=auditEvents.find(value=>value.requestId===failure.requestId&&value.event==='application.complete');
+    expect(rpc).toMatchObject({traceId:failure.traceId,browserSessionId:tracing.browserSessionId,rpcErrorCount:1});
+    await vi.waitFor(()=>expect(server.events.find(value=>value.event==='request.complete'&&value.requestId===failure.requestId)).toMatchObject({traceId:failure.traceId}));
+    expect(JSON.stringify(auditEvents)).not.toContain('not.a.registered.command');
 });

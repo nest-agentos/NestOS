@@ -1,3 +1,4 @@
+import {BrowserRequestTrace} from './request-trace';
 import { randomUUID } from '@nestos/common';
 import {HttpViewClient, SnapshotCache, ViewExpiredError} from '@nestos/app-transport/http';
 import {RPC_VERSION} from '@nestos/app-transport/rpc';
@@ -31,13 +32,15 @@ class ConnectionStatus {
 /** Begin data transfer before importing the DOM shell and editor implementation. */
 export function connectApplication() {
     const listeners = new AbortController(), route = initialView(location.hash), status = new ConnectionStatus();
+    const tracing = new BrowserRequestTrace();
+    window.addEventListener('hashchange', () => tracing.beginNavigation(), {signal:listeners.signal});
     const identity = resolveUser();
     const fetcher: typeof fetch = async (input, init) => {
         const userId = await identity;
         const headers = new Headers(init?.headers); headers.set('X-NestOS-User', userId);
         return globalThis.fetch(input, {...init, headers});
     };
-    const client = new HttpViewClient(randomUUID(), '/api/application', fetcher,
+    const client = new HttpViewClient(randomUUID(), '/api/application', tracing.wrap(fetcher),
         error => status.publish(error instanceof ViewExpiredError ? 'expired' : 'reconnecting'),
         () => status.publish('view-error'), () => status.publish('connected'));
     for (const event of ['online', 'focus', 'nestos:http-retry']) window.addEventListener(event, () => client.retryConnection(), {signal: listeners.signal});
