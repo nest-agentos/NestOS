@@ -29,3 +29,8 @@ it('routes fixes to the original group Session and never creates them in the dec
  expect(f.fixTask).toHaveBeenCalledWith('b',expect.objectContaining({itemId:'group'}));expect((await f.service.read('b')).items).toEqual(before);
  await expect(f.request('decision.add-fix',{itemId:'child'})).rejects.toMatchObject({code:'DECISION_REQUEST_UNSUPPORTED'});
 });
+
+it('accepts automatic replacement without verification from the conversation API',async()=>{
+ const f=await fixture();await f.request('decision.propose',{id:'mail-read',title:'Mail read state',content:'Mark opened mail as read',rationale:'Sidebar reflects read state',projectIds:['one'],verificationMode:'release'});
+ expect(await f.service.record('b','mail-read')).toMatchObject({verificationLevel:'none',deliveryMode:'release',completion:'automatic'});
+});

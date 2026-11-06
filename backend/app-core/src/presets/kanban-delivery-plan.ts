@@ -28,7 +28,7 @@ export function decisionDeliveryPolicy(policy:DevelopmentPolicy,context:unknown)
     const snapshot=(context as {decision?:{snapshot?:{verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'}}})?.decision?.snapshot;
     const verificationLevel=snapshot?.verificationLevel??'full',deliveryMode=snapshot?.deliveryMode??'release';
     requireValue(['full','quick','none'].includes(verificationLevel)&&['release','source','build'].includes(deliveryMode),'DELIVERY_PREFERENCES_INVALID');
-    requireValue(verificationLevel==='none'?deliveryMode==='source'||deliveryMode==='build':deliveryMode==='release','DELIVERY_PREFERENCES_INVALID');
+    requireValue(verificationLevel==='none'?deliveryMode==='source'||deliveryMode==='build'||deliveryMode==='release':deliveryMode==='release','DELIVERY_PREFERENCES_INVALID');
     return {...base,verificationLevel,deliveryMode,instruction:base.preferenceInstruction??base.instruction};
 }
 export function validateDeliveryDecomposition(policy:DevelopmentPolicy,output:unknown,context?:unknown):void {

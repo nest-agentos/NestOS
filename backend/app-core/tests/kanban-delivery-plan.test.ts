@@ -31,16 +31,17 @@ it('accepts the minimum implementation-plus-verification plan and rejects unexpl
  const extra={...task('extra','source'),splitJustification:undefined};
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[extra,task('implementation','release',['extra']),subtasks[1]]})).toThrowError(expect.objectContaining({code:'DELIVERY_SPLIT_JUSTIFICATION_REQUIRED'}));
 });
-it.each([['quick','release','release'],['none','build','release'],['none','source','source']])('accepts %s/%s without redundant verification tasks', (verificationLevel,deliveryMode,profile)=>{
+it.each([['quick','release','release'],['none','release','release'],['none','build','release'],['none','source','source']])('accepts %s/%s without redundant verification tasks', (verificationLevel,deliveryMode,profile)=>{
  const context={decision:{snapshot:{verificationLevel,deliveryMode}}};
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation',profile)]},context)).not.toThrow();
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation',profile),task('verify','verification',['implementation'])]},context)).toThrowError(expect.objectContaining({code:'DELIVERY_CHAIN_INVALID'}));
 });
 it('rejects unsupported combinations and freezes the build-only manual review barrier',()=>{
- for(const [verificationLevel,deliveryMode] of [['full','source'],['quick','source'],['none','release']])expect(()=>decisionDeliveryPolicy(policy,{decision:{snapshot:{verificationLevel,deliveryMode}}})).toThrowError(expect.objectContaining({code:'DELIVERY_PREFERENCES_INVALID'}));
+ for(const [verificationLevel,deliveryMode] of [['full','source'],['quick','source'],['none','invalid']])expect(()=>decisionDeliveryPolicy(policy,{decision:{snapshot:{verificationLevel,deliveryMode}}})).toThrowError(expect.objectContaining({code:'DELIVERY_PREFERENCES_INVALID'}));
  const item={externalRefs:[{system:'nestos-work-delivery',id:'release',revision:'1'}]} as any;
  expect(selectedDeliveryProfile(policy,item,{decision:{snapshot:{verificationLevel:'none',deliveryMode:'build'}}})).toMatchObject({manualAfter:'build'});
  expect(selectedDeliveryProfile(policy,item,{decision:{snapshot:{verificationLevel:'quick',deliveryMode:'release'}}})).not.toHaveProperty('manualAfter');
+ expect(selectedDeliveryProfile(policy,item,{decision:{snapshot:{verificationLevel:'none',deliveryMode:'release'}}})).not.toHaveProperty('manualAfter');
 });
 it('rejects a ready plan that bypasses explicit decision delivery profiles',()=>{
  expect(()=>validateDeliveryDecomposition(policy,{ready:true},{decision:{snapshot:{verificationLevel:'quick',deliveryMode:'release'}}})).toThrowError(expect.objectContaining({code:'DELIVERY_PROFILE_REQUIRED'}));
