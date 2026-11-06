@@ -44,3 +44,17 @@ it.each([1,50,200])('keeps real preparation bounded with %i UTF-8 history candid
     const durationMs=Date.now()-started;expect(durationMs).toBeLessThan(5000);
     console.info(JSON.stringify({operation:'kanban.context.acceptance',candidateCount:count,inputBytes,manifestBytes:Buffer.byteLength(manifest),commitBytes:Buffer.byteLength(JSON.stringify(commit)),channelCalls:f.sessionChannel.mock.calls.length,workspaceOpens:f.openWorkspace.mock.calls.length,durationMs}));
 });
+it('does not append history or duplicate prompt sections when the same preparation resumes',async()=>{
+    const f=await fixture(50),prepare=developmentPreparation(f.options as never);
+    const input={target:f.target,context:f.context,item:f.item,stage:'decision',preparation:{system:'nestos-work-preparation',id:'git-worktree',revision:'1'},dispatch:{id:'attempt',itemId:f.item.id}};
+    let originalManifest='',originalCommit='',originalSnapshot='';
+    for(let attempt=0;attempt<10;attempt++){
+        await prepare(input as never);
+        const manifest=await readPrompt(f.fs,'/workspace/_nestos/worktrees/attempt/_nestos/kanban/manifest.json');
+        const commit=JSON.stringify(await f.journal.get('development-commit-context:attempt'));
+        const snapshot=JSON.stringify(f.sessionChannel.mock.calls.at(-1)![2].snapshot);
+        if(attempt===0){originalManifest=manifest;originalCommit=commit;originalSnapshot=snapshot;}
+        expect(manifest).toBe(originalManifest);expect(commit).toBe(originalCommit);expect(snapshot).toBe(originalSnapshot);
+    }
+    expect(f.sessionChannel).toHaveBeenCalledTimes(10);expect(f.openWorkspace).toHaveBeenCalledTimes(10);
+});
