@@ -36,7 +36,7 @@ interface Options {
     kernel: Pick<Kernel, 'sessionActivity' | 'inspectSession' | 'task'>; remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
     projects: Pick<ProjectService, 'get' | 'openWorkspace'>; runningVersion?: string;
 }
-interface MaintenanceInput {id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot; action?: Exclude<import('../kanban/item-operation-types').ReviewAction, 'accept'>; context?: unknown}
+interface MaintenanceInput {deployment?:import('../runtime/service-control').RuntimeServiceDescriptor;id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot; action?: Exclude<import('../kanban/item-operation-types').ReviewAction, 'accept'>; context?: unknown}
 interface ReviewResource {id: string; tree: PreparedWorktree; record: DevelopmentWorkspaceRecord}
 export function developmentReviewAdapter(options: Options): ReviewAdapter {
     const watches = new DirectorySubscriptions();
@@ -49,9 +49,10 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
             return async () => {stop?.(); await client.close();};});
         return record;
     };
-    return {managed:managedServiceDeployment(options.serviceControl,async item=>{const project=item.externalRefs?.find(ref=>ref.system==='nestos-remote-project');requireValue(project,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(project.id)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');}),runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
+    const managed=managedServiceDeployment(options.serviceControl,async item=>{const project=item.externalRefs?.find(ref=>ref.system==='nestos-remote-project');requireValue(project,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(project.id)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
+    return {managed,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
         snapshot: (board, item) => snapshot(options, board, item), close: () => watches.dispose(),
-        prepareAnalysis: input => prepareAnalysis(options, input), prepareOperation: input => prepareAnalysis(options, input),
+        prepareAnalysis: input => prepareAnalysis(options, input), prepareOperation: async input => prepareAnalysis(options,{...input,...(input.action==='build'?{deployment:await managed?.describe?.(input.item)}:{})}),
         exchange: options.submission ? async (job, observation) => {
             const record = await watch(job);
             return developmentChannelExchange({...options, submission: options.submission!}, {id: job.id, record, service: options.service,
@@ -123,11 +124,11 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
         await publishImmutableFile(view.fs, directory, 'commit-contexts.json', contextText);
         const approvalText = input.context === undefined ? undefined : JSON.stringify(input.context);
         if (approvalText) await publishImmutableFile(view.fs, directory, 'operation-input.json', approvalText);
-        await publishPromptBundle(view.fs, directory, policy.prompts, {operationId: input.id, phase:input.action??'analyze',receiptPath:'_nestos/kanban/review/'+input.id+'/result.json',approval: approvalText ? {path: 'operation-input.json', sha256: sha256HexSync(approvalText)} : null, boardId: input.board.id,
+        await publishPromptBundle(view.fs, directory, policy.prompts, {operationId: input.id, phase:input.action??'analyze',...(input.deployment?{deployment:input.deployment}:{}),receiptPath:'_nestos/kanban/review/'+input.id+'/result.json',approval: approvalText ? {path: 'operation-input.json', sha256: sha256HexSync(approvalText)} : null, boardId: input.board.id,
             itemId: input.item.id, sessionId, input: current.record.context, commitContexts: {path: 'commit-contexts.json', sha256: sha256HexSync(contextText)}, sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, resources: input.snapshot.context});
         await options.journal.update('worktree:' + input.id, old => old ?? current.tree);
         const record = await options.journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.id, old => old ?? {...current.record, channelId: input.id, worktreeId: current.id, communicationDirectory: directory, policy,
-            context: {...current.record.context as object, operation: {operationId: input.id, phase:input.action??'analyze',receiptPath:'_nestos/kanban/review/'+input.id+'/result.json',approval: input.context ?? null,
+            context: {...current.record.context as object, operation: {operationId: input.id, phase:input.action??'analyze',...(input.deployment?{deployment:input.deployment}:{}),receiptPath:'_nestos/kanban/review/'+input.id+'/result.json',approval: input.context ?? null,
                 sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, commitContexts: context, resources: input.snapshot.context}}});
         await openDevelopmentChannel(options.remote, input.id, record, {runId: input.id, itemId: input.item.id, attemptId: input.id}, input.item,
             await currentChannelBinding(options.remote,record,nativeSessionId));

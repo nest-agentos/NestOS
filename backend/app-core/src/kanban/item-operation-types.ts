@@ -19,7 +19,7 @@ export interface ReviewJob {
 }
 export interface ReviewSettings {revision: number; bindings: Partial<Record<ReviewAction, KanbanExternalReference>>; jobs: string[]; receipts: Record<string, string>}
 export interface ReviewAdapter {
-    managed?:{prepare(input:{id:string;board:KanbanBoard;item:KanbanItem;snapshot:ReviewSnapshot;context:unknown}):Promise<import('../runtime/service-control').ServiceSwitchRequest|undefined>;
+    managed?:{describe?(item:KanbanItem):Promise<import('../runtime/service-control').RuntimeServiceDescriptor|undefined>;prepare(input:{id:string;board:KanbanBoard;item:KanbanItem;snapshot:ReviewSnapshot;context:unknown}):Promise<import('../runtime/service-control').ServiceSwitchRequest|undefined>;
         submit(request:import('../runtime/service-control').ServiceSwitchRequest):Promise<void>;
         inspect(job:ReviewJob):Promise<import('../run/published-operation').OperationObservation>};
     supports?(board: KanbanBoard, item: KanbanItem): boolean;

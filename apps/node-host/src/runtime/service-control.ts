@@ -11,10 +11,14 @@ export function localServiceControl():RuntimeServiceControl|undefined {
     };
     const check=async()=>{const {state}=await load(),value=await state.readLaunch(root,'release');
         if(value?.serviceId!==serviceId||!await state.launcherAlive(value))throw Object.assign(new Error('Service controller unavailable'),{code:'SERVICE_CONTROLLER_UNAVAILABLE'});return value;};
-    return {describe:async()=>{const value=await check();return {id:serviceId,version:value.currentRelease};},
+    return {describe:async()=>{const value=await check();const {runtime}=await load(),relative=path.relative(root,runtime.releasesRoot(root));
+            return {id:serviceId,version:value.currentRelease,artifact:{format:'nestos.httpd.release/1',manifest:'release.json',...(!path.isAbsolute(relative)&&!relative.startsWith('..')?{store:{base:'source-checkout' as const,path:relative.split(path.sep).join('/')}}:{})}};},
         submit:async request=>{
             if(request.serviceId!==serviceId)throw Object.assign(new Error('Wrong service'),{code:'HTTPD_SERVICE_MISMATCH'});
-            const {state,runtime}=await load();await check();runtime.verifyRelease(runtime.releaseDirectory(runtime.releasesRoot(root),request.targetVersion));
+            const {state,runtime}=await load();await check();const started=Date.now();
+            try{runtime.verifyRelease(runtime.releaseDirectory(runtime.releasesRoot(root),request.targetVersion));}
+            catch(error){console.warn('[HTTPServiceControl]',JSON.stringify({operation:'service.replace',operationId:request.operationId,stage:'artifact.verify',result:'failure',code:'SERVICE_ARTIFACT_INVALID',causeCode:(error as {code?:string}).code,durationMs:Date.now()-started}));
+                throw Object.assign(new Error('Candidate does not match the declared service artifact'),{code:'SERVICE_ARTIFACT_INVALID',executionOutcome:'not-started',retryable:false});}
             await state.requestLaunch(root,'release',{operationId:request.operationId,action:'switch',targetRelease:request.targetVersion,expectedCurrent:request.expectedVersion,serviceId});
         },inspect:async request=>{
             const value=await check(),receipt=value.receipts?.[request.operationId];if(!receipt)return {state:'running'};

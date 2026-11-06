@@ -413,6 +413,7 @@ export const en: LocaleStrings = {
     "kanban.errors.OPERATION_RESULT_RUNNING_VERSION_MISMATCH": "The running version does not match the replacement result.",
     "kanban.errors.OPERATION_FLOW_REQUIRED": "Configure a project workflow first.",
     "kanban.errors.OPERATION_FLOW_CONTEXT_REQUIRED": "The Flow must declare a context string parameter.",
+    'kanban.errors.SERVICE_ARTIFACT_INVALID': 'The artifact does not match the target service. Rebuild a runnable service release.',
     "kanban.errors.OPERATION_SELECTION_REQUIRED": "Choose a resolution for every conflict.",
     "kanban.errors.OPERATION_CONFIRMATION_REQUIRED": "Check the confirmation before proceeding.",
     "kanban.errors.OPERATION_COORDINATOR_REQUIRED": "Board coordinator permission is required.",

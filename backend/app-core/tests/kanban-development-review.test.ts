@@ -14,7 +14,7 @@ vi.mock('../src/projects/worktree-modules', () => ({gitWorkspace: async (_proces
 vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async () => ({value: {bindings: {original: {id: 'binding', branchId: 'main', connectionId: 'work-original', validity: mock.context ? 'valid' : 'invalid', nativeRef: {profileId: 'codex', sessionId: 'original-native'}, revision: 7, generation: 2}}}})}));
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); mock.dirty = mock.busy = false; mock.context = true;mock.ancestry=0;});
-async function fixture(withExchange = false) {
+async function fixture(withExchange = false,serviceControl?:import('../src/runtime/service-control').RuntimeServiceControl) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/');
     const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     await journal.update('worktree:original', () => ({id: 'original', directory: '/workspace/_nestos/worktrees/original', branch: 'work/original', phase: 'ready'}));
@@ -27,7 +27,7 @@ async function fixture(withExchange = false) {
     const submission = {start: vi.fn(async () => ({sessionId: 'original-session', outcome})), inspect: vi.fn(async () => ({sessionId: 'original-session', outcome}))};
     const channels=memoryChannels();
     const stop = vi.fn(), close = vi.fn(async () => {}), remote = {sessionChannel:channels.channel,projectHarness: async () => ({subscribeChannel: () => stop, close})};
-    const api = developmentReviewAdapter({fs, journal, calls, remote, submission: withExchange ? submission : undefined, kernel: {sessionActivity: async () => ({counts: {}})}, projects: {get: async () => ({path: '/project'}), openWorkspace: async () => ({fs, dispose: async () => {}})}, runningVersion: 'running', service: {execute: async () => {}, workflow: async () => workflow, read: async () => board, item: async () => ({item})}} as never);
+    const api = developmentReviewAdapter({serviceControl,fs, journal, calls, remote, submission: withExchange ? submission : undefined, kernel: {sessionActivity: async () => ({counts: {}})}, projects: {get: async () => ({path: '/project'}), openWorkspace: async () => ({fs, dispose: async () => {}})}, runningVersion: 'running', service: {execute: async () => {}, workflow: async () => workflow, read: async () => board, item: async () => ({item})}} as never);
     closes.push(() => api.close!());
     return {api, journal, fs, workflow, channels, submission, stop, close, complete: () => {outcome = 'succeeded';}, item: item as never, board: board as never, target, calls};
 }
@@ -109,4 +109,14 @@ it('accepts archived artifact evidence but refuses protocol receipts as build ev
  const bad=await f.api.prepareOperation!({id:'protocol-proof',action:'build',board:f.board,item:f.item,snapshot});
  f.channels.report('protocol-proof','proof',{type:'result',content:'Protocol is not an artifact',payload:{status:'succeeded',evidence:{path:'_nestos/kanban/review/protocol-proof/result.json',sha256:sha256HexSync(content)}}});
  await expect(f.api.readOperation!({id:'protocol-proof',action:'build',boardId:'board',itemId:'task',request:bad,snapshot} as never)).rejects.toMatchObject({code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
+});
+
+it('freezes the declared service artifact requirements into the build Session context',async()=>{
+ const deployment={id:'service',version:'running',artifact:{format:'service-release/1',manifest:'release.json',store:{base:'source-checkout' as const,path:'release/httpd'}}};
+ const f=await fixture(false,{describe:async()=>deployment,submit:async()=>{},inspect:async()=>({state:'running'})});
+ await f.fs.driver.createFile({parentPath:'/workspace/_nestos/etc',name:'deployment.json',content:JSON.stringify({schema:1,serviceId:'service'}),recursive:true});
+ const snapshot=await f.api.snapshot(f.board,f.item);await f.api.prepareOperation!({id:'service-build',action:'build',board:f.board,item:f.item,snapshot});
+ expect((await f.journal.get<any>('development-workspace:service-build')).context.operation.deployment).toEqual(deployment);
+ const manifest=JSON.parse(await readPrompt(f.fs,'/workspace/_nestos/worktrees/original/_nestos/kanban/review/service-build/manifest.json'));
+ expect(manifest.context.deployment).toEqual(deployment);
 });

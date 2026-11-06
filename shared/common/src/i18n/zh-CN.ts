@@ -414,6 +414,7 @@ export const zhCN = {
     "kanban.errors.OPERATION_RESULT_RUNNING_VERSION_MISMATCH": "替换流程已结束，但当前服务版本与验收版本不符。",
     "kanban.errors.OPERATION_FLOW_REQUIRED": "请先配置项目的执行流程。",
     "kanban.errors.OPERATION_FLOW_CONTEXT_REQUIRED": "流程必须声明名为 context 的文本参数。",
+    'kanban.errors.SERVICE_ARTIFACT_INVALID': '验收产物不符合目标服务要求，请重新构建完整服务版本。',
     "kanban.errors.OPERATION_SELECTION_REQUIRED": "请为每个冲突选择处理方式。",
     "kanban.errors.OPERATION_CONFIRMATION_REQUIRED": "请勾选确认后执行。",
     "kanban.errors.OPERATION_COORDINATOR_REQUIRED": "需要看板协调者权限。",
