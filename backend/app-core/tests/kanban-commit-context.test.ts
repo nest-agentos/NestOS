@@ -92,3 +92,11 @@ it('respects the requested fields and avoids reading decisions for a task-only q
     expect(result.contexts[0].historical).not.toHaveProperty('decision'); expect(result.contexts[0].historical.task).not.toHaveProperty('acceptance');
     expect(result.contexts[0].current).not.toHaveProperty('decision'); expect(f.service.record).not.toHaveBeenCalled();
 });
+
+it('freezes only current provenance without copying unrelated planning candidates',async()=>{
+ const f=await fixture(),context=await freezeCommitContext(f.journal,{...f.source,executionId:'new-execution',context:{...f.source.context,snapshot:{items:[{responsibility:'UNRELATED_HISTORY'.repeat(6000)}]},inputs:{body:'UNRELATED_PAYLOAD'.repeat(6000)}}});
+ expect(context.input).toEqual(f.source.context);expect(JSON.stringify(context)).not.toContain('UNRELATED_');
+ expect(new TextEncoder().encode(JSON.stringify(context)).byteLength).toBeLessThan(49152);
+ const huge={...f.source.context,task:{...f.source.context.task,acceptance:'Own requirement'.repeat(6000)}};
+ await expect(freezeCommitContext(f.journal,{...f.source,executionId:'oversized-own-task',context:huge})).rejects.toMatchObject({code:'COMMIT_CONTEXT_LIMIT'});
+});

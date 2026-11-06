@@ -87,7 +87,7 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
         const scope = {runId: input.item.externalRefs?.find(ref => ref.system === 'nestos-decision-run')?.id ?? input.dispatch.planId,
             itemId: input.item.id, attemptId: input.dispatch.id};
         const digest = await developmentStage(input.dispatch.id, 'prompts.publish', () => publishPromptBundle(view.fs, record.directory + '/_nestos/kanban', record.policy.prompts,
-            {...scope, entry: input.stage === 'decision' ? 'prompts/decision.md' : input.stage === 'fix' ? 'prompts/task-fix-pre.md' : 'prompts/task.md', commit: policy.commit, gitIdentity: record.gitIdentity, repositories: record.repositories, availableRepositories: record.availableRepositories,...(record.context===undefined?{}:{input:record.context})}));
+            {...scope, entry: input.stage === 'decision' ? 'prompts/decision.md' : input.stage === 'fix' ? 'prompts/task-fix-pre.md' : 'prompts/task.md', commit: policy.commit, gitIdentity: record.gitIdentity, repositories: record.repositories, availableRepositories: record.availableRepositories,...(record.context===undefined?{}:{input:planningSections(record.context).context})}));
         await recordPublication(journal, input.dispatch.id, digest);
         await openDevelopmentChannel(options.remote, input.dispatch.id, record, scope, input.item);
         return record;
