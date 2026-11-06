@@ -25,6 +25,7 @@ export async function mailView(vfs: FileSystemsPort): Promise<MailClient> {
         const archive = await held.archive;
         const requireOpen = () => {if (closed) throw new Error('MAIL_CLOSED');};
         return {queryMail: query => {requireOpen(); return archive.queryMail(query);}, readThread: query => {requireOpen(); return archive.readThread(query);},
+            confirmThreadRead: confirmation => {requireOpen(); return archive.confirmThreadRead(confirmation);},
             refreshMail: () => {requireOpen(); return archive.refreshMail();}, dispose};
     } catch (error) {held.refs--; if (!held.refs && archives.get(vfs) === held) archives.delete(vfs); throw error;}
 }

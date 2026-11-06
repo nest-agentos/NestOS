@@ -79,6 +79,8 @@ VFS `IPlugin` 可以提供变更提示，但不能替代跨窗口扫描、恢复
 
 邮件归档核心位于独立库 `@nestos/mail`：公开 contracts、VFS SeqFile 摘要/搜索索引与可选 ui 入口。app-core 只绑定用户授权的邮件空间、索引路径及共享租约，app-shell 只注入 MDXEditor、文案、图标和路由；RPC 通过 MailClient 返回每页 20 个主题摘要，正文按需读取。详见 [邮件模块](../libraries/mail/README.md)。
 
+主题已读状态由 mail 库在同一 SeqFile 的独立 `read/` 元数据项持久化；MailClient.confirmThreadRead 是显式 RPC 写命令。阅读器仅在当前代次正文成功挂载后确认成员/版本快照，侧栏保留选中态并更新已读文字和字重；新邮件使快照不匹配，恢复未读。确认与索引更新通过事务修订检查隔离，过期确认不能覆盖新快照；查询仅补读当前页状态元数据，不重读原始正文。旧归档缺少状态时默认未读，状态保存失败显示具体安全错误码。
+
 数字分身的领域服务与 SeqFile 布局归 app-core 的 `digital-twin/`，五页工作台归 app-shell 的 `digital-twin/`。kernel-adapters 仅注入通用发送前钩子，vfsdrivers 的 IndexedDB/SQLite schema 不加入分身表或业务字段；固定槽分页与版本链由 SeqTwinStore 管理。见[数字分身实施边界](design/digital-twin.md#实现与边界)。
 
 `tools/image-tools` 是参与 pnpm 工作区的通用外部 Tool 包；核心工厂与 Node 引擎位于该包，Canvas 装配在 Web 宿主，Tauri 复用公开宿主入口。Rust `tools/anki-cli` 与 Node `tools/googlecli` 均为独立 Git 子模块，未加入 pnpm 包工作区；各自的提交先推送到外部仓库，再由主仓库记录子模块提交。

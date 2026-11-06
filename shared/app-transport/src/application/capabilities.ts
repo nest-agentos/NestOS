@@ -13,7 +13,7 @@ const fileSystem: CapabilitySchema = {
 
 export const CAPABILITIES: Readonly<Record<string, CapabilitySchema>> = {
     "MailClient": {markers: ['queryMail', 'readThread', 'refreshMail', 'dispose'], fields: [],
-        methods: {queryMail: 'query', readThread: 'query', refreshMail: 'query', dispose: 'async'}},
+        methods: {queryMail: 'query', readThread: 'query', confirmThreadRead: 'async', refreshMail: 'query', dispose: 'async'}},
     "ProjectWorkspaceSource": {markers: ['fs', 'initialFile', 'dispose'], fields: ['fs', 'initialFile'], methods: {dispose: 'async'}},
     "OpenedApplicationView": {markers: ['workbench', 'observation', 'cursor', 'dispose'],
         domain: 'opened-view', invalidates: [],
