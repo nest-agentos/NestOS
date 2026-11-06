@@ -9,6 +9,7 @@ import {SeqKanbanStore} from '@nestos/kanban/storage';
 import type {KanbanCommand} from '@nestos/kanban/contracts';
 import {scanTaskControls} from '@nestos/kanban/integration';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
+vi.mock('../src/projects/harness-context-catalog',()=>({readContextCatalog:async()=>({value:{bindings:{canonical:{id:'canonical',branchId:'main',validity:'valid',revision:5,generation:1,nativeRef:{sessionId:'native-original'}}}}})}));
 const closes:Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});
 async function fixture() {
@@ -67,13 +68,13 @@ it('transfers a linked answer through the original Session queue, retaining a re
     await f.run({type:'report-issue',itemId:'t',issue:{id:'question',attemptId:'original',type:'clarification'}});
     await f.journal.update('development-workspace:original',()=>({projectId:'x1',directory:'/workspace/work'}));
     await f.journal.update('managed-agent:work-original',()=>({target:{kind:'agent',id:'worker',version:'1',digest:'a'.repeat(64)}}));
-    const enqueue=vi.fn(async()=>{}),options={sessionChannel:vi.fn(),projects:{get:async()=>({path:'/x1'}),openWorkspace:async()=>({fs:f.fs,dispose:async()=>{}})},enqueueTaskReply:enqueue};
+    const enqueue=vi.fn(async()=>{}),options={calls:{inspectTaskCallSubmission:async()=>({executionSessionId:'original-session'}),list:async()=>[{receipt:{executionSessionId:'original-session'},callerState:{settled:true},executionTree:{settled:true},input:{request:{expectedSessionId:'original',expectedBranch:'main',expectedTarget:{kind:'agent',id:'worker',version:'1',digest:'a'.repeat(64)},submission:{id:'original'}}}}]},kernel:{sessionActivity:async()=>({counts:{}})},sessionChannel:vi.fn(),projects:{get:async()=>({path:'/x1'}),openWorkspace:async()=>({fs:f.fs,dispose:async()=>{}})},enqueueTaskReply:enqueue};
     const replies=taskReplies(f.service,f.journal,options as never),request={itemId:'t',attemptId:'original',replyTo:'question',operationId:'answer',content:'Use the verified input'};
     await replies('b',request);
     const source=(enqueue.mock.calls[0][0] as {source:{text:string}}).source;
     expect(promptData(source.text,'Reply binding')).toEqual({scopeId:'original',replyTo:'question',operationId:'answer'});
     expect(source.text).toContain('## User reply\n\n'+request.content);
-    expect(enqueue.mock.calls[0][0]).toMatchObject({expectedSessionId:'original-session',submission:{id:'answer'}});
+    expect(enqueue.mock.calls[0][0]).toMatchObject({expectedSessionId:'original-session',submission:{id:'answer'},overrides:{branchMode:'continue',harnessConversation:{mode:'resume',bindingId:'canonical',expectedBindingRevision:5,expectedGeneration:1}}});
     await f.run({type:'resolve-issue',itemId:'t',attemptId:'original',issueId:'question',resolvedBy:'done'});
     await replies('b',request);await replies.scan();expect(enqueue).toHaveBeenCalledTimes(1);
     await expect(replies('b',{...request,content:'Changed'})).rejects.toMatchObject({code:'IDEMPOTENCY_CONFLICT'});

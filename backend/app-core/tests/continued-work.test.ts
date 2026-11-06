@@ -81,3 +81,11 @@ it('reattaches a host execution context to a running admitted round without subm
     expect(await port.inspect(request)).toMatchObject({outcome: 'running'});
     expect(open).toHaveBeenCalledWith('original'); expect(lease.dispose).toHaveBeenCalledOnce(); expect(execute).not.toHaveBeenCalled();
 });
+
+it('retains the sole confirmed native binding while preserving a failed unconfirmed creation as history',async()=>{
+ const f=fixture();context.bindings={canonical:{id:'canonical',branchId:'main',validity:'valid',revision:10,generation:1,nativeRef:{sessionId:'native-original'}},unconfirmed:{id:'unconfirmed',branchId:'main',validity:'invalid',invalidReason:'CONTEXT_NATIVE_REFERENCE_UNCONFIRMED'}};
+ const frozen=await f.executor.prepareContinuation!(f.dispatch as any,f.item as any,f.original) as any;
+ expect(frozen.request.overrides.harnessConversation).toEqual({mode:'resume',bindingId:'canonical',expectedBindingRevision:10,expectedGeneration:1});
+ context.bindings.unconfirmed={...context.bindings.unconfirmed as object,activeOperation:{}};
+ await expect(f.executor.prepareContinuation!(f.dispatch as any,f.item as any,f.original)).rejects.toMatchObject({code:'CONTINUATION_CONTEXT_AMBIGUOUS'});
+});

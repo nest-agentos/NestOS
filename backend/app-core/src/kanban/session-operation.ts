@@ -14,8 +14,9 @@ export async function originalSession(options:OriginalSessionOptions,input:Indep
     const activity=await options.kernel.sessionActivity(sessionId);
     requireValue(!Object.entries(activity.counts).some(([key,count])=>['running','queued','created','waiting','blocked','paused'].includes(key)&&count>0),'CONTINUATION_IN_USE');
     const catalog=await readContextCatalog(options.kernel,sessionId),branch=source.expectedBranch!;
-    const bindings=Object.values(catalog.value.bindings).filter(binding=>binding.branchId===branch);
-    requireValue(bindings.length<=1&&bindings.every(binding=>binding.validity==='valid'&&!binding.activeOperation),'CONTINUATION_CONTEXT_AMBIGUOUS');
+    const candidates=Object.values(catalog.value.bindings).filter(binding=>binding.branchId===branch);
+    const bindings=candidates.filter(binding=>!(binding.validity==='invalid'&&!binding.nativeRef&&!binding.activeOperation));
+    requireValue(bindings.length<=1&&(!candidates.length||bindings.length===1)&&bindings.every(binding=>binding.validity==='valid'&&!binding.activeOperation),'CONTINUATION_CONTEXT_AMBIGUOUS');
     const binding=bindings[0],target=source.expectedTarget!;
     requireValue(target&&branch,'CONTINUATION_CONTEXT_AMBIGUOUS');
     return {sessionId,nativeSessionId:binding?.nativeRef?.sessionId,target,request(id:string,text:string):SubmissionRequest {
