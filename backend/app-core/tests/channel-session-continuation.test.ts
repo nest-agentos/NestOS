@@ -1,8 +1,8 @@
 import {afterEach, expect, it, vi} from 'vitest';
 import {prepareChannelContinuation} from '../src/run/channel-session-continuation';
-const state = vi.hoisted(() => ({generation: 2, valid: true, native: true, active: false}));
-vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async () => ({value: {bindings: {binding: {id: 'binding', generation: state.generation, revision: 9, branchId: 'main', connectionId: 'work-original', validity: state.valid ? 'valid' : 'invalid', activeOperation: state.active ? {} : undefined, nativeRef: state.native ? {profileId: 'codex', sessionId: 'native-original'} : undefined}}}})}));
-afterEach(() => {state.generation = 2; state.valid = state.native = true; state.active = false;});
+const state = vi.hoisted(() => ({generation: 2, valid: true, native: true, active: false, extra:false, extraActive:false}));
+vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async () => ({value: {bindings: {...(state.extra?{failed:{id:'failed',branchId:'main',connectionId:'work-original',validity:'invalid',activeOperation:state.extraActive?{}:undefined}}:{}),binding: {id: 'binding', generation: state.generation, revision: 9, branchId: 'main', connectionId: 'work-original', validity: state.valid ? 'valid' : 'invalid', activeOperation: state.active ? {} : undefined, nativeRef: state.native ? {profileId: 'codex', sessionId: 'native-original'} : undefined}}}})}));
+afterEach(() => {state.generation = 2; state.valid = state.native = true; state.active = state.extra = state.extraActive = false;});
 function fixture() {
     const base = {expectedSessionId: 'original', expectedBranch: 'main', expectedTarget: {kind: 'agent', id: 'managed', version: '1', digest: 'digest'},
         source: {kind: 'composer', text: JSON.stringify({instruction: 'Read-only merge analysis', dependencies: {lifecycle: {stage: 'postload.succeeded'}}}), values: {}, attachments: []},
@@ -22,4 +22,9 @@ it('refuses a changed generation, missing native context, active operation or in
     state.generation = 2; state.native = false; await expect(prepareChannelContinuation(f.options)).rejects.toMatchObject({code: 'CHANNEL_CONTEXT_UNAVAILABLE'});
     state.native = true; state.active = true; await expect(prepareChannelContinuation(f.options)).rejects.toMatchObject({code: 'CHANNEL_CONTEXT_UNAVAILABLE'});
     state.active = false; state.valid = false; await expect(prepareChannelContinuation(f.options)).rejects.toMatchObject({code: 'CHANNEL_CONTEXT_UNAVAILABLE'});
+});
+
+it('ignores a settled failed creation but keeps an unconfirmed active creation blocking',async()=>{
+ state.extra=true;await expect(prepareChannelContinuation(fixture().options)).resolves.toMatchObject({expectedSessionId:'original'});
+ state.extraActive=true;await expect(prepareChannelContinuation(fixture().options)).rejects.toMatchObject({code:'CHANNEL_CONTEXT_UNAVAILABLE'});
 });

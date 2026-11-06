@@ -1,3 +1,4 @@
+import {channelDigest} from '../src/run/channel-protocol';
 import {afterEach,expect,it,vi} from 'vitest';
 import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {SeqKanbanStore,createKanbanModule} from '@nestos/kanban';
@@ -81,4 +82,13 @@ it('rechecks a formally rejected acceptance in the retained Session without chan
  expect(attempts.find(row=>row.id===first.id)?.outcome).toBe('rejected');
  expect(attempts.find(row=>row.attempt===3)).toMatchObject({continuation:{previousDispatchId:first.id},outcome:'prepared'});
  expect(attempts.find(row=>row.itemId==='source')?.outcome).toBe('accepted');
+});
+
+it('returns strict JSON channel values before the first persistence round trip', async()=>{
+ const f=await fixture();f.options.executionResource.mockResolvedValue(undefined);
+ const state=await f.recovery.taskRecovery('b','verify');
+ expect(()=>channelDigest(state)).not.toThrow();
+ expect(state).not.toHaveProperty('sessionId',undefined);
+ expect(state).not.toHaveProperty('deliveryOperationId');
+ expect(state.related[0]).not.toHaveProperty('resourceId');
 });

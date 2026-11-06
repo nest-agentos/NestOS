@@ -1,3 +1,4 @@
+import {retainedExecutionContexts} from '../projects/harness-context-selection';
 import {verifyFileDigest} from '../run/file-digest';
 import {verifyReadOnlyDelivery} from './kanban-delivery-plan';
 import {managedServiceDeployment} from './managed-service-deployment';
@@ -103,7 +104,7 @@ async function prepareAnalysis(options: Options, input: MaintenanceInput): Promi
     const sessionId = original.receipt.executionSessionId, activity = await options.kernel.sessionActivity(sessionId);
     requireValue(!Object.entries(activity.counts).some(([key, count]) => ['running', 'queued', 'created', 'waiting', 'blocked', 'paused'].includes(key) && count > 0), 'OPERATION_ORIGINAL_SESSION_BUSY');
     const branch = original.input.request.expectedBranch!, catalog = await readContextCatalog(options.kernel, sessionId);
-    const bindings = Object.values(catalog.value.bindings).filter(row => row.branchId === branch && row.connectionId === 'work-' + current.id);
+    const bindings = retainedExecutionContexts(Object.values(catalog.value.bindings).filter(row => row.branchId === branch && row.connectionId === 'work-' + current.id));
     requireValue(bindings.length === 1 && bindings[0].validity === 'valid' && !bindings[0].activeOperation, 'OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE');
     const binding = bindings[0], target = original.input.request.expectedTarget!, directory = current.record.directory + '/_nestos/kanban/review/' + input.id;
     requireValue(binding.nativeRef?.sessionId,'OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE');

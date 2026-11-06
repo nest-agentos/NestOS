@@ -1,3 +1,4 @@
+import {retainedExecutionContexts} from '../projects/harness-context-selection';
 import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallInput,SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {Kernel} from '@nestos/durable-kernel';
@@ -15,7 +16,7 @@ export async function originalSession(options:OriginalSessionOptions,input:Indep
     requireValue(!Object.entries(activity.counts).some(([key,count])=>['running','queued','created','waiting','blocked','paused'].includes(key)&&count>0),'CONTINUATION_IN_USE');
     const catalog=await readContextCatalog(options.kernel,sessionId),branch=source.expectedBranch!;
     const candidates=Object.values(catalog.value.bindings).filter(binding=>binding.branchId===branch);
-    const bindings=candidates.filter(binding=>!(binding.validity==='invalid'&&!binding.nativeRef&&!binding.activeOperation));
+    const bindings=retainedExecutionContexts(candidates);
     requireValue(bindings.length<=1&&(!candidates.length||bindings.length===1)&&bindings.every(binding=>binding.validity==='valid'&&!binding.activeOperation),'CONTINUATION_CONTEXT_AMBIGUOUS');
     const binding=bindings[0],target=source.expectedTarget!;
     requireValue(target&&branch,'CONTINUATION_CONTEXT_AMBIGUOUS');
