@@ -1,4 +1,6 @@
 import {collectWithTool, type ToolCollectorOptions} from './tool-collector';
+import {TwinSafePoint} from './analysis-lifecycle';
+import {waitCollection} from './collection-wait';
 import {collectionTools, presentCollectionTools, validateCollectionTool} from './collection-tools';
 import type {TwinCollectionExecutor} from '@nestos/app-contracts';
 import type {IndependentCallService, SessionRepository} from '@nestos/llm-session';
@@ -8,7 +10,7 @@ import {traceAnalysis, TwinDiagnosticError} from './diagnostics';
 import {collectionProgress} from './collection-progress';
 type Progress = import('@nestos/app-contracts').TwinCollectionProgress;
 
-export interface TwinCollectionRequest {runId: string; sessionId: string; executor: TwinCollectionExecutor}
+export interface TwinCollectionRequest {runId: string; sessionId: string; executor: TwinCollectionExecutor; signal?: AbortSignal}
 export interface TwinCollectionPort {
     tools?(): import('@nestos/app-contracts').TwinScannerTool[] | Promise<import('@nestos/app-contracts').TwinScannerTool[]>;
     validate?(executor: TwinCollectionExecutor): void;
@@ -42,6 +44,8 @@ export class PublishedScannerCollector implements TwinCollectionPort {
             traceAnalysis(identity, 'collection.completed', {operationId: request.runId, complete: progress?.complete, processed: progress?.processed, durationMs: Date.now() - started});
             return progress;
         } catch (error) {
+            if (request.signal?.aborted && request.signal.reason instanceof TwinSafePoint) throw request.signal.reason;
+            if (error instanceof TwinSafePoint) throw error;
             try {await this.cancelCollection(request.sessionId);} catch {
                 traceAnalysis(identity, 'failed', {operationId: request.runId, category: 'collection-cancel-unconfirmed', durationMs: Date.now() - started});
             }
@@ -60,10 +64,11 @@ export class PublishedScannerCollector implements TwinCollectionPort {
         const ready = await calls.prepareTaskCall(input, {maxDepth: 1, timeoutMs: 150000});
         assertCollectionPlan(ready.plan.task);
         await bind(ready.executionSessionId);
+        request.signal?.throwIfAborted();
         const result = await calls.submitPreparedTaskCall(input), taskId = result.submission.task.taskId;
         const task = await kernel.attachTask(request.sessionId, taskId);
-        try {await attached(taskId);} catch (error) {await task.cancel(undefined, {requestId: 'collection-cancel'}); throw error;}
-        const exit = await task.wait({until: 'settled', timeoutMs: 180000}), output = exit.output as TaskCallResult | undefined;
+        try {await attached(taskId);} catch (error) {if (!(error instanceof TwinSafePoint)) await task.cancel(undefined, {requestId: 'collection-cancel'}); throw error;}
+        const exit = await waitCollection(task, request.signal), output = exit.output as TaskCallResult | undefined;
         if (exit.status !== 'succeeded' || output?.exit.status !== 'succeeded') {
             const message = output?.exit.error?.message ?? exit.error?.message ?? '';
             const code = message.match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/)?.[0];

@@ -11,7 +11,7 @@ import { TwinSources } from './sources';
 import {write, type TwinDataRecord} from './records';
 
 export interface TwinCollectionRunner {
-    collect(run: TwinDataRecord<TwinScanRun>, attached: (taskId: string) => Promise<void>): Promise<import('@nestos/app-contracts').TwinCollectionProgress | void>;
+    collect(run: TwinDataRecord<TwinScanRun>, attached: (taskId: string) => Promise<void>, signal?: AbortSignal): Promise<import('@nestos/app-contracts').TwinCollectionProgress | void>;
     cancel(run: TwinDataRecord<TwinScanRun>): Promise<void>;
 }
 /** One online host coordinates scans; extraction still runs as native durable tasks. */
@@ -21,6 +21,7 @@ export class TwinScanWorker {
     private safeStopping = false;
     private quiescing?: Promise<void>;
     private stage = 'idle';
+    private readonly collectionStop = new AbortController();
     private error = '';
     private renewing?: Promise<void>;
     constructor(private readonly store: TwinScanStore, private readonly plans: TwinScanPlans,
@@ -33,6 +34,7 @@ export class TwinScanWorker {
     }
     quiesce(): Promise<void> {
         this.stopped = this.safeStopping = true;
+        this.collectionStop.abort(new TwinSafePoint());
         return this.quiescing ??= (async () => {
             const started = Date.now();
             const report = (result: string) => console.info('[ScannerShutdown]', JSON.stringify({operation: 'scanner.quiesce', workerId: this.store.owner, stage: this.stage, result, durationMs: Date.now() - started}));
@@ -123,7 +125,10 @@ export class TwinScanWorker {
         }
     }
     private async restoreSafeRun(run: TwinDataRecord<TwinScanRun>, fence: number): Promise<boolean> {
-        if (run.data.collection) return false;
+        if (run.data.collection) {
+            await this.store.records.save('scan-run', run.id, {...run.data, state: 'queued', owner: '', error: ''}, run.revision, [await this.store.fence(fence)]);
+            this.changed(); return true;
+        }
         const jobs = (await this.store.records.list<TwinAnalysisJob>('job')).filter(job => job.data.scanScope?.runId === run.id);
         const safe = ['prepared', 'submitted', 'result-ready'];
         if (!jobs.length || jobs.some(job => job.data.state !== 'committed' &&
@@ -151,7 +156,7 @@ export class TwinScanWorker {
     private async run(record: TwinDataRecord<TwinScanRun>, fence: number): Promise<void> {
         try {
             await this.store.records.save('scan-run', record.id, { ...record.data, state: 'running', owner: this.store.owner,
-                fence, startedAt: this.store.now() }, record.revision, [await this.store.fence(fence)]);
+                fence, startedAt: record.data.startedAt ?? this.store.now() }, record.revision, [await this.store.fence(fence)]);
             this.changed();
             if (record.data.collection) await this.step('collection', () => this.collectSources(record.id, fence));
             if (record.data.mode !== 'collect') await this.scanSources(record.id, { runId: record.id, planId: record.data.planId,
@@ -180,8 +185,10 @@ export class TwinScanWorker {
         const progress = await this.collection.collect(run, async taskId => {
             const latest = (await this.store.records.get<TwinScanRun>('scan-run', id))!;
             if (latest.data.state !== 'running') throw new Error('TWIN_SCAN_CANCELLED');
+            const saved = await this.store.records.get<{taskId: string}>('checkpoint', 'collection-task:' + id);
+            if (saved) {if (saved.data.taskId !== taskId) throw new Error('TWIN_COLLECTION_TASK_CHANGED'); return;}
             await this.store.records.save('checkpoint', 'collection-task:' + id, {taskId}, null, [await this.store.fence(fence)]);
-        });
+        }, this.collectionStop.signal);
         await this.store.fence(fence);
         if (run.data.mode !== 'collect' && !this.stopped) {await this.index?.sync(); await this.sources.reconcile(false, () => !this.stopped);}
         const latest = (await this.store.records.get<TwinScanRun>('scan-run', id))!;

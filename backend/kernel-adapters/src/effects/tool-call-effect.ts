@@ -32,6 +32,9 @@ export interface ToolCallEffectRequest {
 export class ToolCallEffectAdapter implements EffectAdapter<ToolCallEffectRequest, ToolInvokeResult> {
     readonly kind = 'tool.call';
     readonly version = '1';
+    failureOutcome(error: unknown): 'indeterminate' | 'failed' {
+        return /^TOOL_WORKER_(EXITED|DISCONNECTED|START_FAILED)$/.test(String((error as {code?: unknown})?.code)) ? 'indeterminate' : 'failed';
+    }
     private readonly inFlight = new InFlightEffects();
 
     constructor(
@@ -113,7 +116,12 @@ export class ToolCallEffectAdapter implements EffectAdapter<ToolCallEffectReques
                 progress: { message: progress.message.slice(0, 2048), output: progress.output?.slice(0, 8192) },
             } } });
         } : undefined;
-        const result = await service.invoke({ ...request, executionIdentity: toolIdentity(context), signal: context.abortSignal, admitOutput, onProgress });
+        const isolated = service.getToolMeta(request.toolId)?.executionIsolation === 'process';
+        const invoke = async (signal: AbortSignal) => {
+            try {return await service.invoke({ ...request, executionIdentity: toolIdentity(context), signal, admitOutput, onProgress });}
+            finally {if (isolated && signal.aborted) throw signal.reason;}
+        };
+        const result = isolated && context.waitForObservation ? await context.waitForObservation(invoke, {confirmLocalStop: true}) : await invoke(context.abortSignal);
         // Unload has already changed persistent state; its cleanup must still settle as an Effect.
         if (result.recoverable !== true || unloadKey) requireToolSuccess(result);
         let skillContext: ToolInvokeResult['skillContext'];
@@ -143,7 +151,15 @@ export class ToolCallEffectAdapter implements EffectAdapter<ToolCallEffectReques
         context.abortSignal.throwIfAborted();
         const service = await (typeof this.service === 'function' ? this.service(context, request) : this.service);
         context.abortSignal.throwIfAborted();
-        if (service.reconcile) return service.reconcile({ ...request, ...toolIdentity(context), signal: context.abortSignal });
+        if (service.reconcile) {
+            if (service.getToolMeta(request.toolId)?.executionIsolation !== 'process' || !context.waitForObservation)
+                return service.reconcile({...request, ...toolIdentity(context), signal: context.abortSignal});
+            const reconcile = async (signal: AbortSignal) => {
+                try {return await service.reconcile!({...request, ...toolIdentity(context), signal});}
+                finally {if (signal.aborted) throw signal.reason;}
+            };
+            return context.waitForObservation(reconcile, {confirmLocalStop: true});
+        }
         if (service.getToolMeta(request.toolId)?.sideEffect === 'none') return { status: 'retry' };
         return {
             status: 'indeterminate',

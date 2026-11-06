@@ -112,3 +112,26 @@ flowchart LR
 - 业务结果结算与资源回收分离。停止时不新开终态清理，`cleaned` 未完成记录保留；清理过程中在关闭 Session 和删除 Session 之间也检查停止，下一宿主通过既有 recoverCleanup 幂等补做。
 
 诊断事件以 Session 身份关联，细分 kernel.session、kernel.submit、kernel.bind-and-start、kernel.wait、result.commit、failure.settle、cleanup.close-session、cleanup.remove-session，记录阶段、结果、安全错误码和耗时，不记录提示词、模型输出或来源正文。完整 Runtime 回归覆盖三个检查点重建、模型请求仅一次、原预算结算，以及结果持久化失败后的同 Task 重试，见 [扫描器集成测试](../../backend/app-core/tests/digital-twin-published-scanner.test.ts)。
+
+## Node 采集业务进程与恢复
+
+Node 宿主通过统一 Tool 模块加载器，将外部包的 `call/reconcile` 放在独立子进程执行；直接采集与静态 Flow 的外部 Tool 节点使用相同机制。扫描调度、Kernel、授权和 SeqFile 存储仍由原宿主单一持有，不在子进程创建第二个 Runtime 或文件写入者。内置 Tool 和纯 Transform 继续沿用原执行机制。
+
+```mermaid
+flowchart LR
+    S[扫描调度与原 runId] --> K[Kernel 原 Task / Effect]
+    K --> H[Node Tool 执行代理]
+    H --> G[轻量 guardian]
+    G --> W[独立业务 worker]
+    W -->|私有 IPC 受限能力| H
+    H --> A[当前调用的文件 / 资产 / 连接授权]
+    A --> D[(原宿主存储)]
+```
+
+每次执行使用当前 Tool 固定版本和原操作身份。IPC 只提供本次调用的能力，不向进程参数或日志写入工具输入、材料、消息、凭据；业务模块来自可信宿主配置。它是生命周期和事件循环隔离，不是针对恶意插件的安全沙箱。当前每个 Node 进程最多同时执行 8 个 Tool worker，排队有界；未声明并发安全的同模块工具保留串行执行。
+
+正常关停先停止本机观察准入并向业务进程组发送 SIGTERM，业务通过 AbortSignal 在小步骤边界收尾；最多等待 20 秒后强制回收本次拥有的进程组。独立 guardian 在宿主异常断连时执行相同回收，避免业务死循环阻止停止信号处理。Kernel 的 `confirmLocalStop` 保证本机进程确认退出前不能报告 `localIdle` 或释放存储锁。正在提交的宿主文件事务仍须完成，不以杀子进程代替存储收尾。
+
+扫描器把原 collection Task 身份保存在原运行记录，宿主停止只将运行排队续办，不作为用户取消。重启挂接原 Task，按原操作身份调用 Tool 的 `reconcile`；本机退休只使匹配的 Effect lease 到期，避免无谓等待旧 TTL。异常退出且没有确定回执时结果为未知，不能直接重发有副作用的 `call`。未提供核对能力的工具保留未知状态供用户处理；只读重试仍遵循已有 Tool 规则。
+
+定向证据：[进程隔离和宿主异常回收](../../apps/node-host/tests/tool-worker.test.ts)、[采集写文件后停止及原 Task 恢复](../../apps/node-host/tests/scanner-process-recovery.test.ts)。正式 HTTP 与 CLI 构建均包含同版本 `tool-worker.js` 入口；源码调试使用 tsx，生产执行无需运行源码 loader。

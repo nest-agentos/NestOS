@@ -7,7 +7,7 @@
     "create:certs": "bash scripts/create-certificates.sh",
     "dev": "node ../../scripts/httpd.mjs dev",
     "build:ui": "vite build",
-    "build": "pnpm build:ui && tsup src/server/main.ts --format esm --platform node --out-dir dist-server --splitting",
+    "build": "pnpm build:ui && tsup src/server/main.ts src/server/tool-worker.ts --format esm --platform node --out-dir dist-server --splitting",
     "start": "node ../../scripts/httpd.mjs start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

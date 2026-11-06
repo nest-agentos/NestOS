@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./http": "./src/http/index.ts",
+    "./tool-worker": "./src/runtime/tool-worker/launch.ts",
     "./runtime": "./src/runtime/index.ts",
     "./storage": "./src/storage/index.ts",
     "./authorization": "./src/authorization/index.ts",

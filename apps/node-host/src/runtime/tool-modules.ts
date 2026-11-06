@@ -4,6 +4,8 @@ import { isAbsolute } from 'node:path';
 import { buildTool, type Tool } from '@nestos/tools';
 import type {ToolConnectionAccess} from '@nestos/app-contracts/services';
 import { z } from 'zod/v4';
+import {processTool} from './tool-worker/tool';
+import {ToolWorkerPool} from './tool-worker/pool';
 
 export interface ToolModuleAPI { buildTool: typeof buildTool; z: typeof z; connections?: ToolConnectionAccess; executables?: Readonly<Record<string, string>>; }
 
@@ -20,9 +22,10 @@ export async function loadNodeToolModules(value = process.env.NESTOS_TOOL_MODULE
         if (typeof module.createTools !== 'function') throw new Error('Tool module must export createTools');
         const additions = await module.createTools({ buildTool, z, connections, executables } satisfies ToolModuleAPI);
         if (!Array.isArray(additions)) throw new Error('Tool module must return a tool array');
+        const group = new ToolWorkerPool(1);
         for (const tool of additions) {
             if (!tool?.name || names.has(tool.name) || typeof tool.call !== 'function') throw new Error('Invalid or duplicate external tool');
-            names.add(tool.name); tools.push(tool);
+            names.add(tool.name); tools.push(processTool(tool, {module: path, connections, executables, group}));
         }
     }
     return tools;

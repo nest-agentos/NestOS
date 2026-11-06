@@ -24,6 +24,7 @@ export type ToolPermission = 'allowed' | 'denied' | 'ask_user';
  * 工具注册时需要同时提供此元数据和 LLM ToolDefinition。
  */
 export interface ToolMeta {
+    executionIsolation?: 'process';
     /** Decode a handler's complete JSON output before structured consumers receive it. */
     outputEncoding?: 'text' | 'json';
     version?: string;

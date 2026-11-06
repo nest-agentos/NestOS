@@ -41,7 +41,9 @@ export class ToolHistory {
             if (summary.success) row.collection = summary.data;
             return result;}
         catch (error) {
-            row.status = context.signal?.aborted ? 'cancelled' : 'failed';
+            const unknown = (error as {executionOutcome?: string})?.executionOutcome === 'unknown' ||
+                (context.signal?.reason as {code?: string})?.code === 'WORKER_OBSERVATION_DRAINED';
+            row.status = unknown ? 'unknown' : context.signal?.aborted ? 'cancelled' : 'failed';
             const code = (error as {code?: string})?.code;
             Object.assign(row, {code: typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'TOOL_EXECUTION_FAILED'}); throw error;
         } finally {

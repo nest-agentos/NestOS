@@ -577,11 +577,13 @@ export class DigitalTwinService {
         const scans = new TwinScans(scanStore, sources, analysis, () => this.notify(), index, async () => {
             await knowledge.recoverCleanup(() => !this.disposed); await analysis.recoverCleanup(() => !this.disposed);
         }, {
-            collect: async (run, attached) => {
+            collect: async (run, attached, signal) => {
                 if (!run.data.collection || !this.collector) throw new Error('TWIN_SCANNER_EXECUTOR_UNAVAILABLE');
                 await this.authorizeCollection(run.id);
-                const progress = await this.collector.collect({runId: run.id, sessionId: 'twin-collection-' + run.id, executor: run.data.collection}, attached, async sessionId => {
+                const progress = await this.collector.collect({runId: run.id, sessionId: 'twin-collection-' + run.id, executor: run.data.collection, signal}, attached, async sessionId => {
                     await this.authorizeCollection(run.id);
+                    const old = await records.get<{runId: string}>('checkpoint', 'collection-binding:' + sessionId);
+                    if (old) {if (old.data.runId !== run.id) throw new Error('TWIN_COLLECTION_BINDING_CHANGED'); return;}
                     await records.save('checkpoint', 'collection-binding:' + sessionId, {runId: run.id}, null);
                 });
                 await this.authorizeCollection(run.id);

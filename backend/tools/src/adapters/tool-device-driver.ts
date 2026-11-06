@@ -42,6 +42,7 @@ const admission = new WeakMap<ToolMeta, {allowed: boolean}>();
 function toolMetaFromTool(tool: Tool): ToolMeta {
   return liveToolMeta({
     id: tool.name,
+    ...(tool.executionIsolation ? {executionIsolation: tool.executionIsolation} : {}),
     version: tool.version ?? '1',
     name: tool.userFacingName(undefined),
     description: '',

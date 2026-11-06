@@ -685,6 +685,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const quiesce = () => quiescing ??= (async () => {
             // Stop upstream scheduling first; accepted submissions retain their dependency services.
             recovery.stopBackground();
+            kernelCore.beginObservationDrain();
             const requests = [
                 stop('startup.close', () => startup.close()),
                 stop('kanban.quiesce', () => kanban.quiesce()),

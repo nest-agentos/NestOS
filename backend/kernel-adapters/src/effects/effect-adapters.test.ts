@@ -7,6 +7,19 @@ import { BashEffectAdapter } from './bash-effect';
 import { SkillLoadEffectAdapter } from './skill-load-effect';
 
 describe('KernelAdapters Effect adapters', () => {
+    it('drains isolated tool observation with the original checkpoint reason rather than recording cancellation', async () => {
+        const controller = new AbortController(), reason = Object.assign(new Error('checkpoint'), {code: 'WORKER_OBSERVATION_DRAINED'});
+        const service = toolService(async request => {
+            controller.abort(reason);
+            expect(request.signal).toBe(controller.signal);
+            return {...result('external', false, 'stopped'), errorCode: 'CANCELLED'};
+        });
+        service.getToolMeta = () => ({executionIsolation: 'process'}) as never;
+        const observation = vi.fn(async (read: (signal: AbortSignal) => Promise<unknown>) => read(controller.signal));
+        const execution = {...context('tool'), waitForObservation: observation} as EffectExecutionContext;
+        await expect(new ToolCallEffectAdapter(service).execute({resourceHandleId: 'tool-handle', toolId: 'external', args: {}}, execution)).rejects.toBe(reason);
+        expect(observation).toHaveBeenCalledOnce();
+    });
     it('logs execution identity and a classified failure without dumping tool arguments', async () => {
         const log = vi.fn();
         const logger = { debug() {}, info() {}, warn() {}, error: log };

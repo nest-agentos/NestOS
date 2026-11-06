@@ -152,7 +152,7 @@ function compile(context, source, staging, kind) {
             run('pnpm', ['exec', 'vite', 'build', '--outDir', output, '--emptyOutDir'], app, {...env, NESTOS_HTTPD_BUILD_GRAPH: graph});
             files = readJSON(graph); rmSync(graph);
         } else {
-            run('pnpm', ['exec', 'tsup', 'src/server/main.ts', '--format', 'esm', '--platform', 'node', '--out-dir', output, '--splitting', '--clean', '--metafile'], app, env);
+            run('pnpm', ['exec', 'tsup', 'src/server/main.ts', 'src/server/tool-worker.ts', '--format', 'esm', '--platform', 'node', '--out-dir', output, '--splitting', '--clean', '--metafile'], app, env);
             const metafile = path.join(output, 'metafile-esm.json');
             const metadata = readJSON(metafile);
             files = Object.keys(metadata.inputs).map(file => path.resolve(app, file));
