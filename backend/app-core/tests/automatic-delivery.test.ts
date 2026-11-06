@@ -63,3 +63,17 @@ it('retains target ownership until cancelled work has no unsettled admitted oper
  await f.journal.update('review-operation:held',()=>({phase:'settled'}));f.jobs.clear();await automaticDelivery(f.options).scan();
  expect(f.run).toHaveBeenCalledTimes(2);expect(f.run.mock.calls[1][1].itemId).toBe('second');
 });
+it('rechecks a cleanup precondition after restart without repeating unchanged notifications',async()=>{
+ const f=await fixture();f.item.status='completed';(f.item.planning as any).execution='children';let blocked=true;
+ f.options.cleanup=vi.fn(async()=>{if(blocked)throw Object.assign(new Error('Cache remains'),{code:'CACHE_PENDING',cleanupPrecondition:true});return true;});
+ for(let n=0;n<3;n++)await automaticDelivery(f.options).scan();
+ expect(f.options.cleanup).toHaveBeenCalledTimes(3);expect(f.options.report).toHaveBeenCalledOnce();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(false);
+ blocked=false;await automaticDelivery(f.options).scan();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);
+ expect(f.options.report).toHaveBeenLastCalledWith(expect.objectContaining({done:true,code:undefined}));
+});
+it('does not replay a cleanup effect whose outcome is unknown',async()=>{
+ const f=await fixture();f.item.status='completed';(f.item.planning as any).execution='children';
+ f.options.cleanup=vi.fn(async()=>{throw Object.assign(new Error('Unknown effect'),{code:'CLEANUP_OUTCOME_UNKNOWN'});});
+ for(let n=0;n<3;n++)await automaticDelivery(f.options).scan();expect(f.options.cleanup).toHaveBeenCalledOnce();expect(f.options.report).toHaveBeenCalledOnce();
+ expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(false);
+});

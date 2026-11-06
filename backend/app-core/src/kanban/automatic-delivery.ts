@@ -2,7 +2,7 @@ import {claimDeliveryTarget,releaseDeliveryTarget} from './automatic-delivery-ta
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanItemOperationRequest,KanbanItemOperations,KanbanService,KanbanWorkflowState} from '@nestos/kanban/contracts';
 import {safeCode,type KanbanAutomationJournal} from '@nestos/kanban/integration';
-interface State {id:string;boardId:string;itemId:string;executionId:string;target?:string;waitingForTarget?:boolean;step:number;code?:string;done?:boolean;resolvedBy?:string;requests:Record<string,KanbanItemOperationRequest>}
+interface State {id:string;boardId:string;itemId:string;executionId:string;target?:string;waitingForTarget?:boolean;step:number;code?:string;cleanupPrecondition?:boolean;done?:boolean;resolvedBy?:string;requests:Record<string,KanbanItemOperationRequest>}
 interface Options {service:KanbanService;journal:KanbanAutomationJournal;active():boolean;
     target?(board:KanbanBoard,item:KanbanItem):string|undefined;automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;cleanup?(board:string,item:string,id:string):Promise<boolean>;
     view(board:string,item:string):Promise<KanbanItemOperations>;run(board:string,request:KanbanItemOperationRequest):Promise<KanbanItemOperations>;
@@ -45,12 +45,14 @@ async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workfl
     if(!await claimDeliveryTarget(options,state)){if(!state.waitingForTarget)await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:true}));return;}
     if(state.waitingForTarget)state=await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:false}));
     try {
-        if(state.code){state=await resumeConfirmedOperation(options,state);if(state.code)return;}
+        if(state.code&&!(steps[state.step]==='cleanup'&&state.cleanupPrecondition)){state=await resumeConfirmedOperation(options,state);if(state.code)return;}
         await advance(options,state);
         if((await options.journal.get<State>(key(board.id,item.id)))?.done)await releaseDeliveryTarget(options,state);
     }catch(error){
         if(!options.active())return;
-        state=await options.journal.update<State>(key(board.id,item.id),old=>({...old!,code:safeCode(error,'AUTOMATIC_DELIVERY_FAILED')}));
+        const code=safeCode(error,'AUTOMATIC_DELIVERY_FAILED'),cleanupPrecondition=steps[state.step]==='cleanup'&&(error as {cleanupPrecondition?:boolean})?.cleanupPrecondition===true;
+        if(state.code===code&&state.cleanupPrecondition===cleanupPrecondition)return;
+        state=await options.journal.update<State>(key(board.id,item.id),old=>({...old!,code,cleanupPrecondition}));
         await options.report?.(state);
     }
 }
@@ -64,7 +66,7 @@ async function advance(options:Options,state:State) {
     const storageKey=key(state.boardId,state.itemId),action=steps[state.step];if(!options.active())return;
     if(action==='cleanup') {
         if(!options.cleanup||!await options.cleanup(state.boardId,state.itemId,state.id))return;
-        const done=await options.journal.update<State>(storageKey,old=>({...old!,done:true,step:steps.length}));await options.report?.(done);return;
+        const done=await options.journal.update<State>(storageKey,old=>({...old!,done:true,code:undefined,cleanupPrecondition:undefined,step:steps.length}));await options.report?.(done);return;
     }
     const view=await options.view(state.boardId,state.itemId);if(!options.active())return;
     const id=state.id+'-'+action,entry=view.operations.find(row=>row.id===action);

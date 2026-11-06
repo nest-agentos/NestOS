@@ -803,3 +803,5 @@ HTTP 将物理 `<nestos>/etc/kanban` 挂到每个用户运行时的 `/etc/kanban
 缓存隔离保留 HOME/XDG_CONFIG_HOME 的既有身份配置，使用工具专用缓存目录、TMPDIR 与 XDG_CACHE_HOME；确需隔离 HOME 时先读取既有 Git 身份并以单次提交参数传入，不臆造作者、不改全局配置。提交来源查询只使用已声明的 kanban.context.resolve；作者身份来自项目已有 Git 配置，不转化成用户产品澄清。
 
 允许提交的开发派发在隔离会话启动前由宿主以 user.useConfigOnly=true 读取项目已有 Git 身份，并随 policy.gitIdentity 与原始工作区记录冻结；续办沿用原身份。代理仅在单次提交参数中使用，不修改共享或全局配置。宿主缺少配置时在 git.identity 阶段报告 GIT_COMMIT_IDENTITY_REQUIRED，不从提交历史猜作者，也不把基础配置缺失伪装成产品澄清。姓名邮箱不进入诊断日志。
+
+构建与合入后提示词依据项目工作区配置枚举全部包，释放本次操作或有记录的前序操作创建的可复现缓存与本地链接；不删除工作树、分支、用户文件或已发布制品。宿主删除前置检查失败通过 cleanupPrecondition 标记允许后续只读重检，条件不变不重复通知或记日志；实际删除效果未知时不重放。所有资源确认清理后才解除依赖。
