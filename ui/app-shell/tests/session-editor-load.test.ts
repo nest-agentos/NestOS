@@ -146,6 +146,12 @@ it('measures A → B → A with retained session state and fresh editor preferen
             await editor.init(container);
             const readySidecar = { ...backend.sidecarStats };
             const readyFiles = fileCounts();
+            const elapsed = (metrics as {durationMs: number}).durationMs;
+            expect(elapsed, 'Editor initialization phase exceeded 5 seconds').toBeLessThan(5000);
+            expect(readySidecar.getRecordField, 'Record reads grew beyond the fixed 100-round fixture budget').toBeLessThanOrEqual(index === 2 ? 70 : 210);
+            expect(readySidecar.getRecordFields).toBeLessThanOrEqual(index === 2 ? 80 : 120);
+            expect(readyFiles.stat).toBeLessThanOrEqual(index === 2 ? 120 : 360);
+
             await f.kernel.waitIdle();
             samples.push({ label: ['A first', 'B first', 'A return'][index], metrics, readySidecar, readyFiles,
                 idleSidecar: { ...backend.sidecarStats }, idleFiles: fileCounts(),

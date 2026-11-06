@@ -20,13 +20,14 @@ export async function openLocalApplication(options: CommandOptions, initializeWo
 }
 
 /** Transport selection belongs to the CLI host; commands consume only ApplicationClient. */
-export async function openCliApplication(options: CommandOptions): Promise<{client: ApplicationClient; close(): Promise<void>}> {
+export async function openCliApplication(options: CommandOptions, observeRequest?: (input: RequestInfo | URL, init?: RequestInit) => void): Promise<{client: ApplicationClient; close(): Promise<void>}> {
     if (options.connect) {
         const [{HttpViewClient}, {openNodeHttpClient}] = await Promise.all([import('@nestos/app-transport/http'), import('@nestos/node-host/client')]);
         const endpoint = new URL(options.connect);
         if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error('--connect requires an HTTPS endpoint without embedded credentials');
         const transport = await openNodeHttpClient(options);
-        const view = new HttpViewClient(crypto.randomUUID(), new URL('/api/application', endpoint).href, transport.fetcher);
+        const fetcher: typeof fetch = observeRequest ? (input, init) => {observeRequest(input, init); return transport.fetcher(input, init);} : transport.fetcher;
+        const view = new HttpViewClient(crypto.randomUUID(), new URL('/api/application', endpoint).href, fetcher);
         try {
             const client = await view.start(); let closing: Promise<void> | undefined;
             return {client, close: () => closing ??= (async () => { try { await view.close(); } finally { transport.close(); } })()};

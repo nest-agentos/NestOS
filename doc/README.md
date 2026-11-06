@@ -48,7 +48,7 @@
 | Durable 契约 | [主协议](design/durable-harness-protocol.md)、[目标与证据映射](design/durable-harness-evidence.md)、[接口与事件审查](design/durable-kernel-interface-review.md) |
 | Session 指令队列 | [前后端 C4、编辑规则与恢复边界](design/session-instruction-queue.md) |
 | 默认模型与服务 | [用途默认、前后端 C4、迁移和执行快照](design/model-purpose-defaults.md) |
-| 性能诊断 | [启动与导航](design/startup-diagnostics.md)、[会话打开](design/llm-ui-session-performance.md)、[VFS 读取](design/vfs-read-performance-review.md) |
+| 性能诊断 | [回归与验收](design/performance-regression.md)、[启动与导航](design/startup-diagnostics.md)、[会话打开](design/llm-ui-session-performance.md)、[VFS 读取](design/vfs-read-performance-review.md) |
 | 待办与验收 | [目标与待办](todo.md)、[按日期记录的验收证据](minimal-system-acceptance.md) |
 
 其他专题保留在 [design/](design/)，分别标明实现、设计目标与验证边界。[feat/](feat/README.md) 只保留当前协议仍引用的历史背景。

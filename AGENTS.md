@@ -139,3 +139,8 @@ LLMProvider (云厂商) → LLMConnection (tier→model) → AgentDefinition (sy
 - 临时测试/预览服务器、watcher 与测试驱动必须使用 `tools/temporary-process/node/index.mjs` 的 `withTemporaryScope`，或 `node tools/temporary-process/node/cli.mjs run --scope <operation-id> -- <command> [args]`；将服务和验收驱动放在同一有界作用域。禁止用裸 `node server &`、nohup 等方式在作用域外遗留临时进程。
 - 等待作用域清理回执后才报告验收完成；清理 unknown 不视为完成。该工具要求 Linux/bwrap，无保护回退不可用。对缺少该能力的远程项目，使用有界前台检查或明确报告缺失能力。正式部署和可续办 Session 沿用原生命周期。
 - owner/guardian 异常退出由 IPC 与 PID namespace 回收；仓库 httpd 启动器和已安装工具包初始化时核对持久记录。只处理登记的临时资源，不根据端口、进程名称或单独 PID 猜测所有权。
+
+## 性能回归门槛
+
+- 打开、状态读取、订阅、RPC 批次、存储和恢复链路的修改，完成前运行相关 `pnpm test:performance [core|transport|ui]`，并复测对应真实场景。一次用户操作从点击到目标页面可操作须同时满足耗时 < 5 秒、逻辑 API 调用 < 30 次；批量中每个 RPC 单独计数，另记 HTTP 请求数。
+- 记录固定数据规模、版本、冷/热状态和后台负载；缺失调用数、仅有后台 API 就绪结果或功能测试通过，不能声明完整页面性能达标。相同口径与基线相比，时间显著退化或逻辑调用增加均须处理。不得自动更新基线或放宽门槛来通过；详见 [性能回归与验收](./doc/design/performance-regression.md)。

@@ -50,7 +50,9 @@
     "lib:build": "node scripts/local-libraries.mjs build",
     "cli:built": "node apps/cli/dist/cli.js",
     "nestos:pack": "node scripts/release-nestos.mjs prepare",
-    "nestos:publish": "node scripts/release-nestos.mjs publish"
+    "nestos:publish": "node scripts/release-nestos.mjs publish",
+    "test:performance": "node scripts/test-performance.mjs",
+    "performance:session": "node tools/temporary-process/node/cli.mjs run --timeout-ms 180000 -- pnpm --filter @nestos/cli exec tsx scripts/profile-session-switch.ts --gate"
   },
   "keywords": [],
   "author": "lizlok@gmail.com",
