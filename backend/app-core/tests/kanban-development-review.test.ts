@@ -6,14 +6,14 @@ import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {readPrompt} from '../src/run/prompt-bundle';
 import {developmentReviewAdapter} from '../src/presets/kanban-development-review';
-const mock = vi.hoisted(() => ({dirty: false, busy: false, context: true, process: {}}));
+const mock = vi.hoisted(() => ({dirty: false, busy: false, context: true, ancestry:0, process: {}}));
 vi.mock('../src/presets/kanban-development-workspace', () => ({developmentWorkspace: async (_remote, _provider, _project, work) => work(mock.process)}));
 vi.mock('../src/presets/kanban-work-resource-execution', () => ({workResourceExecution: async () => mock.busy ? ['OPERATION_ORIGINAL_SESSION_BUSY'] : []}));
 vi.mock('../src/projects/worktree-status', () => ({inspectWorktree: async () => ({exists: true, head: 'source-head', targetHead: 'target-head', targetBranch: 'main'})}));
-vi.mock('../src/projects/worktree-modules', () => ({gitWorkspace: async () => ({stdout: mock.dirty ? ' M file' : ''}), verifyWorktreeDelivery: async () => [{path: '.', fingerprint: 'delivery'}]}));
+vi.mock('../src/projects/worktree-modules', () => ({gitWorkspace: async (_process,_directory,args) => ({stdout: mock.dirty ? ' M file' : '',code:args[0]==='merge-base'&&args[2]==='source-head'?mock.ancestry:0}), verifyWorktreeDelivery: async () => [{path: '.', fingerprint: 'delivery'}]}));
 vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async () => ({value: {bindings: {original: {id: 'binding', branchId: 'main', connectionId: 'work-original', validity: mock.context ? 'valid' : 'invalid', nativeRef: {profileId: 'codex', sessionId: 'original-native'}, revision: 7, generation: 2}}}})}));
 const closes: Array<() => Promise<void>> = [];
-afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); mock.dirty = mock.busy = false; mock.context = true;});
+afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); mock.dirty = mock.busy = false; mock.context = true;mock.ancestry=0;});
 async function fixture(withExchange = false) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/');
     const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
@@ -82,4 +82,13 @@ it('reads a successful original-session build only with a matching immutable art
     const payload = {schema: 'nestos.kanban.operation-result/1', operationId: 'build-ok', status: 'succeeded', sourceVersion: snapshot.sourceVersion, targetVersion: snapshot.targetVersion, version: 'candidate', evidence: {path: 'build-receipt.json', sha256: sha256HexSync(receipt)}};
     f.channels.report('build-ok','result',{type:'result',content:'Build result',payload});
     expect(await f.api.readOperation!({id: 'build-ok', action: 'build', boardId: 'board', itemId: 'task', request, snapshot} as never)).toEqual(payload);
+});
+
+it('accepts already-integrated delivery without inventing a target commit and rejects an unrelated target',async()=>{
+ const f=await fixture(),snapshot=await f.api.snapshot(f.board,f.item),request=await f.api.prepareOperation!({id:'merge-confirm',action:'merge',board:f.board,item:f.item,snapshot});
+ const payload={schema:'nestos.kanban.operation-result/1',operationId:'merge-confirm',status:'succeeded',sourceVersion:snapshot.sourceVersion,targetVersion:snapshot.targetVersion,targetHead:'target-head'};
+ f.channels.report('merge-confirm','result',{type:'result',content:'Already integrated',payload});
+ const job={id:'merge-confirm',action:'merge',boardId:'board',itemId:'task',request,snapshot} as never;
+ expect(await f.api.readOperation!(job)).toEqual(payload);mock.ancestry=1;
+ await expect(f.api.readOperation!(job)).rejects.toMatchObject({code:'OPERATION_RESULT_MERGE_UNCONFIRMED'});
 });

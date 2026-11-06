@@ -163,9 +163,11 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
     requireValue(actual.sourceVersion === job.snapshot.sourceVersion, 'OPERATION_RESULT_SOURCE_CHANGED');
     if (job.action !== 'merge') requireValue(actual.version === job.snapshot.version, 'OPERATION_RESULT_SCOPE_MISMATCH');
     else {
-        requireValue((result as {targetHead?: string}).targetHead === actual.targetVersion && actual.targetVersion !== job.snapshot.targetVersion, 'OPERATION_RESULT_MERGE_UNCONFIRMED');
+        requireValue((result as {targetHead?: string}).targetHead === actual.targetVersion, 'OPERATION_RESULT_MERGE_UNCONFIRMED');
         await developmentWorkspace(options.remote, options.provider, current.record.projectId, async process => {
             requireValue((await gitWorkspace(process, '/workspace', ['merge-base', '--is-ancestor', job.snapshot.targetVersion, actual.targetVersion], true)).code === 0, 'OPERATION_RESULT_TARGET_REWRITTEN');
+            const sourceHead=(actual.context as {sourceHead:string}).sourceHead;
+            requireValue((await gitWorkspace(process,'/workspace',['merge-base','--is-ancestor',sourceHead,actual.targetVersion],true)).code===0,'OPERATION_RESULT_MERGE_UNCONFIRMED');
         });
     }
     return result;
