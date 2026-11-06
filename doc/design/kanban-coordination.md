@@ -885,3 +885,5 @@ CLI 使用 `kanban task preview-restart <board> <item>` 查看范围，再以 `k
 续办在准备阶段失败时可能尚无新 Session 或工作区记录。恢复只沿同事项、同 executionEpoch 的显式前驱链读取已有冻结请求，不另建会话；桥只允许跳过没有提交记录、没有执行会话且明确失败的准备轮次。工作树资源索引保存收尾任务 ID，读取时统一转换为正式 lifecycle 存储键；缺失正式证据继续阻塞并记录具体读取阶段，不能用“空闲”推断收尾完成。
 
 澄清回复与普通续办共用 originalSession 绑定：先核对原调用及执行树已结算、Session 当前无活动任务，再冻结原生 bindingId/revision/generation 与新 submission 身份。回复不得仅传 managed Agent target 而使用默认创建策略。已明确失效、无原生引用且无活动操作的创建失败记录保留为历史，不遮蔽唯一已确认的原上下文；未知或仍有活动操作的记录不能静默跳过。
+
+续办后的验收快照从当前 dispatch 读取冻结的工作区上下文与版本证据，物理 worktree 及原生 Session 身份仍沿用原关联。不得按物理 worktree ID 回读首次执行的旧证据；历史冻结记录不覆盖，当前证据与运行版本不一致仍拒绝接受。

@@ -73,7 +73,7 @@ async function resource(options: Options, item: KanbanItem, boardId: string): Pr
     const ref = primary ? {system:'nestos-worktree',id:primary.id} : refs.length === 1 ? refs[0] : undefined;
     requireValue(ref, 'OPERATION_WORKSPACE_REQUIRED');
     const [tree, record, cleanup] = await Promise.all([options.journal.get<PreparedWorktree>('worktree:' + ref.id),
-        options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + ref.id), options.journal.get('worktree-cleanup:' + ref.id)]);
+        options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + (primary ? dispatch!.id : ref.id)), options.journal.get('worktree-cleanup:' + ref.id)]);
     requireValue(tree && record && !cleanup && tree.directory === record.directory, 'OPERATION_WORKSPACE_UNAVAILABLE');
     requireValue(item.externalRefs?.some(row => row.system === 'nestos-remote-project' && row.id === record.projectId), 'WORKTREE_PROJECT_CHANGED');
     return {id: ref.id, tree, record};

@@ -121,3 +121,16 @@ it('freezes the declared service artifact requirements into the build Session co
  const manifest=JSON.parse(await readPrompt(f.fs,'/workspace/_nestos/worktrees/original/_nestos/kanban/review/service-build/manifest.json'));
  expect(manifest.context.deployment).toEqual(deployment);
 });
+
+it('accepts current continuation evidence without changing the original workspace history', async () => {
+    const f = await fixture(), tree = await f.journal.get('worktree:original');
+    const original = await f.journal.get<any>('development-workspace:original');
+    await f.journal.update('development-workspace:original', () => ({...original, context: {...original.context, delivery: {readOnly: true, evidence: {result: {version: 'old'}}}}}));
+    await f.journal.update('worktree:retry', () => tree);
+    await f.journal.update('development-workspace:retry', () => ({...original, context: {...original.context, delivery: {readOnly: true, evidence: {result: {version: 'running'}}}}}));
+    Object.assign(f.workflow.dispatches, {retry: {id: 'retry', itemId: 'task', attempt: 2}});
+    await expect(f.api.snapshot(f.board, f.item)).resolves.toMatchObject({context: {worktreeId: 'original'}});
+    expect((await f.journal.get<any>('development-workspace:original')).context.delivery.evidence.result.version).toBe('old');
+    await f.journal.update('development-workspace:retry', old => ({...old as any, context: {...original.context, delivery: {readOnly: true, evidence: {result: {version: 'different'}}}}}));
+    await expect(f.api.snapshot(f.board, f.item)).rejects.toMatchObject({code: 'VERIFICATION_RUNNING_VERSION_MISMATCH'});
+});
