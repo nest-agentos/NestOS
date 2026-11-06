@@ -41,10 +41,10 @@ it('keeps a known writer refusal retryable before claiming the persistent contro
 it('removes only the original queued continuation and reconciles a lost removal reply without resending',async()=>{
     const f=fixture();f.repository.readDocument.mockResolvedValue(undefined as never);
     f.options.repository.getManifest=vi.fn(async()=>({id:'original'}));
-    let items=[{id:'continuation',state:'pending'}],lost=true;
+    let items=[{id:'continuation',state:'pending'}],lost=true; const cancelledIds:string[]=[];
     const execute=vi.fn(async(command:string)=>{
-        if(command==='session.instructions.get')return {sessionId:'original',revision:2,items};
-        if(command==='session.instructions.edit'){items=[];if(lost){lost=false;throw Object.assign(new Error('PRIVATE'),{code:'ECONNRESET'});}return;}
+        if(command==='session.instructions.get')return {sessionId:'original',revision:2,items,cancelledIds};
+        if(command==='session.instructions.edit'){items=[];cancelledIds.push('continuation');if(lost){lost=false;throw Object.assign(new Error('PRIVATE'),{code:'ECONNRESET'});}return;}
     });
     const dispose=vi.fn();f.options.contexts.open.mockResolvedValue({commandBus:{execute},dispose});
     const input={sessionId:'original',submissionId:'continuation',requestId:'cancel-queue',action:'cancel' as const};
@@ -53,15 +53,26 @@ it('removes only the original queued continuation and reconciles a lost removal 
     expect(execute.mock.calls.filter(row=>row[0]==='session.instructions.edit')).toHaveLength(1);
     expect(f.kernel.cancel).not.toHaveBeenCalled();expect(dispose).toHaveBeenCalledTimes(2);
 });
-it('does not remove dispatching work or infer cancellation from an unobserved missing queue item',async()=>{
+it('does not cancel dispatching work or overwrite an admitted identity whose round is unknown',async()=>{
     const f=fixture();f.repository.readDocument.mockResolvedValue(undefined as never);
     f.options.repository.getManifest=vi.fn(async()=>({id:'original'}));
     let items=[{id:'continuation',state:'dispatching'}];
-    const execute=vi.fn(async()=>({sessionId:'original',revision:2,items}));
+    const execute=vi.fn(async(command:string)=>{if(command==='session.instructions.edit')throw Object.assign(new Error('Admitted'),{code:'QUEUE_EXECUTION_UNSETTLED'});return {sessionId:'original',revision:2,items};});
     f.options.contexts.open.mockResolvedValue({commandBus:{execute},dispose:vi.fn()});
     const input={sessionId:'original',submissionId:'continuation',requestId:'cancel-queue',action:'cancel' as const};
     expect(await submissionControl(f.options)(input,f.journal)).toBe('unknown');
     items=[];expect(await submissionControl(f.options)(input,f.journal)).toBe('unknown');
-    expect(execute.mock.calls.every(row=>row.length===0||row[0]==='session.instructions.get')).toBe(true);
+    expect(execute.mock.calls.filter(row=>row[0]==='session.instructions.edit')).toHaveLength(1);
     expect(f.kernel.cancel).not.toHaveBeenCalled();
+});
+
+it('requires a durable cancellation receipt before accepting cancellation of unadmitted input',async()=>{
+    const f=fixture();f.repository.readDocument.mockResolvedValue(undefined as never);
+    f.options.repository.getManifest=vi.fn(async()=>({id:'original'}));
+    const execute=vi.fn(async(command:string)=>command==='session.instructions.get'?{sessionId:'original',revision:0,items:[]}:{cancelledIds:[]});
+    f.options.contexts.open.mockResolvedValue({commandBus:{execute},dispose:vi.fn()});
+    const input={sessionId:'original',submissionId:'continuation',requestId:'cancel-empty',action:'cancel' as const};
+    await expect(submissionControl(f.options)(input,f.journal)).rejects.toMatchObject({code:'SUBMISSION_CANCEL_UNCONFIRMED'});
+    execute.mockImplementation(async(command:string)=>command==='session.instructions.get'?{sessionId:'original',revision:0,items:[]}:{cancelledIds:['continuation']});
+    expect(await submissionControl(f.options)(input,f.journal)).toBe('cancelled');expect(f.kernel.cancel).not.toHaveBeenCalled();
 });

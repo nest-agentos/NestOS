@@ -48,6 +48,7 @@ export function editInstructionQueue(queue: SessionInstructionQueue, edit: Instr
     assertRevision(queue, edit);
     const next = structuredClone(queue);
     switch (edit.action) {
+        case 'cancel': return cancelInstruction(next, edit.id);
         case 'update': return updateText(next, edit.id, edit.text);
         case 'update-input': return updateInput(next, edit.id, edit.source);
         case 'remove': editable(next, [edit.id], true); next.items = next.items.filter(item => item.id !== edit.id); break;
@@ -59,6 +60,17 @@ export function editInstructionQueue(queue: SessionInstructionQueue, edit: Instr
         default: throw queueError('QUEUE_INVALID', 'Unknown instruction queue operation');
     }
     return next;
+}
+
+function cancelInstruction(queue: SessionInstructionQueue & {accepted?: Array<{id: string}>}, id: string): SessionInstructionQueue {
+    if (typeof id !== 'string' || !/^[\w-]{1,128}$/.test(id)) throw queueError('QUEUE_INVALID', 'Invalid submission identity');
+    if (queue.cancelledIds?.includes(id)) return queue;
+    const item = queue.items.find(row => row.id === id);
+    if (item && !['pending', 'failed'].includes(item.state) || !item && queue.accepted?.some(row => row.id === id))
+        throw queueError('QUEUE_EXECUTION_UNSETTLED', 'Admitted execution requires its original round');
+    queue.cancelledIds = [...queue.cancelledIds ?? [], id];
+    queue.items = queue.items.filter(row => row.id !== id);
+    return queue;
 }
 
 function assertRevision(queue: SessionInstructionQueue, edit: InstructionQueueEdit): void {

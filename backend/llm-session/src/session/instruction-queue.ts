@@ -53,6 +53,7 @@ export class SessionInstructionQueues {
         await this.ports.assertWritable(sessionId);
         let item = prepareInstruction(snapshot, sessionId, await this.ports.branch(sessionId));
         const queue = await this.get(sessionId);
+        if (queue.cancelledIds?.includes(item.id)) throw Object.assign(queueError('SUBMISSION_CANCELLED', 'Submission was cancelled before execution'), {executionOutcome: 'not-started'});
         const digest = await instructionDigest(item), receipt = queue.accepted?.find(entry => entry.id === item.id);
         if (receipt) {
             if (receipt.digest !== digest) throw queueError('QUEUE_CONFLICT', 'Instruction identity already belongs to another request');

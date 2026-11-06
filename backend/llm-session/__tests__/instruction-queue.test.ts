@@ -272,3 +272,25 @@ it('runs a host ingress gate after authorization and branch checks, before prepa
     await expect(f.queues.enqueue('s',{...input('wrong','完成'),expectedBranch:'wrong'})).rejects.toMatchObject({code:'QUEUE_BRANCH_CHANGED'});
     expect(intercepted).toHaveBeenCalledTimes(2);
 });
+
+it('persists cancellation before admission and rejects late input after queue recovery', async () => {
+    const f = await fixture(), before = await f.queues.view('s');
+    const receipt = await f.queues.edit('s', {action: 'cancel', id: 'late', expectedRevision: before.revision});
+    expect(receipt.cancelledIds).toEqual(['late']); f.queues.dispose();
+    const restored = new SessionInstructionQueues(f.ports); cleanup.push(async () => restored.dispose());
+    await expect(restored.enqueue('s', input('late'))).rejects.toMatchObject({code: 'SUBMISSION_CANCELLED', executionOutcome: 'not-started'});
+    expect((await restored.view('s')).items).toHaveLength(0); expect(f.submit).not.toHaveBeenCalled();
+});
+
+it('cancels pending input by identity but refuses to fence dispatching or settled admitted work', async () => {
+    const f = await fixture(); await f.queues.enqueue('s', input('pending'));
+    const queue = await f.queues.view('s');
+    expect((await f.queues.edit('s', {action: 'cancel', id: 'pending', expectedRevision: queue.revision})).cancelledIds).toEqual(['pending']);
+    await expect(f.queues.enqueue('s', input('pending'))).rejects.toMatchObject({code: 'SUBMISSION_CANCELLED'});
+    await f.queues.enqueue('s', input('active')); f.setReady(true); f.queues.wake('s');
+    await vi.waitFor(() => expect(f.submit).toHaveBeenCalledOnce()); await f.queues.whenIdle();
+    const active = await f.queues.view('s');
+    await expect(f.queues.edit('s', {action: 'cancel', id: 'active', expectedRevision: active.revision})).rejects.toMatchObject({code: 'QUEUE_EXECUTION_UNSETTLED'});
+    const stored = await f.store.read('s'); stored.items = []; await f.store.write(stored);
+    await expect(f.queues.edit('s', {action: 'cancel', id: 'active', expectedRevision: (await f.queues.view('s')).revision})).rejects.toMatchObject({code: 'QUEUE_EXECUTION_UNSETTLED'});
+});

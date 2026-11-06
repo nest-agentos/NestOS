@@ -18,7 +18,8 @@ export interface StoredInstructionQueue extends SessionInstructionQueue {
 }
 
 export function instructionQueueProjection(queue: SessionInstructionQueue): SessionInstructionQueue {
-    const result = structuredClone({ sessionId: queue.sessionId, revision: queue.revision, paused: queue.paused, reason: queue.reason, items: queue.items });
+    const result = structuredClone({ sessionId: queue.sessionId, revision: queue.revision, paused: queue.paused, reason: queue.reason, items: queue.items,
+        ...(queue.cancelledIds?.length ? {cancelledIds: queue.cancelledIds} : {}) });
     for (const item of result.items) if (item.connectionBinding) delete item.connectionBinding.agent;
     return result;
 }
@@ -77,6 +78,8 @@ function validateQueue(value: StoredInstructionQueue & {schemaVersion?: number},
     }
     if (value.accepted !== undefined && (!Array.isArray(value.accepted) || value.accepted.some(receipt =>
         typeof receipt.id !== 'string' || !/^[a-f0-9]{64}$/.test(receipt.digest)))) invalid();
+    if (value.cancelledIds !== undefined && (!Array.isArray(value.cancelledIds) || new Set(value.cancelledIds).size !== value.cancelledIds.length
+        || value.cancelledIds.some(id => typeof id !== 'string' || !/^[\w-]{1,128}$/.test(id)))) invalid();
 }
 
 function validFlowBinding(item: SessionInstructionQueue['items'][number]): boolean {

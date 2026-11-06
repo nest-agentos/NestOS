@@ -21,7 +21,7 @@ function assert(value: unknown, code: string): asserts value {if (!value) throw 
 export function submissionControl(options: Options) {
     return async (input: SubmissionControlRequest, journal: ControlJournal): Promise<SubmissionControlState> => {
         const task = await originalTask(options, input);
-        if (!task) return cancelQueuedSubmission(options, input, journal);
+        if (!task) return cancelQueuedSubmission(options, input);
         if (input.action === 'cancel' && await treeSettled(options.kernel, task)) return 'cancelled';
         const key = 'submission-control:' + JSON.stringify([input.sessionId, input.submissionId, input.requestId]);
         const frozen = await journal.update<Frozen>(key, old => old ?? {phase:'prepared',taskId:task.id,expectedEpoch:task.control?.epoch ?? 0,

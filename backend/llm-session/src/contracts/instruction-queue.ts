@@ -62,10 +62,13 @@ export interface SessionInstructionQueue {
     paused: boolean;
     reason?: 'failed' | 'aborted' | 'branch-changed' | 'recovery';
     items: SessionInstruction[];
+    /** Durable fences prevent late admission of explicitly cancelled submission IDs. */
+    cancelledIds?: string[];
 }
 
 /** Every edit is conditional on the projection the caller actually saw. */
 export type InstructionQueueEdit = { expectedRevision: number } & (
+    | { action: 'cancel'; id: string }
     | { action: 'update'; id: string; text: string }
     | { action: 'update-input'; id: string; source: import('@nestos/llm-flow/contracts').FlowCallSource }
     | { action: 'remove'; id: string }
