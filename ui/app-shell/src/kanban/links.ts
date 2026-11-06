@@ -7,7 +7,7 @@ import {t} from '@nestos/common';
 export const sessionUrl = (id: string): string => workbenchUrl(id);
 export function kanbanReferenceLink(projects: Pick<ProjectService, 'get'>) {
     return async (reference: KanbanExternalReference) => {
-        if (reference.system === KANBAN_EXECUTION_SESSION) return {href: sessionUrl(reference.id), label: t('kanban.executionSession'), sessionId: reference.id};
+        if (reference.system === KANBAN_EXECUTION_SESSION) return {href: sessionUrl(reference.id), label: t('kanban.enterSession'), sessionId: reference.id};
         if (reference.system !== 'nestos-native-session') return;
         let scope: {projectId?: string; profileId?: string};
         try {scope = JSON.parse(reference.revision ?? '{}');} catch {return;}

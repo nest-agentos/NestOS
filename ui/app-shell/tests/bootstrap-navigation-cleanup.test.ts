@@ -10,6 +10,7 @@ import { fileContentFormat } from '../src/browser/file-format';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {UserEventService} from '../../../backend/app-core/src/events/service';
 
+const kanbanSession = vi.hoisted(() => ({open: undefined as ((id: string) => Promise<void>) | undefined, destroy: vi.fn(async () => {})}));
 const visibility = vi.hoisted(() => vi.fn());
 const invalidateEvents = vi.hoisted(() => vi.fn());
 const lifecycle = vi.hoisted(() => ({ start: vi.fn(async () => {}), open: vi.fn(async (_id: string) => {}),
@@ -65,6 +66,12 @@ vi.mock('../src/projects/SessionWorkbench', () => ({
         setWaitingInput = vi.fn();
     },
 }));
+
+vi.mock('../src/kanban/windows', () => ({KanbanWindowWorkbench: class {
+    constructor(options: any) {kanbanSession.open = options.openSession; options.editor.textContent = 'Retained kanban';}
+    start = vi.fn(async () => {}); destroy = kanbanSession.destroy;
+    openResource = vi.fn(async () => {}); getActiveResourceId = () => '/board/development';
+}}));
 
 import { initApp } from '../src/bootstrap';
 
@@ -464,5 +471,20 @@ it('routes window Home to the module sidebar and records a returnable list page 
         expect(location.hash).toBe('#/settings'); expect(history.state).toMatchObject({resourceId: null, mobileView: 'list'});
         history.back(); await vi.waitFor(() => expect(history.state).toMatchObject({resourceId: 'kept-file', mobileView: 'detail'}));
         await vi.waitFor(() => expect(layout.dataset.mobileView).toBe('detail'));
+    } finally {await app.destroy();}
+});
+
+it('opens a Kanban Session in a new NestOS tab and retains the source workspace', async () => {
+    navigationDOM(); kanbanSession.destroy.mockClear();
+    const chatHost = document.createElement('div'); chatHost.id = 'chat-workspace'; document.body.append(chatHost);
+    const kanban = {...workspace, workspaceName: 'kanban', slug: 'kanban', type: 'kanban' as const};
+    const chat = {...workspace, elementId: 'chat-workspace', workspaceName: 'chat', slug: 'workbench', type: 'chat' as const};
+    const app = await initTestApp({services: makeRuntime(), workspaces: [kanban, chat], ui: testUI()});
+    try {
+        expect(kanbanSession.open).toBeTypeOf('function');
+        await kanbanSession.open!('/folder:x1/@harness/codex/native');
+        expect(lifecycle.open).toHaveBeenCalledWith('/folder:x1/@harness/codex/native', {newTab: true});
+        expect(document.getElementById(workspace.elementId)?.textContent).toContain('Retained kanban');
+        expect(kanbanSession.destroy).not.toHaveBeenCalled();
     } finally {await app.destroy();}
 });

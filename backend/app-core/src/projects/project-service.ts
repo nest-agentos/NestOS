@@ -221,7 +221,15 @@ export class ProjectService {
         if (!project) throw new FSError('ENOENT', 'Project not found');
         return project;
     }
-    async forFolder(path: string | null | undefined, folders?: readonly SessionFolder[]): Promise<ProjectFolder | undefined> {
+    private readonly folderReads = new Map<string | null | undefined, Promise<ProjectFolder | undefined>>();
+    forFolder(path: string | null | undefined, folders?: readonly SessionFolder[]): Promise<ProjectFolder | undefined> {
+        if (folders) return this.lookupFolder(path, folders);
+        const current = this.folderReads.get(path); if (current) return current;
+        const work = this.lookupFolder(path); this.folderReads.set(path, work);
+        void work.finally(() => {if (this.folderReads.get(path) === work) this.folderReads.delete(path);}).catch(() => {});
+        return work;
+    }
+    private async lookupFolder(path: string | null | undefined, folders?: readonly SessionFolder[]): Promise<ProjectFolder | undefined> {
         const projects = this.navigationFromIndex
             ? this.listNavigation(folders ?? await this.repository.listFolders()) : await this.list(folders);
         return projects.filter(folder => path === folder.path || path?.startsWith(folder.path + '/'))

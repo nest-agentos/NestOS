@@ -53,7 +53,7 @@ it('shares real opened windows with the shell and navigates item, board and cata
     expect(f.active().querySelector<HTMLButtonElement>('[data-window-navigation=parent]')!.hidden).toBe(true);
     expect(f.registry.items()).toHaveLength(3);
     await f.registry.items().find(item => item.id === '/board/b/card')!.activate();
-    expect(f.active().querySelector('[data-panel] h3')?.textContent).toBe('A long item title');
+    expect(f.active().querySelector('[data-panel] h3')?.textContent).toBe('KB-1#1A long item title');
 });
 it('keeps filter, scroll and unsaved forms when switching windows and refuses to close unsaved work', async () => {
     const f = await fixture('/board/b');
@@ -99,6 +99,7 @@ it('updates shared navigation after creating a board through its toolbar', async
     const f = await fixture('/');
     f.sidebar.querySelector<HTMLButtonElement>('button[aria-label="' + t('kanban.newBoard') + '"]')!.click();
     await vi.waitFor(() => expect(f.active().querySelector('[data-form=board]')).not.toBeNull()); await idle(f.active);
+    const id = f.active().querySelector<HTMLInputElement>('[data-form=board] [name=id]')!; id.value = 'new-board'; id.dispatchEvent(new Event('input', {bubbles: true}));
     const input = f.active().querySelector<HTMLInputElement>('[name=title]')!; input.value = 'New board'; input.dispatchEvent(new Event('input', {bubbles: true}));
     f.active().querySelector<HTMLButtonElement>('[data-form=board] button:not([type])')!.click(); await idle(f.active);
     await vi.waitFor(() => expect(f.sidebar.textContent).toContain('New board'));

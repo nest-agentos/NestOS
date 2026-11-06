@@ -78,7 +78,8 @@ it('reads a successful original-session build only with a matching immutable art
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
     const request = await f.api.prepareOperation!({id: 'build-ok', action: 'build', board: f.board, item: f.item, snapshot});
     const directory = '/workspace/_nestos/worktrees/original';
-    const receipt = JSON.stringify({version: 'candidate', checks: ['project build completed']});
+    const receipt = JSON.stringify({version: 'candidate', checks: ['project build completed'], entries: Array.from({length: 1000}, (_, index) => ({path: 'dependency/' + index, sha256: 'a'.repeat(64)}))});
+    expect(new TextEncoder().encode(receipt).byteLength).toBeGreaterThan(65536);
     await f.fs.driver.createFile({parentPath: directory, name: 'build-receipt.json', content: receipt});
     const payload = {schema: 'nestos.kanban.operation-result/1', operationId: 'build-ok', status: 'succeeded', sourceVersion: snapshot.sourceVersion, targetVersion: snapshot.targetVersion, version: 'candidate', evidence: {path: 'build-receipt.json', sha256: sha256HexSync(receipt)}};
     f.channels.report('build-ok','result',{type:'result',content:'Build result',payload});

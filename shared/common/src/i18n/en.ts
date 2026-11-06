@@ -654,6 +654,7 @@ export const en: LocaleStrings = {
     "kanban.boardControl.processing": "Submitting execution control…",
     "kanban.boardControl.refreshFailed": "Status refresh failed. Refresh the board to verify.",
     'kanban.title': 'Kanban',
+    'kanban.enterSession': 'Open session',
     'kanban.executionSession': 'Execution session',
     'kanban.executionSessionHelp': 'The current execution session handles this work item. Only session status and activity are shown. Binding does not start or stop a session or complete the item.',
     'kanban.noExecutionSession': 'No execution session is bound. Other linked sessions provide context.',

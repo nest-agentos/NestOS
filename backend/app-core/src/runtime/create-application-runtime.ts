@@ -1,3 +1,4 @@
+import {kanbanSessionResource} from '../kanban/session-resource';
 import {developmentDeliveryPlan} from '../presets/kanban-delivery-plan';
 import {developmentSessionOperation} from '../presets/kanban-session-operation';
 import {nativeSessionArchive} from '../projects/session-archive';
@@ -634,7 +635,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 try {await lease.commandBus.execute('session.submit',request);} finally {await lease.dispose();}
             },
             registerInstructionGate: gate=>executionActivity.registerInstructionGate(gate),
-            executionResource:remoteConnections?nativeSessionResource(kernelCore,projects,remoteConnections):undefined,
+            executionResource:remoteConnections?kanbanSessionResource(projects,nativeSessionResource(kernelCore,projects,remoteConnections)):undefined,
             sessionChannel: remoteConnections?.sessionChannel.bind(remoteConnections),
             projects, requiresItemResource:requiresDevelopmentProject,
             validatePreparation: (reference, settings) => {

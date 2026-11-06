@@ -655,6 +655,7 @@ export const zhCN = {
     "kanban.boardControl.processing": "正在提交执行控制…",
     "kanban.boardControl.refreshFailed": "状态刷新失败，请刷新看板核对。",
     'kanban.title': '看板',
+    'kanban.enterSession': '进入会话',
     'kanban.executionSession': '执行会话',
     'kanban.executionSessionHelp': '显示当前执行会话的状态与最近活动。绑定不会自动启动或结束会话，也不会自动完成工作项。',
     'kanban.noExecutionSession': '尚未绑定执行会话；普通关联会话仅提供上下文。',

@@ -1,3 +1,4 @@
+import {verifyFileDigest} from '../run/file-digest';
 import {verifyReadOnlyDelivery} from './kanban-delivery-plan';
 import {managedServiceDeployment} from './managed-service-deployment';
 import {operationReceipt} from '../run/operation-receipt';
@@ -26,7 +27,7 @@ import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../proje
 import type {ProjectService} from '@nestos/app-contracts/services';
 import {developmentPolicy,requiresDevelopmentProject} from './kanban-development-policy';
 import {publishPromptBundle} from '../run/prompt-bundle';
-import {readPrompt, publishImmutableFile} from '../run/prompt-bundle';
+import {publishImmutableFile} from '../run/prompt-bundle';
 import {readChannelResult, channelResultInstruction} from '../run/channel-results';
 import {workResourceExecution} from './kanban-work-resource-execution';
 
@@ -180,5 +181,5 @@ async function verifyBuildEvidence(fs: IFileSystem, directory: string, value: un
     const evidence = (value as {evidence?: {path?: string; sha256?: string}})?.evidence;
     requireValue(typeof evidence?.path === 'string' && evidence.path.length <= 512 && evidence.path.split('/').every(part => /^[a-zA-Z0-9_.-]+$/.test(part) && part !== '.' && part !== '..')
         && (!evidence.path.startsWith('_nestos/kanban/')||evidence.path.startsWith('_nestos/kanban/artifacts/')) && typeof evidence.sha256 === 'string' && /^[a-f0-9]{64}$/.test(evidence.sha256), 'OPERATION_RESULT_ARTIFACT_UNVERIFIED');
-    requireValue(sha256HexSync(await readPrompt(fs, directory + '/' + evidence.path)) === evidence.sha256, 'OPERATION_RESULT_ARTIFACT_UNVERIFIED');
+    await verifyFileDigest(fs, directory + '/' + evidence.path, evidence.sha256, 8 * 1024 * 1024, (value as {operationId?: string}).operationId);
 }

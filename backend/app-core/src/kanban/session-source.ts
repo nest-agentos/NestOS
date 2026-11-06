@@ -1,16 +1,16 @@
 import type {Kernel} from '@nestos/durable-kernel';
 import type {SessionActivity} from '@nestos/durable-kernel/contracts';
 import type {ISessionRepository} from '@nestos/llm-session';
-import type {KanbanSessionPhase} from '@nestos/kanban/contracts';
+import type {KanbanBoard,KanbanSessionPhase} from '@nestos/kanban/contracts';
 import {KanbanError} from '@nestos/kanban';
 import type {KanbanSessionSource} from '@nestos/kanban/activity';
 /** Cold Session metadata only; never resumes, attaches, or exposes Task records. */
-export function createLocalKanbanSessionSource(repository: Pick<ISessionRepository,'getManifest'>, kernel: Pick<Kernel,'sessionActivity'>,resource?:(sessionId:string,branch:string)=>Promise<string|undefined>): KanbanSessionSource {
-    return {async authorizeBinding(_board,sessionId) {await sessionManifest(repository,sessionId);},async inspect(_board,sessionId) {
+export function createLocalKanbanSessionSource(repository: Pick<ISessionRepository,'getManifest'>, kernel: Pick<Kernel,'sessionActivity'>,resource?:(sessionId:string,branch:string,board?:KanbanBoard)=>Promise<string|undefined>): KanbanSessionSource {
+    return {async authorizeBinding(_board,sessionId) {await sessionManifest(repository,sessionId);},async inspect(board,sessionId) {
         const manifest=await sessionManifest(repository,sessionId), activity=await kernel.sessionActivity(sessionId);
         if(activity.sessionId!==sessionId) throw new KanbanError('SESSION_ACTIVITY_SCOPE_MISMATCH');
         const lastActivityAt=activity.lastActivityAt ?? activity.latestExit?.at;
-        const resourceId=await resource?.(sessionId,manifest.currentBranch);
+        const resourceId=await resource?.(sessionId,manifest.currentBranch,board);
         return {sessionId,...(resourceId?{resourceId}:{}),title:manifest.title,createdAt:manifest.createdAt,state:sessionPhase(activity),lastActivityAt,observedAt:Date.now(),stale:false};
     }};
 }

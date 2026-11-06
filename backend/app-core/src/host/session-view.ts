@@ -1,21 +1,24 @@
+import {randomUUID} from '@nestos/common';
+import {sessionOpenMetrics} from './session-open-metrics';
 import { FSError, type FileSystemContextOwner } from '@nestos/vfs-core';
 import { SessionCommand, type SessionSnapshot } from '@nestos/llm-session/contracts';
 import type { LocalApplicationServices, SessionEditorInitialData, SessionOpenView } from '@nestos/app-contracts/services';
 
 /** Preparation may fail without replacing the editor's current binding. */
 export async function openSessionView(services: LocalApplicationServices, sessionId: string): Promise<SessionOpenView> {
-    await services.prepareSession?.(sessionId);
-    const conversation = await services.acquireConversation?.(sessionId);
-    try { return await prepareSessionView(services, sessionId, conversation); }
+    const measure = sessionOpenMetrics(sessionId, randomUUID());
+    await measure('execution.prepare', async () => services.prepareSession?.(sessionId));
+    const conversation = await measure('conversation.acquire', async () => services.acquireConversation?.(sessionId));
+    try { return await prepareSessionView(services, sessionId, measure, conversation); }
     catch (error) { await conversation?.dispose(); throw error; }
 }
 
-async function prepareSessionView(services: LocalApplicationServices, sessionId: string, conversation?: { dispose(): Promise<void> }): Promise<SessionOpenView> {
-    const manifest = await services.sessionRepository.getManifest(sessionId);
+async function prepareSessionView(services: LocalApplicationServices, sessionId: string, measure: ReturnType<typeof sessionOpenMetrics>, conversation?: { dispose(): Promise<void> }): Promise<SessionOpenView> {
+    const manifest = await measure('manifest.read', () => services.sessionRepository.getManifest(sessionId));
     const [project, fixed] = await Promise.all([
-        services.projects?.forFolder(manifest.folder), services.directoryMounts?.fixedWorkspace(sessionId),
+        measure('project.resolve', async () => services.projects?.forFolder(manifest.folder)), measure('workspace.fixed', async () => services.directoryMounts?.fixedWorkspace(sessionId)),
     ]);
-    const owner = await services.sessionFiles.acquireFiles(sessionId);
+    const owner = await measure('files.acquire', () => services.sessionFiles.acquireFiles(sessionId));
     const owned = { context: owner.context, release: async () => { try { await owner.release(); } finally { await conversation?.dispose(); } } };
     return { manifest, project, workspaceReadOnly: fixed !== undefined, context: owner.context, ...activationLease(services, sessionId, owned) };
 }
@@ -26,7 +29,7 @@ function activationLease(services: LocalApplicationServices, sessionId: string, 
     return {
         activate: async branch => {
             if (closed) throw new FSError('EIO', 'Session view is closed');
-            const pending = activateSession(services, sessionId, branch); activations.add(pending);
+            const pending = sessionOpenMetrics(sessionId, randomUUID())('editor.activate', () => activateSession(services, sessionId, branch)); activations.add(pending);
             try {
                 const initial = await pending;
                 if (closed) throw new FSError('EIO', 'Session view is closed');
