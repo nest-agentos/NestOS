@@ -161,3 +161,5 @@ Responses 请求统一发送 `input` item 数组，包括单条纯文本消息�
 `vfsdriver-local` 的 Node SQLite 回退在 WebView 中不可运行；Tauri 通过 `createDb` 注入原生 `TauriSqlSidecarDb`。Vite 将 `better-sqlite3` 映射到显式的不可用适配器，防止开发服务器直接向浏览器发送 CommonJS 原生模块。Node 文件系统内置模块仍由生产构建外置，宿主通过 `createFs` 注入原生端口。
 
 Flow 草稿缺省 `layout` 在定义读取边界归一为 `{}`，只补展示值，不重写源文件或发布修订；新模板应声明节点位置。Flow 编辑器区分读取、接管和渲染阶段，加载失败保留可见错误码与 operationId，日志不含 Flow 正文或原始异常内容。
+
+UI 修改在开发交付前执行适用的类型、测试和 `pnpm styles:check`，新增 markup 类必须定义规则、移除无用类或明确声明行为标记。样式检查复用 Git 源文件枚举，纳入已初始化独立库与未忽略的新源码，跳过忽略的构建产物和符号链接；失效构建链接不阻断源码检查。HTTP 源码快照复用同一枚举机制，并保留制品模式排除 libraries 源码的规则。

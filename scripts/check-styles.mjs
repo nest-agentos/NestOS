@@ -12,9 +12,10 @@
 //   node scripts/check-styles.mjs --list     # print every orphan (no exit code)
 //
 // Allowlist: scripts/style-class-allowlist.txt (one class per line, '#' comments).
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, lstatSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { WORKSPACE_GROUPS } from './workspace-packages.mjs';
+import { gitSourceFiles } from './git-source-files.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', 'target', 'vendor', '__tests__', 'tests', 'test', 'demo', 'coverage']);
@@ -24,24 +25,15 @@ const ALLOWLIST = join(ROOT, 'scripts/style-class-allowlist.txt');
 // Behaviour/state hooks and icon-font classes carry no layout of their own.
 const HOOK_PATTERN = /^(?:fa-|fas$|far$|fab$|is-|has-|active$|selected$|hidden$|collapsed$|dragging$|loading$|open$|disabled$)/;
 
-function walk(dir, visit) {
-    for (const entry of readdirSync(dir)) {
-        if (SKIP_DIRS.has(entry)) continue;
-        const path = join(dir, entry);
-        if (statSync(path).isDirectory()) walk(path, visit);
-        else visit(path);
-    }
-}
-
 const cssFiles = [];
 const markupFiles = [];
-for (const group of WORKSPACE_GROUPS) {
-    const base = join(ROOT, group);
-    if (!existsSync(base)) continue;
-    walk(base, path => {
-        if (path.endsWith('.css')) cssFiles.push(path);
-        else if (MARKUP_EXT.test(path)) markupFiles.push(path);
-    });
+for (const file of gitSourceFiles(ROOT)) {
+    const parts = file.split('/');
+    if (!WORKSPACE_GROUPS.includes(parts[0]) || parts.some(part => SKIP_DIRS.has(part))) continue;
+    const path = join(ROOT, file);
+    if (lstatSync(path).isSymbolicLink()) continue;
+    if (path.endsWith('.css')) cssFiles.push(path);
+    else if (MARKUP_EXT.test(path)) markupFiles.push(path);
 }
 
 const defined = new Set();

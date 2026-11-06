@@ -7,18 +7,12 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, readlinkSync } from 'node:fs';
 import { cpSync, writeFileSync } from 'node:fs';
 import libraryState from './local-library-state.mjs';
+import {gitSourceFiles} from './git-source-files.mjs';
 
 /** Capture Git inputs, including initialized library repositories, without build output. */
 export function sourceFiles(root, prefix = '') {
-    const names = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root }).toString().split('\0').filter(Boolean);
     const snapshot = !prefix && libraryState.readSelection(root);
-    return [...new Set(names)].sort().flatMap(name => {
-        if (snapshot && (name === 'libraries' || name.startsWith('libraries/'))) return [];
-        const file = path.join(root, name), relative = path.join(prefix, name);
-        if (!existsSync(file)) return [];
-        if (lstatSync(file).isDirectory()) return existsSync(path.join(file, '.git')) ? sourceFiles(file, relative) : [];
-        return [relative];
-    });
+    return gitSourceFiles(root, prefix, name => !snapshot || name !== 'libraries' && !name.startsWith('libraries/'));
 }
 /** Carry the selected artifacts into the release capture, with no live library sources. */
 export function copyLibrarySnapshot(root, destination, snapshot = libraryState.readSelection(root)) {
