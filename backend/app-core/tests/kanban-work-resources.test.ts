@@ -44,7 +44,7 @@ async function fixture() {
         remote: {list: () => [mount], resolveConnection: async () => ({})}, provider: {
             projects: () => ({read: async () => ({revision: 1, mounts: []}), close: async () => {}}),
             capabilities: async () => ({serverId: 'server', processEpoch: 'epoch'}), projectProcess: async () => process}} as never;
-    return {root, physical, fs, tree, process, git, item, service, workLog, commands, api: developmentWorkResources(options)};
+    return {root, physical, fs, tree, process, git, item, service, workLog, journal, commands, api: developmentWorkResources(options)};
 }
 it('checks real Git ancestry, uncommitted changes and ignored files before offering cleanup', async () => {
     const f = await fixture(); expect(worktreeBlockers(await inspectWorktree(f.process, f.tree))).toEqual([]);
@@ -170,4 +170,12 @@ it('archives workspace associations without removing directories or running Git 
     expect(rows[0].archivedAt).toBeTypeOf('number');
     expect((await stat(f.physical)).isDirectory()).toBe(true);
     expect(f.commands).toHaveLength(before);
+});
+
+it('exposes the current coordination workspace for group cleanup while retaining older planning history',async()=>{
+ const f=await fixture();(f.item as any).planning={execution:'children'};f.item.externalRefs.push({system:'nestos-worktree',id:'old-plan'});
+ await f.journal.update('analysis-history:'+JSON.stringify(['board','item']),()=>({keys:['analysis:old','analysis:current'],indexed:true}));
+ await f.journal.update('analysis:old',()=>({id:'old-plan'}));await f.journal.update('analysis:current',()=>({id:'ready'}));
+ await f.journal.update('analysis-current:'+JSON.stringify(['board','item']),()=>'analysis:current');
+ expect((await f.api.workResources('board','item',{inspect:false})).map(row=>row.id)).toEqual(['ready']);
 });

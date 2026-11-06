@@ -1,7 +1,7 @@
 import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {KanbanService, KanbanWorkResource, KanbanWorkResourceCleanup, KanbanExternalReference} from '@nestos/kanban/contracts';
-import {analysisHistory,type KanbanWorkLog} from '@nestos/kanban/integration';
+import {analysisHistory,currentAnalysis,type KanbanWorkLog} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {developmentWorkspace} from './kanban-development-workspace';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
@@ -64,7 +64,8 @@ async function references(options: Options, boardId: string, itemId:string,inclu
         refs.push(...page.items.flatMap(row => row.externalRefs ?? [])); cursor = page.nextCursor;
         requireValue(refs.length <= 10000, 'WORK_RESOURCE_LIMIT');
     } while (cursor);
-    const planning=new Set(includePlanning?[]:(await analysisHistory(options.journal,boardId,itemId)).map(job=>job.id));
+    const current=!includePlanning&&item.planning?.execution==='children'?await currentAnalysis(options.journal,boardId,itemId):undefined;
+    const planning=new Set(includePlanning?[]:(await analysisHistory(options.journal,boardId,itemId)).filter(job=>job.id!==current?.id).map(job=>job.id));
     return [...new Map(refs.filter(ref=>ref.system==='nestos-worktree'&&!planning.has(ref.id)).map(ref => [ref.id, ref])).values()];
 }
 async function scope(options: Options, boardId: string, itemId: string, id: string, known?: KanbanExternalReference[]): Promise<ResourceScope> {
