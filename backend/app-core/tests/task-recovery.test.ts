@@ -67,3 +67,18 @@ it('retains the canonical Session and workspace when the newest recovery failed 
  const retry=await f.recovery.recoverTask('b',{operationId:'after-preparation',itemId:'verify',expectedRevision:after.revision,action:'retry-current',confirmed:true});
  expect((await f.service.workflow('b')).dispatches[retry.dispatchId!]).toMatchObject({attempt:3,continuation:{previousDispatchId:dispatch.id}});
 });
+
+it('rechecks a formally rejected acceptance in the retained Session without changing its rejected history', async () => {
+ const f=await fixture(), state=await f.recovery.taskRecovery('b','verify');
+ await f.recovery.recoverTask('b',{operationId:'first',itemId:'verify',expectedRevision:state.revision,action:'retry-current',confirmed:true});
+ const first=Object.values((await f.service.workflow('b')).dispatches).find(row=>row.continuation)!;
+ await f.run({type:'observe-execution',dispatchId:first.id,fence:first.fence,outcome:'succeeded',outputs:[],executionSessionId:'canonical-session'});
+ await f.run({type:'accept-execution',dispatchId:first.id,accept:false});
+ await f.journal.update('development-workspace:'+first.id,()=>({...f.original,context:{delivery:{readOnly:true,evidence:{result:{version:'current'}}}}}));
+ const rejected=await f.recovery.taskRecovery('b','verify');expect(rejected.canRetry).toBe(true);
+ await f.recovery.recoverTask('b',{operationId:'second',itemId:'verify',expectedRevision:rejected.revision,action:'retry'});
+ const attempts=Object.values((await f.service.workflow('b')).dispatches);
+ expect(attempts.find(row=>row.id===first.id)?.outcome).toBe('rejected');
+ expect(attempts.find(row=>row.attempt===3)).toMatchObject({continuation:{previousDispatchId:first.id},outcome:'prepared'});
+ expect(attempts.find(row=>row.itemId==='source')?.outcome).toBe('accepted');
+});
