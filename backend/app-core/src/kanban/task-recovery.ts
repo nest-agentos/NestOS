@@ -1,8 +1,8 @@
+import {recoveryWorkspace} from './recovery-workspace';
 import {sha256HexSync} from '@nestos/common';
 import {journalCommand} from '@nestos/kanban/integration';
 import type {KanbanTaskRecoveryRequest,KanbanTaskRecoveryResult} from '@nestos/kanban/contracts';
 import type {TaskRecoveryOptions,RecoveryIntent} from './task-recovery-ports';
-import type {DevelopmentWorkspaceRecord} from '../presets/kanban-development';
 import {taskRecoveryState} from './task-recovery-state';
 import {taskRecoveryChannels} from './task-recovery-channel';
 import {requireValue} from './validation';
@@ -28,7 +28,7 @@ async function recover(options:TaskRecoveryOptions,boardId:string,request:Kanban
     }
     requireValue(request.action==='retry'?state.canRetry:state.canSelectCurrentVersion&&request.confirmed===true,'RECOVERY_TARGET_NOT_READY');
     const workflow=await options.service.workflow(boardId),previous=Object.values(workflow.dispatches).filter(row=>row.itemId===request.itemId).sort((a,b)=>b.attempt-a.attempt)[0];requireValue(previous,'EXECUTION_NOT_FOUND');
-    const dispatchId='retry-'+sha256HexSync(request.operationId).slice(0,48),record=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+previous.id);
+    const dispatchId='retry-'+sha256HexSync(request.operationId).slice(0,48),record=(await recoveryWorkspace(options.journal,workflow,previous))?.record;
     const target=(request.action==='retry-current'||state.deliveryOperationId)?await options.describe((await options.service.item(boardId,request.itemId)).item):undefined;
     requireValue(!target||target.version===state.actualVersion,'RECOVERY_TARGET_CHANGED');
     const intent=await options.journal.update<RecoveryIntent>(key,old=>old??{boardId,request,digest,dispatchId,previousDispatchId:previous.id,targetVersion:target?.version??state.expectedVersion,

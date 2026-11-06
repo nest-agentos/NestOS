@@ -881,3 +881,5 @@ fix 由**任务组原协调会话**提出，开发和验收会话不直接创建
 重启沿用事项 ID 与编号，使用新的 executionEpoch 和递增 attempt；所有旧 dispatch、Session 关联、产物和终态保留历史。新轮次不能显示旧 Session 为当前执行、不能消费旧轮次产物；不相关事项不受影响。父组、决策运行投影随新轮次恢复观察。意图、控制回执和阶段提交均持久化在原 SeqFile journal，httpd 重启后核对同一操作而非创建另一执行。
 
 CLI 使用 `kanban task preview-restart <board> <item>` 查看范围，再以 `kanban task restart <board> <item> --submission-file request.json` 冻结并执行；丢回执后使用同一文件的 `--file` 核对和继续。界面“从头执行”位于事项菜单，确认框列出受影响事项名称与编号。
+
+续办在准备阶段失败时可能尚无新 Session 或工作区记录。恢复只沿同事项、同 executionEpoch 的显式前驱链读取已有冻结请求，不另建会话；桥只允许跳过没有提交记录、没有执行会话且明确失败的准备轮次。工作树资源索引保存收尾任务 ID，读取时统一转换为正式 lifecycle 存储键；缺失正式证据继续阻塞并记录具体读取阶段，不能用“空闲”推断收尾完成。

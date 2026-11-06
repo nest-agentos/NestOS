@@ -1,3 +1,4 @@
+import {recoveryWorkspace} from './recovery-workspace';
 import {conversationPolicy,conversationInstruction} from './conversation-policy';
 import {resolveBrowserTarget} from '@nestos/app-contracts';
 import type {KanbanTaskRecoveryRequest,KanbanTaskRecoveryResult} from '@nestos/kanban/contracts';
@@ -13,8 +14,8 @@ export function taskRecoveryChannels(options:TaskRecoveryOptions,ports:Ports) {
     return {open:async(boardId:string,request:{itemId:string;operationId:string})=>{
         const state=await ports.inspect(options,boardId,request.itemId);requireValue(state.resourceId,'CONTINUATION_SESSION_UNKNOWN');
         const target=resolveBrowserTarget(state.resourceId);requireValue(target.kind==='remote'&&target.profileId&&target.nativeSessionId,'CONTINUATION_NATIVE_SESSION_UNKNOWN');
-        const dispatch=Object.values((await options.service.workflow(boardId)).dispatches).filter(row=>row.itemId===request.itemId).sort((a,b)=>b.attempt-a.attempt)[0];requireValue(dispatch,'EXECUTION_NOT_FOUND');
-        const record=await options.journal.get<import('../presets/kanban-development').DevelopmentWorkspaceRecord>('development-workspace:'+dispatch.id);requireValue(record?.channelId,'CONTINUATION_WORKSPACE_UNAVAILABLE');
+        const workflow=await options.service.workflow(boardId);const dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===request.itemId).sort((a,b)=>b.attempt-a.attempt)[0];requireValue(dispatch,'EXECUTION_NOT_FOUND');
+        const record=(await recoveryWorkspace(options.journal,workflow,dispatch))?.record;requireValue(record?.channelId,'CONTINUATION_WORKSPACE_UNAVAILABLE');
         const scope=await options.journal.update<RecoverySession>('task-recovery-session:'+dispatch.id,old=>old??{boardId,itemId:request.itemId,dispatchId:dispatch.id,scopeId:record.channelId!,projectId:record.projectId,profileId:target.profileId!,sessionId:target.nativeSessionId!,resourceId:state.resourceId!});
         await watch(scope);
         if(!scope.ready){await enqueue(options,scope,'recovery-open-'+dispatch.id,(await conversationPolicy(options.fs)).recoveryBootstrap);await options.journal.update<RecoverySession>('task-recovery-session:'+dispatch.id,old=>({...old!,ready:true}));}

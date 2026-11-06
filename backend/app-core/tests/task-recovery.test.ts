@@ -59,3 +59,11 @@ it('automatically rechecks in the original execution only after the group repair
  expect(continued).toMatchObject({itemId:'verify',attempt:2,continuation:{previousDispatchId:'failed-dispatch'}});expect(workflow.dispatches['source-dispatch'].outcome).toBe('accepted');expect(workflow.dispatches['failed-dispatch'].outcome).toBe('failed');
  await f.recovery.scan();expect(Object.values((await f.service.workflow('b')).dispatches)).toHaveLength(4);
 });
+
+it('retains the canonical Session and workspace when the newest recovery failed before preparation completed',async()=>{
+ const f=await fixture();const state=await f.recovery.taskRecovery('b','verify');const result=await f.recovery.recoverTask('b',{operationId:'preparation',itemId:'verify',expectedRevision:state.revision,action:'retry-current',confirmed:true});
+ const dispatch=(await f.service.workflow('b')).dispatches[result.dispatchId!];await f.run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:'failed',code:'WORKTREE_EXECUTION_UNKNOWN'});
+ const after=await f.recovery.taskRecovery('b','verify');expect(after).toMatchObject({sessionId:'canonical-session',expectedVersion:'old',canSelectCurrentVersion:true});
+ const retry=await f.recovery.recoverTask('b',{operationId:'after-preparation',itemId:'verify',expectedRevision:after.revision,action:'retry-current',confirmed:true});
+ expect((await f.service.workflow('b')).dispatches[retry.dispatchId!]).toMatchObject({attempt:3,continuation:{previousDispatchId:dispatch.id}});
+});

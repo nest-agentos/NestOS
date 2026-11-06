@@ -23,8 +23,8 @@ export async function workResourceExecution(options: ResourceExecutionOptions, i
     for(const key of index.review){const job=await options.journal.get<ReviewJob>(jobKey(key));
         if((query.purpose!=='resume'||job?.id!==query.operationId)&&job?.phase!=='settled')return ['WORKTREE_IN_USE'];}
     for (const key of index.lifecycle) {
-        const job = await options.journal.get<{done?:boolean;observation?:{outcome:string};dispatch: {id: string}; request: {input: {request: {expectedSessionId: string}}}}>(key);
-        if(!job)return ['WORKTREE_EXECUTION_UNKNOWN'];
+        const job = await options.journal.get<{done?:boolean;observation?:{outcome:string};dispatch: {id: string}; request: {input: {request: {expectedSessionId: string}}}}>(lifecycleKey(key));
+        if(!job){log.warn('Lifecycle workspace evidence missing',{operation:'kanban.worktree.inspect',operationId:query.operationId??id,stage:'lifecycle.read',result:'failure',code:'WORKTREE_LIFECYCLE_RECORD_MISSING',lifecycleId:key,durationMs:0});return ['WORKTREE_EXECUTION_UNKNOWN'];}
         if (job?.done && job.observation?.outcome === 'cancelled') continue;
         if(job)callers.push(job.request.input.request.expectedSessionId);
     }
@@ -41,7 +41,8 @@ async function discoverResourceJobs(journal:ResourceExecutionOptions['journal'],
         const settings=await journal.get<ReviewSettings>(reviewKey(scope.board,scope.item));
         for(const jobId of settings?.jobs??[]){const job=await journal.get<ReviewJob>(jobKey(jobId));if((job?.snapshot.context as {worktreeId?:string})?.worktreeId===id)review.push(jobId);}
     }
-    for(const jobId of await journal.get<string[]>('development-lifecycle-index')??[]) {
+    for(const key of await journal.get<string[]>('development-lifecycle-index')??[]) {
+        const jobId=lifecycleKey(key).slice('development-lifecycle:'.length);
         const record=await journal.get<{worktreeId?:string}>('development-workspace:'+jobId);
         if(record?.worktreeId===id||jobId.startsWith(id+'-postload-'))lifecycle.push(jobId);
     }
@@ -86,3 +87,5 @@ function nativeUnknown(state: NativeState): boolean {
     const observed = state.observation;
     return state.writerLock?.status==='unknown'||!observed || observed.stale || observed.connection !== 'online' || observed.receiptUnknown === true || observed.execution === 'unknown';
 }
+
+function lifecycleKey(id:string):string {return id.startsWith('development-lifecycle:')?id:'development-lifecycle:'+id;}

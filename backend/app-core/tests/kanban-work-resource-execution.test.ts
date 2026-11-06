@@ -80,8 +80,17 @@ it('checks only indexed current-resource operations and re-reads their authorita
 });
 it('retains a continued execution’s finalizer through its explicit worktree association',async()=>{
  const f=await fixture(),options=f.options as any;
- options.journal.get.mockImplementation(async(key:string)=>key==='work-resource-jobs:ready'?{complete:true,review:[],lifecycle:['continued-hook']}:key==='continued-hook'?{dispatch:{id:'different-attempt-postload-succeeded'},request:{input:{request:{expectedSessionId:'continued-caller'}}}}:undefined);
+ options.journal.get.mockImplementation(async(key:string)=>key==='work-resource-jobs:ready'?{complete:true,review:[],lifecycle:['continued-hook']}:key==='development-lifecycle:continued-hook'?{dispatch:{id:'different-attempt-postload-succeeded'},request:{input:{request:{expectedSessionId:'continued-caller'}}}}:undefined);
  options.calls.list.mockImplementation(async({sessionId})=>sessionId==='continued-caller'?[{callerState:{settled:false},executionTree:{settled:false}}]:[f.call]);
  expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_IN_USE');
  expect(options.calls.list).toHaveBeenCalledWith({sessionId:'continued-caller'});
+});
+
+it('resolves indexed lifecycle IDs to their authoritative prefixed journal record',async()=>{
+ const f=await fixture(),options=f.options as any;
+ options.journal.get.mockImplementation(async(key:string)=>key==='work-resource-jobs:ready'?{complete:true,review:[],lifecycle:['ready-postload-failed']}:key==='development-lifecycle:ready-postload-failed'?{done:true,observation:{outcome:'succeeded'},request:{input:{request:{expectedSessionId:'hook-caller'}}}}:undefined);
+ expect(await workResourceExecution(f.options,'ready','project',{purpose:'resume'})).toEqual([]);
+ expect(options.calls.list).toHaveBeenCalledWith({sessionId:'hook-caller'});
+ options.journal.get.mockImplementation(async(key:string)=>key==='work-resource-jobs:ready'?{complete:true,review:[],lifecycle:['missing-hook']}:undefined);
+ expect(await workResourceExecution(f.options,'ready','project',{purpose:'resume'})).toEqual(['WORKTREE_EXECUTION_UNKNOWN']);
 });
