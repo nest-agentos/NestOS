@@ -27,3 +27,13 @@ it('cleans completed task groups without creating a second build or deployment',
  await automaticDelivery(f.options).scan();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(false);
  await automaticDelivery(f.options).scan();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);expect(f.run).not.toHaveBeenCalled();
 });
+
+it('waits for a user-confirmed conflict resolution and cleans only after its verified merge',async()=>{
+ const f=await fixture();for(let n=0;n<8;n++)await automaticDelivery(f.options).scan();
+ f.options.view=async()=>({revision:'r',operations:[...f.jobs.values(),{id:'merge',enabled:true,fields:[{id:'conflict'}]}]});
+ await automaticDelivery(f.options).scan();await automaticDelivery(f.options).scan();expect(f.options.cleanup).not.toHaveBeenCalled();
+ f.options.view=async()=>({revision:'r',operations:[{id:'merge',state:'running',runId:'user-merge'}]});await automaticDelivery(f.options).scan();expect(f.options.cleanup).not.toHaveBeenCalled();
+ f.options.view=async()=>({revision:'r',operations:[{id:'merge',state:'succeeded',runId:'user-merge'}]});await automaticDelivery(f.options).scan();
+ expect(f.options.cleanup).toHaveBeenCalledOnce();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);
+ expect(f.run.mock.calls.some(call=>call[1].action==='merge')).toBe(false);
+});
