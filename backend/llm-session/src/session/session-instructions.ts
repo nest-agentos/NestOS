@@ -1,3 +1,4 @@
+import {recoverInstructionRound} from './instruction-round-recovery';
 import {taskStat, type Kernel} from '@nestos/durable-kernel';
 import {attachmentMetadata} from '../contracts/chat';
 import {freezeAttachments} from './attachment-integrity';
@@ -154,6 +155,9 @@ export class SessionInstructions {
         if (round.sessionId !== id || round.id !== item.id) return 'uncertain';
         if (round.status === 'completed') return 'completed';
         if (round.status === 'failed' || round.status === 'cancelled') return 'failed';
-        return 'uncertain';
+        if((await this.registry.engine.getManifest(id)).currentBranch!==item.branch)return 'uncertain';
+        const invocation=round.executions.find(row=>row.role==='primary')?.invocation;
+        if(!item.invocation||invocation?.invocationId!==item.invocation.invocationId||item.submissionDigest&&round.submissionDigest&&item.submissionDigest!==round.submissionDigest)return 'uncertain';
+        return recoverInstructionRound(this.kernel,this.registry.engine,round,this.registry.host);
     }
 }

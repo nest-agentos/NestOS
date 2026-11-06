@@ -158,8 +158,9 @@ export class SessionInstructionQueues {
         let queue = await this.get(sessionId);
         this.report(queue);
         if (!queue.items.length) { this.tracked.delete(sessionId); return; }
-        if (queue.paused) return;
         const item = queue.items[0];
+        if (item.state === 'uncertain' && queue.reason === 'recovery') return this.reconcile(queue,item);
+        if (queue.paused) return;
         if (item.state === 'dispatching') return this.reconcile(queue, item);
         if (item.state !== 'pending' || !await this.ports.ready(sessionId)) return;
         if (await this.ports.branch(sessionId) !== item.branch) {
@@ -189,6 +190,7 @@ export class SessionInstructionQueues {
         const outcome = await this.ports.recover(queue.sessionId, item);
         if (outcome === 'running') return;
         if (outcome === 'uncertain') {
+            if(item.state==='uncertain'&&queue.reason==='recovery')return;
             item.state = 'uncertain'; item.error = 'Interrupted dispatch has no confirmed completion; inspect history before removing this instruction';
         } else queue.items = queue.items.filter(entry => entry.id !== item.id);
         queue.paused = outcome !== 'completed' && queue.items.length > 0;

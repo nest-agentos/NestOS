@@ -1,6 +1,6 @@
+import {terminalTaskRoundResult} from './task-round-result';
 import {taskStat, type TaskRecord} from '@nestos/durable-kernel';
-import type {DurableChatOutput} from '@nestos/llm-tasks';
-import {formatFlowOutput, type DagRunSpec, type JsonValue} from '@nestos/llm-flow/contracts';
+import {type DagRunSpec, type JsonValue} from '@nestos/llm-flow/contracts';
 import type {Round} from '../contracts/conversation';
 import type {SubmissionRequest} from '../contracts/submission';
 import type {PreparedIndependentTaskCall} from './independent-call-preparation';
@@ -19,7 +19,7 @@ export async function independentCallResult(request: SubmissionRequest, ready: P
     const flow = flowHistory(task);
     return {id: request.submission!.id, sessionId: task.sessionId, submission: structuredClone(request.submission),
         submissionDigest: await instructionDigest(input), historyParentIds: [],
-        input: [conversationUserMessage(input.text, input.files)], ...result(task),
+        input: [conversationUserMessage(input.text, input.files)], ...terminalTaskRoundResult(task),
         executions: [{taskId: task.id, role: 'primary', invocation: structuredClone(ready.invocation)}],
         createdAt: task.createdAt, completedAt: task.exit.completedAt, origin: 'user',
         ...(request.expectedTarget!.kind === 'agent' ? {agentId: request.expectedTarget!.id} : {}), target: structuredClone(request.expectedTarget),
@@ -28,20 +28,6 @@ export async function independentCallResult(request: SubmissionRequest, ready: P
         defaultContextMode: temporary ? 'exclude' : 'include', defaultContextScope: 'subtree'};
 }
 
-function result(task: TaskRecord): Pick<Round, 'output' | 'status' | 'error' | 'result'> {
-    const exit = task.exit!;
-    if (exit.status !== 'succeeded') return {output: [], status: exit.status === 'cancelled' ? 'cancelled' : 'failed',
-        error: exit.error?.message ?? `Task ${exit.status}`};
-    if (task.program.kind === 'flow.aggregate') return {output: [{role: 'assistant', content: formatFlowOutput(exit.output)}], status: 'completed'};
-    const output = exit.output as Partial<DurableChatOutput> | null;
-    if (!output?.message || output.message.role !== 'assistant'
-        || typeof output.message.content !== 'string' && !Array.isArray(output.message.content))
-        throw invalid('CALL_RESULT_INVALID');
-    return {output: [structuredClone(output.message)], status: 'completed', result: {
-        assistantBlocks: [{type: 'text', content: structuredClone(output.message.content)}], toolResults: [],
-        ...(output.usage ? {usage: structuredClone(output.usage)} : {}),
-        ...(output.finishReason ? {finishReason: output.finishReason} : {})}};
-}
 function flowHistory(task: TaskRecord): Round['flow'] {
     if (task.program.kind !== 'flow.aggregate') return;
     const initial = (task.input as {initialScheduler?: {spec: DagRunSpec; parameters?: Record<string, JsonValue>}}).initialScheduler;

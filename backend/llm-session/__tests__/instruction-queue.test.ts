@@ -294,3 +294,11 @@ it('cancels pending input by identity but refuses to fence dispatching or settle
     const stored = await f.store.read('s'); stored.items = []; await f.store.write(stored);
     await expect(f.queues.edit('s', {action: 'cancel', id: 'active', expectedRevision: (await f.queues.view('s')).revision})).rejects.toMatchObject({code: 'QUEUE_EXECUTION_UNSETTLED'});
 });
+
+it('reconciles recovery-paused uncertain history without resubmitting the completed instruction',async()=>{
+ const f=await fixture();await f.queues.enqueue('s',input('old'));await f.queues.enqueue('s',input('next'));
+ const queue=await f.store.read('s');queue.items[0].state='uncertain';queue.items[0].invocation={invocationId:'original'};queue.paused=true;queue.reason='recovery';await f.store.write(queue);
+ f.ports.recover=vi.fn(async()=> 'completed');f.setReady(true);await f.queues.restore('s');await f.queues.whenIdle();
+ await vi.waitFor(()=>expect(f.submit).toHaveBeenCalledOnce());expect(f.submit.mock.calls[0][1]).toMatchObject({id:'next'});
+ expect(f.ports.recover).toHaveBeenCalledOnce();expect((await f.queues.view('s')).items.map(x=>x.id)).toEqual(['next']);
+});
