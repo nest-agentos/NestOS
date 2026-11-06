@@ -7,14 +7,14 @@ import {requireValue} from '../kanban/validation';
 import type {DevelopmentPolicy} from './kanban-development-policy';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 interface Profile extends DeliveryPlan {id:string;label:string;readOnly?:boolean}
-interface Policy {schema:1;profiles:Profile[];instruction:string}
+interface Policy {requireSplitJustification?:boolean;schema:1;profiles:Profile[];instruction:string}
 const system='nestos-work-delivery';
 export function deliveryPolicy(policy:DevelopmentPolicy):Policy|undefined {
     const content=policy.prompts.files.find(file=>file.name==='delivery-policy.json')?.content;if(!content)return;
     let value:Policy;try{value=JSON.parse(content);}catch{throw Object.assign(new Error('Invalid delivery policy'),{code:'DELIVERY_POLICY_INVALID'});}
     requireValue(value?.schema===1&&Array.isArray(value.profiles)&&value.profiles.length===3&&typeof value.instruction==='string'&&value.instruction.length<=8000,'DELIVERY_POLICY_INVALID');
     const expected:Record<string,string[]>={source:['accept','analyze','merge','cleanup'],release:['build','deploy','accept','analyze','merge','cleanup'],verification:['accept','cleanup']};
-    requireValue(new Set(value.profiles.map(profile=>profile.id)).size===3&&value.profiles.every(profile=>JSON.stringify(profile.steps)===JSON.stringify(expected[profile.id])&&profile.acceptance===(profile.id==='release'?'runtime':'source')&&!!profile.readOnly===(profile.id==='verification')),'DELIVERY_POLICY_INVALID');
+    requireValue(new Set(value.profiles.map(profile=>profile.id)).size===3&&value.profiles.every(profile=>Array.isArray(profile.steps)&&profile.steps.length===expected[profile.id]?.length&&new Set(profile.steps).size===profile.steps.length&&profile.steps.every(step=>expected[profile.id].includes(step))&&profile.steps.at(-1)==='cleanup'&&profile.acceptance===(profile.id==='release'?'runtime':'source')&&!!profile.readOnly===(profile.id==='verification')),'DELIVERY_POLICY_INVALID');
     return value;
 }
 export function deliveryProfile(policy:DevelopmentPolicy,item:KanbanItem):Profile|undefined {
@@ -23,13 +23,14 @@ export function deliveryProfile(policy:DevelopmentPolicy,item:KanbanItem):Profil
     requireValue(refs.length===1&&refs[0].revision==='1'&&selected,'DELIVERY_PROFILE_UNAVAILABLE');return selected.id==='source'?{...selected,acceptanceLabel:t('kanban.operationAcceptSource'),acceptanceConfirmation:t('kanban.operationConfirmSource')}:selected;
 }
 export function validateDeliveryDecomposition(policy:DevelopmentPolicy,output:unknown):void {
-    const value=output as {subtasks?:Array<{key:string;dependsOn:string[];executionProfile?:{system:string;id:string;revision:string}}>};
+    const value=output as {subtasks?:Array<{key:string;dependsOn:string[];splitJustification?:string;executionProfile?:{system:string;id:string;revision:string}}>};
     if(!value?.subtasks||!deliveryPolicy(policy))return;
     const tasks=value.subtasks;
     requireValue(Array.isArray(tasks)&&tasks.length>=2&&tasks.every(task=>task.executionProfile?.system===system&&task.executionProfile.revision==='1'&&deliveryPolicy(policy)!.profiles.some(profile=>profile.id===task.executionProfile!.id)),'DELIVERY_PROFILE_REQUIRED');
     const releases=tasks.filter(task=>task.executionProfile!.id==='release'),verifiers=tasks.filter(task=>task.executionProfile!.id==='verification');
     requireValue(releases.length===1&&verifiers.length>0,'DELIVERY_CHAIN_INVALID');
     const ancestors=(key:string,seen=new Set<string>()):Set<string>=>{for(const dependency of tasks.find(task=>task.key===key)?.dependsOn??[]){if(seen.has(dependency))continue;seen.add(dependency);ancestors(dependency,seen);}return seen;};
+    if(deliveryPolicy(policy)?.requireSplitJustification)requireValue(tasks.every(task=>task.executionProfile!.id!=='source'||typeof task.splitJustification==='string'&&task.splitJustification.trim().length>=30&&task.splitJustification.length<=2000),'DELIVERY_SPLIT_JUSTIFICATION_REQUIRED');
     const source=ancestors(releases[0].key);
     requireValue(tasks.every(task=>task.executionProfile!.id!=='source'||source.has(task.key))&&verifiers.every(task=>task.dependsOn.includes(releases[0].key)),'DELIVERY_CHAIN_INVALID');
 }

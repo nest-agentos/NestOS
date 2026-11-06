@@ -2,7 +2,7 @@ import {expect,it} from 'vitest';
 import defaults from '../src/resources/kanban/kanban-delivery-policy.json';
 import {deliveryProfile,validateDeliveryDecomposition,verifyReadOnlyDelivery} from '../src/presets/kanban-delivery-plan';
 const policy={prompts:{files:[{name:'delivery-policy.json',content:JSON.stringify(defaults)}]}} as any;
-const task=(key:string,id:string,dependsOn:string[]=[])=>({key,dependsOn,executionProfile:{system:'nestos-work-delivery',id,revision:'1'}});
+const task=(key:string,id:string,dependsOn:string[]=[])=>({key,dependsOn,...(id==='source'?{splitJustification:'An independently owned library deliverable with its own release and acceptance boundary, beyond this feature implementation.'}:{}),executionProfile:{system:'nestos-work-delivery',id,revision:'1'}});
 it('requires one shared release after all source tasks and independent verification after it',()=>{
  const subtasks=[task('a','source'),task('b','source',['a']),task('release','release',['b']),task('verify','verification',['release'])];
  expect(()=>validateDeliveryDecomposition(policy,{subtasks})).not.toThrow();
@@ -23,4 +23,11 @@ it('requires verification to preserve source and check the actual frozen release
  expect(()=>verifyReadOnlyDelivery(record,repositories,'old')).toThrowError(expect.objectContaining({code:'VERIFICATION_RUNNING_VERSION_MISMATCH'}));
  expect(()=>verifyReadOnlyDelivery(record,[{baseCommit:'a',head:'b',dirty:false}] as any,'release-1')).toThrowError(expect.objectContaining({code:'VERIFICATION_CHANGED_SOURCE'}));
  expect(()=>verifyReadOnlyDelivery(record,[{baseCommit:'a',head:'a',dirty:true}] as any,'release-1')).toThrowError(expect.objectContaining({code:'VERIFICATION_CHANGED_SOURCE'}));
+});
+
+it('accepts the minimum implementation-plus-verification plan and rejects unexplained extra handoffs',()=>{
+ const subtasks=[task('implementation','release'),task('verify','verification',['implementation'])];
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks})).not.toThrow();
+ const extra={...task('extra','source'),splitJustification:undefined};
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:[extra,task('implementation','release',['extra']),subtasks[1]]})).toThrowError(expect.objectContaining({code:'DELIVERY_SPLIT_JUSTIFICATION_REQUIRED'}));
 });

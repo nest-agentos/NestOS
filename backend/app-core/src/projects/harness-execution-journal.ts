@@ -36,6 +36,11 @@ export class ExecutionJournal {
     constructor(readonly state: EffectSessionState, readonly context: Identity, private readonly request: HarnessExecutionRequest) {
         this.key = harnessExecutionJournalKey(context);
     }
+    /** A native context epoch is not the transport process epoch used to fence RPCs. */
+    matchesNativeReference(native:NonNullable<ContextBinding['nativeRef']>):boolean {
+        return native.sessionId===this.data.sessionId&&native.nodeConnectionId===this.request.connection.nodeConnectionId
+            &&native.profileId===this.request.connection.profileId;
+    }
     withState(state: EffectSessionState): ExecutionJournal {return new ExecutionJournal(state, this.context, this.request);}
     contextOperation(): ContextBindingOperation {
         if (!this.request.context) throw executionError('CONTEXT_INVOCATION_REQUIRED');

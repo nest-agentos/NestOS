@@ -1,7 +1,8 @@
+import {resourceJobIndex} from '../kanban/resource-operation-index';
 import {createModuleLogger} from '@nestos/common';
 const log=createModuleLogger('kanban-worktree');
 import {taskStat, type Kernel} from '@nestos/durable-kernel';
-import {jobKey, reviewKey, type ReviewJob, type ReviewSettings} from '../kanban/item-operation-types';
+import {jobKey,reviewKey,type ReviewSettings, type ReviewJob} from '../kanban/item-operation-types';
 import {readContextCatalog, type ContextInspector} from '../projects/harness-context-catalog';
 import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallView} from '@nestos/llm-session/contracts';
@@ -18,17 +19,14 @@ type NativeState = ReturnType<ProjectConversationPort['snapshot']>;
 /** Inspect original calls and native turns without activating Sessions or acquiring writers. */
 export async function workResourceExecution(options: ResourceExecutionOptions, id: string, projectId: string, query:{purpose?:'resume';operationId?:string}={}): Promise<string[]> {
     const callers = [id], reasons: string[] = [];
-    for (const scope of await options.journal.get<Array<{board: string; item: string}>>('review-operation-scopes') ?? []) {
-        const settings = await options.journal.get<ReviewSettings>(reviewKey(scope.board, scope.item));
-        for (const key of settings?.jobs ?? []) {
-            const job = await options.journal.get<ReviewJob>(jobKey(key));
-            if ((query.purpose!=='resume'||job?.id!==query.operationId)&& job?.phase !== 'settled' && (job?.snapshot.context as {worktreeId?: string})?.worktreeId === id) return ['WORKTREE_IN_USE'];
-        }
-    }
-    for (const key of await options.journal.get<string[]>('development-lifecycle-index') ?? []) {
+    const index=await resourceJobIndex(options.journal,id,()=>discoverResourceJobs(options.journal,id));
+    for(const key of index.review){const job=await options.journal.get<ReviewJob>(jobKey(key));
+        if((query.purpose!=='resume'||job?.id!==query.operationId)&&job?.phase!=='settled')return ['WORKTREE_IN_USE'];}
+    for (const key of index.lifecycle) {
         const job = await options.journal.get<{done?:boolean;observation?:{outcome:string};dispatch: {id: string}; request: {input: {request: {expectedSessionId: string}}}}>(key);
+        if(!job)return ['WORKTREE_EXECUTION_UNKNOWN'];
         if (job?.done && job.observation?.outcome === 'cancelled') continue;
-        if (job?.dispatch.id.startsWith(id + '-postload-')) callers.push(job.request.input.request.expectedSessionId);
+        if(job)callers.push(job.request.input.request.expectedSessionId);
     }
     for (const sessionId of new Set(callers)) {
         const calls = await options.calls.list({sessionId});
@@ -36,6 +34,18 @@ export async function workResourceExecution(options: ResourceExecutionOptions, i
         for (const call of calls) reasons.push(...await inspectCall(options, call, id, projectId,query.purpose==='resume',query.operationId));
     }
     return [...new Set(reasons)];
+}
+async function discoverResourceJobs(journal:ResourceExecutionOptions['journal'],id:string) {
+    const review:string[]=[],lifecycle:string[]=[];
+    for(const scope of await journal.get<Array<{board:string;item:string}>>('review-operation-scopes')??[]) {
+        const settings=await journal.get<ReviewSettings>(reviewKey(scope.board,scope.item));
+        for(const jobId of settings?.jobs??[]){const job=await journal.get<ReviewJob>(jobKey(jobId));if((job?.snapshot.context as {worktreeId?:string})?.worktreeId===id)review.push(jobId);}
+    }
+    for(const jobId of await journal.get<string[]>('development-lifecycle-index')??[]) {
+        const record=await journal.get<{worktreeId?:string}>('development-workspace:'+jobId);
+        if(record?.worktreeId===id||jobId.startsWith(id+'-postload-'))lifecycle.push(jobId);
+    }
+    return {review,lifecycle};
 }
 async function inspectCall(options: ResourceExecutionOptions, call: IndependentCallView, id: string, projectId: string,resume=false,operationId?:string): Promise<string[]> {
     if (!call.callerState?.settled || !call.executionTree?.settled) return ['WORKTREE_IN_USE'];

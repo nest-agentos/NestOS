@@ -194,3 +194,15 @@ it('logs scoped cleanup stages and safe codes without input, storage details or 
     expect(logs).toContain('journal-verification'); expect(logs).toContain('EACCES'); expect(logs).toContain('settled');
     for (const secret of [request.prompt, 'PRIVATE_STORAGE_BODY', 'native-session', 'PRIVATE_NATIVE_TURN']) expect(logs).not.toContain(secret);
 });
+
+it('settles its owned stable native context when the RPC process epoch is a different identifier',async()=>{
+ const f=await fixture();const binding=(f.records.get(CONTEXT_BINDINGS_KEY)!.value as any).bindings[f.id];
+ binding.nativeRef.epoch='stable-profile-context';expect(f.journal.data.epoch).toBe('service-epoch');
+ await expect(f.cleanup(f.journal,false,f.context)).resolves.toMatchObject({bindingId:f.id});
+ expect((await f.store.get(f.id))?.activeOperation).toBeUndefined();
+});
+it.each(['nodeConnectionId','profileId'])('rejects a foreign native %s even when its session identifier matches',async field=>{
+ const f=await fixture();(f.records.get(CONTEXT_BINDINGS_KEY)!.value as any).bindings[f.id].nativeRef[field]='foreign';
+ await expect(f.cleanup(f.journal,false,f.context)).rejects.toMatchObject({code:'CLEANUP_NATIVE_IDENTITY_MISMATCH'});
+ expect((await f.store.get(f.id))?.activeOperation).toBeDefined();
+});

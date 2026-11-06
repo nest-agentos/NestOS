@@ -14,7 +14,8 @@ async function fixture(release = true) {
         observation: {stale: false, connection: 'online', receiptUnknown: false, execution: 'idle'}};
     const view = {read: vi.fn(async () => {}), snapshot: () => snapshot, close: vi.fn(async () => {})};
     const call = {callerState: {settled: true}, executionTree: {settled: true}, receipt: {executionSessionId: 'child'}};
-    const options = {journal: {get: vi.fn(async () => undefined)}, calls: {list: vi.fn(async () => [call])},
+    const indices=new Map<string,unknown>();
+    const options = {journal: {get: vi.fn(async (key:string) => indices.get(key)),update:vi.fn(async(key:string,change:(value:unknown)=>unknown)=>{const value=change(indices.get(key));indices.set(key,value);return value;})}, calls: {list: vi.fn(async () => [call])},
         kernel: {task:vi.fn(async()=>({id:'task-1',effects:{},exit:{status:'failed'}})),inspectSession: vi.fn(async () => ({getShared: saved.state.get}))}, remote: {projectConversation: vi.fn(async () => view)}} as never;
     return {options, snapshot, view, call};
 }
@@ -68,4 +69,19 @@ it('allows cleanup only after the native session is archived and all execution e
  const f=await fixture();f.snapshot.writerLock.status='held';Object.assign(f.snapshot,{archived:true});
  expect(await workResourceExecution(f.options,'ready','project')).toEqual([]);
  f.snapshot.active=true;expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_IN_USE');
+});
+
+it('checks only indexed current-resource operations and re-reads their authoritative state',async()=>{
+ const f=await fixture(),options=f.options as any,job={phase:'submitting',snapshot:{context:{worktreeId:'ready'}}};
+ options.journal.get.mockImplementation(async(key:string)=>key==='work-resource-jobs:ready'?{complete:true,review:['active'],lifecycle:[]}:key==='review-operation:active'?job:undefined);
+ expect(await workResourceExecution(f.options,'ready','project')).toEqual(['WORKTREE_IN_USE']);expect(options.calls.list).not.toHaveBeenCalled();
+ job.phase='settled';expect(await workResourceExecution(f.options,'ready','project')).toEqual([]);
+ expect(options.journal.get.mock.calls.some(([key])=>key==='review-operation-scopes'||key==='development-lifecycle-index')).toBe(false);
+});
+it('retains a continued execution’s finalizer through its explicit worktree association',async()=>{
+ const f=await fixture(),options=f.options as any;
+ options.journal.get.mockImplementation(async(key:string)=>key==='work-resource-jobs:ready'?{complete:true,review:[],lifecycle:['continued-hook']}:key==='continued-hook'?{dispatch:{id:'different-attempt-postload-succeeded'},request:{input:{request:{expectedSessionId:'continued-caller'}}}}:undefined);
+ options.calls.list.mockImplementation(async({sessionId})=>sessionId==='continued-caller'?[{callerState:{settled:false},executionTree:{settled:false}}]:[f.call]);
+ expect(await workResourceExecution(f.options,'ready','project')).toContain('WORKTREE_IN_USE');
+ expect(options.calls.list).toHaveBeenCalledWith({sessionId:'continued-caller'});
 });

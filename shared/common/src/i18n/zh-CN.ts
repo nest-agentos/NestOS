@@ -5,6 +5,7 @@
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    "kanban.errors.DELIVERY_SPLIT_JUSTIFICATION_REQUIRED": "额外拆分缺少独立交付边界及收益说明；同项目功能请优先使用整体实现与独立验收两项。",
     "kanban.errors.DELIVERY_POLICY_INVALID": "交付配置格式无效，请检查看板全局交付配置。",
     "kanban.errors.DELIVERY_PROFILE_REQUIRED": "规划缺少交付类型，请在原规划会话补全每个子任务的交付类型。",
     "kanban.errors.DELIVERY_PROFILE_UNAVAILABLE": "任务引用的交付类型不可用，请检查冻结配置。",

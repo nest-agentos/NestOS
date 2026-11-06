@@ -50,7 +50,8 @@ async function inspectSubmission(options: Options, request: SubmissionRequest): 
     const controlCapabilities = {pause:supported ? 'boundary' as const : 'none' as const, resume:supported};
     const tree = snapshot.tasks.filter(row => row.rootTaskId === task.rootTaskId);
     if (!taskStat(task).settled || tree.some(row => !taskStat(row).settled)) return {sessionId, controlCapabilities, outcome: 'running'};
-    if (!task.exit || !['completed', 'failed', 'cancelled'].includes(round.status)) return {sessionId, controlCapabilities, outcome: 'unknown', code: 'SUBMISSION_SETTLEMENT_PENDING'};
+    if(!task.exit)return {sessionId,controlCapabilities,outcome:'unknown',code:'SUBMISSION_EXIT_MISSING'};
+    if(!['completed','failed','cancelled'].includes(round.status))return {sessionId,controlCapabilities,outcome:'running',code:'SUBMISSION_SETTLEMENT_PENDING'};
     const outcome = task.exit.status === 'succeeded' ? 'succeeded' : task.exit.status === 'cancelled' ? 'cancelled' : 'failed';
     const code = (task.exit.error as {code?: string})?.code;
     return {sessionId, controlCapabilities, outcome, ...(outcome === 'failed' ? {code: code && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'SUBMISSION_EXECUTION_FAILED'} : {})};

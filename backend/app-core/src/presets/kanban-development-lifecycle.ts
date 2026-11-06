@@ -1,3 +1,4 @@
+import {indexResourceJob} from '../kanban/resource-operation-index';
 import {lifecyclePromptFiles} from '../run/prompt-lifecycle';
 import {developmentObservation} from './kanban-development-log';
 import {t} from '@nestos/common';
@@ -111,6 +112,7 @@ async function enqueue(options: Options, state: State, boardId: string, dispatch
             const request = await state.executor.prepare(hookDispatch, hookItem);
             await options.journal.update<Job>(key, old => old ?? {id, boardId, dispatch: hookDispatch, stage, request, phase: 'prepared'});
         }
+        if(workspace)await indexResourceJob(options.journal,workspace.worktreeId??dispatch.id,'lifecycle',id);
         await options.journal.update<string[]>('development-lifecycle-index', old => old?.includes(key) ? old : [...old ?? [], key]);
 }
 

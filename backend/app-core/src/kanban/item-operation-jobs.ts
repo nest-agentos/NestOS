@@ -1,3 +1,4 @@
+import {indexResourceJob} from './resource-operation-index';
 import {coordinateOperation} from '@nestos/kanban/integration';
 import type {KanbanBoard, KanbanItem, KanbanItemOperationRequest} from '@nestos/kanban/contracts';
 import {sha256HexSync} from '@nestos/common';
@@ -31,6 +32,7 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
         submission: {id: base.id, source: {kind: 'conversation', ownerId: base.id, id: base.id}}}}};
 }
 export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
+    const resource=(job.snapshot.context as {worktreeId?:string})?.worktreeId;if(resource)await indexResourceJob(options.journal,resource,'review',job.id);
     if(job.action==='accept')return acceptReview(options,job);
     return coordinateOperation({service:options.service,journal:options.journal,key:jobKey(job.id),record:job,port:{
         start:async record=>{const board=await options.service.read(record.boardId);

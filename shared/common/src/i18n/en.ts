@@ -4,6 +4,7 @@
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    "kanban.errors.DELIVERY_SPLIT_JUSTIFICATION_REQUIRED": "Additional tasks require independent delivery boundaries and benefits. Prefer implementation plus independent verification for one project feature.",
     "kanban.errors.DELIVERY_POLICY_INVALID": "The delivery configuration is invalid. Check the global Kanban configuration.",
     "kanban.errors.DELIVERY_PROFILE_REQUIRED": "The plan must select a supplied delivery profile for every subtask.",
     "kanban.errors.DELIVERY_PROFILE_UNAVAILABLE": "The task delivery profile is unavailable in its frozen configuration.",

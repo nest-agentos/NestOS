@@ -59,7 +59,7 @@ function settlementPort(store: HarnessContextBindings, journal: ExecutionJournal
 
 function assertOwner(binding: ContextBinding | undefined, journal: ExecutionJournal): void {
     if (!binding || canonical(binding.activeOperation) !== canonical(journal.contextOperation())) throw executionError('CLEANUP_BINDING_OWNER_MISMATCH');
-    if (binding.nativeRef && (binding.nativeRef.sessionId !== journal.data.sessionId || binding.nativeRef.epoch !== journal.data.epoch))
+    if (binding.nativeRef && (!journal.matchesNativeReference(binding.nativeRef)))
         throw executionError('CLEANUP_NATIVE_IDENTITY_MISMATCH');
 }
 

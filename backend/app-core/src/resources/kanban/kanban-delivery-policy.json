@@ -1,9 +1,41 @@
 {
   "schema": 1,
   "profiles": [
-    {"id":"source","label":"源码交付","steps":["accept","analyze","merge","cleanup"],"acceptance":"source"},
-    {"id":"release","label":"整链统一发布","steps":["build","deploy","accept","analyze","merge","cleanup"],"acceptance":"runtime"},
-    {"id":"verification","label":"发布后独立验收","steps":["accept","cleanup"],"acceptance":"source","readOnly":true}
+    {
+      "id": "source",
+      "label": "源码交付",
+      "steps": [
+        "analyze",
+        "merge",
+        "accept",
+        "cleanup"
+      ],
+      "acceptance": "source"
+    },
+    {
+      "id": "release",
+      "label": "整链统一发布",
+      "steps": [
+        "build",
+        "deploy",
+        "analyze",
+        "merge",
+        "accept",
+        "cleanup"
+      ],
+      "acceptance": "runtime"
+    },
+    {
+      "id": "verification",
+      "label": "发布后独立验收",
+      "steps": [
+        "accept",
+        "cleanup"
+      ],
+      "acceptance": "source",
+      "readOnly": true
+    }
   ],
-  "instruction": "For an automatic development decomposition, select executionProfile {system:'nestos-work-delivery',id:<profile id>,revision:'1'} for EVERY subtask. Use source for development and integration: run relevant local checks, commit and integrate source without rebuilding or replacing the service. Create exactly ONE release subtask after ALL source tasks; it owns the single full build and service replacement. Add at least ONE verification subtask depending on release: independently verify the actual deployed version using its frozen deliveryEvidence; do not modify source, rebuild or deploy again. A verification failure blocks completion; repairs need a new explicit task. The parent only aggregates completion. Do not create a release per component. All source tasks must be ancestors of release and every verification must be a descendant of release. Keep task responsibilities small; platform delivery operations already perform build/deploy, so release task checks readiness and does not itself repeat these operations."
+  "instruction": "Use the fewest independently owned deliverables. For one feature in one project, the default is TWO subtasks: one implementation/integration task with executionProfile {system:'nestos-work-delivery',id:'release',revision:'1'}, then one independent read-only verification task with id:'verification' and the same system/revision, directly depending on implementation. The implementation harness owns internal planning, files, modules, local checks and commits in ONE worktree and canonical Session; those internal steps are not separate Kanban items. Build, deploy, integration analysis, merge and cleanup are host lifecycle operations, never readiness-only or release-only tasks. Split additional source-profile tasks ONLY for a genuinely independent deliverable, cross-project ownership, separate acceptance/approval, or substantial safe parallelism; explain the boundary and why its benefit exceeds extra sessions, handoffs and integration. Complexity, duration, file count, package count and a checklist alone do NOT justify more Kanban tasks. Select an executionProfile on every subtask. Exactly one real implementation/integration task uses release; it depends on all extra source deliverables and owns the single full build and service replacement after development. Every verification task directly depends on release, consumes its frozen deliveryEvidence and checks the actual version without modifying source, rebuilding or deploying. Verification failure blocks completion and requires an explicit repair task. The parent only aggregates; no empty coordination, documentation-only or readiness placeholders unless independently required by the user. Every extra source-profile task MUST carry splitJustification (30-2000 characters) naming its independent delivery/approval/ownership boundary and concrete benefit over extra orchestration. Without this justification the host rejects the plan; a long implementation checklist is not a justification.",
+  "requireSplitJustification": true
 }
