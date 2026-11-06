@@ -37,7 +37,7 @@ export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
         const workspace=await journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+id);
         requireValue(workspace,'SESSION_CHANNEL_WORKSPACE_REQUIRED');
         await watch(id,workspace.projectId);
-        const result=await readPlanningChannel(options.remote,workspace.projectId,id,journal,output=>validateDeliveryDecomposition(workspace.policy,output));
+        const result=await readPlanningChannel(options.remote,workspace.projectId,id,journal,output=>validateDeliveryDecomposition(workspace.policy,output,workspace.context));
         if(result&&['succeeded','failed','cancelled'].includes(result.state))await watches.close(id);
         return result;
     }};

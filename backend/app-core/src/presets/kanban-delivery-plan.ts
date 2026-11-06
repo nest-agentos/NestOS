@@ -7,7 +7,7 @@ import {requireValue} from '../kanban/validation';
 import type {DevelopmentPolicy} from './kanban-development-policy';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 interface Profile extends DeliveryPlan {id:string;label:string;readOnly?:boolean}
-interface Policy {requireSplitJustification?:boolean;schema:1;profiles:Profile[];instruction:string}
+interface Policy {verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source';preferenceInstruction?:string;requireSplitJustification?:boolean;schema:1;profiles:Profile[];instruction:string}
 const system='nestos-work-delivery';
 export function deliveryPolicy(policy:DevelopmentPolicy):Policy|undefined {
     const content=policy.prompts.files.find(file=>file.name==='delivery-policy.json')?.content;if(!content)return;
@@ -22,17 +22,30 @@ export function deliveryProfile(policy:DevelopmentPolicy,item:KanbanItem):Profil
     const selected=deliveryPolicy(policy)?.profiles.find(profile=>profile.id===refs[0].id);
     requireValue(refs.length===1&&refs[0].revision==='1'&&selected,'DELIVERY_PROFILE_UNAVAILABLE');return selected.id==='source'?{...selected,acceptanceLabel:t('kanban.operationAcceptSource'),acceptanceConfirmation:t('kanban.operationConfirmSource')}:selected;
 }
-export function validateDeliveryDecomposition(policy:DevelopmentPolicy,output:unknown):void {
-    const value=output as {subtasks?:Array<{key:string;dependsOn:string[];splitJustification?:string;executionProfile?:{system:string;id:string;revision:string}}>};
-    if(!value?.subtasks||!deliveryPolicy(policy))return;
-    const tasks=value.subtasks;
-    requireValue(Array.isArray(tasks)&&tasks.length>=2&&tasks.every(task=>task.executionProfile?.system===system&&task.executionProfile.revision==='1'&&deliveryPolicy(policy)!.profiles.some(profile=>profile.id===task.executionProfile!.id)),'DELIVERY_PROFILE_REQUIRED');
-    const releases=tasks.filter(task=>task.executionProfile!.id==='release'),verifiers=tasks.filter(task=>task.executionProfile!.id==='verification');
-    requireValue(releases.length===1&&verifiers.length>0,'DELIVERY_CHAIN_INVALID');
+/** Frozen decision choices override the default release-and-independent-verifier shape. */
+export function decisionDeliveryPolicy(policy:DevelopmentPolicy,context:unknown):Policy|undefined {
+    const base=deliveryPolicy(policy);if(!base)return;
+    const snapshot=(context as {decision?:{snapshot?:{verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'}}})?.decision?.snapshot;
+    const verificationLevel=snapshot?.verificationLevel??'full',deliveryMode=snapshot?.deliveryMode??'release';
+    requireValue(['full','quick','none'].includes(verificationLevel)&&['release','source'].includes(deliveryMode),'DELIVERY_PREFERENCES_INVALID');
+    return {...base,verificationLevel,deliveryMode,instruction:base.instruction+'\n'+(base.preferenceInstruction??'')};
+}
+export function validateDeliveryDecomposition(policy:DevelopmentPolicy,output:unknown,context?:unknown):void {
+    const value=output as {ready?:boolean;subtasks?:Array<{key:string;dependsOn:string[];splitJustification?:string;executionProfile?:{system:string;id:string;revision:string}}>};
+    const selected=decisionDeliveryPolicy(policy,context);
+    const snapshot=(context as {decision?:{snapshot?:{verificationLevel?:string;deliveryMode?:string}}})?.decision?.snapshot;
+    if(value?.ready&&(snapshot?.verificationLevel||snapshot?.deliveryMode))requireValue(!!value.subtasks?.length,'DELIVERY_PROFILE_REQUIRED');
+    if(!value?.subtasks||!selected)return;
+    const tasks=value.subtasks,mode=selected.deliveryMode!,full=selected.verificationLevel==='full';
+    requireValue(Array.isArray(tasks)&&tasks.length>0&&tasks.every(task=>task.executionProfile?.system===system&&task.executionProfile.revision==='1'&&selected.profiles.some(profile=>profile.id===task.executionProfile!.id)),'DELIVERY_PROFILE_REQUIRED');
+    const integrations=tasks.filter(task=>task.executionProfile!.id===mode),verifiers=tasks.filter(task=>task.executionProfile!.id==='verification');
+    requireValue((mode==='release'?integrations.length===1:integrations.length>0&&!tasks.some(task=>task.executionProfile!.id==='release'))&&(full?verifiers.length===1:verifiers.length===0),'DELIVERY_CHAIN_INVALID');
     const ancestors=(key:string,seen=new Set<string>()):Set<string>=>{for(const dependency of tasks.find(task=>task.key===key)?.dependsOn??[]){if(seen.has(dependency))continue;seen.add(dependency);ancestors(dependency,seen);}return seen;};
-    if(deliveryPolicy(policy)?.requireSplitJustification)requireValue(tasks.every(task=>task.executionProfile!.id!=='source'||typeof task.splitJustification==='string'&&task.splitJustification.trim().length>=30&&task.splitJustification.length<=2000),'DELIVERY_SPLIT_JUSTIFICATION_REQUIRED');
-    const source=ancestors(releases[0].key);
-    requireValue(tasks.every(task=>task.executionProfile!.id!=='source'||source.has(task.key))&&verifiers.every(task=>task.dependsOn.includes(releases[0].key)),'DELIVERY_CHAIN_INVALID');
+    const terminal=integrations.filter(task=>integrations.every(other=>other.key===task.key||ancestors(task.key).has(other.key)));
+    requireValue(terminal.length===1,'DELIVERY_CHAIN_INVALID');
+    if(selected.requireSplitJustification)requireValue(tasks.every(task=>task.executionProfile!.id!=='source'||task===terminal[0]&&mode==='source'||typeof task.splitJustification==='string'&&task.splitJustification.trim().length>=30&&task.splitJustification.length<=2000),'DELIVERY_SPLIT_JUSTIFICATION_REQUIRED');
+    const source=ancestors(terminal[0].key);
+    requireValue(tasks.every(task=>task.executionProfile!.id!=='source'||task===terminal[0]||source.has(task.key))&&verifiers.every(task=>task.dependsOn.includes(terminal[0].key)),'DELIVERY_CHAIN_INVALID');
 }
 export function developmentDeliveryPlan(journal:KanbanAutomationJournal,service:{workflow(board:string):Promise<import('@nestos/kanban/contracts').KanbanWorkflowState>}) {
     return async(board:KanbanBoard,item:KanbanItem):Promise<DeliveryPlan>=>{
@@ -47,7 +60,7 @@ export async function deliveryEvidence(journal:KanbanAutomationJournal,context:u
     const value=context as {board?:{id:string};task?:{dependencies:string[]}},evidence=[];
     for(const item of value.task?.dependencies??[]){
         const settings=await journal.get<ReviewSettings>(reviewKey(value.board!.id,item));
-        for(const id of settings?.jobs??[]){const job=await journal.get<ReviewJob>(jobKey(id));if(job?.action==='deploy'&&job.state==='succeeded'&&job.phase==='settled')evidence.push({itemId:item,operationId:job.id,result:job.result});}
+        for(const id of settings?.jobs??[]){const job=await journal.get<ReviewJob>(jobKey(id));if(job?.action===((context as {decision?:{snapshot?:{deliveryMode?:string}}})?.decision?.snapshot?.deliveryMode==='source'?'merge':'deploy')&&job.state==='succeeded'&&job.phase==='settled')evidence.push({itemId:item,operationId:job.id,action:job.action,result:job.result});}
     }
     requireValue(evidence.length===1,'VERIFICATION_DEPLOYMENT_REQUIRED');return evidence[0];
 }
@@ -57,6 +70,7 @@ export function verifyReadOnlyDelivery(record:DevelopmentWorkspaceRecord,reposit
     const delivery=(record.context as {delivery?:{readOnly?:boolean;evidence?:{result?:{version?:string}}}})?.delivery;
     if(!delivery?.readOnly)return;
     requireValue(repositories.every(repository=>repository.head===repository.baseCommit&&!repository.dirty),'VERIFICATION_CHANGED_SOURCE');
+    if((delivery?.evidence as {action?:string})?.action==='merge')return;
     const expected=delivery.evidence?.result?.version;
     requireValue(typeof expected==='string'&&runningVersion===expected,'VERIFICATION_RUNNING_VERSION_MISMATCH');
 }

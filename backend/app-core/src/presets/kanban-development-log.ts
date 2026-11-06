@@ -30,3 +30,9 @@ export function developmentObservation(operationId: string, stage: string, outco
     if (['unknown', 'failed', 'cancelled'].includes(outcome)) log.warn('Development lifecycle', event);
     else log.info('Development lifecycle', event);
 }
+
+export function developmentDeliveryChoice(operationId: string, choices: {verificationLevel?: string; deliveryMode?: string} | undefined): void {
+    if (!choices) return;
+    log.info('Delivery preferences frozen', {operation: 'kanban.development', operationId, stage: 'delivery.preferences', result: 'success',
+        verificationLevel: choices.verificationLevel, deliveryMode: choices.deliveryMode, durationMs: 0});
+}

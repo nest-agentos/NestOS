@@ -31,3 +31,18 @@ it('accepts the minimum implementation-plus-verification plan and rejects unexpl
  const extra={...task('extra','source'),splitJustification:undefined};
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[extra,task('implementation','release',['extra']),subtasks[1]]})).toThrowError(expect.objectContaining({code:'DELIVERY_SPLIT_JUSTIFICATION_REQUIRED'}));
 });
+it.each(['quick','none'])('allows one source integration with %s verification and rejects unwanted builds or verifier sessions',level=>{
+ const context={decision:{snapshot:{verificationLevel:level,deliveryMode:'source'}}};
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation','source')]},context)).not.toThrow();
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation','release')]},context)).toThrowError(expect.objectContaining({code:'DELIVERY_CHAIN_INVALID'}));
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation','source'),task('verify','verification',['implementation'])]},context)).toThrowError(expect.objectContaining({code:'DELIVERY_CHAIN_INVALID'}));
+});
+it('preserves independent verification for full source delivery without requiring a runtime version',()=>{
+ const context={decision:{snapshot:{verificationLevel:'full',deliveryMode:'source'}}};
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation','source'),task('verify','verification',['implementation'])]},context)).not.toThrow();
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation','source')]},context)).toThrow();
+ expect(()=>verifyReadOnlyDelivery({context:{delivery:{readOnly:true,evidence:{action:'merge'}}}} as any,[{head:'a',baseCommit:'a',dirty:false}] as any)).not.toThrow();
+});
+it('rejects a ready plan that bypasses explicit decision delivery profiles',()=>{
+ expect(()=>validateDeliveryDecomposition(policy,{ready:true},{decision:{snapshot:{verificationLevel:'quick',deliveryMode:'source'}}})).toThrowError(expect.objectContaining({code:'DELIVERY_PROFILE_REQUIRED'}));
+});

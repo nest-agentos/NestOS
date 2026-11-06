@@ -1,5 +1,5 @@
 import {initializeResourceIndex} from '../kanban/resource-operation-index';
-import {deliveryPolicy,deliveryProfile,deliveryEvidence} from './kanban-delivery-plan';
+import {decisionDeliveryPolicy,deliveryProfile,deliveryEvidence} from './kanban-delivery-plan';
 import {planningSections} from './kanban-planning-sections';
 import {readGitCommitIdentity, type GitCommitIdentity} from './kanban-git-identity';
 import {kanbanJournalOptions} from '../kanban/host-policy';
@@ -7,7 +7,7 @@ import {developmentPrompts as defaults} from '../resources/catalog';
 import {freezeCommitContext, type CommitContext} from './kanban-commit-context';
 import {publishImmutableFile} from '../run/prompt-bundle';
 import {lifecyclePromptFiles} from '../run/prompt-lifecycle';
-import {developmentStage} from './kanban-development-log';
+import {developmentStage,developmentDeliveryChoice} from './kanban-development-log';
 import type {AgentDefinition, IAgentManagementService} from '@nestos/kernel-adapters/contracts';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {RemoteFileSourceProvider, ProjectRemoteMountService} from '../projects/remote-mounts';
@@ -63,9 +63,11 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
     try {
         const policy = await developmentStage(input.dispatch.id, 'policy.freeze', () => developmentPolicy(journal,options.fs,view.fs,input.dispatch.id,{...input.options,...(input.stage===undefined&&(input.context as {decision?:{snapshot?:{completion?:string}}})?.decision?.snapshot?.completion==='automatic'?{commit:'worktree'}:{})}));
         let context=input.context;
-        if(input.stage==='decision'&&context)context={...context as object,snapshot:{...(context as {snapshot?:object}).snapshot,delivery:deliveryPolicy(policy)}};
+        const selected=await developmentStage(input.dispatch.id,'delivery.policy',async()=>decisionDeliveryPolicy(policy,context));
+        developmentDeliveryChoice(input.dispatch.id,selected);
+        if(input.stage==='decision'&&context)context={...context as object,snapshot:{...(context as {snapshot?:object}).snapshot,delivery:selected}};
         const profile=input.stage===undefined?deliveryProfile(policy,input.item):undefined;
-        if(profile)context={...context as object,delivery:{...profile,...(profile.readOnly?{evidence:await deliveryEvidence(journal,context)}:{})}};
+        if(profile)context={...context as object,delivery:{...profile,verificationLevel:selected?.verificationLevel,deliveryMode:selected?.deliveryMode,...(profile.readOnly?{evidence:await deliveryEvidence(journal,context)}:{})}};
         const record = await developmentWorkspace(options.remote, options.provider, projectId, async process => {
             const existing = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id);
             if(!existing)await initializeResourceIndex(journal,input.dispatch.id);
