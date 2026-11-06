@@ -24,7 +24,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     archiveSession?(sessionId:string,operationId:string):Promise<void>;
     sessionChannel?: import('@nestos/app-contracts/services').ProjectRemoteMountPort['sessionChannel'];
     itemOperations?(context: {service: KanbanService; journal: KanbanAutomationJournal; workLog: KanbanWorkLog;
-        automatic?:import('./item-operation-types').ReviewOperationsOptions['automatic'];cleanup?:import('./item-operation-types').ReviewOperationsOptions['cleanup'];reportAutomatic?:import('./item-operation-types').ReviewOperationsOptions['reportAutomatic'];
+        automaticTarget?:import('./item-operation-types').ReviewOperationsOptions['automaticTarget'];automatic?:import('./item-operation-types').ReviewOperationsOptions['automatic'];cleanup?:import('./item-operation-types').ReviewOperationsOptions['cleanup'];reportAutomatic?:import('./item-operation-types').ReviewOperationsOptions['reportAutomatic'];
         log: import('./item-operation-types').ReviewOperationsOptions['log']}): ReturnType<typeof import('./item-operations').createItemOperations>;
     relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
     sessionExecutionResources?(id: string): Promise<Array<{label: string; value: string}>>;

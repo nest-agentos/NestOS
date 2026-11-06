@@ -33,6 +33,7 @@ export interface ReviewAdapter {
     readAnalysis(job: ReviewJob): Promise<unknown | undefined>;
 }
 export interface ReviewOperationsOptions {
+    automaticTarget?(board:KanbanBoard,item:KanbanItem):string|undefined;
     automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;
     cleanup?(board:string,item:string,id:string):Promise<boolean>;
     reportAutomatic?(state:{id:string;boardId:string;itemId:string;step:number;code?:string;done?:boolean}):Promise<void>;

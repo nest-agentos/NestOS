@@ -17,7 +17,7 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         const pending = (tails.get(key) ?? Promise.resolve()).catch(() => {}).then(() => {requireValue(!stopped, 'SERVICE_STOPPING'); return work();}); tails.set(key, pending);
         void pending.finally(() => {if (tails.get(key) === pending) tails.delete(key);}).catch(() => {}); return pending;
     };
-    const automatic=automaticDelivery({...options,active:()=>!stopped,report:options.reportAutomatic,view:(board,item)=>queue(board,item,async()=>view(options,await load(options,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(options,board,request))});
+    const automatic=automaticDelivery({...options,target:options.automaticTarget,active:()=>!stopped,report:options.reportAutomatic,view:(board,item)=>queue(board,item,async()=>view(options,await load(options,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(options,board,request))});
     return {deliveryReady:automatic.ready,itemOperations: (board: string, item: string) => queue(board, item, async () => view(options, await load(options, board, item, true))),
         bindItemOperation: (board: string, request: KanbanItemOperationBinding) => {validateRequest(request); return queue(board, request.itemId, () => bind(options, board, request));},
         runItemOperation: (board: string, request: KanbanItemOperationRequest) => {validateRequest(request); return queue(board, request.itemId, () => run(options, board, request));},

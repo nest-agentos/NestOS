@@ -7,7 +7,7 @@ async function fixture(){const {manager}=await createVFS({rootBackend:new Memory
  const item={id:'task',status:'review',planning:{kind:'task'}},board={id:'b',automation:{enabled:true},items:[item]},jobs=new Map<string,any>();
  const run=vi.fn(async(_board,request)=>{jobs.set(request.action,{id:request.action,runId:request.operationId,state:'succeeded',enabled:true});if(request.action==='accept')item.status='completed';return {revision:'revision',operations:[...jobs.values()]};});
  const view=vi.fn(async()=>({revision:'revision',operations:['build','deploy','accept','analyze','merge'].map(id=>jobs.get(id)??{id,enabled:true,state:'ready'})}));
- const options={service:{catalog:async()=>[{id:'b'}],read:async()=>board,workflow:async()=>({dispatches:{d:{id:'d',itemId:'task',attempt:1,outcome:'succeeded'}}})},journal,active:()=>true,automatic:async()=>true,view,run,cleanup:vi.fn(async()=>true),report:vi.fn()} as any;
+ const options={service:{catalog:async()=>[{id:'b'}],read:async()=>board,item:async(_board,id)=>({item:board.items.find(row=>row.id===id)}),workflow:async()=>({dispatches:{d:{id:'d',itemId:'task',attempt:1,outcome:'succeeded'}}})},journal,active:()=>true,automatic:async()=>true,view,run,cleanup:vi.fn(async()=>true),report:vi.fn()} as any;
  return {options,journal,run,jobs,item,board};}
 it('resumes all approved stages once and releases dependencies only after verified cleanup',async()=>{const f=await fixture();
  for(let n=0;n<12;n++){await automaticDelivery(f.options).scan();if(n<10)expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(false);}
@@ -42,4 +42,24 @@ it('adopts a verified manual rebuild after a failure without replaying the faile
  const f=await fixture();await automaticDelivery(f.options).scan();f.jobs.get('build').state='failed';await automaticDelivery(f.options).scan();
  f.jobs.set('build',{id:'build',runId:'confirmed-manual-rebuild',state:'succeeded',enabled:true});await automaticDelivery(f.options).scan();
  expect(f.run.mock.calls.map(call=>call[1].action)).toEqual(['build','deploy']);
+});
+
+it('serializes finalization for the same target while leaving development independent',async()=>{
+ const f=await fixture(),second={...f.item,id:'second'};f.board.items.push(second);f.options.target=()=> 'project';
+ f.options.service.workflow=async()=>({dispatches:{a:{id:'a',itemId:'task',attempt:1,outcome:'succeeded'},b:{id:'b',itemId:'second',attempt:1,outcome:'succeeded'}}});
+ const jobs=new Map<string,any>();f.options.view=async(_b,id)=>({revision:'r',operations:['build','deploy','accept','analyze','merge'].map(action=>jobs.get(id+action)??{id:action,enabled:true,state:'ready'})});
+ f.options.run=vi.fn(async(_b,request)=>{jobs.set(request.itemId+request.action,{id:request.action,runId:request.operationId,state:'succeeded',enabled:true});if(request.action==='accept')f.board.items.find(row=>row.id===request.itemId)!.status='completed';});
+ await automaticDelivery(f.options).scan();await automaticDelivery(f.options).scan();expect(f.options.run.mock.calls.map(call=>call[1].itemId)).toEqual(['task']);
+ for(let n=0;n<10;n++)await automaticDelivery(f.options).scan();
+ expect(f.options.cleanup).toHaveBeenCalledWith('b','task',expect.any(String));expect(f.options.run.mock.calls.some(call=>call[1].itemId==='second')).toBe(true);
+});
+
+it('retains target ownership until cancelled work has no unsettled admitted operation',async()=>{
+ const f=await fixture();f.options.target=()=> 'project';await automaticDelivery(f.options).scan();
+ f.item.status='cancelled';f.board.items.push({...f.item,id:'second',status:'review'});
+ f.options.service.workflow=async()=>({dispatches:{second:{id:'second',itemId:'second',attempt:1,outcome:'succeeded'}}});
+ await f.journal.update('review-operations:'+JSON.stringify(['b','task']),()=>({jobs:['held']}));await f.journal.update('review-operation:held',()=>({phase:'submitting'}));
+ await automaticDelivery(f.options).scan();expect(f.run).toHaveBeenCalledOnce();
+ await f.journal.update('review-operation:held',()=>({phase:'settled'}));f.jobs.clear();await automaticDelivery(f.options).scan();
+ expect(f.run).toHaveBeenCalledTimes(2);expect(f.run.mock.calls[1][1].itemId).toBe('second');
 });

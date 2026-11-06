@@ -11,6 +11,7 @@ export const zhCN = {
     'kanban.errors.OPERATION_RESULT_RECEIPT_CONFLICT': '执行结果文件发生变化或与 MCP 结果冲突，请检查该操作的回执。',
     'kanban.operationAction.cleanup': '清理工作树',
     'kanban.operationAction.completed': '已完成',
+    'kanban.automaticWaitingTarget': '等待同项目其他事项完成发布与清理',
     'kanban.automaticCompletion': '全流程自动完成',
     'kanban.automaticCompletionConsent': '自动验证、构建、替换目标服务、验收、无冲突合入并清理工作树；真实澄清或冲突时暂停',
     'kanban.operationRebuild': '重新构建',

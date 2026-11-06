@@ -41,7 +41,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
 function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanAutomationOptions|undefined,events:UserEventService,log:ReturnType<typeof personalOptions>['log'],setOperations:(value:ReturnType<typeof import('./item-operations').createItemOperations>|undefined)=>void):KanbanRuntimeExtension[] {
     const {service,journal,workLog,fs,serviceFor}=context;
     const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,...resources}=resourcePorts??{};
-    const operations=options?.itemOperations?.({service,journal,workLog,log,automatic:async(board,item)=>{
+    const operations=options?.itemOperations?.({service,journal,workLog,log,automaticTarget:(_board,item)=>item.externalRefs?.find(ref=>ref.system==='nestos-remote-project')?.id,automatic:async(board,item)=>{
         const context=await workContext(journal,board,item);if((context.decision?.snapshot as {completion?:string})?.completion!=='automatic')return false;
         return (await service.record(context.decision!.sourceBoardId,context.decision!.recordId)).status==='confirmed';
     },cleanup:async(board,item,id)=>{

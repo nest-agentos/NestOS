@@ -10,6 +10,7 @@ export const en: LocaleStrings = {
     'kanban.errors.OPERATION_RESULT_RECEIPT_CONFLICT': 'The operation receipt changed or conflicts with the MCP result. Check the operation evidence.',
     'kanban.operationAction.cleanup': 'Clean worktrees',
     'kanban.operationAction.completed': 'Completed',
+    'kanban.automaticWaitingTarget': 'Waiting for another item in this project to finish publishing and cleanup',
     'kanban.automaticCompletion': 'Automatic completion',
     'kanban.automaticCompletionConsent': 'Automatically verify, build, replace the declared service, accept, integrate without conflicts, and clean worktrees; pause for clarification or conflicts',
     'kanban.operationRebuild': 'Rebuild',

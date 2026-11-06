@@ -1,9 +1,10 @@
+import {claimDeliveryTarget,releaseDeliveryTarget} from './automatic-delivery-target';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanItemOperationRequest,KanbanItemOperations,KanbanService,KanbanWorkflowState} from '@nestos/kanban/contracts';
 import {safeCode,type KanbanAutomationJournal} from '@nestos/kanban/integration';
-interface State {id:string;boardId:string;itemId:string;executionId:string;step:number;code?:string;done?:boolean;resolvedBy?:string;requests:Record<string,KanbanItemOperationRequest>}
+interface State {id:string;boardId:string;itemId:string;executionId:string;target?:string;waitingForTarget?:boolean;step:number;code?:string;done?:boolean;resolvedBy?:string;requests:Record<string,KanbanItemOperationRequest>}
 interface Options {service:KanbanService;journal:KanbanAutomationJournal;active():boolean;
-    automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;cleanup?(board:string,item:string,id:string):Promise<boolean>;
+    target?(board:KanbanBoard,item:KanbanItem):string|undefined;automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;cleanup?(board:string,item:string,id:string):Promise<boolean>;
     view(board:string,item:string):Promise<KanbanItemOperations>;run(board:string,request:KanbanItemOperationRequest):Promise<KanbanItemOperations>;
     report?(state:State):Promise<void>}
 const steps=['build','deploy','accept','analyze','merge','cleanup'];
@@ -35,13 +36,18 @@ async function prepareState(options:Options,board:KanbanBoard,item:KanbanItem,wo
     const dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===item.id).sort((a,b)=>b.attempt-a.attempt)[0];
     if(!group&&(!dispatch||!['succeeded','accepted'].includes(dispatch.outcome)))return;
     const id='auto-'+sha256HexSync(JSON.stringify([board.id,item.id,dispatch?.id??item.externalRefs?.find(ref=>ref.system==='nestos-decision-run')?.id])).slice(0,48);
-    return options.journal.update<State>(key(board.id,item.id),old=>old??{id,boardId:board.id,itemId:item.id,executionId:dispatch?.id??item.id,step:group?5:0,requests:{}});
+    const target=options.target?.(board,item);
+    return options.journal.update<State>(key(board.id,item.id),old=>old?old.target||!target?old:{...old,target}:{id,target,boardId:board.id,itemId:item.id,executionId:dispatch?.id??item.id,step:group?5:0,requests:{}});
 }
 async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workflow:KanbanWorkflowState) {
-    let state=await prepareState(options,board,item,workflow);if(!state||state.done)return;
+    let state=await prepareState(options,board,item,workflow);if(!state)return;
+    if(state.done){await releaseDeliveryTarget(options,state);return;}
+    if(!await claimDeliveryTarget(options,state)){if(!state.waitingForTarget)await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:true}));return;}
+    if(state.waitingForTarget)state=await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:false}));
     try {
         if(state.code){state=await resumeConfirmedOperation(options,state);if(state.code)return;}
         await advance(options,state);
+        if((await options.journal.get<State>(key(board.id,item.id)))?.done)await releaseDeliveryTarget(options,state);
     }catch(error){
         if(!options.active())return;
         state=await options.journal.update<State>(key(board.id,item.id),old=>({...old!,code:safeCode(error,'AUTOMATIC_DELIVERY_FAILED')}));
@@ -77,5 +83,5 @@ async function advance(options:Options,state:State) {
 }
 export async function automaticDeliveryStatus(journal:KanbanAutomationJournal,board:string,item:string):Promise<NonNullable<KanbanItemOperations['automatic']>|undefined> {
     const state=await journal.get<State>(key(board,item));
-    return state?{state:state.done?'completed':state.code?'blocked':'running',stage:steps[state.step]??'completed',code:state.code}:undefined;
+    return state?{state:state.done?'completed':state.code?'blocked':'running',stage:steps[state.step]??'completed',code:state.code,...(state.waitingForTarget?{waitingForTarget:true}:{})}:undefined;
 }
