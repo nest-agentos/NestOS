@@ -55,7 +55,7 @@ async function publishContinuation(options: Options, input: Parameters<NonNullab
     await journal.update('managed-agent:work-' + dispatch.id, old => old ?? managed);
     const scope = {runId: item.externalRefs?.find(ref => ref.system === 'nestos-decision-run')?.id ?? dispatch.planId, itemId: item.id, attemptId: dispatch.id};
     if (record.commitContext) await publishImmutableFile(fs, record.communicationDirectory!, 'commit-trailers.txt', record.commitContext.trailers);
-    await publishPromptBundle(fs, record.communicationDirectory!, record.policy.prompts, {...scope, entry: 'prompts/task.md', commit: policy.commit,
+    await publishPromptBundle(fs, record.communicationDirectory!, record.policy.prompts, {...scope, entry: 'prompts/task.md', commit: policy.commit, gitIdentity: record.gitIdentity,
         repositories: record.repositories, availableRepositories: record.availableRepositories, input: record.context});
     await openDevelopmentChannel(options.remote, dispatch.id, record, scope, item,
         await currentChannelBinding(options.remote,record,input.nativeSessionId));
