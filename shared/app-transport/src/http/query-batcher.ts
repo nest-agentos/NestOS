@@ -24,9 +24,17 @@ export class QueryBatcher {
         this.scheduled = true; queueMicrotask(() => {
             this.scheduled = false;
             while (this.pending.length && this.active < 2) {
-                this.active++; void this.flush(this.pending.splice(0, 32));
+                this.active++; void this.flush(this.takeBatch());
             }
         });
+    }
+    private takeBatch(): Pending[] {
+        const target = this.pending[0].call.target, batch: Pending[] = [];
+        this.pending = this.pending.filter(item => {
+            if (item.call.target !== target || batch.length >= 32) return true;
+            batch.push(item); return false;
+        });
+        return batch;
     }
     private async flush(pending: Pending[]): Promise<void> {
         try {

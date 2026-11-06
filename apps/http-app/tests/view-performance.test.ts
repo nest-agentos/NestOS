@@ -133,6 +133,19 @@ it('batches independent queries with a bound and preserves individual errors', a
     expect(send.mock.calls.map(([calls]) => calls.length)).toEqual([32, 32, 1]);
     expect(replies[2].error?.message).toBe('missing'); expect(replies[64].value).toBe(64);
 });
+it('keeps a slow capability query from blocking a different capability in the same turn', async () => {
+    let release!: () => void;
+    const slow = new Promise<void>(resolve => {release = resolve;});
+    const send = vi.fn(async (calls: Call[]): Promise<Reply[]> => {
+        if (calls[0].target === 'overview') await slow;
+        return calls.map(() => ({value: 'ready'}));
+    });
+    const batcher = new QueryBatcher(send, () => {});
+    const pending = batcher.query({target: 'overview', method: 'read', args: []});
+    const fast = batcher.query({target: 'board', method: 'read', args: []});
+    try {expect(await fast).toMatchObject({value: 'ready'}); expect(send.mock.calls.map(([calls]) => calls.map(call => call.target))).toEqual([['overview'], ['board']]);}
+    finally {release(); await pending; batcher.close();}
+});
 it('sends ordered notifications with one snapshot refresh per event batch', async () => {
     vi.useFakeTimers(); const write = vi.fn(), refresh = vi.fn(async (): Promise<WireValue[]> => []);
     const queue = new ViewNotifications(() => ({ write, writableLength: 0, destroyed: false } as unknown as ServerResponse), refresh, error => { throw error; });

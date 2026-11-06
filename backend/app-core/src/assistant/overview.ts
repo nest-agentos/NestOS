@@ -45,7 +45,9 @@ async function readSource<T extends {events: AssistantEvent[]}>(operationId: str
     const started = performance.now();
     try {
         const result = await read();
-        log.info('assistant.overview', {operationId, stage, result: 'success', count: result.events.length, durationMs: Math.round(performance.now() - started)});
+        const fields = {operationId, stage, result: 'success', count: result.events.length, durationMs: Math.round(performance.now() - started)};
+        log.info('assistant.overview', fields);
+        if (fields.durationMs >= 1000) console.warn('[AssistantOverview]', fields);
         return result;
     } catch (error) {
         log.warn('assistant.overview', {operationId, stage, result: 'failure', code: 'ASSISTANT_SOURCE_UNAVAILABLE',

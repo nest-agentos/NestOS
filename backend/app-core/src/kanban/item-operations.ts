@@ -18,7 +18,10 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         void pending.finally(() => {if (tails.get(key) === pending) tails.delete(key);}).catch(() => {}); return pending;
     };
     const automatic=automaticDelivery({...options,target:options.automaticTarget,plan:options.deliveryPlan,active:()=>!stopped,report:options.reportAutomatic,view:(board,item)=>queue(board,item,async()=>view(options,await load(options,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(options,board,request,true))});
-    return {deliveryReady:automatic.ready,itemOperations: (board: string, item: string) => queue(board, item, async () => view(options, await load(options, board, item, true))),
+    return {deliveryReady:automatic.ready,itemOperations: (board: string, item: string) => {
+        requireValue(!stopped, 'SERVICE_STOPPING');
+        return load(options, board, item, false).then(context => view(options, context));
+    },
         bindItemOperation: (board: string, request: KanbanItemOperationBinding) => {validateRequest(request); return queue(board, request.itemId, () => bind(options, board, request));},
         runItemOperation: (board: string, request: KanbanItemOperationRequest) => {validateRequest(request); return queue(board, request.itemId, () => run(options, board, request));},
         async scan() {
@@ -97,7 +100,7 @@ async function authorize(options: ReviewOperationsOptions, context: Context): Pr
         && member.roles?.includes('coordinator')), 'OPERATION_COORDINATOR_REQUIRED');
 }
 async function bind(options: ReviewOperationsOptions, board: string, request: KanbanItemOperationBinding) {
-    const context = await load(options, board, request.itemId, true); await authorize(options, context);
+    const context = await load(options, board, request.itemId, false); await authorize(options, context);
     requireValue(!context.board.lifecycle || request.action === 'accept','BOARD_STOPPING');
     requireValue(context.item.deletedAt === undefined && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
     requireValue(['build', 'deploy', 'merge'].includes(request.action), 'OPERATION_BINDING_FORBIDDEN');
@@ -114,7 +117,7 @@ async function bind(options: ReviewOperationsOptions, board: string, request: Ka
     return view(options, await load(options, board, request.itemId, false));
 }
 async function run(options: ReviewOperationsOptions, board: string, request: KanbanItemOperationRequest, automatic=false): Promise<KanbanItemOperations> {
-    const context = await load(options, board, request.itemId, true); await authorize(options, context);
+    const context = await load(options, board, request.itemId, false); await authorize(options, context);
     if(automatic)requireValue(!context.board.executionControl?.paused,'AUTOMATIC_DELIVERY_PAUSED');
     requireValue(!context.board.lifecycle || request.action === 'accept','BOARD_STOPPING');
     requireValue(context.item.deletedAt === undefined && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');

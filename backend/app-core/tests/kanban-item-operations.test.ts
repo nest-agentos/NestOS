@@ -48,6 +48,19 @@ it('keeps a lost admission reply unknown and only reconciles after restart', asy
     expect(f.published.start).toHaveBeenCalledOnce(); expect(f.published.inspect).toHaveBeenCalled();
     expect((await f.journal.get<ReviewJob>(jobKey('build')))!.phase).toBe('submitting');
 });
+it('reads committed operation state while reconciliation is blocked without starting or observing work', async () => {
+    const f = await fixture(); await f.bind('build'); await f.run('build');
+    let release!: () => void;
+    const held = new Promise<void>(resolve => {release = resolve;});
+    f.published.inspect.mockImplementation(async () => {await held; return {state: 'running'};});
+    const before = f.published.inspect.mock.calls.length, scan = f.api.scan();
+    try {
+        await vi.waitFor(() => expect(f.published.inspect.mock.calls.length).toBe(before + 1));
+        const view = await f.api.itemOperations('board', 'task');
+        expect(view.operations.find(row => row.id === 'build')?.state).toBe('running');
+        expect(f.published.inspect.mock.calls.length).toBe(before + 1); expect(f.published.start).toHaveBeenCalledOnce();
+    } finally {release(); await scan;}
+});
 it('retries only a proven pre-admission ownership rejection with the same identity', async () => {
     const f = await fixture(); await f.bind('build');
     f.published.start.mockRejectedValueOnce(Object.assign(new Error('Owned'), {code: 'OPERATION_SESSION_OWNED', executionOutcome: 'not-started', retryable: true}));
@@ -58,24 +71,24 @@ it('retries only a proven pre-admission ownership rejection with the same identi
 it('rejects stale UI requests and source changes before replacement', async () => {
     const f = await fixture(), stale = (await f.api.itemOperations('board', 'task')).revision;
     await f.bind('build'); await expect(f.api.runItemOperation('board', {operationId: 'old', itemId: 'task', action: 'build', expectedRevision: stale})).rejects.toMatchObject({code: 'OPERATION_STALE_REFRESH'});
-    await f.bind('deploy'); await f.run('build'); f.complete('build'); await f.api.itemOperations('board', 'task');
+    await f.bind('deploy'); await f.run('build'); f.complete('build'); await f.api.scan(); await f.api.itemOperations('board', 'task');
     f.snapshot.version = 'changed'; await expect(f.run('deploy', 'deploy', {confirmed: true})).rejects.toMatchObject({code: 'OPERATION_SOURCE_CHANGED_REBUILD'});
     expect(f.published.start).toHaveBeenCalledOnce();
 });
 it('continues the original Session, requires every conflict choice, and invalidates stale analysis', async () => {
     const f = await fixture(); await f.run('analyze');
     expect(f.submission.start).toHaveBeenCalledWith(expect.objectContaining({expectedSessionId: 'original'})); expect(f.published.start).not.toHaveBeenCalled();
-    await f.api.itemOperations('board', 'task'); f.item.status = 'completed'; await f.bind('merge');
+    await f.api.scan(); await f.api.itemOperations('board', 'task'); f.item.status = 'completed'; await f.bind('merge');
     await expect(f.run('merge', 'no-choice', {confirmed: true})).rejects.toMatchObject({code: 'OPERATION_SELECTION_REQUIRED'});
     f.snapshot.version = 'changed'; await expect(f.run('merge', 'stale-plan', {confirmed: true, selections: {file: 'integrate'}})).rejects.toMatchObject({code: 'OPERATION_SOURCE_CHANGED_REANALYZE'});
     f.snapshot.version = 'scope'; await f.run('merge', 'merge', {confirmed: true, selections: {file: 'integrate'}});
     const input = f.published.start.mock.calls[0][0] as never as {request: {source: {values: {context: string}}}};
     expect(JSON.parse(input.request.source.values.context).input).toMatchObject({approvalId: 'merge', analysisId: 'analyze', analysisDigest: sha256HexSync(JSON.stringify(f.plan)), selections: {file: 'integrate'}});
-    f.complete('merge'); const view = await f.api.itemOperations('board', 'task'); expect(view.operations.find(op => op.id === 'merge')).toMatchObject({state: 'succeeded', enabled: false});
+    f.complete('merge'); await f.api.scan(); const view = await f.api.itemOperations('board', 'task'); expect(view.operations.find(op => op.id === 'merge')).toMatchObject({state: 'succeeded', enabled: false});
 });
 it('checks the real running version before acceptance and journals canonical acceptance once', async () => {
-    const f = await fixture(); await f.bind('build'); await f.bind('deploy'); await f.run('build'); f.complete('build'); await f.api.itemOperations('board', 'task');
-    f.published.inspect.mockResolvedValue({state: 'running'}); await f.run('deploy', 'deploy', {confirmed: true}); f.complete('deploy'); await f.api.itemOperations('board', 'task');
+    const f = await fixture(); await f.bind('build'); await f.bind('deploy'); await f.run('build'); f.complete('build'); await f.api.scan(); await f.api.itemOperations('board', 'task');
+    f.published.inspect.mockResolvedValue({state: 'running'}); await f.run('deploy', 'deploy', {confirmed: true}); f.complete('deploy'); await f.api.scan(); await f.api.itemOperations('board', 'task');
     f.adapter.runningVersion.mockReturnValue('other'); await expect(f.run('accept', 'not-this-version', {confirmed: true})).rejects.toMatchObject({code: 'OPERATION_RUNNING_VERSION_MISMATCH'});
     f.adapter.runningVersion.mockReturnValue('candidate'); const view = await f.run('accept', 'accept', {confirmed: true});
     expect(f.service.execute).toHaveBeenCalledOnce(); expect(f.service.execute.mock.calls[0][1]).toMatchObject({command: {type: 'accept-execution', dispatchId: 'execution', accept: true}});
@@ -84,7 +97,7 @@ it('checks the real running version before acceptance and journals canonical acc
 it('refuses malformed output and does not enable dependent actions', async () => {
     const f = await fixture(); await f.bind('build'); await f.bind('deploy'); await f.run('build');
     f.published.inspect.mockResolvedValue({state: 'succeeded', output: {...f.result('build'), sourceVersion: 'somebody-else'}} as never);
-    const view = await f.api.itemOperations('board', 'task'); expect(view.operations.find(op => op.id === 'build')).toMatchObject({state: 'failed', code: 'OPERATION_RESULT_SCOPE_MISMATCH'});
+    await f.api.scan(); const view = await f.api.itemOperations('board', 'task'); expect(view.operations.find(op => op.id === 'build')).toMatchObject({state: 'failed', code: 'OPERATION_RESULT_SCOPE_MISMATCH'});
     expect(view.operations.find(op => op.id === 'deploy')?.enabled).toBe(false);
 });
 it('requires a human coordinator and validates requests before journal access', async () => {
@@ -96,7 +109,7 @@ it('requires a human coordinator and validates requests before journal access', 
 it('blocks cleanup while an operation is prepared, running or unknown', async () => {
     const f = await fixture(); await f.bind('build'); await f.run('build'); const cleanup = vi.fn(async () => 'cleaned');
     await expect(f.api.guardResource('board', 'task', cleanup)).rejects.toMatchObject({code: 'WORKTREE_IN_USE'}); expect(cleanup).not.toHaveBeenCalled();
-    f.complete('build'); await f.api.itemOperations('board', 'task'); expect(await f.api.guardResource('board', 'task', cleanup)).toBe('cleaned');
+    f.complete('build'); await f.api.scan(); await f.api.itemOperations('board', 'task'); expect(await f.api.guardResource('board', 'task', cleanup)).toBe('cleaned');
 });
 it('reconciles canonical accepted state after an acceptance reply was lost without replaying it', async () => {
     const f = await fixture();
@@ -135,7 +148,7 @@ it('retains the agent prerequisite explanation when an operation reports blocked
 it('persists build-time replacement consent and starts the replacement once across restart',async()=>{
     const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build','build-auto',{followUp:'deploy'});
     expect(f.published.start).toHaveBeenCalledOnce();f.complete('build-auto');
-    const queued=await f.api.itemOperations('board','task');expect(queued.operations.find(op=>op.id==='deploy')).toMatchObject({state:'running',hideRun:true});expect(f.published.start).toHaveBeenCalledOnce();
+    const queued=await f.api.itemOperations('board','task');expect(queued.operations.find(op=>op.id==='build')).toMatchObject({state:'running'});expect(queued.operations.find(op=>op.id==='deploy')).toMatchObject({hideRun:true});expect(f.published.start).toHaveBeenCalledOnce();
     await f.api.quiesce();const restored=createItemOperations(f.options);closes.push(()=>restored.quiesce());await restored.scan();
     expect(f.published.start).toHaveBeenCalledTimes(2);
     const settings=await f.journal.get<any>(reviewKey('board','task')),id=settings.jobs.at(-1);
@@ -162,7 +175,7 @@ it('recovers replacement success from verified evidence when the old host lost t
 });
 
 it('uses the trusted service controller once and validates its deployment result without a model request',async()=>{
- const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.itemOperations('board','task');
+ const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.scan();await f.api.itemOperations('board','task');
  const managed={operationId:'managed-deploy',serviceId:'host',expectedVersion:'old',targetVersion:'candidate'};
  const submit=vi.fn(async()=>{});f.options.adapter.managed={prepare:async()=>managed,submit,inspect:async()=>({state:'succeeded',output:{...f.result('managed-deploy'),status:'succeeded'}})};
  await f.run('deploy','managed-deploy',{confirmed:true});await f.api.scan();
@@ -200,19 +213,19 @@ it('keeps a task in review until verified integration and then accepts the integ
  expect((await api.itemOperations('board','task')).operations.find(op=>op.id==='accept')?.enabled).toBe(false);
  await perform('analyze');await api.itemOperations('board','task');await f.bind('merge');
  await perform('merge');expect(f.item.status).toBe('review');expect(f.service.execute).not.toHaveBeenCalled();
- f.complete('merge');await api.itemOperations('board','task');await perform('accept');
+ f.complete('merge');await api.scan();await api.itemOperations('board','task');await perform('accept');
  expect(f.service.execute).toHaveBeenCalledOnce();expect(await f.journal.get(jobKey('accept'))).toMatchObject({acceptanceScope:'source',state:'succeeded'});
 });
 
 it('accepts the same deployed source after a verified target integration without rebuilding',async()=>{
  const f=await fixture();f.options.deliveryPlan=async()=>({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});f.plan.conflicts=[];
  await f.bind('build');await f.bind('deploy');await f.bind('merge');
- await f.run('build');f.complete('build');await f.api.itemOperations('board','task');
- f.published.inspect.mockResolvedValue({state:'running'});await f.run('deploy','deploy',{confirmed:true});f.complete('deploy');await f.api.itemOperations('board','task');
+ await f.run('build');f.complete('build');await f.api.scan();await f.api.itemOperations('board','task');
+ f.published.inspect.mockResolvedValue({state:'running'});await f.run('deploy','deploy',{confirmed:true});f.complete('deploy');await f.api.scan();await f.api.itemOperations('board','task');
  await f.run('analyze');await f.api.itemOperations('board','task');
  f.published.inspect.mockResolvedValue({state:'running'});await f.run('merge','merge',{confirmed:true});
  expect(f.service.execute).not.toHaveBeenCalled();expect(f.item.status).toBe('review');
- f.published.inspect.mockResolvedValue({state:'succeeded',output:{...f.result('merge'),targetHead:'integrated'}} as never);await f.api.itemOperations('board','task');
+ f.published.inspect.mockResolvedValue({state:'succeeded',output:{...f.result('merge'),targetHead:'integrated'}} as never);await f.api.scan();await f.api.itemOperations('board','task');
  f.snapshot.targetVersion='integrated';f.snapshot.version='integrated-scope';await f.run('accept','accept',{confirmed:true});
  expect(f.service.execute).toHaveBeenCalledOnce();expect(await f.journal.get(jobKey('accept'))).toMatchObject({state:'succeeded',acceptanceVersion:'candidate',snapshot:{targetVersion:'integrated'}});
  expect(f.published.start).toHaveBeenCalledTimes(3);

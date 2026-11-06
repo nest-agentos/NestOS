@@ -109,7 +109,7 @@ export class ViewApi {
         const operations = calls.map(call => client.peer.operationName(call));
         let replies: Reply[] = [];
         try {
-            const result = ['queries', 'bindings'].includes(body.kind!) ? await this.queries(client, body.calls, body.kind === 'bindings') : await client.peer.handle(body.call!);
+            const result = ['queries', 'bindings'].includes(body.kind!) ? await this.queries(client, body.calls, body.kind === 'bindings', response) : await client.peer.handle(body.call!);
             replies = 'replies' in result ? result.replies : [result];
             const requestId = String(response.getHeader('X-Request-ID') ?? '');
             for (const reply of replies) if (reply.error && !reply.error.requestId && /^[a-f0-9-]{36}$/.test(requestId)) reply.error.requestId = requestId;
@@ -147,11 +147,21 @@ export class ViewApi {
         if (client.active >= 16) throw new FSError('EBUSY', 'Too many active view requests');
         client.active++;
     }
-    private async queries(client: Client, calls: Call[] | undefined, bindings = false): Promise<{ replies: Reply[]; updates: Reply['updates'] }> {
+    private async queries(client: Client, calls: Call[] | undefined, bindings = false, response?: ServerResponse): Promise<{ replies: Reply[]; updates: Reply['updates'] }> {
         if (!Array.isArray(calls) || !calls.length || calls.length > 32 || calls.some(call => !validCall(call) || !(bindings ? client.peer.binding(call) : client.peer.query(call))))
             throw new FSError('EINVAL', 'Only bounded read queries may be batched');
-        const replies = await Promise.all(calls.map(call => client.peer.handle(call, false)));
-        return { replies, updates: await client.peer.refresh() };
+        const replies = await Promise.all(calls.map(async call => {
+            const started = Date.now();
+            const reply = await client.peer.handle(call, false);
+            if (Date.now() - started >= 1000 || reply.error) this.audit?.write({event: 'application.call',
+                requestId: String(response?.getHeader('X-Request-ID') ?? ''), operation: client.peer.operationName(call), stage: 'invoke',
+                result: reply.error ? 'failure' : 'success', ...replyDiagnostics([reply]), durationMs: Date.now() - started});
+            return reply;
+        }));
+        const started = Date.now(), updates = await client.peer.refresh();
+        if (Date.now() - started >= 1000) this.audit?.write({event: 'application.call', requestId: String(response?.getHeader('X-Request-ID') ?? ''),
+            stage: 'snapshots', result: 'success', durationMs: Date.now() - started});
+        return { replies, updates };
     }
     private client(identity: string): Promise<Client> {
         let ready = this.clients.get(identity);

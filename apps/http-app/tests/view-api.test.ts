@@ -263,11 +263,10 @@ it('batches parallel queries and subscription bindings without batching business
     const peer = new HttpViewClient('batched', server.origin + '/api/application', fetcher); clients.push(peer);
     const root = await peer.start(); requests.length = 0;
     await Promise.all([root.services.projects.list(), root.services.digitalTwin!.getSettings()]);
-    expect(requests).toHaveLength(1); expect(requests[0]).toMatchObject({ kind: 'queries', calls: expect.any(Array) });
-    expect(requests[0].calls).toHaveLength(2);
+    expect(requests).toHaveLength(2); expect(requests.every(request => request.kind === 'queries' && request.calls?.length === 1)).toBe(true);
     const unsubscribe = [root.services.agentService.onChange(() => {}), root.services.projects.subscribeChanges(() => {})];
     await new Promise(resolve => setTimeout(resolve, 20));
-    expect(requests.filter(request => request.kind === 'bindings')).toHaveLength(1);
+    expect(requests.filter(request => request.kind === 'bindings')).toHaveLength(2);
     unsubscribe.forEach(release => release());
     const ref = await peer.peer.expose(root.services.commandBus) as { $ref: string };
     const rejected = await auth.fetcher(server.origin + '/api/application', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -359,8 +358,8 @@ it('records registered RPC names and batch size without recording UI document co
     }));
     expect(JSON.stringify(auditEvents)).not.toContain('private-document');
     await Promise.all([root.services.projects.list(), root.services.digitalTwin!.getSettings()]);
-    expect(auditEvents).toContainEqual(expect.objectContaining({ rpcKind: 'queries', rpcBatchSize: 2,
-        rpcOperations: ['ProjectService.list', 'DigitalTwinService.getSettings'] }));
+    for (const operation of ['ProjectService.list', 'DigitalTwinService.getSettings'])
+        expect(auditEvents).toContainEqual(expect.objectContaining({rpcKind: 'queries', rpcBatchSize: 1, rpcOperations: [operation]}));
 });
 
 it('resumes the same view and replays missed configuration updates and callbacks once', async () => {
@@ -418,7 +417,7 @@ it('does not replay a command whose response was lost even after reconnecting su
     };
     const peer = new HttpViewClient('unknown-outcome', server.origin + '/api/application', fetcher, () => {}, undefined, restored); clients.push(peer);
     const root = await peer.start(); loseResponse = true;
-    await expect(root.services.projects.sessions.create('Create only once', null)).rejects.toThrow('Response lost');
+    await expect(root.services.projects.sessions.create('Create only once', null)).rejects.toMatchObject({code: 'HTTP_CONNECTION_LOST'});
     await vi.waitFor(() => expect(restored).toHaveBeenCalledOnce());
     expect(writes).toBe(1);
     const {sessions} = await root.services.projects.sessions.navigation();

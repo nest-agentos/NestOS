@@ -35,11 +35,12 @@ export function developmentPreparation(options: Options): NonNullable<PersonalKa
     return async input => {
         requireValue(input.preparation.system === 'nestos-work-preparation' && input.preparation.id === 'git-worktree' && input.preparation.revision === '1', 'WORK_PREPARATION_UNSUPPORTED');
         requireValue(input.target.kind === 'agent', 'NATIVE_AGENT_REQUIRED');
-        const source = await options.agents.getAgentRevision?.(input.target.id, input.target.version);
+        const source = await developmentStage(input.dispatch.id, 'agent.resolve', async () => options.agents.getAgentRevision?.(input.target.id, input.target.version));
         requireValue(source?.target.digest === input.target.digest && source.definition.execution?.kind === 'harness', 'NATIVE_AGENT_REQUIRED');
         const selected = input.item.externalRefs?.filter(ref => ref.system === REMOTE_PROJECT_REFERENCE) ?? [];
         requireValue(selected.length === 1, 'SINGLE_PROJECT_TASK_REQUIRED');
-        const template = await options.connections.get(source.definition.execution.connectionId);
+        const connectionId = source.definition.execution.connectionId;
+        const template = await developmentStage(input.dispatch.id, 'connection.resolve', () => options.connections.get(connectionId));
         requireValue(template?.connection && template.connection.enabled !== false, 'NATIVE_CONNECTION_REQUIRED');
         const projectId = selected[0].id, directory = '_nestos/worktrees/' + input.dispatch.id;
         const record = await prepareWorkspace(options, journal, input, projectId, template.connection.profileId, directory, [source.definition.config.systemPrompt, ...source.systemPrompt?.content ?? []].filter(Boolean).join('\n\n'));
@@ -57,8 +58,8 @@ export function developmentPreparation(options: Options): NonNullable<PersonalKa
     };
 }
 async function prepareWorkspace(options: Options, journal: KanbanAutomationJournal, input: Input, projectId: string, profileId: string, directory: string, instructions: string): Promise<DevelopmentWorkspaceRecord> {
-    await requireDevelopmentHarness(options, projectId, profileId);
-    const folder = await options.projects.get(projectId), view = await options.projects.openWorkspace(folder.path);
+    await developmentStage(input.dispatch.id, 'harness.profiles', () => requireDevelopmentHarness(options, projectId, profileId));
+    const folder = await options.projects.get(projectId), view = await developmentStage(input.dispatch.id, 'workspace.open', () => options.projects.openWorkspace(folder.path));
     try {
         const policy = await developmentStage(input.dispatch.id, 'policy.freeze', () => developmentPolicy(journal,options.fs,view.fs,input.dispatch.id,{...input.options,...(input.stage===undefined&&(input.context as {decision?:{snapshot?:{completion?:string}}})?.decision?.snapshot?.completion==='automatic'?{commit:'worktree'}:{})}));
         let context=input.context;
