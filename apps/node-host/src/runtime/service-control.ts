@@ -1,3 +1,4 @@
+import {releaseDependencies} from './release-provenance';
 import type {RuntimeServiceControl} from '@nestos/app-core';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -13,11 +14,13 @@ export function localServiceControl():RuntimeServiceControl|undefined {
         if(value?.serviceId!==serviceId||!await state.launcherAlive(value))throw Object.assign(new Error('Service controller unavailable'),{code:'SERVICE_CONTROLLER_UNAVAILABLE'});return value;};
     return {describe:async()=>{const value=await check();const {runtime}=await load(),relative=path.relative(root,runtime.releasesRoot(root));
             return {id:serviceId,version:process.env.NESTOS_HTTPD_VERSION??value.currentRelease,artifact:{format:'nestos.httpd.release/1',manifest:'release.json',...(!path.isAbsolute(relative)&&!relative.startsWith('..')?{store:{base:'source-checkout' as const,path:relative.split(path.sep).join('/')}}:{})}};},
-        provenance:async()=>{
+        provenance:async(previousVersion)=>{
             await check();const {runtime}=await load(),version=process.env.NESTOS_HTTPD_VERSION;if(!version)return;
             const manifest=runtime.verifyRelease(runtime.releaseDirectory(runtime.releasesRoot(root),version));
             if(manifest.id!==version||manifest.dirty!==false||typeof manifest.commit!=='string'||!/^[a-f0-9]{40,64}$/.test(manifest.commit))return;
-            return {serviceId,version,sourceCommit:manifest.commit};
+            const current=runtime.releaseDirectory(runtime.releasesRoot(root),version),previous=runtime.releaseDirectory(runtime.releasesRoot(root),previousVersion);
+            runtime.verifyRelease(previous);
+            return {serviceId,version,sourceCommit:manifest.commit,dependencies:releaseDependencies(current,previous)};
         },
         submit:async request=>{
             if(request.serviceId!==serviceId)throw Object.assign(new Error('Wrong service'),{code:'HTTPD_SERVICE_MISMATCH'});
