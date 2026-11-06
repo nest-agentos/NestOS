@@ -84,3 +84,12 @@ describe('planning conversation reports',()=>{
         expect(await f.read()).toMatchObject({state:'clarification'});
     });
 });
+
+it('rejects a host-invalid delivery plan before acknowledging or freezing success',async()=>{
+ const f=fixture();f.report('invalid','result','q',{payload:{ready:true}});
+ const validate=()=>{throw Object.assign(new Error('Missing release'),{code:'DELIVERY_CHAIN_INVALID'});};
+ expect(await readPlanningChannel(f.remote as any,'p','scope',f.journal,validate)).toMatchObject({state:'clarification'});
+ expect(f.acks.get('invalid')).toEqual({status:'rejected',code:'DELIVERY_CHAIN_INVALID'});
+ f.report('corrected','result','q',{payload:{ready:true,reason:'One release'}});
+ expect(await f.read()).toMatchObject({state:'succeeded',output:{reason:'One release'}});
+});

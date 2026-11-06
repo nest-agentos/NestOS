@@ -1,3 +1,4 @@
+import {verifyReadOnlyDelivery} from './kanban-delivery-plan';
 import {managedServiceDeployment} from './managed-service-deployment';
 import {operationReceipt} from '../run/operation-receipt';
 import {maintenanceInstruction} from './kanban-maintenance';
@@ -85,6 +86,7 @@ async function snapshot(options: Options, board: KanbanBoard, item: KanbanItem):
         const targetChanges = await gitWorkspace(process, '/workspace', ['status', '--porcelain', '--untracked-files=normal', '--ignore-submodules=none']);
         requireValue(!targetChanges.stdout.trim(), 'OPERATION_TARGET_DIRTY');
         const repositories = await verifyWorktreeDelivery(process, record.directory, record.repositories, record.policy.commit, record.availableRepositories);
+        verifyReadOnlyDelivery(record,repositories,options.runningVersion);
         const {input: _input, ...commitContext} = record.commitContext ?? {};
         const sourceVersion = sha256HexSync(JSON.stringify([record.projectId, tree.id, repositories])), targetVersion = status.targetHead;
         return {sourceVersion, targetVersion, version: sha256HexSync(JSON.stringify([sourceVersion, status.targetBranch, targetVersion])),

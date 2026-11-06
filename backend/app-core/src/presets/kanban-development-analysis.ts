@@ -1,3 +1,4 @@
+import {validateDeliveryDecomposition} from './kanban-delivery-plan';
 import {planningConversationControl} from './kanban-planning-control';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {DEFAULT_KANBAN_WORK_TYPES} from '@nestos/kanban/contracts';
@@ -36,7 +37,7 @@ export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
         const workspace=await journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+id);
         requireValue(workspace,'SESSION_CHANNEL_WORKSPACE_REQUIRED');
         await watch(id,workspace.projectId);
-        const result=await readPlanningChannel(options.remote,workspace.projectId,id,journal);
+        const result=await readPlanningChannel(options.remote,workspace.projectId,id,journal,output=>validateDeliveryDecomposition(workspace.policy,output));
         if(result&&['succeeded','failed','cancelled'].includes(result.state))await watches.close(id);
         return result;
     }};

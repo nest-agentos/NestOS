@@ -4,6 +4,14 @@
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    "kanban.errors.DELIVERY_POLICY_INVALID": "The delivery configuration is invalid. Check the global Kanban configuration.",
+    "kanban.errors.DELIVERY_PROFILE_REQUIRED": "The plan must select a supplied delivery profile for every subtask.",
+    "kanban.errors.DELIVERY_PROFILE_UNAVAILABLE": "The task delivery profile is unavailable in its frozen configuration.",
+    "kanban.errors.DELIVERY_CHAIN_INVALID": "Complete all source tasks, publish once, then independently verify. Correct the plan dependencies in the original session.",
+    "kanban.errors.VERIFICATION_DEPLOYMENT_REQUIRED": "Verification requires one confirmed deployment receipt from its release dependency.",
+    "kanban.errors.VERIFICATION_CHANGED_SOURCE": "Verification changed source. Preserve it and create a separate repair task.",
+    "kanban.errors.VERIFICATION_RUNNING_VERSION_MISMATCH": "The running version differs from the deployment receipt being verified.",
+    "kanban.errors.AUTOMATIC_DELIVERY_PAUSED": "Automatic delivery is paused and will resume from the retained step.",
     'kanban.errors.WORKTREE_IN_USE': 'The workspace has active or unconfirmed operations. Check its execution session before retrying.',
     'kanban.errors.WORKTREE_EXECUTION_UNKNOWN': 'Execution completion cannot be verified. Check the remote connection and session.',
     'kanban.errors.OPERATION_RESULT_RECEIPT_INVALID': 'The operation receipt is malformed. Check its execution session.',
@@ -392,6 +400,8 @@ export const en: LocaleStrings = {
     "kanban.operationNeedsFlow": "Configure the project workflow first.",
     "kanban.operationNeedsPrevious": "Complete the preceding steps first.",
     "kanban.operationConfirmDeploy": "Replace the current service with this acceptance version; allow a brief interruption.",
+    "kanban.operationAcceptSource": "Accept source delivery",
+    "kanban.operationConfirmSource": "Approve this task’s source and relevant checks. The complete chain is released once and independently verified afterwards.",
     "kanban.operationConfirmAcceptance": "I manually verified this version and approve it.",
     "kanban.operationConfirmMerge": "Merge using these conflict choices. Source or target changes require a new analysis.",
     "kanban.operationAction.build": "Build acceptance version",

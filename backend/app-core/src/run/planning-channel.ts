@@ -9,7 +9,7 @@ interface Envelope {messages:Message[];execution?:Origin & {status?:string}}
 type Remote=Pick<ProjectRemoteMountService,'sessionChannel'>;
 
 /** Publication evidence is supplied by Cells, never by model-authored message fields. */
-export async function readPlanningChannel(remote:Remote,projectId:string,scopeId:string,journal:PromptJournal):Promise<KanbanAnalysisObservation|undefined> {
+export async function readPlanningChannel(remote:Remote,projectId:string,scopeId:string,journal:PromptJournal,validate?:(output:unknown)=>void):Promise<KanbanAnalysisObservation|undefined> {
     const value=await remote.sessionChannel(projectId,'messages',{scopeId}) as Envelope;
     if(!Array.isArray(value?.messages)||value.messages.length>200||value.messages.some(row=>!row||typeof row.id!=='string')||new Set(value.messages.map(row=>row.id)).size!==value.messages.length)throw failure('CHANNEL_MESSAGES_INVALID');
     const key='planning-conversation:'+scopeId;
@@ -30,6 +30,12 @@ export async function readPlanningChannel(remote:Remote,projectId:string,scopeId
     if(final.length){const row=final[0];
         if(Object.keys(state.questions).some(id=>!state.resolved.includes(id)))return clarification(value,state);
         if(!state.final&&!terminal(value,row))return {state:'running'};
+        try{validate?.(row.message.payload);}catch(error){
+            const code=(error as {code?:string}).code??'PLANNING_RESULT_INVALID';
+            await journal.update<State>(key,old=>({...old!,rejected:{...old?.rejected,[row.id]:code}}));
+            await remote.sessionChannel(projectId,'acknowledge',{scopeId,id:row.id,ack:{status:'rejected',code}});
+            return {state:'clarification',reason:code};
+        }
         const digest=channelDigest(row.message.payload);
         state=await journal.update<State>(key,old=>{if(old?.final&&(old.final.id!==row.id||old.final.digest!==digest))throw failure('CHANNEL_RESULT_CHANGED');return {...old!,final:{id:row.id,digest}};});
         await acknowledge(remote,projectId,scopeId,row.id,'validated');

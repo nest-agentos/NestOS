@@ -15,7 +15,7 @@ export interface ReviewJob {
     managed?:import('../runtime/service-control').ServiceSwitchRequest;
     operationContext?: unknown; input?: IndependentCallInput; request?: SubmissionRequest; result?: unknown; createdAt: number;
     followUp?:{action:'deploy';state:'queued'|'started'|'failed';code?:string;request?:import('@nestos/kanban/contracts').KanbanItemOperationRequest};
-    command?: import('@nestos/kanban/contracts').KanbanCommand; acceptanceVersion?: string;
+    command?: import('@nestos/kanban/contracts').KanbanCommand; acceptanceVersion?: string; acceptanceScope?: 'source'|'runtime';
 }
 export interface ReviewSettings {revision: number; bindings: Partial<Record<ReviewAction, KanbanExternalReference>>; jobs: string[]; receipts: Record<string, string>}
 export interface ReviewAdapter {
@@ -32,7 +32,9 @@ export interface ReviewAdapter {
     close?(): Promise<void>;
     readAnalysis(job: ReviewJob): Promise<unknown | undefined>;
 }
+export interface DeliveryPlan {steps:string[];acceptance:'source'|'runtime';acceptanceLabel?:string;acceptanceConfirmation?:string}
 export interface ReviewOperationsOptions {
+    deliveryPlan?(board:KanbanBoard,item:KanbanItem):Promise<DeliveryPlan>;
     automaticTarget?(board:KanbanBoard,item:KanbanItem):string|undefined;
     automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;
     cleanup?(board:string,item:string,id:string):Promise<boolean>;

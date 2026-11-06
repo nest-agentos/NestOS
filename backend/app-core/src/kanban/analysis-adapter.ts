@@ -23,7 +23,7 @@ export interface AnalysisOptions {
 /** Only NestOS request construction and execution observation live in this adapter. */
 export function analyzeItem(options:AnalysisOptions,board:KanbanBoard,item:KanbanItem,target:TargetRef|undefined,service:KanbanService):Promise<void> {
     return coordinateAnalysis<TargetRef,IndependentCallInput>({journal:options.journal,active:options.active,log:options.log,
-        inheritReferences:inheritWorkReferences,
+        inheritReferences:refs=>inheritWorkReferences(refs).filter(ref=>ref.system!=='nestos-work-delivery'),
         onSettled:options.onAnalysis?async input=>options.onAnalysis!({...input,target:input.request.request.expectedTarget!}):undefined,
         port:{
             prepare:async ({id,board,item,target})=>{

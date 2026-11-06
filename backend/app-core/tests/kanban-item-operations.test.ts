@@ -169,3 +169,26 @@ it('uses the trusted service controller once and validates its deployment result
  expect(submit).toHaveBeenCalledOnce();expect(f.published.start).toHaveBeenCalledOnce();expect(f.submission.start).not.toHaveBeenCalled();
  expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='deploy')).toMatchObject({state:'succeeded'});
 });
+
+it('accepts verified source delivery without requiring a deployed runtime and hides release actions',async()=>{
+ const f=await fixture();f.options.deliveryPlan=async()=>({steps:['accept','analyze','merge','cleanup'],acceptance:'source'});
+ const api=createItemOperations(f.options);closes.push(()=>api.quiesce());
+ const view=await api.itemOperations('board','task');expect(view.operations.map(op=>op.id)).toEqual(['accept','analyze','merge']);
+ await api.runItemOperation('board',{operationId:'accept-source',itemId:'task',action:'accept',expectedRevision:view.revision,confirmed:true});
+ expect(f.service.execute).toHaveBeenCalledOnce();expect(f.adapter.runningVersion).not.toHaveBeenCalled();
+ expect(await f.journal.get(jobKey('accept-source'))).toMatchObject({acceptanceScope:'source',state:'succeeded'});
+});
+
+it('keeps build-time replacement consent queued while paused and resumes once',async()=>{
+ const f=await fixture(),board=await f.service.read();await f.bind('build');await f.bind('deploy');await f.run('build','pause-build',{followUp:'deploy'});f.complete('pause-build');
+ (board as any).executionControl={paused:true};await f.api.scan();expect(f.published.start).toHaveBeenCalledOnce();
+ expect((await f.journal.get<ReviewJob>(jobKey('pause-build')))?.followUp?.state).toBe('queued');
+ (board as any).executionControl={paused:false};await f.api.scan();expect(f.published.start).toHaveBeenCalledTimes(2);
+});
+it('rechecks pause at the actual external admission after a long preparation',async()=>{
+ const f=await fixture(),board=await f.service.read();
+ f.options.adapter.prepareOperation=vi.fn(async()=>{(board as any).executionControl={paused:true};return {expectedSessionId:'original'} as never;});
+ await f.run('build','slow-preparation');expect(f.submission.start).not.toHaveBeenCalled();
+ expect(await f.journal.get(jobKey('slow-preparation'))).toMatchObject({phase:'prepared'});
+ (board as any).executionControl={paused:false};await f.api.scan();expect(f.submission.start).toHaveBeenCalledOnce();
+});

@@ -77,3 +77,23 @@ it('does not replay a cleanup effect whose outcome is unknown',async()=>{
  for(let n=0;n<3;n++)await automaticDelivery(f.options).scan();expect(f.options.cleanup).toHaveBeenCalledOnce();expect(f.options.report).toHaveBeenCalledOnce();
  expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(false);
 });
+
+it('freezes selected steps across restarts and performs only one release for an entire chain',async()=>{
+ const f=await fixture();f.options.plan=async()=>({steps:['accept','analyze','merge','cleanup']});
+ await automaticDelivery(f.options).scan();f.options.plan=async()=>({steps:['build','deploy','accept','analyze','merge','cleanup']});
+ for(let n=0;n<8;n++)await automaticDelivery(f.options).scan();
+ expect(f.run.mock.calls.map(call=>call[1].action)).toEqual(['accept','analyze','merge']);expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);
+ f.jobs.clear();f.item.id='release';f.item.status='review';f.options.service.workflow=async()=>({dispatches:{r:{id:'r',itemId:'release',attempt:1,outcome:'succeeded'}}});
+ for(let n=0;n<12;n++)await automaticDelivery(f.options).scan();
+ f.jobs.clear();f.item.id='verifier';f.item.status='review';f.options.plan=async()=>({steps:['accept','cleanup']});
+ f.options.service.workflow=async()=>({dispatches:{v:{id:'v',itemId:'verifier',attempt:1,outcome:'succeeded'}}});
+ for(let n=0;n<4;n++)await automaticDelivery(f.options).scan();
+ const actions=f.run.mock.calls.map(call=>call[1].action);expect(actions.filter(action=>action==='build')).toHaveLength(1);expect(actions.filter(action=>action==='deploy')).toHaveLength(1);
+ expect(actions.at(-1)).toBe('accept');expect(f.options.cleanup).toHaveBeenCalledTimes(3);
+});
+it('rechecks pause after asynchronous preparation before admitting the next step',async()=>{
+ const f=await fixture(),view=f.options.view;
+ f.options.view=async()=>{const result=await view();(f.board as any).executionControl={paused:true};return result;};
+ await automaticDelivery(f.options).scan();expect(f.run).not.toHaveBeenCalled();expect(f.options.report).not.toHaveBeenCalled();
+ (f.board as any).executionControl={paused:false};f.options.view=view;await automaticDelivery(f.options).scan();expect(f.run).toHaveBeenCalledOnce();
+});

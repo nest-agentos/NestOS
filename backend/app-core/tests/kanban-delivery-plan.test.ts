@@ -1,0 +1,26 @@
+import {expect,it} from 'vitest';
+import defaults from '../src/resources/kanban/kanban-delivery-policy.json';
+import {deliveryProfile,validateDeliveryDecomposition,verifyReadOnlyDelivery} from '../src/presets/kanban-delivery-plan';
+const policy={prompts:{files:[{name:'delivery-policy.json',content:JSON.stringify(defaults)}]}} as any;
+const task=(key:string,id:string,dependsOn:string[]=[])=>({key,dependsOn,executionProfile:{system:'nestos-work-delivery',id,revision:'1'}});
+it('requires one shared release after all source tasks and independent verification after it',()=>{
+ const subtasks=[task('a','source'),task('b','source',['a']),task('release','release',['b']),task('verify','verification',['release'])];
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks})).not.toThrow();
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:[...subtasks,task('again','release')]})).toThrowError(expect.objectContaining({code:'DELIVERY_CHAIN_INVALID'}));
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:[...subtasks,task('unintegrated','source')]})).toThrowError(expect.objectContaining({code:'DELIVERY_CHAIN_INVALID'}));
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:subtasks.slice(0,3)})).toThrowError(expect.objectContaining({code:'DELIVERY_CHAIN_INVALID'}));
+ expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('a','source'),{key:'b',dependsOn:[]}]})).toThrowError(expect.objectContaining({code:'DELIVERY_PROFILE_REQUIRED'}));
+});
+it('does not let a profile grant unrelated external references or change its delivery actions',()=>{
+ expect(()=>deliveryProfile(policy,{externalRefs:[{system:'nestos-work-delivery',id:'arbitrary',revision:'1'}]} as any)).toThrowError(expect.objectContaining({code:'DELIVERY_PROFILE_UNAVAILABLE'}));
+ const edited=structuredClone(defaults);edited.profiles[0].steps=['accept','cleanup'];
+ expect(()=>deliveryProfile({prompts:{files:[{name:'delivery-policy.json',content:JSON.stringify(edited)}]}} as any,{externalRefs:[{system:'nestos-work-delivery',id:'source',revision:'1'}]} as any)).toThrowError(expect.objectContaining({code:'DELIVERY_POLICY_INVALID'}));
+});
+it('requires verification to preserve source and check the actual frozen release version',()=>{
+ const record={context:{delivery:{readOnly:true,evidence:{result:{version:'release-1'}}}}} as any;
+ const repositories=[{baseCommit:'a',head:'a',dirty:false}] as any;
+ expect(()=>verifyReadOnlyDelivery(record,repositories,'release-1')).not.toThrow();
+ expect(()=>verifyReadOnlyDelivery(record,repositories,'old')).toThrowError(expect.objectContaining({code:'VERIFICATION_RUNNING_VERSION_MISMATCH'}));
+ expect(()=>verifyReadOnlyDelivery(record,[{baseCommit:'a',head:'b',dirty:false}] as any,'release-1')).toThrowError(expect.objectContaining({code:'VERIFICATION_CHANGED_SOURCE'}));
+ expect(()=>verifyReadOnlyDelivery(record,[{baseCommit:'a',head:'a',dirty:true}] as any,'release-1')).toThrowError(expect.objectContaining({code:'VERIFICATION_CHANGED_SOURCE'}));
+});

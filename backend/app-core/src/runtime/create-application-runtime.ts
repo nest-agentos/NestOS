@@ -1,3 +1,4 @@
+import {developmentDeliveryPlan} from '../presets/kanban-delivery-plan';
 import {developmentSessionOperation} from '../presets/kanban-session-operation';
 import {nativeSessionArchive} from '../projects/session-archive';
 import {ensureKanbanConfiguration} from '../presets/kanban-global-configuration';
@@ -583,7 +584,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const prepareDevelopment = developmentBindings ? developmentPreparation(developmentBindings) : undefined;
         const analyzeDevelopment = developmentBindings ? developmentAnalysis(developmentBindings,()=>wakeKanban()) : undefined;
         if(analyzeDevelopment)cleanupFns.push(()=>analyzeDevelopment.dispose());
-        const verifyDevelopment = developmentBindings ? developmentDelivery(systemFS, developmentBindings.remote, developmentBindings.provider) : undefined;
+        const verifyDevelopment = developmentBindings ? developmentDelivery(systemFS, developmentBindings.remote, developmentBindings.provider,options.runningVersion) : undefined;
         const continueDevelopment = developmentBindings && independentCalls ? developmentContinuation({...developmentBindings,
             journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), calls: independentCalls, kernel: kernelCore}) : undefined;
         const lifecycleJournal = new KanbanAutomationJournal(systemFS, kanbanJournalOptions);
@@ -607,7 +608,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             wake: () => wakeKanban()});
         cleanupFns.push(() => developmentMessages.dispose());
         const kanban = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,kernelCore, independentCalls ? {
-            itemOperations: developmentBindings ? context => createItemOperations({...context,
+            itemOperations: developmentBindings ? context => createItemOperations({...context,deliveryPlan:developmentDeliveryPlan(context.journal,context.service),
                 adapter: developmentReviewAdapter({...developmentBindings, ...context, calls: independentCalls, kernel: kernelCore, runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission, wake: () => wakeKanban()}),
                 published: publishedOperation({calls: independentCalls, kernel: kernelCore, ensureSession: (id, title) => sessionRepository.ensureSession(id, title),
                     prepareSession: async id => {await initializeProjects(); await prepareChildExecution(id); return recovery.acquireLater(id);}}),

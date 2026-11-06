@@ -5,6 +5,14 @@
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    "kanban.errors.DELIVERY_POLICY_INVALID": "交付配置格式无效，请检查看板全局交付配置。",
+    "kanban.errors.DELIVERY_PROFILE_REQUIRED": "规划缺少交付类型，请在原规划会话补全每个子任务的交付类型。",
+    "kanban.errors.DELIVERY_PROFILE_UNAVAILABLE": "任务引用的交付类型不可用，请检查冻结配置。",
+    "kanban.errors.DELIVERY_CHAIN_INVALID": "规划应先完成所有源码任务，再统一发布一次，最后独立验收。请在原规划会话修正依赖。",
+    "kanban.errors.VERIFICATION_DEPLOYMENT_REQUIRED": "验收任务缺少唯一且已成功的发布回执，请检查它对发布任务的依赖。",
+    "kanban.errors.VERIFICATION_CHANGED_SOURCE": "验收任务修改了源码，请保留现场并另建修复任务。",
+    "kanban.errors.VERIFICATION_RUNNING_VERSION_MISMATCH": "当前运行版本与本次验收的发布回执不一致，请核对服务版本。",
+    "kanban.errors.AUTOMATIC_DELIVERY_PAUSED": "自动交付已暂停，继续后将从原步骤恢复。",
     'kanban.errors.WORKTREE_IN_USE': '工作树仍有执行或未确认操作，请检查执行会话后重试。',
     'kanban.errors.WORKTREE_EXECUTION_UNKNOWN': '无法确认执行是否已结束，请检查远程连接和会话状态。',
     'kanban.errors.OPERATION_RESULT_RECEIPT_INVALID': '执行结果文件格式不正确，请查看该操作的执行会话。',
@@ -393,6 +401,8 @@ export const zhCN = {
     "kanban.operationNeedsFlow": "请先配置项目的执行 Flow。",
     "kanban.operationNeedsPrevious": "请先完成前面的步骤。",
     "kanban.operationConfirmDeploy": "确认用此验收版本替换当前服务，切换期间允许短暂中断。",
+    "kanban.operationAcceptSource": "接受源码交付",
+    "kanban.operationConfirmSource": "确认此任务的源码与相关检查通过；整个任务链完成后统一发布并独立验收。",
     "kanban.operationConfirmAcceptance": "我已在此版本完成手工验收，确认通过。",
     "kanban.operationConfirmMerge": "确认按以上冲突选择合入主分支；源或目标变化时必须重新分析。",
     "kanban.operationAction.build": "构建验收版本",

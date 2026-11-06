@@ -33,7 +33,11 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
 export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
     if(job.action==='accept')return acceptReview(options,job);
     return coordinateOperation({service:options.service,journal:options.journal,key:jobKey(job.id),record:job,port:{
-        start:async record=>{if(record.managed){await options.adapter.managed!.submit(record.managed);return;}if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
+        start:async record=>{const board=await options.service.read(record.boardId);
+            if(board.executionControl?.paused)throw Object.assign(new Error('Delivery paused before admission'),{code:'AUTOMATIC_DELIVERY_PAUSED',executionOutcome:'not-started',retryable:true});
+            requireValue(!board.lifecycle,'BOARD_STOPPING');
+            const {item}=await options.service.item(record.boardId,record.itemId);requireValue(!item.deletedAt&&item.control?.action!=='cancel','TASK_CANCELLING');
+            if(record.managed){await options.adapter.managed!.submit(record.managed);return;}if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
         inspect:async record=>{
             if(record.managed)return options.adapter.managed!.inspect(record);
             const observation=await observeReview(options,record);
@@ -67,7 +71,7 @@ async function acceptReview(options: ReviewOperationsOptions, job: ReviewJob): P
     if (!(item.status === 'completed' && accepted)) {
         const current = await options.adapter.snapshot(await options.service.read(job.boardId), item);
         const code = current.version !== job.snapshot.version ? 'OPERATION_SOURCE_CHANGED_REBUILD'
-            : options.adapter.runningVersion?.() !== job.acceptanceVersion ? 'OPERATION_RUNNING_VERSION_MISMATCH' : undefined;
+            : job.acceptanceScope!=='source'&&options.adapter.runningVersion?.() !== job.acceptanceVersion ? 'OPERATION_RUNNING_VERSION_MISMATCH' : undefined;
         if (code) return save(options, job, {...job, phase: 'settled', state: 'failed', code});
         await journalCommand(options.journal, options.service, job.boardId, 'review-accept:' + job.id, command);
     }

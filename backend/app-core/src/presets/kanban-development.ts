@@ -1,3 +1,4 @@
+import {deliveryPolicy,deliveryProfile,deliveryEvidence} from './kanban-delivery-plan';
 import {planningSections} from './kanban-planning-sections';
 import {readGitCommitIdentity, type GitCommitIdentity} from './kanban-git-identity';
 import {kanbanJournalOptions} from '../kanban/host-policy';
@@ -59,6 +60,10 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
     const folder = await options.projects.get(projectId), view = await options.projects.openWorkspace(folder.path);
     try {
         const policy = await developmentStage(input.dispatch.id, 'policy.freeze', () => developmentPolicy(journal,options.fs,view.fs,input.dispatch.id,{...input.options,...(input.stage===undefined&&(input.context as {decision?:{snapshot?:{completion?:string}}})?.decision?.snapshot?.completion==='automatic'?{commit:'worktree'}:{})}));
+        let context=input.context;
+        if(input.stage==='decision'&&context)context={...context as object,snapshot:{...(context as {snapshot?:object}).snapshot,delivery:deliveryPolicy(policy)}};
+        const profile=input.stage===undefined?deliveryProfile(policy,input.item):undefined;
+        if(profile)context={...context as object,delivery:{...profile,...(profile.readOnly?{evidence:await deliveryEvidence(journal,context)}:{})}};
         const record = await developmentWorkspace(options.remote, options.provider, projectId, async process => {
             const existing = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id);
             const gitIdentity = existing ? existing.gitIdentity : policy.commit === 'worktree' ? await developmentStage(input.dispatch.id, 'git.identity', () => readGitCommitIdentity(process)) : undefined;
@@ -66,7 +71,7 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
             const repositories = await developmentStage(input.dispatch.id, 'modules.prepare', () => prepareWorktreeModules(journal, tree, policy.modules, process));
             const availableRepositories = await availableWorktreeModules(process, tree);
             return journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id,
-                old => old ?? {channelId: input.dispatch.id, projectId, directory: tree.directory, repositories, availableRepositories, policy, gitIdentity, instructions,...(input.context===undefined?{}:{context:input.context})});
+                old => old ?? {channelId: input.dispatch.id, projectId, directory: tree.directory, repositories, availableRepositories, policy, gitIdentity, instructions,...(context===undefined?{}:{context})});
         });
         if ((record.context as {board?: {id?: string}})?.board?.id) {
             const commitContext = record.commitContext ?? await freezeCommitContext(journal, {projectId, boardId: (record.context as {board:{id:string}}).board.id, itemId: input.item.id, itemRevision: input.item.revision, executionId: input.dispatch.id, context: record.context});
