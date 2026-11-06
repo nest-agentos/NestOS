@@ -15,7 +15,7 @@ export interface ReviewJob {
     managed?:import('../runtime/service-control').ServiceSwitchRequest;
     operationContext?: unknown; input?: IndependentCallInput; request?: SubmissionRequest; result?: unknown; createdAt: number;
     followUp?:{action:'deploy';state:'queued'|'started'|'failed';code?:string;request?:import('@nestos/kanban/contracts').KanbanItemOperationRequest};
-    command?: import('@nestos/kanban/contracts').KanbanCommand; acceptanceVersion?: string; acceptanceScope?: 'source'|'runtime';
+    command?: import('@nestos/kanban/contracts').KanbanCommand; acceptanceVersion?: string; acceptanceScope?: 'source'|'runtime'; acceptanceEvidence?: unknown;
 }
 export interface ReviewSettings {revision: number; bindings: Partial<Record<ReviewAction, KanbanExternalReference>>; jobs: string[]; receipts: Record<string, string>}
 export interface ReviewAdapter {
@@ -25,6 +25,7 @@ export interface ReviewAdapter {
     supports?(board: KanbanBoard, item: KanbanItem): boolean;
     runningVersion?(): string | undefined;
     snapshot(board: KanbanBoard, item: KanbanItem): Promise<ReviewSnapshot>;
+    acceptanceVersion?(board:KanbanBoard,item:KanbanItem,expectedVersion:string):Promise<{version:string;receipt:unknown}|undefined>;
     prepareOperation?(input: {id: string; action: Exclude<ReviewAction, 'accept'>; context?: unknown; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot}): Promise<SubmissionRequest>;
     readOperation?(job: ReviewJob): Promise<unknown | undefined>;
     prepareAnalysis(input: {id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot}): Promise<SubmissionRequest>;

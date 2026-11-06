@@ -236,3 +236,12 @@ it('keeps pre-acceptance runtime integration unavailable until the release is de
  await f.bind('merge');await f.run('analyze');const view=await f.api.itemOperations('board','task');
  expect(view.operations.find(op=>op.id==='merge')?.enabled).toBe(false);expect(view.operations.find(op=>op.id==='accept')?.enabled).toBe(false);
 });
+it('freezes a separately proven compatible runtime on acceptance without rewriting old deployment receipts',async()=>{
+ const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.scan();
+ f.published.inspect.mockResolvedValue({state:'running'});await f.run('deploy','deploy',{confirmed:true});f.complete('deploy');await f.api.scan();
+ f.adapter.runningVersion.mockReturnValue('newer');
+ f.options.adapter.acceptanceVersion=async()=>({version:'newer',receipt:{previousVersion:'candidate',verified:true}});
+ await f.run('accept','accept-newer',{confirmed:true});
+ expect(await f.journal.get<ReviewJob>(jobKey('accept-newer'))).toMatchObject({state:'succeeded',acceptanceVersion:'newer',acceptanceEvidence:{previousVersion:'candidate'}});
+ expect((await f.journal.get<ReviewJob>(jobKey('deploy')))?.result).toMatchObject({version:'candidate'});
+});

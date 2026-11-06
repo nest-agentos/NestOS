@@ -3,6 +3,7 @@ export interface ServiceSwitchRequest {operationId:string;serviceId:string;expec
 export interface RuntimeServiceDescriptor {id:string;version:string;artifact?:{format:string;manifest:string;store?:{base:'source-checkout';path:string}}}
 export interface RuntimeServiceControl {
     describe():Promise<RuntimeServiceDescriptor>;
+    provenance?():Promise<{serviceId:string;version:string;sourceCommit:string}|undefined>;
     submit(request:ServiceSwitchRequest):Promise<void>;
     inspect(request:ServiceSwitchRequest):Promise<{state:'running'|'succeeded'|'failed';version?:string;code?:string}>;
 }

@@ -17,7 +17,7 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         const pending = (tails.get(key) ?? Promise.resolve()).catch(() => {}).then(() => {requireValue(!stopped, 'SERVICE_STOPPING'); return work();}); tails.set(key, pending);
         void pending.finally(() => {if (tails.get(key) === pending) tails.delete(key);}).catch(() => {}); return pending;
     };
-    const automatic=automaticDelivery({...options,target:options.automaticTarget,plan:options.deliveryPlan,active:()=>!stopped,report:options.reportAutomatic,view:(board,item)=>queue(board,item,async()=>view(options,await load(options,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(options,board,request,true))});
+    const automatic=automaticDelivery({...options,target:options.automaticTarget,plan:options.deliveryPlan,active:()=>!stopped,report:options.reportAutomatic,retryPrecondition:(board,item,action,code)=>recoverAcceptancePrecondition(options,board,item,action,code),view:(board,item)=>queue(board,item,async()=>view(options,await load(options,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(options,board,request,true))});
     return {deliveryReady:automatic.ready,itemOperations: (board: string, item: string) => {
         requireValue(!stopped, 'SERVICE_STOPPING');
         return load(options, board, item, false).then(context => view(options, context));
@@ -156,17 +156,21 @@ async function operationInput(options: ReviewOperationsOptions, context: Context
 }
 async function acceptanceJob(options: ReviewOperationsOptions, context: Context, request: KanbanItemOperationRequest): Promise<ReviewJob> {
     const deployed = latest(context, 'deploy'), snapshot = await options.adapter.snapshot(context.board, context.item),scope=context.deliveryPlan?.acceptance??'runtime';
-    let version:string|undefined;
+    let version:string|undefined,acceptanceEvidence:unknown;
     if(scope==='runtime'){
         requireValue(deployed&&snapshot.sourceVersion===deployed.snapshot.sourceVersion,'OPERATION_SOURCE_CHANGED_REBUILD');
         requireValue(acceptsAfterMerge(context)?snapshot.targetVersion===(latest(context,'merge')?.result as {targetHead?:string})?.targetHead:snapshot.version===deployed.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');
         version=(deployed.result as {version:string}).version;
-        requireValue(options.adapter.runningVersion?.() === version, 'OPERATION_RUNNING_VERSION_MISMATCH');
+        if(options.adapter.runningVersion?.()!==version){
+            const replacement=await options.adapter.acceptanceVersion?.(context.board,context.item,version!);
+            requireValue(replacement&&replacement.version===options.adapter.runningVersion?.(),'OPERATION_RUNNING_VERSION_MISMATCH');
+            version=replacement.version;acceptanceEvidence=replacement.receipt;
+        }
     }
     const workflow = await options.service.workflow(context.board.id), dispatch = Object.values(workflow.dispatches).filter(row => row.itemId === context.item.id).sort((a, b) => b.attempt - a.attempt)[0];
     requireValue(dispatch?.outcome === 'succeeded', 'OPERATION_ACCEPTANCE_UNAVAILABLE');
     return {id: request.operationId, boardId: context.board.id, itemId: context.item.id, action: 'accept', phase: 'prepared', state: 'running',
-        fingerprint: sha256HexSync(JSON.stringify(request)), snapshot, createdAt: Date.now(), acceptanceVersion: version,acceptanceScope:scope,
+        fingerprint: sha256HexSync(JSON.stringify(request)), snapshot, createdAt: Date.now(), acceptanceVersion: version,acceptanceScope:scope,...(acceptanceEvidence===undefined?{}:{acceptanceEvidence}),
         command: {type: 'accept-execution', dispatchId: dispatch.id, accept: true}};
 }
 
@@ -201,4 +205,13 @@ async function followUp(options:ReviewOperationsOptions,board:string,item:string
 }
 async function markFollowUp(options:ReviewOperationsOptions,build:ReviewJob,state:'started'|'failed',code?:string) {
     await options.journal.update<ReviewJob>(jobKey(build.id),old=>({...old!,followUp:{...old!.followUp!,state,code}}));
+}
+
+/** Only an unadmitted acceptance may retry after trusted runtime provenance becomes available. */
+async function recoverAcceptancePrecondition(options:ReviewOperationsOptions,board:string,item:string,action:string,code:string):Promise<boolean> {
+    if(action!=='accept'||code!=='OPERATION_RUNNING_VERSION_MISMATCH'||!options.adapter.acceptanceVersion)return false;
+    const context=await load(options,board,item,false),deployed=latest(context,'deploy');
+    const expected=(deployed?.result as {version?:string})?.version;if(!expected)return false;
+    const proof=await options.adapter.acceptanceVersion(context.board,context.item,expected);
+    return !!proof&&proof.version===options.adapter.runningVersion?.();
 }

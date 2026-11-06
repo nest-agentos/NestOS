@@ -6,6 +6,7 @@ interface State {id:string;boardId:string;itemId:string;executionId:string;targe
 interface Options {service:KanbanService;journal:KanbanAutomationJournal;active():boolean;
     plan?(board:KanbanBoard,item:KanbanItem):Promise<{steps:string[];manualAfter?:string}>;
     target?(board:KanbanBoard,item:KanbanItem):string|undefined;automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;cleanup?(board:string,item:string,id:string):Promise<boolean>;
+    retryPrecondition?(board:string,item:string,action:string,code:string):Promise<boolean>;
     view(board:string,item:string):Promise<KanbanItemOperations>;run(board:string,request:KanbanItemOperationRequest):Promise<KanbanItemOperations>;
     report?(state:State):Promise<void>}
 const steps=['build','deploy','accept','analyze','merge','cleanup'];
@@ -69,7 +70,13 @@ async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workfl
 }
 async function resumeConfirmedOperation(options:Options,state:State):Promise<State> {
     const action=actions(state)[state.step];
-    const entry=(await options.view(state.boardId,state.itemId)).operations.find(row=>row.id===action);
+    const view=await options.view(state.boardId,state.itemId),entry=view.operations.find(row=>row.id===action);
+    if(entry?.enabled&&!entry.runId&&state.code&&await options.retryPrecondition?.(state.boardId,state.itemId,action,state.code)){
+        const previous=state.requests[action];
+        await options.journal.update('automatic-precondition-retry:'+previous.operationId,old=>old??previous);
+        const request={...previous,operationId:state.id+'-'+action+'-'+sha256HexSync(view.revision).slice(0,12),expectedRevision:view.revision};
+        return options.journal.update<State>(key(state.boardId,state.itemId),old=>({...old!,code:undefined,requests:{...old!.requests,[action]:request}}));
+    }
     if(entry?.state!=='succeeded'||!entry.runId)return state;
     return options.journal.update<State>(key(state.boardId,state.itemId),old=>({...old!,code:undefined,step:old!.step+1,resolvedBy:entry.runId}));
 }
@@ -80,7 +87,7 @@ async function advance(options:Options,state:State) {
         const done=await options.journal.update<State>(storageKey,old=>({...old!,done:true,code:undefined,cleanupPrecondition:undefined,step:actions(state).length}));await options.report?.(done);return;
     }
     const view=await options.view(state.boardId,state.itemId);if(!options.active())return;
-    const id=state.id+'-'+action,entry=view.operations.find(row=>row.id===action);
+    const id=state.requests[action]?.operationId??state.id+'-'+action,entry=view.operations.find(row=>row.id===action);
     if(entry?.state==='succeeded'&&(entry.runId||action==='accept')){
         await options.journal.update<State>(storageKey,old=>({...old!,waitingForUser:false,step:old!.step+1,...(entry.runId!==id?{resolvedBy:entry.runId}:{})}));return;
     }

@@ -108,3 +108,13 @@ it('builds once then waits for manual receipts across restarts without deploy, m
  f.item.status='completed';await automaticDelivery(f.options).scan();expect(f.options.cleanup).toHaveBeenCalledOnce();
  expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);expect(f.run).toHaveBeenCalledOnce();
 });
+it('retries only a proven unadmitted precondition with a new frozen identity and preserves the old request',async()=>{
+ const f=await fixture();f.options.plan=async()=>({steps:['accept','cleanup']});
+ const original=f.options.run;f.options.run=vi.fn(async()=>{throw Object.assign(Error('version changed'),{code:'OPERATION_RUNNING_VERSION_MISMATCH'});});
+ await automaticDelivery(f.options).scan();const old=f.options.run.mock.calls[0][1];
+ await automaticDelivery(f.options).scan();expect(f.options.run).toHaveBeenCalledOnce();
+ f.options.retryPrecondition=async()=>true;f.options.view=async()=>({revision:'new-revision',operations:[{id:'accept',enabled:true,state:'ready'}]});f.options.run=original;
+ await automaticDelivery(f.options).scan();
+ const retried=f.run.mock.calls[0][1];expect(retried.operationId).not.toBe(old.operationId);expect(retried.expectedRevision).toBe('new-revision');
+ expect(await f.journal.get('automatic-precondition-retry:'+old.operationId)).toEqual(old);
+});

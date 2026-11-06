@@ -1,3 +1,4 @@
+import {compatibleRuntimeDelivery} from './kanban-runtime-acceptance';
 import {retainedExecutionContexts} from '../projects/harness-context-selection';
 import {verifyFileDigest} from '../run/file-digest';
 import {verifyReadOnlyDelivery} from './kanban-delivery-plan';
@@ -54,6 +55,11 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
     };
     const managed=managedServiceDeployment(options.serviceControl,async item=>{const project=item.externalRefs?.find(ref=>ref.system==='nestos-remote-project');requireValue(project,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(project.id)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
     return {managed,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
+        acceptanceVersion:async(board,item,expectedVersion)=>{
+            const current=await resource(options,item,board.id),target=await managed?.describe?.(item),proof=await options.serviceControl?.provenance?.();
+            if(!target||!proof||proof.serviceId!==target.id||proof.version!==target.version||proof.version!==options.runningVersion)return;
+            return developmentWorkspace(options.remote,options.provider,current.record.projectId,process=>compatibleRuntimeDelivery(process,current.record,proof,expectedVersion));
+        },
         snapshot: (board, item) => snapshot(options, board, item), close: () => watches.dispose(),
         prepareAnalysis: input => prepareAnalysis(options, input), prepareOperation: async input => prepareAnalysis(options,{...input,...(input.action==='build'?{deployment:await managed?.describe?.(input.item)}:{})}),
         exchange: options.submission ? async (job, observation) => {
