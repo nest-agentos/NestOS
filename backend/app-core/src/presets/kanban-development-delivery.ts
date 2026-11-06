@@ -1,7 +1,8 @@
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {verifyCommitContexts} from './kanban-commit-context';
 import {developmentStage} from './kanban-development-log';
-import {failure} from '../run/prompt-bundle';
+import type {PromptJournal} from '../run/prompt-bundle';
+import {sha256HexSync} from '@nestos/common';
 import type {RepositoryEvidence} from '../projects/worktree-modules';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../projects/remote-mounts';
@@ -20,13 +21,16 @@ export function developmentDelivery(fs: IFileSystem, remote: ProjectRemoteMountS
                 const evidence = await verifyWorktreeDelivery(process, record.directory, record.repositories, record.policy.commit, record.availableRepositories);
                 if (record.commitContext && record.policy.commit === 'worktree') {
                     const commits = await verifyCommitContexts(process, record.directory, evidence, record.commitContext);
-                    await journal.update('development-commits:' + dispatchId, old => old ?? {contextDigest: record.commitContext!.digest, repositories: commits});
+                    const digest = sha256HexSync(JSON.stringify(evidence));
+                    await journal.update('development-commits:' + dispatchId + ':' + digest, old => old ?? {contextDigest: record.commitContext!.digest, repositories: commits});
                 }
                 return evidence;
             }));
-        await journal.update<{verifiedAt: number; commit: string; repositories: RepositoryEvidence[]}>('development-delivery:' + dispatchId, old => {
-            if (old && JSON.stringify(old.repositories) !== JSON.stringify(repositories)) throw failure('DELIVERY_CHANGED_AFTER_VERIFICATION');
-            return old ?? {verifiedAt: Date.now(), commit: record.policy.commit, repositories};
-        });
+        await recordDeliveryEvidence(journal, dispatchId, record.policy.commit, repositories);
     };
+}
+/** Every independently verified revision is immutable; a rebuild never overwrites earlier evidence. */
+export async function recordDeliveryEvidence(journal: PromptJournal, dispatchId: string, commit: string, repositories: RepositoryEvidence[]): Promise<void> {
+    const digest = sha256HexSync(JSON.stringify(repositories));
+    await journal.update('development-delivery:' + dispatchId + ':' + digest, old => old ?? {verifiedAt: Date.now(), commit, repositories});
 }

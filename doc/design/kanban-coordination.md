@@ -622,7 +622,7 @@ prepared/removing/cleaned 回执持久化。进入移除前的失败释放该次
 
 ### 提交来源与双向通道上下文
 
-新建开发工作区通过 `presets/kanban-commit-context` 冻结提交来源：用户存储的稳定 scope、项目、看板、事项及修订、执行身份和 workContext（包括来源决策的已保存运行快照）。上下文按 SHA-256 保存于原 automation journal，准备阶段发布 `commit-trailers.txt`。Conventional Commits 标题保持不变；允许 worktree 提交时，每个新提交附加 NestOS-Scope / NestOS-Board / NestOS-Task / NestOS-Execution / NestOS-Context trailer。changes 模式仍禁止提交。交付核验逐仓库读取真实 Git trailer，与冻结身份核对，再将提交列表关联到原派发；已存在于受信项目当前检出的提交不归属于当前任务，允许同步主线历史，但仅任务分支可达的提交（含同步合并提交）仍须携带本任务来源。源和目标历史各有 256 条上限，超限拒绝；不自动 amend、合并或提交用户改动。历史无元数据的工作区继续沿用旧契约，不伪造来源。
+新建开发工作区通过 `presets/kanban-commit-context` 冻结提交来源：用户存储的稳定 scope、项目、看板、事项及修订、执行身份和 workContext（包括来源决策的已保存运行快照）。上下文按 SHA-256 保存于原 automation journal，准备阶段发布 `commit-trailers.txt`。Conventional Commits 标题保持不变；允许 worktree 提交时，每个新提交附加 NestOS-Scope / NestOS-Board / NestOS-Task / NestOS-Execution / NestOS-Context trailer。changes 模式仍禁止提交。交付核验逐仓库读取真实 Git trailer，与冻结身份核对，再将提交列表关联到原派发；已存在于受信项目当前检出的提交不归属于当前任务，允许同步主线历史，但仅任务分支可达的提交（含同步合并提交）仍须携带本任务来源。源和目标历史各有 256 条上限，超限拒绝；交付核验与提交归属证据按派发身份和仓库证据摘要分别持久化，重新构建后的有效版本生成新记录，不覆盖首次交付；验收仍复验当前源码快照和实际运行版本；不自动 amend、合并或提交用户改动。历史无元数据的工作区继续沿用旧契约，不伪造来源。
 
 合并分析开始前，宿主有界读取源／目标对称差的最近提交，验证提交可达性及元数据所属用户存储和项目，读取冻结任务／决策与当前修订。`commit-contexts.json` 保存预载数据，manifest 仅保存其路径与摘要，避免重复正文挤占 manifest 容量；历史缺失、外部提交或范围超限明确进入 unresolved，不推断其他 task。独立仓库查询仅接受已登记模块；引用必须为完整提交 SHA，Git 参数不接收任意修订表达式。
 
