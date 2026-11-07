@@ -6,6 +6,8 @@ import type {DecisionConversationOptions,DecisionConversation} from './decision-
 import {validateRemoteReferences,REMOTE_PROJECT_REFERENCE} from './resource-catalog';
 import {requireValue} from './validation';
 interface Link {recordId:string;state:'draft'|'confirmed';proposalDigest:string}
+interface Proposal {record:KanbanRecordInput;proposalDigest:string}
+const proposalKey=(id:string)=>'decision-conversation-proposal:'+id;
 const linkKey=(id:string)=>'decision-conversation-record:'+id;
 
 /** A channel is scoped to one board and one decision; model IDs cannot select another decision. */
@@ -13,17 +15,17 @@ export async function resolveDecisionRequest(options:DecisionConversationOptions
     const link=await options.journal.get<Link>(linkKey(conversation.id)),board=await options.service.read(conversation.boardId);
     requireValue(!board.lifecycle&&!board.deletedAt,'BOARD_STOPPING');
     if(request.method==='decision.read') {
-        const record=link?await options.service.record(board.id,link.recordId):null;
+        const record=link?await options.service.record(board.id,link.recordId):null,proposal=await options.journal.get<Proposal>(proposalKey(conversation.id));
         const selected=request.params.itemIds;
         requireValue(selected===undefined||Array.isArray(selected)&&selected.length<=1&&selected.every(id=>typeof id==='string'),'INVALID_DETAIL_SELECTION');
         const tasks=board.items.filter(item=>record&&related(board.items,item.id,record.itemIds));
-        return {conversationId:conversation.id,board:{id:board.id,title:board.title},record,total:tasks.length,
+        return {conversationId:conversation.id,board:{id:board.id,title:board.title},record,...(!link&&proposal?{proposal}:{}),total:tasks.length,
             tasks:(Array.isArray(selected)?tasks.filter(item=>selected.includes(item.id)):tasks.slice(0,50)).map(item=>({id:item.id,title:item.title.slice(0,160),status:item.status,revision:item.revision,admittedAt:item.launch?.admittedAt,editing:item.launch?.editing,
                 ...(Array.isArray(selected)&&selected.includes(item.id)?{responsibility:item.responsibility,acceptance:item.acceptance,planning:item.planning}:{})}))};
     }
     if(request.method==='decision.propose')return propose(options,conversation,request);
-    requireValue(link,'DECISION_PROPOSAL_REQUIRED');
     if(request.method==='decision.confirm')return confirm(options,conversation,request,link);
+    requireValue(link,'DECISION_PROPOSAL_REQUIRED');
     if(request.method==='decision.begin-edit'||request.method==='decision.apply-edit'||request.method==='decision.cancel-edit')return reviseTasks(options,conversation,request,link);
     if(request.method==='decision.open-coordination')return openCoordination(options,conversation,request,link);
     throw Object.assign(new Error('Unsupported decision request'),{code:'DECISION_REQUEST_UNSUPPORTED'});
@@ -39,25 +41,32 @@ async function propose(options:DecisionConversationOptions,conversation:Decision
     const value=request.params as {id:string;title:string;content:string;rationale:string;projectIds:string[];verificationMode:string};
     requireValue(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.id)&&Array.isArray(value.projectIds)&&value.projectIds.length>0&&value.projectIds.length<=16,'DECISION_PROPOSAL_INVALID');
     const externalRefs=value.projectIds.map(id=>({system:REMOTE_PROJECT_REFERENCE,id}));await validateRemoteReferences(options.projects,{externalRefs});
-    const selected=kanbanVerificationOptions(value.verificationMode),record:KanbanRecordInput={id:value.id,kind:'decision',title:value.title,content:value.content,rationale:value.rationale,itemIds:[],externalRefs,discussionSessionId:conversation.resourceId,...selected,
+    const selected=kanbanVerificationOptions(value.verificationMode),record:KanbanRecordInput={id:value.id,kind:'decision',completion:'automatic',title:value.title,content:value.content,rationale:value.rationale,itemIds:[],externalRefs,discussionSessionId:conversation.resourceId,...selected,
         sources:[{sessionId:conversation.resourceId!,messageId:request.id,revision:channelDigest(request),role:'assistant'}]};
-    const previous=await options.journal.get<Link>(linkKey(conversation.id));requireValue(!previous||previous.recordId===value.id,'DECISION_ID_IMMUTABLE');
-    if(previous){const current=await options.service.record(conversation.boardId,previous.recordId);requireValue(current.status==='draft','DECISION_ALREADY_CONFIRMED');
-        await command(options,conversation,request,{type:'revise-record',recordId:value.id,title:value.title,content:value.content,rationale:value.rationale,externalRefs,...selected});}
-    else await command(options,conversation,request,{type:'append-record',record});
-    const link={recordId:value.id,state:'draft' as const,proposalDigest:channelDigest(record)};await options.journal.update<Link>(linkKey(conversation.id),()=>link);
-    return {...link,record:await options.service.record(conversation.boardId,value.id),confirmation:(await conversationPolicy(options.fs)).confirmDecision};
+    const previous=await options.journal.get<Link>(linkKey(conversation.id));requireValue(!previous,'DECISION_ALREADY_CONFIRMED');
+    requireValue([value.title,value.content,value.rationale].every(text=>typeof text==='string'&&text.trim().length>0),'DECISION_PROPOSAL_INVALID');
+    const proposal={record,proposalDigest:channelDigest(record)};
+    await options.journal.update<Proposal>(proposalKey(conversation.id),old=>{requireValue(!old||old.record.id===value.id,'DECISION_ID_IMMUTABLE');return proposal;});
+    return {state:'draft',...proposal,confirmation:(await conversationPolicy(options.fs)).confirmDecision};
 }
-async function confirm(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,link:Link) {
-    requireValue(request.params.proposalDigest===link.proposalDigest,'DECISION_PROPOSAL_CHANGED');
+async function confirm(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,previous?:Link) {
+    const proposal=await options.journal.get<Proposal>(proposalKey(conversation.id)),digest=previous?.proposalDigest??proposal?.proposalDigest;
+    requireValue(digest,'DECISION_PROPOSAL_REQUIRED');requireValue(request.params.proposalDigest===digest,'DECISION_PROPOSAL_CHANGED');
     await requireUserConfirmation(options,conversation,request,(await conversationPolicy(options.fs)).confirmDecision);
+    let link=previous;
+    if(!link){
+        requireValue(proposal,'DECISION_PROPOSAL_REQUIRED');
+        await validateRemoteReferences(options.projects,{externalRefs:proposal.record.externalRefs});
+        await command(options,conversation,request,{type:'append-record',record:proposal.record});
+        link=await options.journal.update<Link>(linkKey(conversation.id),()=>({recordId:proposal.record.id,state:'draft',proposalDigest:digest}));
+    }
     const record=await options.service.record(conversation.boardId,link.recordId);
     if(record.status==='draft')await command(options,conversation,request,{type:'review-record',recordId:link.recordId,accept:true});
     requireValue((await options.service.record(conversation.boardId,link.recordId)).status==='confirmed','DECISION_NOT_CONFIRMED');
     await options.journal.update<Link>(linkKey(conversation.id),old=>({...old!,state:'confirmed'}));
     const client=options.client();requireValue(client.runRecord,'RECORD_EXECUTION_UNAVAILABLE');
     const current=await options.service.record(conversation.boardId,link.recordId);
-    const frozen=await options.journal.update<import('@nestos/kanban/contracts').KanbanRecordRunRequest>('decision-run-request:'+conversation.id,old=>old??{recordId:link.recordId,operationId:'decision-run-'+conversation.id,expectedRevision:current.revision,placement:'current-board'});
+    const frozen=await options.journal.update<import('@nestos/kanban/contracts').KanbanRecordRunRequest>('decision-run-request:'+conversation.id,old=>old??{recordId:link!.recordId,operationId:'decision-run-'+conversation.id,expectedRevision:current.revision,placement:'current-board'});
     requireValue(options.active?.()!==false,'SERVICE_STOPPING');
     const run=await client.runRecord(conversation.boardId,frozen);
     return {recordId:link.recordId,state:'confirmed',execution:run};
@@ -94,4 +103,6 @@ async function openCoordination(options:DecisionConversationOptions,conversation
 function related(items:Array<{id:string;planning?:{parentId?:string}}>,id:string,roots:string[]):boolean {
     const seen=new Set<string>();while(!seen.has(id)){if(roots.includes(id))return true;seen.add(id);const parent=items.find(row=>row.id===id)?.planning?.parentId;if(!parent)return false;id=parent;}return false;
 }
-export async function decisionConversationState(options:DecisionConversationOptions,id:string) {return await options.journal.get<Link>(linkKey(id))??{};}
+export async function decisionConversationState(options:DecisionConversationOptions,id:string) {
+    return await options.journal.get<Link>(linkKey(id))??(await options.journal.get<Proposal>(proposalKey(id))?{state:'draft' as const}:{});
+}
