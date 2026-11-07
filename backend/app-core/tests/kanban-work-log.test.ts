@@ -147,3 +147,15 @@ it('repairs a legacy completion projection once without changing board state or 
     expect((await reopened.records(legacy,'board',{kind:'log'})).total).toBe(after.total);expect(execute).not.toHaveBeenCalled();
     expect(await f.service.read('board')).toEqual(board);expect(await f.service.workflow('board')).toEqual(workflow);
 });
+
+it('records cleanup for deleted tasks and keeps retries idempotent', async () => {
+    const f = await fixture(); await f.create('retired');
+    await f.command({type: 'cancel-item', itemId: 'retired', reason: 'Stopped'});
+    await f.command({type: 'delete-item', itemId: 'retired'});
+    const fact = {stage: 'worktree.cleaned', result: 'success' as const, dispatchId: 'cleanup-retired'};
+    await f.logs.append(f.service, 'board', 'retired', fact);
+    await f.logs.append(f.service, 'board', 'retired', fact);
+    const page = await f.records({kind: 'log', itemId: 'retired'});
+    expect(page.items.filter(row => row.activity?.stage === 'worktree.cleaned')).toHaveLength(1);
+    expect((await f.service.query('board', {view: 'all'})).items).toHaveLength(0);
+});

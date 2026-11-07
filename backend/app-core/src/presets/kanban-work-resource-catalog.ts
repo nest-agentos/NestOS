@@ -12,7 +12,8 @@ interface Options {journal:KanbanAutomationJournal;service:KanbanService;project
 const key=(board:string,id?:string)=>'work-resource:'+(id===undefined?JSON.stringify([board]).slice(0,-1)+',':JSON.stringify([board,id]));
 
 /** This small derived association is rebuilt from frozen workspace ownership, never treated as cleanup authority. */
-export async function registerWorkResource(journal:KanbanAutomationJournal,id:string,record:Pick<DevelopmentWorkspaceRecord,'projectId'|'context'>):Promise<void>{
+export async function registerWorkResource(journal:KanbanAutomationJournal,id:string,record:Pick<DevelopmentWorkspaceRecord,'projectId'|'context'|'worktreeId'>):Promise<void>{
+    if(record.worktreeId&&record.worktreeId!==id)return;
     const context=record.context as {board?:{id?:string};task?:KanbanItem}|undefined,item=context?.task,boardId=context?.board?.id;
     if(!boardId||!item?.id)return;
     const association:Association={id,boardId,itemId:item.id,parentId:item.planning?.parentId,projectId:record.projectId,createdAt:item.createdAt??0};
@@ -32,8 +33,8 @@ export async function boardWorkResources(options:Options,boardId:string,query:Ka
         const limit=query.limit??30;requireValue(Number.isInteger(limit)&&limit>0&&limit<=100&&(query.includeCleaned===undefined||typeof query.includeCleaned==='boolean'),'INVALID_WORK_RESOURCE_QUERY');
         await options.service.query(boardId,{view:'all',limit:1});await ensureCatalog(options.journal);
         const associations=(await options.journal.find<Association>(key(boardId),row=>row.boardId===boardId)).map(row=>row.value).sort((a,b)=>b.createdAt-a.createdAt||a.id.localeCompare(b.id));
-        const cleanup=await options.journal.getMany<Cleanup>(associations.map(row=>'worktree-cleanup:'+row.id));
-        const visible=associations.filter((_row,index)=>query.includeCleaned||cleanup[index]?.phase!=='cleaned');
+        const [cleanup,trees]=await Promise.all([options.journal.getMany<Cleanup>(associations.map(row=>'worktree-cleanup:'+row.id)),options.journal.getMany<PreparedWorktree>(associations.map(row=>'worktree:'+row.id))]);
+        const visible=associations.filter((_row,index)=>trees[index]&&(query.includeCleaned||cleanup[index]?.phase!=='cleaned'));
         const start=query.cursor?visible.findIndex(row=>row.id===query.cursor)+1:0;
         requireValue(!query.cursor||start>0,'CURSOR_STALE');
         const page=visible.slice(start,start+limit),items=await catalogRows(options,boardId,page);

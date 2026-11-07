@@ -27,9 +27,18 @@ it('lists indexed ownership and live group progress without inspecting Git or re
 });
 it('paginates only the requested ownership rows and rejects invalid cursors or unauthorized boards',async()=>{
  const f=await fixture();await f.journal.update('work-resource-catalog-version',()=>1);
+ for(const id of ['a','b'])await f.journal.update('worktree:'+id,()=>({id,directory:'/workspace/_nestos/worktrees/'+id,branch:'work/'+id}));
  for(const id of ['a','b'])await registerWorkResource(f.journal,id,{projectId:'project',context:{board:{id:'board'},task:{id:'child',createdAt:1,planning:{parentId:'group'}}}} as any);
  const page=await boardWorkResources(f.options,'board',{limit:1});expect(page.total).toBe(2);expect(page.items).toHaveLength(1);
  const next=await boardWorkResources(f.options,'board',{limit:1,cursor:page.nextCursor});expect(next.items[0].id).not.toBe(page.items[0].id);expect(next.nextCursor).toBeUndefined();
  await expect(boardWorkResources(f.options,'board',{cursor:'absent'})).rejects.toMatchObject({code:'CURSOR_STALE'});
  f.query.mockRejectedValueOnce(Object.assign(new Error('Denied'),{code:'EACCES'}));await expect(boardWorkResources(f.options,'other')).rejects.toMatchObject({code:'EACCES'});
+});
+
+it('does not represent reused lifecycle workspaces or uncreated preparation intents as additional Git worktrees',async()=>{
+ const f=await fixture(),record={projectId:'project',context:{board:{id:'board'},task:{id:'child',createdAt:1}}} as any;
+ await registerWorkResource(f.journal,'source',record);await f.journal.update('worktree:source',()=>({id:'source',directory:'/workspace/_nestos/worktrees/source',branch:'work/source'}));
+ await registerWorkResource(f.journal,'source-postload-succeeded',{...record,worktreeId:'source'});
+ await registerWorkResource(f.journal,'not-created',record);
+ const page=await boardWorkResources(f.options,'board',{includeCleaned:true});expect(page.total).toBe(1);expect(page.items.map(row=>row.id)).toEqual(['source']);
 });
