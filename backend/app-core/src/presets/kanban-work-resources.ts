@@ -1,3 +1,5 @@
+import {readManagedBranches,inspectManagedBranches,removeManagedBranches,type ManagedBranch} from './kanban-work-resource-branches';
+import {boardWorkResources as readBoardResources} from './kanban-work-resource-catalog';
 import {inspectRemovalModules} from '../projects/worktree-removal-modules';
 import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
@@ -30,12 +32,12 @@ interface Cleanup {operationId: string; boardId: string; itemId: string; version
 interface ResourceScope {id: string; item: Awaited<ReturnType<KanbanService['item']>>['item']; record: DevelopmentWorkspaceRecord; tree: PreparedWorktree}
 
 export function developmentWorkResources(options: Options) {
-    return {archiveItemResources:(board:string,item:string,operation:string)=>archiveAssociations(options,board,item,operation),workResources: async (boardId: string, itemId: string, query?: import('@nestos/kanban/contracts').KanbanWorkResourceQuery) => {
+    return {boardWorkResources:(board:string,query?:import('@nestos/kanban/contracts').KanbanBoardWorkResourceQuery)=>readBoardResources({journal:options.journal,service:options.service,projectLabel:async id=>(await options.projects.get(id)).name},board,query),archiveItemResources:(board:string,item:string,operation:string)=>archiveAssociations(options,board,item,operation),workResources: async (boardId: string, itemId: string, query?: import('@nestos/kanban/contracts').KanbanWorkResourceQuery) => {
         const started = Date.now(), operationId = randomUUID(), stage = query?.inspect === false ? 'associations' : 'inspect';
         try {
-            requireValue(query === undefined || !!query && typeof query === 'object' && !Array.isArray(query) && Object.keys(query).every(key => key === 'inspect')
-                && (query.inspect === undefined || typeof query.inspect === 'boolean'), 'INVALID_WORK_RESOURCE_QUERY');
-            const rows = await (query?.inspect === false ? associations(options, boardId, itemId) : list(options, boardId, itemId));
+            requireValue(query === undefined || !!query && typeof query === 'object' && !Array.isArray(query) && Object.keys(query).every(key => key === 'inspect'||key==='resourceId')
+                && (query.inspect === undefined || typeof query.inspect === 'boolean')&&(query.resourceId===undefined||typeof query.resourceId==='string'&&/^[\w-]{1,128}$/.test(query.resourceId)), 'INVALID_WORK_RESOURCE_QUERY');
+            const rows = await (query?.inspect === false ? associations(options, boardId, itemId,query.resourceId) : list(options, boardId, itemId,query?.resourceId));
             log.debug('work-resource.list', {operation: 'work-resource.list', operationId, stage, result: 'success', count: rows.length, durationMs: Date.now() - started}); return rows;
         } catch (error) {
             log.warn('work-resource.list', {operation: 'work-resource.list', operationId, stage, result: 'failure', code: safeCode(error), durationMs: Date.now() - started}); throw error;
@@ -43,8 +45,8 @@ export function developmentWorkResources(options: Options) {
     },
         cleanupWorkResource: (boardId: string, request: KanbanWorkResourceCleanup) => cleanup(options, boardId, structuredClone(request))};
 }
-async function associations(options: Options, boardId: string, itemId: string): Promise<KanbanWorkResource[]> {
-    const refs = await references(options, boardId, itemId), rows: KanbanWorkResource[] = [];
+async function associations(options: Options, boardId: string, itemId: string,resourceId?:string): Promise<KanbanWorkResource[]> {
+    const refs = (await references(options, boardId, itemId)).filter(ref=>!resourceId||ref.id===resourceId), rows: KanbanWorkResource[] = [];
     for (let offset = 0; offset < refs.length; offset += 8) rows.push(...await Promise.all(refs.slice(offset, offset + 8).map(async (ref): Promise<KanbanWorkResource> => {
         const [tree, cleanup] = await Promise.all([options.journal.get<PreparedWorktree>('worktree:' + ref.id), options.journal.get<Cleanup>('worktree-cleanup:' + ref.id)]);
         return {archivedAt:tree?.archivedAt,id: ref.id, kind: 'git-worktree', title: tree?.branch ?? ref.id, location: tree?.directory ?? ref.id, version: '',
@@ -80,8 +82,8 @@ async function scope(options: Options, boardId: string, itemId: string, id: stri
     requireValue(item.externalRefs?.some(ref => ref.system === 'nestos-remote-project' && ref.id === record.projectId), 'WORKTREE_PROJECT_CHANGED');
     return {id, item, record, tree};
 }
-async function list(options: Options, boardId: string, itemId: string): Promise<KanbanWorkResource[]> {
-    const refs = await references(options, boardId, itemId), rows: KanbanWorkResource[] = [];
+async function list(options: Options, boardId: string, itemId: string,resourceId?:string): Promise<KanbanWorkResource[]> {
+    const refs = (await references(options, boardId, itemId)).filter(ref=>!resourceId||ref.id===resourceId), rows: KanbanWorkResource[] = [];
     for (let offset = 0; offset < refs.length; offset += 4) {
         const batch = await Promise.allSettled(refs.slice(offset, offset + 4).map(ref => inspectReference(options, boardId, itemId, ref, refs)));
         for (const row of batch) {if (row.status === 'rejected') throw row.reason; rows.push(row.value);}
@@ -95,7 +97,7 @@ async function inspectReference(options: Options, boardId: string, itemId: strin
         log.warn('work-resource.inspect', {operation: 'work-resource.inspect', operationId: randomUUID(), stage: 'inspect',
             result: 'failure', code: safeCode(error), resourceId: /^[\w-]{1,128}$/.test(ref.id) ? ref.id : undefined, durationMs: Date.now() - started});
         const tree = /^[\w-]{1,128}$/.test(ref.id) ? await options.journal.get<PreparedWorktree>('worktree:' + ref.id) : undefined;
-        return {id: ref.id, kind: 'git-worktree', title: 'Git worktree', location: tree?.directory ?? ref.id, version: '',
+        return {id: ref.id, kind: 'git-worktree', title: tree?.branch??ref.id, location: tree?.directory ?? ref.id, version: '',
             ownership: 'unknown', state: 'unknown', canCleanup: false, reasons: [safeCode(error)], properties: tree ? [{label: t('kanban.workResourceBranch'), value: tree.branch}] : []};
     }
 }
@@ -103,21 +105,22 @@ async function inspect(options: Options, boardId: string, resource: ResourceScop
     const {id, item, record, tree} = resource, saved = await options.journal.get<Cleanup>('worktree-cleanup:' + id);
     const context = record.context as {board?: {id?: string}; task?: {id?: string}} | undefined;
     const ownership = context?.board?.id && context?.task?.id ? context.board.id === boardId && context.task.id === item.id ? 'current' as const : 'other' as const : 'unknown' as const;
-    const base = {id,archivedAt:tree.archivedAt, ownership, kind: 'git-worktree', title: 'Git worktree', location: record.directory,
+    const base = {id,archivedAt:tree.archivedAt, ownership, kind: 'git-worktree', title: tree.branch, location: record.directory,
         properties: [{label: t('kanban.workResourceBranch'), value: tree.branch}, {label: t('kanban.workResourceProject'), value: (await options.projects.get(record.projectId)).name}]};
     if (saved) return {...base, properties: [...base.properties, ...(saved.archive ? [{label: t('kanban.workResourceArchive'), value: saved.archive}] : [])], version: saved.version, state: saved.phase === 'cleaned' ? 'cleaned' : 'unknown', canCleanup: false,
         reasons: saved.phase === 'cleaned' ? [] : ['WORKTREE_CLEANUP_UNCONFIRMED']};
     if (ownership !== 'current') return {...base, version: sha256HexSync(JSON.stringify([id, ownership, item.revision])), state: 'retained', canCleanup: false, reasons: [ownership === 'other' ? 'WORKTREE_OTHER_OWNER' : 'WORKTREE_ASSOCIATION_UNVERIFIED']};
     if (await sharedReference(options, boardId, id, item.id)) return {...base,version:sha256HexSync(JSON.stringify([id,'shared',item.revision])),state:'retained',canCleanup:false,reasons:['WORKTREE_SHARED']};
-    const {state,modules,reasons}=await developmentWorkspace(options.remote,options.provider,record.projectId,process=>removalState(process,resource));
+    const declarations=await managedBranches(options,resource);
+    const {state,modules,temporary,reasons}=await developmentWorkspace(options.remote,options.provider,record.projectId,process=>removalState(process,resource,declarations));
     if (context?.board?.id !== boardId || context?.task?.id !== item.id) reasons.push('WORKTREE_ASSOCIATION_UNVERIFIED');
     if (!['completed','cancelled'].includes(item.status)) reasons.push('WORKTREE_TASK_UNFINISHED');
     const dispatch = (await options.service.workflow(boardId)).dispatches[id];
     if (dispatch && ['prepared', 'running', 'unknown', 'succeeded'].includes(dispatch.outcome)) reasons.push('WORKTREE_IN_USE');
     if (!reasons.length) reasons.push(...await workResourceExecution(options, id, record.projectId));
-    const version = sha256HexSync(JSON.stringify([state.version,modules?.version,item.revision,item.status,reasons]));
+    const version = sha256HexSync(JSON.stringify([state.version,modules?.version,temporary.version,item.revision,item.status,reasons]));
     return {...base, version, reasons, state: reasons.includes('WORKTREE_IN_USE') ? 'in-use' : reasons.length ? 'retained' : 'cleanup-ready',
-        canCleanup: reasons.length === 0, properties: [...base.properties, {label: t('kanban.workResourceTarget'), value: state.targetBranch},
+        canCleanup: reasons.length === 0, properties: [...base.properties,...temporary.branches.map(branch=>({label:t('kanban.workResourceTemporaryBranch'),value:branch.repository+' · '+branch.name})), {label: t('kanban.workResourceTarget'), value: state.targetBranch},
             ...(state.head ? [{label: 'HEAD', value: state.head.slice(0, 12)}] : [])]};
 }
 async function cleanup(options: Options, boardId: string, request: KanbanWorkResourceCleanup): Promise<KanbanWorkResource> {
@@ -159,25 +162,33 @@ async function remove(options: Options, resource: ResourceScope, key: string, bo
         const archive = await archiveWorktree(view.fs, options.fs, record.directory, id);
         await options.journal.update<Cleanup>(key, old => ({...old!, archive}));
         await developmentWorkspace(options.remote, options.provider, record.projectId, async process => {
-            const {state,modules,reasons}=await removalState(process,resource);
+            const declared=await readManagedBranches(view.fs,record.directory,id,['.',...record.repositories?.map(row=>row.path)??[],...record.availableRepositories?.map(row=>row.path)??[]]);
+            const {state,modules,temporary,reasons}=await removalState(process,resource,declared);
             requireValue(!reasons.length,reasons[0]??'WORKTREE_STATE_CHANGED');
             requireValue(!await sharedReference(options,boardId,id,resource.item.id),'WORKTREE_SHARED');
             const latest = (await options.service.item(boardId, resource.item.id)).item;
-            requireValue(['completed','cancelled'].includes(latest.status) && sha256HexSync(JSON.stringify([state.version,modules?.version,latest.revision,latest.status,[]])) === version, 'WORKTREE_STATE_CHANGED');
+            requireValue(['completed','cancelled'].includes(latest.status) && sha256HexSync(JSON.stringify([state.version,modules?.version,temporary.version,latest.revision,latest.status,[]])) === version, 'WORKTREE_STATE_CHANGED');
             requireValue(!(await workResourceExecution(options, id, record.projectId)).length, 'WORKTREE_IN_USE');
             await archiveWorktree(view.fs, options.fs, record.directory, id);
             await options.journal.update<Cleanup>(key, old => ({...old!, phase: 'removing'}));
+            await removeManagedBranches(process,temporary);
             await gitWorkspace(process, '/workspace', ['worktree','remove',...(modules?['--force']:[]),tree.directory]);
             await gitWorkspace(process, '/workspace', ['branch', '-d', tree.branch]);
             await options.journal.update<Cleanup>(key, old => ({...old!, phase: 'cleaned'}));
         });
     } finally {await view.dispose();}
 }
-async function removalState(process:import('../projects/remote-mounts').RemoteProcessHandle,resource:ResourceScope) {
+async function removalState(process:import('../projects/remote-mounts').RemoteProcessHandle,resource:ResourceScope,branches:ManagedBranch[]=[]) {
     const state=await inspectWorktree(process,resource.tree,'_nestos/kanban/');
     const modules=state.initializedModules?await inspectRemovalModules(process,resource.tree.directory,[...resource.record.repositories??[],...resource.record.availableRepositories??[]]):undefined;
-    const reasons=[...worktreeBlockers(state).filter(reason=>reason!=='WORKTREE_INITIALIZED_MODULES'||!modules),...modules?.reasons??[]];
-    return {state,modules,reasons:[...new Set(reasons)]};
+    const temporary=await inspectManagedBranches(process,branches);
+    const reasons=[...temporary.reasons,...worktreeBlockers(state).filter(reason=>reason!=='WORKTREE_INITIALIZED_MODULES'||!modules),...modules?.reasons??[]];
+    return {state,modules,temporary,reasons:[...new Set(reasons)]};
+}
+async function managedBranches(options:Options,resource:ResourceScope):Promise<ManagedBranch[]>{
+    const folder=await options.projects.get(resource.record.projectId),view=await options.projects.openWorkspace(folder.path);
+    try{return await readManagedBranches(view.fs,resource.record.directory,resource.id,['.',...resource.record.repositories?.map(row=>row.path)??[],...resource.record.availableRepositories?.map(row=>row.path)??[]]);}
+    finally{await view.dispose();}
 }
 function safeCode(error: unknown): string {
     const value = error as {code?: unknown; remoteCode?: unknown}, code = value?.remoteCode ?? value?.code;

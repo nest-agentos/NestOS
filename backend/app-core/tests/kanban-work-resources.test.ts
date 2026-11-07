@@ -196,3 +196,23 @@ it('retains ignored files inside populated modules instead of treating a clean p
  const resource=(await f.api.workResources('board','item'))[0];expect(resource).toMatchObject({canCleanup:false,reasons:expect.arrayContaining(['WORKTREE_UNTRACKED_IGNORED'])});
  expect(f.commands.some(args=>args[0]==='worktree'&&args[1]==='remove')).toBe(false);
 });
+
+it('removes explicitly registered merged temporary branches and preserves unrelated branches',async()=>{
+ const f=await fixture();await f.git(f.root,['branch','verify/ready/check']);await f.git(f.root,['branch','backup/keep-user-copy']);
+ await f.fs.driver.createFile({parentPath:f.tree.directory+'/_nestos/kanban',name:'managed-resources.json',content:JSON.stringify({schema:'nestos.managed-resources/1',scopeId:'ready',branches:[{repository:'.',name:'verify/ready/check'}]}),recursive:true});
+ const resource=(await f.api.workResources('board','item'))[0];expect(resource.canCleanup).toBe(true);expect(resource.properties.some(row=>row.value.includes('verify/ready/check'))).toBe(true);
+ await f.api.cleanupWorkResource('board',{operationId:'cleanup-registered',itemId:'item',resourceId:'ready',version:resource.version});
+ await expect(f.git(f.root,['rev-parse','--verify','refs/heads/verify/ready/check'])).rejects.toBeDefined();expect((await f.git(f.root,['rev-parse','--verify','refs/heads/backup/keep-user-copy'])).stdout.trim()).toHaveLength(40);
+});
+it('retains branches outside the registered task scope',async()=>{
+ const f=await fixture();
+ await f.fs.driver.createFile({parentPath:f.tree.directory+'/_nestos/kanban',name:'managed-resources.json',content:JSON.stringify({schema:'nestos.managed-resources/1',scopeId:'ready',branches:[{repository:'.',name:'backup/other/task'}]}),recursive:true});
+ expect((await f.api.workResources('board','item'))[0]).toMatchObject({canCleanup:false,reasons:['WORKTREE_BRANCH_SCOPE_INVALID']});
+});
+
+it('refuses cleanup while a registered temporary branch contains unintegrated commits',async()=>{
+ const f=await fixture();await f.git(f.root,['switch','-c','fix/ready/change']);await writeFile(join(f.root,'fix.txt'),'Unintegrated');await f.git(f.root,['add','fix.txt']);await f.git(f.root,['commit','-m','test: unintegrated fix']);await f.git(f.root,['switch','main']);
+ await f.fs.driver.createFile({parentPath:f.tree.directory+'/_nestos/kanban',name:'managed-resources.json',content:JSON.stringify({schema:'nestos.managed-resources/1',scopeId:'ready',branches:[{repository:'.',name:'fix/ready/change'}]}),recursive:true});
+ const resource=(await f.api.workResources('board','item'))[0];expect(resource.canCleanup).toBe(false);expect(resource.reasons).toContain('WORKTREE_TEMP_BRANCH_NOT_INTEGRATED');
+ expect((await f.git(f.root,['rev-parse','--verify','refs/heads/fix/ready/change'])).stdout.trim()).toHaveLength(40);
+});

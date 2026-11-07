@@ -1,3 +1,4 @@
+import {registerWorkResource} from './kanban-work-resource-catalog';
 import {initializeResourceIndex} from '../kanban/resource-operation-index';
 import {decisionDeliveryPolicy,selectedDeliveryProfile,deliveryEvidence} from './kanban-delivery-plan';
 import {planningSections} from './kanban-planning-sections';
@@ -43,6 +44,7 @@ export function developmentPreparation(options: Options): NonNullable<PersonalKa
         const template = await developmentStage(input.dispatch.id, 'connection.resolve', () => options.connections.get(connectionId));
         requireValue(template?.connection && template.connection.enabled !== false, 'NATIVE_CONNECTION_REQUIRED');
         const projectId = selected[0].id, directory = '_nestos/worktrees/' + input.dispatch.id;
+        await registerWorkResource(journal,input.dispatch.id,{projectId,context:input.context});
         const record = await prepareWorkspace(options, journal, input, projectId, template.connection.profileId, directory, [source.definition.config.systemPrompt, ...source.systemPrompt?.content ?? []].filter(Boolean).join('\n\n'));
         await input.reportActivity?.({stage: 'worktree.prepared', result: 'success', fields: {directory: record.directory, branch: record.repositories[0]?.branch ?? '', baseCommit: record.repositories[0]?.baseCommit ?? ''},
             references: [{system: 'nestos-worktree', id: input.dispatch.id, revision: JSON.stringify({projectId, directory: record.directory, repositories: record.repositories})}]});
@@ -90,6 +92,7 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
             {...scope, entry: input.stage === 'decision' ? 'prompts/decision.md' : input.stage === 'fix' ? 'prompts/task-fix-pre.md' : 'prompts/task.md', commit: policy.commit, gitIdentity: record.gitIdentity, repositories: record.repositories, availableRepositories: record.availableRepositories,...(record.context===undefined?{}:{input:planningSections(record.context).context})}));
         await recordPublication(journal, input.dispatch.id, digest);
         await openDevelopmentChannel(options.remote, input.dispatch.id, record, scope, input.item);
+        await registerWorkResource(journal,input.dispatch.id,record);
         return record;
     } finally {await view.dispose();}
 }

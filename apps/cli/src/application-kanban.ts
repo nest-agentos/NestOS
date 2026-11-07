@@ -27,6 +27,7 @@ export async function kanbanCommand(client: ApplicationClient, args: string[], o
     if (action === 'query') return service.query(boardId,options.file?await jsonFile(options.file):{view:'all'});
     if (action === 'item-resources' && service.itemResources) return service.itemResources(boardId, itemId);
     if (action === 'show') return service.read(boardId);
+    if(action==='worktrees'&&service.boardWorkResources)return service.boardWorkResources(boardId,options.file?await jsonFile(options.file):undefined);
     if (action === 'work-resources' && itemId && service.workResources) return service.workResources(boardId, itemId);
     if (action === 'cleanup-work-resource' && service.cleanupWorkResource) return service.cleanupWorkResource(boardId, await jsonFile<Parameters<NonNullable<Service['cleanupWorkResource']>>[1]>(options.file));
     if (action === 'workflow') return service.workflow(boardId);

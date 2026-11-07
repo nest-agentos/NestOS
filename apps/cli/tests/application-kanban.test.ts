@@ -94,3 +94,9 @@ it('freezes a dependency restart against the reviewed scope and reuses the opera
  await kanbanCommand(client,['task','restart','board','source'],{file});expect(restartTask.mock.calls[1]).toEqual(first);
  expect(first).toEqual(['board',expect.objectContaining({itemId:'source',version:'scope-version',confirmed:true})]);expect(previewTaskRestart).toHaveBeenCalledTimes(1);
 });
+
+it('reads the board worktree catalog without invoking per-task Git checks',async()=>{
+ const boardWorkResources=vi.fn(async()=>({items:[],total:0})),workResources=vi.fn();
+ const client={services:{kanban:{boardWorkResources,workResources}}} as unknown as ApplicationClient;
+ expect(await kanbanCommand(client,['worktrees','development'],{})).toEqual({items:[],total:0});expect(boardWorkResources).toHaveBeenCalledWith('development',undefined);expect(workResources).not.toHaveBeenCalled();
+});
