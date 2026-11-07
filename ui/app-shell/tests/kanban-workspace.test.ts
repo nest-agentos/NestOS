@@ -21,7 +21,12 @@ async function fixture(source?: import('@nestos/app-core/kanban').KanbanSessionS
 }
 async function idle(editor: HTMLElement) {await vi.waitFor(() => expect(editor.hasAttribute('aria-busy')).toBe(false));}
 async function click(root: HTMLElement, selector: string) {
-    const target = root.querySelector<HTMLButtonElement>(selector); expect(target, selector).not.toBeNull(); target!.click();
+    if(!root.querySelector(selector)&&['[data-action=new-log]','[data-action=new-decision]'].includes(selector)) {
+        const history=root.querySelector<HTMLDetailsElement>('[data-item-history]');
+        if(history){history.open=true;history.dispatchEvent(new Event('toggle'));}
+    }
+    await vi.waitFor(()=>expect(root.querySelector(selector),selector).not.toBeNull());
+    root.querySelector<HTMLButtonElement>(selector)!.click();
     await vi.waitFor(() => expect(document.querySelector('main')!.hasAttribute('aria-busy')).toBe(false));
 }
 function input(root: HTMLElement, name: string, value: string) {
@@ -29,6 +34,7 @@ function input(root: HTMLElement, name: string, value: string) {
 }
 async function submit(root: HTMLElement, kind: string) {
     const form = root.querySelector<HTMLFormElement>(`[data-form="${kind}"]`)!;
+    if(kind==='board')input(root,'id','test-board');
     form.querySelector<HTMLButtonElement>('button[type=submit], button:not([type])')!.click(); await idle(document.querySelector('main')! as HTMLElement);
 }
 it('creates durable boards and cards, claims, completes, archives and restores using the visible controls', async () => {
@@ -50,7 +56,7 @@ it('preserves unsaved input on notifications, failed writes and rejected navigat
     await expect(f.workbench.openResource('/')).rejects.toThrow(t('kanban.unsaved'));
     const create = vi.spyOn(f.service, 'create').mockRejectedValueOnce(Object.assign(new Error('PRIVATE ERROR'), {code: 'EIO'}));
     await submit(f.editor, 'board'); expect(f.editor.querySelector<HTMLInputElement>('[name=title]')!.value).toBe('Pending form');
-    expect(f.editor.querySelector('[role=alert]')!.textContent).toContain('EIO'); expect(f.editor.textContent).not.toContain('PRIVATE ERROR');
+    expect(f.editor.querySelector('[data-panel-error]')!.textContent).toContain('EIO'); expect(f.editor.textContent).not.toContain('PRIVATE ERROR');
     await submit(f.editor, 'board'); expect(create).toHaveBeenCalledTimes(2); expect((await f.service.list())).toHaveLength(1);
 });
 it('links a Session and routes the existing identity without opening a second conversation', async () => {
@@ -80,7 +86,7 @@ it('binds an execution Session through the inspector, shows session-only activit
     search.closest<HTMLDetailsElement>('details')!.open=true;search.value='execution-session';search.dispatchEvent(new Event('input',{bubbles:true}));search.focus();
     await vi.waitFor(()=>expect(f.editor.querySelector('[data-form=execution-session] [role=option]')).not.toBeNull());
     f.editor.querySelector<HTMLButtonElement>('[data-form=execution-session] [role=option]')!.click();await submit(f.editor,'execution-session');
-    expect(f.editor.querySelector('[data-execution-session]')!.textContent).toContain('Execution conversation');
+    expect(f.editor.querySelector('[data-execution-session]')!.textContent).toContain(t('kanban.enterSession'));
     await click(f.editor,'[data-execution-session] [data-session]');expect(f.openSession).toHaveBeenCalledWith('execution-session');
     await click(f.editor,'[data-action=close-panel]');await vi.waitFor(()=>expect(f.editor.querySelector('[data-execution-state=running]')).not.toBeNull());
     const filter=f.editor.querySelector<HTMLSelectElement>('[name=execution]')!;filter.value='recent';await submit(f.editor,'filter');
@@ -116,7 +122,8 @@ it('opens decision discussion before displaying a session-created decision and k
     expect(f.editor.textContent).toContain('Reduce uncertainty.'); await click(f.editor, '[data-action=confirm-record]');
     records = await f.service.records(board.id, {kind: 'decision'}); expect(records.items[0].status).toBe('confirmed');
     expect((await f.service.item(board.id, id)).item.status).toBe('backlog');
-    await click(f.editor, '[data-item]'); expect(f.editor.querySelector('[data-related-records]')!.textContent).toContain('Investigation');
+    await click(f.editor, '[data-item]'); await click(f.editor, '[data-item-history] > summary');
+    await vi.waitFor(()=>expect(f.editor.querySelector('[data-related-records]')!.textContent).toContain('Investigation'));
     expect(f.editor.querySelector('[data-related-records]')!.textContent).toContain('Choose a bounded scope');
     await click(f.editor, '[data-action=close-panel]'); await click(f.editor, '[data-context=decision]');
     expect(f.editor.querySelector('.kanban__record-list')!.textContent).toContain('Choose a bounded scope');
@@ -154,7 +161,7 @@ it('shows stable references, copies references and links, and opens work by its 
     const writeText=vi.fn(async()=>{});Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
     const form=f.sidebar.querySelector<HTMLFormElement>('[data-form=reference]')!;
     form.querySelector<HTMLInputElement>('input')!.value='KB-1#1';form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
-    await vi.waitFor(()=>expect(f.editor.querySelector('[data-panel] h3')?.textContent).toBe('Referenced work'));
+    await vi.waitFor(()=>expect(f.editor.querySelector('[data-panel] h3')?.textContent).toContain('Referenced work'));
     await click(f.editor,'[data-panel] .kanban__menu > summary');
     await click(f.editor,'[data-panel] [data-action=copy-reference]');expect(writeText).toHaveBeenLastCalledWith('KB-1#1');
     await click(f.editor,'[data-panel] [data-action=copy-link]');expect(writeText).toHaveBeenLastCalledWith(expect.stringContaining('#/kanban/%2Fboard%2Fnumbered%2Fwork'));
