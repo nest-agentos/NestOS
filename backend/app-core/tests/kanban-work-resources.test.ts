@@ -177,12 +177,13 @@ it('archives workspace associations without removing directories or running Git 
     expect(f.commands).toHaveLength(before);
 });
 
-it('exposes the current coordination workspace for group cleanup while retaining older planning history',async()=>{
+it('includes historical planning workspaces in settled group cleanup and retains them during active coordination',async()=>{
  const f=await fixture();(f.item as any).planning={execution:'children'};f.item.externalRefs.push({system:'nestos-worktree',id:'old-plan'});
  await f.journal.update('analysis-history:'+JSON.stringify(['board','item']),()=>({keys:['analysis:old','analysis:current'],indexed:true}));
  await f.journal.update('analysis:old',()=>({id:'old-plan'}));await f.journal.update('analysis:current',()=>({id:'ready'}));
  await f.journal.update('analysis-current:'+JSON.stringify(['board','item']),()=>'analysis:current');
- expect((await f.api.workResources('board','item',{inspect:false})).map(row=>row.id)).toEqual(['ready']);
+ expect((await f.api.workResources('board','item',{inspect:false})).map(row=>row.id)).toEqual(['ready','old-plan']);
+ f.item.status='open';expect((await f.api.workResources('board','item',{inspect:false})).map(row=>row.id)).toEqual(['ready']);
 });
 
 it('removes populated modules only after proving clean files and integration into their main repositories',async()=>{

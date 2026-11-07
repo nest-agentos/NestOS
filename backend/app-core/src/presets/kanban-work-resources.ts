@@ -1,5 +1,5 @@
 import {readManagedBranches,inspectManagedBranches,removeManagedBranches,type ManagedBranch} from './kanban-work-resource-branches';
-import {boardWorkResources as readBoardResources} from './kanban-work-resource-catalog';
+import {boardWorkResources as readBoardResources,associatedWorkResourceIds} from './kanban-work-resource-catalog';
 import {inspectRemovalModules} from '../projects/worktree-removal-modules';
 import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
@@ -46,7 +46,7 @@ export function developmentWorkResources(options: Options) {
         cleanupWorkResource: (boardId: string, request: KanbanWorkResourceCleanup) => cleanup(options, boardId, structuredClone(request))};
 }
 async function associations(options: Options, boardId: string, itemId: string,resourceId?:string): Promise<KanbanWorkResource[]> {
-    const refs = (await references(options, boardId, itemId)).filter(ref=>!resourceId||ref.id===resourceId), rows: KanbanWorkResource[] = [];
+    const refs = (await references(options, boardId, itemId,!!resourceId)).filter(ref=>!resourceId||ref.id===resourceId), rows: KanbanWorkResource[] = [];
     for (let offset = 0; offset < refs.length; offset += 8) rows.push(...await Promise.all(refs.slice(offset, offset + 8).map(async (ref): Promise<KanbanWorkResource> => {
         const [tree, cleanup] = await Promise.all([options.journal.get<PreparedWorktree>('worktree:' + ref.id), options.journal.get<Cleanup>('worktree-cleanup:' + ref.id)]);
         return {archivedAt:tree?.archivedAt,id: ref.id, kind: 'git-worktree', title: tree?.branch ?? ref.id, location: tree?.directory ?? ref.id, version: '',
@@ -57,6 +57,8 @@ async function associations(options: Options, boardId: string, itemId: string,re
 }
 async function references(options: Options, boardId: string, itemId:string,includePlanning=false):Promise<KanbanExternalReference[]> {
     const {item} = await options.service.item(boardId, itemId), refs = [...item.externalRefs ?? []]; let cursor: string | undefined;
+    for(const id of await associatedWorkResourceIds(options.journal,boardId,itemId))refs.push({system:'nestos-worktree',id});
+    if(['completed','cancelled'].includes(item.status))includePlanning=true;
     const workflow = await options.service.workflow(boardId);
     for (const dispatch of Object.values(workflow.dispatches)) if (dispatch.itemId === itemId) {
         const tree = await options.journal.get<PreparedWorktree>('worktree:' + dispatch.id);
@@ -74,7 +76,7 @@ async function references(options: Options, boardId: string, itemId:string,inclu
 async function scope(options: Options, boardId: string, itemId: string, id: string, known?: KanbanExternalReference[]): Promise<ResourceScope> {
     requireValue(/^[\w-]{1,128}$/.test(id), 'WORKTREE_SCOPE_INVALID');
     const {item} = await options.service.item(boardId, itemId);
-    requireValue((known ?? await references(options, boardId, itemId)).some(ref => ref.id === id), 'WORKTREE_NOT_ASSOCIATED');
+    requireValue((known ?? await references(options, boardId, itemId,true)).some(ref => ref.id === id), 'WORKTREE_NOT_ASSOCIATED');
     const record = await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + id);
     const tree = await options.journal.get<PreparedWorktree>('worktree:' + id);
     requireValue(record && tree && tree.directory === record.directory, 'WORKTREE_ASSOCIATION_UNKNOWN');
@@ -83,7 +85,7 @@ async function scope(options: Options, boardId: string, itemId: string, id: stri
     return {id, item, record, tree};
 }
 async function list(options: Options, boardId: string, itemId: string,resourceId?:string): Promise<KanbanWorkResource[]> {
-    const refs = (await references(options, boardId, itemId)).filter(ref=>!resourceId||ref.id===resourceId), rows: KanbanWorkResource[] = [];
+    const refs = (await references(options, boardId, itemId,!!resourceId)).filter(ref=>!resourceId||ref.id===resourceId), rows: KanbanWorkResource[] = [];
     for (let offset = 0; offset < refs.length; offset += 4) {
         const batch = await Promise.allSettled(refs.slice(offset, offset + 4).map(ref => inspectReference(options, boardId, itemId, ref, refs)));
         for (const row of batch) {if (row.status === 'rejected') throw row.reason; rows.push(row.value);}
