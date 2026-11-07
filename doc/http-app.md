@@ -402,7 +402,7 @@ pnpm httpd:activate <版本ID>   # 下次启动使用此版本
 
 隔离环境安装依赖及 deploy 均优先复用本地 pnpm 缓存，缺失的安装包或 registry 元数据允许联网补齐，不要求开发环境事先缓存全部依赖。安装先以 `--offline` 复用 store，store 缺少包或 registry 元数据时自动以 `--prefer-offline` 重试，并记录 `stage=install result=store-miss packages=<缺失包>` 与 `result=store-warmed`；锁文件不一致、registry 拒绝等其他安装错误按 `HTTP_BUILD_INSTALL_FAILED` 直接失败，不触发联网重试。完全离线且 store 缺包时错误信息保留 pnpm 给出的缺失包，可在仓库根执行 `pnpm install --prefer-offline --frozen-lockfile` 预热 store 后重试。
 
-构建缓存位于忽略目录 `release/httpd/.build-cache/`。源码、库快照、运行时及构建环境均未变化时，校验并复用完整 release；源码有变化时复用依赖安装环境，按 Vite/tsup 实际输入分别判断是否重新编译 UI 和服务端。新增文件、配置、锁文件、库快照、Node/ABI、pnpm 或原生模块变化会使对应缓存失效。输出损坏会重新编译，构建锁防止并发改写隔离环境；每步日志包含 operationId、缓存命中原因及耗时。变更构建仍重新 deploy 生产依赖，发布副本与缓存互相独立。清除 `.build-cache/` 后下次重建即可，不影响已有 release；清理时应确保没有构建进程。
+构建缓存位于忽略目录 `release/httpd/.build-cache/`。源码、库快照、运行时及构建环境均未变化时，校验并复用完整 release；源码有变化时复用依赖安装环境，按 Vite/tsup 实际输入分别判断是否重新编译 UI 和服务端。新增文件、配置、锁文件、库快照、Node/ABI、pnpm 或原生模块变化会使对应缓存失效。输出损坏会重新编译，构建锁防止并发改写隔离环境；每步日志包含 operationId、缓存命中原因及耗时。变更构建仍重新 deploy 生产依赖，发布副本与缓存互相独立。清除 `.build-cache/` 后下次重建即可，不影响已有 release；清理时应确保没有构建进程。 原生依赖在隔离安装目录内按当前 Node/ABI、平台、架构及锁定包版本准备：安装仍跳过全部生命周期脚本，随后检查 SQLite、PTY 和图像原生绑定，仅对不可加载的白名单依赖执行 rebuild 并再次验证。缓存命中也执行绑定检查；发布只复制该安装的原生输出，不读取源码 node_modules 或旧 release。源码依赖应由 pnpm install 管理，禁止链接到可清理的 HTTP 构建缓存。开发宿主启动前复用同一原生依赖检查与修复流程。
 
 源码变化检查只覆盖 HTTP 的有效构建输入：backend/ui/shared 生产文件、Web/HTTP/Node 宿主、提供生产模块的 tools 工作区包及依赖清单、锁文件和构建脚本。`tests`/`__tests__`、`*.test.*`/`*.spec.*`、测试配置、文档及 Tauri/CLI 的实现不触发此检查；其他应用的 package.json 仍参与依赖安装校验。库源码先制成不可变快照，独立检查生产与打包输入，测试变动不触发库重建。生产文件在捕获后变化仍报 `HTTP_BUILD_SOURCE_CHANGED`，需要等待本次编辑完成后重试，不能因此取消制品一致性保护。
 

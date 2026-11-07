@@ -1,7 +1,8 @@
+import {ensureNativeRuntime} from './httpd-native-runtime.mjs';
 import {isHttpBuildSource} from './build-source-policy.mjs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { pinSnapshotManifests, copyLibrarySnapshot, copyNativeRuntimes, copySource, freezeWorkspaceDependencies, sourceFiles, sourceFingerprint, verifyRelease } from './httpd-runtime.mjs';
 import { acquireBuildLock, artifactContext, buildEnvironment, dependencyInputs, digest, fileHash, graphInputs, readJSON, restoreArtifact, storeArtifact, treeRecords } from './httpd-build-cache.mjs';
@@ -63,23 +64,6 @@ function reporter(operationId) {
         catch (error) { console.error(`[HTTPBuild] operationId=${operationId} stage=${stage} result=failure durationMs=${Date.now() - started} code=${error.code ?? error.status ?? 'HTTP_BUILD_FAILED'}`); throw error; }
     };
 }
-function nativeFingerprint(app) {
-    const hash = createHash('sha256');
-    function visit(directory) {
-        if (!existsSync(directory)) return;
-        for (const entry of readdirSync(directory, {withFileTypes: true}).sort((a, b) => a.name.localeCompare(b.name))) {
-            if (['obj', 'obj.target', '.deps'].includes(entry.name) || entry.name.endsWith('.o')) continue;
-            const file = path.join(directory, entry.name); hash.update(entry.name);
-            if (entry.isDirectory()) visit(file); else hash.update(readFileSync(file));
-        }
-    }
-    for (const name of ['better-sqlite3', 'node-pty', 'sharp']) {
-        const directory = realpathSync(path.join(app, 'node_modules', name));
-        hash.update(readFileSync(path.join(directory, 'package.json')));
-        if (name !== 'sharp') visit(path.join(directory, 'build/Release'));
-    }
-    return hash.digest('hex');
-}
 function installationHit(directory, key) {
     try {
         const receipt = readJSON(path.join(directory, 'installed.json'));
@@ -119,6 +103,7 @@ function workspace(context) {
                 lock: fileHash(path.join(directory, 'installed-lock.yaml')), modules: fileHash(path.join(source, 'node_modules/.modules.yaml'))}));
         }
     });
+    ensureNativeRuntime(source,{operationId:context.operationId,env,log:console.log});
     return {source, directory};
 }
 function assertDependencies(directory, snapshot, visited = new Set()) {
@@ -133,7 +118,7 @@ function assertDependencies(directory, snapshot, visited = new Set()) {
 function deployment(context, source, staging) {
     context.stage('deploy', () => {
         run('pnpm', ['--config.package-import-method=copy', '--config.prefer-offline=true', '--ignore-scripts', '--filter', '@nestos/http-app', 'deploy', '--prod', '--legacy', staging], source, context.env);
-        freezeWorkspaceDependencies(staging); copyNativeRuntimes(path.join(context.root, 'apps/http-app'), staging);
+        freezeWorkspaceDependencies(staging); copyNativeRuntimes(path.join(source, 'apps/http-app'), staging);
         run(process.execPath, [path.join(context.root, 'scripts/check-node-native-runtime.mjs'), staging], staging);
         for (const entry of readdirSync(staging)) if (!['package.json', 'node_modules'].includes(entry)) rmSync(path.join(staging, entry), {recursive: true, force: true});
     });
@@ -163,19 +148,22 @@ function compile(context, source, staging, kind) {
         if (cache) storeArtifact(directory, output, source, common, graphInputs(source, files));
     });
 }
-function reuseRelease(releases, key) {
+function reuseRelease(releases, key, root, operationId) {
     for (const pointer of ['current.json', '.build-cache/last-release.json']) {
         try {
             const id = readJSON(path.join(releases, pointer)).id;
             if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$/.test(id)) continue;
             const directory = path.join(releases, id), manifest = verifyRelease(directory);
-            if (manifest.buildKey === key && existsSync(path.join(directory, 'node_modules'))) return id;
+            if (manifest.buildKey !== key || !existsSync(path.join(directory, 'node_modules'))) continue;
+            const checked=runCaptured(process.execPath,[path.join(root,'scripts/check-node-native-runtime.mjs'),directory],root,process.env);
+            if(checked.status===0)return id;
+            console.warn(`[HTTPBuild] operationId=${operationId} stage=release cache=miss id=${id} reason=native-binding-unavailable`);
         } catch { /* A removed or modified release is rebuilt. */ }
     }
 }
 function buildRelease(context, activate) {
     const {root, releases, snapshot, stage, fingerprint, key, commit, dirty, cache, operationId} = context;
-    const reused = cache && reuseRelease(releases, key);
+    const reused = cache && reuseRelease(releases, key, root, operationId);
     if (reused) {
         stage('validate-reuse', () => run(process.execPath, [path.join(releases, reused, 'server/main.js'), '--help'], path.join(releases, reused)));
         context.sourceGuard.check();
@@ -214,8 +202,8 @@ export function buildHttpRelease(root, {cache = true, activate, releases = path.
         const commit = execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim();
         const dirty = !!execFileSync('git', ['status', '--porcelain'], {cwd: root, encoding: 'utf8'}).trim();
         const pnpm = execFileSync('pnpm', ['--version'], {cwd: root, encoding: 'utf8'}).trim();
-        const dependencyKey = digest(JSON.stringify({format: 1, snapshot: snapshot.id, node: process.version, abi: process.versions.modules,
-            platform: process.platform, arch: process.arch, pnpm, native: nativeFingerprint(path.join(root, 'apps/http-app')),
+        const dependencyKey = digest(JSON.stringify({format: 2, snapshot: snapshot.id, node: process.version, abi: process.versions.modules,
+            platform: process.platform, arch: process.arch, pnpm,
             inputs: sourceFingerprint(root, dependencyInputs(inputs))}));
         const key = digest(JSON.stringify({fingerprint, dependencyKey, environment, commit, dirty}));
         return buildRelease({root, releases, cacheDirectory, snapshot, inputs, fingerprint, environment, dependencyKey, key,

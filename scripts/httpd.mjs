@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { hostArguments, hostEnvironment, runtimePaths, runtimeLog, releaseDirectory, releasesRoot, verifyRelease } from './httpd-runtime.mjs';
+import {ensureNativeRuntime} from './httpd-native-runtime.mjs';
 import { buildHttpRelease } from './httpd-build.mjs';
 
 import {withHttpdControl, runningHttpd, registerHttpd, unregisterHttpd, stopHttpd, lifecycleLog, setLifecycleLog} from './httpd-process.mjs';
@@ -47,7 +48,7 @@ async function serve(mode, args) {
     if (mode === 'release') {
         id = JSON.parse(readFileSync(path.join(releases, 'current.json'), 'utf8')).id;
         directory = releaseDirectory(releases, id); verifyRelease(directory); entry = path.join(directory, 'server/main.js');
-    } else run('pnpm', ['exec', 'vite', 'build', '--outDir', developmentUI, '--emptyOutDir'], app);
+    } else {ensureNativeRuntime(root);run('pnpm', ['exec', 'vite', 'build', '--outDir', developmentUI, '--emptyOutDir'], app);}
     const command = process.execPath;
     const values = hostArguments(mode, args);
     const childArgs = mode === 'release' ? [entry, ...values] : ['--import', createRequire(path.join(app, 'package.json')).resolve('tsx'), entry, '--static', developmentUI, ...values];
