@@ -2,6 +2,8 @@ import type {KanbanAutomationJournal,KanbanTaskControlOptions,KanbanControlReque
 import {callSettled,controlCall,type CallLifecyclePorts} from './call-lifecycle';
 import {kanbanReferences} from './work-log-policy';
 import {requireValue} from './validation';
+import {createModuleLogger} from '@nestos/common';
+const log=createModuleLogger('KanbanControl');
 
 export function kanbanControlOptions(options:CallLifecyclePorts,journal:KanbanAutomationJournal):KanbanTaskControlOptions {
     return {beforeCancel:options.beforeCancel,references:kanbanReferences,finalizerPrefix:'development-lifecycle:',control:{
@@ -21,7 +23,14 @@ export function kanbanControlOptions(options:CallLifecyclePorts,journal:KanbanAu
                 requireValue(options.submissionControl,'TASK_CONTROL_UNSUPPORTED');
                 return options.submissionControl({sessionId:route.executionId,submissionId:route.attemptId,requestId:input.operationId,action:input.action},journal);
             }
-            return controlCall(options,journal,route.executionId,input.operationId,input.action,route.attemptId,input.previousKey,input.fallbackSubmission);
+            try{return await controlCall(options,journal,route.executionId,input.operationId,input.action,route.attemptId,input.previousKey,input.fallbackSubmission);}
+            catch(error){
+                const code=(error as {code?:string}).code;
+                if(input.action!=='cancel'||!input.observationSessionId||!['ENOENT','TASK_CONTROL_ROUTE_MISSING'].includes(code??''))throw error;
+                const started=Date.now(),stopped=await options.inspectStoppedSession?.(input.observationSessionId);
+                log.info('control.reconcile',{operationId:input.operationId,stage:'session-terminal-evidence',result:stopped?'success':'failure',code,durationMs:Date.now()-started});
+                if(!stopped)throw error;return 'cancelled';
+            }
         },
         inspect:async(executionId,attemptId=executionId)=>{
             const rows=await options.calls.list({sessionId:executionId,branchId:'main'}),view=rows.find(row=>row.input.request.submission?.id===attemptId);

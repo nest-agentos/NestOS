@@ -1063,6 +1063,9 @@ importers:
       '@nestos/kanban':
         specifier: workspace:*
         version: link:../kanban
+      '@nestos/mdxeditor':
+        specifier: workspace:*
+        version: link:../mdxeditor
       '@nestos/ui-common':
         specifier: workspace:*
         version: link:../ui-common

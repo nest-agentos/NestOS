@@ -21,11 +21,12 @@ import type {DiagnosticJournal} from '../diagnostics/journal';
 import {createNestOSKanban} from './module';
 import {openPersonalKanbanStore} from './store';
 import {KanbanExamples} from '../presets/kanban-examples';
-import {createLocalKanbanSessionSource} from './session-source';
+import {createLocalKanbanSessionSource,sessionPhase} from './session-source';
 import {planningSessionReader} from './planning-sessions';
 import {relatedKanbanSessions} from './related-sessions';
 /** The authenticated runtime owns this user store; project boards require their own binding. */
 export async function createPersonalKanban(fs: IFileSystem, events: UserEventService, diagnostics: DiagnosticJournal, sessions?: Pick<import('@nestos/llm-session/contracts').ISessionRepository, 'listSummaries'|'getManifest'>, kernel?: Pick<import('@nestos/durable-kernel').Kernel,'sessionActivity'>, automationOptions?: PersonalKanbanAutomationOptions) {
+    if(automationOptions&&kernel)automationOptions={...automationOptions,inspectStoppedSession:async id=>['completed','failed','cancelled'].includes(sessionPhase(await kernel.sessionActivity(id)))};
     const store=await openPersonalKanbanStore(fs);await new KanbanExamples(store).seed();
     const journal=new KanbanAutomationJournal(fs,{...kanbanJournalOptions,diagnostic:event=>diagnostics.record({...event,module:'application',operation:'kanban.operation',level:event.result==='failure'?'warn':'info'})});
     let client:KanbanClient;
@@ -36,7 +37,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
     const runtime=await assembleKanbanRuntime({...base,assertRestartIdle,fs,store,journal,directory:'/var/lib/kanban',actor:{kind:'human',id:'admin'},
         workLog:workLogOptions(events,base.log),resources:automationOptions?.projects?projectResourceCatalog(automationOptions.projects):undefined,
         requiresItemResource:automationOptions?.requiresItemResource,archiveSession:automationOptions?.archiveSession,
-        control:kanbanControlOptions(automationOptions??{calls:{list:async()=>[]}},journal),
+        control:kanbanControlOptions({...automationOptions,calls:automationOptions?.calls??{list:async()=>[]},inspectStoppedSession:kernel?async id=>['completed','failed','cancelled'].includes(sessionPhase(await kernel.sessionActivity(id))):undefined},journal),
         createService:options=>createNestOSKanban({...options,notifications:base.notifications}),
         extensions:context=>personalExtensions(context,automationOptions,events,base.log,value=>{operations=value;},()=>client)});
     client=runtime.service;

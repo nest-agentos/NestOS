@@ -35,6 +35,15 @@ async function fixture(enabled = true, workTypes?: KanbanWorkType[]) {
     return {service, command, open, projects, log, journal};
 }
 
+async function completeCoordination(f:Awaited<ReturnType<typeof fixture>>,id:string):Promise<void>{
+ const board=await f.service.read('source'),parent=board.items.find(item=>item.id===id)!,rank=(board.workTypes??(await import('@nestos/kanban/contracts')).DEFAULT_KANBAN_WORK_TYPES).find(type=>type.id===parent.planning?.kind)!.rank;
+ const type=(board.workTypes??(await import('@nestos/kanban/contracts')).DEFAULT_KANBAN_WORK_TYPES).find(type=>type.executable&&type.rank>rank)!;
+ const child=id+'-execute';await f.command({type:'create-item',item:{id:child,title:'Execute',responsibility:'Implement',acceptance:'Verified'},planning:{kind:type.id,parentId:id,priority:2,dependencies:[],references:[]}});
+ await f.command({type:'finish-planning',itemId:id});await f.command({type:'set-stage',itemId:child,stage:'open'});
+ const claimed=await f.command({type:'claim',itemId:child});await f.command({type:'submit',itemId:child,token:claimed.items.find(item=>item.id===child)!.owner!.token,resultRef:'verified'});
+ await f.command({type:'review',itemId:child,accept:true});await f.command({type:'close-plan',itemId:id,resultRef:'children-verified'});
+}
+
 it('rejects unconfirmed/stale decisions and local project selection', async () => {
     const f = await fixture(), execution = f.open();
     await expect(execution.runRecord('source', {operationId: 'run', recordId: 'decision', expectedRevision: 1})).rejects.toMatchObject({code: 'DECISION_NOT_CONFIRMED'});
@@ -50,7 +59,7 @@ it('deduplicates concurrent runs and preserves remote bindings across reopening'
     const [first, second] = await Promise.all([execution.runRecord('source', request), execution.runRecord('source', {...request, operationId: 'double-click'})]);
     expect(first.id).toBe(second.id);
     const board = await f.service.read(first.boardId);
-    expect(first.boardId).toBe('source'); expect(board.items).toHaveLength(3); expect(board.automation).toMatchObject({enabled: true, autoAccept: false});
+    expect(first.boardId).toBe('source'); expect(board.items).toHaveLength(2); expect(board.automation).toMatchObject({enabled: true, autoAccept: false});
     expect(board.items.filter(item => first.itemIds!.includes(item.id)).map(item => item.externalRefs![0].id)).toEqual(['one', 'two']);
     expect(board.items.filter(item => item.planning?.parentId === first.rootItemId)).toHaveLength(2);
     await f.open().scan(); expect(await f.open().runRecord('source', request)).toMatchObject({id: first.id, boardId: first.boardId});
@@ -71,18 +80,18 @@ it('recovers a committed creation when the response is lost without creating dup
     const request = {operationId: 'run', recordId: 'decision', expectedRevision: 2};
     await expect(f.open().runRecord('source', request)).rejects.toMatchObject({code: 'EIO'});
     const run = await f.open().runRecord('source', request);
-    expect((await f.service.read(run.boardId)).items).toHaveLength(3);
+    expect((await f.service.read(run.boardId)).items).toHaveLength(2);
     expect(JSON.stringify(f.log.mock.calls)).not.toContain('PRIVATE_REPLY');
 });
 
 it('keeps one run after linking the decision advances its revision and does not duplicate a feature', async () => {
     const f = await fixture(); await f.command({type: 'review-record', recordId: 'decision', accept: true});
     const first = await f.open().runRecord('source', {operationId: 'first', recordId: 'decision', expectedRevision: 2});
-    const decision = await f.service.record('source', 'decision'); expect(decision.itemIds).toContain(first.rootItemId);
+    const decision = await f.service.record('source', 'decision'); expect(decision.itemIds).toEqual(expect.arrayContaining(first.itemIds!));
     const request = {operationId: 'again', recordId: 'decision', expectedRevision: decision.revision};
     expect((await f.open().runRecord('source', request)).id).toBe(first.id);
     expect((await f.open().runRecord('source', request)).id).toBe(first.id);
-    expect((await f.service.read('source')).items).toHaveLength(3);
+    expect((await f.service.read('source')).items).toHaveLength(2);
     await expect(f.open().runRecord('source', {...request, operationId: 'separate', placement: 'new-board'})).rejects.toMatchObject({code: 'DECISION_EXECUTION_PLACEMENT_CONFLICT'});
 });
 it('requires explicitly resuming paused AI and only creates a board when selected', async () => {
@@ -103,29 +112,21 @@ it('creates a single task for one project and derives completion only from its o
     await f.command({type: 'block-item', itemId: 'unrelated', reason: 'Independent work'});
     const run = await f.open().runRecord('source', {operationId: 'small', recordId: 'small', expectedRevision: 2});
     expect(run.itemIds).toHaveLength(1); expect(run.rootItemId).toBe(run.itemIds![0]); expect(run.state).toBe('running');
-    await f.command({type: 'set-stage', itemId: run.rootItemId!, stage: 'open'});
-    const claimed = await f.command({type: 'claim', itemId: run.rootItemId!});
-    await f.command({type: 'submit', itemId: run.rootItemId!, token: claimed.items.find(item => item.id === run.rootItemId)!.owner!.token, resultRef: 'verified'});
-    await f.command({type: 'review', itemId: run.rootItemId!, accept: true});
+    expect((await f.service.item('source',run.rootItemId!)).item.taskType).toBe('coordination');
+    await completeCoordination(f,run.rootItemId!);
     await f.open().scan();
     expect((await f.open().recordExecutions('source', 'small'))[0].state).toBe('completed');
     const completed=await f.service.record('source','small');
     await expect(f.open().runRecord('source',{operationId:'after-completed',recordId:'small',expectedRevision:completed.revision})).rejects.toMatchObject({code:'DECISION_EXECUTION_COMPLETED'});
     expect((await f.service.read('source')).items.find(item => item.id === 'unrelated')?.blocked).toBeDefined();
 });
-it('closes the feature after its own children complete and keeps the approved decision', async () => {
-    const f = await fixture(); await f.command({type: 'review-record', recordId: 'decision', accept: true});
-    const run = await f.open().runRecord('source', {operationId: 'feature', recordId: 'decision', expectedRevision: 2});
-    await expect(f.command({type: 'close-plan', itemId: run.rootItemId!, resultRef: 'early'})).rejects.toMatchObject({code: 'CHILDREN_UNFINISHED'});
-    for (const itemId of run.itemIds!) {
-        await f.command({type: 'set-stage', itemId, stage: 'open'});
-        const claimed = await f.command({type: 'claim', itemId});
-        await f.command({type: 'submit', itemId, token: claimed.items.find(item => item.id === itemId)!.owner!.token, resultRef: 'verified'});
-        await f.command({type: 'review', itemId, accept: true});
-    }
-    await f.open().scan();
-    expect((await f.service.item('source', run.rootItemId!)).item.status).toBe('completed');
-    expect((await f.service.record('source', 'decision')).status).toBe('confirmed');
+it('completes the decision after each project coordination task finishes its execution children',async()=>{
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const run=await f.open().runRecord('source',{operationId:'projects',recordId:'decision',expectedRevision:2});
+ expect(run.rootItemId).toBeUndefined();expect(run.itemIds).toHaveLength(2);
+ await completeCoordination(f,run.itemIds![0]);await f.open().scan();expect((await f.open().recordExecutions('source','decision'))[0].state).not.toBe('completed');
+ await completeCoordination(f,run.itemIds![1]);await f.open().scan();expect((await f.open().recordExecutions('source','decision'))[0].state).toBe('completed');
+ expect((await f.service.record('source','decision')).status).toBe('confirmed');
 });
 
 it('resumes legacy dedicated boards in place without introducing parent items or moving identities', async () => {
@@ -147,7 +148,7 @@ it('marks only the affected decision run failed when a task is cancelled', async
     const run = await f.open().runRecord('source', {operationId: 'cancelled', recordId: 'decision', expectedRevision: 2});
     await f.command({type: 'cancel-item', itemId: run.itemIds![0], reason: 'User choice'}); await f.open().scan();
     expect((await f.open().recordExecutions('source', 'decision'))[0]).toMatchObject({state: 'failed', code: 'DECISION_TASK_CANCELLED'});
-    expect((await f.service.item('source', run.rootItemId!)).item.status).toBe('backlog');
+    expect((await f.service.item('source', run.itemIds![1])).item.status).toBe('backlog');
 });
 
 it('uses configured work type ranks instead of requiring feature/task identifiers', async () => {
@@ -155,9 +156,9 @@ it('uses configured work type ranks instead of requiring feature/task identifier
     await f.command({type: 'review-record', recordId: 'decision', accept: true});
     const run = await f.open().runRecord('source', {operationId: 'custom', recordId: 'decision', expectedRevision: 2, placement: 'new-board'});
     const board = await f.service.read(run.boardId);
-    expect(board.items.find(item => item.id === run.rootItemId)?.planning?.kind).toBe('bundle');
-    expect(board.items.filter(item => run.itemIds!.includes(item.id)).every(item => item.planning?.kind === 'action' && item.planning.parentId === run.rootItemId)).toBe(true);
-    await f.open().scan(); expect((await f.service.read(run.boardId)).items).toHaveLength(3);
+    expect(run.rootItemId).toBeUndefined();
+    expect(board.items.filter(item => run.itemIds!.includes(item.id)).every(item => item.planning?.kind === 'bundle' && item.taskType==='coordination')).toBe(true);
+    await f.open().scan(); expect((await f.service.read(run.boardId)).items).toHaveLength(2);
 });
 
 it('provides a single resource selector that inherits and locks the parent project',async()=>{
@@ -225,12 +226,12 @@ it('archives generated tasks with the decision and deletes archived descendants 
     await f.open().controlRecord('source',{recordId:'decision',operationId:'archive',action:'archive'});await settleCancellation(f);
     expect((await f.service.record('source','decision')).archivedAt).toBeTypeOf('number');
     expect((await f.service.records('source')).items).toHaveLength(0);
-    expect((await f.service.query('source',{view:'archive'})).total).toBe(3);
+    expect((await f.service.query('source',{view:'archive'})).total).toBe(2);
     expect((await f.service.read('source')).items.map(item=>item.id)).toEqual(['unrelated']);
     await f.open().controlRecord('source',{recordId:'decision',operationId:'delete',action:'delete'});await f.open().scan();
     expect((await f.service.record('source','decision')).deletedAt).toBeTypeOf('number');
     await f.open().controlRecord('source',{recordId:'decision',operationId:'delete',action:'delete'});
-    for(const id of [run.rootItemId!,...run.itemIds!])expect((await f.service.item('source',id)).item.deletedAt).toBeTypeOf('number');
+    for(const id of run.itemIds!)expect((await f.service.item('source',id)).item.deletedAt).toBeTypeOf('number');
     expect((await f.service.item('source','unrelated')).item.deletedAt).toBeUndefined();
 });
 it('restarts a decision after settlement with a new run and retains replay identity across reopening',async()=>{
@@ -244,7 +245,7 @@ it('restarts a decision after settlement with a new run and retains replay ident
     expect((await f.service.record('source','decision')).status).toBe('confirmed');
     await f.open().controlRecord('source',request);await f.open().scan();
     expect(await f.open().recordExecutions('source','decision')).toHaveLength(2);
-    expect((await f.service.query('source',{view:'archive'})).total).toBe(3);
+    expect((await f.service.query('source',{view:'archive'})).total).toBe(2);
 });
 it('keeps decision deletion pending when task cancellation has no confirmed receipt',async()=>{
     const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});

@@ -47,7 +47,7 @@ it('creates durable boards and cards, claims, completes, archives and restores u
     expect(board.items[0].status).toBe('backlog'); await click(f.editor, '[data-action=ready]'); await submit(f.editor, 'claim');
     input(f.editor, 'resultRef', 'record://verified'); await submit(f.editor, 'submit');
     expect((await f.service.item(board.id, id)).item.status).toBe('completed');
-    await click(f.editor, '[data-action=archive]'); expect((await f.service.item(board.id, id)).archive).toBeDefined();
+    f.editor.querySelector<HTMLButtonElement>('[data-action=archive]')!.click();await vi.waitFor(()=>expect(document.querySelector('.settings-modal-confirm')).not.toBeNull());document.querySelector<HTMLButtonElement>('.settings-modal-confirm')!.click();await idle(f.editor); expect((await f.service.item(board.id, id)).archive).toBeDefined();
     await click(f.editor, '[data-action=restore]'); expect((await f.service.item(board.id, id)).archive).toBeUndefined();
 });
 it('preserves unsaved input on notifications, failed writes and rejected navigation', async () => {
@@ -157,13 +157,13 @@ it('shows stable references, copies references and links, and opens work by its 
     const board=await f.service.create({id:'numbered',title:'Referenced board',scope:{kind:'system'},members:[{kind:'human',id:'admin',responsibility:'Manage',roles:['worker','coordinator']}]});
     await f.service.execute(board.id,{operationId:'numbered-item',expectedRevision:board.revision,command:{type:'create-item',item:{id:'work',title:'Referenced work',responsibility:'Do',acceptance:'Verify'}}});
     f.workbench.invalidateFromEvents();
-    await vi.waitFor(()=>expect(f.editor.textContent).toContain('KB-1#1'));
+    await vi.waitFor(()=>expect(f.editor.textContent).toContain('KBT-1-1'));
     const writeText=vi.fn(async()=>{});Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
     const form=f.sidebar.querySelector<HTMLFormElement>('[data-form=reference]')!;
-    form.querySelector<HTMLInputElement>('input')!.value='KB-1#1';form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+    form.querySelector<HTMLInputElement>('input')!.value='KBT-1-1';form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
     await vi.waitFor(()=>expect(f.editor.querySelector('[data-panel] h3')?.textContent).toContain('Referenced work'));
     await click(f.editor,'[data-panel] .kanban__menu > summary');
-    await click(f.editor,'[data-panel] [data-action=copy-reference]');expect(writeText).toHaveBeenLastCalledWith('KB-1#1');
+    await click(f.editor,'[data-panel] [data-action=copy-reference]');expect(writeText).toHaveBeenLastCalledWith('KBT-1-1');
     await click(f.editor,'[data-panel] [data-action=copy-link]');expect(writeText).toHaveBeenLastCalledWith(expect.stringContaining('#/kanban/%2Fboard%2Fnumbered%2Fwork'));
     writeText.mockRejectedValueOnce(new Error('Denied'));
     await click(f.editor,'[data-panel] [data-action=copy-reference]');expect(f.editor.querySelector('[data-panel-error]')?.textContent).toContain('COPY_FAILED');
