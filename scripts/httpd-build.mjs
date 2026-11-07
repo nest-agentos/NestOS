@@ -99,11 +99,11 @@ function workspace(context) {
         else {
             installDependencies(source, env, {operationId: context.operationId});
             writeFileSync(path.join(directory, 'installed-lock.yaml'), readFileSync(path.join(source, 'pnpm-lock.yaml')));
-            writeFileSync(path.join(directory, 'installed.json'), JSON.stringify({key: dependencyKey,
-                lock: fileHash(path.join(directory, 'installed-lock.yaml')), modules: fileHash(path.join(source, 'node_modules/.modules.yaml'))}));
         }
     });
     ensureNativeRuntime(source,{operationId:context.operationId,env,log:console.log});
+    writeFileSync(path.join(directory,'installed.json'),JSON.stringify({key:dependencyKey,
+        lock:fileHash(path.join(directory,'installed-lock.yaml')),modules:fileHash(path.join(source,'node_modules/.modules.yaml'))}));
     return {source, directory};
 }
 function assertDependencies(directory, snapshot, visited = new Set()) {
