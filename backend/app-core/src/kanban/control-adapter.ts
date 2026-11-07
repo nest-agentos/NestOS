@@ -26,10 +26,10 @@ export function kanbanControlOptions(options:CallLifecyclePorts,journal:KanbanAu
             try{return await controlCall(options,journal,route.executionId,input.operationId,input.action,route.attemptId,input.previousKey,input.fallbackSubmission);}
             catch(error){
                 const code=(error as {code?:string}).code;
-                if(input.action!=='cancel'||!input.observationSessionId||!['ENOENT','TASK_CONTROL_ROUTE_MISSING'].includes(code??''))throw error;
-                const started=Date.now(),stopped=await options.inspectStoppedSession?.(input.observationSessionId);
-                log.info('control.reconcile',{operationId:input.operationId,stage:'session-terminal-evidence',result:stopped?'success':'failure',code,durationMs:Date.now()-started});
-                if(!stopped)throw error;return 'cancelled';
+                if(input.action!=='cancel'||!input.observationSessionId||!options.submissionControl||!['ENOENT','TASK_CONTROL_ROUTE_MISSING'].includes(code??''))throw error;
+                const started=Date.now(),state=await options.submissionControl({sessionId:input.observationSessionId,submissionId:route.attemptId,requestId:input.operationId,action:'cancel'},journal);
+                log.info('control.reconcile',{operationId:input.operationId,stage:'canonical-submission-control',result:state==='cancelled'?'success':'failure',code,durationMs:Date.now()-started});
+                return state;
             }
         },
         inspect:async(executionId,attemptId=executionId)=>{

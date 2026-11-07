@@ -133,17 +133,17 @@ it('settles unsent replies, maintenance and postloads in their original journals
     expect(enqueue).not.toHaveBeenCalled();expect(f.control).not.toHaveBeenCalled();
 });
 
-it('reconciles a missing historical control route only with fresh terminal evidence for the bound session',async()=>{
+it('reconciles a missing historical control route only through a canonical cancellation receipt for the bound session',async()=>{
     const f=await fixture();
     await f.run({type:'observe-execution',dispatchId:'original',fence:(await f.service.workflow('b')).dispatches.original.fence,outcome:'running',executionSessionId:'bound-session'});
     await f.run({type:'request-control',itemId:'t',controlId:'cancel-missing',action:'cancel'});
     f.calls.list.mockRejectedValue(Object.assign(new Error('Missing historical route'),{code:'ENOENT'}));
-    const inspectStoppedSession=vi.fn(async()=>false);
-    const control=kanbanControlOptions({calls:f.calls as never,inspectStoppedSession},f.journal);
+    const submissionControl=vi.fn(async()=> 'unknown' as 'unknown'|'cancelled');
+    const control=kanbanControlOptions({calls:f.calls as never,submissionControl},f.journal);
     await scanTaskControls(control,f.journal,await f.service.read('b'),f.service);
     expect((await f.service.item('b','t')).item.control?.state).toBe('unknown');
-    inspectStoppedSession.mockResolvedValue(true);
+    submissionControl.mockResolvedValue('cancelled');
     await scanTaskControls(control,f.journal,await f.service.read('b'),f.service);
-    expect(inspectStoppedSession).toHaveBeenLastCalledWith('bound-session');
+    expect(submissionControl).toHaveBeenLastCalledWith(expect.objectContaining({sessionId:'bound-session',submissionId:'original',requestId:'cancel-missing',action:'cancel'}),f.journal);
     expect((await f.service.item('b','t')).item).toMatchObject({status:'cancelled',control:{state:'cancelled'}});
 });
