@@ -427,6 +427,8 @@ export const zhCN = {
     'kanban.log': '工作日志',
     'kanban.decision': '决策记录',
     'kanban.newLog': '记录工作日志',
+    'kanban.errors.DECISION_SESSION_UNAVAILABLE': '决策会话暂不可用，请检查远程项目与智能体配置。',
+    'kanban.errors.DECISION_SESSION_REQUIRED': '请进入决策会话澄清需求并创建决策。',
     'kanban.newDecision': '提出决策',
     'kanban.recordResources': '远程项目（可多选）',
     'kanban.runRecordSeparate': '在新看板运行',

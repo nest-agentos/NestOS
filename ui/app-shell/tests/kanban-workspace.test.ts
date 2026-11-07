@@ -99,14 +99,20 @@ it('retries a card write with the same operation and item identities after a los
     await submit(f.editor, 'item'); expect((await f.service.list())[0].items).toHaveLength(1);
     expect(spy.mock.calls[0][1]).toEqual(spy.mock.calls[1][1]);
 });
-it('creates linked logs and decisions in the same workspace and confirms a draft without changing work status', async () => {
+it('opens decision discussion before displaying a session-created decision and keeps linked logs', async () => {
     const f = await fixture(); await click(f.editor, '[data-action=new-board]'); input(f.editor, 'title', 'Context board'); await submit(f.editor, 'board');
     await click(f.editor, '[data-action=new-item]'); input(f.editor, 'title', 'Work'); input(f.editor, 'responsibility', 'Scope'); input(f.editor, 'acceptance', 'Evidence'); await submit(f.editor, 'item');
     const board = (await f.service.list())[0], id = board.items[0].id;
     await click(f.editor, '[data-action=new-log]'); input(f.editor, 'title', 'Investigation'); input(f.editor, 'content', 'Checked the current implementation.'); await submit(f.editor, 'record');
     let records = await f.service.records(board.id, {itemId: id}); expect(records.items).toHaveLength(1); expect(records.items[0].status).toBe('confirmed');
+    const start=vi.fn(async()=>({id:'discussion',boardId:board.id,state:'clarifying',resourceId:'/native/decision',createdAt:1}));
+    Object.assign(f.service,{startRecordConversation:start});
     await click(f.editor, '[data-item]'); await click(f.editor, '[data-action=new-decision]');
-    input(f.editor, 'title', 'Choose a bounded scope'); input(f.editor, 'content', 'Ship the smallest verified change.'); input(f.editor, 'rationale', 'Reduce uncertainty.'); await submit(f.editor, 'record');
+    expect(start).toHaveBeenCalledWith(board.id,{operationId:expect.any(String)});expect(f.openSession).toHaveBeenCalledWith('/native/decision');
+    expect((await f.service.records(board.id,{kind:'decision'})).total).toBe(0);
+    const latest=await f.service.read(board.id);
+    await f.service.execute(board.id,{operationId:'session-proposal',expectedRevision:latest.revision,command:{type:'append-record',record:{id:'session-decision',kind:'decision',title:'Choose a bounded scope',content:'Ship the smallest verified change.',rationale:'Reduce uncertainty.',itemIds:[id],sources:[],externalRefs:[]}}});
+    await f.workbench.openResource(`/board/${board.id}/@record/session-decision`);
     expect(f.editor.textContent).toContain('Reduce uncertainty.'); await click(f.editor, '[data-action=confirm-record]');
     records = await f.service.records(board.id, {kind: 'decision'}); expect(records.items[0].status).toBe('confirmed');
     expect((await f.service.item(board.id, id)).item.status).toBe('backlog');

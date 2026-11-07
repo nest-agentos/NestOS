@@ -426,6 +426,8 @@ export const en: LocaleStrings = {
     'kanban.log': 'Work log',
     'kanban.decision': 'Decisions',
     'kanban.newLog': 'Add work log',
+    'kanban.errors.DECISION_SESSION_UNAVAILABLE': 'Decision conversations are unavailable. Check the remote project and agent configuration.',
+    'kanban.errors.DECISION_SESSION_REQUIRED': 'Open a decision conversation to clarify requirements and create the decision.',
     'kanban.newDecision': 'Propose decision',
     'kanban.recordResources': 'Remote projects (multiple selection)',
     'kanban.runRecordSeparate': 'Run in a new board',

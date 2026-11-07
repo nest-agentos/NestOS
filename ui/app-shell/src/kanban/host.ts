@@ -1,9 +1,9 @@
-import {ACTION_ICONS, CHAT_ICONS, t, createModuleLogger} from '@nestos/common';
+import {ACTION_ICONS, CHAT_ICONS, PROJECT_ACTION_ICONS, t, createModuleLogger} from '@nestos/common';
 import type {KanbanPresentation, KanbanUIOptions} from '@nestos/kanban-ui';
 const log = createModuleLogger('kanban');
 export const kanbanPresentation: KanbanPresentation = {
     text: (key, values) => t(`kanban.${key}` as Parameters<typeof t>[0], values),
-    icons: {refreshView: ACTION_ICONS.refreshView, more: CHAT_ICONS.more, close: ACTION_ICONS.close, back: ACTION_ICONS.back, copy: CHAT_ICONS.copy, run: ACTION_ICONS.run, pause: ACTION_ICONS.pause, resume: ACTION_ICONS.run, fix: ACTION_ICONS.fix, edit: ACTION_ICONS.edit},
+    icons: {refreshView: ACTION_ICONS.refreshView, more: CHAT_ICONS.more, close: ACTION_ICONS.close, back: ACTION_ICONS.back, copy: CHAT_ICONS.copy, link: ACTION_ICONS.link, archive: PROJECT_ACTION_ICONS.archive, delete: CHAT_ICONS.delete, run: ACTION_ICONS.run, pause: ACTION_ICONS.pause, resume: ACTION_ICONS.run, fix: ACTION_ICONS.fix, edit: ACTION_ICONS.edit},
     referenceUrl: path => `${location.href.split('#')[0]}#/kanban/${encodeURIComponent(path)}`,
     log: event => {if (event.result === 'failure') log.warn('kanban.ui', event); else log.debug('kanban.ui', event);},
 };
