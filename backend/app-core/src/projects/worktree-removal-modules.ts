@@ -26,3 +26,15 @@ async function inspectModule(process:RemoteProcessHandle,directory:string,path:s
     requireValue(merged.code===0||merged.code===1,'WORKTREE_MODULE_INTEGRATION_UNKNOWN');
     return {path,head,target:targetHead,reasons:[changed&&'WORKTREE_DIRTY',ignored&&'WORKTREE_UNTRACKED_IGNORED',merged.code===1&&'WORKTREE_NOT_INTEGRATED'].filter((value):value is string=>!!value)};
 }
+
+/** Linked module worktrees share their source repository registry and must be unregistered explicitly. */
+export async function removeLinkedModuleWorktrees(process:RemoteProcessHandle,directory:string,modules:ModuleProof[],branch:string):Promise<void>{
+    for(const module of [...modules].sort((a,b)=>b.path.length-a.path.length)){
+        const source='/workspace/'+module.path,child=directory+'/'+module.path;
+        const listing=(await gitWorkspace(process,source,['worktree','list','--porcelain'])).stdout;
+        const entry=listing.split('\n\n').find(row=>row.split('\n').includes('worktree '+child));
+        if(!entry)continue;
+        await gitWorkspace(process,source,['worktree','remove',child]);
+        if(entry.split('\n').includes('branch refs/heads/'+branch))await gitWorkspace(process,source,['branch','-d',branch]);
+    }
+}

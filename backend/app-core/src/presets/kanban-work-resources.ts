@@ -1,6 +1,6 @@
 import {readManagedBranches,inspectManagedBranches,removeManagedBranches,type ManagedBranch} from './kanban-work-resource-branches';
 import {boardWorkResources as readBoardResources,associatedWorkResourceIds} from './kanban-work-resource-catalog';
-import {inspectRemovalModules} from '../projects/worktree-removal-modules';
+import {inspectRemovalModules,removeLinkedModuleWorktrees} from '../projects/worktree-removal-modules';
 import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {KanbanService, KanbanWorkResource, KanbanWorkResourceCleanup, KanbanExternalReference} from '@nestos/kanban/contracts';
@@ -174,6 +174,7 @@ async function remove(options: Options, resource: ResourceScope, key: string, bo
             await archiveWorktree(view.fs, options.fs, record.directory, id);
             await options.journal.update<Cleanup>(key, old => ({...old!, phase: 'removing'}));
             await removeManagedBranches(process,temporary);
+            if(modules)await removeLinkedModuleWorktrees(process,tree.directory,modules.modules,tree.branch);
             await gitWorkspace(process, '/workspace', ['worktree','remove',...(modules?['--force']:[]),tree.directory]);
             await gitWorkspace(process, '/workspace', ['branch', '-d', tree.branch]);
             await options.journal.update<Cleanup>(key, old => ({...old!, phase: 'cleaned'}));

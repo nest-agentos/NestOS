@@ -217,3 +217,12 @@ it('refuses cleanup while a registered temporary branch contains unintegrated co
  const resource=(await f.api.workResources('board','item'))[0];expect(resource.canCleanup).toBe(false);expect(resource.reasons).toContain('WORKTREE_TEMP_BRANCH_NOT_INTEGRATED');
  expect((await f.git(f.root,['rev-parse','--verify','refs/heads/fix/ready/change'])).stdout.trim()).toHaveLength(40);
 });
+
+it('unregisters independently linked module worktrees and their owned work branches during cleanup',async()=>{
+ const f=await fixture(true);await rm(join(f.physical,'library'),{recursive:true,force:true});
+ await f.git(join(f.root,'library'),['worktree','add','-b','work/ready',join(f.physical,'library'),'HEAD']);
+ const resource=(await f.api.workResources('board','item'))[0];expect(resource.canCleanup).toBe(true);
+ await f.api.cleanupWorkResource('board',{operationId:'linked-module-clean',itemId:'item',resourceId:'ready',version:resource.version});
+ expect((await f.git(join(f.root,'library'),['worktree','list','--porcelain'])).stdout).not.toContain(join(f.physical,'library'));
+ await expect(f.git(join(f.root,'library'),['rev-parse','--verify','refs/heads/work/ready'])).rejects.toBeDefined();
+});
