@@ -17,6 +17,8 @@ import type {
 import type { LLMUIEditors } from '@nestos/app-settings';
 
 export interface StudyCreationOptions extends Pick<StudyCreation, 'generation' | 'prompts' | 'sources' | 'recovery'> {
+    /** Resolve host presets only when the study workspace is opened. */
+    loadPrompts?(): Promise<NonNullable<StudyCreation['prompts']>>;
     /** Host post-save policy, outside the independent editor contract. */
     documentSaved?(draft: StudyDraft): Promise<void>;
 }
@@ -120,7 +122,7 @@ export interface AppUI {
     createFlowEditor(deps: FlowEditorDeps): EditorFactory;
     createSkillEditor(agentService: IAgentManagementService): EditorFactory;
     createAIContextMenu<TNode extends AIContextMenuNode>(deps: AIContextMenuDeps): ContextMenuConfig<TNode>;
-    llmUiEditors: LLMUIEditors;
+    llmUiEditors: LLMUIEditors | (() => Promise<LLMUIEditors>);
 }
 
 /** Containers a staged boot overlay can target once the workspace shell exists. */

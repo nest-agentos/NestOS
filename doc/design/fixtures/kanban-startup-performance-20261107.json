@@ -1,0 +1,3791 @@
+{
+  "dataset": {
+    "boards": 2,
+    "items": 50,
+    "sessions": 0
+  },
+  "version": "working-tree",
+  "network": "loopback; delay is added per application POST before sending",
+  "samples": [
+    {
+      "phase": "before",
+      "delay": 0,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 277.09999990463257,
+            "responseStart": 63.799999713897705,
+            "responseEnd": 64.39999961853027,
+            "domInteractive": 73.19999980926514,
+            "domContentLoaded": 136.39999961853027
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 72
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 125
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 296
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 504
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 134,
+            "ms": 3,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 140,
+            "ms": 134,
+            "transfer": 181492,
+            "decoded": 181192
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 364,
+            "ms": 4,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 371,
+            "ms": 3,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 392,
+            "ms": 76,
+            "transfer": 18365,
+            "decoded": 18065
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 392,
+            "ms": 15,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 392,
+            "ms": 16,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 393,
+            "ms": 23,
+            "transfer": 28869,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 409,
+            "ms": 12,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 503,
+            "ms": 49,
+            "transfer": 28869,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 505,
+            "ms": 22,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 506,
+            "ms": 22,
+            "transfer": 560,
+            "decoded": 260
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GI1ZSxfp.js",
+            "start": 135,
+            "ms": 180,
+            "transfer": 447946,
+            "decoded": 1638950
+          },
+          {
+            "file": "index-Bmo5ws4t.js",
+            "start": 71,
+            "ms": 38,
+            "transfer": 235560,
+            "decoded": 789020
+          },
+          {
+            "file": "context-menu-BSR5WQ4T.js",
+            "start": 136,
+            "ms": 155,
+            "transfer": 173954,
+            "decoded": 542061
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 72,
+            "ms": 68,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 136,
+            "ms": 40,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 157,
+            "ms": 112,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 136,
+            "ms": 32,
+            "transfer": 17601,
+            "decoded": 98292
+          },
+          {
+            "file": "conversation-status-DgXUhkvE.js",
+            "start": 136,
+            "ms": 136,
+            "transfer": 1043,
+            "decoded": 1520
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-first",
+      "ms": 583,
+      "logicalCalls": 13,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 157,
+          "durationMs": 123
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 372,
+          "durationMs": 1
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 375,
+          "durationMs": 4
+        },
+        {
+          "method": "catalog",
+          "atMs": 405,
+          "durationMs": 67
+        },
+        {
+          "method": "catalog",
+          "atMs": 405,
+          "durationMs": 67
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 405,
+          "durationMs": 67
+        },
+        {
+          "method": "subscribe",
+          "atMs": 405,
+          "durationMs": 14
+        },
+        {
+          "method": "onChanged",
+          "atMs": 405,
+          "durationMs": 14
+        },
+        {
+          "method": "query",
+          "atMs": 405,
+          "durationMs": 19
+        },
+        {
+          "method": "onChange",
+          "atMs": 419,
+          "durationMs": 11
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 516,
+          "durationMs": 40
+        },
+        {
+          "method": "onChange",
+          "atMs": 516,
+          "durationMs": 17
+        },
+        {
+          "method": "readEvents",
+          "atMs": 516,
+          "durationMs": 17
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "before",
+      "delay": 0,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 27.299999713897705,
+            "responseStart": 2.299999713897705,
+            "responseEnd": 2.5999999046325684,
+            "domInteractive": 16,
+            "domContentLoaded": 21.299999713897705
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 15
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 18
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 138
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 248
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 18,
+            "ms": 2,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 43,
+            "ms": 89,
+            "transfer": 20310,
+            "decoded": 20010
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 139,
+            "ms": 3,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 143,
+            "ms": 2,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 153,
+            "ms": 75,
+            "transfer": 18365,
+            "decoded": 18065
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 154,
+            "ms": 11,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 154,
+            "ms": 11,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 154,
+            "ms": 71,
+            "transfer": 28869,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 166,
+            "ms": 11,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 246,
+            "ms": 50,
+            "transfer": 28869,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 249,
+            "ms": 12,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 249,
+            "ms": 12,
+            "transfer": 560,
+            "decoded": 260
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GI1ZSxfp.js",
+            "start": 18,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 1638950
+          },
+          {
+            "file": "index-Bmo5ws4t.js",
+            "start": 14,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 789020
+          },
+          {
+            "file": "context-menu-BSR5WQ4T.js",
+            "start": 18,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 542061
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 15,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 21,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 25,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 19,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 98292
+          },
+          {
+            "file": "conversation-status-DgXUhkvE.js",
+            "start": 20,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 1520
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-reload",
+      "ms": 310,
+      "logicalCalls": 13,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 46,
+          "durationMs": 89
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 142,
+          "durationMs": 3
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 145,
+          "durationMs": 2
+        },
+        {
+          "method": "catalog",
+          "atMs": 162,
+          "durationMs": 69
+        },
+        {
+          "method": "catalog",
+          "atMs": 162,
+          "durationMs": 69
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 162,
+          "durationMs": 69
+        },
+        {
+          "method": "subscribe",
+          "atMs": 162,
+          "durationMs": 8
+        },
+        {
+          "method": "onChanged",
+          "atMs": 163,
+          "durationMs": 12
+        },
+        {
+          "method": "query",
+          "atMs": 163,
+          "durationMs": 65
+        },
+        {
+          "method": "onChange",
+          "atMs": 175,
+          "durationMs": 10
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 262,
+          "durationMs": 38
+        },
+        {
+          "method": "onChange",
+          "atMs": 262,
+          "durationMs": 4
+        },
+        {
+          "method": "readEvents",
+          "atMs": 262,
+          "durationMs": 4
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "before",
+      "delay": 0,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 346.00000000000006,
+            "responseStart": 83,
+            "responseEnd": 99,
+            "domInteractive": 104.00000000000001,
+            "domContentLoaded": 208.00000000000003
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 102
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 204
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 317
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 801
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 205,
+            "ms": 3,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 211,
+            "ms": 73,
+            "transfer": 181492,
+            "decoded": 181192
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 424,
+            "ms": 48,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 477,
+            "ms": 47,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 566,
+            "ms": 50,
+            "transfer": 18365,
+            "decoded": 18065
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 566,
+            "ms": 58,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 566,
+            "ms": 58,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 567,
+            "ms": 57,
+            "transfer": 28869,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 635,
+            "ms": 49,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 801,
+            "ms": 51,
+            "transfer": 28869,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 803,
+            "ms": 49,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 803,
+            "ms": 49,
+            "transfer": 560,
+            "decoded": 260
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GI1ZSxfp.js",
+            "start": 207,
+            "ms": 73,
+            "transfer": 447946,
+            "decoded": 1638950
+          },
+          {
+            "file": "index-Bmo5ws4t.js",
+            "start": 103,
+            "ms": 49,
+            "transfer": 235560,
+            "decoded": 789020
+          },
+          {
+            "file": "context-menu-BSR5WQ4T.js",
+            "start": 207,
+            "ms": 73,
+            "transfer": 173954,
+            "decoded": 542061
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 104,
+            "ms": 52,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 207,
+            "ms": 86,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 253,
+            "ms": 79,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 207,
+            "ms": 113,
+            "transfer": 17601,
+            "decoded": 98292
+          },
+          {
+            "file": "fa-regular-400-BVHPE7da.woff2",
+            "start": 348,
+            "ms": 3,
+            "transfer": 19288,
+            "decoded": 18988
+          },
+          {
+            "file": "conversation-status-DgXUhkvE.js",
+            "start": 207,
+            "ms": 113,
+            "transfer": 1043,
+            "decoded": 1520
+          }
+        ]
+      },
+      "engine": "webkit18-mobile",
+      "scenario": "board-first",
+      "ms": 903,
+      "logicalCalls": 13,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 219,
+          "durationMs": 74
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 428,
+          "durationMs": 49
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 480,
+          "durationMs": 49
+        },
+        {
+          "method": "catalog",
+          "atMs": 569,
+          "durationMs": 50
+        },
+        {
+          "method": "catalog",
+          "atMs": 569,
+          "durationMs": 50
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 569,
+          "durationMs": 50
+        },
+        {
+          "method": "subscribe",
+          "atMs": 571,
+          "durationMs": 66
+        },
+        {
+          "method": "onChanged",
+          "atMs": 571,
+          "durationMs": 66
+        },
+        {
+          "method": "query",
+          "atMs": 571,
+          "durationMs": 66
+        },
+        {
+          "method": "onChange",
+          "atMs": 637,
+          "durationMs": 170
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 804,
+          "durationMs": 59
+        },
+        {
+          "method": "onChange",
+          "atMs": 807,
+          "durationMs": 56
+        },
+        {
+          "method": "readEvents",
+          "atMs": 807,
+          "durationMs": 56
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "before",
+      "delay": 0,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 38,
+            "responseStart": 3,
+            "responseEnd": 3,
+            "domInteractive": 15,
+            "domContentLoaded": 35
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 8
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 28
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 171
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 406
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 28,
+            "ms": 3,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 113,
+            "ms": 53,
+            "transfer": 20310,
+            "decoded": 20010
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 172,
+            "ms": 50,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 225,
+            "ms": 49,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 294,
+            "ms": 59,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 294,
+            "ms": 59,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 294,
+            "ms": 60,
+            "transfer": 18365,
+            "decoded": 18065
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 294,
+            "ms": 60,
+            "transfer": 28869,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 356,
+            "ms": 46,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 407,
+            "ms": 60,
+            "transfer": 28869,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 408,
+            "ms": 58,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 408,
+            "ms": 58,
+            "transfer": 560,
+            "decoded": 260
+          }
+        ],
+        "assets": [
+          {
+            "file": "index-Bmo5ws4t.js",
+            "start": 8,
+            "ms": 1,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 9,
+            "ms": 6,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "hosted-application-GI1ZSxfp.js",
+            "start": 28,
+            "ms": 1,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "context-menu-BSR5WQ4T.js",
+            "start": 29,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 29,
+            "ms": 1,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "conversation-status-DgXUhkvE.js",
+            "start": 30,
+            "ms": 1,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 31,
+            "ms": 3,
+            "transfer": 0,
+            "decoded": 0
+          }
+        ]
+      },
+      "engine": "webkit18-mobile",
+      "scenario": "board-reload",
+      "ms": 493,
+      "logicalCalls": 13,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 115,
+          "durationMs": 54
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 175,
+          "durationMs": 52
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 228,
+          "durationMs": 51
+        },
+        {
+          "method": "catalog",
+          "atMs": 297,
+          "durationMs": 61
+        },
+        {
+          "method": "catalog",
+          "atMs": 297,
+          "durationMs": 61
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 297,
+          "durationMs": 61
+        },
+        {
+          "method": "subscribe",
+          "atMs": 298,
+          "durationMs": 60
+        },
+        {
+          "method": "onChanged",
+          "atMs": 299,
+          "durationMs": 59
+        },
+        {
+          "method": "query",
+          "atMs": 299,
+          "durationMs": 59
+        },
+        {
+          "method": "onChange",
+          "atMs": 359,
+          "durationMs": 54
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 410,
+          "durationMs": 60
+        },
+        {
+          "method": "onChange",
+          "atMs": 412,
+          "durationMs": 58
+        },
+        {
+          "method": "readEvents",
+          "atMs": 412,
+          "durationMs": 58
+        }
+      ],
+      "errors": [
+        "Fetch API cannot load https"
+      ]
+    },
+    {
+      "phase": "before",
+      "delay": 150,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 258.30000019073486,
+            "responseStart": 58.5,
+            "responseEnd": 59.30000019073486,
+            "domInteractive": 68.30000019073486,
+            "domContentLoaded": 144
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 67
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 133
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 399
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 948
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 142,
+            "ms": 9,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 171,
+            "ms": 215,
+            "transfer": 181492,
+            "decoded": 181192
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 402,
+            "ms": 155,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 559,
+            "ms": 155,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 734,
+            "ms": 179,
+            "transfer": 18365,
+            "decoded": 18065
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 734,
+            "ms": 166,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 735,
+            "ms": 166,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 735,
+            "ms": 172,
+            "transfer": 28869,
+            "decoded": 28569
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GI1ZSxfp.js",
+            "start": 143,
+            "ms": 81,
+            "transfer": 447946,
+            "decoded": 1638950
+          },
+          {
+            "file": "index-Bmo5ws4t.js",
+            "start": 65,
+            "ms": 58,
+            "transfer": 235560,
+            "decoded": 789020
+          },
+          {
+            "file": "context-menu-BSR5WQ4T.js",
+            "start": 143,
+            "ms": 51,
+            "transfer": 173954,
+            "decoded": 542061
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 67,
+            "ms": 63,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 144,
+            "ms": 68,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 156,
+            "ms": 79,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 144,
+            "ms": 63,
+            "transfer": 17601,
+            "decoded": 98292
+          },
+          {
+            "file": "conversation-status-DgXUhkvE.js",
+            "start": 144,
+            "ms": 80,
+            "transfer": 1043,
+            "decoded": 1520
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-first",
+      "ms": 1013,
+      "logicalCalls": 13,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 187,
+          "durationMs": 205
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 405,
+          "durationMs": 155
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 562,
+          "durationMs": 156
+        },
+        {
+          "method": "catalog",
+          "atMs": 738,
+          "durationMs": 178
+        },
+        {
+          "method": "catalog",
+          "atMs": 738,
+          "durationMs": 178
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 738,
+          "durationMs": 178
+        },
+        {
+          "method": "subscribe",
+          "atMs": 739,
+          "durationMs": 170
+        },
+        {
+          "method": "onChanged",
+          "atMs": 739,
+          "durationMs": 170
+        },
+        {
+          "method": "query",
+          "atMs": 739,
+          "durationMs": 172
+        },
+        {
+          "method": "onChange",
+          "atMs": 909,
+          "durationMs": 161
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 953,
+          "durationMs": 167
+        },
+        {
+          "method": "onChange",
+          "atMs": 955,
+          "durationMs": 167
+        },
+        {
+          "method": "readEvents",
+          "atMs": 956,
+          "durationMs": 166
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "before",
+      "delay": 150,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 189.19999980926514,
+            "responseStart": 50.09999990463257,
+            "responseEnd": 51,
+            "domInteractive": 74.09999990463257,
+            "domContentLoaded": 130.69999980926514
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 73
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 129
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 401
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 1005
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 130,
+            "ms": 9,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 151,
+            "ms": 244,
+            "transfer": 20310,
+            "decoded": 20010
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 402,
+            "ms": 204,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 608,
+            "ms": 153,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 769,
+            "ms": 174,
+            "transfer": 18365,
+            "decoded": 18065
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 770,
+            "ms": 216,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 770,
+            "ms": 217,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 770,
+            "ms": 217,
+            "transfer": 28869,
+            "decoded": 28569
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GI1ZSxfp.js",
+            "start": 130,
+            "ms": 18,
+            "transfer": 447946,
+            "decoded": 1638950
+          },
+          {
+            "file": "index-Bmo5ws4t.js",
+            "start": 73,
+            "ms": 50,
+            "transfer": 235560,
+            "decoded": 789020
+          },
+          {
+            "file": "context-menu-BSR5WQ4T.js",
+            "start": 130,
+            "ms": 15,
+            "transfer": 173954,
+            "decoded": 542061
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 74,
+            "ms": 8,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 131,
+            "ms": 56,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 105,
+            "ms": 49,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 130,
+            "ms": 10,
+            "transfer": 17601,
+            "decoded": 98292
+          },
+          {
+            "file": "conversation-status-DgXUhkvE.js",
+            "start": 130,
+            "ms": 16,
+            "transfer": 1043,
+            "decoded": 1520
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-reload",
+      "ms": 1348,
+      "logicalCalls": 14,
+      "httpRequests": 12,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "assistantOverview",
+          "atMs": 108,
+          "durationMs": 158
+        },
+        {
+          "method": "bootstrap",
+          "atMs": 445,
+          "durationMs": 239
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 692,
+          "durationMs": 204
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 897,
+          "durationMs": 154
+        },
+        {
+          "method": "catalog",
+          "atMs": 1059,
+          "durationMs": 185
+        },
+        {
+          "method": "catalog",
+          "atMs": 1059,
+          "durationMs": 185
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 1059,
+          "durationMs": 185
+        },
+        {
+          "method": "subscribe",
+          "atMs": 1060,
+          "durationMs": 216
+        },
+        {
+          "method": "onChanged",
+          "atMs": 1060,
+          "durationMs": 216
+        },
+        {
+          "method": "query",
+          "atMs": 1060,
+          "durationMs": 217
+        },
+        {
+          "method": "onChange",
+          "atMs": 1277
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 1297
+        },
+        {
+          "method": "onChange",
+          "atMs": 1297
+        },
+        {
+          "method": "readEvents",
+          "atMs": 1299
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "before",
+      "delay": 150,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 208.00000000000003,
+            "responseStart": 79,
+            "responseEnd": 95,
+            "domInteractive": 100,
+            "domContentLoaded": 143.00000000000003
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 99
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 141
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 417
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 1295
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 144,
+            "ms": 23,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 354,
+            "ms": 47,
+            "transfer": 181492,
+            "decoded": 181192
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 573,
+            "ms": 54,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 784,
+            "ms": 47,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 1025,
+            "ms": 65,
+            "transfer": 18365,
+            "decoded": 18065
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 1026,
+            "ms": 53,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 1026,
+            "ms": 54,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 1026,
+            "ms": 57,
+            "transfer": 28869,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 1297,
+            "ms": 46,
+            "transfer": 662,
+            "decoded": 362
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GI1ZSxfp.js",
+            "start": 144,
+            "ms": 56,
+            "transfer": 447946,
+            "decoded": 1638950
+          },
+          {
+            "file": "index-Bmo5ws4t.js",
+            "start": 100,
+            "ms": 6,
+            "transfer": 235560,
+            "decoded": 789020
+          },
+          {
+            "file": "context-menu-BSR5WQ4T.js",
+            "start": 144,
+            "ms": 18,
+            "transfer": 173954,
+            "decoded": 542061
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 103,
+            "ms": 50,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 144,
+            "ms": 24,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 283,
+            "ms": 2,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 144,
+            "ms": 56,
+            "transfer": 17601,
+            "decoded": 98292
+          },
+          {
+            "file": "fa-regular-400-BVHPE7da.woff2",
+            "start": 335,
+            "ms": 2,
+            "transfer": 19288,
+            "decoded": 18988
+          },
+          {
+            "file": "conversation-status-DgXUhkvE.js",
+            "start": 144,
+            "ms": 18,
+            "transfer": 1043,
+            "decoded": 1520
+          }
+        ]
+      },
+      "engine": "webkit18-mobile",
+      "scenario": "board-first",
+      "ms": 1365,
+      "logicalCalls": 13,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 204,
+          "durationMs": 201
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 422,
+          "durationMs": 209
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 635,
+          "durationMs": 200
+        },
+        {
+          "method": "catalog",
+          "atMs": 875,
+          "durationMs": 217
+        },
+        {
+          "method": "catalog",
+          "atMs": 875,
+          "durationMs": 217
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 875,
+          "durationMs": 217
+        },
+        {
+          "method": "subscribe",
+          "atMs": 876,
+          "durationMs": 208
+        },
+        {
+          "method": "onChanged",
+          "atMs": 876,
+          "durationMs": 208
+        },
+        {
+          "method": "query",
+          "atMs": 876,
+          "durationMs": 212
+        },
+        {
+          "method": "onChange",
+          "atMs": 1085,
+          "durationMs": 261
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 1295,
+          "durationMs": 200
+        },
+        {
+          "method": "onChange",
+          "atMs": 1299,
+          "durationMs": 208
+        },
+        {
+          "method": "readEvents",
+          "atMs": 1299,
+          "durationMs": 207
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "before",
+      "delay": 150,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 204.00000000000003,
+            "responseStart": 45,
+            "responseEnd": 47,
+            "domInteractive": 55,
+            "domContentLoaded": 106
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 54
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 103
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 356
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 1048
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 114,
+            "ms": 4,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 301,
+            "ms": 49,
+            "transfer": 20310,
+            "decoded": 20010
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 510,
+            "ms": 48,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 714,
+            "ms": 56,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 943,
+            "ms": 50,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 943,
+            "ms": 51,
+            "transfer": 18365,
+            "decoded": 18065
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 944,
+            "ms": 53,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 944,
+            "ms": 53,
+            "transfer": 28869,
+            "decoded": 28569
+          }
+        ],
+        "assets": [
+          {
+            "file": "index-Bmo5ws4t.js",
+            "start": 55,
+            "ms": 10,
+            "transfer": 235560,
+            "decoded": 789020
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 56,
+            "ms": 7,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 114,
+            "ms": 5,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 129,
+            "ms": 44,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 114,
+            "ms": 47,
+            "transfer": 17601,
+            "decoded": 98292
+          },
+          {
+            "file": "fa-regular-400-BVHPE7da.woff2",
+            "start": 208,
+            "ms": 2,
+            "transfer": 19288,
+            "decoded": 18988
+          },
+          {
+            "file": "hosted-application-GI1ZSxfp.js",
+            "start": 104,
+            "ms": 1,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "context-menu-BSR5WQ4T.js",
+            "start": 105,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "conversation-status-DgXUhkvE.js",
+            "start": 105,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 0
+          }
+        ]
+      },
+      "engine": "webkit18-mobile",
+      "scenario": "board-reload",
+      "ms": 1460,
+      "logicalCalls": 14,
+      "httpRequests": 12,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "assistantOverview",
+          "atMs": 129,
+          "durationMs": 204
+        },
+        {
+          "method": "bootstrap",
+          "atMs": 499,
+          "durationMs": 203
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 708,
+          "durationMs": 202
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 911,
+          "durationMs": 211
+        },
+        {
+          "method": "catalog",
+          "atMs": 1141,
+          "durationMs": 204
+        },
+        {
+          "method": "catalog",
+          "atMs": 1141,
+          "durationMs": 204
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 1141,
+          "durationMs": 204
+        },
+        {
+          "method": "subscribe",
+          "atMs": 1141,
+          "durationMs": 203
+        },
+        {
+          "method": "onChanged",
+          "atMs": 1141,
+          "durationMs": 211
+        },
+        {
+          "method": "query",
+          "atMs": 1142,
+          "durationMs": 211
+        },
+        {
+          "method": "onChange",
+          "atMs": 1352
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 1398
+        },
+        {
+          "method": "onChange",
+          "atMs": 1399
+        },
+        {
+          "method": "readEvents",
+          "atMs": 1399
+        }
+      ],
+      "errors": [
+        "Fetch API cannot load https"
+      ]
+    },
+    {
+      "phase": "after",
+      "delay": 0,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 257.69999980926514,
+            "responseStart": 56.799999713897705,
+            "responseEnd": 57.299999713897705,
+            "domInteractive": 66.5,
+            "domContentLoaded": 124.5
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 65
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 113
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 230
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 365
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 123,
+            "ms": 3,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 127,
+            "ms": 82,
+            "transfer": 41205,
+            "decoded": 181192
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 275,
+            "ms": 3,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 275,
+            "ms": 4,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 302,
+            "ms": 24,
+            "transfer": 2413,
+            "decoded": 9078
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 303,
+            "ms": 11,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 303,
+            "ms": 11,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 303,
+            "ms": 22,
+            "transfer": 2096,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 315,
+            "ms": 12,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 364,
+            "ms": 16,
+            "transfer": 2096,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 367,
+            "ms": 13,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 368,
+            "ms": 13,
+            "transfer": 560,
+            "decoded": 260
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GZHtrw5U.js",
+            "start": 124,
+            "ms": 118,
+            "transfer": 364212,
+            "decoded": 1329219
+          },
+          {
+            "file": "index-M8O2mfDE.js",
+            "start": 64,
+            "ms": 33,
+            "transfer": 235587,
+            "decoded": 789043
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 66,
+            "ms": 72,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 124,
+            "ms": 82,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 167,
+            "ms": 86,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-1tEBN4W7.js",
+            "start": 124,
+            "ms": 87,
+            "transfer": 33095,
+            "decoded": 103135
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 124,
+            "ms": 25,
+            "transfer": 17601,
+            "decoded": 98292
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-first",
+      "ms": 441,
+      "logicalCalls": 12,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 134,
+          "durationMs": 82
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 280,
+          "durationMs": 3
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 280,
+          "durationMs": 4
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 309,
+          "durationMs": 22
+        },
+        {
+          "method": "catalog",
+          "atMs": 309,
+          "durationMs": 22
+        },
+        {
+          "method": "subscribe",
+          "atMs": 309,
+          "durationMs": 13
+        },
+        {
+          "method": "onChanged",
+          "atMs": 309,
+          "durationMs": 13
+        },
+        {
+          "method": "query",
+          "atMs": 309,
+          "durationMs": 21
+        },
+        {
+          "method": "onChange",
+          "atMs": 322,
+          "durationMs": 8
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 375,
+          "durationMs": 11
+        },
+        {
+          "method": "onChange",
+          "atMs": 375,
+          "durationMs": 11
+        },
+        {
+          "method": "readEvents",
+          "atMs": 375,
+          "durationMs": 11
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "after",
+      "delay": 0,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 25.59999990463257,
+            "responseStart": 2.0999999046325684,
+            "responseEnd": 2.3999996185302734,
+            "domInteractive": 15.299999713897705,
+            "domContentLoaded": 20.09999990463257
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 14
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 17
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 134
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 192
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 17,
+            "ms": 2,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 40,
+            "ms": 88,
+            "transfer": 5977,
+            "decoded": 20010
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 135,
+            "ms": 4,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 135,
+            "ms": 4,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 147,
+            "ms": 24,
+            "transfer": 2413,
+            "decoded": 9078
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 147,
+            "ms": 11,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 148,
+            "ms": 11,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 148,
+            "ms": 24,
+            "transfer": 2096,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 159,
+            "ms": 13,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 192,
+            "ms": 14,
+            "transfer": 2096,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 193,
+            "ms": 12,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 193,
+            "ms": 12,
+            "transfer": 560,
+            "decoded": 260
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GZHtrw5U.js",
+            "start": 17,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 1329219
+          },
+          {
+            "file": "index-M8O2mfDE.js",
+            "start": 13,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 789043
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 15,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 20,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 24,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-1tEBN4W7.js",
+            "start": 17,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 103135
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 18,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 98292
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-reload",
+      "ms": 264,
+      "logicalCalls": 12,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 45,
+          "durationMs": 87
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 140,
+          "durationMs": 3
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 141,
+          "durationMs": 2
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 153,
+          "durationMs": 23
+        },
+        {
+          "method": "catalog",
+          "atMs": 153,
+          "durationMs": 23
+        },
+        {
+          "method": "subscribe",
+          "atMs": 153,
+          "durationMs": 11
+        },
+        {
+          "method": "onChanged",
+          "atMs": 153,
+          "durationMs": 11
+        },
+        {
+          "method": "query",
+          "atMs": 153,
+          "durationMs": 26
+        },
+        {
+          "method": "onChange",
+          "atMs": 168,
+          "durationMs": 9
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 208,
+          "durationMs": 3
+        },
+        {
+          "method": "onChange",
+          "atMs": 209,
+          "durationMs": 2
+        },
+        {
+          "method": "readEvents",
+          "atMs": 209,
+          "durationMs": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "after",
+      "delay": 0,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 251,
+            "responseStart": 78,
+            "responseEnd": 96,
+            "domInteractive": 101,
+            "domContentLoaded": 143.00000000000003
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 100
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 140
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 313
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 664
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 141,
+            "ms": 2,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 145,
+            "ms": 58,
+            "transfer": 41401,
+            "decoded": 181192
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 317,
+            "ms": 53,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 317,
+            "ms": 53,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 415,
+            "ms": 51,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 415,
+            "ms": 51,
+            "transfer": 2413,
+            "decoded": 9078
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 415,
+            "ms": 58,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 415,
+            "ms": 59,
+            "transfer": 2096,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 487,
+            "ms": 50,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 664,
+            "ms": 54,
+            "transfer": 2096,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 666,
+            "ms": 51,
+            "transfer": 560,
+            "decoded": 260
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 703,
+            "ms": 50,
+            "transfer": 662,
+            "decoded": 362
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GZHtrw5U.js",
+            "start": 142,
+            "ms": 65,
+            "transfer": 364212,
+            "decoded": 1329219
+          },
+          {
+            "file": "index-M8O2mfDE.js",
+            "start": 101,
+            "ms": 9,
+            "transfer": 235587,
+            "decoded": 789043
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 101,
+            "ms": 49,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 142,
+            "ms": 65,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 214,
+            "ms": 3,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-1tEBN4W7.js",
+            "start": 142,
+            "ms": 100,
+            "transfer": 33095,
+            "decoded": 103135
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 142,
+            "ms": 59,
+            "transfer": 17601,
+            "decoded": 98292
+          },
+          {
+            "file": "fa-regular-400-BVHPE7da.woff2",
+            "start": 254,
+            "ms": 47,
+            "transfer": 19288,
+            "decoded": 18988
+          }
+        ]
+      },
+      "engine": "webkit18-mobile",
+      "scenario": "board-first",
+      "ms": 770,
+      "logicalCalls": 12,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 150,
+          "durationMs": 74
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 319,
+          "durationMs": 54
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 320,
+          "durationMs": 54
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 417,
+          "durationMs": 52
+        },
+        {
+          "method": "catalog",
+          "atMs": 417,
+          "durationMs": 52
+        },
+        {
+          "method": "subscribe",
+          "atMs": 418,
+          "durationMs": 51
+        },
+        {
+          "method": "onChanged",
+          "atMs": 418,
+          "durationMs": 71
+        },
+        {
+          "method": "query",
+          "atMs": 418,
+          "durationMs": 71
+        },
+        {
+          "method": "onChange",
+          "atMs": 489,
+          "durationMs": 180
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 667,
+          "durationMs": 55
+        },
+        {
+          "method": "readEvents",
+          "atMs": 669,
+          "durationMs": 52
+        },
+        {
+          "method": "onChange",
+          "atMs": 706,
+          "durationMs": 50
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "after",
+      "delay": 0,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 80,
+            "responseStart": 42,
+            "responseEnd": 43,
+            "domInteractive": 56,
+            "domContentLoaded": 76
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 49
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 69
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 193
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 362
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 70,
+            "ms": 2,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 137,
+            "ms": 51,
+            "transfer": 5977,
+            "decoded": 20010
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 195,
+            "ms": 52,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 195,
+            "ms": 52,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 265,
+            "ms": 50,
+            "transfer": 2413,
+            "decoded": 9078
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 265,
+            "ms": 54,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 266,
+            "ms": 53,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 266,
+            "ms": 53,
+            "transfer": 2096,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 362,
+            "ms": 49,
+            "transfer": 2096,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 364,
+            "ms": 51,
+            "transfer": 560,
+            "decoded": 260
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 376,
+            "ms": 55,
+            "transfer": 662,
+            "decoded": 362
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 376,
+            "ms": 55,
+            "transfer": 498,
+            "decoded": 198
+          }
+        ],
+        "assets": [
+          {
+            "file": "index-M8O2mfDE.js",
+            "start": 49,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 50,
+            "ms": 5,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "hosted-application-GZHtrw5U.js",
+            "start": 70,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "context-menu-1tEBN4W7.js",
+            "start": 70,
+            "ms": 1,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 71,
+            "ms": 1,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 72,
+            "ms": 4,
+            "transfer": 0,
+            "decoded": 0
+          }
+        ]
+      },
+      "engine": "webkit18-mobile",
+      "scenario": "board-reload",
+      "ms": 447,
+      "logicalCalls": 12,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 140,
+          "durationMs": 50
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 197,
+          "durationMs": 53
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 197,
+          "durationMs": 53
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 267,
+          "durationMs": 50
+        },
+        {
+          "method": "catalog",
+          "atMs": 267,
+          "durationMs": 50
+        },
+        {
+          "method": "subscribe",
+          "atMs": 268,
+          "durationMs": 56
+        },
+        {
+          "method": "onChanged",
+          "atMs": 268,
+          "durationMs": 56
+        },
+        {
+          "method": "query",
+          "atMs": 269,
+          "durationMs": 55
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 364,
+          "durationMs": 49
+        },
+        {
+          "method": "readEvents",
+          "atMs": 367,
+          "durationMs": 50
+        },
+        {
+          "method": "onChange",
+          "atMs": 383,
+          "durationMs": 50
+        },
+        {
+          "method": "onChange",
+          "atMs": 383,
+          "durationMs": 50
+        }
+      ],
+      "errors": [
+        "Fetch API cannot load https",
+        "Fetch API cannot load https"
+      ]
+    },
+    {
+      "phase": "after",
+      "delay": 150,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 218.30000019073486,
+            "responseStart": 57,
+            "responseEnd": 57.80000019073486,
+            "domInteractive": 66.59999990463257,
+            "domContentLoaded": 110.5
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 65
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 98
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 346
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 743
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 109,
+            "ms": 6,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 125,
+            "ms": 207,
+            "transfer": 41214,
+            "decoded": 181193
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 349,
+            "ms": 157,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 350,
+            "ms": 158,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 531,
+            "ms": 175,
+            "transfer": 2413,
+            "decoded": 9078
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 532,
+            "ms": 167,
+            "transfer": 663,
+            "decoded": 363
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 532,
+            "ms": 167,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 532,
+            "ms": 174,
+            "transfer": 2096,
+            "decoded": 28569
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GZHtrw5U.js",
+            "start": 110,
+            "ms": 76,
+            "transfer": 364212,
+            "decoded": 1329219
+          },
+          {
+            "file": "index-M8O2mfDE.js",
+            "start": 64,
+            "ms": 14,
+            "transfer": 235587,
+            "decoded": 789043
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 66,
+            "ms": 64,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 110,
+            "ms": 79,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 149,
+            "ms": 64,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-1tEBN4W7.js",
+            "start": 110,
+            "ms": 68,
+            "transfer": 33095,
+            "decoded": 103135
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 110,
+            "ms": 84,
+            "transfer": 17601,
+            "decoded": 98292
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-first",
+      "ms": 802,
+      "logicalCalls": 12,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 139,
+          "durationMs": 199
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 353,
+          "durationMs": 157
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 353,
+          "durationMs": 158
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 535,
+          "durationMs": 175
+        },
+        {
+          "method": "catalog",
+          "atMs": 535,
+          "durationMs": 175
+        },
+        {
+          "method": "subscribe",
+          "atMs": 536,
+          "durationMs": 170
+        },
+        {
+          "method": "onChanged",
+          "atMs": 536,
+          "durationMs": 170
+        },
+        {
+          "method": "query",
+          "atMs": 536,
+          "durationMs": 174
+        },
+        {
+          "method": "onChange",
+          "atMs": 706,
+          "durationMs": 159
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 749,
+          "durationMs": 168
+        },
+        {
+          "method": "onChange",
+          "atMs": 751,
+          "durationMs": 165
+        },
+        {
+          "method": "readEvents",
+          "atMs": 751,
+          "durationMs": 165
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "after",
+      "delay": 150,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 73.5,
+            "responseStart": 4.400000095367432,
+            "responseEnd": 4.900000095367432,
+            "domInteractive": 28.09999990463257,
+            "domContentLoaded": 48.19999980926514
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 27
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 47
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 311
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 673
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 47,
+            "ms": 6,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 65,
+            "ms": 240,
+            "transfer": 5978,
+            "decoded": 20011
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 311,
+            "ms": 156,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 312,
+            "ms": 156,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 478,
+            "ms": 173,
+            "transfer": 2413,
+            "decoded": 9078
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 479,
+            "ms": 163,
+            "transfer": 663,
+            "decoded": 363
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 479,
+            "ms": 163,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 479,
+            "ms": 172,
+            "transfer": 2096,
+            "decoded": 28569
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GZHtrw5U.js",
+            "start": 48,
+            "ms": 15,
+            "transfer": 364212,
+            "decoded": 1329219
+          },
+          {
+            "file": "index-M8O2mfDE.js",
+            "start": 27,
+            "ms": 9,
+            "transfer": 235587,
+            "decoded": 789043
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 28,
+            "ms": 8,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 48,
+            "ms": 10,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 54,
+            "ms": 9,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-1tEBN4W7.js",
+            "start": 48,
+            "ms": 11,
+            "transfer": 33095,
+            "decoded": 103135
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 48,
+            "ms": 10,
+            "transfer": 17601,
+            "decoded": 98292
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-reload",
+      "ms": 995,
+      "logicalCalls": 13,
+      "httpRequests": 12,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "assistantOverview",
+          "atMs": 113,
+          "durationMs": 156
+        },
+        {
+          "method": "bootstrap",
+          "atMs": 338,
+          "durationMs": 241
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 584,
+          "durationMs": 156
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 585,
+          "durationMs": 156
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 752,
+          "durationMs": 173
+        },
+        {
+          "method": "catalog",
+          "atMs": 752,
+          "durationMs": 173
+        },
+        {
+          "method": "subscribe",
+          "atMs": 752,
+          "durationMs": 167
+        },
+        {
+          "method": "onChanged",
+          "atMs": 752,
+          "durationMs": 167
+        },
+        {
+          "method": "query",
+          "atMs": 752,
+          "durationMs": 172
+        },
+        {
+          "method": "onChange",
+          "atMs": 919
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 949
+        },
+        {
+          "method": "onChange",
+          "atMs": 949
+        },
+        {
+          "method": "readEvents",
+          "atMs": 949
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "after",
+      "delay": 150,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 274,
+            "responseStart": 76,
+            "responseEnd": 91,
+            "domInteractive": 96,
+            "domContentLoaded": 140
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 95
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 137
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 462
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 1102
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 140,
+            "ms": 60,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 399,
+            "ms": 48,
+            "transfer": 41208,
+            "decoded": 181193
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 619,
+            "ms": 50,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 619,
+            "ms": 53,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 866,
+            "ms": 51,
+            "transfer": 2413,
+            "decoded": 9078
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 866,
+            "ms": 54,
+            "transfer": 498,
+            "decoded": 198
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 866,
+            "ms": 54,
+            "transfer": 663,
+            "decoded": 363
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 867,
+            "ms": 54,
+            "transfer": 2096,
+            "decoded": 28569
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 1104,
+            "ms": 48,
+            "transfer": 663,
+            "decoded": 363
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-GZHtrw5U.js",
+            "start": 140,
+            "ms": 52,
+            "transfer": 364212,
+            "decoded": 1329219
+          },
+          {
+            "file": "index-M8O2mfDE.js",
+            "start": 96,
+            "ms": 8,
+            "transfer": 235587,
+            "decoded": 789043
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 96,
+            "ms": 49,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 140,
+            "ms": 17,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 241,
+            "ms": 2,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-1tEBN4W7.js",
+            "start": 140,
+            "ms": 49,
+            "transfer": 33095,
+            "decoded": 103135
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 140,
+            "ms": 56,
+            "transfer": 17601,
+            "decoded": 98292
+          },
+          {
+            "file": "fa-regular-400-BVHPE7da.woff2",
+            "start": 277,
+            "ms": 6,
+            "transfer": 19288,
+            "decoded": 18988
+          }
+        ]
+      },
+      "engine": "webkit18-mobile",
+      "scenario": "board-first",
+      "ms": 1212,
+      "logicalCalls": 12,
+      "httpRequests": 11,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 248,
+          "durationMs": 202
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 468,
+          "durationMs": 204
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 468,
+          "durationMs": 208
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 715,
+          "durationMs": 205
+        },
+        {
+          "method": "catalog",
+          "atMs": 715,
+          "durationMs": 205
+        },
+        {
+          "method": "subscribe",
+          "atMs": 715,
+          "durationMs": 222
+        },
+        {
+          "method": "onChanged",
+          "atMs": 715,
+          "durationMs": 222
+        },
+        {
+          "method": "query",
+          "atMs": 715,
+          "durationMs": 222
+        },
+        {
+          "method": "onChange",
+          "atMs": 938,
+          "durationMs": 220
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 1104,
+          "durationMs": 208
+        },
+        {
+          "method": "readEvents",
+          "atMs": 1106,
+          "durationMs": 206
+        },
+        {
+          "method": "onChange",
+          "atMs": 1140,
+          "durationMs": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "phase": "after",
+      "delay": 150,
+      "resources": {
+        "navigation": [
+          {
+            "duration": 197,
+            "responseStart": 48,
+            "responseEnd": 49,
+            "domInteractive": 55,
+            "domContentLoaded": 106
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 54
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 105
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 354
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 829
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 115,
+            "ms": 3,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 297,
+            "ms": 51,
+            "transfer": 5978,
+            "decoded": 20011
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 507,
+            "ms": 49,
+            "transfer": 427,
+            "decoded": 127
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 508,
+            "ms": 48,
+            "transfer": 438,
+            "decoded": 138
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 727,
+            "ms": 50,
+            "transfer": 2413,
+            "decoded": 9078
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 727,
+            "ms": 53,
+            "transfer": 663,
+            "decoded": 363
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 728,
+            "ms": 52,
+            "transfer": 663,
+            "decoded": 363
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 728,
+            "ms": 56,
+            "transfer": 2096,
+            "decoded": 28569
+          }
+        ],
+        "assets": [
+          {
+            "file": "index-M8O2mfDE.js",
+            "start": 55,
+            "ms": 10,
+            "transfer": 235587,
+            "decoded": 789043
+          },
+          {
+            "file": "index-CCWXJ5Yg.css",
+            "start": 56,
+            "ms": 7,
+            "transfer": 99281,
+            "decoded": 524227
+          },
+          {
+            "file": "hosted-application-jbcYOYGH.css",
+            "start": 115,
+            "ms": 5,
+            "transfer": 45348,
+            "decoded": 280811
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 136,
+            "ms": 44,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "context-menu-dA8kNTb2.css",
+            "start": 115,
+            "ms": 45,
+            "transfer": 17601,
+            "decoded": 98292
+          },
+          {
+            "file": "fa-regular-400-BVHPE7da.woff2",
+            "start": 211,
+            "ms": 1,
+            "transfer": 19288,
+            "decoded": 18988
+          },
+          {
+            "file": "hosted-application-GZHtrw5U.js",
+            "start": 106,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 0
+          },
+          {
+            "file": "context-menu-1tEBN4W7.js",
+            "start": 106,
+            "ms": 0,
+            "transfer": 0,
+            "decoded": 0
+          }
+        ]
+      },
+      "engine": "webkit18-mobile",
+      "scenario": "board-reload",
+      "ms": 1202,
+      "logicalCalls": 13,
+      "httpRequests": 12,
+      "boardCount": 3,
+      "calls": [
+        {
+          "method": "assistantOverview",
+          "atMs": 99,
+          "durationMs": 199
+        },
+        {
+          "method": "bootstrap",
+          "atMs": 450,
+          "durationMs": 203
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 661,
+          "durationMs": 201
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 661,
+          "durationMs": 201
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 881,
+          "durationMs": 203
+        },
+        {
+          "method": "catalog",
+          "atMs": 881,
+          "durationMs": 203
+        },
+        {
+          "method": "subscribe",
+          "atMs": 881,
+          "durationMs": 211
+        },
+        {
+          "method": "onChanged",
+          "atMs": 881,
+          "durationMs": 210
+        },
+        {
+          "method": "query",
+          "atMs": 881,
+          "durationMs": 210
+        },
+        {
+          "method": "onChange",
+          "atMs": 1092
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 1135
+        },
+        {
+          "method": "onChange",
+          "atMs": 1135
+        },
+        {
+          "method": "readEvents",
+          "atMs": 1136
+        }
+      ],
+      "errors": [
+        "Fetch API cannot load https"
+      ]
+    }
+  ],
+  "conditions": {
+    "baseline": "pre-change UI artifact; application JSON gzip disabled",
+    "candidate": "current source UI and host; negotiated gzip enabled",
+    "viewport": "390x844; mobile touch; no CPU throttling",
+    "background": "scanners disabled; no active Sessions",
+    "cleanup": "confirmed",
+    "cold": "new browser context for each phase/engine/delay",
+    "warm": "reload of the same page/context",
+    "delay": "extra delay per application POST, not a full WAN bandwidth simulation",
+    "webkit_reload_note": "Network cancellation page errors were observed during reload in both baseline and candidate; retained in samples. Cold samples have no page errors."
+  },
+  "lazyModuleValidation": [
+    {
+      "engine": "chrome",
+      "initialSettings": 0,
+      "loadedSettings": 1,
+      "modelDefaults": true,
+      "notes": true,
+      "mailOpenAndBack": true
+    },
+    {
+      "engine": "webkit18",
+      "initialSettings": 0,
+      "loadedSettings": 1,
+      "modelDefaults": true,
+      "notes": true,
+      "mailOpenAndBack": true
+    }
+  ]
+}

@@ -74,7 +74,9 @@ it('edits automatic rules, previews matches, preserves drafts and shows kernel r
         await workbench.openResource('/sources/plans');
         editor.querySelector<HTMLButtonElement>(`[data-action="runScanPlan"][data-id="${first.id}"]`)!.click();
         await vi.waitFor(async () => expect((await service.snapshot()).scans.runs[0]?.data.state).toBe('succeeded'));
-        await workbench.openResource('/sources/runs'); expect(editor.textContent).toContain('kernel-task');
+        await workbench.openResource('/sources/runs');
+        const latestRun = (await service.snapshot()).scans.runs.at(-1)!;
+        await workbench.openResource('/runs/' + latestRun.id); expect(editor.textContent).toContain('kernel-task');
         await workbench.openResource('/sources/sources'); expect(editor.querySelector('[data-form="source"]')).toBeNull();
         await workbench.openResource('/sources/plans');
         editor.querySelector<HTMLButtonElement>(`[data-action="pauseScanPlan"][data-id="${first.id}"]`)!.click();
@@ -160,7 +162,7 @@ it('shows content while loading and recovers a stalled first load without accept
         extractor: { run: vi.fn(), cancel: vi.fn(), cleanup: vi.fn() }, deleteSession: vi.fn() });
     const snapshot = await service.snapshot();
     let complete!: (value: typeof snapshot) => void;
-    vi.spyOn(service, 'snapshot').mockImplementationOnce(() => new Promise(resolve => { complete = resolve; })).mockResolvedValue(snapshot);
+    (Object.defineProperty(service, 'readView', {value: undefined}), vi.spyOn(service, 'snapshot')).mockImplementationOnce(() => new Promise(resolve => { complete = resolve; })).mockResolvedValue(snapshot);
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const sidebar = document.createElement('aside'), editor = document.createElement('main'); document.body.append(sidebar, editor);
     const workbench = new TwinWorkbench({ service, sidebar, editor, connections: async () => [], selected: vi.fn() });
@@ -188,7 +190,7 @@ it('does not restart a stalled load on background notifications or hide its time
         extractor: { run: vi.fn(), cancel: vi.fn(), cleanup: vi.fn() }, deleteSession: vi.fn() });
     let changed!: () => void;
     vi.spyOn(service, 'onChange').mockImplementation(listener => { changed = listener; return () => {}; });
-    const snapshot = vi.spyOn(service, 'snapshot').mockImplementation(progress => { progress?.('sources.reconcile'); return new Promise(() => {}); });
+    const snapshot = (Object.defineProperty(service, 'readView', {value: undefined}), vi.spyOn(service, 'snapshot')).mockImplementation(progress => { progress?.('sources.reconcile'); return new Promise(() => {}); });
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const sidebar = document.createElement('aside'), editor = document.createElement('main'); document.body.append(sidebar, editor);

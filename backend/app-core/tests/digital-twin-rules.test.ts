@@ -46,6 +46,22 @@ it('matches typed scopes, root globs, directory patterns, comments and exclusion
     for (const line of ['unknown:**', 'file:../secret', '!file:**', 'file:[a]']) expect(() => ruleLines([line])).toThrow('TWIN_INVALID_SCAN_RULE');
 });
 describe.each(['memory', 'indexeddb'] as const)('automatic rules on %s', kind => {
+    it('skips empty scheduled scopes but discovers a later matching file', async () => {
+        const host = await setup(kind);
+        await host.rule(['file:demo.md']);
+        await host.service.configure({budgetUnlimited: true}, (await host.service.snapshot()).settings.revision);
+        await host.service.scanOnce();
+        expect((await host.service.snapshot()).scans.runs).toHaveLength(0);
+        host.advance(); host.put('demo.md', 'New evidence');
+        await host.service.scanOnce();
+        expect((await host.service.snapshot()).scans.runs).toHaveLength(1);
+        expect(host.extractor.run).toHaveBeenCalledTimes(1);
+        host.advance(); await host.service.scanOnce();
+        expect((await host.service.snapshot()).scans.runs).toHaveLength(1);
+        host.put('demo.md', 'Changed evidence'); host.advance(); await host.service.scanOnce();
+        expect((await host.service.snapshot()).scans.runs).toHaveLength(2);
+        expect(host.extractor.run).toHaveBeenCalledTimes(2);
+    });
     it('keeps zero finite by default and lets unlimited rules extract while preserving usage accounting', async () => {
         const host = await setup(kind); host.put('note.md', 'first fact');
         await host.service.configure({ tokenLimit: 0 }, (await host.service.getSettings()).revision);

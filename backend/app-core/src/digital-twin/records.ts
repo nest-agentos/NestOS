@@ -20,6 +20,9 @@ export class TwinRecords {
         }
         throw new Error('TWIN_RECORD_LIMIT');
     }
+    async page<T>(family: TwinRecordFamily, offset = 0, limit = 20, reverse = false): Promise<TwinDataRecord<T>[]> {
+        return (await this.store.list(family, {offset, limit, reverse})).map(decoded<T>);
+    }
     async save<T>(family: TwinRecordFamily, id: string, data: T, expectedRevision: string | null,
         conditions: Array<{ family: TwinRecordFamily; id: string; expectedRevision: string | null }> = []) {
         const current = await this.store.inspect();

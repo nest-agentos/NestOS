@@ -6,6 +6,15 @@ import {BrowserRequestTrace} from '../src/client/request-trace';
 import {requestTrace,traceRequest,tracedCellsFetch} from '../../node-host/src/logging/request-trace';
 import {auditRequest} from '../../node-host/src/logging/audit-log';
 const response=()=>Object.assign(new EventEmitter(),{headers:new Map<string,string>(),setHeader(name:string,value:string){this.headers.set(name,value);},getHeader(name:string){return this.headers.get(name);},statusCode:200,writableFinished:true});
+it('uses a navigation operation as the backend trace even when pushState emits no hashchange',async()=>{
+    const browser=new BrowserRequestTrace(),headers:Headers[]=[];
+    const fetcher=browser.wrap(async(_input,init)=>{headers.push(new Headers(init?.headers));return new Response('{}');});
+    const first='11111111-1111-4111-8111-111111111111',second='22222222-2222-4222-8222-222222222222';
+    browser.beginNavigation(first);await fetcher('/api/application');browser.beginNavigation(second);await fetcher('/api/application');
+    expect(headers.map(h=>h.get('traceparent')!.split('-')[1])).toEqual([first.replaceAll('-',''),second.replaceAll('-','')]);
+    browser.beginNavigation('INVALID_PRIVATE_BODY');await fetcher('/api/application');
+    expect(headers[2].get('traceparent')).not.toContain('PRIVATE_BODY');
+});
 function request(trace='11111111111111111111111111111111'):IncomingMessage {return {url:'/api/application',socket:{remoteAddress:'127.0.0.1'},method:'POST',headers:{traceparent:`00-${trace}-2222222222222222-01`,'x-nestos-browser-session-id':'11111111-1111-4111-8111-111111111111'}} as unknown as IncomingMessage;}
 it('keeps concurrent Node requests isolated and propagates parentage to Cells and finish logs',async()=>{
     const records:any[]=[],outgoing:string[]=[],audit={write:(event:any)=>records.push(event),close:async()=>{}};

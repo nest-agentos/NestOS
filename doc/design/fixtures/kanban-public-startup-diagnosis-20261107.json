@@ -1,0 +1,359 @@
+{
+  "version": "20261107T035217-c077b3e5-dirty",
+  "route": "/board/development",
+  "network": "public origin accessed through the local configured HTTP proxy; not the user phone network",
+  "note": "Only completed cold samples are included. Reload/WebKit samples timed out and cannot establish a full public-page performance pass.",
+  "samples": [
+    {
+      "resources": {
+        "navigation": [
+          {
+            "duration": 9717.400000095367,
+            "responseStart": 3425.1000003814697,
+            "responseEnd": 3426,
+            "domInteractive": 3436.2000002861023,
+            "domContentLoaded": 7042.200000286102
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 3435
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 7028
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 11117
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 13424
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-Dh9IPqjc.js",
+            "start": 7042,
+            "ms": 1141,
+            "transfer": 418011,
+            "decoded": 1534155
+          },
+          {
+            "file": "context-menu-vz5BGggj.js",
+            "start": 7042,
+            "ms": 3675,
+            "transfer": 379513,
+            "decoded": 1160137
+          },
+          {
+            "file": "index-Dqlcrq-P.js",
+            "start": 3433,
+            "ms": 3582,
+            "transfer": 268243,
+            "decoded": 907910
+          },
+          {
+            "file": "index-PpS4361R.css",
+            "start": 3435,
+            "ms": 2021,
+            "transfer": 100736,
+            "decoded": 534456
+          },
+          {
+            "file": "hosted-application-w6vbmWIO.css",
+            "start": 7042,
+            "ms": 2671,
+            "transfer": 49382,
+            "decoded": 296282
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 5482,
+            "ms": 915,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "conversation-status-CLkC3HEs.js",
+            "start": 7042,
+            "ms": 2403,
+            "transfer": 1043,
+            "decoded": 1520
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-first",
+      "ms": 13493,
+      "logicalCalls": 13,
+      "httpRequests": 11,
+      "boardCount": 2,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 7361,
+          "durationMs": 3746
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 11125,
+          "durationMs": 774
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 11902,
+          "durationMs": 620
+        },
+        {
+          "method": "catalog",
+          "atMs": 12547,
+          "durationMs": 848
+        },
+        {
+          "method": "catalog",
+          "atMs": 12547,
+          "durationMs": 848
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 12547,
+          "durationMs": 848
+        },
+        {
+          "method": "subscribe",
+          "atMs": 12548,
+          "durationMs": 341
+        },
+        {
+          "method": "onChanged",
+          "atMs": 12548,
+          "durationMs": 612
+        },
+        {
+          "method": "query",
+          "atMs": 12548,
+          "durationMs": 518
+        },
+        {
+          "method": "onChange",
+          "atMs": 12890,
+          "durationMs": 344
+        },
+        {
+          "method": "assistantOverview",
+          "atMs": 13066
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 13432
+        },
+        {
+          "method": "onChange",
+          "atMs": 13433
+        }
+      ],
+      "errors": []
+    },
+    {
+      "resources": {
+        "navigation": [
+          {
+            "duration": 26702.5,
+            "responseStart": 7651.099999904633,
+            "responseEnd": 7651.5,
+            "domInteractive": 7660.199999809265,
+            "domContentLoaded": 24451.599999904633
+          }
+        ],
+        "marks": [
+          {
+            "name": "nestos:document",
+            "ms": 7659
+          },
+          {
+            "name": "nestos:entry",
+            "ms": 24438
+          },
+          {
+            "name": "nestos:data-ready",
+            "ms": 29252
+          },
+          {
+            "name": "nestos:editor-ready",
+            "ms": 32325
+          }
+        ],
+        "api": [
+          {
+            "endpoint": "/api/identity",
+            "start": 24450,
+            "ms": 2163,
+            "transfer": 318,
+            "decoded": 18
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 26615,
+            "ms": 2614,
+            "transfer": 330863,
+            "decoded": 330563
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 29254,
+            "ms": 314,
+            "transfer": 430,
+            "decoded": 130
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 29571,
+            "ms": 1290,
+            "transfer": 102043,
+            "decoded": 101743
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 30886,
+            "ms": 1406,
+            "transfer": 12799,
+            "decoded": 12499
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 30886,
+            "ms": 359,
+            "transfer": 727,
+            "decoded": 427
+          },
+          {
+            "endpoint": "/api/application",
+            "start": 30887,
+            "ms": 1083,
+            "transfer": 21831,
+            "decoded": 21531
+          }
+        ],
+        "assets": [
+          {
+            "file": "hosted-application-Dh9IPqjc.js",
+            "start": 24451,
+            "ms": 2695,
+            "transfer": 418011,
+            "decoded": 1534155
+          },
+          {
+            "file": "context-menu-vz5BGggj.js",
+            "start": 24451,
+            "ms": 3842,
+            "transfer": 379513,
+            "decoded": 1160137
+          },
+          {
+            "file": "index-Dqlcrq-P.js",
+            "start": 7658,
+            "ms": 16770,
+            "transfer": 268243,
+            "decoded": 907910
+          },
+          {
+            "file": "index-PpS4361R.css",
+            "start": 7659,
+            "ms": 5399,
+            "transfer": 100736,
+            "decoded": 534456
+          },
+          {
+            "file": "hosted-application-w6vbmWIO.css",
+            "start": 24451,
+            "ms": 2247,
+            "transfer": 49382,
+            "decoded": 296282
+          },
+          {
+            "file": "fa-solid-900-8GirhLYJ.woff2",
+            "start": 13076,
+            "ms": 633,
+            "transfer": 113452,
+            "decoded": 113152
+          },
+          {
+            "file": "conversation-status-CLkC3HEs.js",
+            "start": 24451,
+            "ms": 1718,
+            "transfer": 1043,
+            "decoded": 1520
+          }
+        ]
+      },
+      "engine": "chrome-mobile",
+      "scenario": "board-first",
+      "ms": 32384,
+      "logicalCalls": 12,
+      "httpRequests": 10,
+      "boardCount": 2,
+      "calls": [
+        {
+          "method": "bootstrap",
+          "atMs": 26621,
+          "durationMs": 2619
+        },
+        {
+          "method": "eventBaseline",
+          "atMs": 29260,
+          "durationMs": 314
+        },
+        {
+          "method": "readUiDocuments",
+          "atMs": 29576,
+          "durationMs": 1291
+        },
+        {
+          "method": "catalog",
+          "atMs": 30892,
+          "durationMs": 1406
+        },
+        {
+          "method": "catalog",
+          "atMs": 30892,
+          "durationMs": 1406
+        },
+        {
+          "method": "currentPrincipal",
+          "atMs": 30892,
+          "durationMs": 1406
+        },
+        {
+          "method": "subscribe",
+          "atMs": 30892
+        },
+        {
+          "method": "onChanged",
+          "atMs": 30892,
+          "durationMs": 359
+        },
+        {
+          "method": "query",
+          "atMs": 30892,
+          "durationMs": 1083
+        },
+        {
+          "method": "onChange",
+          "atMs": 31252
+        },
+        {
+          "method": "assistantOverview",
+          "atMs": 31976
+        },
+        {
+          "method": "queryActivity",
+          "atMs": 32333
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

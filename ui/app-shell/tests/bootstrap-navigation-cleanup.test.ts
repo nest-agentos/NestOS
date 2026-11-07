@@ -256,6 +256,30 @@ it('releases the global banner before slow workspace startup and ignores obsolet
     } finally { await app.destroy(); }
 });
 
+it('keeps a global event unread when its resource fails to open and allows retry', async () => {
+    navigationDOM();
+    HTMLDialogElement.prototype.showModal ??= function () {this.open = true;};
+    HTMLDialogElement.prototype.close ??= function () {this.open = false; this.dispatchEvent(new Event('close'));};
+    const runtime = makeRuntime(), {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    runtime.vfs = manager;
+    runtime.sessionRepository.listSummaries = vi.fn(async () => [{id: 'event-session', title: 'Event session'}]) as never;
+    runtime.kernel.kernel.listSessions = async function* () {yield {id: 'event-session', updatedAt: 1} as never;};
+    runtime.kernel.kernel.sessionActivity = vi.fn(async () => ({pending: {}, counts: {}, latestExit: {status: 'failed', at: 1}})) as never;
+    const app = await initTestApp({services: runtime, workspaces: [{...workspace, slug: 'chat'}], startPage: true, ui: testUI()});
+    try {
+        document.querySelector<HTMLButtonElement>('.assistant-launcher')!.click();
+        await vi.waitFor(() => expect(document.querySelector('[data-assistant-event]')).not.toBeNull());
+        lifecycle.open.mockRejectedValueOnce(new Error('Resource unavailable'));
+        document.querySelector<HTMLButtonElement>('[data-assistant-event]')!.click();
+        await vi.waitFor(() => expect(document.querySelector('.assistant-menu__error')!.textContent).not.toBe(''));
+        await vi.waitFor(() => expect(document.querySelector<HTMLButtonElement>('[data-assistant-action=close]')!.disabled).toBe(false));
+        expect(document.querySelector<HTMLDialogElement>('.assistant-menu')!.open).toBe(true);
+        expect(document.querySelector('[data-assistant-count]')!.textContent).toBe('1');
+        document.querySelector<HTMLButtonElement>('[data-assistant-event]')!.click();
+        await vi.waitFor(() => expect(document.querySelector('[data-assistant-count]')!.textContent).toBe('0'));
+        expect(lifecycle.open).toHaveBeenCalledWith('event-session');
+    } finally {await app.destroy(); await manager.dispose();}
+});
 it('keeps a failed workspace local and releases it before retrying', async () => {
     navigationDOM(); lifecycle.start.mockClear(); lifecycle.destroy.mockClear();
     lifecycle.start.mockRejectedValueOnce(new Error('Temporary workspace failure'));
@@ -412,6 +436,22 @@ it('wires durable event replay and focus catch-up without reopening resources, a
         window.dispatchEvent(new Event('focus'));
         expect(invalidateEvents).toHaveBeenCalledTimes(2);
     } finally {await app.destroy(); events.journal.close(); await manager.dispose();}
+});
+
+it('prefetches presentation documents while the event baseline is pending, before loading workspace data', async () => {
+    navigationDOM(); lifecycle.start.mockClear();
+    const {manager} = await createVFS({rootBackend:new MemoryBackend()});
+    const events = await UserEventService.open(await manager.openFileSystem('/'));
+    const runtime = makeRuntime(); runtime.events = events;
+    let release!: () => void; const gate = new Promise<void>(resolve => {release = resolve;});
+    const original = events.eventBaseline.bind(events);
+    vi.spyOn(events, 'eventBaseline').mockImplementation(async () => {await gate; return original();});
+    const backend = bindApplicationBackend(runtime), documents = vi.spyOn(backend, 'readUiDocuments').mockResolvedValue({});
+    const opening = initApp({services:runtime,backend,workspaces:[workspace],ui:testUI()});
+    try {
+        await vi.waitFor(() => expect(documents).toHaveBeenCalledWith(['theme','nestos_assistant_menu_v1']));
+        expect(lifecycle.start).not.toHaveBeenCalled();
+    } finally {release(); const app = await opening; await app.destroy(); events.journal.close(); await manager.dispose();}
 });
 
 it('ignores intermediate selection notifications while replaying the previous page',async()=>{

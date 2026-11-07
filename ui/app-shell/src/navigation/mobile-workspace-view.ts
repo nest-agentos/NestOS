@@ -11,13 +11,13 @@ function hasEditorContent(editor: HTMLElement): boolean {
 }
 
 /** Keep list and editor as separate mobile screens within one workspace. */
-export function setupMobileWorkspaceView(layout: HTMLElement, sidebar: HTMLElement, editor: HTMLElement, initialDetail = false): () => void {
+export function setupMobileWorkspaceView(layout: HTMLElement, sidebar: HTMLElement, editor: HTMLElement, initialDetail = false, hasDetail?: () => boolean): () => void {
     layout.dataset.mobileView = initialDetail ? 'detail' : 'list';
     let hadContent = false;
     let activation = editor.dataset.workbenchActivation;
     const sync = () => {
         const opening = layout.dataset.workspaceOpening === 'true';
-        const hasContent = opening || hasEditorContent(editor);
+        const hasContent = opening || (hasDetail ? hasDetail() : hasEditorContent(editor));
         const active = editor.classList.contains('workbench-tabs')
             ? editor.querySelector('.workbench-tabs__panel:not([hidden])') : editor;
         layout.dataset.mobileHeader = active?.matches('[data-editor-mobile-navigation="embedded"]')

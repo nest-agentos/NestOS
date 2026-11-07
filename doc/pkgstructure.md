@@ -50,7 +50,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 | `@nestos/ui-common-adapter` | 通用编辑器宿主契约、应用设置基类与保存/恢复基础设施；导航、弹窗和浏览器工具由独立 ui-common 提供。 |
 | `@nestos/app-settings` | 设置 UI 与导航投影：SettingsEngine；技能文件系统、持久化、标签和维护用例归 app-core，Web 快照归宿主。 |
 | `@nestos/kanban` | 独立协调库，仅依赖 vfs-core：责任、计划 DAG、产物引用、派发意图、验收、SeqFile 原子事件与回执、条件事务存储、来源扫描、执行恢复；DOM 界面独立为 kanban-ui；Session/Flow/Kernel/notify 接入归 app-core，呈现和导航接线归 app-shell。 |
-| `@nestos/kanban-ui` | 独立 DOM 看板界面，仅消费 kanban/contracts 和 ui-common；宿主注入本地/远程客户端、文案、图标、窗口与导航。 |
+| `@nestos/kanban-ui` | 独立 DOM 看板界面，仅消费 kanban/contracts、ui-common 和 mdxeditor（只读 Markdown 渲染）；宿主注入本地/远程客户端、文案、图标、窗口与导航。 |
 | `@nestos/app-contracts` | 共享应用 DTO、事件、设置端口、身份与纯变换；不加载后端执行或 UI 实现。 |
 | `@nestos/app-transport` | 平台中立的 HTTP/SSE 与能力 RPC，应用描述/selector 注入机制，不加载 Node 或 UI。 |
 | `@nestos/app-core` | 无 UI 应用核心：NestOS profile、RunDefinition、共享 Session 文件/目录服务，以及统一装配 `createApplicationRuntime`（VFS/LLM/Session/Flow）与 headless `createKernelRuntime`（durable-kernel + kernel-adapters + Flow programs）。Web/Tauri/CLI 共用。 |

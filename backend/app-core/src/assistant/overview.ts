@@ -1,6 +1,7 @@
 import {createModuleLogger, randomUUID} from '@nestos/common';
 import type {AssistantEvent, AssistantOverview, LocalApplicationServices, TwinActivitySummary} from '@nestos/app-contracts/services';
 import type {SessionActivity} from '@nestos/durable-kernel/contracts';
+import {projectedSessionEvents} from './session-projection';
 const log = createModuleLogger('assistant-overview');
 type Services = Pick<LocalApplicationServices, 'kernel' | 'sessionRepository' | 'digitalTwin'>;
 interface PendingOverview {kernel: Services['kernel']['kernel']; twin: Services['digitalTwin']; result: Promise<AssistantOverview>}
@@ -56,6 +57,8 @@ async function readSource<T extends {events: AssistantEvent[]}>(operationId: str
     }
 }
 async function sessionEvents(services: Services): Promise<{events: AssistantEvent[]}> {
+    const projected = await projectedSessionEvents(services);
+    if (projected) return {events: projected};
     const repository = services.sessionRepository, kernel = services.kernel.kernel;
     if (!kernel.sessionActivity) return {events: []};
     const summaries = await (repository.listSummaries?.() ?? repository.list()), byId = new Map(summaries.map(item => [item.id, item]));

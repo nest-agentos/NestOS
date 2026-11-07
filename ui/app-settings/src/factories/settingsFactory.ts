@@ -54,7 +54,7 @@ export interface SettingsFactoryOptions {
     settingsService: SettingsService;
     agentService: IAgentManagementService;
     connectionService: IConnectionService;
-    llmUiEditors: LLMUIEditors;
+    llmUiEditors: LLMUIEditors | (() => Promise<LLMUIEditors>);
     connectBrowser: FileBrowserConnector;
     initialFiles?: InitialFilesPort;
     restoreFlows?: () => Promise<number>;
@@ -65,21 +65,23 @@ export const createSettingsFactory = ({ settingsService, agentService, connectio
     return async (container: HTMLElement, options: EditorOptions) => {
         if (requestDelete) options = { ...options, hostContext: { toggleSidebar: () => {}, navigate: async () => {}, ...options.hostContext, requestDelete } };
         const nodeId = resolveSettingsSlug(editorResourceId(options) || '');
+        const editors = ['model-defaults', 'providers', 'connections', 'mcp-servers', 'cost', 'system-prompts'].includes(nodeId)
+            ? typeof llmUiEditors === 'function' ? await llmUiEditors() : llmUiEditors : undefined;
 
         let editor: IEditor | null = null;
 
         switch (nodeId) {
             case 'cells': editor = new CellsSettingsEditor(container, cells, options); break;
             case 'terminal': editor = new TerminalSettingsEditor(container, serverTerminals, options); break;
-            case 'model-defaults': editor = new llmUiEditors.ModelDefaultsEditor(container, connectionService, options, ocr); break;
+            case 'model-defaults': editor = new editors!.ModelDefaultsEditor(container, connectionService, options, ocr); break;
             case 'storage':     editor = new StorageSettingsEditor(container, settingsService, options); break;
             case 'tags':        editor = new TagSettingsEditor(container, settingsService, options); break;
             case 'contacts':    editor = new ContactSettingsEditor(container, settingsService, options); break;
-            case 'providers':   editor = new llmUiEditors.ProviderSettingsEditor(container, connectionService, options, mediaProbeExamples); break;
-            case 'connections': editor = new llmUiEditors.ConnectionSettingsEditor(container, connectionService, options); break;
-            case 'mcp-servers': editor = new llmUiEditors.MCPSettingsEditor(container, agentService, options); break;
-            case 'cost':        editor = new llmUiEditors.CostEditor(container, agentService, options); break;
-            case 'system-prompts': editor = new llmUiEditors.SystemPromptSettingsEditor(container, agentService, options); break;
+            case 'providers':   editor = new editors!.ProviderSettingsEditor(container, connectionService, options, mediaProbeExamples); break;
+            case 'connections': editor = new editors!.ConnectionSettingsEditor(container, connectionService, options); break;
+            case 'mcp-servers': editor = new editors!.MCPSettingsEditor(container, agentService, options); break;
+            case 'cost':        editor = new editors!.CostEditor(container, agentService, options); break;
+            case 'system-prompts': editor = new editors!.SystemPromptSettingsEditor(container, agentService, options); break;
             case 'recovery':    editor = new RecoverySettingsEditor(container, agentService, options, restoreFlows, initialFiles); break;
             case 'log':         editor = new LogSettingsEditor(container, settingsService, options, diagnostics); break;
             case 'about':       editor = new AboutSettingsEditor(container, settingsService, options); break;

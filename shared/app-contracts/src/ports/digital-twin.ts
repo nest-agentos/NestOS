@@ -67,7 +67,22 @@ export interface TwinDataRecord<T> {
     data: T;
 }
 
+export interface TwinViewRequest {
+    page: 'overview' | 'profile' | 'memories' | 'goals' | 'sources' | 'runs';
+    tab?: 'plans' | 'sources' | 'runs';
+    offset?: number;
+    runId?: string;
+    planId?: string;
+    query?: string;
+    enabled?: string;
+    kind?: string;
+    state?: string;
+}
+export interface TwinPageInfo {offset: number; limit: number; total: number; all?: number}
+export type TwinViewSnapshot = Awaited<ReturnType<DigitalTwinService['snapshot']>>;
+
 export interface DigitalTwinService {
+    readView?(request: TwinViewRequest): Promise<TwinViewSnapshot>;
     activitySummary?(): Promise<import('./assistant').TwinActivitySummary>;
     listSourceConnections(): ReturnType<import('./tool-connections').ToolConnections['snapshot']>;
     saveSourceConnection(input: import('./tool-connections').ToolConnectionInput): Promise<void>;
@@ -83,6 +98,7 @@ export interface DigitalTwinService {
     onChange(listener: () => void): () => void;
     scanOnce(): Promise<void>;
     snapshot(progress?: (stage: string) => void): Promise<{
+        pagination?: {sources: TwinPageInfo; runs: TwinPageInfo; jobs?: TwinPageInfo};
         workspace: AppContracts.TwinWorkspaceView;
         metering: {
             period: {id: string; spentTokens: number; reservedTokens: number};
@@ -212,6 +228,8 @@ export interface DigitalTwinService {
 }
 
 export interface TwinScanRun {
+    sourceCount?: number;
+    completedSourceCount?: number;
     collectionProgress?: AppContracts.TwinCollectionProgress;
     executor?: AppContracts.TwinScannerExecutor;
     collection?: AppContracts.TwinCollectionExecutor;

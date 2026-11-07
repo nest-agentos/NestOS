@@ -40,7 +40,8 @@ it('carries composer originals, conditional updates and receipt queries through 
     const client = new RpcPeer('client', call => server.handle(call), error => {throw error;});
     server = new RpcPeer('server', call => client.handle(call), error => {throw error;});
     try {
-        const fs = await manager.openFileSystem('/'), store = new ConversationComposerStore(memoryClientState(),true,()=>{});
+        await manager.openFileSystem('/');
+        const store = new ConversationComposerStore(memoryClientState(),true,()=>{});
         const controls = {kind: 'fixture', snapshot: () => ({title: 'Fixture', messages: [], requests: []}), respond: async () => {},
             readComposerDraft: () => store.readComposerDraft(), saveComposerDraft: store.saveComposerDraft.bind(store),
             putComposerAsset: store.putComposerAsset.bind(store), readComposerAsset: store.readComposerAsset.bind(store)};

@@ -19,7 +19,7 @@ export function createWorkspaceModule(controller: WorkspaceHandle, dispose: () =
     let disposal: Promise<void> | undefined;
     const destroy = () => disposal ??= Promise.resolve().then(dispose);
     return { dispose: destroy, workbench: {
-        start: () => controller.start(), destroy,
+        start: initialResource => controller.start(initialResource), destroy,
         ...(controller.invalidateFromEvents ? {invalidateFromEvents: () => controller.invalidateFromEvents!()} : {}),
         ...(controller.captureRecovery ? {captureRecovery: () => controller.captureRecovery!()} : {}),
         ...(controller.restoreRecovery ? {restoreRecovery: (state: unknown) => controller.restoreRecovery!(state)} : {}),

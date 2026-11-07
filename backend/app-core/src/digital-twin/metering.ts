@@ -40,10 +40,10 @@ export async function settleMeter(records: TwinRecords, id: string, job: TwinAna
         write('meter-entry', id, {...entry.data, state: 'settled', reservedTokens: 0, tokens, usageKind}, entry.revision)];
 }
 
-export async function meterSnapshot(records: TwinRecords) {
+export async function meterSnapshot(records: TwinRecords, limit?: number) {
     const id = meterPeriod(), period = await records.get<Period>('meter-period', id);
     return {period: {id, spentTokens: period?.data.spentTokens ?? 0, reservedTokens: period?.data.reservedTokens ?? 0},
-        entries: (await records.list<TwinMeterEntry>('meter-entry')).map(row => ({id: row.id, ...row.data})).sort((a, b) => b.createdAt - a.createdAt)};
+        entries: (limit === 0 ? [] : limit ? await records.page<TwinMeterEntry>('meter-entry', 0, limit, true) : await records.list<TwinMeterEntry>('meter-entry')).map(row => ({id: row.id, ...row.data})).sort((a, b) => b.createdAt - a.createdAt)};
 }
 
 function tokenSum(...values: number[]): number {

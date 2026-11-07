@@ -1,11 +1,17 @@
-import {createModuleLogger, randomUUID} from '@nestos/common';
+import {createModuleLogger, randomUUID, NAVIGATION_EVENTS} from '@nestos/common';
 const log = createModuleLogger('http-client');
 const traceId = () => randomUUID().replaceAll('-', '');
 /** A navigation owns a trace; each fetch captures its own immutable child span. */
 export class BrowserRequestTrace {
     readonly browserSessionId = randomUUID();
     private navigation = traceId();
-    beginNavigation(): void {this.navigation = traceId();}
+    bindNavigation(signal: AbortSignal): void {
+        window.addEventListener(NAVIGATION_EVENTS.START, event => this.beginNavigation((event as CustomEvent<{operationId:string}>).detail?.operationId), {signal});
+    }
+    beginNavigation(operationId?: string): void {
+        this.navigation = operationId && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(operationId)
+            && !/^0+$/.test(operationId.replaceAll('-','')) ? operationId.replaceAll('-','') : traceId();
+    }
     wrap(fetcher: typeof fetch): typeof fetch {
         return async (input, init) => {
             const traceId = this.navigation, spanId = randomUUID().replaceAll('-', '').slice(0,16), started = Date.now();

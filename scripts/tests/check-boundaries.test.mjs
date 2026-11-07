@@ -257,14 +257,30 @@ test('mail permits its documented shared reader dependency while retaining appli
     assert.match(manifestDependencyError('@nestos/mail','@nestos/app-core'),/mail only depends/);
 });
 
- test('Kanban UI consumes only contracts and the backend rejects UI dependencies',()=>{
+test('Kanban UI consumes public contracts and renderers while the backend rejects UI dependencies',()=>{
     const ui={name:'@nestos/kanban-ui',dir:'/repo/libraries/kanban-ui'};
     for(const target of ['@nestos/ui-common','@nestos/kanban-ui'])assert.match(dependencyError('@nestos/kanban',target),/only depend on vfs-core/);
     assert.equal(dependencyError(ui.name,'@nestos/kanban'),undefined);
     assert.equal(dependencyError(ui.name,'@nestos/ui-common'),undefined);
+    assert.equal(manifestDependencyError(ui.name,'@nestos/mdxeditor'),undefined);
     assert.match(dependencyError(ui.name,'@nestos/vfs-core'),/only depend on Kanban contracts/);
     const inspect=text=>sourceErrors(ui,ui.dir+'/src/index.ts',text,[]);
     assert.deepEqual(inspect("import type {KanbanClient} from '@nestos/kanban/contracts';"),[]);
     for(const entry of ['@nestos/kanban','@nestos/kanban/storage','@nestos/kanban/runtime'])
         assert.ok(inspect(`import {factory} from '${entry}';`).some(error=>/never backend/.test(error)));
+});
+
+test('Kanban Markdown rendering stays on public UI exports and rejects host dependencies',()=>{
+    const ui={name:'@nestos/kanban-ui',dir:'/repo/libraries/kanban-ui'};
+    const renderer=pkg('mdxeditor');
+    const blocked=['vfs-core','vfs-ui','app-core','app-shell','llm-session','durable-kernel'].map(name=>pkg(name));
+    const inspect=text=>sourceErrors(ui,ui.dir+'/src/detail-content.ts',text,[ui,renderer,...blocked]);
+    for(const expression of ["import {MDxRenderer} from '@nestos/mdxeditor';",
+        "import('@nestos/mdxeditor');", "type Renderer = import('@nestos/mdxeditor').MDxRenderer;"])
+        assert.deepEqual(inspect(expression),[]);
+    assert.ok(inspect("import {MDxRenderer} from '@nestos/mdxeditor/src/renderer';").some(error=>/declared package export/.test(error)));
+    for(const {name:target} of blocked) {
+        assert.match(manifestDependencyError(ui.name,target),/only depend on Kanban contracts/);
+        assert.ok(inspect(`import type {Client} from '${target}';`).some(error=>/only depend on Kanban contracts/.test(error)));
+    }
 });

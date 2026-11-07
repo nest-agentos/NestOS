@@ -132,9 +132,9 @@ describe.each(['memory', 'indexeddb'] as const)('scan plans on %s', kind => {
         await host.service.saveScanPlan(null, null, host.input([host.b], { trigger: 'changes' }));
         await host.service.scanOnce(); expect((await host.service.snapshot()).scans.runs).toHaveLength(2);
         host.advance(600000); await host.service.scanOnce();
-        expect((await host.service.snapshot()).scans.runs).toHaveLength(3); expect(host.extractor.run).toHaveBeenCalledTimes(2);
+        expect((await host.service.snapshot()).scans.runs).toHaveLength(2); expect(host.extractor.run).toHaveBeenCalledTimes(2);
         host.texts.set('b', 'Beta changed preference'); host.advance(60000); await host.service.scanOnce();
-        expect((await host.service.snapshot()).scans.runs).toHaveLength(5); expect(host.extractor.run).toHaveBeenCalledTimes(3);
+        expect((await host.service.snapshot()).scans.runs).toHaveLength(3); expect(host.extractor.run).toHaveBeenCalledTimes(3);
     });
     it('reconciles deletion while analysis is paused and deletes plans without deleting generated memories', async () => {
         const host = await setup(kind), id = await host.service.saveScanPlan(null, null, host.input([host.a]));

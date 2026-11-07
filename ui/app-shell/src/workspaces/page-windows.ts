@@ -8,6 +8,7 @@ interface Page {controller: WorkspaceHandle; sidebar: HTMLElement; ready: Promis
 interface Options {
     sidebar: HTMLElement; editor: HTMLElement; title: string; initialResource?: string;
     windows?: WorkbenchWindowBinding;
+    initializeAtResource?: boolean;
     selected(path: string): void;
     titleFor?(path: string): string;
     create(host: {sidebar: HTMLElement; editor: HTMLElement; selected(path: string): void}): WorkspaceHandle;
@@ -54,8 +55,8 @@ export class PageWindows {
         this.sidebar.navigation.append(sidebar); tab.panel.append(editor);
         const controller = this.options.create({sidebar, editor, selected: resource => this.update(tab, resource)});
         tab.value = {controller, sidebar, ready: Promise.resolve(), mounted: false}; this.syncVisibility();
-        tab.value.ready = controller.start().then(async () => {
-            if (path !== '/') await controller.openResource(path);
+        tab.value.ready = controller.start(this.options.initializeAtResource ? path : undefined).then(async () => {
+            if (!this.options.initializeAtResource && path !== '/') await controller.openResource(path);
             if (this.recovered.has(path)) {controller.restoreRecovery?.(this.recovered.get(path)); this.recovered.delete(path);}
             tab.value!.mounted = true;
             this.update(tab, controller.getActiveResourceId() ?? path);

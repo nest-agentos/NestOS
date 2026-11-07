@@ -21,6 +21,7 @@ async function setup() {
     snapshot.sources = Array.from({ length: 201 }, (_, index) => ({ ...source, id: `source-${index}`, data: { ...source.data,
         label: `Target ${index}`, target: `file-${index}.md`, kind: index === 200 ? 'harness-session' : 'file', status: index === 200 ? 'inaccessible' : 'available' } }));
     vi.spyOn(service, 'snapshot').mockResolvedValue(snapshot);
+    Object.defineProperty(service, 'readView', {value: undefined});
     const sidebar = document.createElement('aside'), editor = document.createElement('main'); document.body.append(sidebar, editor);
     const selected = vi.fn();
     const workbench = new TwinWorkbench({ service, sidebar, editor, connections: async () => [{ id: 'model', name: 'Model' }], selected });

@@ -2688,6 +2688,7 @@ export const en: LocaleStrings = {
     'textGeneration.previousDraft': 'Previous draft',
     'editor.study': 'Anki study',
     'editor.studyCreate': "New Anki note",
+    'editor.studyPromptsUnavailable': 'Study prompts could not be loaded. Check the connection or permissions and retry.',
     'editor.studyAlreadyCreated': "The file was created. Open it before changing its name or content.",
     'editor.studyInvalidName': "Enter a file name without path separators.",
     'editor.outline.label': 'Contents',

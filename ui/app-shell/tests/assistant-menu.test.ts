@@ -38,6 +38,19 @@ it('shows the same count on desktop/mobile, only previews the three most importa
     await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledWith({target: 'chat', resourceId: 'approval'}));
     expect(f.write).not.toHaveBeenCalled(); expect(document.querySelector('[data-assistant-count]')!.textContent).toBe('4');
 });
+it('opens a scanner event at its workspace run and keeps failed navigation unread', async () => {
+    const target = {target: 'twin' as const, resourceId: '/workspace/team/runs/run-1'};
+    const f = setup([{id: 'scan', revision: 'v1', source: 'scanners', kind: 'scanFailure', title: 'Scanner', at: 1, priority: 2, requiresAction: false, target}]);
+    await vi.waitFor(() => expect(f.assistantOverview).toHaveBeenCalledOnce()); f.open();
+    f.navigate.mockRejectedValueOnce(new Error('Unavailable'));
+    document.querySelector<HTMLButtonElement>('[data-assistant-event=scan]')!.click();
+    await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledWith(target));
+    expect(f.write).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(document.querySelector('.assistant-menu__error')!.textContent).not.toBe(''));
+    await vi.waitFor(() => expect(document.querySelector<HTMLButtonElement>('[data-assistant-action=close]')!.disabled).toBe(false));
+    document.querySelector<HTMLButtonElement>('[data-assistant-event=scan]')!.click();
+    await vi.waitFor(() => expect(f.write).toHaveBeenCalledWith(ASSISTANT_MENU_DOCUMENT, expect.objectContaining({seen: {scan: 'v1'}})));
+});
 it('persists read receipts only for acknowledged results and retains stale items if a source temporarily fails', async () => {
     const f = setup(); await vi.waitFor(() => expect(f.assistantOverview).toHaveBeenCalledOnce()); f.open();
     document.querySelector<HTMLButtonElement>('[data-assistant-read=failed]')!.click();

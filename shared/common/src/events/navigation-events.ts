@@ -15,6 +15,8 @@ export const NAVIGATION_EVENTS = {
     CREATE_CHAT_SESSION: 'app:navigate:create-chat',
     /** 通用导航请求 */
     NAVIGATE: 'app:navigate',
+    START: 'app:navigate:start',
+    END: 'app:navigate:end',
 } as const;
 
 /**

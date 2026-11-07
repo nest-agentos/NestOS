@@ -1,9 +1,13 @@
+import {mountContentTitleBar} from './workbench/content-titlebar';
+import {lazyScannerPackages} from './digital-twin/lazy-packages';
 import {ACTION_ICONS, randomUUID} from '@nestos/common';
 import {studyDraftStore} from './persistence/study-draft-store';
 import {showFlowDependencies} from './configuration/flow-dependencies-dialog';
 import {ShellApplicationEvents, workspaceConsumesEvent} from './lifecycle/application-events';
 import {studySources} from './browser/study-sources';
 import {studyGeneration} from './browser/study-generation';
+import {loadStudyPrompts} from './browser/study-prompts';
+import {beginNavigationTiming} from './navigation/navigation-timing';
 import {withAssistantShortcut} from './navigation/assistant-actions';
 import {installAssistantMenu} from './navigation/assistant-menu';
 import {createEditorSwapFactory} from './browser/editor-swap';
@@ -29,16 +33,11 @@ import { FSError } from '@nestos/vfs-core';
 import { createFileChatHandler } from './projects/file-chat';
 import { createOcrControls } from './configuration/ocr-controls';
 import { ConfigurationDeletionDialog } from './configuration/delete-dialog';
-import { TwinWorkbench } from './digital-twin';
 import {createPageWindows} from './workspaces/page-windows';
 import {sessionUrl, kanbanReferenceLink} from './kanban/links';
 import {createKanbanWorkspace} from './kanban';
-import {createMailModule} from './mail';
-import {CalendarWorkbench} from './calendar';
-import { createToolboxModule } from './toolbox';
 import { TOOLBOX_SCOPE } from './toolbox/ToolboxWorkbench';
 import { TOOLBOX_KINDS, legacyToolboxRoute, toolboxSettingsRoute } from './toolbox/routes';
-import { createProjectModule } from './projects';
 import { SESSION_BROWSER_SCOPE } from './projects/SessionWorkbench';
 import { VfsUIPersistence } from './persistence/vfs-ui-state-store';
 import { VfsJsonStore } from './persistence/vfs-json-store';
@@ -122,11 +121,14 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
     }, () => !document.hidden) : undefined;
     cleanupFns.push(() => applicationEvents?.close());
-    await applicationEvents?.prepare(!!options.initialView);
     const startupRoute = parseWorkspaceHash(location.hash, resolvedDefault);
     const startupWorkspace = workspaces.find(ws => ws.elementId === routeMap[startupRoute.slug]);
     const initialDocuments = startupWorkspace?.type === 'chat'
         ? INITIAL_CHAT_DOCUMENTS : ['theme', 'nestos_assistant_menu_v1'];
+    const prefetchedDocuments = !options.initialView && startupWorkspace?.type !== 'chat' ? new VfsJsonStore(backend) : undefined;
+    const eventPreparation = applicationEvents?.prepare(!!options.initialView);
+    prefetchedDocuments?.prefetch(initialDocuments);
+    await eventPreparation;
     const opened = options.initialView ?? (startupWorkspace?.type === 'chat' && typeof backend.openView === 'function' ? await openInitialView(backend, initialDocuments, startupRoute.resource) : undefined);
     const projection = opened ? new OpenedViewProjection(opened, services, backend) : undefined;
     if (projection) {
@@ -140,9 +142,9 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const agentService = services.agentService;
     // UI state lives beside the theme in `etc:/ui`, so Web and Tauri share one
     // inspectable store instead of the webview's localStorage.
-    const uiDocs = new VfsJsonStore(backend);
+    const uiDocs = prefetchedDocuments ?? new VfsJsonStore(backend);
     if (opened) uiDocs.seed(opened.documents);
-    else uiDocs.prefetch(initialDocuments);
+    else if (!prefetchedDocuments) uiDocs.prefetch(initialDocuments);
     const executorUsage = new ExecutorUsage(uiDocs);
     cleanupFns.push(() => uiDocs.flush());
     const themeReady = themeService.init(uiDocs);
@@ -325,13 +327,19 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         layoutEl.appendChild(editorEl);
         container.appendChild(layoutEl);
         if (visibleWorkspaceId === elementId) options.onWorkspaceMounted?.({ editor: editorEl });
-        own(setupMobileWorkspaceView(layoutEl, sidebarEl, editorEl, !!initialResource));
+        const hasDetail = wsConfig.type === 'mail' || wsConfig.type === 'kanban' ? () => {
+            const resource = managerCache.get(elementId)?.getActiveResourceId();
+            return !!resource && resource !== '/';
+        } : undefined;
+        own(setupMobileWorkspaceView(layoutEl, sidebarEl, editorEl, !!initialResource, hasDetail));
 
         const strategyType = wsConfig.type ?? 'standard';
         const factory = factories[strategyType] ?? defaultEditorFactory;
 
         if (strategyType === 'mail') {
+            const {createMailModule} = await import('./mail');
             const module = createMailModule({client: await backend.mailView(),
+                mountTitleBar: (container, parts) => mountContentTitleBar(container, parts, () => () => {}).destroy,
                 onContentSelection: options.ui.prepareChatSubmission ? createContentSelectionChat(services, backend, options.ui.prepareChatSubmission, handleNavigationRequest) : undefined,
                 sidebar: sidebarEl, editor: editorEl, selected: path => selectionHistory(elementId, path, 'push'),
                 scanners: () => handleNavigationRequest({target: 'twin', resourceId: '/sources'})});
@@ -342,6 +350,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
 
         if (strategyType === 'calendar') {
+            const {CalendarWorkbench} = await import('./calendar');
             const toolbox = await backend.toolboxView(); own(() => toolbox.dispose());
             const files = await vfs.openFileSystem(workspaceRoot(wsConfig.workspaceName));
             const module = createPageWindows({sidebar: sidebarEl, editor: editorEl, title: translate('calendar.title'), windows: windowBinding, initialResource,
@@ -367,12 +376,15 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
 
         if (strategyType === 'twin') {
+            const {TwinWorkbench} = await import('./digital-twin');
             if (!services.digitalTwin) throw new Error('Digital twin is unavailable in this services');
             const service = services.digitalTwin;
-            const toolbox = await backend.toolboxView(); own(() => toolbox.dispose());
-            const module = createPageWindows({sidebar: sidebarEl, editor: editorEl, title: translate('twin.title'), windows: windowBinding, initialResource,
+            let pendingToolbox: ReturnType<typeof backend.toolboxView> | undefined;
+            const toolbox = () => pendingToolbox ??= backend.toolboxView().then(value => {own(() => value.dispose()); return value;})
+                .catch(error => {pendingToolbox = undefined; throw error;});
+            const module = createPageWindows({sidebar: sidebarEl, editor: editorEl, title: translate('twin.title'), windows: windowBinding, initialResource, initializeAtResource: true,
                 selected: path => selectionHistory(elementId, path, 'push'), create: host => new TwinWorkbench({...host, service, showNavigationTitle: false,
-                packages: toolbox.resources.toolPackages,
+                packages: lazyScannerPackages(async () => (await toolbox()).resources.toolPackages, own),
                 projects: async () => (await services.projects.list()).map(project => ({id: project.project.id, name: project.name})),
                 connections: async () => (await agentService.getConnections()).filter(connection => connection.enabled)
                     .map(connection => ({ id: connection.id, name: connection.name }))})});
@@ -383,6 +395,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
 
         if (strategyType === 'toolbox') {
+            const {createToolboxModule} = await import('./toolbox');
             await executorUsage.load();
             const [storedPreferences, uiPersistence, workbenchState] = await Promise.all([
                 uiDocs.read(TOOLBOX_PREFERENCES_DOC), uiState.port(TOOLBOX_SCOPE), uiState.workbenchPort(TOOLBOX_SCOPE),
@@ -403,6 +416,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
 
         if (strategyType === 'chat') {
+            const {createProjectModule} = await import('./projects');
             let sidebarReady = false;
             const revealSidebar = () => {
                 if (sidebarReady || (visibleWorkspaceId && visibleWorkspaceId !== elementId)) return false;
@@ -489,7 +503,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             editorContainer: editorEl,
             files,
             editorFactory: factory,
-            studyGeneration: {recovery: studyDraftStore(elementId), ...studyGeneration(backend, services.sessionRepository), sources: studySources(services, workspaces.filter(workspace => workspace.mentionAble || workspace.workspaceName === 'notes').map(workspace => ({id: workspace.workspaceName, label: workspace.title || workspace.workspaceName, files: async () => workspace.files?.fs ?? vfs.openFileSystem(workspaceRoot(workspace.workspaceName))}))), ...(plugins?.includes('cloze:cloze') ? {prompts: {presets: await backend.studyPromptPresets()}} : {}), ...options.studyGeneration},
+            studyGeneration: {recovery: studyDraftStore(elementId), ...studyGeneration(backend, services.sessionRepository), sources: studySources(services, workspaces.filter(workspace => workspace.mentionAble || workspace.workspaceName === 'notes').map(workspace => ({id: workspace.workspaceName, label: workspace.title || workspace.workspaceName, files: async () => workspace.files?.fs ?? vfs.openFileSystem(workspaceRoot(workspace.workspaceName))}))), ...(plugins?.includes('cloze:cloze') && !options.studyGeneration?.prompts ? {loadPrompts: () => loadStudyPrompts(backend)} : {}), ...options.studyGeneration},
             scopeId:       elementId, deferNavigation: !!initialResource,
             uiPersistence, workbenchState, windows: windowBinding,
             fileTypes,
@@ -601,7 +615,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         if (!closed && !replayingHistory && routingRevision === undefined && visibleWorkspaceId === id) updateHistory(id, resource, mode);
     };
 
-    const performNavigation = async (workspaceId: string, resourceId?: string, sourceSlug?: string, historyReplay?: symbol, openOptions?: import('@nestos/app-contracts').WorkspaceOpenOptions): Promise<void> => {
+    const performNavigation = async (workspaceId: string, resourceId?: string, sourceSlug?: string, historyReplay?: symbol, openOptions?: import('@nestos/app-contracts').WorkspaceOpenOptions, failOnError = false): Promise<void> => {
         if (replayingHistory !== historyReplay) replayingHistory = undefined;
         const revision = ++navigationRevision;
         if (closed) return;
@@ -612,6 +626,8 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         if (legacyToolbox) { workspaceId = toolboxId!; resourceId = legacyToolbox.path ?? '/' + legacyToolbox.kind; }
         if (closed || revision !== navigationRevision) return;
         routingRevision = revision;
+        const completeNavigation = beginNavigationTiming(managerCache.has(workspaceId), diagnostic => backend.reportClientDiagnostic?.(diagnostic));
+        let navigationFailed = false;
         visibleWorkspaceId = workspaceId; windows.changed();
         for (const [id, workbench] of managerCache) {
             void Promise.resolve(workbench.setVisible?.(id === workspaceId && !document.hidden)).catch(error => console.error('[Shell] Workspace save failed', error));
@@ -666,9 +682,11 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             }
             options.onEditorReady?.();
         } catch (error) {
+            navigationFailed = true;
             if (!closed && revision === navigationRevision) {
                 console.error('[Shell] Workspace navigation failed', error);
                 workspaceStatus(container, error, () => { void performNavigation(workspaceId, resourceId, sourceSlug); });
+                if (failOnError) throw error;
             }
         } finally {
             if (routingRevision === revision) routingRevision = undefined;
@@ -689,6 +707,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                 navigationObservers.set(manager, stop);
                 cleanupFns.push(() => {stop(); navigationObservers.delete(manager);});
             }
+            completeNavigation(closed || revision !== navigationRevision ? 'superseded' : navigationFailed ? 'failure' : 'success');
         }
         if (closed || revision !== navigationRevision) return;
         requestAnimationFrame(() => { if (!closed) services.startBackground?.(); });
@@ -704,7 +723,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     };
 
     const isProjectWorkspace = (id: string) => workspaces.some(ws => ws.elementId === id && ws.type === 'chat');
-    const handleNavigationRequest = async (req: NavigationRequest): Promise<void> => {
+    const handleNavigationRequest = async (req: NavigationRequest, failOnError = false): Promise<void> => {
         rememberCurrentPage();
         const moved = toolboxId && req.target === 'settings' ? toolboxSettingsRoute(req.resourceId, req.state?.anchor) : undefined;
         if (moved) req = { ...req, target: 'toolbox', resourceId: moved, state: undefined };
@@ -754,7 +773,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                 }
                 const resourceId = req.resourceId ?? (isProjectWorkspace(targetWsId) ? '/' : undefined);
                 updateHistory(targetWsId, resourceId ?? null, 'push');
-                await performNavigation(targetWsId, resourceId, req.target, undefined, req.options?.newTab ? {newTab: true} : undefined);
+                await performNavigation(targetWsId, resourceId, req.target, undefined, req.options?.newTab ? {newTab: true} : undefined, failOnError);
             }
         }
     };
@@ -831,7 +850,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             const resource = managerCache.get(visibleWorkspaceId ?? '')?.getActiveResourceId() ?? '';
             const active = windows.items().find(item => item.active);
             return {workspace, resource, title: active?.title ?? workspaces.find(item => item.elementId === visibleWorkspaceId)?.title ?? translate('assistant.currentPage')};
-        }, navigate: handleNavigationRequest,
+        }, navigate: request => handleNavigationRequest(request, true),
         home: options.startPage ? async () => {rememberCurrentPage(); updateHistory(START_PAGE_ID, null, 'push'); await performNavigation(START_PAGE_ID);} : undefined,
     }));
     const initialRoute = parseWorkspaceHash(location.hash, resolvedDefault);

@@ -9,7 +9,7 @@ import { graphView } from './graph-view';
 import { escapeHTML, escapeAttr, t } from '@nestos/common';
 import {TWIN_KINDS} from '@nestos/app-contracts';
 import type { TwinSourceSpec } from '@nestos/app-contracts';
-import type { DigitalTwinService, TwinScanRuleInput } from '@nestos/app-contracts/services';
+import type { DigitalTwinService, TwinScanRuleInput, TwinViewRequest } from '@nestos/app-contracts/services';
 import { createWorkspaceModule } from '../workspaces/module';
 import { TWIN_PAGES, label, overview, memories, type TwinSnapshot, type TwinPage } from './view';
 import { scanPage, scanRunPage, type TwinSourcesTab } from './scan-view';
@@ -40,6 +40,9 @@ export class TwinWorkbench {
     private routeWorkspaceId = '';
     private focusPlanId?: string;
     private focusRunId?: string;
+    private viewOffset = 0;
+    private viewFilters: Pick<TwinViewRequest, 'query' | 'enabled' | 'kind' | 'state'> = {};
+    private filterTimer?: ReturnType<typeof setTimeout>;
     private sourcesTab: TwinSourcesTab = 'plans';
     private snapshot?: TwinSnapshot;
     private connections: Array<{ id: string; name: string }> = [];
@@ -66,18 +69,18 @@ export class TwinWorkbench {
         }, path => this.snapshot ? `/workspace/${encodeURIComponent(this.snapshot.workspace.id)}${path}` : path, options.showNavigationTitle);
     }
 
-    async start(): Promise<void> {
+    async start(initialResource?: string): Promise<void> {
         const { editor } = this.options, signal = this.abort.signal;
         editor.classList.add('twin');
         editor.addEventListener('click', event => { void this.click(event); }, { signal });
         editor.addEventListener('keydown', event => this.scanTabKey(event), { signal });
         editor.addEventListener('submit', event => { event.preventDefault(); void this.submit(event); }, { signal });
         editor.addEventListener('input', event => this.search(event), { signal });
-        editor.addEventListener('change', event => { if (event.target instanceof HTMLSelectElement && event.target.hasAttribute('data-twin-workspace')) {void this.switchWorkspace(event.target); return;} if (event.target instanceof HTMLInputElement && event.target.name === 'connectionImport') {this.dirty = true; void importConnection(event.target).catch(error => {this.options.editor.querySelector('[role=alert]')!.textContent = error instanceof SyntaxError ? label('connectionImportInvalid') : errorText(error);}); return;} if (event.target instanceof HTMLInputElement && event.target.name === 'inputUpload') {void this.loadScannerUpload(event.target); return;} if (scannerFieldChange(event, this.targets, this.tools)) {this.dirty = true; return;} if (!this.scanLists.handle(event)) this.settingsChanged(event, true); }, { signal });
+        editor.addEventListener('change', event => { if (event.target instanceof HTMLSelectElement && event.target.hasAttribute('data-twin-workspace')) {void this.switchWorkspace(event.target); return;} if (event.target instanceof HTMLInputElement && event.target.name === 'connectionImport') {this.dirty = true; void importConnection(event.target).catch(error => {this.options.editor.querySelector('[role=alert]')!.textContent = error instanceof SyntaxError ? label('connectionImportInvalid') : errorText(error);}); return;} if (event.target instanceof HTMLInputElement && event.target.name === 'inputUpload') {void this.loadScannerUpload(event.target); return;} if (scannerFieldChange(event, this.targets, this.tools)) {this.dirty = true; return;} if (!this.handleViewPage(event) && !this.scanLists.handle(event)) this.settingsChanged(event, true); }, { signal });
         this.unsubscribe = this.options.service.onChange(() => this.serviceChanged());
         this.unsubscribePackages = this.options.packages?.onChange?.(() => this.serviceChanged());
         signal.addEventListener('abort', () => this.unsubscribePackages?.(), {once: true});
-        await Promise.all([this.navigation.start(), this.refresh()]);
+        await Promise.all([this.navigation.start(), initialResource ? this.openResource(initialResource) : this.refresh()]);
         await this.navigation.sync('/' + this.page);
     }
     async openResource(path: string): Promise<void> {
@@ -93,6 +96,7 @@ export class TwinWorkbench {
             this.workspaceRoute = true; this.routeWorkspaceId = id; path = '/' + parts.slice(3).join('/');
         }
         this.dirty = false;
+        this.viewOffset = 0; this.viewFilters = {};
         const page = path.split('/')[1] as TwinPage;
         this.page = TWIN_PAGES.includes(page) ? page : 'overview';
         this.selectedSession = path.split('/')[2] ? decodeURIComponent(path.split('/')[2]) : '';
@@ -110,11 +114,11 @@ export class TwinWorkbench {
         return null;
     }
     restoreRecovery(_snapshot: unknown): void {}
-    suspendForRecovery(): void { this.generation++; this.abort.abort(); }
+    suspendForRecovery(): void { clearTimeout(this.filterTimer); this.generation++; this.abort.abort(); }
     async destroy(): Promise<void> {
         await this.autosave.flush();
         if (this.autosave.pending) throw new Error(this.autosave.error || 'TWIN_SETTINGS_UNSAVED');
-        this.generation++; this.abort.abort(); this.unsubscribe?.(); this.unsubscribePackages?.(); this.navigation.destroy();
+        clearTimeout(this.filterTimer); this.generation++; this.abort.abort(); this.unsubscribe?.(); this.unsubscribePackages?.(); this.navigation.destroy();
     }
 
     private serviceChanged(): void {
@@ -135,7 +139,7 @@ export class TwinWorkbench {
         this.loading = true; this.refreshQueued = false;
         if (!this.snapshot) this.render();
         try {
-            const [snapshot, connections, targets, workspaces, tools, sourceConnections, packages, projects] = await loadOverview(this.options, this.abort.signal);
+            const [snapshot, connections, targets, workspaces, tools, sourceConnections, packages, projects] = await loadOverview(this.options, this.abort.signal, this.options.service.readView ? {page: this.page, tab: this.sourcesTab, offset: this.viewOffset, ...this.viewFilters, ...(this.page === 'runs' && this.selectedSession ? {runId: this.selectedSession} : {})} : undefined);
             if (generation !== this.generation || this.abort.signal.aborted) return;
             this.projects = projects; this.packages = packages; this.tools = tools; this.sourceConnections = sourceConnections; this.snapshot = snapshot; this.connections = connections; this.targets = targets; this.workspaces = workspaces; this.error = ''; this.loading = false; this.render();
             if (this.refreshQueued && !this.dirty) void this.refreshDraft();
@@ -161,7 +165,7 @@ export class TwinWorkbench {
         if (settings && previousSettings && previousSettings.dataset.configured === settings.dataset.configured) settings.open = previousSettings.open;
         this.options.editor.querySelectorAll<HTMLFormElement>('[data-form=scanPlan]').forEach(form => {updateInputMode(form); updateExecutorMode(form);});
         this.options.editor.querySelectorAll<HTMLDetailsElement>('[data-scanner-history]').forEach(item => {item.open = expandedHistory.has(item.dataset.scannerHistory);});
-        this.scanLists.restore(this.options.editor);
+        this.restoreViewLists();
         if (this.focusPlanId && this.scanLists.reveal(this.options.editor, this.focusPlanId)) this.focusPlanId = undefined;
         if (this.focusRunId) {
             const row = [...this.options.editor.querySelectorAll<HTMLElement>('[data-scan-run]')].find(row => row.dataset.scanRun === this.focusRunId);
@@ -227,15 +231,29 @@ export class TwinWorkbench {
             this.options.editor.querySelector<HTMLElement>('[role=alert]')!.textContent = this.error;
             this.options.editor.querySelectorAll<HTMLButtonElement>('button').forEach(button => { button.disabled = false; });
             this.options.editor.querySelectorAll<HTMLFormElement>('[data-form=scanPlan]').forEach(form => {updateInputMode(form); updateExecutorMode(form);});
-            this.scanLists.restore(this.options.editor);
+            this.restoreViewLists();
             if (this.focusPlanId && this.scanLists.reveal(this.options.editor, this.focusPlanId)) this.focusPlanId = undefined;
             const retry = document.createElement('button'); retry.type = 'button'; retry.dataset.action = 'refresh'; retry.textContent = label('refresh');
             this.applyReadOnly();
             if (!this.options.editor.querySelector('[data-action=refresh]')) this.options.editor.querySelector('[role=alert]')!.after(retry);
         }
     }
+    private handleViewPage(event: Event): boolean {
+        if (!this.options.service.readView || !(event.target instanceof HTMLElement)) return false;
+        const control = event.target.closest<HTMLElement>('[data-view-page], [data-server-page] [data-scan-filter]');
+        if (!control) return false;
+        if (control.dataset.viewPage && event.type === 'click') {
+            this.viewOffset = Math.max(0, this.viewOffset + (control.dataset.viewPage === 'next' ? 20 : -20));
+        } else if (control.matches('[data-scan-filter]') && ['input', 'change'].includes(event.type)) {
+            const field = control.dataset.scanFilter as keyof typeof this.viewFilters;
+            this.viewFilters[field] = (control as HTMLInputElement).value; this.viewOffset = 0;
+        } else return false;
+        clearTimeout(this.filterTimer);
+        this.filterTimer = setTimeout(() => {if (!this.abort.signal.aborted) void this.refreshDraft();}, event.type === 'input' ? 250 : 0);
+        return true;
+    }
     private async click(event: Event): Promise<void> {
-        if (this.scanLists.handle(event)) return;
+        if (this.handleViewPage(event) || this.scanLists.handle(event)) return;
         const target = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action]');
         if (!target || this.busy) return;
         const { action = '', id = '' } = target.dataset;
@@ -278,6 +296,7 @@ export class TwinWorkbench {
         await this.autosave.flush();
         if (this.autosave.pending || this.abort.signal.aborted || this.page !== 'sources') return;
         this.sourcesTab = tab; this.selectedSession = tab;
+        if (this.options.service.readView) {this.viewOffset = 0; this.viewFilters = {}; this.options.selected(this.getActiveResourceId()); await this.refreshDraft(); return;}
         const root = this.options.editor;
         root.querySelectorAll<HTMLButtonElement>('[data-action="scanTab"]').forEach(button => {
             button.setAttribute('aria-selected', String(button.dataset.id === tab));
@@ -318,11 +337,18 @@ export class TwinWorkbench {
         await this.options.service.suppress(id, memory.revision); this.message = label('suppressed');
     }
     private async refreshDraft(): Promise<void> {
+        const active = document.activeElement as HTMLInputElement | null;
+        const filter = active?.matches('[data-server-page] [data-scan-filter]') ? {field: active.dataset.scanFilter!, start: active.selectionStart, end: active.selectionEnd} : undefined;
         const resource = this.getActiveResourceId();
         const drafts = [...this.options.editor.querySelectorAll<HTMLFormElement>('form:not([data-form=sourceConnection])')].map(form => ({
             key: `${form.dataset.form}:${form.dataset.id ?? ''}`, open: form.closest('details')?.open, values: [...new FormData(form).entries()] }));
         await this.refresh();
         if (resource !== this.getActiveResourceId()) return;
+        if (filter) {
+            const control = this.options.editor.querySelector<HTMLInputElement>(`[data-server-page] [data-scan-filter="${filter.field}"]`);
+            control?.focus({preventScroll: true});
+            if (control instanceof HTMLInputElement && filter.start !== null) control.setSelectionRange(filter.start, filter.end);
+        }
         for (const form of this.options.editor.querySelectorAll<HTMLFormElement>('form')) {
             const draft = drafts.find(item => item.key === `${form.dataset.form}:${form.dataset.id ?? ''}`);
             if (!draft) continue;
@@ -451,7 +477,7 @@ export class TwinWorkbench {
         await this.options.service.review(memory.id, memory.revision, 'correct', memoryInput(data));
     }
     private search(event: Event): void {
-        if (this.scanLists.handle(event)) return;
+        if (this.handleViewPage(event) || this.scanLists.handle(event)) return;
         const input = event.target as HTMLInputElement;
         if (input.closest('[data-form=settings]')) { this.settingsChanged(event, false); return; }
         if (!input.matches('[data-search]')) { if (input.closest('form')) this.dirty = true; return; }
@@ -470,6 +496,22 @@ export class TwinWorkbench {
             if (amount) amount.disabled = control.checked;
         }
         this.autosave.edit(control, immediate || control instanceof HTMLSelectElement || control.type === 'checkbox');
+    }
+    private restoreViewLists(): void {
+        this.scanLists.restore(this.options.editor);
+        this.options.editor.querySelectorAll<HTMLButtonElement>('[data-view-page]').forEach(button => {
+            const page = this.page === 'sources' && this.sourcesTab === 'sources' ? this.snapshot?.pagination?.sources : this.selectedSession && this.page === 'runs' ? this.snapshot?.pagination?.jobs : this.snapshot?.pagination?.runs;
+            if (page) button.disabled = this.busy || (button.dataset.viewPage === 'previous' ? page.offset === 0 : page.offset + page.limit >= page.total);
+        });
+        const remoteList = this.options.editor.querySelector('[data-server-page]');
+        const page = this.snapshot?.pagination?.sources;
+        if (remoteList && page) {
+            remoteList.querySelector('[data-scan-list-count]')!.textContent = t('twin.scanListCount', {shown: this.snapshot!.sources.length, matched: page.total, total: page.all ?? page.total});
+            (remoteList.querySelector('[data-scan-no-matches]') as HTMLElement).hidden = page.total > 0 || (page.all ?? page.total) === 0;
+        }
+        remoteList?.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-scan-filter]').forEach(control => {
+            control.value = this.viewFilters[control.dataset.scanFilter as keyof typeof this.viewFilters] ?? '';
+        });
     }
     private renderSaveState(): void {
         const status = this.options.editor.querySelector<HTMLElement>('[data-save-status]');

@@ -1,0 +1,69 @@
+{
+  "dataset": {
+    "sources": 1665,
+    "runs": 2937,
+    "jobs": 330,
+    "memories": 53
+  },
+  "version": "working-tree-final",
+  "storage": "isolated LocalFS/SQLite copy of current metadata; scans disabled",
+  "samples": [
+    {
+      "sample": 0,
+      "state": "cold-browser/warm-runtime",
+      "ms": 539,
+      "logicalCalls": 11,
+      "httpRequests": 10,
+      "legacySnapshots": 0,
+      "errors": []
+    },
+    {
+      "sample": 1,
+      "state": "warm-browser/warm-runtime",
+      "ms": 331,
+      "logicalCalls": 11,
+      "httpRequests": 10,
+      "legacySnapshots": 0,
+      "errors": []
+    },
+    {
+      "sample": 2,
+      "state": "warm-browser/warm-runtime",
+      "ms": 317,
+      "logicalCalls": 11,
+      "httpRequests": 10,
+      "legacySnapshots": 0,
+      "errors": []
+    },
+    {
+      "scenario": "sources-first-page",
+      "ms": 556,
+      "logicalCalls": 11,
+      "httpRequests": 8,
+      "rows": 20,
+      "errors": []
+    },
+    {
+      "scenario": "sources-next-page",
+      "ms": 144,
+      "logicalCalls": 8,
+      "httpRequests": 5,
+      "errors": []
+    },
+    {
+      "scenario": "runs-first-page",
+      "ms": 77,
+      "logicalCalls": 3,
+      "httpRequests": 3,
+      "rows": 20,
+      "errors": []
+    },
+    {
+      "scenario": "old-run-deep-link",
+      "ms": 115,
+      "logicalCalls": 3,
+      "httpRequests": 3,
+      "errors": []
+    }
+  ]
+}

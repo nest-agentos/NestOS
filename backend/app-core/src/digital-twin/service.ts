@@ -4,6 +4,7 @@ import {saveScannerText, scannerInputReader} from './scanner-input';
 import {bindScannerSession, scannerJob, authorizeScannerExchange} from './scanner-authority';
 import {assertScannerPlan, type TwinScannerExecutionPort} from './scanner-executor';
 import {meterSnapshot} from './metering';
+import {readTwinView, recentPlanRuns} from './read-view';
 import { userIdentity } from './identity';
 import { extractionPrompt } from './extraction';
 import { selectionPattern, selectionKinds, type TwinSelectionTarget, type TwinSelectionType } from './selection';
@@ -218,12 +219,16 @@ export class DigitalTwinService {
         const workspace = await this.workspaceView();
         if (!await this.initialized()) return {workspace, plans: [], runs: []};
         const records = (await this.services('read')).records;
-        const plans = await records.list<TwinScanPlan>('scan-plan'), runs = await records.list<import('./scan-domain').TwinScanRun>('scan-run');
+        const plans = await records.list<TwinScanPlan>('scan-plan'), runs = await recentPlanRuns(records, plans.map(plan => plan.id));
         const latest = new Map<string, typeof runs[number]>();
         for (const run of runs) if (run.data.createdAt > (latest.get(run.data.planId)?.data.createdAt ?? -1)) latest.set(run.data.planId, run);
         return {workspace, plans: plans.map(plan => ({id: plan.id, name: plan.data.name})),
             runs: [...latest.values()].map(run => ({id: run.id, planId: run.data.planId, name: run.data.name, state: run.data.state,
                 at: run.data.finishedAt || run.data.startedAt || run.data.createdAt}))};
+    }
+    async readView(request: import('@nestos/app-contracts/services').TwinViewRequest) {
+        const services = await this.services('read');
+        return readTwinView(services.records, services.scans, await this.workspaceView(), request);
     }
 
     async snapshot(progress: (stage: string) => void = () => {}) {

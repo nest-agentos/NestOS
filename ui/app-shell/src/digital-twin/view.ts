@@ -1,7 +1,7 @@
 import { escapeHTML, escapeAttr, t } from '@nestos/common';
 import { TWIN_KINDS, type TwinMemoryData } from '@nestos/app-contracts';
 import type { DigitalTwinService, TwinDataRecord } from '@nestos/app-contracts/services';
-import { scanListFilters, scanListPagination } from './scan-list';
+import { scanListFilters, scanListPagination, viewPagination } from './scan-list';
 
 export type TwinSnapshot = Awaited<ReturnType<DigitalTwinService['snapshot']>>;
 export type TwinPage = 'overview' | 'profile' | 'memories' | 'goals' | 'sources' | 'runs';
@@ -64,10 +64,10 @@ function budgetSettings(snapshot: TwinSnapshot): string {
 }
 
 export function sources(snapshot: TwinSnapshot, _connections: Array<{ id: string; name: string }>): string {
-    return `<section data-scan-list="sources">${scanListFilters('sources')}
+    return `<section data-scan-list="sources"${snapshot.pagination ? ' data-server-page' : ''}>${scanListFilters('sources')}
         ${snapshot.sources.map(source => `<article class="twin__card" data-scan-row="${escapeAttr(source.id)}" data-scan-text="${escapeAttr([source.data.label, source.data.target, source.data.resource?.projectName, source.data.resource?.projectId].join(' ').toLocaleLowerCase())}" data-scan-enabled="${source.data.enabled}" data-scan-kind="${source.data.kind}" data-scan-state="${source.data.status}"><h3>${escapeHTML(source.data.label || source.data.target)}</h3>
         <p>${escapeHTML(source.data.resource?.projectName ?? source.data.resource?.projectId ?? '')} · ${escapeHTML(source.data.target)} · ${escapeHTML(label(source.data.enabled ? 'enabled' : 'disabled'))} · ${escapeHTML(label(`source.${source.data.status}`))}</p>
-        <p>${source.data.offset} / ${source.data.characters} · ${escapeHTML(label('checkedAt'))}: ${escapeHTML(new Date(source.observedAt).toLocaleString())}</p></article>`).join('') || `<p>${escapeHTML(label('targetsEmpty'))}</p>`}${scanListPagination()}</section>`;
+        <p>${source.data.offset} / ${source.data.characters} · ${escapeHTML(label('checkedAt'))}: ${escapeHTML(new Date(source.observedAt).toLocaleString())}</p></article>`).join('') || `<p>${escapeHTML(label('targetsEmpty'))}</p>`}${snapshot.pagination ? viewPagination(snapshot.pagination.sources) : scanListPagination()}</section>`;
 }
 
 export function memories(snapshot: TwinSnapshot, page: 'memories' | 'goals', scanRunId?: string): string {

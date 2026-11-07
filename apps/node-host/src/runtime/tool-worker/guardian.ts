@@ -14,7 +14,7 @@ export function runToolGuardian(): void {
     const forward = (message: object) => {
         forwarding = forwarding.then(() => new Promise<void>(resolve => {
             if (!process.connected) {resolve(); stop(); return;}
-            try {process.send!(message, () => resolve());} catch {resolve(); stop();}
+            try {process.send!(message, undefined, undefined, () => resolve());} catch {resolve(); stop();}
         }));
     };
     process.on('message', message => {

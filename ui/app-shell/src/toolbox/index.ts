@@ -43,9 +43,13 @@ export async function createToolboxModule(options: Options): Promise<WorkspaceMo
     } catch (error) { await view.dispose(); throw error; }
 }
 function configurationFactories(options: Options, inventory: ToolboxInventory, resources: ToolboxResources) {
-    const { agentService } = options.services, editors = options.ui.llmUiEditors;
-    const create = (Editor: new (element: HTMLElement, service: typeof agentService, options: import('@nestos/ui-common-adapter').EditorOptions, examples?: MediaProbeExamples) => import('@nestos/ui-common-adapter').IEditor, examples?: MediaProbeExamples): EditorFactory => async (element, config) => {
-        const editor = new Editor(element, agentService, config, examples); await editor.init(element); return editor;
+    const { agentService } = options.services;
+    const editors = () => typeof options.ui.llmUiEditors === 'function' ? options.ui.llmUiEditors() : Promise.resolve(options.ui.llmUiEditors);
+    const create = (key: 'SystemPromptSettingsEditor' | 'ProviderSettingsEditor' | 'ConnectionSettingsEditor', examples?: MediaProbeExamples): EditorFactory => async (element, config) => {
+        const loaded = await editors();
+        const editor = key === 'ProviderSettingsEditor' ? new loaded.ProviderSettingsEditor(element, agentService, config, examples)
+            : new loaded[key](element, agentService, config);
+        await editor.init(element); return editor;
     };
     return { ...options.factories, cells: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
         const editor = new CellsSettingsEditor(element, options.services.projects?.remoteMounts, config); await editor.init(element); return editor;
@@ -54,11 +58,12 @@ function configurationFactories(options: Options, inventory: ToolboxInventory, r
             const editor = new RemoteAgentDetailsEditor(element, inventory, config, options.services.projects); await editor.init(element); return editor;
         }
         return options.factories.agents(element, config);
-    }, prompts: create(editors.SystemPromptSettingsEditor), providers: create(editors.ProviderSettingsEditor, mediaProbeExamples), connections: create(editors.ConnectionSettingsEditor),
+    }, prompts: create('SystemPromptSettingsEditor'), providers: create('ProviderSettingsEditor', mediaProbeExamples), connections: create('ConnectionSettingsEditor'),
         mcp: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
             const remote = options.services.projects?.remoteMounts;
             const controls = new MCPConfigurationControlsRegistry().register('diagnostics', new MCPDiagnosticsControls(options.backend.diagnostics, remote), () => true);
-            const editor = new editors.MCPSettingsEditor(element, agentService, config, controls); await editor.init(element); return editor;
+            const Editor = (await editors()).MCPSettingsEditor;
+            const editor = new Editor(element, agentService, config, controls); await editor.init(element); return editor;
         }, tools: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
             const editor = new ToolDetailsEditor(element, inventory, config, resources); await editor.init(element); return editor;
         } };

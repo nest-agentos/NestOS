@@ -35,3 +35,16 @@ it.each([{name:'new-note',file:'new-note.mind'},{name:'custom.md',file:'custom.m
   expect(await fs.driver.exists('/.nestos/cloze-srs.seq')).toBe(false);
  }finally{await workbench.destroy();await manager.dispose();}
 });
+
+it('keeps file navigation independent of lazy study prompts and loads them only when opening study',async()=>{
+ vi.stubGlobal('matchMedia',()=>({matches:false,addEventListener(){},removeEventListener(){}}));
+ const {manager}=await createVFS({rootBackend:new MemoryBackend()}),fs=await manager.openFileSystem('/');
+ const sidebar=document.createElement('div'),content=document.createElement('div');document.body.append(sidebar,content);
+ const loadPrompts=vi.fn(async()=>({presets:[{id:'default',name:'Template',content:'Temporary template'}]}));
+ const workbench=new Workbench({files:{fs,cwd:'/'},sidebarContainer:sidebar,editorContainer:content,editorConfig:{plugins:['cloze:cloze']},studyGeneration:{loadPrompts}});
+ try{
+  await workbench.start();expect(loadPrompts).not.toHaveBeenCalled();
+  await workbench.openFile('@study');expect(loadPrompts).toHaveBeenCalledOnce();
+  await workbench.openFile('@study');expect(loadPrompts).toHaveBeenCalledOnce();
+ }finally{await workbench.destroy();await manager.dispose();}
+});

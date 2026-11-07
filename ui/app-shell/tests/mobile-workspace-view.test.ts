@@ -5,8 +5,30 @@ import { setupMobileWorkspaceView } from '../src/navigation/mobile-workspace-vie
 import { ACTION_ICONS, t } from '@nestos/common';
 import { VFS_DOM_EVENTS } from '@nestos/vfs-ui';
 import { WorkbenchTabs } from '../src/workbench/tabs';
+import {installMobileShellState} from '../src/navigation/mobile-shell-state';
 
 afterEach(() => { document.body.innerHTML = ''; vi.unstubAllGlobals(); });
+
+it('keeps bottom navigation on the kanban catalog and restores it after leaving a board', async () => {
+    document.body.innerHTML = '<nav class="app-sidebar"></nav><section class="workspace-view active"><div class="mm-layout"><aside></aside><main></main></div></section>';
+    const layout = document.querySelector<HTMLElement>('.mm-layout')!, sidebar = layout.querySelector('aside')!, editor = layout.querySelector('main')!;
+    let resource = '/';
+    const disposeView = setupMobileWorkspaceView(layout, sidebar, editor, false, () => resource !== '/');
+    const disposeShell = installMobileShellState();
+    const tabs = new WorkbenchTabs(editor, {activate: async id => tabs.activate(id), dispose: async () => {}, empty() {}, error() {}});
+    const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+    try {
+        const catalog = await tabs.open('/', 'Boards', false);
+        catalog.panel.innerHTML = '<section data-editor-mobile-navigation="embedded">Catalog</section>';
+        await flush(); expect(layout.dataset.mobileView).toBe('list'); expect(document.body.dataset.mobileNavigation).toBe('standard');
+        resource = '/board/example';
+        const board = await tabs.open(resource, 'Example', false);
+        board.panel.innerHTML = '<section data-editor-mobile-navigation="embedded">Board</section>';
+        await flush(); expect(layout.dataset.mobileView).toBe('detail'); expect(document.body.dataset.mobileNavigation).toBe('immersive');
+        resource = '/'; tabs.activate('/');
+        await flush(); expect(layout.dataset.mobileView).toBe('list'); expect(document.body.dataset.mobileNavigation).toBe('standard');
+    } finally {disposeShell(); disposeView(); await tabs.destroy();}
+});
 
 it('switches a narrow workspace between the file list and the active editor', async () => {
     const layout = document.createElement('div');
@@ -171,4 +193,22 @@ it('keeps sidebar and window controls together for standalone documents and pres
         expect(doc.panel.querySelector('textarea')!.value).toBe('Unsaved content');
         tabs.activate('doc'); await new Promise(resolve => setTimeout(resolve, 0)); expect(layout.dataset.mobileView).toBe('detail');
     } finally { dispose(); await tabs.destroy(); }
+});
+
+it('uses an explicit content state so an empty mail reader does not hide the mobile sidebar', async () => {
+    const layout = document.createElement('div'), sidebar = document.createElement('aside'), editor = document.createElement('main');
+    layout.append(sidebar, editor); document.body.append(layout); editor.innerHTML = '<p class="mail__empty">Choose a thread</p>';
+    let active = false;
+    const dispose = setupMobileWorkspaceView(layout, sidebar, editor, false, () => active);
+    try {
+        expect(layout.dataset.mobileView).toBe('list');
+        editor.innerHTML = '<section class="mail__thread"><header data-editor-mobile-navigation="embedded">Thread</header></section>';
+        await new Promise(resolve => setTimeout(resolve, 0)); expect(layout.dataset.mobileView).toBe('list');
+        active = true; sidebar.dispatchEvent(new CustomEvent(VFS_DOM_EVENTS.resourceActivated, {bubbles: true}));
+        expect(layout.dataset.mobileView).toBe('detail');
+        editor.append(document.createElement('p')); await new Promise(resolve => setTimeout(resolve, 0));
+        expect(layout.dataset.mobileHeader).toBe('embedded');
+        layout.dataset.mobileView = 'list'; editor.append(document.createElement('p'));
+        await new Promise(resolve => setTimeout(resolve, 0)); expect(layout.dataset.mobileView).toBe('list');
+    } finally {dispose();}
 });

@@ -6,6 +6,7 @@ import {SeqKanbanStore} from '@nestos/kanban/storage';
 import {KanbanWindowWorkbench} from '../src/kanban/windows';
 import {WorkbenchWindows} from '../src/workbench/windows';
 import {t} from '@nestos/common';
+import {kanbanReference} from '@nestos/kanban/contracts';
 import {UserEventService} from '../../../backend/app-core/src/events/service';
 import {ShellApplicationEvents} from '../src/lifecycle/application-events';
 
@@ -53,7 +54,17 @@ it('shares real opened windows with the shell and navigates item, board and cata
     expect(f.active().querySelector<HTMLButtonElement>('[data-window-navigation=parent]')!.hidden).toBe(true);
     expect(f.registry.items()).toHaveLength(3);
     await f.registry.items().find(item => item.id === '/board/b/card')!.activate();
-    expect(f.active().querySelector('[data-panel] h3')?.textContent).toBe('KB-1#1A long item title');
+    const board = await f.service.read('b'), {item} = await f.service.item('b', 'card');
+    expect(f.active().querySelector('[data-panel] h3')?.textContent).toBe(kanbanReference(board, item) + item.title);
+});
+
+it('opens sibling context tabs from the shared catalog without redundant principal or catalog reads', async () => {
+    const f = await fixture('/board/b');
+    const catalog = vi.spyOn(f.service,'catalog'), principal = vi.spyOn(f.service,'currentPrincipal'), records = vi.spyOn(f.service,'records');
+    await f.workbench.openResource('/board/b/@log'); await f.workbench.openResource('/board/b/@decision');
+    expect(catalog).not.toHaveBeenCalled(); expect(principal).not.toHaveBeenCalled(); expect(records).toHaveBeenCalledTimes(2);
+    await f.workbench.openResource('/board/b/@log');
+    expect(records).toHaveBeenCalledTimes(2);
 });
 it('keeps filter, scroll and unsaved forms when switching windows and refuses to close unsaved work', async () => {
     const f = await fixture('/board/b');

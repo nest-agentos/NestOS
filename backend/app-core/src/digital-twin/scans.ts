@@ -23,6 +23,11 @@ export class TwinScans {
                 planId: plan.id, nextAt: (await this.plans.schedule(plan.id))?.data.nextAt ?? 0 }))),
             worker: { ...this.worker.status(), ownerHost: lease && lease.data.until > this.store.now() ? lease.data.host : '', leaseUntil: lease?.data.until ?? 0 } };
     }
+    async viewStatus() {
+        const lease = await this.store.lease();
+        return {discovery: this.index?.status() ?? {errors: []}, worker: {...this.worker.status(),
+            ownerHost: lease && lease.data.until > this.store.now() ? lease.data.host : '', leaseUntil: lease?.data.until ?? 0}};
+    }
     async save(id: string | null, revision: string | null, input: TwinScanPlanInput, sync = true): Promise<string> {
         const result = await this.plans.save(id, revision, input);
         if (id) await this.cancelPlan(id, (await this.store.records.get('scan-plan', id))!.revision);

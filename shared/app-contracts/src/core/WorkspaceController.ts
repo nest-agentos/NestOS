@@ -1,7 +1,7 @@
 /** Workspace routing uses resource identities; each workspace defines their meaning. */
 export interface WorkspaceOpenOptions {newTab?: boolean}
 export interface WorkspaceController {
-    start(): Promise<void>;
+    start(initialResource?: string): Promise<void>;
     /** Suspend view-only work and flush edits when hidden; keep background execution alive. */
     setVisible?(visible: boolean): void | Promise<void>;
     /** Load and observe navigation only while its surface is visible. */

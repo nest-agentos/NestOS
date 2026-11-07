@@ -92,7 +92,7 @@ export class TwinScanWorker {
         if (discovery) await this.step('discovery', async () => {await this.index?.sync();});
         if (this.stopped) return false;
         await this.step('sources', () => this.sources.reconcile(false, () => !this.stopped)); if (this.stopped) return false;
-        await this.step('schedule', () => this.schedule()); return !this.stopped;
+        await this.step('schedule', () => this.schedule(fence)); return !this.stopped;
     }
     private async step<T>(stage: string, work: () => Promise<T>): Promise<T> {
         const previous = this.stage; this.stage = stage;
@@ -137,7 +137,7 @@ export class TwinScanWorker {
             [await this.store.fence(fence), ...jobs.map(job => ({family: 'job' as const, id: job.id, expectedRevision: job.revision}))]);
         this.changed(); return true;
     }
-    private async schedule(): Promise<void> {
+    private async schedule(fence: number): Promise<void> {
         for (const plan of await this.store.records.list<TwinScanPlan>('scan-plan')) {
             if (this.stopped) return;
             if (!plan.data.enabled || ['manual', 'event'].includes(plan.data.trigger)) continue;
@@ -147,11 +147,22 @@ export class TwinScanWorker {
                 const sources = await this.plans.selected(plan.data);
                 const signature = sha256HexSync(JSON.stringify(sources.map(source => source ?
                 [source.id, source.data.hash, source.data.incarnation, source.data.enabled, source.data.status] : null)));
-                if (plan.data.collection || plan.data.trigger === 'interval' || schedule?.data.signature !== signature) await this.plans.enqueue(plan.id, plan.data.trigger, signature, false);
-                else await this.store.records.save('checkpoint', scheduleId(plan.id), { ...schedule!.data,
-                    nextAt: this.store.now() + plan.data.intervalMinutes * 60000 }, schedule!.revision);
+                const pending = await this.hasPendingWork(plan, sources, fence);
+                if (pending && (plan.data.collection || plan.data.trigger === 'interval' || schedule?.data.signature !== signature)) await this.plans.enqueue(plan.id, plan.data.trigger, signature, false);
+                else await this.store.records.save('checkpoint', scheduleId(plan.id), {planRevision: plan.revision, signature: schedule?.data.signature ?? '', ...schedule?.data,
+                    nextAt: this.store.now() + plan.data.intervalMinutes * 60000 }, schedule?.revision ?? null);
             } catch (error) { if (!conflict(error)) this.error = scanError(error); }
         }
+    }
+    private async hasPendingWork(plan: TwinDataRecord<TwinScanPlan>, sources: TwinDataRecord<TwinSourceData>[], fence: number): Promise<boolean> {
+        const started = Date.now();
+        if (plan.data.collection || plan.data.mode === 'reconcile') return true;
+        const scope: TwinScanScope = {runId: '', planId: plan.id, planRevision: plan.revision, sourceId: '', fence,
+            kinds: plan.data.kinds, focus: plan.data.focus, executor: plan.data.executor, maxOutputTokens: plan.data.maxOutputTokens};
+        for (const source of sources) if (!(await this.analysis.progress(source, scope)).complete) return true;
+        console.info('[DigitalTwin]', {operation: 'scanner.schedule', operationId: plan.id, planId: plan.id, stage: 'check-progress', result: 'skipped',
+            code: sources.length ? 'SOURCES_UNCHANGED' : 'NO_MATCHING_SOURCES', sourceCount: sources.length, durationMs: Date.now() - started});
+        return false;
     }
     private async run(record: TwinDataRecord<TwinScanRun>, fence: number): Promise<void> {
         try {

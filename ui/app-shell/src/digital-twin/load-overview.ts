@@ -1,7 +1,8 @@
 import type { TwinWorkbenchOptions } from './index';
+import type {TwinViewRequest} from '@nestos/app-contracts/services';
 
 /** Trace names and timings only; never include source contents or model credentials. */
-export function loadOverview(options: TwinWorkbenchOptions, signal: AbortSignal) {
+export function loadOverview(options: TwinWorkbenchOptions, signal: AbortSignal, request?: TwinViewRequest) {
     const started = Date.now(), pending = new Map<string, { stage: string; since: number }>();
     const durations: Array<{ stage: string; milliseconds: number }> = [];
     const stage = (key: string, name: string) => {
@@ -16,15 +17,16 @@ export function loadOverview(options: TwinWorkbenchOptions, signal: AbortSignal)
     };
     const diagnostic = () => ({ elapsedMs: Date.now() - started, ...options.service.diagnostics(),
         pending: [...pending.values()].map(item => ({ stage: item.stage, milliseconds: Date.now() - item.since })), completed: [...durations] });
+    const configuration = !request || request.page === 'sources';
     return bounded(() => Promise.all([
-        read('snapshot', () => options.service.snapshot(name => stage('snapshot', name))),
-        read('connections.list', () => options.connections()),
-        read('scanner.targets', () => options.service.scannerTargets?.() ?? Promise.resolve([])),
+        read('snapshot', () => request && options.service.readView ? options.service.readView(request) : options.service.snapshot(name => stage('snapshot', name))),
+        read('connections.list', () => configuration ? options.connections() : Promise.resolve([])),
+        read('scanner.targets', () => configuration ? (options.service.scannerTargets?.() ?? Promise.resolve([])) : Promise.resolve([])),
         read('twin.workspaces', () => options.service.workspaces?.() ?? Promise.resolve([])),
-        read('collection.tools', () => options.service.collectionTools?.() ?? Promise.resolve([])),
-        read('source.connections', () => options.service.listSourceConnections?.() ?? Promise.resolve({types: [], connections: []})),
-        read('scanner.packages', () => options.packages?.list() ?? Promise.resolve([])),
-        read('scanner.projects', () => options.projects?.() ?? Promise.resolve([])),
+        read('collection.tools', () => configuration ? (options.service.collectionTools?.() ?? Promise.resolve([])) : Promise.resolve([])),
+        read('source.connections', () => configuration ? (options.service.listSourceConnections?.() ?? Promise.resolve({types: [], connections: []})) : Promise.resolve({types: [], connections: []})),
+        read('scanner.packages', () => configuration ? (options.packages?.list() ?? Promise.resolve([])) : Promise.resolve([])),
+        read('scanner.projects', () => configuration ? (options.projects?.() ?? Promise.resolve([])) : Promise.resolve([])),
     ]), signal, diagnostic);
 }
 

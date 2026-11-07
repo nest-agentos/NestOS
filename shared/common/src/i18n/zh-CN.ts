@@ -2688,6 +2688,7 @@ export const zhCN = {
     'textGeneration.previousDraft': '上一版草稿',
     'editor.study': 'Anki 学习管理',
     'editor.studyCreate': "新增 Anki 文件",
+    'editor.studyPromptsUnavailable': '学习提示词加载失败，请检查连接或权限后重试。',
     'editor.studyAlreadyCreated': "文件已创建，请先打开该文件再修改名称或内容。",
     'editor.studyInvalidName': "请输入文件名，名称中不能包含路径分隔符。",
     'editor.outline.label': '目录',

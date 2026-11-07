@@ -5,10 +5,19 @@ import { decodeCleanup, decodeRecord, epoch, identity, payload, recordKey, recor
 import type { TwinCleanup, TwinCommit, TwinCommitReceipt, TwinForget, TwinRecord, TwinRecordFamily, TwinRecordRef,
     TwinRecordWrite, TwinStore } from './contracts';
 import { TwinSeqPages } from './seq-pages';
+import {TwinViewHealth} from './view-health';
+import {RecentRunIndex} from './recent-run-index';
 import { TwinSeqStorage } from './seq-storage';
 
 /** Storage foundation for trusted host services; does not implement consumer/source policy. */
 export class SeqTwinStore implements TwinStore {
+    private viewHealth() {return new TwinViewHealth(this.storage.file('indexes'), this.storage.file('knowledge'));}
+    cleanupError(): Promise<string> {return this.storage.transaction(tx => this.viewHealth().read(tx));}
+    private recentIndex() {return new RecentRunIndex(this.storage.file('indexes'), this.storage.file('knowledge'));}
+    async recentRuns(planIds: string[]): Promise<TwinRecord[]> {
+        if (planIds.length > 50) throw new Error('TWIN_INVALID_VIEW_REQUEST');
+        return this.storage.transaction(tx => this.recentIndex().read(tx, planIds));
+    }
     private readonly pages: TwinSeqPages;
     private constructor(private readonly storage: TwinSeqStorage) { this.pages = new TwinSeqPages(storage.file('indexes')); }
 
@@ -30,14 +39,18 @@ export class SeqTwinStore implements TwinStore {
         });
     }
 
-    async list(family: TwinRecordFamily, options: { offset?: number; limit?: number } = {}): Promise<TwinRecord[]> {
+    async count(family: TwinRecordFamily): Promise<number> {
+        recordRef({family, id: 'validate'});
+        return this.storage.transaction(tx => this.pages.count(tx, family));
+    }
+    async list(family: TwinRecordFamily, options: { offset?: number; limit?: number; reverse?: boolean } = {}): Promise<TwinRecord[]> {
         recordRef({ family, id: 'validate' });
         const offset = options.offset ?? 0, limit = options.limit ?? 100;
         if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
             throw new Error('Invalid Twin page');
         }
         return this.storage.transaction(async tx => {
-            const ids = await this.pages.list(tx, family, offset, limit), result: TwinRecord[] = [];
+            const ids = await this.pages.list(tx, family, offset, limit, options.reverse), result: TwinRecord[] = [];
             for (const id of ids) {
                 const ref = { family, id };
                 if (await tx.getEntry(this.storage.file('authority'), `forgotten/${recordKey(ref)}`)) continue;
@@ -142,6 +155,8 @@ export class SeqTwinStore implements TwinStore {
         await tx.setEntry(this.storage.file('knowledge'), versionKey(record, record.revision), JSON.stringify({ ...record, previousRevision }));
         await tx.setEntry(this.storage.file('knowledge'), `head/${recordKey(record)}`, record.revision);
         await tx.setEntry(this.storage.file('indexes'), `family/${recordKey(record)}`, record.revision);
+        await this.recentIndex().put(tx, record);
+        await this.viewHealth().put(tx, record);
     }
 
     private async receipt<T>(tx: ISeqFileTransaction, operationId: string, action: string, digest: string): Promise<T | null> {
@@ -179,6 +194,8 @@ export class SeqTwinStore implements TwinStore {
         await tx.setEntry(this.storage.file('authority'), `forgotten/${key}`,
             JSON.stringify({ operationId: operation.operationId, forgetEpoch: operation.forgetEpoch }));
         await tx.deleteEntry(this.storage.file('indexes'), `family/${key}`);
+        if (ref.family === 'scan-run') await this.recentIndex().invalidate(tx);
+        if (ref.family === 'job') await this.viewHealth().invalidate(tx);
     }
 
     private async pendingIds(tx: ISeqFileTransaction): Promise<string[]> {

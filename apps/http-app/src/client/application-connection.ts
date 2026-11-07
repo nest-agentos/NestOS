@@ -33,7 +33,7 @@ class ConnectionStatus {
 export function connectApplication() {
     const listeners = new AbortController(), route = initialView(location.hash), status = new ConnectionStatus();
     const tracing = new BrowserRequestTrace();
-    window.addEventListener('hashchange', () => tracing.beginNavigation(), {signal:listeners.signal});
+    tracing.bindNavigation(listeners.signal);
     const identity = resolveUser();
     const fetcher: typeof fetch = async (input, init) => {
         const userId = await identity;

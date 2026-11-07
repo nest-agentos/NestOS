@@ -1,0 +1,1263 @@
+{
+  "dataset": {
+    "boards": 2,
+    "items": 50,
+    "notes": 1,
+    "sessions": 0,
+    "records": 0,
+    "workResources": 0
+  },
+  "version": "working-tree-final",
+  "artifacts": {
+    "before": "./assets/index-M8O2mfDE.js",
+    "after": "./assets/index-CfZRMR_v.js"
+  },
+  "network": "loopback; delay is added per application POST before sending",
+  "samples": [
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "worktrees-first",
+      "ms": 142,
+      "logicalCalls": 3,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "boardWorkResources"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "decision-first",
+      "ms": 98,
+      "logicalCalls": 4,
+      "httpRequests": 3,
+      "apiHttpRequests": 3,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "records",
+        "recordConversations"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "log-first",
+      "ms": 116,
+      "logicalCalls": 3,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "records"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "decision-retained",
+      "ms": 83,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "notes-first",
+      "ms": 182,
+      "logicalCalls": 6,
+      "httpRequests": 6,
+      "apiHttpRequests": 6,
+      "methods": [
+        "navigationView",
+        "studyPromptPresets",
+        "onAny",
+        "onAny",
+        "onGlobalEvent",
+        "writeUiDocuments"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "kanban-retained",
+      "ms": 84,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "notes-retained",
+      "ms": 117,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "worktrees-first",
+      "ms": 269,
+      "logicalCalls": 3,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "boardWorkResources"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "decision-first",
+      "ms": 273,
+      "logicalCalls": 4,
+      "httpRequests": 3,
+      "apiHttpRequests": 3,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "records",
+        "recordConversations"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "log-first",
+      "ms": 273,
+      "logicalCalls": 3,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "records"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "decision-retained",
+      "ms": 80,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "notes-first",
+      "ms": 382,
+      "logicalCalls": 5,
+      "httpRequests": 5,
+      "apiHttpRequests": 5,
+      "methods": [
+        "navigationView",
+        "studyPromptPresets",
+        "onAny",
+        "onAny",
+        "onGlobalEvent"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "kanban-retained",
+      "ms": 109,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "notes-retained",
+      "ms": 146,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "worktrees-first",
+      "ms": 856,
+      "logicalCalls": 3,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "boardWorkResources"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "decision-first",
+      "ms": 849,
+      "logicalCalls": 4,
+      "httpRequests": 3,
+      "apiHttpRequests": 3,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "records",
+        "recordConversations"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "log-first",
+      "ms": 849,
+      "logicalCalls": 3,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "records"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "decision-retained",
+      "ms": 83,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "notes-first",
+      "ms": 883,
+      "logicalCalls": 5,
+      "httpRequests": 5,
+      "apiHttpRequests": 5,
+      "methods": [
+        "navigationView",
+        "studyPromptPresets",
+        "onAny",
+        "onAny",
+        "onGlobalEvent"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "kanban-retained",
+      "ms": 82,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "notes-retained",
+      "ms": 118,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "worktrees-first",
+      "ms": 895,
+      "logicalCalls": 3,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "boardWorkResources"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "decision-first",
+      "ms": 868,
+      "logicalCalls": 4,
+      "httpRequests": 3,
+      "apiHttpRequests": 3,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "records",
+        "recordConversations"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "log-first",
+      "ms": 869,
+      "logicalCalls": 3,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "currentPrincipal",
+        "catalog",
+        "records"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "decision-retained",
+      "ms": 95,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "notes-first",
+      "ms": 973,
+      "logicalCalls": 5,
+      "httpRequests": 5,
+      "apiHttpRequests": 5,
+      "methods": [
+        "navigationView",
+        "studyPromptPresets",
+        "onAny",
+        "onAny",
+        "onGlobalEvent"
+      ],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "kanban-retained",
+      "ms": 92,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "before",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "notes-retained",
+      "ms": 156,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": null,
+      "navigation": []
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "worktrees-first",
+      "ms": 68,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "boardWorkResources"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 13
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "decision-first",
+      "ms": 82,
+      "logicalCalls": 2,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "records",
+        "recordConversations"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 18
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "log-first",
+      "ms": 100,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "records"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 26
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "decision-retained",
+      "ms": 83,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 4
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "notes-first",
+      "ms": 133,
+      "logicalCalls": 4,
+      "httpRequests": 4,
+      "apiHttpRequests": 4,
+      "methods": [
+        "navigationView",
+        "onAny",
+        "onAny",
+        "onGlobalEvent"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": false
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": false,
+          "durationMs": 26
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "kanban-retained",
+      "ms": 82,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 10
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 0,
+      "scenario": "notes-retained",
+      "ms": 118,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 3
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "worktrees-first",
+      "ms": 184,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "boardWorkResources"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 70
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "decision-first",
+      "ms": 176,
+      "logicalCalls": 2,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "records",
+        "recordConversations"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 80
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "log-first",
+      "ms": 176,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "records"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 91
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "decision-retained",
+      "ms": 80,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 10
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "notes-first",
+      "ms": 326,
+      "logicalCalls": 4,
+      "httpRequests": 4,
+      "apiHttpRequests": 4,
+      "methods": [
+        "navigationView",
+        "onAny",
+        "onAny",
+        "onGlobalEvent"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": false
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": false,
+          "durationMs": 105
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "kanban-retained",
+      "ms": 74,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 18
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 0,
+      "scenario": "notes-retained",
+      "ms": 145,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 7
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "worktrees-first",
+      "ms": 327,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "boardWorkResources"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 250
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "decision-first",
+      "ms": 348,
+      "logicalCalls": 2,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "records",
+        "recordConversations"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 222
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "log-first",
+      "ms": 350,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "records"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 229
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "decision-retained",
+      "ms": 83,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 4
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "notes-first",
+      "ms": 384,
+      "logicalCalls": 3,
+      "httpRequests": 3,
+      "apiHttpRequests": 3,
+      "methods": [
+        "navigationView",
+        "onAny",
+        "onAny"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": false
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": false,
+          "durationMs": 228
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "kanban-retained",
+      "ms": 82,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 6
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "chrome-mobile",
+      "delay": 200,
+      "scenario": "notes-retained",
+      "ms": 133,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "onGlobalEvent"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 4
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "worktrees-first",
+      "ms": 398,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "boardWorkResources"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 273
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "decision-first",
+      "ms": 367,
+      "logicalCalls": 2,
+      "httpRequests": 2,
+      "apiHttpRequests": 2,
+      "methods": [
+        "records",
+        "recordConversations"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 280
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "log-first",
+      "ms": 370,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "records"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 290
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "decision-retained",
+      "ms": 80,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 9
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "notes-first",
+      "ms": 500,
+      "logicalCalls": 3,
+      "httpRequests": 3,
+      "apiHttpRequests": 3,
+      "methods": [
+        "navigationView",
+        "onAny",
+        "onAny"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": false
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": false,
+          "durationMs": 306
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "kanban-retained",
+      "ms": 80,
+      "logicalCalls": 0,
+      "httpRequests": 0,
+      "apiHttpRequests": 0,
+      "methods": [],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 16
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "engine": "webkit18-mobile",
+      "delay": 200,
+      "scenario": "notes-retained",
+      "ms": 127,
+      "logicalCalls": 1,
+      "httpRequests": 1,
+      "apiHttpRequests": 1,
+      "methods": [
+        "onGlobalEvent"
+      ],
+      "errors": [],
+      "targetTraceMatches": true,
+      "navigation": [
+        {
+          "kind": "start",
+          "cached": true
+        },
+        {
+          "kind": "end",
+          "result": "success",
+          "cached": true,
+          "durationMs": 7
+        }
+      ]
+    }
+  ],
+  "conditions": {
+    "viewport": "390x844 mobile touch",
+    "background": "scanners off; initial assistant overview completed before switching; no active Sessions",
+    "delay": "extra 200 ms per application POST when selected; not a WAN bandwidth simulation",
+    "fixturePorts": "empty work-resource and decision-conversation projections; list and authorization behavior covered separately by library tests",
+    "boundaries": "actual UI click, current target content and non-busy state, actionability trial; retained navigation includes opening the real navigation sheet when required",
+    "counts": "logicalCalls counts each batched RPC; httpRequests includes all HTTP requests during the action, apiHttpRequests counts application POSTs including callback replies",
+    "trace": "targetTraceMatches verifies the target data request; older background bindings retain their own trace",
+    "notes": "a late onGlobalEvent binding from the initial notes load can fall into a later retained-navigation window; it is recorded, not a new retained-page data query",
+    "cleanup": "confirmed",
+    "deployment": "source validation only"
+  },
+  "historyValidation": [
+    {
+      "engine": "chrome-mobile",
+      "backToLog": true,
+      "forwardToDecision": true,
+      "lateHashchangePreservedTrace": true
+    },
+    {
+      "engine": "webkit18-mobile",
+      "backToLog": true,
+      "forwardToDecision": true,
+      "lateHashchangePreservedTrace": true
+    }
+  ]
+}

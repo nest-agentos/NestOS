@@ -51,7 +51,10 @@ export interface TwinCleanup {
 export interface TwinStore {
     inspect(): Promise<TwinIdentity>;
     read(ref: TwinRecordRef): Promise<TwinRecord | null>;
-    list(family: TwinRecordFamily, options?: { offset?: number; limit?: number }): Promise<TwinRecord[]>;
+    list(family: TwinRecordFamily, options?: { offset?: number; limit?: number; reverse?: boolean }): Promise<TwinRecord[]>;
+    count(family: TwinRecordFamily): Promise<number>;
+    cleanupError(): Promise<string>;
+    recentRuns(planIds: string[]): Promise<TwinRecord[]>;
     commit(command: TwinCommit): Promise<TwinCommitReceipt>;
     startForget(command: TwinForget): Promise<TwinCleanup>;
     pendingCleanup(): Promise<TwinCleanup[]>;

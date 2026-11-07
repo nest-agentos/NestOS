@@ -3,6 +3,7 @@ import type {IFileSystem, FSEvent} from '@nestos/vfs-core';
 import type {ApplicationRuntime} from '../runtime/create-application-runtime';
 import {UserEventService} from './service';
 import {projectKernelEvents} from './kernel-source';
+import {startAssistantSessions} from '../assistant/session-projection';
 
 type Sources = Pick<ApplicationRuntime, 'kernel' | 'sessionRepository' | 'digitalTwin'>;
 
@@ -14,6 +15,7 @@ class RuntimeEventProjection {
     private dirty = new Set<string>();
     private releases: Array<() => void> = [];
     private timer?: ReturnType<typeof setInterval>;
+    private stopAssistant?: () => Promise<void>;
     constructor(private readonly service: UserEventService, private readonly sources: Sources) {}
     attach(files: IFileSystem): void {
         this.releases.push(this.sources.kernel.kernel.onChanged(event => {
@@ -33,6 +35,7 @@ class RuntimeEventProjection {
     async start(): Promise<void> {
         const started = Date.now(), operationId = randomUUID();
         try {
+            if (typeof this.sources.kernel.kernel.sessionActivity === 'function') this.stopAssistant = await startAssistantSessions(this.sources);
             for await (const session of this.sources.kernel.kernel.listSessions()) this.dirty.add(session.id);
             await this.pending; await this.drain();
             await this.service.journal.append(randomUUID(), {type: 'runtime.reset'});
@@ -48,6 +51,7 @@ class RuntimeEventProjection {
     async dispose(): Promise<void> {
         this.closed = true; clearInterval(this.timer);
         this.releases.splice(0).reverse().forEach(stop => stop());
+        await this.stopAssistant?.();
         await this.pending; this.service.journal.close();
     }
     private scheduleKernel(): void {

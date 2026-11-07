@@ -17,7 +17,7 @@ class ToolWorkerMain {
     private work?: Promise<void>;
     constructor() {
         if (!process.send) throw new Error('TOOL_WORKER_IPC_REQUIRED');
-        this.channel = new ToolWorkerChannel({send: (message, done) => {process.send!(message, done);},
+        this.channel = new ToolWorkerChannel({send: (message, done) => {process.send!(message, undefined, undefined, done);},
             on: listener => {process.on('message', listener);}, off: listener => {process.off('message', listener);}}, 'client', this.receive);
         process.on('SIGTERM', this.stop); process.on('SIGINT', this.stop); process.on('disconnect', this.stop);
     }

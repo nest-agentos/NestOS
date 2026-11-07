@@ -1,3 +1,4 @@
+import {viewPagination} from './scan-list';
 import type {CollectionProject} from './collection-destination';
 import {t} from '@nestos/common';
 import {scannerHistory, scanCollectionSummary, scanRunState} from './scan-history';
@@ -17,7 +18,7 @@ export {scanRunState} from './scan-history';
 
 export type TwinSourcesTab = 'sources' | 'plans' | 'runs';
 export function scanPage(snapshot: TwinSnapshot, connections: Array<{ id: string; name: string }>, tab: TwinSourcesTab, targets: RootCallTarget[] = [], tools: TwinScannerTool[] = [], projects: CollectionProject[] = []): string {
-    const tabs = [['plans', 'scanPlans', snapshot.scans.plans.length], ['sources', 'scanTargets', snapshot.sources.length], ['runs', 'scanRuns', snapshot.scans.runs.length]] as const;
+    const tabs = [['plans', 'scanPlans', snapshot.scans.plans.length], ['sources', 'scanTargets', snapshot.pagination?.sources.all ?? snapshot.pagination?.sources.total ?? snapshot.sources.length], ['runs', 'scanRuns', snapshot.pagination?.runs.total ?? snapshot.scans.runs.length]] as const;
     const configured = connections.some(connection => connection.id === snapshot.settings.data.connectionId);
     return scanSummary(snapshot)
         + `<details class="twin__panel" data-scan-settings data-configured="${configured}"${configured ? '' : ' open'}><summary>${escapeHTML(label('updateSettings'))}</summary>${updateSettings(snapshot, connections)}</details>`
@@ -29,7 +30,7 @@ export function scanPage(snapshot: TwinSnapshot, connections: Array<{ id: string
 
 function scanSummary(snapshot: TwinSnapshot): string {
     const metrics = [['updateRules', snapshot.scans.plans.filter(plan => plan.data.enabled).length],
-        ['connectedSources', snapshot.sources.filter(source => source.data.enabled).length],
+        [snapshot.pagination ? 'scanTargets' : 'connectedSources', snapshot.pagination?.sources.all ?? snapshot.pagination?.sources.total ?? snapshot.sources.filter(source => source.data.enabled).length],
         ['activeKnowledge', snapshot.memories.filter(memory => memory.supported && memory.data.state === 'active').length]] as const;
     return `<header class="twin__intro"><p class="twin__help">${escapeHTML(label('updatesSubtitle'))}</p>
         <span class="twin__badge">${escapeHTML(label(snapshot.settings.data.paused ? 'updatesPaused' : 'updatesEnabled'))}</span></header>
@@ -58,7 +59,7 @@ function planCard(snapshot: TwinSnapshot, connections: Array<{ id: string; name:
         ${scannerHistory(plan.id, snapshot.scans.runs)}
         <p>${escapeHTML(label('scanNextAt'))}: ${date(next, plan.data.enabled && !['manual', 'event'].includes(plan.data.trigger))}</p>
         ${plan.data.runTokenLimit !== undefined ? `<p>${escapeHTML(label('scannerRunLimit'))}: ${plan.data.runTokenLimit}</p>` : ''}
-        ${latest && plan.data.mode !== 'collect' ? `<p>${escapeHTML(label('updatedSources'))}: ${latest.data.completedSourceIds.length} · ${escapeHTML(label('newMemories'))}: ${snapshot.jobs.filter(job => job.data.scanScope?.runId === latest.id).reduce((sum, job) => sum + (job.data.addedMemories ?? 0), 0)}</p>` : ''}
+        ${latest && plan.data.mode !== 'collect' ? `<p>${escapeHTML(label('updatedSources'))}: ${(latest.data.completedSourceCount ?? latest.data.completedSourceIds.length)}${snapshot.pagination ? '' : ' · ' + escapeHTML(label('newMemories')) + ': ' + snapshot.jobs.filter(job => job.data.scanScope?.runId === latest.id).reduce((sum, job) => sum + (job.data.addedMemories ?? 0), 0)}</p>` : ''}
         ${plan.data.enabled ? button('runScanPlan', 'scanNow', plan.id) + button('pauseScanPlan', 'pauseScanPlan', plan.id) : button('enableScanPlan', 'enableScanPlan', plan.id)}
         <button type="button" data-action="addShortcut" data-id="${escapeAttr(plan.id)}">${escapeHTML(t('assistant.addToShortcuts'))}</button>
         ${button('removeScanPlan', 'removeScanPlan', plan.id)}<details><summary>${escapeHTML(label('editScanPlan'))}</summary>${planForm(snapshot, connections, plan, targets, tools, projects)}</details></article>`;
@@ -111,13 +112,13 @@ function scheduleFields(data?: TwinScanPlan): string {
 const ruleText = (name: string, title: string, lines: string[]) => `<label>${escapeHTML(label(title))}<textarea name="${name}" rows="4" placeholder="${name === 'include' ? 'project:Alpha' : '**/*.log&#10;drafts/'}">${escapeHTML(lines.join('\n'))}</textarea></label>`;
 
 export function scanRunPage(snapshot: TwinSnapshot, selected?: string): string {
-    const rows = snapshot.scans.runs.slice(-50).reverse(), pinned = snapshot.scans.runs.find(run => run.id === selected);
+    const rows = snapshot.pagination ? [...snapshot.scans.runs] : snapshot.scans.runs.slice(-50).reverse(), pinned = snapshot.scans.runs.find(run => run.id === selected);
     if (pinned && !rows.includes(pinned)) rows.unshift(pinned);
     const worker = snapshot.scans.worker;
     return `<p class="twin__error">${escapeHTML(snapshot.scans.discovery.errors.join(', '))}</p><p>${escapeHTML(label('scanHost'))}: ${escapeHTML(worker.host)} · ${escapeHTML(label(worker.online ? 'scanOnline' : 'scanOffline'))} · ${escapeHTML(worker.error)}</p>
         <p>${escapeHTML(label('scanLeaseHost'))}: ${escapeHTML(worker.ownerHost || label('scanIdle'))}</p>
         <p>${escapeHTML(label('scanHostHelp'))}</p>${rows.map(run => `<article class="twin__card" data-scan-run="${escapeAttr(run.id)}"><h3>${escapeHTML(run.data.name)}</h3>
-        <p>${escapeHTML(scanRunState(run.data))}${run.data.mode === 'collect' ? '' : ' · ' + run.data.completedSourceIds.length + ' / ' + run.data.sourceIds.length} · ${escapeHTML(twinError(run.data.error, run.data.errorDetail))}</p>
+        <p>${escapeHTML(scanRunState(run.data))}${run.data.mode === 'collect' ? '' : ' · ' + (run.data.completedSourceCount ?? run.data.completedSourceIds.length) + ' / ' + (run.data.sourceCount ?? run.data.sourceIds.length)} · ${escapeHTML(twinError(run.data.error, run.data.errorDetail))}</p>
         ${collectionDestinationSummary(run.data.collection)}
         ${scanCollectionSummary(run.data)}
         ${run.data.mode === 'collect' ? `<p>${escapeHTML(label('scanNoModel'))}</p>` : `<p>${escapeHTML(label('spentTokens'))}: ${run.data.spentTokens} · ${escapeHTML(label('reservedTokens'))}: ${run.data.reservedTokens} · ${escapeHTML(label('tokenLimit'))}: ${run.data.budgetUnlimited ? escapeHTML(label('unlimited')) : run.data.tokenLimit}</p>`}
@@ -125,8 +126,8 @@ export function scanRunPage(snapshot: TwinSnapshot, selected?: string): string {
         ${button('openScanResults', 'scannerResults', run.id)}
         <p>${date(run.data.createdAt)} · ${escapeHTML(label('scanFinishedAt'))}: ${date(run.data.finishedAt)}</p>
         ${['queued', 'running'].includes(run.data.state) ? button('cancelScanRun', 'cancel', run.id) : run.data.planId && snapshot.scans.plans.some(plan => plan.id === run.data.planId && plan.data.enabled) ? button('runScanPlan', 'scanContinue', run.data.planId) : ''}
-        <details><summary>${escapeHTML(label('scanTaskRefs'))}</summary>${snapshot.jobs.filter(job => job.data.scanScope?.runId === run.id).map(job =>
-        `<p>${escapeHTML(job.data.sessionId)} / ${escapeHTML(job.data.taskId)} · ${escapeHTML(label(`job.${job.data.state}`))} · ${job.data.offset}–${job.data.end}</p>`).join('') || escapeHTML(label('scanNoModel'))}</details></article>`).join('')}`;
+        <details${selected ? ' open' : ''}><summary>${escapeHTML(label('scanTaskRefs'))}</summary>${snapshot.jobs.filter(job => job.data.scanScope?.runId === run.id).map(job =>
+        `<p>${escapeHTML(job.data.sessionId)} / ${escapeHTML(job.data.taskId)} · ${escapeHTML(label(`job.${job.data.state}`))} · ${job.data.offset}–${job.data.end}</p>`).join('') || escapeHTML(label('scanNoModel'))}${snapshot.pagination?.jobs ? viewPagination(snapshot.pagination.jobs) : ''}</details></article>`).join('')}${snapshot.pagination && !selected ? viewPagination(snapshot.pagination.runs) : ''}`;
 }
 const date = (value: number, enabled = true) => value && enabled ? escapeHTML(new Date(value).toLocaleString()) : escapeHTML(label('scanNotScheduled'));
 const input = (name: string, title: string, value: string, type = 'text') => `<label>${escapeHTML(label(title))}<input name="${name}" type="${type}" value="${escapeAttr(value)}" required${type === 'number' ? ' min="1" max="10080" step="1"' : ' maxlength="200"'}></label>`;

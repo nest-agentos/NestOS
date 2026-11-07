@@ -30,7 +30,7 @@ export class TwinScanLists {
         const control = event.target;
         if (!(control instanceof HTMLElement)) return false;
         const list = control.closest<HTMLElement>('[data-scan-list]');
-        if (!list || !(control.matches('[data-scan-filter]') || control.closest('[data-scan-page]'))) return false;
+        if (!list || list.hasAttribute('data-server-page') || !(control.matches('[data-scan-filter]') || control.closest('[data-scan-page]'))) return false;
         const state = this.filters[list.dataset.scanList as ListKind];
         if (event.type === 'click') {
             const action = control.closest<HTMLElement>('[data-scan-page]')?.dataset.scanPage;
@@ -43,7 +43,7 @@ export class TwinScanLists {
         this.applyList(list); return true;
     }
     restore(root: HTMLElement): void {
-        root.querySelectorAll<HTMLElement>('[data-scan-list]').forEach(list => {
+        root.querySelectorAll<HTMLElement>('[data-scan-list]:not([data-server-page])').forEach(list => {
             const state = this.filters[list.dataset.scanList as ListKind];
             list.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-scan-filter]').forEach(control => {
                 control.value = state[control.dataset.scanFilter as Exclude<keyof Filter, 'page'>];
@@ -75,4 +75,8 @@ export class TwinScanLists {
         list.querySelector<HTMLButtonElement>('[data-scan-page="previous"]')!.disabled = state.page === 0;
         list.querySelector<HTMLButtonElement>('[data-scan-page="next"]')!.disabled = state.page + 1 >= pages;
     }
+}
+
+export function viewPagination(page: {offset: number; limit: number; total: number}): string {
+    return `<nav class="twin__scan-pagination" aria-label="${escapeAttr(label('pagination'))}"><button type="button" data-view-page="previous"${page.offset === 0 ? ' disabled' : ''}>${escapeHTML(label('previousPage'))}</button><span>${Math.floor(page.offset / page.limit) + 1} / ${Math.max(1, Math.ceil(page.total / page.limit))}</span><button type="button" data-view-page="next"${page.offset + page.limit >= page.total ? ' disabled' : ''}>${escapeHTML(label('nextPage'))}</button></nav>`;
 }

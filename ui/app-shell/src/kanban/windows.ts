@@ -6,6 +6,7 @@ import type {WorkbenchWindowBinding} from '../workbench/windows';
 import {kanbanPresentation, kanbanReviewGuidance} from './host';
 import {KanbanSidebar} from './sidebar';
 import {VFS_DOM_EVENTS} from '@nestos/vfs-ui';
+import {shareKanbanCatalog} from './catalog';
 
 const log = createModuleLogger('kanban-windows');
 export type KanbanWorkspaceOptions = Omit<KanbanUIOptions, 'presentation' | 'sidebar'> & {sidebar: HTMLElement; windows?: WorkbenchWindowBinding};
@@ -18,9 +19,12 @@ export class KanbanWindowWorkbench {
     private visible = true;
     private disposing = false;
     private availableBoards?: Set<string>;
+    private boardSnapshots?: readonly import('@nestos/kanban/contracts').KanbanBoardSummary[];
     private reconcile?: Promise<void>;
     private reconcileAgain = false;
-    constructor(private readonly options: KanbanWorkspaceOptions) {
+    private readonly options: KanbanWorkspaceOptions;
+    constructor(options: KanbanWorkspaceOptions) {
+        this.options = options = {...options, service: shareKanbanCatalog(options.service)};
         this.tabs = new WorkbenchTabs(options.editor, {
             navigation: t('kanban.title'), activate: id => this.navigate(id),
             parent: tab => this.navigate(parentPath(tab.id)), canGoUp: tab => tab.id !== '/',
@@ -29,7 +33,7 @@ export class KanbanWindowWorkbench {
         }, undefined, options.windows);
         this.navigation = new KanbanSidebar({container: options.sidebar, service: options.service, navigate: path => this.navigate(path), windowManagement: this.tabs.windowManagement,
             create: () => this.openBoardCreation(), report: error => this.report(error),
-            catalogChanged: boards => {this.availableBoards = new Set(boards.map(board => board.id)); this.scheduleReconcile();}});
+            catalogChanged: boards => {this.boardSnapshots = boards; this.availableBoards = new Set(boards.map(board => board.id)); this.scheduleReconcile();}});
         const host = document.createElement('div'); host.hidden = true; host.append(this.tabs.opened); options.sidebar.append(host);
     }
     async start(): Promise<void> {await Promise.all([this.navigation.start(), this.openResource(this.options.initialResource ?? '/')]);}
@@ -52,7 +56,7 @@ export class KanbanWindowWorkbench {
         }
     }
     getActiveResourceId(): string {return this.tabs.current?.id ?? '/';}
-    invalidateFromEvents(): void {this.availableBoards = undefined; this.navigation.invalidate(); for (const tab of this.tabs.values()) tab.value?.view.invalidateFromEvents();}
+    invalidateFromEvents(): void {this.boardSnapshots = undefined; this.availableBoards = undefined; this.navigation.invalidate(); for (const tab of this.tabs.values()) tab.value?.view.invalidateFromEvents();}
     setVisible(visible: boolean): void {this.visible = visible; this.navigation.setVisible(visible); this.syncVisibility();}
     captureRecovery(): unknown {
         for (const tab of this.tabs.values()) tab.value?.view.captureRecovery();
@@ -67,11 +71,12 @@ export class KanbanWindowWorkbench {
     private createPage(tab: WorkbenchTab<Page>): void {
         const editor = document.createElement('div'); tab.panel.append(editor);
         const view = new KanbanView({...this.options, sidebar: undefined, editor, initialResource: tab.id,
+            getBoardSnapshot: id => this.boardSnapshots?.find(board => board.id === id),
             itemOperationsAvailable: (_board, item) => !!item.externalRefs?.some(ref => ref.system === "nestos-worktree"),
             presentation: kanbanPresentation, executionReference: executionSessionReference, reviewGuidance: this.options.reviewGuidance ?? kanbanReviewGuidance,
             openSession: async id => {this.tabs.keep(tab.id); await this.options.openSession(id);},
             navigate: path => this.navigate(path), changed: () => this.updatePage(tab),
-            selected: () => this.updatePage(tab), committed: () => {this.availableBoards = undefined; this.navigation.invalidate();},
+            selected: () => this.updatePage(tab), committed: () => {this.boardSnapshots = undefined; this.availableBoards = undefined; this.navigation.invalidate();},
             mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts),
         });
         tab.value = {view, ready: Promise.resolve()}; this.tabs.setIcon(tab.id, ACTION_ICONS.kanbanView);

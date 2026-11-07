@@ -1,0 +1,50 @@
+{
+  "version": "working-tree",
+  "samples": [
+    {
+      "scenario": "chrome-desktop",
+      "titleWidth": 662,
+      "editingWidth": 662,
+      "barWidth": 888,
+      "restoredWidth": 662
+    },
+    {
+      "scenario": "chrome-mobile",
+      "titleWidth": 56,
+      "editingWidth": 378,
+      "barWidth": 378,
+      "restoredWidth": 56,
+      "menuWidth": 44,
+      "menuHeight": 44,
+      "deleted": true,
+      "moved": true,
+      "menuDidNotNavigate": true,
+      "kanbanCatalogKeepsNav": true,
+      "kanbanNavigationMs": 107,
+      "kanbanLogicalCalls": 7,
+      "kanbanHttpRequests": 5,
+      "mailSidebarVisible": true,
+      "mailOpenAndBack": true
+    },
+    {
+      "scenario": "webkit-mobile",
+      "titleWidth": 56,
+      "editingWidth": 378,
+      "barWidth": 378,
+      "restoredWidth": 56,
+      "menuWidth": 44,
+      "menuHeight": 44,
+      "deleted": true,
+      "moved": true,
+      "menuDidNotNavigate": true,
+      "kanbanCatalogKeepsNav": true,
+      "kanbanNavigationMs": 135,
+      "kanbanLogicalCalls": 6,
+      "kanbanHttpRequests": 4,
+      "mailSidebarVisible": true,
+      "mailOpenAndBack": true
+    }
+  ],
+  "fixture": "Isolated runtime; empty board catalog, one mail thread, temporary note files; no background scans",
+  "cleanup": "confirmed"
+}

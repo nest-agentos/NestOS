@@ -1,8 +1,6 @@
 import type { AppUI } from '@nestos/app-shell';
 import { createFlowContextMenuConfig, createAIContextMenuConfig,
     restoreFlowLibrary } from '@nestos/llm-ui-adapter/startup';
-import { ProviderSettingsEditor, ConnectionSettingsEditor, ModelDefaultsEditor, MCPSettingsEditor,
-    CostEditor, SystemPromptSettingsEditor } from '@nestos/llm-ui-adapter/settings';
 
 import {loadChatEditor} from './editor-modules';
 export {preloadBrowserEditor} from './editor-modules';
@@ -28,12 +26,6 @@ export function createBrowserUI(library: Parameters<typeof restoreFlowLibrary>[1
         createSkillEditor: service => lazyEditorFactory(async () =>
             (await import('@nestos/llm-ui-adapter/settings')).createSkillsEditorFactory(service)),
         createAIContextMenu: createAIContextMenuConfig,
-        llmUiEditors: {
-            ProviderSettingsEditor,
-            ConnectionSettingsEditor, ModelDefaultsEditor,
-            MCPSettingsEditor,
-            CostEditor,
-            SystemPromptSettingsEditor,
-        },
+        llmUiEditors: () => import('@nestos/llm-ui-adapter/settings'),
     };
 }

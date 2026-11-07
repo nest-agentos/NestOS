@@ -2,6 +2,11 @@ import type { ServerResponse, IncomingMessage } from 'node:http';
 import { FSError, type FSErrorCode } from '@nestos/vfs-core';
 import { MAX_BODY_BYTES } from '@nestos/app-transport/rpc';
 import { recordResponseQueued } from '../logging/audit-log';
+import {gzip} from 'node:zlib';
+import {promisify} from 'node:util';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+
+const compress = promisify(gzip), log = createModuleLogger('http-response');
 
 export async function readJson(request: IncomingMessage): Promise<{ method?: unknown; args?: unknown }> {
     const bytes = await readBytes(request);
@@ -22,10 +27,45 @@ export async function readBytes(request: IncomingMessage): Promise<Buffer> {
 }
 export function json(response: ServerResponse, status: number, payload: unknown): void {
     if (response.destroyed) return;
-    const body = JSON.stringify(payload);
-    if (Buffer.byteLength(body) > MAX_BODY_BYTES) throw new FSError('EFBIG', 'HTTP response is too large; use smaller pages or file ranges');
-    response.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    writeJson(response, status, jsonBody(payload));
+}
+/** Bound the uncompressed response before negotiating transport compression. */
+export async function compressedJson(response: ServerResponse, status: number, payload: unknown): Promise<void> {
+    if (response.destroyed) return;
+    const body = jsonBody(payload), encoding = response.req?.headers['accept-encoding'] ?? '';
+    if (body.length < 4096 || !acceptsGzip(encoding)) {writeJson(response, status, body); return;}
+    const operationId = String(response.getHeader('X-Request-ID') ?? randomUUID()), started = performance.now();
+    try {
+        const encoded = await compress(body, {level:1}), smaller = encoded.length < body.length;
+        if (response.destroyed) return;
+        writeJson(response, status, smaller ? encoded : body, smaller);
+        log.debug('http.response', {operationId, stage:'compress', result:'success', bodyBytes:body.length,
+            wireBytes:smaller ? encoded.length : body.length, durationMs:Math.round(performance.now()-started)});
+    } catch (error) {
+        const raw = (error as NodeJS.ErrnoException)?.code;
+        const code = typeof raw === 'string' && /^[A-Z_0-9]{1,64}$/.test(raw) ? raw : 'HTTP_COMPRESSION_FAILED';
+        log.warn('http.response', {operationId, stage:'compress', result:'failure', code, bodyBytes:body.length, durationMs:Math.round(performance.now()-started)});
+        throw new FSError('EIO', 'HTTP response compression failed');
+    }
+}
+function jsonBody(payload: unknown): Buffer {
+    const body = Buffer.from(JSON.stringify(payload));
+    if (body.length > MAX_BODY_BYTES) throw new FSError('EFBIG', 'HTTP response is too large; use smaller pages or file ranges');
+    return body;
+}
+function writeJson(response: ServerResponse, status: number, body: Buffer, encoded = false): void {
+    response.writeHead(status, {'Content-Type':'application/json', 'Cache-Control':'no-store', 'Content-Length':body.length,
+        Vary:'Accept-Encoding', ...(encoded ? {'Content-Encoding':'gzip'} : {})});
     recordResponseQueued(response); response.end(body);
+}
+function acceptsGzip(header: string): boolean {
+    const entries = header.split(',').map(entry => {
+        const [name, ...parameters] = entry.trim().toLowerCase().split(';');
+        const quality = parameters.map(value => value.trim()).find(value => value.startsWith('q='));
+        return {name, weight:quality ? Number(quality.slice(2)) : 1};
+    });
+    const selected = entries.find(entry => entry.name === 'gzip') ?? entries.find(entry => entry.name === '*');
+    return !!selected && selected.weight > 0 && selected.weight <= 1;
 }
 export function sendError(response: ServerResponse, error: unknown): void {
     if (response.headersSent) { response.destroy(); return; }

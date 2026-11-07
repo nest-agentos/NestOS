@@ -49,7 +49,8 @@ export class PublishedScannerCollector implements TwinCollectionPort {
             try {await this.cancelCollection(request.sessionId);} catch {
                 traceAnalysis(identity, 'failed', {operationId: request.runId, category: 'collection-cancel-unconfirmed', durationMs: Date.now() - started});
             }
-            traceAnalysis(identity, 'failed', {operationId: request.runId, category: 'collection-execution', durationMs: Date.now() - started});
+            const code = error instanceof Error ? error.message.match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/)?.[0] : undefined;
+            traceAnalysis(identity, 'failed', {operationId: request.runId, category: 'collection-execution', errorCode: code ?? 'TWIN_COLLECTION_FAILED', durationMs: Date.now() - started});
             throw error;
         }
     }

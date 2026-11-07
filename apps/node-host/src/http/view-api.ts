@@ -9,7 +9,7 @@ import type { ApplicationRuntime } from '@nestos/app-core';
 import { RpcPeer } from '@nestos/app-transport/application';
 import type { Call, Reply } from '@nestos/app-transport/rpc';
 import { RPC_VERSION } from '@nestos/app-transport/rpc';
-import { json, readJson, readBytes } from './http-response';
+import { json, compressedJson, readJson, readBytes } from './http-response';
 import { MAX_BODY_BYTES } from '@nestos/app-transport/rpc';
 import { createHostedView, type HostedView } from './view-services';
 import { ViewNotifications } from './view-notifications';
@@ -56,7 +56,7 @@ export class ViewApi {
         const client = await (body.kind === 'bootstrap' ? this.client(identity) : this.requireClient(identity, response)); client.lastSeen = Date.now();
         recordRequestPhase(response, 'viewReadyMs', Date.now() - preparing);
         if (body.kind === 'bootstrap') return this.respondBootstrap(client, identity, body, response);
-        if (body.kind === 'bootstrap-data') {json(response, 200, await client.bootstrap!); return;}
+        if (body.kind === 'bootstrap-data') {await compressedJson(response, 200, await client.bootstrap!); return;}
         if (body.kind === 'updates-read') return this.readUpdates(client, body.id, response);
         if (body.kind === 'reply') {
             const pending = client.pending.get(body.id!); if (!pending) throw new FSError('ENOENT', 'Unknown callback');
@@ -84,9 +84,9 @@ export class ViewApi {
         }
         response.writeHead(303, {Location: '/api/tool-connections/result'}); response.end();
     }
-    private readUpdates(client: Client, id: string | undefined, response: ServerResponse): void {
+    private async readUpdates(client: Client, id: string | undefined, response: ServerResponse): Promise<void> {
         if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id)) throw new FSError('EINVAL', 'Invalid prepared update identity');
-        try {json(response, 200, client.updateReads.read(id, String(response.getHeader('X-Request-ID') ?? '')));}
+        try {await compressedJson(response, 200, client.updateReads.read(id, String(response.getHeader('X-Request-ID') ?? '')));}
         catch (error) {
             if (error instanceof FSError && error.code === 'ENOENT') this.expire(response, 'VIEW_UPDATE_EXPIRED', 'Prepared view update expired; reconnect the page');
             throw error;
@@ -94,7 +94,7 @@ export class ViewApi {
     }
     private async respondBootstrap(client: Client, identity: string, body: BootstrapRequest, response: ServerResponse): Promise<void> {
         const started = Date.now(), existing = client.bootstrap;
-        try {json(response, 200, await bootstrapView(client, body, this.snapshots));}
+        try {await compressedJson(response, 200, await bootstrapView(client, body, this.snapshots));}
         catch (error) {if (!existing) await this.release(identity); throw error;}
         finally {
             recordRequestPhase(response, 'rpcMs', Date.now() - started);
@@ -119,7 +119,7 @@ export class ViewApi {
                 const traceId = String(response.getHeader('X-Trace-ID') ?? '');
                 if (/^[a-f0-9]{32}$/.test(traceId)) reply.error.traceId = traceId;
             }
-            json(response, 200, result);
+            await compressedJson(response, 200, result);
         }
         finally {
             client.active--; client.lastSeen = Date.now();

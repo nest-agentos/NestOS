@@ -114,11 +114,14 @@ export class Workbench {
             {
                 directoryActions: study ? [{id: 'study', label: t('editor.study'), icon: ACTION_ICONS.anki, run: () => this.openStudy()}] : [],
                 virtualViews: study ? [{ id: '@study', title: t('editor.study'), icon: ACTION_ICONS.anki, preview: false,
-                    create: async container => (await import('@nestos/mdx-adapter')).createStudyEditor(container, this.engine,
-                        path => this.openFileInternal(path), config.uiOptions?.readOnly || config.editorConfig?.readOnly || config.editorConfig?.canCreateEntries === false ? {} : {
-                            creation: {generation: config.studyGeneration?.generation, prompts: config.studyGeneration?.prompts, sources: config.studyGeneration?.sources, recovery: config.studyGeneration?.recovery,
+                    create: async container => {
+                        const writable = !config.uiOptions?.readOnly && !config.editorConfig?.readOnly && config.editorConfig?.canCreateEntries !== false;
+                        const [module, prompts] = await Promise.all([import('@nestos/mdx-adapter'), writable ? config.studyGeneration?.loadPrompts?.() : undefined]);
+                        return module.createStudyEditor(container, this.engine, path => this.openFileInternal(path), writable ? {
+                            creation: {generation: config.studyGeneration?.generation, prompts: {...prompts,...config.studyGeneration?.prompts}, sources: config.studyGeneration?.sources, recovery: config.studyGeneration?.recovery,
                                 label: t('editor.studyCreate'), documents: {save: draft => this.createStudyFile(draft)}},
-                        }) }] : [],
+                        } : {});
+                    } }] : [],
                 windows: config.windows,
                 navigationLabel: config.uiOptions?.title ?? t('project.files'),
                 onBeforeNavigate: config.onBeforeNavigate,

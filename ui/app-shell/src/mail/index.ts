@@ -5,7 +5,7 @@ import {createWorkspaceModule} from '../workspaces/module';
 import {VFS_DOM_EVENTS} from '@nestos/vfs-ui';
 const log = createModuleLogger('mail');
 export {MailWorkbench} from '@nestos/mail/ui';
-interface Options {client: MailClient; sidebar: HTMLElement; editor: HTMLElement; selected(path: string): void; scanners(): Promise<void>; onContentSelection?: import('@nestos/mail/ui').MailUIOptions['onContentSelection']}
+interface Options {client: MailClient; sidebar: HTMLElement; editor: HTMLElement; selected(path: string): void; scanners(): Promise<void>; onContentSelection?: import('@nestos/mail/ui').MailUIOptions['onContentSelection']; mountTitleBar?: import('@nestos/mail/ui').MailUIOptions['mountTitleBar']}
 export function createMailModule(options: Options) {
     const workbench = new MailWorkbench({...options, presentation: {
         locale: getLocale(), text: key => t(('mail.' + key) as Parameters<typeof t>[0]), createOperationId: randomUUID,

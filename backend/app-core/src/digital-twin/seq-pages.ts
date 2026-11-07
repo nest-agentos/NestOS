@@ -30,7 +30,14 @@ export class TwinSeqPages {
         await tx.deleteEntry(this.path, `page/${ref.family}/${page}/${String(ordinal).padStart(16, '0')}`);
         await tx.deleteEntry(this.path, key); await this.save(tx, ref.family, directory);
     }
-    async list(tx: ISeqFileTransaction, family: TwinRecordFamily, offset: number, limit: number): Promise<string[]> {
+    async count(tx: ISeqFileTransaction, family: TwinRecordFamily): Promise<number> {
+        return Object.values((await this.directory(tx, family)).counts).reduce((sum, count) => sum + count, 0);
+    }
+    async list(tx: ISeqFileTransaction, family: TwinRecordFamily, offset: number, limit: number, reverse = false): Promise<string[]> {
+        if (reverse) {
+            const total = await this.count(tx, family), length = Math.min(limit, Math.max(0, total - offset));
+            return length ? (await this.list(tx, family, total - offset - length, length)).reverse() : [];
+        }
         const directory = await this.directory(tx, family), ids: string[] = [];
         for (const page of Object.keys(directory.counts).sort()) {
             const count = directory.counts[page];
