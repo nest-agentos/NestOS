@@ -83,3 +83,9 @@
 	path = libraries/kanban-ui
 	url = https://github.com/nest-agentos/kanban-ui.git
 	branch = main
+[submodule "libraries/scanner"]
+	path = libraries/scanner
+	url = git@github.com:nest-agentos/scanner.git
+[submodule "libraries/scanner-ui"]
+	path = libraries/scanner-ui
+	url = git@github.com:nest-agentos/scanner-ui.git
