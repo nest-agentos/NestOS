@@ -16,7 +16,7 @@ import {parseAnalysis} from '@nestos/kanban/integration';
 import type {PersonalKanbanAutomationOptions} from '../src/kanban/personal-automation';
 
 const disposers: Array<() => Promise<void>> = [];
-afterEach(async () => {for (const close of disposers.splice(0)) await close();});
+afterEach(async () => {for (const close of disposers.splice(0)) await close(); vi.useRealTimers();});
 async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: Error) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); disposers.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/'), events = await UserEventService.open(fs);
@@ -50,7 +50,8 @@ async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: E
         return {id, sessionId: _session, version: 1, effects: {}, exit: {status: 'succeeded', output: {exit: {status: 'succeeded', output}}}} as unknown as TaskRecord;
     })} as unknown as PersonalKanbanAutomationOptions['kernel'];
     const fileJournal=new KanbanAutomationJournal(fs, kanbanJournalOptions);await fileJournal.open();
-    const options: PersonalKanbanAutomationOptions = {prepareAnalysis: prepareFailure ? async () => {throw prepareFailure;} : undefined, observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:vi.fn(async id=>{const output=await readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal);return output===undefined?undefined:{state:'succeeded',output};}),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
+    const preparation = vi.fn<NonNullable<PersonalKanbanAutomationOptions['prepareAnalysis']>>(async () => {throw prepareFailure;});
+    const options: PersonalKanbanAutomationOptions = {prepareAnalysis: prepareFailure ? preparation : undefined, observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:vi.fn(async id=>{const output=await readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal);return output===undefined?undefined:{state:'succeeded',output};}),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
         prepareSession: vi.fn(async () => true), catalog: vi.fn(async () => targets)};
     const diagnostics = new DiagnosticJournal();
     const open = () => createPersonalKanban(fs, events, diagnostics, options.sessions, kernel, options);
@@ -61,7 +62,7 @@ async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: E
     const settings: KanbanAutomationSettings = {enabled: true, autoAccept, planner: catalog.targets[0].reference, executor: catalog.targets[1].reference, coordinator: catalog.coordinator, worker: catalog.worker};
     await command({type: 'configure-automation', settings});
     const item = async (id: string) => {await command({type: 'create-item', item: {id, title: id, responsibility: 'Deliver ' + id, acceptance: 'Evidence verified'}});return command({type:'request-run',itemId:id});};
-    return {events,service, command, item, calls, kernel, analysisOutput:options.readAnalysisOutput!, submitted, completed, settings, open, diagnostics,
+    return {events,service, command, item, calls, kernel, preparation, analysisOutput:options.readAnalysisOutput!, submitted, completed, settings, open, diagnostics,
         lose: () => {loseReply = true; hideAdmission = true;}, reveal: () => {hideAdmission = false;}, invalid: () => {invalid = true;},
         executions: () => [...submitted.entries()].filter(([, input]) => input.request.expectedTarget!.id === 'executor')};
 }
@@ -214,8 +215,11 @@ it('executes manually created subtasks and aggregates their accepted results wit
     f.completed.add(dispatch);await f.service.scan();
     expect((await f.service.item('board','parent')).item.status).toBe('backlog');
     await f.command({type:'accept-execution',dispatchId:dispatch,accept:true});
-    await f.command({type:'archive-items',itemIds:['child'],reason:'Verified'});
+    await expect(f.command({type:'archive-items',itemIds:['child'],reason:'Verified'})).rejects.toThrow('SUBTASK_CLEANUP_VIA_GROUP');
     await f.service.scan();expect((await f.service.item('board','parent')).item.status).toBe('completed');
+    await f.command({type:'archive-items',itemIds:['parent'],reason:'Verified group'});
+    expect((await f.service.item('board','parent')).archive?.reason).toBe('Verified group');
+    expect((await f.service.item('board','child')).archive?.reason).toBe('Verified group');
     expect(f.executions()).toHaveLength(1);
 });
 
@@ -234,7 +238,7 @@ it('projects two explicit EFFECT_TIMEOUT analysis attempts to the root task, wor
 });
 
 
-it.each(['ENOENT', 'EACCES', 'ETIMEDOUT'])('keeps a Cells preparation fault %s as an error without cancelling the task', async code => {
+it.each(['ENOENT', 'EACCES'])('keeps a permanent Cells preparation fault %s as an error without cancelling the task', async code => {
     const f = await fixture(false, undefined, Object.assign(new Error('Cells unavailable'), {code}));
     await f.item('unavailable'); await f.service.scan(); await f.service.scan();
     const item = await f.service.item('board', 'unavailable');
@@ -242,6 +246,28 @@ it.each(['ENOENT', 'EACCES', 'ETIMEDOUT'])('keeps a Cells preparation fault %s a
     expect(item.item.analysis).toMatchObject({state: 'failed', code});
     expect(item.item.control).toBeUndefined(); expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
     expect((await f.service.events('board')).some(event => event.kind === 'control-receipt')).toBe(false);
+});
+
+it('retains the analysis identity and retry budget across reopening, then reports an exhausted preparation timeout', async () => {
+    vi.useFakeTimers({toFake: ['Date']});
+    const f = await fixture(false, undefined, Object.assign(new Error('Cells unavailable'), {code: 'ETIMEDOUT'}));
+    await f.item('unavailable'); await f.service.scan();
+    expect((await f.service.item('board', 'unavailable')).item.analysis).toMatchObject({state: 'analyzing',
+        recovery: {attempt: 0, limit: 10, code: 'ETIMEDOUT'}});
+    await f.service.dispose(); const reopened = await f.open(); disposers.push(() => reopened.dispose());
+    await reopened.scan(); expect(f.preparation).toHaveBeenCalledTimes(1);
+    for (let retry = 1; retry <= 10; retry++) {
+        vi.setSystemTime(Date.now() + 30000); await reopened.scan();
+        expect(f.preparation).toHaveBeenCalledTimes(retry + 1);
+        if (retry < 10) expect((await reopened.item('board', 'unavailable')).item.analysis)
+            .toMatchObject({state: 'analyzing', recovery: {attempt: retry, code: 'ETIMEDOUT'}});
+    }
+    const item = await reopened.item('board', 'unavailable');
+    expect(item.item.status).toBe('backlog'); expect(item.task).toMatchObject({phase: 'error', reason: 'ETIMEDOUT'});
+    expect(item.item.analysis).toMatchObject({state: 'failed', code: 'ETIMEDOUT'}); expect(item.item.control).toBeUndefined();
+    expect(new Set(vi.mocked(f.preparation).mock.calls.map(([input]) => input.id)).size).toBe(1);
+    await reopened.scan(); expect(f.preparation).toHaveBeenCalledTimes(11);
+    expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
 });
 
 it('retains one planning session while waiting for clarification and resumes the approved plan after host recovery',async()=>{

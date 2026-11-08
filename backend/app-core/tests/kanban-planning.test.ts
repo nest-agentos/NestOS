@@ -90,11 +90,16 @@ it('archives terminal work into separate records and retains session history and
     expect((await f.service.read('board')).items[0].status).toBe('completed');
     await expect(f.run({type: 'claim', itemId: 'done', estimate})).rejects.toThrow('ITEM_COMPLETED');
 });
-it('rejects an entire archive batch containing active work without partially moving history', async () => {
+it('rejects agent cleanup and unsettled human cleanup without partially archiving a batch', async () => {
     const f = await fixture(); await f.create('closed'); await f.finish('closed'); await f.create('active', {}, 'open');
     await f.run({type: 'claim', itemId: 'active', estimate});
-    await expect(f.run({type: 'archive-items', itemIds: ['closed', 'active'], reason: 'Cleanup'})).rejects.toThrow('ARCHIVE_REQUIRES_CLOSED_ITEM');
-    expect((await f.service.read('board')).items).toHaveLength(2); expect((await f.service.query('board', {view: 'archive'})).total).toBe(0);
+    const before = await f.service.read('board');
+    const command = {type: 'archive-items' as const, itemIds: ['closed', 'active'], reason: 'Cleanup'};
+    await expect(f.run(command)).rejects.toThrow('FORBIDDEN');
+    const human = createNestOSKanban({store: f.store, actor: {kind: 'human', id: 'admin'}, authorize: async () => {}, log: f.log});
+    await expect(human.execute('board', {operationId: 'human-cleanup', expectedRevision: (await f.service.read('board')).revision, command}))
+        .rejects.toThrow('TASK_CLEANUP_EXECUTION_UNSETTLED');
+    expect(await f.service.read('board')).toEqual(before); expect((await f.service.query('board', {view: 'archive'})).total).toBe(0);
 });
 it('automatically archives by retention and allows restored history a fresh visibility period', async () => {
     const f = await fixture({archiveAfterMs: 100}); await f.create('old'); await f.finish('old'); f.tick(101); await f.service.scan();
@@ -111,9 +116,12 @@ it('paginates summaries by priority and rejects stale or differently scoped curs
     await f.create('later'); await expect(f.service.query('board', {view: 'backlog', cursor: first.nextCursor})).rejects.toThrow('CURSOR_STALE');
     await expect(f.service.query('board', {limit: 201})).rejects.toThrow('INVALID_PAGE_SIZE');
 });
-it('counts archived descendants in roadmap progress without automatically accepting the feature', async () => {
-    const f = await fixture(); await f.create('feature', {kind: 'feature'}); await f.create('task', {parentId: 'feature'});
-    await f.finish('task'); await f.run({type: 'archive-items', itemIds: ['task'], reason: 'Finished'});
+it('counts retention-archived descendants in roadmap progress without automatically accepting the feature', async () => {
+    const f = await fixture({archiveAfterMs: 100}); await f.create('feature', {kind: 'feature'}); await f.create('task', {parentId: 'feature'});
+    await f.finish('task');
+    await expect(f.run({type: 'archive-items', itemIds: ['task'], reason: 'Finished'})).rejects.toThrow('SUBTASK_CLEANUP_VIA_GROUP');
+    f.tick(101); await f.service.scan();
+    expect((await f.service.item('board', 'task')).archive?.reason).toBe('retention-policy');
     const roadmap = await f.service.query('board', {view: 'backlog', kind: 'feature'});
     expect(roadmap.items[0].progress).toMatchObject({total: 1, completed: 1}); expect(roadmap.items[0].status).toBe('backlog');
     await f.run({type: 'close-plan', itemId: 'feature', resultRef: 'evidence://acceptance'});

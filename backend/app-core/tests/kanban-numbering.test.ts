@@ -36,12 +36,13 @@ it('numbers work, logs and decisions separately and preserves references through
     expect((await api.resolve('KB-1#1')).itemId).toBe('first');
     expect((await api.item('b','first')).item.number).toBe(1);
     await f.run(api,'b',{type:'restore-item',itemId:'first'});
-    expect(kanbanReference(board,(await api.item('b','first')).item)).toBe('KB-1#1');
+    expect(kanbanReference(board,(await api.item('b','first')).item)).toBe('KBT-1-1');
+    expect((await api.resolve('KBT-1-1')).itemId).toBe('first');
     for(const kind of ['log','decision'] as const) await f.run(api,'b',{type:'append-record',record:{id:kind,kind,title:kind,content:'Notes',rationale:kind==='decision'?'Reason':undefined,itemIds:['first'],sources:[]}});
     expect((await api.resolve('kb-1/l-1')).recordId).toBe('log');expect((await api.resolve('KB-1/D-1')).recordId).toBe('decision');
-    expect((await api.query('b',{view:'all',search:'KB-1#2'})).items.map(item=>item.id)).toEqual(['second']);
-    expect((await api.suggest('b',{kind:'item',search:'KB-1#2'})).items[0].id).toBe('second');
-    expect((await api.suggest('b',{kind:'decision',search:'KB-1/D-1'})).items).toEqual([]);
+    expect((await api.query('b',{view:'all',search:'KBT-1-2'})).items.map(item=>item.id)).toEqual(['second']);
+    expect((await api.suggest('b',{kind:'item',search:'KBT-1-2'})).items[0].id).toBe('second');
+    expect((await api.suggest('b',{kind:'decision',search:'KBD-1-1'})).items).toEqual([]);
 });
 it('does not accept caller-assigned numbers, consume numbers on failed writes or reuse deleted numbers',async()=>{
     const f=await fixture(), api=f.service();await api.create({...f.input('b'),number:999} as never);
