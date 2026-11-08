@@ -911,3 +911,18 @@ Effect适配器可通过可选 `failureOutcome(error)` 将实时调用无法确�
 根 Kernel 和 `/core` Harness 提供 `readTaskCallTarget({sessionId, taskId, effectId})`，以原 caller/Effect 读取实际目标 TaskRef，不需要成功输出或 Session 历史。检查原持久 request/binding、深度继承与所有者；目标 Session 代次和 Task 在同一目标事务读取，防止重建 Session 后误接续旧记录。源/目标不是跨存储的原子快照，目标暂缺不能用作重发依据。
 
 读取不创建目标、授予能力、登记 worker 或恢复执行。目标存在后，失败与取消不抹掉原关系；已完成 Effect 的目标丢失明确报错。Session 的现有调用查询消费此事实，将 caller/target 执行结果与 historyPending 分开，不增加第二份执行状态。公开细节见[独立库 API](../libraries/durable-kernel/docs/api.md#cold-task-call-target-inspection)。
+
+
+## 事务恢复责任索引
+
+完整 Kernel 提供 `listRecoveryTasks(scope)`、`listRecoveryShared(scope)` 与 `acknowledgeTaskRecovery(sessionId, taskId, scope)`。这些是宿主内部冷查询/确认接口，不是浏览器执行能力。Kernel 只处理不透明 scope、引用和完成条件，不识别 Flow、模型或业务字段；业务层决定何时需要恢复及确认哪些结果。
+
+| 责任 | 写入时机 | 移除时机 |
+|---|---|---|
+| `TaskSpec.recovery.until = terminal` | Task 接纳事务 | Task 终态转换事务 |
+| `TaskSpec.recovery.until = acknowledged` | Task 接纳事务 | Task 已结算且宿主核验后续结果，再在确认事务移除 |
+| `SharedStateWriteOptions.recovery.pending` | shared 接纳意图提交事务 | shared 根绑定/失败结果提交事务，或记录删除事务 |
+
+索引位于 catalog.seq 的 `recovery/<scope>/<taskId>` 与 `shared-recovery/<scope>/<sessionId>/<key>`，只存身份引用。Session 和 catalog 必须在同一 IFileSystem 事务域；跨域明确拒绝。普通 shared 覆盖保留原责任，归档导入重绑定目标目录及索引，Session 删除清除其引用。历史确认以 Round 和提交索引的正式证据为准，不能仅凭调用 Task 已终态移除责任。
+
+Flow 声明 `flow.scheduler`，调用意图声明 `session.flow.admission`，独立调用声明 `session.call.history`；这些字符串只存在消费层。恢复定位随未完成责任数增长，不随历史 Session 数增长；空索引直接返回空数组。无旧数据兼容、扫描回填或损坏后全扫。原任务、共享记录、检查点及历史仍是事实权威，索引不授予执行权限。完整通用契约见[独立库 API](../libraries/durable-kernel/docs/api.md)。

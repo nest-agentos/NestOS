@@ -165,11 +165,11 @@ Context GC 的 `observeSession` 不再枚举全部 Session 寻找一条记录：
 
 已保存宿主目录改为**首次使用时连接**：`DirectoryMountService.init()` 只读偏好，不再为每个书签打开 sidecar；`SessionFilesService.create()` 新增 `resolveSource` 端口（`app-core/src/runtime/create-application-runtime.ts` 接到 `directoryMounts.resolveSource`），在构建 Session 视图时按需打开并注册来源，不可达时保持原有"来源缺失"降级路径，不使恢复失败。回归：`backend/app-core/tests/directory-mounts.test.ts`「启动不调用 openDirectory / resolveSource 只打开一次 / 不可达返回 undefined」、`backend/app-core/tests/session-files.test.ts`「未注册来源经 resolver 打开、resolver 拒绝时 fail closed」。
 
-Flow 调用恢复新增**持久标记** `/var/lib/kernel/flow-invocations.json`（`llm-session/src/persistence/flow-invocation-sessions.ts`）：`FlowInvocationService.submit()` 在写调用记录之前标记 Session，`recover()` 先读一次标记，标记存在且不含某 Session 时完全跳过该 Session 的 `listShared` 探测（3 个 Session、0 条记录的重载场景实测 513ms 属纯探测开销）；标记缺失/损坏/版本不符时报告 unknown，恢复退回逐 Session 探测并把命中者补写进标记（自愈旧数据根）。标记写入串行化，并发 `mark` 不丢条目。回归：`backend/llm-session/__tests__/flow-invocation-sessions.test.ts`、`__tests__/flow-invocations.test.ts`（标记为空时零探测、unknown 时探测并补写、受理先于记录写入）。
+Flow 调用恢复现使用 Kernel catalog 中的 `shared-recovery/session.flow.admission/` 精确待办索引，与冻结调用 shared 记录同事务登记，根绑定或明确失败后同事务移除；Flow 调度器使用 `recovery/flow.scheduler/` 根任务索引。独立调用的 `recovery/session.call.history/` 保留到执行结算及历史提交后显式确认。启动只按待办引用读取，不再读取所有 open Session、扫描历史 shared 记录或回填旧 membership 文件。回归见 `libraries/durable-kernel/src/recovery-index.test.ts`、`backend/llm-session/__tests__/flow-invocations.test.ts`、`backend/llm-session/__tests__/independent-call-preparation.test.ts`。
 
 早期桌面曾通过 `onWorkspaceReady` 把 `#__boot-overlay` 移到正文列，再等编辑器挂载移除。当前已由上述 `onShellReady` + 工作区局部提示替代，启动无需打开工作台。`<head>` 仍按持久主题镜像及系统偏好设置 `data-theme`，避免首帧闪烁；`is-booting` 只保护路由监听安装前的静态控件。
 
-Flow 调用标记新增**封存**语义（`FlowInvocationSessions.establish`）：标记缺失（升级后的首个数据根，或标记损坏）时，恢复完整探测一遍后把结果写入标记（**空集也写**），否则零调用记录的用户会永远停留在"每次启动逐 Session 探测"；探测中出现不可读 Session 时不封存，下次继续按 unknown 处理。回归在 `backend/llm-session/__tests__/flow-invocations.test.ts`。
+旧标记封存和 unknown 时全扫的流程已移除。本次数据结构没有旧格式兼容或迁移；缺失待办视为无工作，损坏索引明确失败而非回退全扫。新操作的任务/意图与索引共用事务，取消、删除、归档导入及确认均维护对应索引。
 
 ### 2026-09-27 第四轮：跨 SeqFile 批量读（`getEntriesMany`）
 

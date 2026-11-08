@@ -34,6 +34,7 @@ export function prepareFlowCallTask(graph: DagRunSpec, parameters: Record<string
         nodeConnections: Object.entries(spec.nodeConnections ?? {}),
     });
     return {kind: 'task', sessionId: options.sessionId, capabilities: [], task: {
+        recovery: {scope: 'flow.scheduler', until: 'terminal'},
         program: {kind: 'flow.aggregate', version: '1'}, input: {
             awaitingSchedule: true, dependencies: [], skipped: [], runTasks: [], initialScheduler: checkpoint,
             initialWorkspacePending: 1, initialWorkspaceResource: 1,

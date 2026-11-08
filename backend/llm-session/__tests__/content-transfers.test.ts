@@ -94,7 +94,7 @@ it('validates bound parameter values before starting a Flow and retains validate
         parameters: [{name: 'text', type: 'string', required: true}], nodes: [], edges: []};
     const definitions = {loadRevision: async () => flow} as unknown as FlowDefinitionStore;
     const dag = new DagCommandService({kernel, plugins: createBuiltinDagPluginRegistry(), flowStore: definitions}); dag.register(commands);
-    const invocations = new FlowInvocationService(kernel, definitions, commands, undefined, undefined, undefined, undefined, dag, service);
+    const invocations = new FlowInvocationService(kernel, definitions, commands, undefined, undefined, undefined, dag, service);
     const input = {sessionId, requestId: 'bound-call', flowId: 'f', revision: 1, parameters: {text: 'tampered'}, inputSources: {text: {sessionId, id: transfer.id}}};
     await expect(invocations.invoke(input)).rejects.toThrow('CONTENT_PARAMETER_MISMATCH');
     expect(await kernel.listSessionTasks(sessionId)).toEqual([]);

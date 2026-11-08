@@ -772,6 +772,8 @@ createApplicationRuntime 返回初始化时创建的 independentCalls 服务；�
 
 准备器复用普通对话的目标、连接与 Context 机制，持久服务仍归 llm-session，Kernel 持有实际执行和资源事实；app-core 只接线，不增加目标编译器或调度器。Flow 实现尚未具备完整 Kernel 工作区收尾，当前明确拒绝裸 Task 准备。旧 session.call.submit 路径和正式入口迁移、历史恢复的剩余范围见[功能合入计划第 91 节](design/functional-merge-plan.md#91-已发布目标复用普通对话准备进入可信宿主调用)。
 
-启动恢复会扫描已接纳且仍 `awaitingSchedule` 的 Flow 根，通过既有 `FlowCommand.RunResume` 重挂原冻结调度器，覆盖没有 invocation journal 的直接运行与重跑。继续使用原检查点、回答与 Task 身份，不重新提交已完成业务步骤；只读 Session、终态根不接管。仍有效的调度租约通过有界退避等待，不强夺所有权；宿主销毁释放恢复重试定时器。回归见 [重启后输入继续](../backend/app-core/tests/flow-scheduler-recovery.test.ts)与[恢复策略](../backend/app-core/tests/flow-scheduler-recovery-policy.test.ts)。
+启动恢复从 `kernel.listRecoveryTasks("flow.scheduler")` 定位已接纳且仍 `awaitingSchedule` 的 Flow 根，通过既有 `FlowCommand.RunResume` 重挂原冻结调度器，覆盖没有 invocation journal 的直接运行与重跑。继续使用原检查点、回答与 Task 身份，不重新提交已完成业务步骤；只读 Session、终态根不接管。仍有效的调度租约通过有界退避等待，不强夺所有权；宿主销毁释放恢复重试定时器。回归见 [重启后输入继续](../backend/app-core/tests/flow-scheduler-recovery.test.ts)与[恢复策略](../backend/app-core/tests/flow-scheduler-recovery-policy.test.ts)。
+
+Flow 根在 Task 接纳时声明 `recovery: {scope: "flow.scheduler", until: "terminal"}`，Kernel 在同一事务写入任务与待恢复引用，终态转换同事务移除引用。恢复只读取索引候选及其精确 Task，不枚举 Session 或完整任务列表；最多 8 个候选并发，等待全部已接纳读取结束后返回清理函数。只读、暂停、终态根不接管；单个候选读取失败保留错误分类并继续其他候选。`FlowRecovery` 汇总候选数、根数量、失败数、并发数、关联操作 ID 与耗时。未完成的 Flow 调用接纳另由 `shared-recovery/session.flow.admission/` 保存冻结 shared 记录引用，与接纳记录同事务增删；绑定根后由 Task 索引接管，覆盖接纳提交后响应丢失。空索引意味着无待办，不做历史扫描、旧格式兼容或回填。启动日志分别计时 `flowInvocationRecords.recover`、`independentCalls.recover`、`flowSchedulers.recover` 和 `instructionQueues.recover`，避免将不同恢复路径的耗时混在一起。
 
 Runtime 关闭先停止上游准入，再排空内核原子步骤；只读子调用观察退出本地等待，保留原持久 Effect 与子任务供原身份恢复，不取消子任务。上游 quiesce 失败不会跳过其余资源释放；所有清理阶段执行后汇总错误。未能确认内核空闲时仍保留存储与租约，不以超时冒充关闭完成。

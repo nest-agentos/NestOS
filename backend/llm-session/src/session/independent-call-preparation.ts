@@ -14,7 +14,7 @@ export interface IndependentTaskCallPreparation extends IndependentTaskCallPolic
     prepare(request: SubmissionRequest, invocation: InvocationIdentity): Promise<PreparedDirectConversationRun>;
 }
 export interface PreparedIndependentTaskCall {
-    operationId: string; caller: {sessionId: string; requestId: string}; executionSessionId: string;
+    operationId: string; caller: {sessionId: string; requestId: string; recovery?: import('@nestos/durable-kernel').TaskSpec['recovery']}; executionSessionId: string;
     invocation: InvocationIdentity; plan: TaskCallPlan; context: PreparedConversationContext;
 }
 /** Real Kernel admission; target execution and history completion are separate observations. */

@@ -6,7 +6,7 @@ const suites = {
     budget: ['node', ['--test', 'scripts/tests/performance-budget.test.mjs']],
     core: ['pnpm', ['--filter', '@nestos/app-core', 'exec', 'vitest', 'run', '--fileParallelism=false',
         'tests/host/session-view.test.ts', 'tests/host/session-performance.test.ts', 'tests/session-browser.test.ts',
-        'tests/digital-twin-view.test.ts', 'tests/assistant-session-projection.test.ts', 'tests/kanban-session-source.test.ts', 'tests/kanban-session-resource.test.ts', 'tests/session-resource.test.ts']],
+        'tests/digital-twin-view.test.ts', 'tests/assistant-session-projection.test.ts', 'tests/kanban-session-source.test.ts', 'tests/kanban-session-resource.test.ts', 'tests/session-resource.test.ts', 'tests/recovery-index-performance.test.ts']],
     transport: ['pnpm', ['--filter', '@nestos/http-app', 'exec', 'vitest', 'run', '--fileParallelism=false', 'tests/view-performance.test.ts', 'tests/json-compression.test.ts']],
     ui: ['pnpm', ['--filter', '@nestos/app-shell', 'exec', 'vitest', 'run', '--fileParallelism=false',
         'tests/digital-twin-view.test.ts', 'tests/kanban-catalog.test.ts', 'tests/lazy-settings-editors.test.ts',

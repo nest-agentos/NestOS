@@ -7,13 +7,13 @@ import {simpleHash} from '@nestos/llm-context';
 import { FlowCommand, FlowDefinitionStore, prepareFlowCallInput, type DagCommandService } from '@nestos/llm-flow';
 import type { ContentTransferService } from './content-transfers';
 import { createSessionHost, type SessionHostPorts } from '../utils/host-ports';
-import type { FlowInvocationSessions } from '../persistence/flow-invocation-sessions';
 
 import { FlowInvocationCommand, flowInvocationId, type FlowInvocationInput, type FlowInvocationRecord } from '../contracts/flow-invocations';
 import {FLOW_INVOCATION_PREFIX, flowInvocationRequest, assertFlowRerun, findFlowInvocationRoot} from './flow-invocation-identity';
 import {ulid} from '../persistence/ulid';
 export { FlowInvocationCommand, type FlowInvocationInput, type FlowInvocationRecord } from '../contracts/flow-invocations';
 const PREFIX = FLOW_INVOCATION_PREFIX;
+const RECOVERY_SCOPE = 'session.flow.admission';
 /** Shared records already read by a caller, so recovery does not list them twice. */
 type StoredInvocations = Awaited<ReturnType<Kernel['listShared']>>;
 
@@ -24,7 +24,6 @@ export class FlowInvocationService {
         private canWrite?: (id: string) => Promise<boolean>,
         private source?: (id: string) => Promise<{ branch: string; head: string | null; parentSessionId?: string }>,
         private resolveConnection?: (sessionId: string, connectionId?: string) => Promise<string | undefined>,
-        private invocationSessions?: FlowInvocationSessions,
         private runs?: Pick<DagCommandService, 'prepareRun' | 'submitPrepared'>,
         private transfers?: Pick<ContentTransferService, 'read'> & Partial<Pick<ContentTransferService, 'createChild'>>, private hostPorts?: SessionHostPorts) {}
 
@@ -61,58 +60,29 @@ export class FlowInvocationService {
     }
 
     async recover(): Promise<void> {
-        // The persisted marker lists the Sessions that ever admitted a call; without it every
-        // Session is probed once and the probe result is then sealed (see below).
-        const marker = this.invocationSessions;
-        const marked = marker ? await marker.sessions().catch(() => undefined) : undefined;
-        const found = new Set<string>();
-        let complete = true;
-        for await (const session of this.kernel.listSessions()) {
-            // The catalog record already carries the Session status; listing the persisted
-            // records validates the storage, so no extra sessionStat round trip is needed.
-            if (session.status !== 'open') continue;
-            if (marked && !marked.has(session.id)) continue;
-            let stored: StoredInvocations;
-            try { stored = await this.kernel.listShared(session.id, PREFIX); }
-            catch (error) {
-                // An interrupted removal leaves a catalog entry without storage.
-                complete = false;
-                console.warn(`[Flow] Invocation recovery skipped for Session ${session.id}`, error);
+        const candidates = await this.kernel.listRecoveryShared(RECOVERY_SCOPE), started = Date.now(), operationId = ulid();
+        for (const ref of candidates) {
+            if ((await this.kernel.sessionStat(ref.sessionId)).phase !== 'open') continue;
+            if (this.canWrite && !await this.canWrite(ref.sessionId)) continue;
+            const session = await this.kernel.inspectSession(ref.sessionId), stored = await session.getShared(ref.key);
+            if (!stored) throw Object.assign(new Error('Flow recovery record missing'), {code: 'FLOW_RECOVERY_RECORD_MISSING'});
+            const record = stored.value as unknown as FlowInvocationRecord;
+            this.assertIdentity(record, ref.sessionId);
+            if (ref.key !== PREFIX + record.requestId) throw Object.assign(new Error('Flow recovery scope mismatch'), {code: 'FLOW_RECOVERY_SCOPE_MISMATCH'});
+            if (record.error || record.executionSessionId && await this.childAdmissionError(record)) {
+                await this.kernel.setShared(ref.sessionId, ref.key, stored.value,
+                    {expectedVersion: stored.version, recovery: {scope: RECOVERY_SCOPE, pending: false}});
                 continue;
             }
-            if (stored.length === 0) continue;
-            found.add(session.id);
-            if (this.canWrite && !await this.canWrite(session.id)) continue;
-            for (const record of await this.list(session.id, stored)) {
-                try {
-                    if (record.execution === 'child' && !record.error) {
-                        const routed = await this.invoke(record);
-                        if (routed.rootTaskId) await this.commands.execute(FlowCommand.RunResume,
-                            {sessionId: routed.executionSessionId, taskId: routed.rootTaskId});
-                        continue;
-                    }
-                    if (!record.rootTaskId && !record.error) await this.invoke(record);
-                    else if (record.rootTaskId) {
-                        if (record.preparedGraph) {
-                            await this.assertWritable(session.id);
-                            await this.saveRoot(await this.kernel.openSession(session.id), record, record.rootTaskId);
-                        }
-                        await this.commands.execute(FlowCommand.RunResume, { sessionId: record.executionSessionId ?? session.id, taskId: record.rootTaskId });
-                    }
-                } catch (error) { console.error('Flow invocation recovery failed', session.id, record.requestId, error); }
-            }
+            await this.invoke(record);
         }
-        // Seal a probe that covered every Session, so later boots take the cheap path even when
-        // no Session holds a call. An incomplete pass stays unknown and is probed again.
-        if (marker && marked === undefined && complete) await marker.establish(found);
+        console.info('[FlowRecovery]', {operation: 'flow.invocations.recover', operationId, stage: 'indexed', result: 'success',
+            candidateCount: candidates.length, durationMs: Date.now() - started});
     }
 
     private async submit(input: FlowInvocationInput): Promise<FlowInvocationRecord> {
         await this.assertWritable(input.sessionId);
         if (input.execution === 'child' && !this.transfers?.createChild) throw new Error('Independent Flow calls are unavailable');
-        // Mark the Session before its first invocation record is written, so a later boot knows
-        // which Sessions to scan. A mark failure surfaces here instead of hiding a lost resume.
-        await this.invocationSessions?.mark(input.sessionId);
         const session = await this.kernel.openSession(input.sessionId), key = PREFIX + input.requestId;
         let record = await this.admit(input, session);
         if (record.execution === 'child') return this.submitChild(session, record);
@@ -121,7 +91,7 @@ export class FlowInvocationService {
         // Upgrade older intents only when no durable root already owns their graph.
         if (this.runs && !record.preparedGraph) {
             record = await this.prepare(record);
-            await session.setShared(key, json(record));
+            await session.setShared(key, json(record), {recovery: {scope: RECOVERY_SCOPE, pending: true}});
         }
         try {
             await this.assertWritable(input.sessionId);
@@ -130,7 +100,7 @@ export class FlowInvocationService {
         } catch (error) {
             const root = findFlowInvocationRoot(await session.listTasks(), record);
             if (root) return this.saveRoot(session, record, root.id);
-            await session.setShared(key, json({ ...record, error: String(error) }));
+            await session.setShared(key, json({ ...record, error: String(error) }), {recovery: {scope: RECOVERY_SCOPE, pending: false}});
             throw error;
         }
     }
@@ -152,10 +122,9 @@ export class FlowInvocationService {
         if (record.executionSessionId && record.executionSessionId !== sessionId) throw new Error('Independent Flow Session identity conflict');
         if (!record.executionSessionId) {
             record = {...record, executionSessionId: sessionId};
-            await parent.setShared(PREFIX + record.requestId, json(record));
+            await parent.setShared(PREFIX + record.requestId, json(record), {recovery: {scope: RECOVERY_SCOPE, pending: true}});
         }
         await this.assertWritable(sessionId);
-        await this.invocationSessions?.mark(sessionId);
         const child = await this.kernel.openSession(sessionId);
         const input = {...record, sessionId, execution: undefined, executionSessionId: undefined,
             callerSessionId: parent.id, rootTaskId: undefined, preparedGraph: undefined,
@@ -170,7 +139,7 @@ export class FlowInvocationService {
         let stored = await child.getShared(key);
         if (!stored) {
             const prepared = await this.prepare(input);
-            try {await child.setShared(key, json(prepared), {expectedVersion: null}); return;}
+            try {await child.setShared(key, json(prepared), {expectedVersion: null, recovery: {scope: RECOVERY_SCOPE, pending: true}}); return;}
             catch (error) {stored = await child.getShared(key); if (!stored) throw error;}
         }
         const record = stored.value as unknown as FlowInvocationRecord;
@@ -200,7 +169,7 @@ export class FlowInvocationService {
     private async saveRoot(session: SessionHandle, record: FlowInvocationRecord, taskId: string): Promise<FlowInvocationRecord> {
         if (record.rootTaskId === taskId && !record.preparedGraph && !record.error) return record;
         const saved = { ...record, rootTaskId: taskId, error: undefined, preparedGraph: undefined };
-        await session.setShared(PREFIX + record.requestId, json(saved));
+        await session.setShared(PREFIX + record.requestId, json(saved), {recovery: {scope: RECOVERY_SCOPE, pending: false}});
         return saved;
     }
 
@@ -220,7 +189,7 @@ export class FlowInvocationService {
         else {
             record = await this.inputRecord(input);
             record = await this.prepare(record);
-            try {await session.setShared(key, json(record), { expectedVersion: null });}
+            try {await session.setShared(key, json(record), {expectedVersion: null, recovery: {scope: RECOVERY_SCOPE, pending: true} });}
             catch (error) {
                 const winner = await session.getShared(key);
                 if (!winner) throw error;

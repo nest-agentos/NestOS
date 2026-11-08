@@ -1,0 +1,132 @@
+{
+  "operation": "recovery.index.acceptance",
+  "date": "2026-11-08",
+  "source": {
+    "workspaceCommit": "fe825a079adfd50c2d92f036c52b309a8de08c6b",
+    "kernelCommit": "83a2f3b2aad7c9059ca9c324e33841d33d4684d7",
+    "workingTreeChanges": true
+  },
+  "dataset": {
+    "catalogSessions": 1215,
+    "historicalTaskBodies": 1692,
+    "storage": "isolated admin LocalFS/Node SQLite snapshot, full durability",
+    "indexPolicy": "old membership and old unindexed tasks are not migrated; empty pending index is intentional",
+    "pendingFixture": "one newly admitted, deferred Flow root with a transactional recovery responsibility; not executed"
+  },
+  "measurement": {
+    "scope": "three recovery-index lookups and exact pending Flow-root reads only",
+    "cache": "one process; cold Kernel bindings initially; warm OS filesystem cache",
+    "background": "production httpd kept running; no external execution on the fixture",
+    "comparison": "historical-task-scan is cold read-only enumeration, not a full old startup; current actual startup logs include additional background work",
+    "excludes": [
+      "complete httpd startup",
+      "independent execution resume",
+      "event projection",
+      "browser readiness",
+      "old data migration"
+    ],
+    "cleanup": "temporary process scope confirmed; copied data removed after validation"
+  },
+  "samples": [
+    {
+      "mode": "historical-task-scan",
+      "durationMs": 1281.7328440000001,
+      "logicalKernelQueries": 1216,
+      "historicalSessionReads": 1215,
+      "taskBodies": 1692,
+      "httpRequests": 0
+    },
+    {
+      "mode": "indexed-empty",
+      "durationMs": 2.3537560000004305,
+      "logicalKernelQueries": 3,
+      "taskBodies": 0,
+      "historicalSessionReads": 0,
+      "flowCandidates": 0,
+      "callCandidates": 0,
+      "admissionCandidates": 0,
+      "httpRequests": 0
+    },
+    {
+      "mode": "indexed-empty",
+      "durationMs": 1.6336419999997815,
+      "logicalKernelQueries": 3,
+      "taskBodies": 0,
+      "historicalSessionReads": 0,
+      "flowCandidates": 0,
+      "callCandidates": 0,
+      "admissionCandidates": 0,
+      "httpRequests": 0
+    },
+    {
+      "mode": "indexed-empty",
+      "durationMs": 1.604244000000108,
+      "logicalKernelQueries": 3,
+      "taskBodies": 0,
+      "historicalSessionReads": 0,
+      "flowCandidates": 0,
+      "callCandidates": 0,
+      "admissionCandidates": 0,
+      "httpRequests": 0
+    },
+    {
+      "mode": "indexed-one-pending-root",
+      "durationMs": 5.901789000000008,
+      "logicalKernelQueries": 4,
+      "taskBodies": 1,
+      "historicalSessionReads": 0,
+      "flowCandidates": 1,
+      "callCandidates": 0,
+      "admissionCandidates": 0,
+      "httpRequests": 0
+    },
+    {
+      "mode": "indexed-one-pending-root",
+      "durationMs": 3.5793429999998807,
+      "logicalKernelQueries": 4,
+      "taskBodies": 1,
+      "historicalSessionReads": 0,
+      "flowCandidates": 1,
+      "callCandidates": 0,
+      "admissionCandidates": 0,
+      "httpRequests": 0
+    },
+    {
+      "mode": "indexed-one-pending-root",
+      "durationMs": 2.031887000000097,
+      "logicalKernelQueries": 4,
+      "taskBodies": 1,
+      "historicalSessionReads": 0,
+      "flowCandidates": 1,
+      "callCandidates": 0,
+      "admissionCandidates": 0,
+      "httpRequests": 0
+    }
+  ],
+  "verification": {
+    "kernelFullTestsPassed": 570,
+    "sessionFullTestsPassed": 615,
+    "flowFullTestsPassed": 758,
+    "appCoreFullTestsPassed": 1855,
+    "appCoreSkippedLiveTests": 13,
+    "performanceCore": {
+      "result": "passed",
+      "files": 9,
+      "tests": 56,
+      "cleanup": "confirmed"
+    },
+    "typecheck": [
+      "durable-kernel",
+      "llm-session",
+      "llm-flow",
+      "app-core"
+    ],
+    "architecture": "passed",
+    "docs": "passed",
+    "additionalRecoveryIndexTestsPassed": 9,
+    "additionalCallerRecoveryTestsPassed": 59,
+    "additionalFlowRecoveryTestsPassed": 7,
+    "scope": "full suites plus final focused validation and new performance gate"
+  },
+  "deployment": "not deployed; production service unchanged"
+}

@@ -1,26 +1,32 @@
-import {createModuleLogger} from '@nestos/common';
-import type {KernelViewPort, TaskRecord} from '@nestos/durable-kernel/contracts';
+import {createModuleLogger, randomUUID} from '@nestos/common';
+import type {TaskRecord} from '@nestos/durable-kernel/contracts';
+import type {Kernel} from '@nestos/durable-kernel';
 import {FlowCommand} from '@nestos/llm-flow/contracts';
 import type {ICommandBus} from '@nestos/llm-session/contracts';
+import {mapConcurrent} from '../utils/map-concurrent';
 
 const log = createModuleLogger('flow-scheduler-recovery');
 /** Reattach admitted Flow schedulers, including reruns which have no invocation journal. */
-export async function recoverFlowSchedulers(kernel: KernelViewPort, commands: ICommandBus,
+export async function recoverFlowSchedulers(kernel: Pick<Kernel, 'listRecoveryTasks' | 'task'>, commands: ICommandBus,
     writable: (sessionId: string) => Promise<boolean>): Promise<() => void> {
     const disposers: (() => void)[] = [];
-    for await (const session of kernel.listSessions()) {
-        if (session.status !== 'open') continue;
-        const started = Date.now();
+    const started = Date.now(), operationId = randomUUID();
+    const candidates = await kernel.listRecoveryTasks('flow.scheduler');
+    let failures = 0;
+    await mapConcurrent(candidates, 8, async ref => {
+        const scanStarted = Date.now();
         try {
-            const roots = (await kernel.listSessionTasks(session.id)).filter(needsScheduler);
-            if (!roots.length) continue;
-            for (const root of roots) disposers.push(await recoverRoot(session.id, root.id, commands, writable));
-        } catch (error) {report(session.id, session.id, 'scan', started, error);}
-    }
+            const root = await kernel.task(ref.sessionId, ref.taskId);
+            if (needsScheduler(root)) disposers.push(await recoverRoot(ref.sessionId, root.id, commands, writable));
+        } catch (error) {failures++; report(ref.sessionId, operationId, 'candidate', scanStarted, error);}
+    });
+    console.info('[FlowRecovery]', {operation: 'flow.scheduler.recover', operationId, stage: 'scan',
+        result: failures ? 'partial' : 'success', candidateCount: candidates.length, rootCount: disposers.length,
+        failureCount: failures, concurrency: 8, durationMs: Date.now() - started});
     return () => disposers.forEach(dispose => dispose());
 }
 function needsScheduler(task: TaskRecord): boolean {
-    if (task.program.kind !== 'flow.aggregate' || task.labels?.kind !== 'flow-root'
+    if (task.sessionPaused || task.ownedBy && task.status === 'created' || task.program.kind !== 'flow.aggregate' || task.labels?.kind !== 'flow-root'
         || ['succeeded', 'failed', 'cancelled'].includes(task.status)) return false;
     const state = task.state ?? task.input;
     return !!state && typeof state === 'object' && !Array.isArray(state) && 'awaitingSchedule' in state && state.awaitingSchedule === true;

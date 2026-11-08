@@ -1,0 +1,194 @@
+{
+  "operation": "httpd.recovery.cold-scan",
+  "date": "2026-11-08",
+  "source": {
+    "workspaceCommit": "fe825a079adfd50c2d92f036c52b309a8de08c6b",
+    "kernelCommit": "83a2f3b2aad7c9059ca9c324e33841d33d4684d7",
+    "workingTreeChanges": true
+  },
+  "dataset": {
+    "source": "isolated snapshot of current admin Kernel storage",
+    "sessionDirectories": 1650,
+    "catalogSessions": 1215,
+    "openSessions": 1215,
+    "tasks": 1692,
+    "independentCallRecords": 77,
+    "flowMarkedSessions": 0,
+    "independentMarkedSessions": 77
+  },
+  "method": {
+    "storage": "LocalFS + Node SQLite, durability=full",
+    "samples": "3 sequential before/after pairs, fresh Kernel and VFS per sample",
+    "cache": "cold Kernel bindings; warm OS filesystem cache; no disk-cache eviction",
+    "background": "production httpd left running; large test suites completed before paired samples",
+    "before": "original activating listShared/listSessionTasks, scheduler reads sequential",
+    "after": "cold listShared/listSessionTasks, scheduler reads bounded to 8",
+    "scope": "membership-guided shared-record reads and open-Session Task listing only; no Flow resume, instruction dispatch or business execution",
+    "logicalKernelQueriesPerSample": 1293,
+    "httpRequestsPerSample": 0,
+    "sidecarCalls": "counts host sidecar method calls, not SQL statements or browser RPCs",
+    "metadataWrites": "includes one catalog initialization write; remaining writes belong to the scan",
+    "exclusions": [
+      "full httpd startup",
+      "event projection",
+      "remote recovery",
+      "browser readiness",
+      "first-boot index backfill"
+    ]
+  },
+  "samples": [
+    {
+      "mode": "before",
+      "sessions": 1215,
+      "open": 1215,
+      "probes": {
+        "flow": 0,
+        "independent": 77
+      },
+      "taskCount": 1692,
+      "recordCount": 77,
+      "phases": {
+        "flow": 7,
+        "independent": 134,
+        "schedulers": 13394
+      },
+      "durationMs": 13552,
+      "sidecarCalls": 235220,
+      "metadataWrites": 1216
+    },
+    {
+      "mode": "after",
+      "sessions": 1215,
+      "open": 1215,
+      "probes": {
+        "flow": 0,
+        "independent": 77
+      },
+      "taskCount": 1692,
+      "recordCount": 77,
+      "phases": {
+        "flow": 2,
+        "independent": 49,
+        "schedulers": 1126
+      },
+      "durationMs": 1189,
+      "sidecarCalls": 10354,
+      "metadataWrites": 1
+    },
+    {
+      "mode": "before",
+      "sessions": 1215,
+      "open": 1215,
+      "probes": {
+        "flow": 0,
+        "independent": 77
+      },
+      "taskCount": 1692,
+      "recordCount": 77,
+      "phases": {
+        "flow": 2,
+        "independent": 102,
+        "schedulers": 15737
+      },
+      "durationMs": 15850,
+      "sidecarCalls": 280391,
+      "metadataWrites": 1216
+    },
+    {
+      "mode": "after",
+      "sessions": 1215,
+      "open": 1215,
+      "probes": {
+        "flow": 0,
+        "independent": 77
+      },
+      "taskCount": 1692,
+      "recordCount": 77,
+      "phases": {
+        "flow": 2,
+        "independent": 35,
+        "schedulers": 1118
+      },
+      "durationMs": 1166,
+      "sidecarCalls": 10354,
+      "metadataWrites": 1
+    },
+    {
+      "mode": "before",
+      "sessions": 1215,
+      "open": 1215,
+      "probes": {
+        "flow": 0,
+        "independent": 77
+      },
+      "taskCount": 1692,
+      "recordCount": 77,
+      "phases": {
+        "flow": 6,
+        "independent": 107,
+        "schedulers": 15212
+      },
+      "durationMs": 15335,
+      "sidecarCalls": 279934,
+      "metadataWrites": 1216
+    },
+    {
+      "mode": "after",
+      "sessions": 1215,
+      "open": 1215,
+      "probes": {
+        "flow": 0,
+        "independent": 77
+      },
+      "taskCount": 1692,
+      "recordCount": 77,
+      "phases": {
+        "flow": 2,
+        "independent": 42,
+        "schedulers": 1138
+      },
+      "durationMs": 1192,
+      "sidecarCalls": 10354,
+      "metadataWrites": 1
+    }
+  ],
+  "validation": {
+    "kernelFullTestsPassed": 560,
+    "finalKernelTargetedTestsPassed": 150,
+    "sessionFullTestsPassed": 624,
+    "performanceCore": "passed, cleanup confirmed",
+    "typecheck": [
+      "durable-kernel",
+      "llm-session",
+      "app-core"
+    ],
+    "architecture": "passed",
+    "docs": "passed",
+    "temporaryScopeCleanup": "confirmed",
+    "appCoreInitial": {
+      "passed": 1849,
+      "failed": 5,
+      "skipped": 13,
+      "failureFiles": [
+        "kanban-planning.test.ts",
+        "kanban-numbering.test.ts",
+        "kanban-automation.test.ts"
+      ]
+    },
+    "appCore": {
+      "passed": 1854,
+      "failed": 0,
+      "skipped": 13,
+      "testFilesPassed": 266,
+      "testFilesSkipped": 4
+    },
+    "kanbanAndOperationRecoveryTargetedTestsPassed": 40,
+    "resolvedInitialFailures": [
+      "canonical KBT references and textual search; legacy resolve retained",
+      "agent cleanup and unsettled human cleanup rejected atomically",
+      "manual cleanup starts from the parent group; retention-archived child progress retained",
+      "analysis timeout retries retain identity and budget across reopen, and fail after exhaustion"
+    ]
+  },
+  "deployment": "not deployed; production service unchanged"
+}

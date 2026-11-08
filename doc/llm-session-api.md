@@ -489,7 +489,7 @@ backend/llm-session/src/
 | `FLOW_MODULE_NAME = 'flows'` | 独立 flows 模块名（`persistence/flow-engine.ts`）；应用装配于 `/home/admin/flows`（`app-core/src/runtime/create-application-runtime.ts:106`），每个 Flow 一个 `.flow` 文件 |
 | `/home/admin/.config/nestos/prompt-history` | prompt 历史文件系统（经 `initializeConversationSystem({ promptHistoryFiles })` 传入，`create-application-runtime.ts:192`） |
 | `RUNTIME_KEY = 'conversation/runtime'` | Durable Conversation 运行时共享键 |
-| `/var/lib/kernel/flow-invocations.json` | Flow 调用标记（`persistence/flow-invocation-sessions.ts`，经 `initializeConversationSystem({ flowInvocationSessions })` 传入）：受理调用**之前**写入 Session id，启动恢复据此跳过从未受理过调用的 Session；缺失/损坏/不可读时报告 unknown，恢复退回逐 Session 探测并把命中者补写进标记 |
+| `/var/lib/kernel/catalog.seq` 的 `shared-recovery/session.flow.admission/` | 未完成 Flow 接纳意图的精确引用；与冻结 shared 记录同事务登记，根绑定或明确失败后同事务移除 |
 
 **约定**：Round 只表达对话历史（`historyParentIds`）；Run 引用经 `executions` 附着到 Round；Branch/merge/context fold 只在本包实现；普通 Chat 用 Direct Scheduler，不伪装成单节点 DAG；不访问 Kernel Dispatcher/ProcessTable 内部对象。
 
@@ -863,7 +863,7 @@ initializeConversationSystem 在已配置独立调用宿主时返回 independent
 
 历史队列调用保留只读回执与列表投影，缺少 `kernelPreparation` 不影响同一来源 Session 的新调用查询；新的提交仍只接受持久冻结的 Kernel 计划，不恢复队列提交降级。
 
-createFlowInvocationSessions(fs, "independent") 提供独立调用恢复索引，供 ConversationSystemOptions.independentCallSessions 注入。事务 SeqFile 在路由写入前标记来源 Session，完整兼容扫描后才确认目录完整；索引不可用时继续扫描原 Kernel 路由。目录仅优化恢复定位，不代替 Kernel 接纳或执行事实。
+独立调用的 caller Task 声明 `recovery: {scope: "session.call.history", key: operationId, until: "acknowledged"}`，在接纳事务内进入 Kernel catalog 的待办索引；仅 prepare 不登记恢复责任。启动通过 `kernel.listRecoveryTasks("session.call.history")` 读取精确 caller 引用，再按 key 读取原路由，不枚举 Session 或历史调用。执行结算并核验 Round/提交索引完成后，`acknowledgeTaskRecovery` 同事务确认 Task 与移除待办；终态但历史未提交的 caller 仍保留。历史提交后确认丢失可在重启时只核对并完成确认，不重提执行。恢复 I/O 阶段最多 8 个并发，长时间等待不占用并发槽；暂停 Session 不自动续办。旧 membership 文件、兼容扫描及回填已移除。
 
 ### 提取助手正文
 

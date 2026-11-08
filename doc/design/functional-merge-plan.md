@@ -569,13 +569,15 @@ C4Component
 
 ## 25. F16 路由实施前的调用恢复索引修复
 
+本节记录旧 membership 文件的历史修复；当前实现已由 Kernel catalog 的事务待办索引替代，不再读取或回填该文件，见[运行时架构](../runtime-architecture.md)。
+
 审查子 Session 链路发现既有 `flow-invocations.json` 索引先更新内存 Set、后写文件。写入失败后，同进程重试会因 Set 已含 Session 而跳过写入；旧索引仍缺少该 Session，重启恢复可能跳过真实调用。这是 Session 持久化缓存发布顺序的问题，不属于 UI 路由或 Flow 调度策略。
 
 ```mermaid
 C4Component
   title 调用恢复索引的持久确认边界
   Component(admission, "FlowInvocationService", "调用接纳", "索引登记成功后才能保存调用意图")
-  Component(marker, "FlowInvocationSessions", "持久化适配", "串行写入，确认后发布缓存，未知结果重新读")
+  Component(marker, "历史 Session membership 标记", "持久化适配", "串行写入，确认后发布缓存，未知结果重新读")
   ContainerDb(file, "flow-invocations.json", "既有 VFS 索引", "启动恢复候选 Session")
   Container(kernel, "Kernel shared records", "执行事实", "真实调用意图及根 Task")
   Rel(admission, marker, "先 mark Session")

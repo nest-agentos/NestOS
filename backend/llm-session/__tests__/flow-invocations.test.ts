@@ -15,6 +15,7 @@ import { bindStandaloneFlowNode } from '../src/session/flow-node-binder';
 import { checkFlowConnections } from '../src/session/flow-connection-check';
 import {flowInvocationId, type FlowInvocationRecord} from '../src/contracts/flow-invocations';
 
+let kernelFS: import('@nestos/vfs-core').IFileSystem;
 let manager: Awaited<ReturnType<typeof createVFS>>['manager'], kernel: Kernel, service: FlowInvocationService, commands: CommandBus;
 const flow: FlowRevision = { id: 'wait' as never, name: 'Wait', revision: 1, digest: 'wait-v1', createdAt: 0,
     parameters: [{ name: 'text', type: 'string', required: true }], nodes: [
@@ -35,7 +36,7 @@ async function finishInvocation(call: FlowInvocationRecord, value = 'Done') {
 }
 beforeEach(async () => {
     ({ manager } = await createVFS({ rootBackend: new MemoryBackend() }));
-    const fs = await manager.openFileSystem('/test');
+    const fs = kernelFS = await manager.openFileSystem('/test');
     kernel = new Kernel({ catalog: { fs }, pollMs: 5 });
     kernel.registerStorageResolver({ kind: 'test', async resolve() { return { fs, rootPath: '/s' }; } });
     registerDurablePrograms(kernel); await kernel.initialize();
@@ -224,7 +225,7 @@ it('retains the write gate for persisted invocations', async () => {
     const execute = vi.spyOn(commands, 'execute');
     const recovery = new FlowInvocationService(kernel, definitions, commands, canWrite);
     await recovery.recover();
-    expect(canWrite).toHaveBeenCalledWith('s');
+    expect(canWrite).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
 });
 
@@ -235,59 +236,16 @@ it('recovers pending invocations without a status probe or a second shared-state
     const recovery = new FlowInvocationService(kernel, definitions, commands);
     await recovery.recover();
     expect(stat).not.toHaveBeenCalled();
-    expect(list).toHaveBeenCalledTimes(1);
-    // The records read for the status check are handed to list() instead of being listed again.
-    expect(list.mock.calls[0][1]).toHaveLength(1);
+    expect(list).not.toHaveBeenCalled();
 });
 
-it('skips every Session without probing when the persisted marker lists none', async () => {
-    const sessions = { sessions: vi.fn(async () => new Set<string>()), mark: vi.fn(async () => {}), establish: vi.fn(async () => {}) };
-    const shared = vi.spyOn(kernel, 'listShared');
-    const recovery = new FlowInvocationService(kernel, definitions, commands, undefined, undefined, undefined, sessions);
-    await recovery.recover();
-    expect(sessions.sessions).toHaveBeenCalledTimes(1);
-    expect(shared).not.toHaveBeenCalled();
-    expect(sessions.establish).not.toHaveBeenCalled();
-});
-
-it('seals an unknown marker with an empty set so later boots probe nothing', async () => {
-    const sessions = { sessions: vi.fn(async () => undefined as Set<string> | undefined), mark: vi.fn(async () => {}), establish: vi.fn(async () => {}) };
-    const recovery = new FlowInvocationService(kernel, definitions, commands, undefined, undefined, undefined, sessions);
-    await recovery.recover();
-    expect(sessions.establish).toHaveBeenCalledTimes(1);
-    expect([...sessions.establish.mock.calls[0][0]]).toEqual([]);
-});
-
-it('seals an unknown marker with the Sessions that hold records', async () => {
-    await service.invoke(input('legacy'));
-    const sessions = { sessions: vi.fn(async () => undefined as Set<string> | undefined), mark: vi.fn(async () => {}), establish: vi.fn(async () => {}) };
-    const recovery = new FlowInvocationService(kernel, definitions, commands, undefined, undefined, undefined, sessions);
-    await recovery.recover();
-    expect([...sessions.establish.mock.calls[0][0]]).toEqual(['s']);
-});
-
-it('keeps the marker unknown when a Session could not be probed', async () => {
-    await service.invoke(input('unreadable'));
-    const sessions = { sessions: vi.fn(async () => undefined as Set<string> | undefined), mark: vi.fn(async () => {}), establish: vi.fn(async () => {}) };
-    vi.spyOn(kernel, 'listShared').mockRejectedValueOnce(new Error('Session record missing'));
-    const recovery = new FlowInvocationService(kernel, definitions, commands, undefined, undefined, undefined, sessions);
-    await recovery.recover();
-    expect(sessions.establish).not.toHaveBeenCalled();
-});
-
-it('marks a Session before its first invocation record is written', async () => {
-    const order: string[] = [];
-    const sessions = { sessions: vi.fn(async () => undefined as Set<string> | undefined), mark: vi.fn(async () => { order.push('mark'); }), establish: vi.fn(async () => {}) };
-    const open = kernel.openSession.bind(kernel);
-    vi.spyOn(kernel, 'openSession').mockImplementation(async (...args: Parameters<typeof open>) => {
-        order.push('open');
-        return open(...args);
-    });
-    const recovery = new FlowInvocationService(kernel, definitions, commands, undefined, undefined, undefined, sessions);
-    await recovery.invoke(input('marked-first'));
-    expect(sessions.mark).toHaveBeenCalledWith('s');
-    expect(order[0]).toBe('mark');
-    expect(order).toContain('open');
+it('does not enumerate historical Sessions, shared records or Tasks when the recovery index is empty', async () => {
+    await service.invoke(input('settled-admission'));
+    const sessions = vi.spyOn(kernel, 'listSessions'), shared = vi.spyOn(kernel, 'listShared');
+    const tasks = vi.spyOn(kernel, 'listSessionTasks'), inspect = vi.spyOn(kernel, 'inspectSession');
+    await new FlowInvocationService(kernel, definitions, commands).recover();
+    expect(sessions).not.toHaveBeenCalled(); expect(shared).not.toHaveBeenCalled();
+    expect(tasks).not.toHaveBeenCalled(); expect(inspect).not.toHaveBeenCalled();
 });
 
 it('runs three calls in one Session, deduplicates admission, and routes identical interaction ids to the chosen Run', async () => {
@@ -327,17 +285,22 @@ it('restores multiple pending calls after rebuilding Kernel and also submits a d
     const calls = await Promise.all([service.invoke(input('restore-a')), service.invoke(input('restore-b'))]);
     await vi.waitFor(async () => expect((await kernel.listSessionTasks('s')).filter(task => task.interactions.same?.status === 'pending')).toHaveLength(2));
     const session = await kernel.openSession('s');
-    await session.setShared('flow.invocation.intent', { ...input('intent'), flow, createdAt: Date.now() } as never);
+    const execute = vi.spyOn(commands, 'execute').mockRejectedValueOnce(new Error('interrupted admission'));
+    await expect(service.invoke(input('intent'))).rejects.toThrow('interrupted admission'); execute.mockRestore();
+    const intent = (await session.getShared('flow.invocation.intent'))!.value as any; delete intent.error;
+    await session.setShared('flow.invocation.intent', intent, {recovery: {scope: 'session.flow.admission', pending: true}});
     kernel.dispose(); await kernel.waitIdle();
     await vi.waitFor(async () => {
         for (const call of calls) expect(Number(((await session.getShared(`flow.run.${call.rootTaskId}.scheduler-owner`))!.value as any).expiresAt)).toBeLessThanOrEqual(Date.now());
     }, { timeout: 3000 });
-    const fs = await manager.openFileSystem('/test');
+    const fs = kernelFS = await manager.openFileSystem('/test');
     kernel = new Kernel({ catalog: { fs }, pollMs: 5 });
     kernel.registerStorageResolver({ kind: 'test', async resolve() { return { fs, rootPath: '/s' }; } });
     registerDurablePrograms(kernel); await kernel.initialize(); await kernel.recoverSession('s');
     commands = new CommandBus(); new DagCommandService({ kernel, flowStore: definitions, plugins: createBuiltinDagPluginRegistry() }).register(commands);
-    service = new FlowInvocationService(kernel, definitions, commands); await service.recover();
+    service = new FlowInvocationService(kernel, definitions, commands);
+    for (const ref of await kernel.listRecoveryTasks('flow.scheduler')) await commands.execute(FlowCommand.RunResume, ref);
+    await service.recover();
     const restored = await service.list('s'); expect(restored).toHaveLength(3);
     expect(restored.find(call => call.requestId === 'restore-a')?.rootTaskId).toBe(calls[0].rootTaskId);
     await vi.waitFor(async () => expect((await kernel.listSessionTasks('s')).filter(task => task.interactions.same?.status === 'pending')).toHaveLength(3));
@@ -350,7 +313,7 @@ it('restores multiple pending calls after rebuilding Kernel and also submits a d
 });
 
 it('starts the launcher call before any view binds the new Session and leaves its chat branch untouched', async () => {
-    const fs = await manager.openFileSystem('/sessions');
+    const fs = kernelFS;
     const repository = new SessionRepository(fs); await repository.init();
     kernel.registerStorageResolver(new SessionDirectoryStorageResolver(fs));
     const sessionManager = new SessionManager(repository, {} as never, { kernel,
@@ -444,7 +407,7 @@ function connectionRuntime(source: 'defaults' | 'run' | 'fallback' | 'nested') {
         prepareConnections: (flow: FlowRevision, bindings?: Record<string, string>) => prepareFlowConnections(flow, bindings, catalog) };
     const create = () => {
         const dag = new DagCommandService(options);
-        return { dag, service: new FlowInvocationService(kernel, definitions, commands, undefined, undefined, async () => 'chosen', undefined, dag) };
+        return { dag, service: new FlowInvocationService(kernel, definitions, commands, undefined, undefined, async () => 'chosen', dag) };
     };
     return { selection, catalog, input, create, definition };
 }
@@ -491,20 +454,11 @@ it('recovers an interrupted admission with the persisted graph after model confi
     const session = await kernel.openSession('s');
     const saved = (await session.getShared('flow.invocation.frozen'))!.value as any;
     delete saved.error;
-    await session.setShared('flow.invocation.frozen', saved);
+    await session.setShared('flow.invocation.frozen', saved, {recovery: {scope: 'session.flow.admission', pending: true}});
     fixture.selection.model = 'after';
     const recovered = fixture.create().service;
     await recovered.recover();
     const [call] = await recovered.list('s');
-    const root = (await (await kernel.openTask(call.rootTaskId!)).status()).task;
-    expect((root.input as any).initialScheduler.spec.nodes[0].config).toMatchObject({ modelName: 'before' });
-});
-
-it('prepares a legacy intent without a root before submitting it', async () => {
-    const fixture = connectionRuntime('fallback'), session = await kernel.openSession('s');
-    await session.setShared('flow.invocation.frozen', { ...fixture.input, flow: fixture.definition, createdAt: 0,
-        resolvedConnectionId: 'chosen' } as never);
-    const call = await fixture.create().service.invoke(fixture.input);
     const root = (await (await kernel.openTask(call.rootTaskId!)).status()).task;
     expect((root.input as any).initialScheduler.spec.nodes[0].config).toMatchObject({ modelName: 'before' });
 });
@@ -523,7 +477,7 @@ it('removes an admission graph left behind after the durable root was created', 
     const fixture = connectionRuntime('run'), call = await fixture.create().service.invoke(fixture.input);
     const session = await kernel.openSession('s'), root = (await (await kernel.openTask(call.rootTaskId!)).status()).task;
     await session.setShared('flow.invocation.frozen', { ...call, rootTaskId: undefined,
-        preparedGraph: (root.input as any).initialScheduler.spec } as never);
+        preparedGraph: (root.input as any).initialScheduler.spec } as never, {recovery: {scope: 'session.flow.admission', pending: true}});
     const lookups = fixture.catalog.getConnection.mock.calls.length;
     fixture.selection.enabled = false;
     await fixture.create().service.recover();
@@ -534,12 +488,12 @@ it('removes an admission graph left behind after the durable root was created', 
 });
 
 async function childCallFixture() {
-    const fs = await manager.openFileSystem('/child-sessions'), repository = new SessionRepository(fs);
+    const fs = kernelFS, repository = new SessionRepository(fs);
     await repository.init(); await repository.ensureSession('s', 'Parent');
     kernel.registerStorageResolver(new SessionDirectoryStorageResolver(fs));
     const transfers = new ContentTransferService({kernel, repository, commands});
     const create = (canWrite?: (id: string) => Promise<boolean>) => new FlowInvocationService(kernel, definitions, commands, canWrite, undefined, undefined,
-        undefined, undefined, transfers);
+        undefined, transfers);
     return {repository, transfers, create};
 }
 

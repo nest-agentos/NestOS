@@ -3,7 +3,7 @@ import type {RunExecution, TaskRunDefinition} from './run-submission';
 
 export interface TaskCallSubmitOptions {
     kernel: Pick<Kernel, 'openSession' | 'bindTaskCall'>;
-    caller: {sessionId: string; requestId: string; parent?: string; spawnKey?: string; labels?: Record<string, string>};
+    caller: {sessionId: string; requestId: string; parent?: string; spawnKey?: string; labels?: Record<string, string>; recovery?: TaskSpec['recovery']};
     onDiagnostic?(event: KernelDiagnostic): void;
     /** Trusted host admission work; rejection leaves the same caller deferred for retry. */
     beforeBind?(caller: TaskRef): Promise<void>;
@@ -83,13 +83,14 @@ function callerSpec(caller: TaskCallRunOptions['caller'], plan: TaskCallPlan): T
     if (!validCaller(caller))
         throw invalid('Task call caller identity is invalid');
     return {program: {kind: 'kernel.call', version: plan.timeoutMs === null ? '2' : '1'}, input: plan, requestId: caller.requestId, deferStart: true,
+        ...(caller.recovery ? {recovery: structuredClone(caller.recovery)} : {}),
         ...(caller.parent !== undefined ? {parent: caller.parent} : {}), ...(caller.spawnKey !== undefined ? {spawnKey: caller.spawnKey} : {}),
         ...(caller.labels !== undefined ? {labels: structuredClone(caller.labels)} : {})};
 }
 
 function validCaller(caller: TaskCallRunOptions['caller']): boolean {
     return record(caller) && text(caller.sessionId) && text(caller.requestId) && optionalText(caller.parent) && optionalText(caller.spawnKey)
-        && validLabels(caller.labels) && Object.keys(caller).every(key => ['sessionId', 'requestId', 'parent', 'spawnKey', 'labels'].includes(key));
+        && validLabels(caller.labels) && Object.keys(caller).every(key => ['sessionId', 'requestId', 'parent', 'spawnKey', 'labels', 'recovery'].includes(key));
 }
 function optionalText(value: unknown): boolean {return value === undefined || text(value);}
 function validLabels(value: unknown): boolean {

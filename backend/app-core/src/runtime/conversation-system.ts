@@ -11,7 +11,7 @@ import {registerInputAssets} from './input-assets';
 import {validateCallAssets} from './call-asset-preflight';
 import { createNestosDirectAgentPolicy } from '../presets/direct-agent-policy';
 import { createFlowCapabilities } from './flow-capabilities';
-import { createFlowInvocationSessions, initializeConversationSystem, type CommandBus, type FlowEngine, type SessionManager, type SessionRepository, type VFSAgentService } from '@nestos/llm-session';
+import { initializeConversationSystem, type CommandBus, type FlowEngine, type SessionManager, type SessionRepository, type VFSAgentService } from '@nestos/llm-session';
 import { resolveSessionSkillContext, resolveSessionSelectedSkills } from '@nestos/kernel-adapters';
 import type { IFileSystem, IVFSManager } from '@nestos/vfs-core';
 import type { HeadlessKernelRuntime } from './create-kernel-runtime';
@@ -81,8 +81,6 @@ export async function createConversationSystem(
         summarizeContent: createTransferSummarizer(sessionRepository, agentService, kernel.llmService),
         sessionEngine: sessionRepository,
         promptHistoryFiles: options.promptHistoryFiles ?? await vfs.openFileSystem('/home/admin/.config/nestos/prompt-history'),
-        flowInvocationSessions: createFlowInvocationSessions(systemFS),
-        independentCallSessions: createFlowInvocationSessions(systemFS, 'independent'),
         kernel: kernel.kernel,
         flowStore: flowEngine,
         dagPlugins: kernel.dagPlugins,

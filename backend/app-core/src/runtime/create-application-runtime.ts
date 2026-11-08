@@ -562,8 +562,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         await startup.schedule(policy.invocations, 'instructions.recover', async () => {
             await initializeProjects();
             await traceBoot('remote.instructions.recover', async () => remoteConnections?.recoverConversations());
-            cleanupFns.push(await recoverFlowSchedulers(kernel.kernel, commandBus, id => recovery.acquireLater(id)));
-            await recoverInstructionQueues(instructionQueueSessions, kernel.kernel, conversationContexts);
+            cleanupFns.push(await traceBoot('flowSchedulers.recover', () => recoverFlowSchedulers(kernel.kernel, commandBus, id => recovery.acquireLater(id))));
+            await traceBoot('instructionQueues.recover', () => recoverInstructionQueues(instructionQueueSessions, kernel.kernel, conversationContexts));
         });
 
         const acquireSessionLease = (sessionId: string): Promise<boolean> => recovery.acquireLater(sessionId);

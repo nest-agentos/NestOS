@@ -77,7 +77,7 @@ it('freezes one business Invocation and a ready Kernel plan in the existing rout
     const configured = options(), compile = vi.fn(configured.prepare); configured.prepare = compile;
     expect(await service.inspectPreparedTaskCall(input())).toBeUndefined();
     const ready = await service.prepareTaskCall(input(), configured);
-    expect(ready.caller).toEqual({sessionId: parent, requestId: 'independent-call:call'});
+    expect(ready.caller).toEqual({sessionId: parent, requestId: 'independent-call:call', recovery: {scope: 'session.call.history', key: 'call', until: 'acknowledged'}});
     expect(ready.plan).toMatchObject({targetSessionId: ready.executionSessionId, maxDepth: 3, timeoutMs: null,
         task: {labels: {invocationId: ready.invocation.invocationId, roundId: 'call', targetId: target.id}}});
     const allocate = vi.spyOn(identity, 'ulid');
@@ -379,6 +379,52 @@ async function completedKernelHistory() {
         executions: [{taskId: execution.target!.taskId, role: 'primary', invocation: ready.invocation}], status: 'completed', origin: 'user', createdAt: admitted.submission.acceptedAt};
     return {ready, admitted, execution, request, round};
 }
+
+it('indexes admitted callers only, preserves uncommitted history and removes the exact committed responsibility', async () => {
+    await service.prepareTaskCall(input(), options());
+    expect(await kernel.listRecoveryTasks('session.call.history')).toEqual([]);
+    const admitted = await service.submitPreparedTaskCall(input());
+    expect(await kernel.listRecoveryTasks('session.call.history')).toEqual([{...admitted.submission.task, key: 'call'}]);
+    await (await kernel.attachTask(parent, admitted.submission.task.taskId)).wait({until: 'settled', timeoutMs: 3000});
+    expect(await kernel.listRecoveryTasks('session.call.history')).toHaveLength(1);
+    expect(await service.reconcileTaskCallHistory(input())).toBe(true);
+    expect(await kernel.listRecoveryTasks('session.call.history')).toEqual([]);
+    const restored = createService(), sessions = vi.spyOn(kernel, 'listSessions'), shared = vi.spyOn(kernel, 'listShared');
+    const resume = vi.spyOn(restored, 'submitPreparedTaskCall');
+    await restored.recover(); await restored.dispose();
+    expect(sessions).not.toHaveBeenCalled(); expect(shared).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled();
+});
+
+it('repairs the commit-before-ack crash window without resubmitting completed execution', async () => {
+    const {ready, round} = await completedKernelHistory();
+    await new RoundLog(repository, ready.executionSessionId).append('main', round);
+    expect(await kernel.listRecoveryTasks('session.call.history')).toHaveLength(1);
+    const restored = createService(), resume = vi.spyOn(restored, 'submitPreparedTaskCall');
+    try {
+        await restored.recover();
+        await vi.waitFor(async () => expect(await kernel.listRecoveryTasks('session.call.history')).toEqual([]));
+        expect(resume).not.toHaveBeenCalled(); expect(model).toHaveBeenCalledOnce();
+    } finally {await restored.dispose();}
+});
+
+it('does not let eight durable caller waits block recovery of the ninth admitted call', async () => {
+    vi.spyOn(kernel, 'bindTaskCall').mockImplementation(async () => undefined as never);
+    const receipts = new Map<string, Awaited<ReturnType<typeof service.submitPreparedTaskCall>>>();
+    for (let i = 0; i < 9; i++) {
+        const request = input(); request.request.submission!.id = `call-${i}`; request.request.submission!.source.id = `call-${i}`;
+        await service.prepareTaskCall(request, options());
+        receipts.set(`call-${i}`, await service.submitPreparedTaskCall(request));
+    }
+    const restored = createService(), resume = vi.spyOn(restored, 'submitPreparedTaskCall')
+        .mockImplementation(async request => receipts.get(request.request.submission!.id)!);
+    try {
+        await restored.recover();
+        await vi.waitFor(() => expect(resume).toHaveBeenCalledTimes(9));
+        expect(model).not.toHaveBeenCalled();
+        expect(await kernel.listRecoveryTasks('session.call.history')).toHaveLength(9);
+    } finally {await restored.dispose();}
+});
+
 it('keeps completed execution separate from failed history commit and does not rerun the target', async () => {
     const {ready, admitted, round} = await completedKernelHistory();
     vi.spyOn(repository, 'updateManifest').mockRejectedValueOnce(Object.assign(Error('PRIVATE WRITE FAILURE'), {code: 'EIO'}));

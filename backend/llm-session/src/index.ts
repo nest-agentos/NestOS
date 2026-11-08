@@ -12,11 +12,9 @@ import { createSessionHost, type SessionHostPorts } from './utils/host-ports';
 import { ContentTransferService } from './session/content-transfers';
 export { ContentTransferService } from './session/content-transfers';
 import { FlowInvocationService } from './session/flow-invocations';
-import type { FlowInvocationSessions } from './persistence/flow-invocation-sessions';
 import { RoundLog as InvocationRoundLog } from './persistence/round-log';
 export { FlowInvocationService, FlowInvocationCommand, type FlowInvocationRecord, type FlowInvocationInput } from './session/flow-invocations';
 export {flowInvocationId} from './contracts/flow-invocations';
-export { createFlowInvocationSessions, type FlowInvocationSessions } from './persistence/flow-invocation-sessions';
 import { bindStandaloneFlowNode } from './session/flow-node-binder';
 import { AgentResolver } from './session/agent-resolver';
 export { createSessionDataProjection } from './persistence/session-projection';
@@ -152,8 +150,6 @@ export interface ConversationSystemOptions {
      * Marks Sessions that admitted a Flow invocation, so boot recovery skips the Sessions that
      * never did instead of probing every Session's shared state.
      */
-    flowInvocationSessions?: FlowInvocationSessions;
-    independentCallSessions?: FlowInvocationSessions;
 }
 
 export interface ConversationSystem {
@@ -212,7 +208,6 @@ async function initializeInvocations(options: ConversationSystemOptions, system:
         system.independentCalls = new IndependentCallService({kernel: options.kernel, repository: options.sessionEngine,
             transfers, prepareTaskCall: (request, invocation) => system.sessionManager.prepareIndependentTaskCall(request, invocation),
             taskCallPolicy: options.independentTaskCallPolicy,
-            sessions: options.independentCallSessions,
             resumeExecution: async target => {
                 const task = await options.kernel.task(target.sessionId, target.taskId);
                 if (task.program.kind === 'flow.aggregate') await system.commandBus.execute(FlowCommand.RunResume,
@@ -234,10 +229,12 @@ async function initializeInvocations(options: ConversationSystemOptions, system:
         const manifest = await new InvocationRoundLog(options.sessionEngine, id).loadManifest();
         const identity = await options.sessionEngine.getManifest(id);
         return { branch: manifest.currentBranch, head: manifest.currentHead, parentSessionId: identity.parentSessionId ?? undefined };
-    }, (id, selected) => resolveSessionConnection(options, id, selected), options.flowInvocationSessions, system.dag, transfers, options.hostPorts);
+    }, (id, selected) => resolveSessionConnection(options, id, selected), system.dag, transfers, options.hostPorts);
     invocations.register();
     const recover = () => createSessionHost(options.hostPorts).traceBoot('flowInvocations.recover', async () => {
-        await invocations.recover(); await system.independentCalls?.recover();
+        const host = createSessionHost(options.hostPorts);
+        await host.traceBoot('flowInvocationRecords.recover', () => invocations.recover());
+        await host.traceBoot('independentCalls.recover', async () => system.independentCalls?.recover());
     });
     if (options.scheduleInvocationRecovery) await options.scheduleInvocationRecovery(recover);
     else await recover();

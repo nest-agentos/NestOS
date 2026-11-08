@@ -72,6 +72,7 @@ export class FlowRunAggregation {
         dependencies: ReturnType<FlowRunAggregation['dependencies']>): Promise<TaskHandle<JsonValue>> {
         const initialCheckpoint = request.initial?.initialScheduler as unknown as SchedulerCheckpoint | undefined;
         const spec: TaskSpec<typeof input> = {
+            recovery: {scope: 'flow.scheduler', until: 'terminal'},
             program: { kind: 'flow.aggregate', version: '1' }, input,
             ...(initialCheckpoint?.spec.invocation ? { requestId: `flow-invocation:${initialCheckpoint.spec.invocation.requestId}` } : {}),
             // Terminal dependencies still decide success, including suppressed outputs.
