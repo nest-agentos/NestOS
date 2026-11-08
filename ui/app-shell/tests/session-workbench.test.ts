@@ -166,6 +166,21 @@ it('offers reset only on tasks and cancels through Kernel without deleting histo
     expect(f.factory).not.toHaveBeenCalled();
     await f.workbench.destroy();
 });
+it('offers project draft reset through the host menu extension without deleting native sessions', async () => {
+    const f=setup();await f.workbench.start();
+    const workbench=f.workbench as any;workbench.projects={};
+    const reset=vi.spyOn(workbench,'resetProjectDraft').mockResolvedValue(undefined);
+    try {
+        const options=vi.mocked(createVFSUI).mock.calls.at(-1)![0];
+        const item={id:'/folder:cx1/@new',metadata:{title:'New session',custom:{}}} as any;
+        const menu=options.contextMenu!.items!(item,[{id:'delete',label:'Delete'}]);
+        expect(menu.some(row=>'id' in row&&row.id==='delete')).toBe(false);
+        const action=menu.find(row=>'id' in row&&row.id==='reset-project-draft') as {onClick:(item:any)=>void};
+        action.onClick(item);await vi.waitFor(()=>expect(reset).toHaveBeenCalledWith('/cx1'));
+        const native=options.contextMenu!.items!({...item,id:'/folder:cx1/@harness/dsh/native'},[]);
+        expect(native.some(row=>'id' in row&&row.id==='reset-project-draft')).toBe(false);
+    } finally {workbench.projects=undefined;await f.workbench.destroy();}
+});
 
 it('offers closing a Session while keeping its records', async () => {
     const f = setup(); await f.workbench.start();
@@ -350,4 +365,22 @@ it('refreshes again when a visible navigation reload was interrupted by hiding',
         await f.workbench.setVisible(false); await f.workbench.setVisible(true); finish();
         await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(2));
     } finally { finish?.(); await f.workbench.destroy(); }
+});
+
+it('routes Cells mount actions through workbench dialogs and rejects root-directory detach',async()=>{
+    const f=setup(),w=f.workbench as any;
+    const root={mountId:'root',at:'/',serverProjectId:'server-demo'},docs={mountId:'docs',at:'/docs'};
+    w.projects={get:vi.fn(async()=>({id:'demo',name:'Renamed',path:'/group/Renamed'})),remoteMounts:{list:()=>[root,docs]}};
+    const status=vi.spyOn(w,'showProjectStatus').mockResolvedValue(undefined);
+    const detach=vi.spyOn(w,'unmountDirectoryDialog').mockResolvedValue(undefined);
+    const remount=vi.spyOn(w,'remountProjectDialog').mockResolvedValue(undefined);
+    const open=vi.spyOn(w,'showDirectory').mockResolvedValue(undefined);
+    try {
+        await w.openResource('@project/demo/status/docs');expect(status).toHaveBeenCalledWith('demo');
+        await w.openResource('@project/demo/detach/docs');expect(detach).toHaveBeenCalledExactlyOnceWith('demo','docs');
+        await w.openResource('@project/demo/remount/root');expect(remount).toHaveBeenCalledWith('demo');
+        await expect(w.openResource('@project/demo/detach/root')).rejects.toThrow('MOUNT_ACTION_UNAVAILABLE');
+        await expect(w.openResource('@project/demo/detach/missing')).rejects.toThrow('MOUNT_NOT_FOUND');
+        expect(open).not.toHaveBeenCalled();
+    } finally {await f.workbench.destroy();}
 });

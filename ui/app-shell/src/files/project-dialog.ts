@@ -1,3 +1,4 @@
+import {projectCreateGroups} from './project-create-groups';
 import { t } from '@nestos/common';
 import type { ProjectService } from '@nestos/app-contracts/services';
 import { remoteProjectFields } from './remote-project-fields';
@@ -34,21 +35,11 @@ export function showNameDialog(title: string, label: string, signal: AbortSignal
 
 export async function showProjectDialog(projects: ProjectService, parent: string | null, signal: AbortSignal,
     created: (path: string) => Promise<void>): Promise<void> {
+    if(signal.aborted)return;
     const controller = new AbortController();
     const fields = document.createElement('div');
-    const idLabel = document.createElement('label'); idLabel.textContent = t('project.id');
-    const projectId = document.createElement('input'); projectId.setAttribute('aria-label', t('project.id'));
-    projectId.pattern = '[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}'; projectId.maxLength = 64; idLabel.append(projectId); fields.append(idLabel);
-    const idHint = document.createElement('p'); idHint.textContent = t('project.idHint'); fields.append(idHint);
-    const group = document.createElement('label'); group.textContent = t('project.group');
-    const select = document.createElement('select');
-    const root = document.createElement('option'); root.value = ''; root.textContent = t('project.root'); select.append(root);
-    const folders = (await projects.sessions.navigation()).folders;
-    for (const folder of folders) {
-        if (await projects.forFolder(folder.path)) continue;
-        const option = document.createElement('option'); option.value = folder.path; option.textContent = folder.path; select.append(option);
-    }
-    select.value = parent ?? ''; group.append(select); fields.append(group);
+    const projectId=projectIdField(fields);
+    const groups=projectCreateGroups(projects,parent,fields,controller.signal),select=groups.select;
     const local = document.createElement('div');
     const remote = projects.remoteMounts ? remoteProjectFields(projects, fields, local, controller.signal) : undefined;
     fields.append(local);
@@ -62,9 +53,17 @@ export async function showProjectDialog(projects: ProjectService, parent: string
     }
     const abort = () => controller.abort(); signal.addEventListener('abort', abort, { once: true });
     try { await showNameDialog(t('project.create'), t('project.name'), signal, async name => {
+        groups.assertReady();
         const project = remote?.isRemote()
             ? await projects.createRemote(name, select.value || null, remote.connection.value, remote.path.value.trim(), remote.writable.checked ? 'rw' : 'ro', { signal: controller.signal, timeoutMs: 10000, createDirectory:remote.createDirectory.checked, projectId:projectId.value.trim() || undefined })
             : await projects.create(name, select.value || null, directory, projectId.value.trim() || undefined);
         await created(project.path);
     }, fields); } finally { controller.abort(); signal.removeEventListener('abort', abort); }
+}
+
+function projectIdField(fields:HTMLElement):HTMLInputElement {
+    const label=document.createElement('label');label.textContent=t('project.id');
+    const input=document.createElement('input');input.setAttribute('aria-label',t('project.id'));
+    input.pattern='[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}';input.maxLength=64;label.append(input);fields.append(label);
+    const hint=document.createElement('p');hint.textContent=t('project.idHint');fields.append(hint);return input;
 }

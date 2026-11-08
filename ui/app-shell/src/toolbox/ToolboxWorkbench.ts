@@ -193,13 +193,13 @@ export class ToolboxWorkbench implements WorkspaceController {
         this.ui?.refreshList(); this.updateToolbar(); this.persist();
     }
     private updateToolbar(): void {
-        this.ui?.setToolbar({ fileLabel: t('toolbox.new'), fileTitle: t('toolbox.create'),
-            secondary: this.prefs.filter === 'tools' && this.options.resources.toolPackages
+        this.ui?.setToolbar({ fileLabel: t(this.prefs.filter === 'cells' ? 'cells.new' : 'toolbox.new'), fileTitle: t(this.prefs.filter === 'cells' ? 'cells.new' : 'toolbox.create'),
+            secondary: this.prefs.filter === 'cells' ? undefined : this.prefs.filter === 'tools' && this.options.resources.toolPackages
                 ? {label: t('toolbox.packages.title'), run: () => {void showToolPackages(this.options.resources, this.abort.signal, () => this.refresh());}}
                 : this.prefs.filter === 'models' ? { label: t('modelDefaults.button'), run: () => { void this.options.navigate({ target: 'settings', resourceId: 'model-defaults' }); } } : { label: t('toolbox.organize'), run: () => { const group = this.selectedDrawer();
                 const kind = group?.kind ?? (drawerKind(this.prefs.filter as ToolboxKind) ? this.prefs.filter as import('@nestos/app-contracts').DrawerKind : 'flows');
                 void this.drawerActions.move(kind, group?.paths).catch(error => alert(String(error))); } },
-            hiddenActions: this.prefs.filter === 'tools' ? ['create-file', 'create-directory']
+            hiddenActions: this.prefs.filter === 'cells' ? ['create-directory', 'import', 'export'] : this.prefs.filter === 'tools' ? ['create-file', 'create-directory']
                 : ['create-directory'],
             actions: { 'create-file': async () => { await this.createResource(); }, import: context => this.import(context), export: context => this.export(context) } });
     }
@@ -235,8 +235,10 @@ export class ToolboxWorkbench implements WorkspaceController {
         this.reportInvalidConnections();
         if (this.options.agentsInWorkbench && this.prefs.filter !== 'agents') items = items.filter(item => toolboxKind(item.id) !== 'agents');
         const models = items.filter(item => ['providers', 'connections'].includes(toolboxKind(item.id)!));
+        const cells = items.filter(item => toolboxKind(item.id) === 'cells' && ['all', 'cells'].includes(this.prefs.filter));
+        const cellNodes = cells.some(item => item.id !== '/cells/manage') ? cells.filter(item => item.id !== '/cells/manage') : cells;
         return [...(this.prefs.filter === 'all' || this.prefs.filter === 'models' ? modelDrawers(models, this.options.inventory) : []),
-            ...items.filter(item => toolboxKind(item.id) === 'cells' && ['all', 'cells'].includes(this.prefs.filter)),
+            ...cellNodes,
             ...resourceDrawers(items, this.options.resources.drawers, this.prefs.filter)
                 .filter(group => !this.options.agentsInWorkbench || this.prefs.filter === 'agents' || group.metadata.custom.toolboxKind !== 'agents')];
     }
@@ -342,6 +344,10 @@ export class ToolboxWorkbench implements WorkspaceController {
         clearTimeout(this.timer); this.timer = setTimeout(() => { void this.refresh().catch(error => alert(String(error))); }, 100);
     }
     invalidateFromEvents(): void {this.scheduleRefresh();}
+    async openCellsNode(id?: string): Promise<void> {
+        await this.refresh();
+        await this.options.navigate({target: 'toolbox',resourceId: '/cells/' + (id ? encodeURIComponent(id) : 'manage')});
+    }
     private refresh(): Promise<void> {
         const work = this.refreshTail.then(async () => {
             if (this.closed) return;

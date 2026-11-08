@@ -75,3 +75,31 @@ it('does not discard a remote submission whose outcome is still unknown', async 
 it('rejects malformed persisted submission targets', () => {
     expect(() => decodeDraftRecord(JSON.stringify({version: 1, id: 'draft', state: 'submitting', data: '', sessionId: 'draft', submissionId: 'operation', remoteTarget: {...target, profileId: 42}}))).toThrow();
 });
+it('reads the authoritative node receipt behind a local index and creates exactly one successor UUID', async () => {
+    const f = await setup(); await prepareRemoteDraft(f.fs,f.project.project.id,f.composer.id!,target);
+    const key = JSON.stringify([f.project.project.id,'connection','native-project','principal','codex',f.composer.id]);
+    await f.journal().save({sessionId:'native-remote'});
+    await f.fs.meta.seq!.setEntry('/etc/fs/harness-conversations.seq',key,JSON.stringify({remote:true,sessionId:'native-remote',needsRecovery:true}));
+    const read = vi.fn(async()=>({sessionId:'native-remote',submittedTurnId:undefined as string|undefined,pending:true}));
+    app!.projects.remoteMounts!.readConversationRecovery = read;
+    await app!.projects.drafts.reconcile(f.project.project.id);
+    await expect(f.composer.clear()).rejects.toMatchObject({code:'EBUSY'});
+    read.mockResolvedValue({sessionId:'native-remote',submittedTurnId:'accepted-turn',pending:false});
+    const notify=vi.fn();app!.projects.drafts.onPromoted(notify);
+    const next=await app!.projects.drafts.open(f.project.project.id,f.folder);
+    expect(next.id).not.toBe(f.composer.id);expect(next.id).toMatch(/^[0-9a-f-]{36}$/);expect(next.initialData).toBe('');
+    expect(read).toHaveBeenCalledWith(f.project.project.id,target,f.composer.id);
+    expect(await readConversationIdentity(f.fs,f.project.project.id,{...target,nativeSessionId:'native-remote'})).toBe(f.composer.id);
+    expect((await app!.projects.drafts.open(f.project.project.id,f.folder)).id).toBe(next.id);
+    expect(notify).toHaveBeenCalledOnce();
+});
+it('retains a submitting draft when the authoritative node receipt cannot be read', async () => {
+    const f = await setup();await prepareRemoteDraft(f.fs,f.project.project.id,f.composer.id!,target);
+    await f.journal().save({sessionId:'native'});
+    const key=JSON.stringify([f.project.project.id,'connection','native-project','principal','codex',f.composer.id]);
+    await f.fs.meta.seq!.setEntry('/etc/fs/harness-conversations.seq',key,JSON.stringify({remote:true,sessionId:'native'}));
+    app!.projects.remoteMounts!.readConversationRecovery=vi.fn(async()=>{throw Object.assign(new Error('unavailable'),{code:'EIO'});});
+    await expect(app!.projects.drafts.reconcile(f.project.project.id)).rejects.toThrow('unavailable');
+    expect((await new ProjectDraftStore(f.fs,f.project.project.id).load()).id).toBe(f.composer.id);
+    await expect(f.composer.clear()).rejects.toThrow('unavailable');
+});

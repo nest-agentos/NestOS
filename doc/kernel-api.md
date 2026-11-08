@@ -915,6 +915,10 @@ Effect适配器可通过可选 `failureOutcome(error)` 将实时调用无法确�
 
 ## 事务恢复责任索引
 
+完整 Kernel 另提供 `listRuntimeRecoverySessions()`：从 `catalog.seq.runtime-recovery/<session>/<kind>/<identity>` 去重读取当前承担运行恢复责任的 Session。普通未终态 Task（含等待计时器）、Effect 未决与物理清理、消息 outbox 未投递/未确认结算，以及托管资源句柄、claim、待办请求和清理均随原状态事务维护。仅 `created` 的延迟任务无需通用恢复；启动时才登记责任。Task 终态不提前清除 Effect 清理责任；消息 delivered 也不能提前清除跨 Session 结算责任。资源 Decision 与直接命令共用事务追踪，覆盖共享权威和本地句柄两个目录；Kernel 级资源清理由原资源 poller 负责。
+
+索引要求 Session 与 catalog 共享同一个 IFileSystem 事务域；跨域存储由所有者显式恢复。绑定上下文由权威 catalog 重建，不信任归档中的路径。归档导入同事务重建目标索引并保留暂停；删除 Session 清除其引用。索引损坏报错，无历史回填或全量扫描兜底；旧数据中未建索引的运行责任需显式恢复。
+
 完整 Kernel 提供 `listRecoveryTasks(scope)`、`listRecoveryShared(scope)` 与 `acknowledgeTaskRecovery(sessionId, taskId, scope)`。这些是宿主内部冷查询/确认接口，不是浏览器执行能力。Kernel 只处理不透明 scope、引用和完成条件，不识别 Flow、模型或业务字段；业务层决定何时需要恢复及确认哪些结果。
 
 | 责任 | 写入时机 | 移除时机 |

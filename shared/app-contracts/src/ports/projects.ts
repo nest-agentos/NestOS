@@ -287,6 +287,8 @@ export interface ProjectDraftComposer {
 }
 
 export interface ProjectRemoteMountService {
+    nodeOverview(id: string, options?: OperationOptions): Promise<CellsNodeOverview>;
+    confirmAuthorizationRefresh(id: string, proposalId: string, options?: OperationOptions): Promise<void>;
     mountedProjectIds(): string[];
     readonly sessionStatus: RemoteSessionStatus;
     existingProjectIds?: () => Promise<readonly string[]>;
@@ -296,6 +298,9 @@ export interface ProjectRemoteMountService {
     init(): Promise<void>;
     executionCapabilities(connectionId: string, options?: OperationOptions): Promise<ExecutionCapabilities>;
     list(projectId: string): ProjectRemoteMount[];
+    readConversationRecovery?(projectId: string,
+        target: Omit<NonNullable<ProjectDraftPromotion['remote']>, 'nativeSessionId' | 'turnId'>,
+        conversationId: string): Promise<{sessionId?: string; submittedTurnId?: string; pending: boolean}>;
     connections(): RemoteFileSystemConfig[];
     connectionName(id: string): string | undefined;
     connectionDiagnostic(id: string): CellsConnectionDiagnostic;
@@ -308,7 +313,7 @@ export interface ProjectRemoteMountService {
         paths: string[];
         nextCursor: string | null;
     }>;
-    saveConnection(input: RemoteFileSystemInput, password: string, id?: string): Promise<string>;
+    saveConnection(input: RemoteFileSystemInput, password: string, id?: string, options?: {requireTested?:boolean}): Promise<string>;
     removeConnection(id: string): Promise<void>;
     sessionChannel(projectId: string, operation: 'open' | 'messages' | 'close' | 'requests' | 'respond' | 'current' | 'acknowledge', input: Record<string, unknown>): Promise<unknown>;
     reconcileReferences(): Promise<void>;
@@ -344,6 +349,31 @@ export interface ProjectRemoteMountService {
 }
 
 export type RemoteConnectionStatus = 'unknown' | 'checking' | 'online' | 'offline';
+
+export type CellsAuthorizationRefresh =
+    | {state: 'available'; proposalId: string; serverId: string; principalId: string; previousRevision: string;
+        nextRevision: string; detectedAt: number; expiresAt: number; affectedProjectIds: string[]}
+    | {state: 'blocked'; reason: 'server-changed' | 'principal-changed' | 'identity-unverified'}
+    | {state: 'unavailable'; code: string}
+    | {state: 'unchanged'};
+
+export interface CellsNodeOverview {
+    connectionId: string;
+    sampledAt: number;
+    authorizationRefresh?: CellsAuthorizationRefresh;
+    mounts: Array<{
+        projectId: string; projectName: string; mountId: string;
+        alias: string; root: string; at: string; access: 'ro' | 'rw';
+        status: RemoteConnectionStatus;
+        projectStatus: import('./diagnostics').RemoteProjectStatus['status'];
+        problem?: import('./diagnostics').RemoteProjectStatus['problem'];
+        checkedAt?: number;
+        canRemount: boolean;
+        unmount: 'project' | 'directory' | null;
+    }>;
+    statistics: {state: 'available'; value: import('@nestos/cells-driver').CellsNodeStatus}
+        | {state: 'unsupported' | 'unavailable'; code?: string};
+}
 
 export type RemoteFileSystemInput = Pick<RemoteFileSystemConfig, 'name' | 'endpoint' | 'username' | 'anonymous'>;
 

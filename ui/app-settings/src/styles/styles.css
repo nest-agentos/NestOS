@@ -8,3 +8,5 @@
 @import './_appearance.css';
 @import '@xterm/xterm/css/xterm.css';
 @import './_terminal.css';
+
+@import './_cells.css';

@@ -1,3 +1,4 @@
+import {parseProjectAction, type ProjectActionRoute} from './project-action-route';
 import type {ChatEditorFactory as EditorFactory, ChatEditorOptions as EditorOptions} from '@nestos/llm-ui-adapter/contracts';
 import {confirmRemoteRemoval, remoteRemovalItems} from './remote-session-removal';
 import { PROJECT_ACTION_ICONS } from '@nestos/common';
@@ -177,7 +178,7 @@ function afterSidebarPaint(): Promise<void> {
 }
 
 function initialSessionId(resource?: string): string | undefined {
-    if (!resource || resource.startsWith('draft:') || isFlowPath(resource)) return;
+    if (!resource || resource.startsWith('@project/') || resource.startsWith('draft:') || isFlowPath(resource)) return;
     try {
         const target = resolveBrowserTarget(parseSessionRoute(resource).path);
         return target.kind === 'session' ? target.sessionId : undefined;
@@ -471,6 +472,8 @@ export class SessionWorkbench implements WorkspaceController {
                     if (isFlowPath(item.id)) return this.flows?.menu.items?.(item,
                         item.id === '/@flows' ? [] : defaults.filter(entry => 'id' in entry && entry.id === 'delete')) ?? [];
                     const target = resolveBrowserTarget(item.id);
+                    if (target.kind === 'project-draft' && this.projects) return [{id: 'reset-project-draft', label: t('project.resetDraft'),
+                        onClick: () => {void this.resetProjectDraft(target.folder).catch(error => this.report(error));}}];
                     const twin = this.digitalTwin && this.projects && (['session', 'project-files'].includes(target.kind) || (target.kind === 'remote' && target.nativeSessionId) || (target.kind === 'folder' && item.metadata.custom.projectId))
                         ? twinSourceMenu(this.digitalTwin, () => projectTwinTarget(this.projects!, item),
                             async () => { await this.hostContext?.navigate({ target: 'twin', resourceId: '/sources' }); }, this.dialogs.signal) : [];
@@ -667,7 +670,7 @@ export class SessionWorkbench implements WorkspaceController {
     private showProjectStatus(projectId: string, container?: HTMLElement, signal = this.dialogs.signal): Promise<void> {
         return showDiagnostics({diagnostics: this.backend.diagnostics, remote: this.projects?.remoteMounts,
             projectId, container, title: t('diagnostics.projectStatus'), signal, refreshBinding: () => this.refreshProjectBinding(projectId), remount: () => this.remountProjectDialog(projectId),
-            configureConnection: async () => {await this.hostContext?.navigate({target: 'toolbox', resourceId: '/cells/manage'});}});
+            configureConnection: async id => {await this.hostContext?.navigate({target: 'toolbox', resourceId: id?'/cells/'+encodeURIComponent(id):'/cells/manage'});}});
     }
     private projectHarnessMenu(id: string) {
         const remote=this.projects?.remoteMounts;
@@ -756,6 +759,30 @@ export class SessionWorkbench implements WorkspaceController {
             await this.sidebarUI?.refresh(); await this.projectNavigation?.refresh();
             if (active === prefix || active?.startsWith(prefix + '/')) await this.openResource(active);
         }, panel, {hideName: true, confirmLabel: t('action.confirm')});
+    }
+    private async openProjectAction({projectId,action,mountId}:ProjectActionRoute):Promise<void> {
+        const project=await this.projects!.get(projectId),remote=this.projects?.remoteMounts;
+        if(action==='open')return this.openResource(folderBrowserPath(project.path));
+        if(action==='status')return this.showProjectStatus(projectId);
+        const mount=remote?.list(projectId).find(item=>item.mountId===mountId);
+        if(!mount)throw new Error('MOUNT_NOT_FOUND');
+        if(action==='remount'&&mount.at==='/'&&mount.serverProjectId)return this.remountProjectDialog(projectId);
+        if(action==='unmount'&&mount.at==='/'&&projectFileSource(project,remote).kind==='remote')return this.unmountProjectDialog(projectId);
+        if(action==='detach'&&mount.at!=='/'&&!mount.serverProjectId)return this.unmountDirectoryDialog(projectId,mountId);
+        throw new Error('MOUNT_ACTION_UNAVAILABLE');
+    }
+    private async unmountDirectoryDialog(projectId:string,mountId:string):Promise<void> {
+        const project=await this.projects!.get(projectId),remote=this.projects!.remoteMounts!;
+        const note=document.createElement('p');note.textContent=t('cells.unmountDirectoryConfirm');
+        await showNameDialog(t('cells.unmountDirectory'),'',this.dialogs.signal,async()=>{
+            const mount=remote.list(projectId).find(item=>item.mountId===mountId);
+            if(!mount||mount.at==='/'||mount.serverProjectId)throw new Error('MOUNT_ACTION_UNAVAILABLE');
+            const active=this.active,prefix=folderBrowserPath(project.path);
+            await remote.assertUnmountable(projectId);await this.closeProjectTabs(project.path);
+            await remote.remove(projectId,mountId);
+            await this.sidebarUI?.refresh();await this.projectNavigation?.refresh();
+            if(active===prefix||active?.startsWith(prefix+'/'))await this.openResource(prefix);
+        },note,{hideName:true,confirmLabel:t('cells.unmountDirectory')});
     }
     private async renameProjectDialog(id: string): Promise<void> {
         const project = await this.projects!.get(id);
@@ -907,6 +934,8 @@ export class SessionWorkbench implements WorkspaceController {
         }
     }
     async openResource(resourceId: string, options: OpenResourceOptions = {}): Promise<void> {
+        const projectAction=parseProjectAction(resourceId);
+        if(projectAction)return this.openProjectAction(projectAction);
         if (resourceId.startsWith('@agent/')) return this.openAgentSettings(decodeURIComponent(resourceId.slice(7)));
         this.onBeforeNavigate?.();
         this.sessions ??= await this.sessionsReady;
@@ -1654,7 +1683,7 @@ export class SessionWorkbench implements WorkspaceController {
     private async createProject(selected?: string | null): Promise<void> {
         const path = selected ?? this.sidebarUI?.getActiveSession()?.id ?? '/';
         const folder = folderPathFromBrowserPath(path);
-        const current = await this.projects!.forFolder(folder);
+        const current = folder ? await this.projects!.forFolder(folder) : undefined;
         const parent = current ? current.parentPath : folder;
         await showProjectDialog(this.projects!, parent, this.dialogs.signal, async () => {
             await this.sidebarUI?.refresh(); await this.projectNavigation?.refresh();
@@ -2035,6 +2064,21 @@ export class SessionWorkbench implements WorkspaceController {
         this.scheduleRefresh('project.draftPromoted');
         await confirming;
         if (replaceActive) {this.tabs.activate(path); await this.restoreEditor(value); this.onSelect(this.getActiveResourceId()!, 'replace');}
+    }
+    private async resetProjectDraft(folder: string): Promise<void> {
+        const project = await this.projects!.forFolder(folder);
+        if (!project) throw new Error(t('project.selectForSession'));
+        const composer = await this.projects!.drafts.open(project.project.id, project.path);
+        const note = document.createElement('p'); note.textContent = t('project.resetDraftEffect');
+        await showNameDialog(t('project.resetDraft'), '', this.dialogs.signal, async () => {
+            const current = await this.projects!.drafts.open(project.project.id, project.path);
+            if (current.id !== composer.id) throw new Error(t('project.resetDraftChanged'));
+            await current.clear();
+            await this.tabs.close(`draft:${project.project.id}`, false);
+            await this.browser?.invalidateNavigation();
+            await this.startSessionDraft(folderBrowserPath(project.path));
+            await this.sidebarUI?.refresh();
+        }, note, {hideName: true, confirmLabel: t('project.resetDraft')});
     }
     async startSessionDraft(parent?: string, input?: {text: string; files: File[]}, agentId?: string,
         preferences?: import('@nestos/llm-ui-adapter/contracts').SessionDraftPreferences, navigationCurrent?: () => boolean): Promise<void> {

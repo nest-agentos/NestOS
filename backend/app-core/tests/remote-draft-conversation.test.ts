@@ -12,7 +12,7 @@ async function fixture(draftTitle?: string) {
     const session = {id: 'native', title: 'Native preview', cwd: '/', status: 'idle', updatedAt: 1, resumable: true, owned: true};
     const profile: HarnessProfile = {id: 'p', kind: 'native', workspaces: [{id: 'w'}],
         capabilities: {create: true, history: true, resume: true, interrupt: true, interactions: true, rename: true, slashCommands: true}};
-    const client = {subscribe: vi.fn(() => () => {}),create: vi.fn(async () => ({session})), read: vi.fn(async () => ({session, turns: []})),
+    const client = {profiles: vi.fn(async()=>({epoch:'epoch',profiles:[profile]})),subscribe: vi.fn(() => () => {}),create: vi.fn(async () => ({session})), read: vi.fn(async () => ({session, turns: []})),
         commands: vi.fn(async () => [{name: 'verify', description: 'Verify', kind: 'prompt'}]),
         command: vi.fn(async () => ({turnId: 'command-turn'})), turn: vi.fn(async () => ({turnId: 'turn'})), operation: vi.fn(), close: vi.fn(async () => {}),
         rename: vi.fn(async (_profile, _session, name) => ({session: {...session, title: name}})),

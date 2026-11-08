@@ -31,7 +31,7 @@ const cleanup: Array<() => unknown> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); await runtime?.dispose(); document.body.replaceChildren(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 class Editor extends BaseSettingsEditor<object> { async render() { this.container.textContent = editorResourceId(this.options) ?? ''; } }
 async function setup(ocr?: import('../src/configuration/ocr-controls').OcrConfigurationControls,
-    uiPreferences?: import('../src/toolbox/ToolboxWorkbench').ToolboxPreferencesPort, executorUsage?: EditorOptions['executorUsage'], agentsInWorkbench = false) {
+    uiPreferences?: import('../src/toolbox/ToolboxWorkbench').ToolboxPreferencesPort, executorUsage?: EditorOptions['executorUsage'], agentsInWorkbench = false, cells?: import('@nestos/app-contracts/services').ProjectRemoteMountPort) {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
     vi.stubGlobal('cancelAnimationFrame', clearTimeout);
     HTMLDialogElement.prototype.showModal ??= function () { this.setAttribute('open', ''); };
@@ -43,12 +43,12 @@ async function setup(ocr?: import('../src/configuration/ocr-controls').OcrConfig
     await runtime.commandBus.execute(FlowCommand.DraftCreate, { id: 'review', name: 'English review' });
     await runtime.agentService.saveMCPServer({ id: 'docs', name: 'Documentation', transport: 'http', autoConnect: false, endpoint: 'https://example.invalid/mcp', tools: [{ name: 'lookup', description: 'Find docs', inputSchema: { type: 'object' } }] });
     const skills = new SkillsEngine(runtime.agentService); cleanup.push(() => skills.dispose());
-    const inventory = new ToolboxInventory(() => runtime.agentService.getMCPServers(), runtime.kernel.toolCatalog, runtime.agentService, () => runtime.agentService.listSystemPrompts()); await inventory.init(); cleanup.push(() => inventory.dispose());
+    const inventory = new ToolboxInventory(() => runtime.agentService.getMCPServers(), runtime.kernel.toolCatalog, runtime.agentService, () => runtime.agentService.listSystemPrompts(), undefined, undefined, () => cells?.connections().map(node => ({id:node.id,name:node.name,endpoint:node.endpoint,status:cells.connectionStatus(node.id)})) ?? []); await inventory.init(); cleanup.push(() => inventory.dispose());
     const resources = new ToolboxResources({ agents: await runtime.vfs.openFileSystem('/home/admin/agents'), skills,
         flows: runtime.flowEngine.engine, ...inventory.sources }, runtime.agentService, runtime.commandBus, await runtime.vfs.openFileSystem('/etc'), inventory, createNestosFlowDrawers(), createNestosProviderTemplates());
     const sidebar = document.createElement('div'), main = document.createElement('div'); document.body.append(sidebar, main);
     const factory = vi.fn(async (container: HTMLElement, options: EditorOptions) => { const editor = new Editor(container, {}, options); await editor.init(container); return editor; });
-    const factories = { cells: async (container: HTMLElement, options: EditorOptions) => {const editor = new CellsSettingsEditor(container, undefined, options); await editor.init(container); return editor;}, prompts: async (container: HTMLElement, options: EditorOptions) => { const editor = new SystemPromptSettingsEditor(container, runtime.agentService, options); await editor.init(container); return editor; }, agents: factory, skills: factory, flows: factory,
+    const factories = { cells: async (container: HTMLElement, options: EditorOptions) => {const editor = new CellsSettingsEditor(container, cells, options); await editor.init(container); return editor;}, prompts: async (container: HTMLElement, options: EditorOptions) => { const editor = new SystemPromptSettingsEditor(container, runtime.agentService, options); await editor.init(container); return editor; }, agents: factory, skills: factory, flows: factory,
         providers: async (container: HTMLElement, options: EditorOptions) => { const editor = new ProviderSettingsEditor(container, runtime.agentService, options, mediaProbeExamples); await editor.init(container); return editor; },
         connections: async (container: HTMLElement, options: EditorOptions) => { const editor = new ConnectionSettingsEditor(container, runtime.agentService, options); await editor.init(container); return editor; },
         mcp: async (container: HTMLElement, options: EditorOptions) => { const editor = new MCPSettingsEditor(container, runtime.agentService, options); await editor.init(container); return editor; },
@@ -1104,4 +1104,19 @@ it('offers Cells immediately before Skills and opens its shared configuration re
     await f.workbench.openResource('/cells/manage');
     await vi.waitFor(() => expect(f.main.querySelector('[data-cells-form]')).not.toBeNull());
     expect(toolboxSettingsRoute('cells')).toBe('/cells/manage');
+});
+
+it('lists actual Cells nodes in the sidebar and opens only the selected node overview',async()=>{
+    const summary=vi.fn(async(id:string)=>({connectionId:id,sampledAt:Date.now(),mounts:[],statistics:{state:'unsupported'}}));
+    const cells={connections:()=>[{id:'vm-node',name:'Cell X1',endpoint:'http://127.0.0.1:18787',credentialRef:'never-project-this'}],
+        connectionStatus:()=> 'online',nodeOverview:summary,onChange:()=>()=>{}} as unknown as import('@nestos/app-contracts/services').ProjectRemoteMountPort;
+    const f=await setup(undefined,undefined,undefined,false,cells);f.workbench.setFilter('cells');
+    await vi.waitFor(()=>expect(f.sidebar.querySelector('[data-item-id="/cells/vm-node"]')).not.toBeNull());
+    expect(f.sidebar.textContent).toContain('Cell X1');expect(f.sidebar.textContent).not.toContain('never-project-this');
+    expect(summary).not.toHaveBeenCalled();await f.workbench.openResource('/cells/vm-node');
+    await vi.waitFor(()=>expect(f.main.querySelector('[data-cells-title]')?.textContent).toBe('Cell X1'));
+    expect(summary).toHaveBeenCalledTimes(1);
+    expect(f.sidebar.querySelector('[data-item-id="/cells/manage"]')).toBeNull();
+    await f.workbench.openResource('/cells/manage');
+    await vi.waitFor(()=>expect(f.main.querySelector('[data-cells-title]')?.textContent).toBe(t('cells.new')));
 });

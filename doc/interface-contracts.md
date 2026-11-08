@@ -223,6 +223,8 @@ HarnessExecutionProvider.reconcile 返回 ConnectionReconcileResult；Effect 桥
 
 `ModelConfigurationCommands.inspectMCPDeletion` 返回配置和项目挂载引用的删除预览；`deleteMCPServers` 校验预览并要求有引用时显式 force。`MCPDeletionPort` 由 ProjectRemoteMountService 实现，预览由 ProjectService 提供远程项目与本地会话信息；经 SessionLifecycleService 清理以目标 MCP 为根来源的本地远程项目及其本地会话，再批量移除引用并释放视图。普通本地项目只解除附加挂载，服务器内容和原生会话保留。普通 MCP 删除仍禁止有引用的配置。
 
+`ProjectRemoteMountService.nodeOverview(connectionId, options)` 为工具箱提供单次只读概览：当前用户项目挂载的项目身份/名称、alias/root/at/access，以及 Cells 节点资源统计或明确的 unsupported/unavailable 状态。DTO 不返回 credentialRef、令牌或物理路径。`saveConnection` 的可选 `requireTested` 要求复用 `checkDraft` 已验证的同一参数，保存不再次探测；草稿验证只保留后端短期私有证据，不持久化连接。
+
 `ProjectRemoteMountService.connectionDiagnostic(connectionId)` 返回不含凭据和端点的 `CellsConnectionDiagnostic`（名称、验证原因、catalog revision、当前配置身份）。`ProjectRemoteMountService.resolveConnection` 在访问前检查当前连接目录，缺失连接抛出 `RemoteConnectionUnavailableError`，保留 ENOENT 错误码并附带诊断及引用项目 ID。宿主本地化展示；`reportRemoteFailure` 记录 `cells` 模块日志和时间在前的控制台错误，按异常实例去重，只输出身份、阶段、结构化错误码。详见 [项目模型](design/cells-project-model.md)。
 
 
@@ -420,3 +422,9 @@ ChatOptions.ocr 是独立 llm-ui 的可选识别端口，支持 recognize、read
 `@nestos/mdxeditor` 标题栏依次为复制、目录、up、更多，保存等次要操作保留在更多。H1–H3 使用与渲染相同的 Markdown 语法，重复标题 ID 带出现序号，源码位置保留代码块和 CRLF 偏移。`ContentListView` 的 `ContentListItem.outlineName` 可选；`getOutline()` 与 `reveal(id)` 管理命名窗口并展开定位目标。
 
 `SessionRenderer` 通过 `RendererContext.windowName` 接受可选名称，`getWindowOutline()`/`revealWindow(id)` 使用同一注册表。LLM 宿主仅给用户窗口配置时间与提问摘要，回复不配置；邮件给正文窗口配置时间与发件人。稳定消息/邮件 ID 不随显示名称、内容更新或重渲染改变，移除和卸载撤销引用。
+
+
+Cells `nodeOverview` 的 mounts 保留同一项目的每条子目录绑定，包含 mountId、源 alias/root、目标 at、权限、挂载状态和项目整体状态，并声明可用的项目/目录操作。状态复用 `projectStatus` 的本地观察快照，读取不探测所有远程目录。UI 项目操作通过工作台的确认与生命周期处理，不能用删除根挂载记录代替卸载项目。
+
+
+Cells 授权确认：`CellsNodeOverview.authorizationRefresh` 为可选确认状态（available/blocked/unavailable/unchanged）。仅在收到授权变更错误后自动发现；available 携带短期 proposalId、服务器/principal、新旧 revision、有效期与关联项目 ID，不含认证秘密。`ProjectRemoteMountService.confirmAuthorizationRefresh` 在 transport 中声明为 async 写命令，确认时重新核验候选和当前节点，不能通过 query 自动覆盖连接或项目授权。

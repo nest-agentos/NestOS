@@ -62,7 +62,10 @@ export class ProjectService {
             return new Map(sessions.filter(session => project && (session.folder === project.path || session.folder?.startsWith(project.path + '/')))
                 .map(session => [session.id, session.title]));
         });
-        const remoteDrafts = new RemoteDraftRecovery(root, id => this.remoteMounts?.list(id) ?? []);
+        const remoteDrafts = new RemoteDraftRecovery(root, id => this.remoteMounts?.list(id) ?? [], async (id, target, draftId) => {
+            if (!this.remoteMounts?.readConversationRecovery) throw new FSError('ECAPABILITY', 'Remote draft recovery is unavailable');
+            return this.remoteMounts.readConversationRecovery(id, target, draftId);
+        });
         this.drafts = new ProjectDraftService(id => new ProjectDraftStore(root, id), repository, async () => (await this.list()).map(item => item.project.id), async (id, request) => {
             const project = await this.get(id);
             if (request?.harness) {
@@ -143,6 +146,9 @@ export class ProjectService {
     async list(folders?: readonly SessionFolder[]): Promise<ProjectFolder[]> {
         const navigation = folders ?? await this.repository.listFolders();
         return (await this.projectRepository.list()).map(project => this.projectFolder(project, navigation));
+    }
+    async storedProjectSummaries(): Promise<Array<{id: string; name: string; remote: boolean}>> {
+        return (await this.projectRepository.list()).map(({id,name,kind}) => ({id,name,remote:kind === 'remote'}));
     }
     private projectFolder(project: StoredProject, folders: readonly SessionFolder[]): ProjectFolder {
         const cached = folders.find(folder => folder.project?.id === project.id);

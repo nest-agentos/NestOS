@@ -11,7 +11,7 @@ describe('Session recovery with leases', () => {
         let release!: () => void;
         const gate = new Promise<void>(resolve => {release = resolve;});
         const beforeRecover = vi.fn(async () => {await gate;});
-        const kernel = {async *listSessions() {}, recoverSessions: vi.fn(), recoverSession: vi.fn(async () => {})};
+        const kernel = {async listRuntimeRecoverySessions() { return []; }, recoverSessions: vi.fn(), recoverSession: vi.fn(async () => {})};
         const recovery = await recoverSessionsWithLeases(kernel as never, store, {id: 'host', kind: 'cli'}, 10_000, beforeRecover, new Set(), 'deferred');
         try {
             const preparing = recovery.acquireLater('session');
@@ -28,7 +28,7 @@ describe('Session recovery with leases', () => {
         const fs = await manager.openFileSystem('/'), store = new SessionLeaseStore(fs);
         const ids = Array.from({ length: 12 }, (_, index) => `s${index}`);
         const gates = new Map<string, () => void>();
-        const kernel = { async *listSessions() { for (const id of ids) yield { id }; }, recoverSessions: vi.fn(async () => {}), recoverSession: vi.fn() };
+        const kernel = { async listRuntimeRecoverySessions() { return ids; }, recoverSessions: vi.fn(async () => {}), recoverSession: vi.fn() };
         const boot = recoverSessionsWithLeases(kernel as never, store, { id: 'host', kind: 'web' }, 10_000,
             async id => { await new Promise<void>(resolve => { gates.set(id, resolve); }); });
         try {
@@ -48,7 +48,7 @@ describe('Session recovery with leases', () => {
         const { manager } = await createVFS({ rootBackend: new MemoryBackend() });
         const fs = await manager.openFileSystem('/'), store = new SessionLeaseStore(fs);
         let release!: () => void, fail!: (error: Error) => void;
-        const kernel = { async *listSessions() { yield { id: 'bad' }; yield { id: 'slow' }; }, recoverSessions: vi.fn() };
+        const kernel = { async listRuntimeRecoverySessions() { return ['bad', 'slow']; }, recoverSessions: vi.fn() };
         const boot = recoverSessionsWithLeases(kernel as never, store, { id: 'host', kind: 'web' }, 10_000,
             async id => new Promise<void>((resolve, reject) => { if (id === 'bad') fail = reject; else release = resolve; }));
         let settled = false;
@@ -72,14 +72,17 @@ describe('Session recovery with leases', () => {
         const resolve = async (ref: { locator: unknown }) => ({ fs, rootPath: String(ref.locator) });
         const store = new SeqFileKernelStore(catalog, resolve);
         await store.initialize();
-        for (const id of ['first', 'second', 'busy']) await store.createSession(id, { kind: 'test', locator: `/${id}` });
+        for (const id of ['first', 'second', 'busy']) {
+            await store.createSession(id, { kind: 'test', locator: `/${id}` });
+            await store.createTask({fs, rootPath: `/${id}`}, id, {program: {kind: 'pending', version: '1'}, input: null});
+        }
         const kernel = new Kernel({ catalog, maxConcurrent: 0, pollMs: 0 });
         kernel.registerStorageResolver({ kind: 'test', resolve }); await kernel.initialize();
         const leases = new SessionLeaseStore(fs);
         await leases.acquire('busy', { id: 'other', kind: 'tauri' });
         try {
             const recovery = await recoverSessionsWithLeases(kernel, leases, { id: 'host', kind: 'tauri' }, 10_000,
-                async id => { expect(await (await kernel.inspectSession(id)).listTasks()).toEqual([]); });
+                async id => { expect(await (await kernel.inspectSession(id)).listTasks()).toHaveLength(1); });
             expect([...recovery.leases.keys()].sort()).toEqual(['first', 'second']);
             expect((await leases.inspect('busy'))?.ownerId).toBe('other');
             await recovery.release();
@@ -118,7 +121,7 @@ describe('Session recovery with leases', () => {
             // Another host already owns `busy`; a refused lease must not recover it.
             expect(await leaseStore.acquire('busy', { id: 'other-host', kind: 'tauri' })).not.toBeNull();
             const kernel = {
-                async *listSessions() { yield { id: 'free' }; yield { id: 'busy' }; },
+                async listRuntimeRecoverySessions() { return ['free', 'busy']; },
                 recoverSessions: vi.fn(async () => undefined),
                 recoverSession: vi.fn(async () => undefined),
             };
@@ -158,7 +161,7 @@ describe('Session recovery with leases', () => {
         await store.acquire('s', { id: 'old-tab', kind: 'web' });
         let releaseRecovery!: () => void;
         const gate = new Promise<void>(resolve => { releaseRecovery = resolve; });
-        const kernel = { async *listSessions() {}, recoverSessions: vi.fn(), recoverSession: vi.fn(async () => gate) };
+        const kernel = { async listRuntimeRecoverySessions() { return []; }, recoverSessions: vi.fn(), recoverSession: vi.fn(async () => gate) };
         const recovery = await recoverSessionsWithLeases(kernel as never, store, { id: 'new-tab', kind: 'web' });
         try {
             expect(await recovery.acquireLater('s')).toBe(false);
@@ -180,7 +183,7 @@ describe('Session recovery with leases', () => {
     it('does not admit writes when late recovery fails and allows a later retry', async () => {
         const { manager } = await createVFS({ rootBackend: new MemoryBackend() });
         const fs = await manager.openFileSystem('/data'), store = new SessionLeaseStore(fs);
-        const kernel = { async *listSessions() {}, recoverSessions: vi.fn(),
+        const kernel = { async listRuntimeRecoverySessions() { return []; }, recoverSessions: vi.fn(),
             recoverSession: vi.fn().mockRejectedValueOnce(new Error('recovery failed')).mockResolvedValue(undefined) };
         const recovery = await recoverSessionsWithLeases(kernel as never, store, { id: 'host', kind: 'web' });
         try {
@@ -195,7 +198,7 @@ describe('Session recovery with leases', () => {
         const fs = await manager.openFileSystem('/data'), store = new SessionLeaseStore(fs);
         let releaseSweep!: () => void;
         const gate = new Promise<void>(resolve => { releaseSweep = resolve; });
-        const kernel = { async *listSessions() { yield { id: 's' }; }, recoverSessions: vi.fn(() => gate), recoverSession: vi.fn() };
+        const kernel = { async listRuntimeRecoverySessions() { return ['s']; }, recoverSessions: vi.fn(() => gate), recoverSession: vi.fn() };
         const recovery = await recoverSessionsWithLeases(kernel as never, store, { id: 'host', kind: 'web' });
         try {
             expect(kernel.recoverSessions).toHaveBeenCalledExactlyOnceWith(['s'], expect.objectContaining({ takeover: true }));
@@ -219,7 +222,7 @@ describe('Session recovery with leases', () => {
         const fs = await manager.openFileSystem('/data'), store = new SessionLeaseStore(fs);
         let failSweep!: () => void;
         const gate = new Promise<void>((_resolve, reject) => { failSweep = () => reject(new Error('sweep failed')); });
-        const kernel = { async *listSessions() { yield { id: 's' }; },
+        const kernel = { async listRuntimeRecoverySessions() { return ['s']; },
             recoverSessions: vi.fn(() => gate), recoverSession: vi.fn(async () => undefined) };
         const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
         const recovery = await recoverSessionsWithLeases(kernel as never, store, { id: 'host', kind: 'web' });
@@ -241,7 +244,7 @@ describe('Session recovery with leases', () => {
         const { manager } = await createVFS({ rootBackend: new MemoryBackend() });
         const fs = await manager.openFileSystem('/data');
         const leaseStore = new SessionLeaseStore(fs);
-        const kernel = { async *listSessions() { yield { id: 'free' }; }, recoverSessions: vi.fn() };
+        const kernel = { async listRuntimeRecoverySessions() { return ['free']; }, recoverSessions: vi.fn() };
         try {
             await expect(recoverSessionsWithLeases(kernel as never, leaseStore, { id: 'first', kind: 'tauri' }, 10_000,
                 async () => { throw new Error('workspace reconciliation failed'); })).rejects.toThrow('workspace reconciliation failed');
@@ -258,7 +261,7 @@ it('returns before background reconciliation and does not block one Session behi
     const fs = await manager.openFileSystem('/'), store = new SessionLeaseStore(fs);
     let unblock!: () => void;
     const gate = new Promise<void>(resolve => { unblock = resolve; });
-    const kernel = { async *listSessions() { yield { id: 'slow' }; yield { id: 'fast' }; },
+    const kernel = { async listRuntimeRecoverySessions() { return ['slow', 'fast']; },
         recoverSession: vi.fn(async () => {}), recoverSessions: vi.fn() };
     const recovery = await recoverSessionsWithLeases(kernel as never, store, { id: 'host', kind: 'web' }, 10_000,
         async id => { if (id === 'slow') await gate; }, new Set(), true);

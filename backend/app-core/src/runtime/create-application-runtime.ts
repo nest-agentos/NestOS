@@ -318,6 +318,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             sourceCleanupFns.push(() => remote.dispose());
             await remote.init(); remoteConnections = remote; projects.remoteMounts = remote;
             remote.existingProjectIds = () => projects.storedProjectIds();
+            remote.projectSummaries = () => projects.storedProjectSummaries();
 
 
 

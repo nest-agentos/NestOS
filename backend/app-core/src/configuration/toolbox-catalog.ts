@@ -24,7 +24,7 @@ export class ToolboxInventory {
     defaultConnectionId?: string;
     modelDefaults: import('@nestos/kernel-adapters/contracts').ModelDefaults = {};
     readonly tools = new Map<string, ToolboxTool>();
-    constructor(private readonly servers: () => Promise<MCPServer[]>, private readonly catalog: Catalog, private readonly models?: IConnectionService, private readonly prompts?: () => Promise<SystemPromptDefinition[]>, private readonly harnesses?: () => Promise<RemoteHarnessAgent[]>, private readonly projectHealth?: (id: string) => Promise<{total: number; offline: number; unknown: number; degraded: number}>) {}
+    constructor(private readonly servers: () => Promise<MCPServer[]>, private readonly catalog: Catalog, private readonly models?: IConnectionService, private readonly prompts?: () => Promise<SystemPromptDefinition[]>, private readonly harnesses?: () => Promise<RemoteHarnessAgent[]>, private readonly projectHealth?: (id: string) => Promise<{total: number; offline: number; unknown: number; degraded: number}>, private readonly cells?: () => Array<{id:string;name:string;endpoint:string;status:string}>) {}
     async init(): Promise<void> {
         try {
             for (const kind of ['remoteAgents', 'cells', 'mcp', 'tools', 'providers', 'connections', 'prompts'] as const) this.owners[kind] = await createFileSystemSource({
@@ -35,7 +35,8 @@ export class ToolboxInventory {
     get sources() { return { cells: this.owners.cells!.fs, prompts: this.owners.prompts!.fs, mcp: this.owners.mcp!.fs, tools: this.owners.tools!.fs, providers: this.owners.providers!.fs, connections: this.owners.connections!.fs }; }
 
     async refresh(): Promise<void> {
-        await this.replace('cells', [{id: 'manage', name: t('cells.title'), description: t('cells.description'), source: '', icon: ENTITY_ICONS.model}]);
+        await this.replace('cells', [{id: 'manage', name: t('cells.new'), description: t('cells.description'), source: '', icon: ENTITY_ICONS.model},
+            ...(this.cells?.() ?? []).map(node => ({id:node.id,name:node.name,description:node.endpoint,source:node.status,icon:ENTITY_ICONS.model}))]);
         const servers = await this.servers();
         const harnesses = await this.harnesses?.() ?? [];
         this.remoteAgents.clear();

@@ -266,3 +266,5 @@ WorkbenchSidebar 只适配 WorkbenchSnapshot 与 vfs-ui SidebarState，页签 DO
 返回策略统一在 navigation/page-history：手机标题栏、文件编辑器及 compact 导航都调用 navigateWorkspaceBack，存在站内历史时回到实际上一页，首次深链才返回列表；桌面侧栏图标继续只折叠侧栏。普通资源选择 push，装配、历史回放与旧路由规范化不把中间选中通知写回历史。列表/详情即使 URL 相同也保留独立历史状态；新显式导航会终止旧回放模式。
 
 通用目录内容页的 DOM、工具栏、多选、面包屑、列宽调整与样式由 vfs-ui 的 directory/ 提供。workbench/directory-list 和 directory-breadcrumbs 仅做宿主适配，不能重新复制渲染实现；业务类型、搜索、路由、权限与变更订阅从宿主注入。创建时间位于列表末列，支持排序。
+
+创建项目先显示弹窗，再通过 ProjectService.navigationFolders 单次读取项目/组织目录分组；不读取完整 Session 导航，也不逐个目录调用 forFolder。分组加载中、失败及重试状态保留输入；关闭后丢弃迟到结果，未就绪时禁止实际创建。

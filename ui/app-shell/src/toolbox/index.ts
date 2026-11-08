@@ -1,3 +1,4 @@
+import {projectActionPath} from '../projects/project-action-route';
 import {CellsSettingsEditor} from '@nestos/app-settings';
 import {MCPDiagnosticsControls} from './mcp-diagnostics';
 import { RemoteAgentDetailsEditor } from './RemoteAgentDetailsEditor';
@@ -35,14 +36,15 @@ export async function createToolboxModule(options: Options): Promise<WorkspaceMo
     const { commandBus } = options.services;
     const view = await options.backend.toolboxView(), { inventory, resources, files } = view;
     try {
-        const factories = configurationFactories(options, inventory, resources);
-        const workbench = new ToolboxWorkbench({ ...options, inventory, resources, files, initial: view.initial, factories, configuration: options.services.configuration, projects: options.services.projects,
+        let workbench: ToolboxWorkbench;
+        const factories = configurationFactories(options, inventory, resources, id => workbench.openCellsNode(id));
+        workbench = new ToolboxWorkbench({ ...options, inventory, resources, files, initial: view.initial, factories, configuration: options.services.configuration, projects: options.services.projects,
             flowMenu: options.ui.createFlowContextMenu<VFSNodeUI>({ commands: commandBus,
                 navigate: id => options.navigate({ target: 'chat', resourceId: id }) }) });
         return createWorkspaceModule(workbench, async () => { try { await workbench.destroy(); } finally { await view.dispose(); } });
     } catch (error) { await view.dispose(); throw error; }
 }
-function configurationFactories(options: Options, inventory: ToolboxInventory, resources: ToolboxResources) {
+function configurationFactories(options: Options, inventory: ToolboxInventory, resources: ToolboxResources, openCells: (id?: string) => Promise<void>) {
     const { agentService } = options.services;
     const editors = () => typeof options.ui.llmUiEditors === 'function' ? options.ui.llmUiEditors() : Promise.resolve(options.ui.llmUiEditors);
     const create = (key: 'SystemPromptSettingsEditor' | 'ProviderSettingsEditor' | 'ConnectionSettingsEditor', examples?: MediaProbeExamples): EditorFactory => async (element, config) => {
@@ -52,7 +54,8 @@ function configurationFactories(options: Options, inventory: ToolboxInventory, r
         await editor.init(element); return editor;
     };
     return { ...options.factories, cells: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
-        const editor = new CellsSettingsEditor(element, options.services.projects?.remoteMounts, config); await editor.init(element); return editor;
+        const editor = new CellsSettingsEditor(element, options.services.projects?.remoteMounts, config, {saved: id => openCells(id), removed: () => openCells(),
+            project: (mount,action) => options.navigate({target:'chat',resourceId:projectActionPath(mount.projectId,action,mount.mountId)})}); await editor.init(element); return editor;
     }, agents: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
         if (config.target?.kind === 'file' && config.target.path.startsWith('/@remote/')) {
             const editor = new RemoteAgentDetailsEditor(element, inventory, config, options.services.projects); await editor.init(element); return editor;

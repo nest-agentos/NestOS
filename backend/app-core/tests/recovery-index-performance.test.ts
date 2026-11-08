@@ -44,3 +44,31 @@ it('reads one indexed root without enumerating unrelated history and resumes onl
     expect(sessions).not.toHaveBeenCalled(); expect(tasks).not.toHaveBeenCalled();
     expect(execute).toHaveBeenCalledExactlyOnceWith(FlowCommand.RunResume, {sessionId: 'pending', taskId: root.id});
 });
+
+it('recovers no historical Sessions in the background and does not repeat an earlier on-demand recovery', async () => {
+    const {kernel} = await fixture();
+    const {SessionLeaseStore} = await import('../src/kernel/session-lease');
+    const {recoverSessionsWithLeases} = await import('../src/runtime/session-recovery');
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()}), fs = await manager.openFileSystem('/');
+    releases.push(() => manager.dispose());
+    const leases = new SessionLeaseStore(fs), acquire = vi.spyOn(leases, 'acquire');
+    const list = vi.spyOn(kernel, 'listRuntimeRecoverySessions'), history = vi.spyOn(kernel, 'listSessions');
+    const restore = vi.spyOn(kernel, 'recoverSession').mockResolvedValue({} as never);
+    const recovery = await recoverSessionsWithLeases(kernel, leases, {id: 'fixture', kind: 'cli'}, 60_000, undefined, new Set(), 'deferred');
+    releases.push(() => recovery.release());
+    const log = vi.spyOn(console, 'log');
+    recovery.startBackground();
+    await vi.waitFor(() => expect(log.mock.calls.some(call => String(call[0]).includes('stage=indexed-sessions'))).toBe(true));
+    await recovery.quiesce();
+    expect(list).toHaveBeenCalledOnce(); expect(history).not.toHaveBeenCalled();
+    expect(acquire).not.toHaveBeenCalled(); expect(restore).not.toHaveBeenCalled();
+    const second = await recoverSessionsWithLeases(kernel, leases, {id: 'fixture', kind: 'cli'}, 60_000, undefined, new Set(), 'deferred');
+    releases.push(() => second.release());
+    await second.acquireLater('already-ready'); acquire.mockClear();
+    log.mockClear(); list.mockResolvedValue(['already-ready', 'pending']); second.startBackground();
+    await vi.waitFor(() => expect(log.mock.calls.some(call => String(call[0]).includes('stage=indexed-sessions'))).toBe(true));
+    await second.quiesce();
+    expect(restore).toHaveBeenCalledTimes(2); expect(restore).toHaveBeenLastCalledWith('pending');
+    expect(acquire).toHaveBeenCalledExactlyOnceWith('pending', {id: 'fixture', kind: 'cli'});
+    expect(history).not.toHaveBeenCalled();
+});

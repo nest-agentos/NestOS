@@ -34,7 +34,7 @@ src/
 
 系统恢复页通过 createSettingsFactory 的可选 InitialFilesPort 提供初始文件清单与勾选恢复；存储与文件系统页不挂载该区块。initial-files.ts 负责折叠分组、默认不勾选、存在状态与逐文件结果；系统恢复页由顶部统一提供选中项恢复和全局状态刷新，不重复展示文件级操作按钮，刷新保留用户手动勾选与展开状态；每个笔记/Flow/Agent 折叠组标题旁的全选仅影响本组；app-shell 注入 app-core 的 NestosInitialFiles，写入当前笔记文件系统并经原 Flow 命令恢复工作流。设置包不依赖 app-core 或 Flow 运行器。旧 restoreFlows 回调保留兼容；初始文件恢复与 Agent 强制重置分开；恢复列表和全量重置均不处理 Provider/Connection，模型配置在工具箱删除后重新添加。
 
-CellsSettingsEditor 由工具箱 Cells 栏复用，旧 Cells 设置地址只作导航别名，同一编辑器管理多个固定 API 节点；StorageSettingsEditor 只负责存储维护。MCP 编辑器通过中立 ConfigurationFormControls 接收宿主字段与操作，不使设置包依赖 app-core。
+CellsSettingsEditor 由工具箱 Cells 栏复用，旧 Cells 设置地址只作导航别名，每个节点使用独立详情编辑器，节点列表由工具箱 catalog 投影；StorageSettingsEditor 只负责存储维护。MCP 编辑器通过中立 ConfigurationFormControls 接收宿主字段与操作，不使设置包依赖 app-core。
 
 - createSettingsNavigation 只生成本地设置目录；编辑器消费已就绪的 SettingsPort，不调用服务 init。backend.settings 在后端完成联系人和标签定义加载；工作区来源仅传身份或已有文件视图，需要导出、标签统计或系统浏览时才打开。持久化与标签存储归 app-core/settings，数据库快照与存储估计归宿主适配。禁止将 IndexedDB、存储复制或 Runtime 创建重新放入 UI。
 
@@ -43,3 +43,7 @@ CellsSettingsEditor 由工具箱 Cells 栏复用，旧 Cells 设置地址只作�
 InitialFilesPort.restore 的资源结果可附带独立依赖报告；页面分别显示资源 restored/preserved 和依赖 ready/missingTools/needsConfiguration/failed，具体工具、参数与连接原因均来自宿主。prepareDependencies 只重试依赖准备，不再恢复或覆盖 Flow；未就绪的依赖不能被汇总成恢复全部成功。处理入口通过宿主导航到工具箱，设置 UI 不发现或执行 Node 工具包。
 
 TerminalSettingsEditor 通过宿主注入的 ServerTerminals 打开服务器 PTY，按需加载 xterm 与 FitAddon；输入不持久化、不重放，关闭编辑器释放终端。设置包不直接创建进程；非 HTTP 管理员视图显示不可用原因。输出游标读取有界，隐藏/尺寸变化由公开 ResizeObserver 与 FitAddon 处理。
+
+CellsSettingsEditor 的连接测试和保存分开：参数改变后先 checkDraft，再以 requireTested 保存；状态和概览刷新不重绘未保存表单。项目挂载与指标从 nodeOverview 单次聚合读取，旧节点缺少统计时明确显示不可用；不扫描会话历史。
+
+Cells 授权变化通过概览显示待确认候选；自动发现不自动保存。确认按钮只提交 proposalId，后端重新检查身份与最新指纹。发现失败、身份不一致、过期/再次变化须显示具体操作指引；刷新不覆盖未保存连接表单，节点授权确认不替代项目绑定刷新。

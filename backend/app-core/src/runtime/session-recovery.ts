@@ -1,14 +1,18 @@
-import { traceBoot } from '@nestos/common';
+import { randomUUID, traceBoot } from '@nestos/common';
 import type { Kernel } from '@nestos/durable-kernel';
 import { SessionLeaseStore, type SessionLeaseRecord, type SessionOwnerKind } from '../kernel/session-lease';
 import { summarizeRecovery, type RecoverySample } from './recovery-trace';
 import { mapConcurrent } from '../utils/map-concurrent';
 
-type RecoveryKernel = Pick<Kernel, 'listSessions' | 'recoverSessions' | 'recoverSession'>;
+type RecoveryKernel = Pick<Kernel, 'listRuntimeRecoverySessions' | 'recoverSessions' | 'recoverSession'>;
 type Owner = { id: string; kind: SessionOwnerKind };
 type BeforeRecovery = (id: string, ensureLeases: (ids: string[]) => Promise<void>) => Promise<void>;
 const BOOT_RECONCILIATION_CONCURRENCY = 10;
 const BOOT_LEASE_BATCH_SIZE = 100;
+function recoveryErrorCode(error: unknown): string {
+    const code = (error as {code?: unknown})?.code;
+    return typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'SESSION_RECOVERY_FAILED';
+}
 export interface SessionRecovery {
     leases: Map<string, SessionLeaseRecord>;
     /** Acquire and recover before admitting writes; concurrent requests share one recovery. */
@@ -43,8 +47,7 @@ class LeasedRecovery implements SessionRecovery {
     }
 
     async boot(): Promise<void> {
-        const ids: string[] = [];
-        for await (const session of this.kernel.listSessions()) if (!this.excluded.has(session.id)) ids.push(session.id);
+        const ids = (await this.kernel.listRuntimeRecoverySessions()).filter(id => !this.excluded.has(id));
         for (let offset = 0; offset < ids.length; offset += BOOT_LEASE_BATCH_SIZE) {
             const batch = ids.slice(offset, offset + BOOT_LEASE_BATCH_SIZE);
             const acquired = await this.store.acquireMany(batch, this.owner);
@@ -55,7 +58,7 @@ class LeasedRecovery implements SessionRecovery {
             await this.beforeRecover?.(id, ids => this.ensureReconciliationLeases(ids));
             return id;
         });
-        // Recovery is proportional to the catalog, so the host paints first and every write waits
+        // Recovery is proportional to indexed pending work, so the host paints first and every write waits
         // for it through acquireLater; only lease acquisition and host reconciliation block boot.
         if (leased.length) this.startSweep(leased);
     }
@@ -64,19 +67,26 @@ class LeasedRecovery implements SessionRecovery {
     startBackground(): void {
         if (this.scanning || this.released || this.stopping || this.backgroundStopped) return;
         this.scanning = this.scanOnline();
-        void this.scanning.catch(error => console.warn('[Lease] Background scan failed; Sessions recover on access', error));
+        void this.scanning.catch(() => {}); // The indexed stage logs classified failures before rejecting.
     }
     private async scanOnline(): Promise<void> {
-        const ids: string[] = [];
-        for await (const session of this.kernel.listSessions()) {
-            if (this.released || this.stopping || this.backgroundStopped) return;
-            if (!this.excluded.has(session.id)) ids.push(session.id);
-        }
-        await mapConcurrent(ids, 2, async id => {
-            if (this.released || this.stopping || this.backgroundStopped) return;
-            try { await this.acquireLater(id); }
-            catch (error) { console.warn(`[Lease] Background recovery failed for ${id}`, error); }
+        const operationId = randomUUID(), started = performance.now();
+        const candidates = await this.kernel.listRuntimeRecoverySessions().catch(error => {
+            console.warn(`[Lease] operation=runtime-recovery stage=index result=failed operationId=${operationId} code=${recoveryErrorCode(error)} durationMs=${Math.round(performance.now() - started)}`);
+            throw error;
         });
+        const ids = candidates.filter(id => !this.excluded.has(id) && !this.ready.has(id));
+        let recovered = 0, refused = 0, failed = 0, skipped = candidates.length - ids.length;
+        await mapConcurrent(ids, 2, async id => {
+            if (this.released || this.stopping || this.backgroundStopped || this.ready.has(id)) { skipped++; return; }
+            const sessionStarted = performance.now();
+            try { if (await this.acquireLater(id)) recovered++; else refused++; }
+            catch (error) {
+                failed++;
+                console.warn(`[Lease] operation=runtime-recovery stage=session result=failed operationId=${operationId} sessionId=${id} code=${recoveryErrorCode(error)} durationMs=${Math.round(performance.now() - sessionStarted)}`);
+            }
+        });
+        console.log(`[Lease] operation=runtime-recovery stage=indexed-sessions result=${failed ? 'partial' : 'success'} operationId=${operationId} candidates=${candidates.length} recovered=${recovered} refused=${refused} skipped=${skipped} failed=${failed} durationMs=${Math.round(performance.now() - started)}`);
     }
     private async ensureReconciliationLeases(ids: string[]): Promise<void> {
         for (const id of ids) {
@@ -96,7 +106,7 @@ class LeasedRecovery implements SessionRecovery {
         });
     }
 
-    /** Recovery is proportional to the leased catalog; report the per-Session split at boot. */
+    /** Recovery is proportional to leased pending work; report the per-Session split at boot. */
     private async recoverLeased(leased: string[]): Promise<void> {
         const samples: RecoverySample[] = [];
         try {

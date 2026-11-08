@@ -420,7 +420,7 @@ it('shows expected permission failures as unavailable without swallowing unrelat
 });
 
 
-it('boots existing central Sessions into project storage without moving their runtime grants', async () => {
+it('prepares existing central Sessions on access without moving their runtime grants', async () => {
     const backend = new IndexedDBBackend({ dbName: `central-session-${crypto.randomUUID()}` });
     const first = await createApplicationRuntime({ backend, ownerKind: 'web' });
     const project = (await first.projects.current())!;
@@ -435,6 +435,7 @@ it('boots existing central Sessions into project storage without moving their ru
     const reopened = await createApplicationRuntime({ backend, ownerKind: 'web' });
     cleanups.push(() => reopened.dispose());
     const files = await reopened.vfs.openFileSystem('/');
+    expect(await reopened.prepareSession(id)).toBe(true);
     expect(await reopened.sessionRepository.readDocument(id, 'round.json')).toBe('{"text":"saved"}');
     await vi.waitFor(async () => expect(await files.driver.exists(`${project.project.directory}/.nestos/sessions/${id}/history.seq`)).toBe(true));
     expect((await reopened.sessionFiles.inspect(id))?.mounts).toEqual(before?.mounts);
@@ -557,7 +558,8 @@ it('recovers an old data directory and its conversation during IndexedDB applica
     expect((await reopened.projects.get('old-startup')).path).toBe('/Old startup');
     expect((await reopened.sessionRepository.getManifest(id)).folder).toBe('/Old startup/@sessions');
     expect(await reopened.sessionRepository.readDocument(id, 'round.json')).toBe('{"text":"original conversation"}');
-    // Wait for committed public access while recovery runs in the background.
+    expect(await reopened.prepareSession(id)).toBe(true);
+    // First write preparation reconciles the selected historical Session.
     await vi.waitFor(async () => expect(await readSession(reopened, id, 'old.md')).toBe('original file'));
     expect(await (await reopened.vfs.openFileSystem('/')).driver.exists(`${directory}/.nestos/sessions/${id}/history.seq`)).toBe(true);
 });

@@ -1,4 +1,6 @@
+import {CellsAuthorizationRefreshes} from './cells-authorization-refresh';
 import {remoteClientState} from './remote-client-state';
+import {CellsDraftChecks} from './cells-draft-checks';
 import {inspectAuthorization} from './authorization-inspection';
 import {DiagnosticJournal} from '../diagnostics/journal';
 import {diagnosticFailure} from '../diagnostics/failure';
@@ -39,9 +41,11 @@ export interface RemoteProcessRequest {
 export interface RemoteProcessHandle { nativeShell: NonNullable<ProjectExecutionContext['nativeShell']>; release(): Promise<void> }
 
 export interface RemoteFileSourceProvider {
+    nodeStatus?(connection: Omit<RemoteFileConnection, 'alias'>, options?: OperationOptions): Promise<import('@nestos/cells-driver').CellsNodeStatus>;
     observeHarness?(client: HarnessClient, writable?: boolean, options?: {watchFiles?: boolean}): import('@nestos/cells-driver').HarnessStatusPort;
     conversation?(client: HarnessClient, profile: HarnessProfile, workspaceId: string, sessionId?: string, writable?: boolean, journal?: HarnessConversationJournal): HarnessConversationPort;
     resolveCredential?(reference: string): string | Promise<string>;
+    discoverDraft?(connection: Omit<RemoteFileConnection, 'alias'>,password:string,options?:OperationOptions):Promise<import('@nestos/cells-driver').CellsDescriptor>;
     discover?(connection: Omit<RemoteFileConnection, 'alias'>, options?: OperationOptions): Promise<import('@nestos/cells-driver').CellsDescriptor>;
     projects?(connection: Omit<RemoteFileConnection, 'alias'>): ProjectClient;
     projectProcess?(connection: Omit<RemoteFileConnection, 'alias'>, project: RemoteProject, request: RemoteProcessRequest): Promise<RemoteProcessHandle>;
@@ -68,6 +72,8 @@ const channelOperations:ChannelOperation[]=['open','messages','close','requests'
 
 /** Project-owned grants; credentials stay in the injected host provider. */
 export class ProjectRemoteMountService {
+    private readonly draftChecks=new CellsDraftChecks();
+    private readonly authorizationRefreshes=new CellsAuthorizationRefreshes();
     private readonly conversations = new ConversationRegistry();
     private conversationRecovery?: RemoteConversationRecoveryLoop;
     estimateUsage?: (usage: import('@nestos/cells-driver').HarnessUsage) => import('@nestos/kernel-adapters/contracts').UsageCostEstimate;
@@ -80,6 +86,7 @@ export class ProjectRemoteMountService {
         return this.provider.observeHarness(this.guardHarness(client, id, JSON.stringify(this.list(id)), root.connectionId!), root.access === 'rw', {watchFiles: true});
     });
     existingProjectIds?: () => Promise<readonly string[]>;
+    projectSummaries?: () => Promise<Array<{id: string; name: string; remote?: boolean}>>;
     rootValidator?: (projectId: string, mount: ProjectRemoteMount) => Promise<void>;
     private catalog: Catalog = { version: 1, revision: 0, projects: {} };
     private readonly views = new Map<string, Set<FileSystemSourceOwner>>();
@@ -166,7 +173,7 @@ export class ProjectRemoteMountService {
             this.checkHarnessAccess(projectId,fingerprint,root.connectionId);
             if (!client.channel || project.revision !== root.serverProjectRevision) throw new FSError('ECAPABILITY', 'Session channel binding unavailable');
             return await client.channel(project, operation, {...input,
-                ...(['open', 'current'].includes(operation) ? {cwd: '/projects/' + project.id + '/' + String(input.cwd).replace(/^\/workspace\//, ''),
+                ...(['open', 'current'].includes(operation) ? {cwd: String(input.cwd).replace(/^\/workspace\//, ''),
                     endpoint: connection.endpoint.replace(/\/$/, '') + '/v1/channel/mcp'} : {})});
         } finally {await client.close();}
     }
@@ -183,6 +190,38 @@ export class ProjectRemoteMountService {
         }));
     }
     connections(): RemoteFileSystemConfig[] { return structuredClone(this.catalog.connections ?? []); }
+    async nodeOverview(id: string, options?: OperationOptions): Promise<import('@nestos/app-contracts/services').CellsNodeOverview> {
+        const started = performance.now(), operationId = randomUUID(), connection = this.connection(id);
+        checkOperation(options);
+        const projects = await this.projectSummaries?.() ?? [];
+        const mounts = (await Promise.all(projects.map(project => this.overviewMounts(id,project)))).flat();
+        let statistics: import('@nestos/app-contracts/services').CellsNodeOverview['statistics'] = {state:'unsupported'};
+        if (this.provider.nodeStatus) {
+            try { statistics = {state:'available',value:await this.provider.nodeStatus(connection, options)}; }
+            catch (error) {
+                checkOperation(options);
+                await this.detectAuthorizationChange(error,connection,options);
+                const code = diagnosticFailure(error).code;
+                statistics = {state:code === 'ECAPABILITY' ? 'unsupported' : 'unavailable',code};
+                remoteLog.warn('cells.overview.statistics.failed',{operationId,operation:'cells.overview',stage:'statistics',result:'failure',code});
+            }
+        }
+        checkOperation(options);
+        remoteLog.info('cells.overview.read',{operationId,operation:'cells.overview',stage:'aggregate',result:'success',mountCount:mounts.length,
+            statistics:statistics.state,durationMs:Math.round(performance.now()-started)});
+        return {connectionId:id,sampledAt:Date.now(),mounts,statistics,authorizationRefresh:this.authorizationRefreshes.read(connection)};
+    }
+    private async overviewMounts(id:string,project:{id:string;name:string;remote?:boolean}) {
+        const definitions=this.list(project.id).filter(mount=>mount.connectionId===id);
+        if(!definitions.length)return [];
+        const status=await this.projectStatus(project.id);
+        return definitions.map(mount=>({projectId:project.id,projectName:project.name,mountId:mount.mountId,
+            alias:mount.alias,root:mount.root,at:mount.at,access:mount.access,status:this.status(mount.mountId),
+            projectStatus:status.status,problem:status.problem,checkedAt:status.checkedAt,
+            canRemount:mount.at==='/'&&!!mount.serverProjectId,
+            unmount:project.remote&&mount.at==='/'?'project' as const
+                :mount.at!=='/'&&!mount.serverProjectId?'directory' as const:null}));
+    }
     connectionName(id: string): string | undefined {
         return this.connections().find(connection => connection.id === id)?.name;
     }
@@ -224,7 +263,7 @@ export class ProjectRemoteMountService {
             else if (!projects.length) throw new FSError('ECAPABILITY', 'Connection checks unavailable');
         } catch (error) {
             handshakeFailed = !options?.signal?.aborted;
-            if (handshakeFailed) this.recordFailure(error, {stage: 'connection-check', connectionId: id});
+            if (handshakeFailed) {this.recordFailure(error, {stage: 'connection-check', connectionId: id});await this.detectAuthorizationChange(error,connection,options);}
         }
         if (options?.signal?.aborted) { this.setConnectionStatus(id, previous); return; }
         // Probe the mounts either way: a failed handshake must not pin a reachable connection to
@@ -234,20 +273,72 @@ export class ProjectRemoteMountService {
         const offline = projects.some(projectId => this.projectOffline(projectId)) || (handshakeFailed && !projects.length);
         this.setConnectionStatus(id, offline ? 'offline' : 'online');
     }
+    private async detectAuthorizationChange(error:unknown,connection:RemoteFileSystemConfig,options?:OperationOptions):Promise<void> {
+        if(diagnosticFailure(error).reason!=='authorization-changed')return;
+        const scope=operationScope({...options,timeoutMs:Math.min(options?.timeoutMs??2000,2000)}),started=Date.now(),operationId=randomUUID();
+        try {
+            await this.authorizationRefreshes.inspect(connection,(value,request)=>this.discoverAuthorization(value,request),this.connectionProjects(connection.id),scope.options);
+            checkOperation(options);
+            const state=this.authorizationRefreshes.read(connection);
+            remoteLog.info('cells.authorization.discovered',{operationId,connectionId:connection.id,operation:'cells.authorization.refresh',stage:'discover',
+                result:state?.state==='available'?'confirmation-required':state?.state==='unavailable'?'failure':state?.state,reason:state?.state==='blocked'?state.reason:undefined,
+                code:state?.state==='unavailable'?state.code:undefined,durationMs:Date.now()-started});
+        }catch(failure){
+            if(!options?.signal?.aborted)this.authorizationRefreshes.failed(connection,diagnosticFailure(failure).code);
+            remoteLog.warn('cells.authorization.discovery.failed',{operationId,connectionId:connection.id,operation:'cells.authorization.refresh',stage:'discover',
+                result:'failure',...diagnosticFailure(failure),durationMs:Date.now()-started});
+        }finally{scope.dispose();}
+    }
+    private discoverAuthorization(connection:RemoteFileSystemConfig,options?:OperationOptions) {
+        if(!this.provider.discover)throw new FSError('ECAPABILITY','Cells discovery unavailable');
+        return this.provider.discover(connection,options);
+    }
+    confirmAuthorizationRefresh(id:string,proposalId:string,options?:OperationOptions):Promise<void> {
+        return this.serial(async()=>{
+            const started=Date.now(),operationId=randomUUID(),current=this.connection(id);let stage='verify';
+            try {
+                const descriptor=await this.authorizationRefreshes.verify(current,proposalId,(value,request)=>this.discoverAuthorization(value,request),options);
+                stage='project-guard';for(const projectId of this.connectionProjects(id))await this.beforeChange(projectId);
+                checkOperation(options);
+                stage='persist';const next={...current,authorization:descriptor.authorization,projects:descriptor.projects};
+                await this.persist({...this.catalog,connections:this.connections().map(value=>value.id===id?next:value)});
+                this.authorizationRefreshes.clear(id);this.setConnectionStatus(id,'unknown');
+                for(const listener of this.listeners)listener();
+                remoteLog.info('cells.authorization.updated',{operationId,connectionId:id,operation:'cells.authorization.refresh',stage:'persist',result:'success',
+                    affectedProjectCount:this.connectionProjects(id).length,durationMs:Date.now()-started});
+            }catch(error){
+                this.recordFailure(error,{operation:'cells.authorization.refresh',stage,connectionId:id,operationId,durationMs:Date.now()-started});throw error;
+            }
+        });
+    }
     async checkDraft(input: RemoteFileSystemInput, password: string, id?: string, options?: OperationOptions): Promise<void> {
         const value = normalizeConnection(input);
-        const credentialRef = id ? this.connection(id).credentialRef : '';
-        if (!this.provider.checkDraft) throw new FSError('ECAPABILITY', 'Connection checks unavailable');
-        await this.provider.checkDraft({ ...value, credentialRef }, password, options);
+        const current=id?this.connection(id):undefined,key=await this.draftChecks.key(value,password,id,current);
+        if(this.provider.discoverDraft){
+            const descriptor=await this.provider.discoverDraft({...value,credentialRef:current?.credentialRef??''},password,options);
+            checkOperation(options);this.draftChecks.remember(key,descriptor);return;
+        }
+        const credentialRef=password?'cells-draft-'+randomUUID():current?.credentialRef??'';
+        const restore=password?this.provider.setCredential(credentialRef,password):undefined;
+        try {
+            let descriptor:import('@nestos/cells-driver').CellsDescriptor|undefined;
+            if(this.provider.discover)descriptor=await this.provider.discover({...value,credentialRef},options);
+            else if(this.provider.checkDraft)await this.provider.checkDraft({...value,credentialRef},password,options);
+            else throw new FSError('ECAPABILITY','Connection checks unavailable');
+            checkOperation(options);this.draftChecks.remember(key,descriptor);
+        }finally{if(password){restore?.();this.provider.clearCredential?.(credentialRef);}}
     }
     async browseDirectories(id: string, path: string, cursor?: string, options?: OperationOptions) {
         if (!this.provider.browse) throw new FSError('ECAPABILITY', 'Directory browsing unavailable');
         const normalized = path === '/' ? '/' : (() => { const { alias, root } = remoteProjectPath(path); return `/${alias}${root === '/' ? '' : root}`; })();
         return this.provider.browse(await this.resolveConnection(id, options), normalized, cursor, options);
     }
-    saveConnection(input: RemoteFileSystemInput, password: string, id?: string): Promise<string> {
+    saveConnection(input: RemoteFileSystemInput, password: string, id?: string, options?:{requireTested?:boolean}): Promise<string> {
         return this.serial(async () => {
             const value = normalizeConnection(input), existing = id ? this.connections().find(connection => connection.id === id) : undefined;
+            const unchanged=!!existing&&!password&&existing.endpoint===value.endpoint&&existing.username===value.username&&!!existing.anonymous===!!value.anonymous;
+            const proof=options?.requireTested?this.draftChecks.read(await this.draftChecks.key(value,password,id,existing)):undefined;
+            if(options?.requireTested&&!unchanged&&!proof)throw new FSError('ECONFLICT','CELLS_TEST_REQUIRED');
             if (!existing && !password && !value.anonymous) throw new FSError('EINVAL', 'Password required');
             const connections = this.connections();
             if (connections.some(item => item.id !== id && (item.name === value.name || (!!value.username && item.endpoint === value.endpoint && item.username === value.username))))
@@ -256,12 +347,13 @@ export class ProjectRemoteMountService {
             if (id && !existing && !affected.length) throw new FSError('ENOENT', 'Cells connection not found');
             if (affected.length && existing && existing.endpoint !== value.endpoint) throw new FSError('EBUSY', 'Referenced endpoint cannot change');
             for (const projectId of affected) await this.beforeChange(projectId);
-            let next: RemoteFileSystemConfig = { ...value, id: id ?? randomUUID(), credentialRef: existing?.credentialRef ?? randomUUID() };
+            let next: RemoteFileSystemConfig = { ...(unchanged?existing:{}), ...value, id: id ?? randomUUID(), credentialRef: existing?.credentialRef ?? randomUUID() };
             const restore = password ? this.provider.setCredential(next.credentialRef, password) : undefined;
             try {
                 if (affected.length && !existing && !this.provider.discover) throw new FSError('ECAPABILITY', 'Cells discovery is required to recover a referenced connection');
-                if (this.provider.discover) {
-                    const descriptor = await this.provider.discover(next, {timeoutMs: 10_000});
+                if (this.provider.discover && !(options?.requireTested&&unchanged)) {
+                    const descriptor = options?.requireTested?proof?.descriptor:await this.provider.discover(next, {timeoutMs: 10_000});
+                    if(!descriptor)throw new FSError('ECONFLICT','CELLS_TEST_REQUIRED');
                     next = {...next, endpoint: descriptor.httpEndpoint, serverId: descriptor.serverId ?? undefined, projects: descriptor.projects, authorization: descriptor.authorization};
                     if (affected.length && existing && !canReaddressConnection(existing, next)) throw new FSError('EBUSY', 'Referenced Cells identity or authorization changed');
                     if (affected.length && !existing) this.assertRecoveredConnection(id!, next);
@@ -272,8 +364,9 @@ export class ProjectRemoteMountService {
             for (const projectId of affected) {
                 await this.changed(projectId);
                 for (const mount of this.list(projectId).filter(item => item.connectionId === id)) await this.releaseSource(mount.mountId);
-                await this.checkConnections(projectId, { timeoutMs: 3000 });
+                if(!options?.requireTested)await this.checkConnections(projectId, { timeoutMs: 3000 });
             }
+            if(options?.requireTested&&proof)this.setConnectionStatus(next.id,'online');
             for (const listener of this.listeners) listener();
             return next.id;
         });
@@ -535,6 +628,27 @@ export class ProjectRemoteMountService {
         });
         await this.conversationRecovery.recover();
     }
+    async readConversationRecovery(projectId: string, target: import('./drafts/contracts').RemoteDraftTarget, conversationId: string) {
+        const fingerprint = JSON.stringify(this.list(projectId));
+        const checkAccess = () => {
+            const root = this.list(projectId).find(mount => mount.at === '/');
+            if (this.closed || fingerprint !== JSON.stringify(this.list(projectId)) || !root
+                || root.connectionId !== target.connectionId || root.serverProjectId !== target.serverProjectId
+                || root.authorization?.principalId !== target.principalId)
+                throw new FSError('ECONFLICT', 'Remote draft authorization binding changed');
+        };
+        checkAccess();
+        if (!this.provider.projects) throw new FSError('ECAPABILITY', 'Remote draft recovery is unavailable');
+        const client = this.provider.projects(await this.resolveConnection(target.connectionId, {timeoutMs: 10000}));
+        try {
+            const project = await client.read(target.serverProjectId, {timeoutMs: 10000});
+            if (project.revision !== this.list(projectId).find(mount => mount.at === '/')!.serverProjectRevision)
+                throw new FSError('ECONFLICT', 'Remote draft project revision changed');
+            const owner = remoteConversationKey(projectId, target, conversationId);
+            const receipt = await new RemoteConversationStore(this.store, owner, remoteClientState(client, project, owner, checkAccess)).load();
+            return {sessionId: receipt?.sessionId, submittedTurnId: receipt?.submittedTurnId, pending: !!receipt?.pending};
+        } finally {await client.close();}
+    }
     private async openRecoveredConversation(target: RemoteConversationRecoveryTarget): Promise<ProjectConversationPort> {
         const root = this.list(target.projectId).find(mount => mount.at === '/');
         if (!root || root.connectionId !== target.connectionId || root.serverProjectId !== target.serverProjectId
@@ -672,6 +786,7 @@ export class ProjectRemoteMountService {
             this.setStatus(mount.mountId, 'online');
         } catch (error) {
             if (cancelledByCaller(parent)) {this.setStatus(mount.mountId, previous); return;}
+            if(mount.connectionId)await this.detectAuthorizationChange(error,this.connection(mount.connectionId),scoped);
             const failure = this.recordFailure(error, {...context, durationMs: Date.now() - started}, scoped.signal?.aborted ? 'timeout' : undefined);
             this.observations.set(mount.mountId, {...this.observations.get(mount.mountId), checkedAt: Date.now(), failure});
             // The remote file gate can reject reads during execution while the connection stays usable.
@@ -831,6 +946,8 @@ export class ProjectRemoteMountService {
         } catch (error) { await base?.dispose(); throw error; }
     }
     async dispose(): Promise<void> {
+        this.draftChecks.clear();
+        await this.authorizationRefreshes.dispose();
         await this.conversationRecovery?.close();
         await this.conversations.dispose();
         await this.sessionStatus.dispose();

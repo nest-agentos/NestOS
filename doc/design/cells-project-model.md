@@ -110,13 +110,13 @@ HTTP 关系经过授权 VFS 视图；图中的组件关系不是 UI 绕过 VFS �
 
 已知目录的正文路径为：获取授权视图 → 并行目录 stat / entries / 项目投影 → 并行祖先规则 → 节点映射 → 渲染。首次来源初始化与非在线连接的有界探测仍需要等待；大目录仍按协议读完分页，不伪造完成。`projectDirectory.read` 记录正文总耗时，`projectFile.navigation` 记录后台导航耗时。测试验证源获取次数、规则请求数量与并行启动、修改后的刷新、取消与故障、只读创建限制以及侧栏刷新不会打开旧资源；真实远程网络的耗时需现场观测，不能由单元测试推断。
 
-远程项目持久保存 `connectionId`，运行时从独立 Cells 连接目录读取。连接缺失是本地绑定错误，不能据此判断服务端目录或原生 Session 已丢失。节点保存通过固定 HTTP 能力发现验证。
+远程项目持久保存 `connectionId`，运行时从独立 Cells 连接目录读取。连接缺失是本地绑定错误，不能据此判断服务端目录或原生 Session 已丢失。工具箱 Cells 侧栏逐项显示真实节点，右侧为当前节点的概览和连接表单。新增及变更连接参数先独立“测试连接”，测试不保存；显式保存复用后端五分钟内与该地址、认证和凭据绑定的私有测试结果，不重复探测。仅改名称可直接保存，未测试或已变化的参数拒绝保存。原有服务调用的保存语义保持兼容。
 
 连接缺失使用结构化 `RemoteConnectionUnavailableError` 和 `cells-not-found` 原因；网络、授权、能力、版本和持久化失败分别保留具体错误码。界面显示连接名称与修复提示。异步请求前后核对当前绑定，不按名称或地址猜测重绑，也不依赖 MCP 初始化。
 
 远程项目在项目选择器旁与项目菜单提供“项目状态”。状态窗口独立于远端目录打开，项目离线时仍可查看本地后端记录、重新检查及复制日志。项目菜单及工作台的状态窗口另提供“刷新授权与项目绑定”：以已保存的 Cells 身份重新发现运行时授权，再以原访问级别更新原项目绑定并检查连接，不切换连接身份；权限由服务端授予，服务端拒绝时保留原绑定并明确提示管理员处理。相同原生故障只在错误分类变化时发布状态失效通知，避免导航刷新重试形成循环；每次操作的诊断仍可查询。状态区分尚未检查、检查中、已连接、无法连接与部分功能不可用；文件根探测和原生会话目录分别提供证据。原生 profiles/list 失败按 profile 分别保留，只有对应读取成功才清除，不能用节点能力发现成功或其他 profile 恢复覆盖。项目菜单先打开，不等待同步状态查询成功。
 
-“设置 → 系统日志”通过 `ApplicationBackend.diagnostics` 查询当前用户 Runtime 的事件；项目状态提供本项目诊断，设置 → Cells 管理独立节点。普通 MCP 的状态和日志独立显示，不聚合 Cells 挂载状态。HTTP 使用显式 query/subscribe 能力，不读取或转发 Node 全局 MemoryLogger；查询失败显示原因及重试入口。
+“设置 → 系统日志”通过 `ApplicationBackend.diagnostics` 查询当前用户 Runtime 的事件；项目状态提供本项目诊断，设置 → Cells 管理独立节点。普通 MCP 的状态和日志独立显示，不聚合 Cells 挂载状态。工具箱节点详情通过 `ProjectRemoteMountService.nodeOverview` 一次聚合当前用户的项目挂载目录、项目内挂载点与读写权限。统计使用认证的 `GET /v1/node/status`：CPU/内存来自节点系统，VM 内为 guest；空间按可读导出所在文件系统分别显示，不能累加成磁盘总量或目录大小；活跃 harness 会话仅统计当前身份可见、Cells 托管的执行或待交互会话，不扫描原生历史、不启动闲置 runtime。旧节点缺少接口显示不支持，读取失败保留本地挂载信息。仅打开详情或手动刷新时读取，切换/销毁取消旧请求，服务通知不覆盖未保存表单。HTTP 使用显式 query/subscribe 能力，不读取或转发 Node 全局 MemoryLogger；查询失败显示原因及重试入口。
 
 `DiagnosticJournal` 在各 Runtime 内按来源合并连续相同事件：记录首次/最近发生时间、次数、恢复或结束时间、耗时范围及最多五个近期关联操作样本；阶段、项目、挂载、profile、会话或错误分类不同不会混合。其他来源插入不打断本来源，恢复、分类改变、超过五分钟间隔或运行时重启会结束旧分组。最多保留 500 组且不超过 512 KiB，单次查询最多返回 200 组，界面每页 20 组，支持项目、连接、模块、级别、关键字及时间范围筛选。事件经用户系统文件能力持久化到 `/var/log/application-diagnostics.seq`，每组使用独立 `event:<id>` entry，以版本化索引及 SeqFile 事务原子提交本次变化和淘汰记录；旧 `events` 整体数组在成功事务中迁移并删除。正常关闭排空写入；刷新或重启后可重读保留事件，但当前可用性仍需要重新检查。初始化/写入失败明确显示仅内存状态。挂载、刷新绑定、卸载、根探测、MCP 连接与能力发现、原生目录失败与恢复均记录重要事件，包含 operationId、阶段、结果、具体错误码、耗时及适用的项目/连接/profile/会话/requestId。MCP JSON-RPC 的数字错误码单独保留 rpcCode；异常原因只提取安全分类与错误链，不记录正文、凭据、认证引用、请求头、端点地址或原始堆栈。
 
@@ -290,6 +290,14 @@ cells@0.3.1 内置 `kind = "dsh"`，通过 DSH Remote HTTP/WebSocket 适配通�
 
 托管模式启动 DSH `web` profile，项目实例使用 ProjectRuntime/launcher 与独立授权的模型 home；多个会话共享该实例的 WS mux，HTTP 只等提交回执。连接已有服务时必须显式配置 origin、令牌环境变量和 legacy workspaces，拒绝声明项目沙箱或多身份隔离。配置示例见 [config.dsh.example.toml](../../tools/cells/config.dsh.example.toml)。
 
+项目会话通道的 cwd 优先使用项目内相对目录。节点声明 `projectChannelPaths: 1`，由 ProjectRuntime 按 `isolation` 解析为 namespace 虚拟路径或当前 OS/guest 实际路径；open/current 使用同一规范形式，旧虚拟路径兼容，越界与符号链接逃逸仍拒绝。宿主只剥离自己的 `/workspace/` 前缀，不拼接原生运行目录；驱动为未声明新能力的旧节点保留旧前缀。`[projects].channel_endpoint` 可覆盖调用方 URL，固定 Agent 在节点网络中可达的 MCP 地址；VMM 内监听 8787 时使用 guest 的 `http://127.0.0.1:8787/v1/channel/mcp`，不是宿主发布的 18787。配置缺省时保持调用方地址。
+
+virtio-fs 的设备号由 guest 内核按挂载时序分配，重启后可能变化。目录身份对 virtio-fs 使用挂载来源摘要、inode 与创建时间；普通文件系统继续使用设备号。旧数字设备号记录仅在当前目录已证明属于 virtio-fs、inode 和创建时间均一致时兼容，不放行 inode、创建时间或新格式挂载来源变化。授权资源摘要沿用同一稳定文件系统身份，首次切换会产生一次授权指纹更新，需通过既有确认流程；其后 VM 重启不因临时设备号改变指纹。
+
+2026-11-08 已部署宿主版 `20261108T010516-dad0311b-dirty` 与更新后的 Cells：namespace/native 相对路径、旧客户端前缀、越界拒绝、挂载身份与同步回归通过。`cell-x1` 的 `cx1` 使用专属临时目录验证通道 open/current、guest 内 MCP discover/list（5 个工具）及 close；open/current 为 5/4 ms，各 1 个逻辑 API、1 个 HTTP 请求，关闭通道与移除目录均确认完成。再次重启 VM 后项目 ID、revision、授权指纹保持一致，通道重复验证通过。浏览器确认新旧指纹预览与“确认更新授权”按钮可见，未代为确认；未提交模型消息，因此不把通道验收表述为完整决策生成或完整页面性能验收。
+
+DSH 的提交回执成功不代表模型执行成功，模型目录可读也不代表已配置凭据。失败的原生 `turn/end` 记录投影为 `status=failed` 的 `systemMessage`，保留有界错误说明与安全错误码（如 `MISSING_CREDENTIAL`）；实时事件和历史使用同一记录 ID，重开后仍可见并去重。诊断日志记录 `nativeCode`，不记录原生错误正文。回归覆盖缺少凭据、缺失错误正文、消息长度限制、重复序列及实时/历史一致性，见 Cells 的 `dsh` 集成测试与 DSH `protocol` 单元测试。
+
 多身份服务的追加式配置模板见 [profiles/dsh.example.toml](../../tools/cells/profiles/dsh.example.toml)，profile 必须绑定现有 principal 并沿用需要读取历史的 DSH_HOME。DSH 会话发现同时校验原生会话 cwd 与 workspace 成员关系；项目运行时通过已有目录授权映射物理路径和虚拟路径，不按路径文本直接相等过滤旧历史，也不扫描其他主体的 home。
 
 默认 profile ID 使用 codex、dsh；改名通过配置 aliases 保留旧引用，客户端按服务端发现的 aliases 解析旧目录和会话路由。别名在服务端先规范化，再执行主体授权、实例选择与回执处理，不能创建重复实例或绕过权限。历史收藏保留原键并继续识别，新发现列表只展示规范 ID。
@@ -375,6 +383,12 @@ stateDiagram-v2
 ## 多用户、事件持久化与队列重启恢复
 
 以下描述当前源码及回归证据，不表示某个线上 release 已部署。指定线上会话的实际阻塞原因必须结合已认证快照、原回执及运行版本判断，不能根据 URL、最后一条消息或界面空闲状态推断完成。
+
+### 专用 VM 中的项目执行
+
+Cells 的 `[projects].isolation` 默认为 `"bubblewrap"`；专用 VM 可显式设置为 `"none"`，使用 guest 内 Cells 服务用户、真实项目 cwd 和完整安装依赖启动 harness、项目命令与 process API。VMM 保持通用，不识别 Codex、Claude 或 DSH。原生模式声明 `trusted-cooperative-host`、`cooperative`、`readOnlyEnforcement="none"` 与 `host-mapped`；文件 API 仍检查授权，进程访问由 OS 权限决定，不提供项目级内核只读隔离。目录身份检查、取消与进程组清理继续生效，不支持的路径重映射明确拒绝。配置示例与限制见 [Cells README](../../tools/cells/README.md#project-isolation-mode)。
+
+2026-11-08 在 `cell-x1` 的 `cx1` 项目验证了此模式：Cells 托管 Codex 返回 8 个模型，托管 DSH 返回 2 个模型，两个会话列表请求成功；未提交模型消息。DSH 对不支持的 SOCKS `all_proxy` 使用已有 HTTP 代理，日志确认转换成功，重启后未再出现 `NATIVE_STDOUT_EOF` 或 `DSH_STARTUP_FAILED`。冷查询分别为 Codex 会话 854 ms、模型 5026 ms，DSH 会话 2349 ms、模型 8 ms；热查询 2–5 ms，每次测量各为一个逻辑 API、一个 HTTP 请求。数据为单个目标项目、两个 profile、返回会话数均为 0，运行于 1 vCPU/约 1 GiB guest；使用本次 release 构建，未做全页面点击验收，冷模型查询超过 5 秒，因此不声明完整页面或冷启动性能达标。Rust 功能回归与 transport 性能回归通过，临时验收作用域均已确认清理。
 
 ### 用户隔离边界（C4 Container）
 
@@ -571,3 +585,23 @@ DSH 展示投影不将明确来源为 agent-instructions、runtime-context、too
 ### 远程会话客户端状态
 
 `projectClientState: 1` 声明固定 API `project_client_state`，按获授权的项目、principal 和私有 key 保存不透明值。读取和 CAS 均核对项目 revision，写入要求 rw；此能力不暴露给 agent MCP。客户端状态用于远程输入草稿、发送回执与指令队列，原生聊天历史仍只由 harness 保存。小记录原位保存，大记录按唯一代次分块并核验摘要；NestOS 本机只保留会话定位和是否需要恢复的索引，不保存正文。旧本机记录先复制并核验远端结果，再移除本机当前正文；迁移失败保留原输入以便继续核对。
+
+新建操作（包括 resume、输入及交互答复）在冻结操作身份前查询当前节点 epoch，不复用打开会话时固定的 journal epoch；已有 pending、控制和输出回执仍携带原 epoch 查询，禁止因重启自动重放。首次输入接纳后，草稿提升和清空检查遇到远端状态索引时必须读取同一连接、主体和项目 revision 下的权威回执；只向草稿策略投影 sessionId、submittedTurnId 和 pending，不传递正文。提升原子保留原 UUID 到原生 Session 的映射，并创建一个新 UUID 的空白“新会话”。
+
+“新会话”右键菜单通过 app-shell 的现有 contextMenu 扩展提供“复位”，不修改 vfs-ui。确认后调用 ProjectDraftComposer.clear，以 CAS 替换当前草稿并清理其附件，再关闭旧编辑器并打开空白草稿；不删除原生会话或历史。当前草稿身份已改变或远程提交结果未知时拒绝清空，读取权威状态失败也保留原草稿。`@new` 是稳定入口，实际草稿身份保存在内部 UUID 中。
+
+2026-11-08 在运行版 `20261108T005036-dad0311b-dirty` 验证 `cx1/@new`：已有应用壳与节点连接，目标为 1 个项目、1 份当前 UUID 草稿，后台为正式 httpd 与 guest 正常运行；打开到 UUID 编辑器可用耗时 353 ms，25 次逻辑 API、23 个 HTTP 请求。右键复位显示确认提示，取消后 UUID 不变，未清空用户草稿。既有 DSH Session 用当前 epoch 恢复成功，未发送模型消息。上述临时浏览器与 RPC 验收作用域均确认清理；core/transport/ui 性能回归通过。
+
+
+Cells 节点详情中的项目挂载目录按挂载记录显示，而不是按项目或导出根目录合并。同一项目可显示多个源子目录到项目内路径的映射；父目录下未挂载的子目录不列出，也不扫描文件树。每行保留 mountId、源 alias/root、目标 at、访问模式、单条挂载状态及工作台 projectStatus 的整体状态与问题分类。概览仅聚合已有状态，不把已配置或资源统计接口可达解释为挂载在线。
+
+项目名称通过稳定项目 ID 在打开时解析最新工作台路径；项目状态打开原有诊断界面。根挂载复用工作台的重新挂载/卸载项目确认流程；独立的附加目录挂载提供“卸载此目录”，只移除对应绑定，不删除源文件或整个项目。服务器项目声明的附加挂载不提供单独卸载入口。变更操作重验当前 mountId，经过运行会话保护和未保存标签关闭流程；导航本身不会直接执行卸载。
+
+
+授权指纹变更采用“自动发现、显式确认”：`nodeOverview` 或连接/挂载探测识别 `AUTHORIZATION_CHANGED` 后，仅以原凭据重新读取节点发现接口，不附带过期授权头，不修改连接或项目记录。当前节点及 principal 身份一致时，返回 5 分钟有效的确认候选，显示新旧指纹与关联项目数量；身份不一致、缺少原身份、发现失败分别返回 blocked/unavailable 并提供核对地址/凭据或重试指引。候选仅保存在当前用户服务实例内，重复发现合并，不写磁盘，不记录凭据。
+
+`confirmAuthorizationRefresh(connectionId, proposalId, options)` 是独立写命令：校验候选与原连接快照、有效期，再次获取服务端授权并核对服务器/principal/新指纹，经过项目变更保护后，仅持久化节点连接的授权。候选过期、配置变化、远端再次变更、取消或运行会话保护拒绝时不写入。已有项目 grants 保持原授权，用户通过“项目状态 → 刷新授权与项目绑定”单独重新校验；该入口可跳转对应 Cells 节点详情。UI 明确显示“尚未更新”、确认按钮和每种失败的具体下一步操作，不把检查或发现成功当成已授权更新。
+
+项目创建弹窗在目录分组读取完成前即可显示并输入名称；分组仅使用 navigationFolders 元数据，不扫描会话历史或逐项跨 RPC 判断项目归属。加载中禁止提交实际创建，失败显示安全错误码与“重新加载分组”，重试保留草稿，关闭忽略迟到结果。
+
+2026-11-07 实机验收：运行版本 `20261107T154645-fe825a07-dirty`，浏览器使用已登记的客户端证书。数据规模为节点挂载项目 1 个、挂载行 1 条、创建项目分组选项 1 个（根）；正常 durable session 后台负载，无构建或测试矩阵并行。已就绪工具箱刷新节点概览 307 ms、1 次逻辑 API / 1 次 HTTP；工作台点击创建项目至分组控件可用 118 ms、1 次 `navigationFolders` / 1 次 HTTP，未调用 `ProjectSessions.navigation`。仅验证弹窗读取/取消，不自动提交真实项目或接受真实授权候选。浏览器和验收驱动作用域已清理；记录 `/var/tmp/project-create-live-browser-receipt.json`。

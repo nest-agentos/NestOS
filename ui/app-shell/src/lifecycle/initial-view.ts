@@ -8,7 +8,7 @@ export function openInitialView(backend: ApplicationBackend, documents: string[]
 export function initialViewRequest(documents: string[], resource?: string) {
     let initialSessionId: string | undefined, branch: string | undefined;
     try {
-        const route = resource ? parseSessionRoute(resource) : undefined;
+        const route = resource && !resource.startsWith('@project/') ? parseSessionRoute(resource) : undefined;
         const target = route && resolveBrowserTarget(route.path);
         if (target?.kind === 'session') {initialSessionId = target.sessionId; branch = route?.branch;}
     } catch { /* The normal resource loader owns malformed-route diagnostics. */ }

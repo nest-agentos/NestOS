@@ -1,0 +1,69 @@
+{
+  "operation": "runtime-recovery.acceptance",
+  "date": "2026-11-08",
+  "version": {
+    "root": "dad0311b165f1cf7a7b7295cefc1d8815ba26c66",
+    "kernel": "908d2c7c9bf6a0096b034b743008aef3044fa499",
+    "workingTreeChanges": true
+  },
+  "dataset": {
+    "historicalSessions": 1215,
+    "storage": "isolated admin LocalFS snapshot with consistent online SQLite backup",
+    "indexPolicy": "no legacy index backfill; one newly admitted ordinary Task"
+  },
+  "measurement": {
+    "cache": "cold Kernel bindings, warm OS filesystem cache",
+    "background": "production httpd left running; unrelated concurrent validation",
+    "scope": "background recovery candidate lookup and one Session recovery; excludes complete startup and browser readiness",
+    "cleanup": "temporary scope confirmed; data copy removed",
+    "logicalApiBoundary": "public Kernel calls issued by the background driver; lease acquisitions reported separately; no browser RPC"
+  },
+  "samples": [
+    {
+      "mode": "historical-session-enumeration",
+      "durationMs": 19.396621999999752,
+      "logicalApiCalls": 1,
+      "historicalSessionReads": 1215
+    },
+    {
+      "mode": "indexed-empty-background",
+      "durationMs": 2.6525759999999536,
+      "logicalApiCalls": 1,
+      "historicalSessionReads": 0,
+      "sessionInspections": 0,
+      "recoveries": 0,
+      "leaseAcquisitions": 0,
+      "httpRequests": 0
+    },
+    {
+      "mode": "indexed-empty-background",
+      "durationMs": 1.315787999999884,
+      "logicalApiCalls": 1,
+      "historicalSessionReads": 0,
+      "sessionInspections": 0,
+      "recoveries": 0,
+      "leaseAcquisitions": 0,
+      "httpRequests": 0
+    },
+    {
+      "mode": "indexed-empty-background",
+      "durationMs": 0.836453999999776,
+      "logicalApiCalls": 1,
+      "historicalSessionReads": 0,
+      "sessionInspections": 0,
+      "recoveries": 0,
+      "leaseAcquisitions": 0,
+      "httpRequests": 0
+    },
+    {
+      "mode": "indexed-one-pending-background",
+      "durationMs": 12.814014999999927,
+      "logicalApiCalls": 2,
+      "historicalSessionReads": 0,
+      "sessionInspections": 0,
+      "recoveries": 1,
+      "leaseAcquisitions": 1,
+      "httpRequests": 0
+    }
+  ]
+}

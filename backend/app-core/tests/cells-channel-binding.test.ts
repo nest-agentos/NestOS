@@ -29,3 +29,11 @@ it('rejects authorization changed during an async lookup and closes the client',
     await expect(f.service.sessionChannel('project','respond',{scopeId:'attempt'})).rejects.toMatchObject({code:'ECONFLICT'});
     expect(f.client.channel).not.toHaveBeenCalled();expect(f.client.close).toHaveBeenCalledOnce();
 });
+it('sends project-relative channel directories without assuming a namespace or VMM path',async()=>{
+    const f=await fixture('rw');
+    for(const operation of ['open','current'] as const) {
+        await f.service.sessionChannel('project',operation,{scopeId:'attempt',cwd:'/workspace/_nestos/kanban/conversations/attempt'});
+        expect(f.client.channel).toHaveBeenLastCalledWith({id:'native',revision:1},operation,
+            expect.objectContaining({cwd:'_nestos/kanban/conversations/attempt'}));
+    }
+});
