@@ -40,7 +40,7 @@ export class KanbanSidebar {
             source: {get: async id => this.nodes.find(node => node.id === id), children: async parent => parent === null ? this.nodes : [], subscribe: () => () => {}},
             onActivate: node => {void options.navigate(node.id).catch(error => this.failure(error));}, onError: error => this.failure(error),
             actions: [
-                {id: 'execution-settings', label: controlLabel('settings'), iconHTML: TOOLBOX_ICONS.settings, placements: ['toolbar', 'menu'], state: () => ({visible: !!this.controls, enabled: !!this.controls}), run: async context => this.controls?.open(this.boards, this.targetBoard(context.target)?.id)},
+                {id: 'execution-settings', label: controlLabel('settings'), iconHTML: TOOLBOX_ICONS.settings, placements: ['toolbar', 'menu'], state: () => ({visible: !!this.controls, enabled: !!this.controls}), run: async context => this.openSettings(this.targetBoard(context.target)?.id)},
                 ...this.executionActions(),
                 {id: 'create', label: t('kanban.newBoard'), iconHTML: FILE_BROWSER_ICONS.addFile, placements: ['toolbar'], run: () => options.create()},
                 {id: 'refresh', label: t('kanban.refresh'), iconHTML: ACTION_ICONS.refreshView, placements: ['toolbar'], run: () => this.reload()},
@@ -51,6 +51,7 @@ export class KanbanSidebar {
         await this.reload(); if (this.closed) return;
         await this.browser.start(); this.started = true; this.select(this.selected);
     }
+    openSettings(boardId?:string):void {this.controls?.open(this.boards,boardId);}
     select(path: string): void {
         this.selected = path.split('/').slice(0, 3).join('/');
         this.browser.select(this.nodes.some(node => node.id === this.selected) ? [this.selected] : []);

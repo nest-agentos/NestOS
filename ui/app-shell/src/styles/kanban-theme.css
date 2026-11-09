@@ -1,0 +1,10 @@
+.kanban, .kanban-sidebar-controls {
+    --kanban-bg-hover: var(--llm-bg-hover, #eef2f7);
+    --kanban-bg-primary: var(--llm-bg-primary, #fff);
+    --kanban-bg-secondary: var(--llm-bg-secondary, #f8fafc);
+    --kanban-border-color: var(--llm-border-color, #dce1e8);
+    --kanban-color-error: var(--llm-color-error, #b91c1c);
+    --kanban-color-primary: var(--llm-color-primary, #2563eb);
+    --kanban-text-primary: var(--llm-text-primary, #222);
+    --kanban-text-secondary: var(--llm-text-secondary, #64748b);
+}

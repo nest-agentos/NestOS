@@ -68,3 +68,18 @@ it('uses one accessible settings dialog, rejects stale writes and retains partia
     expect(dialog.querySelector<HTMLButtonElement>('[data-board-control=resume]')!.hidden).toBe(false);
     show.mockRestore();
 });
+
+it('keeps the exact harness settings request on an unknown reply and restores it when reopening',async()=>{
+ Object.defineProperty(HTMLDialogElement.prototype,'showModal',{configurable:true,value(){this.open=true;}});
+ Object.defineProperty(HTMLDialogElement.prototype,'close',{configurable:true,value(){this.open=false;this.dispatchEvent(new Event('close'));}});
+ const execute=vi.fn().mockRejectedValueOnce(Object.assign(new Error('uncertain'),{code:'EIO',outcome:'unknown'})).mockResolvedValue({});
+ const service={read:async()=>({...board('A'),revision:4,settings:{target:'codex'}}),boardSettings:async()=>({fields:[{name:'target',label:'Harness',choices:[{value:'codex',label:'Codex'},{value:'claude',label:'Claude'}]}]}),execute} as unknown as KanbanClient;
+ const controls=new KanbanSidebarControls(service,async()=>{},vi.fn());cleanups.push(()=>controls.destroy());controls.open([{...board('A'),revision:4}],'A');
+ await vi.waitFor(()=>expect(document.querySelector('[data-board-settings=A]')).not.toBeNull());
+ let form=document.querySelector<HTMLFormElement>('[data-board-settings=A]')!;form.querySelector<HTMLSelectElement>('select')!.value='claude';form.requestSubmit();
+ await vi.waitFor(()=>expect(form.querySelector('[role=alert]')).not.toBeNull());const original=execute.mock.calls[0][1];
+ expect(form.querySelector<HTMLSelectElement>('select')!.disabled).toBe(true);document.querySelector<HTMLDialogElement>('dialog')!.close();
+ controls.open([{...board('A'),revision:4}],'A');await vi.waitFor(()=>expect(document.querySelector('[data-board-settings=A]')).not.toBeNull());
+ form=document.querySelector<HTMLFormElement>('[data-board-settings=A]')!;form.requestSubmit();await vi.waitFor(()=>expect(execute).toHaveBeenCalledTimes(2));
+ expect(execute.mock.calls[1][1]).toEqual(original);expect(original.command.settings.target).toBe('claude');
+});

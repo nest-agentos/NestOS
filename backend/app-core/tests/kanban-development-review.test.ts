@@ -137,3 +137,26 @@ it('accepts current continuation evidence without changing the original workspac
     await f.journal.update('development-workspace:retry', old => ({...old as any, context: {...original.context, delivery: {readOnly: true, evidence: {result: {version: 'different'}}}}}));
     await expect(f.api.snapshot(f.board, f.item)).rejects.toMatchObject({code: 'VERIFICATION_RUNNING_VERSION_MISMATCH'});
 });
+
+it('prepares a new analysis channel for the same Session when its previous channel is closed without any view',async()=>{
+ const f=await fixture(),snapshot=await f.api.snapshot(f.board,f.item),original=f.channels.channel.getMockImplementation()!;
+ f.channels.channel.mockImplementation(async(...args)=>{if(args[1]==='current')throw Object.assign(new Error('closed'),{code:'EIO',remoteCode:'CHANNEL_SCOPE_UNKNOWN',outcome:'not-committed'});return original(...args);});
+ const request=await f.api.prepareAnalysis({id:'after-close',board:f.board,item:f.item,snapshot});
+ expect(request).toMatchObject({expectedSessionId:'original-session',overrides:{harnessConversation:{mode:'resume',bindingId:'binding'}}});
+ expect(f.channels.channel).toHaveBeenCalledWith('project','open',expect.objectContaining({scopeId:'after-close'}));
+ const opened=f.channels.channel.mock.calls.find(row=>row[1]==='open')![2];expect(opened).not.toHaveProperty('previousScopeId');
+ expect(f.submission.start).not.toHaveBeenCalled();
+});
+it.each(['EACCES','CHANNEL_EXECUTION_UNKNOWN'])('does not reinterpret %s as an absent predecessor',async code=>{
+ const f=await fixture(),snapshot=await f.api.snapshot(f.board,f.item);
+ f.channels.channel.mockRejectedValueOnce(Object.assign(new Error(code),{code}));
+ await expect(f.api.prepareAnalysis({id:'blocked-channel',board:f.board,item:f.item,snapshot})).rejects.toMatchObject({code});
+ expect(f.channels.channel.mock.calls.some(row=>row[1]==='open')).toBe(false);
+});
+
+it('preserves an unknown channel lookup outcome rather than opening a replacement channel',async()=>{
+ const f=await fixture(),snapshot=await f.api.snapshot(f.board,f.item);
+ f.channels.channel.mockRejectedValueOnce(Object.assign(new Error('uncertain'),{code:'EIO',remoteCode:'CHANNEL_SCOPE_UNKNOWN',outcome:'unknown'}));
+ await expect(f.api.prepareAnalysis({id:'unknown-channel',board:f.board,item:f.item,snapshot})).rejects.toMatchObject({code:'EIO',outcome:'unknown'});
+ expect(f.channels.channel.mock.calls.some(row=>row[1]==='open')).toBe(false);
+});

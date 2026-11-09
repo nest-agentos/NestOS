@@ -210,3 +210,26 @@ it('keeps project decision shortcuts alive through catalog refresh and opens the
  await vi.waitFor(()=>expect(f.active().querySelector<HTMLElement>('[data-panel]')!.hidden).toBe(true));
  expect(f.workbench.getActiveResourceId()).toBe('/board/b/@decision/nestos-remote-project/secondary');
 });
+
+it('opens the same execution and harness settings from the board menu and sidebar and saves only the selected board',async()=>{
+ Object.defineProperty(HTMLDialogElement.prototype,'showModal',{configurable:true,value(){this.open=true;}});
+ Object.defineProperty(HTMLDialogElement.prototype,'close',{configurable:true,value(){this.open=false;this.dispatchEvent(new Event('close'));}});
+ const f=await fixture();await f.service.create({id:'other',title:'Other',scope:{kind:'system'},members:(await f.service.read('b')).members});
+ Object.assign(f.service,{boardSettings:vi.fn(async()=>({fields:[{name:'target',label:'Harness',choices:[{value:'',label:'Default'},{value:'codex',label:'Codex'},{value:'claude',label:'Claude'}]}]}))});
+ await f.workbench.openResource('/board/b');f.active().querySelector<HTMLButtonElement>('[data-action=board-settings]')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('[data-board-settings=b]')).not.toBeNull());
+ const dialog=document.querySelector<HTMLDialogElement>('dialog.kanban-sidebar-controls')!;
+ expect(dialog.textContent).toContain(t('kanban.boardControl.execution'));expect(dialog.textContent).toContain(t('kanban.boardControl.harness'));
+ expect(dialog.querySelector<HTMLSelectElement>('[data-settings-scope]')!.value).toBe('b');
+ dialog.querySelector<HTMLSelectElement>('[name=setting-target]')!.value='codex';
+ dialog.querySelector<HTMLButtonElement>('[data-board-control=manual]')!.click();
+ await vi.waitFor(()=>expect(dialog.querySelector<HTMLButtonElement>('[data-board-control=manual]')!.disabled).toBe(false));
+ expect((await f.service.read('b')).executionControl?.mode).toBe('manual');
+ dialog.querySelector<HTMLFormElement>('form')!.requestSubmit();
+ await vi.waitFor(()=>expect(document.querySelector('dialog.kanban-sidebar-controls')).toBeNull());
+ expect((await f.service.read('b')).settings).toEqual({target:'codex'});expect((await f.service.read('other')).settings).toBeUndefined();
+ f.sidebar.querySelector<HTMLButtonElement>('[data-action=execution-settings]')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('[data-board-settings=b]')).not.toBeNull());
+ expect(document.querySelector<HTMLSelectElement>('[name=setting-target]')!.value).toBe('codex');
+ expect(document.querySelectorAll('dialog.kanban-sidebar-controls')).toHaveLength(1);
+});

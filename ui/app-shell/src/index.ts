@@ -2,7 +2,8 @@ export type { DirectorySourceProvider } from '@nestos/app-contracts/services';
 export { workspaceRoot } from '@nestos/app-contracts';
 import './styles/workspace.css';
 import './styles/digital-twin.css';
-import './styles/kanban.css';
+import '@nestos/kanban-ui/style.css';
+import './styles/kanban-theme.css';
 import './styles/calendar.css';
 import '@nestos/mail/ui.css';
 

@@ -1,3 +1,4 @@
+import {createModuleLogger} from '@nestos/common';
 import {freezeKanbanHarness,harnessSettingKey} from './kanban-harness-settings';
 import {registerWorkResource} from './kanban-work-resource-catalog';
 import {initializeResourceIndex} from '../kanban/resource-operation-index';
@@ -142,7 +143,15 @@ export async function openDevelopmentChannel(remote: Pick<ProjectRemoteMountServ
 
 /** Fence the exact previous execution while selecting the next native Session explicitly. */
 export async function currentChannelBinding(remote:Pick<ProjectRemoteMountService,'sessionChannel'>,record:DevelopmentWorkspaceRecord,sessionId?:string) {
-    const active=await remote.sessionChannel(record.projectId,'current',{cwd:record.directory}) as {scopeId?:unknown;execution?:{sessionId?:unknown}};
+    const started=Date.now();
+    let active:{scopeId?:unknown;execution?:{sessionId?:unknown}};
+    try {active=await remote.sessionChannel(record.projectId,'current',{cwd:record.directory}) as typeof active;}
+    catch(error){const detail=error as {code?:string;remoteCode?:string;outcome?:string};
+        if((detail.remoteCode??detail.code)!=='CHANNEL_SCOPE_UNKNOWN'||detail.outcome==='unknown')throw error;
+        createModuleLogger('kanban-channel').debug('Channel predecessor absent',{operation:'kanban.channel.prepare',operationId:record.channelId,
+            stage:'predecessor.read',result:'success',projectId:record.projectId,hasNativeSession:!!sessionId,durationMs:Date.now()-started});
+        return undefined;
+    }
     if(active.scopeId===record.channelId)return undefined;
     requireValue(typeof active.scopeId==='string'&&typeof active.execution?.sessionId==='string','CHANNEL_EXECUTION_UNKNOWN');
     return {previousScopeId:active.scopeId,previousSessionId:active.execution.sessionId,...(sessionId?{sessionId}:{})};

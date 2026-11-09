@@ -1024,3 +1024,9 @@ Cell 重启后，原生执行已脱离但缺少精确 turn 终态时，Kanban �
 `pnpm test:kanban-cancel-browser` 使用真实领域、SeqFile、宿主控制状态与 DOM，模拟执行器停止回执，验证点击→取消中→确认停止、保留待验收任务及重新开放跳过入口；不操作生产任务。
 
 快照准备阶段收到 Cells 明确的 `EBUSY` 或 `PROCESS_READERS_BUSY` 且 `outcome: not-committed` 回执时，映射为 `OPERATION_WORKSPACE_BUSY`，界面明确“操作尚未启动”，保留具体原因及原请求身份供人工重试；此时不生成分析 Session 或持久运行记录。结果未知继续按未知处理，不能据忙碌错误重派。Cells 普通命令与项目命令在目录读取竞争时使用有界公平等待，原生会话/命令占用仍保持原准入隔离。
+
+看板侧栏与标题栏“…”的设置入口通过宿主 `openSettings(boardId)` 端口复用同一个设置对话框，显式绑定当前看板，统一提供执行模式/暂停/继续和后端目录声明的各阶段 harness 选择。全部看板范围仅支持执行控制，harness 必须单看板配置。字段渲染复用独立 UI 的 `boardSettingsFields`；保存使用打开时的看板修订和稳定请求身份，冲突保留草稿，未知回执沿原请求重试。当前对话框自己提交的执行控制回执可推进同修订草稿的基线，不重写未知请求或其他并发修改。
+
+合并分析由 `runItemOperation` 后端 API 冻结快照、准备通信通道并提交至原执行 Session，不依赖打开看板或会话 View。前通道已关闭而 `current` 明确返回 `CHANNEL_SCOPE_UNKNOWN` 时，不把它当作会话丢失；宿主重新打开本次作用域并沿已核验的原 Session/native binding 继续。创建端仍原子复验当前通道，拒绝并发接管、未知回执或未结算执行。入口分别称“分析合并方案”和“确认并执行 Git 合并”，前者不会执行合并。
+
+看板导航和设置对话框的布局、按钮、表单及响应式样式统一归 [kanban-ui 样式](../../libraries/kanban-ui/src/kanban.css)；`app-shell` 仅通过 `styles/kanban-theme.css` 将宿主主题变量映射到公开 `--kanban-*` 变量，不再持有看板业务 CSS。

@@ -1,3 +1,4 @@
+import {KanbanBoardSettings} from './board-settings';
 import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
 import type {KanbanBoardSummary, KanbanClient, KanbanCommand} from '@nestos/kanban/contracts';
 
@@ -9,29 +10,38 @@ export const controlIcon = (phase: string) => ['paused', 'pausing', 'waiting-del
 /** Scope is explicit; each board is revision checked and partial failures are retained. */
 export class KanbanSidebarControls {
     private dialog?: HTMLDialogElement;
+    private releaseDialog?:()=>void;
     private render?: (boards: KanbanBoardSummary[]) => void;
     private busy = false;
+    private settings?:KanbanBoardSettings;
+    private boards:KanbanBoardSummary[]=[];
     private closed = false;
     constructor(private readonly service: KanbanClient, private readonly changed: () => Promise<void>, private readonly report: (error: unknown) => void) {}
     open(boards: KanbanBoardSummary[], selected?: string): void {
         if (this.dialog) {this.dialog.focus(); return;}
+        this.boards=boards;
         const dialog = document.createElement('dialog'), title = document.createElement('h2');
         dialog.className = 'kanban-sidebar-controls'; dialog.setAttribute('aria-label', controlLabel('settings')); title.textContent = controlLabel('settings');
-        const close = document.createElement('button'); close.type = 'button'; close.textContent = t('action.close'); close.onclick = () => dialog.close();
+        const close = document.createElement('button'); close.type = 'button'; close.textContent = t('action.close'); close.onclick = () => this.closeSettings();
         const header = document.createElement('header'); header.append(title, close);
-        const scope = document.createElement('select'); scope.setAttribute('aria-label', controlLabel('scope'));
+        const scope = document.createElement('select'); scope.setAttribute('aria-label', controlLabel('scope'));scope.dataset.settingsScope='';
         scope.append(new Option(controlLabel('all'), '*'));
         boards.forEach(board => scope.append(new Option(board.title, board.id))); scope.value = selected ?? '*';
         const help = document.createElement('p'); help.textContent = controlLabel('help');
         const state = document.createElement('p'); state.setAttribute('role', 'status');
         const buttons = this.actions(boards, scope, state);
         this.bindState(boards, scope, state, buttons);
-        dialog.append(header, scope, help, state, buttons); document.body.append(dialog); this.dialog = dialog;
+        const execution=document.createElement('h3');execution.textContent=controlLabel('execution');
+        const settings=this.settings??=new KanbanBoardSettings(this.service,this.changed,()=>this.closeSettings(),busy=>{this.busy=busy;this.dialog?.querySelectorAll<HTMLSelectElement|HTMLButtonElement>('header button,[data-settings-scope]').forEach(input=>{input.disabled=busy;});this.render?.(this.boards);});
+        const updateSettings=()=>{void settings.select(scope.value==='*'?undefined:scope.value);};scope.addEventListener('change',updateSettings);updateSettings();
+        dialog.append(header, scope, execution, help, state, buttons,settings.element); document.body.append(dialog); this.dialog = dialog;
         const origin = document.activeElement;
         dialog.addEventListener('cancel', event => {if (this.busy) event.preventDefault();});
-        dialog.addEventListener('close', () => {dialog.remove(); this.dialog = undefined; this.render = undefined; if (origin instanceof HTMLElement && origin.isConnected) origin.focus();}, {once: true});
+        this.releaseDialog=()=>{if(this.dialog!==dialog)return;settings.element.remove();dialog.remove();this.dialog=undefined;this.render=undefined;this.releaseDialog=undefined;if(origin instanceof HTMLElement&&origin.isConnected)origin.focus();};
+        dialog.addEventListener('close',this.releaseDialog,{once:true});
         dialog.showModal();
     }
+    private closeSettings():void {this.dialog?.close();this.releaseDialog?.();}
     private actions(boards: KanbanBoardSummary[], scope: HTMLSelectElement, state: HTMLElement): HTMLElement {
         const buttons = document.createElement('div'); buttons.className = 'kanban-sidebar-controls__actions';
         const commands: Array<[string, string, Command]> = [
@@ -60,12 +70,14 @@ export class KanbanSidebarControls {
         };
         scope.onchange = () => this.render?.(boards); this.render(boards);
     }
-    update(boards: KanbanBoardSummary[]): void {this.render?.(boards);}
+    update(boards: KanbanBoardSummary[]): void {this.boards=boards;this.render?.(boards);}
     async toggle(board: KanbanBoardSummary): Promise<void> {await this.apply([board], {type: 'set-board-control', paused: !board.executionControl?.paused});}
-    destroy(): void {this.closed = true; this.dialog?.close();}
+    destroy(): void {this.closed = true; this.closeSettings();this.settings?.destroy();}
     private async apply(boards: KanbanBoardSummary[], command: Command, state?: HTMLElement, buttons?: HTMLElement): Promise<void> {
         if (this.busy || this.closed) return; this.busy = true;
         this.dialog?.setAttribute('aria-busy', 'true');
+        const inputs=[...this.dialog?.querySelectorAll<HTMLSelectElement|HTMLButtonElement>('select,button')??[]].map(input=>({input,disabled:input.disabled}));
+        inputs.forEach(({input})=>{input.disabled=true;});
         buttons?.querySelectorAll('button').forEach(button => {button.disabled = true;});
         if (state) state.textContent = controlLabel('processing');
         const failures: string[] = [];
@@ -73,7 +85,8 @@ export class KanbanSidebarControls {
             for (const board of boards) {
                 const operationId = randomUUID(), started = performance.now();
                 try {
-                    await this.service.execute(board.id, {operationId, expectedRevision: board.revision, command});
+                    const result=await this.service.execute(board.id, {operationId, expectedRevision: board.revision, command});
+                    this.settings?.observeControl(result,board.revision);
                     log.debug('board.control', {operationId, boardId: board.id, stage: 'commit', result: 'success', durationMs: Math.round(performance.now() - started)});
                 } catch (error) {
                     const raw = (error as {code?: unknown})?.code, code = typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'KANBAN_OPERATION_FAILED';
@@ -85,6 +98,6 @@ export class KanbanSidebarControls {
             if (!this.closed && state) state.textContent = failures.length ? failures.join('\n') : boards.map(board => board.title + ': ' + controlLabel(board.executionPhase ?? 'automatic')).join('\n');
             if (failures.length) this.report(Object.assign(new Error(failures.join('\n')), {code: 'BOARD_CONTROL_PARTIAL_FAILURE'}));
         } catch (error) {this.report(error); if (!this.closed && state) state.textContent = controlLabel('refreshFailed');}
-        finally {this.busy = false; this.dialog?.removeAttribute('aria-busy'); this.render?.(boards); if (failures.length && state) state.textContent = failures.join('\n');}
+        finally {this.busy = false; inputs.forEach(({input,disabled})=>{input.disabled=disabled;}); this.dialog?.removeAttribute('aria-busy'); this.render?.(boards); if (failures.length && state) state.textContent = failures.join('\n');}
     }
 }
