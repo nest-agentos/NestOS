@@ -1,4 +1,3 @@
-import {promptData} from './helpers/prompt-data';
 import {expect, it, vi} from 'vitest';
 import type {IndependentCallView, IndependentCallInput} from '@nestos/llm-session/contracts';
 import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
@@ -78,6 +77,13 @@ it('passes only the frozen context reference without eagerly reading dependency 
     const executor=createPublishedKanbanWorkExecutor({calls:f.calls,kernel:{task:f.task},prepareSession:f.prepareSession,context,
         binding:async()=>({target:{kind:'agent',id:'worker',version:'1',digest:'b'.repeat(64)},contextRef})});
     const prepared=await executor.prepare(dispatch,{id:'item',title:'Task',responsibility:'large task body'.repeat(1000)} as KanbanItem) as {input:IndependentCallInput};
-    expect(promptData((prepared.input.request.source as {text:string}).text,'Context reference')).toEqual(contextRef);
+    const text=(prepared.input.request.source as {text:string}).text;expect(text).toContain('`task`, `context`');expect(text).not.toContain(dispatch.id);expect(text.length).toBeLessThan(200);
     expect(context).not.toHaveBeenCalled();
+});
+
+it('preserves explicitly supplied dependency data for custom context-reference bindings',async()=>{
+ const f=await fixture(),executor=createPublishedKanbanWorkExecutor({calls:f.calls,kernel:{task:f.task},prepareSession:f.prepareSession,
+  binding:async()=>({target:{kind:'agent',id:'worker',version:'1',digest:'b'.repeat(64)},contextRef:{scopeId:dispatch.id,sections:['task']},dependencies:{checkpoint:'verified custom prerequisite'}})});
+ const prepared=await executor.prepare(dispatch,{id:'item',title:'Task'} as KanbanItem) as {input:IndependentCallInput};
+ expect((prepared.input.request.source as {text:string}).text).toContain('verified custom prerequisite');
 });

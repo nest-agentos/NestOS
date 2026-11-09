@@ -33,7 +33,7 @@ import type {ProjectService} from '@nestos/app-contracts/services';
 import {developmentPolicy,requiresDevelopmentProject} from './kanban-development-policy';
 import {publishPromptBundle} from '../run/prompt-bundle';
 import {publishImmutableFile} from '../run/prompt-bundle';
-import {readChannelResult, channelResultInstruction} from '../run/channel-results';
+import {readChannelResult} from '../run/channel-results';
 import {workResourceExecution} from './kanban-work-resource-execution';
 
 interface Options {
@@ -122,7 +122,7 @@ async function prepareAnalysis(options: Options, input: MaintenanceInput): Promi
     requireValue(binding.nativeRef?.sessionId,'OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE');
     await freezeAnalysis(options,current,input,sessionId,directory,binding.nativeRef.sessionId);
     return {expectedSessionId: sessionId, expectedBranch: branch, expectedTarget: target, target: {kind: target.kind, id: target.id, version: target.version},
-        source: {kind: 'composer', text: !input.action || input.action === 'analyze' ? mergeInstruction(input, directory) : maintenanceInstruction({...input, action: input.action}, directory), attachments: [], values: {}},
+        source: {kind: 'composer', text: maintenanceInstruction(input.action??'analyze'), attachments: [], values: {}},
         submission: {id: input.id, source: {kind: 'conversation', ownerId: sessionId, id: input.id}},
         overrides: {...original.input.request.overrides, baseRoundId: undefined, newBranchName: undefined, branchMode: 'continue',
             harnessConversation: {mode: 'resume', bindingId: binding.id, expectedBindingRevision: binding.revision, expectedGeneration: binding.generation}}};
@@ -149,16 +149,6 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
         await openDevelopmentChannel(options.remote, input.id, record, {runId: input.id, itemId: input.item.id, attemptId: input.id}, input.item,
             await currentChannelBinding(options.remote,record,nativeSessionId));
     } finally {await view.dispose();}
-}
-function mergeInstruction(input: {id: string; item: KanbanItem; snapshot: ReviewSnapshot}, _directory: string): string {
-    return JSON.stringify({dependencies: {lifecycle: {stage: 'postload.succeeded'}}, operation: {phase: 'merge-analysis', operationId: input.id},
-        instruction: `The original development execution has ended; the host task awaits submission. Continue in this SAME Session for READ-ONLY integration analysis; do not rerun development, create another Session or worktree, commit, merge, push, or modify source/main files. `
-            + `Read the identity, context and task-merge-pre.md sections through session_context. Context.operation contains frozen commit contexts and approved source/target versions. Compare the retained delivery with the target branch and inspect current target working changes read-only. A dirty target is not itself a conflict. Identify actual overlapping files/modules or functional interactions; unrelated changes must not block this workflow. Preserve all existing user changes. `
-            + `Return a plan payload {sourceVersion,targetVersion,summary,conflicts:[{id,path,reason,options:[{id,label,detail}]}]}. Every conflict needs explicit user-selectable alternatives; no choices are approved yet. `
-            + `Use exactly sourceVersion ${input.snapshot.sourceVersion} and targetVersion ${input.snapshot.targetVersion}; report changed inputs instead of guessing. `
-            + `If context is insufficient use session_request and yield without a final result; the host resumes this SAME Session. Never poll. Read task-merge-post.md through session_context after analysis. `
-            + channelResultInstruction,
-        task: {id: input.item.id, title: input.item.title, responsibility: input.item.responsibility, acceptance: input.item.acceptance}});
 }
 async function readAnalysis(options: Options, job: ReviewJob): Promise<unknown | undefined> {
     const board = await options.service.read(job.boardId), item = (await options.service.item(job.boardId, job.itemId)).item;

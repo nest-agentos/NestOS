@@ -35,7 +35,7 @@ it('prepares merge analysis in the original logical Session and exact native con
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
     const request = await f.api.prepareAnalysis({id: 'analysis', board: f.board, item: f.item, snapshot});
     expect(request).toMatchObject({expectedSessionId: 'original-session', expectedTarget: f.target, overrides: {branchMode: 'continue', harnessConversation: {mode: 'resume', bindingId: 'binding', expectedBindingRevision: 7, expectedGeneration: 2}}});
-    expect(request.source).toMatchObject({kind: 'composer', text: expect.stringContaining('READ-ONLY')});
+    expect(request.source).toMatchObject({kind: 'composer', text: expect.stringContaining('`task-merge-pre.md`')});
     expect(await f.journal.get('worktree:analysis')).toMatchObject({id: 'original'});
     const bundle = (await f.journal.get<{prompts: {files: Array<{name: string}>}}>('development-policy:analysis'))!;
     expect(bundle.prompts.files.map(row => row.name)).toContain('task-merge-pre.md'); expect(bundle.prompts.files.map(row => row.name)).toContain('task-merge-post.md');
@@ -66,7 +66,7 @@ it('publishes context replies and resumes merge analysis in the original Session
 it('prepares project-discovered builds in the original Session and freezes maintenance prompts', async () => {
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
     const request = await f.api.prepareOperation!({id: 'build', action: 'build', board: f.board, item: f.item, snapshot});
-    expect(request.expectedSessionId).toBe('original-session'); expect((request.source as {text:string}).text).toContain('operation.md');
+    expect(request.expectedSessionId).toBe('original-session'); expect((request.source as {text:string}).text).toContain('`task-build-pre.md`');
     expect(f.channels.channel).toHaveBeenCalledWith('project','open',expect.objectContaining({scopeId:'build',sessionId:'original-native'}));
     const path = '/workspace/_nestos/worktrees/original/_nestos/kanban/review/build';
     const manifest = JSON.parse(await readPrompt(f.fs, path + '/manifest.json'));
@@ -159,4 +159,18 @@ it('preserves an unknown channel lookup outcome rather than opening a replacemen
  f.channels.channel.mockRejectedValueOnce(Object.assign(new Error('uncertain'),{code:'EIO',remoteCode:'CHANNEL_SCOPE_UNKNOWN',outcome:'unknown'}));
  await expect(f.api.prepareAnalysis({id:'unknown-channel',board:f.board,item:f.item,snapshot})).rejects.toMatchObject({code:'EIO',outcome:'unknown'});
  expect(f.channels.channel.mock.calls.some(row=>row[1]==='open')).toBe(false);
+});
+
+it('keeps maintenance entry messages bounded while retaining full task and version context in the channel',async()=>{
+ const f=await fixture();Object.assign(f.item,{responsibility:'Detailed original work '.repeat(300),acceptance:'Actual acceptance '.repeat(200)});
+ const snapshot=await f.api.snapshot(f.board,f.item);
+ for(const action of ['analyze','build','deploy','merge'] as const){
+  const input={id:'compact-'+action,action,board:f.board,item:f.item,snapshot};
+  const request=action==='analyze'?await f.api.prepareAnalysis(input):await f.api.prepareOperation!(input);
+  const text=(request.source as {text:string}).text;
+  expect(Buffer.byteLength(text)).toBeLessThan(240);expect(text).not.toContain('Detailed original work');expect(text).not.toContain(snapshot.sourceVersion);expect(text.startsWith('{')).toBe(false);expect(text).not.toContain('-post.md');expect(text).not.toContain('`context`');
+  const open=f.channels.channel.mock.calls.find(([,op,args])=>op==='open'&&args.scopeId===input.id)!;
+  expect(open[2].snapshot.task).toMatchObject({responsibility:'Detailed original work '.repeat(300)});
+  expect(open[2].snapshot.context.operation).toMatchObject({operationId:input.id,sourceVersion:snapshot.sourceVersion,targetVersion:snapshot.targetVersion});
+ }
 });

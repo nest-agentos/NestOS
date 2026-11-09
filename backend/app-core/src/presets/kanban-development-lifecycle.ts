@@ -45,7 +45,7 @@ export async function developmentLifecycleSessions(options: Pick<Options, 'journ
 }
 function lifecycleExecutor(options: Options) {
     return createPublishedKanbanWorkExecutor({...options, title: (dispatch, item) => `${t('kanban.lifecycleTitle', {stage: dispatch.id.split('-postload-').at(-1) ?? ''})} · ${item.number ? '#' + item.number : item.title}`,
-        binding: async (dispatch,item) => {
+        binding: async (dispatch) => {
             const id=dispatch.id.replace(/-postload-(succeeded|failed|cancelled)$/,'');
             const override=await options.journal.get<TargetRef>('lifecycle-target:'+dispatch.id);
             const managed=await options.journal.get<{target?:TargetRef}>('managed-agent:work-'+id);
@@ -53,8 +53,7 @@ function lifecycleExecutor(options: Options) {
             if(!target)throw failure('LIFECYCLE_TARGET_MISSING');
             const record=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+dispatch.id);
             if(!record?.channelId)throw failure('LIFECYCLE_CHANNEL_REQUIRED');
-            return {target,contextRef:{scopeId:record.channelId,sections:['task','context']},instruction:item.responsibility,
-                dependencies:{lifecycle:{stage:'postload.'+dispatch.id.split('-postload-').at(-1)}}};
+            return {target,contextRef:{scopeId:record.channelId,sections:['task','context']},instruction:'Read `task` via `session_context` and follow its lifecycle guidance.'};
         }});
 }
 

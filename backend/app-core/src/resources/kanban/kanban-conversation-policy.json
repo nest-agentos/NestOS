@@ -3,11 +3,11 @@
   "confirmDecision": "确认决策",
   "confirmAdjustment": "确认调整",
   "confirmVersion": "使用当前版本重新验收",
-  "bootstrap": "Read decision-propose.md and context through session_context.",
+  "bootstrap": "Read `decision-propose.md` and `context` via `session_context`.",
   "recoveryBootstrap": "Use session_request with method kanban.recovery.inspect and params {} to inspect this failed task. Yield for the host response. Do not modify source, change task state, rebuild or deploy. Use formal host recovery requests and preserve frozen version checks.",
-  "resumeDecision": "Read the host response with session_response for request {{requestId}}. Explain its actual outcome and continue this same decision conversation.",
-  "resumeRecovery": "Read the host response using session_response for {{requestId}}. Explain its actual outcome. Preserve completed tasks and use only the offered recovery actions.",
+  "resumeDecision": "Read reply `{{requestId}}` via `session_response` and continue this decision discussion.",
+  "resumeRecovery": "Read reply `{{requestId}}` via `session_response`; continue only the offered recovery action.",
   "cancelDecision": "取消决策",
-  "coordinationBootstrap": "Read coordination-conversation.md and context through session_context. This is the persistent coordination window for the bound decision. Read current state through coordination.read before giving advice; do not start or change tasks just because this window opened.",
+  "coordinationBootstrap": "Read `coordination-conversation.md` and `context` via `session_context`; inspect current state with `coordination.read`.",
   "confirmFix": "确认修复"
 }

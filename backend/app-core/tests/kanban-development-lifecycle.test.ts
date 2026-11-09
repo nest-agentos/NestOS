@@ -1,4 +1,3 @@
-import {promptData} from './helpers/prompt-data';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {memoryChannels} from './helpers/session-channels';
 import {afterEach, expect, it, vi} from 'vitest';
@@ -40,10 +39,10 @@ it('runs cancellation finalization independently and reconciles a lost response 
     expect(calls.prepareTaskCall).toHaveBeenCalledTimes(1);
     const input = calls.submitPreparedTaskCall.mock.calls[0][0];
     expect(input.request.expectedSessionId).toBe(hookId);
-    expect(input.request.source.text).toContain('postload.cancelled');
-    expect(promptData(input.request.source.text,'Context reference').scopeId).toBe(hookId);
+    expect(input.request.source.text).toContain('`task`');expect(input.request.source.text.length).toBeLessThan(200);
+    const hook=channels.channel.mock.calls.find(([,operation,args])=>operation==='open'&&args.scopeId===hookId)![2];expect(hook.snapshot.context.lifecycle.stage).toBe('postload.cancelled');
     expect(channels.channel.mock.calls.some(([,operation,args])=>operation==='open'&&args.scopeId===hookId)).toBe(true);
-    expect(input.request.source.text).toContain('Do not implement, commit');
+    expect(hook.snapshot.task.responsibility).toContain('Do not implement, commit');
     expect(await second.settled('attempt', 'cancelled')).toBe(true);
     expect((await journal.get<{done: boolean}>('development-lifecycle:' + hookId))?.done).toBe(true);
     expect((await events.listNotifications()).items).toHaveLength(1);
@@ -54,7 +53,7 @@ it('runs cancellation finalization independently and reconciles a lost response 
     const last = calls.submitPreparedTaskCall.mock.calls.at(-1)![0];
     expect(last.request.expectedTarget.id).toBe('planner');
     expect(last.request.source.text).not.toContain('Decision recovery summary');
-    expect(last.request.source.text).toContain('decision.md');
+    expect(channels.channel.mock.calls.find(([,op,args])=>op==='open'&&args.scopeId==='analysis-postload-failed')![2].snapshot.task.responsibility).toContain('decision.md');
     await journal.update('development-workspace:custom',()=>({projectId:'project',directory:'_nestos/worktrees/custom',channelId:'custom',repositories:[],availableRepositories:[],policy:{commit:'changes',prompts:{files:[
         {name:'task.md',content:'Custom base without status sections'},
         {name:'task-post.md',content:'Custom post body'},
@@ -64,7 +63,7 @@ it('runs cancellation finalization independently and reconciles a lost response 
         {kind:'agent',id:'worker',version:'1',digest:'c'.repeat(64)});
     await second.scan();
     const custom=calls.submitPreparedTaskCall.mock.calls.at(-1)![0].request.source.text;
-    expect(custom).toContain('task-post.md, task-succ.md, task-clear.md');
+    expect(channels.channel.mock.calls.find(([,op,args])=>op==='open'&&args.scopeId==='custom-postload-succeeded')![2].snapshot.task.responsibility).toContain('task-post.md, task-succ.md, task-clear.md');
     expect(custom).not.toContain('Custom post body');
     const count = calls.submitPreparedTaskCall.mock.calls.length;
     await journal.update('development-lifecycle:late',()=>({id:'late',boardId:'board',dispatch:{...dispatch,id:'late'},stage:'postload.succeeded',request:null,phase:'prepared'}));

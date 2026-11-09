@@ -1,3 +1,4 @@
+import {contextReferenceInstruction} from '../run/context-reference-instruction';
 import {formatPromptSections} from '@nestos/llm-context/prompt';
 import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallInput, IndependentCallView} from '@nestos/llm-session/contracts';
@@ -28,7 +29,7 @@ export function createPublishedKanbanWorkExecutor(options: PublishedKanbanWorkOp
             const binding=await options.binding(dispatch, item);
             const input: IndependentCallInput={title:options.title?.(dispatch, item) ?? `${item.number ? '#' + item.number + ' · ' : ''}${item.title}`, request:{expectedSessionId:sessionId,expectedBranch:'main',expectedTarget:binding.target,
                 target:{kind:binding.target.kind,id:binding.target.id,version:binding.target.version},overrides:binding.overrides,
-                source:{kind:'composer',text:formatPromptSections(binding.contextRef === undefined ? [{title:'Task',content:{item,inputs:dispatch.inputs,dependencies:await options.context?.(dispatch,item),planId:dispatch.planId,planRevision:dispatch.planRevision}}] : [{title:'Instructions',content:binding.instruction},{title:'Context reference',content:binding.contextRef},{title:'Dependencies',content:binding.dependencies}]),attachments:[],values:{}},
+                source:{kind:'composer',text:binding.contextRef!==undefined?referencePrompt(binding):formatPromptSections( [{title:'Task',content:{item,inputs:dispatch.inputs,dependencies:await options.context?.(dispatch,item),planId:dispatch.planId,planRevision:dispatch.planRevision}}]),attachments:[],values:{}},
                 submission:{id:dispatch.id,source:{kind:'conversation',ownerId:sessionId,id:dispatch.id}}}};
             return {schema:1,dispatch:structuredClone(dispatch),input,policy:structuredClone(options.executionPolicy ?? {maxDepth:4, timeoutMs: null})};
         },
@@ -76,4 +77,9 @@ function isStopping(error: unknown): boolean {return ['SERVICE_STOPPING', 'DISPO
 /** Only a definite lack of admission allows replaying the same frozen request after restart. */
 function unstarted(error: unknown): Error {
     return Object.assign(new KanbanError(knownCode(error, 'SERVICE_STOPPING')), {executionOutcome: 'not-started', retryable: true});
+}
+
+function referencePrompt(binding:{contextRef?:unknown;instruction?:string;dependencies?:unknown}):string {
+    const text=contextReferenceInstruction(binding.contextRef,binding.instruction);
+    return binding.dependencies===undefined?text:text+'\n\n'+formatPromptSections([{title:'Dependencies',content:binding.dependencies}]);
 }

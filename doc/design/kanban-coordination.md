@@ -1040,3 +1040,13 @@ Cell 重启后，原生执行已脱离但缺少精确 turn 终态时，Kanban �
 看板导航和设置对话框的布局、按钮、表单及响应式样式统一归 [kanban-ui 样式](../../libraries/kanban-ui/src/kanban.css)；`app-shell` 仅通过 `styles/kanban-theme.css` 将宿主主题变量映射到公开 `--kanban-*` 变量，不再持有看板业务 CSS。
 
 Cells 内部 MCP 与 NestOS 外部 API 分开监听：默认内部 `127.0.0.1:8788`，外部端口可独立转发。支持 `projectChannelEndpoint: 1` 的节点由 SDK 省略调用方 URL；Cells 在创建/恢复会话时注入当前运行地址，旧通道中的历史地址不再决定连接目标。地址变化不修改冻结上下文、原 scope token 或操作回执，不能据此重发未知执行或把未确认分析标成成功。内部监听失败阻止启动；原生必需 MCP 初始化失败保留 `HARNESS_MCP_INIT_FAILED` 错误分类，不记录原始错误正文或令牌。
+
+### 精简 Markdown 入口
+
+决策、规划、执行、生命周期与构建/提交的消息入口使用简短 Markdown，引用需要的 session_context 章节，不重复发送任务正文、完整规则、scope/operation ID、版本摘要或生命周期 JSON。任务、版本和审批保留在冻结通道与宿主提交记录中。上下文续办仅列出需要读取的 session_response ID，不复制原请求全文。无通道的通用 Flow 保留其必要结构化输入。
+
+默认角色 Markdown 保留本轮职责与结果格式；公共请求、报告、逐条 resolved 和 unknown 恢复规则合并为 session-protocol.md，由角色按需引用。所有默认模板的总大小是配置库大小，不表示一次 LLM 输入；每轮按需读取所需章节。新操作重新冻结配置，历史请求及结果未知的旧操作不改写、不重发。
+
+渐进式披露分三层：简短入口 → 当前阶段 Markdown → 触发时才读取的协议/手册。task.md 在命令/编辑前引用 workspace-rules.md，在检查/交付前引用 delivery.md；决策与持久协调分别在操作前读取 decision-actions.md、coordination-actions.md。维护阶段先读 pre，发布结果前再读 post 和 operation-result.md。bootstrap 不要求预读完整 policy 或所有模板；阶段手册在需要时读取对应冻结数据。
+
+决策/协调通道只冻结入口及其配置内 Markdown 引用闭包，支持项目覆盖并处理引用环；原生模型通过 session_context 选择单个章节，不会因冻结保存而收到整套模板。完整执行通道保留冻结资源目录供后续阶段查询，也不自动注入全文。历史请求和既有冻结配置不改写。

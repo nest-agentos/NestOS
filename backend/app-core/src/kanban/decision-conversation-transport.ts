@@ -1,3 +1,4 @@
+import {promptReferenceSections} from '../run/prompt-reference-sections';
 import {selectKanbanHarness,freezeKanbanHarness,harnessSettingKey} from '../presets/kanban-harness-settings';
 import {remoteSessionPath} from '@nestos/app-contracts';
 import {conversationPolicy,conversationInstruction} from './conversation-policy';
@@ -39,7 +40,7 @@ async function prepare(options:DecisionConversationOptions,id:string,boardId:str
             const files=await resolveKanbanConfiguration(options.fs,view.fs,'development'),prompt=files.find(file=>file.name===(coordination?'coordination-conversation.md':'decision-propose.md'));requireValue(prompt,'KANBAN_PROFILE_FILE_MISSING');
             if(!await view.fs.driver.exists('/workspace/'+directory+'/.scope'))await view.fs.driver.createFile({parentPath:'/workspace/'+directory,name:'.scope',content:id,recursive:true});
             const receipt=await options.remote.sessionChannel(projectId,'open',{scopeId:id,cwd:directory,runId:id,itemId:id,attemptId:id,contextProjects,
-                snapshot:{[coordination?'coordination-conversation.md':'decision-propose.md']:prompt.content,context:{boardId,...(coordination?{recordId:coordination.recordId}:{}),projects:projects.map(row=>({id:row.project!.id,name:row.displayName??row.name,cellProjectId:options.remote.list(row.project!.id).find(mount=>mount.at==='/')!.serverProjectId})),primaryProjectId:projectId,secondaryProjectIds:resources.filter(ref=>ref.id!==projectId).map(ref=>ref.id),conversationProjectId:projectId,projectIds:resources.map(ref=>ref.id),conversationId:id}}});
+                snapshot:{...promptReferenceSections(files,prompt.name),context:{boardId,...(coordination?{recordId:coordination.recordId}:{}),projects:projects.map(row=>({id:row.project!.id,name:row.displayName??row.name,cellProjectId:options.remote.list(row.project!.id).find(mount=>mount.at==='/')!.serverProjectId})),primaryProjectId:projectId,secondaryProjectIds:resources.filter(ref=>ref.id!==projectId).map(ref=>ref.id),conversationProjectId:projectId,projectIds:resources.map(ref=>ref.id),conversationId:id}}});
             requireDecisionProjectContext(receipt,contextProjects);
         }finally{await view.dispose();}
         return {id,boardId,...(coordination?{purpose:'coordination' as const,recordId:coordination.recordId}:{}),projectId,projectIds:resources.map(ref=>ref.id),profileId:profile.id,workspaceId:workspaceId!,directory,epoch:descriptor.epoch,createId:randomUUID(),inputId:randomUUID()};

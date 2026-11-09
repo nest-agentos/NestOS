@@ -1,3 +1,4 @@
+import {contextReferenceInstruction} from '../run/context-reference-instruction';
 import {workContext} from './work-context';
 import {transientOperationFailure} from '../run/operation-recovery';
 import {inheritWorkReferences} from './task-projects';
@@ -40,7 +41,7 @@ function analysisInput(board:KanbanBoard,item:KanbanItem,target:TargetRef,id:str
     const items=board.items.map(({id,title,responsibility,acceptance,planning,status})=>({id,title,responsibility,acceptance,planning,status}));
     return {title:`${t('kanban.automationAnalysis')} · ${item.number?'#'+item.number+' · ':''}${item.title}`,
         request:{expectedSessionId:id,expectedBranch:'main',expectedTarget:target,target:{kind:target.kind,id:target.id,version:target.version},
-            source:{kind:'composer',text:formatPromptSections([{title:'Instructions',content:instruction},{title:contextRef===undefined?'Snapshot':'Context reference',content:contextRef??{item,items,workTypes:board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:board.defaultWorkType??'task'}}]),attachments:[],values:{}},
+            source:{kind:'composer',text:contextRef!==undefined?contextReferenceInstruction(contextRef,instruction):formatPromptSections([{title:'Instructions',content:instruction},{title:'Snapshot',content:{item,items,workTypes:board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:board.defaultWorkType??'task'}}]),attachments:[],values:{}},
             submission:{id,source:{kind:'conversation',ownerId:id,id}}}};
 }
 async function inspectAnalysis(options:AnalysisOptions,id:string,input:IndependentCallInput,board:KanbanBoard,item:KanbanItem,service:KanbanService):Promise<KanbanAnalysisObservation> {

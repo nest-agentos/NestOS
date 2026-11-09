@@ -10,12 +10,12 @@ function fixture() {
     const options = {kernel: {sessionActivity: async () => ({counts: {running: 0}})}, base, sessionId: 'original', connectionId: 'work-original', id: 'next-round', replies: [{id: 'request', requestDigest: 'b'.repeat(64), sha256: 'a'.repeat(64)}]} as never;
     return {base, options};
 }
-it('continues the same logical/native identity with the current revision and response hashes', async () => {
+it('continues the same logical/native identity with the current revision and concise response references', async () => {
     const f = fixture(), before = JSON.stringify(f.base), request = await prepareChannelContinuation(f.options);
     expect(request).toMatchObject({expectedSessionId: 'original', expectedTarget: f.base.expectedTarget, submission: {id: 'next-round'}, overrides: {branchMode: 'continue', harnessConversation: {mode: 'resume', bindingId: 'binding', expectedBindingRevision: 9, expectedGeneration: 2}}});
-    const message = JSON.parse((request.source as {text: string}).text);
-    expect(message.dependencies).toMatchObject({lifecycle: {stage: 'postload.succeeded'}, channelExchange: {responses: [{id: 'request', requestDigest: 'b'.repeat(64), sha256: 'a'.repeat(64)}]}});
-    expect(message.continuation).toContain('Do not rerun'); expect(JSON.stringify(f.base)).toBe(before);
+    const text=(request.source as {text:string}).text;
+    expect(text).toContain('`session_response`');expect(text).toContain('`request`');expect(text).toContain('Do not rerun');
+    expect(text).not.toContain('postload.succeeded');expect(text).not.toContain('b'.repeat(64));expect(text.length).toBeLessThan(240);expect(JSON.stringify(f.base)).toBe(before);
 });
 it('refuses a changed generation, missing native context, active operation or invalid binding', async () => {
     const f = fixture(); state.generation = 3; await expect(prepareChannelContinuation(f.options)).rejects.toMatchObject({code: 'CHANNEL_CONTEXT_CHANGED'});

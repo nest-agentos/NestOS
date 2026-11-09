@@ -62,7 +62,7 @@ export function developmentPreparation(options: Options): NonNullable<PersonalKa
         const definition = workerDefinition(source.definition, input, connection.id, record.policy);
         const target = await developmentStage(input.dispatch.id, 'agent.publish', () => publishManagedAgent(options.agents, journal, definition));
         await input.reportActivity?.({stage: 'agent.prepared', result: 'success', fields: {agentId: target.id}});
-        return {target,contextRef:{scopeId:record.channelId,sections:['task','context']}};
+        return {target,contextRef:{scopeId:record.channelId,sections:['task']}};
     };
 }
 async function prepareWorkspace(options: Options, journal: KanbanAutomationJournal, input: Input, projectId: string, profileId: string, directory: string, instructions: string): Promise<DevelopmentWorkspaceRecord> {
@@ -125,7 +125,7 @@ async function recordPublication(journal: KanbanAutomationJournal, id: string, d
 }
 
 export function channelInstruction(policy: DevelopmentPolicy, entry: string, pre: string[]): string {
-    const sections=entry==='decision.md'?'instructions, decision.md, planning, planning-input':`identity, policy, instructions, ${[...pre,entry].join(', ')}`;
+    const sections=entry==='decision.md'?'instructions, decision.md':`identity, instructions, ${[...pre,entry].join(', ')}`;
     const template=policy.prompts.files.find(file=>file.name==='bootstrap.md')?.content??defaults['bootstrap.md'];
     return template.replace(/\{\{(sections|commit)\}\}/g,(_match,key:string)=>key==='sections'?sections:policy.commit);
 
