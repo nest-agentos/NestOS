@@ -686,7 +686,7 @@ export const en: LocaleStrings = {
     "kanban.errors.OPERATION_ACCEPTANCE_WAIVER_REQUIRED": "Acceptance was waived and must retain its waiver identity when settled.",
     "kanban.operationState.skipped": "Skipped",
     "kanban.operationSkip": "Skip operation",
-    "kanban.operationSkipImpact": "The following operations will be skipped according to this delivery plan:",
+    "kanban.operationSkipImpact": "Skipping this step also stops and skips the dependent steps below. Independent operations are unaffected:",
     "kanban.operationSkipReason": "Reason (required)",
     "kanban.operationSkipDirect": "Explicitly skipped",
     "kanban.operationSkipDependency": "Skipped due to dependency",

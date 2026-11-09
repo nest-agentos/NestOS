@@ -687,7 +687,7 @@ export const zhCN = {
     "kanban.errors.OPERATION_ACCEPTANCE_WAIVER_REQUIRED": "本次验收已有豁免，必须保留豁免身份后结算。",
     "kanban.operationState.skipped": "已跳过",
     "kanban.operationSkip": "跳过此操作",
-    "kanban.operationSkipImpact": "将跳过以下操作（按当前交付计划的依赖关系计算）：",
+    "kanban.operationSkipImpact": "跳过此步骤后，以下依赖步骤也将停止推进并记为“因依赖跳过”；独立操作不受影响：",
     "kanban.operationSkipReason": "跳过原因（必填）",
     "kanban.operationSkipDirect": "主动跳过",
     "kanban.operationSkipDependency": "因依赖跳过",

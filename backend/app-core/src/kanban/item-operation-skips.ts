@@ -4,9 +4,9 @@ import type {KanbanBoard,KanbanItem,KanbanItemOperationRequest,KanbanItemOperati
 import type {DeliveryPlan,ReviewJob,ReviewOperationsOptions} from './item-operation-types';
 import {requireValue} from './validation';
 export function operationDependencies(plan?:DeliveryPlan):Record<string,string[]> {
-    const steps=plan?.steps??['build','deploy','accept','analyze','merge','cleanup'],after=steps.indexOf('merge')>=0&&steps.indexOf('merge')<steps.indexOf('accept');
-    const graph:Record<string,string[]>={build:[],deploy:['build'],analyze:[],accept:after?['merge']:plan?.acceptance==='source'?[]:['deploy'],
-        merge:['analyze',...(after?(plan?.acceptance==='source'?[]:['deploy']):['accept'])],cleanup:steps.filter(id=>id!=='cleanup')};
+    const steps=plan?.steps??['build','deploy','accept','analyze','merge','cleanup'];
+    const graph:Record<string,string[]>={build:[],deploy:['build'],analyze:[],accept:plan?.acceptance==='source'?(steps.indexOf('merge')>=0&&steps.indexOf('merge')<steps.indexOf('accept')?['merge']:[]):['deploy'],
+        merge:['analyze'],cleanup:steps.filter(id=>id!=='cleanup')};
     return Object.fromEntries(steps.map(id=>[id,(graph[id]??[]).filter(dep=>steps.includes(dep))]));
 }
 export function affectedOperations(graph:Record<string,string[]>,action:string):string[] {

@@ -231,10 +231,10 @@ it('accepts the same deployed source after a verified target integration without
  expect(f.published.start).toHaveBeenCalledTimes(3);
 });
 
-it('keeps pre-acceptance runtime integration unavailable until the release is deployed',async()=>{
+it('allows pre-acceptance runtime integration while acceptance waits for replacement',async()=>{
  const f=await fixture();f.options.deliveryPlan=async()=>({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});f.plan.conflicts=[];
  await f.bind('merge');await f.run('analyze');const view=await f.api.itemOperations('board','task');
- expect(view.operations.find(op=>op.id==='merge')?.enabled).toBe(false);expect(view.operations.find(op=>op.id==='accept')?.enabled).toBe(false);
+ expect(view.operations.find(op=>op.id==='merge')?.enabled).toBe(true);expect(view.operations.find(op=>op.id==='accept')?.enabled).toBe(false);
 });
 it('freezes a separately proven compatible runtime on acceptance without rewriting old deployment receipts',async()=>{
  const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.scan();
@@ -325,4 +325,19 @@ it('never regresses a confirmed cancellation when a concurrent receipt check ret
  await vi.waitFor(()=>expect(cancel).toHaveBeenCalledOnce());await f.api.scan();
  expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='build')?.state).toBe('cancelled');
  release('accepted');await pending;expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='build')?.state).toBe('cancelled');
+});
+
+it('offers merge independently of runtime build, replacement and acceptance, including frozen release plans',async()=>{
+ const f=await fixture();f.options.deliveryPlan=async()=>({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});
+ await f.run('analyze');await f.api.scan();await f.bind('merge');
+ const view=await f.api.itemOperations('board','task');expect(view.operations.find(row=>row.id==='merge')).toMatchObject({enabled:true,dependsOn:['analyze']});
+ expect(view.operations.find(row=>row.id==='accept')).toMatchObject({enabled:false,dependsOn:['deploy']});
+ await f.run('merge','independent-merge',{confirmed:true,selections:{file:'integrate'}});expect(f.published.start).toHaveBeenCalledOnce();
+});
+it('allows runtime acceptance after replacement without requiring a merge in a frozen release plan',async()=>{
+ const f=await fixture();f.options.deliveryPlan=async()=>({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});
+ await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.scan();
+ f.published.inspect.mockResolvedValue({state:'running'});await f.run('deploy','deploy',{confirmed:true});f.complete('deploy');await f.api.scan();
+ expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='accept')).toMatchObject({enabled:true,dependsOn:['deploy']});
+ await f.run('accept','independent-accept',{confirmed:true});expect(f.service.execute).toHaveBeenCalledOnce();
 });

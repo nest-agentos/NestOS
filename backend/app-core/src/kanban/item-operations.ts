@@ -1,5 +1,5 @@
 import {cancellationKey,pendingCancellation,cancellationSupported,requestCancellation,scanCancellations,type ReviewCancellation} from './item-operation-cancellation';
-import {projectOperationSkips,skipItemOperations,applySkipIntent} from './item-operation-skips';
+import {operationDependencies,projectOperationSkips,skipItemOperations,applySkipIntent} from './item-operation-skips';
 import {automaticDelivery,automaticDeliveryStatus} from './automatic-delivery';
 import {safeCode,journalCommand} from '@nestos/kanban/integration';
 import {sha256HexSync, t} from '@nestos/common';
@@ -80,17 +80,11 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     const catalog = await options.catalog(), flows = catalog.entries.filter(entry => entry.target.kind === 'flow' && entry.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'));
     return {revision: revision(context),operations,automatic,...audit,targets: automationCatalog({...catalog, entries: flows}).targets};
 }
-function acceptsAfterMerge(context:Context):boolean {const steps=context.deliveryPlan?.steps;return !!steps&&steps.indexOf('merge')>=0&&steps.indexOf('merge')<steps.indexOf('accept');}
-function mergePrerequisite(context:Context):boolean {
-    if(context.item.status==='completed')return true;
-    if(!acceptsAfterMerge(context)||context.item.status!=='review')return false;
-    return context.deliveryPlan?.acceptance!=='runtime'||latest(context,'deploy')?.state==='succeeded';
-}
 function operation(context: Context, action: ReviewAction, active: boolean, supported: boolean, agent = false): KanbanItemOperation {
     const job = latest(context, action), binding = context.settings.bindings[action], plan = latest(context, 'analyze')?.result as MergePlan | undefined;
     const ready = action === 'build' || action === 'analyze' || action === 'deploy' && latest(context, 'build')?.state === 'succeeded'
-        || action === 'accept' && (acceptsAfterMerge(context)?latest(context,'merge')?.state==='succeeded':context.deliveryPlan?.acceptance==='source'||latest(context, 'deploy')?.state === 'succeeded') && context.item.status === 'review'
-        || action === 'merge' && !!plan && latest(context, 'analyze')?.state === 'succeeded' && mergePrerequisite(context);
+        || action === 'accept' && (operationDependencies(context.deliveryPlan).accept??[]).every(id=>latest(context,id as ReviewAction)?.state==='succeeded') && context.item.status === 'review'
+        || action === 'merge' && !!plan && latest(context, 'analyze')?.state === 'succeeded';
     const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && context.item.status === 'completed' || action === 'merge' && job?.state === 'succeeded';
     const enabled = (!context.deliveryPlan||context.deliveryPlan.steps.includes(action)) && supported && !context.archived && !finished && !active && ready && (!configurable || !!binding);
     const built=latest(context,'build'),auto=built?.followUp,autoPending=action==='deploy'&&auto?.state==='queued'&&built?.state==='succeeded'&&(!job||job.createdAt<built.createdAt);
@@ -175,7 +169,6 @@ async function operationInput(options: ReviewOperationsOptions, context: Context
     if (request.action !== 'merge') return;
     const analysis = latest(context, 'analyze')!, plan = analysis.result as MergePlan, selections = request.selections ?? {};
     requireValue(Object.keys(selections).length === plan.conflicts.length && plan.conflicts.every(conflict => Object.hasOwn(selections, conflict.id) && conflict.options.some(option => option.id === selections[conflict.id])), 'OPERATION_SELECTION_REQUIRED');
-    if(acceptsAfterMerge(context)&&context.deliveryPlan?.acceptance==='runtime')requireValue(options.adapter.runningVersion?.()===(latest(context,'deploy')?.result as {version?:string})?.version,'OPERATION_RUNNING_VERSION_MISMATCH');
     const current = await options.adapter.snapshot(context.board, context.item);
     requireValue(current.version === analysis.snapshot.version, 'OPERATION_SOURCE_CHANGED_REANALYZE');
     return {approvalId: request.operationId, analysisId: analysis.id, analysisDigest: sha256HexSync(JSON.stringify(plan)),
@@ -186,7 +179,9 @@ async function acceptanceJob(options: ReviewOperationsOptions, context: Context,
     let version:string|undefined,acceptanceEvidence:unknown;
     if(scope==='runtime'){
         requireValue(deployed&&snapshot.sourceVersion===deployed.snapshot.sourceVersion,'OPERATION_SOURCE_CHANGED_REBUILD');
-        requireValue(acceptsAfterMerge(context)?snapshot.targetVersion===(latest(context,'merge')?.result as {targetHead?:string})?.targetHead:snapshot.version===deployed.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');
+        const merged=latest(context,'merge'),targetHead=(merged?.result as {targetHead?:string})?.targetHead;
+        const integrated=merged?.state==='succeeded'&&merged.snapshot.sourceVersion===deployed.snapshot.sourceVersion&&targetHead&&snapshot.targetVersion===targetHead;
+        requireValue(snapshot.version===deployed.snapshot.version||integrated,'OPERATION_SOURCE_CHANGED_REBUILD');
         version=(deployed.result as {version:string}).version;
         if(options.adapter.runningVersion?.()!==version){
             const replacement=await options.adapter.acceptanceVersion?.(context.board,context.item,version!);

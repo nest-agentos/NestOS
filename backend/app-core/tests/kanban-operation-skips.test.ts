@@ -25,8 +25,11 @@ async function fixture(){
  return {api,options,service,worker,journal,command,request,start};
 }
 it('uses actual delivery dependencies rather than skipping every later step',()=>{
- const runtime=operationDependencies();expect(affectedOperations(runtime,'deploy')).toEqual(['deploy','accept','merge','cleanup']);
+ const runtime=operationDependencies();expect(affectedOperations(runtime,'deploy')).toEqual(['deploy','accept','cleanup']);
  expect(affectedOperations(runtime,'analyze')).toEqual(['analyze','merge','cleanup']);
+ const release=operationDependencies({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});
+ expect(affectedOperations(release,'build')).toEqual(['build','deploy','accept','cleanup']);expect(release.merge).toEqual(['analyze']);
+ expect(release.accept).toEqual(['deploy']);
  const source=operationDependencies({steps:['analyze','merge','accept','cleanup'],acceptance:'source'});
  expect(affectedOperations(source,'analyze')).toEqual(['analyze','merge','accept','cleanup']);
 });
@@ -36,6 +39,7 @@ it('persists dependency skips and their actor without completing outstanding ind
  expect(result.operations.find(row=>row.id==='deploy')).toMatchObject({state:'skipped',enabled:false,waiver:{cause:'direct'}});
  expect(result.operations.find(row=>row.id==='accept')).toMatchObject({state:'skipped',waiver:{cause:'dependency'}});
  expect(result.operations.find(row=>row.id==='analyze')).not.toHaveProperty('waiver');
+ expect(result.operations.find(row=>row.id==='merge')).toMatchObject({dependsOn:['analyze']});expect(result.operations.find(row=>row.id==='merge')).not.toHaveProperty('waiver');
  const item=(await f.service.item('b','task')).item;expect(item.status).toBe('review');
  expect(item.operationWaivers?.[0]).toMatchObject({id:'deploy',dispatchId:'d',actor:{kind:'human',id:'admin'},reason:request.skip!.reason});
  await f.api.runItemOperation('b',request);expect((await f.service.item('b','task')).item.operationWaivers).toHaveLength(1);expect(f.start).not.toHaveBeenCalled();
@@ -75,7 +79,7 @@ it('retains the failed operation and rejects skipping an unsettled execution',as
  const second=await fixture();await second.journal.update('review-operation:active',()=>({...failed,id:'active',action:'build',phase:'submitting',state:'unknown'}));
  await second.journal.update('review-operations:'+JSON.stringify(['b','task']),()=>({revision:1,bindings:{},jobs:['active'],receipts:{}}));
  const before=await second.service.item('b','task');
- await expect(second.api.runItemOperation('b',{operationId:'blocked',itemId:'task',action:'skip',expectedRevision:(await second.api.itemOperations('b','task')).revision,confirmed:true,skip:{action:'deploy',reason:'Cannot abandon unknown execution',affected:['deploy','accept','merge','cleanup']}})).rejects.toMatchObject({code:'OPERATION_IN_USE'});
+ await expect(second.api.runItemOperation('b',{operationId:'blocked',itemId:'task',action:'skip',expectedRevision:(await second.api.itemOperations('b','task')).revision,confirmed:true,skip:{action:'deploy',reason:'Cannot abandon unknown execution',affected:['deploy','accept','cleanup']}})).rejects.toMatchObject({code:'OPERATION_IN_USE'});
  expect(await second.service.item('b','task')).toEqual(before);
 });
 it('rejects a forged incomplete dependency closure atomically in the domain command',async()=>{
