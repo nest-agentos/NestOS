@@ -11,7 +11,7 @@ import {jobKey, type ReviewJob, type ReviewOperationsOptions, type ReviewSetting
 
 export async function prepareReviewJob(options: ReviewOperationsOptions, board: KanbanBoard, item: KanbanItem,
     settings: ReviewSettings, request: KanbanItemOperationRequest, context?: unknown): Promise<ReviewJob> {
-    const snapshot = await options.adapter.snapshot(board, item), action = request.action as ReviewAction;
+    const snapshot = await preparationStage(options, request.operationId, 'snapshot', () => options.adapter.snapshot(board, item)), action = request.action as ReviewAction;
     const base: ReviewJob = {id: request.operationId, boardId: board.id, itemId: item.id, action, snapshot,
         fingerprint: sha256HexSync(JSON.stringify(request)), phase:'prepared',state:'running',createdAt:Date.now(),...(request.followUp==='deploy'?{followUp:{action:'deploy' as const,state:'queued' as const}}:{})};
     if (action === 'deploy' || action === 'merge') {
@@ -21,16 +21,25 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
     if(action==='deploy'&&options.adapter.managed){const managed=await options.adapter.managed.prepare({id:base.id,board,item,snapshot,context});if(managed)return {...base,operationContext:context,managed};}
     if (options.adapter.prepareOperation) {
         requireValue(action !== 'accept', 'OPERATION_REQUEST_INVALID');
-        const request = await options.adapter.prepareOperation({id: base.id, action, context, board, item, snapshot});
+        const request = await preparationStage(options, base.id, 'session', () => options.adapter.prepareOperation!({id: base.id, action, context, board, item, snapshot}));
         return {...base, operationContext: context, request, sessionId: request.expectedSessionId};
     }
-    if (action === 'analyze') {const request = await options.adapter.prepareAnalysis({id: base.id, board, item, snapshot}); return {...base, request, sessionId: request.expectedSessionId};}
+    if (action === 'analyze') {const request = await preparationStage(options, base.id, 'session', () => options.adapter.prepareAnalysis({id: base.id, board, item, snapshot})); return {...base, request, sessionId: request.expectedSessionId};}
     const binding = settings.bindings[action]; requireValue(binding, 'OPERATION_FLOW_REQUIRED');
     const target = automationTarget(binding, await options.catalog()); requireValue(target.kind === 'flow', 'OPERATION_FLOW_REQUIRED');
     return {...base, input: {title: item.title, request: {expectedSessionId: base.id, expectedBranch: 'main', target: {kind: target.kind, id: target.id, version: target.version},
         expectedTarget: target, source: {kind: 'composer', text: '', attachments: [], values: {context: JSON.stringify({schema: 'nestos.kanban.operation/1', operationId: base.id,
             action, boardId: board.id, itemId: item.id, sourceVersion: snapshot.sourceVersion, targetVersion: snapshot.targetVersion, resources: snapshot.context, input: context})}},
         submission: {id: base.id, source: {kind: 'conversation', ownerId: base.id, id: base.id}}}}};
+}
+async function preparationStage<T>(options: ReviewOperationsOptions, operationId: string, stage: string, work: () => Promise<T>): Promise<T> {
+    const started = Date.now();
+    try {
+        const result = await work();
+        options.log({operationId, stage: 'prepare.' + stage, result: 'success', durationMs: Date.now() - started}); return result;
+    } catch (error) {
+        options.log({operationId, stage: 'prepare.' + stage, result: 'failure', code: safeCode(error), durationMs: Date.now() - started}); throw error;
+    }
 }
 export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
     const resource=(job.snapshot.context as {worktreeId?:string})?.worktreeId;if(resource)await indexResourceJob(options.journal,resource,'review',job.id);

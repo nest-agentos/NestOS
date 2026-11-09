@@ -945,6 +945,7 @@ export class ProjectRemoteMountService {
         try {
             for (const mount of definitions) {
                 if (base && mount.at !== '/' && await base.fs.driver.exists(mount.at)) diagnostics.push(`MOUNT_SHADOW_CONFLICT:${mount.at}`);
+                await this.recheckOfflineMount(mount);
                 const source = await (this.status(mount.mountId) === 'offline' ? Promise.reject(new FSError('EIO', 'Source unavailable')) : this.resolve(mount))
                     .catch(error => {
                         const failure = this.observations.get(mount.mountId)?.failure
@@ -987,6 +988,7 @@ export class ProjectRemoteMountService {
             if (typeof key !== 'string' || typeof (fallback.driver as any)[key] !== 'function') return (fallback.driver as any)[key];
             if (key === 'on' || key === 'onAny') return (fallback.driver as any)[key].bind(fallback.driver);
             return async (...args: any[]) => {
+                await this.recheckOfflineMount(mount);
                 if (this.status(mount.mountId) === 'offline') {
                     const path = typeof args[0] === 'string' ? normalizeVirtualPath(args[0]) : '';
                     const ancestor = path === '/' || path === mount.root || mount.root.startsWith(path + '/');
@@ -996,7 +998,8 @@ export class ProjectRemoteMountService {
                             name: path.split('/').pop() ?? '', version: 0, createdAt: 0, modifiedAt: 0, tags: [], metadata: { unavailable: true } };
                     }
                     const failure = this.observations.get(mount.mountId)?.failure;
-                    throw new FSError('EIO', 'Remote source unavailable', undefined, undefined, failure ? Object.assign(new Error('Remote diagnostic'), {code: failure.code}) : undefined);
+                    const code = failure?.reason === 'timeout' ? 'ETIMEDOUT' : ['authentication', 'authorization-changed'].includes(failure?.reason ?? '') ? 'EACCES' : 'EIO';
+                    throw new FSError(code, 'Remote source unavailable', undefined, undefined, failure ? Object.assign(new Error('Remote diagnostic'), {code: failure.code}) : undefined);
                 }
                 try { const fs = await current(); return await (fs.driver as any)[key](...args); }
                 catch (error) {
@@ -1019,6 +1022,15 @@ export class ProjectRemoteMountService {
             };
             const value = Reflect.get(target, key); return typeof value === 'function' ? value.bind(target) : value;
         } });
+    }
+    /** A past failed read is an observation, not a permanent revocation of this grant. */
+    private async recheckOfflineMount(mount: ProjectRemoteMount): Promise<void> {
+        const pending = this.probes.get(mount.mountId);
+        if (pending) {await pending; return;}
+        if (this.closed || this.status(mount.mountId) !== 'offline') return;
+        const checkedAt = this.observations.get(mount.mountId)?.checkedAt ?? 0;
+        if (Date.now() - checkedAt < 3000) return;
+        await this.probe(mount);
     }
     private resolve(mount: ProjectRemoteMount, options?: OperationOptions) {
         if (mount.connectionId) {
