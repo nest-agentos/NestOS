@@ -71,6 +71,10 @@ async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workfl
 async function resumeConfirmedOperation(options:Options,state:State):Promise<State> {
     const action=actions(state)[state.step];
     const view=await options.view(state.boardId,state.itemId),entry=view.operations.find(row=>row.id===action);
+    if(entry?.state==='running'&&entry.runId===state.requests[action]?.operationId){
+        const resumed=await options.journal.update<State>(key(state.boardId,state.itemId),old=>({...old!,code:undefined}));
+        await options.report?.(resumed);return resumed;
+    }
     if(entry?.enabled&&!entry.runId&&state.code&&await options.retryPrecondition?.(state.boardId,state.itemId,action,state.code)){
         const previous=state.requests[action];
         await options.journal.update('automatic-precondition-retry:'+previous.operationId,old=>old??previous);
