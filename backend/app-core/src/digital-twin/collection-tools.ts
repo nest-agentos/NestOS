@@ -23,6 +23,23 @@ export function validateCollectionTool(catalog: CollectionToolCatalog, executor:
         throw new Error('TWIN_SCANNER_TARGET_CHANGED');
 }
 
+/** Explain a rejected frozen target: which identity component moved and what the catalog offers now. */
+export type CollectionTargetMatch = 'exact' | 'version' | 'digest' | 'missing' | 'unavailable';
+export interface CollectionTargetDiagnostics {
+    targetKind: string; targetId: string; targetVersion: string; targetDigest: string;
+    catalogMatch: CollectionTargetMatch; catalogSize: number; catalogVersion?: string; catalogDigest?: string;
+}
+export function describeCollectionTarget(catalog: CollectionToolCatalog | undefined, executor: TwinCollectionExecutor): CollectionTargetDiagnostics {
+    const target = executor.target;
+    const base = {targetKind: target.kind, targetId: target.id, targetVersion: target.version, targetDigest: digestPrefix(target.digest)};
+    if (!catalog) return {...base, catalogMatch: 'unavailable', catalogSize: 0};
+    const tools = collectionTools(catalog), match = tools.find(item => item.target.id === target.id);
+    if (!match) return {...base, catalogMatch: 'missing', catalogSize: tools.length};
+    const catalogMatch: CollectionTargetMatch = match.target.version !== target.version ? 'version' : match.target.digest !== target.digest ? 'digest' : 'exact';
+    return {...base, catalogMatch, catalogSize: tools.length, catalogVersion: match.target.version, catalogDigest: digestPrefix(match.target.digest)};
+}
+function digestPrefix(digest: string): string {return digest.slice(0, 16);}
+
 /** Presentation changes neither execution identity nor admission of existing compatibility tools. */
 export function presentCollectionTools(tools: TwinScannerTool[], packages: ToolPackageInfo[]): TwinScannerTool[] {
     const declarations = packages.filter(item => item.status === 'registered').flatMap(item => item.configuration?.tools ?? []);

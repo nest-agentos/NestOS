@@ -29,7 +29,8 @@ export class PublishedScannerExecutor implements TwinScannerExecutionPort {
     }
     async run(job: TwinAnalysisJob, text: string, attached: (id: string) => Promise<void>, _progress?: (progress: TwinRequestProgress) => Promise<void>, lifecycle?: TwinExtractionLifecycle) {
         const started = Date.now();
-        traceAnalysis(job, 'scanner.prepare', {targetKind: job.executor?.target.kind, targetId: job.executor?.target.id, inputCharacters: text.length});
+        traceAnalysis(job, 'scanner.prepare', {targetKind: job.executor?.target.kind, targetId: job.executor?.target.id,
+            targetVersion: job.executor?.target.version, targetDigest: job.executor?.target.digest.slice(0, 16), inputCharacters: text.length});
         try {
             const result = await this.execute(job, text, attached, lifecycle);
             traceAnalysis(job, 'scanner.completed', {candidates: result.candidates.length, tokens: result.tokens, durationMs: Date.now() - started});
@@ -38,8 +39,11 @@ export class PublishedScannerExecutor implements TwinScannerExecutionPort {
         catch (error) {
             if (error instanceof TwinSafePoint) throw error;
             const count = await this.options.exchanges?.(job).catch(() => undefined);
-            throw new TwinDiagnosticError(error instanceof Error && /^TWIN_[A-Z_]+$/.test(error.message) ? error.message : 'TWIN_SCANNER_EXECUTION_FAILED',
-                error, error instanceof TwinDiagnosticError && error.tokens !== undefined ? error.tokens : count === 0 ? 0 : undefined);
+            const code = error instanceof Error && /^TWIN_[A-Z_]+$/.test(error.message) ? error.message : 'TWIN_SCANNER_EXECUTION_FAILED';
+            const target = job.executor?.target;
+            traceAnalysis(job, 'scanner.failed', {targetKind: target?.kind, targetId: target?.id, targetVersion: target?.version,
+                targetDigest: target?.digest.slice(0, 16), errorCode: code, durationMs: Date.now() - started});
+            throw new TwinDiagnosticError(code, error, error instanceof TwinDiagnosticError && error.tokens !== undefined ? error.tokens : count === 0 ? 0 : undefined);
         }
     }
     private async execute(job: TwinAnalysisJob, text: string, attached: (id: string) => Promise<void>, lifecycle?: TwinExtractionLifecycle) {

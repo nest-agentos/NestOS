@@ -1,7 +1,7 @@
 import {collectWithTool, type ToolCollectorOptions} from './tool-collector';
 import {TwinSafePoint} from './analysis-lifecycle';
 import {waitCollection} from './collection-wait';
-import {collectionTools, presentCollectionTools, validateCollectionTool} from './collection-tools';
+import {collectionTools, describeCollectionTarget, presentCollectionTools, validateCollectionTool} from './collection-tools';
 import type {TwinCollectionExecutor} from '@nestos/app-contracts';
 import type {IndependentCallService, SessionRepository} from '@nestos/llm-session';
 import {KernelError, KernelErrorCode, type Kernel, type TaskCallResult} from '@nestos/durable-kernel';
@@ -33,8 +33,9 @@ export class PublishedScannerCollector implements TwinCollectionPort {
         }
     }
     async collect(request: TwinCollectionRequest, attached: (taskId: string) => Promise<void>, bind: (sessionId: string) => Promise<void>): Promise<Progress | undefined> {
-        const started = Date.now(), identity = {sessionId: request.sessionId, connectionId: ''};
-        traceAnalysis(identity, 'collection.prepare', {operationId: request.runId});
+        const started = Date.now(), identity = {sessionId: request.sessionId, connectionId: ''}, target = request.executor.target;
+        traceAnalysis(identity, 'collection.prepare', {operationId: request.runId, targetKind: target.kind, targetId: target.id,
+            targetVersion: target.version, targetDigest: target.digest.slice(0, 16)});
         try {
             let progress: Progress | undefined;
             if (request.executor.target.kind === 'tool') {
@@ -50,7 +51,9 @@ export class PublishedScannerCollector implements TwinCollectionPort {
                 traceAnalysis(identity, 'failed', {operationId: request.runId, category: 'collection-cancel-unconfirmed', durationMs: Date.now() - started});
             }
             const code = error instanceof Error ? error.message.match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/)?.[0] : undefined;
-            traceAnalysis(identity, 'failed', {operationId: request.runId, category: 'collection-execution', errorCode: code ?? 'TWIN_COLLECTION_FAILED', durationMs: Date.now() - started});
+            traceAnalysis(identity, 'failed', {operationId: request.runId, category: 'collection-execution',
+                phase: collectionFailurePhase(code), errorCode: code ?? 'TWIN_COLLECTION_FAILED',
+                ...describeCollectionTarget(this.options.tools?.tools, request.executor), durationMs: Date.now() - started});
             throw error;
         }
     }
@@ -101,4 +104,10 @@ export function assertCollectionPlan(value: unknown, expected?: TwinCollectionEx
     if (task.program?.kind !== 'flow.aggregate' || !graph || Object.keys(graph.functionCalls ?? {}).length
         || graph.nodes.some(node => !['builtin.tool', 'builtin.transform', 'builtin.return'].includes(node.plugin)))
         throw new Error('TWIN_COLLECTION_STATIC_TOOLS_REQUIRED');
+}
+/** Separate a rejected frozen target from a failing execution so operators pick the right remedy. */
+const TARGET_VALIDATION_CODES = new Set(['TWIN_SCANNER_TARGET_CHANGED', 'TWIN_SCANNER_TARGET_INVALID', 'TWIN_SCANNER_ARGUMENTS_INVALID',
+    'TWIN_SCANNER_EXECUTOR_UNAVAILABLE', 'TWIN_SCANNER_PLAN_LIMIT', 'TWIN_COLLECTION_TARGET_INVALID', 'TWIN_COLLECTION_STATIC_TOOLS_REQUIRED']);
+function collectionFailurePhase(code: string | undefined): string {
+    return code && TARGET_VALIDATION_CODES.has(code) ? 'target-validation' : 'execution';
 }

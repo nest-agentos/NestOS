@@ -3,7 +3,7 @@ export function twinError(code: string, detail = ''): string {
     if (!code) return '';
     const keys: Record<string, string> = {
         TWIN_EVENT_INVALID: 'eventInvalid', TWIN_EVENT_TRIGGER_REQUIRED: 'eventTriggerRequired',
-        TWIN_SCANNER_TARGET_CHANGED: 'scannerTargetUnavailable', TWIN_COLLECTION_TARGET_INVALID: 'scannerTargetUnavailable',
+        TWIN_SCANNER_TARGET_CHANGED: 'scannerTargetChanged', TWIN_COLLECTION_TARGET_INVALID: 'scannerTargetInvalid',
         TWIN_COLLECTION_FAILED: 'collectionFailed', TWIN_COLLECTION_SCOPE_REQUIRED: 'collectionScopeRequired',
         TWIN_COLLECTION_RESULT_INVALID: 'collectionResultInvalid',
         TWIN_COLLECTION_DESTINATION_INVALID: 'collectionDestinationInvalid',
