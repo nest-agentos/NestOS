@@ -46,6 +46,22 @@ describe('DurableFlowExecutor', () => {
         expect(rows.find((row: any) => row.taskId === success.root.id)).not.toHaveProperty('failure');
     });
 
+    it('lists bounded persisted input and terminal output without opening or resuming a run', async () => {
+        const service = executor(kernel), parameters = {essay: 'original input', enabled: false, limit: 0};
+        const run = await service.submit('session-one', valueFlow(), parameters);
+        await runToEnd(run); await service.waitIdle();
+        const handlers = new Map<string, (args: any) => Promise<any>>();
+        new DagCommandService({kernel, plugins: createBuiltinDagPluginRegistry(), flowStore: {loadRevision: async () => null} as never})
+            .register({register: (name, handler) => handlers.set(name, handler)} as never);
+        const open = vi.spyOn(kernel, 'openSession');
+        const rows = await handlers.get(FlowCommand.RunList)!({sessionId: 'session-one'});
+        const row = rows.find((row: any) => row.taskId === run.root.id);
+        expect(row).toMatchObject({sessionId: 'session-one', status: 'succeeded', createdAt: expect.any(Number),
+            inputPreview: {text: JSON.stringify(parameters, null, 2), truncated: false}});
+        expect(row.outputPreview.text).toContain('left'); expect(row.outputPreview.text.length).toBeLessThanOrEqual(600);
+        expect(open).not.toHaveBeenCalled(); open.mockRestore();
+    });
+
     it.each([-1, 0.5, NaN, Infinity])('rejects invalid scheduler skew allowance %s', async schedulerLeaseSkewMs => {
         const run = new DurableFlowExecutor({ kernel, plugins: createBuiltinDagPluginRegistry(), schedulerLeaseSkewMs });
         await expect(run.submit('session-one', valueFlow())).rejects.toThrow('skewMs');

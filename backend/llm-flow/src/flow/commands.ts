@@ -26,6 +26,9 @@ import {assertRootCallable} from '../contracts/callable-exposure';
 import {sameTargetRef} from '../contracts/call-target';
 import {controlFlowRun, assertCurrentFlowControl, assertFlowRoot, assertPauseWithdrawal} from './run-control';
 import {assertFlowControlTree} from './control-tree';
+import {flowRunOutputPreview, flowRunPreview} from './run-preview';
+import type {FlowRunSummary} from '../contracts/flow-run-summary';
+export type {FlowRunSummary} from '../contracts/flow-run-summary';
 
 export interface DagCommandServiceOptions {
     validateInputAssets?(sessionId: string, parameters: Record<string, JsonValue>): Promise<void>;
@@ -56,9 +59,6 @@ export interface FlowRunPreparation {
     fallbackConnectionId?: string | null;
     connectionBindings?: Record<string, string>;
 }
-
-export interface FlowRunSummary { taskId: string; sessionId: string; name: string; status: string; createdAt: number;
-    failure?: {code?: string; message: string}; invocation?: import('../contracts').InvocationIdentity; }
 
 export interface DurableFlowSnapshot {
     controlStats?: Record<string, import('@nestos/durable-kernel/contracts').TaskStat>;
@@ -213,22 +213,24 @@ export class DagCommandService {
     }
 
     private async listRuns(sessionId?: string): Promise<FlowRunSummary[]> {
-        const runs: FlowRunSummary[] = [];
+        const runs: Array<{summary: FlowRunSummary; input: unknown; output: unknown}> = [];
         for await (const session of this.options.kernel.listSessions()) {
             if (sessionId && session.id !== sessionId) continue;
             const inspection = await this.options.kernel.inspectSession(session.id);
             for (const task of await inspection.listTasks()) {
                 if (task.program.kind !== 'flow.aggregate' || task.labels?.kind !== 'flow-root') continue;
-                const input = task.input as { run?: { goal?: { objective?: string } }; initialScheduler?: { nodes?: { name?: string }[] } };
+                const input = task.input as { run?: { goal?: { objective?: string } }; initialScheduler?: { parameters?: unknown; nodes?: { name?: string }[] } };
                 const name = input?.run?.goal?.objective || input?.initialScheduler?.nodes?.map(node => node.name).filter(Boolean).join(' → ') || 'Flow';
                 const invocation = invocationFromLabels(task.labels);
                 const failure = task.status === 'failed' ? task.exit?.error ?? task.lastError : undefined;
-                runs.push({ taskId: task.id, sessionId: session.id, name, status: task.status, createdAt: task.createdAt,
+                runs.push({input: input?.initialScheduler?.parameters, output: task.exit?.output,
+                    summary: {taskId: task.id, sessionId: session.id, name, status: task.status, createdAt: task.createdAt,
                     ...(failure ? {failure: {code: failure.code, message: failure.message}} : {}),
-                    ...(invocation ? {invocation} : {}) });
+                    ...(invocation ? {invocation} : {})} });
             }
         }
-        return runs.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
+        return runs.sort((a, b) => b.summary.createdAt - a.summary.createdAt).slice(0, 100)
+            .map(({summary, input, output}) => ({...summary, inputPreview: flowRunPreview(input), outputPreview: flowRunOutputPreview(output)}));
     }
 
     private async start(

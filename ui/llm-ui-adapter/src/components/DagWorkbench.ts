@@ -62,6 +62,7 @@ export class DagWorkbench {
     private callSignatures = new Map<string, FlowDraft | null>();
     private parameterPanel?: FlowRunParameters;
     private inspectorMode: 'parameters' | 'edit' = 'parameters';
+    private inspectorVisible = true;
     private preparingRun = false;
     private toolDialog?: AbortController;
     private readonly artifacts: TaskArtifactBrowser;
@@ -175,6 +176,7 @@ export class DagWorkbench {
             <footer class="dag-validation" aria-live="polite"></footer>
         </section>`;
         this.bindToolbar();
+        this.updateInspectorVisibility();
         if (!draft) return this.renderEmpty();
         void this.loadCallSignatures(draft);
         this.renderCanvas(draft);
@@ -197,6 +199,7 @@ export class DagWorkbench {
             <button data-action="zoom-out" title="${escapeHTML(t('flow.toolbar.zoomOut'))}" aria-label="${escapeHTML(t('flow.toolbar.zoomOut'))}" ${draft ? '' : 'disabled'}>−</button>
             <button data-action="zoom-in" title="${escapeHTML(t('flow.toolbar.zoomIn'))}" aria-label="${escapeHTML(t('flow.toolbar.zoomIn'))}" ${draft ? '' : 'disabled'}>＋</button>
             <button data-action="fit" ${draft ? '' : 'disabled'}>${escapeHTML(t('flow.toolbar.fit'))}</button>
+            <button type="button" data-action="toggle-inspector" aria-expanded="${this.inspectorVisible}" ${draft ? '' : 'disabled'}>${escapeHTML(t(this.inspectorVisible ? 'flow.parameters.hidePanel' : 'flow.parameters.showPanel'))}</button>
             <button data-action="settings" ${draft ? '' : 'disabled'}>${escapeHTML(t('flow.toolbar.settings'))}</button>
             ${draft?.id && isRootCallable(draft) && this.options.inspectDependencies ? `<button data-action="dependencies">${escapeHTML(t('flow.dependencies.check'))}</button>` : ''}
             <button data-action="save" ${draft ? '' : 'disabled'}>${escapeHTML(t('action.save'))}</button>
@@ -225,7 +228,7 @@ export class DagWorkbench {
         });
         this.canvas.render(draft, this.selectedNodeId, manifests, this.selectedEdgeId);
         this.canvas.setActive(this.visible);
-        mountFlowSteps(root, draft, id => {this.inspectorMode = 'edit'; this.selectNode(id as FlowNodeId);}, !!this.selectedNodeId || !!this.selectedEdgeId);
+        mountFlowSteps(root, draft, id => {this.inspectorMode = 'edit'; this.selectNode(id as FlowNodeId);});
     }
 
     private async renderInspector(draft: FlowDraft): Promise<void> {
@@ -424,6 +427,7 @@ export class DagWorkbench {
             'zoom-out': () => this.zoom(-0.1),
             'zoom-in': () => this.zoom(0.1),
             fit: () => this.fitCanvas(),
+            'toggle-inspector': () => {this.inspectorVisible = !this.inspectorVisible; this.updateInspectorVisibility();},
             settings: () => void this.openFlowSettings(),
             dependencies: () => void this.inspectDependencies(),
             save: () => void this.save(),
@@ -432,6 +436,16 @@ export class DagWorkbench {
         for (const [action, callback] of Object.entries(actions)) {
             this.root.querySelector(`[data-action="${action}"]`)?.addEventListener('click', callback);
         }
+    }
+
+    private updateInspectorVisibility(): void {
+        const panel = this.root.querySelector<HTMLElement>('.dag-inspector');
+        if (panel) panel.hidden = !this.inspectorVisible;
+        this.root.querySelector('.dag-workbench__body')?.classList.toggle('dag-workbench__body--canvas-only', !this.inspectorVisible);
+        const button = this.root.querySelector<HTMLButtonElement>('[data-action="toggle-inspector"]');
+        if (!button) return;
+        button.setAttribute('aria-expanded', String(this.inspectorVisible));
+        button.textContent = t(this.inspectorVisible ? 'flow.parameters.hidePanel' : 'flow.parameters.showPanel');
     }
 
     private async inspectDependencies(): Promise<void> {

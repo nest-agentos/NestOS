@@ -8,9 +8,11 @@ it('keeps the actual graph and routes overview selection to the original node', 
     mountFlowSteps(canvas, {layout: {steps: [{name: 'Review', nodes: ['a', 'a', 'missing']}]},
         nodes: [{id: 'a', name: 'Content review'}]} as never, select);
     expect(canvas.querySelectorAll('button')).toHaveLength(1);
-    expect(graph.closest('details')!.open).toBe(false);
+    expect(graph.closest('details')).toBeNull();
+    expect(canvas.firstElementChild?.className).toBe('flow-steps-graph');
+    expect(canvas.lastElementChild?.className).toBe('flow-steps');
     canvas.querySelector('button')!.click();
-    expect(select).toHaveBeenCalledWith('a'); expect(graph.closest('details')!.open).toBe(true);
+    expect(select).toHaveBeenCalledWith('a'); expect(graph.closest('details')).toBeNull();
 });
 
 it('leaves legacy graphs available without requiring overview declarations', () => {

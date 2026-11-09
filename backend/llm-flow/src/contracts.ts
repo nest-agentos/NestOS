@@ -10,6 +10,7 @@ export * from './contracts/harness-hook';
 export * from './contracts/dispatch';
 export * from './contracts/flow-templates';
 export * from './contracts/flow-output';
+export type {FlowRunSummary, FlowRunPreview} from './contracts/flow-run-summary';
 export { validFlowImages, validImageConstraints, type FlowImageConstraints } from './contracts/flow-images';
 export {validFlowFiles, validFileConstraints, type FlowFilePart, type FlowFileConstraints} from './contracts/flow-files';
 export * from './contracts/control-flow';

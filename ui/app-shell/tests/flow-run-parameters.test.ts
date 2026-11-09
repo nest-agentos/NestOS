@@ -100,6 +100,26 @@ it('keeps the form DOM and input when selecting nodes, editing connections, and 
     expect(f.execute.mock.calls.filter(([name]) => name === SessionCommand.GetConnections)).toHaveLength(1);
 });
 
+it('toggles the side panel without replacing form values or issuing reads, and keeps it hidden across redraws', async () => {
+    const f = await setup(), original = f.field(), panel = f.root.querySelector<HTMLElement>('.dag-inspector')!;
+    original.value = 'Keep this'; f.slot().value = 'model';
+    const calls = f.execute.mock.calls.length;
+    const toggle = () => f.root.querySelector<HTMLButtonElement>('[data-action="toggle-inspector"]')!;
+    toggle().click();
+    expect(panel.hidden).toBe(true);
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    expect(f.root.querySelector('.dag-workbench__body--canvas-only')).not.toBeNull();
+    expect(f.execute.mock.calls).toHaveLength(calls);
+    f.root.querySelector<HTMLButtonElement>('[data-action="zoom-in"]')!.click();
+    expect(f.root.querySelector<HTMLElement>('.dag-inspector')!.hidden).toBe(true);
+    toggle().click();
+    expect(f.root.querySelector<HTMLElement>('.dag-inspector')!.hidden).toBe(false);
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    expect(f.root.querySelector('.dag-workbench__body--canvas-only')).toBeNull();
+    expect(f.field()).toBe(original); expect(f.field().value).toBe('Keep this'); expect(f.slot().value).toBe('model');
+    expect(f.execute.mock.calls.filter(([name]) => name === SessionCommand.GetConnections)).toHaveLength(1);
+});
+
 it('shows launch failures in the panel and keeps the entered values for retry', async () => {
     const f = await setup(), previous = f.execute.getMockImplementation()!;
     f.execute.mockImplementation(async (name, args) => {
