@@ -93,6 +93,7 @@ export class SessionRunCoordinator {
         directAgentPolicy?: import('../contracts/direct-agent-policy').DirectAgentPolicy,
         private readonly activity?: SessionExecutionActivity,
         loadArtifact?: import('../contracts/artifacts').ArtifactLoader,
+        resolveHarnessConversation?: import('./conversation-preparation').DirectConversationPreparationOptions['resolveHarnessConversation'],
     ) {
         this.runs = new ConversationRunCoordinator({
             hostPorts: host,
@@ -102,7 +103,7 @@ export class SessionRunCoordinator {
             kernel,
             dagPlugins,
             resolveTools,
-            resolveHarnessToolIds,
+            resolveHarnessToolIds, resolveHarnessConversation,
             resolveMCPToolIds: (sessionId, ids) => this.agents.getMCPToolIds(ids, sessionId),
             resolveSkills: (ids, sessionId) => this.agents.getSkills(ids, sessionId),
             retrieveMemory,

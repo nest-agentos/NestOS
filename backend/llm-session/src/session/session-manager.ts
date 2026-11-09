@@ -118,6 +118,7 @@ export class SessionManager implements ISession, SessionQuery {
             resolveSessionContext?: (sessionId: string, userMessage: string) => Promise<{ projectInstructions: string; skillInstructions: string; skillIndex: string }>;
             resolveSessionSkills?: (sessionId: string, ids: string[]) => Promise<import('../contracts').LLMSkill[]>;
             resolveMCPToolIds?: (sessionId: string, ids: string[]) => Promise<string[]>;
+    resolveHarnessConversation?: import('./conversation-preparation').DirectConversationPreparationOptions['resolveHarnessConversation'];
     resolveHarnessToolIds?: (sessionId: string) => Promise<string[]>;
             resolveTools?: (sessionId: string, allowedIds: string[]) => Promise<{
                 definitions: ToolDefinition[];
@@ -186,7 +187,7 @@ export class SessionManager implements ISession, SessionQuery {
             this.host,
             this.directAgentPolicy,
             executionActivity,
-            options.loadArtifact,
+            options.loadArtifact, options.resolveHarnessConversation,
         );
 
         this.roundOps = new RoundOperations(this.registry, this.runs, this.promptHistory);

@@ -184,3 +184,16 @@ it('rejects malformed preparation identities without logging them as correlation
     expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('PRIVATE BODY');
     expect(await kernel.listSessionTasks(sessionId)).toEqual([]);
 });
+
+it('uses host-selected native continuation without replacing explicit input or assembling history into the turn', async () => {
+    const configured = options(), request = nativeInput();
+    configured.resolveHarnessConversation = async () => ({selection: {mode: 'resume', bindingId: 'original', expectedBindingRevision: 7, expectedGeneration: 1}});
+    const prepared = await prepareDirectConversationRun(request, configured);
+    expect(prepared.definition.task.input).toMatchObject({context: {conversation: {mode: 'resume', bindingId: 'original'}, input: {mode: 'native-continuation'}}});
+    expect(request.task.input.overrides?.harnessConversation).toBeUndefined();
+    configured.resolveHarnessConversation = vi.fn(async () => {throw Error('Explicit selection must win');});
+    request.task.input.overrides!.harnessConversation = {mode: 'new'};
+    const explicit = await prepareDirectConversationRun(request, configured);
+    expect(explicit.definition.task.input).toMatchObject({context: {conversation: {mode: 'new'}}});
+    expect(configured.resolveHarnessConversation).not.toHaveBeenCalled();
+});

@@ -132,6 +132,7 @@ export interface ConversationSystemOptions {
     resolveSessionContext?: (sessionId: string, userMessage: string) => Promise<{ projectInstructions: string; skillInstructions: string; skillIndex: string }>;
     resolveSessionSkills?: (sessionId: string, ids: string[]) => Promise<import('./contracts').LLMSkill[]>;
     resolveMCPToolIds?: (sessionId: string, ids: string[]) => Promise<string[]>;
+    resolveHarnessConversation?: import('./session/conversation-preparation').DirectConversationPreparationOptions['resolveHarnessConversation'];
     resolveHarnessToolIds?: (sessionId: string) => Promise<string[]>;
     resolveTools?: (sessionId: string, allowedIds: string[]) => Promise<{
         definitions: ToolDefinition[];
@@ -185,7 +186,7 @@ function createManagedSession(options: ConversationSystemOptions, promptHistory:
         instructionQueueSessions: options.instructionQueueSessions,
         directAgentPolicy: options.directAgentPolicy, agentResolution: options.agentResolution, hostPorts: options.hostPorts, promptHistory,
         kernel: options.kernel, dagPlugins: options.dagPlugins, flowStore: options.flowStore,
-        resolveTools: options.resolveTools, resolveHarnessToolIds: options.resolveHarnessToolIds,
+        resolveTools: options.resolveTools, resolveHarnessToolIds: options.resolveHarnessToolIds, resolveHarnessConversation: options.resolveHarnessConversation,
         resolveMCPToolIds: options.resolveMCPToolIds, resolveSessionContext: options.resolveSessionContext,
         resolveSessionSkills: options.resolveSessionSkills, retrieveMemory: options.retrieveMemory,
         memoryProvider: options.memoryProvider, canWriteSession: options.canWriteSession,

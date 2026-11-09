@@ -3,7 +3,7 @@ import type {TaskRunDefinition} from '@nestos/llm-flow';
 import {snapshotDirectAgentPolicy, type DirectAgentPolicy} from '../contracts/direct-agent-policy';
 import {createSessionHost, type SessionHost, type SessionHostPorts} from '../utils/host-ports';
 import {ConversationContextBuilder, type ConversationContextInput, type ConversationContextOptions} from './conversation-context';
-import {prepareDirectConversation, type DirectConversationPorts} from './direct-conversation';
+import {prepareDefaultHarnessContext, prepareDirectConversation, type DirectConversationPorts} from './direct-conversation';
 import {directToolIds} from './direct-execution-mode';
 import {prepareDirectRun, assertDirectRunInput} from './direct-run-preparation';
 
@@ -31,6 +31,7 @@ export async function prepareDirectConversationRun(input: DirectConversationPrep
         const prepared = await prepareDirectConversation(options, execution), builder = new ConversationContextBuilder(options, policy);
         progress.stage = 'context'; const location = await builder.resolveLocation(prepared.execution);
         const snapshot = await builder.assemble(prepared.execution, location, prepared.skillsPrompt);
+        progress.stage = 'context-selection'; await prepareDefaultHarnessContext(options, prepared.execution, snapshot);
         progress.tokenCount = snapshot.tokenCount; progress.stage = 'tool-catalog';
         const tools = directToolIds(prepared.execution.config, prepared.execution.task.input);
         const catalog = prepared.execution.config.execution?.kind === 'harness' ? {definitions: [], externalIds: []}

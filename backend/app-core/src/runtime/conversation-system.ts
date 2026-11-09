@@ -3,6 +3,7 @@ import {registerInputSourceExecution} from '../host/input-source-execution';
 import {registerResourceReferences} from '../host/resource-references';
 import {createTaskAssetReader} from './task-assets';
 import {createTaskArtifactServices} from './task-artifact-services';
+import {createDefaultHarnessConversationResolver} from '../projects/harness-default-conversation';
 import {createContextBindingReader} from '../projects/harness-context-catalog';
 import {createContextOptionsReader} from '../projects/harness-context-options';
 import type {HarnessConnectionService} from '../projects/harness-connections';
@@ -74,6 +75,7 @@ export async function createConversationSystem(
         hostPorts: { translate: t, logger: createModuleLogger('llm-conversation'), traceBoot },
         loadArtifact: artifacts.loadArtifact,
         readContextBindings: createContextBindingReader(kernel.kernel),
+        resolveHarnessConversation: createDefaultHarnessConversationResolver(kernel.kernel),
         readContextOptions: createContextOptionsReader({kernel: kernel.kernel, agents: agentService,
             sessions: sessionRepository, connections: options.executionConnections}),
         validateCallAssets: (_sessionId, value) => validateCallAssets(systemFS, value),

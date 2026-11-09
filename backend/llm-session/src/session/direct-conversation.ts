@@ -14,6 +14,7 @@ import type {ChatAttachment, ExecutionTask, ExecutorConfig} from '../core/types'
 export interface DirectToolCatalog {definitions: ToolDefinition[]; externalIds: string[];}
 /** Ready context and input only; planning does not require a UI state or a running Task. */
 export interface DirectConversationInput {
+    defaultHarnessConversation?: import('@nestos/kernel-adapters/contracts').ConversationSelection;
     title?: string;
     task: Pick<ExecutionTask, 'sessionId' | 'input'>;
     config: ExecutorConfig;
@@ -24,6 +25,8 @@ export interface DirectConversationInput {
 }
 
 export interface DirectConversationPorts {
+    resolveHarnessConversation?(sessionId: string, context: HarnessContextRequest,
+        connection: import('@nestos/kernel-adapters/contracts').HarnessConnectionSnapshot): Promise<{selection: import('@nestos/kernel-adapters/contracts').ConversationSelection; connection?: import('@nestos/kernel-adapters/contracts').HarnessConnectionSnapshot} | undefined>;
     resolveHarnessToolIds?(sessionId: string): Promise<string[]>;
     resolveMCPToolIds?(sessionId: string, ids: string[]): Promise<string[]>;
     resolveSkills?(ids: string[], sessionId?: string): Promise<LLMSkill[]>;
@@ -122,7 +125,7 @@ function harnessContext(execution: DirectConversationInput, snapshot: ContextSna
         return;
     }
     const connection = execution.config.harnessConnection!;
-    const conversation = structuredClone(execution.task.input.overrides?.harnessConversation ?? {mode: 'new' as const});
+    const conversation = structuredClone(execution.task.input.overrides?.harnessConversation ?? execution.defaultHarnessConversation ?? {mode: 'new' as const});
     return {invocationId: invocation.invocationId, branchId: snapshot.branchRef,
         ...directHarnessContextIdentity(snapshot.agent, connection.project), scopeRef: `conversation:${execution.config.id}`,
         policyRef: sha256HexSync(JSON.stringify(snapshot.blocks.filter(block => block.kind === 'system'))),
@@ -189,4 +192,15 @@ function directInput(execution: DirectConversationInput, snapshot: ContextSnapsh
         llmRetry: mode === 'agent' ? policy.llmRetry : undefined,
         toolTimeoutMs: mode === 'agent' ? policy.toolTimeoutMs : undefined,
     };
+}
+
+/** Resolve only an omitted selection; explicit choices and frozen admitted definitions stay unchanged. */
+export async function prepareDefaultHarnessContext(options: DirectConversationPorts, execution: DirectConversationInput, snapshot: ContextSnapshot): Promise<void> {
+    if (execution.config.execution?.kind !== 'harness' || execution.task.input.overrides?.harnessConversation || !options.resolveHarnessConversation) return;
+    const context = harnessContext(execution, snapshot);
+    if (!context) return;
+    const resolved = await options.resolveHarnessConversation(execution.task.sessionId, context, execution.config.harnessConnection!);
+    if (!resolved) return;
+    execution.defaultHarnessConversation = resolved.selection;
+    if (resolved.connection) execution.config = {...execution.config, harnessConnection: structuredClone(resolved.connection)};
 }
