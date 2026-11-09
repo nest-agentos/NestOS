@@ -1,4 +1,4 @@
-import { t } from '@nestos/common';
+import { createModuleLogger, randomUUID, t } from '@nestos/common';
 import type { MenuItem } from '@nestos/ui-common-adapter';
 import { createMoveOperation, type VFSNodeUI } from '@nestos/vfs-ui';
 import { showNameDialog } from '../files/project-dialog';
@@ -15,6 +15,7 @@ interface Options {
     remove?(paths: string[], signal: AbortSignal): Promise<import('@nestos/vfs-ui').DeleteResult>;
     canRemove?(paths: string[]): boolean;
 }
+const log = createModuleLogger('toolbox-drawers');
 export class DrawerActions {
     constructor(private readonly options: Options) {}
     menu(item: VFSNodeUI): MenuItem<VFSNodeUI>[] {
@@ -74,11 +75,26 @@ export class DrawerActions {
     private readonly moveItems = async (paths: string[], name: string, signal = this.options.signal): Promise<void> => {
         const move = createMoveOperation<string[], string>({
             resolve: (ids, destination) => ({ batches: [{ ids, execute: async selected => {
-                await this.options.groups.assign(selected.map(path => ({ path, name: destination })));
+                await this.assign(selected, destination);
                 return 'completed';
             } }] }),
             completed: () => this.options.refresh(),
         });
         await move({ selection: paths, destination: name }, signal);
     };
+    private async assign(paths: string[], name: string): Promise<void> {
+        const operationId = randomUUID(), started = Date.now();
+        const metadata = {operation: 'toolbox.drawer.move', operationId, stage: 'persist', count: paths.length};
+        log.info('drawer.move', {...metadata, result: 'start'});
+        try {
+            await this.options.groups.assign(paths.map(path => ({path, name})));
+            log.info('drawer.move', {...metadata, result: 'success', durationMs: Date.now() - started});
+        } catch (error) {
+            const code = (error as {code?: unknown})?.code;
+            log.error('drawer.move', {...metadata, result: 'failure', durationMs: Date.now() - started,
+                code: typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'TOOLBOX_DRAWER_ASSIGN_FAILED',
+                errorType: error instanceof Error ? error.name : 'Unknown'});
+            throw error;
+        }
+    }
 }

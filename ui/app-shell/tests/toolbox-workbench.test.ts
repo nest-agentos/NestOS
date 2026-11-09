@@ -23,7 +23,7 @@ import { ToolboxWorkbench } from '../src/toolbox/ToolboxWorkbench';
 import { ToolDetailsEditor } from '../src/toolbox/ToolDetailsEditor';
 import { legacyToolboxRoute, TOOLBOX_KINDS } from '../src/toolbox/routes';
 import { MCPServerConnection } from '../../../backend/kernel-adapters/src/llm-management/skills/mcp-client';
-import { t } from '@nestos/common';
+import { getLogger, t } from '@nestos/common';
 import mediaProbeExamples from '../src/config/media-probe-examples.json';
 
 let runtime: ApplicationRuntime;
@@ -410,6 +410,54 @@ it('creates every editable category in named drawers and persists their organiza
     const reloaded = new ToolboxDrawers(await runtime.vfs.openFileSystem('/etc')); await reloaded.init();
     expect(reloaded.snapshot().filter(item => item.name === '学习')).toHaveLength(5);
 });
+it('moves selected flows from the footer into a drawer while preserving their source identities', async () => {
+    const f = await setup();
+    await f.workbench.setVisible(false);
+    const [copy] = await f.resources.import(await f.resources.export(['/flows/review.flow']));
+    await f.workbench.setVisible(true);
+    f.workbench.setFilter('flows');
+    f.sidebar.querySelector<HTMLElement>('[data-item-id="/drawers/ungrouped-flows"] .vfs-directory-item__header')!.click();
+    await f.workbench.openResource('/flows/review.flow');
+    f.sidebar.querySelector(`[data-item-id="${copy}"] .vfs-node-item__content`)!
+        .dispatchEvent(new MouseEvent('click', {bubbles: true, ctrlKey: true}));
+    const move = f.sidebar.querySelector<HTMLButtonElement>('[data-action="bulk-move"]')!;
+    expect(move.hidden).toBe(false); expect(move.disabled).toBe(false); move.click();
+    await vi.waitFor(() => expect(document.querySelector('.toolbox-organize-list')).not.toBeNull());
+    const dialog = document.querySelector<HTMLDialogElement>('.project-dialog')!;
+    expect([...dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')].map(input => input.value).sort())
+        .toEqual(['/flows/review.flow', copy].sort());
+    dialog.querySelector<HTMLInputElement>('[name="drawer"]')!.value = '验收';
+    dialog.querySelector<HTMLFormElement>('form')!.requestSubmit();
+    await vi.waitFor(() => expect(document.querySelector('.project-dialog')).toBeNull());
+    expect(f.resources.drawers.forPath(copy)?.name).toBe('验收');
+    expect(f.resources.drawers.forPath('/flows/review.flow')?.name).toBe('验收');
+    for (const path of ['/flows/review.flow', copy]) expect(await f.resources.sources.flows.driver.exists(path.slice('/flows'.length))).toBe(true);
+});
+
+it.each(['flows', 'skills', 'prompts', 'mcp', 'tools'] as const)('connects %s footer actions and bulk export to the host policy', async kind => {
+    const f = await setup(); await f.workbench.setVisible(false);
+    const available = f.resources.drawers.list(kind).flatMap(group => group.paths);
+    const paths = kind === 'tools' ? available.slice(0, 2)
+        : [available[0], ...(await f.resources.import(await f.resources.export([available[0]])))];
+    await f.workbench.setVisible(true); f.workbench.setFilter(kind);
+    await f.workbench.openResource(paths[0]);
+    f.sidebar.querySelector(`[data-item-id="${paths[1]}"] .vfs-node-item__content`)!
+        .dispatchEvent(new MouseEvent('click', {bubbles: true, ctrlKey: true}));
+    const move = f.sidebar.querySelector<HTMLButtonElement>('[data-action="bulk-move"]')!;
+    expect(move.hidden).toBe(false); expect(move.disabled).toBe(false); move.click();
+    await vi.waitFor(() => expect(document.querySelector('.toolbox-organize-list')).not.toBeNull());
+    const dialog = document.querySelector<HTMLDialogElement>('.project-dialog')!;
+    expect([...dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')].map(input => input.value).sort()).toEqual(paths.sort());
+    dialog.dispatchEvent(new Event('cancel', {cancelable: true}));
+    const remove = f.sidebar.querySelector<HTMLButtonElement>('[data-action="bulk-delete"]')!;
+    expect(remove.hidden).toBe(kind === 'tools');
+    const download = vi.spyOn(archiveTransfer, 'downloadArchive').mockImplementation(() => {});
+    f.sidebar.querySelector(`[data-item-id="${paths[0]}"]`)!.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true}));
+    document.querySelector<HTMLButtonElement>('.vfs-context-menu [data-action="bulk-export"]')!.click();
+    await vi.waitFor(() => expect(download).toHaveBeenCalledOnce());
+    expect(JSON.parse(download.mock.calls[0][0]).entries).toHaveLength(paths.length);
+});
+
 it('moves tool references in bulk without changing definitions and deleting a drawer only ungroups them', async () => {
     const f = await setup(); f.workbench.setFilter('all');
     f.sidebar.querySelector<HTMLButtonElement>('.vfs-node-list__secondary-action')!.click();
@@ -448,6 +496,26 @@ async function organizeSelection(f: Awaited<ReturnType<typeof setup>>, kind: 'fl
     }
     return {dialog, remove: dialog.querySelector<HTMLButtonElement>('[data-action="delete-organized"]')!};
 }
+
+it('retains the selected resources and destination after a grouping write fails and allows retry', async () => {
+    const f = await setup(), assign = vi.spyOn(f.resources.drawers, 'assign');
+    const {dialog} = await organizeSelection(f, 'flows', '/flows/review.flow');
+    dialog.querySelector<HTMLInputElement>('[name="drawer"]')!.value = '验收';
+    assign.mockRejectedValueOnce(Object.assign(new Error('Grouping storage unavailable'), {code: 'EIO'}));
+    const form = dialog.querySelector<HTMLFormElement>('form')!; form.requestSubmit();
+    await vi.waitFor(() => expect(dialog.textContent).toContain('Grouping storage unavailable'));
+    const failure = getLogger().query({modules: ['toolbox-drawers']}).find(entry => (entry.data as {result?: string})?.result === 'failure');
+    expect(failure?.data).toMatchObject({stage: 'persist', code: 'EIO', count: 1, operationId: expect.any(String), durationMs: expect.any(Number)});
+    expect(JSON.stringify(failure?.data)).not.toContain('Grouping storage unavailable');
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector<HTMLInputElement>('[name="drawer"]')!.value).toBe('验收');
+    expect(dialog.querySelector<HTMLInputElement>('input[value="/flows/review.flow"]')!.checked).toBe(true);
+    expect(f.resources.drawers.forPath('/flows/review.flow')?.name).not.toBe('验收');
+    await vi.waitFor(() => expect(dialog.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false));
+    form.requestSubmit();
+    await vi.waitFor(() => expect(document.querySelector('.project-dialog')).toBeNull());
+    expect(assign).toHaveBeenCalledTimes(2); expect(f.resources.drawers.forPath('/flows/review.flow')?.name).toBe('验收');
+});
 
 it('deletes selected definitions inside the organizer and preserves the destination draft', async () => {
     const f = await setup(); vi.stubGlobal('confirm', () => true);
@@ -693,7 +761,7 @@ it('keeps bulk deletion and JSON export for editable files while tool references
     f.sidebar.querySelector(`[data-item-id="${copied[0]}"] .vfs-node-item__content`)!.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
     f.sidebar.querySelector('[data-item-id="/skills/phrases"]')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
     expect(document.querySelector('[data-action="bulk-delete"]')).not.toBeNull();
-    expect(document.querySelector('[data-action="export-json"]')).not.toBeNull();
+    expect(document.querySelector('[data-action="bulk-export"]')).not.toBeNull();
     vi.stubGlobal('confirm', () => true);
     document.querySelector<HTMLButtonElement>('[data-action="bulk-delete"]')!.click();
     await vi.waitFor(async () => expect(await runtime.agentService.getSkills()).toHaveLength(0));

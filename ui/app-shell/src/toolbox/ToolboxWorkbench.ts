@@ -129,7 +129,7 @@ export class ToolboxWorkbench implements WorkspaceController {
             fileCreation: { resolveParent: path => path ?? (['agents', 'flows'].includes(this.prefs.filter) ? '/' + this.prefs.filter : null) },
             sort: { by: 'title', direction: 'asc', directoriesFirst: true },
             compareItems: compareModelItems,
-            contextMenu: { items: withAssistantShortcut((item, defaults) => this.menu(item, defaults), item => ({title: this.titles.get(item.id) || item.metadata.title || item.id, context: t('toolbox.title'), target: {kind: 'resource', workspace: 'toolbox', resource: item.id}})), bulkItems: (items, defaults) => this.bulkMenu(items, defaults) },
+            contextMenu: { items: withAssistantShortcut((item, defaults) => this.menu(item, defaults), item => ({title: this.titles.get(item.id) || item.metadata.title || item.id, context: t('toolbox.title'), target: {kind: 'resource', workspace: 'toolbox', resource: item.id}})), bulkItems: items => this.bulkMenu(items) },
         }, this.view);
         this.connectSources();
         const stopUsage = this.options.executorUsage?.subscribe?.(() => this.ui.refreshList());
@@ -260,8 +260,8 @@ export class ToolboxWorkbench implements WorkspaceController {
         this.loadedDirectories.splice(0, this.loadedDirectories.length, ...navigation.loadedDirectories);
         this.snapshot.seed(navigation.directories);
     }
-    private exportMenu(ids: string[]): MenuItem<VFSNodeUI> {
-        return { id: 'export-json', label: t('toolbox.exportJSON'), onClick: async () => {
+    private exportMenu(ids: string[], bulk = false): MenuItem<VFSNodeUI> {
+        return { id: bulk ? 'bulk-export' : 'export-json', label: t('toolbox.exportJSON'), onClick: async () => {
             downloadArchive(await this.exportSelection(ids), 'toolbox.json');
         } };
     }
@@ -298,24 +298,16 @@ export class ToolboxWorkbench implements WorkspaceController {
         return { id: 'delete-resource', label: t(kind === 'providers' ? 'toolbox.deleteProvider' : 'action.delete'),
             onClick: () => this.deletion.request([{ kind: 'entity', entityType, id: decodeURIComponent(toolboxSourcePath(path).slice(1)) }]) };
     }
-    private bulkMenu(items: VFSNodeUI[], defaults: MenuItem<VFSNodeUI>[]): MenuItem<VFSNodeUI>[] {
+    private bulkMenu(items: VFSNodeUI[]): MenuItem<VFSNodeUI>[] {
         if (items.some(item => toolboxKind(item.id) === 'cells')) return [];
         const paths = items.map(item => item.id), kind = toolboxKind(paths[0] ?? '');
-        const menu = [this.exportMenu(paths)];
+        const menu = [this.exportMenu(paths, true)];
         if (drawerKind(kind) && items.every(item => item.type === 'file' && toolboxKind(item.id) === kind))
-            menu.unshift({ id: 'moveDrawer', label: t('toolbox.moveDrawer'), onClick: () => {
+            menu.unshift({ id: 'bulk-move', label: t('toolbox.moveDrawer'), onClick: () => {
                 void this.drawerActions.move(kind, paths).catch(error => alert(String(error)));
             } });
-        if (items.some(item => item.kind === 'group') && this.selectionDeletion.allows(items)) {
+        if (this.selectionDeletion.allows(items))
             menu.push({ id: 'bulk-delete', label: t('action.delete'), onClick: async () => { await this.selectionDeletion.run(paths, this.abort.signal); } });
-            return menu;
-        }
-        if (kind === 'prompts' && items.every(item => toolboxKind(item.id) === 'prompts'))
-            menu.push({ id: 'delete-resource', label: t('action.delete'), onClick: () => this.deletion.request(paths.map(path => ({
-                kind: 'entity', entityType: 'system-prompt', id: decodeURIComponent(toolboxSourcePath(path).slice(1)),
-            }))) });
-        if (items.every(item => item.type === 'file' && ['agents', 'skills', 'flows'].includes(toolboxKind(item.id) ?? '') && !item.metadata.custom._readOnly))
-            menu.push(...defaults.filter(item => 'id' in item && item.id === 'bulk-delete'));
         return menu;
     }
     private selectedDrawer(): Drawer | undefined {
