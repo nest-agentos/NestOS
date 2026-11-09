@@ -3,7 +3,7 @@ import type { HarnessClient, HarnessProfile } from '@nestos/cells-driver';
 import type { HarnessConnectionSnapshot, HarnessExecutionConnection } from '@nestos/kernel-adapters/contracts';
 import type { ProjectRemoteMountService } from './remote-mounts';
 import { HarnessConnectionStore, type HarnessConnectionRecord } from './harness-connection-store';
-import { canonical, harnessProjectIdentity, normalizeHarnessConnection } from './harness-connection-policy';
+import { canonical, harnessProjectIdentity, normalizeHarnessConnection, sameHarnessProjectAuthorization } from './harness-connection-policy';
 import { traceHarnessConnection } from './harness-connection-diagnostics';
 import { readHarnessConnectionTargets } from './harness-connection-targets';
 import type { ProjectFolder } from './project-service';
@@ -76,7 +76,11 @@ export class HarnessConnectionService {
         const { version: _version, revision: _revision, project, ...definition } = snapshot;
         const normalized = normalizeHarnessConnection(definition), current = await this.get(snapshot.id);
         if (!current?.connection || current.connection.enabled === false || current.revision !== snapshot.revision
-            || canonical(current.connection) !== canonical(normalized) || canonical(await this.project(normalized)) !== canonical(project)) throw changed();
+            || canonical(current.connection) !== canonical(normalized)) throw changed();
+        const liveProject = await this.project(normalized);
+        if (!sameHarnessProjectAuthorization(liveProject, project)) throw changed();
+        if (canonical(liveProject) !== canonical(project))
+            await traceHarnessConnection('harness.connection.validate-remount', snapshot.id, async () => {});
     }
     acquire(snapshot: HarnessConnectionSnapshot): Promise<HarnessConnectionAcquisition> {
         return traceHarnessConnection('harness.connection.acquire', snapshot?.id, () => this.acquireConnection(snapshot));

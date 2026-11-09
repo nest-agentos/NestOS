@@ -222,3 +222,14 @@ it('rejects stale project selection before discovery or target persistence', asy
         expectedProject: {nodeConnectionId: 'other-node', serverProjectId: 'server-project'}})).rejects.toMatchObject({code: 'ECONFLICT'});
     expect(f.remote.projectHarness).not.toHaveBeenCalled(); expect(await f.service.list()).toEqual([]);
 });
+
+it('preserves admitted connection policy across a remount record ID change but rejects grant drift', async () => {
+    const f = await fixture(); await f.service.save(definition, 0);
+    const snapshot = (await f.service.freeze('execution'))!;
+    f.mounts[0].mountId = 'replacement-local-mount-record';
+    await expect(f.service.validate(snapshot)).resolves.toBeUndefined();
+    const acquired = await f.service.acquire(snapshot); await acquired.release();
+    f.mounts[0].root = '/different'; await expect(f.service.validate(snapshot)).rejects.toMatchObject({code: 'ECONFLICT'});
+    f.mounts[0].root = '/allowed'; f.mounts[0].access = 'ro';
+    await expect(f.service.validate(snapshot)).rejects.toMatchObject({code: 'ECONFLICT'});
+});

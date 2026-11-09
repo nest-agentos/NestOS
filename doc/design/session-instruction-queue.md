@@ -199,3 +199,5 @@ C4Component
 若原操作只有初始化 journal、没有原生 create/fork/turn，也未取得该 binding 的控制权，取消按“未启动”确认；既有 binding 不变，不释放其他操作的控制权。取消失败向 UI 保留聚合错误内的安全具体错误码，不展示正文或原始内部异常。会话打开不是执行前置条件：prompt 到达队首后恢复原生 Session，控制命令通过持久执行身份直接处理。
 
 未显式选择原生上下文时，NestOS 宿主在编译实际执行前按本 Session、分支、连接、目标与策略定位唯一保留的 native binding，并冻结其当前 revision/generation。连接目录身份一致时可沿用该 binding 原 Task 中经过摘要核对的连接快照；不以目录映射元数据更新为理由另建 Session，实际获取连接仍经过现有授权和路径校验。多个候选、策略不符或占用均报明确错误；用户显式的新建/恢复/分叉选择优先。独立 llm-session 仅提供可选 `resolveHarnessConversation` 端口，不内置宿主选择策略。
+
+连接授权比较保留项目、服务、远程项目版本、principal 授权、挂载源、目标、alias 与读写权限；仅本机 remount 记录的 `mountId` 不参与授权等价比较。旧连接快照可在实际授权不变时继续使用，源目录、访问权限或 principal 改变仍拒绝，并记录 `harness.connection.validate-remount` 诊断。

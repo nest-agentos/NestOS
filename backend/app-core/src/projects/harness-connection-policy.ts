@@ -48,3 +48,18 @@ export function canonical(value: unknown): string {
     return JSON.stringify(value);
 }
 function invalid() { return new FSError('EINVAL', 'Invalid harness execution connection'); }
+
+/** A remount's local record ID is not an authorization boundary; every grant field remains fenced. */
+export function sameHarnessProjectAuthorization(left: unknown, right: unknown): boolean {
+    const stable = (value: unknown) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+        const project = value as Record<string, unknown>;
+        if (!Array.isArray(project.grants)) return value;
+        return {...project, grants: project.grants.map(grant => {
+            if (!grant || typeof grant !== 'object' || Array.isArray(grant)) return grant;
+            const {mountId: _mountId, ...authorization} = grant as Record<string, unknown>;
+            return authorization;
+        })};
+    };
+    return canonical(stable(left)) === canonical(stable(right));
+}
