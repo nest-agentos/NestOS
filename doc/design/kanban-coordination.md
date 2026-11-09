@@ -381,6 +381,8 @@ CLI 提供 `kanban list/create/show/targets/resources/execute/record/records/run
 
 源 Markdown 可纳入版本控制；`.gitignore` 仅忽略 `_nestos` 的运行目录，保留 `_nestos/etc/kanban/` 可跟踪。默认模板正文声明源为产品资源 `kanban-development-prompts.json`，执行时解析得到真实 MD 文件。
 
+默认提示词属于 NestOS 产品资源，随 NestOS 构建部署，不随独立 `@nestos/kanban` 或 `@nestos/kanban-ui` npm 包发布；这些库只提供通用机制和不透明策略端口。全局或项目 Markdown 可单独更新，新操作重新解析并冻结。已有操作、重试及结果未知请求继续使用其原始快照，不通过替换提示词重派。交付提示词统一声明构建、替换、验收、提交的顺序，以及提交内部分析、明确确认、Git 合并和宿主清理的职责。
+
 ### 执行路径与快照
 
 ```text

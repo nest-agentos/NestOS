@@ -152,7 +152,7 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
 }
 function mergeInstruction(input: {id: string; item: KanbanItem; snapshot: ReviewSnapshot}, _directory: string): string {
     return JSON.stringify({dependencies: {lifecycle: {stage: 'postload.succeeded'}}, operation: {phase: 'merge-analysis', operationId: input.id},
-        instruction: `The original development task is terminal. Continue in this SAME Session for READ-ONLY integration analysis; do not rerun development, create another Session or worktree, commit, merge, push, or modify source/main files. `
+        instruction: `The original development execution has ended; the host task awaits submission. Continue in this SAME Session for READ-ONLY integration analysis; do not rerun development, create another Session or worktree, commit, merge, push, or modify source/main files. `
             + `Read the identity, context and task-merge-pre.md sections through session_context. Context.operation contains frozen commit contexts and approved source/target versions. Compare the retained delivery with the target branch and inspect current target working changes read-only. A dirty target is not itself a conflict. Identify actual overlapping files/modules or functional interactions; unrelated changes must not block this workflow. Preserve all existing user changes. `
             + `Return a plan payload {sourceVersion,targetVersion,summary,conflicts:[{id,path,reason,options:[{id,label,detail}]}]}. Every conflict needs explicit user-selectable alternatives; no choices are approved yet. `
             + `Use exactly sourceVersion ${input.snapshot.sourceVersion} and targetVersion ${input.snapshot.targetVersion}; report changed inputs instead of guessing. `
