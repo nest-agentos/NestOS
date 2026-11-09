@@ -38,7 +38,7 @@ async function preparationStage<T>(options: ReviewOperationsOptions, operationId
         const result = await work();
         options.log({operationId, stage: 'prepare.' + stage, result: 'success', durationMs: Date.now() - started}); return result;
     } catch (error) {
-        options.log({operationId, stage: 'prepare.' + stage, result: 'failure', code: safeCode(error), durationMs: Date.now() - started}); throw error;
+        options.log({operationId, stage: 'prepare.' + stage, result: 'failure', code: safeCode(error, 'OPERATION_PREPARATION_FAILED'), durationMs: Date.now() - started}); throw error;
     }
 }
 export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
