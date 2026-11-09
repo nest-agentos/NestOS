@@ -61,6 +61,9 @@ function validateQueue(value: StoredInstructionQueue & {schemaVersion?: number},
             || item.submissionDigest !== undefined && !/^[a-f0-9]{64}$/.test(item.submissionDigest)
             || !Array.isArray(item.files) || item.files.some(file => !file || typeof file.name !== 'string' || typeof file.type !== 'string'
                 || file.content !== undefined && !isAttachmentContentIdentity(file.content))) invalid();
+        if (item.observation !== undefined && (!item.observation || !Number.isFinite(item.observation.lastProgressAt)
+            || item.observation.code !== undefined && typeof item.observation.code !== 'string'
+            || item.observation.stopping !== undefined && typeof item.observation.stopping !== 'boolean')) invalid();
         if (item.invocation !== undefined && !isInvocationIdentity(item.invocation)) invalid();
         if (item.target !== undefined && !isTargetSelection(item.target)) invalid();
         if (item.expectedBranch !== undefined && (typeof item.expectedBranch !== 'string' || item.expectedBranch !== item.branch)) invalid();

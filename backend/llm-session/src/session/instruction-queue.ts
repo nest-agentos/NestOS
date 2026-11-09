@@ -16,6 +16,7 @@ export interface InstructionQueuePorts {
     ready(sessionId: string): Promise<boolean>;
     submit(sessionId: string, item: SessionInstruction): Promise<string>;
     recover(sessionId: string, item: SessionInstruction): Promise<'running' | 'completed' | 'failed' | 'uncertain'>;
+    inspect?(sessionId: string, item: SessionInstruction, stop: boolean): Promise<SessionInstruction['observation']>;
     mark?(sessionId: string): Promise<void>;
     unmark?(sessionId: string): Promise<void>;
     prepare?(sessionId: string, item: SessionInstruction, immediate: boolean): Promise<SessionInstruction>;
@@ -34,10 +35,32 @@ export class SessionInstructionQueues {
     private readonly observed = new Map<string, number>();
     private readonly tracked = new Set<string>();
     private closed = false;
+    private readonly inspections = new Map<string, Promise<void>>();
+    private readonly inspectAgain = new Set<string>();
     constructor(private readonly ports: InstructionQueuePorts) {}
 
     get(sessionId: string): Promise<StoredInstructionQueue> { return this.ports.store.read(sessionId); }
-    async view(sessionId: string): Promise<SessionInstructionQueue> { return instructionQueueProjection(await this.get(sessionId)); }
+    async view(sessionId: string): Promise<SessionInstructionQueue> {
+        const queue = instructionQueueProjection(await this.get(sessionId));
+        const item = queue.items[0];
+        if (item && ['dispatching', 'uncertain'].includes(item.state) && this.ports.inspect)
+            item.observation = await this.ports.inspect(sessionId, item, false);
+        return queue;
+    }
+    observe(sessionId: string): Promise<void> {
+        if (this.closed || !this.tracked.has(sessionId)) return Promise.resolve();
+        const current = this.inspections.get(sessionId);
+        if (current) {this.inspectAgain.add(sessionId); return current;}
+        const pending = (async () => {
+            do {
+                this.inspectAgain.delete(sessionId);
+                try {if (!this.closed) this.ports.changed(await this.view(sessionId));}
+                catch (error) {this.log('inspect', sessionId, ulid(), error, 0);}
+            } while (!this.closed && this.inspectAgain.has(sessionId));
+        })().finally(() => this.inspections.delete(sessionId));
+        this.inspections.set(sessionId, pending);
+        return pending;
+    }
     hasWork(owns: (sessionId: string) => boolean): boolean { return [...this.tails.keys()].some(owns); }
 
     enqueue(sessionId: string, input: SessionInstructionInput): Promise<string> {
@@ -88,10 +111,28 @@ export class SessionInstructionQueues {
         edit = structuredClone(edit);
         return this.serialize(sessionId, async () => {
             await this.ports.assertWritable(sessionId);
-            const previous = await this.get(sessionId), next = editInstructionQueue(previous, edit);
+            const previous = await this.get(sessionId);
+            if (edit.action === 'check' || edit.action === 'stop') return this.control(previous, edit);
+            const next = editInstructionQueue(previous, edit);
             await this.reviseEdit(sessionId, previous, next);
             return this.save(next, edit.action);
         }, `edit.${edit.action}`).then(queue => { this.wake(sessionId); return instructionQueueProjection(queue); });
+    }
+
+    private async control(queue: StoredInstructionQueue, edit: InstructionQueueEdit & {action: 'check' | 'stop'; id: string}): Promise<StoredInstructionQueue> {
+        if (queue.revision !== edit.expectedRevision) throw queueError('QUEUE_CONFLICT', 'Queue changed; refresh before continuing');
+        const item = queue.items[0];
+        if (!item || item.id !== edit.id || !['dispatching', 'uncertain'].includes(item.state) || !this.ports.inspect)
+            throw queueError('QUEUE_EXECUTION_UNSETTLED', 'The original execution is unavailable for this action');
+        item.observation = await this.ports.inspect(queue.sessionId, item, edit.action === 'stop');
+        const outcome = await this.ports.recover(queue.sessionId, item);
+        if (outcome === 'completed' || outcome === 'failed') {
+            this.active.delete(queue.sessionId);
+            queue.items.shift();
+            queue.paused = outcome === 'failed' && queue.items.length > 0;
+            queue.reason = queue.paused ? 'recovery' : undefined;
+        }
+        return this.save(queue, edit.action, item.id);
     }
 
     private async reviseEdit(sessionId: string, previous: SessionInstructionQueue, next: SessionInstructionQueue): Promise<void> {
@@ -148,7 +189,7 @@ export class SessionInstructionQueues {
 
     dispose(): void { this.closed = true; this.tracked.clear(); }
     async whenIdle(): Promise<void> {
-        while (this.tails.size) await Promise.allSettled([...this.tails.values()]);
+        while (this.tails.size || this.inspections.size) await Promise.allSettled([...this.tails.values(), ...this.inspections.values()]);
     }
 
     private async dispatch(sessionId: string): Promise<void> {

@@ -23,7 +23,7 @@ export class NativeInstructionQueuePanel {
             onDiagnostic: event => { if (event.result === 'failure') log.warn('chat.native.queue.ui', event); else log.info('chat.native.queue.ui', event); },
             read: async () => apply(await controls.read()),
             edit: async (edit: InstructionQueueEdit) => {
-                if (this.readOnly || edit.action === 'update-input') throw new Error(t('session.instructions.editFailed'));
+                if (this.readOnly || edit.action === 'update-input' || edit.action === 'check' || edit.action === 'stop') throw new Error(t('session.instructions.editFailed'));
                 try {return await apply(await controls.editInstructionQueue!(edit));}
                 catch (error) {
                     if ((error as {remoteCode?: string})?.remoteCode === 'HARNESS_RECOVERY_NOT_DETACHED')

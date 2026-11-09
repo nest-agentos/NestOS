@@ -1,3 +1,4 @@
+import {inspectQueuedExecution} from './instruction-execution-control';
 import {recoverInstructionRound} from './instruction-round-recovery';
 import {taskStat, type Kernel} from '@nestos/durable-kernel';
 import {attachmentMetadata} from '../contracts/chat';
@@ -36,6 +37,7 @@ export class SessionInstructions {
             hasSession: id => !!registry.getSessionRuntime(id),
             assertWritable: id => this.assertWritable(id), branch: async id => (await registry.engine.getManifest(id)).currentBranch,
             ready: id => this.ready(id), submit: (id, item) => this.submit(id, item),
+            inspect: (id, item, stop) => inspectQueuedExecution(this.kernel, registry.engine, id, item, stop),
             recover: (id, item) => this.recover(id, item), prepare: (id, item, immediate) => this.prepare(id, item, immediate),
             revise: (id, item) => this.runs.reviseQueuedInstruction(id, item),
             capture: (id, item, source) => this.persistAttachments(id, item, source),
@@ -148,13 +150,10 @@ export class SessionInstructions {
     }
 
     private async recover(id: string, item: SessionInstruction): Promise<'running' | 'completed' | 'failed' | 'uncertain'> {
-        if (this.runs.isActive(id) || !await this.ready(id)) return 'running';
         const raw = await this.registry.engine.readDocument(id, `round-${item.id}.json`);
         if (!raw) return 'uncertain';
         const round = JSON.parse(raw) as PersistedRound;
         if (round.sessionId !== id || round.id !== item.id) return 'uncertain';
-        if (round.status === 'completed') return 'completed';
-        if (round.status === 'failed' || round.status === 'cancelled') return 'failed';
         if((await this.registry.engine.getManifest(id)).currentBranch!==item.branch)return 'uncertain';
         const invocation=round.executions.find(row=>row.role==='primary')?.invocation;
         if(!item.invocation||invocation?.invocationId!==item.invocation.invocationId||item.submissionDigest&&round.submissionDigest&&item.submissionDigest!==round.submissionDigest)return 'uncertain';

@@ -8,3 +8,8 @@ function fixture(){const task={id:'t',sessionId:'s',rootTaskId:'t',effects:{},st
 it('repairs history only from the exact terminal task without invoking execution',async()=>{const f=fixture();expect(await f.run()).toBe('completed');expect(log.setAssistantInRound).toHaveBeenCalledWith('r',expect.objectContaining({assistantMessages:[{role:'assistant',content:'actual result'}]}));});
 it('waits for unsettled descendants and refuses mismatched execution identities',async()=>{const f=fixture();f.snapshot.tasks.push({...f.task,id:'child',phase:'running',exit:undefined} as never);expect(await f.run()).toBe('running');expect(log.setAssistantInRound).not.toHaveBeenCalled();f.task.labels.invocationId='other';await expect(f.run()).rejects.toMatchObject({code:'QUEUE_HISTORY_EXECUTION_CONFLICT'});});
 it('preserves failure as failure and never manufactures assistant success',async()=>{const f=fixture();f.task.exit={status:'failed',error:{message:'real failure'}} as never;expect(await f.run()).toBe('failed');expect(log.setAssistantInRound).not.toHaveBeenCalled();expect(log.setConversationStatus).toHaveBeenCalledWith('r','failed','real failure',undefined);});
+it('does not treat a cancelled exit as settled while external cleanup remains pending', async () => {
+    const f = fixture(); f.task.exit = {status: 'cancelled'} as never;
+    f.task.effects = {harness: {status: 'cancelled', cleanupPending: true}} as never;
+    expect(await f.run()).toBe('running'); expect(log.setConversationStatus).not.toHaveBeenCalled();
+});

@@ -174,7 +174,7 @@ class SessionChatBinding {
                 && this.queued.has(record.context.operationId)).map(record => ({status: 'accepted', operationId: record.context.operationId})),
             executionRef: this.execution?.executionRef,
             submissionMode: this.execution?.running || this.options.session.isGenerating() ? 'queue' : 'send',
-            execution: this.execution?.waiting ? 'waiting-input' : this.execution?.running || this.options.session.isGenerating() ? 'running' : 'idle', connection: 'online', hasEarlier: false,
+            execution: this.options.session.getSnapshot?.().instructionQueue?.items[0]?.observation?.code ? 'unknown' : this.execution?.waiting ? 'waiting-input' : this.execution?.running || this.options.session.isGenerating() ? 'running' : 'idle', connection: 'online', hasEarlier: false,
             allowed: this.options.readOnly ? [] : ['send', ...(this.execution?.executionRef ? ['cancel' as const] : []),
                 ...(this.execution?.interactions.some(item => item.kind !== 'unsupported') ? ['respond' as const] : []), ...(this.options.composerCommands ? ['command' as const] : []),
                 ...(this.options.history?.edit ? ['edit' as const] : []), ...(this.options.history?.retry ? ['retry' as const] : [])] });

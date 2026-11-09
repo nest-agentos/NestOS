@@ -302,3 +302,23 @@ it('reconciles recovery-paused uncertain history without resubmitting the comple
  await vi.waitFor(()=>expect(f.submit).toHaveBeenCalledOnce());expect(f.submit.mock.calls[0][1]).toMatchObject({id:'next'});
  expect(f.ports.recover).toHaveBeenCalledOnce();expect((await f.queues.view('s')).items.map(x=>x.id)).toEqual(['next']);
 });
+
+it('checks an active original request without resubmission and preserves pending messages until stop settles', async () => {
+    const f = await fixture(); f.setReady(true);
+    f.ports.inspect = vi.fn(async (_id, _item, stop) => ({lastProgressAt: 1, code: 'CONTEXT_OPERATION_CONFLICT', stopping: stop}));
+    f.ports.recover = vi.fn(async () => 'running');
+    await f.queues.enqueue('s', input('original')); await f.queues.enqueue('s', input('later'));
+    let queue = await f.queues.view('s');
+    expect(queue.items[0].observation?.code).toBe('CONTEXT_OPERATION_CONFLICT');
+    queue = await f.queues.edit('s', {action: 'check', id: 'original', expectedRevision: queue.revision});
+    expect(f.submit).toHaveBeenCalledOnce(); expect(queue.items.map(item => item.id)).toEqual(['original', 'later']);
+    await expect(f.queues.edit('s', {action: 'stop', id: 'later', expectedRevision: queue.revision})).rejects.toMatchObject({code: 'QUEUE_EXECUTION_UNSETTLED'});
+    queue = await f.queues.edit('s', {action: 'stop', id: 'original', expectedRevision: queue.revision});
+    expect(queue.items[0].observation?.stopping).toBe(true); expect(queue.items).toHaveLength(2);
+    await expect(f.queues.edit('s', {action: 'check', id: 'original', expectedRevision: queue.revision - 1})).rejects.toMatchObject({code: 'QUEUE_CONFLICT'});
+    f.ports.recover = vi.fn(async () => 'failed');
+    queue = await f.queues.edit('s', {action: 'check', id: 'original', expectedRevision: queue.revision});
+    expect(queue.items.map(item => item.id)).toEqual(['later']); expect(queue.paused).toBe(true); expect(f.submit).toHaveBeenCalledOnce();
+    f.setReady(true); await f.queues.edit('s', {action: 'resume', expectedRevision: queue.revision});
+    await f.queues.whenIdle(); expect(f.submit).toHaveBeenCalledTimes(2);
+});

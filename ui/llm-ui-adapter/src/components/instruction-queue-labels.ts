@@ -3,6 +3,9 @@ import type {InstructionQueueViewOptions} from '@nestos/llm-ui';
 
 export function instructionQueueLabels(): InstructionQueueViewOptions['labels'] {
     return {
+        needsCheck: t('session.instructions.needsCheck'), stalled: t('session.instructions.stalled'),
+        check: t('session.instructions.check'), stop: t('session.instructions.stop'), confirmStop: t('session.instructions.confirmStop'),
+        stopping: t('session.instructions.stopping'), lastProgress: t('session.instructions.lastProgress'), openSession: t('session.instructions.openSession'),
         recovered: t('session.instructions.recovered'), recover: t('session.instructions.recover'), confirmRecovery: t('session.instructions.confirmRecovery'), recoveryRequired: t('session.instructions.recoveryRequired'),
         title: t('session.instructions.title'), resume: t('session.instructions.resume'), pause: t('session.instructions.pause'),
         expand: t('session.instructions.expand'), collapse: t('session.instructions.collapse'),

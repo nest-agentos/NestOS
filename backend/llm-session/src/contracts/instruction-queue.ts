@@ -54,6 +54,8 @@ export interface SessionInstruction extends SessionInstructionInput {
     createdAt: number;
     state: 'pending' | 'dispatching' | 'failed' | 'uncertain';
     error?: string;
+    /** Read-only execution evidence; observation never admits another request. */
+    observation?: {lastProgressAt: number; code?: string; stopping?: boolean};
 }
 
 export interface SessionInstructionQueue {
@@ -68,6 +70,7 @@ export interface SessionInstructionQueue {
 
 /** Every edit is conditional on the projection the caller actually saw. */
 export type InstructionQueueEdit = { expectedRevision: number } & (
+    | { action: 'check' | 'stop'; id: string }
     | { action: 'cancel'; id: string }
     | { action: 'update'; id: string; text: string }
     | { action: 'update-input'; id: string; source: import('@nestos/llm-flow/contracts').FlowCallSource }

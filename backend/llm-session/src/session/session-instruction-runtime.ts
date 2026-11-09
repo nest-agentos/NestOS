@@ -7,7 +7,7 @@ import { SessionInstructionQueues, type InstructionQueuePorts } from './instruct
 import { queueError } from './instruction-queue-rules';
 
 export interface SessionInstructionContext extends Pick<InstructionQueuePorts,
-    'assertWritable' | 'branch' | 'ready' | 'submit' | 'recover' | 'prepare' | 'revise' | 'capture' | 'previouslyAccepted' | 'changed'> {
+    'inspect' | 'assertWritable' | 'branch' | 'ready' | 'submit' | 'recover' | 'prepare' | 'revise' | 'capture' | 'previouslyAccepted' | 'changed'> {
     hasSession(sessionId: string): boolean;
     idle(sessionId: string): void;
 }
@@ -27,6 +27,7 @@ export class SessionInstructionRuntime {
             branch: id => this.context(id).branch(id),
             ready: id => this.find(id)?.ready(id) ?? Promise.resolve(false),
             submit: (id, item) => this.context(id).submit(id, item),
+            inspect: (id, item, stop) => this.context(id).inspect?.(id, item, stop) ?? Promise.resolve(undefined),
             recover: (id, item) => this.context(id).recover(id, item),
             prepare: (id, item, immediate) => this.context(id).prepare?.(id, item, immediate) ?? Promise.resolve(item),
             revise: (id, item) => this.context(id).revise?.(id, item) ?? Promise.reject(queueError('QUEUE_INPUT_EDIT_UNAVAILABLE', 'Input revision requires the owning execution host')),
@@ -36,7 +37,7 @@ export class SessionInstructionRuntime {
             changed: queue => this.changed(queue), idle: id => this.notify(id, context => context.idle(id)),
         });
         this.release = kernel.onChanged(event => {
-            if (event.reason === 'structure') this.queues.wake(event.sessionId);
+            if (event.reason === 'structure') {this.queues.wake(event.sessionId); void this.queues.observe(event.sessionId);}
         });
     }
 
@@ -73,6 +74,7 @@ export class SessionInstructionRuntime {
     }
 
     private changed(queue: SessionInstructionQueue): void {
+        if ((this.projections.get(queue.sessionId)?.revision ?? -1) > queue.revision) return;
         this.projections.set(queue.sessionId, structuredClone(queue));
         this.notify(queue.sessionId, context => context.changed(structuredClone(queue)));
     }

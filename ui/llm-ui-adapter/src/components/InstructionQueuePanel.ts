@@ -18,8 +18,11 @@ export class InstructionQueuePanel {
             ownerId: sessionId, locale: getLocale(), initiallyCollapsed: true, toggleIcon: CHAT_ICONS.enqueue, removeIcon: CHAT_ICONS.delete,
             edit: edit => this.execute('edit', () => commands.execute<Projection>(SessionCommand.EditInstructionQueue, this.edit(edit)), project),
             read: () => this.execute('read', () => commands.execute<Projection>(SessionCommand.GetInstructionQueue), project),
-            labels: instructionQueueLabels(),
+            labels: instructionQueueLabels(), attentionAfterMs: 30 * 60 * 1000, executionControl: true,
+            sessionHref: `#/workbench/${encodeURIComponent(sessionId)}`,
         });
+        void this.execute('read', () => commands.execute<Projection>(SessionCommand.GetInstructionQueue), project)
+            .then(queue => {if (this.isCurrent()) this.view.update(queue);}).catch(() => {});
     }
     private async execute(stage: string, action: () => Promise<Projection>, project: (queue: Projection) => InstructionQueueSnapshot): Promise<InstructionQueueSnapshot> {
         const started = Date.now();
@@ -44,7 +47,7 @@ export class InstructionQueuePanel {
         if (queue.sessionId === this.sessionId && (!this.queue || queue.revision >= this.queue.revision)) this.queue = queue;
         return {ownerId: queue.sessionId, revision: queue.revision, paused: queue.paused, reason: queue.reason,
             items: queue.items.map(item => ({id: item.id, text: item.text, state: item.state, agentId: item.agentId, createdAt: item.createdAt,
-            error: item.error, files: item.files.map(file => ({name: file.name})),
+            observation: item.observation, error: item.error, files: item.files.map(file => ({name: file.name})),
             ...(item.target ? {targetLabel: `${item.target.kind === 'flow' ? 'Flow' : 'Agent'} · ${item.flowBinding?.agent?.name ?? item.flowBinding?.definition.name ?? item.target.id}`} : {}),
             ...(item.source && item.flowBinding ? {input: item.source.kind === 'arguments' ? item.source.value : item.source.values,
                 textEditable: item.source.kind === 'composer'} : {})}))};
