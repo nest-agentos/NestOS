@@ -1446,6 +1446,7 @@ export const en: LocaleStrings = {
     'twin.scannerTargetUnavailable': 'Published target unavailable; select again',
     'twin.scannerTargetChanged': 'The scanned target was republished; reselect it in scan targets and save',
     'twin.scannerTargetInvalid': 'The scanned target no longer matches its frozen parameters; reselect and save',
+    'twin.scannerFocusUnavailable': 'Opened the target page, but could not find that record in the current list.',
     'twin.scannerOutputHelp': 'Return JSON {"candidates":[{"content":"knowledge","kind":"fact","subject":"self","project":"","eventTime":"","quote":"exact source quote"}]}. A Flow can return this via outputs. Leave the path blank for standard output.',
     'twin.scannerOutputPath': 'Output path (optional, dot separated)',
     'twin.scannerKeepInput': 'Keep current source',

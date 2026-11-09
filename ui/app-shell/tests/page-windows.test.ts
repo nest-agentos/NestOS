@@ -52,3 +52,19 @@ it('adapts the real calendar while preserving the selected date in its window', 
     await workbench.openResource('/2026-12-01'); await workbench.openResource('/2026-11-01');
     expect(editor.querySelectorAll('.calendar')).toHaveLength(2); expect(workbench.getActiveResourceId()).toBe('/2026-11-01');
 });
+it('rebuilds a page whose mount failed instead of replaying its rejected readiness', async () => {
+    const sidebar = document.createElement('aside'), editor = document.createElement('main'); document.body.append(sidebar, editor);
+    const destroys: Array<ReturnType<typeof vi.fn>> = []; let attempts = 0, path = '/one';
+    const workbench = new PageWindows({sidebar, editor, title: 'Pages', initialResource: '/one', selected: vi.fn(),
+        create: host => {
+            const attempt = ++attempts, destroy = vi.fn(async () => {}); destroys.push(destroy);
+            return {start: async () => {if (attempt === 1) throw new Error('WORKSPACE_PAGE_BOOT_FAILED'); host.selected(path);},
+                openResource: async id => {path = id; host.selected(path);}, getActiveResourceId: () => path, destroy};
+        }});
+    cleanup.push(() => workbench.destroy());
+    await expect(workbench.start()).rejects.toThrow('WORKSPACE_PAGE_BOOT_FAILED');
+    await workbench.openResource('/one');
+    expect(attempts).toBe(2); expect(destroys[0]!).toHaveBeenCalledOnce();
+    expect(workbench.getActiveResourceId()).toBe('/one');
+    expect(document.querySelectorAll('.workbench-page')).toHaveLength(1);
+});

@@ -234,3 +234,12 @@ it('drops a selection when refresh changes its event revision', async () => {
     expect(document.querySelector<HTMLButtonElement>('[data-assistant-action=clearSelected]')!.disabled).toBe(true);
     expect(f.write).not.toHaveBeenCalled();
 });
+it('keeps the destination failure code and detail instead of one generic open error', async () => {
+    const f = setup(); await vi.waitFor(() => expect(document.querySelector('[data-assistant-count]')!.textContent).toBe('4')); f.open();
+    f.navigate.mockRejectedValueOnce(Object.assign(new Error('TWIN_SCAN_RUN_UNAVAILABLE'), {code: 'TWIN_SCAN_RUN_UNAVAILABLE'}));
+    document.querySelector<HTMLButtonElement>('[data-assistant-event=done]')!.click();
+    await vi.waitFor(() => expect(document.querySelector('.assistant-menu__error')!.textContent).toContain('TWIN_SCAN_RUN_UNAVAILABLE'));
+    f.navigate.mockRejectedValueOnce(new Error('数字分身加载失败：TWIN_VIEW_READ_FAILED'));
+    document.querySelector<HTMLButtonElement>('[data-assistant-event=failed]')!.click();
+    await vi.waitFor(() => expect(document.querySelector('.assistant-menu__error')!.textContent).toContain('TWIN_VIEW_READ_FAILED'));
+});

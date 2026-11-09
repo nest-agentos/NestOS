@@ -14,6 +14,13 @@ interface Options {
     create(host: {sidebar: HTMLElement; editor: HTMLElement; selected(path: string): void}): WorkspaceHandle;
 }
 const log = createModuleLogger('page-windows');
+const SAFE_CODE = /^[A-Z][A-Z0-9_]{2,79}$/;
+function failureCode(error: unknown): string {
+    const value = error as {code?: unknown; message?: unknown} | null;
+    if (typeof value?.code === 'string' && SAFE_CODE.test(value.code)) return value.code;
+    if (typeof value?.message === 'string' && SAFE_CODE.test(value.message)) return value.message;
+    return 'WORKSPACE_PAGE_OPEN_FAILED';
+}
 
 /** Adapts independent page controllers to the shared window and sidebar lifecycle. */
 export class PageWindows {
@@ -40,13 +47,28 @@ export class PageWindows {
         try {
             const alias = this.aliases.get(path), id = alias && this.tabs.get(alias) ? alias : path;
             const tab = await this.tabs.open(id, this.options.titleFor?.(path) ?? this.options.title, false);
+            // A failed page keeps its rejected readiness; rebuild it so a retry is not a replay.
+            if (tab.value && tab.failed) await this.discardPage(tab, operationId);
             if (!tab.value) this.createPage(tab, path);
             await tab.value!.ready; this.syncVisibility();
             if (this.tabs.current === tab) this.options.selected(tab.value!.controller.getActiveResourceId() ?? tab.id);
             log.debug('page.open', {operationId, stage: 'mount', result: 'success', count: this.tabs.values().length, durationMs: Math.round(performance.now() - started)});
         } catch (error) {
-            log.warn('page.open', {operationId, stage: 'mount', result: 'failure', code: 'WORKSPACE_PAGE_OPEN_FAILED', durationMs: Math.round(performance.now() - started)});
+            log.warn('page.open', {operationId, stage: 'mount', result: 'failure', code: failureCode(error),
+                errorType: error instanceof Error ? error.name : typeof error, durationMs: Math.round(performance.now() - started)});
             this.options.windows?.registry.report(error); throw error;
+        }
+    }
+    /** Drop a failed page's DOM and controller so the next open mounts a fresh one. */
+    private async discardPage(tab: WorkbenchTab<Page>, operationId: string): Promise<void> {
+        const previous = tab.value; tab.value = undefined; tab.failed = false;
+        if (!previous) return;
+        for (const node of [...tab.panel.children]) node.remove();
+        previous.sidebar.remove();
+        try { await previous.controller.destroy?.(); }
+        catch (error) {
+            log.warn('page.open', {operationId, stage: 'discard', result: 'failure', code: 'WORKSPACE_PAGE_DISCARD_FAILED',
+                errorType: error instanceof Error ? error.name : typeof error});
         }
     }
     private createPage(tab: WorkbenchTab<Page>, path: string): void {

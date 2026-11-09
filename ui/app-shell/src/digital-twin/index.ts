@@ -104,7 +104,16 @@ export class TwinWorkbench {
         this.focusRunId = this.page === 'runs' ? this.selectedSession || undefined : undefined;
         this.focusPlanId = this.page === 'sources' && this.selectedSession.startsWith('plan:') ? this.selectedSession.slice(5) : undefined;
         this.options.selected(this.getActiveResourceId()); await this.refresh();
-        if (this.focusPlanId || this.focusRunId) {this.focusPlanId = undefined; this.focusRunId = undefined; throw new Error(this.error || label('scannerUnavailable'));}
+        if (this.focusPlanId || this.focusRunId) {
+            const unlocated = this.focusPlanId ?? this.focusRunId, failure = this.error;
+            this.focusPlanId = undefined; this.focusRunId = undefined;
+            // Reading really failed: keep the underlying reason and expose a stable code.
+            if (failure) throw Object.assign(new Error(failure), {code: 'TWIN_VIEW_READ_FAILED'});
+            // The page rendered but the row was not reachable (superseded refresh or filtered list):
+            // keep the destination open and report the miss instead of failing the whole navigation.
+            console.warn('[DigitalTwin] Focus target unavailable in the current list', {record: unlocated});
+            this.message = label('scannerFocusUnavailable'); this.render();
+        }
         await this.navigation.sync('/' + this.page);
     }
     getActiveResourceId(): string { return (this.workspaceRoute && this.snapshot ? '/workspace/' + encodeURIComponent(this.routeWorkspaceId || this.snapshot.workspace.id) : '') + '/' + this.page + (this.selectedSession ? '/' + encodeURIComponent(this.selectedSession) : ''); }

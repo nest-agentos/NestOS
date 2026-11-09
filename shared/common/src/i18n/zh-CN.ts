@@ -1447,6 +1447,7 @@ export const zhCN = {
     'twin.scannerTargetUnavailable': '所选发布版本不可用，请重新选择',
     'twin.scannerTargetChanged': '扫描目标的发布版本已变更，请在扫描目标中重新选择并保存',
     'twin.scannerTargetInvalid': '扫描目标与已冻结的参数不一致，请重新选择目标并保存',
+    'twin.scannerFocusUnavailable': '已打开目标页，但未能在当前列表定位该记录。',
     'twin.scannerOutputHelp': '执行器须返回 JSON：{"candidates":[{"content":"知识","kind":"fact","subject":"self","project":"","eventTime":"","quote":"原文中的完整片段"}]}。Flow 可通过 outputs 返回；输出路径留空自动读取标准结果。',
     'twin.scannerOutputPath': '结果字段路径（可选，用点分隔）',
     'twin.scannerKeepInput': '保留当前来源',

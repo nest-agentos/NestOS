@@ -334,3 +334,22 @@ it('saves a Tool collector through the workbench without a model, Flow, or knowl
         expect(edited.querySelector<HTMLElement>('[data-knowledge-settings]')!.hidden).toBe(true);
     } finally {await view.destroy(); await service.dispose(); await manager.dispose();}
 });
+it('keeps a run destination open when the focused row is missing and keeps the read failure separate', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    const service = new DigitalTwinService({fs: await manager.openFileSystem('/'), reader: {sessions: async () => [], read: vi.fn()},
+        extractor: {run: vi.fn(), cancel: vi.fn(), cleanup: vi.fn()}, deleteSession: vi.fn()});
+    const sidebar = document.createElement('aside'), editor = document.createElement('main'); document.body.append(sidebar, editor);
+    const workbench = new TwinWorkbench({service, sidebar, editor, connections: async () => [], selected: vi.fn()});
+    try {
+        const base = await service.readView({page: 'runs'}), readView = vi.spyOn(service, 'readView');
+        readView.mockResolvedValue({...base, scans: {...base.scans, runs: []}});
+        await workbench.openResource('/runs/00000000-0000-4000-8000-000000000000');
+        expect(editor.querySelector('.twin__status')!.textContent).toContain(t('twin.scannerFocusUnavailable'));
+        expect(warnings).toHaveBeenCalledWith('[DigitalTwin] Focus target unavailable in the current list',
+            expect.objectContaining({record: '00000000-0000-4000-8000-000000000000'}));
+        readView.mockRejectedValue(new Error('TWIN_SCAN_RUN_UNAVAILABLE'));
+        await expect(workbench.openResource('/runs/00000000-0000-4000-8000-000000000001')).rejects.toMatchObject({code: 'TWIN_VIEW_READ_FAILED'});
+    } finally {await workbench.destroy(); await service.dispose(); await manager.dispose();}
+});

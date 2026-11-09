@@ -7,6 +7,20 @@ import {assistantLabel as label, shortcutEditor, readShortcutForm, updateShortcu
 import {matchesShortcutQuery, shortcutSearchValues, validShortcutTarget, ASSISTANT_MENU_DOCUMENT, emptyAssistantState, readAssistantState, shortcutNavigation, type AssistantShortcut, type AssistantMenuState} from './assistant-shortcuts';
 import './assistant-menu.css';
 const escape = escapeHTML, log = createModuleLogger('assistant-menu');
+const SAFE_CODE = /^[A-Z][A-Z0-9_]{2,79}$/;
+/** Keep the destination's own reason and stable code instead of collapsing every failure. */
+function openFailure(error: unknown): {message: string; code: string} {
+    const value = error as {code?: unknown; message?: unknown} | null;
+    const code = typeof value?.code === 'string' && SAFE_CODE.test(value.code) ? value.code
+        : typeof value?.message === 'string' && SAFE_CODE.test(value.message) ? value.message : undefined;
+    const detail = typeof value?.message === 'string' && !SAFE_CODE.test(value.message) ? redact(value.message) : '';
+    const suffix = [code, detail].filter(Boolean).join(' · ');
+    return {message: suffix ? label('openFailed') + ' · ' + suffix : label('openFailed'), code: code ?? 'ASSISTANT_TARGET_OPEN_FAILED'};
+}
+function redact(value: string): string {
+    return value.replace(/https?:\/\/[^\s"'<>]+/gi, '[endpoint]').replace(/Bearer\s+[^\s"',;]+/gi, 'Bearer [redacted]')
+        .replace(/\b(sk|pk)-[A-Za-z0-9_-]{8,}/g, '[redacted]').slice(0, 160);
+}
 interface Options {
     services: ApplicationServices; backend: ApplicationBackend; documents: Pick<VfsJsonStore, 'read' | 'write' | 'flush'>;
     current(): {workspace: string; resource: string; title: string}; navigate(target: {target: string; resourceId?: string}): Promise<void>;
@@ -281,7 +295,11 @@ class AssistantMenu {
         this.busy = true;
         const started = performance.now();
         try {const completed = await action(); if (!this.closed && completed !== false) this.dialog.close();}
-        catch {if (!this.closed) {this.error = label('openFailed'); this.render();} this.report('navigate', 'ASSISTANT_TARGET_OPEN_FAILED', undefined, performance.now() - started);}
+        catch (error) {
+            const failure = openFailure(error);
+            if (!this.closed) {this.error = failure.message; this.render();}
+            this.report('navigate', failure.code, undefined, performance.now() - started);
+        }
         finally {this.busy = false; if (this.dialog.open && !this.editing) this.render();}
     }
     private icon(name: 'assistant' | 'markRead', fallback: 'nav' | 'markRead'): string {
