@@ -652,6 +652,15 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 
 ### 持久启动器与服务替换
 
+日常编译部署在仓库根目录执行：
+
+```bash
+./httpd.sh                 # 增量准备库、构建、切换运行版本并核对健康状态
+./httpd.sh --no-cache      # 显式禁用 HTTP 构建缓存
+```
+
+脚本自动定位仓库，复用当前运行服务的配置、端口和证书，无需重复传参。终端逐阶段显示 `preflight / build / switch / health`、操作 ID 和版本。构建不提前激活 release，构建或预检查失败不切换服务；切换沿用启动器健康检查和失败回退。构建期间版本或服务身份发生变化会拒绝覆盖。需要已有运行中的持久启动器；首次启动仍按上文配置后执行 `pnpm httpd`。脚本失败保留具体阶段和错误码，不自行强杀会话。
+
 `pnpm httpd` 常驻启动器管理 release 子进程。`pnpm httpd:status` 返回服务 ID、当前版本和切换回执；`pnpm httpd:switch <release-id> --operation-id <id> --expected-current <version>` 请求版本切换。`httpd:restart` 选取构建后的 release，不重新构建。旧宿主在安全点退出后才启动候选版本，健康检查失败自动回退原版本。
 
 控制状态位于 `$XDG_CONFIG_HOME/nestos/httpd-launchers/<项目路径摘要>/release.json`（默认 `~/.config`），可用 `NESTOS_HTTPD_CONTROL_DIR` 覆盖；文件权限 0600，独立于 worktree 和 release。状态保存服务 ID、目标版本、进程身份和幂等回执；启动器重启接管已登记的候选进程，继续核对。显式 stop 持久化停止意图，不会被守护循环复活；未到安全点仍等待，只有显式 `--force` 可升级停止。

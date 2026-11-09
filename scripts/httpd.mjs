@@ -36,6 +36,7 @@ function build(args) {
     const id = buildHttpRelease(root, { cache: !args.includes('--no-cache'), releases: directory,
         activate: args.includes('--no-activate') ? undefined : value => activate(value, directory) });
     console.log(`HTTP release ready: ${id}\nStart: ${shared ? `NESTOS_HTTPD_RELEASE_ROOT=${directory} pnpm httpd` : 'pnpm httpd'}\nDevelopment: pnpm httpd:dev`);
+    return id;
 }
 async function serve(mode, args) {
     const hosts = await runningHttpd(root, mode, releases);
@@ -85,7 +86,7 @@ async function supervise(child, mode, entry, args, output) {
     } catch (error) {child.kill('SIGTERM'); throw error;}
 }
 function prepareLifecycleLog(command, args) {
-    if (!['start','stop','restart','switch','status','dev'].includes(command)) return;
+    if (!['start','stop','restart','switch','status','dev','deploy'].includes(command)) return;
     const mode = command === 'dev' || args.includes('--dev') ? 'dev' : 'release';
     try {
         const output = runtimeLog(runtimePaths(mode).runtime);
@@ -95,7 +96,9 @@ function prepareLifecycleLog(command, args) {
 const [command = 'start', ...args] = process.argv.slice(2), commandStarted = Date.now();
 try {
     prepareLifecycleLog(command, args);
-    if (command === 'build') build(args);
+    if (command === 'deploy' && args.includes('--help')) console.log('Usage: ./httpd.sh [--no-cache]\nBuild, switch the running HTTP service, and verify its version and health.');
+    else if (command === 'deploy') await (await import('./httpd-deploy.mjs')).deployHttpd(root, releases, args, build);
+    else if (command === 'build') build(args);
     else if (command === 'dev') await withHttpdControl(root, () => serve('dev', args));
     else if(['start','switch','status'].includes(command)||['stop','restart'].includes(command)&&!args.includes('--dev'))await (await import('./httpd-launcher.mjs')).launcherCommand(root,releases,command,args);
     else if (command === 'stop' || command === 'restart') await withHttpdControl(root, async () => {
@@ -109,7 +112,7 @@ try {
     else if (command === 'list') {
         for (const entry of readdirSync(releases)) if (!entry.startsWith('.') && entry !== 'current.json') console.log(entry);
     }
-    else throw new Error('Usage: httpd.mjs build [--share-main] [--no-cache] [--no-activate] | start [httpd options] | dev [httpd options] | stop [--dev] | restart [--dev] [httpd options] | switch <release-id> [--expected-current <id>] [--operation-id <id>] [--service-id <id>] | status | list | activate <release-id>');
+    else throw new Error('Usage: httpd.mjs deploy [--no-cache] | build [--share-main] [--no-cache] [--no-activate] | start [httpd options] | dev [httpd options] | stop [--dev] | restart [--dev] [httpd options] | switch <release-id> [--expected-current <id>] [--operation-id <id>] [--service-id <id>] | status | list | activate <release-id>');
 } catch (error) {
     lifecycleLog({operationId: randomUUID(), stage: command, result: 'failure', code: error.code ?? 'HTTPD_COMMAND_FAILED', durationMs: Date.now() - commandStarted});
     console.error(error.code === 'ENOENT' && command === 'start' ? 'No HTTP release found. Run pnpm httpd:build first.' : error.message); process.exitCode = 1;
