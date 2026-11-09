@@ -28,6 +28,11 @@ itookit 保存自己的项目 ID 与服务端项目引用，显示「服务器�
 
 服务端导出 `rw` 是授权上限；NestOS 创建远程项目默认保存 `ro` 绑定，修改服务端配置不会自动升权。远程项目菜单只提供重命名、重新挂载和卸载等项目管理操作，不提供根项目的复制/移动/删除入口；项目内文件保留其文件操作。重新挂载使用 `remountProject` 用例：切为 `rw` 时读取服务端登记，必要时调用带 revision 的 `project_remount`；切为 `ro` 只收窄客户端视图，不下调其他客户端的服务端授权。持久绑定更新后撤销旧视图及会话授权，释放旧来源，保留项目 ID、文件和原生会话。切换前保存并关闭本项目编辑视图，本地在途任务由应用层拒绝，服务端权限修改由文件执行门拒绝；响应丢失后重读登记核对，不盲目重放。
 
+重新挂载弹窗还支持重新绑定根目录：`projectRemountOptions` 读取原所有者的修复元数据和当前可授权 export 列表；更换 alias/path 时调用 `rebindProject`，经 cells-driver 的 `project_binding` 与扩展 `project_remount.directory` 完成。原路径已失效也不要求先通过旧目录访问校验。Cells 核验新目标是原已固定目录，并以 revision CAS 保存；不更换项目 ID、所有者、原生会话或看板关联。目录改绑明确采用所选服务端根权限；未更改目录时仍沿用上述本地权限衰减规则。
+
+Cells 用 `projectRemountPaths: 1` 协商此能力。旧节点只展示可用的权限切换，并提示更新后才能改绑目录。新目标越界、符号链接逃逸、目录身份不符、目标已登记为其他项目、失效 revision 和执行占用均拒绝。响应或本地保存失败不自动重放；显式重试先读取最新 owner-only 绑定，同一目标的服务端 remount 为幂等核对。成功后轮换 mountId、更新授权与服务端修订并释放旧文件来源；项目编辑器先保存关闭，其他窗口的旧修订失效。修改 Cells 的 export 配置需要重启该服务，普通改绑无需重启 NestOS。真实浏览器与 Cells 的扩大导出验收：`node scripts/verify-project-remount.mjs`。
+
+
 卸载经独立 `ApplicationBackend.unmountProject` 用例，仅撤销客户端挂载、移除本地项目接入和本地 Session；离线仍可卸载，不遍历远端树，不调用服务端 `project_forget` 或原生删除。项目状态展示 ProjectRemoteMountService 的挂载、客户端权限与连通状态；节点配置独立于挂载。cells 启动日志单独展示实际导出权限，避免将导出上限与项目绑定混为一谈。
 
 ## 同一项目授权用于三种访问

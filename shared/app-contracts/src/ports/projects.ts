@@ -328,6 +328,8 @@ export interface ProjectRemoteMountService {
     refreshProjectBinding(projectId: string, options?: OperationOptions): Promise<void>;
     executionSettings(projectId: string, options?: OperationOptions): Promise<HarnessContracts.ProjectExecutionSettings & {project: HarnessContracts.RemoteProject}>;
     setExecution(projectId: string, expected: HarnessContracts.RemoteProject, execution: HarnessContracts.ProjectEnvironment, options?: OperationOptions): Promise<void>;
+    projectRemountOptions(projectId:string,options?:OperationOptions):Promise<{alias:string;path:string;roots:Array<{alias:string;access:'ro'|'rw'}>}>;
+    rebindProject(projectId:string,directory:{alias:string;path:string;access:'ro'|'rw'},options?:OperationOptions):Promise<void>;
     remountProject(projectId: string, access: 'ro' | 'rw', options?: OperationOptions): Promise<void>;
     searchFiles(projectId: string, query: HarnessContracts.FileSearchQuery, options?: OperationOptions): Promise<HarnessContracts.FileSearchResult>;
     projectConversation(projectId: string, profileId: string, sessionId?: string, options?: OperationOptions, readOnly?: boolean, draftId?: string, draftTitle?: string): Promise<ProjectConversationPort>;

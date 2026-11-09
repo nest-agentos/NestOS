@@ -118,3 +118,37 @@ it('saves execution settings with the captured revision and updates the local bi
         expect(f.client.setExecution).toHaveBeenCalledTimes(2);
     } finally {await f.dispose();}
 });
+
+it('rebinds a broken export while preserving the host and server project identities',async()=>{
+ const f=await fixture();try{
+  f.client.binding=vi.fn(async()=>f.get());vi.mocked(f.client.read).mockRejectedValue(new Error('Old export missing'));
+  const apply=f.remount.getMockImplementation()!;
+  f.client.remount=vi.fn(async(current,access,options,directory)=>Object.assign(await apply(current,access),directory));
+  expect(await f.remote.projectRemountOptions('project')).toMatchObject({alias:'docs',path:'a'});
+  await f.remote.rebindProject('project',{alias:'broader',path:'group/a',access:'rw'});
+  const next=f.remote.list('project')[0];expect(next).toMatchObject({serverProjectId:'native',alias:'broader',root:'/group/a',access:'rw',serverProjectRevision:2});
+  expect(next.mountId).not.toBe('original');expect(f.client.read).not.toHaveBeenCalled();expect(f.after).toHaveBeenCalledWith('project');
+ }finally{await f.dispose();}
+});
+it('keeps the old local binding on a lost remount reply and recovers on explicit retry',async()=>{
+ const f=await fixture();try{
+  f.client.binding=vi.fn(async()=>f.get());const apply=f.remount.getMockImplementation()!;let first=true;
+  f.client.remount=vi.fn(async(current,access,options,directory)=>{
+   const result=Object.assign(await apply(current,access),directory);if(first){first=false;throw new Error('Response lost');}return result;
+  });
+  const target={alias:'broader',path:'group/a',access:'rw' as const};
+  await expect(f.remote.rebindProject('project',target)).rejects.toThrow('Response lost');
+  expect(f.remote.list('project')[0].alias).toBe('docs');
+  await f.remote.rebindProject('project',target);expect(f.remote.list('project')[0]).toMatchObject({alias:'broader',serverProjectId:'native'});
+ }finally{await f.dispose();}
+});
+it('does not replace local grants on a mismatched remount receipt or while a task is running',async()=>{
+ const f=await fixture();try{
+  f.client.binding=vi.fn(async()=>f.get());f.client.remount=vi.fn(async()=>({...f.get(),id:'another'}));
+  const target={alias:'broader',path:'group/a',access:'rw' as const};
+  await expect(f.remote.rebindProject('project',target)).rejects.toMatchObject({code:'ECONFLICT'});
+  expect(f.remote.list('project')[0].mountId).toBe('original');
+  f.before.mockRejectedValueOnce(new Error('Task running'));await expect(f.remote.rebindProject('project',target)).rejects.toThrow('Task running');
+  expect(f.client.remount).toHaveBeenCalledTimes(1);
+ }finally{await f.dispose();}
+});

@@ -51,6 +51,7 @@
     "cli:built": "node apps/cli/dist/cli.js",
     "nestos:pack": "node scripts/release-nestos.mjs prepare",
     "nestos:publish": "node scripts/release-nestos.mjs publish",
+    "test:project-remount-browser": "node scripts/verify-project-remount.mjs",
     "test:kanban-settings-browser": "node scripts/verify-kanban-decision-filter.mjs settings",
     "test:kanban-browser": "node scripts/verify-kanban-decision-filter.mjs",
     "test:performance": "node scripts/test-performance.mjs",

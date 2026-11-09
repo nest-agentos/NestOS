@@ -547,6 +547,51 @@ export class ProjectRemoteMountService {
             await this.checkConnections(projectId, options);
         }, root.connectionId);
     }
+    async projectRemountOptions(projectId:string,options?:OperationOptions) {
+        const root=this.list(projectId).find(m=>m.at==='/');
+        if(!root?.connectionId||!root.serverProjectId||!this.provider.projects)throw new FSError('ECAPABILITY','Registered project required');
+        const client=this.provider.projects(await this.resolveConnection(root.connectionId,options));
+        try {
+            if(!client.binding)throw new FSError('ECAPABILITY','Directory rebinding requires an updated Cells node');
+            const [binding,available]=await Promise.all([client.binding(root.serverProjectId,options),client.roots(options)]);
+            if(binding.id!==root.serverProjectId)throw new FSError('ECONFLICT','Remote project identity changed');
+            return {alias:binding.alias,path:binding.path,roots:available.roots};
+        } finally {await client.close();}
+    }
+    rebindProject(projectId:string,directory:{alias:string;path:string;access:'ro'|'rw'},options?:OperationOptions):Promise<void> {
+        return this.trackProject('project.rebind',projectId,()=>this.serial(async()=>{
+            const normalized=remoteProjectPath('/'+directory.alias+'/'+directory.path);
+            directory={...directory,alias:normalized.alias,path:normalized.root.replace(/^\//,'')};
+            if(!['ro','rw'].includes(directory.access))throw new FSError('EINVAL','Invalid project access');
+            checkOperation(options);await this.beforeChange(projectId);
+            const grants=this.list(projectId),root=grants.find(m=>m.at==='/');
+            if(!root?.connectionId||!root.serverProjectId||!this.provider.projects)throw new FSError('ECAPABILITY','Registered project required');
+            const duplicate=this.findRemoteProject(root.connectionId,'/'+directory.alias+'/'+directory.path);
+            if(duplicate&&duplicate!==projectId)throw new FSError('EEXIST','Directory already belongs to another project');
+            await this.rootValidator?.(projectId,{...root,alias:directory.alias,root:directory.path?'/'+directory.path:'/',access:directory.access});
+            const client=this.provider.projects(await this.resolveConnection(root.connectionId,options));
+            try {
+                if(!client.binding||!client.remount)throw new FSError('ECAPABILITY','Directory rebinding requires an updated Cells node');
+                const current=await client.binding(root.serverProjectId,options);
+                if(current.id!==root.serverProjectId)throw new FSError('ECONFLICT','Remote project identity changed');
+                const applied=await client.remount(current,directory.access,options,{alias:directory.alias,path:directory.path});
+                if(applied.id!==root.serverProjectId||applied.alias!==directory.alias||applied.path!==directory.path||applied.access!==directory.access)
+                    throw new FSError('ECONFLICT','Remote remount receipt does not match the requested directory');
+                const next=this.reboundGrants(root,applied);
+                checkOperation(options);await this.save(projectId,next);
+                try{await this.changed(projectId);}finally{await this.releaseSources(grants);}
+            }finally{await client.close();}
+        }));
+    }
+    private reboundGrants(root:ProjectRemoteMount,project:RemoteProject):ProjectRemoteMount[] {
+        const base={...root,serverProjectRevision:project.revision,authorization:project.authorization,capabilities:project.capabilities};
+        const declarations=[{alias:project.alias,path:project.path,access:project.access,at:'/workspace'},...project.mounts];
+        return declarations.map(m=>{
+            if(m.at!=='/workspace'&&!m.at.startsWith('/workspace/'))throw new FSError('EACCES','Remote mount outside project');
+            const grant={...base,alias:m.alias,root:m.path?'/'+m.path:'/',access:m.access,at:m.at==='/workspace'?'/':m.at.slice('/workspace'.length),mountId:randomUUID()};
+            validateMount(grant);return grant;
+        });
+    }
     remountProject(projectId: string, access: 'ro' | 'rw', options?: OperationOptions): Promise<void> {
         return this.trackProject('project.remount', projectId, () => this.serial(async () => {
             if (!['ro', 'rw'].includes(access)) throw new FSError('EINVAL', 'Invalid project access');

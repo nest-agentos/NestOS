@@ -1,3 +1,4 @@
+import {projectRemountFields,remountFailure} from './project-remount-fields';
 import {conversationLifetime} from './conversation-lifetime';
 import {parseProjectAction, type ProjectActionRoute} from './project-action-route';
 import type {ChatEditorFactory as EditorFactory, ChatEditorOptions as EditorOptions} from '@nestos/llm-ui-adapter/contracts';
@@ -750,19 +751,18 @@ export class SessionWorkbench implements WorkspaceController {
     }
     private async remountProjectDialog(id: string): Promise<void> {
         const project = await this.projects!.get(id), remote = this.projects!.remoteMounts!;
-        const root = remote.list(id).find(mount => mount.at === '/')!, panel = document.createElement('div');
-        const label = document.createElement('label'); label.textContent = t('remote.remountAs');
-        const select = document.createElement('select'); select.setAttribute('aria-label', t('remote.remountAs'));
-        for (const mode of ['ro', 'rw'] as const) { const option = document.createElement('option'); option.value = mode; option.textContent = t(`remote.access.${mode}`); select.append(option); }
-        select.value = root.access; label.append(select); panel.append(label);
-        const note = document.createElement('p'); note.textContent = t('remote.remountEffect'); panel.append(note);
+        const root = remote.list(id).find(mount => mount.at === '/')!;
+        const fields=await projectRemountFields(remote,id,root,this.dialogs.signal);
         await showNameDialog(t('remote.remountAs'), '', this.dialogs.signal, async () => {
             const active = this.active, prefix = folderBrowserPath(project.path);
+            const directory=fields.directory(),options={signal:this.dialogs.signal,timeoutMs:10000};
             await remote.assertUnmountable(id); await this.closeProjectTabs(project.path);
-            await remote.remountProject(id, select.value as 'ro' | 'rw', {signal: this.dialogs.signal, timeoutMs: 10000});
+            const rebind=directory&&(directory.alias!==root.alias||directory.path!==root.root.replace(/^\//,''));
+            await (rebind?remote.rebindProject(id,{...directory,access:fields.access()},options):remote.remountProject(id,fields.access(),options))
+                .catch(error=>{throw remountFailure(error);});
             await this.sidebarUI?.refresh(); await this.projectNavigation?.refresh();
             if (active === prefix || active?.startsWith(prefix + '/')) await this.openResource(active);
-        }, panel, {hideName: true, confirmLabel: t('action.confirm')});
+        }, fields.panel, {hideName: true, confirmLabel: t('action.confirm')});
     }
     private async openProjectAction({projectId,action,mountId}:ProjectActionRoute):Promise<void> {
         const project=await this.projects!.get(projectId),remote=this.projects?.remoteMounts;

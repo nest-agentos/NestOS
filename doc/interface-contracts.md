@@ -191,7 +191,7 @@ Cells 配置位于设置的独立连接目录。cells-driver 从 `GET /v1/capabi
 
 `CellsDriver.projects` 暴露 ProjectClient/RemoteProject/ProjectMount/RegisterProject；服务端目录项目与 sync 数据项目是不同身份。项目文件请求使用项目 ID、revision 与只读衰减 headers，project_exec/harness 从服务端同一份授权获取 mounts。ProjectLauncher 是进程/harness 共用启动端口，当前 bubblewrap，VMM 尚未实现。详见 [项目模型](design/cells-project-model.md)。
 
-`ProjectRemoteMountService.remountProject` 修改客户端项目权限，必要时经可选 `ProjectClient.remount` 调用 `project_remount` 提升服务端项目根授权；所有写入均校验当前权限与版本，不修改项目身份。客户端降为只读只衰减本地绑定。`ApplicationBackend.unmountProject` 是本地卸载用例，允许远端离线，不通过远程文件删除或服务端 `project_forget` 执行。
+`ProjectRemoteMountService.remountProject` 修改客户端项目权限，必要时经可选 `ProjectClient.remount` 调用 `project_remount` 提升服务端项目根授权；所有写入均校验当前权限与版本，不修改项目身份。客户端降为只读只衰减本地绑定。`ProjectRemoteMountService.projectRemountOptions/rebindProject` 提供旧导出失效后的目录重新绑定；通过 `ProjectClient.binding` 读取原所有者的安全绑定元数据，协商 `projectRemountPaths: 1` 后调用带 `directory: {alias,path}` 的 `project_remount`，仅允许新映射仍指向原目录。成功更新原项目的挂载、修订及来源缓存。`ApplicationBackend.unmountProject` 是本地卸载用例，允许远端离线，不通过远程文件删除或服务端 `project_forget` 执行。
 
 ### 远程 Harness 执行连接
 
