@@ -1023,4 +1023,4 @@ Cell 重启后，原生执行已脱离但缺少精确 turn 终态时，Kanban �
 
 `pnpm test:kanban-cancel-browser` 使用真实领域、SeqFile、宿主控制状态与 DOM，模拟执行器停止回执，验证点击→取消中→确认停止、保留待验收任务及重新开放跳过入口；不操作生产任务。
 
-快照准备阶段收到 Cells 明确的 `EBUSY / not-committed` 回执时，映射为 `OPERATION_WORKSPACE_BUSY`，界面明确“操作尚未启动”，保留具体原因及原请求身份供人工重试；此时不生成分析 Session 或持久运行记录。结果未知继续按未知处理，不能据忙碌错误重派。Cells 普通命令与项目命令在目录读取竞争时使用有界公平等待，原生会话/命令占用仍保持原准入隔离。
+快照准备阶段收到 Cells 明确的 `EBUSY` 或 `PROCESS_READERS_BUSY` 且 `outcome: not-committed` 回执时，映射为 `OPERATION_WORKSPACE_BUSY`，界面明确“操作尚未启动”，保留具体原因及原请求身份供人工重试；此时不生成分析 Session 或持久运行记录。结果未知继续按未知处理，不能据忙碌错误重派。Cells 普通命令与项目命令在目录读取竞争时使用有界公平等待，原生会话/命令占用仍保持原准入隔离。

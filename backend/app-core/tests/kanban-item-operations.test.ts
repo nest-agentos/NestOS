@@ -342,9 +342,9 @@ it('allows runtime acceptance after replacement without requiring a merge in a f
  await f.run('accept','independent-accept',{confirmed:true});expect(f.service.execute).toHaveBeenCalledOnce();
 });
 
-it('identifies proven workspace admission rejection before a review session starts and retains unknown failures',async()=>{
+it.each(['EBUSY','PROCESS_READERS_BUSY'])('identifies proven workspace admission rejection %s before a review session starts and retains unknown failures',async remoteCode=>{
  const f=await fixture();await f.bind('build');
- f.adapter.snapshot.mockRejectedValueOnce(Object.assign(new Error('busy'),{code:'EIO',remoteCode:'EBUSY',outcome:'not-committed'}));
+ f.adapter.snapshot.mockRejectedValueOnce(Object.assign(new Error('busy'),{code:'EIO',remoteCode,outcome:'not-committed'}));
  await expect(f.run('build','read-conflict')).rejects.toMatchObject({code:'OPERATION_WORKSPACE_BUSY',outcome:'not-committed'});
  expect(await f.journal.get(jobKey('read-conflict'))).toBeUndefined();expect(f.published.start).not.toHaveBeenCalled();
  f.adapter.snapshot.mockRejectedValueOnce(Object.assign(new Error('uncertain'),{code:'EIO',remoteCode:'EBUSY',outcome:'unknown'}));
