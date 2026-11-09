@@ -21,12 +21,12 @@ async function run(){
  const metrics:any[]=[];
  const measure=async(operation:string,action:()=>Promise<unknown>|void,ready:()=>boolean)=>{calls=[];const started=performance.now();await action();await wait(ready);const row={operation,durationMs:Math.round((performance.now()-started)*100)/100,logicalApiCalls:calls.length,httpRequests:0,methods:[...calls]};metrics.push(row);if(row.durationMs>=5000||row.logicalApiCalls>=30)throw Error('PERFORMANCE_LIMIT:'+operation);};
  await measure('cold.open-review-actions',()=>view.start(),()=>!!editor.querySelector('[data-form="item-operation-skip"][data-operation="build"]'));
- if(!editor.querySelector('[data-operation-group="build,deploy,accept"]')||!editor.querySelector('[data-operation-group="analyze,merge"]'))throw Error('DEPENDENCY_GROUPS_INVALID');
+ if(editor.querySelectorAll('[data-operation-group]').length!==4||!editor.querySelector('[data-operation-group="analyze,merge"]'))throw Error('DEPENDENCY_GROUPS_INVALID');
  const skip=(action:string)=>{const form=editor.querySelector<HTMLFormElement>('[data-form="item-operation-skip"][data-operation="'+action+'"]')!;for(const details of editor.querySelectorAll<HTMLDetailsElement>('[data-item-operations] details'))details.open=true;form.querySelector<HTMLTextAreaElement>('textarea')!.value='用户确认本次豁免，保留工作区';form.querySelector<HTMLInputElement>('[name="confirmed"]')!.checked=true;form.requestSubmit();};
- await measure('warm.skip-build-and-dependents',()=>skip('build'),()=>!editor.querySelector('[data-form="item-operation-skip"][data-operation="build"]'));
- if((await operations.itemOperations('board','task')).operations.find(row=>row.id==='merge')?.waiver)throw Error('INDEPENDENT_MERGE_SKIPPED');
- if((await service.item('board','task')).item.status!=='review')throw Error('INDEPENDENT_REQUIREMENTS_BYPASSED');
- await measure('warm.skip-independent-analysis',()=>skip('analyze'),()=>editor.textContent!.includes('已完成 · 有豁免'));
+ await measure('warm.skip-replacement-and-dependents',()=>skip('deploy'),()=>!editor.querySelector('[data-form="item-operation-skip"][data-operation="deploy"]'));
+ if((await operations.itemOperations('board','task')).operations.find(row=>row.id==='merge')?.state!=='skipped')throw Error('DEPENDENT_SUBMISSION_NOT_SKIPPED');
+ if((await service.item('board','task')).item.status!=='review')throw Error('OUTSTANDING_BUILD_BYPASSED');
+ await measure('warm.skip-remaining-build',()=>skip('build'),()=>editor.textContent!.includes('已完成 · 有豁免'));
  const item=(await service.item('board','task')).item;if(item.acceptanceResult?.outcome!=='waived'||item.operationWaivers?.length!==2||starts)throw Error('WAIVER_AUDIT_INVALID');
  for(const details of editor.querySelectorAll<HTMLDetailsElement>('[data-item-operations] details'))details.open=true;
  document.getElementById('result')!.textContent=JSON.stringify({result:'passed',environment:'Google Chrome headless; actual Kanban domain, SeqFile store, review service and DOM; no HTTP transport',dataset:{boards:1,tasks:1,operations:5,waivers:2,backgroundLoad:'none'},metrics});

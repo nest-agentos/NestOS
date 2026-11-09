@@ -49,6 +49,8 @@ async function inspectSubmission(options: Options, request: SubmissionRequest): 
     const supported = task.program?.kind !== 'flow.aggregate' && task.labels?.kind !== 'flow-root' || hasFlowControlTree(task);
     const controlCapabilities = {pause:supported ? 'boundary' as const : 'none' as const, resume:supported};
     const tree = snapshot.tasks.filter(row => row.rootTaskId === task.rootTaskId);
+    const uncertain=tree.flatMap(row=>Object.values(row.effects??{})).find(effect=>effect.status==='indeterminate');
+    if(uncertain){const code=uncertain.error?.code;return {sessionId,controlCapabilities,outcome:'unknown',code:code&&/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'SUBMISSION_EFFECT_INDETERMINATE'};}
     if (!taskStat(task).settled || tree.some(row => !taskStat(row).settled)) return {sessionId, controlCapabilities, outcome: 'running'};
     if(!task.exit)return {sessionId,controlCapabilities,outcome:'unknown',code:'SUBMISSION_EXIT_MISSING'};
     if(!['completed','failed','cancelled'].includes(round.status))return {sessionId,controlCapabilities,outcome:'running',code:'SUBMISSION_SETTLEMENT_PENDING'};

@@ -1,5 +1,6 @@
+import {finishReviewCleanup,reviewCleanupKey,type ReviewCleanup} from './item-operation-cleanup';
 import {cancellationKey,pendingCancellation,cancellationSupported,requestCancellation,scanCancellations,type ReviewCancellation} from './item-operation-cancellation';
-import {operationDependencies,projectOperationSkips,skipItemOperations,applySkipIntent} from './item-operation-skips';
+import {operationDependencies,operationSteps,operationGroup,affectedOperations,effectiveOperationWaivers,projectOperationSkips,skipItemOperations,applySkipIntent} from './item-operation-skips';
 import {automaticDelivery,automaticDeliveryStatus} from './automatic-delivery';
 import {safeCode,journalCommand} from '@nestos/kanban/integration';
 import {sha256HexSync, t} from '@nestos/common';
@@ -11,7 +12,7 @@ import {reviewKey, jobKey, type ReviewJob, type ReviewSettings, type ReviewOpera
 
 const actions: ReviewAction[] = ['build', 'deploy', 'accept', 'analyze', 'merge'];
 const initial = (): ReviewSettings => ({revision: 0, bindings: {}, jobs: [], receipts: {}});
-interface Context {deliveryPlan?:import('./item-operation-types').DeliveryPlan;board: KanbanBoard; item: KanbanItem; archived: boolean; settings: ReviewSettings; jobs: ReviewJob[]; cancellations:ReviewCancellation[]}
+interface Context {cleanup?:ReviewCleanup;deliveryPlan?:import('./item-operation-types').DeliveryPlan;board: KanbanBoard; item: KanbanItem; archived: boolean; settings: ReviewSettings; jobs: ReviewJob[]; cancellations:ReviewCancellation[]}
 export function createItemOperations(options: ReviewOperationsOptions) {
     let stopped = false; const tails = new Map<string, Promise<unknown>>();
     const queue = <T>(board: string, item: string, work: () => Promise<T>, lane='run'): Promise<T> => {
@@ -19,7 +20,7 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         const pending = (tails.get(key) ?? Promise.resolve()).catch(() => {}).then(() => {requireValue(!stopped, 'SERVICE_STOPPING'); return work();}); tails.set(key, pending);
         void pending.finally(() => {if (tails.get(key) === pending) tails.delete(key);}).catch(() => {}); return pending;
     };
-    const automatic=automaticDelivery({...options,target:options.automaticTarget,plan:options.deliveryPlan,active:()=>!stopped,report:options.reportAutomatic,retryPrecondition:(board,item,action,code)=>recoverAcceptancePrecondition(options,board,item,action,code),view:(board,item)=>queue(board,item,async()=>view(options,await load(options,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(options,board,request,true))});
+    const automatic=automaticDelivery({...options,target:options.automaticTarget,plan:options.deliveryPlan,cleanup:(board,item,id)=>cleanupAfterSubmission(options,board,item,id),active:()=>!stopped,report:options.reportAutomatic,retryPrecondition:(board,item,action,code)=>recoverAcceptancePrecondition(options,board,item,action,code),view:(board,item)=>queue(board,item,async()=>view(options,await load(options,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(options,board,request,true))});
     return {deliveryReady:automatic.ready,itemOperations: (board: string, item: string) => {
         requireValue(!stopped, 'SERVICE_STOPPING');
         return load(options, board, item, false).then(context => view(options, context));
@@ -33,7 +34,7 @@ export function createItemOperations(options: ReviewOperationsOptions) {
                 if (stopped) return;
                 await queue(scope.board, scope.item, async () => {const context = await load(options, scope.board, scope.item, false);
                     for (const job of context.jobs) {if (stopped) return; if (job.phase !== 'settled') {if(job.phase==='prepared'&&(await options.service.read(scope.board)).executionControl?.paused)continue;await advanceReviewJob(options, job);} else await options.report?.(job);}
-                    if(!stopped){await followUp(options,scope.board,scope.item);await settleWaivedAcceptance(options,scope.board,scope.item);}});
+                    if(!stopped){await followUp(options,scope.board,scope.item);await settleDeliveryAcceptance(options,scope.board,scope.item);}});
             }
             if(!stopped)await automatic.scan();
         },
@@ -49,17 +50,22 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         async quiesce() {stopped = true; await Promise.allSettled([...tails.values()]); await options.adapter.close?.(); await options.journal.drain();}};
 }
 async function load(options: ReviewOperationsOptions, board: string, item: string, observe: boolean): Promise<Context> {
-    const [definition, entry, saved] = await Promise.all([options.service.read(board), options.service.item(board, item), options.journal.get<ReviewSettings>(reviewKey(board, item))]);
+    const [definition, entry, saved, cleanup] = await Promise.all([options.service.read(board), options.service.item(board, item), options.journal.get<ReviewSettings>(reviewKey(board, item)),options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item))]);
     const settings = saved ?? initial(), jobs: ReviewJob[] = [];
     for (const id of settings.jobs) {let job = await options.journal.get<ReviewJob>(jobKey(id)); if (!job) continue;
         requireValue(job.boardId === board && job.itemId === item, 'OPERATION_SCOPE_MISMATCH');
         if (observe && job.phase === 'submitting') job = await advanceReviewJob(options, job); jobs.push(job);}
     const cancellations=(await options.journal.getMany<ReviewCancellation>(jobs.map(job=>cancellationKey(job.id)))).filter((row):row is ReviewCancellation=>!!row);
     requireValue(cancellations.every(row=>row.boardId===board&&row.itemId===item&&jobs.some(job=>job.id===row.runId)),'OPERATION_SCOPE_MISMATCH');
-    return {cancellations,deliveryPlan:await options.deliveryPlan?.(definition,entry.item),board: definition, item: entry.item, archived: !!entry.archive, settings, jobs};
+    return {cleanup,cancellations,deliveryPlan:await options.deliveryPlan?.(definition,entry.item),board: definition, item: entry.item, archived: !!entry.archive, settings, jobs};
 }
-const latest = (context: Context, action: ReviewAction) => context.jobs.filter(job => job.action === action).at(-1);
-function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision,context.deliveryPlan,context.cancellations, context.jobs.map(job => [job.id, job.phase, job.state, job.code,job.result,job.followUp?.state,job.followUp?.code])]));}
+function latest(context:Context,action:ReviewAction):ReviewJob|undefined {
+    const job=context.jobs.filter(row=>row.action===action).at(-1);if(!job||job.phase!=='settled')return job;
+    const steps=operationSteps(context.deliveryPlan?.steps),ancestors=steps.slice(0,steps.indexOf(action));
+    const position=context.jobs.indexOf(job);
+    return context.jobs.some((row,index)=>index>position&&ancestors.includes(row.action))?undefined:job;
+}
+function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision,context.cleanup,context.deliveryPlan,context.cancellations, context.jobs.map(job => [job.id, job.phase, job.state, job.code,job.result,job.followUp?.state,job.followUp?.code])]));}
 async function view(options: ReviewOperationsOptions, context: Context): Promise<KanbanItemOperations> {
     if (context.archived || options.adapter.supports?.(context.board, context.item) === false) return {revision: revision(context), operations: []};
     const active = context.jobs.some(job => job.phase !== 'settled')||context.cancellations.some(pendingCancellation), supported = ['review', 'completed'].includes(context.item.status);
@@ -72,9 +78,16 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     const activeWaivers=await currentWaivers(options,context);
     const selected=raw.filter(op=>!context.deliveryPlan||context.deliveryPlan.steps.includes(op.id));
     const actor=await options.service.currentPrincipal(),canSkip=actor.kind==='human'&&context.board.members?.some(row=>row.kind===actor.kind&&row.id===actor.id&&row.roles?.includes('coordinator'));
-    const operations=projectOperationSkips(selected,context.deliveryPlan,activeWaivers,!!canSkip&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel').map(entry=>canSkip||!entry.cancel?entry:{...entry,cancel:{...entry.cancel,enabled:false,reason:t('kanban.errors.OPERATION_COORDINATOR_REQUIRED')}});
+    const projected=projectOperationSkips(cancelDependentOperations(context,selected),context.deliveryPlan,activeWaivers,!!canSkip&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel').map(entry=>canSkip||!entry.cancel?entry:{...entry,cancel:{...entry.cancel,enabled:false,reason:t('kanban.errors.OPERATION_COORDINATOR_REQUIRED')}});
+    const operations=projected.map(entry=>{
+        const cleanup=context.cleanup,merged=latest(context,'merge');
+        if(entry.id==='merge'&&cleanup&&merged&&cleanup.runId===merged.id&&cleanup.state!=='succeeded')return {...entry,group:operationGroup(entry.id),label:t('kanban.operationCleanup'),state:cleanup.state==='failed'?'failed' as const:'running' as const,
+            code:cleanup.code,progress:cleanup.state==='running'?{stage:'running' as const,label:t('kanban.operationProgress.cleanup')}:undefined,runAction:'cleanup',runLabel:t('kanban.operationRetryCleanup'),confirmation:undefined,
+            enabled:cleanup.state==='failed'&&!active,cancel:undefined,fields:undefined,skip:undefined};
+        return {...entry,group:operationGroup(entry.id)};
+    });
     const halted=operationHalt(context,activeWaivers);
-    const audit={...(halted?{halted:{runId:halted.runId,state:halted.state==='cancelled'?'cancelled' as const:'cancelling' as const}}:{}),waivers:activeWaivers,waiverHistory:context.item.operationWaivers,acceptance:context.item.acceptanceResult,skippedActions:[...new Set(activeWaivers.flatMap(row=>row.operations.map(op=>op.id)))]};
+    const audit={...(halted?{halted:{runId:halted.runId,state:halted.state==='cancelled'?'cancelled' as const:'cancelling' as const}}:{}),waivers:activeWaivers,waiverHistory:context.item.operationWaivers,acceptance:context.item.acceptanceResult,skippedActions:[...new Set(activeWaivers.flatMap(row=>row.operations.map(op=>op.id)))].filter(id=>{const entry=operations.find(row=>row.id===id);return entry?entry.state==='skipped':!active;})};
     const automatic=await automaticDeliveryStatus(options.journal,context.board.id,context.item.id);
     if(options.adapter.prepareOperation)return {revision:revision(context),operations,automatic,...audit};
     const catalog = await options.catalog(), flows = catalog.entries.filter(entry => entry.target.kind === 'flow' && entry.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'));
@@ -82,10 +95,10 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
 }
 function operation(context: Context, action: ReviewAction, active: boolean, supported: boolean, agent = false): KanbanItemOperation {
     const job = latest(context, action), binding = context.settings.bindings[action], plan = latest(context, 'analyze')?.result as MergePlan | undefined;
-    const ready = action === 'build' || action === 'analyze' || action === 'deploy' && latest(context, 'build')?.state === 'succeeded'
-        || action === 'accept' && (operationDependencies(context.deliveryPlan).accept??[]).every(id=>latest(context,id as ReviewAction)?.state==='succeeded') && context.item.status === 'review'
-        || action === 'merge' && !!plan && latest(context, 'analyze')?.state === 'succeeded';
-    const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && context.item.status === 'completed' || action === 'merge' && job?.state === 'succeeded';
+    const dependencies=operationDependencies(context.deliveryPlan)[action]??[];
+    const prerequisites=dependencies.every(id=>latest(context,id as ReviewAction)?.state==='succeeded'||id==='accept'&&context.item.status==='completed');
+    const ready=prerequisites&&(action!=='merge'||!!plan&&latest(context,'analyze')?.state==='succeeded')&&(action!=='accept'||context.item.status==='review');
+    const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && (context.item.status === 'completed'||job?.state==='succeeded') || action === 'merge' && job?.state === 'succeeded';
     const enabled = (!context.deliveryPlan||context.deliveryPlan.steps.includes(action)) && supported && !context.archived && !finished && !active && ready && (!configurable || !!binding);
     const built=latest(context,'build'),auto=built?.followUp,autoPending=action==='deploy'&&auto?.state==='queued'&&built?.state==='succeeded'&&(!job||job.createdAt<built.createdAt);
     return {...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...(!context.deliveryPlan?.manualAfter?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
@@ -128,7 +141,12 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     if(automatic)requireValue(!context.board.executionControl?.paused,'AUTOMATIC_DELIVERY_PAUSED');
     requireValue(!context.board.lifecycle || request.action === 'accept'||request.action==='cancel','BOARD_STOPPING');
     requireValue(request.action==='cancel'||context.item.deletedAt === undefined && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
-    requireValue(/^[\w-]{1,128}$/.test(request.operationId) && (actions.includes(request.action as ReviewAction)||request.action==='skip'||request.action==='cancel'), 'OPERATION_REQUEST_INVALID');
+    requireValue(/^[\w-]{1,128}$/.test(request.operationId) && (actions.includes(request.action as ReviewAction)||request.action==='skip'||request.action==='cancel'||request.action==='cleanup'), 'OPERATION_REQUEST_INVALID');
+    if(request.action==='cleanup'){
+        requireValue(request.expectedRevision===revision(context),'OPERATION_STALE_REFRESH');
+        const merged=latest(context,'merge');requireValue(merged?.state==='succeeded'&&context.cleanup?.runId===merged.id&&!context.jobs.some(job=>job.phase!=='settled'),'OPERATION_PREREQUISITE_REQUIRED');
+        await finishReviewCleanup(options,board,request.itemId,merged.id,true);return view(options,await load(options,board,request.itemId,false));
+    }
     if(request.cancel){
         const job=context.jobs.find(row=>row.id===request.cancel!.runId);requireValue(job,'OPERATION_SCOPE_MISMATCH');
         const saved=await options.journal.get<ReviewCancellation>(cancellationKey(job.id));requireValue(saved?.id===request.operationId||request.expectedRevision===revision(context),'OPERATION_STALE_REFRESH');
@@ -138,7 +156,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
         const key='review-skip:'+request.operationId,prior=await options.journal.get(key);
         requireValue(prior||request.expectedRevision===revision(context),'OPERATION_STALE_REFRESH');
         const current=await view(options,context);await skipItemOperations(options,context,request,current.operations);
-        await settleWaivedAcceptance(options,board,request.itemId);
+        await settleDeliveryAcceptance(options,board,request.itemId);
         return view(options,await load(options,board,request.itemId,false));
     }
     requireValue(!context.cancellations.some(pendingCancellation),'OPERATION_CANCELLING');
@@ -152,14 +170,14 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     if (entry.confirmation) requireValue(request.confirmed === true, 'OPERATION_CONFIRMATION_REQUIRED');
     requireValue(request.followUp===undefined||request.action==='build'&&request.followUp==='deploy'&&!context.deliveryPlan?.manualAfter,'OPERATION_REQUEST_INVALID');
     const input = await operationInput(options, context, request), job = prior ?? (request.action === 'accept' ? await acceptanceJob(options, context, request)
-        : await prepareReviewJob(options, context.board, context.item, context.settings, request, input));
+        : await prepareReviewJob(options, context.board, context.item, context.settings, request, input,request.action==='analyze'?latest(context,'accept')?.snapshot.sourceVersion:undefined));
     await options.journal.update<Array<{board: string; item: string}>>('review-operation-scopes', old => old?.some(row => row.board === board && row.item === request.itemId) ? old : [...old ?? [], {board, item: request.itemId}]);
     await options.journal.update<ReviewJob>(jobKey(job.id), old => {requireValue(!old || old.fingerprint === job.fingerprint, 'IDEMPOTENCY_CONFLICT'); return old ?? job;});
     await options.journal.update<ReviewSettings>(reviewKey(board, request.itemId), old => {
         const saved = old ?? initial(); requireValue(saved.revision === context.settings.revision, 'OPERATION_STALE_REFRESH'); requireValue(saved.jobs.length < 64, 'OPERATION_HISTORY_LIMIT');
         return {...saved, revision: saved.revision + 1, jobs: [...saved.jobs, job.id]};
     });
-    await options.report?.(job); if(!automatic||!(await options.service.read(board)).executionControl?.paused)await advanceReviewJob(options,job);if(request.action==='build')await followUp(options,board,request.itemId);await settleWaivedAcceptance(options,board,request.itemId);return view(options,await load(options,board,request.itemId,false));
+    await options.report?.(job); if(!automatic||!(await options.service.read(board)).executionControl?.paused)await advanceReviewJob(options,job);if(request.action==='build')await followUp(options,board,request.itemId);await settleDeliveryAcceptance(options,board,request.itemId);return view(options,await load(options,board,request.itemId,false));
 }
 async function operationInput(options: ReviewOperationsOptions, context: Context, request: KanbanItemOperationRequest): Promise<unknown> {
     if (request.action === 'deploy') {
@@ -199,7 +217,7 @@ async function acceptanceJob(options: ReviewOperationsOptions, context: Context,
 function validateRequest(request: KanbanItemOperationRequest | KanbanItemOperationBinding): void {
     requireValue(request && typeof request === 'object' && typeof request.itemId === 'string' && request.itemId.length > 0 && request.itemId.length <= 256
         && typeof request.operationId === 'string' && /^[\w-]{1,128}$/.test(request.operationId) && !['__proto__', 'constructor', 'prototype'].includes(request.operationId)
-        && (actions.includes(request.action as ReviewAction)||request.action==='skip'||request.action==='cancel') && typeof request.expectedRevision === 'string' && /^[a-f0-9]{64}$/.test(request.expectedRevision), 'OPERATION_REQUEST_INVALID');
+        && (actions.includes(request.action as ReviewAction)||request.action==='skip'||request.action==='cancel'||request.action==='cleanup') && typeof request.expectedRevision === 'string' && /^[a-f0-9]{64}$/.test(request.expectedRevision), 'OPERATION_REQUEST_INVALID');
     if(request.action==='cancel')requireValue('cancel'in request&&!!request.cancel&&typeof request.cancel.runId==='string'&&!('target'in request)&&request.followUp===undefined,'OPERATION_REQUEST_INVALID');
     else if('cancel'in request)requireValue(request.cancel===undefined,'OPERATION_REQUEST_INVALID');
     if(request.action==='skip'){requireValue('skip'in request&&!!request.skip&&typeof request.skip==='object'&&!Array.isArray(request.skip)&&actions.includes(request.skip.action as ReviewAction)&&request.followUp===undefined,'OPERATION_REQUEST_INVALID');}
@@ -247,14 +265,26 @@ async function recoverAcceptancePrecondition(options:ReviewOperationsOptions,boa
 async function currentWaivers(options:ReviewOperationsOptions,context:Context) {
     if(!context.item.operationWaivers?.length)return [];
     const workflow=await options.service.workflow(context.board.id),dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===context.item.id).sort((a,b)=>b.attempt-a.attempt)[0];
-    return context.item.operationWaivers.filter(row=>row.dispatchId===dispatch?.id);
+    return effectiveOperationWaivers(context.item.operationWaivers.filter(row=>row.dispatchId===dispatch?.id),context.deliveryPlan);
 }
 
-async function settleWaivedAcceptance(options:ReviewOperationsOptions,board:string,item:string):Promise<void> {
-    const context=await load(options,board,item,false);if(context.item.status!=='review'||!context.item.operationWaivers?.length)return;
-    const waivers=await currentWaivers(options,context),waiver=waivers.find(row=>row.acceptanceWaived);if(!waiver)return;
-    const current=await view(options,context);if(!current.operations.every(row=>['succeeded','skipped'].includes(row.state)))return;
-    await journalCommand(options.journal,options.service,board,'review-waived-accept:'+waiver.id,{type:'accept-execution',dispatchId:waiver.dispatchId,accept:true,waiverId:waiver.id});
+async function cleanupAfterSubmission(options:ReviewOperationsOptions,board:string,item:string,id:string):Promise<boolean> {
+    const context=await load(options,board,item,false),merged=latest(context,'merge');
+    return merged?.state==='succeeded'?finishReviewCleanup(options,board,item,merged.id):options.cleanup?.(board,item,id)??false;
+}
+
+async function settleDeliveryAcceptance(options:ReviewOperationsOptions,board:string,item:string):Promise<void> {
+    const context=await load(options,board,item,false),current=await view(options,context);
+    const required=current.operations.filter(row=>row.runAction!=='cleanup');
+    if(!required.every(row=>['succeeded','skipped'].includes(row.state)))return;
+    const waivers=await currentWaivers(options,context),waiver=waivers.find(row=>row.acceptanceWaived),accepted=latest(context,'accept');
+    if(context.item.status==='review'){
+        if(waiver)await journalCommand(options.journal,options.service,board,'review-waived-accept:'+waiver.id,{type:'accept-execution',dispatchId:waiver.dispatchId,accept:true,waiverId:waiver.id});
+        else if(accepted?.state==='succeeded'&&accepted.command)await journalCommand(options.journal,options.service,board,'review-accept:'+accepted.id,accepted.command);
+        else return;
+    }
+    const merged=latest(context,'merge');
+    if(merged?.state==='succeeded'&&!waivers.some(row=>row.operations.some(op=>op.id==='cleanup')))await finishReviewCleanup(options,board,item,merged.id);
 }
 
 function operationProgress(job:ReviewJob|undefined,queued:boolean):KanbanItemOperation['progress'] {
@@ -267,9 +297,26 @@ function cancellationView(options:ReviewOperationsOptions,context:Context,entry:
     const job=latest(context,entry.id as ReviewAction);if(!job)return entry;
     const enabled=entry.enabled,cancel=context.cancellations.find(row=>row.runId===job.id),pending=pendingCancellation(cancel),cancelled=cancel?.state==='cancelled';
     if(pending||cancelled){entry={...entry,state:cancelled?'cancelled':'cancelling',enabled:false,followUp:undefined,reason:undefined,code:cancel?.code??(cancelled&&job.code!=='OPERATION_CANCELLED'?job.code:undefined),progress:pending?{stage:'cancelling',label:t('kanban.operationProgress.cancelling'),requestedAt:cancel!.requestedAt}:undefined};}
-    if(job.phase!=='settled'||cancel)entry.cancel={runId:job.id,enabled:!pending&&!cancelled&&job.phase!=='settled'&&cancellationSupported(options,job),...(cancel?{operationId:cancel.id,state:cancel.state,code:cancel.code,requestedAt:cancel.requestedAt}:{}),...(!cancellationSupported(options,job)?{reason:t(job.managed?'kanban.operationCancelUnsupported':'kanban.operationCancelUnavailable')}:{})};
+    if(job.phase!=='settled'||cancel)entry.cancel={affected:affectedOperations(operationDependencies(context.deliveryPlan),job.action).map(id=>({id,label:t(('kanban.operationAction.'+id) as Parameters<typeof t>[0]),group:operationGroup(id)})),runId:job.id,enabled:!pending&&!cancelled&&job.phase!=='settled'&&cancellationSupported(options,job),...(cancel?{operationId:cancel.id,state:cancel.state,code:cancel.code,requestedAt:cancel.requestedAt}:{}),...(!cancellationSupported(options,job)?{reason:t(job.managed?'kanban.operationCancelUnsupported':'kanban.operationCancelUnavailable')}:{})};
     if(cancelled)entry.enabled=enabled;
     return entry;
+}
+
+function cancelDependentOperations(context:Context,entries:KanbanItemOperation[]):KanbanItemOperation[] {
+    const graph=operationDependencies(context.deliveryPlan);
+    return entries.map(entry=>{
+        if(entry.state==='succeeded')return entry;
+        const cancellation=[...context.cancellations].reverse().find(cancel=>{
+            const job=context.jobs.find(row=>row.id===cancel.runId);
+            return job&&latest(context,job.action)?.id===job.id&&!['failed','not-required'].includes(cancel.state)
+                &&job.action!==entry.id&&affectedOperations(graph,job.action).includes(entry.id);
+        });
+        if(!cancellation)return entry;
+        const live=latest(context,entry.id as ReviewAction);
+        if(live?.phase&&live.phase!=='settled')return {...entry,enabled:false,reason:t('kanban.operationDependencyCancelling')};
+        return {...entry,state:cancellation.state==='cancelled'?'cancelled':'cancelling',enabled:false,hideRun:true,
+            progress:undefined,followUp:undefined,reason:t('kanban.operationDependencyCancelled')};
+    });
 }
 
 function operationHalt(context:Context,waivers:NonNullable<KanbanItem['operationWaivers']>):import('@nestos/kanban/contracts').KanbanItemOperations['halted'] {

@@ -30,11 +30,13 @@ async function run(){
  cancelForm.querySelector<HTMLInputElement>('[name="confirmed"]')!.checked=true;
  await measure('warm.request-review-cancellation',()=>cancelForm.requestSubmit(),()=>!!editor.querySelector('[data-operation-progress="cancelling"]'));
  if(editor.querySelector<HTMLButtonElement>('[data-form="item-operation-cancel"] button')!.disabled!==true||stops!==1)throw Error('CANCEL_PENDING_INVALID');
+ for(const id of ['deploy','accept','analyze','merge'])if((await operations.itemOperations('board','task')).operations.find(row=>row.id===id)?.state!=='cancelling')throw Error('DEPENDENT_CANCEL_NOT_PENDING');
  if((await service.item('board','task')).item.status!=='review')throw Error('TASK_WAS_CANCELLED');
  stopState='cancelled';await operations.scan();
  await measure('warm.verify-original-stopped',()=>editor.querySelector<HTMLButtonElement>('[data-action="refresh-item-operations"]')!.click(),()=>editor.textContent!.includes('已取消'));
  const final=await operations.itemOperations('board','task');
  if(final.operations.find(row=>row.id==='build')?.state!=='cancelled'||!editor.querySelector('[data-form="item-operation-skip"][data-operation="build"]')||starts!==1||stops!==2)throw Error('CANCEL_RESULT_INVALID');
+ for(const id of ['deploy','accept','analyze','merge'])if(final.operations.find(row=>row.id===id)?.state!=='cancelled')throw Error('DEPENDENT_CANCEL_NOT_CONFIRMED');
  if((await service.item('board','task')).item.status!=='review')throw Error('TASK_WAS_COMPLETED');
  document.getElementById('result')!.textContent=JSON.stringify({result:'passed',environment:'Google Chrome headless; actual Kanban domain, SeqFile store, review service and DOM; no HTTP transport',dataset:{boards:1,tasks:1,operations:5,backgroundLoad:'none',buildSubmission:'admitted then cancelling then stopped; task retained'},metrics});
 }

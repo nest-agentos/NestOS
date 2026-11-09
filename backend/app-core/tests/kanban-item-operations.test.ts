@@ -1,3 +1,4 @@
+import {finishReviewCleanup} from '../src/kanban/item-operation-cleanup';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
@@ -28,7 +29,12 @@ async function fixture() {
     const bind = async (action: string) => api.bindItemOperation('board', {operationId: 'bind-' + action, itemId: 'task', action, expectedRevision: (await api.itemOperations('board', 'task')).revision, target: reference});
     const result = (id: string, version = 'candidate') => ({schema: 'nestos.kanban.operation-result/1', operationId: id, sourceVersion: 'source', targetVersion: 'target', version});
     const complete = (id: string) => published.inspect.mockResolvedValue({state: 'succeeded', output: result(id)} as never);
-    return {api, options, journal, item, actor, published, submission, adapter, snapshot, plan, reference, run, bind, complete, result, service};
+    const acceptRuntime = async () => {
+        await bind('build'); await bind('deploy'); await run('build'); complete('build'); await api.scan();
+        published.inspect.mockResolvedValue({state:'running'}); await run('deploy','deploy',{confirmed:true}); complete('deploy'); await api.scan();
+        await run('accept','accept',{confirmed:true}); published.start.mockClear(); published.inspect.mockResolvedValue({state:'running'});
+    };
+    return {acceptRuntime, api, options, journal, item, actor, published, submission, adapter, snapshot, plan, reference, run, bind, complete, result, service};
 }
 it('does not start anything on query and requires a compatible frozen Flow binding', async () => {
     const f = await fixture(), view = await f.api.itemOperations('board', 'task');
@@ -76,9 +82,9 @@ it('rejects stale UI requests and source changes before replacement', async () =
     expect(f.published.start).toHaveBeenCalledOnce();
 });
 it('continues the original Session, requires every conflict choice, and invalidates stale analysis', async () => {
-    const f = await fixture(); await f.run('analyze');
+    const f = await fixture(); await f.acceptRuntime(); await f.run('analyze');
     expect(f.submission.start).toHaveBeenCalledWith(expect.objectContaining({expectedSessionId: 'original'})); expect(f.published.start).not.toHaveBeenCalled();
-    await f.api.scan(); await f.api.itemOperations('board', 'task'); f.item.status = 'completed'; await f.bind('merge');
+    await f.api.scan(); await f.api.itemOperations('board', 'task'); await f.bind('merge');
     await expect(f.run('merge', 'no-choice', {confirmed: true})).rejects.toMatchObject({code: 'OPERATION_SELECTION_REQUIRED'});
     f.snapshot.version = 'changed'; await expect(f.run('merge', 'stale-plan', {confirmed: true, selections: {file: 'integrate'}})).rejects.toMatchObject({code: 'OPERATION_SOURCE_CHANGED_REANALYZE'});
     f.snapshot.version = 'scope'; await f.run('merge', 'merge', {confirmed: true, selections: {file: 'integrate'}});
@@ -91,8 +97,8 @@ it('checks the real running version before acceptance and journals canonical acc
     f.published.inspect.mockResolvedValue({state: 'running'}); await f.run('deploy', 'deploy', {confirmed: true}); f.complete('deploy'); await f.api.scan(); await f.api.itemOperations('board', 'task');
     f.adapter.runningVersion.mockReturnValue('other'); await expect(f.run('accept', 'not-this-version', {confirmed: true})).rejects.toMatchObject({code: 'OPERATION_RUNNING_VERSION_MISMATCH'});
     f.adapter.runningVersion.mockReturnValue('candidate'); const view = await f.run('accept', 'accept', {confirmed: true});
-    expect(f.service.execute).toHaveBeenCalledOnce(); expect(f.service.execute.mock.calls[0][1]).toMatchObject({command: {type: 'accept-execution', dispatchId: 'execution', accept: true}});
-    await f.api.scan(); expect(f.service.execute).toHaveBeenCalledOnce(); expect(view.operations.find(op => op.id === 'accept')?.state).toBe('succeeded');
+    expect(f.service.execute).not.toHaveBeenCalled(); expect(f.item.status).toBe('review');
+    await f.api.scan(); expect(f.service.execute).not.toHaveBeenCalled(); expect(view.operations.find(op => op.id === 'accept')?.state).toBe('succeeded');
 });
 it('refuses malformed output and does not enable dependent actions', async () => {
     const f = await fixture(); await f.bind('build'); await f.bind('deploy'); await f.run('build');
@@ -188,7 +194,7 @@ it('accepts verified source delivery without requiring a deployed runtime and hi
  const api=createItemOperations(f.options);closes.push(()=>api.quiesce());
  const view=await api.itemOperations('board','task');expect(view.operations.map(op=>op.id)).toEqual(['accept','analyze','merge']);
  await api.runItemOperation('board',{operationId:'accept-source',itemId:'task',action:'accept',expectedRevision:view.revision,confirmed:true});
- expect(f.service.execute).toHaveBeenCalledOnce();expect(f.adapter.runningVersion).not.toHaveBeenCalled();
+ expect(f.service.execute).not.toHaveBeenCalled();expect(f.item.status).toBe('review');expect(f.adapter.runningVersion).not.toHaveBeenCalled();
  expect(await f.journal.get(jobKey('accept-source'))).toMatchObject({acceptanceScope:'source',state:'succeeded'});
 });
 
@@ -210,10 +216,11 @@ it('keeps a task in review until verified integration and then accepts the integ
  const f=await fixture();f.options.deliveryPlan=async()=>({steps:['analyze','merge','accept','cleanup'],acceptance:'source'});f.plan.conflicts=[];
  const api=createItemOperations(f.options);closes.push(()=>api.quiesce());
  const perform=async(action:string,id=action)=>api.runItemOperation('board',{operationId:id,itemId:'task',action,expectedRevision:(await api.itemOperations('board','task')).revision,confirmed:true});
- expect((await api.itemOperations('board','task')).operations.find(op=>op.id==='accept')?.enabled).toBe(false);
+ expect((await api.itemOperations('board','task')).operations.find(op=>op.id==='accept')?.enabled).toBe(true);
+ await perform('accept');expect(f.item.status).toBe('review');
  await perform('analyze');await api.itemOperations('board','task');await f.bind('merge');
  await perform('merge');expect(f.item.status).toBe('review');expect(f.service.execute).not.toHaveBeenCalled();
- f.complete('merge');await api.scan();await api.itemOperations('board','task');await perform('accept');
+ f.complete('merge');await api.scan();await api.itemOperations('board','task');
  expect(f.service.execute).toHaveBeenCalledOnce();expect(await f.journal.get(jobKey('accept'))).toMatchObject({acceptanceScope:'source',state:'succeeded'});
 });
 
@@ -222,19 +229,20 @@ it('accepts the same deployed source after a verified target integration without
  await f.bind('build');await f.bind('deploy');await f.bind('merge');
  await f.run('build');f.complete('build');await f.api.scan();await f.api.itemOperations('board','task');
  f.published.inspect.mockResolvedValue({state:'running'});await f.run('deploy','deploy',{confirmed:true});f.complete('deploy');await f.api.scan();await f.api.itemOperations('board','task');
+ await f.run('accept','accept',{confirmed:true});expect(f.service.execute).not.toHaveBeenCalled();
  await f.run('analyze');await f.api.itemOperations('board','task');
  f.published.inspect.mockResolvedValue({state:'running'});await f.run('merge','merge',{confirmed:true});
  expect(f.service.execute).not.toHaveBeenCalled();expect(f.item.status).toBe('review');
  f.published.inspect.mockResolvedValue({state:'succeeded',output:{...f.result('merge'),targetHead:'integrated'}} as never);await f.api.scan();await f.api.itemOperations('board','task');
- f.snapshot.targetVersion='integrated';f.snapshot.version='integrated-scope';await f.run('accept','accept',{confirmed:true});
- expect(f.service.execute).toHaveBeenCalledOnce();expect(await f.journal.get(jobKey('accept'))).toMatchObject({state:'succeeded',acceptanceVersion:'candidate',snapshot:{targetVersion:'integrated'}});
+ f.snapshot.targetVersion='integrated';f.snapshot.version='integrated-scope';
+ expect(f.service.execute).toHaveBeenCalledOnce();expect(await f.journal.get(jobKey('accept'))).toMatchObject({state:'succeeded',acceptanceVersion:'candidate',snapshot:{targetVersion:'target'}});
  expect(f.published.start).toHaveBeenCalledTimes(3);
 });
 
-it('allows pre-acceptance runtime integration while acceptance waits for replacement',async()=>{
+it('requires replacement and acceptance before admitting submission',async()=>{
  const f=await fixture();f.options.deliveryPlan=async()=>({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});f.plan.conflicts=[];
- await f.bind('merge');await f.run('analyze');const view=await f.api.itemOperations('board','task');
- expect(view.operations.find(op=>op.id==='merge')?.enabled).toBe(true);expect(view.operations.find(op=>op.id==='accept')?.enabled).toBe(false);
+ await f.bind('merge');await expect(f.run('analyze')).rejects.toMatchObject({code:'OPERATION_PREREQUISITE_REQUIRED'});const view=await f.api.itemOperations('board','task');
+ expect(view.operations.find(op=>op.id==='merge')?.enabled).toBe(false);expect(view.operations.find(op=>op.id==='accept')?.enabled).toBe(false);
 });
 it('freezes a separately proven compatible runtime on acceptance without rewriting old deployment receipts',async()=>{
  const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.scan();
@@ -246,7 +254,7 @@ it('freezes a separately proven compatible runtime on acceptance without rewriti
  expect((await f.journal.get<ReviewJob>(jobKey('deploy')))?.result).toMatchObject({version:'candidate'});
 });
 it('projects persisted execution phases without pretending that a request is a completed build',async()=>{
- const f=await fixture();expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='analyze')?.progress).toBeUndefined();
+ const f=await fixture();await f.acceptRuntime();expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='analyze')?.progress).toBeUndefined();
  f.submission.inspect.mockResolvedValue({sessionId:'original',outcome:'running'});
  const result=await f.run('analyze','progress-analysis');
  expect(result.operations.find(row=>row.id==='analyze')).toMatchObject({state:'running',progress:{stage:'running',requestedAt:expect.any(Number)}});
@@ -265,6 +273,7 @@ it('cancels the exact review operation without completing the task and preserves
  const request={operationId:'stop-build',itemId:'task',action:'cancel',expectedRevision:view.revision,confirmed:true,cancel:{runId:'cancel-build'}};
  view=await f.api.runItemOperation('board',request);
  expect(view.operations.find(row=>row.id==='build')).toMatchObject({state:'cancelling',cancel:{enabled:false,state:'accepted'}});
+ for(const id of ['deploy','accept','analyze','merge'])expect(view.operations.find(row=>row.id===id)).toMatchObject({state:'cancelling',enabled:false,hideRun:true});
  expect(view.halted).toMatchObject({runId:'cancel-build',state:'cancelling'});expect(f.item.status).toBe('review');
  const starts=f.published.start.mock.calls.length;control.mockResolvedValue('cancelled');await f.api.scan();
  view=await f.api.itemOperations('board','task');expect(view.operations.find(row=>row.id==='build')).toMatchObject({state:'cancelled',enabled:true});
@@ -327,19 +336,20 @@ it('never regresses a confirmed cancellation when a concurrent receipt check ret
  release('accepted');await pending;expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='build')?.state).toBe('cancelled');
 });
 
-it('offers merge independently of runtime build, replacement and acceptance, including frozen release plans',async()=>{
+it('does not admit submission ahead of acceptance even for an older frozen release plan',async()=>{
  const f=await fixture();f.options.deliveryPlan=async()=>({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});
- await f.run('analyze');await f.api.scan();await f.bind('merge');
- const view=await f.api.itemOperations('board','task');expect(view.operations.find(row=>row.id==='merge')).toMatchObject({enabled:true,dependsOn:['analyze']});
- expect(view.operations.find(row=>row.id==='accept')).toMatchObject({enabled:false,dependsOn:['deploy']});
- await f.run('merge','independent-merge',{confirmed:true,selections:{file:'integrate'}});expect(f.published.start).toHaveBeenCalledOnce();
+ await f.bind('merge');const view=await f.api.itemOperations('board','task');
+ expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({enabled:false,dependsOn:['accept']});
+ await expect(f.run('analyze')).rejects.toMatchObject({code:'OPERATION_PREREQUISITE_REQUIRED'});
+ await expect(f.run('merge','early-merge',{confirmed:true,selections:{file:'integrate'}})).rejects.toMatchObject({code:'OPERATION_PREREQUISITE_REQUIRED'});
+ expect(f.submission.start).not.toHaveBeenCalled();expect(f.published.start).not.toHaveBeenCalled();
 });
 it('allows runtime acceptance after replacement without requiring a merge in a frozen release plan',async()=>{
  const f=await fixture();f.options.deliveryPlan=async()=>({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});
  await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.scan();
  f.published.inspect.mockResolvedValue({state:'running'});await f.run('deploy','deploy',{confirmed:true});f.complete('deploy');await f.api.scan();
  expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='accept')).toMatchObject({enabled:true,dependsOn:['deploy']});
- await f.run('accept','independent-accept',{confirmed:true});expect(f.service.execute).toHaveBeenCalledOnce();
+ await f.run('accept','independent-accept',{confirmed:true});expect(f.service.execute).not.toHaveBeenCalled();expect(f.item.status).toBe('review');
 });
 
 it.each(['EBUSY','PROCESS_READERS_BUSY'])('identifies proven workspace admission rejection %s before a review session starts and retains unknown failures',async remoteCode=>{
@@ -349,4 +359,45 @@ it.each(['EBUSY','PROCESS_READERS_BUSY'])('identifies proven workspace admission
  expect(await f.journal.get(jobKey('read-conflict'))).toBeUndefined();expect(f.published.start).not.toHaveBeenCalled();
  f.adapter.snapshot.mockRejectedValueOnce(Object.assign(new Error('uncertain'),{code:'EIO',remoteCode:'EBUSY',outcome:'unknown'}));
  await expect(f.run('build','uncertain')).rejects.toMatchObject({code:'EIO',outcome:'unknown'});
+});
+
+it('retries failed post-merge cleanup without resending the merge or deleting Session history',async()=>{
+ const f=await fixture();f.options.cleanup=vi.fn().mockRejectedValueOnce(Object.assign(Error('Dirty'),{code:'WORKTREE_DIRTY',cleanupPrecondition:true})).mockResolvedValue(true);
+ await f.acceptRuntime();f.plan.conflicts=[];await f.bind('merge');await f.run('analyze');await f.api.scan();await f.run('merge','submit',{confirmed:true});
+ f.complete('submit');await f.api.scan();
+ let view=await f.api.itemOperations('board','task');
+ expect(view.operations.find(row=>row.id==='merge')).toMatchObject({state:'failed',runAction:'cleanup',code:'WORKTREE_DIRTY',group:{id:'merge'}});
+ const submissions=f.published.start.mock.calls.length;
+ await f.api.scan();expect(f.options.cleanup).toHaveBeenCalledOnce();
+ view=await f.run('cleanup','retry-cleanup');expect(view.operations.find(row=>row.id==='merge')?.state).toBe('succeeded');
+ expect(f.options.cleanup).toHaveBeenCalledTimes(2);expect(f.published.start).toHaveBeenCalledTimes(submissions);
+ expect(await f.journal.get(jobKey('analyze'))).toMatchObject({sessionId:'original'});
+ await f.api.scan();expect(f.options.cleanup).toHaveBeenCalledTimes(2);expect(f.service.execute).toHaveBeenCalledOnce();
+});
+it('rejects analysis when the source changes after acceptance',async()=>{
+ const f=await fixture();await f.acceptRuntime();f.snapshot.sourceVersion='changed';f.snapshot.version='changed';
+ await expect(f.run('analyze')).rejects.toMatchObject({code:'OPERATION_SOURCE_CHANGED_REBUILD'});
+ expect(f.submission.start).not.toHaveBeenCalled();expect(f.item.status).toBe('review');
+});
+
+it('requires fresh replacement and acceptance after a rebuild instead of reusing older success receipts',async()=>{
+ const f=await fixture();await f.acceptRuntime();
+ await f.run('build','rebuild');let view=await f.api.itemOperations('board','task');
+ expect(view.operations.find(row=>row.id==='accept')).toMatchObject({enabled:false,state:'unavailable'});
+ f.complete('rebuild');await f.api.scan();view=await f.api.itemOperations('board','task');
+ expect(view.operations.find(row=>row.id==='deploy')).toMatchObject({enabled:true});
+ f.published.inspect.mockResolvedValue({state:'running'});await f.run('deploy','redeploy',{confirmed:true});f.complete('redeploy');await f.api.scan();
+ view=await f.api.itemOperations('board','task');expect(view.operations.find(row=>row.id==='accept')).toMatchObject({enabled:true});
+ await f.run('accept','reaccept',{confirmed:true});
+ expect(await f.journal.get(jobKey('accept'))).toMatchObject({state:'succeeded'});
+ expect(await f.journal.get(jobKey('reaccept'))).toMatchObject({state:'succeeded'});
+});
+
+it('keeps the exact cleanup identity when reconciling an unknown external outcome',async()=>{
+ const f=await fixture();f.options.cleanup=vi.fn().mockRejectedValueOnce(Object.assign(Error('Lost reply'),{code:'CLEANUP_OUTCOME_UNKNOWN'})).mockResolvedValue(true);
+ expect(await finishReviewCleanup(f.options,'board','task','merged')).toBe(false);
+ expect(await finishReviewCleanup(f.options,'board','task','merged')).toBe(false);
+ expect(f.options.cleanup).toHaveBeenCalledOnce();
+ expect(await finishReviewCleanup(f.options,'board','task','merged',true)).toBe(true);
+ expect(vi.mocked(f.options.cleanup!).mock.calls[0][2]).toBe(vi.mocked(f.options.cleanup!).mock.calls[1][2]);
 });

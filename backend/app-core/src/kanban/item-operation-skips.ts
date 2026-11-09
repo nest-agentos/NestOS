@@ -3,24 +3,39 @@ import {journalCommand,safeCode} from '@nestos/kanban/integration';
 import type {KanbanBoard,KanbanItem,KanbanItemOperationRequest,KanbanItemOperation,KanbanOperationWaiver} from '@nestos/kanban/contracts';
 import type {DeliveryPlan,ReviewJob,ReviewOperationsOptions} from './item-operation-types';
 import {requireValue} from './validation';
+export const operationSteps=(configured:string[]=['build','deploy','accept','analyze','merge','cleanup'])=>['build','deploy','accept','analyze','merge','cleanup'].filter(id=>configured.includes(id));
+export function operationGroup(id:string):NonNullable<KanbanItemOperation['group']> {
+    const stage=id==='analyze'||id==='cleanup'?'merge':id;
+    return {id:stage,label:t(('kanban.operationStage.'+stage) as Parameters<typeof t>[0])};
+}
 export function operationDependencies(plan?:DeliveryPlan):Record<string,string[]> {
-    const steps=plan?.steps??['build','deploy','accept','analyze','merge','cleanup'];
-    const graph:Record<string,string[]>={build:[],deploy:['build'],analyze:[],accept:plan?.acceptance==='source'?(steps.indexOf('merge')>=0&&steps.indexOf('merge')<steps.indexOf('accept')?['merge']:[]):['deploy'],
-        merge:['analyze'],cleanup:steps.filter(id=>id!=='cleanup')};
-    return Object.fromEntries(steps.map(id=>[id,(graph[id]??[]).filter(dep=>steps.includes(dep))]));
+    const steps=operationSteps(plan?.steps);
+    return Object.fromEntries(steps.map((id,index)=>[id,index?[steps[index-1]]:[]]));
 }
 export function affectedOperations(graph:Record<string,string[]>,action:string):string[] {
     const affected=new Set([action]);let previous=0;
     while(previous!==affected.size){previous=affected.size;for(const [id,deps] of Object.entries(graph))if(deps.some(dep=>affected.has(dep)))affected.add(id);}
     return Object.keys(graph).filter(id=>affected.has(id));
 }
+/** Re-evaluate current consequences while keeping the stored waiver history immutable. */
+export function effectiveOperationWaivers(waivers:KanbanOperationWaiver[],plan?:DeliveryPlan):KanbanOperationWaiver[] {
+    const graph=operationDependencies(plan);
+    return waivers.filter(row=>Object.hasOwn(graph,row.action)).map(row=>{
+        const affected=affectedOperations(graph,row.action);
+        return {...row,dependencies:graph,acceptanceWaived:row.acceptanceWaived&&affected.includes('accept'),operations:affected.map(id=>({
+            ...row.operations.find(op=>op.id===id),id,cause:id===row.action?'direct' as const:'dependency' as const,
+            previousState:row.operations.find(op=>op.id===id)?.previousState??'unavailable'}))};
+    });
+}
+
 export function projectOperationSkips(operations:KanbanItemOperation[],plan:DeliveryPlan|undefined,waivers:KanbanOperationWaiver[],eligible:boolean):KanbanItemOperation[] {
     const graph=operationDependencies(plan);
     return operations.map(entry=>{
         const record=waivers.filter(row=>row.operations.some(op=>op.id===entry.id)).at(-1),row=record?.operations.find(op=>op.id===entry.id);
+        if(record&&row&&entry.progress)return {...entry,enabled:false,hideRun:true,followUp:undefined,dependsOn:graph[entry.id],reason:t('kanban.operationWaiverWaitingStop')};
         if(record&&row)return {...entry,state:'skipped',reason:undefined,progress:undefined,enabled:false,hideRun:true,fields:undefined,confirmation:undefined,configurable:false,followUp:undefined,dependsOn:graph[entry.id],waiver:{id:record.id,cause:row.cause,action:record.action,reason:record.reason,actor:record.actor,at:record.at}};
         const affected=affectedOperations(graph,entry.id),consumed=operations.some(op=>affected.includes(op.id)&&op.state==='succeeded');
-        return {...entry,...(waivers.some(row=>row.operations.some(op=>op.id==='deploy'))?{followUp:undefined}:{}),dependsOn:graph[entry.id],...(!eligible||consumed||entry.state==='succeeded'?{}:{skip:{affected:affected.map(id=>({id,label:operations.find(op=>op.id===id)?.label??t(('kanban.operationAction.'+id) as Parameters<typeof t>[0])}))}})};
+        return {...entry,...(waivers.some(row=>row.operations.some(op=>op.id==='deploy'))?{followUp:undefined}:{}),dependsOn:graph[entry.id],...(!eligible||consumed||entry.state==='succeeded'?{}:{skip:{affected:affected.map(id=>({id,label:operations.find(op=>op.id===id)?.label??t(('kanban.operationAction.'+id) as Parameters<typeof t>[0]),group:operationGroup(id)}))}})};
     });
 }
 interface Context {board:KanbanBoard;item:KanbanItem;jobs:ReviewJob[];deliveryPlan?:DeliveryPlan}

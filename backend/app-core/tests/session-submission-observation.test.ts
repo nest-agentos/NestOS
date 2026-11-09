@@ -15,3 +15,10 @@ it('retains a real failed execution after settlement instead of treating it as u
  expect(await f.api.inspect(f.request)).toMatchObject({outcome:'running'});f.round.status='failed';
  expect(await f.api.inspect(f.request)).toMatchObject({outcome:'failed',code:'CELLS_UNAVAILABLE'});expect(f.submit).not.toHaveBeenCalled();
 });
+
+it.each(['CELLS_UNAVAILABLE','unsafe message with token'])('keeps an indeterminate harness effect unknown without resubmitting (%s)',async code=>{
+ const f=fixture();delete (f.task as any).exit;
+ Object.assign(f.task.effects,{harness:{status:'indeterminate',error:{code}}});
+ expect(await f.api.inspect(f.request)).toMatchObject({outcome:'unknown',code:code==='CELLS_UNAVAILABLE'?code:'SUBMISSION_EFFECT_INDETERMINATE'});
+ expect(f.submit).not.toHaveBeenCalled();
+});

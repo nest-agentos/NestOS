@@ -7,12 +7,12 @@ import {sha256HexSync} from '@nestos/common';
 import {automationTarget} from './automation-targets';
 import {requireValue} from './validation';
 import {safeCode} from '@nestos/kanban/integration';
-import {journalCommand} from '@nestos/kanban/integration';
 import {jobKey, type ReviewJob, type ReviewOperationsOptions, type ReviewSettings, type ReviewAction} from './item-operation-types';
 
 export async function prepareReviewJob(options: ReviewOperationsOptions, board: KanbanBoard, item: KanbanItem,
-    settings: ReviewSettings, request: KanbanItemOperationRequest, context?: unknown): Promise<ReviewJob> {
+    settings: ReviewSettings, request: KanbanItemOperationRequest, context?: unknown,expectedAcceptanceSource?:string): Promise<ReviewJob> {
     const snapshot = await preparationStage(options, request.operationId, 'snapshot', () => options.adapter.snapshot(board, item)), action = request.action as ReviewAction;
+    if(action==='analyze'&&expectedAcceptanceSource!==undefined)await preparationStage(options,request.operationId,'acceptance-source',async()=>requireValue(snapshot.sourceVersion===expectedAcceptanceSource,'OPERATION_SOURCE_CHANGED_REBUILD'));
     const base: ReviewJob = {id: request.operationId, boardId: board.id, itemId: item.id, action, snapshot,
         fingerprint: sha256HexSync(JSON.stringify(request)), phase:'prepared',state:'running',createdAt:Date.now(),...(request.followUp==='deploy'?{followUp:{action:'deploy' as const,state:'queued' as const}}:{})};
     if (action === 'deploy' || action === 'merge') {
@@ -91,7 +91,7 @@ async function acceptReview(options: ReviewOperationsOptions, job: ReviewJob): P
         const code = current.version !== job.snapshot.version ? 'OPERATION_SOURCE_CHANGED_REBUILD'
             : job.acceptanceScope!=='source'&&options.adapter.runningVersion?.() !== job.acceptanceVersion ? 'OPERATION_RUNNING_VERSION_MISMATCH' : undefined;
         if (code) return save(options, job, {...job, phase: 'settled', state: 'failed', code});
-        await journalCommand(options.journal, options.service, job.boardId, 'review-accept:' + job.id, command);
+        // Acceptance evidence is committed with delivery only after the submission stage settles.
     }
     return save(options, job, {...job, phase: 'settled', state: 'succeeded'});
 }

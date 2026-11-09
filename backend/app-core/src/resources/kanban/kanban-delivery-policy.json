@@ -5,9 +5,9 @@
       "id": "source",
       "label": "源码交付",
       "steps": [
+        "accept",
         "analyze",
         "merge",
-        "accept",
         "cleanup"
       ],
       "acceptance": "source"
@@ -18,9 +18,9 @@
       "steps": [
         "build",
         "deploy",
+        "accept",
         "analyze",
         "merge",
-        "accept",
         "cleanup"
       ],
       "acceptance": "runtime"

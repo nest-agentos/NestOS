@@ -1,3 +1,4 @@
+import {operationSteps} from './item-operation-skips';
 import {claimDeliveryTarget,releaseDeliveryTarget} from './automatic-delivery-target';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanItemOperationRequest,KanbanItemOperations,KanbanService,KanbanWorkflowState} from '@nestos/kanban/contracts';
@@ -44,10 +45,14 @@ async function prepareState(options:Options,board:KanbanBoard,item:KanbanItem,wo
     const dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===item.id).sort((a,b)=>b.attempt-a.attempt)[0];
     if(!group&&(!dispatch||!['succeeded','accepted'].includes(dispatch.outcome)))return;
     const id='auto-'+sha256HexSync(JSON.stringify([board.id,item.id,dispatch?.id??item.externalRefs?.find(ref=>ref.system==='nestos-decision-run')?.id])).slice(0,48);
-    const target=options.target?.(board,item),plan=group?undefined:await options.plan?.(board,item),selected=group?['cleanup']:plan?.steps??steps;
+    const target=options.target?.(board,item),plan=group?undefined:await options.plan?.(board,item),selected=operationSteps(group?['cleanup']:plan?.steps??steps);
     const previous=await options.journal.get<State>(key(board.id,item.id)),executionId=dispatch?.id??item.id;
     if(previous&&previous.executionId!==executionId){await options.journal.update('automatic-delivery-history:'+previous.id,old=>old??previous);await releaseDeliveryTarget(options,previous);}
-    return options.journal.update<State>(key(board.id,item.id),old=>old?.executionId===executionId?old.target||!target?old:{...old,target}:{id,target,boardId:board.id,itemId:item.id,executionId,step:0,steps:selected,manualAfter:plan?.manualAfter,requests:{}});
+    return options.journal.update<State>(key(board.id,item.id),old=>{
+        if(old?.executionId!==executionId)return {id,target,boardId:board.id,itemId:item.id,executionId,step:0,steps:selected,manualAfter:plan?.manualAfter,requests:{}};
+        const ordered=operationSteps(old.steps??steps),changed=JSON.stringify(ordered)!==JSON.stringify(old.steps??steps);
+        return {...old,...(!old.target&&target?{target}:{}),...(changed?{steps:ordered,step:0}: {})};
+    });
 }
 async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workflow:KanbanWorkflowState) {
     let state=await prepareState(options,board,item,workflow);if(!state)return;

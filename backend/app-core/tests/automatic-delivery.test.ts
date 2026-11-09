@@ -104,7 +104,7 @@ it('builds once then waits for manual receipts across restarts without deploy, m
  expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(false);
  expect(f.options.report).toHaveBeenCalledOnce();expect(f.options.report).toHaveBeenCalledWith(expect.objectContaining({waitingForUser:true}));
  expect(await f.journal.get('automatic-target:'+JSON.stringify('project'))).toBeNull();
- for(const action of ['deploy','analyze','merge','accept']){f.jobs.set(action,{id:action,runId:'human-'+action,state:'succeeded',enabled:true});await automaticDelivery(f.options).scan();}
+ for(const action of ['deploy','accept','analyze','merge']){f.jobs.set(action,{id:action,runId:'human-'+action,state:'succeeded',enabled:true});await automaticDelivery(f.options).scan();}
  f.item.status='completed';await automaticDelivery(f.options).scan();expect(f.options.cleanup).toHaveBeenCalledOnce();
  expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);expect(f.run).toHaveBeenCalledOnce();
 });
@@ -133,4 +133,17 @@ it('holds automatic follow-up during cancellation and only resumes after an expl
  expect(f.run).not.toHaveBeenCalled();expect(f.options.cleanup).not.toHaveBeenCalled();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(false);
  halted=undefined;f.jobs.set('build',{id:'build',runId:'explicit-new-build',state:'succeeded',enabled:true});await automaticDelivery(f.options).scan();
  expect(f.run.mock.calls.map(row=>row[1].action)).toEqual(['deploy']);
+});
+
+it('migrates the order of a frozen plan while preserving request identities and unknown work',async()=>{
+ const f=await fixture();await automaticDelivery(f.options).scan();
+ const key='automatic-delivery:'+JSON.stringify(['b','task']);
+ const original={operationId:'original-analysis',itemId:'task',action:'analyze',expectedRevision:'original'};
+ await f.journal.update<any>(key,old=>({...old,step:2,steps:['build','deploy','analyze','merge','accept','cleanup'],requests:{...old.requests,analyze:original}}));
+ f.jobs.set('deploy',{id:'deploy',state:'succeeded',runId:'original-deploy'});
+ f.jobs.set('accept',{id:'accept',state:'unavailable',enabled:false});
+ f.jobs.set('analyze',{id:'analyze',state:'unknown',enabled:false,runId:'original-analysis'});
+ for(let n=0;n<6;n++)await automaticDelivery(f.options).scan();
+ expect(f.run).toHaveBeenCalledOnce();expect(f.options.cleanup).not.toHaveBeenCalled();
+ expect(await f.journal.get(key)).toMatchObject({step:2,steps:['build','deploy','accept','analyze','merge','cleanup'],requests:{analyze:original}});
 });

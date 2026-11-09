@@ -24,33 +24,33 @@ async function fixture(){
  const request=async(action:string,id=action):Promise<KanbanItemOperationRequest>=>{const view=await api.itemOperations('b','task');return {operationId:id,itemId:'task',action:'skip',expectedRevision:view.revision,confirmed:true,skip:{action,reason:'User-approved environment exception',affected:view.operations.find(row=>row.id===action)!.skip!.affected.map(row=>row.id)}};};
  return {api,options,service,worker,journal,command,request,start};
 }
-it('uses actual delivery dependencies rather than skipping every later step',()=>{
- const runtime=operationDependencies();expect(affectedOperations(runtime,'deploy')).toEqual(['deploy','accept','cleanup']);
+it('cascades the four delivery stages in canonical order even for older frozen plans',()=>{
+ const runtime=operationDependencies();expect(affectedOperations(runtime,'deploy')).toEqual(['deploy','accept','analyze','merge','cleanup']);
  expect(affectedOperations(runtime,'analyze')).toEqual(['analyze','merge','cleanup']);
  const release=operationDependencies({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});
- expect(affectedOperations(release,'build')).toEqual(['build','deploy','accept','cleanup']);expect(release.merge).toEqual(['analyze']);
+ expect(affectedOperations(release,'build')).toEqual(['build','deploy','accept','analyze','merge','cleanup']);expect(release.merge).toEqual(['analyze']);
  expect(release.accept).toEqual(['deploy']);
- const source=operationDependencies({steps:['analyze','merge','accept','cleanup'],acceptance:'source'});
- expect(affectedOperations(source,'analyze')).toEqual(['analyze','merge','accept','cleanup']);
+ const source=operationDependencies({steps:['analyze','merge','cleanup'],acceptance:'source'});
+ expect(affectedOperations(source,'analyze')).toEqual(['analyze','merge','cleanup']);
 });
 it('persists dependency skips and their actor without completing outstanding independent requirements',async()=>{
  const f=await fixture(),request=await f.request('deploy');
  const result=await f.api.runItemOperation('b',request);
  expect(result.operations.find(row=>row.id==='deploy')).toMatchObject({state:'skipped',enabled:false,waiver:{cause:'direct'}});
  expect(result.operations.find(row=>row.id==='accept')).toMatchObject({state:'skipped',waiver:{cause:'dependency'}});
- expect(result.operations.find(row=>row.id==='analyze')).not.toHaveProperty('waiver');
- expect(result.operations.find(row=>row.id==='merge')).toMatchObject({dependsOn:['analyze']});expect(result.operations.find(row=>row.id==='merge')).not.toHaveProperty('waiver');
+ expect(result.operations.find(row=>row.id==='analyze')).toMatchObject({state:'skipped',waiver:{cause:'dependency'}});
+ expect(result.operations.find(row=>row.id==='merge')).toMatchObject({dependsOn:['analyze']});expect(result.operations.find(row=>row.id==='merge')).toMatchObject({state:'skipped',waiver:{cause:'dependency'}});
  const item=(await f.service.item('b','task')).item;expect(item.status).toBe('review');
  expect(item.operationWaivers?.[0]).toMatchObject({id:'deploy',dispatchId:'d',actor:{kind:'human',id:'admin'},reason:request.skip!.reason});
  await f.api.runItemOperation('b',request);expect((await f.service.item('b','task')).item.operationWaivers).toHaveLength(1);expect(f.start).not.toHaveBeenCalled();
  await expect(f.api.runItemOperation('b',{...request,skip:{...request.skip!,reason:'Changed'}})).rejects.toMatchObject({code:'IDEMPOTENCY_CONFLICT'});
 });
 it('completes with waived acceptance only after every other requirement is settled and survives restart',async()=>{
- const f=await fixture();await f.api.runItemOperation('b',await f.request('build'));
+ const f=await fixture();await f.api.runItemOperation('b',await f.request('deploy'));
  expect((await f.service.item('b','task')).item.status).toBe('review');
- await f.api.runItemOperation('b',await f.request('analyze'));
+ await f.api.runItemOperation('b',await f.request('build'));
  const item=(await f.service.item('b','task')).item;expect(item.status).toBe('completed');
- expect(item.acceptanceResult).toMatchObject({outcome:'waived',dispatchId:'d',waiverId:'build'});
+ expect(item.acceptanceResult).toMatchObject({outcome:'waived',dispatchId:'d',waiverId:'deploy'});
  expect((await f.service.workflow('b')).dispatches.d.outcome).toBe('accepted');
  await f.api.quiesce();const restored=createItemOperations(f.options);closes.push(()=>restored.quiesce());
  const view=await restored.itemOperations('b','task');expect(view.waiverHistory).toHaveLength(2);expect(view.acceptance?.outcome).toBe('waived');
@@ -63,7 +63,7 @@ it.each(['reason','confirmation','impact','revision'])('rejects invalid skip %s 
  await expect(f.api.runItemOperation('b',request)).rejects.toBeDefined();expect(await f.service.item('b','task')).toEqual(before);
 });
 it('refuses agent-authored waivers and ordinary acceptance cannot erase an existing waiver',async()=>{
- const f=await fixture();await f.api.runItemOperation('b',await f.request('build'));
+ const f=await fixture();await f.api.runItemOperation('b',await f.request('deploy'));
  await expect(f.command({type:'accept-execution',dispatchId:'d',accept:true})).rejects.toMatchObject({code:'OPERATION_ACCEPTANCE_WAIVER_REQUIRED'});
  const row=(await f.service.item('b','task')).item;
  await expect(f.command({type:'waive-operations',itemId:'task',dispatchId:'d',expectedItemRevision:row.revision,waiver:{id:'agent-skip',action:'analyze',reason:'Agent suggestion',dependencies:{analyze:[]},operations:[{id:'analyze',cause:'direct',previousState:'ready'}]}},f.worker)).rejects.toMatchObject({code:'OPERATION_COORDINATOR_REQUIRED'});
@@ -79,7 +79,7 @@ it('retains the failed operation and rejects skipping an unsettled execution',as
  const second=await fixture();await second.journal.update('review-operation:active',()=>({...failed,id:'active',action:'build',phase:'submitting',state:'unknown'}));
  await second.journal.update('review-operations:'+JSON.stringify(['b','task']),()=>({revision:1,bindings:{},jobs:['active'],receipts:{}}));
  const before=await second.service.item('b','task');
- await expect(second.api.runItemOperation('b',{operationId:'blocked',itemId:'task',action:'skip',expectedRevision:(await second.api.itemOperations('b','task')).revision,confirmed:true,skip:{action:'deploy',reason:'Cannot abandon unknown execution',affected:['deploy','accept','cleanup']}})).rejects.toMatchObject({code:'OPERATION_IN_USE'});
+ await expect(second.api.runItemOperation('b',{operationId:'blocked',itemId:'task',action:'skip',expectedRevision:(await second.api.itemOperations('b','task')).revision,confirmed:true,skip:{action:'deploy',reason:'Cannot abandon unknown execution',affected:['deploy','accept','analyze','merge','cleanup']}})).rejects.toMatchObject({code:'OPERATION_IN_USE'});
  expect(await second.service.item('b','task')).toEqual(before);
 });
 it('rejects a forged incomplete dependency closure atomically in the domain command',async()=>{
@@ -99,4 +99,16 @@ it('recovers an acknowledged-lost domain commit by its original receipt without 
  expect((await f.service.item('b','task')).item.operationWaivers).toHaveLength(1);
  spy.mockRestore();await f.api.scan();await f.api.runItemOperation('b',request);
  expect((await f.service.item('b','task')).item.operationWaivers).toHaveLength(1);expect(f.start).not.toHaveBeenCalled();
+});
+
+it('retains historical waivers but does not hide or complete a still unconfirmed analysis',async()=>{
+ const f=await fixture(),before=(await f.service.item('b','task')).item;
+ await f.command({type:'waive-operations',itemId:'task',dispatchId:'d',expectedItemRevision:before.revision,waiver:{id:'legacy-build',action:'build',reason:'Historical waiver',acceptanceWaived:true,dependencies:{build:[],deploy:['build'],analyze:[],merge:['analyze','deploy'],accept:['merge'],cleanup:['accept']},operations:['build','deploy','merge','accept','cleanup'].map(id=>({id,cause:id==='build'?'direct':'dependency',previousState:'unavailable'}))}} as KanbanCommand);
+ const history=(await f.service.item('b','task')).item.operationWaivers;
+ await f.journal.update('review-operation:legacy-analysis',()=>({id:'legacy-analysis',boardId:'b',itemId:'task',action:'analyze',phase:'submitting',state:'unknown',snapshot:{},fingerprint:'original',createdAt:1,sessionId:'original'}));
+ await f.journal.update('review-operations:'+JSON.stringify(['b','task']),()=>({revision:1,bindings:{},jobs:['legacy-analysis'],receipts:{}}));
+ const view=await f.api.itemOperations('b','task');
+ expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({state:'unknown',sessionId:'original',enabled:false,progress:{stage:'reconciling'}});
+ expect(view.skippedActions).not.toContain('analyze');expect(view.waiverHistory).toEqual(history);
+ expect((await f.service.item('b','task')).item.status).toBe('review');expect(f.start).not.toHaveBeenCalled();
 });

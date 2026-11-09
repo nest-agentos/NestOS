@@ -23,6 +23,7 @@ async function run(){
  await measure('cold.open-operation-feedback',()=>view.start(),()=>!!editor.querySelector('[data-form="item-operation"][data-operation="build"]'));
  const form=editor.querySelector<HTMLFormElement>('[data-form="item-operation"][data-operation="build"]')!,button=form.querySelector<HTMLButtonElement>('button')!;
  await measure('warm.click-pending-build',()=>button.click(),()=>!!form.querySelector('[data-operation-submit-status]'));
+ if(editor.querySelectorAll('[data-operation-group]').length!==4)throw Error('FOUR_STAGES_MISSING');
  if(!button.disabled||starts)throw Error('SUBMISSION_FEEDBACK_INVALID');button.click();if(calls.filter(id=>id==='runItemOperation').length!==1)throw Error('DUPLICATE_SUBMISSION');
  await measure('warm.receive-build-admission',()=>release(),()=>!!editor.querySelector('[data-operation-progress="running"]'));
  if(starts!==1||!editor.textContent!.includes('执行已启动'))throw Error('MISSING_RUNNING_FEEDBACK');
