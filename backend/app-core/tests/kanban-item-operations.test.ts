@@ -341,3 +341,12 @@ it('allows runtime acceptance after replacement without requiring a merge in a f
  expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='accept')).toMatchObject({enabled:true,dependsOn:['deploy']});
  await f.run('accept','independent-accept',{confirmed:true});expect(f.service.execute).toHaveBeenCalledOnce();
 });
+
+it('identifies proven workspace admission rejection before a review session starts and retains unknown failures',async()=>{
+ const f=await fixture();await f.bind('build');
+ f.adapter.snapshot.mockRejectedValueOnce(Object.assign(new Error('busy'),{code:'EIO',remoteCode:'EBUSY',outcome:'not-committed'}));
+ await expect(f.run('build','read-conflict')).rejects.toMatchObject({code:'OPERATION_WORKSPACE_BUSY',outcome:'not-committed'});
+ expect(await f.journal.get(jobKey('read-conflict'))).toBeUndefined();expect(f.published.start).not.toHaveBeenCalled();
+ f.adapter.snapshot.mockRejectedValueOnce(Object.assign(new Error('uncertain'),{code:'EIO',remoteCode:'EBUSY',outcome:'unknown'}));
+ await expect(f.run('build','uncertain')).rejects.toMatchObject({code:'EIO',outcome:'unknown'});
+});

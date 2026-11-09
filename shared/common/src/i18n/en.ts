@@ -671,6 +671,8 @@ export const en: LocaleStrings = {
     "kanban.errors.OPERATION_ALREADY_SETTLED": "The operation already ended. Cancellation did not take effect; the original result is retained.",
     "kanban.errors.OPERATION_CANCEL_UNKNOWN": "Cancellation is unconfirmed. Reconciling the original receipt.",
     "kanban.operationSubmitting": "Submitting the request. Waiting for a receipt; do not submit again.",
+    "kanban.errors.OPERATION_WORKSPACE_BUSY": "The workspace is busy. This operation has not started; retry shortly.",
+    "kanban.operationNotStarted": "The operation has not started.",
     "kanban.operationSubmitFailed": "The request outcome could not be confirmed. Check the original operation and the specific cause before retrying.",
     "kanban.operationRequestedAt": "Request created",
     "kanban.operationProgress.preparing": "The operation is recorded and execution is being prepared.",

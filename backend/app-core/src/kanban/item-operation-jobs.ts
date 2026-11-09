@@ -38,7 +38,10 @@ async function preparationStage<T>(options: ReviewOperationsOptions, operationId
     try {
         const result = await work();
         options.log({operationId, stage: 'prepare.' + stage, result: 'success', durationMs: Date.now() - started}); return result;
-    } catch (error) {
+    } catch (cause) {
+        const detail=cause as {remoteCode?:string;code?:string;outcome?:string};
+        const error=stage==='snapshot'&&(detail.remoteCode??detail.code)==='EBUSY'&&detail.outcome==='not-committed'
+            ?Object.assign(new Error('OPERATION_WORKSPACE_BUSY'),{code:'OPERATION_WORKSPACE_BUSY',outcome:'not-committed',cause}):cause;
         options.log({operationId, stage: 'prepare.' + stage, result: 'failure', code: safeCode(error, 'OPERATION_PREPARATION_FAILED'), durationMs: Date.now() - started}); throw error;
     }
 }

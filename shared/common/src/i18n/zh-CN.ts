@@ -672,6 +672,8 @@ export const zhCN = {
     "kanban.errors.OPERATION_ALREADY_SETTLED": "操作已结束，取消未生效；保留原执行结果。",
     "kanban.errors.OPERATION_CANCEL_UNKNOWN": "取消结果暂未确认，系统正在核对原回执。",
     "kanban.operationSubmitting": "正在提交请求，请等待回执。请勿重复点击。",
+    "kanban.errors.OPERATION_WORKSPACE_BUSY": "工作区正被其他操作占用，本次操作尚未启动，请稍后重试。",
+    "kanban.operationNotStarted": "操作尚未启动。",
     "kanban.operationSubmitFailed": "请求未能确认完成，请按具体原因核对原操作后重试。",
     "kanban.operationRequestedAt": "请求创建时间",
     "kanban.operationProgress.preparing": "操作已登记，正在准备执行。",
