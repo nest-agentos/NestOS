@@ -1,3 +1,4 @@
+import {cancellationKey,pendingCancellation,cancellationSupported,requestCancellation,scanCancellations,type ReviewCancellation} from './item-operation-cancellation';
 import {projectOperationSkips,skipItemOperations,applySkipIntent} from './item-operation-skips';
 import {automaticDelivery,automaticDeliveryStatus} from './automatic-delivery';
 import {safeCode,journalCommand} from '@nestos/kanban/integration';
@@ -10,11 +11,11 @@ import {reviewKey, jobKey, type ReviewJob, type ReviewSettings, type ReviewOpera
 
 const actions: ReviewAction[] = ['build', 'deploy', 'accept', 'analyze', 'merge'];
 const initial = (): ReviewSettings => ({revision: 0, bindings: {}, jobs: [], receipts: {}});
-interface Context {deliveryPlan?:import('./item-operation-types').DeliveryPlan;board: KanbanBoard; item: KanbanItem; archived: boolean; settings: ReviewSettings; jobs: ReviewJob[]}
+interface Context {deliveryPlan?:import('./item-operation-types').DeliveryPlan;board: KanbanBoard; item: KanbanItem; archived: boolean; settings: ReviewSettings; jobs: ReviewJob[]; cancellations:ReviewCancellation[]}
 export function createItemOperations(options: ReviewOperationsOptions) {
     let stopped = false; const tails = new Map<string, Promise<unknown>>();
-    const queue = <T>(board: string, item: string, work: () => Promise<T>): Promise<T> => {
-        requireValue(!stopped, 'SERVICE_STOPPING'); const key = reviewKey(board, item);
+    const queue = <T>(board: string, item: string, work: () => Promise<T>, lane='run'): Promise<T> => {
+        requireValue(!stopped, 'SERVICE_STOPPING'); const key = JSON.stringify([board,item,lane]);
         const pending = (tails.get(key) ?? Promise.resolve()).catch(() => {}).then(() => {requireValue(!stopped, 'SERVICE_STOPPING'); return work();}); tails.set(key, pending);
         void pending.finally(() => {if (tails.get(key) === pending) tails.delete(key);}).catch(() => {}); return pending;
     };
@@ -24,8 +25,9 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         return load(options, board, item, false).then(context => view(options, context));
     },
         bindItemOperation: (board: string, request: KanbanItemOperationBinding) => {validateRequest(request); return queue(board, request.itemId, () => bind(options, board, request));},
-        runItemOperation: (board: string, request: KanbanItemOperationRequest) => {validateRequest(request); return queue(board, request.itemId, () => run(options, board, request));},
+        runItemOperation: (board: string, request: KanbanItemOperationRequest) => {validateRequest(request); return queue(board, request.itemId, () => run(options, board, request),request.action==='cancel'?'cancel':'run');},
         async scan() {
+            await scanCancellations(options,()=>!stopped);
             for(const intent of await options.journal.get<Array<{key:string;board:string}>>('review-skip-intents')??[]){if(stopped)return;try{await applySkipIntent(options,intent.key,intent.board);}catch{/* The frozen intent retains its failure; other scopes must continue. */}}
             for (const scope of await options.journal.get<Array<{board: string; item: string}>>('review-operation-scopes') ?? []) {
                 if (stopped) return;
@@ -42,7 +44,7 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         async sessions(board: string, item: string): Promise<KanbanSessionAssociation[]> {
             const context = await load(options, board, item, false);
             return context.jobs.filter(job => job.sessionId).map(job => ({sessionId: job.sessionId!, purpose: job.action === 'analyze' ? 'execution' : 'finalization',
-                execution: {id: job.id, purpose: job.action === 'analyze' ? 'execution' : 'finalization', state: job.state === 'succeeded' ? 'completed' : job.state, code: job.code, createdAt: job.createdAt}}));
+                execution: {id: job.id, purpose: job.action === 'analyze' ? 'execution' : 'finalization', state:job.code==='OPERATION_CANCELLED'?'cancelled':job.state === 'succeeded' ? 'completed' : job.state, code: job.code, createdAt: job.createdAt}}));
         },
         async quiesce() {stopped = true; await Promise.allSettled([...tails.values()]); await options.adapter.close?.(); await options.journal.drain();}};
 }
@@ -52,15 +54,17 @@ async function load(options: ReviewOperationsOptions, board: string, item: strin
     for (const id of settings.jobs) {let job = await options.journal.get<ReviewJob>(jobKey(id)); if (!job) continue;
         requireValue(job.boardId === board && job.itemId === item, 'OPERATION_SCOPE_MISMATCH');
         if (observe && job.phase === 'submitting') job = await advanceReviewJob(options, job); jobs.push(job);}
-    return {deliveryPlan:await options.deliveryPlan?.(definition,entry.item),board: definition, item: entry.item, archived: !!entry.archive, settings, jobs};
+    const cancellations=(await options.journal.getMany<ReviewCancellation>(jobs.map(job=>cancellationKey(job.id)))).filter((row):row is ReviewCancellation=>!!row);
+    requireValue(cancellations.every(row=>row.boardId===board&&row.itemId===item&&jobs.some(job=>job.id===row.runId)),'OPERATION_SCOPE_MISMATCH');
+    return {cancellations,deliveryPlan:await options.deliveryPlan?.(definition,entry.item),board: definition, item: entry.item, archived: !!entry.archive, settings, jobs};
 }
 const latest = (context: Context, action: ReviewAction) => context.jobs.filter(job => job.action === action).at(-1);
-function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision,context.deliveryPlan, context.jobs.map(job => [job.id, job.phase, job.state, job.code,job.result,job.followUp?.state,job.followUp?.code])]));}
+function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision,context.deliveryPlan,context.cancellations, context.jobs.map(job => [job.id, job.phase, job.state, job.code,job.result,job.followUp?.state,job.followUp?.code])]));}
 async function view(options: ReviewOperationsOptions, context: Context): Promise<KanbanItemOperations> {
     if (context.archived || options.adapter.supports?.(context.board, context.item) === false) return {revision: revision(context), operations: []};
-    const active = context.jobs.some(job => job.phase !== 'settled'), supported = ['review', 'completed'].includes(context.item.status);
+    const active = context.jobs.some(job => job.phase !== 'settled')||context.cancellations.some(pendingCancellation), supported = ['review', 'completed'].includes(context.item.status);
     const raw = await Promise.all(actions.map(async action => {
-        const entry = operation(context, action, active, supported, !!options.adapter.prepareOperation);
+        const entry = cancellationView(options,context,operation(context, action, active, supported, !!options.adapter.prepareOperation));
         if (context.board.lifecycle && action !== 'accept') {entry.enabled=false;entry.reason=t('kanban.errors.BOARD_STOPPING');}
         if (entry.sessionId) entry.sessionId = await options.sessionResource?.(entry.sessionId) ?? entry.sessionId;
         return entry;
@@ -68,8 +72,9 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     const activeWaivers=await currentWaivers(options,context);
     const selected=raw.filter(op=>!context.deliveryPlan||context.deliveryPlan.steps.includes(op.id));
     const actor=await options.service.currentPrincipal(),canSkip=actor.kind==='human'&&context.board.members?.some(row=>row.kind===actor.kind&&row.id===actor.id&&row.roles?.includes('coordinator'));
-    const operations=projectOperationSkips(selected,context.deliveryPlan,activeWaivers,!!canSkip&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel');
-    const audit={waivers:activeWaivers,waiverHistory:context.item.operationWaivers,acceptance:context.item.acceptanceResult,skippedActions:[...new Set(activeWaivers.flatMap(row=>row.operations.map(op=>op.id)))]};
+    const operations=projectOperationSkips(selected,context.deliveryPlan,activeWaivers,!!canSkip&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel').map(entry=>canSkip||!entry.cancel?entry:{...entry,cancel:{...entry.cancel,enabled:false,reason:t('kanban.errors.OPERATION_COORDINATOR_REQUIRED')}});
+    const halted=operationHalt(context,activeWaivers);
+    const audit={...(halted?{halted:{runId:halted.runId,state:halted.state==='cancelled'?'cancelled' as const:'cancelling' as const}}:{}),waivers:activeWaivers,waiverHistory:context.item.operationWaivers,acceptance:context.item.acceptanceResult,skippedActions:[...new Set(activeWaivers.flatMap(row=>row.operations.map(op=>op.id)))]};
     const automatic=await automaticDeliveryStatus(options.journal,context.board.id,context.item.id);
     if(options.adapter.prepareOperation)return {revision:revision(context),operations,automatic,...audit};
     const catalog = await options.catalog(), flows = catalog.entries.filter(entry => entry.target.kind === 'flow' && entry.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'));
@@ -127,9 +132,14 @@ async function bind(options: ReviewOperationsOptions, board: string, request: Ka
 async function run(options: ReviewOperationsOptions, board: string, request: KanbanItemOperationRequest, automatic=false): Promise<KanbanItemOperations> {
     const context = await load(options, board, request.itemId, false); await authorize(options, context);
     if(automatic)requireValue(!context.board.executionControl?.paused,'AUTOMATIC_DELIVERY_PAUSED');
-    requireValue(!context.board.lifecycle || request.action === 'accept','BOARD_STOPPING');
-    requireValue(context.item.deletedAt === undefined && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
-    requireValue(/^[\w-]{1,128}$/.test(request.operationId) && (actions.includes(request.action as ReviewAction)||request.action==='skip'), 'OPERATION_REQUEST_INVALID');
+    requireValue(!context.board.lifecycle || request.action === 'accept'||request.action==='cancel','BOARD_STOPPING');
+    requireValue(request.action==='cancel'||context.item.deletedAt === undefined && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
+    requireValue(/^[\w-]{1,128}$/.test(request.operationId) && (actions.includes(request.action as ReviewAction)||request.action==='skip'||request.action==='cancel'), 'OPERATION_REQUEST_INVALID');
+    if(request.cancel){
+        const job=context.jobs.find(row=>row.id===request.cancel!.runId);requireValue(job,'OPERATION_SCOPE_MISMATCH');
+        const saved=await options.journal.get<ReviewCancellation>(cancellationKey(job.id));requireValue(saved?.id===request.operationId||request.expectedRevision===revision(context),'OPERATION_STALE_REFRESH');
+        requireValue(saved?.id===request.operationId||job.phase!=='settled','OPERATION_ALREADY_SETTLED');await requestCancellation(options,board,request,job);return view(options,await load(options,board,request.itemId,false));
+    }
     if(request.skip){
         const key='review-skip:'+request.operationId,prior=await options.journal.get(key);
         requireValue(prior||request.expectedRevision===revision(context),'OPERATION_STALE_REFRESH');
@@ -137,6 +147,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
         await settleWaivedAcceptance(options,board,request.itemId);
         return view(options,await load(options,board,request.itemId,false));
     }
+    requireValue(!context.cancellations.some(pendingCancellation),'OPERATION_CANCELLING');
     const prior = await options.journal.get<ReviewJob>(jobKey(request.operationId));
     requireValue(!prior || prior.boardId === board && prior.itemId === request.itemId && prior.fingerprint === sha256HexSync(JSON.stringify(request)), 'IDEMPOTENCY_CONFLICT');
     if (prior && context.settings.jobs.includes(prior.id)) {requireValue(prior.fingerprint === sha256HexSync(JSON.stringify(request)), 'IDEMPOTENCY_CONFLICT'); return view(options, context);}
@@ -193,7 +204,9 @@ async function acceptanceJob(options: ReviewOperationsOptions, context: Context,
 function validateRequest(request: KanbanItemOperationRequest | KanbanItemOperationBinding): void {
     requireValue(request && typeof request === 'object' && typeof request.itemId === 'string' && request.itemId.length > 0 && request.itemId.length <= 256
         && typeof request.operationId === 'string' && /^[\w-]{1,128}$/.test(request.operationId) && !['__proto__', 'constructor', 'prototype'].includes(request.operationId)
-        && (actions.includes(request.action as ReviewAction)||request.action==='skip') && typeof request.expectedRevision === 'string' && /^[a-f0-9]{64}$/.test(request.expectedRevision), 'OPERATION_REQUEST_INVALID');
+        && (actions.includes(request.action as ReviewAction)||request.action==='skip'||request.action==='cancel') && typeof request.expectedRevision === 'string' && /^[a-f0-9]{64}$/.test(request.expectedRevision), 'OPERATION_REQUEST_INVALID');
+    if(request.action==='cancel')requireValue('cancel'in request&&!!request.cancel&&typeof request.cancel.runId==='string'&&!('target'in request)&&request.followUp===undefined,'OPERATION_REQUEST_INVALID');
+    else if('cancel'in request)requireValue(request.cancel===undefined,'OPERATION_REQUEST_INVALID');
     if(request.action==='skip'){requireValue('skip'in request&&!!request.skip&&typeof request.skip==='object'&&!Array.isArray(request.skip)&&actions.includes(request.skip.action as ReviewAction)&&request.followUp===undefined,'OPERATION_REQUEST_INVALID');}
     else if('skip'in request)requireValue(request.skip===undefined,'OPERATION_REQUEST_INVALID');
     if('followUp' in request&&request.followUp!==undefined)requireValue(request.action==='build'&&request.followUp==='deploy','OPERATION_REQUEST_INVALID');
@@ -207,6 +220,7 @@ function validateRequest(request: KanbanItemOperationRequest | KanbanItemOperati
 /** The user's build-time approval is frozen; restart resumes this exact replacement request. */
 async function followUp(options:ReviewOperationsOptions,board:string,item:string):Promise<void> {
     const started=Date.now(),context=await load(options,board,item,false),build=latest(context,'build');
+    if(context.cancellations.some(row=>row.runId===build?.id&&!['failed','not-required'].includes(row.state)))return;
     if((await currentWaivers(options,context)).some(row=>row.operations.some(op=>op.id==='deploy')))return;
     if(context.board.executionControl?.paused||context.board.lifecycle||context.item.deletedAt||context.item.control?.action==='cancel')return;
     if(build?.state!=='succeeded'||build.phase!=='settled'||build.followUp?.state!=='queued')return;
@@ -252,4 +266,22 @@ function operationProgress(job:ReviewJob|undefined,queued:boolean):KanbanItemOpe
     const stage=queued?'queued':!job||job.phase==='settled'?undefined:job.code==='WORKSPACE_CONTEXT_PENDING'?'waiting-context':job.state==='unknown'?'reconciling':job.phase==='prepared'?'preparing':'running';
     if(!stage)return;
     return {stage,label:t(('kanban.operationProgress.'+stage) as Parameters<typeof t>[0]),...(!queued&&job?.createdAt?{requestedAt:job.createdAt}:{})};
+}
+
+function cancellationView(options:ReviewOperationsOptions,context:Context,entry:KanbanItemOperation):KanbanItemOperation {
+    const job=latest(context,entry.id as ReviewAction);if(!job)return entry;
+    const enabled=entry.enabled,cancel=context.cancellations.find(row=>row.runId===job.id),pending=pendingCancellation(cancel),cancelled=cancel?.state==='cancelled';
+    if(pending||cancelled){entry={...entry,state:cancelled?'cancelled':'cancelling',enabled:false,followUp:undefined,reason:undefined,code:cancel?.code??(cancelled&&job.code!=='OPERATION_CANCELLED'?job.code:undefined),progress:pending?{stage:'cancelling',label:t('kanban.operationProgress.cancelling'),requestedAt:cancel!.requestedAt}:undefined};}
+    if(job.phase!=='settled'||cancel)entry.cancel={runId:job.id,enabled:!pending&&!cancelled&&job.phase!=='settled'&&cancellationSupported(options,job),...(cancel?{operationId:cancel.id,state:cancel.state,code:cancel.code,requestedAt:cancel.requestedAt}:{}),...(!cancellationSupported(options,job)?{reason:t(job.managed?'kanban.operationCancelUnsupported':'kanban.operationCancelUnavailable')}:{})};
+    if(cancelled)entry.enabled=enabled;
+    return entry;
+}
+
+function operationHalt(context:Context,waivers:NonNullable<KanbanItem['operationWaivers']>):import('@nestos/kanban/contracts').KanbanItemOperations['halted'] {
+    for(const cancel of [...context.cancellations].reverse()){
+        const job=context.jobs.find(row=>row.id===cancel.runId);
+        if(!job||['failed','not-required'].includes(cancel.state))continue;
+        if(latest(context,job.action)?.id!==job.id||waivers.some(row=>row.operations.some(op=>op.id===job.action)))continue;
+        return {runId:job.id,state:cancel.state==='cancelled'?'cancelled':'cancelling'};
+    }
 }

@@ -258,3 +258,71 @@ it('projects persisted execution phases without pretending that a request is a c
  expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='analyze')?.progress?.stage).toBe('waiting-context');
  expect(f.submission.start).toHaveBeenCalledOnce();
 });
+it('cancels the exact review operation without completing the task and preserves its original request',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build','cancel-build');
+ const control=vi.fn(async()=> 'accepted' as 'accepted'|'cancelled');f.options.cancelOperation=control;
+ let view=await f.api.itemOperations('board','task');
+ const request={operationId:'stop-build',itemId:'task',action:'cancel',expectedRevision:view.revision,confirmed:true,cancel:{runId:'cancel-build'}};
+ view=await f.api.runItemOperation('board',request);
+ expect(view.operations.find(row=>row.id==='build')).toMatchObject({state:'cancelling',cancel:{enabled:false,state:'accepted'}});
+ expect(view.halted).toMatchObject({runId:'cancel-build',state:'cancelling'});expect(f.item.status).toBe('review');
+ const starts=f.published.start.mock.calls.length;control.mockResolvedValue('cancelled');await f.api.scan();
+ view=await f.api.itemOperations('board','task');expect(view.operations.find(row=>row.id==='build')).toMatchObject({state:'cancelled',enabled:true});
+ expect(view.halted?.state).toBe('cancelled');expect(f.item.status).toBe('review');expect(f.service.execute).not.toHaveBeenCalled();expect(f.published.start).toHaveBeenCalledTimes(starts);
+ await f.api.runItemOperation('board',request);expect(control).toHaveBeenCalledTimes(2);
+});
+it('persists an unknown cancellation and resumes checking the same identity after restart',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build','unknown-build');
+ const cancel=vi.fn().mockRejectedValueOnce(Object.assign(new Error('NETWORK'),{code:'TRANSPORT_DISCONNECTED'})).mockResolvedValue('cancelled');f.options.cancelOperation=cancel;
+ const request={operationId:'stop-unknown',itemId:'task',action:'cancel',expectedRevision:(await f.api.itemOperations('board','task')).revision,confirmed:true,cancel:{runId:'unknown-build'}};
+ expect((await f.api.runItemOperation('board',request)).operations.find(row=>row.id==='build')?.state).toBe('cancelling');
+ await f.api.quiesce();const restored=createItemOperations(f.options);closes.push(()=>restored.quiesce());await restored.scan();
+ expect((await restored.itemOperations('board','task')).operations.find(row=>row.id==='build')?.state).toBe('cancelled');
+ expect(cancel.mock.calls.map(row=>row[1])).toEqual(['stop-unknown','stop-unknown']);expect(f.published.start).toHaveBeenCalledOnce();
+});
+it('allows cancellation while the original start reply is suspended and rejects a late completion overwrite',async()=>{
+ const f=await fixture();await f.bind('build');let release!:(value:unknown)=>void;
+ f.published.start.mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;}));f.options.cancelOperation=vi.fn(async()=> 'cancelled');
+ const starting=f.run('build','held-build');await vi.waitFor(()=>expect(f.published.start).toHaveBeenCalledOnce());
+ const view=await f.api.itemOperations('board','task');
+ const cancelled=await f.api.runItemOperation('board',{operationId:'stop-held',itemId:'task',action:'cancel',expectedRevision:view.revision,confirmed:true,cancel:{runId:'held-build'}});
+ expect(cancelled.operations.find(row=>row.id==='build')?.state).toBe('cancelled');
+ release({state:'succeeded',output:f.result('held-build')});await starting;
+ expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='build')?.state).toBe('cancelled');expect(f.item.status).toBe('review');
+});
+it('does not cancel a newer run, skip confirmation, or claim managed switches are interruptible',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build','target-build');f.options.cancelOperation=vi.fn(async()=> 'cancelled');
+ const request={operationId:'stop',itemId:'task',action:'cancel',expectedRevision:(await f.api.itemOperations('board','task')).revision,confirmed:true,cancel:{runId:'other-build'}};
+ await expect(f.api.runItemOperation('board',request)).rejects.toMatchObject({code:'OPERATION_SCOPE_MISMATCH'});
+ await expect(f.api.runItemOperation('board',{...request,cancel:{runId:'target-build'},confirmed:false})).rejects.toMatchObject({code:'OPERATION_CONFIRMATION_REQUIRED'});
+ expect(f.options.cancelOperation).not.toHaveBeenCalled();
+});
+it('cancels a proven unstarted retry locally without invoking or replaying the executor',async()=>{
+ const f=await fixture();await f.bind('build');f.published.start.mockRejectedValueOnce(Object.assign(new Error('Not started'),{code:'OPERATION_SESSION_OWNED',executionOutcome:'not-started',retryable:true}));
+ await f.run('build','unstarted');const cancel=vi.fn(async()=> 'cancelled' as const);f.options.cancelOperation=cancel;
+ const result=await f.api.runItemOperation('board',{operationId:'stop-unstarted',action:'cancel',itemId:'task',expectedRevision:(await f.api.itemOperations('board','task')).revision,confirmed:true,cancel:{runId:'unstarted'}});
+ expect(result.operations.find(row=>row.id==='build')?.state).toBe('cancelled');expect(cancel).not.toHaveBeenCalled();await f.api.scan();expect(f.published.start).toHaveBeenCalledOnce();
+});
+it('allows a new human cancellation attempt only after authoritative rejection and retains its history',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build','rejected-stop-build');
+ const cancel=vi.fn().mockRejectedValueOnce(Object.assign(new Error('Denied'),{code:'EACCES',cancelRejected:true})).mockResolvedValue('cancelled');f.options.cancelOperation=cancel;
+ const request={operationId:'stop-one',action:'cancel',itemId:'task',expectedRevision:(await f.api.itemOperations('board','task')).revision,confirmed:true,cancel:{runId:'rejected-stop-build'}};
+ const rejected=await f.api.runItemOperation('board',request);expect(rejected.operations.find(row=>row.id==='build')?.cancel?.state).toBe('failed');
+ const result=await f.api.runItemOperation('board',{...request,operationId:'stop-two',expectedRevision:rejected.revision});
+ expect(result.operations.find(row=>row.id==='build')?.state).toBe('cancelled');
+ const receipt=await f.journal.get<{history:Array<{id:string;code:string}>}>('review-operation-cancel:rejected-stop-build');expect(receipt?.history).toContainEqual(expect.objectContaining({id:'stop-one',code:'EACCES'}));
+});
+it('explicitly refuses interruption of managed service replacement',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build');f.complete('build');await f.api.scan();
+ const submit=vi.fn(async()=>{});f.options.adapter.managed={prepare:async()=>({operationId:'managed',serviceId:'server',expectedVersion:'old',targetVersion:'candidate'}),submit,inspect:async()=>({state:'running'})};
+ await f.bind('deploy');const view=await f.run('deploy','managed',{confirmed:true});expect(view.operations.find(row=>row.id==='deploy')?.cancel).toMatchObject({enabled:false,reason:expect.any(String)});
+ await expect(f.api.runItemOperation('board',{operationId:'stop-managed',action:'cancel',itemId:'task',expectedRevision:view.revision,confirmed:true,cancel:{runId:'managed'}})).rejects.toMatchObject({code:'OPERATION_CANCEL_UNSUPPORTED'});expect(submit).toHaveBeenCalledOnce();
+});
+it('never regresses a confirmed cancellation when a concurrent receipt check returns late',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build','concurrent-build');let release!:(value:'accepted')=>void;
+ const cancel=vi.fn().mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;})).mockResolvedValue('cancelled');f.options.cancelOperation=cancel;
+ const pending=f.api.runItemOperation('board',{operationId:'stop-concurrent',action:'cancel',itemId:'task',expectedRevision:(await f.api.itemOperations('board','task')).revision,confirmed:true,cancel:{runId:'concurrent-build'}});
+ await vi.waitFor(()=>expect(cancel).toHaveBeenCalledOnce());await f.api.scan();
+ expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='build')?.state).toBe('cancelled');
+ release('accepted');await pending;expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='build')?.state).toBe('cancelled');
+});

@@ -58,9 +58,9 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
         for(const row of rows){if(row.state==='cleaned')continue;if(!row.canCleanup){const code=row.reasons.find(reason=>['WORKTREE_DIRTY','WORKTREE_UNTRACKED_IGNORED','WORKTREE_NOT_INTEGRATED','WORKTREE_MISSING'].includes(reason));if(code)throw Object.assign(new KanbanError(code),{cleanupPrecondition:true});return false;}await resources.cleanupWorkResource?.(board,{itemId:item,resourceId:row.id,version:row.version,operationId:id+'-cleanup-'+sha256HexSync(row.id).slice(0,12)});}
         return true;
     },reportAutomatic:async state=>{
-        await workLog.append(service,state.boardId,state.itemId,{stage:state.done?'automatic.completed':state.waitingForUser?'automatic.waiting-review':'automatic.blocked',result:state.code?'failure':'success',dispatchId:state.id,code:state.code});
+        await workLog.append(service,state.boardId,state.itemId,{stage:state.done?'automatic.completed':state.waitingForUser?'automatic.waiting-review':'automatic.blocked',result:state.code&&state.code!=='OPERATION_CANCELLED'?'failure':'success',dispatchId:state.id,code:state.code});
         if(state.waitingForUser)await events.journal.append('automatic-review:'+state.id,{type:'kanban.automatic.waiting-review',operationId:state.id,resourceId:'kanban:'+JSON.stringify(['personal:user-store',state.boardId,state.itemId]),notification:'info'});
-        if(state.code)await events.journal.append('automatic:'+state.id+':'+state.code,{type:'kanban.automatic.blocked',operationId:state.id,resourceId:'kanban:'+JSON.stringify(['personal:user-store',state.boardId,state.itemId]),notification:'error'});
+        if(state.code&&state.code!=='OPERATION_CANCELLED')await events.journal.append('automatic:'+state.id+':'+state.code,{type:'kanban.automatic.blocked',operationId:state.id,resourceId:'kanban:'+JSON.stringify(['personal:user-store',state.boardId,state.itemId]),notification:'error'});
     }});setOperations(operations);
     const recovery=options?.taskRecovery?.({service,client,journal,log});
     const conversations=options?.decisionConversations?.({service,client,journal,log});

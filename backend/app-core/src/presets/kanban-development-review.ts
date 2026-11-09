@@ -1,3 +1,6 @@
+import {reviewCancellation} from './kanban-review-cancellation';
+import {planningConversationControl} from './kanban-planning-control';
+import {cancellationKey,blocksOperation,type ReviewCancellation} from '../kanban/item-operation-cancellation';
 import {compatibleRuntimeDelivery} from './kanban-runtime-acceptance';
 import {retainedExecutionContexts} from '../projects/harness-context-selection';
 import {verifyFileDigest} from '../run/file-digest';
@@ -34,6 +37,8 @@ import {readChannelResult, channelResultInstruction} from '../run/channel-result
 import {workResourceExecution} from './kanban-work-resource-execution';
 
 interface Options {
+    connections?:Parameters<typeof planningConversationControl>[0]['connections'];
+    cancelSubmission?:ReturnType<typeof import('../run/submission-control').submissionControl>;
     serviceControl?:import('../runtime/service-control').RuntimeServiceControl;
     submission?: ReturnType<typeof sessionSubmission>; wake?(): void;
     fs: IFileSystem; journal: KanbanAutomationJournal; service: KanbanService; calls: Pick<IndependentCallService, 'list'>;
@@ -54,7 +59,8 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
         return record;
     };
     const managed=managedServiceDeployment(options.serviceControl,async item=>{const project=item.externalRefs?.find(ref=>ref.system==='nestos-remote-project');requireValue(project,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(project.id)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
-    return {managed,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
+    const cancel=options.cancelSubmission&&options.connections?reviewCancellation({journal:options.journal,submission:options.cancelSubmission,native:planningConversationControl({remote:options.remote,connections:options.connections},options.journal)}):undefined;
+    return {managed,cancel,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
         acceptanceVersion:async(board,item,expectedVersion)=>{
             const current=await resource(options,item,board.id),target=await managed?.describe?.(item),proof=await options.serviceControl?.provenance?.(expectedVersion);
             if(!target||!proof||proof.serviceId!==target.id||proof.version!==target.version||proof.version!==options.runningVersion)return;
@@ -64,9 +70,9 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
         prepareAnalysis: input => prepareAnalysis(options, input), prepareOperation: async input => prepareAnalysis(options,{...input,...(input.action==='build'?{deployment:await managed?.describe?.(input.item)}:{})}),
         exchange: options.submission ? async (job, observation) => {
             const record = await watch(job);
-            return developmentChannelExchange({...options, submission: options.submission!}, {id: job.id, record, service: options.service,
+            return developmentChannelExchange({...options, submission: {...options.submission!,start:async request=>{requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))),'OPERATION_CANCELLING');return options.submission!.start(request);}}}, {id: job.id, record, service: options.service,
                 base: job.request!, observation, targetHead: job.snapshot.targetVersion,
-                beforeResume: async () => {requireValue((await snapshot(options, await options.service.read(job.boardId), (await options.service.item(job.boardId, job.itemId)).item)).version === job.snapshot.version, 'MERGE_PLAN_SOURCE_CHANGED');},
+                beforeResume: async () => {requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))),'OPERATION_CANCELLING');requireValue((await snapshot(options, await options.service.read(job.boardId), (await options.service.item(job.boardId, job.itemId)).item)).version === job.snapshot.version, 'MERGE_PLAN_SOURCE_CHANGED');},
                 report: (stage, id, code) => journalCommand(options.journal, options.service, job.boardId, 'review-context-log:' + job.id + ':' + stage + ':' + id,
                     {type: 'message', itemId: job.itemId, message: t(('kanban.fileExchange.' + stage) as Parameters<typeof t>[0]) + (code ? ': ' + code : ''), recipientSessionIds: []})});
         } : undefined,

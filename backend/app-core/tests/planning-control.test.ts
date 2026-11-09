@@ -10,7 +10,7 @@ function fixture(status='completed') {
     const options={remote,connections:{get:vi.fn(async()=>({connection:{profileId:'codex'}}))}};
     const control=planningConversationControl(options as any,journal as any);
     const input={scopeId:'scope',operationId:'cancel',action:'cancel' as const};
-    return {control,input,remote,client,execution};
+    return {control,input,remote,client,execution,data,options};
 }
 it('only closes an idle retained conversation with its observed revision',async()=>{
     const f=fixture();expect(await f.control(f.input)).toBe('cancelled');
@@ -33,4 +33,14 @@ it('does not repeat an interrupt whose response was lost',async()=>{
     const f=fixture('running');f.client.interrupt.mockRejectedValueOnce(Error('NETWORK'));
     await expect(f.control(f.input)).rejects.toThrow('NETWORK');
     expect(await f.control(f.input)).toBe('accepted');expect(f.client.interrupt).toHaveBeenCalledTimes(1);
+});
+
+it('uses the original worktree connection when a review scope reuses its native conversation',async()=>{
+ const f=fixture('running');f.data.set('development-workspace:scope',{projectId:'p',worktreeId:'original-worktree'});
+ expect(await f.control(f.input)).toBe('accepted');expect(f.options.connections.get).toHaveBeenCalledWith('work-original-worktree');
+});
+it('preserves an authoritative rejected interrupt receipt instead of reporting acceptance',async()=>{
+ const f=fixture('running');await f.control(f.input);
+ f.client.operation.mockResolvedValueOnce({outcome:'not-committed',code:'EACCES'} as never);
+ await expect(f.control(f.input)).rejects.toMatchObject({code:'EACCES',cancelRejected:true});expect(f.client.interrupt).toHaveBeenCalledOnce();
 });

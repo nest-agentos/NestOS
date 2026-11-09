@@ -19,6 +19,7 @@ export interface ReviewJob {
 }
 export interface ReviewSettings {revision: number; bindings: Partial<Record<ReviewAction, KanbanExternalReference>>; jobs: string[]; receipts: Record<string, string>}
 export interface ReviewAdapter {
+    cancel?(job:ReviewJob,operationId:string):Promise<'accepted'|'cancelled'|'unknown'>;
     managed?:{describe?(item:KanbanItem):Promise<import('../runtime/service-control').RuntimeServiceDescriptor|undefined>;prepare(input:{id:string;board:KanbanBoard;item:KanbanItem;snapshot:ReviewSnapshot;context:unknown}):Promise<import('../runtime/service-control').ServiceSwitchRequest|undefined>;
         submit(request:import('../runtime/service-control').ServiceSwitchRequest):Promise<void>;
         inspect(job:ReviewJob):Promise<import('../run/published-operation').OperationObservation>};
@@ -35,6 +36,7 @@ export interface ReviewAdapter {
 }
 export interface DeliveryPlan {manualAfter?:string;steps:string[];acceptance:'source'|'runtime';acceptanceLabel?:string;acceptanceConfirmation?:string}
 export interface ReviewOperationsOptions {
+    cancelOperation?(job:ReviewJob,operationId:string):Promise<'accepted'|'cancelled'|'unknown'>;
     deliveryPlan?(board:KanbanBoard,item:KanbanItem):Promise<DeliveryPlan>;
     automaticTarget?(board:KanbanBoard,item:KanbanItem):string|undefined;
     automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;

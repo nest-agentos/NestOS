@@ -55,6 +55,7 @@
     "test:performance": "node scripts/test-performance.mjs",
     "performance:session": "node tools/temporary-process/node/cli.mjs run --timeout-ms 180000 -- pnpm --filter @nestos/cli exec tsx scripts/profile-session-switch.ts --gate",
     "test:native-queue-browser": "node scripts/verify-kanban-decision-filter.mjs queue-recovery",
+    "test:kanban-cancel-browser": "node scripts/verify-kanban-decision-filter.mjs operation-cancel",
     "test:kanban-progress-browser": "node scripts/verify-kanban-decision-filter.mjs operation-progress",
     "test:kanban-skips-browser": "node scripts/verify-kanban-decision-filter.mjs operation-skips",
     "test:kanban-native-browser": "node scripts/verify-kanban-decision-filter.mjs native-activity"

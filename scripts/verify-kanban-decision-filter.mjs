@@ -5,13 +5,14 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {withTemporaryScope,processOutput} from '../tools/temporary-process/node/index.mjs';
+const cancel=process.argv[2]==='operation-cancel';
 const progress=process.argv[2]==='operation-progress';
 const skips=process.argv[2]==='operation-skips';
 const native=process.argv[2]==='native-activity',automatic=process.argv[2]==='queue-system-recovery',queue=process.argv[2]==='queue-recovery'||automatic;
 const root=fileURLToPath(new URL('..',import.meta.url)),directory=await mkdtemp(join(tmpdir(),'nestos-kanban-filter-'));
 const chrome=process.env.KANBAN_BROWSER??'/usr/bin/google-chrome';
 await withTemporaryScope({scopeId:'kanban-filter-browser-'+randomUUID()},async scope=>{
- const build=await(await scope.start(resolve(root,'node_modules/.bin/esbuild'),[resolve(root,'scripts/fixtures/'+(progress?'kanban-operation-progress':skips?'kanban-operation-skips':queue?'native-queue-recovery':native?'kanban-native-activity':'kanban-decision-filter')+'.ts'),'--bundle','--format=iife','--platform=browser','--loader:.css=empty','--outfile='+join(directory,'fixture.js')],{cwd:root,timeoutMs:60000})).result;
+ const build=await(await scope.start(resolve(root,'node_modules/.bin/esbuild'),[resolve(root,'scripts/fixtures/'+(cancel?'kanban-operation-cancel':progress?'kanban-operation-progress':skips?'kanban-operation-skips':queue?'native-queue-recovery':native?'kanban-native-activity':'kanban-decision-filter')+'.ts'),'--bundle','--format=iife','--platform=browser','--loader:.css=empty','--outfile='+join(directory,'fixture.js')],{cwd:root,timeoutMs:60000})).result;
  if(build.outcome!=='succeeded')throw Error((await processOutput(undefined,build.id)).output);
  await copyFile(resolve(root,queue?'libraries/llm-ui/src/style.css':'libraries/kanban-ui/src/kanban.css'),join(directory,'kanban.css'));
  await writeFile(join(directory,'index.html'),'<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="kanban.css"><style>html,body{height:100%;margin:0}#editor{height:100%;min-height:0}#result{display:none}</style><body><main id="editor"></main><pre id="result"></pre><script src="fixture.js"></script></body>');
@@ -25,4 +26,4 @@ await withTemporaryScope({scopeId:'kanban-filter-browser-'+randomUUID()},async s
  if(report.result!=='passed')throw Error('BROWSER_ASSERTION_FAILED: '+JSON.stringify(report));
  console.log(JSON.stringify({...report,artifacts:directory}));
 });
-console.log(JSON.stringify({operation:progress?'kanban.operation-progress.browser':skips?'kanban.operation-skips.browser':automatic?'native.queue-system-recovery.browser':queue?'native.queue-recovery.browser':native?'kanban.native-activity.browser':'kanban.decision-filter.browser',result:'success',cleanup:'confirmed'}));
+console.log(JSON.stringify({operation:cancel?'kanban.operation-cancel.browser':progress?'kanban.operation-progress.browser':skips?'kanban.operation-skips.browser':automatic?'native.queue-system-recovery.browser':queue?'native.queue-recovery.browser':native?'kanban.native-activity.browser':'kanban.decision-filter.browser',result:'success',cleanup:'confirmed'}));

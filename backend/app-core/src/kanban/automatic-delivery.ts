@@ -52,6 +52,7 @@ async function prepareState(options:Options,board:KanbanBoard,item:KanbanItem,wo
 async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workflow:KanbanWorkflowState) {
     let state=await prepareState(options,board,item,workflow);if(!state)return;
     if(state.done){await releaseDeliveryTarget(options,state);return;}
+    if(state.code==='OPERATION_CANCELLED'&&(await options.view(state.boardId,state.itemId)).halted){await releaseDeliveryTarget(options,state);return;}
     if(state.manualAfter&&state.step>actions(state).indexOf(state.manualAfter))await releaseDeliveryTarget(options,state);
     else if(!await claimDeliveryTarget(options,state)){if(!state.waitingForTarget)await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:true}));return;}
     if(state.waitingForTarget)state=await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:false}));
@@ -87,6 +88,7 @@ async function resumeConfirmedOperation(options:Options,state:State):Promise<Sta
 async function advance(options:Options,state:State) {
     const storageKey=key(state.boardId,state.itemId),action=actions(state)[state.step];if(!await admitted(options,state))return;
     const snapshot=await options.view(state.boardId,state.itemId);
+    if(snapshot.halted){if(snapshot.halted.state==='cancelled'){const next=await options.journal.update<State>(storageKey,old=>({...old!,code:'OPERATION_CANCELLED'}));await releaseDeliveryTarget(options,next);await options.report?.(next);}return;}
     if(snapshot.skippedActions?.includes(action)){
         const finished=state.step+1>=actions(state).length;
         const next=await options.journal.update<State>(storageKey,old=>({...old!,step:old!.step+1,code:undefined,waitingForUser:false,...(finished?{done:true}:{})}));
@@ -106,7 +108,7 @@ async function advance(options:Options,state:State) {
         return;
     }
     if(entry?.runId===id) {
-        if(entry.state==='failed')throw Object.assign(new Error('Automatic step failed'),{code:entry.code??'AUTOMATIC_STEP_FAILED'});
+        if(entry.state==='failed'||entry.state==='cancelled')throw Object.assign(new Error('Automatic step failed'),{code:entry.code??'AUTOMATIC_STEP_FAILED'});
         return;
     }
     if(!entry?.enabled)return;

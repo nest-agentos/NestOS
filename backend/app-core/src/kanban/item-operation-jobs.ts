@@ -1,3 +1,4 @@
+import {cancellationKey,pendingCancellation,blocksOperation,type ReviewCancellation} from './item-operation-cancellation';
 import {validateOperationResult} from './item-operation-results';
 import {indexResourceJob} from './resource-operation-index';
 import {coordinateOperation} from '@nestos/kanban/integration';
@@ -42,15 +43,17 @@ async function preparationStage<T>(options: ReviewOperationsOptions, operationId
     }
 }
 export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
+    if(pendingCancellation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))))return (await options.journal.get<ReviewJob>(jobKey(job.id)))??job;
     const resource=(job.snapshot.context as {worktreeId?:string})?.worktreeId;if(resource)await indexResourceJob(options.journal,resource,'review',job.id);
     if(job.action==='accept')return acceptReview(options,job);
     return coordinateOperation({service:options.service,journal:options.journal,key:jobKey(job.id),record:job,port:{
-        start:async record=>{const board=await options.service.read(record.boardId);
+        start:async record=>{requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(record.id))),'OPERATION_CANCELLING');const board=await options.service.read(record.boardId);
             if(board.executionControl?.paused)throw Object.assign(new Error('Delivery paused before admission'),{code:'AUTOMATIC_DELIVERY_PAUSED',executionOutcome:'not-started',retryable:true});
             requireValue(!board.lifecycle,'BOARD_STOPPING');
             const {item}=await options.service.item(record.boardId,record.itemId);requireValue(!item.deletedAt&&item.control?.action!=='cancel','TASK_CANCELLING');
             if(record.managed){await options.adapter.managed!.submit(record.managed);return;}if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
         inspect:async record=>{
+            if(blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(record.id))))return {state:'unknown' as const,code:'OPERATION_CANCELLING'};
             if(record.managed)return options.adapter.managed!.inspect(record);
             const observation=await observeReview(options,record);
             const recoverReplacement=record.action==='deploy'&&record.request&&observation.state==='unknown';

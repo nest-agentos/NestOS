@@ -125,3 +125,12 @@ it('advances explicitly waived steps without running or cleaning them and preser
  expect(f.run.mock.calls.map(call=>call[1].action)).toEqual(['analyze']);expect(f.options.cleanup).not.toHaveBeenCalled();
  expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);
 });
+it('holds automatic follow-up during cancellation and only resumes after an explicit new build',async()=>{
+ const f=await fixture(),view=f.options.view;let halted:{runId:string;state:string}|undefined={runId:'cancelled-build',state:'cancelling'};
+ f.options.view=async()=>({...await view(),halted});
+ await automaticDelivery(f.options).scan();expect(f.run).not.toHaveBeenCalled();
+ halted={...halted!,state:'cancelled'};await automaticDelivery(f.options).scan();await automaticDelivery(f.options).scan();
+ expect(f.run).not.toHaveBeenCalled();expect(f.options.cleanup).not.toHaveBeenCalled();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(false);
+ halted=undefined;f.jobs.set('build',{id:'build',runId:'explicit-new-build',state:'succeeded',enabled:true});await automaticDelivery(f.options).scan();
+ expect(f.run.mock.calls.map(row=>row[1].action)).toEqual(['deploy']);
+});
