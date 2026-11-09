@@ -30,7 +30,7 @@ it('uses one durable cancellation identity and keeps unconfirmed cleanup blocked
 });
 it('preserves the original control fence when the cancellation response is lost', async () => {
     const f = fixture(); f.kernel.cancel.mockRejectedValueOnce(new Error('Response lost'));
-    await expect(f.run(true)).rejects.toThrow('Response lost'); f.task.control.epoch = 7;
+    await expect(f.run(true)).rejects.toMatchObject({code: 'QUEUE_STOP_UNCONFIRMED'}); f.task.control.epoch = 7;
     await f.run(true); expect(f.kernel.cancel.mock.calls[1][3]).toMatchObject({expectedEpoch: 4});
 });
 it('rejects changed execution ownership before cancellation', async () => {
@@ -44,4 +44,10 @@ it('can stop remaining children of a terminal original without changing its succ
     await f.run(true);
     expect(f.kernel.cancelRemainingTaskTree).toHaveBeenCalledWith('s', 'task', expect.objectContaining({requestId: 'queue-stop-original', expectedEpoch: 4}));
     expect(f.kernel.cancel).not.toHaveBeenCalled(); expect(f.task).toMatchObject({exit: {status: 'succeeded'}});
+});
+it('surfaces the safe specific cause instead of a generic task-tree cancellation message', async () => {
+    const f = fixture(); f.kernel.cancel.mockRejectedValueOnce(new AggregateError([
+        new AggregateError([Object.assign(new Error('Private cleanup details'), {code: 'CLEANUP_BINDING_OWNER_MISMATCH'})], 'Effects failed'),
+    ], 'Failed to cancel task tree'));
+    await expect(f.run(true)).rejects.toMatchObject({code: 'CLEANUP_BINDING_OWNER_MISMATCH', message: 'Execution cleanup not confirmed: CLEANUP_BINDING_OWNER_MISMATCH'});
 });

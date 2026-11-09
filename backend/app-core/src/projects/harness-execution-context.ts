@@ -87,7 +87,10 @@ function assertSettlementKind(journal: ExecutionJournal, unstarted: boolean): vo
 
 function unclaimedBeforeDispatch(journal: ExecutionJournal, existing: ContextBinding | undefined, unstarted: boolean): boolean {
     const operations = journal.data.operations;
-    return !existing && unstarted && !operations.create && !operations.fork && !operations.turn;
+    const owner = operationId(journal);
+    return unstarted && !operations.create && !operations.fork && !operations.turn
+        && !journal.data.sessionId && !journal.data.turnId && !journal.data.bindingSettlement
+        && existing?.activeOperation?.operationId !== owner && existing?.lastOperation?.operationId !== owner;
 }
 
 function settlementPort(journal: ExecutionJournal): ContextBindingSettlementPort {

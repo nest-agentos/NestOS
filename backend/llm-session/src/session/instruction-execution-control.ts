@@ -11,7 +11,9 @@ export async function inspectQueuedExecution(kernel: Kernel, repository: ISessio
         if (stop) throw Object.assign(new Error('QUEUE_HISTORY_INCOMPLETE'), {code: 'QUEUE_HISTORY_INCOMPLETE'});
         return {lastProgressAt: item.createdAt};
     }
-    const receipt = await stopReceipt(kernel, sessionId, task, item.id, stop);
+    let receipt: Awaited<ReturnType<typeof stopReceipt>>;
+    try {receipt = await stopReceipt(kernel, sessionId, task, item.id, stop);}
+    catch (error) {throw cleanupFailure(error);}
     if (stop) task = await kernel.task(sessionId, task.id);
     const activity = await kernel.sessionActivity(sessionId);
     const effect = Object.values(task.effects).find(effect => effect.status === 'indeterminate');
@@ -60,4 +62,20 @@ async function stopReceipt(kernel: Kernel, sessionId: string, task: Awaited<Retu
     }
     await kernel.cancel(sessionId, task.id, 'User stopped the original queued execution', {requestId, expectedEpoch});
     return kernel.readTaskCancellationReceipt(sessionId, task.id, requestId);
+}
+
+/** Preserve a safe specific cleanup cause across aggregate cancellation errors. */
+function cleanupFailure(error: unknown): Error {
+    const pending = [error], seen = new Set<unknown>();
+    while (pending.length && seen.size < 32) {
+        const current = pending.shift();
+        if (!current || typeof current !== 'object' || seen.has(current)) continue;
+        seen.add(current);
+        const value = current as {code?: unknown; errors?: unknown; cause?: unknown};
+        if (typeof value.code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(value.code))
+            return Object.assign(new Error(`Execution cleanup not confirmed: ${value.code}`), {code: value.code});
+        if (Array.isArray(value.errors)) pending.push(...value.errors.slice(0, 32));
+        if (value.cause) pending.push(value.cause);
+    }
+    return Object.assign(new Error('Execution cleanup not confirmed: QUEUE_STOP_UNCONFIRMED'), {code: 'QUEUE_STOP_UNCONFIRMED'});
 }

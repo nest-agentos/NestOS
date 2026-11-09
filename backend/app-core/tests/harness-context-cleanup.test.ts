@@ -206,3 +206,18 @@ it.each(['nodeConnectionId','profileId'])('rejects a foreign native %s even when
  await expect(f.cleanup(f.journal,false,f.context)).rejects.toMatchObject({code:'CLEANUP_NATIVE_IDENTITY_MISMATCH'});
  expect((await f.store.get(f.id))?.activeOperation).toBeDefined();
 });
+
+it.each(['occupied', 'released'] as const)('confirms cancellation before binding claim without changing the %s original context', async mode => {
+    const f = await fixture();
+    if (mode === 'released') await f.cleanup(f.journal, false, f.context);
+    const binding = (await f.store.get(f.id))!, before = structuredClone(binding);
+    const call = {...f.call, context: {...context, invocationId: 'unclaimed', conversation: {mode: 'resume' as const,
+        bindingId: f.id, expectedBindingRevision: binding.revision, expectedGeneration: binding.generation}}};
+    const owner = {...f.context, taskId: 'unclaimed-task'}, journal = new ExecutionJournal(f.state, owner, call);
+    await journal.initialize('service-epoch');
+    const acquire = vi.fn(async () => {throw new Error('Must not open native execution');});
+    const provider = createHarnessExecutionProvider({...f.connections, acquire}, {stateForCleanup: async () => f.state,
+        settleContextForCleanup: f.cleanup});
+    expect(await provider.cancel(call, {...owner, sessionState: undefined})).toMatchObject({status: 'stopped', cleanup: 'confirmed', evidence: {kind: 'not-started'}});
+    expect(await f.store.get(f.id)).toEqual(before); expect(acquire).not.toHaveBeenCalled();
+});
