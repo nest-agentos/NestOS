@@ -737,9 +737,11 @@ Journal 首次打开时以一个跨 seq 事务迁移已有记录，最后写版�
 
 NestOS/cells-driver 使用 `/v1/capabilities` 和 `/v1/api/{harness|projects}/{operation}`。设置 → Cells 保存多个独立节点与凭据，和普通 MCP 配置没有投影、迁移或别名关系；被项目引用的节点拒绝删除和更改端点／授权身份。文件、同步、事件使用各自固定 HTTP 接口。
 
-开发预设要求 Harness 正向声明 `sessionChannels`，不支持时明确拒绝。规划、开发、fix、续办、合并分析和维护均走 `/v1/channel/mcp`（MCP 2.0，2026-07-28），没有文件通信回退。scope token 仅访问本 scope，不能访问固定 API，且每次请求重验项目所有者授权；token 不进入 prompt 或日志。Cells 私有 SQLite 保存上下文、消息、请求／响应、业务 acknowledge 和精确 Session/turn 状态。
+开发预设要求 Harness 正向声明 `sessionChannels`，不支持时明确拒绝。规划、开发、fix、续办、合并分析和维护均走 `/v1/channel/mcp`（统一工具契约，适配 MCP 2.0 与原生 MCP 2025 HTTP 传输），没有文件通信回退。scope token 仅访问本 scope，不能访问固定 API，且每次请求重验项目所有者授权；token 不进入 prompt 或日志。Cells 私有 SQLite 保存上下文、消息、请求／响应、业务 acknowledge 和精确 Session/turn 状态。
 
 Codex thread 使用扁平配置 `features.mcp_2026_07_28=true` 和 `mcp_servers.cells_session`。scope 切换时先核对原 turn 已终结，原子撤销旧 token；对已加载 thread 执行 unsubscribe、等待 closed，再 resume 同一 thread 以刷新 MCP 连接。app-server 设置 `thread_unload_delay_secs=0`，不关闭原生历史或更换 Session。测试 `tools/cells/src/plugin/harness/tests/real_channel.py` 使用真实 Codex app-server 验证工具发现、上下文、请求响应、卸载续办和原 turn 历史；模型请求仅到本地拒绝 fixture，不调用外部模型。
+
+Cells 0.4.5 起，项目模式的 Claude Code 与受管 DSH 也声明 `sessionChannels` 和 `workingDirectory`。Claude 通过原生 `mcp_set_servers`，DSH 通过按实际执行 Agent 身份绑定的工具扩展，接入同一端点、SQLite 通道和五个 `session_*` 工具；不在适配器内实现看板状态机。恢复及下一轮提交刷新绑定，失效令牌不可继续上报。工作目录由共同 ProjectRuntime 校验，不能越过注册项目范围。原生适配验收见 `tools/cells/src/plugin/harness/tests/real_native_channels.py`。
 
 ### 看板删除与资源归属
 
