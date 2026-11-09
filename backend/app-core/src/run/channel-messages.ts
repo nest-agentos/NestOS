@@ -31,10 +31,11 @@ function parseMessages(rows:Row[],scope:WorkMessageScope):WorkMessage[] {
     const messages:WorkMessage[]=[];
     for(const row of rows) {
         if(!row||typeof row.id!=='string'||!row.message||typeof row.message!=='object'||Array.isArray(row.message))throw failure('CHANNEL_MESSAGE_INVALID');
-        const {payload:_payload,...body}=row.message as Record<string,unknown>;
+        const {payload,...body}=row.message as Record<string,unknown>;
         if(Object.keys(body).some(key=>!['type','content','replyTo'].includes(key)))throw failure('CHANNEL_MESSAGE_INVALID');
         if(body.type==='proposal')continue;
-        messages.push(parseWorkMessage(JSON.stringify({...body,schema:'work-message/2',...scope,id:row.id}),scope,JSON.parse));
+        const handler=['error','clarification'].includes(String(body.type))?(payload as {handler?:unknown}|undefined)?.handler:undefined;
+        messages.push(parseWorkMessage(JSON.stringify({...body,...(handler===undefined?{}:{handler}),schema:'work-message/2',...scope,id:row.id}),scope,JSON.parse));
     }
     if(new Set(rows.map(row=>row.id)).size!==rows.length)throw failure('CHANNEL_MESSAGE_INVALID');
     unresolvedWorkIssues(messages);

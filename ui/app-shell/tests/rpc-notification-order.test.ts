@@ -89,3 +89,20 @@ it.each(['dag.run', 'session.call'])('reads %s remaining-tree admission over RPC
         expect(errors).not.toHaveBeenCalled(); await query;
     } finally {release(); await pending; await client.close(); await server.close();}
 });
+
+it('transports persistent Kanban coordination entries through real RPC capabilities',async()=>{
+ let server!:RpcPeer;const errors=vi.fn();
+ const client=new RpcPeer('client',call=>server.handle(call),errors,undefined,undefined,CAPABILITIES);
+ server=new RpcPeer('server',call=>client.handle(call),errors,undefined,undefined,CAPABILITIES);
+ const result={id:'communication',boardId:'board',recordId:'decision',state:'confirmed',purpose:'coordination',createdAt:1,resourceId:'/native/retained'};
+ const openRecordCoordination=vi.fn(async()=>result),openTaskCoordination=vi.fn(async()=>result),openTaskCommunication=vi.fn(async()=>result);
+ try{
+  const initial=await server.bootstrap({openRecordCoordination,openTaskCoordination,openTaskCommunication,records:async()=>({revision:1,total:0,items:[]}),record:async()=>({}),execute:async()=>({})});
+  client.applyUpdates(initial.updates);const source=client.decode(initial.value!);
+  expect(await source.openRecordCoordination('board',{recordId:'decision',operationId:'open'})).toEqual(result);
+  expect(await source.openTaskCoordination('board',{itemId:'task',operationId:'open-task'})).toEqual(result);
+  expect(openRecordCoordination).toHaveBeenCalledWith('board',{recordId:'decision',operationId:'open'});
+  expect(openTaskCoordination).toHaveBeenCalledWith('board',{itemId:'task',operationId:'open-task'});
+  expect(await source.openTaskCommunication('board',{itemId:'task',operationId:'resolve'})).toEqual(result);expect(openTaskCommunication).toHaveBeenCalledWith('board',{itemId:'task',operationId:'resolve'});expect(errors).not.toHaveBeenCalled();
+ }finally{await client.close();await server.close();}
+});

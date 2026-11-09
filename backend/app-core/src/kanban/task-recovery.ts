@@ -1,6 +1,6 @@
 import {recoveryWorkspace} from './recovery-workspace';
 import {sha256HexSync} from '@nestos/common';
-import {journalCommand} from '@nestos/kanban/integration';
+import {resumeCollaborationRepairs,journalCommand} from '@nestos/kanban/integration';
 import type {KanbanTaskRecoveryRequest,KanbanTaskRecoveryResult} from '@nestos/kanban/contracts';
 import type {TaskRecoveryOptions,RecoveryIntent} from './task-recovery-ports';
 import {taskRecoveryState} from './task-recovery-state';
@@ -49,14 +49,8 @@ async function settle(options:TaskRecoveryOptions,intent:RecoveryIntent):Promise
 }
 
 async function resumeRepairs(options:TaskRecoveryOptions,active:()=>boolean,recoverTask:(board:string,request:KanbanTaskRecoveryRequest)=>Promise<KanbanTaskRecoveryResult>):Promise<void> {
-    const rows=await options.journal.find<{fixId:string;boardId:string;itemId:string;done:boolean}>('repair-resumption:',row=>!row.done);
-    for(const row of rows) {
-        if(!active())return;const pending=row.value,fix=await options.journal.get<{accepted?:boolean}>('fix:'+pending.fixId);if(!fix?.accepted)continue;
-        const board=await options.service.read(pending.boardId),item=board.items.find(item=>item.id===pending.itemId);
-        if(!item?.repairPending){await options.journal.update(row.key,()=>({...pending,done:true}));continue;}
-        if(!board.automation?.enabled||board.executionControl?.paused||board.executionControl?.mode==='manual'||board.lifecycle)continue;
-        if(board.items.find(row=>row.id===item.repairPending!.itemId)?.status!=='completed')continue;
-        const state=await taskRecoveryState(options,board.id,item.id);if(!state.canRetry)continue;
-        await recoverTask(board.id,{operationId:'repair-retry-'+sha256HexSync(JSON.stringify([board.id,item.id,item.repairPending])).slice(0,48),itemId:item.id,action:'retry',expectedRevision:state.revision});
-    }
+    await resumeCollaborationRepairs(options.service,options.journal,active,async(boardId,item,operationId)=>{
+        const state=await taskRecoveryState(options,boardId,item.id);if(!state.canRetry)return;
+        await recoverTask(boardId,{operationId,itemId:item.id,action:'retry',expectedRevision:state.revision});
+    });
 }

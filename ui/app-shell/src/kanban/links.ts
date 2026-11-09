@@ -3,6 +3,9 @@ import type {ProjectService} from '@nestos/app-contracts/services';
 import type {KanbanExternalReference} from '@nestos/kanban/contracts';
 import {KANBAN_EXECUTION_SESSION} from '@nestos/app-contracts';
 import {t} from '@nestos/common';
+import {decisionListPath} from '@nestos/kanban-ui';
+
+export const projectDecisionsPath=(projectId:string):string=>decisionListPath('',{system:'nestos-remote-project',id:projectId});
 
 export const sessionUrl = (id: string): string => workbenchUrl(id);
 export function kanbanReferenceLink(projects: Pick<ProjectService, 'get'>) {

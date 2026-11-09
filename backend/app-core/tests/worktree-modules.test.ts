@@ -9,7 +9,7 @@ import {prepareWorktreeModules, verifyWorktreeDelivery} from '../src/projects/wo
 import type {RemoteProcessHandle} from '../src/projects/remote-mounts';
 const run = promisify(execFile), paths: string[] = [];
 afterEach(async () => {for (const path of paths.splice(0)) await rm(path, {recursive: true, force: true});});
-async function fixture() {
+async function fixture(native=false) {
     const root = await mkdtemp(join(tmpdir(), 'nestos-module-')); paths.push(root);
     const git = async (cwd: string, args: string[]) => (await run('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args], {cwd})).stdout.trim();
     await run('git', ['init', '-q', join(root, 'source')]); await git(join(root, 'source'), ['commit', '--allow-empty', '-qm', 'base']);
@@ -21,13 +21,13 @@ async function fixture() {
     const entries = new Map<string, unknown>();
     const journal = {get: async <T>(key: string) => structuredClone(entries.get(key)) as T | undefined,
         update: async <T>(key: string, change: (old: T | undefined) => T) => {const value = change(entries.get(key) as T | undefined); entries.set(key, structuredClone(value)); return value;}};
-    let lost = false;
+    let lost = false;const commands:string[][]=[];
     const process = {nativeShell: {exec: async (program: string, args: string[], options: {cwd: string}) => {
-        const actual = args.map(arg => arg.replaceAll('/workspace', project));
+        commands.push(args);const actual = native?args:args.map(arg => arg.replaceAll('/workspace', project));
         try {
             const result = await run(program, ['-c', 'protocol.file.allow=always', ...actual], {cwd: options.cwd.replace('/workspace', project)});
             if (args[0] === 'switch' && !lost) {lost = true; throw new Error('Response lost');}
-            return {stdout: result.stdout.replaceAll(project, '/workspace'), stderr: result.stderr, code: 0};
+            return {stdout: native?result.stdout:result.stdout.replaceAll(project, '/workspace'), stderr: result.stderr, code: 0};
         } catch (error) {
             const e = error as {code?: number; stdout?: string; stderr?: string};
             if (typeof e.code !== 'number') throw error;
@@ -35,7 +35,7 @@ async function fixture() {
         }
     }}} as RemoteProcessHandle;
     const tree = await prepareWorktree(journal, 'attempt', '/workspace/_nestos/worktrees/attempt', process);
-    return {root: project, git, journal, process, tree, work: join(project, '_nestos/worktrees/attempt')};
+    return {root: project, git, journal, process, tree, commands, work: join(project, '_nestos/worktrees/attempt')};
 }
 it('prepares a separate module branch, recovers a lost switch response and verifies both commit modes', async () => {
     const f = await fixture();
@@ -99,4 +99,16 @@ it('initializes a pinned unpublished module commit from the original project che
     await expect(prepareWorktreeModules(f.journal,tree,['module'],f.process)).rejects.toThrow('Response lost');
     const rows=await prepareWorktreeModules(f.journal,tree,['module'],f.process);
     expect(await f.git(join(f.root,'_nestos/worktrees/local-pin/module'),['rev-parse','HEAD'])).toBe(rows[1].baseCommit);
+});
+
+it('uses native argv paths while retaining logical worktree receipts and relocatable module metadata',async()=>{
+ const f=await fixture(true);await expect(prepareWorktreeModules(f.journal,f.tree,['module'],f.process)).rejects.toThrow('Response lost');
+ const repositories=await prepareWorktreeModules(f.journal,f.tree,['module'],f.process);
+ expect(await f.git(f.work,['rev-parse','HEAD'])).toBe(f.tree.baseCommit);expect(f.tree.directory).toBe('/workspace/_nestos/worktrees/attempt');
+ expect((await verifyWorktreeDelivery(f.process,f.tree.directory,repositories,'changes')).every(row=>!row.dirty)).toBe(true);
+ const {gitWorkspace}=await import('../src/projects/worktree-modules');
+ expect((await gitWorkspace(f.process,'/workspace',['worktree','list','--porcelain'])).stdout).toContain('worktree '+f.tree.directory);
+ expect(f.commands.flat().some(arg=>arg.includes('/workspace'))).toBe(false);
+ await gitWorkspace(f.process,'/workspace',['worktree','remove','--force',f.tree.directory]);
+ expect((await f.git(f.root,['worktree','list','--porcelain']))).not.toContain(f.work);
 });

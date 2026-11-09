@@ -19,7 +19,7 @@ import { RemoteSessionStatus } from '../session/remote-session-status';
 import { RemoteConnectionUnavailableError, reportRemoteFailure, remoteLog, type CellsConnectionDiagnostic } from './remote-diagnostics';
 import type { ExecutionCapabilities, ProjectExecutionContext } from './execution/contracts';
 import { RemoteMountStore, type RemoteMountCatalog as Catalog } from './remote-mount-store';
-import { randomUUID } from '@nestos/common';
+import { randomUUID, sha256HexSync } from '@nestos/common';
 import { checkOperation, createFileSystemView, FSError, normalizeVirtualPath, operationScope,
     type FileSystemSourceOwner, type FileSystemMount, type IFileSystem, type OperationOptions } from '@nestos/vfs-core';
 import { createUnavailableDirectory } from '../vfs/unavailable-directory';
@@ -614,6 +614,25 @@ export class ProjectRemoteMountService {
             return await this.guardHarness(client, projectId, fingerprint, root.connectionId!).models!(profile.id, undefined, options);
         } finally {await client.close();}
     }
+    async nativeSessionRecovery(target: import('@nestos/app-contracts/services').NativeSessionRecoveryTarget, request?: import('@nestos/app-contracts/services').NativeSessionRecoveryRequest) {
+        if (!this.provider.projects) throw new FSError('ECAPABILITY','Cells recovery unavailable');
+        const root=this.list(target.projectId).find(m=>m.at==='/');
+        if (!root?.connectionId || !root.serverProjectId) throw new FSError('EACCES','Session project is not mounted');
+        const fingerprint=JSON.stringify(this.list(target.projectId));
+        const client=this.provider.projects(await this.resolveConnection(root.connectionId,{timeoutMs:10000}));
+        let harness: HarnessClient | undefined;
+        try {
+            const project=await client.read(root.serverProjectId,{timeoutMs:10000});
+            if (project.revision!==root.serverProjectRevision || project.capabilities?.sessionControl===false) throw new FSError('EACCES','Session project authorization changed');
+            harness=client.harness(project);const profiles=await harness.profiles({timeoutMs:10000});
+            const profile=profiles.profiles.find(p=>p.id===target.profileId || p.aliases?.includes(target.profileId));
+            if (!profile?.projectRuntime || !client.recoverSession) throw new FSError('ECAPABILITY','Cells recovery unavailable');
+            const conversationId=await readConversationIdentity(this.store,target.projectId,{connectionId:root.connectionId,serverProjectId:root.serverProjectId,principalId:root.authorization?.principalId,profileId:profile.id,nativeSessionId:target.sessionId});
+            const owner=remoteConversationKey(target.projectId,{connectionId:root.connectionId,serverProjectId:root.serverProjectId,principalId:root.authorization?.principalId,profileId:conversationId?profile.id:target.profileId},conversationId??target.sessionId);
+            if (this.closed || fingerprint!==JSON.stringify(this.list(target.projectId))) throw new FSError('ECONFLICT','Session project authorization changed');
+            return await client.recoverSession(project,{namespace:sha256HexSync(owner),profileId:profile.id,sessionId:target.sessionId,action:request?'recover':'inspect',...(request?{operationId:request.operationId,instructionId:request.instructionId,expectedRevision:request.expectedRevision}:{})},{timeoutMs:15000});
+        } finally {await harness?.close();await client.close();}
+    }
     async projectConversation(projectId: string, profileId: string, sessionId?: string, options?: OperationOptions, readOnly = false, draftId?: string, draftTitle?: string): Promise<ProjectConversationPort> {
         if (!sessionId) return this.createProjectConversation(projectId, profileId, sessionId, options, readOnly, draftId, draftTitle);
         const key = JSON.stringify([projectId, profileId, sessionId, readOnly, this.list(projectId)]);
@@ -686,7 +705,7 @@ export class ProjectRemoteMountService {
             const stateProject=await stateClient.read(root.serverProjectId!,options);
             if(stateProject.revision!==root.serverProjectRevision)throw new FSError('ECONFLICT','Remote harness state binding changed');
             const owner=remoteConversationKey(projectId,target,conversationId??sessionId??'@new');
-            const remoteState=remoteClientState(stateClient,stateProject,owner,checkAccess);
+            const remoteState=remoteClientState(stateClient,stateProject,owner,checkAccess,profile.id,(profile.projectCapabilities?.sessionControl??root.access==='rw')&&!readOnly);
             const recovery = new RemoteConversationStore(this.store,owner,remoteState);
             const conversation = await this.provider.conversation(sessionId ? guarded : draftHarness(guarded, recovery), profile, profile.workspaces[0].id, sessionId, (profile.projectCapabilities?.sessionControl ?? root.access === 'rw') && !readOnly,
                 remoteConversationJournal(recovery, descriptor.epoch, !sessionId && !draftId, checkAccess));

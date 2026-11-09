@@ -1,3 +1,4 @@
+import {nativeSessionActivity} from '../kanban/native-session-activity';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {consumeChannelMessages} from '../run/channel-messages';
 import {createModuleLogger} from '@nestos/common';
@@ -24,7 +25,7 @@ interface Options {exchange?: ReturnType<typeof import('./kanban-channel-exchang
 
 export function developmentObserver(options: Options) {
     const journal = new KanbanAutomationJournal(options.fs, kanbanJournalOptions);
-    const watches = new DirectorySubscriptions(); let stopped = false;
+    const watches = new DirectorySubscriptions(),nativeActivity=nativeSessionActivity(journal); let stopped = false;
     const observe: NonNullable<PersonalKanbanAutomationOptions['observeWork']> = async input => {
         if (stopped) return input.observation;
         const worktree = await journal.get<PreparedWorktree>('worktree:' + input.dispatch.id);
@@ -58,25 +59,24 @@ export function developmentObserver(options: Options) {
         await linkResult(options, journal, input, projectId);
         const scope = {runId: item.externalRefs?.find(ref => ref.system === 'nestos-decision-run')?.id ?? input.dispatch.planId,
             itemId: item.id, attemptId: input.dispatch.id};
-        const envelope=await options.remote.sessionChannel(projectId,'messages',{scopeId:workspace.channelId}) as {messages?:unknown;execution?:{status?:string;sessionId?:string;turnId?:string}};
+        const envelope=await options.remote.sessionChannel(projectId,'messages',{scopeId:workspace.channelId}) as {messages?:unknown;execution?:{status?:string;sessionId?:string;turnId?:string;observedAt?:number}};
+        await nativeActivity.record(input.boardId,input.observation.executionSessionId??input.dispatch.executionSessionId,envelope.execution);
         const messages = await consumeChannelMessages(envelope,scope,journal,
             message => deliver(options, journal, input, message), async message => {await options.remote!.sessionChannel(projectId, 'acknowledge', {scopeId: workspace.channelId, id: message.id, ack: {status: 'delivered'}});});
             const unresolved = unresolvedWorkIssues(messages);
             await reconcileIssues(journal, input, messages);
-            if(envelope.execution?.sessionId&&['running','submitting'].includes(envelope.execution.status??''))return {...input.observation,outcome:'running',outputs:undefined,code:unresolved.some(message=>message.type==='clarification')?'WORKSPACE_INPUT_REQUIRED':undefined};
+            if(envelope.execution?.sessionId&&['running','submitting'].includes(envelope.execution.status??''))return {...input.observation,outcome:'running',outputs:undefined,code:unresolved.some(message=>message.type==='error')?'WORKSPACE_ERROR_REPORTED':unresolved.some(message=>message.type==='clarification')?'WORKSPACE_INPUT_REQUIRED':undefined};
             if (options.exchange && !unresolved.length) input = {...input, observation: await options.exchange({id: input.dispatch.id, record: workspace, service: input.service, observation: input.observation,
                 finalPublished: messages.some(message => message.type === 'result')})};
             if (['failed', 'cancelled'].includes(input.observation.outcome)) {
                 if (!stopping) await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);
                 await close(input.dispatch.id);
             }
-            if (input.observation.outcome !== 'succeeded') return input.observation;
-            if (unresolved.some(message => message.type === 'error')) {
-                const failed = {...input.observation, outcome: 'failed' as const, outputs: undefined, code: 'WORKSPACE_ERROR_REPORTED'};
-                if (!stopping) await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, failed);
-                await close(input.dispatch.id); return failed;
-            }
+            if (!['running','succeeded'].includes(input.observation.outcome)) return input.observation;
+            if (unresolved.some(message => message.type === 'error')) return {...input.observation,outcome:'running',outputs:undefined,code:'WORKSPACE_ERROR_REPORTED'};
             if (unresolved.some(message => message.type === 'clarification')) return {...input.observation, outcome: 'running', outputs: undefined, code: 'WORKSPACE_INPUT_REQUIRED'};
+            if (input.observation.outcome !== 'succeeded') return input.observation;
+            if (!messages.some(message=>message.type==='result')&&messages.some(message=>message.type==='resolved'))return {...input.observation,outcome:'running',outputs:undefined,code:'WORKSPACE_RESULT_PENDING'};
             if (!messages.some(message => message.type === 'result')) return {...input.observation, outcome: 'unknown', outputs: undefined, code: 'WORKSPACE_RESULT_MISSING'};
             try {await options.verifyDelivery?.(input.dispatch.id);}
             catch (error) {
@@ -101,7 +101,7 @@ export function developmentObserver(options: Options) {
             await close(input.dispatch.id); return {...input.observation,outputs};
     };
     async function close(id:string){await watches.close(id);}
-    return {observe, scan: () => options.lifecycle?.scan(), async quiesce() {stopped = true; await options.lifecycle?.dispose();}, async dispose() {stopped = true; await options.lifecycle?.dispose(); await watches.dispose();}};
+    return {observe,sessionObservation:nativeActivity.read, scan: () => options.lifecycle?.scan(), async quiesce() {stopped = true; await options.lifecycle?.dispose();}, async dispose() {stopped = true; await options.lifecycle?.dispose(); await watches.dispose();nativeActivity.clear();}};
 }
 
 async function linkResult(options: Options, journal: KanbanAutomationJournal, input: Input, projectId: string): Promise<void> {
@@ -129,7 +129,7 @@ async function deliver(options: Options, journal: KanbanAutomationJournal, input
     }
     if (!['clarification', 'error'].includes(message.type)) return;
     await journalCommand(journal,input.service,input.boardId,'workspace-issue:'+input.dispatch.id+':'+message.id,
-        {type:'report-issue',itemId:message.itemId,issue:{id:message.id,attemptId:message.attemptId,type:message.type as 'clarification'|'error'}});
+        {type:'report-issue',itemId:message.itemId,issue:{id:message.id,attemptId:message.attemptId,type:message.type as 'clarification'|'error',...(message.handler?{handler:message.handler}:{})}});
     await once(journal, input, message.id + ':block', {type: 'block-item', itemId: message.itemId, token: input.dispatch.fence,
         reason: message.type === 'clarification' ? 'WORKSPACE_INPUT_REQUIRED' : 'WORKSPACE_ERROR_REPORTED'});
     const started=Date.now();
@@ -154,7 +154,7 @@ async function once(journal: KanbanAutomationJournal, input: Input, suffix: stri
 async function reconcileIssues(journal: KanbanAutomationJournal, input: Input, messages: WorkMessage[]): Promise<void> {
     for (const message of messages.filter(m => m.type === 'clarification' || m.type === 'error'))
         await journalCommand(journal,input.service,input.boardId,'workspace-issue:'+input.dispatch.id+':'+message.id,
-            {type:'report-issue',itemId:message.itemId,issue:{id:message.id,attemptId:message.attemptId,type:message.type as 'clarification'|'error'}});
+            {type:'report-issue',itemId:message.itemId,issue:{id:message.id,attemptId:message.attemptId,type:message.type as 'clarification'|'error',...(message.handler?{handler:message.handler}:{})}});
     for (const message of messages.filter(m => m.type === 'resolved'))
         await journalCommand(journal,input.service,input.boardId,'workspace-resolved:'+input.dispatch.id+':'+message.id,
             {type:'resolve-issue',itemId:message.itemId,attemptId:message.attemptId,issueId:message.replyTo!,resolvedBy:message.id});

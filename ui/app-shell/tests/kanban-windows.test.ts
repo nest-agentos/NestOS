@@ -191,3 +191,22 @@ it('waits for an in-flight submission to settle before retiring the deleted boar
     await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('/'));
     expect(f.registry.items().some(item => item.id.startsWith('/board/b'))).toBe(false);
 });
+
+it('keeps project decision shortcuts alive through catalog refresh and opens the selected board with the same project',async()=>{
+ const {projectDecisionsPath}=await import('../src/kanban/links');
+ const f=await fixture();
+ await f.service.create({id:'another',title:'Another',scope:{kind:'system'},members:[{kind:'human',id:'admin',responsibility:'Review'}]});
+ const reference={system:'nestos-remote-project',id:'secondary'};
+ Object.assign(f.service,{recordResources:async()=>[{reference,label:'Secondary',group:'cell'}]});
+ await f.workbench.openResource(projectDecisionsPath('secondary'));expect(f.workbench.getActiveResourceId()).toBe(projectDecisionsPath('secondary'));
+ f.workbench.invalidateFromEvents();await vi.waitFor(()=>expect(f.active().querySelector('[data-board=b]')).not.toBeNull());
+ f.active().querySelector<HTMLButtonElement>('[data-board=b]')!.click();
+ await vi.waitFor(()=>expect(f.workbench.getActiveResourceId()).toBe('/board/b/@decision/nestos-remote-project/secondary'));
+ await vi.waitFor(()=>expect(f.active().querySelector<HTMLSelectElement>('[data-record-resource]')?.value).toBe(JSON.stringify(reference)));
+ Object.assign(f.service,{startRecordConversation:vi.fn()});
+ f.active().querySelector<HTMLButtonElement>('[data-action=new-decision]')!.click();
+ await vi.waitFor(()=>expect(f.active().querySelector('[name=primaryResource]')).not.toBeNull());
+ f.active().querySelector<HTMLButtonElement>('[data-panel] [data-action=close-panel]')!.click();
+ await vi.waitFor(()=>expect(f.active().querySelector<HTMLElement>('[data-panel]')!.hidden).toBe(true));
+ expect(f.workbench.getActiveResourceId()).toBe('/board/b/@decision/nestos-remote-project/secondary');
+});

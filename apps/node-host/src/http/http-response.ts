@@ -74,7 +74,10 @@ export function sendError(response: ServerResponse, error: unknown): void {
     response.setHeader('X-VFS-Error', code);
     const status = code === 'ENOENT' ? 404 : code === 'EACCES' ? 403 : code === 'ECONFLICT' ? 409 : code === 'EFBIG' ? 413 : code === 'EIO' ? 500 : 400;
     const requestId = response.getHeader('X-Request-ID'), traceId = response.getHeader('X-Trace-ID');
-    json(response, status, {error: {code, message: error instanceof FSError ? raw : code,
+    const detail = error as {remoteCode?: string; outcome?: string};
+    const remoteCode = typeof detail?.remoteCode === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(detail.remoteCode) ? detail.remoteCode : undefined;
+    const outcome = ['unknown','not-committed','committed'].includes(detail?.outcome ?? '') ? detail.outcome : code === 'EIO' ? 'unknown' : 'not-committed';
+    json(response, status, {error: {code, message: error instanceof FSError ? raw : code, remoteCode, outcome,
         ...(typeof requestId === 'string' && /^[a-f0-9-]{36}$/.test(requestId) ? {requestId} : {}),
         ...(typeof traceId === 'string' && /^[a-f0-9]{32}$/.test(traceId) ? {traceId} : {})}});
 }

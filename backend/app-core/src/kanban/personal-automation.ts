@@ -20,6 +20,8 @@ import {automationCatalog,automationTarget} from './automation-targets';
 import {requireValue} from './validation';
 import {withContinuedWork,type ContinueWorkOptions} from './continued-work';
 export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
+    prepareTarget?(input:{board:KanbanBoard;dispatch:import('@nestos/kanban/contracts').KanbanDispatch;target:import('@nestos/llm-flow/contracts').TargetRef}):Promise<import('@nestos/llm-flow/contracts').TargetRef>;
+    boardSettings?:{catalog(board:KanbanBoard):Promise<import('@nestos/kanban/contracts').KanbanBoardSettingsCatalog>;validate(board:KanbanBoard,settings:Record<string,string>):Promise<void>};
     taskRecovery?(context:{service:import('@nestos/kanban/contracts').KanbanClient;client():import('@nestos/kanban/contracts').KanbanClient;journal:KanbanAutomationJournal;log:import('./task-recovery-ports').TaskRecoveryOptions['log']}):ReturnType<typeof import('./task-recovery').createTaskRecovery>;
     decisionConversations?(context:{service:import('@nestos/kanban/contracts').KanbanClient;client():import('@nestos/kanban/contracts').KanbanClient;journal:KanbanAutomationJournal;log:import('./decision-conversation-ports').DecisionConversationOptions['log']}):ReturnType<typeof import('./decision-conversations').decisionConversations>;
     deliveryReady?(boardId:string,item:KanbanItem):Promise<boolean>;
@@ -30,6 +32,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
         automaticTarget?:import('./item-operation-types').ReviewOperationsOptions['automaticTarget'];automatic?:import('./item-operation-types').ReviewOperationsOptions['automatic'];cleanup?:import('./item-operation-types').ReviewOperationsOptions['cleanup'];reportAutomatic?:import('./item-operation-types').ReviewOperationsOptions['reportAutomatic'];
         log: import('./item-operation-types').ReviewOperationsOptions['log']}): ReturnType<typeof import('./item-operations').createItemOperations>;
     relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
+    sessionObservation?:import('./native-session-activity').NativeSessionReader;
     sessionExecutionResources?(id: string): Promise<Array<{label: string; value: string}>>;
     collaboration?: {submission:ReturnType<typeof import('../run/session-submission').sessionSubmission>;
         prepare(input:{id:string;originId:string;sessionId:string;nativeSessionId?:string;context:unknown;item:KanbanItem;board:KanbanBoard}):Promise<string>};
@@ -47,7 +50,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     preparations?: import('@nestos/kanban/contracts').KanbanAutomationTarget[];
     observeWork?(input: {boardId: string; dispatch: import('@nestos/kanban/contracts').KanbanDispatch;
         observation: import('@nestos/kanban/execution').KanbanExecutionObservation; service: KanbanService; worker: KanbanService}): Promise<import('@nestos/kanban/execution').KanbanExecutionObservation>;
-    prepareWork?(input: {context?:unknown;dispatch: import('@nestos/kanban/contracts').KanbanDispatch; item: KanbanItem;
+    prepareWork?(input: {board?:Pick<KanbanBoard,'id'|'settings'>;context?:unknown;dispatch: import('@nestos/kanban/contracts').KanbanDispatch; item: KanbanItem;
         reportActivity?(fact: WorkLogFact): Promise<void>; stage?: 'decision' | 'task' | 'fix'; options?: Record<string, string>; preparation: import('@nestos/kanban/contracts').KanbanExternalReference; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target:import('@nestos/llm-flow/contracts').TargetRef;contextRef?:unknown}>;
     projects?: Pick<import('@nestos/app-contracts/services').ProjectService, 'list' | 'get'> & Partial<Pick<import('@nestos/app-contracts/services').ProjectService,'openWorkspace'>>;
     calls: IndependentCallService; kernel: Kernel; sessions: SessionRepository;
@@ -93,10 +96,10 @@ async function createExecutor(options:Options,context:KanbanExecutorContext,prep
             const target = automationTarget(board.automation.executor, await options.catalog());
             if (board.automation.preparation) {
                 requireValue(options.prepareWork, 'WORK_PREPARATION_UNAVAILABLE');
-                return options.prepareWork({context:{...await workContext(options.journal,board,item,options.service),inputs:dispatch.inputs,dependencies:await context.dependencies(item)},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
+                return options.prepareWork({board,context:{...await workContext(options.journal,board,item,options.service),inputs:dispatch.inputs,dependencies:await context.dependencies(item)},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
                     reportActivity: fact => options.workLog?.append(options.service, boardId, item.id, {...fact, actor: fact.actor ?? dispatch.principal, dispatchId: dispatch.id}) ?? Promise.resolve()});
             }
-            return {target};
+            return {target:await options.prepareTarget?.({board,dispatch,target})??target};
         }});
     const executor = options.continuation ? withContinuedWork(primary, {...options.continuation, calls: options.calls, kernel: options.kernel, observe}) : primary;
     return executor;

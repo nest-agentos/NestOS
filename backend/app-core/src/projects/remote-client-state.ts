@@ -2,14 +2,27 @@ import {FSError} from '@nestos/vfs-core';
 import {sha256HexSync,randomUUID} from '@nestos/common';
 import type {ProjectClient,RemoteProject} from '@nestos/cells-driver';
 import {mapConcurrent} from '../utils/map-concurrent';
-export interface ClientStatePort {read(key:string):Promise<string|null>;compare(key:string,before:string|null,after:string|null,operationId?:string):Promise<boolean>}
+export interface ClientStatePort {queueSession?(sessionId:string,input:import('@nestos/cells-driver').HarnessNodeQueueCommand):Promise<import('@nestos/cells-driver').HarnessInstructionQueue>;registerSession?(sessionId:string):Promise<boolean>;recoverSession?(input:{sessionId:string;operationId:string;instructionId:string;expectedRevision:number}):Promise<void>;read(key:string):Promise<string|null>;compare(key:string,before:string|null,after:string|null,operationId?:string):Promise<boolean>}
 interface Head {schema:1;text?:string;sha256?:string;parts?:number;generation?:string}
 /** Opaque records live privately on the Cells node, outside project files and NestOS storage. */
-export function remoteClientState(client:ProjectClient,project:RemoteProject,namespace:string,checkAccess:()=>void):ClientStatePort {
-    return new RemoteClientRecords(client,project,sha256HexSync(namespace),checkAccess);
+export function remoteClientState(client:ProjectClient,project:RemoteProject,namespace:string,checkAccess:()=>void,profileId?:string,writable=true):ClientStatePort {
+    return new RemoteClientRecords(client,project,sha256HexSync(namespace),checkAccess,profileId,writable);
 }
 class RemoteClientRecords implements ClientStatePort {
-    constructor(private client:ProjectClient,private project:RemoteProject,private prefix:string,private checkAccess:()=>void){}
+    constructor(private client:ProjectClient,private project:RemoteProject,private prefix:string,private checkAccess:()=>void,private profileId?:string,private writable=true){}
+    async queueSession(sessionId:string,input:import('@nestos/cells-driver').HarnessNodeQueueCommand){
+        this.checkAccess();if(!this.profileId || !this.client.queueSession)throw new FSError('ECAPABILITY','Cells queue ownership unavailable');
+        return this.client.queueSession(this.project,{...input,sessionId,namespace:this.prefix,profileId:this.profileId,operationId:randomUUID()});
+    }
+    private registered=new Set<string>();
+    async registerSession(sessionId:string):Promise<boolean>{
+        this.checkAccess();if(!this.writable || this.registered.has(sessionId))return false;
+        if(this.profileId && await this.client.registerSession?.(this.project,{namespace:this.prefix,profileId:this.profileId,sessionId})){this.registered.add(sessionId);return true;}return false;
+    }
+    async recoverSession(input:{sessionId:string;operationId:string;instructionId:string;expectedRevision:number}):Promise<void>{
+        this.checkAccess();if(!this.profileId || !this.client.recoverSession)throw new FSError('ECAPABILITY','Cells recovery unavailable');
+        await this.client.recoverSession(this.project,{...input,namespace:this.prefix,profileId:this.profileId,action:'recover'});
+    }
     private async call(key:string,action:'read'|'compare',expected?:string|null,value?:string|null,requestId=randomUUID()){
         this.checkAccess();if(!this.client.clientState)throw new FSError('ECAPABILITY','Remote harness state is unavailable');
         return this.client.clientState(this.project,{key:this.prefix+'/'+key,action,expected,value,requestId});

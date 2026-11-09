@@ -495,3 +495,19 @@ export declare function exportRemoteSession(projects: ProjectService, folder: st
 
 /** UI capabilities exclude credential injection, host change hooks and source composition. */
 export type ProjectRemoteMountPort = Omit<ProjectRemoteMountService, 'mountedProjectIds' | 'beforeMCPChange' | 'beforeMCPDelete' | 'setMCPCredential' | 'compose'>;
+
+/** Business recovery uses stable session identities, never browser capability handles. */
+export interface NativeSessionRecoveryTarget {projectId: string; profileId: string; sessionId: string}
+export interface NativeSessionRecoveryRequest extends NativeSessionRecoveryTarget {
+    operationId: string; instructionId: string; expectedRevision: number;
+}
+export type NativeSessionRecoveryState = Pick<ProjectConversationSnapshot, 'sessionId' | 'instructionQueue' | 'observation'
+    | 'canQueue' | 'canSend' | 'canInterrupt' | 'canRespond' | 'active' | 'pending' | 'disconnected' | 'gap'
+    | 'writerLock' | 'executionRecovery' | 'submission' | 'submittedTurnId'>;
+export interface NativeSessionRecoveryResult {
+    operationId: string; outcome: 'recovered' | 'no-longer-blocked'; duplicate: boolean; state: NativeSessionRecoveryState;
+}
+export interface NativeSessionRecoveryPort {
+    inspect(target: NativeSessionRecoveryTarget): Promise<NativeSessionRecoveryState>;
+    recover(request: NativeSessionRecoveryRequest): Promise<NativeSessionRecoveryResult>;
+}

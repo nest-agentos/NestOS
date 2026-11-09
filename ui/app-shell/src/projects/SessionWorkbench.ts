@@ -1,3 +1,4 @@
+import {conversationLifetime} from './conversation-lifetime';
 import {parseProjectAction, type ProjectActionRoute} from './project-action-route';
 import type {ChatEditorFactory as EditorFactory, ChatEditorOptions as EditorOptions} from '@nestos/llm-ui-adapter/contracts';
 import {confirmRemoteRemoval, remoteRemovalItems} from './remote-session-removal';
@@ -133,6 +134,7 @@ function compareSessionEntries(a: VFSNodeUI, b: VFSNodeUI): number | undefined {
 }
 
 export interface SessionWorkbenchOptions {
+    openProjectDecisions?(projectId:string):Promise<void>;
     initialResource?: string;
     backend: ApplicationBackend;
     sidebar: HTMLElement;
@@ -259,6 +261,7 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly createFactory: SessionWorkbenchOptions['createFactory'];
     private readonly onSelect: SessionWorkbenchOptions['onSelect'];
     private readonly onBeforeNavigate: SessionWorkbenchOptions['onBeforeNavigate'];
+    private readonly openProjectDecisions:SessionWorkbenchOptions['openProjectDecisions'];
     private readonly digitalTwin?: import('@nestos/app-contracts/services').DigitalTwinService;
     private readonly hostContext: SessionWorkbenchOptions['hostContext'];
     private readonly kernel: SessionWorkbenchOptions['kernel'];
@@ -280,6 +283,7 @@ export class SessionWorkbench implements WorkspaceController {
     private initialData?: import('@nestos/app-contracts/services').SessionEditorInitialData;
     private chatConfiguration?: WorkbenchChatControls['configuration'];
     constructor(options: SessionWorkbenchOptions) {
+        this.openProjectDecisions=options.openProjectDecisions;
         this.backend = options.backend;
         this.agentOptions = options.agents; this.agentProjects = new AgentProjectPreferences(this.backend);
         this.agentCatalog = lazyResource(() => this.backend.toolboxView(), view => view.dispose());
@@ -1057,7 +1061,7 @@ export class SessionWorkbench implements WorkspaceController {
             if (target.kind === 'remote') {
                 const project = await this.projects!.forFolder(target.folder); load.check();
                 if (!project || project.path !== target.folder || !target.profileId) throw new Error('Remote project unavailable');
-                const controls = await this.projects!.remoteMounts!.projectConversation(project.project.id, target.profileId, target.nativeSessionId, {signal: load.signal, timeoutMs: 3000}, target.archived);
+                const controls = conversationLifetime(await this.projects!.remoteMounts!.projectConversation(project.project.id, target.profileId, target.nativeSessionId, {signal: load.signal, timeoutMs: 3000}, target.archived));
                 let remoteEditor: IEditor | undefined;
                 try {
                     const mount = await this.editorMount(target.folder); load.check();
@@ -1370,6 +1374,7 @@ export class SessionWorkbench implements WorkspaceController {
         }
         const parent = path.slice(0, path.lastIndexOf('/')) || '/';
         const actions = await projectDirectoryActions(path, directoryNode, this.projects, {
+            decisions:this.openProjectDecisions,
             session: folder => this.startSessionDraft(folder), project: () => this.createProject('/'),
             entry: (directory, type) => this.createDirectoryEntry(directory, type), report: error => this.report(error),
         }, project);
@@ -2024,7 +2029,7 @@ export class SessionWorkbench implements WorkspaceController {
         const [connectionId, serverProjectId, profileId] = JSON.parse(decodeURIComponent(request.agentId!.slice(7))) as string[];
         const root = this.projects!.remoteMounts!.list(project.project.id).find(item => item.at === '/');
         if (root?.connectionId !== connectionId || root.serverProjectId !== serverProjectId) throw new Error(t('toolbox.unavailable'));
-        const controls = await this.projects!.remoteMounts!.projectConversation(project.project.id, profileId!, nativeId, {signal, timeoutMs: 3000}, false, nativeId ? undefined : draftId, request.title);
+        const controls = conversationLifetime(await this.projects!.remoteMounts!.projectConversation(project.project.id, profileId!, nativeId, {signal, timeoutMs: 3000}, false, nativeId ? undefined : draftId, request.title));
         if (tab.value?.draft) tab.value.draft.remote = controls;
         let editor: IEditor | undefined;
         try {

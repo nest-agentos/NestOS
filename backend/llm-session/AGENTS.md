@@ -125,3 +125,5 @@ ContentTransferService.createChild 在入口冻结请求，以原 content.child 
 独立调用只提交持久冻结的 Kernel Task 计划；缺少策略或准备事实明确拒绝。已移除普通队列提交降级及无生产调用方的 guard 接点；宿主不再注入子 Session 队列提交回调。
 
 历史队列独立调用继续按原路由只读核对接纳与历史，不能因缺少 Kernel 准备字段阻断整个调用列表；查询不重新提交，也不迁移历史执行身份。
+
+持久独立调用控制由 controlIndependentCall 提供，注入最小原子 CallControlJournal 与现有调用/控制端口，不依赖 Kanban 或应用路径。先冻结逻辑 action 与原路由；首次 claim 才写，提交不明只查原回执。相同 requestId 不得更换动作或目标，旧 query-only 暂停记录兼容且不重发；caller 与 executionTree 都终结才算收敛。日志异常不能替代已持久结果。

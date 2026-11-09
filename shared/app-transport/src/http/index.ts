@@ -4,3 +4,4 @@ export { installFileTransport } from './file-transport';
 export { ViewExpiredError } from './view-expired';
 export {SnapshotCache} from './snapshot-cache';
 export type {SnapshotStorage, CachedReply} from './snapshot-cache';
+export {createSessionRecoveryClient} from './session-recovery';

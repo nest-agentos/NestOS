@@ -14,7 +14,7 @@ it('preserves native input rejection evidence and attachment-only queue identity
     const profile: HarnessProfile = {id: 'native', kind: 'fixture', workspaces: [{id: 'p'}], capabilities: {
         history: true, create: true, resume: true, interrupt: true, interactions: true, attachments: ['text', 'image'],
     }};
-    const harness = {read: vi.fn(async () => ({session, turns: []})), eventSnapshot: vi.fn(async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []})),
+    const harness = {profiles: async () => ({epoch: 'e', profiles: [profile]}), read: vi.fn(async () => ({session, turns: []})), eventSnapshot: vi.fn(async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []})),
         create: vi.fn(), resume: vi.fn(), turn: vi.fn(async () => ({turnId: 'file-turn'})), subscribe: () => () => {}, close: vi.fn(async () => {})};
     const source = new HarnessConversation(harness as unknown as HarnessClient, profile, 'p', 's', true, {
         epoch: 'e', load: async () => saved, save: async value => {saved = structuredClone(value);},
@@ -62,7 +62,7 @@ it('carries native queue acceptance, CAS text editing and exact reconciliation t
     const session = {id: 's', title: 'Native', cwd: null, status: 'active', activeTurnId: 'prior', updatedAt: 1, resumable: true, owned: true};
     const profile: HarnessProfile = {id: 'native', kind: 'fixture', projectRuntime: true, workspaces: [{id: 'p'}], capabilities: {history: true, create: true, resume: true, interrupt: true, interactions: true, slashCommands: true}};
     let dispatched: unknown;
-    const harness = {read: async () => ({session, turns: []}), eventSnapshot: async () => ({epoch: 'e', cursor: 0, gap: false, events: [], requests: []}),
+    const harness = {profiles: async () => ({epoch: 'e', profiles: [profile]}), read: async () => ({session, turns: []}), eventSnapshot: async () => ({epoch: 'e', cursor: 0, gap: false, events: [], requests: []}),
         commands: async () => [{name: 'session:status', description: 'State', kind: 'action', execution: 'query', id: 'state', revision: 'one'}],
         command: async (_profile: string, _session: string, _command: string, _args: string, options: unknown) => {
             dispatched = options; return {commandId: 'rpc-query', output: 'Active', status: 'completed'};
@@ -98,7 +98,7 @@ it('roundtrips exact-target control recovery through RPC without reusing input r
     let session = {id: 's', title: 'Native', cwd: null, status: 'active', activeTurnId: 't' as string | null, updatedAt: 1, resumable: true, owned: true};
     const profile: HarnessProfile = {id: 'native', kind: 'fixture', workspaces: [{id: 'p'}], capabilities: {history: true, create: true, resume: true, interrupt: true, interactions: true}};
     let dispatched: unknown, calls = 0, outcome: 'unknown' | 'committed' = 'unknown', saved: HarnessRecovery | undefined;
-    const harness = {read: async () => ({session, turns: []}), eventSnapshot: async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []}),
+    const harness = {profiles: async () => ({epoch: 'epoch', profiles: [profile]}), read: async () => ({session, turns: []}), eventSnapshot: async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []}),
         interrupt: async (_profile: string, sessionId: string, turnId: string, options: unknown) => {
             dispatched = {sessionId, turnId, options}; ++calls; throw Object.assign(new Error('Lost reply'), {outcome: 'unknown'});
         },
@@ -132,7 +132,7 @@ it('continues native queue editing and exact cancellation through RPC while the 
     let frames: Array<{seq: number; message: {method: string; params: Record<string, unknown>}}> = [];
     const descriptor = {name: 'session:status', description: 'State', kind: 'action', execution: 'query', revision: 'state-v1'};
     const queried: unknown[] = [];
-    const harness = {commands: async () => [descriptor], queryCommand: async (_profile: string, sessionId: string, name: string, _args: string, options: {requestId: string}) => {
+    const harness = {profiles: async () => ({epoch: 'epoch', profiles: [profile]}), commands: async () => [descriptor], queryCommand: async (_profile: string, sessionId: string, name: string, _args: string, options: {requestId: string}) => {
             queried.push({sessionId, name, options}); return {commandId: options.requestId, output: 'Observed active state', status: 'completed'};
         }, read: async () => ({session, turns: []}), turn: async () => {++paid; return new Promise(resolve => {finish = resolve;});},
         eventSnapshot: async () => ({epoch: 'events', cursor: frames.at(-1)?.seq ?? 0, gap: false, events: frames, requests: []}),
@@ -175,7 +175,7 @@ it('carries active-turn steering and its exact receipt through the application R
     const profile: HarnessProfile = {id: 'native', kind: 'fixture', workspaces: [{id: 'p'}], capabilities: {
         history: true, create: true, resume: true, interrupt: true, interactions: true, steer: true,
     }};
-    const harness = {read: vi.fn(async () => ({session, turns: []})), eventSnapshot: vi.fn(async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []})),
+    const harness = {profiles: async () => ({epoch: 'e', profiles: [profile]}), read: vi.fn(async () => ({session, turns: []})), eventSnapshot: vi.fn(async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []})),
         steer: vi.fn(async () => ({turnId: 'active'})), subscribe: () => () => {}, close: vi.fn(async () => {})};
     const source = new HarnessConversation(harness as unknown as HarnessClient, profile, 'p', 's', true, {
         epoch: 'e', load: async () => saved, save: async value => {saved = structuredClone(value);},
@@ -198,7 +198,7 @@ it('reads native metrics through RPC while a turn submission is suspended withou
         history: true, create: true, resume: true, interrupt: true, interactions: true, metrics: true,
     }};
     const metrics = {observedAt: 1793440000000, contextWindow: {usedTokens: 1000, limitTokens: 200000}};
-    const harness = {read: vi.fn(async () => ({session, turns: []})), eventSnapshot: vi.fn(async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []})),
+    const harness = {profiles: async () => ({epoch: 'e', profiles: [profile]}), read: vi.fn(async () => ({session, turns: []})), eventSnapshot: vi.fn(async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []})),
         metrics: vi.fn(async () => metrics), turn: vi.fn(() => new Promise<{turnId: string}>(resolve => {finish = resolve;})), subscribe: () => () => {}, close: vi.fn(async () => {})};
     const source = new HarnessConversation(harness as unknown as HarnessClient, profile, 'p', 's', true, {epoch: 'e', load: async () => undefined, save: async () => {}});
     const controls = observeConversation(source);
@@ -221,7 +221,7 @@ it('delivers an automatic queued supplement through RPC while preserving the act
     const profile: HarnessProfile = {id: 'native', kind: 'fixture', workspaces: [{id: 'p'}], capabilities: {
         history: true, create: true, resume: true, interrupt: true, interactions: true, steer: true,
     }};
-    const harness = {read: vi.fn(async () => ({session, turns: []})), eventSnapshot: vi.fn(async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []})),
+    const harness = {profiles: async () => ({epoch: 'e', profiles: [profile]}), read: vi.fn(async () => ({session, turns: []})), eventSnapshot: vi.fn(async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []})),
         steer: vi.fn(async () => ({turnId: 'native-next', targetTurnId: 'active'})), turn: vi.fn(), subscribe: () => () => {}, close: vi.fn(async () => {})};
     const source = new HarnessConversation(harness as unknown as HarnessClient, profile, 'p', 's', true, {
         epoch: 'e', load: async () => saved, save: async value => {saved = structuredClone(value);},

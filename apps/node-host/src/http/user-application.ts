@@ -12,7 +12,7 @@ import {guardHostStorage} from '../storage/host-storage';
 import {NodeEditorSwapStore} from '../storage/editor-swaps';
 import type {AuditPort} from '../logging/audit-log';
 import {validUserId} from './certificates';
-import {ViewApi} from './view-api';
+import {RuntimeApi} from './runtime-api';
 import type {HttpHostOptions} from './start-host';
 type HttpRuntimeMounts = import('@nestos/app-core').ApplicationRuntimeOptions['additionalMounts'];
 
@@ -49,7 +49,7 @@ export async function openUserApplication(options: HttpHostOptions, userId: stri
         const host = await openUserRuntime(options, home, internal, mounts, userId !== 'admin', cleanup);
         scoped.write({event: 'user.storage.ready', operationId, stage, result: 'success', durationMs: Date.now() - started});
         if (options.signal?.aborted) await host.runtime.quiesce();
-        const application = new ViewApi(Promise.resolve(host.runtime), scoped, false, userId !== 'admin');
+        const application = new RuntimeApi(Promise.resolve(host.runtime), scoped, false, userId !== 'admin');
         cleanup.push(namedCleanup('views.close', () => application.close()));
         scoped.write({event: 'user.runtime.ready', operationId, stage: 'ready', result: 'success', durationMs: Date.now() - started});
         return {application, quiesce: () => host.runtime.quiesce(), close: () => closeUser(cleanup, scoped)};

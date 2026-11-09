@@ -109,6 +109,7 @@ export class KanbanWindowWorkbench {
     private async reconcileResources(): Promise<void> {
         for (const tab of this.tabs.values()) {
             if (this.disposing || !this.availableBoards) return;
+            if(!tab.id.startsWith('/board/'))continue;
             const board = tab.id.split('/')[2], page = tab.value;
             if (!board || this.availableBoards?.has(decodeURIComponent(board)) || !page) continue;
             const state = page.view.getViewState();
@@ -148,5 +149,6 @@ export class KanbanWindowWorkbench {
     private report(error: unknown): void {this.options.windows?.registry.report(error);}
 }
 function parentPath(path: string): string {
+    if(path.startsWith('/@resource/'))return '/';
     const parts = path.split('/'); return parts.length > 3 ? parts.slice(0, 3).join('/') : '/';
 }

@@ -22,7 +22,8 @@ export function nativeObservationDiagnostics(conversationId: string) {
                     historyRevision: state.observation?.historyRevision,
                     activityPhase: state.observation?.activity?.phase, activityAt: state.observation?.activity?.updatedAt,
                     textLength: state.messages.reduce((size, message) => size + message.text.length, 0),
-                    queueRevision: state.instructionQueue?.revision, durationMs: Date.now() - started, ...presentation,
+                    queueRevision: state.instructionQueue?.revision, queueReason: state.instructionQueue?.reason,
+                    recoveryRequired: state.instructionQueue?.recovery?.required, durationMs: Date.now() - started, ...presentation,
                     visibility: typeof document === 'undefined' ? undefined : document.visibilityState};
                     if (succeeded) log.info('chat.native.pipeline', fields); else log.warn('chat.native.pipeline', fields);
                 } catch { /* Diagnostics cannot alter observation. */ }

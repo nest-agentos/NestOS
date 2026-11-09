@@ -30,3 +30,9 @@ it('starts decision planning fresh without importing the prior answers or planni
     expect(context.decision).not.toHaveProperty('previousRunId');
     expect(context.planning).toBeUndefined();
 });
+it('keeps the hosting primary distinct from a secondary implementation project',async()=>{
+ const snapshot={externalRefs:[{system:'nestos-remote-project',id:'main'},{system:'nestos-remote-project',id:'x1'},{system:'nestos-primary-project',id:'main'}]};
+ const journal={get:async(key:string)=>key==='record-context:run'?{sourceBoardId:'development',recordId:'decision',recordRevision:1,runId:'run'}:key==='record-runs:development'?[{id:'run',record:snapshot}]:undefined} as KanbanAutomationJournal;
+ const context=await workContext(journal,board,item);
+ expect(context).toMatchObject({primaryProjectId:'main',secondaryProjectIds:['x1'],projectIds:['main','x1'],projects:[{system:'nestos-remote-project',id:'x1'}]});
+});

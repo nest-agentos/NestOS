@@ -103,7 +103,7 @@ async function saveChanges(run: NativeExecution, update: Partial<ExecutionJourna
     if (canonical({ ...run.journal.data, ...update }) !== canonical(run.journal.data)) await run.journal.save(update);
 }
 export async function observeNativePage(run: NativeExecution): Promise<HarnessEvents> {
-    const page = await run.acquired.client.eventSnapshot(run.acquired.profile.id, run.journal.data.cursor, nativeOptions(run));
+    const page = await run.acquired.client.eventSnapshot(run.acquired.profile.id, run.journal.data.cursor, {...nativeOptions(run),sessionId:run.journal.data.sessionId});
     await saveChanges(run, eventChanges(run.journal.data, page));
     if (page.gap) {
         const active = await refreshNativeHistory(run);
@@ -112,7 +112,7 @@ export async function observeNativePage(run: NativeExecution): Promise<HarnessEv
     return page;
 }
 export async function observeNativeTurn(run: NativeExecution, context: EffectExecutionContext, pollMs: number): Promise<HarnessExecutionResult> {
-    const stop = run.acquired.client.subscribe(run.acquired.profile.id, () => {});
+    const stop = run.acquired.client.subscribe(run.acquired.profile.id, () => {},run.journal.data.sessionId);
     try {
         while (!run.journal.data.terminal) {
             run.signal.throwIfAborted();
@@ -149,7 +149,7 @@ export function waitForNativeChange(run: NativeExecution, milliseconds: number):
         const finish = () => { clearTimeout(timer); stop(); run.signal.removeEventListener('abort', abort); resolve(); };
         const abort = () => { clearTimeout(timer); stop(); run.signal.removeEventListener('abort', abort); reject(run.signal.reason??executionError('OBSERVATION_ABORTED'));  };
         const timer = setTimeout(finish, milliseconds);
-        stop = run.acquired.client.subscribe(run.acquired.profile.id, finish);
+        stop = run.acquired.client.subscribe(run.acquired.profile.id, finish,run.journal.data.sessionId);
         run.signal.addEventListener('abort', abort, { once: true });
         if (run.signal.aborted) abort();
     });

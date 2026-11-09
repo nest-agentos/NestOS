@@ -1,3 +1,4 @@
+import {reserveJournalResource,releaseJournalResource} from '@nestos/kanban/integration';
 import type {KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {jobKey,reviewKey,type ReviewSettings,type ReviewJob} from './item-operation-types';
@@ -5,17 +6,15 @@ export interface DeliveryScope {id:string;boardId:string;itemId:string;target?:s
 interface Ports {service:KanbanService;journal:KanbanAutomationJournal}
 const key=(target:string)=>'automatic-target:'+JSON.stringify(target);
 /** Reserve a business target across asynchronous jobs, without holding a storage transaction open. */
-export async function claimDeliveryTarget(ports:Ports,scope:DeliveryScope):Promise<boolean> {
+export async function claimDeliveryTarget(ports:Ports,scope:DeliveryScope):Promise<boolean>{
     if(!scope.target)return true;
-    const owner=await ports.journal.update<DeliveryScope|null>(key(scope.target),old=>old??scope);
-    if(owner!.id===scope.id)return true;
-    if(!await releasable(ports,owner!))return false;
-    const claimed=await ports.journal.update<DeliveryScope|null>(key(scope.target),old=>old?.id===owner!.id?scope:old??scope);
-    return claimed?.id===scope.id;
+    return reserveJournalResource(ports.journal,key(scope.target),binding(scope),owner=>releasable(ports,owner),sameBinding);
 }
-export async function releaseDeliveryTarget(ports:Ports,scope:DeliveryScope) {
-    if(scope.target)await ports.journal.update<DeliveryScope|null>(key(scope.target),old=>old?.id===scope.id?null:old??null);
+export async function releaseDeliveryTarget(ports:Ports,scope:DeliveryScope):Promise<void>{
+    if(scope.target)await releaseJournalResource(ports.journal,key(scope.target),binding(scope),sameBinding);
 }
+const binding=({id,boardId,itemId,target}:DeliveryScope):DeliveryScope=>({id,boardId,itemId,target});
+const sameBinding=(left:DeliveryScope,right:DeliveryScope)=>left.boardId===right.boardId&&left.itemId===right.itemId&&left.target===right.target;
 async function releasable(ports:Ports,scope:DeliveryScope):Promise<boolean> {
     const state=await ports.journal.get<{done?:boolean}>('automatic-delivery:'+JSON.stringify([scope.boardId,scope.itemId]));
     if(state?.done)return true;

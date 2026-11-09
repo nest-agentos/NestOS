@@ -1,4 +1,4 @@
-import {safeCode,createTaskCoordinator,currentAnalysis,type CoordinationOperation,type CoordinationSnapshot} from '@nestos/kanban/integration';
+import {validateCoordinationResult,safeCode,createTaskCoordinator,currentAnalysis,type CoordinationOperation,type CoordinationSnapshot} from '@nestos/kanban/integration';
 import type {IndependentCallInput,SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import type {KanbanService} from '@nestos/kanban/contracts';
@@ -13,10 +13,7 @@ export function taskCoordinator(options:Options) {
     return createTaskCoordinator({service:options.service,journal:options.journal,prepare:(id,snapshot)=>prepare(options,id,snapshot),port:{
         start:async job=>{await options.collaboration!.submission.start(job.request as SubmissionRequest);},
         inspect:job=>inspect(options,job),
-        validate:(_job,output)=>{const result=output as {schema?:string;summary?:string;suggestions?:unknown[]};
-            requireValue(result?.schema==='kanban.coordination/1'&&typeof result.summary==='string'&&result.summary.length<=8000&&Array.isArray(result.suggestions)&&result.suggestions.length<=16,'COORDINATION_RESULT_INVALID');
-            const children=new Set(_job.snapshot.children.map(child=>child.id));
-            requireValue(result.suggestions.every(raw=>{const suggestion=raw as {itemId?:string;action?:string;reason?:string};return typeof suggestion.itemId==='string'&&children.has(suggestion.itemId)&&typeof suggestion.action==='string'&&['analyze','build','deploy','accept','merge'].includes(suggestion.action)&&typeof suggestion.reason==='string'&&suggestion.reason.length<=2000;}),'COORDINATION_RESULT_INVALID');},
+        validate:(job,output)=>validateCoordinationResult(output,job.snapshot.children,['analyze','build','deploy','accept','merge']),
         classify:error=>({code:safeCode(error,'COORDINATION_FAILED'),disposition:(error as {executionOutcome?:string}).executionOutcome==='not-started'?'retry-unstarted':['COORDINATION_RESULT_INVALID','CHANNEL_RESULT_INVALID','CHANNEL_RESULT_CHANGED'].includes(safeCode(error,''))?'terminal':'unknown'}),
         report:async job=>{await options.notifyCoordination?.(job);if(job.phase!=='settled')return;const key='coordination-reported:'+job.id;if(await options.journal.get(key))return;
             await options.workLog?.append(options.service,job.boardId,job.itemId,{stage:'coordination.'+job.state,result:job.state==='succeeded'?'success':'failure',dispatchId:job.id,code:job.code,
@@ -37,11 +34,14 @@ async function prepare(options:Options,id:string,snapshot:CoordinationSnapshot) 
     return original.request(id,instruction+' This is an automatic state event: publish a coordination result with ready=true; do not wait for user confirmation unless a real clarification is required.');
 }
 async function inspect(options:Options,job:CoordinationOperation) {
-    const request=job.request as SubmissionRequest,resource=job.snapshot.parent.externalRefs?.find(ref=>ref.system==='nestos-remote-project');
-    requireValue(resource&&options.sessionChannel,'SESSION_CHANNEL_REQUIRED');
-    const result=await readPlanningChannel({sessionChannel:options.sessionChannel},resource.id,job.id,options.journal);
+    const request=job.request as SubmissionRequest,workspace=await options.journal.get<{projectId:string}>('development-workspace:'+job.id);
+    const projectId=workspace?.projectId??job.snapshot.parent.externalRefs?.find(ref=>ref.system==='nestos-remote-project')?.id;
+    requireValue(projectId&&options.sessionChannel,'SESSION_CHANNEL_REQUIRED');
+    const result=await readPlanningChannel({sessionChannel:options.sessionChannel},projectId,job.id,options.journal);
     if(result?.state==='succeeded')return {state:'succeeded' as const,executionId:request.expectedSessionId,output:result.output};
     if(result?.state==='failed'||result?.state==='cancelled')return {state:'failed' as const,executionId:request.expectedSessionId,code:result.code??'COORDINATION_FAILED'};
+    if(result?.state==='blocked')return {state:'running' as const,executionId:request.expectedSessionId,code:result.code??'WORKSPACE_ERROR_REPORTED'};
+    if(result?.state==='running')return {state:'running' as const,executionId:request.expectedSessionId,code:'COORDINATION_RESULT_PENDING'};
     if(result?.state==='clarification')return {state:'running' as const,executionId:request.expectedSessionId,code:'WORKSPACE_INPUT_REQUIRED'};
     const state=await options.collaboration!.submission.inspect(request);
     return {state:state.outcome==='cancelled'?'failed' as const:state.outcome==='succeeded'?'unknown' as const:state.outcome,executionId:state.sessionId,code:state.code??(state.outcome==='succeeded'?'COORDINATION_RESULT_PENDING':undefined)};

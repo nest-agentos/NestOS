@@ -35,6 +35,15 @@ export class RemoteConversationStore {
         validateAttachments(record.draftAttachments);
         this.record = record; return structuredClone(record);
     }
+    async queueSession(input:import('@nestos/cells-driver').HarnessNodeQueueCommand){
+        const sessionId=this.record.sessionId;
+        if(!sessionId || !this.remote?.queueSession)throw new FSError('ECAPABILITY','Cells queue ownership unavailable');
+        const queue=await this.remote.queueSession(sessionId,input);this.record={...this.record,instructionQueue:queue};return queue;
+    }
+    async recoverSession(input:{sessionId:string;operationId:string;instructionId:string;expectedRevision:number}):Promise<void>{
+        if(!this.remote?.recoverSession)throw new FSError('ECAPABILITY','Cells recovery unavailable');
+        await this.remote.recoverSession(input);await this.load();
+    }
     get submittedTurnId(): string | undefined { return this.record.submittedTurnId; }
     submitted(turnId: string): Promise<void> {
         return this.serialize(async () => {
@@ -51,7 +60,7 @@ export class RemoteConversationStore {
     }
     private async write(record: RemoteConversationRecovery): Promise<void> {
         await this.reconcileWrite();
-        this.checkQueueRevision(record);
+        if(this.record.instructionQueue?.owner!=='cells')this.checkQueueRevision(record);
         validateSubmissions(record);
         if (record.deletedSessionIds !== undefined && (!Array.isArray(record.deletedSessionIds) || record.deletedSessionIds.length > 16401
             || record.deletedSessionIds.some(id => typeof id !== 'string' || !id))) throw new FSError('EINVAL', 'Invalid native deletion recovery');
@@ -60,7 +69,8 @@ export class RemoteConversationStore {
             try { await this.fs.driver.createFile({parentPath: '/etc/fs', name: 'harness-conversations.seq', type: 'seqfile', recursive: true}); }
             catch (error) { if ((error as {code?: string}).code !== 'EEXIST') throw error; }
         }
-        const value = JSON.stringify(record);
+        const remoteRecord=this.remote?.queueSession && this.record.instructionQueue?.owner==='cells'?Object.fromEntries(Object.entries(record).filter(([key])=>key!=='instructionQueue')):record;
+        const value = JSON.stringify(remoteRecord);
         if(this.remote)return this.writeRemote(record,value);
         const before = this.raw, started = Date.now();
         try {
@@ -86,7 +96,15 @@ export class RemoteConversationStore {
             const value=raw?JSON.parse(raw) as RemoteConversationRecovery:{};
             await this.fs.meta.seq!.transaction!(tx=>tx.compareAndSet(this.path,this.key,{expected:legacy,value:JSON.stringify(remoteIndex(value))}));
         }
-        this.raw=raw;this.record=raw?JSON.parse(raw):{};validateSubmissions(this.record);return raw?structuredClone(this.record):undefined;
+        this.raw=raw;this.record=raw?JSON.parse(raw):{};validateSubmissions(this.record);
+        if(this.record.sessionId && await this.remote!.registerSession?.(this.record.sessionId)){
+            raw=await this.remote!.read('recovery');this.raw=raw;this.record=raw?JSON.parse(raw):{};validateSubmissions(this.record);}
+        if(this.record.sessionId && this.remote!.queueSession)this.record.instructionQueue=await this.remote!.queueSession(this.record.sessionId,{action:'read'});
+        if(legacy && (JSON.parse(legacy) as {remote?:boolean}).remote){
+            const next=JSON.stringify(remoteIndex(this.record));
+            if(next!==legacy)await this.fs.meta.seq!.transaction!(tx=>tx.compareAndSet(this.path,this.key,{expected:legacy,value:next}));
+        }
+        this.uncertainWrite=undefined;this.conflicted=false;return raw?structuredClone(this.record):undefined;
     }
     private async writeRemote(record:RemoteConversationRecovery,value:string):Promise<void>{
         const token=randomUUID(),pending=JSON.stringify({...remoteIndex(record),needsRecovery:true,indexOperation:token});
@@ -95,7 +113,10 @@ export class RemoteConversationStore {
         try{if(!await this.remote!.compare('recovery',before,value))throw new FSError('ECONFLICT','Remote conversation changed on its harness node');}
         catch(error){this.uncertainWrite={before,after:value};this.log('remote-persist',started,record,error);throw error;}
         this.raw=value;this.record=record;
-        try{await this.fs.meta.seq!.transaction!(tx=>tx.compareAndSet(this.path,this.key,{expected:pending,value:JSON.stringify(remoteIndex(record))}));}
+        if(record.sessionId && await this.remote!.registerSession?.(record.sessionId)){
+            const current=await this.remote!.read('recovery');this.raw=current;this.record=current?JSON.parse(current):{};
+            if(this.remote!.queueSession)this.record.instructionQueue=await this.remote!.queueSession(record.sessionId,{action:'read'});}
+        try{await this.fs.meta.seq!.transaction!(tx=>tx.compareAndSet(this.path,this.key,{expected:pending,value:JSON.stringify(remoteIndex(this.record))}));}
         catch(error){this.log('recovery-index',started,record,error);}
         this.log('remote-persist',started,record);
     }
@@ -177,6 +198,6 @@ function validateAttachments(value: unknown): asserts value is HarnessAttachment
 }
 
 function remoteIndex(record:RemoteConversationRecovery){
-    return {remote:true,sessionId:record.sessionId,needsRecovery:!!(record.pending||record.responses?.length||record.instructionQueue?.items.length
+    return {remote:true,sessionId:record.sessionId,needsRecovery:!!(record.pending||record.responses?.length||record.instructionQueue?.owner!=='cells'&&record.instructionQueue?.items.length
         ||record.controls?.some(row=>row.receipt==='pending'||row.receipt==='accepted'&&!row.terminal))};
 }

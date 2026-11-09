@@ -13,7 +13,7 @@ export async function freezeFix(options:Options,boardId:string,request:{itemId:s
         const decision=context.decision?{...context.decision,record:await state.decisionSnapshot(context.decision)}:null;
         const parent=item.planning?.parentId?(await options.service.item(boardId,item.planning.parentId)).item:null;
         const origin=await fixOrigin(options,boardId,item);
-        return {origin,resourceId:refs[0].id,context:{...context,parent,task:structuredClone(item),decision,fix:{id,originalOperationId:origin.id,scopeId:id}}};
+        return {origin,resourceId:item.planning?.execution==='children'&&context.primaryProjectId?context.primaryProjectId:refs[0].id,context:{...context,parent,task:structuredClone(item),decision,fix:{id,originalOperationId:origin.id,scopeId:id}}};
     });
 }
 

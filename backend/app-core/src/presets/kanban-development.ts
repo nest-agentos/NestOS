@@ -1,3 +1,4 @@
+import {freezeKanbanHarness,harnessSettingKey} from './kanban-harness-settings';
 import {registerWorkResource} from './kanban-work-resource-catalog';
 import {initializeResourceIndex} from '../kanban/resource-operation-index';
 import {decisionDeliveryPolicy,selectedDeliveryProfile,deliveryEvidence} from './kanban-delivery-plan';
@@ -19,6 +20,7 @@ import {prepareWorktreeModules, availableWorktreeModules, type WorktreeRepositor
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {REMOTE_PROJECT_REFERENCE} from '../kanban/resource-catalog';
+import {decisionProjectScope,requireDecisionProjectContext} from '../kanban/decision-project-scope';
 import type {PersonalKanbanAutomationOptions} from '../kanban/personal-automation';
 import {publishPromptBundle} from '../run/prompt-bundle';
 import {developmentPolicy, type DevelopmentPolicy} from './kanban-development-policy';
@@ -28,7 +30,7 @@ interface Options {fs: IFileSystem; agents: IAgentManagementService; connections
     remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
     projects: Pick<import('@nestos/app-contracts/services').ProjectService, 'get' | 'openWorkspace'>}
 type Input = Parameters<NonNullable<PersonalKanbanAutomationOptions['prepareWork']>>[0];
-export interface DevelopmentWorkspaceRecord {projectId: string; directory: string; worktreeId?: string; communicationDirectory?: string; repositories: WorktreeRepository[]; availableRepositories: WorktreeRepository[]; policy: DevelopmentPolicy; gitIdentity?: GitCommitIdentity; context?:unknown; commitContext?: CommitContext; channelId: string; instructions?: string}
+export interface DevelopmentWorkspaceRecord {projectId: string; contextProjects?:Array<{projectId:string;revision:number}>;directory: string; worktreeId?: string; communicationDirectory?: string; repositories: WorktreeRepository[]; availableRepositories: WorktreeRepository[]; policy: DevelopmentPolicy; gitIdentity?: GitCommitIdentity; context?:unknown; commitContext?: CommitContext; channelId: string; instructions?: string}
 
 /** Product policy selects resources; generic Kanban persists opaque preparation options. */
 export function developmentPreparation(options: Options): NonNullable<PersonalKanbanAutomationOptions['prepareWork']> {
@@ -43,13 +45,16 @@ export function developmentPreparation(options: Options): NonNullable<PersonalKa
         const connectionId = source.definition.execution.connectionId;
         const template = await developmentStage(input.dispatch.id, 'connection.resolve', () => options.connections.get(connectionId));
         requireValue(template?.connection && template.connection.enabled !== false, 'NATIVE_CONNECTION_REQUIRED');
-        const projectId = selected[0].id, directory = '_nestos/worktrees/' + input.dispatch.id;
+        const primary=(input.context as {primaryProjectId?:string})?.primaryProjectId;
+        const projectId = input.stage==='decision'&&primary?primary:selected[0].id, directory = '_nestos/worktrees/' + input.dispatch.id;
         await registerWorkResource(journal,input.dispatch.id,{projectId,context:input.context});
-        const record = await prepareWorkspace(options, journal, input, projectId, template.connection.profileId, directory, [source.definition.config.systemPrompt, ...source.systemPrompt?.content ?? []].filter(Boolean).join('\n\n'));
+        const role=input.stage==='decision'?'coordination':'execution';
+        const profileId=await freezeKanbanHarness(journal,input.dispatch.id,input.board?.id??'legacy',role,input.board?.settings?.[harnessSettingKey(role)]||template.connection.profileId);
+        const record = await prepareWorkspace(options, journal, input, projectId, profileId, directory, [source.definition.config.systemPrompt, ...source.systemPrompt?.content ?? []].filter(Boolean).join('\n\n'));
         await input.reportActivity?.({stage: 'worktree.prepared', result: 'success', fields: {directory: record.directory, branch: record.repositories[0]?.branch ?? '', baseCommit: record.repositories[0]?.baseCommit ?? ''},
             references: [{system: 'nestos-worktree', id: input.dispatch.id, revision: JSON.stringify({projectId, directory: record.directory, repositories: record.repositories})}]});
         const root = options.remote.list(projectId).find(mount => mount.at === '/')!;
-        const connection = {...template.connection, id: 'work-' + input.dispatch.id, projectId, nodeConnectionId: root.connectionId!, directory};
+        const connection = {...template.connection,profileId,...(profileId!==template.connection.profileId?{selection:undefined}:{}), id: 'work-' + input.dispatch.id, projectId, nodeConnectionId: root.connectionId!, directory};
         const existing = await options.connections.get(connection.id);
         if (existing) requireValue(JSON.stringify(existing.connection) === JSON.stringify(connection), 'WORK_CONNECTION_CHANGED');
         else await options.connections.save(connection, 0);
@@ -60,11 +65,14 @@ export function developmentPreparation(options: Options): NonNullable<PersonalKa
     };
 }
 async function prepareWorkspace(options: Options, journal: KanbanAutomationJournal, input: Input, projectId: string, profileId: string, directory: string, instructions: string): Promise<DevelopmentWorkspaceRecord> {
+    const projectIds=(input.context as {projectIds?:string[]})?.projectIds;
+    const contextProjects=input.stage==='decision'&&projectIds?decisionProjectScope(options.remote,projectId,projectIds):undefined;
     await developmentStage(input.dispatch.id, 'harness.profiles', () => requireDevelopmentHarness(options, projectId, profileId));
     const folder = await options.projects.get(projectId), view = await developmentStage(input.dispatch.id, 'workspace.open', () => options.projects.openWorkspace(folder.path));
     try {
         const policy = await developmentStage(input.dispatch.id, 'policy.freeze', () => developmentPolicy(journal,options.fs,view.fs,input.dispatch.id,{...input.options,...(input.stage===undefined&&(input.context as {decision?:{snapshot?:{completion?:string}}})?.decision?.snapshot?.completion==='automatic'?{commit:'worktree'}:{})}));
         let context=input.context;
+        if(contextProjects)context={...context as object,projectBindings:projectIds!.map((id,index)=>({id,cellProjectId:contextProjects[index].projectId}))};
         const selected=await developmentStage(input.dispatch.id,'delivery.policy',async()=>decisionDeliveryPolicy(policy,context));
         developmentDeliveryChoice(input.dispatch.id,selected);
         if(input.stage==='decision'&&context)context={...context as object,snapshot:{...(context as {snapshot?:object}).snapshot,delivery:selected}};
@@ -78,7 +86,7 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
             const repositories = await developmentStage(input.dispatch.id, 'modules.prepare', () => prepareWorktreeModules(journal, tree, policy.modules, process));
             const availableRepositories = await availableWorktreeModules(process, tree);
             return journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id,
-                old => old ?? {channelId: input.dispatch.id, projectId, directory: tree.directory, repositories, availableRepositories, policy, gitIdentity, instructions,...(context===undefined?{}:{context})});
+                old => old ?? {channelId: input.dispatch.id, projectId,contextProjects,directory: tree.directory, repositories, availableRepositories, policy, gitIdentity, instructions,...(context===undefined?{}:{context})});
         });
         if ((record.context as {board?: {id?: string}})?.board?.id) {
             const commitContext = record.commitContext ?? await freezeCommitContext(journal, {projectId, boardId: (record.context as {board:{id:string}}).board.id, itemId: input.item.id, itemRevision: input.item.revision, executionId: input.dispatch.id, context: record.context});
@@ -98,7 +106,7 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
 }
 async function requireDevelopmentHarness(options: Options, projectId: string, profileId: string): Promise<void> {
     const harness = await options.remote.projectHarness(projectId, {requireRegistered: true});
-    try {const capabilities = (await harness.profiles()).profiles.find(profile => profile.id === profileId)?.capabilities; requireValue(capabilities?.workingDirectory, 'NATIVE_WORKING_DIRECTORY_UNSUPPORTED'); requireValue(capabilities.sessionChannels === true, 'NATIVE_SESSION_CHANNEL_REQUIRED');}
+    try {const capabilities = (await harness.profiles()).profiles.find(profile => profile.id === profileId)?.capabilities; requireValue(capabilities, 'KANBAN_HARNESS_UNAVAILABLE');requireValue(capabilities.workingDirectory, 'NATIVE_WORKING_DIRECTORY_UNSUPPORTED'); requireValue(capabilities.sessionChannels === true, 'NATIVE_SESSION_CHANNEL_REQUIRED');}
     finally {await harness.close();}
 }
 function workerDefinition(source: AgentDefinition, input: Input, connectionId: string, policy: DevelopmentPolicy): AgentDefinition {
@@ -125,10 +133,11 @@ export function channelInstruction(policy: DevelopmentPolicy, entry: string, pre
 export async function openDevelopmentChannel(remote: Pick<ProjectRemoteMountService, 'sessionChannel'>, id: string, record: DevelopmentWorkspaceRecord,
     identity: {runId: string; itemId: string; attemptId: string}, task: unknown, binding?: {previousScopeId: string; previousSessionId: string; sessionId?: string}): Promise<void> {
     requireValue(record.channelId === id, 'SESSION_CHANNEL_SCOPE_REQUIRED');
-    await remote.sessionChannel(record.projectId, 'open', {scopeId: id, cwd: record.directory, ...binding,
+    const receipt=await remote.sessionChannel(record.projectId, 'open', {scopeId: id, cwd: record.directory, ...binding,...(record.contextProjects?{contextProjects:record.contextProjects}:{}),
         snapshot: {identity, task, instructions: record.instructions ?? '', planning: record.policy.prompts.files.find(file=>file.name==='planning.md')?.content??defaults['planning.md'], ...planningSections(record.context),
             policy: {commit: record.policy.commit, gitIdentity: record.gitIdentity, repositories: record.repositories, availableRepositories: record.availableRepositories},
             ...Object.fromEntries(record.policy.prompts.files.map(file => [file.name, {content: file.content, sha256: file.sha256}]))}});
+    if(record.contextProjects)requireDecisionProjectContext(receipt,record.contextProjects);
 }
 
 /** Fence the exact previous execution while selecting the next native Session explicitly. */

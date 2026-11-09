@@ -11,19 +11,30 @@ export function nativeQueueMessages(state: NativeSnapshot, operations: Operation
     return operations.getSnapshot().filter(record => record.conversationId === conversationId && accepted.has(record.context.operationId))
         .flatMap<NonNullable<ConversationSnapshot['operationMessages']>[number]>(record => {
             const operationId = record.context.operationId, item = queue.items.find(item => item.id === operationId);
-            if (item) return [{operationId, message: queueMessage(item, queue.revision)}];
+            if (item) return [{operationId, message: queueMessage(item, queue)}];
             const sent = submissions.get(operationId);
             return sent?.turnId || sent?.commandId ? [] : [{operationId, message: null}];
         });
 }
 
-function queueMessage(item: ConversationInstructionQueue['items'][number], revision: number): ChatMessage {
-    const failed = item.state === 'failed';
-    return {id: `operation:${item.id}`, revision, role: 'user', state: failed ? 'failed' : 'pending', timestamp: item.createdAt,
+export function nativeQueueNotice(state: NativeSnapshot): {code: string; message: string} | undefined {
+    const queue = state.instructionQueue;
+    if (!queue?.recovery?.required) return;
+    return {code: 'HARNESS_EXECUTION_RECOVERY_REQUIRED', message: recoverySummary(queue)};
+}
+
+function recoverySummary(queue: ConversationInstructionQueue): string {
+    return t(queue.reason === 'execution-detached' ? 'session.instructions.reason.detached' : 'session.instructions.reason.recoveryRequired');
+}
+
+function queueMessage(item: ConversationInstructionQueue['items'][number], queue: ConversationInstructionQueue): ChatMessage {
+    const failed = item.state === 'failed', recovery = !!queue.recovery?.required;
+    return {id: `operation:${item.id}`, revision: queue.revision, role: 'user', state: failed ? 'failed' : 'pending', timestamp: item.createdAt,
+        statusLabel: recovery ? t('session.instructions.recoveryRequired') : undefined,
         parts: [{id: 'text', kind: 'markdown', text: item.text},
-            {id: 'status', kind: 'tool', name: item.state === 'dispatching' ? t(item.acceptedAt ? 'session.instructions.acceptedAt' : 'session.instructions.dispatchedAt') : t(`session.instructions.${item.state}`),
-                summary: queueSummary(item),
-                state: failed ? 'failed' : item.state === 'dispatching' ? 'running' : 'pending'},
+            {id: 'status', kind: 'tool', name: recovery ? t('session.instructions.recoveryRequired') : item.state === 'dispatching' ? t(item.acceptedAt ? 'session.instructions.acceptedAt' : 'session.instructions.dispatchedAt') : t(`session.instructions.${item.state}`),
+                summary: recovery ? recoverySummary(queue) : queueSummary(item),
+                state: failed ? 'failed' : recovery ? 'unknown' : item.state === 'dispatching' ? 'running' : 'pending'},
             ...(item.files.length ? [{id: 'files', kind: 'json' as const, label: t('session.instructions.attachments'), value: item.files.map(file => file.name)}] : [])]};
 }
 

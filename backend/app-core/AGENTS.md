@@ -4,9 +4,9 @@ Kanban 的实际执行者按 WorkItem ↔ Session 关联，执行绑定通过 ne
 
 Kanban 通用规则、契约与 SeqFile 存储位于独立库 `@nestos/kanban`（仅依赖 vfs-core）。本包 kanban/ 仅承担授权 Session 来源读取、远程客户端绑定、正式发布 Agent/Flow 调用、Kernel 回执核对和 UserEventService 投影。扫描状态机、远程事务编码、执行日志与恢复及活动投影归独立库；应用仅提供端口，不改写 reducer、不代转出库 API。资源声明保留在 resources，安装与适配代码位于 presets，借助库 installKanbanContent 安装。独立执行桥先保存冻结请求及 submitting 标记再调用执行入口，重启只核对原身份；unknown 不重派。Runtime 关停先停止准入和监听、排空事务与观察，再关闭 VFS；恢复错误通过现有 global event/notify 去重报告。个人看板显式启用 AI 协作后复用正式发布调用分析与执行，默认关闭；项目接线仍使用 configureKanban，见 [协调设计](../../doc/design/kanban-coordination.md)。
 
-远程原生队列启动恢复由 projects/remote-conversation-recovery 扫描当前用户已有 journal，重验连接、项目、principal 与稳定会话身份后挂入 ConversationRegistry。恢复只建立观察和读取基线，不直接重发原指令；失效绑定或不可用远端保留 deferred 与原记录。所有存储沿注入 IFileSystem 的 SeqFile CAS，不创建跨用户全局 events.seq，也不把会话恢复策略放进 vfs-core。
+远程原生指令队列的准入、派发、终结核对与启动恢复由 Cells 私有队列表和后台 worker 维护；NestOS 的 projects/remote-conversation-recovery 只恢复当前用户的观察与草稿/控制元数据绑定，重验连接、项目、principal 与稳定会话身份后挂入 ConversationRegistry。独立 Session 恢复 API 直接转发 Cells，不依赖 UI view，不自动重发结果未知的原指令；Cells 已拥有的队列不由 Registry 保活或本地 journal 覆写。不创建跨用户全局 events.seq，也不把会话恢复策略放进 vfs-core。
 
-projects/remote-conversation-retry 对暂时性观察接线失败按 15 至 60 秒退避，仅重试失败目标并重新读取原 journal；授权变化/身份冲突不自动放行。NestOS 本机只存不含正文的恢复索引；会话草稿、操作台账及队列正文由 Cells 私有项目状态存储持有。原生历史始终归 harness。旧本机状态经远端确认后移除当前正文。该索引用于跨重启恢复，重试集合只用于进程内调度；dispose 先关闭重试循环并等待当前扫描，再释放 Registry。
+projects/remote-conversation-retry 对暂时性观察接线失败按 15 至 60 秒退避，仅重试失败目标并重新读取原 journal；授权变化/身份冲突不自动放行。NestOS 本机只存不含正文的恢复索引；会话草稿与客户端控制台账由 Cells 私有项目状态存储持有；指令队列独立存储，由 Cells 维护语义及幂等回执，同一授权项目/profile/Session 的不同客户端命名空间共用队列。原生历史始终归 harness。旧本机状态经远端确认后移除当前正文。该索引用于跨重启恢复，重试集合只用于进程内调度；dispose 先关闭重试循环并等待当前扫描，再释放 Registry。
 
 平台无关的**应用用例与装配层**：封装项目组织、配置关联操作等应用策略，并把 VFS / LLM 设备驱动 / durable-kernel / kernel-adapters / llm-session / llm-flow 装配成运行时，供 Tauri、Web 与 CLI 共用。详见 [运行时架构](../../doc/runtime-architecture.md)、[包结构](../../doc/pkgstructure.md)。
 
@@ -252,3 +252,5 @@ session/directory-view 在既有授权 Session 浏览器文件视图内聚合节
 个人看板 AI 联动由 kanban/personal-automation 与 analysis-adapter 装配，规划指令归 resources/kanban/kanban-development-prompts.json 的 planning.md，经全局/项目同名文件覆盖并冻结到每次执行；代码只发送简短上下文读取入口。automation.seq 的稳定调用身份先持久再提交，unknown 只核对不重派；事项修订和规划签名过期则拒绝迟到结果。产物须核对派发归属、正文摘要及字节数，默认独立验收后才解锁依赖。库内不放 NestOS 目标、提示词或调用实现。
 
 工作台聚合查询通过 BrowserReadContext 复用本次项目目录、组织记录、收藏与工作区；文件准备不能等待导航查询。范围不跨查询缓存，失败后排空读取并释放全部借用句柄；项目根不读取不会展示的完整本地摘要。
+
+kanban/call-lifecycle 只适配 Session 的 controlIndependentCall，保留旧控制 key、应用错误码与直接 submission fallback，不再拥有通用控制状态机。协调结果/提案/范围、协作检查点与 ACK 意图、决策确认和恢复准入归 @nestos/kanban；NestOS 继续核对真实用户证据、项目授权、Native 会话、部署版本、业务动作与工作树。开发产物 schema 与合并校验留在 item-operation-results。

@@ -6,5 +6,8 @@
   "bootstrap": "Read decision-propose.md and context through session_context.",
   "recoveryBootstrap": "Use session_request with method kanban.recovery.inspect and params {} to inspect this failed task. Yield for the host response. Do not modify source, change task state, rebuild or deploy. Use formal host recovery requests and preserve frozen version checks.",
   "resumeDecision": "Read the host response with session_response for request {{requestId}}. Explain its actual outcome and continue this same decision conversation.",
-  "resumeRecovery": "Read the host response using session_response for {{requestId}}. Explain its actual outcome. Preserve completed tasks and use only the offered recovery actions."
+  "resumeRecovery": "Read the host response using session_response for {{requestId}}. Explain its actual outcome. Preserve completed tasks and use only the offered recovery actions.",
+  "cancelDecision": "取消决策",
+  "coordinationBootstrap": "Read coordination-conversation.md and context through session_context. This is the persistent coordination window for the bound decision. Read current state through coordination.read before giving advice; do not start or change tasks just because this window opened.",
+  "confirmFix": "确认修复"
 }

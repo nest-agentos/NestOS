@@ -15,7 +15,7 @@ import {NativeComposerCapabilities, type NativeCommandProvider} from './native-c
 import {submitNativeCommand} from './native-command';
 import {nativeControlReceipt} from './native-control';
 import {createNativeQueuePort, nativeQueueToolbar} from './native-queue';
-import {nativeQueueMessages} from './native-queue-messages';
+import {nativeQueueMessages, nativeQueueNotice} from './native-queue-messages';
 import {nativeCatalogNotice} from './native-catalog';
 import { ChatProjection } from './projection';
 import {nativeInteraction, nativeResponse} from '../native-interactions';
@@ -62,7 +62,7 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
         if (closed) return;
         native = state;
         const catalog = commands(state);
-        source.publish({ composerIndicators: nativeComposerIndicators(state), title: state.title, selectors: capabilities.selectors(), error: nativeResultNotice(state) ?? nativeCatalogNotice(state),
+        source.publish({ composerIndicators: nativeComposerIndicators(state), title: state.title, selectors: capabilities.selectors(), error: nativeResultNotice(state) ?? nativeQueueNotice(state) ?? nativeCatalogNotice(state),
             commands: state.supportsSlashCommands || options.commandProviders?.length ? catalog : undefined,
             operationReceipts: nativeReceipts(state, options.operations, options.conversationId),
             operationMessages: [...(nativeQueueMessages(state, options.operations, options.conversationId) ?? []), ...nativeSteeringPreviews(state, options.operations, options.conversationId)],

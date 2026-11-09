@@ -2,7 +2,9 @@ import {afterEach, expect, it, vi} from 'vitest';
 import {MemoryBackend, createVFS} from '@nestos/vfs-core';
 import {UserEventService} from '../../../backend/app-core/src/events/service';
 import {projectKernelEvents} from '../../../backend/app-core/src/events/kernel-source';
-import {ApplicationEventFeed} from '@nestos/app-transport/application';
+import {ApplicationEventFeed, RpcPeer, installViewProjections} from '@nestos/app-transport/application';
+import {createApplicationRuntime} from '@nestos/app-core';
+import {createHostedView} from '@nestos/node-host/http';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close();});
@@ -66,9 +68,6 @@ it('reloads snapshots after cursor expiration and resumes without consuming othe
 });
 
 it('shares read state across real RPC views while keeping publication and storage host-only', async () => {
-    const {createApplicationRuntime} = await import('@nestos/app-core');
-    const {createHostedView} = await import('@nestos/node-host/http');
-    const {RpcPeer, installViewProjections} = await import('@nestos/app-transport/application');
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'web', digitalTwinAutoStart: false});
     cleanup.push(() => runtime.dispose());
     const connect = async () => {

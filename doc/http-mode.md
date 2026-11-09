@@ -55,6 +55,16 @@ pnpm cli session receipt <session-id> call.json --profile /path/to/data
 
 远程使用这些入口需要 httpd 构建包含 session.targets.list、session.submit 与 session.submission.inspect。旧宿主缺少命令时明确失败，不回退到旧 session.send 或本地执行。快速退出时，启动协调器继续允许已接纳恢复工作读取既有就绪 Promise，拒绝新初始化并排空原工作。
 
+## Cells 异常退出后的原生队列恢复
+
+Cells 在 harness home 的 `.cells/executions/` 中按安装或项目/owner/profile 的稳定范围保存执行标识：原 requestId、sessionId、接纳的 turnId、节点 epoch 与状态，不保存 prompt、附件正文或凭据。原生修改前先持久登记 submitting，接纳后保存 turn 身份；持久化失败保留 unknown，不据此重发。
+
+Cells 启动扫描既有执行记录，将前一节点 epoch 尚未结算的运行标为待核对；会话读取先用原生精确 turn 历史核对。找到真实终态就采用真实结果，否则在 `session.executionRecovery.interruptedTurns` 返回 `CELLS_RESTARTED` 及原请求/轮次身份，不伪造成功、失败或取消终态。
+
+队列仅在该证据精确匹配队首原 requestId/turnId，且重新 inspect 确认原生会话未加载、不归当前运行时所有、无活动 turn、写锁已释放、观察新鲜时，自动将旧轮保存为结果未知并解除它的屏障。只继续既有排队输入；用户手动暂停保留，没有后续输入不重放原指令。没有持久证明的旧执行、未确认接纳、未决控制、损坏历史、锁占用或证据过期继续保留人工恢复入口。
+
+GUI 队列恢复需要两次点击确认。`chat.native.queue.ui` 浏览器日志区分 confirmation、confirmation_invalidated、submit、complete 和 availability，含关联操作 ID、队列修订、阶段、结果、耗时及安全错误码，不记录输入正文。服务器 HTTP 审计可核对 `HarnessConversationPort.editInstructionQueue` 是否到达；驱动记录持久恢复及预检查拒绝。只有浏览器本地 confirmation 而无 RPC 不能算恢复已提交，HTTP 200 也不能代替业务结果。
+
 ## 显式连接现有 httpd
 
 ```bash
@@ -190,3 +200,34 @@ call-submit 明确提交原文件身份，由宿主创建独立子 Session。调
 事项创建可以显式传入 `item.id`；留空时在同一看板事务内分配 `task-003` 形式的可读 ID，保留与归档 ID 不复用。同次操作重试保留原结果。所有事项另有稳定编号，可使用 `nestos kanban resolve 'KB-3#12'` 解析真实看板与事项 ID；MCP 会话上下文同时提供 ID 和 reference。
 
 `kanban record-control <board-id> --file request.json` 支持 pause/resume/cancel/restart/archive/delete。请求包含 recordId、稳定 operationId、action 和 expectedRevision；重新执行、归档、删除先结算关联任务，结果未知时持续保留处理责任。重复提交同一文件不会生成额外一轮。
+
+
+## 原生 Session 独立恢复 API
+
+`POST /api/sessions/recovery` 使用既有 mTLS 用户身份与 Origin 校验；不接受 clientId、userId 或视图能力，不要求 bootstrap/SSE。浏览器视图过期的 HTTP 400 不阻止该业务端口核查 Session。
+
+```json
+{"version":1,"action":"inspect","target":{"projectId":"cx1","profileId":"codex","sessionId":"<session-id>"}}
+```
+
+恢复请求使用 `action: "recover"` 和 `request: {projectId, profileId, sessionId, operationId, instructionId, expectedRevision}`。先 inspect，使用其队首指令 ID 与队列 revision；同次重试必须保留所有字段和 operationId。响应包含 operationId、outcome、duplicate 和安全状态投影。`recovered` 表示已核对并解除原队首阻塞，原执行结果仍可为 unknown；`no-longer-blocked` 表示原指令已有原生接纳记录且不再占据队列，均不代表任务完成。
+
+NestOS 仅校验应用身份、解析项目授权并转发 Cells，不持久化原生恢复结论或去重台账。Cells 按 principal、项目和原生 Session 保存队列与恢复回执；队首变化与成功回执在同一 SQLite 事务提交。重复操作沿用原 ID，修改目标或 revision 复用 ID 会拒绝。未知结果不能清成完成；仍有原生执行、writer 或待核对提交时返回具体业务拒绝原因。
+
+```bash
+pnpm cli conversation recovery cx1 codex <session-id> --connect https://host:2000 --client-cert client.crt --client-key client.key --ca-cert ca.crt
+pnpm cli conversation recover cx1 codex <session-id> <instruction-id> <revision> <operation-id> --connect https://host:2000 --client-cert client.crt --client-key client.key --ca-cert ca.crt
+```
+
+CLI 与浏览器复用该端口，无需恢复 UI 视图。CLI 不自动生成新的操作 ID 重试；浏览器在同页视图重建与未知结果重试间保留原 ID。恢复不会重发原指令，也不创建新 Session；恢复后继续队列遵循既有暂停状态与派发规则。
+
+
+### Cells 对原生队列的所有权
+
+支持节点通过 `projectHarnessRecovery: 1`、`projectHarnessQueue: 1` 声明能力；SDK 使用固定 `/v1/api/projects/harness_recovery`、`/v1/api/projects/harness_queue` 协议。节点不足时返回 ECAPABILITY，不退回 NestOS 本地恢复判定。
+
+首次登记将旧客户端 journal 中的队列原子迁入 Cells 独立状态表，保留 ID、revision、暂停、回执与 unknown 恢复记录；草稿和客户端元数据留在原 journal。同一 principal/项目/profile/Session 的不同客户端 namespace 共用同一条队列；存在不同的非空旧队列时拒绝静默合并。迁移后通用 client-state CAS 禁止写回 instructionQueue，防止旧客户端覆盖或重复派发。
+
+Cells 在调用原生协议前保存领取及原 requestId/epoch，接纳后持久保存精确 turn/command 身份。关闭浏览器和 NestOS 不终止 Cells 队列；Cells 自己等待真实终态、派发后续项，并在启动时重新验证项目授权和未结算执行。旧 epoch 未确认的领取只能核对，不自动重发。具备精确重启证据时，旧轮保存为 unknown，保留原暂停策略；证据不完整则保留屏障。
+
+NestOS 不再为 Cells-owned 队列保留后台 Conversation 租约或队列恢复扫描责任。看板、Flow、跨项目业务计划仍属于 NestOS；Cells 只拥有原生执行与队列状态。Rust 纯转换模块与 SQLite、进程核查、事件订阅分开，TypeScript SDK 负责协议及展示投影，不通过 Node 原生扩展在另一进程运行第二份远端状态机。

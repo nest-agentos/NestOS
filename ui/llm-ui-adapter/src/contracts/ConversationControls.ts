@@ -28,7 +28,7 @@ export interface ConversationModelCatalog {
 }
 export interface ConversationInstructionQueue {
     recoveries?: Array<{id: string; turnId: string; recoveredAt: number; outcome: 'unknown'}>;
-    recovery?: {id: string};
+    recovery?: {id: string; required?: boolean};
     reason?: string;
     revision: number; paused: boolean; acceptedIds: string[];
     submissions?: Array<{id: string; turnId?: string; commandId?: string; kind?: 'steer'; createdAt?: number; dispatchedAt?: number; acceptedAt?: number}>;
@@ -44,6 +44,8 @@ export interface ConversationMetrics {
     errors?: {context?: string; quota?: string};
 }
 export interface ConversationSnapshot {
+    historyRecovery?: {skippedRecords: number; skippedBytes: number; nulRecords: number;
+        invalidJsonRecords: number; invalidRecordRecords: number; firstOffset: number; lastOffset: number};
     metrics?: ConversationMetrics;
     supportsMetrics?: boolean;
     metricsError?: {code: string};

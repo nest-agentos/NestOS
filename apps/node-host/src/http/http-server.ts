@@ -1,3 +1,4 @@
+import {NATIVE_SESSION_RECOVERY_ENDPOINT} from '@nestos/app-contracts';
 import {traceRequest} from '../logging/request-trace';
 import { createServer, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -44,7 +45,7 @@ async function serve(request: IncomingMessage, response: ServerResponse, options
         request.socket.destroy(); return;
     }
     const pathname = new URL(request.url ?? '/', 'https://localhost').pathname;
-    const route = ['/api/identity', '/api/vfs', '/api/health', '/api/application', '/api/application/events', '/api/application/files', '/api/tool-connections/callback', '/api/tool-connections/result'].includes(pathname) ? pathname : pathname.startsWith('/api/') ? '/api/unknown' : '/ui';
+    const route = ['/api/identity', '/api/vfs', '/api/health', '/api/application', '/api/application/events', '/api/application/files', NATIVE_SESSION_RECOVERY_ENDPOINT, '/api/tool-connections/callback', '/api/tool-connections/result'].includes(pathname) ? pathname : pathname.startsWith('/api/') ? '/api/unknown' : '/ui';
     const userId = auth.userId;
     if (userId && userId !== 'admin' && !options.multiUser) throw new FSError('EACCES', 'User mappings require multi-user hosting');
     const audit = userId && options.userAudit ? options.userAudit(userId) : options.audit;
@@ -59,7 +60,7 @@ async function serve(request: IncomingMessage, response: ServerResponse, options
         json(response, 200, {userId: userId ?? 'admin'}); return;
     }
     if (request.method === 'POST' || pathname.startsWith('/api/application')) validateOrigin(request);
-    if (['/api/application', '/api/application/events', '/api/application/files'].includes(pathname)) {
+    if (['/api/application', '/api/application/events', '/api/application/files', NATIVE_SESSION_RECOVERY_ENDPOINT].includes(pathname)) {
         if (!options.application) throw new FSError('ECAPABILITY', 'Application hosting is disabled');
         await options.application.handle(request, response, () => options.certificates.accepts(request.socket as TLSSocket)); return;
     }

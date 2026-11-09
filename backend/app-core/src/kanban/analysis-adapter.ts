@@ -1,10 +1,9 @@
 import {workContext} from './work-context';
 import {transientOperationFailure} from '../run/operation-recovery';
-import type {KanbanProjectRecord} from '@nestos/kanban/contracts';
 import {inheritWorkReferences} from './task-projects';
 import {formatPromptSections} from '@nestos/llm-context/prompt';
 import {DEFAULT_KANBAN_WORK_TYPES,type KanbanBoard,type KanbanItem,type KanbanService} from '@nestos/kanban/contracts';
-import {analyzeItem as coordinateAnalysis,safeCode,type KanbanAutomationJournal,type KanbanAnalysisObservation} from '@nestos/kanban/integration';
+import {validateDecisionSource,analyzeItem as coordinateAnalysis,safeCode,type KanbanAutomationJournal,type KanbanAnalysisObservation} from '@nestos/kanban/integration';
 import {t} from '@nestos/common';
 import {taskStat,type Kernel,type TaskCallResult} from '@nestos/durable-kernel';
 import type {IndependentCallService} from '@nestos/llm-session';
@@ -46,8 +45,8 @@ function analysisInput(board:KanbanBoard,item:KanbanItem,target:TargetRef,id:str
 }
 async function inspectAnalysis(options:AnalysisOptions,id:string,input:IndependentCallInput,board:KanbanBoard,item:KanbanItem,service:KanbanService):Promise<KanbanAnalysisObservation> {
     const observed=await options.readAnalysisOutput?.(id);
-    if(observed?.state==='clarification')return observed;
-    if(observed?.state==='succeeded')await validateSource(options,board,item,service);
+    if(observed?.state==='clarification'||observed?.state==='blocked')return observed;
+    if(observed?.state==='succeeded')await validateDecisionSource(service,(await workContext(options.journal,board,item)).decision);
     const pending={state:'running' as const},admission=await options.calls.inspectTaskCallSubmission(input);
     if(!options.active())return pending;
     if(!admission)return {state:'unknown',code:'AUTOMATION_ADMISSION_UNKNOWN'};
@@ -59,12 +58,4 @@ async function inspectAnalysis(options:AnalysisOptions,id:string,input:Independe
     if(record.exit?.status!=='succeeded'||result?.exit.status!=='succeeded')return {state:record.exit?.status==='cancelled'||result?.exit.status==='cancelled'?'cancelled':'failed',code:safeCode(result?.exit.error??record.exit?.error,'AUTOMATION_ANALYSIS_FAILED')};
     requireValue(options.readAnalysisOutput,'SESSION_CHANNEL_RESULT_UNAVAILABLE');
     return observed??{state:'running'};
-}
-
-async function validateSource(options:AnalysisOptions,board:KanbanBoard,item:KanbanItem,service:KanbanService):Promise<void> {
-    const context=await workContext(options.journal,board,item),source=context.decision;
-    if(!source)return;
-    const current=await service.record(source.sourceBoardId,source.recordId),snapshot=source.snapshot as KanbanProjectRecord|undefined;
-    const definition=(record:KanbanProjectRecord)=>JSON.stringify([record.title,record.content,record.rationale,record.externalRefs]);
-    requireValue(current.status==='confirmed'&&snapshot&&definition(current)===definition(snapshot),'PLANNING_DECISION_STALE');
 }

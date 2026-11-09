@@ -51,8 +51,11 @@
     "cli:built": "node apps/cli/dist/cli.js",
     "nestos:pack": "node scripts/release-nestos.mjs prepare",
     "nestos:publish": "node scripts/release-nestos.mjs publish",
+    "test:kanban-browser": "node scripts/verify-kanban-decision-filter.mjs",
     "test:performance": "node scripts/test-performance.mjs",
-    "performance:session": "node tools/temporary-process/node/cli.mjs run --timeout-ms 180000 -- pnpm --filter @nestos/cli exec tsx scripts/profile-session-switch.ts --gate"
+    "performance:session": "node tools/temporary-process/node/cli.mjs run --timeout-ms 180000 -- pnpm --filter @nestos/cli exec tsx scripts/profile-session-switch.ts --gate",
+    "test:native-queue-browser": "node scripts/verify-kanban-decision-filter.mjs queue-recovery",
+    "test:kanban-native-browser": "node scripts/verify-kanban-decision-filter.mjs native-activity"
   },
   "keywords": [],
   "author": "lizlok@gmail.com",

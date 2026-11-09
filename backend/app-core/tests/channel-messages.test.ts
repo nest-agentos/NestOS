@@ -40,3 +40,12 @@ it('does not acknowledge pending business delivery',async()=>{
     const ack=vi.fn(),value={messages:[{id:'m',message:{type:'result',content:'Ready'}}]};
     await consumeChannelMessages(value,scope,journal(),async()=>({pending:true}),ack);expect(ack).not.toHaveBeenCalled();
 });
+
+it('preserves the binary issue handler from the native payload and rejects other handlers',async()=>{
+ const deliver=vi.fn(async()=>{});
+ for(const handler of ['self','parent']){
+  const rows=await consumeChannelMessages({messages:[{id:'error',message:{type:'error',content:'Blocked',payload:{handler}}}]},scope,journal(),deliver);
+  expect(rows[0]).toMatchObject({handler});
+ }
+ await expect(consumeChannelMessages({messages:[{id:'error',message:{type:'error',content:'Blocked',payload:{handler:'administrator'}}}]},scope,journal(),deliver)).rejects.toMatchObject({reasonCode:'WORK_MESSAGE_HANDLER_INVALID'});
+});

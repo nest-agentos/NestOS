@@ -3,7 +3,7 @@ import type {InstructionQueueViewOptions} from '@nestos/llm-ui';
 
 export function instructionQueueLabels(): InstructionQueueViewOptions['labels'] {
     return {
-        recovered: t('session.instructions.recovered'), recover: t('session.instructions.recover'), confirmRecovery: t('session.instructions.confirmRecovery'),
+        recovered: t('session.instructions.recovered'), recover: t('session.instructions.recover'), confirmRecovery: t('session.instructions.confirmRecovery'), recoveryRequired: t('session.instructions.recoveryRequired'),
         title: t('session.instructions.title'), resume: t('session.instructions.resume'), pause: t('session.instructions.pause'),
         expand: t('session.instructions.expand'), collapse: t('session.instructions.collapse'),
         merge: t('session.instructions.merge'), paused: t('session.instructions.paused'), hint: t('session.instructions.hint'),
@@ -18,6 +18,7 @@ export function instructionQueueLabels(): InstructionQueueViewOptions['labels'] 
             paused: t('session.instructions.reason.paused'), 'active-turn': t('session.instructions.reason.activeTurn'),
             'awaiting-interaction': t('session.instructions.reason.interaction'), 'remote-offline': t('session.instructions.reason.offline'),
             'admission-unconfirmed': t('session.instructions.reason.admission'), 'terminal-unconfirmed': t('session.instructions.reason.terminal'),
+            'execution-detached': t('session.instructions.reason.detached'), 'recovery-required': t('session.instructions.reason.recoveryRequired'),
             rejected: t('session.instructions.reason.rejected'),
             'branch-changed': t('session.instructions.reason.branch-changed'), recovery: t('session.instructions.reason.recovery'),
             HARNESS_SESSION_BUSY: `HARNESS_SESSION_BUSY · ${t('chat.submission.occupied')}`},

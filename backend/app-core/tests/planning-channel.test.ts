@@ -39,7 +39,7 @@ describe('planning conversation reports',()=>{
         expect(f.acks.get('fake')).toMatchObject({code:'PLANNING_REPLY_UNVERIFIED'});
         expect(f.acks.get('early')).toMatchObject({code:'PLANNING_CLARIFICATION_UNRESOLVED'});
         f.report('real','resolved','a',{replyTo:'question'});f.envelope.execution={...f.origin('a'),status:'completed'};
-        expect(await f.read()).toBeUndefined();
+        expect(await f.read()).toEqual({state:'running'});
         f.report('corrected','result','a',{payload:{ready:true,reason:'Scope',dependencies:[]}});
         expect(await f.read()).toMatchObject({state:'succeeded'});
     });
@@ -92,4 +92,31 @@ it('rejects a host-invalid delivery plan before acknowledging or freezing succes
  expect(f.acks.get('invalid')).toEqual({status:'rejected',code:'DELIVERY_CHAIN_INVALID'});
  f.report('corrected','result','q',{payload:{ready:true,reason:'One release'}});
  expect(await f.read()).toMatchObject({state:'succeeded',output:{reason:'One release'}});
+});
+
+it('keeps a reported error recoverable across turns until linked resolution and a validated result',async()=>{
+ const f=fixture();f.report('error','error','q');
+ expect(await f.read()).toMatchObject({state:'blocked',code:'PLANNING_ERROR_REPORTED'});
+ f.report('progress','progress','a');f.report('early','result','a',{payload:{ready:true}});
+ expect(await f.read()).toMatchObject({state:'blocked'});
+ expect(f.acks.get('early')).toMatchObject({code:'PLANNING_ISSUES_UNRESOLVED'});
+ f.report('fixed','resolved','a',{replyTo:'error'});
+ expect(await f.read()).toEqual({state:'running'});
+ f.report('result','result','a',{payload:{ready:true,reason:'Environment checked',dependencies:[]}});
+ f.envelope.execution={...f.origin('a'),status:'completed'};
+ expect(await f.read()).toMatchObject({state:'succeeded'});
+});
+it('allows checked same-turn error recovery but preserves real execution failure',async()=>{
+ const f=fixture();f.report('error','error','q');f.report('fixed','resolved','q',{replyTo:'error'});
+ expect(await f.read()).toEqual({state:'running'});
+ f.envelope.execution.status='failed';
+ expect(await f.read()).toMatchObject({state:'failed',code:'PLANNING_EXECUTION_FAILED'});
+});
+
+it('projects the reported binary handler for blocked planning and defaults undeclared errors to parent',async()=>{
+ const f=fixture();f.report('error','error','q',{payload:{handler:'self'}});
+ expect(await f.read()).toMatchObject({state:'blocked',handler:'self'});
+ f.report('external','error','q',{payload:{handler:'parent'}});expect(await f.read()).toMatchObject({handler:'parent'});
+ const old=fixture();old.report('legacy','error','q');expect(await old.read()).toMatchObject({handler:'parent'});
+ const invalid=fixture();invalid.report('bad','error','q',{payload:{handler:'administrator'}});await expect(invalid.read()).rejects.toMatchObject({code:'PLANNING_HANDLER_INVALID'});
 });

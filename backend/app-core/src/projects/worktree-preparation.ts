@@ -1,3 +1,4 @@
+import {worktreeArguments,logicalWorktreeListing} from './worktree-paths';
 import {FSError} from '@nestos/vfs-core';
 import {randomUUID} from '@nestos/common';
 import type {RemoteProcessHandle} from './remote-mounts';
@@ -29,9 +30,9 @@ export async function prepareWorktree(journal: Journal, id: string, directory: s
 }
 
 async function git(process: RemoteProcessHandle, args: string[]): Promise<string> {
-    const result = await process.nativeShell.exec('git', args, {cwd: '/workspace', timeoutMs: 120000});
+    const result = await process.nativeShell.exec('git', await worktreeArguments(process,args), {cwd: '/workspace', timeoutMs: 120000});
     if (result.code !== 0) throw Object.assign(new Error('Git worktree operation failed'), {
-        code: args[0] === 'rev-parse' ? 'GIT_BASE_READ_FAILED' : args[1] === 'add' ? 'GIT_WORKTREE_CREATE_FAILED' : 'GIT_WORKTREE_QUERY_FAILED',
+        code: /unknown repository extension[\s\S]*relativeworktrees/i.test(result.stderr)?'GIT_RELATIVE_WORKTREES_UNSUPPORTED':args[0] === 'rev-parse' ? 'GIT_BASE_READ_FAILED' : args[1] === 'add' ? /permission denied|operation not permitted/i.test(result.stderr)?'GIT_WORKTREE_PERMISSION_DENIED':'GIT_WORKTREE_CREATE_FAILED' : 'GIT_WORKTREE_QUERY_FAILED',
         stage: args[0], exitCode: result.code});
-    return result.stdout;
+    return args[0]==='worktree'&&args[1]==='list'?logicalWorktreeListing(process,result.stdout):result.stdout;
 }

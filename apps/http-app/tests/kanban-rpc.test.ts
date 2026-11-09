@@ -35,7 +35,7 @@ it('exposes user-bound Kanban commands, queries and system notifications through
         const board = await kanban.create({id: 'board', title: 'Work', scope: {kind: 'system'}, members: [{...actor, responsibility: 'Work', roles: ['worker','coordinator','reviewer']}], policy: {requireEstimate: false, review: 'assignee'}, notifications: {rules: {'create-item': 'info'}}});
         await kanban.execute(board.id, {operationId: 'create-card', expectedRevision: board.revision, command: {type: 'create-item', item: {id: 'card', title: 'PRIVATE_CARD_TITLE', responsibility: 'PRIVATE_BODY', acceptance: 'Verified'}}});
         const directory = await kanban.catalog();
-        expect(directory.find((entry: {id: string}) => entry.id === board.id).items).toEqual([{id:'card',title:'PRIVATE_CARD_TITLE',number:1}]);
+        expect(directory.find((entry: {id: string}) => entry.id === board.id).items).toEqual([{id:'card',title:'PRIVATE_CARD_TITLE',number:1,taskType:'execution'}]);
         expect(JSON.stringify(directory)).not.toContain('PRIVATE_BODY');
         const page = await kanban.query(board.id, {view: 'backlog'}); expect(page.items).toHaveLength(1);
         const candidates = await kanban.suggest(board.id, {kind: 'item', search: 'PRIVATE_CARD_TITLE'});
@@ -98,3 +98,20 @@ it('keeps fix and linked reply mutations callable through the declared Kanban RP
         await remote.replyTask('development',request);expect(fixTask).toHaveBeenCalledExactlyOnceWith('development',request);expect(replyTask).toHaveBeenCalledExactlyOnceWith('development',request);expect(report).not.toHaveBeenCalled();
     }finally{await client.close();await server.close();}
 });
+
+it('round-trips board settings through the declared RPC capability with revision and retry identity',async()=>{
+    const runtime=await createApplicationRuntime({backend:new MemoryBackend(),ownerKind:'web',startupMode:'interactive',digitalTwinAutoStart:false});
+    const boardSettings=vi.fn(async()=>({fields:[{name:'harness-execution',label:'Execution',choices:[{value:'',label:'Default'},{value:'codex',label:'Codex'}]}]}));
+    Object.assign(runtime.kanban!,{boardSettings});const view=await openApplicationView(runtime),report=vi.fn();let server!:RpcPeer;
+    const client=new RpcPeer('client',call=>server.handle(call),report,installViewProjections);
+    server=new RpcPeer('server',async call=>{client.applyUpdates(await server.refresh());return client.handle(call);},report);
+    try{
+        const boot=await server.bootstrap({services:view.services,backend:view.backend});client.applyUpdates(boot.updates);const remote=client.decode(boot.value!).services.kanban;
+        const actor=await remote.currentPrincipal();const board=await remote.create({id:'settings-rpc',title:'Settings',scope:{kind:'system'},members:[{...actor,responsibility:'Manage',roles:['coordinator','reviewer','worker']}]});
+        expect((await remote.boardSettings(board.id)).fields[0].name).toBe('harness-execution');expect(boardSettings).toHaveBeenCalledWith(board.id);
+        const request={operationId:'settings-save',expectedRevision:board.revision,command:{type:'configure-board-settings',settings:{'harness-execution':'codex'}}};
+        await remote.execute(board.id,request);await remote.execute(board.id,request);
+        expect((await remote.read(board.id)).settings).toEqual({'harness-execution':'codex'});
+        await expect(remote.execute(board.id,{...request,operationId:'stale-save'})).rejects.toMatchObject({code:'REVISION_CONFLICT'});expect(report).not.toHaveBeenCalled();
+    }finally{await client.close();await server.close();await view.close();await runtime.dispose();}
+},15000);

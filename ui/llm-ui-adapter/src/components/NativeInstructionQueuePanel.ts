@@ -1,8 +1,9 @@
 import type {ConversationControls, ConversationSnapshot} from '../contracts';
-import {CHAT_ICONS, getLocale, t} from '@nestos/common';
+import {CHAT_ICONS, createModuleLogger, getLocale, t} from '@nestos/common';
 import {InstructionQueueView, type InstructionQueueEdit, type InstructionQueueSnapshot} from '@nestos/llm-ui';
 
 import {instructionQueueLabels} from './instruction-queue-labels';
+const log = createModuleLogger('native-instruction-queue');
 
 /** Adapt the native queue directly; native admission does not use Session commands. */
 export class NativeInstructionQueuePanel {
@@ -19,6 +20,7 @@ export class NativeInstructionQueuePanel {
         this.view = new InstructionQueueView(element, {
             ownerId: 'native', locale: getLocale(), initiallyCollapsed: true, toggleIcon: CHAT_ICONS.enqueue,
             removeIcon: CHAT_ICONS.delete, labels: instructionQueueLabels(),
+            onDiagnostic: event => { if (event.result === 'failure') log.warn('chat.native.queue.ui', event); else log.info('chat.native.queue.ui', event); },
             read: async () => apply(await controls.read()),
             edit: async (edit: InstructionQueueEdit) => {
                 if (this.readOnly || edit.action === 'update-input') throw new Error(t('session.instructions.editFailed'));

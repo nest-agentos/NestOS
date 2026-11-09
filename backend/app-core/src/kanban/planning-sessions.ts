@@ -13,7 +13,7 @@ export function planningSessionReader(service: KanbanService, journal: KanbanAut
         if (!admission?.executionSessionId) return;
         const sessionId = admission.executionSessionId;
         const resourceId = await options.executionResource?.(sessionId,'main');
-        const state = job.status.state === 'clarification' ? 'waiting-input' : job.status.state === 'ready' ? 'completed'
+        const state = ['clarification','blocked'].includes(job.status.state) ? 'waiting-input' : job.status.state === 'ready' ? 'completed'
             : job.status.state === 'failed' ? 'failed' : job.status.state === 'analyzing' ? 'running' : 'unknown';
         const operation=item.planning?.coordination?await currentCoordination(journal,board,itemId):undefined;
         const result=operation?.result as {summary?:string;suggestions?:Array<{itemId:string;action:string;reason:string}>}|undefined;

@@ -1,3 +1,4 @@
+import {processWorkspacePath,worktreeArguments,logicalWorktreeListing} from './worktree-paths';
 import {sha256HexSync} from '@nestos/common';
 import {randomUUID} from '@nestos/common';
 import {failure, type PromptJournal} from '../run/prompt-bundle';
@@ -6,11 +7,11 @@ import type {PreparedWorktree} from './worktree-preparation';
 
 export interface WorktreeRepository {path: string; branch: string; baseCommit: string}
 export async function gitWorkspace(process: RemoteProcessHandle, cwd: string, args: string[], allowFailure = false) {
-    const result = await admittedGit(process, cwd, args);
+    const result = await admittedGit(process, cwd, await worktreeArguments(process,args));
     const codes: Record<string, string> = {submodule: 'MODULE_INITIALIZATION_FAILED', switch: 'MODULE_BRANCH_CREATION_FAILED',
         'ls-tree': 'MODULE_BASE_READ_FAILED', status: 'WORKSPACE_STATUS_FAILED', 'hash-object': 'DELIVERY_FILE_HASH_FAILED'};
     if (result.code !== 0 && !allowFailure) throw Object.assign(failure(codes[args[0]] ?? 'WORKSPACE_GIT_FAILED'), {stage: args[0], exitCode: result.code});
-    return result;
+    return args[0]==='worktree'&&args[1]==='list'?{...result,stdout:await logicalWorktreeListing(process,result.stdout)}:result;
 }
 /** A rejected admission ran no process; uncertain outcomes must never be replayed. */
 async function admittedGit(process: RemoteProcessHandle, cwd: string, args: string[]) {
@@ -115,7 +116,7 @@ async function initializeModule(process:RemoteProcessHandle,directory:string,pat
     if(available.code!==0) {await gitWorkspace(process,directory,['submodule','update','--init','--',path]);return;}
     const binding=(await moduleBindings(process,directory)).find(binding=>binding.path===path);
     if(!binding)throw failure('MODULE_NOT_REGISTERED');
-    await gitWorkspace(process,directory,['-c','protocol.file.allow=always','-c',binding.key.slice(0,-5)+'.url='+source,
+    await gitWorkspace(process,directory,['-c','protocol.file.allow=always','-c',binding.key.slice(0,-5)+'.url='+await processWorkspacePath(process,source),
         'submodule','update','--init','--',path]);
 }
 

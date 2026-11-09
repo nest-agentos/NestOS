@@ -4,10 +4,11 @@ import {validateResourceReferences, type KanbanResourceCatalog} from '@nestos/ka
 import {requireValue} from './validation';
 
 export const REMOTE_PROJECT_REFERENCE = 'nestos-remote-project';
-export function projectResourceCatalog(projects: Pick<ProjectService, 'get'> & Partial<Pick<ProjectService, 'list'>>): KanbanResourceCatalog {
+export const PRIMARY_PROJECT_REFERENCE = 'nestos-primary-project';
+export function projectResourceCatalog(projects: Pick<ProjectService, 'get'> & Partial<Pick<ProjectService, 'list'|'remoteMounts'>>): KanbanResourceCatalog {
     return {system: REMOTE_PROJECT_REFERENCE, decisionSystem: 'nestos-decision-run',
         list: async () => (await projects.list?.() ?? []).filter(row => row.project?.source?.kind === 'remote')
-            .map(row => ({reference: {system: REMOTE_PROJECT_REFERENCE, id: row.project.id}, label: row.displayName ?? row.name})),
+            .map(row => ({reference: {system: REMOTE_PROJECT_REFERENCE, id: row.project.id}, label: row.displayName ?? row.name,group:projects.remoteMounts?.list(row.project.id).find(mount=>mount.at==='/')?.serverId})),
         validate: async references => {
             for (const ref of references) requireValue((await projects.get(ref.id)).project?.source?.kind === 'remote', 'REMOTE_PROJECT_REQUIRED');
         },

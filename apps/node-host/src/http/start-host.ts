@@ -2,7 +2,7 @@ import {startUserHost} from './user-host';
 import type { Server } from 'node:http';
 import { closeHostResources, namedCleanup, type HostCleanup } from '../runtime/host-runtime';
 import { openNodeApplication } from '../runtime/application';
-import { ViewApi } from './view-api';
+import {RuntimeApi} from './runtime-api';
 import { createHttpServer } from './http-server';
 import type { loadCertificates } from './certificates';
 import {NodeEditorSwapStore} from '../storage/editor-swaps';
@@ -33,7 +33,7 @@ export async function startHost(options: HttpHostOptions) {
         const {audit} = host;
         audit.write({event: 'server.mode', userId: 'admin', operation: 'server.start', stage: 'mode', result: 'single-user', code: 'SINGLE_USER_ADMIN'});
         if (options.signal?.aborted) await host.runtime.quiesce();
-        const application = new ViewApi(Promise.resolve(host.runtime), audit, false);
+        const application = new RuntimeApi(Promise.resolve(host.runtime), audit, false);
         cleanup.push(namedCleanup('views.close', () => application.close()));
         const server = createHttpServer({ certificates: options.certificates, staticDir: options.staticDir, audit, application,
             build: { mode: options.logMode ?? process.env.NESTOS_HTTPD_MODE ?? 'standalone', version:process.env.NESTOS_HTTPD_VERSION,serviceId:process.env.NESTOS_HTTPD_SERVICE_ID } });

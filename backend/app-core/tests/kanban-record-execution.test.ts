@@ -32,7 +32,7 @@ async function fixture(enabled = true, workTypes?: KanbanWorkType[]) {
     await command({type: 'append-record', record: {id: 'decision', kind: 'decision', title: 'Goal', content: 'PRIVATE_REQUIREMENT', rationale: 'Acceptance criteria', itemIds: [], sources: [],
         externalRefs: ['one', 'two'].map(id => ({system: 'nestos-remote-project', id}))}});
     const open = () => createRecordExecution({service, journal, resources: projectResourceCatalog(projects), log});
-    return {service, command, open, projects, log, journal};
+    return {service, command, open, projects, log, journal,fs};
 }
 
 async function completeCoordination(f:Awaited<ReturnType<typeof fixture>>,id:string):Promise<void>{
@@ -273,4 +273,33 @@ it('recovers restart finalization after new run creation changed the live decisi
  await f.journal.update(controls[0].key,old=>({...old as any,settled:false}));
  await f.open().scan();expect(await f.open().recordExecutions('source','decision')).toHaveLength(2);
  expect((await f.journal.get<any>(controls[0].key)).settled).toBe(true);
+});
+
+it('reports automatically created coordination work as blocked with its exact planning failure instead of running',async()=>{
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});const execution=f.open();
+ const run=await execution.runRecord('source',{operationId:'auto',recordId:'decision',expectedRevision:2});
+ expect(run.itemIds).toHaveLength(2);const root=run.itemIds![0],before=(await f.service.read('source')).items.length;
+ await f.command({type:'report-analysis',itemId:root,operationId:'preparation',status:{itemId:root,state:'failed',code:'GIT_RELATIVE_WORKTREES_UNSUPPORTED'}});
+ await execution.scan();expect((await execution.recordExecutions('source','decision'))[0]).toMatchObject({state:'blocked',code:'GIT_RELATIVE_WORKTREES_UNSUPPORTED',stage:'planning'});
+ expect((await f.service.records('source',{kind:'decision'})).items[0]).toMatchObject({attention:'error',attentionCode:'GIT_RELATIVE_WORKTREES_UNSUPPORTED',attentionItemId:root});
+ await execution.scan();expect((await f.service.read('source')).items).toHaveLength(before);
+});
+it('cancels from the decision protocol and keeps unknown execution receipts pending across recovery',async()=>{
+ const {resolveDecisionRequest}=await import('../src/kanban/decision-conversation-requests'),{decisionConversationViews}=await import('../src/kanban/decision-conversation-views');
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const runtime=f.open(),run=await runtime.runRecord('source',{recordId:'decision',operationId:'run',expectedRevision:2});
+ await f.journal.update('decision-conversation-record:conversation',()=>({recordId:'decision',state:'confirmed',proposalDigest:'preview'}));
+ const read=vi.fn(async()=>({messages:[{id:'cancel',role:'user',text:'取消决策'}]}));
+ const options={...f,client:()=>({...f.service,...runtime}),remote:{projectConversation:async()=>({read,close:async()=>{}})}} as any;
+ const conversation={id:'conversation',boardId:'source',sessionId:'original',resourceId:'/native/original',binding:{projectId:'one',profileId:'codex'}} as any;
+ const request={id:'cancel',scopeId:'conversation',method:'decision.cancel',params:{}};
+ expect(await resolveDecisionRequest(options,conversation,request)).toMatchObject({state:'cancelling',recordId:'decision',retainedSession:true});
+ for(const item of (await f.service.read('source')).items)await f.command({type:'control-receipt',itemId:item.id,controlId:item.control!.id,state:'unknown',code:'CONNECTION_LOST'});
+ await runtime.quiesce();const recovered=f.open();options.client=()=>({...f.service,...recovered});await recovered.scan();
+ expect(await resolveDecisionRequest(options,conversation,{...request,id:'inspect',method:'decision.read'})).toMatchObject({state:'cancelling',record:{status:'cancelling'}});
+ expect((await decisionConversationViews(options,[{...conversation,state:'confirmed',createdAt:1,recordId:'decision'}]))[0].state).toBe('cancelling');
+ for(const item of (await f.service.read('source')).items)await f.command({type:'control-receipt',itemId:item.id,controlId:item.control!.id,state:'cancelled'});
+ await recovered.scan();expect(await resolveDecisionRequest(options,conversation,{...request,id:'settled',method:'decision.read'})).toMatchObject({state:'cancelled',record:{status:'cancelled'}});
+ expect((await recovered.recordExecutions('source','decision')).find(row=>row.id===run.id)?.state).toBe('cancelled');
+ expect((await f.service.read('source')).items).toHaveLength(2);expect((await f.service.read('source')).items.every(item=>item.status==='cancelled')).toBe(true);
 });

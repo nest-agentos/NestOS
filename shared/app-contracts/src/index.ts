@@ -49,3 +49,4 @@ export { CLOZE_SRS_PATH, CLOZE_DOCUMENT_KEY, clozeDocumentPrefix, parseClozeStor
 export type {ClozeDocumentRecord} from './presets/cloze-storage';
 
 export {KANBAN_EXECUTION_SESSION, executionSessionReference} from './presets/kanban-execution';
+export {NATIVE_SESSION_RECOVERY_ENDPOINT, NATIVE_SESSION_RECOVERY_VERSION} from './session/recovery';

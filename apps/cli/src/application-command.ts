@@ -1,3 +1,4 @@
+import {sessionRecoveryCommand} from './application-recovery';
 import {flowControlCommand} from './application-flow-control';
 import {kanbanCommand} from './application-kanban';
 import {agentCommand} from './application-agent';
@@ -15,6 +16,9 @@ export async function applicationCommand(command: string, args: string[], option
     const log = console.log; console.log = (...values) => console.error(...values);
     let application: Awaited<ReturnType<typeof openCliApplication>> | undefined;
     try {
+        if (command === 'conversation' && ['recovery','recover'].includes(args[0] ?? '')) {
+            const result = await sessionRecoveryCommand(args, options); process.stdout.write(JSON.stringify(result) + '\n'); return 0;
+        }
         application = await openCliApplication(options);
         const result = await executeApplicationCommand(application.client, command, args, options);
         process.stdout.write(JSON.stringify(result ?? {success: true}, (_key, value) => value instanceof Map ? Object.fromEntries(value) : value, 2) + '\n');

@@ -9,5 +9,5 @@ export interface DecisionConversationOptions {
     executionResource?(id:string,branch:string,board?:import('@nestos/kanban/contracts').KanbanBoard):Promise<string|undefined>;
     log(event:{operationId:string;boardId:string;stage:string;result:'success'|'failure';code?:string;durationMs:number}):void;
 }
-export interface DecisionConversationBinding {id:string;boardId:string;projectId:string;profileId:string;workspaceId:string;directory:string;epoch:string;createId:string;inputId:string}
+export interface DecisionConversationBinding {id:string;boardId:string;purpose?:'coordination';recordId?:string;projectId:string;projectIds?:string[];profileId:string;workspaceId:string;directory:string;epoch:string;createId:string;inputId:string}
 export type DecisionConversation = SavedRecordConversation & {binding:DecisionConversationBinding};

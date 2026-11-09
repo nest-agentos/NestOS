@@ -58,3 +58,11 @@ it('does not append history or duplicate prompt sections when the same preparati
     }
     expect(f.sessionChannel).toHaveBeenCalledTimes(10);expect(f.openWorkspace).toHaveBeenCalledTimes(10);
 });
+
+it.each([['decision','coordination'],['task','execution']] as const)('binds %s work to the board %s profile and retains it across setting changes',async(stage,role)=>{
+    const f=await fixture(1),save=vi.fn(async()=>{});f.options.connections.save=save;
+    f.projectHarness.mockImplementation(async()=>({profiles:async()=>({profiles:[{id:'chosen',capabilities:{workingDirectory:true,sessionChannels:true}}]}),close:f.close}));
+    const input={board:{id:'board',settings:{['harness-'+role]:'chosen'}},target:f.target,context:f.context,item:f.item,stage,preparation:{system:'nestos-work-preparation',id:'git-worktree',revision:'1'},dispatch:{id:'attempt',itemId:f.item.id}};
+    const prepare=developmentPreparation(f.options as never);await prepare(input as never);input.board.settings['harness-'+role]='missing';await prepare(input as never);
+    expect(save).toHaveBeenCalledTimes(2);for(const [connection]of save.mock.calls as unknown as Array<[{profileId:string}]>)expect(connection.profileId).toBe('chosen');
+});

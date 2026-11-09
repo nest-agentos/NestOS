@@ -876,3 +876,13 @@ initializeConversationSystem 在已配置独立调用宿主时返回 independent
 `session.instructions.edit` 的 `cancel` 操作按 revision CAS 在原队列持久化 `cancelledIds`，可以取消尚未接纳或仍在等待的提交，并阻止相同 ID 的迟到请求。取消回执与队列同一份存储，重启或丢回执后读取核对；取消身份不随普通接纳历史的有界裁剪丢弃。已派发、结果不明或已有接纳历史但缺少轮次的请求不能用该入口推断原结果，仍沿既有轮次控制核对。显式取消只证明停止后续执行，不声称撤销已经发生的副作用。
 
 重启若发生在执行结束与对话历史收尾之间，指令队列保留原指令为 `uncertain`，不能重发。恢复只在原 Session/分支、提交摘要、Round、Task 与 invocation 身份一致且整棵执行树已结算时，从正式 Task exit 投影原 Round 的终态和输出。失败仍记录失败；未结算、缺失或身份冲突保持阻塞。仅由恢复引起的暂停可在正式历史补齐后释放；用户手工暂停不自动解除。诊断使用 `session.history.recover`，记录阶段、身份、实际终态和耗时，不记录正文。
+
+### 持久独立调用控制
+
+`controlIndependentCall(ports, journal, request, keys?)` 在现有独立调用控制命令之上提供持久编排。请求为 `{sessionId, callId, requestId, action}`，action 是 pause/resume/cancel；返回 accepted/paused/resumed/cancelled/unknown。同 requestId 的动作或目标变化返回 `CALL_CONTROL_IDEMPOTENCY_CONFLICT`，即使原调用已终结也不能换动作。调用方与执行树同时终结才满足 `independentCallSettled`。
+
+`CallControlJournal` 仅要求 get/update/claim；update 和 claim 必须跨所有写者原子化，claim 必须在发出控制命令前持久保存。库先冻结请求和原 executionSessionId/taskId/epoch，只有首次 claim 执行写命令，后续只查原请求回执；查询不携带已过期的写入 epoch。claim 后但发命令前崩溃也保留 unknown，不猜测未执行并重发。
+
+默认 key 是 `independent-call-control:` 加 Session/request 身份。可信宿主可注入旧 key/legacyKey；旧 submitting 标记保持不变，旧 query-only 暂停/恢复记录按明确 action 兼容，withdraw 按原 resume 意图核对。不支持的控制、坏记录、目标变化及缺失回执保留具体原因。`DurableCallControlPorts.log` 只接收操作身份、阶段、结果、错误码和耗时，日志异常不改变已持久结果。
+
+本机制不依赖 Kanban、应用目录、项目、提示词、UI 或通知；NestOS 的直接 submission fallback 留在宿主。底层授权、调用成员、Flow/Kernel 控制和回执校验仍复用 `IndependentCallControls`，不创建第二套执行器。

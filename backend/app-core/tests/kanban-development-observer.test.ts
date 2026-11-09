@@ -39,7 +39,7 @@ async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, l
         projects: {get: async () => ({path: '/project'}) as never, openWorkspace: async () => ({fs, dispose: async () => {}}) as never}, wake() {}});
     closes.push(() => observer.dispose());
     const publish = async(id: string,type:string)=>{channels.report('attempt',id,{type,content:'Business message'});};
-    return {fs, directory, scope, publish, channels, service, events, journal, observe: (outcome: 'running' | 'succeeded' | 'failed' | 'cancelled') => observer.observe({boardId: 'board', dispatch,
+    return {observer,fs, directory, scope, publish, channels, service, events, journal, observe: (outcome: 'running' | 'succeeded' | 'failed' | 'cancelled') => observer.observe({boardId: 'board', dispatch,
         service, worker, observation: {outcome, ...(outcome === 'succeeded' ? {outputs: []} : {})}})};
 }
 it('requires a result and native completion before returning a reviewable observation', async () => {
@@ -79,11 +79,16 @@ it('waits for declared terminal finalization before reporting successful deliver
     expect(await f.observe('succeeded')).toMatchObject({outcome: 'succeeded'});
 });
 
-it('settles a reported error only after native completion and notifies once',async()=>{
+it('keeps a reported error recoverable after the turn completes and notifies once',async()=>{
     const f=await fixture();await f.publish('failure','error');
     expect(await f.observe('running')).toMatchObject({outcome:'running'});
-    expect(await f.observe('succeeded')).toMatchObject({outcome:'failed',code:'WORKSPACE_ERROR_REPORTED'});
-    expect(await f.observe('succeeded')).toMatchObject({outcome:'failed'});
+    expect(await f.observe('succeeded')).toMatchObject({outcome:'running',code:'WORKSPACE_ERROR_REPORTED'});
+    expect(await f.observe('succeeded')).toMatchObject({outcome:'running'});
+    f.channels.report('attempt','fixed',{type:'resolved',replyTo:'failure',content:'Git repaired and checked'});
+    expect(await f.observe('succeeded')).toMatchObject({outcome:'running',code:'WORKSPACE_RESULT_PENDING'});
+    expect((await f.service.item('board','item')).item.blocked).toBeUndefined();
+    await f.publish('result','result');
+    expect(await f.observe('succeeded')).toMatchObject({outcome:'succeeded'});
     expect((await f.events.listNotifications()).items.filter(row=>row.event.value.type==='kanban.workspace.error')).toHaveLength(1);
 });
 
@@ -146,4 +151,14 @@ it('accepts repeated linked resolutions without overwriting the first closure or
     expect(f.channels.ensure('attempt').acks.get('prepared')).toEqual({status:'delivered'});
     await f.publish('result','result');expect(await f.observe('succeeded')).toMatchObject({outcome:'running'});
     f.channels.ensure('attempt').execution!.status='completed';expect(await f.observe('succeeded')).toMatchObject({outcome:'succeeded'});
+});
+
+it('exposes later native execution activity without reviving the settled original kernel turn',async()=>{
+ const f=await fixture();f.channels.ensure('attempt').execution={sessionId:'native',turnId:'later',status:'running',observedAt:123456};
+ const workflow=await f.service.workflow('board');workflow.dispatches.attempt.executionSessionId='execution';
+ // The actual observer receives the internal Session identity with every execution observation.
+ await f.journal.update('worktree:attempt',()=>({directory:'/workspace/_nestos/worktrees/attempt',branch:'work/attempt',baseCommit:'a'.repeat(40)}));
+ const value=await f.observer.observe({boardId:'board',dispatch:workflow.dispatches.attempt,service:f.service,worker:f.service,observation:{outcome:'succeeded',executionSessionId:'execution'}});
+ expect(value).toMatchObject({outcome:'running'});
+ expect(await f.observer.sessionObservation({id:'board'} as never,'execution','/folder:project/@harness/codex/native')).toMatchObject({state:'running',lastActivityAt:123456,stale:false});
 });

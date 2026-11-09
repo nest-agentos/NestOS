@@ -147,3 +147,11 @@ it('reconciles a missing historical control route only through a canonical cance
     expect(submissionControl).toHaveBeenLastCalledWith(expect.objectContaining({sessionId:'bound-session',submissionId:'original',requestId:'cancel-missing',action:'cancel'}),f.journal);
     expect((await f.service.item('b','t')).item).toMatchObject({status:'cancelled',control:{state:'cancelled'}});
 });
+
+it('keeps host journal identities while Session rejects reuse of a control request for another action',async()=>{
+    const {controlCall}=await import('../src/kanban/call-lifecycle');const f=await fixture(),ports={calls:f.calls as never,callControl:f.control as never};
+    await controlCall(ports,f.journal,'original','same-control','pause');
+    const reopened=new KanbanAutomationJournal(f.fs,kanbanJournalOptions);await reopened.open();
+    await expect(controlCall(ports,reopened,'original','same-control','resume')).rejects.toMatchObject({code:'TASK_CONTROL_IDEMPOTENCY_CONFLICT'});
+    expect(f.control).toHaveBeenCalledOnce();expect(await reopened.get('call-lifecycle:'+JSON.stringify(['original','same-control']))).toMatchObject({action:'pause',phase:'submitting'});
+});

@@ -1,12 +1,12 @@
 import { folderBrowserPath, folderPathFromBrowserPath, resolveBrowserTarget } from '@nestos/app-contracts';
 import type { ProjectFolder, ProjectService } from '@nestos/app-contracts/services';
-import { FILE_BROWSER_ICONS, t } from '@nestos/common';
+import { ACTION_ICONS, FILE_BROWSER_ICONS, t } from '@nestos/common';
 import type { FSNode } from '@nestos/vfs-core';
 import { sessionCreationReason } from './session-creation-policy';
 import type { DirectoryListOptions } from '../workbench/directory-list';
 
 type Actions = NonNullable<DirectoryListOptions['actions']>;
-interface Commands { session(path: string): Promise<void>; project(): Promise<void>; entry(path: string, type: 'file' | 'directory'): Promise<void>; report(error: unknown): void }
+interface Commands { decisions?(projectId:string):Promise<void>;session(path: string): Promise<void>; project(): Promise<void>; entry(path: string, type: 'file' | 'directory'): Promise<void>; report(error: unknown): void }
 
 /** Creation follows the source directory permissions, independently of sidebar grouping. */
 export async function projectDirectoryActions(path: string, node: FSNode | null, projects: ProjectService | undefined, commands: Commands,
@@ -18,6 +18,7 @@ export async function projectDirectoryActions(path: string, node: FSNode | null,
         const folder = target.kind === 'project-conversations' || target.kind === 'remote' ? target.folder : folderPathFromBrowserPath(path);
         const project = knownProject !== undefined ? knownProject : folder && await projects.forFolder(folder);
         if (project) {
+            if(commands.decisions&&project.project.source?.kind==='remote')actions.push({id:'project-decisions',label:t('kanban.projectDecisions'),icon:ACTION_ICONS.kanbanView,primary:true,run:run(()=>commands.decisions!(project.project.id))});
             const reason = sessionCreationReason(projects, project.project.id);
             actions.push({id: 'create-session', label: t('project.createSession'), icon: FILE_BROWSER_ICONS.newSession, primary: true,
                 disabled: !!reason, disabledReason: reason,

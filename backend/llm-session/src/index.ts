@@ -357,3 +357,5 @@ export { moveSessionDataDirectory } from "./persistence/session-storage-location
 
 export { prepareFlowConnections } from './session/flow-connections';
 export {createSessionId} from './persistence/session-identity';
+
+export {controlIndependentCall,independentCallSettled,CallControlError,type CallControlJournal,type DurableCallControlPorts,type DurableCallControlRequest,type CallControlAction,type CallControlOutcome} from './session/durable-call-control';

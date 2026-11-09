@@ -62,7 +62,7 @@ async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: E
     const settings: KanbanAutomationSettings = {enabled: true, autoAccept, planner: catalog.targets[0].reference, executor: catalog.targets[1].reference, coordinator: catalog.coordinator, worker: catalog.worker};
     await command({type: 'configure-automation', settings});
     const item = async (id: string) => {await command({type: 'create-item', item: {id, title: id, responsibility: 'Deliver ' + id, acceptance: 'Evidence verified'}});return command({type:'request-run',itemId:id});};
-    return {events,service, command, item, calls, kernel, preparation, analysisOutput:options.readAnalysisOutput!, submitted, completed, settings, open, diagnostics,
+    return {options,journal:fileJournal,events,service, command, item, calls, kernel, preparation, analysisOutput:options.readAnalysisOutput!, submitted, completed, settings, open, diagnostics,
         lose: () => {loseReply = true; hideAdmission = true;}, reveal: () => {hideAdmission = false;}, invalid: () => {invalid = true;},
         executions: () => [...submitted.entries()].filter(([, input]) => input.request.expectedTarget!.id === 'executor')};
 }
@@ -309,4 +309,39 @@ it('does not create development subtasks from an unclarified planning result',as
     expect((await f.service.query('board',{view:'all',parentId:'first'})).total).toBe(0);
     expect(Object.keys((await f.service.workflow('board')).plans)).toHaveLength(0);
     expect(f.executions()).toHaveLength(0);
+});
+
+it('resumes a blocked planning conversation in the same session across host reopening without another admission',async()=>{
+ const f=await fixture();vi.mocked(f.analysisOutput).mockResolvedValue({state:'blocked',code:'PLANNING_ERROR_REPORTED',reason:'Git needs repair'} as never);
+ await f.item('first');await f.service.scan();
+ const original=await f.service.planningSession!('board','first');
+ expect(original).toMatchObject({state:'waiting-input'});
+ expect((await f.service.item('board','first')).task).toMatchObject({phase:'error',reason:'PLANNING_ERROR_REPORTED'});
+ expect(f.executions()).toHaveLength(0);
+ await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());
+ await reopened.scan();expect(await reopened.planningSession!('board','first')).toMatchObject({sessionId:original!.sessionId,state:'waiting-input'});
+ vi.mocked(f.analysisOutput).mockResolvedValue({state:'running'} as never);await reopened.scan();
+ expect(await reopened.planningSession!('board','first')).toMatchObject({sessionId:original!.sessionId,state:'running'});
+ expect(f.executions()).toHaveLength(0);
+ vi.mocked(f.analysisOutput).mockResolvedValue({state:'succeeded',output:{ready:true,reason:'Git checked; scope confirmed',dependencies:[],estimate:{complexity:1,workUnits:1,durationMs:60000,confidence:'high'}}});
+ await reopened.scan();expect(f.executions()).toHaveLength(1);
+ expect(await reopened.planningSession!('board','first')).toMatchObject({sessionId:original!.sessionId,state:'completed'});
+ expect([...f.submitted.values()].filter(input=>input.request.expectedTarget!.id==='planner')).toHaveLength(1);
+});
+
+it('ensures a persistent decision coordination Session before a worktree preparation failure',async()=>{
+ const fault=Object.assign(new Error('Git baseline unavailable'),{code:'GIT_WORKTREE_CREATE_FAILED'}),f=await fixture(false,undefined,fault),stages:string[]=[];
+ await f.item('first');
+ await f.command({type:'append-record',record:{id:'decision',kind:'decision',title:'Decision',content:'Scope',rationale:'Checked',itemIds:['first'],sources:[]}});
+ await f.command({type:'review-record',recordId:'decision',accept:true});
+ await f.command({type:'link-reference',itemId:'first',reference:{system:'nestos-decision-run',id:'decision-run'}});
+ const record=await f.service.record('board','decision');await f.journal.update('record-context:decision-run',()=>({sourceBoardId:'board',recordId:'decision',recordRevision:record.revision,runId:'decision-run'}));
+ await f.service.dispose();
+ const openRecordCoordination=vi.fn(async()=>{stages.push('communication');return {id:'retained',boardId:'board',recordId:'decision',sessionId:'native',resourceId:'/native/retained',state:'confirmed',createdAt:1};});
+ f.options.decisionConversations=()=>({openRecordCoordination,startRecordConversation:vi.fn(),recordConversations:async()=>[],scan:async()=>{},quiesce:async()=>{}}) as any;
+ vi.mocked(f.preparation).mockImplementation(async()=>{stages.push('worktree');throw fault;});
+ const reopened=await f.open();disposers.push(()=>reopened.dispose());
+ expect(stages.slice(0,2)).toEqual(['communication','worktree']);
+ expect(openRecordCoordination).toHaveBeenCalledWith('board',expect.objectContaining({recordId:'decision'}));
+ expect((await reopened.item('board','first')).item.analysis?.code).toBe('GIT_WORKTREE_CREATE_FAILED');
 });

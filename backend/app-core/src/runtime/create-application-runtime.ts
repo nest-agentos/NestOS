@@ -1,3 +1,6 @@
+import {kanbanHarnessTarget} from '../presets/kanban-harness-target';
+import {kanbanHarnessSettings} from '../presets/kanban-harness-settings';
+import {NativeSessionRecovery} from '../projects/session-recovery';
 import {createTaskRecovery} from '../kanban/task-recovery';
 import {managedServiceDeployment} from '../presets/managed-service-deployment';
 import {decisionConversations} from '../kanban/decision-conversations';
@@ -128,6 +131,7 @@ export interface ApplicationKernelPlatform {
 }
 
 export interface ApplicationRuntime {
+    sessionRecovery: NativeSessionRecovery;
     events: UserEventService;
     diagnostics: DiagnosticJournal;
     /** Host-only callback/token capability; it is never part of the frontend services graph. */
@@ -296,6 +300,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const directoryReady = startup.task('directoryMounts.init (parallel)', () => directoryMounts.init())();
         const projects = new ProjectService(systemFS, sessionRepository, directoryMounts, sessionFiles,
             id => prepareDraftExecution(id));
+        const sessionRecovery = new NativeSessionRecovery(() => remoteConnections);
+        cleanupFns.push(cleanupStep('sessionRecovery.close', () => sessionRecovery.close()));
         const prepareDraftExecution = createSessionExecutionPreparer({
             openSession: (...args) => kernel.kernel.openSession(...args),
             createSession: (...args) => kernel.kernel.createSession(...args),
@@ -616,6 +622,9 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         cleanupFns.push(() => developmentMessages.dispose());
         const executionResource=remoteConnections?kanbanSessionResource(projects,nativeSessionResource(kernelCore,projects,remoteConnections)):undefined;
         const kanban = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,kernelCore, independentCalls ? {
+            prepareTarget:developmentBindings?kanbanHarnessTarget(developmentBindings):undefined,
+            boardSettings:remoteConnections?kanbanHarnessSettings(remoteConnections):undefined,
+            sessionObservation:developmentBindings?developmentMessages.sessionObservation:undefined,
             taskRecovery:developmentBindings?context=>createTaskRecovery({...developmentBindings,...context,executionResource:executionResource!,
                 describe:async item=>{if(!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'))return;const managed=managedServiceDeployment(options.serviceControl,async selected=>projects.openWorkspace((await projects.get(selected.externalRefs!.find(ref=>ref.system==='nestos-remote-project')!.id)).path),async()=>{});return managed?.describe?.(item);}}):undefined,
             decisionConversations:developmentBindings?context=>decisionConversations({...developmentBindings,...context,executionResource}):undefined,
@@ -699,6 +708,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             recovery.stopBackground();
             kernelCore.beginObservationDrain();
             const requests = [
+                stop('sessionRecovery.close', () => sessionRecovery.close()),
                 stop('startup.close', () => startup.close()),
                 stop('kanban.quiesce', () => kanban.quiesce()),
                 stop('developmentMessages.quiesce', () => developmentMessages.quiesce()),
@@ -736,7 +746,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 const failures = results.filter(result => result.status === 'rejected');
                 if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'KANBAN_SCAN_FAILED');}}, initialScan: kanbanIntegrations.length > 0 || !!developmentBindings, subscribeTick: tick => {
                 wakeKanban = tick;
-                const timer = setInterval(tick, 5_000); return () => {wakeKanban = () => {}; clearInterval(timer);};
+                const timer = setInterval(tick, 30_000); return () => {wakeKanban = () => {}; clearInterval(timer);};
             }, subscribeChanges: tick => systemFS.on('seq:committed', event => {if(event.payload.paths.includes('/var/lib/kanban/boards.seq')) tick();}),
             onSuccess: () => reportKanbanHealth(events), onError: async error => {diagnostics.record({module: 'application', operation: 'kanban.monitor', stage: 'scan', result: 'failure', level: 'warn', code: kanbanFailureCode(error)}); await reportKanbanHealth(events,error);}});
             recovery.startBackground();
@@ -747,7 +757,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const startBackground = () => startup.activate();
         if (policy.projects === 'before-ready') startBackground();
         diagnostics.record({module: 'application', operation: 'application.runtime', stage: 'ready', result: 'success', level: 'info'});
-        return { events, diagnostics, vfs, llmDriver, agentService, configuration, sessionRepository, flowEngine, sessionFiles, directoryMounts, projects, executionConnections, toolConnections: options.toolConnections,
+        return { sessionRecovery, events, diagnostics, vfs, llmDriver, agentService, configuration, sessionRepository, flowEngine, sessionFiles, directoryMounts, projects, executionConnections, toolConnections: options.toolConnections,
             flowInstallations: installations, toolPackages: installations.toolPackages, kernel, sessionManager, commandBus, independentCalls, runCatalog, quiesce, dispose, startBackground, prepareSession: async id => { await initializeProjects(); return recovery.acquireLater(id); },
             projectSync, digitalTwin, kanban, createView: createConversationView, openConversation: id => conversationContexts.open(id), conversationObservation: conversationContexts };
     } catch (error) {

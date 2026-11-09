@@ -5,7 +5,7 @@ import {SeqKanbanStore,createKanbanModule} from '@nestos/kanban';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createTaskRecovery} from '../src/kanban/task-recovery';
 const closes:Array<()=>Promise<void>>=[];afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});
-async function fixture(group=false) {
+async function fixture(group=false,active=false) {
  const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());const fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs);
  const service=createKanbanModule({store,actor:{kind:'human',id:'admin'},authorize:async()=>{},log(){},verifyOutputs:async()=>true}),worker=createKanbanModule({store,actor:{kind:'service',id:'worker'},authorize:async()=>{},log(){}});
  await service.create({id:'b',title:'Work',scope:{kind:'system'},members:[{kind:'human',id:'admin',roles:['coordinator','reviewer'],responsibility:'Manage'},{kind:'service',id:'worker',roles:['worker'],responsibility:'Implement'}],policy:{requireEstimate:false,review:'independent'}});
@@ -15,7 +15,8 @@ async function fixture(group=false) {
  await run({type:'prepare-dispatch',itemId:'source',dispatchId:'source-dispatch'},worker);let dispatch=(await service.workflow('b')).dispatches['source-dispatch'];
  await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:'succeeded',outputs:[]});await run({type:'accept-execution',dispatchId:dispatch.id,accept:true});
  await run({type:'prepare-dispatch',itemId:'verify',dispatchId:'failed-dispatch'},worker);dispatch=(await service.workflow('b')).dispatches['failed-dispatch'];
- await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:'failed',code:'VERIFICATION_RUNNING_VERSION_MISMATCH',executionSessionId:'canonical-session'});
+ await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:active?'running':'failed',code:active?'WORKSPACE_ERROR_REPORTED':'VERIFICATION_RUNNING_VERSION_MISMATCH',executionSessionId:'canonical-session'});
+ if(active)await run({type:'report-issue',itemId:'verify',issue:{id:'repository-registration-error',type:'error',attemptId:dispatch.id,handler:'self'}});
  const journal=new KanbanAutomationJournal(fs);await journal.open();const original={channelId:'failed-dispatch',projectId:'project',directory:'/workspace/worktree',context:{delivery:{readOnly:true,evidence:{operationId:'original-deploy',result:{version:'old'}}}}};
  await journal.update('development-workspace:failed-dispatch',()=>original);
  const describe=vi.fn(async()=>({id:'service',version:'current'}));const options={fs,service,journal,client:()=>service,projects:{},remote:{},describe,executionResource:vi.fn(async(id:string)=>'/native/'+id),log:vi.fn()} as any;
@@ -91,4 +92,17 @@ it('returns strict JSON channel values before the first persistence round trip',
  expect(state).not.toHaveProperty('sessionId',undefined);
  expect(state).not.toHaveProperty('deliveryOperationId');
  expect(state.related[0]).not.toHaveProperty('resourceId');
+});
+
+it('keeps an active blocked execution out of failed-task recovery and opens it without injecting recovery instructions',async()=>{
+ const f=await fixture(false,true);
+ const state=await f.recovery.taskRecovery('b','verify');
+ expect(state).toMatchObject({state:'blocked',pendingIssueIds:['repository-registration-error'],sessionId:'canonical-session',canRetry:false,canSelectCurrentVersion:false});
+ expect(f.options.describe).not.toHaveBeenCalled();expect(()=>channelDigest(state)).not.toThrow();
+ const projectConversation=vi.fn();f.options.remote.projectConversation=projectConversation;
+ expect(await f.recovery.openTaskRecovery('b',{itemId:'verify',operationId:'open-blocked'})).toMatchObject({state:'accepted',resourceId:'/native/canonical-session'});
+ expect(projectConversation).not.toHaveBeenCalled();
+ expect(await f.journal.get('task-recovery-session:failed-dispatch')).toBeUndefined();
+ expect((await f.service.workflow('b')).dispatches['failed-dispatch'].outcome).toBe('running');
+ await expect(f.recovery.recoverTask('b',{itemId:'verify',operationId:'retry-blocked',expectedRevision:state.revision,action:'retry'})).rejects.toMatchObject({code:'RECOVERY_TARGET_NOT_READY'});
 });

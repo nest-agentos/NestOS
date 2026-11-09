@@ -141,3 +141,14 @@ it('persists queued draft ownership across reopening and rejects malformed consu
         expect(await store.load()).toEqual(record);
     } finally {await manager.dispose();}
 });
+it('keeps a Cells-owned queue out of the client journal and the NestOS recovery index',async()=>{
+    const {manager}=await createVFS({rootBackend:new MemoryBackend()});
+    try{
+        const fs=await manager.openFileSystem('/');let body:string|null=JSON.stringify({sessionId:'native',draft:'before'});
+        const queue={owner:'cells' as const,revision:3,paused:false,items:[{id:'owned',text:'Cells input',attachments:[],createdAt:1,state:'pending' as const}],receipts:[]};
+        const remote={read:vi.fn(async()=>body),compare:vi.fn(async(_key:string,before:string|null,after:string|null)=>{if(body!==before)return false;body=after;return true;}),queueSession:vi.fn(async()=>structuredClone(queue))};
+        const store=new RemoteConversationStore(fs,'owned',remote);const loaded=await store.load();expect(loaded?.instructionQueue?.owner).toBe('cells');
+        await store.save({...loaded,draft:'after'});expect(JSON.parse(body!)).toEqual({sessionId:'native',draft:'after'});
+        const index=await fs.meta.seq!.getEntry('/etc/fs/harness-conversations.seq','owned');expect(JSON.parse(index!)).toMatchObject({needsRecovery:false});expect(index).not.toContain('Cells input');
+    }finally{await manager.dispose();}
+});

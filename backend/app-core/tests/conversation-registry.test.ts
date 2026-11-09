@@ -47,3 +47,8 @@ it('retains an unconfirmed control after all viewers close and releases its conf
     for (const listener of listeners) listener();
     await vi.waitFor(() => expect(source.close).toHaveBeenCalledOnce()); await registry.dispose();
 });
+it('releases a Cells-owned queue when the last browser lease closes',async()=>{
+    const registry=new ConversationRegistry();const close=vi.fn(async()=>{});
+    const source={snapshot:()=>({instructionQueue:{owner:'cells',paused:false,items:[{id:'running'}]}}),close,subscribe:()=>()=>{}};
+    const view=await registry.acquire('native',async()=>source as never);await view.close();expect(close).toHaveBeenCalledOnce();await registry.dispose();
+});

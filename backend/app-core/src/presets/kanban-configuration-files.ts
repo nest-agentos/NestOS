@@ -27,13 +27,13 @@ async function resolveFiles(fs:IFileSystem,project:IFileSystem,profile:string):P
         if(['decision.md','task.md','planning.md','bootstrap.md'].some(name=>!names.includes(name)))throw failure('KANBAN_PROFILE_REQUIRED_FILE');
     }else{if(profile!=='development'||await fs.driver.exists(KANBAN_CONFIGURATION_DIRECTORY+'/.defaults.json'))throw failure('PROMPT_PROFILE_NOT_FOUND');names=Object.keys(kanbanConfigurationDefaults);}
     const files:PromptFile[]=manifest?[manifest]:[];
-    const optional=['decision','task'].flatMap(entry=>LIFECYCLE_PROMPT_SUFFIXES.map(suffix=>entry+'-'+suffix+'.md'));
+    const optional=['coordination-conversation.md',...['decision','task'].flatMap(entry=>LIFECYCLE_PROMPT_SUFFIXES.map(suffix=>entry+'-'+suffix+'.md'))];
     for(const name of new Set([...names,...optional])){
         const file=await selected(fs,project,global,local,name);
         if(file)files.push(file);
         else {const content=kanbanConfigurationDefaults[name as keyof typeof kanbanConfigurationDefaults];
-            if(!names.includes(name))continue;
-            if(manifest||!content)throw Object.assign(failure('KANBAN_PROFILE_FILE_MISSING'),{file:name});files.push({name,content,source:'builtin:'+name,sha256:sha256HexSync(content)});}
+            if(!names.includes(name)&&name!=='coordination-conversation.md')continue;
+            if(manifest&&name!=='coordination-conversation.md'||!content)throw Object.assign(failure('KANBAN_PROFILE_FILE_MISSING'),{file:name});files.push({name,content,source:'builtin:'+name,sha256:sha256HexSync(content)});}
     }
     return files;
 }

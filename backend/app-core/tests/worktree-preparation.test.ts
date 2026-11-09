@@ -29,3 +29,11 @@ it('creates a real worktree with relocatable metadata and reconciles a lost crea
     expect(gitFile).toMatch(/^gitdir: \.\.\//);
     expect((await run('git', ['-C', join(root, '_nestos/worktrees/attempt'), 'rev-parse', 'HEAD'])).stdout.trim()).toBe(restored.baseCommit);
 });
+
+it('classifies an unsupported relativeworktrees repository without leaking raw Git output or saving a base',async()=>{
+ const entries=new Map<string,unknown>(),journal={get:async<T>(key:string)=>entries.get(key) as T|undefined,update:async<T>(key:string,change:(old:T|undefined)=>T)=>{const value=change(entries.get(key) as T|undefined);entries.set(key,value);return value;}};
+ const process={nativeShell:{exec:async()=>({code:128,stdout:'',stderr:'fatal: unknown repository extension found:\n relativeworktrees\nPRIVATE_PATH'})}} as unknown as RemoteProcessHandle;
+ await expect(prepareWorktree(journal,'attempt','/workspace/_nestos/worktrees/attempt',process)).rejects.toMatchObject({code:'GIT_RELATIVE_WORKTREES_UNSUPPORTED',stage:'rev-parse',exitCode:128});
+ try{await prepareWorktree(journal,'attempt','/workspace/_nestos/worktrees/attempt',process);}catch(error){expect(String(error)).not.toContain('PRIVATE_PATH');}
+ expect(entries.size).toBe(0);
+});

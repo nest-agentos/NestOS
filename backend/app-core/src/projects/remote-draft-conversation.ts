@@ -4,7 +4,10 @@ import {formatDefaultFileTitle, t} from '@nestos/common';
 import {reportRemoteFailure} from './remote-diagnostics';
 
 export function remoteConversationJournal(recovery: RemoteConversationStore, epoch: string, draft: boolean, checkAccess = () => {}): HarnessConversationJournal {
-    return {epoch, load: async () => {
+    return {epoch, instructions:{
+        enqueue:item=>recovery.queueSession({action:'enqueue',item,input:JSON.stringify([item.text,item.attachments,item.selection??null,item.commandKind??null,...(item.allowSteer?[true]:[])])}),
+        edit:(edit,binding)=>recovery.queueSession({action:'edit',edit:{...edit,...(binding?{commandBinding:binding}:{})}}),
+    }, recoverSession: input=>{checkAccess();return recovery.recoverSession(input);}, load: async () => {
         checkAccess();
         const record = await recovery.load();
         if (draft && record?.submittedTurnId && !hasRecoveryWork(record)) { await recovery.save({}); return undefined; }

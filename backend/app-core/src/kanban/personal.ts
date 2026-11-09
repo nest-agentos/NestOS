@@ -1,3 +1,4 @@
+import {taskCommunication} from './task-communication';
 import {restartBarrier} from './restart-barrier';
 import type {KanbanClient} from '@nestos/kanban/contracts';
 import {sha256HexSync} from '@nestos/common';
@@ -63,12 +64,13 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
     }});setOperations(operations);
     const recovery=options?.taskRecovery?.({service,client,journal,log});
     const conversations=options?.decisionConversations?.({service,client,journal,log});
+    const communication=options&&conversations?taskCommunication(service,journal,options,conversations.openRecordCoordination,log):undefined;
     const fixes=options?.collaboration?createTaskFix({service,journal,events,automation:options,log}):undefined;
-    const automation=options?createPersonalKanbanAutomation({...options,fs,service,journal,workLog,log,serviceFor,deliveryReady:operations?.deliveryReady,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
+    const automation=options?createPersonalKanbanAutomation({...options,...(options.prepareAnalysis&&conversations?{prepareAnalysis:async input=>{const context=await workContext(journal,input.board,input.item,service);if(context.decision)await conversations.openRecordCoordination(context.decision.sourceBoardId,{recordId:context.decision.recordId,operationId:input.id});return options.prepareAnalysis!(input);}}:{}),fs,service,journal,workLog,log,serviceFor,deliveryReady:operations?.deliveryReady,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
     const planning=options?planningSessionReader(service,journal,options):undefined;
-    return [{archiveItemResources,capabilities:{...(recovery?{taskRecovery:recovery.taskRecovery,recoverTask:recovery.recoverTask,openTaskRecovery:recovery.openTaskRecovery}:{}),...(conversations?{startRecordConversation:conversations.startRecordConversation,recordConversations:conversations.recordConversations}:{}),...(planning?{planningSession:planning}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
+    return [{archiveItemResources,capabilities:{...(options?.boardSettings?{boardSettings:async(board:string)=>options.boardSettings!.catalog(await service.read(board))}:{}),...(recovery?{taskRecovery:recovery.taskRecovery,recoverTask:recovery.recoverTask,openTaskRecovery:recovery.openTaskRecovery}:{}),...(conversations?{startRecordConversation:conversations.startRecordConversation,openRecordCoordination:conversations.openRecordCoordination,...communication,recordConversations:conversations.recordConversations}:{}),...(planning?{planningSession:planning}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
         ...(resources?.cleanupWorkResource&&operations?{cleanupWorkResource:(board,request)=>operations.guardResource(board,request.itemId,()=>resources.cleanupWorkResource!(board,request))}:{}),
         ...(options?.continuation?{executionSession:async(board,item,query)=>{
             const detail=await service.executionSession(board,item,query),current=(await service.item(board,item)).item;
@@ -87,7 +89,7 @@ type PersonalOptions = {
 };
 function personalOptions({store, journal, events, diagnostics, sessions, kernel, automationOptions}: PersonalOptions) {
     return {
-        executionSessions:sessions&&kernel?{source:{...createLocalKanbanSessionSource(sessions,kernel,automationOptions?.executionResource),
+        executionSessions:sessions&&kernel?{source:{...createLocalKanbanSessionSource(sessions,kernel,automationOptions?.executionResource,automationOptions?.sessionObservation),
             ...(automationOptions ? {related: relatedKanbanSessions({journal, calls: automationOptions.calls,
                 repository: automationOptions.sessions, kernel: automationOptions.kernel, resources: automationOptions.sessionExecutionResources,
                 related: automationOptions.relatedSessions})} : {})}}:undefined,
@@ -108,6 +110,7 @@ function personalOptions({store, journal, events, diagnostics, sessions, kernel,
         authorize: async (input: Parameters<import('./module').NestOSKanbanOptions['authorize']>[0]) => {
             const {board, command} = input;
             await authorizeAutomation(input, automationOptions?.catalog);
+            if(command?.type==='configure-board-settings')await automationOptions?.boardSettings?.validate(board,command.settings);
             if (command?.type === 'continue-execution') {
                 if (!automationOptions?.continuation) throw new KanbanError('CONTINUATION_UNSUPPORTED');
                 if (!board.automation?.enabled) throw new KanbanError('AUTOMATION_PAUSED');

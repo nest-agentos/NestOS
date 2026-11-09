@@ -49,7 +49,7 @@ export class ConversationRegistry {
     private async collect(key: string, entry: Entry): Promise<void> {
         const snapshot = entry.source.snapshot(), queue = snapshot.instructionQueue;
         const controls = snapshot.controls?.some(row => row.receipt === 'unknown' || row.receipt === 'accepted' && row.effect === 'unconfirmed');
-        if (entry.references || entry.closing || controls || snapshot.pendingQueryReports?.length || queue?.items.length && !queue.paused) return;
+        if (entry.references || entry.closing || controls || snapshot.pendingQueryReports?.length || queue?.owner!=='cells' && queue?.items.length && !queue.paused) return;
         entry.closing = true; this.entries.delete(key); entry.release();
         await entry.source.close();
     }

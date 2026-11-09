@@ -1,3 +1,5 @@
+import {withSessionRecovery} from './session-recovery';
+import {createSessionRecoveryClient} from '@nestos/app-transport/http';
 import {BrowserRequestTrace} from './request-trace';
 import { randomUUID } from '@nestos/common';
 import {HttpViewClient, SnapshotCache, ViewExpiredError} from '@nestos/app-transport/http';
@@ -6,6 +8,7 @@ import {setFileRecoveryOwner} from '@nestos/app-shell/startup';
 import {initialView} from './initial-view';
 
 let pageUser: string | undefined;
+const sessionRecoveryRequests = new Map<string, string>();
 
 export type ConnectionState = 'connected' | 'reconnecting' | 'expired' | 'view-error';
 /** A late UI subscriber receives the latest connection state before further notifications. */
@@ -52,7 +55,7 @@ export function connectApplication() {
         const key = `mindos.snapshot-cache.v${RPC_VERSION}:${userId}`;
         const snapshots = new SnapshotCache({read: () => sessionStorage.getItem(key), write: value => sessionStorage.setItem(key, value)});
         started = true;
-        return client.start({initialView: route.request, snapshots});
+        return client.start({initialView: route.request, snapshots}).then(root => withSessionRecovery(root, createSessionRecoveryClient(tracing.wrap(fetcher)), sessionRecoveryRequests));
     }).then(root => {performance.mark('nestos:data-ready'); return root;});
     return {ready, editor: route.editor, subscribeStatus: (listener: (state: ConnectionState) => void) => status.subscribe(listener),
         close: async () => {listeners.abort(); status.close(); await client.close().catch(error => {if (started) throw error;});}};
