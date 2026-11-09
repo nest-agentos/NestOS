@@ -81,16 +81,22 @@ async function resumeConfirmedOperation(options:Options,state:State):Promise<Sta
         const request={...previous,operationId:state.id+'-'+action+'-'+sha256HexSync(view.revision).slice(0,12),expectedRevision:view.revision};
         return options.journal.update<State>(key(state.boardId,state.itemId),old=>({...old!,code:undefined,requests:{...old!.requests,[action]:request}}));
     }
-    if(entry?.state!=='succeeded'||!entry.runId)return state;
+    if(entry?.state!=='skipped'&&(entry?.state!=='succeeded'||!entry.runId))return state;
     return options.journal.update<State>(key(state.boardId,state.itemId),old=>({...old!,code:undefined,step:old!.step+1,resolvedBy:entry.runId}));
 }
 async function advance(options:Options,state:State) {
     const storageKey=key(state.boardId,state.itemId),action=actions(state)[state.step];if(!await admitted(options,state))return;
+    const snapshot=await options.view(state.boardId,state.itemId);
+    if(snapshot.skippedActions?.includes(action)){
+        const finished=state.step+1>=actions(state).length;
+        const next=await options.journal.update<State>(storageKey,old=>({...old!,step:old!.step+1,code:undefined,waitingForUser:false,...(finished?{done:true}:{})}));
+        await options.report?.(next);return;
+    }
     if(action==='cleanup') {
         if(!await admitted(options,state)||!options.cleanup||!await options.cleanup(state.boardId,state.itemId,state.id))return;
         const done=await options.journal.update<State>(storageKey,old=>({...old!,done:true,code:undefined,cleanupPrecondition:undefined,step:actions(state).length}));await options.report?.(done);return;
     }
-    const view=await options.view(state.boardId,state.itemId);if(!options.active())return;
+    const view=snapshot;if(!options.active())return;
     const id=state.requests[action]?.operationId??state.id+'-'+action,entry=view.operations.find(row=>row.id===action);
     if(entry?.state==='succeeded'&&(entry.runId||action==='accept')){
         await options.journal.update<State>(storageKey,old=>({...old!,waitingForUser:false,step:old!.step+1,...(entry.runId!==id?{resolvedBy:entry.runId}:{})}));return;

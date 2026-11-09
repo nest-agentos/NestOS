@@ -1,0 +1,35 @@
+import {zhCN} from '../../shared/common/src/i18n/zh-CN';
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
+import {createKanbanModule,SeqKanbanStore} from '@nestos/kanban';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {KanbanWorkbench} from '@nestos/kanban-ui';
+import {createItemOperations} from '../../backend/app-core/src/kanban/item-operations';
+const wait=async(ready:()=>boolean)=>{for(let n=0;n<1000;n++){if(ready())return;await new Promise(resolve=>setTimeout(resolve,5));}throw Error('WAIVER_UI_NOT_READY');};
+async function run(){
+ const {manager}=await createVFS({rootBackend:new MemoryBackend()}),fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs);
+ const service=createKanbanModule({store,actor:{kind:'human',id:'reviewer'},authorize:async()=>{},verifyOutputs:async()=>true,log(){}}),worker=createKanbanModule({store,actor:{kind:'service',id:'worker'},authorize:async()=>{},log(){}});
+ await service.create({id:'board',title:'验收豁免验收',scope:{kind:'system'},policy:{requireEstimate:false},members:[{kind:'human',id:'reviewer',responsibility:'Review',roles:['coordinator','reviewer']},{kind:'service',id:'worker',responsibility:'Work',roles:['worker']}]});
+ let seq=0;const command=async(command:any,api=service)=>api.execute('board',{operationId:'seed-'+ ++seq,expectedRevision:(await api.read('board')).revision,command});
+ await command({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'plan',revision:1,sealed:true,items:[{id:'task',title:'带依赖的验收与合并',responsibility:'Work',acceptance:'Acceptance',assignee:{kind:'service',id:'worker'},dependsOn:[]}]}});
+ await command({type:'prepare-dispatch',itemId:'task',dispatchId:'execution'},worker);await command({type:'observe-execution',dispatchId:'execution',fence:(await service.workflow('board')).dispatches.execution.fence,outcome:'succeeded'});
+ const journal=new KanbanAutomationJournal(fs);await journal.open();let starts=0,release!:()=>void;
+ const preparation=new Promise<void>(resolve=>{release=resolve;});
+ const operations=createItemOperations({service,journal,catalog:async()=>({entries:[]}),adapter:{supports:()=>true,snapshot:async()=>({version:'v',sourceVersion:'s',targetVersion:'t',context:{}}),prepareOperation:async({id}:any)=>{await preparation;return {expectedSessionId:'build-session',expectedBranch:'main',submission:{id,source:{kind:'conversation',ownerId:'build-session',id}}};}},submission:{start:async()=>{starts++;},inspect:async()=>({sessionId:'build-session',outcome:'running'})},published:{start:async()=>{throw Error('UNEXPECTED_FLOW');}},sessionResource:async()=>'/native/build-session',log(){}} as never);
+ Object.assign(service,{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation});
+ let calls:string[]=[];const client=new Proxy(service,{get(target,key){const value=Reflect.get(target,key);return typeof value==='function'?(...args:unknown[])=>{calls.push(String(key));return value.apply(target,args);}:value;}});
+ const editor=document.getElementById('editor')!,view=new KanbanWorkbench({service:client,editor,initialResource:'/board/board/task',itemOperationsAvailable:()=>true,selected(){},openSession:async()=>{},presentation:{text:key=>(zhCN as Record<string,string>)['kanban.'+key]??key,icons:{more:'…',close:'×',refreshView:'↻'}}});
+ const metrics:any[]=[];
+ const measure=async(operation:string,action:()=>Promise<unknown>|void,ready:()=>boolean)=>{calls=[];const started=performance.now();await action();await wait(ready);const row={operation,durationMs:Math.round((performance.now()-started)*100)/100,logicalApiCalls:calls.length,httpRequests:0,methods:[...calls]};metrics.push(row);if(row.durationMs>=5000||row.logicalApiCalls>=30)throw Error('PERFORMANCE_LIMIT:'+operation);};
+ await measure('cold.open-operation-feedback',()=>view.start(),()=>!!editor.querySelector('[data-form="item-operation"][data-operation="build"]'));
+ const form=editor.querySelector<HTMLFormElement>('[data-form="item-operation"][data-operation="build"]')!,button=form.querySelector<HTMLButtonElement>('button')!;
+ await measure('warm.click-pending-build',()=>button.click(),()=>!!form.querySelector('[data-operation-submit-status]'));
+ if(!button.disabled||starts)throw Error('SUBMISSION_FEEDBACK_INVALID');button.click();if(calls.filter(id=>id==='runItemOperation').length!==1)throw Error('DUPLICATE_SUBMISSION');
+ await measure('warm.receive-build-admission',()=>release(),()=>!!editor.querySelector('[data-operation-progress="running"]'));
+ if(starts!==1||!editor.textContent!.includes('执行已启动'))throw Error('MISSING_RUNNING_FEEDBACK');
+ const row=(await operations.itemOperations('board','task')).operations.find(row=>row.id==='build')!;
+ await journal.update<any>('review-operation:'+row.runId,old=>({...old,state:'unknown',code:'TRANSPORT_DISCONNECTED'}));
+ await measure('warm.refresh-uncertain-build',()=>editor.querySelector<HTMLButtonElement>('[data-action="refresh-item-operations"]')!.click(),()=>!!editor.querySelector('[data-operation-progress="reconciling"]'));
+ if(starts!==1||(await service.item('board','task')).item.status!=='review')throw Error('EXECUTION_REPLAYED_OR_COMPLETED');
+ document.getElementById('result')!.textContent=JSON.stringify({result:'passed',environment:'Google Chrome headless; actual Kanban domain, SeqFile store, review service and DOM; no HTTP transport',dataset:{boards:1,tasks:1,operations:5,backgroundLoad:'none',buildSubmission:'suspended then admitted then unknown'},metrics});
+}
+void run().catch(error=>{document.getElementById('result')!.textContent=JSON.stringify({result:'failed',code:error instanceof Error?error.message:'UNKNOWN'});});

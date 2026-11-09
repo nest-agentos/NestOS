@@ -118,3 +118,10 @@ it('retries only a proven unadmitted precondition with a new frozen identity and
  const retried=f.run.mock.calls[0][1];expect(retried.operationId).not.toBe(old.operationId);expect(retried.expectedRevision).toBe('new-revision');
  expect(await f.journal.get('automatic-precondition-retry:'+old.operationId)).toEqual(old);
 });
+it('advances explicitly waived steps without running or cleaning them and preserves independent operations',async()=>{
+ const f=await fixture(),base=f.options.view;
+ f.options.view=async()=>{const view=await base();return {...view,skippedActions:['build','deploy','accept','merge','cleanup'],operations:view.operations.map(row=>['build','deploy','accept','merge'].includes(row.id)?{...row,state:'skipped',enabled:false}:row)};};
+ for(let n=0;n<10;n++)await automaticDelivery(f.options).scan();
+ expect(f.run.mock.calls.map(call=>call[1].action)).toEqual(['analyze']);expect(f.options.cleanup).not.toHaveBeenCalled();
+ expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);
+});

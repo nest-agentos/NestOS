@@ -1,0 +1,32 @@
+import {zhCN} from '../../shared/common/src/i18n/zh-CN';
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
+import {createKanbanModule,SeqKanbanStore} from '@nestos/kanban';
+import {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {KanbanWorkbench} from '@nestos/kanban-ui';
+import {createItemOperations} from '../../backend/app-core/src/kanban/item-operations';
+const wait=async(ready:()=>boolean)=>{for(let n=0;n<1000;n++){if(ready())return;await new Promise(resolve=>setTimeout(resolve,5));}throw Error('WAIVER_UI_NOT_READY');};
+async function run(){
+ const {manager}=await createVFS({rootBackend:new MemoryBackend()}),fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs);
+ const service=createKanbanModule({store,actor:{kind:'human',id:'reviewer'},authorize:async()=>{},verifyOutputs:async()=>true,log(){}}),worker=createKanbanModule({store,actor:{kind:'service',id:'worker'},authorize:async()=>{},log(){}});
+ await service.create({id:'board',title:'验收豁免验收',scope:{kind:'system'},policy:{requireEstimate:false},members:[{kind:'human',id:'reviewer',responsibility:'Review',roles:['coordinator','reviewer']},{kind:'service',id:'worker',responsibility:'Work',roles:['worker']}]});
+ let seq=0;const command=async(command:any,api=service)=>api.execute('board',{operationId:'seed-'+ ++seq,expectedRevision:(await api.read('board')).revision,command});
+ await command({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'plan',revision:1,sealed:true,items:[{id:'task',title:'带依赖的验收与合并',responsibility:'Work',acceptance:'Acceptance',assignee:{kind:'service',id:'worker'},dependsOn:[]}]}});
+ await command({type:'prepare-dispatch',itemId:'task',dispatchId:'execution'},worker);await command({type:'observe-execution',dispatchId:'execution',fence:(await service.workflow('board')).dispatches.execution.fence,outcome:'succeeded'});
+ const journal=new KanbanAutomationJournal(fs);await journal.open();let starts=0;
+ const unsupported=async()=>{starts++;throw Error('UNEXPECTED_EXECUTION');};
+ const operations=createItemOperations({service,journal,catalog:async()=>({entries:[]}),adapter:{supports:()=>true,snapshot:unsupported,prepareOperation:unsupported},submission:{start:unsupported,inspect:unsupported},published:{start:unsupported,inspect:unsupported},log(){}} as never);
+ Object.assign(service,{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation});
+ let calls:string[]=[];const client=new Proxy(service,{get(target,key){const value=Reflect.get(target,key);return typeof value==='function'?(...args:unknown[])=>{calls.push(String(key));return value.apply(target,args);}:value;}});
+ const editor=document.getElementById('editor')!,view=new KanbanWorkbench({service:client,editor,initialResource:'/board/board/task',itemOperationsAvailable:()=>true,selected(){},openSession:async()=>{},presentation:{text:key=>(zhCN as Record<string,string>)['kanban.'+key]??key,icons:{more:'…',close:'×',refreshView:'↻'}}});
+ const metrics:any[]=[];
+ const measure=async(operation:string,action:()=>Promise<unknown>|void,ready:()=>boolean)=>{calls=[];const started=performance.now();await action();await wait(ready);const row={operation,durationMs:Math.round((performance.now()-started)*100)/100,logicalApiCalls:calls.length,httpRequests:0,methods:[...calls]};metrics.push(row);if(row.durationMs>=5000||row.logicalApiCalls>=30)throw Error('PERFORMANCE_LIMIT:'+operation);};
+ await measure('cold.open-review-actions',()=>view.start(),()=>!!editor.querySelector('[data-form="item-operation-skip"][data-operation="build"]'));
+ const skip=(action:string)=>{const form=editor.querySelector<HTMLFormElement>('[data-form="item-operation-skip"][data-operation="'+action+'"]')!;form.closest('details')!.open=true;form.querySelector<HTMLTextAreaElement>('textarea')!.value='用户确认本次豁免，保留工作区';form.querySelector<HTMLInputElement>('[name="confirmed"]')!.checked=true;form.requestSubmit();};
+ await measure('warm.skip-build-and-dependents',()=>skip('build'),()=>!editor.querySelector('[data-form="item-operation-skip"][data-operation="build"]'));
+ if((await service.item('board','task')).item.status!=='review')throw Error('INDEPENDENT_REQUIREMENTS_BYPASSED');
+ await measure('warm.skip-independent-analysis',()=>skip('analyze'),()=>editor.textContent!.includes('已完成 · 有豁免'));
+ const item=(await service.item('board','task')).item;if(item.acceptanceResult?.outcome!=='waived'||item.operationWaivers?.length!==2||starts)throw Error('WAIVER_AUDIT_INVALID');
+ for(const details of editor.querySelectorAll<HTMLDetailsElement>('[data-item-operations] details'))details.open=true;
+ document.getElementById('result')!.textContent=JSON.stringify({result:'passed',environment:'Google Chrome headless; actual Kanban domain, SeqFile store, review service and DOM; no HTTP transport',dataset:{boards:1,tasks:1,operations:5,waivers:2,backgroundLoad:'none'},metrics});
+}
+void run().catch(error=>{document.getElementById('result')!.textContent=JSON.stringify({result:'failed',code:error instanceof Error?error.message:'UNKNOWN'});});

@@ -14,7 +14,7 @@ export async function resolveCoordinationRequest(options:DecisionConversationOpt
     const board=await options.service.read(conversation.boardId),record=await options.service.record(board.id,conversation.binding.recordId!);
     const tasks=itemsWithinRoots(board.items,record.itemIds),reports=conversationIssueView(await options.journal.get<ConversationIssueState>(conversationIssuesKey(conversation.id)));
     if(request.method==='coordination.read')return JSON.parse(JSON.stringify({record,groups:tasks.filter(item=>item.purpose==='planning'||item.planning?.execution==='children').map(item=>({id:item.id,title:item.title,revision:item.revision,projectIds:item.externalRefs?.filter(ref=>ref.system==='nestos-remote-project').map(ref=>ref.id),retryPlanning:item.analysis?.state==='failed'&&!item.owner&&!['completed','cancelled'].includes(item.status)})),
-        tasks:tasks.map(item=>({id:item.id,title:item.title,status:item.status,revision:item.revision,parentId:item.planning?.parentId,analysis:item.analysis,blocked:item.blocked})),...reports}));
+        tasks:tasks.map(item=>({id:item.id,title:item.title,status:item.status,revision:item.revision,parentId:item.planning?.parentId,analysis:item.analysis,blocked:item.blocked,acceptanceResult:item.acceptanceResult,operationWaivers:item.operationWaivers})),...reports}));
     requireValue(!board.lifecycle&&!board.deletedAt&&record.status==='confirmed'&&record.archivedAt===undefined,'DECISION_NOT_ACTIVE');
     requireValue(!reports.pendingReports.length,'DECISION_SESSION_BLOCKED');
     if(request.method==='coordination.retry-planning'){

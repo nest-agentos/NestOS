@@ -245,3 +245,16 @@ it('freezes a separately proven compatible runtime on acceptance without rewriti
  expect(await f.journal.get<ReviewJob>(jobKey('accept-newer'))).toMatchObject({state:'succeeded',acceptanceVersion:'newer',acceptanceEvidence:{previousVersion:'candidate'}});
  expect((await f.journal.get<ReviewJob>(jobKey('deploy')))?.result).toMatchObject({version:'candidate'});
 });
+it('projects persisted execution phases without pretending that a request is a completed build',async()=>{
+ const f=await fixture();expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='analyze')?.progress).toBeUndefined();
+ f.submission.inspect.mockResolvedValue({sessionId:'original',outcome:'running'});
+ const result=await f.run('analyze','progress-analysis');
+ expect(result.operations.find(row=>row.id==='analyze')).toMatchObject({state:'running',progress:{stage:'running',requestedAt:expect.any(Number)}});
+ expect(result.operations.find(row=>row.id==='analyze')?.reason).toBeUndefined();
+ const job=await f.journal.get<ReviewJob>(jobKey('progress-analysis'));
+ await f.journal.update<ReviewJob>(jobKey('progress-analysis'),()=>({...job!,state:'unknown',code:'TRANSPORT_DISCONNECTED'}));
+ expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='analyze')?.progress?.stage).toBe('reconciling');
+ await f.journal.update<ReviewJob>(jobKey('progress-analysis'),()=>({...job!,phase:'prepared',code:'WORKSPACE_CONTEXT_PENDING'}));
+ expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='analyze')?.progress?.stage).toBe('waiting-context');
+ expect(f.submission.start).toHaveBeenCalledOnce();
+});
