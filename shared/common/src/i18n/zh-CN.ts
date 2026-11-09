@@ -671,6 +671,7 @@ export const zhCN = {
     'kanban.operationWaiverWaitingStop': '本步骤已被上游跳过覆盖，但已有执行仍需确认停止；请先取消并等待回执。',
     'kanban.operationDependencyCancelling': '上游正在停止，本次流程的后续执行已阻止。',
     'kanban.operationDependencyCancelled': '因上游取消，本次流程不再执行此步骤。',
+    'kanban.errors.HARNESS_MCP_INIT_FAILED': '原生会话所需的 MCP 服务初始化失败，请检查 Cell 内部 MCP 监听与连接。',
     'kanban.errors.SUBMISSION_EFFECT_INDETERMINATE': '原执行结果尚未确认，正在核对回执；请勿重复提交。',
     "kanban.operationCancelConfirm": "停止本次操作，并取消依赖它的后续步骤；保留任务、工作区和已完成成果，等待停止确认后再继续。",
     "kanban.operationCancelUnsupported": "服务切换控制器不支持中途取消，请等待正式结果。",

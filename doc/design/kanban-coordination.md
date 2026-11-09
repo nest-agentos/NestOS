@@ -1038,3 +1038,5 @@ Cell 重启后，原生执行已脱离但缺少精确 turn 终态时，Kanban �
 合并分析由 `runItemOperation` 后端 API 冻结快照、准备通信通道并提交至原执行 Session，不依赖打开看板或会话 View。前通道已关闭而 `current` 明确返回 `CHANNEL_SCOPE_UNKNOWN` 时，不把它当作会话丢失；宿主重新打开本次作用域并沿已核验的原 Session/native binding 继续。创建端仍原子复验当前通道，拒绝并发接管、未知回执或未结算执行。两者统一放在“提交”步骤内：先“分析合并方案”，分析成功后才可“确认并执行 Git 合并”；分析本身不会执行合并。底层效果为 indeterminate 时投影 unknown，并提供原会话入口，不能仅凭 Round 尚未结束显示运行中或重派请求。
 
 看板导航和设置对话框的布局、按钮、表单及响应式样式统一归 [kanban-ui 样式](../../libraries/kanban-ui/src/kanban.css)；`app-shell` 仅通过 `styles/kanban-theme.css` 将宿主主题变量映射到公开 `--kanban-*` 变量，不再持有看板业务 CSS。
+
+Cells 内部 MCP 与 NestOS 外部 API 分开监听：默认内部 `127.0.0.1:8788`，外部端口可独立转发。支持 `projectChannelEndpoint: 1` 的节点由 SDK 省略调用方 URL；Cells 在创建/恢复会话时注入当前运行地址，旧通道中的历史地址不再决定连接目标。地址变化不修改冻结上下文、原 scope token 或操作回执，不能据此重发未知执行或把未确认分析标成成功。内部监听失败阻止启动；原生必需 MCP 初始化失败保留 `HARNESS_MCP_INIT_FAILED` 错误分类，不记录原始错误正文或令牌。

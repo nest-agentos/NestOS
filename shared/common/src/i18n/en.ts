@@ -670,6 +670,7 @@ export const en: LocaleStrings = {
     'kanban.operationWaiverWaitingStop': 'This step is covered by an upstream waiver, but its existing execution must stop first. Cancel it and wait for confirmation.',
     'kanban.operationDependencyCancelling': 'An upstream step is stopping. Further execution in this workflow is blocked.',
     'kanban.operationDependencyCancelled': 'This step will not run because an upstream step was cancelled.',
+    'kanban.errors.HARNESS_MCP_INIT_FAILED': 'A required MCP service failed to initialize. Check the internal Cell MCP listener and connection.',
     'kanban.errors.SUBMISSION_EFFECT_INDETERMINATE': 'The original execution is unconfirmed. Its receipt is being checked; do not resubmit.',
     "kanban.operationCancelConfirm": "Stop this operation and cancel dependent later steps. Preserve the task, workspace and completed work; wait for stop confirmation before continuing.",
     "kanban.operationCancelUnsupported": "The service switch controller cannot interrupt an active switch. Wait for its authoritative result.",
