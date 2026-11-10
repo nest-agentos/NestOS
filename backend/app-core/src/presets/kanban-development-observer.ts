@@ -1,4 +1,6 @@
 import {nativeSessionActivity} from '../kanban/native-session-activity';
+import {registerSessionLearnings} from '../kanban/session-learnings';
+import type {ChannelMessage} from '../run/channel-results';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {consumeChannelMessages} from '../run/channel-messages';
 import {createModuleLogger} from '@nestos/common';
@@ -78,6 +80,16 @@ export function developmentObserver(options: Options) {
             if (input.observation.outcome !== 'succeeded') return input.observation;
             if (!messages.some(message=>message.type==='result')&&messages.some(message=>message.type==='resolved'))return {...input.observation,outcome:'running',outputs:undefined,code:'WORKSPACE_RESULT_PENDING'};
             if (!messages.some(message => message.type === 'result')) return {...input.observation, outcome: 'unknown', outputs: undefined, code: 'WORKSPACE_RESULT_MISSING'};
+            const publications = envelope.messages as ChannelMessage[];
+            const results = publications.filter(row => row.message.type === 'result');
+            if (results.length !== 1) return {...input.observation, outcome: 'unknown', outputs: undefined, code: 'CHANNEL_RESULT_INVALID'};
+            const result = results[0];
+            if (result) try {
+                await registerSessionLearnings({boardId: input.boardId, sessionId: input.observation.executionSessionId ?? input.dispatch.executionSessionId,
+                    messageId: result.id, payload: result.message.payload, publications, service: input.service, journal});
+            } catch (error) {
+                return {...input.observation, outcome: 'unknown', outputs: undefined, code: (error as {code: string}).code};
+            }
             try {await options.verifyDelivery?.(input.dispatch.id);}
             catch (error) {
                 const raw = (error as {code?: unknown})?.code;

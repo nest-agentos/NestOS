@@ -1,4 +1,4 @@
-const settings=process.argv[2]==='settings';
+const settings=process.argv[2]==='settings',learnings=process.argv[2]==='session-learnings';
 import {mkdtemp,writeFile,copyFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
@@ -13,11 +13,11 @@ const native=process.argv[2]==='native-activity',automatic=process.argv[2]==='qu
 const root=fileURLToPath(new URL('..',import.meta.url)),directory=await mkdtemp(join(tmpdir(),'nestos-kanban-filter-'));
 const chrome=process.env.KANBAN_BROWSER??'/usr/bin/google-chrome';
 await withTemporaryScope({scopeId:'kanban-filter-browser-'+randomUUID()},async scope=>{
- const build=await(await scope.start(resolve(root,'node_modules/.bin/esbuild'),[resolve(root,'scripts/fixtures/'+(settings?'kanban-settings':cancel?'kanban-operation-cancel':progress?'kanban-operation-progress':skips?'kanban-operation-skips':queue?'native-queue-recovery':native?'kanban-native-activity':'kanban-decision-filter')+'.ts'),'--bundle','--format=iife','--platform=browser','--loader:.css=empty','--outfile='+join(directory,'fixture.js')],{cwd:root,timeoutMs:60000})).result;
+ const build=await(await scope.start(resolve(root,'node_modules/.bin/esbuild'),[resolve(root,'scripts/fixtures/'+(learnings?'kanban-session-learnings':settings?'kanban-settings':cancel?'kanban-operation-cancel':progress?'kanban-operation-progress':skips?'kanban-operation-skips':queue?'native-queue-recovery':native?'kanban-native-activity':'kanban-decision-filter')+'.ts'),'--bundle','--format=iife','--platform=browser','--loader:.css=empty','--outfile='+join(directory,'fixture.js')],{cwd:root,timeoutMs:60000})).result;
  if(build.outcome!=='succeeded')throw Error((await processOutput(undefined,build.id)).output);
  await copyFile(resolve(root,queue?'libraries/llm-ui/src/style.css':'libraries/kanban-ui/src/kanban.css'),join(directory,'kanban.css'));
  await writeFile(join(directory,'index.html'),'<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="kanban.css"><style>html,body{height:100%;margin:0}#editor{height:100%;min-height:0}#result{display:none}</style><body><main id="editor"></main><pre id="result"></pre><script src="fixture.js"></script></body>');
- const browser=await(await scope.start(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--user-data-dir='+join(directory,'profile'),'--window-size=1280,900','--virtual-time-budget=15000','--screenshot='+join(directory,'screenshot.png'),'--dump-dom','file://'+join(directory,'index.html')+(automatic?'#system-recovery':'')],{cwd:root,timeoutMs:60000})).result;
+ const browser=await(await scope.start(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--user-data-dir='+join(directory,'profile'),'--window-size=1280,900','--virtual-time-budget=15000','--screenshot='+join(directory,'screenshot.png'),'--dump-dom','file://'+join(directory,'index.html')+(automatic?'#system-recovery':learnings&&process.argv[3]==='baseline'?'#baseline':'')],{cwd:root,timeoutMs:60000})).result;
  const output=(await processOutput(undefined,browser.id)).output;await writeFile(join(directory,'browser.log'),output);
  const encoded=output.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1];
  if(browser.outcome!=='succeeded'||!encoded)throw Error('BROWSER_ACCEPTANCE_FAILED: '+directory);
@@ -27,4 +27,4 @@ await withTemporaryScope({scopeId:'kanban-filter-browser-'+randomUUID()},async s
  if(report.result!=='passed')throw Error('BROWSER_ASSERTION_FAILED: '+JSON.stringify(report));
  console.log(JSON.stringify({...report,artifacts:directory}));
 });
-console.log(JSON.stringify({operation:settings?'kanban.settings.browser':cancel?'kanban.operation-cancel.browser':progress?'kanban.operation-progress.browser':skips?'kanban.operation-skips.browser':automatic?'native.queue-system-recovery.browser':queue?'native.queue-recovery.browser':native?'kanban.native-activity.browser':'kanban.decision-filter.browser',result:'success',cleanup:'confirmed'}));
+console.log(JSON.stringify({operation:learnings?'kanban.session-learnings.browser':settings?'kanban.settings.browser':cancel?'kanban.operation-cancel.browser':progress?'kanban.operation-progress.browser':skips?'kanban.operation-skips.browser':automatic?'native.queue-system-recovery.browser':queue?'native.queue-recovery.browser':native?'kanban.native-activity.browser':'kanban.decision-filter.browser',result:'success',cleanup:'confirmed'}));

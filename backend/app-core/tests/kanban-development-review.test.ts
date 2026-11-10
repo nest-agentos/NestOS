@@ -27,10 +27,28 @@ async function fixture(withExchange = false,serviceControl?:import('../src/runti
     const submission = {start: vi.fn(async () => ({sessionId: 'original-session', outcome})), inspect: vi.fn(async () => ({sessionId: 'original-session', outcome}))};
     const channels=memoryChannels();
     const stop = vi.fn(), close = vi.fn(async () => {}), remote = {sessionChannel:channels.channel,projectHarness: async () => ({subscribeChannel: () => stop, close})};
-    const api = developmentReviewAdapter({serviceControl,fs, journal, calls, remote, submission: withExchange ? submission : undefined, kernel: {sessionActivity: async () => ({counts: {}})}, projects: {get: async () => ({path: '/project'}), openWorkspace: async () => ({fs, dispose: async () => {}})}, runningVersion: 'running', service: {execute: async () => {}, workflow: async () => workflow, read: async () => board, item: async () => ({item})}} as never);
+    const execute = vi.fn(async () => {});
+    const api = developmentReviewAdapter({serviceControl,fs, journal, calls, remote, submission: withExchange ? submission : undefined, kernel: {sessionActivity: async () => ({counts: {}})}, projects: {get: async () => ({path: '/project'}), openWorkspace: async () => ({fs, dispose: async () => {}})}, runningVersion: 'running', service: {execute, workflow: async () => workflow, read: async () => board, item: async () => ({item})}} as never);
     closes.push(() => api.close!());
-    return {api, journal, fs, workflow, channels, submission, stop, close, complete: () => {outcome = 'succeeded';}, item: item as never, board: board as never, target, calls};
+    return {api, journal, fs, workflow, channels, submission, stop, close, execute, complete: () => {outcome = 'succeeded';}, item: item as never, board: board as never, target, calls};
 }
+it('registers analysis learnings on the retained Session and recovers writes without replaying native work', async () => {
+    const f = await fixture();
+    Object.assign(f.workflow.dispatches, {original: {id: 'original', itemId: 'task', attempt: 1}});
+    (f.item as {externalRefs: unknown[]}).externalRefs.push({system: 'nestos-execution-session', id: 'original-session', revision: 'original'});
+    const snapshot = await f.api.snapshot(f.board, f.item);
+    const request = await f.api.prepareAnalysis({id: 'analysis-learning', board: f.board, item: f.item, snapshot});
+    const payload = {summary: 'Analysis complete', learnings: [{id: 'receipt', itemId: 'task', event: 'Lost reply', handling: 'Inspect receipt',
+        reason: 'Avoid replay', result: 'Recovered', conditions: 'Stable identity'}]};
+    f.channels.report('analysis-learning', 'result', {type: 'result', content: 'Complete', payload});
+    const job = {id: 'analysis-learning', action: 'analyze', boardId: 'board', itemId: 'task', request, snapshot} as never;
+    f.execute.mockRejectedValueOnce(Object.assign(Error('private details'), {code: 'EIO'}));
+    await expect(f.api.readAnalysis(job)).rejects.toMatchObject({code: 'EIO'});
+    expect(await f.api.readAnalysis(job)).toEqual(payload);
+    expect(await f.api.readAnalysis(job)).toEqual(payload);
+    expect(f.execute).toHaveBeenCalledTimes(2);
+    expect(f.submission.start).not.toHaveBeenCalled();
+});
 it('prepares merge analysis in the original logical Session and exact native context without executing it', async () => {
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
     const request = await f.api.prepareAnalysis({id: 'analysis', board: f.board, item: f.item, snapshot});

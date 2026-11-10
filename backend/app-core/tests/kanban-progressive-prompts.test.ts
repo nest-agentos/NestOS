@@ -30,3 +30,9 @@ it.each(['analyze','build','deploy','merge'] as const)('starts %s with one Markd
  const text=maintenanceInstruction(action);expect(Buffer.byteLength(text)).toBeLessThan(100);
  expect(text).toContain('-pre.md');expect(text).not.toContain('-post.md');expect(text).not.toContain('operation-result.md');expect(text.startsWith('{')).toBe(false);
 });
+it.each(['task.md', 'task-merge-post.md', 'operation-result.md'])('makes the concise learning contract reachable from %s', entry => {
+ const sections = promptReferenceSections(files, entry);
+ expect(sections['session-learnings.md']).toContain('payload.learnings');
+ expect(sections['session-learnings.md']).toContain('formally associated Task IDs');
+ expect(sections['session-learnings.md'].split(/\s+/).length).toBeLessThan(90);
+});
