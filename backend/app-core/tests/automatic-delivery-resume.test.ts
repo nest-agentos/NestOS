@@ -23,3 +23,19 @@ it.each([
         expect(run).not.toHaveBeenCalled(); expect(cleanup).not.toHaveBeenCalled();
     } finally {await manager.dispose();}
 });
+
+it('never reports workflow completion over an error or incomplete steps', async () => {
+    const {automaticDeliveryStatus} = await import('../src/kanban/automatic-delivery');
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    try {
+        const journal = new KanbanAutomationJournal(await manager.openFileSystem('/')); await journal.open();
+        const key = 'automatic-delivery:' + JSON.stringify(['board', 'task']);
+        await journal.update(key, () => ({id: 'auto', boardId: 'board', itemId: 'task', executionId: 'd', done: true, step: 2, steps: ['build', 'cleanup'], code: 'CONFLICT', requests: {}}));
+        expect(await automaticDeliveryStatus(journal, 'board', 'task')).toMatchObject({state: 'blocked', code: 'CONFLICT'});
+        const delivery=automaticDelivery({journal,active:()=>true,automatic:async()=>true,service:{read:async()=>({})}} as never);
+        expect(await delivery.ready('board',{id:'task'} as never)).toBe(false);
+        await journal.update<any>(key, old => ({...old, code: undefined, step: 1}));
+        expect(await automaticDeliveryStatus(journal, 'board', 'task')).toMatchObject({state: 'blocked', code: 'AUTOMATIC_DELIVERY_INCOMPLETE'});
+        expect(await delivery.ready('board',{id:'task'} as never)).toBe(false);
+    } finally {await manager.dispose();}
+});

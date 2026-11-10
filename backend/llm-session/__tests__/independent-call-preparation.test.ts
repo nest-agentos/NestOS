@@ -503,3 +503,28 @@ it('reads historical queue calls alongside prepared calls without resubmitting o
     expect(open).not.toHaveBeenCalled(); expect(recover).not.toHaveBeenCalled(); expect(model).not.toHaveBeenCalled();
     await expect(service.prepareTaskCall(original, options())).rejects.toHaveProperty('code', 'CALL_EXECUTION_MODE_CONFLICT');
 });
+
+it('reads a historical caller without recovery metadata from its exact receipt without recreating execution', async () => {
+    const ready = await service.prepareTaskCall(input(), options()), session = await kernel.openSession(parent);
+    const saved = (await session.getShared(key))!, route = structuredClone(saved.value) as any;
+    delete route.kernelPreparation.callerRecovery;
+    await session.setShared(key, route, {expectedVersion: saved.version});
+    const {recovery: _recovery, ...caller} = ready.caller;
+    const {submitPreparedTaskCall} = await import('@nestos/llm-flow');
+    const execution = await submitPreparedTaskCall(ready.plan, {kernel, caller});
+    await execution.root.wait({timeoutMs: 5000});
+    const before = (await kernel.listSessionTasks(parent)).length;
+    service = createService(async () => false);
+    const receipt = await service.inspectTaskCallSubmission(input());
+    expect(receipt?.submission.task.taskId).toBe(execution.root.id);
+    expect((await service.list({sessionId: parent}))[0].receipt.evidence).toBe('kernel');
+    expect((await kernel.listSessionTasks(parent)).length).toBe(before); expect(model).toHaveBeenCalledOnce();
+});
+it('does not relax receipt matching for a caller whose recovery policy was explicitly frozen', async () => {
+    const ready = await service.prepareTaskCall(input(), options());
+    const {recovery: _recovery, ...caller} = ready.caller;
+    const {submitPreparedTaskCall} = await import('@nestos/llm-flow');
+    const execution = await submitPreparedTaskCall(ready.plan, {kernel, caller});
+    await execution.root.wait({timeoutMs: 5000});
+    await expect(service.inspectTaskCallSubmission(input())).rejects.toMatchObject({code: 'CONFLICT'});
+});

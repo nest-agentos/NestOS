@@ -25,7 +25,7 @@ export interface IndependentTaskCallAdmission {
     submission: TaskSubmissionReceipt;
 }
 interface PreparedData {plan: TaskCallPlan; context: PreparedConversationContext; digest: string}
-export interface IndependentKernelPreparation {version: 1; callerRequestId: string; invocation: InvocationIdentity; policy: IndependentTaskCallPolicy; prepared?: PreparedData}
+export interface IndependentKernelPreparation {version: 1; callerRecovery?: import('@nestos/durable-kernel').TaskSpec['recovery']; callerRequestId: string; invocation: InvocationIdentity; policy: IndependentTaskCallPolicy; prepared?: PreparedData}
 export interface PreparationScope {operationId: string; sessionId: string; roundId: string; target: TargetRef; branch: string}
 
 /** Normalize a trusted child request without admitting it to the instruction queue. */
@@ -52,7 +52,7 @@ export function snapshotIndependentTaskCallPolicy(policy: IndependentTaskCallPol
 }
 /** Allocate an Invocation only for a new route candidate; retries use the persisted winner. */
 export function newIndependentKernelPreparation(policy: IndependentTaskCallPolicy, operationId: string): IndependentKernelPreparation {
-    return {version: 1, callerRequestId: `independent-call:${operationId}`, invocation: {invocationId: ulid()}, policy: snapshotIndependentTaskCallPolicy(policy)};
+    return {version: 1, callerRecovery: {scope: 'session.call.history', key: operationId, until: 'acknowledged'}, callerRequestId: `independent-call:${operationId}`, invocation: {invocationId: ulid()}, policy: snapshotIndependentTaskCallPolicy(policy)};
 }
 export function assertIndependentPreparationMode(saved: IndependentKernelPreparation | undefined, requested?: IndependentTaskCallPolicy): void {
     if (!!saved !== !!requested) throw invalid('CALL_EXECUTION_MODE_CONFLICT');
@@ -79,6 +79,7 @@ export function readIndependentTaskCall(claim: IndependentKernelPreparation, sco
 }
 function assertClaim(value: IndependentKernelPreparation): void {
     if (!value || value.version !== 1 || !/^independent-call:[\w-]{1,128}$/.test(value.callerRequestId) || !isInvocationIdentity(value.invocation)) throw invalid('CALL_PREPARATION_CORRUPT');
+    if (value.callerRecovery && (value.callerRecovery.scope !== 'session.call.history' || value.callerRecovery.key !== value.callerRequestId.slice('independent-call:'.length) || value.callerRecovery.until !== 'acknowledged')) throw invalid('CALL_PREPARATION_CORRUPT');
     assertPolicy(value.policy);
 }
 function assertPolicy(value: IndependentTaskCallPolicy): void {

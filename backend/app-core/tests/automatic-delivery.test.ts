@@ -16,8 +16,9 @@ it('resumes all approved stages once and releases dependencies only after verifi
 });
 it('never repeats an unknown operation and blocks at unapproved conflict choices',async()=>{const f=await fixture();await automaticDelivery(f.options).scan();
  f.jobs.get('build').state='unknown';for(let n=0;n<3;n++)await automaticDelivery(f.options).scan();expect(f.run).toHaveBeenCalledOnce();f.jobs.get('build').state='succeeded';
- for(let n=0;n<7;n++)await automaticDelivery(f.options).scan();
- f.options.view=async()=>({revision:'revision',operations:[...f.jobs.values(),{id:'merge',enabled:true,fields:[{id:'conflict'}]}]});await automaticDelivery(f.options).scan();
+ for(let n=0;n<12&&!f.jobs.has('analyze');n++)await automaticDelivery(f.options).scan();
+ expect(f.jobs.has('analyze')).toBe(true);
+ f.options.view=async()=>({revision:'revision',operations:[...f.jobs.values(),{id:'merge',enabled:true,fields:[{id:'conflict'}]}]});await automaticDelivery(f.options).scan();await automaticDelivery(f.options).scan();
  expect(f.options.report).toHaveBeenCalledWith(expect.objectContaining({code:'OPERATION_SELECTION_REQUIRED'}));expect(f.run.mock.calls.some(call=>call[1].action==='merge')).toBe(false);
 });
 

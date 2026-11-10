@@ -12,6 +12,7 @@ interface Options {service:KanbanService;journal:KanbanAutomationJournal;active(
     report?(state:State):Promise<void>}
 const steps=['build','deploy','accept','analyze','merge','cleanup'];
 const actions=(state:State)=>state.steps??steps;
+const settledDelivery=(state:State|undefined):boolean=>!!state?.done&&!state.code&&state.step>=actions(state).length;
 async function admitted(options:Options,state:State) {
     if(!options.active())return false;
     const board=await options.service.read(state.boardId),item=board.items.find(row=>row.id===state.itemId);
@@ -22,7 +23,7 @@ const key=(board:string,item:string)=>'automatic-delivery:'+JSON.stringify([boar
 export function automaticDelivery(options:Options) {
     return {ready:async(boardId:string,item:KanbanItem)=>{
         if(!options.automatic||!await options.automatic(await options.service.read(boardId),item))return true;
-        return (await options.journal.get<State>(key(boardId,item.id)))?.done===true;
+        return settledDelivery(await options.journal.get<State>(key(boardId,item.id)));
     },scan:async()=>{
         if(!options.automatic)return;
         for(const entry of await options.service.catalog()) {
@@ -56,7 +57,7 @@ async function prepareState(options:Options,board:KanbanBoard,item:KanbanItem,wo
 }
 async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workflow:KanbanWorkflowState) {
     let state=await prepareState(options,board,item,workflow);if(!state)return;
-    if(state.done){await releaseDeliveryTarget(options,state);return;}
+    if(state.done){if(settledDelivery(state))await releaseDeliveryTarget(options,state);return;}
     if(state.code==='OPERATION_CANCELLED'&&(await options.view(state.boardId,state.itemId)).halted){await releaseDeliveryTarget(options,state);return;}
     if(state.manualAfter&&state.step>actions(state).indexOf(state.manualAfter))await releaseDeliveryTarget(options,state);
     else if(!await claimDeliveryTarget(options,state)){if(!state.waitingForTarget)await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:true}));return;}
@@ -64,7 +65,7 @@ async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workfl
     try {
         if(state.code&&!(actions(state)[state.step]==='cleanup'&&state.cleanupPrecondition)){state=await resumeConfirmedOperation(options,state);if(state.code)return;}
         await advance(options,state);
-        if((await options.journal.get<State>(key(board.id,item.id)))?.done)await releaseDeliveryTarget(options,state);
+        if(settledDelivery(await options.journal.get<State>(key(board.id,item.id))))await releaseDeliveryTarget(options,state);
     }catch(error){
         if(!options.active())return;
         const code=safeCode(error,'AUTOMATIC_DELIVERY_FAILED');if(code==='AUTOMATIC_DELIVERY_PAUSED')return;
@@ -113,7 +114,7 @@ async function advance(options:Options,state:State) {
         return;
     }
     if(entry?.runId===id) {
-        if(entry.state==='failed'||entry.state==='cancelled')throw Object.assign(new Error('Automatic step failed'),{code:entry.code??'AUTOMATIC_STEP_FAILED'});
+        if(entry.state==='failed'||entry.state==='cancelled'||entry.state==='unknown')throw Object.assign(new Error('Automatic step failed'),{code:entry.code??(entry.state==='unknown'?'OPERATION_OUTCOME_UNKNOWN':'AUTOMATIC_STEP_FAILED')});
         return;
     }
     if(!entry?.enabled)return;
@@ -124,5 +125,8 @@ async function advance(options:Options,state:State) {
 }
 export async function automaticDeliveryStatus(journal:KanbanAutomationJournal,board:string,item:string):Promise<NonNullable<KanbanItemOperations['automatic']>|undefined> {
     const state=await journal.get<State>(key(board,item));
-    return state?{state:state.done?'completed':state.code?'blocked':state.waitingForUser?'waiting-confirmation':'running',waitingForUser:state.waitingForUser,stage:actions(state)[state.step]??'completed',code:state.code,...(state.waitingForTarget?{waitingForTarget:true}:{})}:undefined;
+    if(!state)return;
+    const completed=settledDelivery(state),code=state.code??(state.done&&!completed?'AUTOMATIC_DELIVERY_INCOMPLETE':undefined);
+    return {state:code?'blocked':completed?'completed':state.waitingForUser?'waiting-confirmation':'running',waitingForUser:state.waitingForUser,
+        stage:actions(state)[state.step]??'completed',code,...(state.waitingForTarget?{waitingForTarget:true}:{})};
 }

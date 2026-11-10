@@ -39,6 +39,7 @@ const RECOVERY_SCOPE = 'session.call.history';
 interface PreparationProgress {stage: string; executionSessionId?: string}
 /** Session routes project the single prepared Kernel call protocol. */
 export class IndependentCallService {
+    private readonly legacyCallers = new WeakSet<PreparedIndependentTaskCall>();
     private readonly host;
     private historyEnabled = false;
     private readonly recoveryWork = new WorkPool(8);
@@ -101,7 +102,7 @@ export class IndependentCallService {
         this.assertPreparationRoute(route, identity);
         progress.executionSessionId = route.executionSessionId;
         await this.writable(route.executionSessionId!);
-        const previous = this.preparedCall(route); if (previous) return previous;
+        const previous = this.preparedCall(route); if (previous) return this.compatiblePreparedCaller(previous);
         progress.stage = 'attachments'; await this.copyAttachments(route);
         progress.stage = 'prepare';
         const ready = await prepare(structuredClone(route.childRequest), structuredClone(route.kernelPreparation!.invocation));
@@ -117,7 +118,7 @@ export class IndependentCallService {
             const route = stored && this.match(stored.value, identity.digest);
             if (route) this.assertPreparationRoute(route, identity);
             const ready = route && this.preparedCall(route);
-            progress.executionSessionId = ready?.executionSessionId; return ready;
+            progress.executionSessionId = ready?.executionSessionId; return ready && this.compatiblePreparedCaller(ready);
         });
     }
     /** Trusted host dispatch consumes only the persisted Kernel plan. */
@@ -311,7 +312,24 @@ export class IndependentCallService {
         await this.writable(ref.sessionId);
         await this.options.kernel.acknowledgeTaskRecovery(ref.sessionId, ref.taskId, RECOVERY_SCOPE);
     }
+    /** Inspect both historical recovery schemas; only an exact admitted receipt can select the legacy variant. */
+    private async compatiblePreparedCaller(ready: PreparedIndependentTaskCall): Promise<PreparedIndependentTaskCall> {
+        if (!this.legacyCallers.has(ready)) return ready;
+        const started = Date.now();
+        const onDiagnostic = (event: import('@nestos/durable-kernel').KernelDiagnostic) => this.host.logger.debug('Legacy caller receipt inspection', event);
+        try {await readTaskCallSubmission(ready.plan, {kernel: this.options.kernel, caller: ready.caller, onDiagnostic}); return ready;}
+        catch (error) {
+            if ((error as {code?: string})?.code !== 'CONFLICT') throw error;
+            const {recovery: _recovery, ...caller} = ready.caller;
+            const receipt = await readTaskCallSubmission(ready.plan, {kernel: this.options.kernel, caller, onDiagnostic});
+            if (!receipt) throw error;
+            this.host.logger.info('Historical caller receipt confirmed', {operation: 'call.prepare.inspect', stage: 'legacy-recovery-metadata', outcome: 'success',
+                operationId: ready.operationId, sessionId: caller.sessionId, durationMs: Date.now() - started});
+            return {...ready, caller};
+        }
+    }
     private async taskCallExecution(ready: PreparedIndependentTaskCall) {
+        ready = await this.compatiblePreparedCaller(ready);
         const observed = await readTaskCallExecution(ready.plan, {kernel: this.options.kernel, caller: ready.caller,
             onDiagnostic: event => this.host.logger.debug('Prepared Kernel execution', event)});
         return observed && {...callAdmission(ready, observed.submission), ...(observed.target ? {target: observed.target} : {})};
@@ -321,6 +339,7 @@ export class IndependentCallService {
         if (!ready) throw independentPreparationError('CALL_PREPARATION_REQUIRED'); return ready;
     }
     private async taskCallAdmission(ready: PreparedIndependentTaskCall): Promise<IndependentTaskCallAdmission | undefined> {
+        ready = await this.compatiblePreparedCaller(ready);
         const submission = await readTaskCallSubmission(ready.plan, {kernel: this.options.kernel, caller: ready.caller,
             onDiagnostic: event => this.host.logger.debug('Prepared Kernel call receipt', event)});
         return submission && callAdmission(ready, submission);
@@ -345,9 +364,11 @@ export class IndependentCallService {
     private preparedCall(route: CallRoute): PreparedIndependentTaskCall | undefined {
         if (!route.kernelPreparation) return;
         const data = readIndependentTaskCall(route.kernelPreparation, this.preparationScope(route)); if (!data) return;
-        return {operationId: route.input.request.submission!.id,
+        const ready: PreparedIndependentTaskCall = {operationId: route.input.request.submission!.id,
             caller: {sessionId: route.input.request.expectedSessionId!, requestId: route.kernelPreparation.callerRequestId,
-                recovery: {scope: RECOVERY_SCOPE, key: route.input.request.submission!.id, until: 'acknowledged'}}, executionSessionId: route.executionSessionId!, invocation: structuredClone(route.kernelPreparation.invocation), ...data};
+                recovery: route.kernelPreparation.callerRecovery ?? {scope: RECOVERY_SCOPE, key: route.input.request.submission!.id, until: 'acknowledged'}}, executionSessionId: route.executionSessionId!, invocation: structuredClone(route.kernelPreparation.invocation), ...data};
+        if (!route.kernelPreparation.callerRecovery) this.legacyCallers.add(ready);
+        return ready;
     }
     private async savePreparation(route: CallRoute, prepared: NonNullable<IndependentKernelPreparation['prepared']>): Promise<CallRoute> {
         const caller = route.input.request.expectedSessionId!, session = await this.options.kernel.openSession(caller);
