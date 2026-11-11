@@ -18,7 +18,11 @@ export async function readOperationScopes(options:ReviewOperationsOptions,board:
     if(!route?.scopes)return read(options);
     const scopes=await Promise.all(route.scopes.map(async scope=>{
         const started=Date.now();
-        try{return {...scope,view:await read(await scopedOperationOptions(options,board,item,scope.id))};}
+        try{
+            const view=await read(await scopedOperationOptions(options,board,item,scope.id));
+            return {...scope,view:scope.completed?{...view,automatic:{state:'completed' as const,stage:'completed'},
+                operations:view.operations.map(operation=>({...operation,enabled:false}))}:view};
+        }
         catch(error){const code=safeCode(error,'OPERATION_SCOPE_UNAVAILABLE');options.log({operationId:scope.id,stage:'operation.scope.read',result:'failure',code,durationMs:Date.now()-started});
             return {...scope,view:{revision:sha256HexSync(JSON.stringify([scope.id,code])),operations:[],code}};}
     }));
@@ -34,9 +38,9 @@ export async function operationRequestOptions(options:ReviewOperationsOptions,bo
 /** Project finalization facts without opening any Session or advancing an operation. */
 export async function scopedFinalizationStatus(options:ReviewOperationsOptions,board:string,item:string):Promise<KanbanItemOperations['automatic']> {
     const route=await options.scopes?.describe(board,item);
-    if(!route?.scopes)return automaticDeliveryStatus(options.journal,board,item);
+    if(!route?.scopes?.length)return automaticDeliveryStatus(options.journal,board,item);
     const statuses=await Promise.all(route.scopes.map(async scope=>scope.completed?{state:'completed' as const,stage:'completed'}:
         await automaticDeliveryStatus(options.journal,board,item,scope.id)??{state:'waiting-confirmation' as const,stage:'analyze'}));
     return statuses.find(row=>row.state==='blocked')??statuses.find(row=>row.state==='waiting-confirmation')
-        ??statuses.find(row=>row.state==='running')??await automaticDeliveryStatus(options.journal,board,item)??(statuses.length?{state:'completed',stage:'completed'}:undefined);
+        ??statuses.find(row=>row.state==='running')??{state:'completed',stage:'completed'};
 }

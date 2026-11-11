@@ -434,6 +434,21 @@ it('keeps management cleanup pending until every repository scope is finalized',
  expect(f.published.start).not.toHaveBeenCalled();
 });
 
+it('projects verified repository cleanup ahead of an older automatic target wait without rewriting receipts',async()=>{
+ const f=await fixture(),legacy={id:'old',boardId:'board',itemId:'task',step:0,waitingForTarget:true,requests:{}};
+ for(const ids of [['board','task'],['board','task','repo-a']])await f.journal.update('automatic-delivery:'+JSON.stringify(ids),()=>legacy);
+ const scopes=[{id:'repo-a',label:'Repository',contributors:[],completed:true}];
+ f.options.scopes={describe:async()=>({scopes}),resolve:async()=>({})};
+ const api=createItemOperations(f.options);closes.push(()=>api.quiesce());
+ expect(await api.finalizationStatus('board','task')).toEqual({state:'completed',stage:'completed'});
+ const view=await api.itemOperations('board','task');
+ expect(view.scopes?.[0].view.automatic).toEqual({state:'completed',stage:'completed'});
+ expect(view.scopes?.[0].view.operations.every(operation=>!operation.enabled)).toBe(true);
+ expect(await f.journal.get('automatic-delivery:'+JSON.stringify(['board','task']))).toEqual(legacy);
+ expect(f.published.start).not.toHaveBeenCalled();expect(f.options.adapter.snapshot).not.toHaveBeenCalled();
+ scopes.splice(0);expect(await api.finalizationStatus('board','task')).toMatchObject({state:'running',waitingForTarget:true});
+});
+
 it('preserves other repository controls when one scope cannot be read',async()=>{
  const f=await fixture();f.options.scopes={describe:async()=>({scopes:['unavailable','ready'].map(id=>({id,label:id,contributors:[]}))}),resolve:async(_b,_i,id)=>{
   if(id==='unavailable')throw Object.assign(Error('offline'),{code:'NATIVE_CONNECTION_FAILED'});return {deliveryPlan:async()=>({steps:['analyze'],acceptance:'source'})};
