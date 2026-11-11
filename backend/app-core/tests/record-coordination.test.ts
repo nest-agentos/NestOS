@@ -106,3 +106,16 @@ it('routes a recoverable execution blocker to its executor and a settled failure
  expect(await communication.openTaskCommunication('b',{itemId:'child',operationId:'open-failed'})).toMatchObject({resourceId:'/native/coordinate'});
  expect(open).toHaveBeenCalledWith('b',{recordId:'decision',operationId:'open-failed'});
 });
+
+
+it('routes management communication to its admitted session without starting another record conversation',async()=>{
+ const {taskCommunication}=await import('../src/kanban/task-communication');const f=await fixture();
+ await f.command({type:'link-reference',itemId:'group',reference:{system:'nestos-decision-run',id:'run'}});
+ const record=await f.service.record('b','decision');await f.journal.update('record-context:run',()=>({sourceBoardId:'b',recordId:'decision',recordRevision:record.revision,runId:'run'}));
+ await f.journal.update('analysis-current:'+JSON.stringify(['b','group']),()=> 'original-analysis');
+ await f.journal.update('original-analysis',()=>({id:'analysis',input:{request:{}},status:{state:'analyzing'}}));
+ const open=vi.fn(),calls={inspectTaskCallSubmission:vi.fn(async()=>({executionSessionId:'management'}))};
+ const api=taskCommunication(f.service,f.journal,{...f.options,calls,executionResource:async()=>'/native/management'} as any,open);
+ expect(await api.openTaskCoordination('b',{itemId:'group',operationId:'open'})).toMatchObject({id:'analysis',sessionId:'management',resourceId:'/native/management'});
+ expect(open).not.toHaveBeenCalled();
+});

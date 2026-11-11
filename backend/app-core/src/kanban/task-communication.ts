@@ -1,5 +1,5 @@
 import type {KanbanClient,KanbanRecordConversation} from '@nestos/kanban/contracts';
-import {safeCode,type KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {safeCode,managementTaskOwner,type KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import {planningSessionReader} from './planning-sessions';
 import {workContext} from './work-context';
@@ -11,6 +11,12 @@ export function taskCommunication(service:KanbanClient,journal:KanbanAutomationJ
     const coordinate=async(boardId:string,request:Request)=>{
         const board=await service.read(boardId),item=(await service.item(boardId,request.itemId)).item,context=await workContext(journal,board,item,service);
         requireValue(context.decision,'DECISION_LINK_UNAVAILABLE');
+        const owner=managementTaskOwner(board,item)??item;
+        const current=owner.purpose==='planning'||owner.planning?.execution==='children'
+            ?await planningSessionReader(service,journal,options)(boardId,owner.id):undefined;
+        if(current)return {id:current.analysisId,boardId,recordId:context.decision.recordId,sessionId:current.sessionId,
+            resourceId:current.resourceId??current.sessionId,state:current.state==='waiting-input'?'blocked' as const:current.state==='completed'?'confirmed' as const:'clarifying' as const,
+            createdAt:current.createdAt??owner.createdAt,purpose:'coordination' as const};
         return open(context.decision.sourceBoardId,{recordId:context.decision.recordId,operationId:request.operationId});
     };
     return {openTaskCoordination:coordinate,openTaskCommunication:async(boardId:string,request:Request):Promise<KanbanRecordConversation>=>{
