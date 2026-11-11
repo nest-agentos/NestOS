@@ -98,6 +98,7 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
         return entry;
     }));
     const selected=raw.filter(op=>!context.deliveryPlan||context.deliveryPlan.steps.includes(op.id)||context.jobs.some(job=>job.action===op.id&&job.phase!=='settled'));
+    if(context.deliveryPlan?.ordering==='configured'){const order=context.deliveryPlan.steps;selected.sort((left,right)=>order.indexOf(left.id)-order.indexOf(right.id));}
     const actor=await options.service.currentPrincipal(),canSkip=!options.scopeId&&actor.kind==='human'&&context.board.members?.some(row=>row.kind===actor.kind&&row.id===actor.id&&row.roles?.includes('coordinator'));
     const projected=projectOperationSkips(cancelDependentOperations(context,selected),context.deliveryPlan,activeWaivers,!!canSkip&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel').map(entry=>canSkip||!entry.cancel?entry:{...entry,cancel:{...entry.cancel,enabled:false,reason:t('kanban.errors.OPERATION_COORDINATOR_REQUIRED')}});
     const operations=projected.map(entry=>{

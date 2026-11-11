@@ -444,3 +444,10 @@ it('preserves other repository controls when one scope cannot be read',async()=>
  expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'operation.scope.read',code:'NATIVE_CONNECTION_FAILED'}));
  expect(f.submission.start).not.toHaveBeenCalled();
 });
+
+it('projects configured scope order consistently for buttons, prerequisites and progress',async()=>{
+ const f=await fixture();f.options.deliveryPlan=async()=>({ordering:'configured',steps:['analyze','merge','build','deploy','accept','cleanup'],acceptance:'runtime'});
+ const view=await f.api.itemOperations('board','task');expect(view.operations.map(row=>row.id)).toEqual(['analyze','merge','build','deploy','accept']);
+ expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({dependsOn:[],enabled:true});
+ expect(view.operations.find(row=>row.id==='build')).toMatchObject({dependsOn:['merge'],enabled:false});
+});
