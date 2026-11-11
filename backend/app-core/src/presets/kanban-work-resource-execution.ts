@@ -21,7 +21,7 @@ export async function workResourceExecution(options: ResourceExecutionOptions, i
     const callers = [id], reasons: string[] = [];
     const index=await resourceJobIndex(options.journal,id,()=>discoverResourceJobs(options.journal,id));
     for(const key of index.review){const job=await options.journal.get<ReviewJob>(jobKey(key));
-        if((query.purpose!=='resume'||job?.id!==query.operationId)&&job?.phase!=='settled')return ['WORKTREE_IN_USE'];}
+        if((query.purpose!=='resume'||key!==query.operationId)&&job?.phase!=='settled')return ['WORKTREE_IN_USE'];}
     for (const key of index.lifecycle) {
         const job = await options.journal.get<{done?:boolean;observation?:{outcome:string};dispatch: {id: string}; request: {input: {request: {expectedSessionId: string}}}}>(lifecycleKey(key));
         if(!job){log.warn('Lifecycle workspace evidence missing',{operation:'kanban.worktree.inspect',operationId:query.operationId??id,stage:'lifecycle.read',result:'failure',code:'WORKTREE_LIFECYCLE_RECORD_MISSING',lifecycleId:key,durationMs:0});return ['WORKTREE_EXECUTION_UNKNOWN'];}
@@ -37,9 +37,10 @@ export async function workResourceExecution(options: ResourceExecutionOptions, i
 }
 async function discoverResourceJobs(journal:ResourceExecutionOptions['journal'],id:string) {
     const review:string[]=[],lifecycle:string[]=[];
-    for(const scope of await journal.get<Array<{board:string;item:string}>>('review-operation-scopes')??[]) {
-        const settings=await journal.get<ReviewSettings>(reviewKey(scope.board,scope.item));
-        for(const jobId of settings?.jobs??[]){const job=await journal.get<ReviewJob>(jobKey(jobId));if((job?.snapshot.context as {worktreeId?:string})?.worktreeId===id)review.push(jobId);}
+    for(const scope of await journal.get<Array<{board:string;item:string;scopeId?:string}>>('review-operation-scopes')??[]) {
+        const settings=await journal.get<ReviewSettings>(reviewKey(scope.board,scope.item,scope.scopeId));
+        for(const jobId of settings?.jobs??[]){const job=await journal.get<ReviewJob>(jobKey(jobId));const context=job?.snapshot.context as {worktreeId?:string;management?:{sources?:Array<{snapshot:{context?:{worktreeId?:string}}}>}}|undefined;
+            if(context?.worktreeId===id||context?.management?.sources?.some(source=>source.snapshot.context?.worktreeId===id))review.push(jobId);}
     }
     for(const key of await journal.get<string[]>('development-lifecycle-index')??[]) {
         const jobId=lifecycleKey(key).slice('development-lifecycle:'.length);

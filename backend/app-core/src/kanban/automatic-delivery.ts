@@ -4,22 +4,24 @@ import {claimDeliveryTarget,releaseDeliveryTarget} from './automatic-delivery-ta
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanItemOperationRequest,KanbanItemOperations,KanbanService,KanbanWorkflowState} from '@nestos/kanban/contracts';
 import {safeCode,type KanbanAutomationJournal} from '@nestos/kanban/integration';
-interface State {id:string;boardId:string;itemId:string;executionId:string;target?:string;waitingForTarget?:boolean;manualAfter?:string;waitingForUser?:boolean;step:number;steps?:string[];code?:string;cleanupPrecondition?:boolean;done?:boolean;resolvedBy?:string;requests:Record<string,KanbanItemOperationRequest>}
-interface Options {service:KanbanService;journal:KanbanAutomationJournal;active():boolean;
-    plan?(board:KanbanBoard,item:KanbanItem):Promise<{steps:string[];manualAfter?:string}>;
+interface State {ordering?:'configured';scopeId?:string;handoff?:{boardId:string;itemId:string;at:number};id:string;boardId:string;itemId:string;executionId:string;target?:string;waitingForTarget?:boolean;manualAfter?:string;waitingForUser?:boolean;step:number;steps?:string[];code?:string;cleanupPrecondition?:boolean;done?:boolean;resolvedBy?:string;requests:Record<string,KanbanItemOperationRequest>}
+interface Options {scopeId?:string;confirmActions?:string[];service:KanbanService;journal:KanbanAutomationJournal;active():boolean;
+    handoff?(board:KanbanBoard,item:KanbanItem):Promise<{boardId:string;itemId:string}|undefined>;
+    settle?(board:string,item:string):Promise<void>;
+    plan?(board:KanbanBoard,item:KanbanItem):Promise<{steps:string[];manualAfter?:string;ordering?:'configured'}>;
     target?(board:KanbanBoard,item:KanbanItem):string|undefined;automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;cleanup?(board:string,item:string,id:string):Promise<boolean>;
     retryPrecondition?(board:string,item:string,action:string,code:string):Promise<boolean>;
     view(board:string,item:string):Promise<KanbanItemOperations>;run(board:string,request:KanbanItemOperationRequest):Promise<KanbanItemOperations>;
     report?(state:State):Promise<void>}
 const steps=['build','deploy','accept','analyze','merge','cleanup'];
 const actions=(state:State)=>state.steps??steps;
-const settledDelivery=(state:State|undefined):boolean=>!!state?.done&&!state.code&&state.step>=actions(state).length;
+const settledDelivery=(state:State|undefined):boolean=>!!state&&!state.code&&(!!state.handoff||!!state.done&&state.step>=actions(state).length);
 async function admitted(options:Options,state:State) {
     if(!options.active())return false;
     const board=await options.service.read(state.boardId),item=board.items.find(row=>row.id===state.itemId);
-    return options.active()&&!!board.automation?.enabled&&!board.executionControl?.paused&&!board.lifecycle&&!!item&&!item.deletedAt&&item.control?.action!=='cancel'&&['review','completed'].includes(item.status);
+    return options.active()&&!!board.automation?.enabled&&!board.executionControl?.paused&&!board.lifecycle&&!!item&&!item.deletedAt&&item.status!=='cancelled'&&item.control?.action!=='cancel'&&(!!options.scopeId||['review','completed'].includes(item.status));
 }
-const key=(board:string,item:string)=>'automatic-delivery:'+JSON.stringify([board,item]);
+const key=(board:string,item:string,scopeId?:string)=>'automatic-delivery:'+JSON.stringify(scopeId?[board,item,scopeId]:[board,item]);
 /** Explicitly retained resources settle finalization without fabricating cleanup receipts. */
 export async function settleWorkspaceFinalization(options:{service:KanbanService;journal:KanbanAutomationJournal},board:string,item:string,resources:KanbanWorkResource[]):Promise<void> {
     if(!resources.length||!resources.every(row=>row.state==='cleaned'||row.resolution?.kind==='ignored'))return;
@@ -32,7 +34,13 @@ export async function settleWorkspaceFinalization(options:{service:KanbanService
 export function automaticDelivery(options:Options) {
     return {ready:async(boardId:string,item:KanbanItem)=>{
         if(!options.automatic||!await options.automatic(await options.service.read(boardId),item))return true;
-        return settledDelivery(await options.journal.get<State>(key(boardId,item.id)));
+        return settledDelivery(await options.journal.get<State>(key(boardId,item.id,options.scopeId)));
+    },scanScope:async(boardId:string,itemId:string)=>{
+        if(!options.automatic)return;
+        const board=await options.service.read(boardId);if(!await options.automatic(board,(await options.service.item(boardId,itemId)).item))return;
+        const item=board.items.find(row=>row.id===itemId);
+        if(!board.automation?.enabled||board.executionControl?.paused||board.lifecycle||!item||item.deletedAt||item.control?.action==='cancel')return;
+        if(options.scopeId&&item.status!=='cancelled')await scanItem(options,board,item,await options.service.workflow(boardId));
     },scan:async()=>{
         if(!options.automatic)return;
         for(const entry of await options.service.catalog()) {
@@ -51,57 +59,73 @@ async function scanBoard(options:Options,board:KanbanBoard) {
     }
 }
 async function prepareState(options:Options,board:KanbanBoard,item:KanbanItem,workflow:KanbanWorkflowState) {
-    const group=item.planning?.execution==='children';if(group&&item.status!=='completed')return;
+    const group=item.planning?.execution==='children';if(group&&!options.scopeId&&item.status!=='completed')return;
     const dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===item.id).sort((a,b)=>b.attempt-a.attempt)[0];
     if(!group&&(!dispatch||!['succeeded','accepted'].includes(dispatch.outcome)))return;
-    const id='auto-'+sha256HexSync(JSON.stringify([board.id,item.id,dispatch?.id??item.externalRefs?.find(ref=>ref.system==='nestos-decision-run')?.id])).slice(0,48);
-    const target=options.target?.(board,item),plan=group?undefined:await options.plan?.(board,item),selected=operationSteps(group?['cleanup']:plan?.steps??steps);
-    const previous=await options.journal.get<State>(key(board.id,item.id)),executionId=dispatch?.id??item.id;
+    const id='auto-'+sha256HexSync(JSON.stringify([board.id,item.id,dispatch?.id??item.externalRefs?.find(ref=>ref.system==='nestos-decision-run')?.id,...options.scopeId?[options.scopeId]:[]])).slice(0,48);
+    const target=options.target?.(board,item),plan=group&&!options.scopeId?undefined:await options.plan?.(board,item),selected=operationSteps(group&&!options.scopeId?['cleanup']:plan?.steps??steps,plan?.ordering);
+    const previous=await options.journal.get<State>(key(board.id,item.id,options.scopeId)),executionId=dispatch?.id??item.id;
     if(previous&&previous.executionId!==executionId){await options.journal.update('automatic-delivery-history:'+previous.id,old=>old??previous);await releaseDeliveryTarget(options,previous);}
-    return options.journal.update<State>(key(board.id,item.id),old=>{
-        if(old?.executionId!==executionId)return {id,target,boardId:board.id,itemId:item.id,executionId,step:0,steps:selected,manualAfter:plan?.manualAfter,requests:{}};
-        const ordered=operationSteps(old.steps??steps),changed=JSON.stringify(ordered)!==JSON.stringify(old.steps??steps);
+    return options.journal.update<State>(key(board.id,item.id,options.scopeId),old=>{
+        if(old?.executionId!==executionId)return {id,target,ordering:plan?.ordering,scopeId:options.scopeId,boardId:board.id,itemId:item.id,executionId,step:0,steps:selected,manualAfter:plan?.manualAfter,requests:{}};
+        const ordered=operationSteps(old.steps??steps,old.ordering),changed=JSON.stringify(ordered)!==JSON.stringify(old.steps??steps);
         return {...old,...(!old.target&&target?{target}:{}),...(changed?{steps:ordered,step:0}: {})};
     });
 }
 async function scanItem(options:Options,board:KanbanBoard,item:KanbanItem,workflow:KanbanWorkflowState) {
     let state=await prepareState(options,board,item,workflow);if(!state)return;
+    if(state.handoff)return;
+    const owner=await options.handoff?.(board,item);
+    if(owner){await handoffDelivery(options,state,owner);return;}
     if(state.done){if(settledDelivery(state))await releaseDeliveryTarget(options,state);return;}
     if(state.code==='OPERATION_CANCELLED'&&(await options.view(state.boardId,state.itemId)).halted){await releaseDeliveryTarget(options,state);return;}
     if(state.manualAfter&&state.step>actions(state).indexOf(state.manualAfter))await releaseDeliveryTarget(options,state);
-    else if(!await claimDeliveryTarget(options,state)){if(!state.waitingForTarget)await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:true}));return;}
-    if(state.waitingForTarget)state=await options.journal.update<State>(key(board.id,item.id),old=>({...old!,waitingForTarget:false}));
+    else if(!await claimDeliveryTarget(options,state)){if(!state.waitingForTarget)await options.journal.update<State>(key(board.id,item.id,options.scopeId),old=>({...old!,waitingForTarget:true}));return;}
+    if(state.waitingForTarget)state=await options.journal.update<State>(key(board.id,item.id,options.scopeId),old=>({...old!,waitingForTarget:false}));
     try {
         if(state.code&&!(actions(state)[state.step]==='cleanup'&&state.cleanupPrecondition)){state=await resumeConfirmedOperation(options,state);if(state.code)return;}
         await advance(options,state);
-        if(settledDelivery(await options.journal.get<State>(key(board.id,item.id))))await releaseDeliveryTarget(options,state);
+        if(settledDelivery(await options.journal.get<State>(key(board.id,item.id,options.scopeId))))await releaseDeliveryTarget(options,state);
     }catch(error){
         if(!options.active())return;
         const code=safeCode(error,'AUTOMATIC_DELIVERY_FAILED');if(code==='AUTOMATIC_DELIVERY_PAUSED')return;
         const cleanupPrecondition=actions(state)[state.step]==='cleanup'&&(error as {cleanupPrecondition?:boolean})?.cleanupPrecondition===true;
         if(state.code===code&&state.cleanupPrecondition===cleanupPrecondition)return;
-        state=await options.journal.update<State>(key(board.id,item.id),old=>({...old!,code,cleanupPrecondition}));
+        state=await options.journal.update<State>(key(board.id,item.id,options.scopeId),old=>({...old!,code,cleanupPrecondition}));
         await options.report?.(state);
     }
+}
+async function handoffDelivery(options:Options,state:State,owner:{boardId:string;itemId:string}):Promise<void> {
+    await options.settle?.(state.boardId,state.itemId);
+    const {item}=await options.service.item(state.boardId,state.itemId);
+    if(item.status==='completed'){
+        await options.journal.update('automatic-handoff-history:'+state.id,old=>old??state);
+        const next=await options.journal.update<State>(key(state.boardId,state.itemId,state.scopeId),old=>({...old!,handoff:{...owner,at:Date.now()},code:undefined,waitingForUser:false,waitingForTarget:false}));
+        await releaseDeliveryTarget(options,next);await options.report?.(next);return;
+    }
+    const view=await options.view(state.boardId,state.itemId),accept=view.operations.find(row=>row.id==='accept');
+    if(!accept?.enabled||view.operations.some(row=>!!row.progress))return;
+    const operationId='handoff-'+sha256HexSync(state.id).slice(0,48);
+    await options.run(state.boardId,{operationId,itemId:state.itemId,action:'accept',expectedRevision:view.revision,confirmed:true});
 }
 async function resumeConfirmedOperation(options:Options,state:State):Promise<State> {
     const action=actions(state)[state.step];
     const view=await options.view(state.boardId,state.itemId),entry=view.operations.find(row=>row.id===action);
     if(entry?.state==='running'&&entry.runId===state.requests[action]?.operationId){
-        const resumed=await options.journal.update<State>(key(state.boardId,state.itemId),old=>({...old!,code:undefined}));
+        const resumed=await options.journal.update<State>(key(state.boardId,state.itemId,state.scopeId),old=>({...old!,code:undefined}));
         await options.report?.(resumed);return resumed;
     }
     if(entry?.enabled&&!entry.runId&&state.code&&await options.retryPrecondition?.(state.boardId,state.itemId,action,state.code)){
         const previous=state.requests[action];
         await options.journal.update('automatic-precondition-retry:'+previous.operationId,old=>old??previous);
         const request={...previous,operationId:state.id+'-'+action+'-'+sha256HexSync(view.revision).slice(0,12),expectedRevision:view.revision};
-        return options.journal.update<State>(key(state.boardId,state.itemId),old=>({...old!,code:undefined,requests:{...old!.requests,[action]:request}}));
+        return options.journal.update<State>(key(state.boardId,state.itemId,state.scopeId),old=>({...old!,code:undefined,requests:{...old!.requests,[action]:request}}));
     }
     if(entry?.state!=='skipped'&&(entry?.state!=='succeeded'||!entry.runId))return state;
-    return options.journal.update<State>(key(state.boardId,state.itemId),old=>({...old!,code:undefined,step:old!.step+1,resolvedBy:entry.runId}));
+    return options.journal.update<State>(key(state.boardId,state.itemId,state.scopeId),old=>({...old!,code:undefined,step:old!.step+1,resolvedBy:entry.runId}));
 }
 async function advance(options:Options,state:State) {
-    const storageKey=key(state.boardId,state.itemId),action=actions(state)[state.step];if(!await admitted(options,state))return;
+    const storageKey=key(state.boardId,state.itemId,state.scopeId),action=actions(state)[state.step];if(!await admitted(options,state))return;
     const snapshot=await options.view(state.boardId,state.itemId);
     if(snapshot.halted){if(snapshot.halted.state==='cancelled'){const next=await options.journal.update<State>(storageKey,old=>({...old!,code:'OPERATION_CANCELLED'}));await releaseDeliveryTarget(options,next);await options.report?.(next);}return;}
     if(snapshot.skippedActions?.includes(action)){
@@ -127,13 +151,17 @@ async function advance(options:Options,state:State) {
         return;
     }
     if(!entry?.enabled)return;
+    if(options.confirmActions?.includes(action)){
+        if(!state.waitingForUser){const waiting=await options.journal.update<State>(storageKey,old=>({...old!,waitingForUser:true}));await options.report?.(waiting);}
+        return;
+    }
     if(action==='merge'&&entry.fields?.length)throw Object.assign(new Error('Conflict selection required'),{code:'OPERATION_SELECTION_REQUIRED'});
-    const request=state.requests[action]??{operationId:id,itemId:state.itemId,action,expectedRevision:view.revision,confirmed:true,selections:{}};
+    const request=state.requests[action]??{operationId:id,itemId:state.itemId,scopeId:state.scopeId,action,expectedRevision:view.revision,confirmed:true,selections:{}};
     state=await options.journal.update<State>(storageKey,old=>({...old!,requests:{...old!.requests,[action]:old!.requests[action]??request}}));
     if(await admitted(options,state))await options.run(state.boardId,state.requests[action]);
 }
-export async function automaticDeliveryStatus(journal:KanbanAutomationJournal,board:string,item:string):Promise<NonNullable<KanbanItemOperations['automatic']>|undefined> {
-    const state=await journal.get<State>(key(board,item));
+export async function automaticDeliveryStatus(journal:KanbanAutomationJournal,board:string,item:string,scopeId?:string):Promise<NonNullable<KanbanItemOperations['automatic']>|undefined> {
+    const state=await journal.get<State>(key(board,item,scopeId));
     if(!state)return;
     return deliveryStatus(state);
 }

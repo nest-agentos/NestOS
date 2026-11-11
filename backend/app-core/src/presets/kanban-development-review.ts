@@ -33,11 +33,11 @@ import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../proje
 import type {ProjectService} from '@nestos/app-contracts/services';
 import {developmentPolicy,requiresDevelopmentProject} from './kanban-development-policy';
 import {publishPromptBundle} from '../run/prompt-bundle';
-import {publishImmutableFile} from '../run/prompt-bundle';
+import {publishImmutableFile,freezePrompts} from '../run/prompt-bundle';
 import {readChannelResult} from '../run/channel-results';
 import {workResourceExecution} from './kanban-work-resource-execution';
 
-interface Options {
+export interface DevelopmentReviewOptions {
     connections?:Parameters<typeof planningConversationControl>[0]['connections'];
     cancelSubmission?:ReturnType<typeof import('../run/submission-control').submissionControl>;
     serviceControl?:import('../runtime/service-control').RuntimeServiceControl;
@@ -46,7 +46,8 @@ interface Options {
     kernel: Pick<Kernel, 'sessionActivity' | 'inspectSession' | 'task'>; remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
     projects: Pick<ProjectService, 'get' | 'openWorkspace'>; runningVersion?: string;
 }
-interface MaintenanceInput {deployment?:import('../runtime/service-control').RuntimeServiceDescriptor;id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot; action?: Exclude<import('../kanban/item-operation-types').ReviewAction, 'accept'>; context?: unknown}
+type Options=DevelopmentReviewOptions;
+interface MaintenanceInput {extraPrompts?:import('../run/prompt-bundle').PromptFile[];deployment?:import('../runtime/service-control').RuntimeServiceDescriptor;id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot; action?: Exclude<import('../kanban/item-operation-types').ReviewAction, 'accept'>; context?: unknown}
 interface ReviewResource {id: string; tree: PreparedWorktree; record: DevelopmentWorkspaceRecord}
 export function developmentReviewAdapter(options: Options): ReviewAdapter {
     const watches = new DirectorySubscriptions();
@@ -132,8 +133,9 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
     input: MaintenanceInput, sessionId: string, directory: string,nativeSessionId:string): Promise<void> {
     const folder = await options.projects.get(current.record.projectId), view = await options.projects.openWorkspace(folder.path);
     try {
-        const policy = await developmentPolicy(options.journal, options.fs, view.fs, input.id,
+        const basePolicy = await developmentPolicy(options.journal, options.fs, view.fs, input.id,
             {profile: current.record.policy.profile, commit: current.record.policy.commit, modules: current.record.policy.modules.join(',')});
+        const policy=input.extraPrompts?.length?{...basePolicy,prompts:await freezePrompts(options.journal,'review-prompts:'+input.id,async()=>[...basePolicy.prompts.files,...input.extraPrompts!])}:basePolicy;
         const preload = await options.journal.get('merge-context-preload:' + input.id) ?? (!input.action || input.action === 'analyze' ? await developmentWorkspace(options.remote, options.provider, current.record.projectId, process =>
             preloadCommitContexts({...options, record: current.record, process, targetHead: input.snapshot.targetVersion})) : {contexts: [], unresolved: []});
         const context = await options.journal.update('merge-context-preload:' + input.id, old => old ?? preload);
@@ -187,3 +189,5 @@ async function verifyBuildEvidence(fs: IFileSystem, directory: string, value: un
         && (!evidence.path.startsWith('_nestos/kanban/')||evidence.path.startsWith('_nestos/kanban/artifacts/')) && typeof evidence.sha256 === 'string' && /^[a-f0-9]{64}$/.test(evidence.sha256), 'OPERATION_RESULT_ARTIFACT_UNVERIFIED');
     await verifyFileDigest(fs, directory + '/' + evidence.path, evidence.sha256, 8 * 1024 * 1024, (value as {operationId?: string}).operationId);
 }
+
+export {snapshot as developmentReviewSnapshot,prepareAnalysis as prepareDevelopmentReviewOperation,verifyBuildEvidence};

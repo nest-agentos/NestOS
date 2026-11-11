@@ -13,7 +13,7 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
     settings: ReviewSettings, request: KanbanItemOperationRequest, context?: unknown,expectedAcceptanceSource?:string): Promise<ReviewJob> {
     const snapshot = await preparationStage(options, request.operationId, 'snapshot', () => options.adapter.snapshot(board, item)), action = request.action as ReviewAction;
     if(action==='analyze'&&expectedAcceptanceSource!==undefined)await preparationStage(options,request.operationId,'acceptance-source',async()=>requireValue(snapshot.sourceVersion===expectedAcceptanceSource,'OPERATION_SOURCE_CHANGED_REBUILD'));
-    const base: ReviewJob = {id: request.operationId, boardId: board.id, itemId: item.id, action, snapshot,
+    const base: ReviewJob = {id: request.operationId, boardId: board.id, itemId: item.id, scopeId:options.scopeId, action, snapshot,
         fingerprint: sha256HexSync(JSON.stringify(request)), phase:'prepared',state:'running',createdAt:Date.now(),...(request.followUp==='deploy'?{followUp:{action:'deploy' as const,state:'queued' as const}}:{})};
     if (action === 'deploy' || action === 'merge') {
         const evidence = context as {sourceVersion?: string; targetVersion?: string};
@@ -83,9 +83,9 @@ async function observeReview(options: ReviewOperationsOptions, job: ReviewJob) {
     return {state: row.outcome === 'cancelled' ? 'failed' as const : row.outcome, sessionId: row.sessionId, code: row.code, output: undefined};
 }
 async function acceptReview(options: ReviewOperationsOptions, job: ReviewJob): Promise<ReviewJob> {
-    const {item} = await options.service.item(job.boardId, job.itemId), command = job.command!;
-    requireValue(command.type === 'accept-execution', 'OPERATION_REQUEST_INVALID');
-    const accepted = (await options.service.workflow(job.boardId)).dispatches[command.dispatchId]?.outcome === 'accepted';
+    const {item} = await options.service.item(job.boardId, job.itemId), command = job.command;
+    requireValue(command?.type === 'accept-execution'||job.scopeId&&Array.isArray(job.commands), 'OPERATION_REQUEST_INVALID');
+    const accepted = command?.type==='accept-execution'&& (await options.service.workflow(job.boardId)).dispatches[command.dispatchId]?.outcome === 'accepted';
     if (!(item.status === 'completed' && accepted)) {
         const current = await options.adapter.snapshot(await options.service.read(job.boardId), item);
         const code = current.version !== job.snapshot.version ? 'OPERATION_SOURCE_CHANGED_REBUILD'

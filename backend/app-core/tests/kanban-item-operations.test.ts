@@ -44,6 +44,24 @@ it('does not start anything on query and requires a compatible frozen Flow bindi
     const input = f.published.start.mock.calls[0][0] as never as {request: {expectedSessionId: string; source: {values: {context: string}}}};
     expect(input.request.expectedSessionId).toBe('build'); expect(JSON.parse(input.request.source.values.context)).toMatchObject({operationId: 'build', action: 'build', sourceVersion: 'source', resources: {worktreeId: 'original'}});
 });
+it('owns repository scopes on one management task and preserves separate durable analysis receipts',async()=>{
+    const f=await fixture();
+    const scopes=['repo-a','repo-b'].map(id=>({id,label:id,contributors:[{itemId:id+'-source',title:'Source '+id}]}));
+    f.options.scopes={describe:async(_board,item)=>item==='child'?{owner:{boardId:'board',itemId:'task'}}:{scopes},
+        resolve:async(_board,_item,id)=>{
+            if(!scopes.some(scope=>scope.id===id))throw Object.assign(Error('invalid'),{code:'OPERATION_SCOPE_INVALID'});
+            return {deliveryPlan:async()=>({steps:['analyze','merge'],acceptance:'source'}),adapter:{...f.adapter,
+                snapshot:async()=>({...f.snapshot,sourceVersion:id}),readAnalysis:async()=>({...f.plan,sourceVersion:id})}};
+        }};
+    const initial=await f.api.itemOperations('board','task');expect(initial.scopes).toHaveLength(2);expect(f.submission.start).not.toHaveBeenCalled();
+    await expect(f.api.runItemOperation('board',{itemId:'child',action:'analyze',operationId:'bypass',expectedRevision:initial.revision})).rejects.toMatchObject({code:'OPERATION_SCOPE_REQUIRED'});
+    await f.api.runItemOperation('board',{itemId:'task',scopeId:'repo-a',action:'analyze',operationId:'repo-a-analysis',expectedRevision:initial.scopes![0].view.revision});
+    await f.api.scan();const next=await f.api.itemOperations('board','task');
+    expect(next.scopes![0].view.operations.find(row=>row.id==='analyze')).toMatchObject({state:'succeeded'});
+    expect(next.scopes![0].view.operations.find(row=>row.id==='merge')).toMatchObject({sessionId:'original'});
+    expect(next.scopes![1].view.operations.find(row=>row.id==='analyze')).toMatchObject({state:'ready'});
+    expect((await f.journal.get<ReviewJob>(jobKey('repo-a-analysis')))?.scopeId).toBe('repo-a');
+});
 it('keeps a lost admission reply unknown and only reconciles after restart', async () => {
     const f = await fixture(); await f.bind('build');
     f.published.start.mockRejectedValueOnce(Object.assign(new Error('Lost'), {code: 'TRANSPORT_DISCONNECTED'}));
@@ -400,4 +418,29 @@ it('keeps the exact cleanup identity when reconciling an unknown external outcom
  expect(f.options.cleanup).toHaveBeenCalledOnce();
  expect(await finishReviewCleanup(f.options,'board','task','merged',true)).toBe(true);
  expect(vi.mocked(f.options.cleanup!).mock.calls[0][2]).toBe(vi.mocked(f.options.cleanup!).mock.calls[1][2]);
+});
+
+it('keeps management cleanup pending until every repository scope is finalized',async()=>{
+ const f=await fixture(),board=await f.service.read();Object.assign(board,{items:[f.item],automation:{enabled:true}});
+ Object.assign(f.item,{status:'completed',planning:{execution:'children'}});
+ const scopes=[{id:'repo-a',label:'Repository',contributors:[],completed:false}];
+ f.options.scopes={describe:async()=>({scopes}),resolve:async()=>({})};
+ f.options.automatic=async()=>true;(f.service as any).catalog=async()=>[{id:'board'}];f.options.cleanup=vi.fn(async()=>true);
+ const api=createItemOperations(f.options);closes.push(()=>api.quiesce());
+ await api.scan();expect(f.options.cleanup).not.toHaveBeenCalled();
+ expect(await api.finalizationStatus('board','task')).toMatchObject({state:'waiting-confirmation',stage:'analyze'});
+ scopes[0].completed=true;await api.scan();expect(f.options.cleanup).toHaveBeenCalledOnce();
+ expect(await api.finalizationStatus('board','task')).toMatchObject({state:'completed'});
+ expect(f.published.start).not.toHaveBeenCalled();
+});
+
+it('preserves other repository controls when one scope cannot be read',async()=>{
+ const f=await fixture();f.options.scopes={describe:async()=>({scopes:['unavailable','ready'].map(id=>({id,label:id,contributors:[]}))}),resolve:async(_b,_i,id)=>{
+  if(id==='unavailable')throw Object.assign(Error('offline'),{code:'NATIVE_CONNECTION_FAILED'});return {deliveryPlan:async()=>({steps:['analyze'],acceptance:'source'})};
+ }};
+ const view=await f.api.itemOperations('board','task');
+ expect(view.scopes![0].view).toMatchObject({operations:[],code:'NATIVE_CONNECTION_FAILED'});
+ expect(view.scopes![1].view.operations[0]).toMatchObject({id:'analyze',enabled:true});
+ expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'operation.scope.read',code:'NATIVE_CONNECTION_FAILED'}));
+ expect(f.submission.start).not.toHaveBeenCalled();
 });

@@ -157,3 +157,29 @@ it('resumes automatic submission after an acceptance-only waiver without waiving
  expect(f.options.cleanup).toHaveBeenCalledOnce();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);
  await automaticDelivery(f.options).scan();expect(f.run).toHaveBeenCalledTimes(4);
 });
+
+it('keeps repository scope checkpoints independent and waits for explicit merge approval',async()=>{
+ const f=await fixture();f.item.status='completed';(f.item.planning as any).execution='children';
+ f.options.service.workflow=async()=>({dispatches:{}});
+ const scoped={...f.options,scopeId:'repo-a',confirmActions:['merge','accept'],plan:async()=>({ordering:'configured',steps:['analyze','merge','accept','cleanup']})};
+ for(let n=0;n<4;n++)await automaticDelivery(scoped).scanScope('b','task');
+ expect(f.run.mock.calls.map(call=>call[1].action)).toEqual(['analyze']);
+ expect(f.run.mock.calls[0][1].scopeId).toBe('repo-a');
+ expect(await f.journal.get('automatic-delivery:'+JSON.stringify(['b','task','repo-a']))).toMatchObject({step:1,waitingForUser:true});
+ expect(await f.journal.get('automatic-delivery:'+JSON.stringify(['b','task','repo-b']))).toBeUndefined();
+ expect(f.options.cleanup).not.toHaveBeenCalled();
+ f.jobs.set('merge',{id:'merge',runId:'user-approved',state:'succeeded',enabled:false});
+ await automaticDelivery(scoped).scanScope('b','task');
+ expect(await f.journal.get('automatic-delivery:'+JSON.stringify(['b','task','repo-a']))).toMatchObject({step:2});
+ expect(f.run.mock.calls.some(call=>call[1].action==='merge')).toBe(false);
+});
+it('hands off source acceptance without pretending the old integration and cleanup stages ran',async()=>{
+ const f=await fixture();f.options.handoff=async()=>({boardId:'b',itemId:'management'});
+ f.options.settle=async()=>{if(f.jobs.has('accept'))f.item.status='completed';};
+ await automaticDelivery(f.options).scan();await automaticDelivery(f.options).scan();
+ expect(f.run.mock.calls.map(call=>call[1].action)).toEqual(['accept']);expect(f.options.cleanup).not.toHaveBeenCalled();
+ const state=await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['b','task']));
+ expect(state).toMatchObject({handoff:{boardId:'b',itemId:'management'},step:0});expect(state.done).toBeUndefined();
+ expect(await f.journal.get('automatic-handoff-history:'+state.id)).toMatchObject({step:0});
+ expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);
+});

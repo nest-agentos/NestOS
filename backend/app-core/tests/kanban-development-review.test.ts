@@ -6,6 +6,7 @@ import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {readPrompt} from '../src/run/prompt-bundle';
 import {developmentReviewAdapter} from '../src/presets/kanban-development-review';
+import {managementReviewAdapter} from '../src/presets/kanban-management-review';
 const mock = vi.hoisted(() => ({dirty: false, busy: false, context: true, ancestry:0, process: {}}));
 vi.mock('../src/presets/kanban-development-workspace', () => ({developmentWorkspace: async (_remote, _provider, _project, work) => work(mock.process)}));
 vi.mock('../src/presets/kanban-work-resource-execution', () => ({workResourceExecution: async () => mock.busy ? ['OPERATION_ORIGINAL_SESSION_BUSY'] : []}));
@@ -27,9 +28,10 @@ async function fixture(withExchange = false,serviceControl?:import('../src/runti
     const submission = {start: vi.fn(async () => ({sessionId: 'original-session', outcome})), inspect: vi.fn(async () => ({sessionId: 'original-session', outcome}))};
     const channels=memoryChannels();
     const stop = vi.fn(), close = vi.fn(async () => {}), remote = {sessionChannel:channels.channel,projectHarness: async () => ({subscribeChannel: () => stop, close})};
-    const api = developmentReviewAdapter({serviceControl,fs, journal, calls, remote, submission: withExchange ? submission : undefined, kernel: {sessionActivity: async () => ({counts: {}})}, projects: {get: async () => ({path: '/project'}), openWorkspace: async () => ({fs, dispose: async () => {}})}, runningVersion: 'running', service: {execute: async () => {}, workflow: async () => workflow, read: async () => board, item: async () => ({item})}} as never);
+    const options={serviceControl,fs, journal, calls, remote, submission: withExchange ? submission : undefined, kernel: {sessionActivity: async () => ({counts: {}})}, projects: {get: async () => ({path: '/project'}), openWorkspace: async () => ({fs, dispose: async () => {}})}, runningVersion: 'running', service: {execute: async () => {}, workflow: async () => workflow, read: async () => board, item: async (_board,id) => ({item:id==='manager'?(board as any).items[0]:item}),executionSession:async()=>({current:{sessionId:'original-session'}})}};
+    const api=developmentReviewAdapter(options as never);
     closes.push(() => api.close!());
-    return {api, journal, fs, workflow, channels, submission, stop, close, complete: () => {outcome = 'succeeded';}, item: item as never, board: board as never, target, calls};
+    return {api, options,journal, fs, workflow, channels, submission, stop, close, complete: () => {outcome = 'succeeded';}, item: item as never, board: board as never, target, calls};
 }
 it('prepares merge analysis in the original logical Session and exact native context without executing it', async () => {
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
@@ -173,4 +175,20 @@ it('keeps maintenance entry messages bounded while retaining full task and versi
   expect(open[2].snapshot.task).toMatchObject({responsibility:'Detailed original work '.repeat(300)});
   expect(open[2].snapshot.context.operation).toMatchObject({operationId:input.id,sourceVersion:snapshot.sourceVersion,targetVersion:snapshot.targetVersion});
  }
+});
+
+it('runs management scope phases in the retained contributor Session and keeps aggregate channel context across a resume',async()=>{
+ const f=await fixture(true),owner={id:'manager',title:'Manage',status:'inProgress',planning:{execution:'children'}};
+ Object.assign(f.item,{status:'completed',planning:{parentId:'manager'}});Object.assign(f.board,{items:[owner,f.item]});
+ (f.workflow.dispatches as any).d={id:'d',itemId:'task',attempt:1,outcome:'accepted',executionSessionId:'original-session'};
+ const scope={schema:1,id:'repository-one',boardId:'board',ownerId:'manager',projectId:'project',label:'Project',contributors:[{itemId:'task',title:'Task',dispatchId:'d',worktreeId:'original'}]};
+ const api=managementReviewAdapter(f.options as never,scope as never);closes.push(()=>api.close!());
+ const snapshot=await api.snapshot(f.board,owner as never),request=await api.prepareOperation!({id:'batch-analysis',action:'analyze',board:f.board,item:owner as never,snapshot});
+ expect(request.expectedSessionId).toBe('original-session');expect((request.source as any).text).toContain('management-integration-pre.md');
+ const manifest=JSON.parse(await readPrompt(f.fs,'/workspace/_nestos/worktrees/original/_nestos/kanban/review/batch-analysis/manifest.json'));
+ expect(manifest.context.resources.management).toMatchObject({ownerId:'manager',sources:[{itemId:'task'}]});
+ f.channels.request('batch-analysis','request','unsupported.context',{});
+ expect(await api.exchange!({id:'batch-analysis',boardId:'board',itemId:'manager',scopeId:scope.id,request,snapshot} as never,{sessionId:'original-session',outcome:'succeeded'})).toMatchObject({outcome:'running'});
+ expect(f.submission.start).toHaveBeenCalledWith(expect.objectContaining({expectedSessionId:'original-session'}));
+ expect(await api.relatedSession!(f.board,owner as never)).toBe('original-session');
 });

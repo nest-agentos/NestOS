@@ -1,3 +1,4 @@
+import {readOperationScopes,operationRequestOptions,scopedOperationOptions,scopedFinalizationStatus} from './item-operation-scopes';
 import {finishReviewCleanup,reviewCleanupKey,type ReviewCleanup} from './item-operation-cleanup';
 import {cancellationKey,pendingCancellation,cancellationSupported,requestCancellation,scanCancellations,type ReviewCancellation} from './item-operation-cancellation';
 import {operationDependencies,operationSteps,operationGroup,affectedOperations,effectiveOperationWaivers,projectOperationSkips,skipItemOperations,applySkipIntent} from './item-operation-skips';
@@ -12,7 +13,7 @@ import {reviewKey, jobKey, type ReviewJob, type ReviewSettings, type ReviewOpera
 
 const actions: ReviewAction[] = ['build', 'deploy', 'accept', 'analyze', 'merge'];
 const initial = (): ReviewSettings => ({revision: 0, bindings: {}, jobs: [], receipts: {}});
-interface Context {cleanup?:ReviewCleanup;deliveryPlan?:import('./item-operation-types').DeliveryPlan;board: KanbanBoard; item: KanbanItem; archived: boolean; settings: ReviewSettings; jobs: ReviewJob[]; cancellations:ReviewCancellation[]}
+interface Context {scoped:boolean;cleanup?:ReviewCleanup;deliveryPlan?:import('./item-operation-types').DeliveryPlan;board: KanbanBoard; item: KanbanItem; archived: boolean; settings: ReviewSettings; jobs: ReviewJob[]; cancellations:ReviewCancellation[]}
 export function createItemOperations(options: ReviewOperationsOptions) {
     let stopped = false; const tails = new Map<string, Promise<unknown>>();
     const queue = <T>(board: string, item: string, work: () => Promise<T>, lane='run'): Promise<T> => {
@@ -20,64 +21,84 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         const pending = (tails.get(key) ?? Promise.resolve()).catch(() => {}).then(() => {requireValue(!stopped, 'SERVICE_STOPPING'); return work();}); tails.set(key, pending);
         void pending.finally(() => {if (tails.get(key) === pending) tails.delete(key);}).catch(() => {}); return pending;
     };
-    const automatic=automaticDelivery({...options,target:options.automaticTarget,plan:options.deliveryPlan,cleanup:(board,item,id)=>cleanupAfterSubmission(options,board,item,id),active:()=>!stopped,report:options.reportAutomatic,retryPrecondition:(board,item,action,code)=>recoverAcceptancePrecondition(options,board,item,action,code),view:(board,item)=>queue(board,item,async()=>view(options,await load(options,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(options,board,request,true))});
-    return {deliveryReady:automatic.ready,itemOperations: (board: string, item: string) => {
+    const read=(board:string,item:string)=>readOperationScopes(options,board,item,scoped=>load(scoped,board,item,false).then(context=>view(scoped,context)));
+    const write=async(board:string,request:KanbanItemOperationRequest|KanbanItemOperationBinding,work:(scoped:ReviewOperationsOptions)=>Promise<KanbanItemOperations>)=>{
+        const result=await work(await operationRequestOptions(options,board,request));
+        return request.scopeId?read(board,request.itemId):result;
+    };
+    const createAutomatic=(scoped:ReviewOperationsOptions)=>automaticDelivery({...scoped,handoff:scoped.scopes?.handoff,
+        automatic:scoped.automatic?async(board,item)=>{const scopes=(await scoped.scopes?.describe(board.id,item.id))?.scopes;return (!scopes||scopes.length>0&&scopes.every(scope=>scope.completed))&&!!await scoped.automatic?.(board,item);}:undefined,
+        confirmActions:scoped.scopeId?['merge','accept']:undefined,settle:(board,item)=>settleDeliveryAcceptance(scoped,board,item),
+        target:scoped.automaticTarget,plan:scoped.deliveryPlan,cleanup:(board,item,id)=>cleanupAfterSubmission(scoped,board,item,id),active:()=>!stopped,
+        report:scoped.reportAutomatic,retryPrecondition:(board,item,action,code)=>recoverAcceptancePrecondition(scoped,board,item,action,code),
+        view:(board,item)=>queue(board,item,async()=>view(scoped,await load(scoped,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(scoped,board,request,true))});
+    const automatic=createAutomatic(options);
+    const contexts=async(board:string,item:string)=>{
+        const route=await options.scopes?.describe(board,item),scopes=route?.scopes??[];
+        return Promise.all([load(options,board,item,false),...scopes.map(async scope=>load(await scopedOperationOptions(options,board,item,scope.id),board,item,false))]);
+    };
+    return {finalizationStatus:(board:string,item:string)=>scopedFinalizationStatus(options,board,item),deliveryReady:async(board:string,item:KanbanItem)=>(await options.scopes?.dependencyReady?.(board,item))??automatic.ready(board,item),itemOperations: (board: string, item: string) => {
         requireValue(!stopped, 'SERVICE_STOPPING');
-        return load(options, board, item, false).then(context => view(options, context));
+        return read(board,item);
     },
-        bindItemOperation: (board: string, request: KanbanItemOperationBinding) => {validateRequest(request); return queue(board, request.itemId, () => bind(options, board, request));},
-        runItemOperation: (board: string, request: KanbanItemOperationRequest) => {validateRequest(request); return queue(board, request.itemId, () => run(options, board, request),request.action==='cancel'?'cancel':'run');},
+        bindItemOperation: (board: string, request: KanbanItemOperationBinding) => {validateRequest(request); return queue(board, request.itemId,()=>write(board,request,scoped=>bind(scoped,board,request)));},
+        runItemOperation: (board: string, request: KanbanItemOperationRequest) => {validateRequest(request); return queue(board, request.itemId,()=>write(board,request,scoped=>run(scoped,board,request)),request.action==='cancel'?'cancel':'run');},
         async scan() {
             await scanCancellations(options,()=>!stopped);
             for(const intent of await options.journal.get<Array<{key:string;board:string}>>('review-skip-intents')??[]){if(stopped)return;try{await applySkipIntent(options,intent.key,intent.board);}catch{/* The frozen intent retains its failure; other scopes must continue. */}}
-            for (const scope of await options.journal.get<Array<{board: string; item: string}>>('review-operation-scopes') ?? []) {
+            for (const scope of await options.journal.get<Array<{board: string; item: string;scopeId?:string}>>('review-operation-scopes') ?? []) {
                 if (stopped) return;
-                await queue(scope.board, scope.item, async () => {const context = await load(options, scope.board, scope.item, false);
-                    for (const job of context.jobs) {if (stopped) return; if (job.phase !== 'settled') {if(job.phase==='prepared'&&(await options.service.read(scope.board)).executionControl?.paused)continue;await advanceReviewJob(options, job);} else await options.report?.(job);}
-                    if(!stopped){await followUp(options,scope.board,scope.item);await settleDeliveryAcceptance(options,scope.board,scope.item);}});
+                const started=Date.now();try{
+                await queue(scope.board, scope.item, async () => {const scoped=await scopedOperationOptions(options,scope.board,scope.item,scope.scopeId);const context = await load(scoped, scope.board, scope.item, false);
+                    for (const job of context.jobs) {if (stopped) return; if (job.phase !== 'settled') {if(job.phase==='prepared'&&(await options.service.read(scope.board)).executionControl?.paused)continue;await advanceReviewJob(scoped, job);} else await scoped.report?.(job);}
+                    if(!stopped){await followUp(scoped,scope.board,scope.item);await settleDeliveryAcceptance(scoped,scope.board,scope.item);}});
+                if(!stopped&&scope.scopeId){const scoped=await scopedOperationOptions(options,scope.board,scope.item,scope.scopeId);await createAutomatic(scoped).scanScope(scope.board,scope.item);}
+                }catch(error){options.log({operationId:scope.scopeId??scope.item,stage:'operation.scope.scan',result:'failure',code:safeCode(error,'OPERATION_OBSERVATION_FAILED'),durationMs:Date.now()-started});}
             }
             if(!stopped)await automatic.scan();
         },
         guardResource: <T>(board: string, item: string, work: () => Promise<T>) => queue(board, item, async () => {
-            requireValue(!(await load(options, board, item, false)).jobs.some(job => job.phase !== 'settled'), 'WORKTREE_IN_USE');
+            requireValue(!(await contexts(board,item)).some(context=>context.jobs.some(job => job.phase !== 'settled')), 'WORKTREE_IN_USE');
             return work();
         }),
         async sessions(board: string, item: string): Promise<KanbanSessionAssociation[]> {
-            const context = await load(options, board, item, false);
-            return context.jobs.filter(job => job.sessionId).map(job => ({sessionId: job.sessionId!, purpose: job.action === 'analyze' ? 'execution' : 'finalization',
+            const jobs=(await contexts(board,item)).flatMap(context=>context.jobs);
+            return jobs.filter(job => job.sessionId).map(job => ({sessionId: job.sessionId!, purpose: job.action === 'analyze' ? 'execution' : 'finalization',
                 execution: {id: job.id, purpose: job.action === 'analyze' ? 'execution' : 'finalization', state:job.code==='OPERATION_CANCELLED'?'cancelled':job.state === 'succeeded' ? 'completed' : job.state, code: job.code, createdAt: job.createdAt}}));
         },
-        async quiesce() {stopped = true; await Promise.allSettled([...tails.values()]); await options.adapter.close?.(); await options.journal.drain();}};
+        async quiesce() {stopped = true; await Promise.allSettled([...tails.values()]); await options.adapter.close?.();await options.scopes?.close?.(); await options.journal.drain();}};
 }
 async function load(options: ReviewOperationsOptions, board: string, item: string, observe: boolean): Promise<Context> {
-    const [definition, entry, saved, cleanup] = await Promise.all([options.service.read(board), options.service.item(board, item), options.journal.get<ReviewSettings>(reviewKey(board, item)),options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item))]);
+    const [definition, entry, saved, cleanup] = await Promise.all([options.service.read(board), options.service.item(board, item), options.journal.get<ReviewSettings>(reviewKey(board, item,options.scopeId)),options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item,options.scopeId))]);
     const settings = saved ?? initial(), jobs: ReviewJob[] = [];
     for (const id of settings.jobs) {let job = await options.journal.get<ReviewJob>(jobKey(id)); if (!job) continue;
-        requireValue(job.boardId === board && job.itemId === item, 'OPERATION_SCOPE_MISMATCH');
+        requireValue(job.boardId === board && job.itemId === item&&job.scopeId===options.scopeId, 'OPERATION_SCOPE_MISMATCH');
         if (observe && job.phase === 'submitting') job = await advanceReviewJob(options, job); jobs.push(job);}
     const cancellations=(await options.journal.getMany<ReviewCancellation>(jobs.map(job=>cancellationKey(job.id)))).filter((row):row is ReviewCancellation=>!!row);
     requireValue(cancellations.every(row=>row.boardId===board&&row.itemId===item&&jobs.some(job=>job.id===row.runId)),'OPERATION_SCOPE_MISMATCH');
-    return {cleanup,cancellations,deliveryPlan:await options.deliveryPlan?.(definition,entry.item),board: definition, item: entry.item, archived: !!entry.archive, settings, jobs};
+    return {scoped:!!options.scopeId,cleanup,cancellations,deliveryPlan:await options.deliveryPlan?.(definition,entry.item),board: definition, item: entry.item, archived: !!entry.archive, settings, jobs};
 }
 function latest(context:Context,action:ReviewAction):ReviewJob|undefined {
     const job=context.jobs.filter(row=>row.action===action).at(-1);if(!job||job.phase!=='settled')return job;
-    const steps=operationSteps(context.deliveryPlan?.steps),ancestors=steps.slice(0,steps.indexOf(action));
+    const steps=operationSteps(context.deliveryPlan?.steps,context.deliveryPlan?.ordering),ancestors=steps.slice(0,steps.indexOf(action));
     const position=context.jobs.indexOf(job);
     return context.jobs.some((row,index)=>index>position&&ancestors.includes(row.action))?undefined:job;
 }
 function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision,context.cleanup,context.deliveryPlan,context.cancellations, context.jobs.map(job => [job.id, job.phase, job.state, job.code,job.result,job.followUp?.state,job.followUp?.code])]));}
 async function view(options: ReviewOperationsOptions, context: Context): Promise<KanbanItemOperations> {
     if (context.archived || options.adapter.supports?.(context.board, context.item) === false) return {revision: revision(context), operations: []};
-    const active = context.jobs.some(job => job.phase !== 'settled')||context.cancellations.some(pendingCancellation), supported = ['review', 'completed'].includes(context.item.status);
+    const active = context.jobs.some(job => job.phase !== 'settled')||context.cancellations.some(pendingCancellation), supported = options.adapter.ready?.(context.board,context.item)??['review', 'completed'].includes(context.item.status);
     const activeWaivers=await currentWaivers(options,context);
+    const related=await options.adapter.relatedSession?.(context.board,context.item),sessionResources=new Map<string,Promise<string|undefined>>();
     const raw = await Promise.all(actions.map(async action => {
         const entry = cancellationView(options,context,operation(context, action, active, supported, !!options.adapter.prepareOperation,activeWaivers));
         if (context.board.lifecycle && action !== 'accept') {entry.enabled=false;entry.reason=t('kanban.errors.BOARD_STOPPING');}
-        if (entry.sessionId) entry.sessionId = await options.sessionResource?.(entry.sessionId) ?? entry.sessionId;
+        entry.sessionId??=related;
+        if(entry.sessionId&&options.sessionResource){const id=entry.sessionId;let resource=sessionResources.get(id);if(!resource){resource=options.sessionResource(id);sessionResources.set(id,resource);}entry.sessionId=await resource??id;}
         return entry;
     }));
-    const selected=raw.filter(op=>!context.deliveryPlan||context.deliveryPlan.steps.includes(op.id));
-    const actor=await options.service.currentPrincipal(),canSkip=actor.kind==='human'&&context.board.members?.some(row=>row.kind===actor.kind&&row.id===actor.id&&row.roles?.includes('coordinator'));
+    const selected=raw.filter(op=>!context.deliveryPlan||context.deliveryPlan.steps.includes(op.id)||context.jobs.some(job=>job.action===op.id&&job.phase!=='settled'));
+    const actor=await options.service.currentPrincipal(),canSkip=!options.scopeId&&actor.kind==='human'&&context.board.members?.some(row=>row.kind===actor.kind&&row.id===actor.id&&row.roles?.includes('coordinator'));
     const projected=projectOperationSkips(cancelDependentOperations(context,selected),context.deliveryPlan,activeWaivers,!!canSkip&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel').map(entry=>canSkip||!entry.cancel?entry:{...entry,cancel:{...entry.cancel,enabled:false,reason:t('kanban.errors.OPERATION_COORDINATOR_REQUIRED')}});
     const operations=projected.map(entry=>{
         const cleanup=context.cleanup,merged=latest(context,'merge');
@@ -88,14 +109,14 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     });
     const halted=operationHalt(context,activeWaivers);
     const audit={...(halted?{halted:{runId:halted.runId,state:halted.state==='cancelled'?'cancelled' as const:'cancelling' as const}}:{}),waivers:activeWaivers,waiverHistory:context.item.operationWaivers,acceptance:context.item.acceptanceResult,skippedActions:[...new Set(activeWaivers.flatMap(row=>row.operations.map(op=>op.id)))].filter(id=>{const entry=operations.find(row=>row.id===id);return entry?entry.state==='skipped':!active;})};
-    const automatic=await automaticDeliveryStatus(options.journal,context.board.id,context.item.id);
+    const automatic=await automaticDeliveryStatus(options.journal,context.board.id,context.item.id,options.scopeId);
     if(options.adapter.prepareOperation)return {revision:revision(context),operations,automatic,...audit};
     const catalog = await options.catalog(), flows = catalog.entries.filter(entry => entry.target.kind === 'flow' && entry.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'));
     return {revision: revision(context),operations,automatic,...audit,targets: automationCatalog({...catalog, entries: flows}).targets};
 }
 function prerequisitesSatisfied(context:Context,action:string,waivers:NonNullable<KanbanItem['operationWaivers']>):boolean {
     const graph=operationDependencies(context.deliveryPlan),settled=new Set(Object.keys(graph).filter(id=>
-        latest(context,id as ReviewAction)?.state==='succeeded'||id==='accept'&&context.item.status==='completed'));
+        latest(context,id as ReviewAction)?.state==='succeeded'||id==='accept'&&!context.scoped&&context.item.status==='completed'));
     const skipped=new Set(waivers.flatMap(row=>row.operations.map(op=>op.id)));
     for(const [id,deps] of Object.entries(graph))if(skipped.has(id)&&deps.every(dep=>settled.has(dep)))settled.add(id);
     return (graph[action]??[]).every(dep=>settled.has(dep));
@@ -103,14 +124,14 @@ function prerequisitesSatisfied(context:Context,action:string,waivers:NonNullabl
 function operation(context: Context, action: ReviewAction, active: boolean, supported: boolean, agent = false,waivers:NonNullable<KanbanItem['operationWaivers']>=[]): KanbanItemOperation {
     const job = latest(context, action), binding = context.settings.bindings[action], plan = latest(context, 'analyze')?.result as MergePlan | undefined;
     const ready=prerequisitesSatisfied(context,action,waivers)&&(action!=='deploy'||latest(context,'build')?.state==='succeeded')
-        &&(action!=='merge'||!!plan&&latest(context,'analyze')?.state==='succeeded')&&(action!=='accept'||context.item.status==='review');
-    const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && (context.item.status === 'completed'||job?.state==='succeeded') || action === 'merge' && job?.state === 'succeeded';
+        &&(action!=='merge'||!!plan&&latest(context,'analyze')?.state==='succeeded')&&(action!=='accept'||context.item.status==='review'||!!context.deliveryPlan&&context.item.planning?.execution==='children');
+    const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && (!context.scoped&&context.item.status === 'completed'||job?.state==='succeeded') || action === 'merge' && job?.state === 'succeeded';
     const enabled = (!context.deliveryPlan||context.deliveryPlan.steps.includes(action)) && supported && !context.archived && !finished && !active && ready && (!configurable || !!binding);
     const built=latest(context,'build'),auto=built?.followUp,autoPending=action==='deploy'&&auto?.state==='queued'&&built?.state==='succeeded'&&(!job||job.createdAt<built.createdAt);
     return {...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...(!context.deliveryPlan?.manualAfter?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
-        state:autoPending?'running':action==='deploy'&&auto?.state==='failed'?'failed':action === 'accept' && context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
+        state:autoPending?'running':action==='deploy'&&auto?.state==='failed'?'failed':action === 'accept' && !context.scoped&&context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
         progress:operationProgress(job,autoPending),
-        code:action==='deploy'&&auto?.state==='failed'?auto.code:job?.code==='WORKSPACE_CONTEXT_PENDING'?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId, configurable, binding, openSessionOnRun: agent || action === 'analyze',
+        code:action==='deploy'&&auto?.state==='failed'?auto.code:job?.code==='WORKSPACE_CONTEXT_PENDING'?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId??(action==='merge'?latest(context,'analyze')?.sessionId:undefined), configurable, binding, openSessionOnRun: agent || action === 'analyze',
         reason: job?.phase&&job.phase!=='settled'||autoPending ? undefined : enabled || finished ? undefined : t(!supported ? 'kanban.operationNeedsDelivery' : active ? 'kanban.operationBusy' : configurable && !binding ? 'kanban.operationNeedsFlow' : 'kanban.operationNeedsPrevious'),
         summary: (action === 'analyze' || action === 'merge') && plan ? plan.summary + '\n' + t('kanban.operationVersions', {source: plan.sourceVersion, target: plan.targetVersion}) : resultSummary(job?.result),
         fields: action === 'merge' && plan ? plan.conflicts.map(conflict => ({id: conflict.id, label: conflict.path + ' · ' + conflict.reason, choices: conflict.options})) : undefined,
@@ -134,7 +155,7 @@ async function bind(options: ReviewOperationsOptions, board: string, request: Ka
     const catalog = await options.catalog(), target = automationTarget(request.target, catalog); requireValue(target.kind === 'flow', 'OPERATION_FLOW_REQUIRED');
     requireValue(catalog.entries.find(entry => entry.target.digest === target.digest && entry.target.id === target.id)?.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'), 'OPERATION_FLOW_CONTEXT_REQUIRED');
     const digest = sha256HexSync(JSON.stringify(request));
-    await options.journal.update<ReviewSettings>(reviewKey(board, request.itemId), old => {
+    await options.journal.update<ReviewSettings>(reviewKey(board, request.itemId,options.scopeId), old => {
         const saved = old ?? initial(); if (Object.hasOwn(saved.receipts, request.operationId)) {requireValue(saved.receipts[request.operationId] === digest, 'IDEMPOTENCY_CONFLICT'); return saved;}
         requireValue(request.expectedRevision === revision(context) && saved.revision === context.settings.revision, 'OPERATION_STALE_REFRESH');
         requireValue(Object.keys(saved.receipts).length < 256, 'OPERATION_HISTORY_LIMIT');
@@ -171,16 +192,16 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     if (prior && context.settings.jobs.includes(prior.id)) {requireValue(prior.fingerprint === sha256HexSync(JSON.stringify(request)), 'IDEMPOTENCY_CONFLICT'); return view(options, context);}
     requireValue(request.expectedRevision === revision(context), 'OPERATION_STALE_REFRESH');
     const waivers=await currentWaivers(options,context);
-    const entry = operation(context, request.action as ReviewAction, context.jobs.some(job => job.phase !== 'settled'), options.adapter.supports?.(context.board, context.item) !== false && ['review', 'completed'].includes(context.item.status), !!options.adapter.prepareOperation,waivers);
+    const entry = operation(context, request.action as ReviewAction, context.jobs.some(job => job.phase !== 'settled'), options.adapter.supports?.(context.board, context.item) !== false && (options.adapter.ready?.(context.board,context.item)??['review', 'completed'].includes(context.item.status)), !!options.adapter.prepareOperation,waivers);
     requireValue(!waivers.some(row=>row.operations.some(op=>op.id===request.action)),'OPERATION_SKIPPED');
     requireValue(entry.enabled, 'OPERATION_PREREQUISITE_REQUIRED');
     if (entry.confirmation) requireValue(request.confirmed === true, 'OPERATION_CONFIRMATION_REQUIRED');
     requireValue(request.followUp===undefined||request.action==='build'&&request.followUp==='deploy'&&!context.deliveryPlan?.manualAfter,'OPERATION_REQUEST_INVALID');
     const input = await operationInput(options, context, request), job = prior ?? (request.action === 'accept' ? await acceptanceJob(options, context, request)
         : await prepareReviewJob(options, context.board, context.item, context.settings, request, input,request.action==='analyze'?latest(context,'accept')?.snapshot.sourceVersion:undefined));
-    await options.journal.update<Array<{board: string; item: string}>>('review-operation-scopes', old => old?.some(row => row.board === board && row.item === request.itemId) ? old : [...old ?? [], {board, item: request.itemId}]);
+    await options.journal.update<Array<{board: string; item: string;scopeId?:string}>>('review-operation-scopes', old => old?.some(row => row.board === board && row.item === request.itemId&&row.scopeId===options.scopeId) ? old : [...old ?? [], {board, item: request.itemId,...(options.scopeId?{scopeId:options.scopeId}:{})}]);
     await options.journal.update<ReviewJob>(jobKey(job.id), old => {requireValue(!old || old.fingerprint === job.fingerprint, 'IDEMPOTENCY_CONFLICT'); return old ?? job;});
-    await options.journal.update<ReviewSettings>(reviewKey(board, request.itemId), old => {
+    await options.journal.update<ReviewSettings>(reviewKey(board, request.itemId,options.scopeId), old => {
         const saved = old ?? initial(); requireValue(saved.revision === context.settings.revision, 'OPERATION_STALE_REFRESH'); requireValue(saved.jobs.length < 64, 'OPERATION_HISTORY_LIMIT');
         return {...saved, revision: saved.revision + 1, jobs: [...saved.jobs, job.id]};
     });
@@ -214,14 +235,16 @@ async function acceptanceJob(options: ReviewOperationsOptions, context: Context,
             version=replacement.version;acceptanceEvidence=replacement.receipt;
         }
     }
+    const commands=await options.adapter.acceptanceCommands?.(context.board,context.item);
     const workflow = await options.service.workflow(context.board.id), dispatch = Object.values(workflow.dispatches).filter(row => row.itemId === context.item.id).sort((a, b) => b.attempt - a.attempt)[0];
-    requireValue(dispatch?.outcome === 'succeeded', 'OPERATION_ACCEPTANCE_UNAVAILABLE');
-    return {id: request.operationId, boardId: context.board.id, itemId: context.item.id, action: 'accept', phase: 'prepared', state: 'running',
+    requireValue(commands!==undefined||dispatch?.outcome === 'succeeded', 'OPERATION_ACCEPTANCE_UNAVAILABLE');
+    return {id: request.operationId, boardId: context.board.id, itemId: context.item.id, scopeId:options.scopeId, action: 'accept', phase: 'prepared', state: 'running',
         fingerprint: sha256HexSync(JSON.stringify(request)), snapshot, createdAt: Date.now(), acceptanceVersion: version,acceptanceScope:scope,...(acceptanceEvidence===undefined?{}:{acceptanceEvidence}),
-        command: {type: 'accept-execution', dispatchId: dispatch.id, accept: true}};
+        ...(commands!==undefined?{commands}:{command: {type: 'accept-execution' as const, dispatchId: dispatch!.id, accept: true}})};
 }
 
 function validateRequest(request: KanbanItemOperationRequest | KanbanItemOperationBinding): void {
+    requireValue(request?.scopeId===undefined||typeof request.scopeId==='string'&&/^[\w-]{1,128}$/.test(request.scopeId),'OPERATION_SCOPE_INVALID');
     requireValue(request && typeof request === 'object' && typeof request.itemId === 'string' && request.itemId.length > 0 && request.itemId.length <= 256
         && typeof request.operationId === 'string' && /^[\w-]{1,128}$/.test(request.operationId) && !['__proto__', 'constructor', 'prototype'].includes(request.operationId)
         && (actions.includes(request.action as ReviewAction)||request.action==='skip'||request.action==='cancel'||request.action==='cleanup') && typeof request.expectedRevision === 'string' && /^[a-f0-9]{64}$/.test(request.expectedRevision), 'OPERATION_REQUEST_INVALID');
@@ -247,7 +270,7 @@ async function followUp(options:ReviewOperationsOptions,board:string,item:string
     const id='deploy-'+sha256HexSync(build.id).slice(0,48),deployed=latest(context,'deploy');
     if(deployed&&deployed.createdAt>=build.createdAt){await markFollowUp(options,build,'started');return;}
     if(context.jobs.some(job=>job.phase!=='settled'))return;
-    const request=build.followUp.request??{operationId:id,itemId:item,action:'deploy',expectedRevision:revision(context),confirmed:true};
+    const request=build.followUp.request??{operationId:id,itemId:item,scopeId:options.scopeId,action:'deploy',expectedRevision:revision(context),confirmed:true};
     await options.journal.update<ReviewJob>(jobKey(build.id),old=>({...old!,followUp:{...old!.followUp!,request:old!.followUp!.request??request}}));
     try{await run(options,board,request,true);await markFollowUp(options,build,'started');}
     catch(error){
@@ -270,7 +293,7 @@ async function recoverAcceptancePrecondition(options:ReviewOperationsOptions,boa
 }
 
 async function currentWaivers(options:ReviewOperationsOptions,context:Context) {
-    if(!context.item.operationWaivers?.length)return [];
+    if(options.scopeId||!context.item.operationWaivers?.length)return [];
     const workflow=await options.service.workflow(context.board.id),dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===context.item.id).sort((a,b)=>b.attempt-a.attempt)[0];
     return effectiveOperationWaivers(context.item.operationWaivers.filter(row=>row.dispatchId===dispatch?.id),context.deliveryPlan);
 }
@@ -285,7 +308,9 @@ async function settleDeliveryAcceptance(options:ReviewOperationsOptions,board:st
     const required=current.operations.filter(row=>row.runAction!=='cleanup');
     if(!required.every(row=>['succeeded','skipped'].includes(row.state)))return;
     const waivers=await currentWaivers(options,context),waiver=waivers.find(row=>row.acceptanceWaived),accepted=latest(context,'accept');
-    if(context.item.status==='review'){
+    if(options.scopeId&&accepted?.state==='succeeded'&&accepted.commands){
+        for(const [index,command] of accepted.commands.entries())await journalCommand(options.journal,options.service,board,'review-accept:'+accepted.id+':'+index,command);
+    }else if(context.item.status==='review'){
         if(waiver)await journalCommand(options.journal,options.service,board,'review-waived-accept:'+waiver.id,{type:'accept-execution',dispatchId:waiver.dispatchId,accept:true,waiverId:waiver.id});
         else if(accepted?.state==='succeeded'&&accepted.command)await journalCommand(options.journal,options.service,board,'review-accept:'+accepted.id,accepted.command);
         else return;

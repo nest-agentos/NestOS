@@ -23,6 +23,7 @@ import {sessionSubmission} from '../run/session-submission';
 import {developmentLifecycle} from '../presets/kanban-development-lifecycle';
 import {developmentWorkResources, developmentSessionResources} from '../presets/kanban-work-resources';
 import {developmentReviewAdapter} from '../presets/kanban-development-review';
+import {managementOperationScopes} from '../presets/kanban-management-operations';
 import {itemOperationReporter} from '../kanban/item-operation-log';
 import {createItemOperations} from '../kanban/item-operations';
 import {publishedOperation} from '../run/published-operation';
@@ -628,15 +629,19 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             taskRecovery:developmentBindings?context=>createTaskRecovery({...developmentBindings,...context,executionResource:executionResource!,
                 describe:async item=>{if(!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'))return;const managed=managedServiceDeployment(options.serviceControl,async selected=>projects.openWorkspace((await projects.get(selected.externalRefs!.find(ref=>ref.system==='nestos-remote-project')!.id)).path),async()=>{});return managed?.describe?.(item);}}):undefined,
             decisionConversations:developmentBindings?context=>decisionConversations({...developmentBindings,...context,executionResource}):undefined,
-            itemOperations: developmentBindings ? context => createItemOperations({...context,cancelOperation:async(job,id)=>{const request=job.input!.request;const result=await controlCall({calls:independentCalls,callControl:(command,input)=>commandBus.execute(command,input),callCancel:(command,input)=>commandBus.execute(command,input)},context.journal,request.expectedSessionId!,id,'cancel',request.submission!.id);return result==='cancelled'?'cancelled':result==='unknown'?'unknown':'accepted';},deliveryPlan:developmentDeliveryPlan(context.journal,context.service),
-                adapter: developmentReviewAdapter({...developmentBindings, ...context,cancelSubmission:submissionControl({contexts:conversationContexts,repository:sessionRepository,kernel:kernelCore,ensureWritable:conversationOptions.ensureWritable}), calls: independentCalls, kernel: kernelCore, runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission, wake: () => wakeKanban()}),
+            itemOperations: developmentBindings ? context => {
+                const review={...developmentBindings,...context,cancelSubmission:submissionControl({contexts:conversationContexts,repository:sessionRepository,kernel:kernelCore,ensureWritable:conversationOptions.ensureWritable}),calls:independentCalls,kernel:kernelCore,runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission,wake:()=>wakeKanban()};
+                const scopes=managementOperationScopes({...review,basePlan:developmentDeliveryPlan(context.journal,context.service)});
+                const report=itemOperationReporter(context);
+                return createItemOperations({...context,scopes,cancelOperation:async(job,id)=>{const request=job.input!.request;const result=await controlCall({calls:independentCalls,callControl:(command,input)=>commandBus.execute(command,input),callCancel:(command,input)=>commandBus.execute(command,input)},context.journal,request.expectedSessionId!,id,'cancel',request.submission!.id);return result==='cancelled'?'cancelled':result==='unknown'?'unknown':'accepted';},deliveryPlan:scopes.deliveryPlan,
+                adapter:developmentReviewAdapter(review),
                 published: publishedOperation({calls: independentCalls, kernel: kernelCore, ensureSession: (id, title) => sessionRepository.ensureSession(id, title),
                     prepareSession: async id => {await initializeProjects(); await prepareChildExecution(id); return recovery.acquireLater(id);}}),
                 submission: sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore, ensureWritable: conversationOptions.ensureWritable}),
                 catalog: () => commandBus.execute('session.targets.list'),
                 sessionResource: remoteConnections ? id => nativeSessionResource(kernelCore, projects, developmentBindings!.remote)(id, 'main') : undefined,
-                report: itemOperationReporter(context),
-            }) : undefined,
+                report:async job=>{await report(job);await scopes.report(job);},
+            });} : undefined,
             archiveSession:remoteConnections?nativeSessionArchive(kernelCore,projects,remoteConnections,new KanbanAutomationJournal(systemFS,kanbanJournalOptions)):undefined,
             relatedSessions: lifecycle ? (boardId, itemId) => lifecycle.sessions(boardId, itemId) : undefined,
             sessionExecutionResources: id => developmentSessionResources(new KanbanAutomationJournal(systemFS, kanbanJournalOptions), id),

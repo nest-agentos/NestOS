@@ -106,6 +106,8 @@ pnpm --filter @nestos/<pkg> typecheck
 
 ## UI 约定
 
+- 问题处理与操作界面应就近展示具体诊断、可执行的手工操作和相关会话链接，让用户可以手工处理，也可以与 LLM 一起处理。会话入口不能埋在长摘要或无关详情中；优先使用真实绑定及可点击链接，不用内部 ID 代替名称，不因渲染或读取而创建会话；尚无可用会话时展示具体原因及已有恢复操作。
+- 手工处理与用户、LLM 在会话中的协作处理复用同一执行与回执链路，保留稳定 operationId、来源与目标版本、授权范围及确认要求。会话报告完成后由宿主核验实际结果再更新任务状态；聊天文本不能直接标记成功或触发资源清理。合并、发布、验收与清理分别展示各自结果和下一步入口。
 - **技术栈**: 原生 DOM + 模板字符串 + `addEventListener` 委托绑定
 - **CSS**: BEM 命名 (`llm-input__xxx`), 变量在 `llm-ui-adapter/src/styles/variables.css`
 - **图标**: 从 `@nestos/common` import (`ENTITY_ICONS`, `ACTION_ICONS` 等), 禁止硬编码 emoji

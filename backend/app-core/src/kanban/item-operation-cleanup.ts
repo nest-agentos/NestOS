@@ -2,11 +2,11 @@ import {sha256HexSync} from '@nestos/common';
 import {safeCode} from '@nestos/kanban/integration';
 import type {ReviewOperationsOptions} from './item-operation-types';
 export interface ReviewCleanup {runId:string;operationId:string;attempt:number;state:'running'|'succeeded'|'failed';code?:string;retryFresh?:boolean}
-export const reviewCleanupKey=(board:string,item:string)=>'review-cleanup:'+JSON.stringify([board,item]);
+export const reviewCleanupKey=(board:string,item:string,scopeId?:string)=>'review-cleanup:'+JSON.stringify(scopeId?[board,item,scopeId]:[board,item]);
 /** Cleanup is owned by the successful delivery, not by a view or an automatic scan ID. */
 export async function finishReviewCleanup(options:ReviewOperationsOptions,board:string,item:string,runId:string,retry=false):Promise<boolean> {
     if(!options.cleanup)return true;
-    const key=reviewCleanupKey(board,item),previous=await options.journal.get<ReviewCleanup>(key);
+    const key=reviewCleanupKey(board,item,options.scopeId),previous=await options.journal.get<ReviewCleanup>(key);
     if(previous?.runId===runId&&previous.state==='succeeded')return true;
     if(previous?.runId===runId&&previous.state==='failed'&&!retry)return false;
     const attempt=previous?.runId===runId?previous.attempt+(retry&&previous.retryFresh?1:0):0;
