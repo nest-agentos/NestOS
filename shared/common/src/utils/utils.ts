@@ -228,7 +228,7 @@ export function timeAgo(date: Date | number): string {
     if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
 
     const d = typeof date === 'number' ? new Date(date) : date;
-    return d.toLocaleDateString();
+    return d.toISOString();
 }
 
 

@@ -1,3 +1,4 @@
+import {formatCalendarDate} from '@nestos/ui-common';
 /**
  * @file mdx/plugins/ui/asset-manager.ui.ts
  * @desc 独立的资源管理器 UI 类，不绑定 MDxPlugin 上下文
@@ -246,7 +247,7 @@ export class AssetManagerUI {
         badge.className = `mdx-asset-badge ${item.isUsed ? 'used' : 'unused'}`;
         badge.textContent = item.isUsed ? '已引用' : '未引用';
         const size = this.formatFileSize((item.node as FSFileNode).size || 0);
-        const date = new Date(item.node.createdAt).toLocaleDateString();
+        const date = formatCalendarDate(new Date(item.node.createdAt));
         meta.append(badge, this.createTextSpan(size), this.createTextSpan(date));
         info.append(name, meta);
         return info;

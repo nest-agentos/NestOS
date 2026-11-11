@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import { t } from '@nestos/common';
 import { resolveBrowserTarget } from '@nestos/app-contracts';
 import type { ApplicationBackend, SessionTaskPage, TaskDetail, TaskEventView } from '@nestos/app-contracts/services';
@@ -103,7 +104,7 @@ class TaskTimeline {
         if (!this.events.length) { const empty = document.createElement('p'); empty.textContent = '已读取范围内无关键事件'; this.entries.append(empty); }
         for (const event of [...this.events].sort((a, b) => a.occurredAt - b.occurredAt)) {
             const detail = document.createElement('details'), summary = document.createElement('summary');
-            summary.textContent = `${new Date(event.occurredAt).toLocaleString()} · ${event.type}`;
+            summary.textContent = `${formatDateTime(new Date(event.occurredAt))} · ${event.type}`;
             const body = document.createElement('pre'); body.textContent = JSON.stringify(event, null, 2);
             detail.append(summary, body); this.entries.append(detail);
         }

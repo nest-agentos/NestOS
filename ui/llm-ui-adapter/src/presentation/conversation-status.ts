@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import { HARNESS_STATE_ICONS, t } from '@nestos/common';
 import type { ConversationSnapshot } from '../contracts/ConversationControls';
 
@@ -7,7 +8,7 @@ function recentActivity(observation: Observation, now: number) {
     if (observation.execution !== 'unknown' || observation.connection === 'offline' || observation.nativeError || observation.refreshError
         || typeof updatedAt !== 'number' || !Number.isFinite(updatedAt) || updatedAt <= 0) return;
     const recent = now >= updatedAt && now - updatedAt <= 120_000;
-    return {label: recent ? t('harness.activity.recent') : t('harness.activity.updated', {time: new Date(updatedAt).toLocaleString()}),
+    return {label: recent ? t('harness.activity.recent') : t('harness.activity.updated', {time: formatDateTime(new Date(updatedAt))}),
         refreshAt: recent ? updatedAt + 120_001 : undefined};
 }
 
@@ -22,7 +23,7 @@ export function conversationStatus(observation: Observation, now = Date.now(), o
     const text = [label, result, observation.receiptUnknown ? t('harness.unknown') : ''].filter(Boolean).join(' · ');
     const tooltip = [text, ...(observation.refreshError ? [`${observation.refreshError.stage}: ${observation.refreshError.code}`] : []), ...(activity ? [t('harness.activity.explanation')] : []), t(observation.canInterrupt && observation.canRespond ? 'harness.control.both' : observation.canInterrupt ? 'harness.control.interrupt' : observation.canRespond ? 'harness.control.respond' : 'harness.control.observe'),
         t('harness.observed', {source: t(`harness.source.${observation.source}`),
-        time: observation.observedAt ? new Date(observation.observedAt).toLocaleString() : t('harness.state.unknown')})].join('\n');
+        time: observation.observedAt ? formatDateTime(new Date(observation.observedAt)) : t('harness.state.unknown')})].join('\n');
     return {text, tooltip, icon: HARNESS_STATE_ICONS[key], refreshAt: activity?.refreshAt,
         indicator: key === 'running' ? 'running' : key === 'waiting-approval' || key === 'waiting-input' ? 'waiting' : 'idle'};
 }

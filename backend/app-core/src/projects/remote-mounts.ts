@@ -709,7 +709,7 @@ export class ProjectRemoteMountService {
             if (project.revision !== this.list(projectId).find(mount => mount.at === '/')!.serverProjectRevision)
                 throw new FSError('ECONFLICT', 'Remote draft project revision changed');
             const owner = remoteConversationKey(projectId, target, conversationId);
-            const receipt = await new RemoteConversationStore(this.store, owner, remoteClientState(client, project, owner, checkAccess)).load();
+            const receipt = await new RemoteConversationStore(this.store, owner, remoteClientState(client, project, owner, checkAccess, target.profileId)).load();
             return {sessionId: receipt?.sessionId, submittedTurnId: receipt?.submittedTurnId, pending: !!receipt?.pending};
         } finally {await client.close();}
     }
@@ -750,10 +750,11 @@ export class ProjectRemoteMountService {
             const stateProject=await stateClient.read(root.serverProjectId!,options);
             if(stateProject.revision!==root.serverProjectRevision)throw new FSError('ECONFLICT','Remote harness state binding changed');
             const owner=remoteConversationKey(projectId,target,conversationId??sessionId??'@new');
-            const remoteState=remoteClientState(stateClient,stateProject,owner,checkAccess,profile.id,(profile.projectCapabilities?.sessionControl??root.access==='rw')&&!readOnly);
+            const writable=(profile.projectCapabilities?.sessionControl??root.access==='rw')&&!readOnly;
+            const remoteState=remoteClientState(stateClient,stateProject,owner,checkAccess,profile.id,writable);
             const recovery = new RemoteConversationStore(this.store,owner,remoteState);
-            const conversation = await this.provider.conversation(sessionId ? guarded : draftHarness(guarded, recovery), profile, profile.workspaces[0].id, sessionId, (profile.projectCapabilities?.sessionControl ?? root.access === 'rw') && !readOnly,
-                remoteConversationJournal(recovery, descriptor.epoch, !sessionId && !draftId, checkAccess));
+            const conversation = await this.provider.conversation(sessionId ? guarded : draftHarness(guarded, recovery), profile, profile.workspaces[0].id, sessionId, writable,
+                remoteConversationJournal(recovery, descriptor.epoch, !sessionId && !draftId, checkAccess, writable ? sessionId : undefined));
             const composer = new ConversationComposerStore(remoteState,!readOnly,checkAccess,{fs:this.store,projectId,owner});
             const observed = observeConversation(sessionId ? conversation : draftConversation(conversation, recovery, preparedDraft?.title), this.estimateUsage, conversationId,
                 () => { void this.sessionStatus.refresh(projectId); });

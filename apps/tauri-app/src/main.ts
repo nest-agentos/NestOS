@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {createBrowserImageTools} from '@nestos/image-tools/browser';
 import { createNestosLlmPresets } from '@nestos/kernel-adapters/llm/presets';
 import { openApplicationView } from '@nestos/app-core/host';
@@ -413,7 +414,7 @@ async function bootstrapRemote(): Promise<void> {
                     ${sessions.length ? sessions.map(session => `
                         <div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff">
                             <div style="font-weight:600">${escapeHtml(session.title)}</div>
-                            <div style="font-size:12px;color:#6b7280">${session.id} · origin=${session.origin ?? 'unknown'} · ${new Date(session.updatedAt).toLocaleString()}</div>
+                            <div style="font-size:12px;color:#6b7280">${session.id} · origin=${session.origin ?? 'unknown'} · ${formatDateTime(new Date(session.updatedAt))}</div>
                         </div>`).join('') : '<div style="color:#6b7280">No sessions yet.</div>'}
                 </div>
                 <h2 style="margin:0 0 12px">Runs (${runs.length})</h2>
@@ -421,7 +422,7 @@ async function bootstrapRemote(): Promise<void> {
                     ${runs.length ? runs.map(run => `
                         <div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff">
                             <div style="font-weight:600">${escapeHtml(run.title)}</div>
-                            <div style="font-size:12px;color:#6b7280">${run.runId} · ${run.status} · origin=${run.origin ?? 'unknown'} · ${new Date(run.updatedAt).toLocaleString()}</div>
+                            <div style="font-size:12px;color:#6b7280">${run.runId} · ${run.status} · origin=${run.origin ?? 'unknown'} · ${formatDateTime(new Date(run.updatedAt))}</div>
                         </div>`).join('') : '<div style="color:#6b7280">No runs yet.</div>'}
                 </div>
             </div>`;

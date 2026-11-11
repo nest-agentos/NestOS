@@ -38,7 +38,7 @@ export class KanbanSidebar {
             presentation: nestOSVFSPresentation, appearance: {showTimestamp: false}, selection: false, windowManagement: options.windowManagement,
             deletion: kanbanSidebarDeletion(options.service, async node => {await this.reload(); if (this.selected === node.id) await options.navigate('/');}, () => this.reload()),
             source: {get: async id => this.nodes.find(node => node.id === id), children: async parent => parent === null ? this.nodes : [], subscribe: () => () => {}},
-            onActivate: node => {void options.navigate(node.id).catch(error => this.failure(error));}, onError: error => this.failure(error),
+            onActivate: node => {void options.navigate(node.id+'/@decision').catch(error => this.failure(error));}, onError: error => this.failure(error),
             actions: [
                 {id: 'execution-settings', label: controlLabel('settings'), iconHTML: TOOLBOX_ICONS.settings, placements: ['toolbar', 'menu'], state: () => ({visible: !!this.controls, enabled: !!this.controls}), run: async context => this.openSettings(this.targetBoard(context.target)?.id)},
                 ...this.executionActions(),

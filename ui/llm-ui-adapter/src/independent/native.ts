@@ -13,6 +13,8 @@ import { type ChatMessage, type ConversationActions,
 
 import {NativeComposerCapabilities, type NativeCommandProvider} from './native-composer';
 import {submitNativeCommand} from './native-command';
+import {awaitNativeAdmission} from './native-admission';
+import {nativeInputPolicy} from './native-input-policy';
 import {nativeControlReceipt} from './native-control';
 import {createNativeQueuePort, nativeQueueToolbar} from './native-queue';
 import {nativeQueueMessages, nativeQueueNotice} from './native-queue-messages';
@@ -72,7 +74,7 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
             loading: false, executionRef: state.observation?.activeTurnId ?? undefined, execution: state.observation?.execution === 'waiting-approval' ? 'waiting-input' : state.observation?.execution ?? 'unknown',
             executionActivity: state.observation?.activity ? {label: t(`harness.activity.${state.observation.activity.phase}`), updatedAt: state.observation.activity.updatedAt} : undefined,
             connection: state.disconnected ? 'offline' : 'online', hasEarlier: state.hasEarlier ?? false,
-            allowed: options.readOnly ? [] : [...(nativeCanSubmit(state, options.controls) && !options.operations.getSnapshot().some(record => record.conversationId === options.conversationId
+            allowed: options.readOnly ? [] : [...(nativeInputPolicy(state, options.controls).route !== 'blocked' && !options.operations.getSnapshot().some(record => record.conversationId === options.conversationId
                     && ['unknown', 'submitting'].includes(record.status) && (record.input as {protocol?: string} | null)?.protocol === 'legacy-composer-v1') ? ['send' as const] : []), ...(state.canRespond ? ['respond' as const] : []),
                 ...(state.canInterrupt && state.sessionId && state.observation?.activeTurnId && options.controls.reconcileControl ? ['cancel' as const] : []),
                 ...(catalog.some(command => !command.disabled) ? ['command' as const] : [])] });
@@ -133,9 +135,9 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
         catch (error) {return reject(context, 'INVALID_SELECTION', String(error));}
         const captured = generation;
         return submitNativeOperation(context, async () => {
-            const state = currentDescriptor.execution !== 'query' && native?.canQueue && options.controls.enqueue
+            const state = await awaitNativeAdmission(options.controls, context.operationId, async () => currentDescriptor.execution !== 'query' && native?.canQueue && options.controls.enqueue
                 ? await options.controls.enqueue(input.text, [], selection, context.operationId)
-                : await submitNativeCommand(options.controls, currentDescriptor, input.arguments, input.text, selection, context.operationId);
+                : await submitNativeCommand(options.controls, currentDescriptor, input.arguments, input.text, selection, context.operationId), lifetime.signal);
             publishResponse(state, captured); return state;
         }, false);
     };
@@ -143,7 +145,9 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
         async send(input, context) {
             if (!valid(context.viewId)) return { status: 'rejected', operationId: context.operationId, code: 'STALE_VIEW', message: 'Observation binding expired' };
             if (input.input) return reject(context, 'UNSUPPORTED_INPUT', 'Native message input has no declared structured argument binding');
-            const steeringTurn = native?.canSteer && options.controls.steer && capabilities.canSteerSelection(input.selection) ? native.observation?.activeTurnId : undefined;
+            const policy = nativeInputPolicy(native!, options.controls, capabilities.canSteerSelection(input.selection));
+            if (policy.route === 'blocked') return reject(context, 'EBUSY', 'Native input is not available');
+            const steeringTurn = policy.turnId;
             let attachments: NonNullable<Parameters<ConversationControls['send']>[1]> = [];
             if (input.attachments.length) {
                 if (!options.images && !options.readAttachment) return reject(context, 'ATTACHMENT_MAPPING_REQUIRED', 'Native attachments require host conversion');
@@ -159,11 +163,11 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
             catch (error) {return {status: 'rejected', operationId: context.operationId, code: 'INVALID_SELECTION', message: String(error)};}
             const captured = generation;
             return submitNativeOperation(context, async () => {
-                const state = steeringTurn
+                const state = await awaitNativeAdmission(options.controls, context.operationId, async () => steeringTurn
                     ? await options.controls.steer!(input.text, steeringTurn, attachments, context.operationId)
-                    : native?.canQueue && options.controls.enqueue
-                    ? await options.controls.enqueue(input.text, attachments, selection, context.operationId, ...(native.supportsSteer && !selection ? ['auto' as const] : []))
-                    : await options.controls.send(input.text, attachments, selection, context.operationId);
+                    : policy.route === 'queue'
+                    ? await options.controls.enqueue!(input.text, attachments, selection, context.operationId, ...(native?.supportsSteer && !selection ? ['auto' as const] : []))
+                    : await options.controls.send(input.text, attachments, selection, context.operationId), lifetime.signal);
                 publishResponse(state, captured); return state;
             }, true);
         },
@@ -380,9 +384,7 @@ function nativeAdmissionReceipt(state: NativeSnapshot, context: OperationContext
     if (state.instructionQueue?.acceptedIds.includes(context.operationId)) return {status: 'accepted', operationId: context.operationId, submissionRef: context.operationId};
 }
 
-function nativeCanSubmit(state: NativeSnapshot, controls: ConversationControls): boolean {
-    return !!(state.canSteer && controls.steer || state.canQueue && controls.enqueue || state.canSend && !state.pending);
-}
+
 
 function nativeUserOperation(record: OperationRecord): boolean {
     return record.kind === 'send' || record.kind === 'command' && !!record.input && typeof record.input === 'object'

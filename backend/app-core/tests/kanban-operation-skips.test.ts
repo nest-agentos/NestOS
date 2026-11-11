@@ -4,7 +4,7 @@ import {createKanbanModule,SeqKanbanStore} from '@nestos/kanban';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {KanbanCommand,KanbanItemOperationRequest} from '@nestos/kanban/contracts';
 import {createItemOperations} from '../src/kanban/item-operations';
-import {operationDependencies,affectedOperations} from '../src/kanban/item-operation-skips';
+import {operationDependencies,operationSkipDependencies,affectedOperations,effectiveOperationWaivers} from '../src/kanban/item-operation-skips';
 import type {ReviewOperationsOptions} from '../src/kanban/item-operation-types';
 const closes:Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});
@@ -24,7 +24,7 @@ async function fixture(){
  const request=async(action:string,id=action):Promise<KanbanItemOperationRequest>=>{const view=await api.itemOperations('b','task');return {operationId:id,itemId:'task',action:'skip',expectedRevision:view.revision,confirmed:true,skip:{action,reason:'User-approved environment exception',affected:view.operations.find(row=>row.id===action)!.skip!.affected.map(row=>row.id)}};};
  return {api,options,service,worker,journal,command,request,start};
 }
-it('cascades the four delivery stages in canonical order even for older frozen plans',()=>{
+it('separates execution dependencies from waiver propagation at the submission boundary',()=>{
  const runtime=operationDependencies();expect(affectedOperations(runtime,'deploy')).toEqual(['deploy','accept','analyze','merge','cleanup']);
  expect(affectedOperations(runtime,'analyze')).toEqual(['analyze','merge','cleanup']);
  const release=operationDependencies({steps:['build','deploy','analyze','merge','accept','cleanup'],acceptance:'runtime'});
@@ -32,16 +32,24 @@ it('cascades the four delivery stages in canonical order even for older frozen p
  expect(release.accept).toEqual(['deploy']);
  const source=operationDependencies({steps:['analyze','merge','cleanup'],acceptance:'source'});
  expect(affectedOperations(source,'analyze')).toEqual(['analyze','merge','cleanup']);
+ const skips=operationSkipDependencies();
+ expect(affectedOperations(skips,'build')).toEqual(['build','deploy','accept']);
+ expect(affectedOperations(skips,'deploy')).toEqual(['deploy','accept']);
+ expect(affectedOperations(skips,'accept')).toEqual(['accept']);
+ expect(affectedOperations(skips,'analyze')).toEqual(['analyze','merge','cleanup']);
+ expect(affectedOperations(operationSkipDependencies({steps:['accept','merge','cleanup'],acceptance:'source'}),'accept')).toEqual(['accept']);
 });
 it('persists dependency skips and their actor without completing outstanding independent requirements',async()=>{
  const f=await fixture(),request=await f.request('deploy');
  const result=await f.api.runItemOperation('b',request);
  expect(result.operations.find(row=>row.id==='deploy')).toMatchObject({state:'skipped',enabled:false,waiver:{cause:'direct'}});
  expect(result.operations.find(row=>row.id==='accept')).toMatchObject({state:'skipped',waiver:{cause:'dependency'}});
- expect(result.operations.find(row=>row.id==='analyze')).toMatchObject({state:'skipped',waiver:{cause:'dependency'}});
- expect(result.operations.find(row=>row.id==='merge')).toMatchObject({dependsOn:['analyze']});expect(result.operations.find(row=>row.id==='merge')).toMatchObject({state:'skipped',waiver:{cause:'dependency'}});
+ expect(result.operations.find(row=>row.id==='analyze')).toMatchObject({state:'unavailable',enabled:false});
+ expect(result.operations.find(row=>row.id==='merge')).toMatchObject({dependsOn:['analyze'],state:'unavailable'});
+ expect(result.skippedActions).not.toContain('analyze');expect(result.skippedActions).not.toContain('merge');
  const item=(await f.service.item('b','task')).item;expect(item.status).toBe('review');
  expect(item.operationWaivers?.[0]).toMatchObject({id:'deploy',dispatchId:'d',actor:{kind:'human',id:'admin'},reason:request.skip!.reason});
+ expect(JSON.stringify(vi.mocked(f.options.log).mock.calls)).not.toContain(request.skip!.reason);
  await f.api.runItemOperation('b',request);expect((await f.service.item('b','task')).item.operationWaivers).toHaveLength(1);expect(f.start).not.toHaveBeenCalled();
  await expect(f.api.runItemOperation('b',{...request,skip:{...request.skip!,reason:'Changed'}})).rejects.toMatchObject({code:'IDEMPOTENCY_CONFLICT'});
 });
@@ -49,11 +57,14 @@ it('completes with waived acceptance only after every other requirement is settl
  const f=await fixture();await f.api.runItemOperation('b',await f.request('deploy'));
  expect((await f.service.item('b','task')).item.status).toBe('review');
  await f.api.runItemOperation('b',await f.request('build'));
+ expect((await f.service.item('b','task')).item.status).toBe('review');
+ expect((await f.api.itemOperations('b','task')).operations.find(row=>row.id==='analyze')).toMatchObject({enabled:true,state:'ready'});
+ await f.api.runItemOperation('b',await f.request('analyze'));
  const item=(await f.service.item('b','task')).item;expect(item.status).toBe('completed');
  expect(item.acceptanceResult).toMatchObject({outcome:'waived',dispatchId:'d',waiverId:'deploy'});
  expect((await f.service.workflow('b')).dispatches.d.outcome).toBe('accepted');
  await f.api.quiesce();const restored=createItemOperations(f.options);closes.push(()=>restored.quiesce());
- const view=await restored.itemOperations('b','task');expect(view.waiverHistory).toHaveLength(2);expect(view.acceptance?.outcome).toBe('waived');
+ const view=await restored.itemOperations('b','task');expect(view.waiverHistory).toHaveLength(3);expect(view.acceptance?.outcome).toBe('waived');
  expect(f.start).not.toHaveBeenCalled();
 });
 it.each(['reason','confirmation','impact','revision'])('rejects invalid skip %s without modifying task records',async field=>{
@@ -111,4 +122,61 @@ it('retains historical waivers but does not hide or complete a still unconfirmed
  expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({state:'unknown',sessionId:'original',enabled:false,progress:{stage:'reconciling'}});
  expect(view.skippedActions).not.toContain('analyze');expect(view.waiverHistory).toEqual(history);
  expect((await f.service.item('b','task')).item.status).toBe('review');expect(f.start).not.toHaveBeenCalled();
+});
+
+async function seedDelivery(f:Awaited<ReturnType<typeof fixture>>,actions=['build','deploy']) {
+ for(const [index,action] of actions.entries())await f.journal.update('review-operation:seed-'+action,()=>({id:'seed-'+action,boardId:'b',itemId:'task',action,
+  phase:'settled',state:'succeeded',fingerprint:'seed',snapshot:{version:'v',sourceVersion:'s',targetVersion:'t',context:{}},
+  result:{sourceVersion:'s',targetVersion:'t',version:'v'},createdAt:index+1}));
+ await f.journal.update('review-operations:'+JSON.stringify(['b','task']),()=>({revision:1,bindings:{},jobs:actions.map(action=>'seed-'+action),receipts:{}}));
+}
+it.each(['succeeded','failed'] as const)('continues real submission after an acceptance waiver and cleans only after merge %s',async outcome=>{
+ const f=await fixture();await seedDelivery(f);
+ let observation:'running'|'succeeded'|'failed'='running';
+ f.options.adapter.prepareOperation=vi.fn(async input=>({expectedSessionId:'original',submission:{id:input.id}} as never));
+ f.options.submission.start=vi.fn(async()=>({sessionId:'original',outcome:'running'} as never));
+ f.options.submission.inspect=vi.fn(async()=>({sessionId:'original',outcome:observation,...(observation==='failed'?{code:'MERGE_REJECTED'}:{})} as never));
+ f.options.adapter.readOperation=vi.fn(async job=>job.action==='analyze'?{sourceVersion:'s',targetVersion:'t',summary:'Checked merge plan',conflicts:[]}:
+  {schema:'nestos.kanban.operation-result/1',operationId:job.id,sourceVersion:'s',targetVersion:'t',status:'succeeded'});
+ f.options.cleanup=vi.fn(async()=>true);
+ const waiverRequest=await f.request('accept');expect(waiverRequest.skip!.affected).toEqual(['accept']);
+ let view=await f.api.runItemOperation('b',waiverRequest);
+ expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({enabled:true,state:'ready'});
+ expect(view.skippedActions).toEqual(['accept']);expect((await f.service.item('b','task')).item.status).toBe('review');
+ await f.api.quiesce();const restored=createItemOperations(f.options);closes.push(()=>restored.quiesce());
+ view=await restored.itemOperations('b','task');expect(view.skippedActions).toEqual(['accept']);
+ await restored.runItemOperation('b',{operationId:'analyze-after-waiver',itemId:'task',action:'analyze',expectedRevision:view.revision});
+ observation='succeeded';await restored.scan();view=await restored.itemOperations('b','task');
+ expect(view.operations.find(row=>row.id==='merge')).toMatchObject({enabled:true,state:'waiting-confirmation'});
+ const merge={operationId:'merge-after-waiver',itemId:'task',action:'merge',expectedRevision:view.revision};
+ await expect(restored.runItemOperation('b',merge)).rejects.toMatchObject({code:'OPERATION_CONFIRMATION_REQUIRED'});
+ vi.mocked(f.options.adapter.snapshot).mockResolvedValueOnce({version:'changed',sourceVersion:'changed-source',targetVersion:'t',context:{}});
+ await expect(restored.runItemOperation('b',{...merge,operationId:'stale-merge',confirmed:true})).rejects.toMatchObject({code:'OPERATION_SOURCE_CHANGED_REANALYZE'});
+ expect(f.options.submission.start).toHaveBeenCalledOnce();
+ observation='running';await restored.runItemOperation('b',{...merge,confirmed:true});
+ expect(f.options.cleanup).not.toHaveBeenCalled();expect((await f.service.item('b','task')).item.status).toBe('review');
+ observation=outcome;await restored.scan();const item=(await f.service.item('b','task')).item;
+ expect(item.status).toBe(outcome==='succeeded'?'completed':'review');
+ if(outcome==='succeeded'){expect(item.acceptanceResult).toMatchObject({outcome:'waived',waiverId:'accept'});expect(f.options.cleanup).toHaveBeenCalledOnce();}
+ else {expect(item.acceptanceResult).toBeUndefined();expect(f.options.cleanup).not.toHaveBeenCalled();}
+ expect(item.operationWaivers![0].operations.map(row=>row.id)).toEqual(['accept']);
+ expect(f.options.submission.start).toHaveBeenCalledTimes(2);
+});
+it('cannot use an acceptance waiver to bypass an outstanding deployment',async()=>{
+ const f=await fixture();await seedDelivery(f,['build']);
+ const view=await f.api.runItemOperation('b',await f.request('accept'));
+ expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({enabled:false,state:'unavailable'});
+ await expect(f.api.runItemOperation('b',{operationId:'premature-analysis',itemId:'task',action:'analyze',expectedRevision:view.revision})).rejects.toMatchObject({code:'OPERATION_PREREQUISITE_REQUIRED'});
+ expect(f.start).not.toHaveBeenCalled();
+});
+it('preserves the exact historical impact set without expanding or revoking confirmed waivers',async()=>{
+ const f=await fixture(),before=(await f.service.item('b','task')).item,graph=operationDependencies();
+ await f.command({type:'waive-operations',itemId:'task',dispatchId:'d',expectedItemRevision:before.revision,waiver:{id:'old-accept-policy',action:'accept',reason:'Previously confirmed scope',acceptanceWaived:true,dependencies:graph,
+  operations:['accept','analyze','merge','cleanup'].map(id=>({id,cause:id==='accept'?'direct':'dependency',previousState:'unavailable'}))}} as KanbanCommand);
+ const history=(await f.service.item('b','task')).item.operationWaivers!;
+ const view=await f.api.itemOperations('b','task');expect(view.waiverHistory).toEqual(history);
+ expect(view.skippedActions).toEqual(['accept','analyze','merge','cleanup']);
+ const isolated={...history[0],dependencies:{accept:[]},operations:history[0].operations.slice(0,1)};
+ expect(effectiveOperationWaivers([isolated])[0].operations).toEqual(isolated.operations);
+ expect(history[0].operations.map(row=>row.id)).toEqual(['accept','analyze','merge','cleanup']);
 });

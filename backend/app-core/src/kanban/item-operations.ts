@@ -69,13 +69,13 @@ function revision(context: Context): string {return sha256HexSync(JSON.stringify
 async function view(options: ReviewOperationsOptions, context: Context): Promise<KanbanItemOperations> {
     if (context.archived || options.adapter.supports?.(context.board, context.item) === false) return {revision: revision(context), operations: []};
     const active = context.jobs.some(job => job.phase !== 'settled')||context.cancellations.some(pendingCancellation), supported = ['review', 'completed'].includes(context.item.status);
+    const activeWaivers=await currentWaivers(options,context);
     const raw = await Promise.all(actions.map(async action => {
-        const entry = cancellationView(options,context,operation(context, action, active, supported, !!options.adapter.prepareOperation));
+        const entry = cancellationView(options,context,operation(context, action, active, supported, !!options.adapter.prepareOperation,activeWaivers));
         if (context.board.lifecycle && action !== 'accept') {entry.enabled=false;entry.reason=t('kanban.errors.BOARD_STOPPING');}
         if (entry.sessionId) entry.sessionId = await options.sessionResource?.(entry.sessionId) ?? entry.sessionId;
         return entry;
     }));
-    const activeWaivers=await currentWaivers(options,context);
     const selected=raw.filter(op=>!context.deliveryPlan||context.deliveryPlan.steps.includes(op.id));
     const actor=await options.service.currentPrincipal(),canSkip=actor.kind==='human'&&context.board.members?.some(row=>row.kind===actor.kind&&row.id===actor.id&&row.roles?.includes('coordinator'));
     const projected=projectOperationSkips(cancelDependentOperations(context,selected),context.deliveryPlan,activeWaivers,!!canSkip&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel').map(entry=>canSkip||!entry.cancel?entry:{...entry,cancel:{...entry.cancel,enabled:false,reason:t('kanban.errors.OPERATION_COORDINATOR_REQUIRED')}});
@@ -93,11 +93,17 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     const catalog = await options.catalog(), flows = catalog.entries.filter(entry => entry.target.kind === 'flow' && entry.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'));
     return {revision: revision(context),operations,automatic,...audit,targets: automationCatalog({...catalog, entries: flows}).targets};
 }
-function operation(context: Context, action: ReviewAction, active: boolean, supported: boolean, agent = false): KanbanItemOperation {
+function prerequisitesSatisfied(context:Context,action:string,waivers:NonNullable<KanbanItem['operationWaivers']>):boolean {
+    const graph=operationDependencies(context.deliveryPlan),settled=new Set(Object.keys(graph).filter(id=>
+        latest(context,id as ReviewAction)?.state==='succeeded'||id==='accept'&&context.item.status==='completed'));
+    const skipped=new Set(waivers.flatMap(row=>row.operations.map(op=>op.id)));
+    for(const [id,deps] of Object.entries(graph))if(skipped.has(id)&&deps.every(dep=>settled.has(dep)))settled.add(id);
+    return (graph[action]??[]).every(dep=>settled.has(dep));
+}
+function operation(context: Context, action: ReviewAction, active: boolean, supported: boolean, agent = false,waivers:NonNullable<KanbanItem['operationWaivers']>=[]): KanbanItemOperation {
     const job = latest(context, action), binding = context.settings.bindings[action], plan = latest(context, 'analyze')?.result as MergePlan | undefined;
-    const dependencies=operationDependencies(context.deliveryPlan)[action]??[];
-    const prerequisites=dependencies.every(id=>latest(context,id as ReviewAction)?.state==='succeeded'||id==='accept'&&context.item.status==='completed');
-    const ready=prerequisites&&(action!=='merge'||!!plan&&latest(context,'analyze')?.state==='succeeded')&&(action!=='accept'||context.item.status==='review');
+    const ready=prerequisitesSatisfied(context,action,waivers)&&(action!=='deploy'||latest(context,'build')?.state==='succeeded')
+        &&(action!=='merge'||!!plan&&latest(context,'analyze')?.state==='succeeded')&&(action!=='accept'||context.item.status==='review');
     const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && (context.item.status === 'completed'||job?.state==='succeeded') || action === 'merge' && job?.state === 'succeeded';
     const enabled = (!context.deliveryPlan||context.deliveryPlan.steps.includes(action)) && supported && !context.archived && !finished && !active && ready && (!configurable || !!binding);
     const built=latest(context,'build'),auto=built?.followUp,autoPending=action==='deploy'&&auto?.state==='queued'&&built?.state==='succeeded'&&(!job||job.createdAt<built.createdAt);
@@ -164,8 +170,9 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     requireValue(!prior || prior.boardId === board && prior.itemId === request.itemId && prior.fingerprint === sha256HexSync(JSON.stringify(request)), 'IDEMPOTENCY_CONFLICT');
     if (prior && context.settings.jobs.includes(prior.id)) {requireValue(prior.fingerprint === sha256HexSync(JSON.stringify(request)), 'IDEMPOTENCY_CONFLICT'); return view(options, context);}
     requireValue(request.expectedRevision === revision(context), 'OPERATION_STALE_REFRESH');
-    const entry = operation(context, request.action as ReviewAction, context.jobs.some(job => job.phase !== 'settled'), options.adapter.supports?.(context.board, context.item) !== false && ['review', 'completed'].includes(context.item.status), !!options.adapter.prepareOperation);
-    requireValue(!(await currentWaivers(options,context)).some(row=>row.operations.some(op=>op.id===request.action)),'OPERATION_SKIPPED');
+    const waivers=await currentWaivers(options,context);
+    const entry = operation(context, request.action as ReviewAction, context.jobs.some(job => job.phase !== 'settled'), options.adapter.supports?.(context.board, context.item) !== false && ['review', 'completed'].includes(context.item.status), !!options.adapter.prepareOperation,waivers);
+    requireValue(!waivers.some(row=>row.operations.some(op=>op.id===request.action)),'OPERATION_SKIPPED');
     requireValue(entry.enabled, 'OPERATION_PREREQUISITE_REQUIRED');
     if (entry.confirmation) requireValue(request.confirmed === true, 'OPERATION_CONFIRMATION_REQUIRED');
     requireValue(request.followUp===undefined||request.action==='build'&&request.followUp==='deploy'&&!context.deliveryPlan?.manualAfter,'OPERATION_REQUEST_INVALID');

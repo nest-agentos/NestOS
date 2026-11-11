@@ -3,6 +3,7 @@ import {composeCommandCatalogs, type CommandCatalog, type CommandDefinition, typ
     type ComposerCommand, type SelectorView, type OperationContext, type OperationReceipt} from '@nestos/llm-ui';
 
 import {t} from '@nestos/common';
+import {nativeInputPolicy, nativeCommandAvailable} from './native-input-policy';
 
 /** Hosts register UI, project, Flow or Agent contributions without exposing their services. */
 export interface NativeCommandProvider {
@@ -80,8 +81,7 @@ export class NativeComposerCapabilities {
         } catch {return false;}
     }
     submissionMode(state: ConversationSnapshot, values?: Readonly<Record<string, string>>): 'steer' | 'queue' | 'send' {
-        if (state.canSteer && this.controls.steer && this.canSteerSelection(values)) return 'steer';
-        return state.canQueue && this.controls.enqueue && (!state.canSend || state.active) ? 'queue' : 'send';
+        return nativeInputPolicy(state, this.controls, this.canSteerSelection(values)).mode;
     }
     catalog(state: ConversationSnapshot): CommandCatalog {
         return {source: {id: 'harness', label: t('harness.remoteAgents')}, commands: this.commands.map(command => ({
@@ -95,8 +95,7 @@ export class NativeComposerCapabilities {
         return command ? {...command} : undefined;
     }
     private available(command: ConversationSlashCommand, state: ConversationSnapshot): boolean {
-        if (command.execution === 'query') return !!(state.canQueryCommand && this.controls.queryCommand) || (state.canCommand ?? state.canSend) && !state.pending;
-        return !!(state.canQueue && this.controls.enqueue) || state.canSend && !state.pending;
+        return nativeCommandAvailable(state, this.controls, command.execution);
     }
     compose(state: ConversationSnapshot, contributions: readonly CommandCatalog[] = []): readonly ComposerCommand[] {
         return composeCommandCatalogs([...contributions, this.catalog(state)]);

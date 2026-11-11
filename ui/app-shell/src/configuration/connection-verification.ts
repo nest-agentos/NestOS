@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {escapeAttr, escapeHTML, t, type LocaleKey} from '@nestos/common';
 import type {ToolConnectionVerification, ToolConnectionView} from '@nestos/app-contracts/services';
 const label = (key: string) => t(`toolbox.connections.${key}` as LocaleKey);
@@ -22,6 +23,6 @@ export function verificationMessage(result: ToolConnectionVerification): string 
 export function connectionVerification(connection: ToolConnectionView, canVerify: boolean): string {
     const result = connection.verification;
     return `<p data-connection-verification="${escapeAttr(connection.id)}" role="${result?.status === 'failed' ? 'alert' : 'status'}">${escapeHTML(result ? verificationMessage(result) : connectionStatus(connection))}</p>
-        ${result ? `<small>${escapeHTML(label('verificationTime'))} ${escapeHTML(new Date(result.checkedAt).toLocaleString())}</small>` : ''}
+        ${result ? `<small>${escapeHTML(label('verificationTime'))} ${escapeHTML(formatDateTime(new Date(result.checkedAt)))}</small>` : ''}
         ${canVerify && connection.authorization?.connected ? `<button type="button" data-connection-verify="${escapeAttr(connection.id)}">${escapeHTML(label('verifyConnection'))}</button>` : ''}`;
 }

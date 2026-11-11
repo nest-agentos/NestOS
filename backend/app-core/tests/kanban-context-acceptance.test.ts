@@ -59,6 +59,18 @@ it('does not append history or duplicate prompt sections when the same preparati
     expect(f.sessionChannel).toHaveBeenCalledTimes(10);expect(f.openWorkspace).toHaveBeenCalledTimes(10);
 });
 
+it('prepares a shared coordination group on its primary project with all selected project contexts',async()=>{
+ const f=await fixture(1),projectIds=['project','secondary'];
+ f.options.remote.list=(id:string)=>[{at:'/',connectionId:'node',serverId:'cell',serverProjectId:'cell-'+id,serverProjectRevision:1,authorization:{principalId:'owner',revision:'auth'}}] as any;
+ f.sessionChannel.mockImplementation(async(_project,_operation,request)=>({accepted:true,projectContext:{projects:request.contextProjects.map((row:any)=>({...row,directory:'/projects/'+row.projectId}))}}));
+ const item={...f.item,externalRefs:projectIds.map(id=>({system:'nestos-remote-project',id}))};
+ const context={...f.context,primaryProjectId:'secondary',projectIds,secondaryProjectIds:['project']};
+ await developmentPreparation(f.options as never)({target:f.target,context,item,stage:'decision',preparation:{system:'nestos-work-preparation',id:'git-worktree',revision:'1'},dispatch:{id:'shared',itemId:item.id}} as never);
+ expect(f.projectHarness).toHaveBeenCalledWith('secondary',expect.anything());
+ expect(f.sessionChannel).toHaveBeenCalledWith('secondary','open',expect.objectContaining({contextProjects:[{projectId:'cell-project',revision:1},{projectId:'cell-secondary',revision:1}]}));
+ await expect(developmentPreparation(f.options as never)({target:f.target,context,item,stage:'task',preparation:{system:'nestos-work-preparation',id:'git-worktree',revision:'1'},dispatch:{id:'execution',itemId:item.id}} as never)).rejects.toMatchObject({code:'SINGLE_PROJECT_TASK_REQUIRED'});
+});
+
 it.each([['decision','coordination'],['task','execution']] as const)('binds %s work to the board %s profile and retains it across setting changes',async(stage,role)=>{
     const f=await fixture(1),save=vi.fn(async()=>{});f.options.connections.save=save;
     f.projectHarness.mockImplementation(async()=>({profiles:async()=>({profiles:[{id:'chosen',capabilities:{workingDirectory:true,sessionChannels:true}}]}),close:f.close}));

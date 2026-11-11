@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {projectStatusLabel} from './presentation';
 import {renderProjectAccess, type ProjectAccessActions, type ProjectAccessDraft} from './project-access';
 import {t} from '@nestos/common';
@@ -84,7 +85,7 @@ class DiagnosticDialog {
         const heading = document.createElement('strong'); heading.textContent = t('diagnostics.projectState', {state: projectStatusLabel(state)});
         heading.dataset.status = state.status; this.summary.append(heading);
         const time = document.createElement('p'); time.textContent = state.checkedAt
-            ? t('diagnostics.checkedAt', {time: new Date(state.checkedAt).toLocaleString()}) : t('diagnostics.neverChecked'); this.summary.append(time);
+            ? t('diagnostics.checkedAt', {time: formatDateTime(new Date(state.checkedAt))}) : t('diagnostics.neverChecked'); this.summary.append(time);
         for (const failure of state.issues ?? (state.issue ? [state.issue] : [])) {
             const issue = document.createElement('p'); issue.textContent = [failure.stage, failure.profileId, failure.code, diagnosticReasonText(failure.reason)].filter(Boolean).join(' · '); this.summary.append(issue);
         }

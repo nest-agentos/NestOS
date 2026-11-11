@@ -152,3 +152,32 @@ it('keeps a Cells-owned queue out of the client journal and the NestOS recovery 
         const index=await fs.meta.seq!.getEntry('/etc/fs/harness-conversations.seq','owned');expect(JSON.parse(index!)).toMatchObject({needsRecovery:false});expect(index).not.toContain('Cells input');
     }finally{await manager.dispose();}
 });
+
+it.each([false, true])('preserves Cells ownership across stale saves and a lost remote acknowledgement (committed: %s)', async committed => {
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    try {
+        const fs = await manager.openFileSystem('/');
+        let body: string | null = JSON.stringify({sessionId: 'native', draft: 'before'});
+        const queue = {owner: 'cells' as const, revision: 3, paused: false, items: [{id: 'owned', text: 'Private queued input', attachments: [], createdAt: 1, state: 'pending' as const}], receipts: []};
+        const compare = vi.fn(async (_key: string, before: string | null, after: string | null) => {
+            if (after && Object.hasOwn(JSON.parse(after), 'instructionQueue'))
+                throw Object.assign(new Error('HARNESS_QUEUE_OWNED_BY_CELLS'), {code: 'EIO', remoteCode: 'HARNESS_QUEUE_OWNED_BY_CELLS', outcome: 'not-committed'});
+            if (body !== before) return false;
+            body = after; return true;
+        });
+        const remote = {read: vi.fn(async () => body), compare, queueSession: vi.fn(async () => structuredClone(queue))};
+        const store = new RemoteConversationStore(fs, 'owned-retry', remote), loaded = await store.load();
+        const stale = {...loaded, instructionQueue: {...queue, owner: undefined, revision: 0, items: []}};
+        await store.save({...stale, draft: 'first'}); await store.save({...stale, draft: 'second'});
+        compare.mockImplementationOnce(async (...args) => {
+            if (committed) await compare.getMockImplementation()!(...args);
+            throw Object.assign(new Error('Lost acknowledgement'), {code: 'EIO'});
+        });
+        await expect(store.save({...stale, draft: 'after fault'})).rejects.toThrow('Lost acknowledgement');
+        await store.submitted('accepted-turn');
+        expect(JSON.parse(body!)).toMatchObject({sessionId: 'native', submittedTurnId: 'accepted-turn', draft: committed ? 'after fault' : 'second'});
+        expect(JSON.parse(body!)).not.toHaveProperty('instructionQueue');
+        expect(remote.queueSession).toHaveBeenCalledOnce();
+        expect((await store.load())?.instructionQueue).toEqual(queue);
+    } finally {await manager.dispose();}
+});

@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {compareFileContents} from './file-compare';
 import {ACTION_ICONS, FILE_BROWSER_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
 import type {MDxEditor} from '@nestos/mdxeditor';
@@ -32,7 +33,7 @@ export function mountFileMenu(container: HTMLElement, editor: MDxEditor, options
             values.replaceChildren();
             for (const [label, value] of [[t('editor.file.created'), node.createdAt], [t('editor.file.modified'), node.modifiedAt]] as const) {
                 const term = document.createElement('dt'), description = document.createElement('dd'); term.textContent = label;
-                description.textContent = Number.isFinite(value) && value > 0 ? new Date(value).toLocaleString() : t('editor.file.unknown'); values.append(term, description);
+                description.textContent = Number.isFinite(value) && value > 0 ? formatDateTime(new Date(value)) : t('editor.file.unknown'); values.append(term, description);
             }
             status.textContent = ''; report('info', operationId, started);
         } catch (error) {if (!lifetime.signal.aborted && read === generation) {status.textContent = error instanceof Error ? error.message : t('editor.file.failed'); report('info', operationId, started, error);}}

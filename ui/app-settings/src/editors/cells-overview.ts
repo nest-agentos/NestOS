@@ -1,3 +1,4 @@
+import {formatClockTime} from '@nestos/ui-common';
 import {escapeHTML, t} from '@nestos/common';
 import type {CellsNodeOverview} from '@nestos/app-contracts/services';
 
@@ -26,7 +27,7 @@ export function overview(value:CellsNodeOverview,interactive=false):string {
     return `<dl class="cells-node__metrics">${summary}${metrics}</dl>
         ${statistics.state==='available'?`<p class="cells-node__hint">${e(t('cells.systemHint'))}</p><p class="cells-node__hint">${e(t('cells.sessionsHint'))}</p>${load(statistics.value.cpu)}${space(statistics.value.exports)}`:
             `<p class="cells-node__notice" role="status">${e(t(statistics.state==='unsupported'?'cells.statisticsUnsupported':'cells.statisticsUnavailable'))}${statistics.code?` (${e(statistics.code)})`:''}</p>`}
-        ${mounts(value,interactive)}<p class="cells-node__hint">${e(t('cells.lastUpdated'))} ${e(new Date(value.sampledAt).toLocaleTimeString())}</p>`;
+        ${mounts(value,interactive)}<p class="cells-node__hint">${e(t('cells.lastUpdated'))} ${e(formatClockTime(new Date(value.sampledAt)))}</p>`;
 }
 function load(cpu:NodeStatus['cpu']):string {
     return cpu?`<p class="cells-node__hint">${e(t('cells.load'))} ${cpu.loadAverage.map(number).join(' / ')}</p>`:'';

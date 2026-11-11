@@ -1,4 +1,5 @@
 import {createModuleLogger,randomUUID} from '@nestos/common';
+import {resolvedWorkResources,workResourceResolutionKey} from './kanban-work-resource-resolution';
 import {kanbanTaskType} from '@nestos/kanban/contracts';
 import type {KanbanItem,KanbanBoardWorkResourceQuery,KanbanBoardWorkResourcePage,KanbanItemSummary,KanbanWorkResourceTask,KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
@@ -34,10 +35,11 @@ export async function boardWorkResources(options:Options,boardId:string,query:Ka
         await options.service.query(boardId,{view:'all',limit:1});await ensureCatalog(options.journal);
         const associations=(await options.journal.find<Association>(key(boardId),row=>row.boardId===boardId)).map(row=>row.value).sort((a,b)=>b.createdAt-a.createdAt||a.id.localeCompare(b.id));
         const [cleanup,trees]=await Promise.all([options.journal.getMany<Cleanup>(associations.map(row=>'worktree-cleanup:'+row.id)),options.journal.getMany<PreparedWorktree>(associations.map(row=>'worktree:'+row.id))]);
-        const visible=associations.filter((_row,index)=>trees[index]&&(query.includeCleaned||cleanup[index]?.phase!=='cleaned'));
+        const resolutions=await options.journal.getMany(associations.map(row=>workResourceResolutionKey(boardId,row.itemId,row.id)));
+        const visible=associations.filter((_row,index)=>trees[index]&&(query.includeCleaned||cleanup[index]?.phase!=='cleaned'&&!resolutions[index]));
         const start=query.cursor?visible.findIndex(row=>row.id===query.cursor)+1:0;
         requireValue(!query.cursor||start>0,'CURSOR_STALE');
-        const page=visible.slice(start,start+limit),items=await catalogRows(options,boardId,page);
+        const page=visible.slice(start,start+limit),items=await resolvedWorkResources(options.journal,boardId,undefined,await catalogRows(options,boardId,page));
         log.debug('work-resource.catalog',{operationId,stage:'associations',result:'success',count:items.length,durationMs:Date.now()-started});
         return {items,total:visible.length,...(start+items.length<visible.length?{nextCursor:items.at(-1)!.id}:{})};
     }catch(error){log.warn('work-resource.catalog',{operationId,stage:'associations',result:'failure',code:(error as {code?:string}).code??'WORK_RESOURCE_CATALOG_FAILED',durationMs:Date.now()-started});throw error;}

@@ -1,11 +1,15 @@
-import {DEFAULT_KANBAN_WORK_TYPES, type KanbanBoard, type KanbanCommand, type KanbanExternalReference} from '@nestos/kanban/contracts';
+import {DEFAULT_KANBAN_WORK_TYPES, type KanbanBoard, type KanbanCommand, type KanbanExternalReference,type KanbanItem} from '@nestos/kanban/contracts';
 import type {ProjectService} from '@nestos/app-contracts/services';
-import {REMOTE_PROJECT_REFERENCE, validateRemoteReferences} from './resource-catalog';
+import {PRIMARY_PROJECT_REFERENCE,REMOTE_PROJECT_REFERENCE, validateRemoteReferences} from './resource-catalog';
 import {requireValue} from './validation';
 
 type Projects=Pick<ProjectService,'get'>;
 const projectRefs=(refs:KanbanExternalReference[]=[])=>(refs.filter(ref=>ref.system===REMOTE_PROJECT_REFERENCE));
-export const inheritWorkReferences = (refs:readonly KanbanExternalReference[]) => refs.filter(ref=>[REMOTE_PROJECT_REFERENCE,'nestos-decision-run','nestos-work-delivery'].includes(ref.system));
+export const inheritWorkReferences = (refs:readonly KanbanExternalReference[]) => refs.filter(ref=>[REMOTE_PROJECT_REFERENCE,PRIMARY_PROJECT_REFERENCE,'nestos-decision-run','nestos-work-delivery'].includes(ref.system));
+export function workProjectId(item:Pick<KanbanItem,'externalRefs'|'planning'|'purpose'>):string|undefined {
+    const selected=projectRefs(item.externalRefs),primary=item.externalRefs?.find(ref=>ref.system===PRIMARY_PROJECT_REFERENCE)?.id;
+    return (item.purpose==='planning'||item.planning?.execution==='children')&&selected.some(ref=>ref.id===primary)?primary:selected[0]?.id;
+}
 /** Project cardinality belongs to NestOS policy; Kanban only stores opaque references. */
 export async function validateWorkProjects(projects:Projects,board:KanbanBoard,command:KanbanCommand,required:boolean):Promise<void> {
     if(command.type==='restart-item') {
@@ -42,7 +46,7 @@ async function validate(projects:Projects,board:KanbanBoard,refs:KanbanExternalR
     if(executable) {
         requireValue(selected.length<=1,'SINGLE_PROJECT_TASK_REQUIRED');
         requireValue(!(required||inherited.length===1)||selected.length===1,'TASK_PROJECT_REQUIRED');
-        requireValue(inherited.length!==1||selected[0]?.id===inherited[0].id,'CHILD_PROJECT_MISMATCH');
+        requireValue(!inherited.length||selected.every(ref=>inherited.some(parent=>parent.id===ref.id)),'CHILD_PROJECT_MISMATCH');
     }
     if(selected.length)await validateRemoteReferences(projects,{externalRefs:selected});
 }

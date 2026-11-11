@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 // @file: app-settings/editors/storage/SnapshotSection.ts
 
 import { Toast, Modal } from '@nestos/ui-common-adapter';
@@ -49,13 +50,13 @@ export class SnapshotSection {
               <div class="snapshot-item__info">
                 <p class="snapshot-item__title">${StorageUtils.escapeHtml(snapshot.displayName)}</p>
                 <p class="snapshot-item__meta">
-                  ${new Date(snapshot.createdAt).toLocaleString()} 
+                  ${formatDateTime(new Date(snapshot.createdAt))}
                   • ${(snapshot.size / 1024 / 1024).toFixed(2)} MB
                   ${snapshot.description ? ` • ${snapshot.description}` : ''}
                 </p>
               </div>
               <div class="settings-snapshot-actions">
-                <button class="settings-btn settings-btn--sm settings-btn--secondary btn-restore-snap" 
+                <button class="settings-btn settings-btn--sm settings-btn--secondary btn-restore-snap"
                   data-name="${snapshot.name}" title="恢复到此快照">
                   <i class="fas fa-undo"></i> 恢复
                 </button>
@@ -63,7 +64,7 @@ export class SnapshotSection {
                   data-name="${snapshot.name}" title="下载快照文件">
                   <i class="fas fa-download"></i>
                 </button>
-                <button class="settings-btn settings-btn--sm settings-btn--danger btn-del-snap" 
+                <button class="settings-btn settings-btn--sm settings-btn--danger btn-del-snap"
                   data-name="${snapshot.name}" title="删除快照">
                   <i class="fas fa-trash"></i>
                 </button>
@@ -78,7 +79,7 @@ export class SnapshotSection {
 
   private bindEvents(): void {
     this.container.querySelector('#btn-create-snapshot')?.addEventListener('click', () => this.createSnapshot());
-    
+
     this.container.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       const restoreBtn = target.closest('.btn-restore') as HTMLElement;
@@ -91,7 +92,7 @@ export class SnapshotSection {
     });
   }
 
-  
+
 
   /**
    * 创建快照
@@ -129,7 +130,7 @@ export class SnapshotSection {
         <p><b>警告：此操作将覆盖当前所有数据！</b></p>
         <p>系统将回滚到 <b>${snapshot.displayName}</b> 的状态。</p>
         <p style="color: var(--st-text-secondary);">
-          创建时间: ${new Date(snapshot.createdAt).toLocaleString()}
+          创建时间: ${formatDateTime(new Date(snapshot.createdAt))}
         </p>
         <p>建议先创建一个当前状态的快照以便恢复。</p>
       </div>`,
@@ -192,7 +193,7 @@ export class SnapshotSection {
     if (!snapshot) {
       throw new Error(`Snapshot not found: ${name}`);
     }
-    
+
     return {
       meta: {
         name,

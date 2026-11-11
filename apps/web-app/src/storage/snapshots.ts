@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 /**
  * @file app-settings/services/SnapshotService.ts
  * @desc IndexedDB-level snapshot management (clone, restore, delete).
@@ -34,7 +35,7 @@ export class SnapshotService implements SnapshotPort {
             if (!isNaN(timestamp)) {
                 snapshots.push({
                     name: db.name,
-                    displayName: new Date(timestamp).toLocaleString(),
+                    displayName: formatDateTime(new Date(timestamp)),
                     createdAt: timestamp,
                     size: 0,
                     description: '',

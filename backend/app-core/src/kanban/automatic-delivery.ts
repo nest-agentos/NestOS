@@ -1,4 +1,5 @@
 import {operationSteps} from './item-operation-skips';
+import type {KanbanWorkResource} from '@nestos/kanban/contracts';
 import {claimDeliveryTarget,releaseDeliveryTarget} from './automatic-delivery-target';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanItemOperationRequest,KanbanItemOperations,KanbanService,KanbanWorkflowState} from '@nestos/kanban/contracts';
@@ -19,6 +20,14 @@ async function admitted(options:Options,state:State) {
     return options.active()&&!!board.automation?.enabled&&!board.executionControl?.paused&&!board.lifecycle&&!!item&&!item.deletedAt&&item.control?.action!=='cancel'&&['review','completed'].includes(item.status);
 }
 const key=(board:string,item:string)=>'automatic-delivery:'+JSON.stringify([board,item]);
+/** Explicitly retained resources settle finalization without fabricating cleanup receipts. */
+export async function settleWorkspaceFinalization(options:{service:KanbanService;journal:KanbanAutomationJournal},board:string,item:string,resources:KanbanWorkResource[]):Promise<void> {
+    if(!resources.length||!resources.every(row=>row.state==='cleaned'||row.resolution?.kind==='ignored'))return;
+    const state=await options.journal.get<State>(key(board,item));
+    if(!state||state.done||actions(state)[state.step]!=='cleanup')return;
+    const settled=await options.journal.update<State>(key(board,item),current=>current&&!current.done&&actions(current)[current.step]==='cleanup'?{...current,done:true,step:actions(current).length,code:undefined,cleanupPrecondition:undefined}:current!);
+    if(settledDelivery(settled))await releaseDeliveryTarget(options,settled);
+}
 /** Frozen identities survive restart; unknown effects are observed rather than retried. */
 export function automaticDelivery(options:Options) {
     return {ready:async(boardId:string,item:KanbanItem)=>{
@@ -126,7 +135,16 @@ async function advance(options:Options,state:State) {
 export async function automaticDeliveryStatus(journal:KanbanAutomationJournal,board:string,item:string):Promise<NonNullable<KanbanItemOperations['automatic']>|undefined> {
     const state=await journal.get<State>(key(board,item));
     if(!state)return;
+    return deliveryStatus(state);
+}
+function deliveryStatus(state:State):NonNullable<KanbanItemOperations['automatic']> {
     const completed=settledDelivery(state),code=state.code??(state.done&&!completed?'AUTOMATIC_DELIVERY_INCOMPLETE':undefined);
     return {state:code?'blocked':completed?'completed':state.waitingForUser?'waiting-confirmation':'running',waitingForUser:state.waitingForUser,
         stage:actions(state)[state.step]??'completed',code,...(state.waitingForTarget?{waitingForTarget:true}:{})};
+}
+
+/** Read existing finalization facts in one snapshot without advancing work. */
+export async function automaticDeliveryStatuses(journal:KanbanAutomationJournal,targets:Array<{boardId:string;itemId:string}>){
+    const states=await journal.getMany<State>(targets.map(target=>key(target.boardId,target.itemId)));
+    return states.map(state=>state?deliveryStatus(state):undefined);
 }

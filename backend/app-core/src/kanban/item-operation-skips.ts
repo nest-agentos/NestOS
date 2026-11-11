@@ -12,34 +12,39 @@ export function operationDependencies(plan?:DeliveryPlan):Record<string,string[]
     const steps=operationSteps(plan?.steps);
     return Object.fromEntries(steps.map((id,index)=>[id,index?[steps[index-1]]:[]]));
 }
+/** Verification waivers do not waive the independent source submission. */
+export function operationSkipDependencies(plan?:DeliveryPlan):Record<string,string[]> {
+    const submission=new Set(['analyze','merge','cleanup']);
+    return Object.fromEntries(Object.entries(operationDependencies(plan)).map(([id,deps])=>
+        [id,deps.filter(dep=>submission.has(id)===submission.has(dep))]));
+}
 export function affectedOperations(graph:Record<string,string[]>,action:string):string[] {
     const affected=new Set([action]);let previous=0;
     while(previous!==affected.size){previous=affected.size;for(const [id,deps] of Object.entries(graph))if(deps.some(dep=>affected.has(dep)))affected.add(id);}
     return Object.keys(graph).filter(id=>affected.has(id));
 }
-/** Re-evaluate current consequences while keeping the stored waiver history immutable. */
+/** Only explicitly confirmed operations are waived, including historical policies. */
 export function effectiveOperationWaivers(waivers:KanbanOperationWaiver[],plan?:DeliveryPlan):KanbanOperationWaiver[] {
     const graph=operationDependencies(plan);
     return waivers.filter(row=>Object.hasOwn(graph,row.action)).map(row=>{
-        const affected=affectedOperations(graph,row.action);
-        return {...row,dependencies:graph,acceptanceWaived:row.acceptanceWaived&&affected.includes('accept'),operations:affected.map(id=>({
-            ...row.operations.find(op=>op.id===id),id,cause:id===row.action?'direct' as const:'dependency' as const,
-            previousState:row.operations.find(op=>op.id===id)?.previousState??'unavailable'}))};
+        const operations=row.operations.filter(op=>Object.hasOwn(graph,op.id));
+        return {...row,acceptanceWaived:row.acceptanceWaived&&operations.some(op=>op.id==='accept'),operations};
     });
 }
 
 export function projectOperationSkips(operations:KanbanItemOperation[],plan:DeliveryPlan|undefined,waivers:KanbanOperationWaiver[],eligible:boolean):KanbanItemOperation[] {
-    const graph=operationDependencies(plan);
+    const graph=operationDependencies(plan),skipGraph=operationSkipDependencies(plan);
     return operations.map(entry=>{
         const record=waivers.filter(row=>row.operations.some(op=>op.id===entry.id)).at(-1),row=record?.operations.find(op=>op.id===entry.id);
         if(record&&row&&entry.progress)return {...entry,enabled:false,hideRun:true,followUp:undefined,dependsOn:graph[entry.id],reason:t('kanban.operationWaiverWaitingStop')};
         if(record&&row)return {...entry,state:'skipped',reason:undefined,progress:undefined,enabled:false,hideRun:true,fields:undefined,confirmation:undefined,configurable:false,followUp:undefined,dependsOn:graph[entry.id],waiver:{id:record.id,cause:row.cause,action:record.action,reason:record.reason,actor:record.actor,at:record.at}};
-        const affected=affectedOperations(graph,entry.id),consumed=operations.some(op=>affected.includes(op.id)&&op.state==='succeeded');
+        const affected=affectedOperations(skipGraph,entry.id),consumed=operations.some(op=>affectedOperations(graph,entry.id).includes(op.id)&&op.state==='succeeded');
         return {...entry,...(waivers.some(row=>row.operations.some(op=>op.id==='deploy'))?{followUp:undefined}:{}),dependsOn:graph[entry.id],...(!eligible||consumed||entry.state==='succeeded'?{}:{skip:{affected:affected.map(id=>({id,label:operations.find(op=>op.id===id)?.label??t(('kanban.operationAction.'+id) as Parameters<typeof t>[0]),group:operationGroup(id)}))}})};
     });
 }
 interface Context {board:KanbanBoard;item:KanbanItem;jobs:ReviewJob[];deliveryPlan?:DeliveryPlan}
 export async function skipItemOperations(options:ReviewOperationsOptions,context:Context,request:KanbanItemOperationRequest,entries:KanbanItemOperation[]):Promise<void> {
+    const started=Date.now();
     const input=request.skip!,fingerprint=sha256HexSync(JSON.stringify([context.board.id,request])),key='review-skip:'+request.operationId;
     const saved=await options.journal.get<{fingerprint:string;errorCode?:string}>(key);requireValue(!saved||saved.fingerprint===fingerprint,'IDEMPOTENCY_CONFLICT');
     if(saved){requireValue(!saved.errorCode,saved.errorCode??'OPERATION_SKIP_FAILED');await applySkipIntent(options,key,context.board.id);return;}
@@ -50,11 +55,12 @@ export async function skipItemOperations(options:ReviewOperationsOptions,context
     requireValue(affected&&Array.isArray(input.affected)&&JSON.stringify([...input.affected].sort())===JSON.stringify([...affected].sort()),'OPERATION_SKIP_IMPACT_CHANGED');
     const workflow=await options.service.workflow(context.board.id),dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===context.item.id).sort((a,b)=>b.attempt-a.attempt)[0];
     requireValue(dispatch&&['succeeded','accepted'].includes(dispatch.outcome),'OPERATION_ACCEPTANCE_UNAVAILABLE');
-    const waiver={id:request.operationId,action:input.action,reason:input.reason.trim(),acceptanceWaived:affected.includes('accept'),dependencies:operationDependencies(context.deliveryPlan),
+    const waiver={id:request.operationId,action:input.action,reason:input.reason.trim(),acceptanceWaived:affected.includes('accept'),dependencies:operationSkipDependencies(context.deliveryPlan),
         operations:affected.map(id=>({id,cause:id===input.action?'direct' as const:'dependency' as const,previousState:entries.find(row=>row.id===id)?.state??'unavailable',...(entries.find(row=>row.id===id)?.runId?{previousRunId:entries.find(row=>row.id===id)!.runId}:{})}))};
     await options.journal.update<Array<{board:string;item:string}>>('review-operation-scopes',old=>old?.some(row=>row.board===context.board.id&&row.item===context.item.id)?old:[...old??[],{board:context.board.id,item:context.item.id}]);
     await options.journal.update<Array<{key:string;board:string}>>('review-skip-intents',old=>old?.some(row=>row.key===key)?old:[...old??[],{key,board:context.board.id}]);
     await options.journal.update(key,old=>old??{fingerprint,command:{type:'waive-operations',itemId:context.item.id,dispatchId:dispatch.id,expectedItemRevision:context.item.revision,waiver}});
+    options.log({operationId:request.operationId,stage:'operation.skip.intent',result:'success',durationMs:Date.now()-started});
     await applySkipIntent(options,key,context.board.id);
 }
 export async function applySkipIntent(options:ReviewOperationsOptions,key:string,board:string):Promise<void> {

@@ -11,7 +11,7 @@ import {validateRemoteReferences,REMOTE_PROJECT_REFERENCE,PRIMARY_PROJECT_REFERE
 import {requireValue} from './validation';
 import {decisionProjectScope} from './decision-project-scope';
 interface Link {recordId:string;state:'draft'|'confirmed';proposalDigest:string}
-interface Proposal {record:KanbanRecordInput;proposalDigest:string}
+interface Proposal {record:KanbanRecordInput;proposalDigest:string;lastActivityAt?:number}
 const proposalKey=(id:string)=>'decision-conversation-proposal:'+id;
 const linkKey=(id:string)=>'decision-conversation-record:'+id;
 
@@ -60,7 +60,7 @@ async function propose(options:DecisionConversationOptions,conversation:Decision
     const previous=await options.journal.get<Link>(linkKey(conversation.id));requireValue(!previous,'DECISION_ALREADY_CONFIRMED');
     requireValue([value.title,value.content,value.rationale].every(text=>typeof text==='string'&&text.trim().length>0),'DECISION_PROPOSAL_INVALID');
     const proposal={record,proposalDigest:channelDigest(record)};
-    await options.journal.update<Proposal>(proposalKey(conversation.id),old=>{requireValue(!old||old.record.id===value.id,'DECISION_ID_IMMUTABLE');return proposal;});
+    await options.journal.update<Proposal>(proposalKey(conversation.id),old=>{requireValue(!old||old.record.id===value.id,'DECISION_ID_IMMUTABLE');return {...proposal,lastActivityAt:old?.proposalDigest===proposal.proposalDigest?old.lastActivityAt:Date.now()};});
     return {state:'draft',...proposal,confirmation:(await conversationPolicy(options.fs)).confirmDecision};
 }
 async function confirm(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,previous?:Link) {

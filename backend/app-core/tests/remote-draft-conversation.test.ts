@@ -18,7 +18,7 @@ async function fixture(draftTitle?: string) {
         rename: vi.fn(async (_profile, _session, name) => ({session: {...session, title: name}})),
         eventSnapshot: vi.fn(async () => ({epoch: 'events', cursor: 0, gap: false, events: [], requests: []}))} as unknown as HarnessClient;
     const open = () => draftConversation(new HarnessConversation(draftHarness(client, recovery), profile, 'w', undefined, true,
-        remoteConversationJournal(recovery, 'epoch', true)), recovery, draftTitle);
+        {...remoteConversationJournal(recovery, 'epoch', true), instructions: undefined}), recovery, draftTitle);
     return {manager, recovery, client, open, fs, fault};
 }
 
@@ -99,6 +99,24 @@ it('does not promote or repeat an unknown turn until its receipt confirms commit
     } finally {await view.close(); await f.manager.dispose();}
 });
 
+it.each(['turn', 'command'] as const)('does not reject or replay an accepted %s when admission metadata is rejected', async operation => {
+    const f = await fixture(), view = f.open();
+    try {
+        await view.read();
+        const failure = Object.assign(new Error('HARNESS_QUEUE_OWNED_BY_CELLS'), {code: 'EIO', remoteCode: 'HARNESS_QUEUE_OWNED_BY_CELLS', outcome: 'not-committed'});
+        vi.spyOn(f.recovery, 'submitted').mockRejectedValueOnce(failure);
+        const send = operation === 'turn' ? view.send('Only once') : view.command!('verify');
+        await expect(send).rejects.toMatchObject({outcome: 'unknown', remoteCode: 'HARNESS_QUEUE_OWNED_BY_CELLS'});
+        expect(view.snapshot()).toMatchObject({pending: true, sessionId: undefined});
+        await expect(view.send('Only once')).rejects.toMatchObject({code: 'EBUSY'});
+        const turnId = operation === 'turn' ? 'turn' : 'command-turn';
+        vi.mocked(f.client.operation).mockImplementation(async (_profile, requestId) => ({requestId, outcome: 'committed', result: {turnId}}));
+        await view.reconcile();
+        expect(view.snapshot()).toMatchObject({pending: false, sessionId: 'native', submittedTurnId: turnId, draft: ''});
+        expect(f.client[operation]).toHaveBeenCalledOnce();
+    } finally {await view.close(); await f.manager.dispose();}
+});
+
 it('keeps an accepted turn distinct from an uncertain automatic title update', async () => {
     const f = await fixture(), view = f.open();
     try {
@@ -159,4 +177,48 @@ it('uses the custom draft title after the first native turn is accepted', async 
         await view.read(); await view.send('Keep the photo');
         expect(f.client.rename).toHaveBeenCalledWith('p', 'native', '手机照片记录', expect.anything());
     } finally {await view.close(); await f.manager.dispose();}
+});
+
+
+it('binds a directly created native session before its first Cells queue admission and reuses it on reopen', async () => {
+    const f = await fixture();
+    let body: string | null = null;
+    const queue = {owner: 'cells' as const, revision: 0, paused: false, items: [], receipts: []};
+    const remote = {read: vi.fn(async () => body),
+        compare: vi.fn(async (_key: string, before: string | null, after: string | null) => {if (body !== before) return false; body = after; return true;}),
+        registerSession: vi.fn(async () => true),
+        queueSession: vi.fn(async (sessionId: string, input: any) => {
+            expect(sessionId).toBe('native'); expect(JSON.parse(body!).sessionId).toBe('native');
+            return input.action === 'enqueue' ? {...queue, revision: 1, items: [input.item]} : queue;
+        })};
+    const open = () => new HarnessConversation(f.client, {id: 'p', kind: 'native', workspaces: [{id: 'w'}],
+        capabilities: {create: true, history: true, resume: true, interrupt: true, interactions: true}}, 'w', 'native', true,
+        remoteConversationJournal(new RemoteConversationStore(f.fs, 'direct', remote), 'epoch', false, () => {}, 'native'));
+    let view = open();
+    try {
+        await view.enqueue('Decision bootstrap', [], undefined, 'stable-input');
+        expect(remote.queueSession).toHaveBeenCalledWith('native', expect.objectContaining({action: 'enqueue', item: expect.objectContaining({id: 'stable-input'})}));
+        const saves = remote.compare.mock.calls.length;
+        await view.close(); view = open(); await view.read();
+        expect(remote.compare).toHaveBeenCalledTimes(saves); expect(f.client.create).not.toHaveBeenCalled();
+    } finally {await view.close(); await f.manager.dispose();}
+});
+
+it('refuses a mismatched native recovery identity without overwriting it', async () => {
+    const f = await fixture();
+    try {
+        await f.recovery.save({sessionId: 'other', draft: 'Keep draft'});
+        await expect(remoteConversationJournal(f.recovery, 'epoch', false, () => {}, 'native').load()).rejects.toMatchObject({code: 'ECONFLICT'});
+        expect(await f.recovery.load()).toMatchObject({sessionId: 'other', draft: 'Keep draft'});
+    } finally {await f.manager.dispose();}
+});
+
+it('does not enqueue when the initial native binding cannot be persisted', async () => {
+    const f = await fixture();
+    try {
+        const failure = Object.assign(new Error('Denied'), {code: 'EACCES'});
+        const remote = {read: vi.fn(async () => null), compare: vi.fn(async () => {throw failure;}), queueSession: vi.fn()};
+        const journal = remoteConversationJournal(new RemoteConversationStore(f.fs, 'denied', remote), 'epoch', false, () => {}, 'native');
+        await expect(journal.load()).rejects.toMatchObject({code: 'EACCES'}); expect(remote.queueSession).not.toHaveBeenCalled();
+    } finally {await f.manager.dispose();}
 });

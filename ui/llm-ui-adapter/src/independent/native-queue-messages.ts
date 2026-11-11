@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import type {ConversationInstructionQueue, ConversationSnapshot as NativeSnapshot} from '../contracts';
 import {getLocale, t} from '@nestos/common';
 import type {ChatMessage, ConversationSnapshot, OperationLedger} from '@nestos/llm-ui';
@@ -42,6 +43,6 @@ function queueSummary(item: ConversationInstructionQueue['items'][number]): stri
     if (item.error) return item.error === 'HARNESS_SESSION_BUSY' ? t('chat.submission.occupied') : item.error;
     const accepted = new Date(item.acceptedAt ?? NaN);
     if (Number.isFinite(accepted.getTime()) && accepted.getTime() > 0)
-        return `${t('session.instructions.acceptedAt')} · ${accepted.toLocaleString(getLocale(), {hour12: false})}`;
+        return `${t('session.instructions.acceptedAt')} · ${formatDateTime(accepted,getLocale(), {hour12: false})}`;
     return item.state === 'pending' ? t('session.instructions.hint') : '';
 }

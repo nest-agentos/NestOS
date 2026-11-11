@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {createModuleLogger, escapeHTML, getLocale, randomUUID, t} from '@nestos/common';
 import type {ICommandBus} from '@nestos/llm-session/contracts';
 import {FlowCommand, type FlowRunPreview, type FlowRunSummary} from '@nestos/llm-flow/contracts';
@@ -44,7 +45,7 @@ async function loadRuns(dialog: HTMLDialogElement, commands: ICommandBus, select
 
 function runCard(run: FlowRunSummary, index: number): string {
     const date = new Date(run.createdAt), valid = Number.isFinite(date.getTime());
-    const time = valid ? date.toLocaleString(getLocale(), {hour12: false}) : t('flow.runs.unknownTime');
+    const time = valid ? formatDateTime(date, getLocale(), {hour12: false}) : t('flow.runs.unknownTime');
     return `<article class="dag-run-list__item">
         <header class="dag-run-list__header"><h3><button type="button" class="dag-run-list__title" data-run-index="${index}" title="${escapeHTML(t('flow.runs.viewDetails'))}">${escapeHTML(runTitle(run))}</button></h3>
             <span class="dag-run-list__status" data-status="${escapeHTML(run.status)}">${escapeHTML(runStatus(run.status))}</span></header>

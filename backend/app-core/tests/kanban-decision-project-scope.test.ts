@@ -27,9 +27,11 @@ it('creates the discussion channel on the explicit primary with only its selecte
  const {manager}=await createVFS({rootBackend:new MemoryBackend()});
  try {
   const fs=await manager.openFileSystem('/'),close=vi.fn(async()=>{}),dispose=vi.fn(async()=>{});
+  const {KanbanAutomationJournal}=await import('@nestos/kanban/integration');
+  const journal=new KanbanAutomationJournal(fs);await journal.open();
   const projectHarness=vi.fn(async()=>({profiles:async()=>({epoch:'epoch',profiles:[{id:'codex',projectRuntime:true,capabilities:{create:true,sessionChannels:true,workingDirectory:true},workspaces:[{id:'unrelated'},{id:'p-two'}]}]}),close}));
   const sessionChannel=vi.fn(async(_project:string,_method:string,input:any)=>({projectContext:{projects:input.contextProjects.map((row:any)=>({...row,directory:'/projects/'+row.projectId}))}}));
-  const options={fs,journal:{get:async()=>undefined},projects:{get:async(id:string)=>({path:'/'+id,name:id,project:{id,source:{kind:'remote'}}}),openWorkspace:async()=>({fs,dispose})},remote:{...remote,projectHarness,sessionChannel},log:vi.fn()} as any;
+  const options={fs,journal,service:{read:async()=>({id:'board',settings:{}})},projects:{get:async(id:string)=>({path:'/'+id,name:id,project:{id,source:{kind:'remote'}}}),openWorkspace:async()=>({fs,dispose})},remote:{...remote,projectHarness,sessionChannel},log:vi.fn()} as any;
   const port=decisionConversationTransport(options,async()=>({})),resources=['one','two'].map(id=>({system:'nestos-remote-project',id}));
   expect(await port.prepare('conversation','board',resources,resources[1])).toMatchObject({projectId:'two',projectIds:['one','two'],workspaceId:'p-two'});
   expect(projectHarness).toHaveBeenCalledWith('two',{requireRegistered:true});

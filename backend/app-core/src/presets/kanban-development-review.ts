@@ -1,4 +1,5 @@
 import {reviewCancellation} from './kanban-review-cancellation';
+import {workProjectId} from '../kanban/task-projects';
 import {planningConversationControl} from './kanban-planning-control';
 import {cancellationKey,blocksOperation,type ReviewCancellation} from '../kanban/item-operation-cancellation';
 import {compatibleRuntimeDelivery} from './kanban-runtime-acceptance';
@@ -58,7 +59,7 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
             return async () => {stop?.(); await client.close();};});
         return record;
     };
-    const managed=managedServiceDeployment(options.serviceControl,async item=>{const project=item.externalRefs?.find(ref=>ref.system==='nestos-remote-project');requireValue(project,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(project.id)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
+    const managed=managedServiceDeployment(options.serviceControl,async item=>{const projectId=workProjectId(item);requireValue(projectId,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(projectId)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
     const cancel=options.cancelSubmission&&options.connections?reviewCancellation({journal:options.journal,submission:options.cancelSubmission,native:planningConversationControl({remote:options.remote,connections:options.connections},options.journal)}):undefined;
     return {managed,cancel,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
         acceptanceVersion:async(board,item,expectedVersion)=>{

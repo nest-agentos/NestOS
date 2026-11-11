@@ -43,7 +43,8 @@
     "@nestos/sync-adapters": "workspace:*",
     "@nestos/cells-driver": "workspace:*",
     "@nestos/app-contracts": "workspace:*",
-    "@nestos/image-tools": "workspace:*"
+    "@nestos/image-tools": "workspace:*",
+    "@nestos/ui-common": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.19.25",

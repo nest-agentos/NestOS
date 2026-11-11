@@ -180,7 +180,7 @@ it('whole-board cancellation freezes scheduling and cancels original tasks witho
     await f.api.cancelBoard!('b',{operationId:'cancel-board',expectedRevision:(await f.api.read('b')).revision});
     expect((await f.api.item('b','t')).item.control?.action).toBe('cancel');
     const {scanTaskControls}=await import('@nestos/kanban/integration');
-    await scanTaskControls(kanbanControlOptions({calls:{list:async()=>[{input:{request:{submission:{id:'original'}}},callerState:{settled:true},executionTree:{settled:true}}] as never}},f.journal),f.journal,await f.core.read('b'),f.core);
+    await scanTaskControls(kanbanControlOptions({calls:{list:async()=>[{receipt:{executionSessionId:'original'},input:{request:{submission:{id:'original'}}},callerState:{settled:true},executionTree:{settled:true}}] as never}},f.journal),f.journal,await f.core.read('b'),f.core);
     await f.api.scan();
     const board=await f.api.read('b');
     expect(board.lifecycle).toMatchObject({intent:'cancel',phase:'ready'});expect(board.deletedAt).toBeUndefined();

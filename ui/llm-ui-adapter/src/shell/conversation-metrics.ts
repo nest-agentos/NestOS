@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import type {ConversationSnapshot} from '../contracts';
 import {getLocale, t} from '@nestos/common';
 
@@ -13,7 +14,7 @@ export function conversationContext(snapshot: ConversationSnapshot): string {
 export function conversationMetrics(snapshot: ConversationSnapshot): Array<[string, string]> {
     const metrics = snapshot.metrics, budget = conversationBudget(snapshot);
     const rows: Array<[string, string]> = [[t('harness.metricsContext'), conversationContext(snapshot)], [budget.label, budget.detail]];
-    if (metrics) rows.push([t('harness.metricsFetched'), new Date(metrics.observedAt).toLocaleString(getLocale(), {hour12: false})]);
+    if (metrics) rows.push([t('harness.metricsFetched'), formatDateTime(new Date(metrics.observedAt), getLocale(), {hour12: false})]);
     const codes = [snapshot.metricsError?.code, ...Object.values(metrics?.errors ?? {})].filter(Boolean);
     if (codes.length) rows.push([t('harness.metricsTitle'), t('harness.metricsError', {code: codes.join(', ')})]);
     return rows;

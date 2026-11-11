@@ -10,6 +10,7 @@ export interface ExecutionJournalData {
     sessionId?: string; turnId?: string; operations: Record<string, NativeOperation>;
     cursor?: { after: number; eventEpoch: string }; texts: NativeText[]; notified: string[];
     terminal?: 'completed' | 'failed' | 'cancelled'; outputChecked?: boolean; result?: HarnessExecutionResult;
+    terminalCode?: string;
     bindingId?: string;
     bindingSettlement?: {ref: ContextBindingRef; kind: 'terminal' | 'not-started'; knownHeadRef?: string};
     forkSource?: ContextBinding['forkedFrom'];

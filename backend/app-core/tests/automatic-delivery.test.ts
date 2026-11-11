@@ -148,3 +148,12 @@ it('migrates the order of a frozen plan while preserving request identities and 
  expect(f.run).toHaveBeenCalledOnce();expect(f.options.cleanup).not.toHaveBeenCalled();
  expect(await f.journal.get(key)).toMatchObject({step:2,steps:['build','deploy','accept','analyze','merge','cleanup'],requests:{analyze:original}});
 });
+it('resumes automatic submission after an acceptance-only waiver without waiving merge or cleanup',async()=>{
+ const f=await fixture(),base=f.options.view;
+ f.options.view=async()=>{const view=await base();return {...view,skippedActions:['accept'],
+  operations:view.operations.map(row=>row.id==='accept'?{...row,state:'skipped',enabled:false}:row)};};
+ for(let n=0;n<14;n++)await automaticDelivery(f.options).scan();
+ expect(f.run.mock.calls.map(call=>call[1].action)).toEqual(['build','deploy','analyze','merge']);
+ expect(f.options.cleanup).toHaveBeenCalledOnce();expect(await automaticDelivery(f.options).ready('b',f.item as never)).toBe(true);
+ await automaticDelivery(f.options).scan();expect(f.run).toHaveBeenCalledTimes(4);
+});

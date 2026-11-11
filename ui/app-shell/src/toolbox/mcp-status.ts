@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import { ENTITY_ICONS, STATUS_META, escapeAttr, t } from '@nestos/common';
 import type { MCPConnectionState } from '@nestos/tools/mcp-contracts';
 
@@ -7,7 +8,7 @@ export function mcpStatusIcon(custom: Record<string, unknown>): string {
     const status = typeof raw === 'string' && Object.hasOwn(STATUS_META, raw) ? raw as MCPConnectionState['status'] : 'idle';
     const detail = [t(`mcp.state.${status}`), ...(state?.issues ?? []).map(issue =>
         `${t(`mcp.stage.${issue.stage}`)}: ${t(`mcp.failure.${issue.reason}`)}`)];
-    if (state?.checkedAt) detail.push(t('mcp.state.observedAt', {time: new Date(state.checkedAt).toLocaleString()}));
+    if (state?.checkedAt) detail.push(t('mcp.state.observedAt', {time: formatDateTime(new Date(state.checkedAt))}));
     const health = custom.mcpProjectHealth as {total: number; offline: number; unknown: number; degraded?: number} | undefined;
     if (health?.total) detail.push(t('diagnostics.mcpProjects', {total: health.total, offline: health.offline + (health.degraded ?? 0), unknown: health.unknown}));
     const visual = status === 'connected' && health?.total ? health.offline || health.degraded ? 'error' : health.unknown ? 'idle' : status : status;

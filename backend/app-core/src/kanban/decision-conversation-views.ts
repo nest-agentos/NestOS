@@ -9,15 +9,16 @@ export async function decisionConversationViews(options:DecisionConversationOpti
     const values=await options.journal.getMany<unknown>(rows.flatMap(row=>['decision-conversation-proposal:'+row.id,'decision-native:'+row.id,'record-conversation:'+row.id,decisionCancellationKey(row.id),conversationIssuesKey(row.id)]));
     const folders=new Map<string,ReturnType<DecisionConversationOptions['projects']['get']>>();
     return Promise.all(rows.map(async(row,index)=>{
-        const proposal=values[index*5] as {record?:{title?:string}}|undefined;
+        const proposal=values[index*5] as {record?:{title?:string};lastActivityAt?:number}|undefined;
         const native=values[index*5+1] as {sessionId?:string}|undefined;
-        const saved=values[index*5+2] as {binding?:DecisionConversationBinding}|undefined;
+        const saved=values[index*5+2] as {binding?:DecisionConversationBinding;lastActivityAt?:number}|undefined;
         const title=proposal?.record?.title,sessionId=row.sessionId??native?.sessionId,binding=saved?.binding;
         const cancellation=values[index*5+3] as DecisionCancellation|undefined;
         const state=cancellation?await cancellationView(options,cancellation):undefined;
         const reports=conversationIssueView(values[index*5+4] as ConversationIssueState|undefined);
         const recovered=row.state==='blocked'&&!reports.pendingReports.length?{state:row.recordId?'confirmed' as const:proposal?'draft' as const:'clarifying' as const,code:undefined}:{};
-        const view={...row,...(binding?.purpose==='coordination'?{purpose:'coordination' as const,recordId:binding.recordId}:{}),...recovered,...(reports.pendingReports.length&&!['cancelled','cancelling'].includes(row.state)?reports:{pendingReports:[]}),...state,...(title?{title}:{}),...(sessionId?{sessionId}:{})};
+        const lastActivityAt=Math.max(row.lastActivityAt??row.createdAt,saved?.lastActivityAt??0,proposal?.lastActivityAt??0,cancellation?.lastActivityAt??0);
+        const view={...row,lastActivityAt,...(binding?.purpose==='coordination'?{purpose:'coordination' as const,recordId:binding.recordId}:{}),...recovered,...(reports.pendingReports.length&&!['cancelled','cancelling'].includes(row.state)?reports:{pendingReports:[]}),...state,...(title?{title}:{}),...(sessionId?{sessionId}:{})};
         if(!sessionId||view.resourceId||!binding)return view;
         const started=Date.now();
         try {

@@ -6,10 +6,11 @@ import { executionError, type ExecutionJournalData, type NativeText } from './ha
 import { nativeOptions, type NativeExecution } from './harness-execution-operations';
 import { driveNativeInteractions } from './harness-execution-interactions';
 import {settleExecutionContext} from './harness-execution-context';
+import {nativeFailureCode,nativeTurnFailure} from './harness-turn-failure';
 
 type Terminal = ExecutionJournalData['terminal'];
 type Message = HarnessEvents['events'][number]['message'];
-type HistoryRow = { id?: string; status?: string; items?: unknown[]; threadId?: string };
+type HistoryRow = { id?: string; status?: string; items?: unknown[]; threadId?: string; error?:unknown };
 export function nativeTerminal(status: unknown): Terminal {
     if (status === 'completed' || status === 'failed' || status === 'cancelled') return status;
     if (status === 'interrupted') return 'cancelled';
@@ -32,19 +33,23 @@ function mergeTexts(first: NativeText[], second: NativeText[]): NativeText[] {
     return texts;
 }
 function eventChanges(data: ExecutionJournalData, page: HarnessEvents): Partial<ExecutionJournalData> {
-    let terminal = data.terminal, texts = data.texts;
+    let terminal = data.terminal, texts = data.texts, terminalCode=data.terminalCode;
     for (const { message } of page.events) {
         const params = message.params;
         if (disconnected(message, data.sessionId) && !terminal)
             throw executionError('NATIVE_DISCONNECTED');
         if (!params || params.threadId !== data.sessionId) continue;
-        terminal = eventTerminal(message, data.turnId) ?? terminal;
+        const observed=eventTerminal(message,data.turnId);
+        if(observed&&!terminal){
+            terminal=observed;
+            if(observed==='failed')terminalCode=nativeFailureCode((params.turn as {error?:unknown})?.error??params.error);
+        }
         if (message.method === 'item/completed') {
             const text = nativeText(params.item, data.turnId!, params.turnId as string | undefined);
             if (text) texts = mergeTexts(texts, [text]);
         }
     }
-    return { ...(terminal ? { terminal } : {}), texts, cursor: { after: page.cursor, eventEpoch: page.epoch } };
+    return { ...(terminal ? { terminal } : {}), ...(terminalCode?{terminalCode}:{}), texts, cursor: { after: page.cursor, eventEpoch: page.epoch } };
 }
 function disconnected(message: Message, sessionId?: string): boolean {
     return message.method === 'harness/disconnected' && (!message.params?.threadId || message.params.threadId === sessionId);
@@ -54,15 +59,16 @@ function eventTerminal(message: Message, turnId?: string): Terminal {
     if (message.method === 'turn/completed' && turn?.id === turnId) return nativeTerminal(turn?.status);
 }
 function historyChanges(data: ExecutionJournalData, history: HarnessHistory): Partial<ExecutionJournalData> {
-    let terminal = data.terminal;
+    let terminal = data.terminal,terminalCode=data.terminalCode;
     const texts: NativeText[] = [];
     for (const value of history.turns ?? []) {
         const turn = value as HistoryRow;
         if (turn.threadId !== undefined && turn.threadId !== data.sessionId) continue;
-        terminal = historyTerminal(turn, data.turnId) ?? terminal;
+        const observed=historyTerminal(turn,data.turnId);
+        if(observed&&!terminal){terminal=observed;if(observed==='failed')terminalCode=nativeFailureCode(turn.error);}
         texts.push(...historyRowTexts(turn, data.turnId!));
     }
-    return { ...(terminal ? { terminal } : {}), texts };
+    return { ...(terminal ? { terminal } : {}), ...(terminalCode?{terminalCode}:{}), texts };
 }
 function historyTerminal(turn: HistoryRow, turnId?: string): Terminal {
     if (turn.id === turnId && Array.isArray(turn.items)) return nativeTerminal(turn.status);
@@ -79,19 +85,19 @@ function historyRowTexts(turn: HistoryRow, turnId: string): NativeText[] {
 export async function refreshNativeHistory(run: NativeExecution): Promise<boolean> {
     const { client, profile } = run.acquired, data = run.journal.data;
     const cursors = new Set<string>();
-    let cursor: string | undefined, texts: NativeText[] = [], terminal = data.terminal, active = false;
+    let cursor: string | undefined, texts: NativeText[] = [], terminal = data.terminal, terminalCode=data.terminalCode, active = false;
     do {
         run.signal.throwIfAborted();
         const history = await client.read(profile.id, data.sessionId!, { ...nativeOptions(run), ...(cursor ? { cursor } : {}) });
         if (history.session.id !== data.sessionId) throw executionError('NATIVE_SESSION_MISMATCH');
         if (!cursor) active = history.session.activeTurnId === data.turnId;
         const update = historyChanges(data, history);
-        texts = mergeTexts(update.texts ?? [], texts); terminal = update.terminal ?? terminal;
+        texts = mergeTexts(update.texts ?? [], texts); terminal = terminal ?? update.terminal; terminalCode=terminalCode??update.terminalCode;
         cursor = history.nextCursor ?? undefined;
         trackHistoryCursor(cursor, cursors);
     } while (cursor);
     const known = new Set(texts.map(item => item.id));
-    await saveChanges(run, { ...(terminal ? { terminal } : {}), texts: mergeTexts(texts, data.texts.filter(item => !known.has(item.id))) });
+    await saveChanges(run, { ...(terminal ? { terminal } : {}), ...(terminalCode?{terminalCode}:{}), texts: mergeTexts(texts, data.texts.filter(item => !known.has(item.id))) });
     return active;
 }
 function trackHistoryCursor(cursor: string | undefined, cursors: Set<string>): void {
@@ -136,7 +142,8 @@ export async function finishNativeTurn(run: Pick<NativeExecution, 'journal'>): P
     if (data.result) return data.result;
     if (data.terminal === 'completed' && !data.outputChecked) throw executionError('NATIVE_OUTPUT_UNCHECKED');
     const contextBinding = data.terminal ? await settleExecutionContext(run.journal) : undefined;
-    if (data.terminal !== 'completed') throw executionError(data.terminal === 'cancelled' ? 'NATIVE_TURN_CANCELLED' : 'NATIVE_TURN_FAILED');
+    if (data.terminal !== 'completed') throw executionError(data.terminal === 'cancelled' ? 'NATIVE_TURN_CANCELLED'
+        : nativeTurnFailure(data.terminalCode)?data.terminalCode!:'NATIVE_TURN_FAILED');
     const result = { sessionId: data.sessionId!, turnId: data.turnId!, text: data.texts.map(item => item.text).join('\n'),
         ...(contextBinding ? {contextBinding} : {}) };
     await run.journal.save({ result });

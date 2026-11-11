@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 // @file: llm-ui/commands/BatchCommands.ts
 
 
@@ -65,7 +66,7 @@ export class BatchCopyCommand extends Command<{ ids: string[] }> {
                     text = extractExecutionOutput(s.executionRoot);
                 }
                 const role = s.role === 'user' ? 'User' : 'Assistant';
-                const time = new Date(s.timestamp).toLocaleString();
+                const time = formatDateTime(new Date(s.timestamp));
                 return `### ${role} (${time}):\n${text}`;
             })
             .filter(Boolean);

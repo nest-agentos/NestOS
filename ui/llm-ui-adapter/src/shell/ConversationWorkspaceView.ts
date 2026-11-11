@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {type EditorOptions} from '../contracts';
 import type {ConversationSnapshot} from '../contracts';
 import { ENTITY_ICONS, escapeHTML, getLocale, t } from '@nestos/common';
@@ -165,7 +166,7 @@ export class ConversationWorkspaceView {
     setSessionTimes(createdAt?: number | null, updatedAt?: number | null): void {
         this.container.querySelectorAll<HTMLInputElement>('#llm-title-input')[0]!.title = [[t('workbench.created'), createdAt], [t('workbench.modified'), updatedAt]]
             .filter(([, time]) => typeof time === 'number' && time > 0)
-            .map(([label, time]) => `${label}: ${new Date(time!).toLocaleString(getLocale())}`).join('\n');
+            .map(([label, time]) => `${label}: ${formatDateTime(new Date(time!), getLocale())}`).join('\n');
     }
     setHistoryProgress(count: number, hasEarlier: boolean, loading = false, error = ''): void {
         this.history.navigation.prompts.setEarlier(hasEarlier, loading || this.earlier.disabled, error);

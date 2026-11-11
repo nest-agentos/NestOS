@@ -1,3 +1,4 @@
+import {formatCalendarDate} from '@nestos/ui-common';
 /**
  * @file app-shell/src/browser/mention/FileMentionSource.ts
  */
@@ -59,7 +60,7 @@ export class FileMentionSource extends BaseMentionSource {
           .substring(0, 150)
           .replace(/[\r\n]+/g, ' ')
           .replace(/([#*`])/g, '') + (text.length > 150 ? '...' : '');
-      const date = new Date(node.modifiedAt).toLocaleDateString();
+      const date = formatCalendarDate(new Date(node.modifiedAt));
       const badge = node.viewId
         ? `<span style="background:#eee;padding:2px 4px;border-radius:3px;font-size:0.8em;margin-right:5px;">${node.viewId}</span>`
         : '';

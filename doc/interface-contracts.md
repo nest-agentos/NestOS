@@ -428,3 +428,6 @@ Cells `nodeOverview` 的 mounts 保留同一项目的每条子目录绑定，包
 
 
 Cells 授权确认：`CellsNodeOverview.authorizationRefresh` 为可选确认状态（available/blocked/unavailable/unchanged）。仅在收到授权变更错误后自动发现；available 携带短期 proposalId、服务器/principal、新旧 revision、有效期与关联项目 ID，不含认证秘密。`ProjectRemoteMountService.confirmAuthorizationRefresh` 在 transport 中声明为 async 写命令，确认时重新核验候选和当前节点，不能通过 query 自动覆盖连接或项目授权。
+
+
+时间点、时长与日历日期遵循 [统一时间语义](design/time-semantics.md)：NestOS/Cells 内部及 API 使用 UTC 时间点（Unix 毫秒或带 Z 的 ISO 文本），浏览器通过 ui-common 时间工具转换为本地并显示实际 UTC 偏移；本地表单在输入边界转回 UTC，日期与时长不按时间点转换。

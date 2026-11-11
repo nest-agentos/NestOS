@@ -46,7 +46,7 @@ function analysisInput(board:KanbanBoard,item:KanbanItem,target:TargetRef,id:str
 }
 async function inspectAnalysis(options:AnalysisOptions,id:string,input:IndependentCallInput,board:KanbanBoard,item:KanbanItem,service:KanbanService):Promise<KanbanAnalysisObservation> {
     const observed=await options.readAnalysisOutput?.(id);
-    if(observed?.state==='clarification'||observed?.state==='blocked')return observed;
+    if(observed&&observed.state!=='running'&&observed.state!=='succeeded')return observed;
     if(observed?.state==='succeeded')await validateDecisionSource(service,(await workContext(options.journal,board,item)).decision);
     const pending={state:'running' as const},admission=await options.calls.inspectTaskCallSubmission(input);
     if(!options.active())return pending;
@@ -58,5 +58,5 @@ async function inspectAnalysis(options:AnalysisOptions,id:string,input:Independe
     const result=record.exit?.output as TaskCallResult|undefined;
     if(record.exit?.status!=='succeeded'||result?.exit.status!=='succeeded')return {state:record.exit?.status==='cancelled'||result?.exit.status==='cancelled'?'cancelled':'failed',code:safeCode(result?.exit.error??record.exit?.error,'AUTOMATION_ANALYSIS_FAILED')};
     requireValue(options.readAnalysisOutput,'SESSION_CHANNEL_RESULT_UNAVAILABLE');
-    return observed??{state:'running'};
+    return observed??{state:'blocked',code:'PLANNING_RESULT_MISSING',reason:'PLANNING_RESULT_MISSING',handler:'self'};
 }

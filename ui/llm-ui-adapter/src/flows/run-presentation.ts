@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {getLocale, t} from '@nestos/common';
 import type {Run} from './session-output';
 
@@ -13,7 +14,7 @@ export function runTitle(run: Run): string {
     return name.length > 64 ? name.slice(0, 61) + '…' : name;
 }
 export function runIdentity(run: Run): string {
-    const date = run.createdAt ? new Date(run.createdAt).toLocaleString(getLocale(), {hour12: false}) : t('flow.runs.unknownTime');
+    const date = run.createdAt ? formatDateTime(new Date(run.createdAt), getLocale(), {hour12: false}) : t('flow.runs.unknownTime');
     return `${date} · #${run.taskId.slice(-8)}`;
 }
 export function runLabel(run: Run): string {return `${runTitle(run)} · ${runIdentity(run)} · ${runStatus(run.status)}`;}

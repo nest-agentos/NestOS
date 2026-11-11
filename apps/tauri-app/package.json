@@ -39,7 +39,8 @@
     "@nestos/llm-flow": "workspace:*",
     "@nestos/cells-driver": "workspace:*",
     "@nestos/app-contracts": "workspace:*",
-    "@nestos/image-tools": "workspace:*"
+    "@nestos/image-tools": "workspace:*",
+    "@nestos/ui-common": "workspace:*"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",

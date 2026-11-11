@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import { renderFlowIdentity } from '../history/FlowIdentity';
 // @file: llm-ui/components/templates/NodeTemplates.ts
 
@@ -11,34 +12,7 @@ export class NodeTemplates {
      * 格式化时间显示
      */
     private static formatTime(timestamp: number): string {
-        if (!timestamp) return '';
-        const date = new Date(timestamp);
-        const now = new Date();
-
-        const isToday =
-            date.getFullYear() === now.getFullYear() &&
-            date.getMonth() === now.getMonth() &&
-            date.getDate() === now.getDate();
-
-        const isSameYear = date.getFullYear() === now.getFullYear();
-
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        if (isToday) {
-            return timeStr;
-        }
-
-        if (isSameYear) {
-            const dateStr = date.toLocaleDateString([], { month: '2-digit', day: '2-digit' });
-            return `${dateStr} ${timeStr}`;
-        }
-
-        const dateStr = date.toLocaleDateString([], {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-        });
-        return `${dateStr} ${timeStr}`;
+        return timestamp ? formatDateTime(timestamp) : '';
     }
 
     private static renderBranchNav(

@@ -1,3 +1,4 @@
+import {getDisplayTimeZone,formatDateTime,formatCalendarDate,formatClockTime} from '@nestos/ui-common';
 import {escapeAttr, escapeHTML, getLocale, t} from '@nestos/common';
 import {dateKey, monthDays, onDay, type CalendarEvent, type CalendarSource} from './model';
 const esc = escapeHTML;
@@ -9,19 +10,19 @@ const color = (event: CalendarEvent, sources: CalendarSource[]) => hue(sources.f
 export function calendarSidebar(sources: CalendarSource[], disabled: Set<string>, showTitle = true): string {
     return `${showTitle ? `<h2>${esc(label('title'))}</h2>` : ''}<p>${esc(label('sourcesHelp'))}</p>
         <label>${esc(label('search'))}<input type="search" data-calendar-search></label>
-        <fieldset><legend>${esc(label('sources'))}</legend>${sources.map((source, index) => `<label class="calendar__source"><input type="checkbox" data-calendar-source="${escapeAttr(source.id)}"${disabled.has(source.id) ? '' : ' checked'}><span class="calendar__source-color" style="background:${hue(index)}"></span><span>${esc(source.name)}${source.archivedAt ? `<small>${esc(label('archivedAt'))}: ${esc(new Date(source.archivedAt).toLocaleString(getLocale()))}</small>` : ''}</span></label>`).join('') || `<p>${esc(label('noSources'))}</p>`}</fieldset>
+        <fieldset><legend>${esc(label('sources'))}</legend>${sources.map((source, index) => `<label class="calendar__source"><input type="checkbox" data-calendar-source="${escapeAttr(source.id)}"${disabled.has(source.id) ? '' : ' checked'}><span class="calendar__source-color" style="background:${hue(index)}"></span><span>${esc(source.name)}${source.archivedAt ? `<small>${esc(label('archivedAt'))}: ${esc(formatDateTime(new Date(source.archivedAt), getLocale()))}</small>` : ''}</span></label>`).join('') || `<p>${esc(label('noSources'))}</p>`}</fieldset>
         <button type="button" data-calendar-action="scanners">${esc(label('manageSources'))}</button>
         <p class="calendar__help">${esc(label('readOnly'))}</p>`;
 }
 export function calendarMain(month: Date, selected: string, events: CalendarEvent[], sources: CalendarSource[], detail?: CalendarEvent): string {
-    const heading = month.toLocaleDateString(getLocale(), {year: 'numeric', month: 'long'});
+    const heading = formatCalendarDate(month, getLocale(), {year: 'numeric', month: 'long'});
     const localeDay = new Date(2024, 0, 1);
-    const weekdays = Array.from({length: 7}, (_, i) => {const day = new Date(localeDay); day.setDate(day.getDate() + i); return day.toLocaleDateString(getLocale(), {weekday: 'short'});});
+    const weekdays = Array.from({length: 7}, (_, i) => {const day = new Date(localeDay); day.setDate(day.getDate() + i); return formatCalendarDate(day, getLocale(), {weekday: 'short'});});
     return `<header class="calendar__toolbar"><h2>${esc(heading)}</h2><div>${button('previous', 'previous')}${button('today', 'today')}${button('next', 'next')}${button('refresh', 'refresh')}</div></header>
-        <p class="calendar__help">${esc(label('timezone'))}: ${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)}</p>
+        <p class="calendar__help">${esc(label('timezone'))}: ${esc(getDisplayTimeZone())}</p>
         <div class="calendar__grid" aria-label="${esc(heading)}">${weekdays.map(day => `<div class="calendar__weekday">${esc(day)}</div>`).join('')}
         ${monthDays(month).map(day => dayCell(day, selected, month, events, sources)).join('')}</div>
-        <section class="calendar__agenda"><h3>${esc(new Date(selected + 'T12:00:00').toLocaleDateString(getLocale(), {dateStyle: 'full'}))}</h3>
+        <section class="calendar__agenda"><h3>${esc(formatCalendarDate(new Date(selected + 'T12:00:00'), getLocale(), {dateStyle: 'full'}))}</h3>
         ${events.filter(event => onDay(event, selected)).sort((a, b) => a.start.localeCompare(b.start)).map(event => eventRow(event, sources)).join('') || `<p>${esc(label('noEvents'))}</p>`}</section>
         ${detail ? eventDetail(detail) : ''}`;
 }
@@ -38,12 +39,12 @@ function eventRow(event: CalendarEvent, sources: CalendarSource[]): string {
 }
 function timeLabel(event: CalendarEvent): string {
     if (event.allDay) return label('allDay');
-    return new Date(event.start).toLocaleTimeString(getLocale(), {hour: '2-digit', minute: '2-digit'}) + ' – '
-        + new Date(event.end).toLocaleTimeString(getLocale(), {hour: '2-digit', minute: '2-digit'});
+    return formatClockTime(new Date(event.start), getLocale(), {hour: '2-digit', minute: '2-digit'}) + ' – '
+        + formatClockTime(new Date(event.end), getLocale(), {hour: '2-digit', minute: '2-digit'});
 }
 function eventDetail(event: CalendarEvent): string {
     const period = event.allDay ? `${event.start} → ${event.end} (${label('exclusiveEnd')})`
-        : `${new Date(event.start).toLocaleString(getLocale())} → ${new Date(event.end).toLocaleString(getLocale())}`;
+        : `${formatDateTime(new Date(event.start), getLocale())} → ${formatDateTime(new Date(event.end), getLocale())}`;
     return `<section class="calendar__detail" aria-label="${esc(label('details'))}"><header><h3>${esc(event.title || label('untitled'))}</h3>${button('close', 'close')}</header>
         <dl><dt>${esc(label('source'))}</dt><dd>${esc(event.sourceName)}</dd><dt>${esc(label('time'))}</dt><dd>${esc(period)}</dd>
         ${event.timeZone ? `<dt>${esc(label('originalTimezone'))}</dt><dd>${esc(event.timeZone)}</dd>` : ''}

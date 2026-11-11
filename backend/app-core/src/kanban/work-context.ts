@@ -7,7 +7,7 @@ export async function workContext(journal:KanbanAutomationJournal,board:KanbanBo
     const current=service&&context.decision?await service.record(context.decision.sourceBoardId,context.decision.recordId).catch(error=>{if((error as {code?:string}).code==='RECORD_NOT_FOUND')return undefined;throw error;}):undefined;
     const amendment=current&&context.decision&&current.revision>context.decision.recordRevision?current:undefined;
     const refs=(context.decision?.snapshot as {externalRefs?:import('@nestos/kanban/contracts').KanbanExternalReference[]}|undefined)?.externalRefs??[];
-    const primaryProjectId=refs.find(ref=>ref.system===PRIMARY_PROJECT_REFERENCE)?.id;
     const projectIds=refs.filter(ref=>ref.system===REMOTE_PROJECT_REFERENCE).map(ref=>ref.id);
+    const primaryProjectId=refs.find(ref=>ref.system===PRIMARY_PROJECT_REFERENCE)?.id??projectIds[0];
     return {...context,...(context.decision&&amendment?{decision:{...context.decision,amendment}}:{}),projects:resources,...(primaryProjectId?{primaryProjectId,secondaryProjectIds:projectIds.filter(id=>id!==primaryProjectId),projectIds}:{})};
 }

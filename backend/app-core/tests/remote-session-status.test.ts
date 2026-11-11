@@ -143,3 +143,25 @@ it('evicts idle projects at the cache limit and does not retain oversized projec
     expect(status.get('oversized', 'p', '0')).toBeUndefined();
     await status.dispose(); expect(vi.getTimerCount()).toBe(0);
 });
+
+it('shares bounded cold reads and leaves no subscriptions or background pollers',async()=>{
+ const {status,port,open}=fixture();vi.setSystemTime(100);
+ const subscribe=vi.spyOn(port,'subscribe');
+ await Promise.all([status.read('project'),status.read('project')]);
+ expect(open).toHaveBeenCalledOnce();expect(port.refresh).toHaveBeenCalledOnce();expect(port.close).toHaveBeenCalledOnce();
+ expect(subscribe).not.toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
+ expect(status.get('project','p','s')).toMatchObject({observedAt:100,stale:false});
+ await status.read('project');expect(open).toHaveBeenCalledOnce();
+ await vi.advanceTimersByTimeAsync(15001);expect(port.refresh).toHaveBeenCalledOnce();
+ await status.read('project');expect(open).toHaveBeenCalledTimes(2);expect(port.close).toHaveBeenCalledTimes(2);
+ await status.dispose();await status.read('project');expect(open).toHaveBeenCalledTimes(2);
+});
+it('releases a failed cold read and discards metadata after an authorization change',async()=>{
+ const {status,port,change}=fixture();vi.setSystemTime(100);
+ port.refresh.mockRejectedValueOnce(Object.assign(new Error('Private endpoint'),{code:'EACCES'}));
+ await expect(status.read('project')).rejects.toMatchObject({code:'EACCES'});expect(port.close).toHaveBeenCalledOnce();
+ const original=port.refresh.getMockImplementation()!;
+ port.refresh.mockImplementationOnce(async()=>{const rows=await original();change('different-scope');return rows;});
+ await status.read('project');expect(status.get('project','p','s')).toBeUndefined();
+ expect(port.close).toHaveBeenCalledTimes(2);expect(vi.getTimerCount()).toBe(0);await status.dispose();
+});

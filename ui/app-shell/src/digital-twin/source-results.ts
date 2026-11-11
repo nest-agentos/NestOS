@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import { twinError } from './error-view';
 import { escapeHTML, escapeAttr } from '@nestos/common';
 import type { DigitalTwinService } from '@nestos/app-contracts/services';
@@ -55,8 +56,8 @@ export function analysisStatusHTML(info: SourceInfo, now = Date.now()): string {
     const added = jobs.reduce((sum, job) => sum + (job.data.addedMemories ?? 0), 0);
     const result = run ? `<p>${run.data.completedSourceIds?.length ?? 0} / ${run.data.sourceIds?.length ?? 0} ${escapeHTML(label('analysisDocuments'))} · ${escapeHTML(label('analysisAddedResults'))}: ${added}</p>` : '';
     const previous = !run ? [...info.runs].sort((a, b) => b.data.createdAt - a.data.createdAt)[0] : undefined;
-    const last = previous ? `<p>${escapeHTML(label('analysisPreviousAttempt'))}: ${escapeHTML(label(`scanState.${previous.data.state}`))}${previous.data.finishedAt ? ` · ${escapeHTML(new Date(previous.data.finishedAt).toLocaleString())}` : ''}</p>` : '';
-    const next = info.included && !info.ignored && !info.settings.data.paused && info.nextScanAt > now ? `<p>${escapeHTML(label('analysisNextScan'))}: ${escapeHTML(new Date(info.nextScanAt).toLocaleString())}</p>` : '';
+    const last = previous ? `<p>${escapeHTML(label('analysisPreviousAttempt'))}: ${escapeHTML(label(`scanState.${previous.data.state}`))}${previous.data.finishedAt ? ` · ${escapeHTML(formatDateTime(new Date(previous.data.finishedAt)))}` : ''}</p>` : '';
+    const next = info.included && !info.ignored && !info.settings.data.paused && info.nextScanAt > now ? `<p>${escapeHTML(label('analysisNextScan'))}: ${escapeHTML(formatDateTime(new Date(info.nextScanAt)))}</p>` : '';
     const failureHelp = progress.key === 'analysisFailed' ? `<p>${escapeHTML(label('analysisFailureHelp'))}</p>` : '';
     const job = [...jobs].sort((a, b) => jobTime(b, info) - jobTime(a, info))[0];
     return `<strong>${escapeHTML(label(progress.key))}</strong>${progress.detail ? `<p>${escapeHTML(progress.detail)}</p>` : ''}
@@ -85,7 +86,7 @@ function jobHTML(job: SourceInfo['jobs'][number], info: SourceInfo): string {
 }
 function requestTimes(data: SourceInfo['jobs'][number]['data']): string {
     return (['requestStartedAt', 'responseReceivedAt', 'responseCompletedAt'] as const).filter(key => data[key]).map(key =>
-        `<p>${escapeHTML(label(`analysisTime.${key}`))}: <time datetime="${new Date(data[key]!).toISOString()}">${escapeHTML(new Date(data[key]!).toLocaleString())}</time></p>`).join('');
+        `<p>${escapeHTML(label(`analysisTime.${key}`))}: <time datetime="${new Date(data[key]!).toISOString()}">${escapeHTML(formatDateTime(new Date(data[key]!)))}</time></p>`).join('');
 }
 function jobTime(job: SourceInfo['jobs'][number], info: SourceInfo): number {
     return job.data.createdAt ?? info.runs.find(run => run.id === job.data.scanScope?.runId)?.data.createdAt ?? 0;
@@ -100,7 +101,7 @@ function jobTimes(data: SourceInfo['jobs'][number]['data'], info: SourceInfo): s
 function timeHTML(data: { createdAt?: number; startedAt?: number; finishedAt?: number }): string {
     const times = (['createdAt', 'startedAt', 'finishedAt'] as const).filter(key => data[key] !== undefined && data[key]! > 0).map(key => {
         const value = data[key]!;
-        return `<span>${escapeHTML(label(`analysisTime.${key}`))}: <time datetime="${new Date(value).toISOString()}">${escapeHTML(new Date(value).toLocaleString())}</time></span>`;
+        return `<span>${escapeHTML(label(`analysisTime.${key}`))}: <time datetime="${new Date(value).toISOString()}">${escapeHTML(formatDateTime(new Date(value)))}</time></span>`;
     });
     if (data.startedAt !== undefined && data.finishedAt !== undefined) {
         times.push(`<span>${escapeHTML(label('analysisDuration'))}: ${Math.max(0, (data.finishedAt - data.startedAt) / 1000).toFixed(1)} ${escapeHTML(label('seconds'))}</span>`);

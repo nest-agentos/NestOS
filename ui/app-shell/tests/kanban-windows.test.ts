@@ -233,3 +233,37 @@ it('opens the same execution and harness settings from the board menu and sideba
  expect(document.querySelector<HTMLSelectElement>('[name=setting-target]')!.value).toBe('codex');
  expect(document.querySelectorAll('dialog.kanban-sidebar-controls')).toHaveLength(1);
 });
+
+
+it('defaults the Kanban entry to decisions and keeps an explicit task board accessible', async () => {
+    const f = await fixture('/');
+    expect(f.workbench.getActiveResourceId()).toBe('/board/b/@decision');
+    expect(f.active().querySelector('.kanban__decision-table')).not.toBeNull();
+    expect(f.queries).not.toHaveBeenCalled();
+    await f.workbench.openResource('/board/b');
+    expect(f.active().querySelector('[data-context=board]')?.getAttribute('aria-current')).toBe('page');
+});
+
+it('keeps the catalog for multiple boards and opens its selection on decisions', async () => {
+    const seed = await fixture('/board/b');
+    await seed.service.create({id: 'second', title: 'Second', scope: {kind: 'system'}, members: [{kind: 'human', id: 'admin', responsibility: 'Work', roles: ['coordinator', 'worker']}]});
+    const f = await fixture('/', seed);
+    expect(f.workbench.getActiveResourceId()).toBe('/');
+    f.active().querySelector<HTMLButtonElement>('[data-board=b]')!.click();
+    await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('/board/b/@decision'));
+    await idle(f.active); expect(f.active().querySelector('.kanban__decision-table')).not.toBeNull();
+});
+
+it('rereads failed Session observations after HTTP reconnect and removes its recovery listener on close',async()=>{
+ const f=await fixture(),read=vi.spyOn(f.service,'executionSession');
+ read.mockRejectedValueOnce(Object.assign(new Error('Application connection interrupted'),{code:'HTTP_CONNECTION_LOST'}));
+ f.workbench.invalidateFromEvents();
+ await vi.waitFor(()=>expect(f.active().querySelector('[data-read-stage="ui.item.session"]')).not.toBeNull());
+ read.mockResolvedValue({current:{sessionId:'original',state:'completed',stale:false,recent:false,observedAt:Date.now()},history:[]} as never);
+ const before=read.mock.calls.length;window.dispatchEvent(new Event('nestos:http-reconnected'));
+ await vi.waitFor(()=>expect(read.mock.calls.length).toBeGreaterThan(before));
+ await vi.waitFor(()=>expect(f.active().querySelector('[data-read-stage="ui.item.session"]')).toBeNull());
+ expect(f.active().querySelector('[data-execution-state=completed]')?.getAttribute('data-stale')).toBe('false');
+ await f.workbench.destroy();const closed=read.mock.calls.length;window.dispatchEvent(new Event('nestos:http-reconnected'));
+ await Promise.resolve();expect(read.mock.calls.length).toBe(closed);
+});

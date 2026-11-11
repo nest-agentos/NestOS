@@ -25,6 +25,7 @@ async function setup(checkpointFork = false, attachmentKinds?: Array<'text' | 'i
     runtimes.push(runtime);
     const prompts: string[] = [], sessions: string[] = [], attachments: unknown[][] = [];
     const forks: Array<{source: string; checkpoint?: string}> = [];
+    const nativeTurns = new Map<string,string[]>();
     vi.spyOn(runtime.executionConnections, 'freeze').mockResolvedValue(connection);
     vi.spyOn(runtime.executionConnections, 'validate').mockResolvedValue();
     vi.spyOn(runtime.executionConnections, 'acquire').mockImplementation(async () => {
@@ -34,10 +35,17 @@ async function setup(checkpointFork = false, attachmentKinds?: Array<'text' | 'i
                 forks.push({source, checkpoint: options.lastTurnId}); id = `native-${sessions.length}`; sessions.push(id);
                 return {session: {id}, checkpoint: {sourceSessionId: source, turnId: options.lastTurnId, verified: true}};
             }} : {}),
-            turn: async (_profile: string, _session: string, prompt: string, options?: {attachments?: unknown[]}) => { attachments.push(structuredClone(options?.attachments ?? [])); prompts.push(prompt); await turnGate?.(); turn = `${id}-turn`; return { turnId: turn }; },
-            read: async () => ({ session: { id }, turns: [{ id: turn, status: 'completed', items: [
-                { id: `${turn}-text`, type: 'agentMessage', text: `RESULT:${id}` },
-            ] }] }),
+            turn: async (_profile: string, session: string, prompt: string, options?: {attachments?: unknown[]}) => {
+                id=session;attachments.push(structuredClone(options?.attachments ?? []));prompts.push(prompt);await turnGate?.();
+                const previous=nativeTurns.get(id)??[];
+                turn=previous.length?`${id}-turn-${previous.length+1}`:`${id}-turn`;nativeTurns.set(id,[...previous,turn]);
+                return {turnId:turn};
+            },
+            read: async (_profile:string,session:string) => {
+                id=session;turn=nativeTurns.get(id)?.at(-1)??turn;
+                return {session:{id,owned:true,resumable:true,status:'idle',writerLock:{status:'not-held'},lastTurnId:turn},
+                    turns:[{id:turn,status:'completed',items:[{id:`${turn}-text`,type:'agentMessage',text:`RESULT:${id}`}]}]};
+            },
             subscribe: () => () => {}, close: async () => {},
             eventSnapshot: async () => ({ epoch: 'events', cursor: 2, gap: false, requests: [], events: [
                 { seq: 1, message: { method: 'item/completed', params: { threadId: id, turnId: turn,
@@ -118,7 +126,7 @@ it('dispatches the next queued Harness instruction only after confirmed cleanup 
     }, {timeout: 10000});
     const saved = await (await f.runtime.kernel.kernel.inspectSession(sessionId)).getShared(CONTEXT_BINDINGS_KEY);
     const bindings = Object.values((saved!.value as any).bindings) as any[];
-    expect(bindings).toHaveLength(2); expect(bindings.every(binding => !binding.activeOperation && binding.checkpoints?.length === 1)).toBe(true);
+    expect(bindings).toHaveLength(1); expect(bindings[0].activeOperation).toBeUndefined();expect(bindings[0].checkpoints).toHaveLength(2);
     expect(f.prompts).toHaveLength(1); expect(f.prompts[0]).toContain('Next instruction'); expect(peer.interrupt).toHaveBeenCalledOnce();
 }, 20000);
 
@@ -188,21 +196,26 @@ it('executes an ordinary harness Agent through the real Program and broker witho
     expect((root.output as any).harness.contextBinding.bindingId).toBe(bindings[0].id);
 });
 
-it('keeps host-assembled context ownership explicit on subsequent conversation rounds', async () => {
+it('continues the confirmed native context with incremental input on subsequent conversation rounds', async () => {
     const f = await setup(), first = await send(f.runtime, 'remote-agent', 'First turn');
     await vi.waitFor(() => expect(f.runtime.sessionManager.isGenerating()).toBe(false));
     await f.runtime.commandBus.execute(SessionCommand.Send, {text: 'Second turn', files: [], agentId: 'remote-agent',
         sendIntent: {branch: {mode: 'continue'}, retention: {mode: 'persistent'}, execution: {kind: 'agent', agentId: 'remote-agent', mode: 'agent'}}});
     await vi.waitFor(async () => {
         const rounds = (await f.runtime.sessionRepository.readHistoryChain(first.id)).rounds;
-        expect(rounds).toHaveLength(2); expect(rounds[1].status).toBe('completed');
+        expect(rounds).toHaveLength(2); expect(rounds[1].status,rounds[1].error).toBe('completed');
     });
     const saved = await (await f.runtime.kernel.kernel.inspectSession(first.id)).getShared(CONTEXT_BINDINGS_KEY);
     const bindings = Object.values((saved!.value as any).bindings) as any[];
-    expect(bindings).toHaveLength(2); expect(new Set(bindings.map(binding => binding.id)).size).toBe(2);
-    expect(f.sessions).toEqual(['native-0', 'native-1']);
-    expect(f.prompts[1]).toContain('RESULT:native-0');
-    expect(bindings.every(binding => binding.initialContext.mode === 'host-assembled' && !binding.activeOperation)).toBe(true);
+    expect(bindings).toHaveLength(1);expect(bindings[0].checkpoints).toHaveLength(2);
+    expect(f.sessions).toEqual(['native-0']);
+    expect(f.prompts[1]).toContain('Second turn');expect(f.prompts[1]).not.toContain('RESULT:native-0');
+    expect(bindings[0]).toMatchObject({initialContext:{mode:'host-assembled'},nativeRef:{sessionId:'native-0'}});
+    expect(bindings[0].activeOperation).toBeUndefined();
+    const rounds=(await f.runtime.sessionRepository.readHistoryChain(first.id)).rounds;
+    expect(rounds[0].executions[0].invocation!.invocationId).not.toBe(rounds[1].executions[0].invocation!.invocationId);
+    const tasks=await f.runtime.kernel.kernel.listSessionTasks(first.id),continued=tasks.find(task=>task.id===rounds[1].executions[0].taskId)!;
+    expect(continued.input).toMatchObject({context:{conversation:{mode:'resume',bindingId:bindings[0].id},input:{mode:'native-continuation'}}});
 });
 
 it('queries the binding produced by an actual Harness Agent after the view is unbound without acquiring native execution', async () => {

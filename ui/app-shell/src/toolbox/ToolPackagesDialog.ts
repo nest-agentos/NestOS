@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {packageConfiguration, readPackageSettings} from './package-configuration';
 import {createModuleLogger, escapeHTML, randomUUID, t, type LocaleKey} from '@nestos/common';
 import type {ToolPackageInfo, ToolPackages, ToolRunRecord} from '@nestos/app-contracts/services';
@@ -367,7 +368,7 @@ function packageConnections(item: ToolPackageInfo, snapshot: SourceConnections):
 }
 function historyView(rows?: ToolRunRecord[]): string {
     if (!rows?.length) return `<p>${escapeHTML(t('toolbox.packages.noHistory'))}</p>`;
-    return `<ul>${rows.map(row => `<li>${escapeHTML(new Date(row.startedAt).toLocaleString())} · ${escapeHTML(row.toolId)} · ${escapeHTML(t(('toolbox.packages.run.' + row.status) as LocaleKey))} · ${row.durationMs ?? '—'} ms${collectionHistorySummary(row)}${row.code ? ' · ' + escapeHTML(row.code) : ''}</li>`).join('')}</ul>`;
+    return `<ul>${rows.map(row => `<li>${escapeHTML(formatDateTime(new Date(row.startedAt)))} · ${escapeHTML(row.toolId)} · ${escapeHTML(t(('toolbox.packages.run.' + row.status) as LocaleKey))} · ${row.durationMs ?? '—'} ms${collectionHistorySummary(row)}${row.code ? ' · ' + escapeHTML(row.code) : ''}</li>`).join('')}</ul>`;
 }
 
 function collectionHistorySummary(row: ToolRunRecord): string {

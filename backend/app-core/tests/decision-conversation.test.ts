@@ -163,3 +163,18 @@ it('allows explicit cancellation of a blocked decision draft without creating a 
  expect(await f.request('decision.cancel',{})).toMatchObject({state:'cancelled'});
  expect((await f.service.records('b')).total).toBe(0);
 });
+
+it('projects proposal activity from durable changes and keeps it stable across rereads and identical proposals',async()=>{
+ const {decisionConversationViews}=await import('../src/kanban/decision-conversation-views'),f=await fixture();
+ const time=vi.spyOn(Date,'now').mockReturnValue(10000);
+ const params={id:'draft',title:'Draft',content:'Scope',rationale:'Check',projectIds:['one'],verificationMode:'quick'};
+ const rows=[{...f.conversation,state:'clarifying',createdAt:1}];
+ try{
+  await f.request('decision.propose',params);
+  expect((await decisionConversationViews(f.options,rows))[0].lastActivityAt).toBe(10000);
+  time.mockReturnValue(20000);await f.request('decision.propose',params);
+  expect((await decisionConversationViews(f.options,rows))[0].lastActivityAt).toBe(10000);
+  await f.request('decision.propose',{...params,title:'Revised draft'});
+  expect((await decisionConversationViews(f.options,rows))[0].lastActivityAt).toBe(20000);
+ }finally{time.mockRestore();}
+});

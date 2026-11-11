@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import { escapeHTML, escapeAttr } from '@nestos/common';
 import type { TwinGraphNode } from '@nestos/app-contracts/services';
 import { label, select, type TwinSnapshot } from './view';
@@ -23,7 +24,7 @@ function entityDetails(snapshot: TwinSnapshot, selected: TwinGraphNode): string 
             return `<li>${escapeHTML(edge.from === selected.id ? nodeName(selected) : nodeName(other))} → ${escapeHTML(edge.predicate === 'context' ? label('relatedContext') : edge.predicate)} → ${escapeHTML(edge.to === selected.id ? nodeName(selected) : nodeName(other))}</li>`;
         }).join('')}</ul>
         <h4>${escapeHTML(label('timeline'))}</h4>${memories.sort((a, b) => b.data.recordedAt - a.data.recordedAt).map(memory => `<details><summary>${escapeHTML(memory.data.content)}</summary>
-            <p>${escapeHTML(memory.data.eventTime || new Date(memory.data.recordedAt).toLocaleString())}</p><blockquote>${escapeHTML(memory.data.quote || label('userStatement'))}</blockquote>
+            <p>${escapeHTML(memory.data.eventTime || formatDateTime(new Date(memory.data.recordedAt)))}</p><blockquote>${escapeHTML(memory.data.quote || label('userStatement'))}</blockquote>
             <p>${escapeHTML(snapshot.sources.find(source => source.id === memory.data.sourceId)?.data.label ?? '')}</p>
             <button type="button" data-action="openMemories" data-id="${escapeAttr(memory.id)}">${escapeHTML(label('correct'))}</button></details>`).join('')}
         ${mergeForm(snapshot, selected)}</article>`;

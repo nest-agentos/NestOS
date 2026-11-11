@@ -93,3 +93,14 @@ it('observes a claimed queue and accepts queue controls while its dispatch reply
     try {expect(source.refresh).toHaveBeenCalledTimes(2); expect(view.snapshot()).toMatchObject({canInterrupt: true});}
     finally {finish(); await vi.advanceTimersByTimeAsync(0);}
 });
+
+it('publishes queue admission and restored availability before a slow history refresh finishes',async()=>{
+ const {source,view,state,emit}=setup();const changed=vi.fn();const stop=view.subscribe(changed);
+ let finish!:(value:typeof state)=>void;source.refresh.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ const refreshing=view.refresh();await vi.waitFor(()=>expect(source.refresh).toHaveBeenCalledOnce());
+ Object.assign(state,{canSend:false,canQueue:true,active:true,instructionQueue:{revision:1,paused:false,acceptedIds:['queued-next'],items:[]}});
+ emit();expect(view.snapshot().canQueue).toBe(true);expect(view.snapshot().instructionQueue?.acceptedIds).toContain('queued-next');
+ expect(changed).toHaveBeenCalledOnce();expect(source.refresh).toHaveBeenCalledOnce();
+ Object.assign(state,{canSend:true,active:false});emit();expect(view.snapshot().canSend).toBe(true);
+ finish(state);await refreshing;stop();
+});

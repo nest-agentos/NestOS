@@ -1,4 +1,6 @@
 import {readManagedBranches,inspectManagedBranches,removeManagedBranches,type ManagedBranch} from './kanban-work-resource-branches';
+import {ignoreWorkResource,resolvedWorkResources} from './kanban-work-resource-resolution';
+import {settleWorkspaceFinalization} from '../kanban/automatic-delivery';
 import {boardWorkResources as readBoardResources,associatedWorkResourceIds} from './kanban-work-resource-catalog';
 import {inspectRemovalModules,removeLinkedModuleWorktrees} from '../projects/worktree-removal-modules';
 import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
@@ -38,7 +40,8 @@ export function developmentWorkResources(options: Options) {
             requireValue(query === undefined || !!query && typeof query === 'object' && !Array.isArray(query) && Object.keys(query).every(key => key === 'inspect'||key==='resourceId')
                 && (query.inspect === undefined || typeof query.inspect === 'boolean')&&(query.resourceId===undefined||typeof query.resourceId==='string'&&/^[\w-]{1,128}$/.test(query.resourceId)), 'INVALID_WORK_RESOURCE_QUERY');
             const rows = await (query?.inspect === false ? associations(options, boardId, itemId,query.resourceId) : list(options, boardId, itemId,query?.resourceId));
-            log.debug('work-resource.list', {operation: 'work-resource.list', operationId, stage, result: 'success', count: rows.length, durationMs: Date.now() - started}); return rows;
+            const projected=await resolvedWorkResources(options.journal,boardId,itemId,rows);
+            log.debug('work-resource.list', {operation: 'work-resource.list', operationId, stage, result: 'success', count: rows.length, durationMs: Date.now() - started}); return projected;
         } catch (error) {
             log.warn('work-resource.list', {operation: 'work-resource.list', operationId, stage, result: 'failure', code: safeCode(error), durationMs: Date.now() - started}); throw error;
         }
@@ -107,7 +110,7 @@ async function inspect(options: Options, boardId: string, resource: ResourceScop
     const {id, item, record, tree} = resource, saved = await options.journal.get<Cleanup>('worktree-cleanup:' + id);
     const context = record.context as {board?: {id?: string}; task?: {id?: string}} | undefined;
     const ownership = context?.board?.id && context?.task?.id ? context.board.id === boardId && context.task.id === item.id ? 'current' as const : 'other' as const : 'unknown' as const;
-    const base = {id,archivedAt:tree.archivedAt, ownership, kind: 'git-worktree', title: tree.branch, location: record.directory,
+    const base = {id,archivedAt:tree.archivedAt, ownership,...(context?.board?.id&&context.task?.id?{owner:{boardId:context.board.id,itemId:context.task.id}}:{}), kind: 'git-worktree', title: tree.branch, location: record.directory,
         properties: [{label: t('kanban.workResourceBranch'), value: tree.branch}, {label: t('kanban.workResourceProject'), value: (await options.projects.get(record.projectId)).name}]};
     if (saved) return {...base, properties: [...base.properties, ...(saved.archive ? [{label: t('kanban.workResourceArchive'), value: saved.archive}] : [])], version: saved.version, state: saved.phase === 'cleaned' ? 'cleaned' : 'unknown', canCleanup: false,
         reasons: saved.phase === 'cleaned' ? [] : ['WORKTREE_CLEANUP_UNCONFIRMED']};
@@ -128,6 +131,13 @@ async function inspect(options: Options, boardId: string, resource: ResourceScop
 async function cleanup(options: Options, boardId: string, request: KanbanWorkResourceCleanup): Promise<KanbanWorkResource> {
     const started = Date.now(), owner = randomUUID(), operationId = /^[\w-]{1,128}$/.test(request.operationId) ? request.operationId : owner; let stage = 'authorize', claimed = false;
     try {
+        if(request.resolution==='ignore'){
+            stage='ignore';await ignoreWorkResource(options,boardId,request,async()=>(await references(options,boardId,request.itemId,true)).some(ref=>ref.id===request.resourceId));
+            const resources=await resolvedWorkResources(options.journal,boardId,request.itemId,await associations(options,boardId,request.itemId));
+            await settleWorkspaceFinalization(options,boardId,request.itemId,resources);
+            return resources.find(row=>row.id===request.resourceId)!;
+        }
+        requireValue(request.resolution===undefined,'INVALID_WORK_RESOURCE_CLEANUP');
         requireValue(/^[\w-]{1,128}$/.test(request.operationId) && /^[a-f0-9]{64}$/.test(request.version), 'INVALID_WORK_RESOURCE_CLEANUP');
         const board = await options.service.read(boardId), actor = await options.service.currentPrincipal();
         requireValue(board.members?.some(row => row.kind === actor.kind && row.id === actor.id && row.roles?.includes('coordinator')), 'COORDINATOR_REQUIRED');

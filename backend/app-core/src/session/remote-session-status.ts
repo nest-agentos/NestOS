@@ -11,6 +11,8 @@ interface Watch {
 interface CachedStatus { identity: string; rows: HarnessStatusRow[]; fileVersion?: string; expiresAt: number }
 /** Ref-counted project observers. Identity includes configuration, server, grants and revision. */
 export class RemoteSessionStatus {
+    private closed = false;
+    private readonly reads = new Map<string,Promise<void>>();
     private readonly watches = new Map<string, Watch>();
     private readonly cached = new Map<string, CachedStatus>();
     constructor(private readonly identity: (projectId: string) => string | undefined,
@@ -49,6 +51,29 @@ export class RemoteSessionStatus {
         if (watch.work) { watch.refreshRequested = true; await watch.work; return; }
         watch.work ??= this.readStatus(projectId, watch).finally(() => { watch.work = undefined; });
         await watch.work;
+    }
+    /** Bounded cold metadata read; does not retain a subscription or a poller. */
+    read(projectId: string): Promise<void> {
+        if (this.closed) return Promise.resolve();
+        if (this.watches.has(projectId)) return this.refresh(projectId);
+        const cached = this.projection(projectId);
+        if (cached?.rows.length && cached.rows.every(row => !row.observation.stale && Date.now() - row.observation.observedAt < 15_000)) return Promise.resolve();
+        let work = this.reads.get(projectId);
+        if (!work) {
+            work = this.readCold(projectId).finally(() => {this.reads.delete(projectId);});
+            this.reads.set(projectId, work);
+        }
+        return work;
+    }
+    private async readCold(id: string): Promise<void> {
+        const identity = this.identity(id); if (!identity || this.closed) return;
+        const options = {timeoutMs: 5000}, port = await this.open(id, options);
+        try {
+            const rows = await port.refresh(options);
+            if (this.closed || identity !== this.identity(id) || this.watches.has(id)) return;
+            this.cached.set(id, {identity, rows, fileVersion: port.fileVersion?.(), expiresAt: Date.now() + 15_000});
+            this.trimCache();
+        } finally {await port.close();}
     }
     private schedule(id: string, watch: Watch, delay: number) {
         watch.timer = setTimeout(() => { watch.timer = undefined; watch.work = this.readStatus(id, watch).finally(() => { watch.work = undefined; }); }, delay);
@@ -109,8 +134,11 @@ export class RemoteSessionStatus {
         this.cached.delete(id);
         const rows = watch.rows.map(row => ({...row, observation: {...row.observation, stale: true, canInterrupt: false, canRespond: false}}));
         this.cached.set(id, { identity: watch.identity, rows, fileVersion: watch.fileVersion, expiresAt: Date.now() + 30_000 });
+        this.trimCache();
+    }
+    private trimCache(): void {
         while (this.cached.size > 64 || [...this.cached.values()].reduce((count, entry) => count + entry.rows.length, 0) > 4096)
             this.cached.delete(this.cached.keys().next().value!);
     }
-    async dispose() { await Promise.all([...this.watches].map(([id, watch]) => this.stop(id, watch))); this.cached.clear(); }
+    async dispose() { this.closed = true; await Promise.allSettled([...this.reads.values()]); await Promise.all([...this.watches].map(([id, watch]) => this.stop(id, watch))); this.cached.clear(); }
 }

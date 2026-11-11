@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import type {ConversationSnapshot} from '../contracts';
 import {getLocale, t} from '@nestos/common';
 
@@ -18,7 +19,7 @@ function windowText(row: Window): string {
     const label = windowLabel(row);
     const value = row.usedPercent == null ? label : t('harness.metricsQuotaValue', {window: label, used: count(row.usedPercent), remaining: count(Math.max(0, 100 - row.usedPercent))});
     const status = row.status ? t(`harness.metricsStatus.${row.status}`) : '';
-    const reset = row.resetsAt == null ? '' : t('harness.metricsReset', {time: new Date(row.resetsAt).toLocaleString(getLocale(), {hour12: false})});
+    const reset = row.resetsAt == null ? '' : t('harness.metricsReset', {time: formatDateTime(new Date(row.resetsAt), getLocale(), {hour12: false})});
     return [value, status, reset].filter(Boolean).join(' · ');
 }
 function quotaBudget(quota: NonNullable<NonNullable<ConversationSnapshot['metrics']>['quota']>): ConversationBudget | undefined {

@@ -1,3 +1,4 @@
+import {formatClockTime} from '@nestos/ui-common';
 /**
  * @file app-settings/editors/log/LogOverviewSection.ts
  * @description 日志缓冲区概览统计
@@ -34,7 +35,7 @@ export class LogOverviewSection {
 
         const formatTime = (ts: number | null) => {
             if (!ts) return '-';
-            return new Date(ts).toLocaleTimeString();
+            return formatClockTime(new Date(ts));
         };
 
         this.container.innerHTML = `

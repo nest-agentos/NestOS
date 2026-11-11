@@ -88,8 +88,9 @@ test('image-parser keeps VFS optional and outside the root and UI entries', () =
     assert.equal(importError(image, resolve(image.dir, 'src/vfs.ts'), '@nestos/vfs-core', packages), undefined);
 });
 
-test('standalone vfs-ui only depends on vfs-core internally', () => {
-    for (const name of ['common', 'ui-common', 'llm-common', 'mdxeditor'])
+test('standalone vfs-ui shares the UI foundation without importing host packages', () => {
+    assert.equal(dependencyError('@nestos/vfs-ui','@nestos/ui-common'),undefined);
+    for (const name of ['common', 'llm-common', 'mdxeditor'])
         assert.match(dependencyError(vfs.name, '@nestos/' + name), /public ports/);
     assert.equal(dependencyError(vfs.name, '@nestos/vfs-core'), undefined);
     assert.match(dependencyError(vfs.name, 'immer'), /public ports/);

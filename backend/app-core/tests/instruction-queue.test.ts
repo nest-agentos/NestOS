@@ -434,9 +434,11 @@ it('freezes newly referenced files during queue edits and preserves the prior re
         await vi.waitFor(() => expect(mock.requests).toHaveLength(1));
         const queued = await view.commandBus.execute<string>(SessionCommand.Send, message('Next instruction'));
         const before = view.sessionManager.getSnapshot().instructionQueue!;
+        const session=await runtime.kernel.kernel.inspectSession(id),stored=await session.getShared('conversation/instructions');
         await expect(view.commandBus.execute(SessionCommand.EditInstructionQueue, {expectedRevision: before.revision,
             action: 'update', id: queued, text: '[missing](@asset/missing.txt)'})).rejects.toMatchObject({code: 'ATTACHMENT_NOT_FOUND'});
-        expect(view.sessionManager.getSnapshot().instructionQueue).toEqual(before);
+        expect(await session.getShared('conversation/instructions')).toEqual(stored);
+        expect(view.sessionManager.getSnapshot().instructionQueue?.revision).toBe(before.revision);
         await runtime.sessionRepository.writeAttachment(id, 'added.txt', new TextEncoder().encode('added-material').buffer);
         await view.commandBus.execute(SessionCommand.EditInstructionQueue, {expectedRevision: before.revision,
             action: 'update', id: queued, text: 'Read [file](@asset/added.txt)'});

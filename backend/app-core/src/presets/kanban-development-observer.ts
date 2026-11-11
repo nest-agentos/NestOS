@@ -1,3 +1,4 @@
+import {currentNativeSessionReader} from '../kanban/native-session-observer';
 import {nativeSessionActivity} from '../kanban/native-session-activity';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {consumeChannelMessages} from '../run/channel-messages';
@@ -20,12 +21,14 @@ type Input = Parameters<NonNullable<PersonalKanbanAutomationOptions['observeWork
 interface Options {exchange?: ReturnType<typeof import('./kanban-channel-exchange').developmentWorkExchange>;
     verifyDelivery?(dispatchId: string): Promise<void>;
     lifecycle?: Pick<ReturnType<typeof import('./kanban-development-lifecycle').developmentLifecycle>, 'enqueue' | 'scan' | 'dispose' | 'settled'>;
-    kernel: ContextInspector; fs: IFileSystem; events: UserEventService; projects: Pick<ProjectService, 'get' | 'openWorkspace'>;
-    remote?: Pick<import('../projects/remote-mounts').ProjectRemoteMountService, 'projectHarness' | 'sessionChannel'>; wake(): void}
+    kernel: ContextInspector; fs: IFileSystem; events: UserEventService; projects: Pick<ProjectService, 'get' | 'openWorkspace'> & Partial<Pick<ProjectService,'forFolder'>>;
+    remote?: Pick<import('../projects/remote-mounts').ProjectRemoteMountService, 'projectHarness' | 'sessionChannel'> & Partial<Pick<import('../projects/remote-mounts').ProjectRemoteMountService,'sessionStatus'>>; wake(): void}
 
 export function developmentObserver(options: Options) {
     const journal = new KanbanAutomationJournal(options.fs, kanbanJournalOptions);
     const watches = new DirectorySubscriptions(),nativeActivity=nativeSessionActivity(journal); let stopped = false;
+    const sessionObservation=options.remote?.sessionStatus&&options.projects.forFolder?currentNativeSessionReader({cached:nativeActivity.read,
+        status:options.remote.sessionStatus,projects:{forFolder:options.projects.forFolder.bind(options.projects)}}):nativeActivity.read;
     const observe: NonNullable<PersonalKanbanAutomationOptions['observeWork']> = async input => {
         if (stopped) return input.observation;
         const worktree = await journal.get<PreparedWorktree>('worktree:' + input.dispatch.id);
@@ -101,7 +104,7 @@ export function developmentObserver(options: Options) {
             await close(input.dispatch.id); return {...input.observation,outputs};
     };
     async function close(id:string){await watches.close(id);}
-    return {observe,sessionObservation:nativeActivity.read, scan: () => options.lifecycle?.scan(), async quiesce() {stopped = true; await options.lifecycle?.dispose();}, async dispose() {stopped = true; await options.lifecycle?.dispose(); await watches.dispose();nativeActivity.clear();}};
+    return {observe,sessionObservation:(...args:Parameters<typeof sessionObservation>)=>stopped?nativeActivity.read(...args):sessionObservation(...args), scan: () => options.lifecycle?.scan(), async quiesce() {stopped = true; await options.lifecycle?.dispose();}, async dispose() {stopped = true; await options.lifecycle?.dispose(); await watches.dispose();nativeActivity.clear();}};
 }
 
 async function linkResult(options: Options, journal: KanbanAutomationJournal, input: Input, projectId: string): Promise<void> {

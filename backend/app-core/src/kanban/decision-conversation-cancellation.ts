@@ -7,7 +7,7 @@ import {conversationPolicy} from './conversation-policy';
 import {requireValue} from './validation';
 import {advanceRecordCancellation,safeCode} from '@nestos/kanban/integration';
 
-export interface DecisionCancellation {boardId:string;recordId?:string;operationId:string;code?:string;state:'cancelling'|'cancelled'}
+export interface DecisionCancellation {boardId:string;recordId?:string;operationId:string;code?:string;lastActivityAt?:number;state:'cancelling'|'cancelled'}
 export const decisionCancellationKey=(id:string)=>'decision-conversation-cancellation:'+id;
 
 /** Cancellation retains the Session and can only control the decision bound by the host. */
@@ -20,18 +20,18 @@ export async function cancelDecisionConversation(options:DecisionConversationOpt
             await requireUserConfirmation(options,conversation,request,(await conversationPolicy(options.fs)).cancelDecision,'DECISION_CANCEL_CONFIRMATION_REQUIRED');
             const recordId=await cancellationTarget(options,conversation,link);
             const operationId='decision-cancel-'+channelDigest({conversationId:conversation.id,requestId:request.id});
-            intent=await options.journal.update<DecisionCancellation>(key,old=>old??{boardId:conversation.boardId,recordId,operationId,state:recordId?'cancelling':'cancelled'});
+            intent=await options.journal.update<DecisionCancellation>(key,old=>old??{boardId:conversation.boardId,recordId,operationId,lastActivityAt:Date.now(),state:recordId?'cancelling':'cancelled'});
         }
         requireValue(options.active?.()!==false,'SERVICE_STOPPING');
         await advanceCancellation(options,intent);
         const state=await cancellationView(options,{...intent,code:undefined});
-        await options.journal.update<DecisionCancellation>(key,old=>({...old!,state:state.state as DecisionCancellation['state'],code:undefined}));
+        await options.journal.update<DecisionCancellation>(key,old=>({...old!,state:state.state as DecisionCancellation['state'],code:undefined,lastActivityAt:old?.state===state.state&&old.code===undefined?old.lastActivityAt:Date.now()}));
         options.log({operationId:intent.operationId,boardId:conversation.boardId,stage:'decision.cancel.'+state.state,result:'success',durationMs:Date.now()-started});
         return {...state,sessionId:conversation.sessionId,resourceId:conversation.resourceId,retainedSession:true,nextAction:state.state==='cancelled'?'none':'wait-for-settlement'};
     }catch(error){
         const code=safeCode(error,'DECISION_CANCEL_FAILED');
         options.log({operationId:intent?.operationId??request.id,boardId:conversation.boardId,stage:'decision.cancel',result:'failure',code,durationMs:Date.now()-started});
-        if(intent)await options.journal.update<DecisionCancellation>(key,old=>({...old!,code}));throw error;
+        if(intent)await options.journal.update<DecisionCancellation>(key,old=>({...old!,code,lastActivityAt:old?.code===code?old.lastActivityAt:Date.now()}));throw error;
     }
 }
 

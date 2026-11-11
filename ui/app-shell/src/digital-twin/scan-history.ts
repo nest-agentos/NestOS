@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {escapeAttr, escapeHTML, t} from '@nestos/common';
 import {collectionDestinationSummary} from './collection-destination';
 import {twinError} from './error-view';
@@ -14,7 +15,7 @@ export function scanCollectionSummary(run: Run['data']): string {
     return batch + `<p>${escapeHTML(t('twin.collectionProcessed', {count: progress.processed}))}</p>`;
 }
 export function scanRunTiming(run: Run['data']): string {
-    const time = new Date(run.startedAt || run.createdAt).toLocaleString();
+    const time = formatDateTime(new Date(run.startedAt || run.createdAt));
     const duration = run.startedAt > 0 && run.finishedAt >= run.startedAt
         ? ' · ' + t('twin.scannerRunDuration', {count: run.finishedAt - run.startedAt}) : '';
     return escapeHTML(time + ' · ' + scanRunState(run) + duration);

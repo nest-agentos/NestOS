@@ -1,3 +1,4 @@
+import {formatClockTime} from '@nestos/ui-common';
 /**
  * @file app-settings/editors/log/LogViewerSection.ts
  * @description 日志查看器 - 支持过滤、搜索、实时刷新
@@ -151,7 +152,7 @@ export class LogViewerSection {
         return sortedLogs.map(log => {
             const levelClass = this.getLevelClass(log.level);
             const levelName = LogLevelNames[log.level] || 'UNKNOWN';
-            const time = new Date(log.timestamp).toLocaleTimeString();
+            const time = formatClockTime(new Date(log.timestamp));
             const dataStr = log.data ? ` | ${JSON.stringify(log.data)}` : '';
 
             return `

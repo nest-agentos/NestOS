@@ -231,3 +231,21 @@ CLI 与浏览器复用该端口，无需恢复 UI 视图。CLI 不自动生成�
 Cells 在调用原生协议前保存领取及原 requestId/epoch，接纳后持久保存精确 turn/command 身份。关闭浏览器和 NestOS 不终止 Cells 队列；Cells 自己等待真实终态、派发后续项，并在启动时重新验证项目授权和未结算执行。旧 epoch 未确认的领取只能核对，不自动重发。具备精确重启证据时，旧轮保存为 unknown，保留原暂停策略；证据不完整则保留屏障。
 
 NestOS 不再为 Cells-owned 队列保留后台 Conversation 租约或队列恢复扫描责任。看板、Flow、跨项目业务计划仍属于 NestOS；Cells 只拥有原生执行与队列状态。Rust 纯转换模块与 SQLite、进程核查、事件订阅分开，TypeScript SDK 负责协议及展示投影，不通过 Node 原生扩展在另一进程运行第二份远端状态机。
+
+## 原生会话的状态与输入接纳
+
+Session 不使用一个全局 `error/busy` 状态控制全部操作，而按相互独立的事实派生能力：
+
+| 维度 | 事实 | 约束 |
+| --- | --- | --- |
+| 生命周期 | 已加载、关闭、删除、归档、分支切换、写权限 | 决定是否允许修改该 Session |
+| 执行观察 | idle、running、waiting-approval、waiting-input、unknown；观察新鲜度 | 决定何时启动原生轮次、补充上下文或处理交互 |
+| 指令接纳 | 原 operationId 的 pending、accepted、rejected 或未知证据 | 决定是否释放本次发送等待、是否需要核对；accepted 不表示执行完成 |
+| 队列 | 持久接纳、待派发、运行、暂停、待恢复 | 接纳与派发分离；执行繁忙或待人工处理不必阻止下一条指令入队 |
+| 任务问题 | 业务诊断、负责人、处理结果 | 不覆盖 Session 的执行与输入能力；会话指导不自动清除任务问题 |
+
+驱动通过 `libraries/cells-driver/src/harness/conversation-policy.ts` 的纯函数统一派生能力，`canSend/canQueue/canSteer` 是兼容投影，不作为独立可写状态。队列接纳不依赖当前原生轮次完成；原生派发仍要求新鲜观察、授权及提交/控制屏障通过。
+
+界面通过 `ui/llm-ui-adapter/src/independent/native-input-policy.ts` 统一输入可用性、发送模式和路由。可用且模型选择兼容的精确 turn 优先补充上下文，否则优先持久队列，再回退直接发送。空闲时队列路由可显示“发送”，执行中显示“排队”；文案与传输方式分别派生，避免文案反向控制派发。旧版界面也复用此策略。
+
+`awaitNativeAdmission` 只凭同一 operationId 的持久接纳证据结束界面等待，无需等原 RPC 或执行完成；其他 operationId、正文或普通结束事件不能替代回执。宿主立即发布本地快照，再异步补齐历史；驱动在解除本地 busy 后通知订阅者。结果未知保留核对屏障，不自动重放。日志记录能力、提交身份、阶段、耗时和错误码，不记录输入正文。

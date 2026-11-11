@@ -59,9 +59,9 @@ it('deduplicates concurrent runs and preserves remote bindings across reopening'
     const [first, second] = await Promise.all([execution.runRecord('source', request), execution.runRecord('source', {...request, operationId: 'double-click'})]);
     expect(first.id).toBe(second.id);
     const board = await f.service.read(first.boardId);
-    expect(first.boardId).toBe('source'); expect(board.items).toHaveLength(2); expect(board.automation).toMatchObject({enabled: true, autoAccept: false});
-    expect(board.items.filter(item => first.itemIds!.includes(item.id)).map(item => item.externalRefs![0].id)).toEqual(['one', 'two']);
-    expect(board.items.filter(item => item.planning?.parentId === first.rootItemId)).toHaveLength(2);
+    expect(first.boardId).toBe('source'); expect(board.items).toHaveLength(1); expect(board.automation).toMatchObject({enabled: true, autoAccept: false});
+    expect(board.items.filter(item => first.itemIds!.includes(item.id)).flatMap(item => item.externalRefs!.filter(ref=>ref.system==='nestos-remote-project').map(ref=>ref.id))).toEqual(['one', 'two']);
+    expect(first.rootItemId).toBe(first.itemIds![0]); expect(board.items.filter(item => item.planning?.parentId === first.rootItemId)).toHaveLength(0);
     await f.open().scan(); expect(await f.open().runRecord('source', request)).toMatchObject({id: first.id, boardId: first.boardId});
     expect((await f.service.catalog()).filter(board => board.scope.kind === 'collection')).toHaveLength(0);
     expect((await f.service.record('source', 'decision')).status).toBe('confirmed');
@@ -80,7 +80,7 @@ it('recovers a committed creation when the response is lost without creating dup
     const request = {operationId: 'run', recordId: 'decision', expectedRevision: 2};
     await expect(f.open().runRecord('source', request)).rejects.toMatchObject({code: 'EIO'});
     const run = await f.open().runRecord('source', request);
-    expect((await f.service.read(run.boardId)).items).toHaveLength(2);
+    expect((await f.service.read(run.boardId)).items).toHaveLength(1);
     expect(JSON.stringify(f.log.mock.calls)).not.toContain('PRIVATE_REPLY');
 });
 
@@ -91,7 +91,7 @@ it('keeps one run after linking the decision advances its revision and does not 
     const request = {operationId: 'again', recordId: 'decision', expectedRevision: decision.revision};
     expect((await f.open().runRecord('source', request)).id).toBe(first.id);
     expect((await f.open().runRecord('source', request)).id).toBe(first.id);
-    expect((await f.service.read('source')).items).toHaveLength(2);
+    expect((await f.service.read('source')).items).toHaveLength(1);
     await expect(f.open().runRecord('source', {...request, operationId: 'separate', placement: 'new-board'})).rejects.toMatchObject({code: 'DECISION_EXECUTION_PLACEMENT_CONFLICT'});
 });
 it('requires explicitly resuming paused AI and only creates a board when selected', async () => {
@@ -120,12 +120,22 @@ it('creates a single task for one project and derives completion only from its o
     await expect(f.open().runRecord('source',{operationId:'after-completed',recordId:'small',expectedRevision:completed.revision})).rejects.toMatchObject({code:'DECISION_EXECUTION_COMPLETED'});
     expect((await f.service.read('source')).items.find(item => item.id === 'unrelated')?.blocked).toBeDefined();
 });
-it('completes the decision after each project coordination task finishes its execution children',async()=>{
+it('creates one coordination group for all projects and settles the decision from that group',async()=>{
  const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
  const run=await f.open().runRecord('source',{operationId:'projects',recordId:'decision',expectedRevision:2});
- expect(run.rootItemId).toBeUndefined();expect(run.itemIds).toHaveLength(2);
- await completeCoordination(f,run.itemIds![0]);await f.open().scan();expect((await f.open().recordExecutions('source','decision'))[0].state).not.toBe('completed');
- await completeCoordination(f,run.itemIds![1]);await f.open().scan();expect((await f.open().recordExecutions('source','decision'))[0].state).toBe('completed');
+ expect(run.rootItemId).toBe(run.itemIds![0]);expect(run.itemIds).toHaveLength(1);
+ expect((await f.service.item('source',run.rootItemId!)).item.externalRefs).toEqual(expect.arrayContaining(['one','two'].map(id=>({system:'nestos-remote-project',id}))));
+ const children=['one','two'].map(project=>({id:'execute-'+project,project}));
+ for(const child of children)await f.command({type:'create-item',item:{id:child.id,title:child.project,responsibility:'Implement',acceptance:'Verified',externalRefs:[{system:'nestos-remote-project',id:child.project}]},planning:{kind:'task',parentId:run.rootItemId!,priority:2,dependencies:[],references:[]}});
+ await f.command({type:'finish-planning',itemId:run.rootItemId!});
+ for(const child of children){
+  await f.command({type:'set-stage',itemId:child.id,stage:'open'});
+  const claimed=await f.command({type:'claim',itemId:child.id});await f.command({type:'submit',itemId:child.id,token:claimed.items.find(item=>item.id===child.id)!.owner!.token,resultRef:'verified'});
+  await f.command({type:'review',itemId:child.id,accept:true});await f.open().scan();
+  expect((await f.open().recordExecutions('source','decision'))[0].state).not.toBe('completed');
+ }
+ await f.command({type:'close-plan',itemId:run.rootItemId!,resultRef:'children-verified'});
+ await f.open().scan();expect((await f.open().recordExecutions('source','decision'))[0].state).toBe('completed');
  expect((await f.service.record('source','decision')).status).toBe('confirmed');
 });
 
@@ -148,7 +158,7 @@ it('marks only the affected decision run failed when a task is cancelled', async
     const run = await f.open().runRecord('source', {operationId: 'cancelled', recordId: 'decision', expectedRevision: 2});
     await f.command({type: 'cancel-item', itemId: run.itemIds![0], reason: 'User choice'}); await f.open().scan();
     expect((await f.open().recordExecutions('source', 'decision'))[0]).toMatchObject({state: 'failed', code: 'DECISION_TASK_CANCELLED'});
-    expect((await f.service.item('source', run.itemIds![1])).item.status).toBe('backlog');
+    expect((await f.service.read('source')).items).toHaveLength(1);
 });
 
 it('uses configured work type ranks instead of requiring feature/task identifiers', async () => {
@@ -156,16 +166,16 @@ it('uses configured work type ranks instead of requiring feature/task identifier
     await f.command({type: 'review-record', recordId: 'decision', accept: true});
     const run = await f.open().runRecord('source', {operationId: 'custom', recordId: 'decision', expectedRevision: 2, placement: 'new-board'});
     const board = await f.service.read(run.boardId);
-    expect(run.rootItemId).toBeUndefined();
+    expect(run.rootItemId).toBe(run.itemIds![0]);
     expect(board.items.filter(item => run.itemIds!.includes(item.id)).every(item => item.planning?.kind === 'bundle' && item.taskType==='coordination')).toBe(true);
-    await f.open().scan(); expect((await f.service.read(run.boardId)).items).toHaveLength(2);
+    await f.open().scan(); expect((await f.service.read(run.boardId)).items).toHaveLength(1);
 });
 
 it('provides a single resource selector that inherits and locks the parent project',async()=>{
     const f=await fixture(),reference={system:'nestos-remote-project',id:'one'};
     await f.command({type:'create-item',item:{id:'parent',title:'Parent',responsibility:'Work',acceptance:'Verified',externalRefs:[reference]}});
     expect(await f.open().itemResources('source','parent')).toMatchObject({selected:reference,required:true,readonly:true,resources:[
-        {reference:{system:'nestos-remote-project',id:'one'}},{reference:{system:'nestos-remote-project',id:'two'}}]});
+        {reference:{system:'nestos-remote-project',id:'one'}}]});
 });
 it('quiesces at a committed decision boundary and reopens with the same run and items', async () => {
     const f = await fixture(), first = f.open();
@@ -226,7 +236,7 @@ it('archives generated tasks with the decision and deletes archived descendants 
     await f.open().controlRecord('source',{recordId:'decision',operationId:'archive',action:'archive'});await settleCancellation(f);
     expect((await f.service.record('source','decision')).archivedAt).toBeTypeOf('number');
     expect((await f.service.records('source')).items).toHaveLength(0);
-    expect((await f.service.query('source',{view:'archive'})).total).toBe(2);
+    expect((await f.service.query('source',{view:'archive'})).total).toBe(1);
     expect((await f.service.read('source')).items.map(item=>item.id)).toEqual(['unrelated']);
     await f.open().controlRecord('source',{recordId:'decision',operationId:'delete',action:'delete'});await f.open().scan();
     expect((await f.service.record('source','decision')).deletedAt).toBeTypeOf('number');
@@ -245,7 +255,7 @@ it('restarts a decision after settlement with a new run and retains replay ident
     expect((await f.service.record('source','decision')).status).toBe('confirmed');
     await f.open().controlRecord('source',request);await f.open().scan();
     expect(await f.open().recordExecutions('source','decision')).toHaveLength(2);
-    expect((await f.service.query('source',{view:'archive'})).total).toBe(2);
+    expect((await f.service.query('source',{view:'archive'})).total).toBe(1);
 });
 it('keeps decision deletion pending when task cancellation has no confirmed receipt',async()=>{
     const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
@@ -278,7 +288,7 @@ it('recovers restart finalization after new run creation changed the live decisi
 it('reports automatically created coordination work as blocked with its exact planning failure instead of running',async()=>{
  const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});const execution=f.open();
  const run=await execution.runRecord('source',{operationId:'auto',recordId:'decision',expectedRevision:2});
- expect(run.itemIds).toHaveLength(2);const root=run.itemIds![0],before=(await f.service.read('source')).items.length;
+ expect(run.itemIds).toHaveLength(1);const root=run.itemIds![0],before=(await f.service.read('source')).items.length;
  await f.command({type:'report-analysis',itemId:root,operationId:'preparation',status:{itemId:root,state:'failed',code:'GIT_RELATIVE_WORKTREES_UNSUPPORTED'}});
  await execution.scan();expect((await execution.recordExecutions('source','decision'))[0]).toMatchObject({state:'blocked',code:'GIT_RELATIVE_WORKTREES_UNSUPPORTED',stage:'planning'});
  expect((await f.service.records('source',{kind:'decision'})).items[0]).toMatchObject({attention:'error',attentionCode:'GIT_RELATIVE_WORKTREES_UNSUPPORTED',attentionItemId:root});
@@ -301,5 +311,33 @@ it('cancels from the decision protocol and keeps unknown execution receipts pend
  for(const item of (await f.service.read('source')).items)await f.command({type:'control-receipt',itemId:item.id,controlId:item.control!.id,state:'cancelled'});
  await recovered.scan();expect(await resolveDecisionRequest(options,conversation,{...request,id:'settled',method:'decision.read'})).toMatchObject({state:'cancelled',record:{status:'cancelled'}});
  expect((await recovered.recordExecutions('source','decision')).find(row=>row.id===run.id)?.state).toBe('cancelled');
- expect((await f.service.read('source')).items).toHaveLength(2);expect((await f.service.read('source')).items.every(item=>item.status==='cancelled')).toBe(true);
+ expect((await f.service.read('source')).items).toHaveLength(1);expect((await f.service.read('source')).items.every(item=>item.status==='cancelled')).toBe(true);
+});
+
+it('settles a legacy review run from completed task groups without applying a second delivery gate',async()=>{
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration');
+ const deliveryReady=vi.fn(async()=>false);
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),extensions:()=>[{deliveryReady,scan:async()=>{}}],log:f.log});
+ cleanup.push(()=>runtime.service.quiesce());
+ const run=await runtime.service.runRecord!('source',{operationId:'legacy-group',recordId:'decision',expectedRevision:2});
+ for(const itemId of run.itemIds??[run.rootItemId!])await completeCoordination(f,itemId);
+ await f.journal.update<any[]>('record-runs:source',old=>old!.map(row=>({...row,state:'review'})));
+ await runtime.service.scan();
+ expect((await runtime.service.recordExecutions!('source','decision'))[0]).toMatchObject({state:'completed'});
+ expect(deliveryReady).not.toHaveBeenCalled();
+ expect((await runtime.service.records('source',{kind:'decision'})).items[0].progress?.state).toBe('completed');
+});
+it('routes attention dismissal through the runtime without cancelling or recreating the failed task group',async()=>{
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),{recordAttentionFingerprint}=await import('@nestos/kanban/contracts');
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log});cleanup.push(()=>runtime.service.quiesce());
+ const run=await runtime.service.runRecord!('source',{operationId:'dismiss-run',recordId:'decision',expectedRevision:2});
+ await f.command({type:'report-analysis',itemId:run.rootItemId!,operationId:'failed',status:{itemId:run.rootItemId!,state:'failed',code:'MISSING_STATE'}});
+ const before=await runtime.service.read('source'),record=(await runtime.service.records('source',{kind:'decision'})).items[0];
+ const fingerprint=recordAttentionFingerprint(record);
+ await runtime.service.controlRecord!('source',{recordId:'decision',operationId:'dismiss-attention',action:'dismiss-attention',attentionFingerprint:fingerprint});
+ expect((await runtime.service.records('source',{kind:'decision'})).items[0]).toMatchObject({progress:{state:'failed'},attentionDismissal:{fingerprint}});
+ const after=await runtime.service.read('source');expect(after.items).toEqual(before.items);
+ expect(await runtime.service.recordExecutions!('source','decision')).toHaveLength(1);
 });

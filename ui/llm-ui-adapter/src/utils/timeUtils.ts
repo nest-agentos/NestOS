@@ -1,17 +1,9 @@
+import {formatDateTime} from '@nestos/ui-common';
 // @file: llm-ui/utils/timeUtils.ts
 
-/** Format timestamp for display: same-day shows time only, older includes date. */
+/** Absolute timestamps share the browser-local display with an explicit UTC offset. */
 export function formatTime(timestamp: number): string {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-
-    if (isToday) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    return date.toLocaleDateString([], {
-        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
+    return formatDateTime(timestamp);
 }
 
 /** Relative time-ago string: "just now", "5m ago", "2h ago", "7d ago", or locale date. */
@@ -28,5 +20,5 @@ export function formatTimeAgo(timestamp: number): string {
     const days = Math.floor(hours / 24);
     if (days < 30) return `${days}d ago`;
 
-    return new Date(timestamp).toLocaleDateString();
+    return formatDateTime(timestamp);
 }

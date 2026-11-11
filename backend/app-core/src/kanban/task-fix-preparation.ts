@@ -8,7 +8,7 @@ export async function freezeFix(options:Options,boardId:string,request:{itemId:s
     const state=new KanbanCollaboration(options.service,options.journal);
     return state.prepareFix(boardId,request,async({id,board,item})=>{
         const refs=item.externalRefs?.filter(ref=>ref.system==='nestos-remote-project')??[];
-        requireValue(refs.length===1&&options.automation.sessionChannel,'SINGLE_PROJECT_TASK_REQUIRED');
+        requireValue((item.planning?.execution==='children'?refs.length>0:refs.length===1)&&options.automation.sessionChannel,'SINGLE_PROJECT_TASK_REQUIRED');
         const context=await workContext(options.journal,board,item,options.service);
         const decision=context.decision?{...context.decision,record:await state.decisionSnapshot(context.decision)}:null;
         const parent=item.planning?.parentId?(await options.service.item(boardId,item.planning.parentId)).item:null;

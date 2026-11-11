@@ -18,12 +18,14 @@ export class KanbanWindowWorkbench {
     private readonly navigation: KanbanSidebar;
     private visible = true;
     private disposing = false;
+    private readonly observationAbort = new AbortController();
     private availableBoards?: Set<string>;
     private boardSnapshots?: readonly import('@nestos/kanban/contracts').KanbanBoardSummary[];
     private reconcile?: Promise<void>;
     private reconcileAgain = false;
     private readonly options: KanbanWorkspaceOptions;
     constructor(options: KanbanWorkspaceOptions) {
+        window.addEventListener('nestos:http-reconnected', () => this.invalidateFromEvents(), {signal: this.observationAbort.signal});
         this.options = options = {...options, service: shareKanbanCatalog(options.service)};
         this.tabs = new WorkbenchTabs(options.editor, {
             navigation: t('kanban.title'), activate: id => this.navigate(id),
@@ -36,7 +38,13 @@ export class KanbanWindowWorkbench {
             catalogChanged: boards => {this.boardSnapshots = boards; this.availableBoards = new Set(boards.map(board => board.id)); this.scheduleReconcile();}});
         const host = document.createElement('div'); host.hidden = true; host.append(this.tabs.opened); options.sidebar.append(host);
     }
-    async start(): Promise<void> {await Promise.all([this.navigation.start(), this.openResource(this.options.initialResource ?? '/')]);}
+    async start(): Promise<void> {
+        const initial=this.options.initialResource;
+        if(initial&&initial!=='/') {await Promise.all([this.navigation.start(),this.openResource(initial)]);return;}
+        await this.navigation.start();
+        const board=this.boardSnapshots?.length===1?this.boardSnapshots[0]:undefined;
+        await this.openResource(board?`/board/${encodeURIComponent(board.id)}/@decision`:'/');
+    }
     async openResource(path: string): Promise<void> {
         if (this.disposing) return;
         const operationId = randomUUID(), started = performance.now();
@@ -67,7 +75,7 @@ export class KanbanWindowWorkbench {
         this.navigation.setVisible(false); this.tabs.suspendForRecovery();
         for (const tab of this.tabs.values()) tab.value?.view.suspendForRecovery();
     }
-    async destroy(): Promise<void> {this.disposing = true; this.navigation.destroy(); await this.reconcile; await this.tabs.destroy(); this.options.sidebar.replaceChildren();}
+    async destroy(): Promise<void> {this.disposing = true; this.observationAbort.abort(); this.navigation.destroy(); await this.reconcile; await this.tabs.destroy(); this.options.sidebar.replaceChildren();}
     private createPage(tab: WorkbenchTab<Page>): void {
         const editor = document.createElement('div'); tab.panel.append(editor);
         const view = new KanbanView({...this.options, sidebar: undefined, editor, initialResource: tab.id,

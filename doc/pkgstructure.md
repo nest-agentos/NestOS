@@ -44,7 +44,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 | `@nestos/llm-ui` | 独立 Chat、Flow 与设置 UI；仅依赖 mdxeditor 和零依赖 ui-common，Flow 与设置分别通过 /flow、/settings 可选子入口提供。 |
 | `@nestos/image-parser` | 独立图片缩放、裁剪与 Scanic 透视校正；/ui 多图编辑面板，/vfs 可选授权读取。 |
 | `@nestos/llm-ui-adapter` | NestOS 的 Session/Task/Flow/VFS 接线与原产品编辑器兼容入口。 |
-| `@nestos/vfs-ui` | 独立文件/资源浏览 UI：目录导航、通用目录内容页（排序、多选、创建时间列）、标签、内容大纲；仅依赖 vfs-core，通过公开接口注入数据源、动作、展示和持久化。 |
+| `@nestos/vfs-ui` | 独立文件/资源浏览 UI：目录导航、通用目录内容页（排序、多选、创建时间列）、标签、内容大纲；依赖 vfs-core 和零依赖 UI 基础库 ui-common，通过公开接口注入数据源、动作、展示和持久化。 |
 | `@nestos/mdxeditor` | 独立 CodeMirror 6 编辑器（[独立仓库](https://github.com/nest-agentos/mdxeditor)，源码工作区接入），不依赖其他内部包；宿主通过公共附件、存储、导航和保存接口注入能力。 |
 | `@nestos/mdx-adapter` | NestOS 编辑器适配：VFS/namespace/Session 校验、文件格式、插件元数据、笔记挖空复习状态的共享 seqfile（路径作用域、评分时按卡写入）、附件管理 UI、文件聊天引用及会话打印。 |
 | `@nestos/ui-common-adapter` | 通用编辑器宿主契约、应用设置基类与保存/恢复基础设施；导航、弹窗和浏览器工具由独立 ui-common 提供。 |
@@ -71,7 +71,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 
 独立库均位于 `libraries/`，参与 pnpm workspace；既有库以 Git 子模块固定提交，包括 [durable-kernel](https://github.com/nest-agentos/durable-kernel)、[llm-ui](https://github.com/nest-agentos/llm-ui) 与 [device-tty](https://github.com/nest-agentos/device-tty)。[kanban](https://github.com/nest-agentos/kanban)、[kanban-ui](https://github.com/nest-agentos/kanban-ui) 与 [mail](https://github.com/nest-agentos/mail) 也已拥有独立仓库并以子模块接入；仓库上传不代表 npm 发布完成。libraries 下的目录就是唯一开发工作树；子模块先向各自远端提交，再由主仓库记录子模块提交；npm 发布独立进行。日常开发通过源码 exports 联调；`pnpm lib:build [库名]` 增量准备本地 tarball 快照，供 `pnpm httpd:build` 在隔离目录消费。`pnpm libraries:use <ID>` 可显式将整个工作区切到制品验收模式，`pnpm libraries:source` 恢复源码。各库保留独立 npm 发布能力，`pnpm build:registry` 在隔离目录构建固定 npm 版本。原 HTTP 驱动并入 cells-driver，文件与进程实现位于其 src/files。目录、安装和发布流程见 [独立库接入](design/npm-library-consumption.md)。
 
-VFS 驱动和 vfs-ui 的内部运行依赖仅为 vfs-core；本地驱动另依赖 better-sqlite3。vfs-sync、driver-llm 没有运行时包依赖。`backend/sync-adapters` 负责宿主同步接入，调用 vfs-sync 与驱动公共端口；同步范围和项目绑定由应用决定。
+VFS 驱动的内部运行依赖仅为 vfs-core；vfs-ui 另复用 ui-common 的通用 UI 与时间展示工具；本地驱动另依赖 better-sqlite3。vfs-sync、driver-llm 没有运行时包依赖。`backend/sync-adapters` 负责宿主同步接入，调用 vfs-sync 与驱动公共端口；同步范围和项目绑定由应用决定。
 
 VFS `IPlugin` 可以提供变更提示，但不能替代跨窗口扫描、恢复日志与条件提交。core 不内置同步业务。
 

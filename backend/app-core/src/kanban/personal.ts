@@ -1,3 +1,6 @@
+import {recordFollowUps} from './record-follow-ups';
+import {assertWorkspaceCleanup} from './workspace-cleanup-blocker';
+import {workProjectId} from './task-projects';
 import {taskCommunication} from './task-communication';
 import {restartBarrier} from './restart-barrier';
 import type {KanbanClient} from '@nestos/kanban/contracts';
@@ -47,7 +50,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
 function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanAutomationOptions|undefined,events:UserEventService,log:ReturnType<typeof personalOptions>['log'],setOperations:(value:ReturnType<typeof import('./item-operations').createItemOperations>|undefined)=>void,client:()=>KanbanClient):KanbanRuntimeExtension[] {
     const {service,journal,workLog,fs,serviceFor}=context;
     const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,...resources}=resourcePorts??{};
-    const operations=options?.itemOperations?.({service,journal,workLog,log,automaticTarget:(_board,item)=>item.externalRefs?.find(ref=>ref.system==='nestos-remote-project')?.id,automatic:async(board,item)=>{
+    const operations=options?.itemOperations?.({service,journal,workLog,log,automaticTarget:(_board,item)=>workProjectId(item),automatic:async(board,item)=>{
         const context=await workContext(journal,board,item);if((context.decision?.snapshot as {completion?:string})?.completion!=='automatic')return false;
         return (await service.record(context.decision!.sourceBoardId,context.decision!.recordId)).status==='confirmed';
     },cleanup:async(board,item,id)=>{
@@ -55,7 +58,7 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
         for(const session of new Set([execution.current?.sessionId,...execution.sessions?.map(row=>row.sessionId)??[],...execution.history.map(row=>row.sessionId)].filter((id):id is string=>!!id))){try{await options.archiveSession?.(session,id+'-archive-'+sha256HexSync(session).slice(0,12));}catch(error){if(['SESSION_ARCHIVE_STILL_RUNNING','SESSION_ARCHIVE_OUTCOME_UNKNOWN'].includes((error as {code:string}).code))return false;throw error;}}
         const rows=await resources.workResources?.(board,item,{inspect:true})??[];
         if(rows.length&&!resources.cleanupWorkResource)return false;
-        for(const row of rows){if(row.state==='cleaned')continue;if(!row.canCleanup){const code=row.reasons.find(reason=>['WORKTREE_DIRTY','WORKTREE_UNTRACKED_IGNORED','WORKTREE_NOT_INTEGRATED','WORKTREE_MISSING'].includes(reason));if(code)throw Object.assign(new KanbanError(code),{cleanupPrecondition:true});return false;}await resources.cleanupWorkResource?.(board,{itemId:item,resourceId:row.id,version:row.version,operationId:id+'-cleanup-'+sha256HexSync(row.id).slice(0,12)});}
+        for(const row of rows){if(row.state==='cleaned'||row.resolution?.kind==='ignored')continue;assertWorkspaceCleanup(row);await resources.cleanupWorkResource?.(board,{itemId:item,resourceId:row.id,version:row.version,operationId:id+'-cleanup-'+sha256HexSync(row.id).slice(0,12)});}
         return true;
     },reportAutomatic:async state=>{
         await workLog.append(service,state.boardId,state.itemId,{stage:state.done?'automatic.completed':state.waitingForUser?'automatic.waiting-review':'automatic.blocked',result:state.code&&state.code!=='OPERATION_CANCELLED'?'failure':'success',dispatchId:state.id,code:state.code});
@@ -70,8 +73,8 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
     const planning=options?planningSessionReader(service,journal,options):undefined;
-    return [{archiveItemResources,capabilities:{...(options?.boardSettings?{boardSettings:async(board:string)=>options.boardSettings!.catalog(await service.read(board))}:{}),...(recovery?{taskRecovery:recovery.taskRecovery,recoverTask:recovery.recoverTask,openTaskRecovery:recovery.openTaskRecovery}:{}),...(conversations?{startRecordConversation:conversations.startRecordConversation,openRecordCoordination:conversations.openRecordCoordination,...communication,recordConversations:conversations.recordConversations}:{}),...(planning?{planningSession:planning}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
-        ...(resources?.cleanupWorkResource&&operations?{cleanupWorkResource:(board,request)=>operations.guardResource(board,request.itemId,()=>resources.cleanupWorkResource!(board,request))}:{}),
+    return [{projectRecords:(board,page)=>recordFollowUps(journal,board,page),archiveItemResources,capabilities:{...(options?.boardSettings?{boardSettings:async(board:string)=>options.boardSettings!.catalog(await service.read(board))}:{}),...(recovery?{taskRecovery:recovery.taskRecovery,recoverTask:recovery.recoverTask,openTaskRecovery:recovery.openTaskRecovery}:{}),...(conversations?{startRecordConversation:conversations.startRecordConversation,openRecordCoordination:conversations.openRecordCoordination,...communication,recordConversations:conversations.recordConversations}:{}),...(planning?{planningSession:planning}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
+        ...(resources?.cleanupWorkResource&&operations?{cleanupWorkResource:(board,request)=>request.resolution==='ignore'?resources.cleanupWorkResource!(board,request):operations.guardResource(board,request.itemId,()=>resources.cleanupWorkResource!(board,request))}:{}),
         ...(options?.continuation?{executionSession:async(board,item,query)=>{
             const detail=await service.executionSession(board,item,query),current=(await service.item(board,item)).item;
             const previous=Object.values((await service.workflow(board)).dispatches).filter(row=>row.itemId===item).sort((a,b)=>b.attempt-a.attempt)[0];

@@ -90,7 +90,7 @@ scopeRef 区分普通对话、主持角色、worker 或并行实例。worker 的
 
 原生续接不重复发送整段本地历史。contextRef 记录上下文构造依据，不保证等于完整模型上下文；原生端可能读取项目指令、记忆或执行压缩。界面与审计分别标明宿主持有和原生端持有的部分。
 
-当前 [独立 Harness 执行](../../backend/app-core/src/projects/harness-execution-operations.ts) 与[输入构造](../../backend/llm-session/src/session/direct-conversation.ts) 保留“新原生会话加宿主装配消息”的默认。续接是额外协商能力，不是简单把 create 改成 resume。
+首次 [独立 Harness 执行](../../backend/app-core/src/projects/harness-execution-operations.ts) 使用新原生会话与宿主装配消息；普通对话下一轮由[默认上下文解析](../../backend/app-core/src/projects/harness-default-conversation.ts)在目标、策略、分支和连接兼容且原执行结算后续接唯一已确认 binding，仅发送增量输入。每轮保留独立 Invocation、操作与 turn；不兼容、多候选或未结算上下文明确拒绝自动选择，Flow 中独立 worker 仍各自新建上下文。
 
 ## 4 场景规则
 

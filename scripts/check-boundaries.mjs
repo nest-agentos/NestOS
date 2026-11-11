@@ -35,7 +35,7 @@ export function dependencyError(source, target) {
     if (source === '@nestos/driver-llm') return 'driver-llm must receive host capabilities through its public ports';
     if (source === '@nestos/llm-context') return 'llm-context must receive I/O through its public ports';
     if (source === '@nestos/mdxeditor' && target.startsWith('@nestos/') && target !== '@nestos/ui-common') return 'mdxeditor must receive host capabilities through its public ports';
-    if (source === '@nestos/vfs-ui' && target !== '@nestos/vfs-core') return 'vfs-ui must not depend on host packages; use its public ports';
+    if (source === '@nestos/vfs-ui' && !['@nestos/vfs-core','@nestos/ui-common'].includes(target)) return 'vfs-ui must not depend on host packages; use its public ports';
     if (source === '@nestos/mail' && !['@nestos/vfs-core', '@nestos/ui-common', '@nestos/mdxeditor'].includes(target)) return 'mail only depends on VFS and UI ports';
     if (source === '@nestos/kanban' && target !== '@nestos/vfs-core') return 'kanban may only depend on vfs-core; execution and application policy require host ports';
     if (source === '@nestos/kanban-ui' && !['@nestos/kanban','@nestos/ui-common','@nestos/mdxeditor'].includes(target)) return 'kanban-ui may only depend on Kanban contracts, ui-common and mdxeditor';

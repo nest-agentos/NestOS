@@ -1,13 +1,6 @@
-/**
- * Generate a default file title using current date and time.
- * Format: "YYYY-MM-DD HH-mm-ss" — local time, filesystem-safe (no colons).
- *
- * @example "2026-05-01 14-30-05"
- */
+/** Generate a filesystem-safe UTC title; existing user titles are never rewritten. */
 export function formatDefaultFileTitle(): string {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+    return new Date().toISOString().replace('T',' ').replaceAll(':','-').replace(/\.\d{3}Z$/,'Z');
 }
 
 /**

@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {type ConversationControls, type ConversationSnapshot, type EditorOptions} from '../contracts';
 import { t } from '@nestos/common';
 import {showConfirmDialog} from '@nestos/ui-common-adapter';
@@ -60,7 +61,7 @@ export class RemoteBranches {
         if (!this.controls.fork) throw new Error(t('branch.unsupported'));
         if (this.closed || this.create.disabled) throw new Error(this.create.title || t('branch.unavailable'));
         await this.run(async () => {
-            const snapshot = await this.controls.fork!(name?.trim() || t('harness.defaultBranch', {time: new Date().toLocaleString()}));
+            const snapshot = await this.controls.fork!(name?.trim() || t('harness.defaultBranch', {time: formatDateTime(new Date())}));
             await accepted?.(); return snapshot;
         });
     }

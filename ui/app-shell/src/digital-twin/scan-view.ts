@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {viewPagination} from './scan-list';
 import type {CollectionProject} from './collection-destination';
 import {t} from '@nestos/common';
@@ -129,6 +130,6 @@ export function scanRunPage(snapshot: TwinSnapshot, selected?: string): string {
         <details${selected ? ' open' : ''}><summary>${escapeHTML(label('scanTaskRefs'))}</summary>${snapshot.jobs.filter(job => job.data.scanScope?.runId === run.id).map(job =>
         `<p>${escapeHTML(job.data.sessionId)} / ${escapeHTML(job.data.taskId)} · ${escapeHTML(label(`job.${job.data.state}`))} · ${job.data.offset}–${job.data.end}</p>`).join('') || escapeHTML(label('scanNoModel'))}${snapshot.pagination?.jobs ? viewPagination(snapshot.pagination.jobs) : ''}</details></article>`).join('')}${snapshot.pagination && !selected ? viewPagination(snapshot.pagination.runs) : ''}`;
 }
-const date = (value: number, enabled = true) => value && enabled ? escapeHTML(new Date(value).toLocaleString()) : escapeHTML(label('scanNotScheduled'));
+const date = (value: number, enabled = true) => value && enabled ? escapeHTML(formatDateTime(new Date(value))) : escapeHTML(label('scanNotScheduled'));
 const input = (name: string, title: string, value: string, type = 'text') => `<label>${escapeHTML(label(title))}<input name="${name}" type="${type}" value="${escapeAttr(value)}" required${type === 'number' ? ' min="1" max="10080" step="1"' : ' maxlength="200"'}></label>`;
 const check = (name: string, value: string, title: string, checked: boolean) => `<label><input type="checkbox" name="${name}" value="${escapeAttr(value)}"${checked ? ' checked' : ''}>${escapeHTML(title)}</label>`;

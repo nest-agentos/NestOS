@@ -112,7 +112,7 @@ export class RemoteConversationStore {
         const started=Date.now(),before=this.raw;
         try{if(!await this.remote!.compare('recovery',before,value))throw new FSError('ECONFLICT','Remote conversation changed on its harness node');}
         catch(error){this.uncertainWrite={before,after:value};this.log('remote-persist',started,record,error);throw error;}
-        this.raw=value;this.record=record;
+        this.raw=value;this.replaceRecord(record);
         if(record.sessionId && await this.remote!.registerSession?.(record.sessionId)){
             const current=await this.remote!.read('recovery');this.raw=current;this.record=current?JSON.parse(current):{};
             if(this.remote!.queueSession)this.record.instructionQueue=await this.remote!.queueSession(record.sessionId,{action:'read'});}
@@ -130,6 +130,12 @@ export class RemoteConversationStore {
             this.log('queue-revision', Date.now(), record, error); throw error;
         }
     }
+    private replaceRecord(record: RemoteConversationRecovery): void {
+        const queue = this.record.instructionQueue;
+        // Client metadata snapshots cannot replace a queue already owned by Cells.
+        this.record = queue?.owner === 'cells' && this.record.sessionId === record.sessionId
+            ? {...record, instructionQueue: queue} : record;
+    }
     private async reconcileWrite(): Promise<void> {
         if (this.conflicted) throw new FSError('ECONFLICT', 'Remote conversation recovery conflicts with another writer');
         if (!this.uncertainWrite) return;
@@ -141,16 +147,18 @@ export class RemoteConversationStore {
             this.log('reconcile-write', started, this.record, error); throw error;
         }
         this.raw = actual;
-        this.record = actual ? JSON.parse(actual) : {};
+        this.replaceRecord(actual ? JSON.parse(actual) : {});
         this.uncertainWrite = undefined;
         this.log('reconcile-write', started, this.record);
     }
     private log(stage: string, started: number, record: RemoteConversationRecovery, error?: unknown): void {
         const raw = (error as {code?: unknown})?.code;
         const code = typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'JOURNAL_WRITE_UNCONFIRMED';
+        const remote = (error as {remoteCode?: unknown})?.remoteCode;
+        const remoteCode = typeof remote === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(remote) ? remote : undefined;
         const fields = {operation: 'harness.journal', stage, result: error ? 'unconfirmed' : 'confirmed',
             operationId: record.pending?.requestId ?? record.controls?.at(-1)?.requestId ?? record.submission?.id,
-            durationMs: Date.now() - started, code: error ? code : undefined};
+            durationMs: Date.now() - started, code: error ? code : undefined, remoteCode};
         if (error) console.warn('[Harness] Recovery write', fields); else console.info('[Harness] Recovery write', fields);
     }
 }

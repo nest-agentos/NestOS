@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import { ACTION_ICONS, FILE_ICONS, getLocale, t } from '@nestos/common';
 import { resolveBrowserTarget, WORKSPACE_PATH } from '@nestos/app-contracts';
 import type { VFSNodeUI } from '@nestos/vfs-ui';
@@ -25,7 +26,7 @@ function datedItem(item: VFSNodeUI): VFSNodeUI {
     const known = (value: string) => Date.parse(value) > 0 ? value : '';
     const createdAt = known(item.metadata.createdAt), lastModified = known(item.metadata.lastModified);
     const subtitle = [[t('workbench.modified'), lastModified], [t('workbench.created'), createdAt]]
-        .filter(([, time]) => time).map(([label, time]) => `${label}: ${new Date(time!).toLocaleString(getLocale())}`).join(' · ');
+        .filter(([, time]) => time).map(([label, time]) => `${label}: ${formatDateTime(new Date(time!), getLocale())}`).join(' · ');
     return {...item, presentation: {...item.presentation, subtitle}, metadata: {...item.metadata, createdAt, lastModified}};
 }
 export function projectItems(items: VFSNodeUI[], query = ''): VFSNodeUI[] {

@@ -1,3 +1,4 @@
+import {formatDateTime} from '@nestos/ui-common';
 import {createModuleLogger, randomUUID, t} from '@nestos/common';
 import type {ApplicationDiagnostics, DiagnosticEvent, DiagnosticQuery} from '@nestos/app-contracts/services';
 
@@ -93,7 +94,7 @@ export class DiagnosticLogView {
         for (const event of this.events) {
             const row = document.createElement('li'); row.className = `diagnostic-log__event diagnostic-log__event--${event.level}`;
             row.dataset.eventId = event.id;
-            const title = document.createElement('strong'); title.textContent = `${new Date(event.timestamp).toLocaleString()} · ${event.operation} · ${t(`diagnostics.result.${event.result}`)}`;
+            const title = document.createElement('strong'); title.textContent = `${formatDateTime(new Date(event.timestamp))} · ${event.operation} · ${t(`diagnostics.result.${event.result}`)}`;
             const summary = document.createElement('p'); summary.textContent = [event.stage, [event.code, ...(event.causeCodes ?? [])].filter(Boolean).join(' → '),
                 event.reason ? diagnosticReasonText(event.reason) : '', event.durationMs !== undefined ? `${event.durationMs} ms` : ''].filter(Boolean).join(' · ');
             const details = document.createElement('details'), label = document.createElement('summary'), data = document.createElement('pre');
@@ -105,14 +106,14 @@ export class DiagnosticLogView {
     private seriesInfo(event: DiagnosticEvent): HTMLElement {
         const section = document.createElement('div'); section.className = 'diagnostic-log__series';
         const line = (label: string, value: string) => {const item = document.createElement('p'); item.textContent = `${label}：${value}`; section.append(item);};
-        if (event.startedAt !== undefined) line(t('diagnostics.startedAt'), new Date(event.startedAt).toLocaleString());
+        if (event.startedAt !== undefined) line(t('diagnostics.startedAt'), formatDateTime(new Date(event.startedAt)));
         const series = event.series;
         if (!series || series.count === 1) return section;
         const count = document.createElement('strong'); count.textContent = t('diagnostics.occurrences', {count: series.count}); section.append(count);
-        line(t('diagnostics.firstAt'), new Date(series?.firstAt ?? event.timestamp).toLocaleString());
-        line(t('diagnostics.lastAt'), new Date(series?.lastAt ?? event.timestamp).toLocaleString());
+        line(t('diagnostics.firstAt'), formatDateTime(new Date(series?.firstAt ?? event.timestamp)));
+        line(t('diagnostics.lastAt'), formatDateTime(new Date(series?.lastAt ?? event.timestamp)));
         if (series && series.endedAt === undefined && series.count > 1) {const active = document.createElement('p'); active.textContent = t('diagnostics.series.active'); section.append(active);}
-        if (series?.ending && series.endedAt !== undefined) line(t(`diagnostics.ending.${series.ending}`), new Date(series.endedAt).toLocaleString());
+        if (series?.ending && series.endedAt !== undefined) line(t(`diagnostics.ending.${series.ending}`), formatDateTime(new Date(series.endedAt)));
         if (series?.minDurationMs !== undefined) line(t('diagnostics.durationRange'), `${series.minDurationMs}–${series.maxDurationMs} ms`);
         return section;
     }

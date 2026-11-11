@@ -109,7 +109,7 @@
 | [`task-coordinator.ts`](../../backend/app-core/src/kanban/task-coordinator.ts) | 63 |
 | [`restart-barrier.ts`](../../backend/app-core/src/kanban/restart-barrier.ts) | 15 |
 
-### 决策与协调会话（混合：Kanban 用例 + 原生通道适配）
+### 决策与管理会话（混合：Kanban 用例 + 原生通道适配）
 
 会话目录、harness 选择、用户消息证据与 channel 协议留宿主；确认后执行/取消、后代工作项范围与提案确认可在库已有 record-conversation/record-control 用例上收口。
 

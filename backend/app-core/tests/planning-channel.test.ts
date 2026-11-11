@@ -1,4 +1,5 @@
 import {describe,it,expect,vi} from 'vitest';
+import {getLogger} from '@nestos/common';
 import {readPlanningChannel} from '../src/run/planning-channel';
 import type {PromptJournal} from '../src/run/prompt-bundle';
 
@@ -38,9 +39,9 @@ describe('planning conversation reports',()=>{
         expect(await f.read()).toMatchObject({state:'clarification'});
         expect(f.acks.get('fake')).toMatchObject({code:'PLANNING_REPLY_UNVERIFIED'});
         expect(f.acks.get('early')).toMatchObject({code:'PLANNING_CLARIFICATION_UNRESOLVED'});
-        f.report('real','resolved','a',{replyTo:'question'});f.envelope.execution={...f.origin('a'),status:'completed'};
+        f.report('real','resolved','a',{replyTo:'question'});f.envelope.execution={...f.origin('a'),status:'running'};
         expect(await f.read()).toEqual({state:'running'});
-        f.report('corrected','result','a',{payload:{ready:true,reason:'Scope',dependencies:[]}});
+        f.report('corrected','result','a',{payload:{ready:true,reason:'Scope',dependencies:[]}});f.envelope.execution.status='completed';
         expect(await f.read()).toMatchObject({state:'succeeded'});
     });
     it('identifies every unresolved historical report and acknowledges resolutions',async()=>{
@@ -60,7 +61,7 @@ describe('planning conversation reports',()=>{
     });
     it('does not accept a final result without trusted publication origin',async()=>{
         const f=fixture();f.envelope.messages.push({id:'x',message:{type:'result',content:'ok',payload:{ready:true}}});
-        expect(await f.read()).toEqual({state:'running'});
+        expect(await f.read()).toEqual({state:'unknown',code:'PLANNING_RESULT_UNVERIFIED'});
     });
     it('freezes legacy ready:false as a question without rewriting its original final result',async()=>{
         const f=fixture();f.envelope.messages.push({id:'old',message:{type:'result',content:'question',payload:{ready:false}}});
@@ -100,14 +101,14 @@ it('keeps a reported error recoverable across turns until linked resolution and 
  f.report('progress','progress','a');f.report('early','result','a',{payload:{ready:true}});
  expect(await f.read()).toMatchObject({state:'blocked'});
  expect(f.acks.get('early')).toMatchObject({code:'PLANNING_ISSUES_UNRESOLVED'});
- f.report('fixed','resolved','a',{replyTo:'error'});
+ f.report('fixed','resolved','a',{replyTo:'error'});f.envelope.execution={...f.origin('a'),status:'running'};
  expect(await f.read()).toEqual({state:'running'});
  f.report('result','result','a',{payload:{ready:true,reason:'Environment checked',dependencies:[]}});
  f.envelope.execution={...f.origin('a'),status:'completed'};
  expect(await f.read()).toMatchObject({state:'succeeded'});
 });
 it('allows checked same-turn error recovery but preserves real execution failure',async()=>{
- const f=fixture();f.report('error','error','q');f.report('fixed','resolved','q',{replyTo:'error'});
+ const f=fixture();f.report('error','error','q');f.report('fixed','resolved','q',{replyTo:'error'});f.envelope.execution.status='running';
  expect(await f.read()).toEqual({state:'running'});
  f.envelope.execution.status='failed';
  expect(await f.read()).toMatchObject({state:'failed',code:'PLANNING_EXECUTION_FAILED'});
@@ -119,4 +120,40 @@ it('projects the reported binary handler for blocked planning and defaults undec
  f.report('external','error','q',{payload:{handler:'parent'}});expect(await f.read()).toMatchObject({handler:'parent'});
  const old=fixture();old.report('legacy','error','q');expect(await old.read()).toMatchObject({handler:'parent'});
  const invalid=fixture();invalid.report('bad','error','q',{payload:{handler:'administrator'}});await expect(invalid.read()).rejects.toMatchObject({code:'PLANNING_HANDLER_INVALID'});
+});
+
+it('settles a completed empty planning channel and deduplicates safe diagnostics across restart',async()=>{
+ const f=fixture(),warn=vi.spyOn(getLogger(),'warn').mockImplementation(()=>{});
+ try {
+  expect(await f.read()).toMatchObject({state:'blocked',code:'PLANNING_RESULT_MISSING',handler:'self'});
+  expect(await readPlanningChannel(f.remote as any,'p','scope',f.journal)).toMatchObject({state:'blocked',code:'PLANNING_RESULT_MISSING',handler:'self'});
+  const logs=warn.mock.calls.filter(args=>JSON.stringify(args).includes('planning.result.missing'));
+  expect(logs).toHaveLength(1);
+  expect(JSON.stringify(logs)).toContain('op-q');
+  expect(JSON.stringify(logs)).toContain('messageCount');
+  expect(f.acks.size).toBe(0);
+ } finally {warn.mockRestore();}
+});
+
+it('keeps active and unverified executions distinct from missing completed results',async()=>{
+ const f=fixture();f.envelope.execution.status='running';expect(await f.read()).toEqual({state:'running'});
+ f.envelope.execution={...f.origin('q'),status:'completed',operationId:''};
+ expect(await f.read()).toEqual({state:'unknown',code:'PLANNING_EXECUTION_UNVERIFIED'});
+ f.envelope.execution={...f.origin('q'),status:'failed'};
+ expect(await f.read()).toEqual({state:'failed',code:'PLANNING_EXECUTION_FAILED'});
+ f.envelope.execution.status='cancelled';expect(await f.read()).toEqual({state:'cancelled',code:'PLANNING_EXECUTION_CANCELLED'});
+});
+
+it('treats completed progress-only and resolved-only turns as missing results without leaking report content',async()=>{
+ const f=fixture(),warn=vi.spyOn(getLogger(),'warn').mockImplementation(()=>{});
+ try {
+  f.report('private','progress','q',{content:'PRIVATE REPORT BODY'});
+  expect(await f.read()).toMatchObject({state:'blocked',code:'PLANNING_RESULT_MISSING',handler:'self'});
+  expect(JSON.stringify(warn.mock.calls)).not.toContain('PRIVATE REPORT BODY');
+  const g=fixture();g.report('question','clarification','q');expect(await g.read()).toMatchObject({state:'clarification'});
+  g.report('answer','resolved','a',{replyTo:'question'});g.envelope.execution={...g.origin('a'),status:'completed'};
+  expect(await g.read()).toMatchObject({state:'blocked',code:'PLANNING_RESULT_MISSING',handler:'self'});
+  g.report('result','result','a',{payload:{ready:true,reason:'Recovered',dependencies:[]}});
+  expect(await g.read()).toMatchObject({state:'succeeded'});
+ } finally {warn.mockRestore();}
 });

@@ -18,6 +18,7 @@ import type { ChatSubmission } from '../domain/submission';
 import type { WorkspaceHandoff } from './drafts/workspace-handoff';
 import {isCommandInput} from '@nestos/llm-ui';
 import {resolveNativeCommand, submitNativeCommand} from '../independent/native-command';
+import {nativeInputPolicy, nativeCommandAvailable} from '../independent/native-input-policy';
 import {nativeBranchCommand, withNativeBranchCommands} from '../commands/native-branch-command';
 import {NativeExecutionNotice} from '../components/NativeExecutionNotice';
 
@@ -131,7 +132,8 @@ export class RemoteConversationEditor extends BaseSettingsEditor<ConversationCon
         this.instructionQueuePanel = new NativeInstructionQueuePanel(element, this.service, snapshot => this.show(snapshot));
     }
     private canSubmit(text = this.view.input.getConfig().text): boolean {
-        return !!(this.service.enqueue && this.snapshot?.canQueue || this.snapshot?.canSend || this.snapshot?.canCommand && isCommandInput(text));
+        return !!this.snapshot && (nativeInputPolicy(this.snapshot, this.service, false).route !== 'blocked'
+            || isCommandInput(text) && nativeCommandAvailable(this.snapshot, this.service, 'query'));
     }
     private persistImages(files: File[], resize: import('@nestos/image-parser').ImageResizePolicy): Promise<void> {
         const config = this.view.input.getConfig();
@@ -364,7 +366,7 @@ export class RemoteConversationEditor extends BaseSettingsEditor<ConversationCon
         } catch (error) {return this.submissionFailure(error, ready && !invoked);}
     }
     private sendPrepared(text: string, attachments: NonNullable<Parameters<ConversationControls['send']>[1]>, selection?: import('../contracts').ConversationModelSelection, submissionId?: string) {
-        if (this.service.enqueue && this.snapshot?.canQueue) {
+        if (this.snapshot && nativeInputPolicy(this.snapshot, this.service, false).route === 'queue') {
             const id = submissionId ?? this.submission!.id;
             return awaitNativeAdmission(this.service, id, () => this.service.enqueue!(text, attachments, selection, id), this.admissions.signal);
         }

@@ -64,7 +64,10 @@ class ConversationView {
         };
     }
     private invalidate(): void {
-        if (this.closed || !this.listeners.size || this.eventTimer) return;
+        if (this.closed || !this.listeners.size) return;
+        // Admission and availability are local snapshots; do not wait for history I/O.
+        this.update();
+        if (this.eventTimer) return;
         this.eventTimer = setTimeout(() => {
             this.eventTimer = undefined;
             if (this.pumping) this.observeDispatch(); else this.pump();
@@ -149,7 +152,8 @@ class ConversationView {
             historyRevision: state.observation?.historyRevision,
             activityPhase: state.observation?.activity?.phase, activityAt: state.observation?.activity?.updatedAt,
             textLength: state.messages.reduce((size, message) => size + message.text.length, 0),
-            queueRevision: state.instructionQueue?.revision, listenerCount: this.listeners.size, durationMs: now - started};
+            queueRevision: state.instructionQueue?.revision, canSend: state.canSend, canQueue: state.canQueue,
+            canSteer: state.canSteer, pending: state.pending, listenerCount: this.listeners.size, durationMs: now - started};
             if (succeeded && !code) console.info('[Conversation] Observation', fields); else console.warn('[Conversation] Observation', fields);
         } catch { /* Diagnostics cannot block snapshot delivery. */ }
     }

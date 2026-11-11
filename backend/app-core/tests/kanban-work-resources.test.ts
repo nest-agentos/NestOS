@@ -68,6 +68,27 @@ it('lists saved associations without remote Git or native-session inspection and
     await expect(f.api.cleanupWorkResource('board',{operationId:'unchecked',itemId:'item',resourceId:'ready',version:''})).rejects.toMatchObject({code:'INVALID_WORK_RESOURCE_CLEANUP'});
     await expect(f.api.workResources('board','item',{inspect:'yes'} as never)).rejects.toMatchObject({code:'INVALID_WORK_RESOURCE_QUERY'});
 });
+it('ignores each associated resource without claiming removal and immediately settles only finalization after every item is resolved',async()=>{
+ const f=await fixture();f.commands.splice(0);f.item.externalRefs.push({system:'nestos-worktree',id:'missing'});
+ const key='automatic-delivery:'+JSON.stringify(['board','item']);
+ await f.journal.update(key,()=>({id:'auto',boardId:'board',itemId:'item',executionId:'run',step:0,steps:['cleanup'],code:'WORKTREE_ASSOCIATION_UNKNOWN',requests:{}}));
+ const request={operationId:'ignore-missing',itemId:'item',resourceId:'missing',version:'',resolution:'ignore' as const,reason:'Retain this workspace'};
+ expect(await f.api.cleanupWorkResource('board',request)).toMatchObject({state:'associated',resolution:{kind:'ignored',actor:{kind:'human',id:'admin'}}});
+ expect((await f.journal.get<any>(key)).done).not.toBe(true);
+ await f.api.cleanupWorkResource('board',request);
+ await expect(f.api.cleanupWorkResource('board',{...request,reason:'Changed reason'})).rejects.toMatchObject({code:'IDEMPOTENCY_CONFLICT'});
+ await f.api.cleanupWorkResource('board',{...request,operationId:'ignore-ready',resourceId:'ready'});
+ expect(await f.journal.get(key)).toMatchObject({done:true,step:1});
+ expect(f.commands).toEqual([]);expect(await f.journal.get('worktree-cleanup:ready')).toBeUndefined();
+ const rows=await f.api.workResources('board','item',{inspect:false});expect(rows.every(row=>row.resolution?.kind==='ignored')).toBe(true);
+ await expect(f.api.cleanupWorkResource('board',{...request,operationId:'ignore-unrelated',resourceId:'unrelated'})).rejects.toMatchObject({code:'WORKTREE_NOT_ASSOCIATED'});
+});
+it('requires a human coordinator and a settled task before ignoring a workspace',async()=>{
+ const f=await fixture(),request={operationId:'ignore',itemId:'item',resourceId:'ready',version:'',resolution:'ignore' as const,reason:'Retain'};
+ f.item.status='review';await expect(f.api.cleanupWorkResource('board',request)).rejects.toMatchObject({code:'WORKTREE_TASK_UNFINISHED'});
+ f.item.status='completed';vi.spyOn(f.service as any,'currentPrincipal').mockResolvedValue({kind:'service',id:'admin'});
+ await expect(f.api.cleanupWorkResource('board',request)).rejects.toMatchObject({code:'COORDINATOR_REQUIRED'});
+});
 it('excludes only archived protocol evidence without enumerating ignored dependency files', async () => {
     const f = await fixture();
     await mkdir(join(f.physical, '_nestos/kanban/inbox'), {recursive: true});

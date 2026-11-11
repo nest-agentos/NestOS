@@ -74,8 +74,8 @@ it('refreshes the native command directory after explicit ownership changes', as
     await capabilities.load(host.state()); expect(host.controls.commands).toHaveBeenCalledTimes(2); capabilities.dispose();
 });
 function deferred<T>() {
-    let resolve!: (value: T) => void;
-    const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve };
+    let resolve!: (value: T) => void, reject!: (error: unknown) => void;
+    const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; }); return { promise, resolve, reject };
 }
 it('rejects structured arguments when the native target has no declared mapping', async () => {
     const host = fixture(); host.controls.enqueue = vi.fn();
@@ -602,4 +602,19 @@ it('projects explicit native send and completion instants without inventing lega
     expect(messages[0].timing?.submittedAt).toBe(start);
     expect(messages[1].timing).toMatchObject({startedAt: start + 1000, completedAt: start + 11000, scope: 'message'});
     expect(messages[2].timing?.completedAt).toBeUndefined(); expect(messages[3].state).toBe('streaming'); binding.dispose();
+});
+
+it('releases native queue admission from durable evidence while its transport reply remains pending',async()=>{
+ const host=fixture(),pending=deferred<ConversationSnapshot>();host.emit({canQueue:true,canSend:false,active:true});
+ host.controls.enqueue=vi.fn(()=>pending.promise);const binding=await createNativeChatBinding(host.options);
+ try {
+  const context={operationId:'queued-while-running',viewId:binding.source.getSnapshot().viewId};
+  const sending=binding.actions.send!({text:'Next instruction',attachments:[]},context);
+  await vi.waitFor(()=>expect(host.controls.enqueue).toHaveBeenCalledOnce());
+  host.emit({instructionQueue:{revision:1,paused:false,acceptedIds:[context.operationId],submissions:[{id:context.operationId}],items:[]}});
+  await expect(sending).resolves.toMatchObject({status:'accepted',operationId:context.operationId});
+  expect(binding.source.getSnapshot().allowed).toContain('send');expect(host.controls.enqueue).toHaveBeenCalledOnce();
+  pending.reject(new Error('Late transport failure'));await Promise.resolve();
+  expect(binding.source.getSnapshot().allowed).toContain('send');
+ }finally{binding.dispose();}
 });

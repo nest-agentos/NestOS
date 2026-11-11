@@ -8,6 +8,7 @@ import { finishNativeTurn, observeNativeTurn } from './harness-execution-observa
 import { cancelNativeExecution } from './harness-execution-cancel';
 import {claimExecutionContext, settleExecutionContext, validateExecutionContext} from './harness-execution-context';
 import {prepareExecutionAttachments} from './harness-execution-assets';
+import {nativeTurnFailure} from './harness-turn-failure';
 
 export { harnessExecutionJournalKey } from './harness-execution-journal';
 export interface HarnessExecutionOptions {
@@ -41,7 +42,7 @@ class NativeHarnessExecutionProvider implements HarnessExecutionProvider {
             const code = safeCode(error);
             if(code==='WORKER_OBSERVATION_DRAINED')throw error;
             if ((error as { executionOutcome?: string })?.executionOutcome === 'not-started'
-                || code === 'NATIVE_TURN_FAILED' || code === 'NATIVE_TURN_CANCELLED') throw error;
+                || nativeTurnFailure(code)) throw error;
             await diagnose(context, 'reconcile', 'unknown', startedAt, code);
             return {status: 'unknown', code};
         }
@@ -144,11 +145,12 @@ export function safeCode(error: unknown): string {
     return typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'NATIVE_OUTCOME_UNKNOWN';
 }
 function executionCorrelation(request: HarnessExecutionRequest, journal: ExecutionJournal) {
-    return {invocationId: diagnosticId(request.context?.invocationId), bindingId: diagnosticId(journal.data?.bindingId)};
+    return {invocationId: diagnosticId(request.context?.invocationId), bindingId: diagnosticId(journal.data?.bindingId),
+        nativeSessionId:diagnosticId(journal.data?.sessionId),nativeTurnId:diagnosticId(journal.data?.turnId)};
 }
 function diagnosticId(value?: string): string | undefined {return value && /^[\w.:%-]{1,256}$/.test(value) ? value : undefined;}
 async function diagnose(context: EffectExecutionContext, stage: string, outcome: string, startedAt: number, code?: string,
-    correlation?: {invocationId?: string; bindingId?: string; attachmentCount?: number; attachmentBytes?: number; assetCount?: number}): Promise<void> {
+    correlation?: {invocationId?: string; bindingId?: string; nativeSessionId?:string; nativeTurnId?:string; attachmentCount?: number; attachmentBytes?: number; assetCount?: number}): Promise<void> {
     const payload = { operation: 'harness.execution', operationId: harnessExecutionJournalKey(context), stage, outcome,
         sessionId: context.sessionId, taskId: context.taskId, effectId: context.effectId, durationMs: Date.now() - startedAt,
         ...correlation, ...(code ? { code } : {}) };

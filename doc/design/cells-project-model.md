@@ -591,6 +591,8 @@ DSH 展示投影不将明确来源为 agent-instructions、runtime-context、too
 
 `projectClientState: 1` 声明固定 API `project_client_state`，按获授权的项目、principal 和私有 key 保存不透明值。读取和 CAS 均核对项目 revision，写入要求 rw；此能力不暴露给 agent MCP。客户端状态用于远程输入草稿、发送回执与指令队列，原生聊天历史仍只由 harness 保存。小记录原位保存，大记录按唯一代次分块并核验摘要；NestOS 本机只保留会话定位和是否需要恢复的索引，不保存正文。旧本机记录先复制并核验远端结果，再移除本机当前正文；迁移失败保留原输入以便继续核对。
 
+Cells 接管指令队列后，客户端恢复记录不再携带 `instructionQueue`；同一 Session 的连续元数据保存和丢回复核对必须保留已确认的队列所有权，不能用旧快照或不含队列的客户端记录覆盖。原生 turn/command 已接纳后，草稿提升记录写入失败只表示元数据未确认，不能把该次存储的 `not-committed` 当作原生未执行；保留原 pending 身份，通过原回执核对，不重新发送。回归见 [恢复存储](../../backend/app-core/tests/remote-conversation-store.test.ts)与[草稿接纳](../../backend/app-core/tests/remote-draft-conversation.test.ts)。恢复写入日志同时保留本地错误码和安全的远端错误码，以区分传输错误与队列所有权拒绝。
+
 新建操作（包括 resume、输入及交互答复）在冻结操作身份前查询当前节点 epoch，不复用打开会话时固定的 journal epoch；已有 pending、控制和输出回执仍携带原 epoch 查询，禁止因重启自动重放。首次输入接纳后，草稿提升和清空检查遇到远端状态索引时必须读取同一连接、主体和项目 revision 下的权威回执；只向草稿策略投影 sessionId、submittedTurnId 和 pending，不传递正文。提升原子保留原 UUID 到原生 Session 的映射，并创建一个新 UUID 的空白“新会话”。
 
 “新会话”右键菜单通过 app-shell 的现有 contextMenu 扩展提供“复位”，不修改 vfs-ui。确认后调用 ProjectDraftComposer.clear，以 CAS 替换当前草稿并清理其附件，再关闭旧编辑器并打开空白草稿；不删除原生会话或历史。当前草稿身份已改变或远程提交结果未知时拒绝清空，读取权威状态失败也保留原草稿。`@new` 是稳定入口，实际草稿身份保存在内部 UUID 中。

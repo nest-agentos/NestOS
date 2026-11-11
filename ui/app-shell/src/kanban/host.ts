@@ -3,7 +3,12 @@ import type {KanbanPresentation, KanbanUIOptions} from '@nestos/kanban-ui';
 const log = createModuleLogger('kanban');
 export const kanbanPresentation: KanbanPresentation = {
     resourceRole: (reference,references) => reference.system==='nestos-remote-project'&&references.some(ref=>ref.system==='nestos-primary-project')?t(references.some(ref=>ref.system==='nestos-primary-project'&&ref.id===reference.id)?'kanban.primaryProject':'kanban.secondaryProject'):undefined,
-    resourceLabel: reference => reference.system==='nestos-primary-project'?`${t('kanban.primaryProject')}：${reference.id}`:reference.system==='nestos-remote-project'?reference.id:undefined,
+    resourceLabel: (reference,resources) => {
+        if(reference.system!=='nestos-remote-project')return;
+        return resources?.find(row=>row.reference.system===reference.system&&row.reference.id===reference.id)?.label
+            ??t(resources===undefined?'kanban.projectNamesUnavailable':'kanban.projectReferenceUnavailable');
+    },
+    resourceOrder: (reference,references) => references.some(ref=>ref.system==='nestos-primary-project'&&ref.id===reference.id)?0:1,
     text: (key, values) => t(`kanban.${key}` as Parameters<typeof t>[0], values),
     icons: {refreshView: ACTION_ICONS.refreshView, more: CHAT_ICONS.more, close: ACTION_ICONS.close, back: ACTION_ICONS.back, copy: CHAT_ICONS.copy, link: ACTION_ICONS.link, archive: PROJECT_ACTION_ICONS.archive, delete: CHAT_ICONS.delete, run: ACTION_ICONS.run, pause: ACTION_ICONS.pause, resume: ACTION_ICONS.run, fix: ACTION_ICONS.fix, edit: ACTION_ICONS.edit},
     referenceUrl: path => `${location.href.split('#')[0]}#/kanban/${encodeURIComponent(path)}`,

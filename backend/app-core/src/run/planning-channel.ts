@@ -1,15 +1,17 @@
 import {channelDigest} from './channel-protocol';
+import {createModuleLogger} from '@nestos/common';
 import {failure,type PromptJournal} from './prompt-bundle';
 import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import type {KanbanAnalysisObservation} from '@nestos/kanban/integration';
 interface Origin {sessionId:string;turnId:string;operationId?:string;revision?:number}
 interface Message {id:string;message:{type:string;content:string;replyTo?:string;payload?:{ready?:boolean;reason?:string;handler?:'self'|'parent'}};origin?:Origin|null}
-interface State {seen:Record<string,string>;questions:Record<string,Origin>;errors?:Record<string,Origin>;resolved:string[];acknowledged?:string[];rejected?:Record<string,string>;blockingQuestions?:Record<string,string[]>;final?:{id:string;digest:string}}
+interface State {seen:Record<string,string>;questions:Record<string,Origin>;errors?:Record<string,Origin>;resolved:string[];acknowledged?:string[];rejected?:Record<string,string>;blockingQuestions?:Record<string,string[]>;final?:{id:string;digest:string};resultFailure?:string}
 interface Envelope {messages:Message[];execution?:Origin & {status?:string}}
 type Remote=Pick<ProjectRemoteMountService,'sessionChannel'>;
 
 /** Publication evidence is supplied by Cells, never by model-authored message fields. */
 export async function readPlanningChannel(remote:Remote,projectId:string,scopeId:string,journal:PromptJournal,validate?:(output:unknown)=>void):Promise<KanbanAnalysisObservation|undefined> {
+    const started=Date.now();
     const value=await remote.sessionChannel(projectId,'messages',{scopeId}) as Envelope;
     if(!Array.isArray(value?.messages)||value.messages.length>200||value.messages.some(row=>!row||typeof row.id!=='string')||new Set(value.messages.map(row=>row.id)).size!==value.messages.length)throw failure('CHANNEL_MESSAGES_INVALID');
     const key='planning-conversation:'+scopeId;
@@ -29,7 +31,7 @@ export async function readPlanningChannel(remote:Remote,projectId:string,scopeId
     if(final.length>1)throw failure('CHANNEL_RESULT_INVALID');
     if(final.length){const row=final[0];
         if(pendingIds(state).length>0)return clarification(value,state);
-        if(!state.final&&!terminal(value,row))return {state:'running'};
+        if(!state.final&&!terminal(value,row))return value.execution?.status==='completed'?{state:'unknown',code:'PLANNING_RESULT_UNVERIFIED'}:{state:'running'};
         try{validate?.(row.message.payload);}catch(error){
             const code=(error as {code?:string}).code??'PLANNING_RESULT_INVALID';
             await journal.update<State>(key,old=>({...old!,rejected:{...old?.rejected,[row.id]:code}}));
@@ -41,7 +43,22 @@ export async function readPlanningChannel(remote:Remote,projectId:string,scopeId
         await acknowledge(remote,projectId,scopeId,row.id,'validated');
         return {state:'succeeded',output:row.message.payload};
     }
-    return clarification(value,state);
+    const pending=clarification(value,state);
+    if(!pending&&['running','submitting'].includes(value.execution?.status??''))return {state:'running'};
+    if((pending&&pending.state!=='running')||value.execution?.status!=='completed')return pending;
+    return missingResult(value,state,journal,key,projectId,scopeId,started);
+}
+async function missingResult(value:Envelope,state:State,journal:PromptJournal,key:string,projectId:string,scopeId:string,started:number):Promise<KanbanAnalysisObservation> {
+    const execution=value.execution;
+    if(!execution?.sessionId||!execution.turnId||!execution.operationId)return {state:'unknown',code:'PLANNING_EXECUTION_UNVERIFIED'};
+    const identity=JSON.stringify([execution.sessionId,execution.turnId,execution.operationId]),code='PLANNING_RESULT_MISSING';
+    if(state.resultFailure!==identity){
+        await journal.update<State>(key,old=>({...old!,resultFailure:identity}));
+        createModuleLogger('kanban').warn('planning.result.missing',{operation:'kanban.analysis',operationId:scopeId,projectId,
+            stage:'channel.result',result:'failure',code,sessionId:execution.sessionId,turnId:execution.turnId,
+            executionOperationId:execution.operationId,messageCount:value.messages.length,durationMs:Date.now()-started});
+    }
+    return {state:'blocked',code,reason:code,handler:'self'};
 }
 function freezePublications(state:State,value:Envelope):State {
     if(Object.keys(state.seen).some(id=>!value.messages.some(row=>row.id===id)))throw failure('CHANNEL_MESSAGE_MISSING');

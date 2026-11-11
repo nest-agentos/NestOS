@@ -42,7 +42,7 @@ export function developmentPreparation(options: Options): NonNullable<PersonalKa
         const source = await developmentStage(input.dispatch.id, 'agent.resolve', async () => options.agents.getAgentRevision?.(input.target.id, input.target.version));
         requireValue(source?.target.digest === input.target.digest && source.definition.execution?.kind === 'harness', 'NATIVE_AGENT_REQUIRED');
         const selected = input.item.externalRefs?.filter(ref => ref.system === REMOTE_PROJECT_REFERENCE) ?? [];
-        requireValue(selected.length === 1, 'SINGLE_PROJECT_TASK_REQUIRED');
+        requireValue(input.stage==='decision'?selected.length>0:selected.length===1, 'SINGLE_PROJECT_TASK_REQUIRED');
         const connectionId = source.definition.execution.connectionId;
         const template = await developmentStage(input.dispatch.id, 'connection.resolve', () => options.connections.get(connectionId));
         requireValue(template?.connection && template.connection.enabled !== false, 'NATIVE_CONNECTION_REQUIRED');

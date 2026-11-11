@@ -345,3 +345,23 @@ it('ensures a persistent decision coordination Session before a worktree prepara
  expect(openRecordCoordination).toHaveBeenCalledWith('board',expect.objectContaining({recordId:'decision'}));
  expect((await reopened.item('board','first')).item.analysis?.code).toBe('GIT_WORKTREE_CREATE_FAILED');
 });
+
+it('settles missing planning output after successful execution without replaying it on restart',async()=>{
+ const f=await fixture();vi.mocked(f.analysisOutput).mockResolvedValue(undefined);
+ await f.item('missing-result');await f.service.scan();
+ expect((await f.service.item('board','missing-result')).task).toMatchObject({phase:'error',reason:'PLANNING_RESULT_MISSING'});
+ expect(f.executions()).toHaveLength(0);expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
+ await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());await reopened.scan();
+ expect(await reopened.analysisStatus!('board','missing-result')).toMatchObject({state:'blocked',code:'PLANNING_RESULT_MISSING'});
+ expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
+ vi.mocked(f.analysisOutput).mockResolvedValue({state:'succeeded',output:{ready:true,dependencies:[],reason:'Published in original session',estimate:{complexity:1,workUnits:1,durationMs:60000,confidence:'high'}}});
+ await reopened.scan();expect(f.executions()).toHaveLength(1);
+ expect([...f.submitted.values()].filter(input=>input.request.expectedTarget!.id==='planner')).toHaveLength(1);
+});
+
+it('uses verified channel failure even while the parent call has not settled',async()=>{
+ const f=await fixture();vi.mocked(f.analysisOutput).mockResolvedValue({state:'blocked',code:'PLANNING_RESULT_MISSING',handler:'self'});
+ vi.mocked(f.calls.list).mockResolvedValue([]);await f.item('channel-completed');await f.service.scan();
+ expect(await f.service.analysisStatus!('board','channel-completed')).toMatchObject({state:'blocked',code:'PLANNING_RESULT_MISSING'});
+ expect(f.executions()).toHaveLength(0);
+});
