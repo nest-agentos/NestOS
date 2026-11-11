@@ -1,7 +1,7 @@
 import {randomUUID} from '@nestos/common';
 import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import {failure, type PromptJournal} from './prompt-bundle';
-import type {sessionSubmission, SessionSubmissionObservation} from './session-submission';
+import type {createSessionSubmission as sessionSubmission, SessionSubmissionObservation} from '@nestos/llm-session';
 import {channelDigest, type ChannelRequest, type ChannelResponse, type ChannelReply, type ChannelEnvelope} from './channel-protocol';
 interface Turn {history?: Array<{id: string; requests: string[]}>; phase: 'idle' | 'prepared' | 'submitting'; consumed: string[]; requests?: string[]; request?: SubmissionRequest}
 interface Receipt {digest: string; request: ChannelRequest; response?: ChannelResponse}

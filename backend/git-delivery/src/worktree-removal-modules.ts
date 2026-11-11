@@ -1,8 +1,8 @@
 import {sha256HexSync} from '@nestos/common';
-import {requireValue} from '../kanban/validation';
-import type {RemoteProcessHandle} from './remote-mounts';
+import {requireValue} from './errors';
+import type {GitProcess as RemoteProcessHandle} from './contracts';
 import {gitWorkspace,type WorktreeRepository} from './worktree-modules';
-interface ModuleProof {path:string;head:string;target:string;reasons:string[]}
+export interface ModuleProof {path:string;head:string;target:string;reasons:string[]}
 /** Git requires force for populated submodules; prove every retained commit and file first. */
 export async function inspectRemovalModules(process:RemoteProcessHandle,directory:string,authorized:WorktreeRepository[]) {
     const listing=(await gitWorkspace(process,directory,['submodule','status','--recursive'])).stdout;

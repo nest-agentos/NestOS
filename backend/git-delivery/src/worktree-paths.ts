@@ -1,5 +1,5 @@
-import type {RemoteProcessHandle} from './remote-mounts';
-import {requireValue} from '../kanban/validation';
+import type {GitProcess as RemoteProcessHandle} from './contracts';
+import {requireValue} from './errors';
 const roots=new WeakMap<RemoteProcessHandle,Promise<string>>();
 
 /** CWD is translated by Cells; absolute argv paths must use that process's real project root. */

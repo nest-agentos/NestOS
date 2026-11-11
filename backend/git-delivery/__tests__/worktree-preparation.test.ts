@@ -4,8 +4,8 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {prepareWorktree} from '../src/projects/worktree-preparation';
-import type {RemoteProcessHandle} from '../src/projects/remote-mounts';
+import {prepareWorktree} from '@nestos/git-delivery/worktrees';
+import type {GitProcess as RemoteProcessHandle} from '@nestos/git-delivery/contracts';
 const run = promisify(execFile), paths: string[] = [];
 afterEach(async () => {for (const path of paths.splice(0)) await rm(path, {recursive: true, force: true});});
 it('creates a real worktree with relocatable metadata and reconciles a lost creation response', async () => {

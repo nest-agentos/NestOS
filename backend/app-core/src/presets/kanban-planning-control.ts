@@ -9,7 +9,7 @@ interface Frozen {phase:'prepared'|'submitting';sessionId:string;turnId:string;e
 
 /** Control the retained native conversation separately from its already settled initial call. */
 export function planningConversationControl(options:Options,journal:KanbanAutomationJournal) {
-    return async(input:Request):Promise<import('../run/submission-control').SubmissionControlState>=>{
+    return async(input:Request):Promise<import('@nestos/llm-session').SubmissionControlState>=>{
         const record=await journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+input.scopeId);
         requireValue(record,'SESSION_CHANNEL_WORKSPACE_REQUIRED');
         const read=async()=>await options.remote.sessionChannel(record.projectId,'messages',{scopeId:input.scopeId}) as {execution?:Execution};

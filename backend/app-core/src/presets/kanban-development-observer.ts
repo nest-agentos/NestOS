@@ -6,7 +6,7 @@ import {createModuleLogger} from '@nestos/common';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 import {readContextCatalog, type ContextInspector} from '../projects/harness-context-catalog';
-import type {PreparedWorktree} from '../projects/worktree-preparation';
+import type {PreparedWorktree} from '@nestos/git-delivery/worktrees';
 import {journalCommand} from '@nestos/kanban/integration';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {ProjectService} from '@nestos/app-contracts/services';

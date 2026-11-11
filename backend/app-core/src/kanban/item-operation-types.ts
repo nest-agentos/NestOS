@@ -1,14 +1,11 @@
 import type {IndependentCallInput, SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {KanbanExternalReference, KanbanItem, KanbanBoard, KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
-import type {publishedOperation, OperationObservation} from '../run/published-operation';
-import type {sessionSubmission} from '../run/session-submission';
+import type {createPublishedOperation as publishedOperation, OperationObservation} from '@nestos/llm-session';
+import type {createSessionSubmission as sessionSubmission} from '@nestos/llm-session';
 export type ReviewAction = 'build' | 'deploy' | 'accept' | 'analyze' | 'merge';
 export interface ReviewSnapshot {version: string; sourceVersion: string; targetVersion: string; context: unknown}
-export interface MergePlan {
-    sourceVersion: string; targetVersion: string; summary: string;
-    conflicts: Array<{id: string; path: string; reason: string; options: Array<{id: string; label: string; detail?: string}>}>;
-}
+export type {MergePlan} from '@nestos/git-delivery/contracts';
 export interface ReviewJob {
     scopeId?:string;
     id: string; boardId: string; itemId: string; action: ReviewAction; fingerprint: string; snapshot: ReviewSnapshot;
@@ -27,7 +24,7 @@ export interface ReviewAdapter {
     cancel?(job:ReviewJob,operationId:string):Promise<'accepted'|'cancelled'|'unknown'>;
     managed?:{describe?(item:KanbanItem):Promise<import('../runtime/service-control').RuntimeServiceDescriptor|undefined>;prepare(input:{id:string;board:KanbanBoard;item:KanbanItem;snapshot:ReviewSnapshot;context:unknown}):Promise<import('../runtime/service-control').ServiceSwitchRequest|undefined>;
         submit(request:import('../runtime/service-control').ServiceSwitchRequest):Promise<void>;
-        inspect(job:ReviewJob):Promise<import('../run/published-operation').OperationObservation>};
+        inspect(job:ReviewJob):Promise<import('@nestos/llm-session').OperationObservation>};
     supports?(board: KanbanBoard, item: KanbanItem): boolean;
     runningVersion?(): string | undefined;
     snapshot(board: KanbanBoard, item: KanbanItem): Promise<ReviewSnapshot>;
@@ -35,7 +32,7 @@ export interface ReviewAdapter {
     prepareOperation?(input: {id: string; action: Exclude<ReviewAction, 'accept'>; context?: unknown; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot}): Promise<SubmissionRequest>;
     readOperation?(job: ReviewJob): Promise<unknown | undefined>;
     prepareAnalysis(input: {id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot}): Promise<SubmissionRequest>;
-    exchange?(job: ReviewJob, observation: import('../run/session-submission').SessionSubmissionObservation): Promise<import('../run/session-submission').SessionSubmissionObservation>;
+    exchange?(job: ReviewJob, observation: import('@nestos/llm-session').SessionSubmissionObservation): Promise<import('@nestos/llm-session').SessionSubmissionObservation>;
     close?(): Promise<void>;
     readAnalysis(job: ReviewJob): Promise<unknown | undefined>;
 }

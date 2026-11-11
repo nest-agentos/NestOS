@@ -285,3 +285,9 @@ test('Kanban Markdown rendering stays on public UI exports and rejects host depe
         assert.ok(inspect(`import type {Client} from '${target}';`).some(error=>/only depend on Kanban contracts/.test(error)));
     }
 });
+
+test('Git delivery owns repository rules without depending on application or execution runtimes',()=>{
+    for(const target of ['common','vfs-core','tools'])assert.equal(dependencyError('@nestos/git-delivery','@nestos/'+target),undefined);
+    for(const target of ['app-core','app-shell','llm-session','llm-flow','durable-kernel','kernel-adapters','kanban'])assert.match(dependencyError('@nestos/git-delivery','@nestos/'+target),/Git rules|execution through ports/);
+    assert.equal(dependencyError('@nestos/app-core','@nestos/git-delivery'),undefined);
+});

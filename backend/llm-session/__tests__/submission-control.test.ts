@@ -1,5 +1,5 @@
 import {expect, it, vi} from 'vitest';
-import {submissionControl, type ControlJournal} from '../src/run/submission-control';
+import {createSubmissionControl as submissionControl, type ControlJournal} from '@nestos/llm-session';
 function fixture() {
     let task = {id:'primary',sessionId:'original',rootTaskId:'primary',labels:{roundId:'continuation'},program:{kind:'agent'},effects:{native:{status:'leased'}},status:'running',control:{epoch:2,mode:'run'},exit:undefined} as any;
     const child = {...task,id:'child',effects:{},exit:{status:'cancelled'}};

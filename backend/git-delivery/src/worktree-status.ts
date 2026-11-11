@@ -1,8 +1,8 @@
 import {sha256HexSync} from '@nestos/common';
 import {gitWorkspace} from './worktree-modules';
-import type {RemoteProcessHandle} from './remote-mounts';
+import type {GitProcess as RemoteProcessHandle} from './contracts';
 import type {PreparedWorktree} from './worktree-preparation';
-import {requireValue} from '../kanban/validation';
+import {requireValue} from './errors';
 
 export interface WorktreeStatus {
     exists: boolean; branch: string; head?: string; targetBranch: string; targetHead: string;

@@ -2,7 +2,7 @@ import {sha256HexSync} from '@nestos/common';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {ReviewAdapter,ReviewJob} from '../kanban/item-operation-types';
-import type {submissionControl,SubmissionControlState} from '../run/submission-control';
+import type {createSubmissionControl as submissionControl,SubmissionControlState} from '@nestos/llm-session';
 import {requireValue} from '../kanban/validation';
 interface Options {journal:KanbanAutomationJournal;submission:ReturnType<typeof submissionControl>;native(input:{scopeId:string;operationId:string;action:'cancel'}):Promise<SubmissionControlState>}
 /** Freeze every admitted continuation and control only this review's channel. */

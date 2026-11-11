@@ -7,13 +7,13 @@ import {indexResourceJob} from '../kanban/resource-operation-index';
 import {requireValue} from '../kanban/validation';
 import {developmentReviewAdapter,developmentReviewSnapshot,prepareDevelopmentReviewOperation,type DevelopmentReviewOptions} from './kanban-development-review';
 import {developmentWorkspace} from './kanban-development-workspace';
-import {gitWorkspace} from '../projects/worktree-modules';
+import {verifyGitIntegration} from '@nestos/git-delivery/integration';
+import type {GitSource,GitApproval} from '@nestos/git-delivery/contracts';
 import {managedServiceDeployment} from './managed-service-deployment';
 import {maintenanceInstruction} from './kanban-maintenance';
 import {managementBatchSnapshot,managementBatch} from './kanban-management-snapshot';
 import {freezeManagementScope,type ManagementScope} from './kanban-management-scope-catalog';
 import prompts from '../resources/kanban/kanban-management-prompts.json';
-import {verifyManagementChanges} from './kanban-management-changes';
 
 /** Each repository uses the existing execution, receipt, cancellation and controller mechanisms. */
 export function managementReviewAdapter(options:DevelopmentReviewOptions,scope:ManagementScope):ReviewAdapter {
@@ -70,19 +70,6 @@ async function acceptanceCommands(options:DevelopmentReviewOptions,scope:Managem
 }
 export async function verifyManagementMerge(options:Pick<DevelopmentReviewOptions,'remote'|'provider'>,job:ReviewJob,actual:ReviewSnapshot,result:unknown):Promise<void> {
     const batch=managementBatch(job.snapshot),target=(result as {targetHead?:string}).targetHead;
-    requireValue(target===actual.targetVersion,'OPERATION_RESULT_MERGE_UNCONFIRMED');
-    await developmentWorkspace(options.remote,options.provider,batch.projectId,async process=>{
-        const ancestor=async(commit:string,cwd='/workspace')=>(await gitWorkspace(process,cwd,['merge-base','--is-ancestor',commit,target!],true)).code===0;
-        requireValue(await ancestor(job.snapshot.targetVersion),'OPERATION_RESULT_TARGET_REWRITTEN');
-        for(const source of batch.sources){
-            const context=source.snapshot.context as {sourceHead?:string;directory:string;repositories?:Array<{path:string;head:string;dirty?:boolean}>};
-            requireValue(typeof context.sourceHead==='string'&&await ancestor(context.sourceHead),'OPERATION_RESULT_BATCH_INCOMPLETE');
-            for(const repository of context.repositories??[]){if(repository.path==='.'){if(repository.dirty)await verifyManagementChanges(process,job,context.directory,target!,'.');continue;}
-                const entry=(await gitWorkspace(process,'/workspace',['ls-tree',target!,'--',repository.path])).stdout;
-                const head=/^160000 commit ([a-f0-9]{40,64})\t/.exec(entry)?.[1];requireValue(head,'OPERATION_RESULT_BATCH_INCOMPLETE');
-                requireValue((await gitWorkspace(process,'/workspace/'+repository.path,['merge-base','--is-ancestor',repository.head,head],true)).code===0,'OPERATION_RESULT_BATCH_INCOMPLETE');
-                if(repository.dirty)await verifyManagementChanges(process,job,context.directory,head!,repository.path);
-            }
-        }
-    });
+    await developmentWorkspace(options.remote,options.provider,batch.projectId,process=>verifyGitIntegration(process,{previousTarget:job.snapshot.targetVersion,
+        actualTarget:actual.targetVersion,reportedTarget:target,sources:batch.sources.map(source=>source.snapshot.context as GitSource),approval:job.operationContext as GitApproval}));
 }

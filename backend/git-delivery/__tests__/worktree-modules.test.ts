@@ -4,9 +4,9 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {prepareWorktree} from '../src/projects/worktree-preparation';
-import {prepareWorktreeModules, verifyWorktreeDelivery} from '../src/projects/worktree-modules';
-import type {RemoteProcessHandle} from '../src/projects/remote-mounts';
+import {prepareWorktree} from '@nestos/git-delivery/worktrees';
+import {prepareWorktreeModules, verifyWorktreeDelivery} from '@nestos/git-delivery/repositories';
+import type {GitProcess as RemoteProcessHandle} from '@nestos/git-delivery/contracts';
 const run = promisify(execFile), paths: string[] = [];
 afterEach(async () => {for (const path of paths.splice(0)) await rm(path, {recursive: true, force: true});});
 async function fixture(native=false) {
@@ -78,7 +78,7 @@ it('keeps initialized submodules usable when the project root changes namespaces
 });
 it('registers module candidates without cloning and verifies lazily prepared branches', async () => {
     const f = await fixture();
-    const {availableWorktreeModules} = await import('../src/projects/worktree-modules');
+    const {availableWorktreeModules} = await import('@nestos/git-delivery/repositories');
     const available = await availableWorktreeModules(f.process, f.tree);
     const prepared = await prepareWorktreeModules(f.journal, f.tree, [], f.process);
     expect(prepared).toHaveLength(1); expect(available[0].path).toBe('module');
@@ -106,7 +106,7 @@ it('uses native argv paths while retaining logical worktree receipts and relocat
  const repositories=await prepareWorktreeModules(f.journal,f.tree,['module'],f.process);
  expect(await f.git(f.work,['rev-parse','HEAD'])).toBe(f.tree.baseCommit);expect(f.tree.directory).toBe('/workspace/_nestos/worktrees/attempt');
  expect((await verifyWorktreeDelivery(f.process,f.tree.directory,repositories,'changes')).every(row=>!row.dirty)).toBe(true);
- const {gitWorkspace}=await import('../src/projects/worktree-modules');
+ const {gitWorkspace}=await import('@nestos/git-delivery/repositories');
  expect((await gitWorkspace(f.process,'/workspace',['worktree','list','--porcelain'])).stdout).toContain('worktree '+f.tree.directory);
  expect(f.commands.flat().some(arg=>arg.includes('/workspace'))).toBe(false);
  await gitWorkspace(f.process,'/workspace',['worktree','remove','--force',f.tree.directory]);

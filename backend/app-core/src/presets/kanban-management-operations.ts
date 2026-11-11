@@ -1,3 +1,4 @@
+import {repositoryDeliveryPlan} from '@nestos/git-delivery/policy';
 import {sha256HexSync,t} from '@nestos/common';
 import type {KanbanBoard,KanbanItem} from '@nestos/kanban/contracts';
 import type {OperationScopeProvider,ReviewAdapter,ReviewJob,ReviewOperationsOptions,DeliveryPlan,ReviewSettings} from '../kanban/item-operation-types';
@@ -7,7 +8,8 @@ import {managementReviewAdapter} from './kanban-management-review';
 import type {DevelopmentReviewOptions} from './kanban-development-review';
 import {requiresDevelopmentProject} from './kanban-development-policy';
 import {managementBatch} from './kanban-management-snapshot';
-import {managementOwner,managementScopes,savedManagementScopes,managementScopeKey,integratedContributionKey,isManagementVerifier,type ManagementScope} from './kanban-management-scope-catalog';
+import {managementTaskOwner as managementOwner} from '@nestos/kanban/integration';
+import {managementScopes,savedManagementScopes,managementScopeKey,integratedContributionKey,isManagementVerifier,type ManagementScope} from './kanban-management-scope-catalog';
 
 interface Options extends DevelopmentReviewOptions {
     basePlan:NonNullable<ReviewOperationsOptions['deliveryPlan']>;
@@ -72,8 +74,7 @@ async function cleanupManagementScope(options:Options,scope:ManagementScope,oper
 
 async function repositoryPlan(options:Options,scope:ManagementScope,board:KanbanBoard):Promise<DeliveryPlan> {
     const plans=await Promise.all(scope.contributors.map(async source=>options.basePlan(board,(await options.service.item(board.id,source.itemId)).item)));
-    const build=plans.some(plan=>plan.steps.includes('build')),deploy=plans.some(plan=>plan.steps.includes('deploy'));
-    return {ordering:'configured',steps:['analyze','merge',...build?['build']:[],...deploy?['deploy']:[],'accept','cleanup'],acceptance:deploy?'runtime':'source',...(plans.some(plan=>plan.manualAfter==='build')?{manualAfter:'build'}:{})};
+    return repositoryDeliveryPlan(plans);
 }
 async function hasManagementReceipt(options:Options,owner:{boardId:string;itemId:string},source:string,action:string):Promise<boolean> {
     for(const scope of await savedManagementScopes(options.journal,owner.boardId,owner.itemId)){

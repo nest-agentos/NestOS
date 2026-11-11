@@ -1,9 +1,9 @@
 import {cancelQueuedSubmission} from './submission-queue-control';
-import {taskStat, type Kernel, type TaskRecord, type TaskControlReceipt} from '@nestos/durable-kernel';
+import {taskStat, taskExecutionStat, type Kernel, type TaskRecord, type TaskControlReceipt} from '@nestos/durable-kernel';
 import {FlowCommand, hasFlowControlTree} from '@nestos/llm-flow/contracts';
-import type {ISessionRepository, Round} from '@nestos/llm-session/contracts';
-import type {ConversationContexts} from '../runtime/conversation-contexts';
-import {failure} from './prompt-bundle';
+import type {ISessionRepository, Round} from '../contracts';
+import type {SessionSubmissionOptions} from './submission-execution';
+const failure=(code:string)=>Object.assign(new Error(code),{code});
 export interface ControlJournal {
     get<T>(key: string): Promise<T | undefined>;
     update<T>(key: string, change: (old: T | undefined) => T): Promise<T>;
@@ -11,14 +11,14 @@ export interface ControlJournal {
 }
 export interface SubmissionControlRequest {sessionId: string; submissionId: string; requestId: string; action: 'pause' | 'resume' | 'cancel'}
 export type SubmissionControlState = 'accepted' | 'paused' | 'resumed' | 'cancelled' | 'unknown';
-interface Options {
-    contexts: Pick<ConversationContexts, 'open'>; repository: Pick<ISessionRepository, 'readDocument' | 'getManifest'>;
+export interface SubmissionControlOptions {
+    contexts: SessionSubmissionOptions['contexts']; repository: Pick<ISessionRepository, 'readDocument' | 'getManifest'>;
     kernel: Kernel; ensureWritable?(sessionId: string): Promise<boolean>;
 }
 interface Frozen {phase: 'prepared' | 'submitting'; taskId: string; expectedEpoch: number; action: SubmissionControlRequest['action'] | 'withdraw'; flow: boolean; remaining: boolean}
 function assert(value: unknown, code: string): asserts value {if (!value) throw failure(code);}
 /** Control the exact persisted round in its existing Session, including continuations and maintenance. */
-export function submissionControl(options: Options) {
+export function createSubmissionControl(options: SubmissionControlOptions) {
     return async (input: SubmissionControlRequest, journal: ControlJournal): Promise<SubmissionControlState> => {
         const task = await originalTask(options, input);
         if (!task) return cancelQueuedSubmission(options, input);
@@ -37,7 +37,7 @@ export function submissionControl(options: Options) {
         return current?.requestId === input.requestId && current.acknowledged ? input.action === 'pause' ? 'paused' : 'resumed' : 'accepted';
     };
 }
-async function originalTask(options: Options, input: SubmissionControlRequest): Promise<TaskRecord | undefined> {
+async function originalTask(options: SubmissionControlOptions, input: SubmissionControlRequest): Promise<TaskRecord | undefined> {
     const raw = await options.repository.readDocument(input.sessionId, 'round-' + input.submissionId + '.json');
     if (!raw) return;
     const round = JSON.parse(raw) as Round;
@@ -50,8 +50,8 @@ async function originalTask(options: Options, input: SubmissionControlRequest): 
 }
 async function treeSettled(kernel: Kernel, task: TaskRecord): Promise<boolean> {
     const snapshot = await (await kernel.inspectSession(task.sessionId)).snapshot();
-    const tree = snapshot.tasks.filter(row => row.id === task.id || task.rootTaskId && row.rootTaskId === task.rootTaskId);
-    return taskStat(task).settled && tree.every(row => taskStat(row).settled);
+    const current=snapshot.tasks.find(row=>row.id===task.id);
+    return !!current&&taskExecutionStat(current,snapshot.tasks).settled;
 }
 async function taskControl(kernel: Kernel, input: SubmissionControlRequest, frozen: Frozen, write: boolean) {
     const {sessionId, requestId} = input, {taskId, expectedEpoch} = frozen, options = {requestId, expectedEpoch};
@@ -68,7 +68,7 @@ async function taskControl(kernel: Kernel, input: SubmissionControlRequest, froz
     }
     return kernel.readTaskControlReceipt(sessionId, taskId, requestId);
 }
-async function flowControl(options: Options, input: SubmissionControlRequest, frozen: Frozen, write: boolean) {
+async function flowControl(options: SubmissionControlOptions, input: SubmissionControlRequest, frozen: Frozen, write: boolean) {
     const lease = await options.contexts.open(input.sessionId);
     const query = {sessionId:input.sessionId,taskId:frozen.taskId,requestId:input.requestId}, control = {...query,expectedEpoch:frozen.expectedEpoch};
     try {

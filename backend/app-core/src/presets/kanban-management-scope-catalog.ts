@@ -1,3 +1,4 @@
+import {managementTaskOwner as managementOwner} from '@nestos/kanban/integration';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanService,KanbanDispatch} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
@@ -15,18 +16,7 @@ export const managementScopeKey=(id:string)=>'management-operation-scope:'+id;
 export const managementScopesKey=(board:string,item:string)=>'management-operation-scopes:'+JSON.stringify([board,item]);
 export const integratedContributionKey=(board:string,item:string,dispatch:string)=>'management-integrated:'+JSON.stringify([board,item,dispatch]);
 
-/** Canonical parent links establish ownership; titles and conversation state never infer it. */
-export function managementOwner(board:KanbanBoard,item:KanbanItem):KanbanItem|undefined {
-    let current=item,owner=item.planning?.execution==='children'?item:undefined;
-    const visited=new Set([item.id]);
-    while(current.planning?.parentId){
-        const parent=board.items.find(row=>row.id===current.planning!.parentId);
-        requireValue(parent&&!visited.has(parent.id),'OPERATION_OWNER_INVALID');
-        visited.add(parent.id);current=parent;
-        if(parent.planning?.execution==='children')owner=parent;
-    }
-    return owner;
-}
+
 function contributions(board:KanbanBoard,owner:KanbanItem,dispatches:KanbanDispatch[]):Map<string,ManagementContribution[]> {
     const groups=new Map<string,ManagementContribution[]>();
     for(const item of board.items){

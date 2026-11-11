@@ -1,0 +1,45 @@
+{
+  "name": "@nestos/git-delivery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contracts": "./src/contracts.ts",
+    "./repositories": "./src/worktree-modules.ts",
+    "./worktrees": "./src/worktree-preparation.ts",
+    "./paths": "./src/worktree-paths.ts",
+    "./inspection": "./src/worktree-status.ts",
+    "./modules": "./src/worktree-removal-modules.ts",
+    "./branches": "./src/managed-branches.ts",
+    "./archives": "./src/worktree-archive.ts",
+    "./integration": "./src/integration.ts",
+    "./snapshots": "./src/snapshot.ts",
+    "./removal": "./src/removal.ts",
+    "./identity": "./src/identity.ts",
+    "./provenance": "./src/commit-context.ts",
+    "./runtime": "./src/runtime-provenance.ts",
+    "./contexts": "./src/commit-query.ts",
+    "./cleanup": "./src/cleanup.ts",
+    "./policy": "./src/policy.ts",
+    "./results": "./src/results.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@nestos/common": "workspace:*",
+    "@nestos/vfs-core": "workspace:*",
+    "@nestos/tools": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "tsup": "^8.5.1"
+  }
+}

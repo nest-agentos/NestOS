@@ -1,7 +1,7 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {compatibleRuntimeDelivery} from '../src/presets/kanban-runtime-acceptance';
 const state=vi.hoisted(()=>({changed:false,ancestor:true,module:false}));
-vi.mock('../src/projects/worktree-modules',()=>({gitWorkspace:vi.fn(async(_process,_directory,args)=>{
+vi.mock('@nestos/git-delivery/repositories',()=>({gitWorkspace:vi.fn(async(_process,_directory,args)=>{
     if(args[0]==='rev-parse')return {stdout:'a'.repeat(40)+'\n',code:0};
     if(args.includes('ls-tree'))return {stdout:state.module?'160000 commit '+ 'd'.repeat(40)+'\tlibraries/mail\0':'',code:0};
     if(args[0]==='show')return {stdout:JSON.stringify({name:'@test/library'}),code:0};

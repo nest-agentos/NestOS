@@ -9,7 +9,7 @@ import { WORKSPACE_GROUPS } from './workspace-packages.mjs';
 
 const application = new Set(['@nestos/app-core', '@nestos/app-shell', '@nestos/app-settings']);
 const coreDependencies = new Set(['app-contracts', 'common', 'llm-context', 'vfs-core', 'durable-kernel', 'kernel-adapters',
-    'llm-flow', 'llm-session', 'llm-tasks', 'tools', 'driver-llm', 'vfs-sync', 'cells-driver', 'kanban', 'mail'].map(name => '@nestos/' + name));
+    'llm-flow', 'llm-session', 'llm-tasks', 'tools', 'driver-llm', 'vfs-sync', 'cells-driver', 'kanban', 'mail', 'git-delivery'].map(name => '@nestos/' + name));
 // Portable codecs are allowed explicitly; native I/O still requires host ports.
 coreDependencies.add('js-yaml');
 const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionStorage', 'navigator',
@@ -17,6 +17,7 @@ const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionSt
 
 export function dependencyError(source, target) {
     if (source === target) return;
+    if (source === '@nestos/git-delivery' && !['@nestos/common','@nestos/vfs-core','@nestos/tools'].includes(target)) return 'git-delivery owns Git rules and receives execution through ports; it must not depend on application or execution runtimes';
     if (source === '@nestos/device-tty' && target.startsWith('@nestos/')) return 'device-tty must use owned contracts and must not depend on application packages';
     if (source === '@nestos/image-parser' && target.startsWith('@nestos/') && target !== '@nestos/vfs-core') return 'image-parser only accepts optional VFS host adaptation';
     if (source === '@nestos/ui-common') return 'ui-common must remain dependency-free; host capabilities require generic ports';

@@ -1,13 +1,14 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
-import {managementOwner,managementScopes,freezeManagementScope,integratedContributionKey} from '../src/presets/kanban-management-scope-catalog';
+import {managementTaskOwner as managementOwner} from '@nestos/kanban/integration';
+import {managementScopes,freezeManagementScope,integratedContributionKey} from '../src/presets/kanban-management-scope-catalog';
 import {managementBatchSnapshot} from '../src/presets/kanban-management-snapshot';
 import {verifyManagementMerge} from '../src/presets/kanban-management-review';
-import {verifyManagementChanges} from '../src/presets/kanban-management-changes';
+import {verifyManagementChanges} from '@nestos/git-delivery/integration';
 const mock=vi.hoisted(()=>({git:vi.fn()}));
 vi.mock('../src/presets/kanban-development-workspace',()=>({developmentWorkspace:async(_r,_p,_id,work)=>work({})}));
-vi.mock('../src/projects/worktree-modules',()=>({gitWorkspace:(...args)=>mock.git(...args)}));
+vi.mock('@nestos/git-delivery/repositories',()=>({gitWorkspace:(...args)=>mock.git(...args)}));
 const closes:Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of closes.splice(0))await close();mock.git.mockReset();});
 async function fixture(){
@@ -62,7 +63,7 @@ it('keeps changes-only policy and verifies target file effects unless the user a
  mock.git.mockImplementation(async(_p,_cwd,args)=>({code:0,stdout:args[0]==='diff'?(args.includes('--diff-filter=D')?'':'file.ts\0'):args[0]==='ls-tree'?'100644 blob target-hash\tfile.ts\n':args[0]==='hash-object'?'source-hash\n':''}));
  await expect(verifyManagementChanges({} as never,{} as never,'/source','target','.')).rejects.toMatchObject({code:'OPERATION_RESULT_BATCH_INCOMPLETE'});
  const approved={operationContext:{selections:{file:'combine'},plan:{conflicts:[{id:'file',path:'file.ts',options:[{id:'combine'}]}]}}};
- await expect(verifyManagementChanges({} as never,approved as never,'/source','target','.')).resolves.toBeUndefined();
+ await expect(verifyManagementChanges({} as never,approved.operationContext,'/source','target','.')).resolves.toBeUndefined();
  expect(mock.git.mock.calls.every(call=>!['commit','reset','stash','merge'].includes(call[2][0]))).toBe(true);
 });
 

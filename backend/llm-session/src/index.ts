@@ -360,3 +360,8 @@ export { prepareFlowConnections } from './session/flow-connections';
 export {createSessionId} from './persistence/session-identity';
 
 export {controlIndependentCall,independentCallSettled,CallControlError,type CallControlJournal,type DurableCallControlPorts,type DurableCallControlRequest,type CallControlAction,type CallControlOutcome} from './session/durable-call-control';
+
+export {createSessionSubmission,type SessionSubmissionOptions,type SessionSubmissionObservation} from './session/submission-execution';
+export {createPublishedOperation,type PublishedOperationOptions,type OperationObservation} from './session/published-operation';
+
+export {createSubmissionControl,type SubmissionControlOptions,type SubmissionControlRequest,type SubmissionControlState,type ControlJournal} from './session/submission-control';

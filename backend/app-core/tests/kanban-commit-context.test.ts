@@ -7,7 +7,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
-import {freezeCommitContext, verifyCommitContexts, parseCommitTrailers} from '../src/presets/kanban-commit-context';
+import {freezeCommitContext, verifyCommitContexts, parseCommitTrailers} from '@nestos/git-delivery/provenance';
 import {resolveCommitRequest, preloadCommitContexts} from '../src/presets/kanban-commit-query';
 const closes: Array<() => Promise<void>> = [], exec = promisify(execFile);
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});

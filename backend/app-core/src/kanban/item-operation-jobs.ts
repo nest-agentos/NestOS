@@ -1,6 +1,6 @@
 import {invalidateReviewAnalysis,revalidateMergeAdmission} from './item-operation-analysis';
 import {cancellationKey,pendingCancellation,blocksOperation,type ReviewCancellation} from './item-operation-cancellation';
-import {validateOperationResult} from './item-operation-results';
+import {validateOperationResult} from '@nestos/git-delivery/results';
 import {indexResourceJob} from './resource-operation-index';
 import {coordinateOperation} from '@nestos/kanban/integration';
 import type {KanbanBoard, KanbanItem, KanbanItemOperationRequest} from '@nestos/kanban/contracts';
@@ -70,7 +70,9 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
             const receipt=output as {status?:string;version?:string}|undefined;
             return {...observation,...(recoverReplacement&&receipt?.status==='succeeded'&&options.adapter.runningVersion?.()===receipt.version?{state:'succeeded' as const}:{}),executionId:observation.sessionId,output};
         },validate:(record,output)=>{
-            validateOperationResult(record,output);
+            const expectedVersion=record.action==='deploy'?(record.request||record.managed?(record.operationContext as {version:string}).version
+                :JSON.parse((record.input!.request.source as {values:Record<string,string>}).values.context).input.version):undefined;
+            validateOperationResult({id:record.id,action:record.action,snapshot:record.snapshot,requireStatus:!!record.request,expectedVersion},output);
             if(record.action==='deploy')requireValue(options.adapter.runningVersion?.()===(output as {version:string}).version,'OPERATION_RESULT_RUNNING_VERSION_MISMATCH');
         },classify:reviewFailure,report:options.report}});
 }

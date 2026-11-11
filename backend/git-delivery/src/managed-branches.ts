@@ -1,8 +1,8 @@
 import {sha256HexSync} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
-import type {RemoteProcessHandle} from '../projects/remote-mounts';
-import {gitWorkspace} from '../projects/worktree-modules';
-import {requireValue} from '../kanban/validation';
+import type {GitProcess as RemoteProcessHandle} from './contracts';
+import {gitWorkspace} from './worktree-modules';
+import {requireValue} from './errors';
 export interface ManagedBranch {repository:string;name:string}
 export interface ManagedBranchState {branches:Array<ManagedBranch&{head:string}>;reasons:string[];version:string}
 /** Explicit scope registration prevents prefix-based deletion of unrelated user branches. */

@@ -1,8 +1,9 @@
 import {processWorkspacePath,worktreeArguments,logicalWorktreeListing} from './worktree-paths';
 import {sha256HexSync} from '@nestos/common';
 import {randomUUID} from '@nestos/common';
-import {failure, type PromptJournal} from '../run/prompt-bundle';
-import type {RemoteProcessHandle} from './remote-mounts';
+import {failure} from './errors';
+import type {GitJournal as PromptJournal} from './contracts';
+import type {GitProcess as RemoteProcessHandle} from './contracts';
 import type {PreparedWorktree} from './worktree-preparation';
 
 export interface WorktreeRepository {path: string; branch: string; baseCommit: string}

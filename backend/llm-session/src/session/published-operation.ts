@@ -1,8 +1,8 @@
-import type {IndependentCallService} from '@nestos/llm-session';
-import type {IndependentCallInput} from '@nestos/llm-session/contracts';
+import type {IndependentCallService} from './independent-calls';
+import type {IndependentCallInput} from '../contracts';
 import type {Kernel, TaskCallResult} from '@nestos/durable-kernel';
 import {nodeOutputEntries} from '@nestos/llm-flow/contracts';
-import {requireValue} from '../kanban/validation';
+function requireValue(value:unknown,code:string):asserts value {if(!value)throw Object.assign(new Error(code),{code});}
 
 export interface PublishedOperationOptions {
     calls: Pick<IndependentCallService, 'prepareTaskCall' | 'submitPreparedTaskCall' | 'inspectTaskCallSubmission' | 'list'>;
@@ -11,7 +11,7 @@ export interface PublishedOperationOptions {
 }
 export interface OperationObservation {state: 'running' | 'unknown' | 'succeeded' | 'failed'; sessionId?: string; output?: unknown; code?: string}
 /** Published calls retain the same frozen identity across lost replies and host restarts. */
-export function publishedOperation(options: PublishedOperationOptions) {
+export function createPublishedOperation(options: PublishedOperationOptions) {
     return {async start(input: IndependentCallInput): Promise<OperationObservation> {
         const id = input.request.expectedSessionId!;
         try {

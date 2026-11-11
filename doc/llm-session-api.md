@@ -886,3 +886,9 @@ initializeConversationSystem 在已配置独立调用宿主时返回 independent
 默认 key 是 `independent-call-control:` 加 Session/request 身份。可信宿主可注入旧 key/legacyKey；旧 submitting 标记保持不变，旧 query-only 暂停/恢复记录按明确 action 兼容，withdraw 按原 resume 意图核对。不支持的控制、坏记录、目标变化及缺失回执保留具体原因。`DurableCallControlPorts.log` 只接收操作身份、阶段、结果、错误码和耗时，日志异常不改变已持久结果。
 
 本机制不依赖 Kanban、应用目录、项目、提示词、UI 或通知；NestOS 的直接 submission fallback 留在宿主。底层授权、调用成员、Flow/Kernel 控制和回执校验仍复用 `IndependentCallControls`，不创建第二套执行器。
+
+### 宿主提交与执行观察端口
+
+`createSessionSubmission` 由宿主注入 contexts、repository、Kernel inspection 和可选 writer 准入，只发送正式 Session Submit 并观察同身份 Round/Task。`createPublishedOperation` 复用 IndependentCallService 的 prepare/submit/inspect，读取已发布 Flow 的正式 Return。二者不另建队列，unknown 只观察，不重发原输入；Round 结算未追上已结束 Task 时继续报告 running。执行树的结算/不确定性归 Kernel 的 taskExecutionStat。原 app-core/run 的实现已删除，调用方直接使用 llm-session 公开入口。
+
+`createSubmissionControl` 在原 Session 中控制原 Round 的 primary Task，复用 Kernel 执行树事实和 Flow 正式控制命令；队列撤回以持久回执确认，丢失响应只查询原请求，不重发。

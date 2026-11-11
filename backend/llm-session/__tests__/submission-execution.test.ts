@@ -1,5 +1,5 @@
 import{expect,it,vi}from'vitest';
-import{sessionSubmission}from'../src/run/session-submission';
+import{createSessionSubmission as sessionSubmission}from'../src';
 function fixture(){
  const submission={id:'request',source:{kind:'conversation',ownerId:'session',id:'request'}},round={id:'request',sessionId:'session',submission,status:'running',executions:[{role:'primary',taskId:'task'}]};
  const task={id:'task',sessionId:'session',rootTaskId:'task',labels:{roundId:'request'},program:{kind:'agent'},effects:{},exit:{status:'succeeded'}};
@@ -20,5 +20,11 @@ it.each(['CELLS_UNAVAILABLE','unsafe message with token'])('keeps an indetermina
  const f=fixture();delete (f.task as any).exit;
  Object.assign(f.task.effects,{harness:{status:'indeterminate',error:{code}}});
  expect(await f.api.inspect(f.request)).toMatchObject({outcome:'unknown',code:code==='CELLS_UNAVAILABLE'?code:'SUBMISSION_EFFECT_INDETERMINATE'});
+ expect(f.submit).not.toHaveBeenCalled();
+});
+
+it('does not accept a mismatched execution owner or fabricate an absent execution',async()=>{
+ const f=fixture();f.round.status='completed';f.task.sessionId='another';
+ await expect(f.api.inspect(f.request)).rejects.toMatchObject({code:'SUBMISSION_EXECUTION_CONFLICT'});
  expect(f.submit).not.toHaveBeenCalled();
 });

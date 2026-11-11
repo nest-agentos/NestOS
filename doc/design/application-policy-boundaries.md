@@ -149,17 +149,28 @@ Flow 库恢复时是否发布修订属于应用策略，由 app-core/presets/res
 
 ## app-core 的协调边界与存量审查（2026-11-11）
 
-目标是由 app-core 组合领域服务、传递授权上下文并协调跨模块调用。模块的领域规则与执行机制由各自所有者提供端口，不能为减小 app-core 而把 Git、看板或项目业务集中到 Kernel。此目标尚未完成迁移，现有目录位置不能作为继续增加业务实现的依据。
+目标是由 app-core 组合领域服务、传递授权上下文并协调跨模块调用。模块的领域规则与执行机制由各自所有者提供端口，不能为减小 app-core 而把 Git、看板或项目业务集中到 Kernel。本次先完成执行事实与 Git 领域的纵向拆分；其余存量目录不能作为继续增加业务实现的依据。
 
 | 职责 | 应拥有的模块 | 当前事实与迁移边界 |
 | --- | --- | --- |
 | 执行准入、调度、Effect、取消、恢复、unknown 和排空 | durable-kernel；kernel-adapters 提供受限副作用适配 | LLM/Flow 已经由 Session/独立调用进入 Kernel。外层可保存业务意图与批准，不另建执行队列，不根据聊天或 HTTP 成功猜测执行终态 |
 | 会话轮次、输入与执行绑定 | llm-session；远程原生队列由 Cells 驱动端拥有 | app-core/run 的 Session/Kernel 事实解析应收敛为下层提供的执行观察契约，适配层只映射业务结果 |
 | 管理任务、执行任务、依赖、验收和资源归属关系 | kanban | 优先复用 itemsWithinRoots 等公开规则。日志引用不赋予归属；业务 scan 失败与运行时是否排空分别核对 |
-| Git 工作区、合并、版本校验、制品和清理规则 | 独立 Git 交付 Tool/领域包；Flow 声明业务步骤 | 当前 app-core/presets/kanban-development-*、kanban-management-*、kanban-work-resource-* 是待迁出的业务实现。后续迁移必须保留 operationId、冻结批准、真实回执和资源归属，不能仅移动文件或再建一套执行器 |
+| Git 工作区、合并、版本校验、制品和清理规则 | 独立 Git 交付 Tool/领域包；Flow 声明业务步骤 | Git 命令、版本、来源、合并核验、资源归档与清理回执已归 backend/git-delivery。app-core/presets 的剩余实现承担项目授权、任务/Session 事实读取和端口组合；不执行原始 Git 指令或解析执行终态 |
 | httpd/VM 等基础设施生命周期 | 宿主与进程外监督器 | 进程外控制负责被重启进程停止后的接续。业务通过受限端口请求和核验回执；普通进程驱动不拥有第二套业务调度与恢复机制 |
 | 界面状态、入口与操作反馈 | 领域读模型与对应 UI | UI 消费归属、准入和结果，不推断业务成功、不因读取创建执行或调用 Git |
 
 业务事实、授权事实、执行事实和资源事实分别保留权威来源。Task 完成、Session 某轮失败、Git 已合入、验收通过和资源可清理并非同一状态；经读模型组合展示，不串成一个跨层总状态机。跨模块统一使用稳定操作身份、冻结输入、执行句柄、结构化回执及副作用核验。
 
 迁移采用可验证的纵向切片：先明确事实所有者与公开端口，再迁移实现及失败/恢复测试，最后由 app-core 注入端口。先完成 Git 交付领域与执行桥的接口划分，再迁出其策略和副作用；每批删除旧实现，避免同时维护新旧执行路径。Kernel 不导入业务包，独立 Kanban 不导入 Kernel/Session SDK，业务工具经现有 Tool/Effect 机制接入。
+
+
+### 已实施的职责收敛
+
+- `durable-kernel.taskExecutionStat` 统一提供执行树是否收尾、是否有不确定 Effect 的只读事实；跨 Session 的任务不混入同一执行。
+- `llm-session.createSessionSubmission/createPublishedOperation/createSubmissionControl` 拥有轮次/独立调用与 Kernel 回执的对应及终态解析；同一 Kernel 快照核对执行身份，本次迁移的交付提交链在 app-core 不再解析 Round/Task.exit。旧的 app-core 实现已删除。
+- `kanban.managementTaskOwner/itemsWithinRoots` 拥有管理任务归属和子树规则，应用只消费其结果。
+- `cells-driver.harnessExecutionConstraints` 拥有原生 writer、观察、草稿、队列与控制回执的约束；应用不重复推导原生 busy/unknown 状态。
+- `git-delivery` 独立模块拥有 GitSource/GitIntegration/GitCleanup 的规则与实现。上下文查询接受当前业务事实端口，清理接受授权、读取资源与执行屏障端口，没有对 app-core 的反向依赖。资源日志继续使用旧 key、schema 和操作身份，不迁移或重放在途执行。
+
+统一执行仍是 Session/Flow → Kernel → 已授权适配器。Git 领域的资源意图不调度 Task，不重派 unknown，Kernel 内不加入 Git/看板字段。httpd 启停监督器留在进程外；服务切换只有受信宿主端口可调用。

@@ -255,3 +255,5 @@ session/directory-view 在既有授权 Session 浏览器文件视图内聚合节
 工作台聚合查询通过 BrowserReadContext 复用本次项目目录、组织记录、收藏与工作区；文件准备不能等待导航查询。范围不跨查询缓存，失败后排空读取并释放全部借用句柄；项目根不读取不会展示的完整本地摘要。
 
 kanban/call-lifecycle 只适配 Session 的 controlIndependentCall，保留旧控制 key、应用错误码与直接 submission fallback，不再拥有通用控制状态机。协调结果/提案/范围、协作检查点与 ACK 意图、决策确认和恢复准入归 @nestos/kanban；NestOS 继续核对真实用户证据、项目授权、Native 会话、部署版本、业务动作与工作树。开发产物 schema 与合并校验留在 item-operation-results。
+
+Git 命令、仓库版本、提交来源与清理回执由 @nestos/git-delivery 拥有；app-core/presets 仅接入授权项目与业务事实端口，不保留原 worktree-* 或 Git 校验实现。Session 提交和已发布调用使用 llm-session 的 createSessionSubmission/createPublishedOperation/createSubmissionControl；执行树终态由 durable-kernel.taskExecutionStat 提供，原生资源约束由 cells-driver.harnessExecutionConstraints 提供，不在此重建同类判断。

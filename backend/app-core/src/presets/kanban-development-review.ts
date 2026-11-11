@@ -5,7 +5,7 @@ import {cancellationKey,blocksOperation,type ReviewCancellation} from '../kanban
 import {compatibleRuntimeDelivery} from './kanban-runtime-acceptance';
 import {retainedExecutionContexts} from '../projects/harness-context-selection';
 import {verifyFileDigest} from '../run/file-digest';
-import {verifyReadOnlyDelivery} from './kanban-delivery-plan';
+import {verifyReadOnlyDelivery} from '@nestos/git-delivery/policy';
 import {managedServiceDeployment} from './managed-service-deployment';
 import {operationReceipt} from '../run/operation-receipt';
 import {maintenanceInstruction} from './kanban-maintenance';
@@ -13,7 +13,7 @@ import {journalCommand} from '@nestos/kanban/integration';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
 import {preloadCommitContexts} from './kanban-commit-query';
 import {developmentChannelExchange} from './kanban-channel-exchange';
-import type {sessionSubmission} from '../run/session-submission';
+import type {createSessionSubmission as sessionSubmission} from '@nestos/llm-session';
 import {t, sha256HexSync} from '@nestos/common';
 import type {KanbanBoard, KanbanItem, KanbanService} from '@nestos/kanban/contracts';
 import type {IndependentCallService} from '@nestos/llm-session';
@@ -24,9 +24,9 @@ import type {ReviewAdapter, ReviewSnapshot, ReviewJob} from '../kanban/item-oper
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {readContextCatalog} from '../projects/harness-context-catalog';
-import {inspectWorktree} from '../projects/worktree-status';
-import {verifyWorktreeDelivery, gitWorkspace} from '../projects/worktree-modules';
-import type {PreparedWorktree} from '../projects/worktree-preparation';
+import {snapshotGitSource} from '@nestos/git-delivery/snapshots';
+import {verifyGitIntegration} from '@nestos/git-delivery/integration';
+import type {PreparedWorktree} from '@nestos/git-delivery/worktrees';
 import {currentChannelBinding, openDevelopmentChannel, type DevelopmentWorkspaceRecord} from './kanban-development';
 import {developmentWorkspace} from './kanban-development-workspace';
 import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../projects/remote-mounts';
@@ -39,7 +39,7 @@ import {workResourceExecution} from './kanban-work-resource-execution';
 
 export interface DevelopmentReviewOptions {
     connections?:Parameters<typeof planningConversationControl>[0]['connections'];
-    cancelSubmission?:ReturnType<typeof import('../run/submission-control').submissionControl>;
+    cancelSubmission?:ReturnType<typeof import('@nestos/llm-session').createSubmissionControl>;
     serviceControl?:import('../runtime/service-control').RuntimeServiceControl;
     submission?: ReturnType<typeof sessionSubmission>; wake?(): void;
     fs: IFileSystem; journal: KanbanAutomationJournal; service: KanbanService; calls: Pick<IndependentCallService, 'list'>;
@@ -98,16 +98,10 @@ async function snapshot(options: Options, board: KanbanBoard, item: KanbanItem):
     requireValue((record.context as {board?: {id?: string}; task?: {id?: string}})?.board?.id === board.id
         && (record.context as {task?: {id?: string}})?.task?.id === item.id, 'OPERATION_WORKSPACE_SCOPE_MISMATCH');
     return developmentWorkspace(options.remote, options.provider, record.projectId, async process => {
-        const status = await inspectWorktree(process, tree, '_nestos/kanban/'); requireValue(status.exists, 'WORKTREE_MISSING');
-        const targetChanges = await gitWorkspace(process, '/workspace', ['status', '--porcelain', '--untracked-files=normal', '--ignore-submodules=none']);
-        const targetWorktree = {dirty:!!targetChanges.stdout.trim(), statusDigest:sha256HexSync(targetChanges.stdout)};
-        const repositories = await verifyWorktreeDelivery(process, record.directory, record.repositories, record.policy.commit, record.availableRepositories);
-        verifyReadOnlyDelivery(record,repositories,options.runningVersion);
-        const {input: _input, ...commitContext} = record.commitContext ?? {};
-        const sourceVersion = sha256HexSync(JSON.stringify([record.projectId, tree.id, repositories])), targetVersion = status.targetHead;
-        return {sourceVersion, targetVersion, version: sha256HexSync(JSON.stringify([sourceVersion, status.targetBranch, targetVersion])),
-            context: {...(record.commitContext ? {commitContext} : {}), commitPolicy: record.policy.commit, projectId: record.projectId, worktreeId: tree.id, directory: tree.directory, branch: tree.branch, sourceHead: status.head,
-                targetBranch: status.targetBranch, targetHead: targetVersion, targetWorktree, repositories}};
+        const {input:_input,...commitContext}=record.commitContext??{};
+        const value=await snapshotGitSource(process,{projectId:record.projectId,tree,repositories:record.repositories,availableRepositories:record.availableRepositories,
+            commit:record.policy.commit,...(record.commitContext?{commitContext}:{})});
+        verifyReadOnlyDelivery(record,value.context.repositories,options.runningVersion);return value;
     });
 }
 async function prepareAnalysis(options: Options, input: MaintenanceInput): Promise<SubmissionRequest> {
@@ -173,12 +167,9 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
     requireValue(actual.sourceVersion === job.snapshot.sourceVersion, 'OPERATION_RESULT_SOURCE_CHANGED');
     if (job.action !== 'merge') requireValue(actual.version === job.snapshot.version, 'OPERATION_RESULT_SCOPE_MISMATCH');
     else {
-        requireValue((result as {targetHead?: string}).targetHead === actual.targetVersion, 'OPERATION_RESULT_MERGE_UNCONFIRMED');
-        await developmentWorkspace(options.remote, options.provider, current.record.projectId, async process => {
-            requireValue((await gitWorkspace(process, '/workspace', ['merge-base', '--is-ancestor', job.snapshot.targetVersion, actual.targetVersion], true)).code === 0, 'OPERATION_RESULT_TARGET_REWRITTEN');
-            const sourceHead=(actual.context as {sourceHead:string}).sourceHead;
-            requireValue((await gitWorkspace(process,'/workspace',['merge-base','--is-ancestor',sourceHead,actual.targetVersion],true)).code===0,'OPERATION_RESULT_MERGE_UNCONFIRMED');
-        });
+        await developmentWorkspace(options.remote,options.provider,current.record.projectId,process=>verifyGitIntegration(process,{
+            incompleteCode:'OPERATION_RESULT_MERGE_UNCONFIRMED',previousTarget:job.snapshot.targetVersion,actualTarget:actual.targetVersion,reportedTarget:(result as {targetHead?:string}).targetHead,
+            sources:[actual.context as import('@nestos/git-delivery/contracts').GitSource],approval:job.operationContext as import('@nestos/git-delivery/contracts').GitApproval}));
     }
     return result;
 }

@@ -5,7 +5,7 @@ import type {FlowDraft} from '@nestos/llm-flow/contracts';
 import type {RootTargetCatalog, IndependentCallInput} from '@nestos/llm-session/contracts';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {createSessionExecutionPreparer} from '../src/session/prepare-session-execution';
-import {publishedOperation} from '../src/run/published-operation';
+import {createPublishedOperation as publishedOperation} from '@nestos/llm-session';
 it('executes a real published Flow through durable Task-call and reads its Return result', async () => {
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'cli', digitalTwinAutoStart: false});
     try {

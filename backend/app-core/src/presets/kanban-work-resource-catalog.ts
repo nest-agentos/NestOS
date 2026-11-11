@@ -4,7 +4,7 @@ import {kanbanTaskType} from '@nestos/kanban/contracts';
 import type {KanbanItem,KanbanBoardWorkResourceQuery,KanbanBoardWorkResourcePage,KanbanItemSummary,KanbanWorkResourceTask,KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
-import type {PreparedWorktree} from '../projects/worktree-preparation';
+import type {PreparedWorktree} from '@nestos/git-delivery/worktrees';
 import {requireValue} from '../kanban/validation';
 const log=createModuleLogger('kanban-worktrees');
 interface Association {id:string;boardId:string;itemId:string;parentId?:string;projectId:string;createdAt:number}

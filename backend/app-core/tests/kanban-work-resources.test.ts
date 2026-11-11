@@ -8,7 +8,7 @@ import {promisify} from 'node:util';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {developmentWorkResources} from '../src/presets/kanban-work-resources';
-import {inspectWorktree, worktreeBlockers} from '../src/projects/worktree-status';
+import {inspectWorktree, worktreeBlockers} from '@nestos/git-delivery/inspection';
 
 const native = vi.hoisted(() => ({reasons: [] as string[]}));
 vi.mock('../src/presets/kanban-work-resource-execution', () => ({workResourceExecution: vi.fn(async () => native.reasons)}));

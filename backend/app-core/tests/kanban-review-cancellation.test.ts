@@ -1,6 +1,6 @@
 import {expect,it,vi} from 'vitest';
 import {reviewCancellation} from '../src/presets/kanban-review-cancellation';
-import type {SubmissionControlRequest,ControlJournal} from '../src/run/submission-control';
+import type {SubmissionControlRequest,ControlJournal} from '@nestos/llm-session';
 import type {ReviewJob} from '../src/kanban/item-operation-types';
 function fixture(){
  const values=new Map<string,unknown>();

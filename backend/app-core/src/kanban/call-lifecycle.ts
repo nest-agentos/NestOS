@@ -3,9 +3,9 @@ import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {KanbanError} from '@nestos/kanban';
 export interface CallLifecyclePorts {
     beforeCancel?:import('@nestos/kanban/integration').KanbanTaskControlOptions['beforeCancel'];
-    controlConversation?(input:{scopeId:string;operationId:string;action:'pause'|'resume'|'cancel'}):Promise<import('../run/submission-control').SubmissionControlState>;
+    controlConversation?(input:{scopeId:string;operationId:string;action:'pause'|'resume'|'cancel'}):Promise<import('@nestos/llm-session').SubmissionControlState>;
     calls: DurableCallControlPorts['calls'];
-    submissionControl?(input: import('../run/submission-control').SubmissionControlRequest, journal: import('../run/submission-control').ControlJournal): Promise<import('../run/submission-control').SubmissionControlState>;
+    submissionControl?(input: import('@nestos/llm-session').SubmissionControlRequest, journal: import('@nestos/llm-session').ControlJournal): Promise<import('@nestos/llm-session').SubmissionControlState>;
     callControl?: DurableCallControlPorts['callControl'];
     callCancel?: DurableCallControlPorts['callCancel'];
 }

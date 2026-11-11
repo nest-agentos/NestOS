@@ -1,15 +1,15 @@
 import {hasFlowControlTree} from '@nestos/llm-flow/contracts';
-import {SessionCommand, type SubmissionRequest, type Round, type ISessionRepository} from '@nestos/llm-session/contracts';
-import {taskStat, type Kernel} from '@nestos/durable-kernel';
-import type {ConversationContexts} from '../runtime/conversation-contexts';
-import {failure} from './prompt-bundle';
+import {SessionCommand, type SubmissionRequest, type Round, type ISessionRepository} from '../contracts';
+import {taskExecutionStat, type Kernel} from '@nestos/durable-kernel';
+import type {ICommandBus} from '../contracts';
+const failure=(code:string)=>Object.assign(new Error(code),{code});
 
-interface Options {contexts: Pick<ConversationContexts, 'open'>; repository: Pick<ISessionRepository, 'readDocument'>;
-    kernel: Pick<Kernel, 'task' | 'inspectSession'>; ensureWritable?(sessionId: string): Promise<boolean>}
+export interface SessionSubmissionOptions {contexts:{open(id:string):Promise<{commandBus:Pick<ICommandBus,'execute'>;dispose():Promise<void>}>}; repository: Pick<ISessionRepository, 'readDocument'>;
+    kernel: Pick<Kernel,'inspectSession'>; ensureWritable?(sessionId: string): Promise<boolean>}
 function requireValue(value: unknown, code: string): asserts value {if (!value) throw failure(code);}
 export interface SessionSubmissionObservation {controlCapabilities?: {pause:'boundary'|'none';resume:boolean}; sessionId: string; outcome: 'running' | 'unknown' | 'succeeded' | 'failed' | 'cancelled'; code?: string}
 /** Recover the admitted Session and inspect durable facts without activating a view or replaying input. */
-export function sessionSubmission(options: Options) {
+export function createSessionSubmission(options: SessionSubmissionOptions) {
     const inspect = async (request: SubmissionRequest): Promise<SessionSubmissionObservation> => {
         if (options.ensureWritable && !await options.ensureWritable(request.expectedSessionId!))
             return {sessionId: request.expectedSessionId!, outcome: 'unknown', code: 'SESSION_WRITER_UNAVAILABLE'};
@@ -30,7 +30,7 @@ export function sessionSubmission(options: Options) {
         return inspect(request);
     }};
 }
-async function inspectSubmission(options: Options, request: SubmissionRequest): Promise<SessionSubmissionObservation> {
+async function inspectSubmission(options: SessionSubmissionOptions, request: SubmissionRequest): Promise<SessionSubmissionObservation> {
     const sessionId = request.expectedSessionId!, id = request.submission!.id;
     const raw = await options.repository.readDocument(sessionId, `round-${id}.json`);
     if (!raw) return {sessionId, outcome: 'unknown', code: 'SUBMISSION_RECEIPT_UNKNOWN'};
@@ -43,15 +43,14 @@ async function inspectSubmission(options: Options, request: SubmissionRequest): 
     }
     const primary = round.executions.find(execution => execution.role === 'primary');
     if (!primary) return {sessionId, outcome: 'unknown', code: 'SUBMISSION_EXECUTION_MISSING'};
-    const task = await options.kernel.task(sessionId, primary.taskId);
-    requireValue(task.labels?.roundId === id, 'SUBMISSION_EXECUTION_CONFLICT');
-    const snapshot = await (await options.kernel.inspectSession(sessionId)).snapshot();
+    const snapshot=await (await options.kernel.inspectSession(sessionId)).snapshot(),task=snapshot.tasks.find(row=>row.id===primary.taskId);
+    if(!task)return {sessionId,outcome:'unknown',code:'SUBMISSION_EXECUTION_MISSING'};
+    requireValue(task.sessionId===sessionId&&task.labels?.roundId === id, 'SUBMISSION_EXECUTION_CONFLICT');
     const supported = task.program?.kind !== 'flow.aggregate' && task.labels?.kind !== 'flow-root' || hasFlowControlTree(task);
     const controlCapabilities = {pause:supported ? 'boundary' as const : 'none' as const, resume:supported};
-    const tree = snapshot.tasks.filter(row => row.rootTaskId === task.rootTaskId);
-    const uncertain=tree.flatMap(row=>Object.values(row.effects??{})).find(effect=>effect.status==='indeterminate');
-    if(uncertain){const code=uncertain.error?.code;return {sessionId,controlCapabilities,outcome:'unknown',code:code&&/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'SUBMISSION_EFFECT_INDETERMINATE'};}
-    if (!taskStat(task).settled || tree.some(row => !taskStat(row).settled)) return {sessionId, controlCapabilities, outcome: 'running'};
+    const execution=taskExecutionStat(task,snapshot.tasks);
+    if(execution.indeterminate)return {sessionId,controlCapabilities,outcome:'unknown',code:execution.code??'SUBMISSION_EFFECT_INDETERMINATE'};
+    if(!execution.settled)return {sessionId,controlCapabilities,outcome:'running'};
     if(!task.exit)return {sessionId,controlCapabilities,outcome:'unknown',code:'SUBMISSION_EXIT_MISSING'};
     if(!['completed','failed','cancelled'].includes(round.status))return {sessionId,controlCapabilities,outcome:'running',code:'SUBMISSION_SETTLEMENT_PENDING'};
     const outcome = task.exit.status === 'succeeded' ? 'succeeded' : task.exit.status === 'cancelled' ? 'cancelled' : 'failed';

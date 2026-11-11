@@ -1,6 +1,6 @@
 import {sha256HexSync} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
-import {requireValue} from '../kanban/validation';
+import {requireValue} from './errors';
 
 /** Retain the frozen prompts, protocol, messages and artifacts before removing a clean worktree. */
 export async function archiveWorktree(source: IFileSystem, destination: IFileSystem, directory: string, id: string): Promise<string> {

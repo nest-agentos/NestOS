@@ -1,8 +1,8 @@
 import {createModuleLogger,randomUUID, sha256HexSync} from '@nestos/common';
-import type {PromptJournal} from '../run/prompt-bundle';
-import {failure} from '../run/prompt-bundle';
-import {gitWorkspace, type RepositoryEvidence} from '../projects/worktree-modules';
-import type {RemoteProcessHandle} from '../projects/remote-mounts';
+import type {GitJournal as PromptJournal} from './contracts';
+import {failure} from './errors';
+import {gitWorkspace, type RepositoryEvidence} from './worktree-modules';
+import type {GitProcess as RemoteProcessHandle} from './contracts';
 const log=createModuleLogger('kanban-commit-context');
 export interface CommitContext {
     schema: 'nestos.commit-context/1'; scopeId: string; projectId: string; boardId: string; itemId: string;

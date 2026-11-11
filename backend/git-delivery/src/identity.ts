@@ -1,6 +1,6 @@
-import type {RemoteProcessHandle} from '../projects/remote-mounts';
-import {gitWorkspace} from '../projects/worktree-modules';
-import {failure} from '../run/prompt-bundle';
+import type {GitProcess as RemoteProcessHandle} from './contracts';
+import {gitWorkspace} from './worktree-modules';
+import {failure} from './errors';
 
 export interface GitCommitIdentity {name: string; email: string}
 /** Resolve configured project authority before entering the isolated native Session. */

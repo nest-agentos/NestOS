@@ -1,22 +1,22 @@
-import type {ReviewJob,MergePlan} from './item-operation-types';
-import {requireValue} from './validation';
+import type {GitOperationReceiptScope, MergePlan} from './contracts';
+import {requireValue} from './errors';
 
-/** Development output schemas and deployment evidence belong to the host. */
-export function validateOperationResult(job: ReviewJob, output: unknown): void {
+/** Validate frozen delivery receipts independently of the execution transport. */
+export function validateOperationResult(job: GitOperationReceiptScope, output: unknown): void {
     const value = output as {schema?: string; operationId?: string; sourceVersion?: string; targetVersion?: string; version?: string};
     if (job.action === 'analyze') {validateMergePlan(output, job); return;}
     requireValue(value?.schema === 'nestos.kanban.operation-result/1' && value.operationId === job.id, 'OPERATION_RESULT_INVALID');
     requireValue(value.sourceVersion === job.snapshot.sourceVersion && value.targetVersion === job.snapshot.targetVersion, 'OPERATION_RESULT_SCOPE_MISMATCH');
     const agent = output as {status?: string; summary?: string};
-    if (job.request) requireValue(['succeeded', 'blocked', 'failed'].includes(agent.status ?? ''), 'OPERATION_RESULT_INVALID');
+    if (job.requireStatus) requireValue(['succeeded', 'blocked', 'failed'].includes(agent.status ?? ''), 'OPERATION_RESULT_INVALID');
     if (agent.status === 'blocked' || agent.status === 'failed') {
         requireValue(typeof agent.summary === 'string' && agent.summary.length <= 8000, 'OPERATION_RESULT_INVALID');
         throw Object.assign(new Error('Agent operation did not complete'), {code: agent.status === 'blocked' ? 'OPERATION_RESULT_AGENT_BLOCKED' : 'OPERATION_RESULT_AGENT_FAILED', result: output});
     }
     if (job.action === 'build' || job.action === 'deploy') requireValue(typeof value.version === 'string' && /^[\w.+-]{1,128}$/.test(value.version), 'OPERATION_RESULT_VERSION_REQUIRED');
-    if (job.action === 'deploy') requireValue(value.version === (job.request || job.managed ? (job.operationContext as {version: string}).version : JSON.parse((job.input!.request.source as {values: Record<string, string>}).values.context).input.version), 'OPERATION_RESULT_VERSION_MISMATCH');
+    if (job.action === 'deploy') requireValue(value.version === job.expectedVersion, 'OPERATION_RESULT_VERSION_MISMATCH');
 }
-export function validateMergePlan(value: unknown, job: ReviewJob): asserts value is MergePlan {
+export function validateMergePlan(value: unknown, job: GitOperationReceiptScope): asserts value is MergePlan {
     const plan = value as MergePlan;
     requireValue(plan && plan.sourceVersion === job.snapshot.sourceVersion && plan.targetVersion === job.snapshot.targetVersion
         && typeof plan.summary === 'string' && plan.summary.length <= 8000 && Array.isArray(plan.conflicts) && plan.conflicts.length <= 100, 'MERGE_PLAN_INVALID');

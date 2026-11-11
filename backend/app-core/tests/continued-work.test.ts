@@ -1,6 +1,6 @@
 import {expect, it, vi, afterEach} from 'vitest';
 import {withContinuedWork} from '../src/kanban/continued-work';
-import {sessionSubmission} from '../src/run/session-submission';
+import {createSessionSubmission as sessionSubmission} from '@nestos/llm-session';
 const context = vi.hoisted(() => ({bindings: {} as Record<string, unknown>}));
 vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async () => ({value: {bindings: context.bindings}})}));
 afterEach(() => {context.bindings = {};});
@@ -40,7 +40,7 @@ it('refuses busy or invalid original bindings before preparing new workspace fil
 it('uses ordinary Session admission and withholds success until the full execution tree settles', async () => {
     const request = {expectedSessionId: 'same', expectedBranch: 'main', submission: {id: 'new', source: {kind: 'conversation', ownerId: 'same', id: 'new'}}} as any;
     const root = {id: 'task', sessionId: 'same', rootTaskId: 'task', labels: {roundId: 'new'}, effects: {}, exit: {status: 'succeeded'}};
-    const child = {id: 'child', rootTaskId: 'task', effects: {external: {status: 'leased'}}, exit: {status: 'succeeded'}};
+    const child = {id: 'child', sessionId:'same',rootTaskId: 'task', effects: {external: {status: 'leased'}}, exit: {status: 'succeeded'}};
     const round = {id: 'new', sessionId: 'same', submission: request.submission, status: 'completed', executions: [{role: 'primary', taskId: 'task'}]};
     const lease = {commandBus: {execute: vi.fn()}, dispose: vi.fn()}, open = vi.fn(async () => lease);
     const snapshot = {tasks: [root, child]}, options = {contexts: {open}, repository: {readDocument: async () => JSON.stringify(round)},
@@ -74,7 +74,7 @@ it('retries recovery of the original Session on observation after a boot-time le
 it('reattaches a host execution context to a running admitted round without submitting it again', async () => {
     const request = {expectedSessionId: 'original', submission: {id: 'frozen', source: {kind: 'conversation', ownerId: 'original', id: 'frozen'}}} as any;
     const round = {id: 'frozen', sessionId: 'original', submission: request.submission, status: 'running', executions: [{role: 'primary', taskId: 'task'}]};
-    const task = {id: 'task', rootTaskId: 'task', labels: {roundId: 'frozen'}, effects: {native: {status: 'leased'}}};
+    const task = {id: 'task',sessionId:'original', rootTaskId: 'task', labels: {roundId: 'frozen'}, effects: {native: {status: 'leased'}}};
     const execute = vi.fn(), lease = {commandBus: {execute}, dispose: vi.fn()}, open = vi.fn(async () => lease);
     const port = sessionSubmission({contexts: {open}, ensureWritable: async () => true, repository: {readDocument: async () => JSON.stringify(round)},
         kernel: {task: async () => task, inspectSession: async () => ({snapshot: async () => ({tasks: [task]})})}} as any);

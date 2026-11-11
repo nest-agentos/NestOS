@@ -930,3 +930,7 @@ Effect适配器可通过可选 `failureOutcome(error)` 将实时调用无法确�
 索引位于 catalog.seq 的 `recovery/<scope>/<taskId>` 与 `shared-recovery/<scope>/<sessionId>/<key>`，只存身份引用。Session 和 catalog 必须在同一 IFileSystem 事务域；跨域明确拒绝。普通 shared 覆盖保留原责任，归档导入重绑定目标目录及索引，Session 删除清除其引用。历史确认以 Round 和提交索引的正式证据为准，不能仅凭调用 Task 已终态移除责任。
 
 Flow 声明 `flow.scheduler`，调用意图声明 `session.flow.admission`，独立调用声明 `session.call.history`；这些字符串只存在消费层。恢复定位随未完成责任数增长，不随历史 Session 数增长；空索引直接返回空数组。无旧数据兼容、扫描回填或损坏后全扫。原任务、共享记录、检查点及历史仍是事实权威，索引不授予执行权限。完整通用契约见[独立库 API](../libraries/durable-kernel/docs/api.md)。
+
+### 执行树只读结算投影
+
+`taskExecutionStat(task, tasks)` 只核对相同 Session/rootTaskId 的树，返回 settled、indeterminate 和经过安全分类的 code。根 Task 有 exit 不能代替后代 Effect 的收尾；缺少原 Task 或存在 leased/indeterminate/cleanupPending 时不报告 settled。该函数不启动、恢复或取得执行租约。

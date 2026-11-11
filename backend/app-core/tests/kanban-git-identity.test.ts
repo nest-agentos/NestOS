@@ -4,7 +4,7 @@ import{tmpdir}from'node:os';
 import{join}from'node:path';
 import{execFile}from'node:child_process';
 import{promisify}from'node:util';
-import{readGitCommitIdentity}from'../src/presets/kanban-git-identity';
+import{readGitCommitIdentity}from'@nestos/git-delivery/identity';
 import{openDevelopmentChannel,type DevelopmentWorkspaceRecord}from'../src/presets/kanban-development';
 const exec=promisify(execFile),roots:string[]=[];
 afterEach(async()=>{await Promise.all(roots.splice(0).map(path=>rm(path,{recursive:true,force:true})));});

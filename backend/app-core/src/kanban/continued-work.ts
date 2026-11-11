@@ -6,7 +6,7 @@ import type {TargetRef} from '@nestos/llm-flow/contracts';
 import type {Kernel} from '@nestos/durable-kernel';
 import {originalSession} from './session-operation';
 import {requireValue} from './validation';
-import type {sessionSubmission} from '../run/session-submission';
+import type {createSessionSubmission as sessionSubmission} from '@nestos/llm-session';
 
 interface Origin {schema: 1; dispatch: KanbanDispatch; input: IndependentCallInput}
 interface Continued {schema: 2; dispatch: KanbanDispatch; origin: Origin; request: SubmissionRequest}

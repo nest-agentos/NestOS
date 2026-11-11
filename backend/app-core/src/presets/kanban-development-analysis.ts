@@ -1,4 +1,4 @@
-import {validateDeliveryDecomposition} from './kanban-delivery-plan';
+import {validateDeliveryDecomposition} from '@nestos/git-delivery/policy';
 import {planningConversationControl} from './kanban-planning-control';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {DEFAULT_KANBAN_WORK_TYPES} from '@nestos/kanban/contracts';

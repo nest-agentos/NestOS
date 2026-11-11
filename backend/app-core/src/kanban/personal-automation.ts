@@ -34,7 +34,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
     sessionObservation?:import('./native-session-activity').NativeSessionReader;
     sessionExecutionResources?(id: string): Promise<Array<{label: string; value: string}>>;
-    collaboration?: {submission:ReturnType<typeof import('../run/session-submission').sessionSubmission>;
+    collaboration?: {submission:ReturnType<typeof import('@nestos/llm-session').createSessionSubmission>;
         prepare(input:{id:string;originId:string;sessionId:string;nativeSessionId?:string;context:unknown;item:KanbanItem;board:KanbanBoard}):Promise<string>};
     continuation?: Pick<ContinueWorkOptions, 'submission' | 'prepare'>;
     workResources?(context: {service: KanbanService; workLog: KanbanWorkLog; journal: KanbanAutomationJournal}): Pick<import('@nestos/kanban/contracts').KanbanClient, 'workResources' | 'cleanupWorkResource' | 'boardWorkResources'> & {archiveItemResources?(boardId:string,itemId:string,operationId:string):Promise<void>};

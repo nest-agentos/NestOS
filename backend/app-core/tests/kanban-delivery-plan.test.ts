@@ -1,6 +1,6 @@
 import {expect,it} from 'vitest';
 import defaults from '../src/resources/kanban/kanban-delivery-policy.json';
-import {decisionDeliveryPolicy,selectedDeliveryProfile,deliveryProfile,validateDeliveryDecomposition,verifyReadOnlyDelivery} from '../src/presets/kanban-delivery-plan';
+import {decisionDeliveryPolicy, selectedDeliveryProfile, deliveryProfile, validateDeliveryDecomposition, verifyReadOnlyDelivery} from '@nestos/git-delivery/policy';
 const policy={prompts:{files:[{name:'delivery-policy.json',content:JSON.stringify(defaults)}]}} as any;
 const task=(key:string,id:string,dependsOn:string[]=[])=>({key,dependsOn,...(id==='source'?{splitJustification:'An independently owned library deliverable with its own release and acceptance boundary, beyond this feature implementation.'}:{}),executionProfile:{system:'nestos-work-delivery',id,revision:'1'}});
 it('requires one shared release after all source tasks and independent verification after it',()=>{

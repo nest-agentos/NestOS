@@ -1,9 +1,9 @@
-import {SessionCommand, type ISessionRepository, type SessionInstructionQueue} from '@nestos/llm-session/contracts';
-import type {ConversationContexts} from '../runtime/conversation-contexts';
+import {SessionCommand, type ISessionRepository, type SessionInstructionQueue} from '../contracts';
+import type {SessionSubmissionOptions} from './submission-execution';
 import type {SubmissionControlRequest, SubmissionControlState} from './submission-control';
-import {failure} from './prompt-bundle';
+const failure=(code:string)=>Object.assign(new Error(code),{code});
 interface Options {
-    contexts: Pick<ConversationContexts, 'open'>; repository: Pick<ISessionRepository, 'readDocument' | 'getManifest'>;
+    contexts: SessionSubmissionOptions['contexts']; repository: Pick<ISessionRepository, 'readDocument' | 'getManifest'>;
     ensureWritable?(sessionId: string): Promise<boolean>;
 }
 /** Fence unadmitted or pending input durably; uncertain admitted work still needs its round. */

@@ -1,13 +1,13 @@
-import {verifyReadOnlyDelivery} from './kanban-delivery-plan';
+import {verifyReadOnlyDelivery} from '@nestos/git-delivery/policy';
 import {kanbanJournalOptions} from '../kanban/host-policy';
-import {verifyCommitContexts} from './kanban-commit-context';
+import {verifyCommitContexts} from '@nestos/git-delivery/provenance';
 import {developmentStage} from './kanban-development-log';
 import type {PromptJournal} from '../run/prompt-bundle';
 import {sha256HexSync} from '@nestos/common';
-import type {RepositoryEvidence} from '../projects/worktree-modules';
+import type {RepositoryEvidence} from '@nestos/git-delivery/repositories';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {ProjectRemoteMountService, RemoteFileSourceProvider} from '../projects/remote-mounts';
-import {verifyWorktreeDelivery} from '../projects/worktree-modules';
+import {verifyWorktreeDelivery} from '@nestos/git-delivery/repositories';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {developmentWorkspace} from './kanban-development-workspace';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
