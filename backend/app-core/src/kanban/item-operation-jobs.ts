@@ -86,9 +86,15 @@ function reviewFailure(error:unknown):import('@nestos/kanban/integration').Kanba
 }
 async function observeReview(options: ReviewOperationsOptions, job: ReviewJob) {
     if (!job.request) return options.published.inspect(job.input!);
-    let row = await options.submission.inspect(job.request);
-    if (options.adapter.exchange) row = await options.adapter.exchange(job, row);
+    let row = await observeStage(options,job,'submission',()=>options.submission.inspect(job.request!));
+    if (options.adapter.exchange) row = await observeStage(options,job,'channel',()=>options.adapter.exchange!(job, row));
     return {state: row.outcome === 'cancelled' ? 'failed' as const : row.outcome, sessionId: row.sessionId, code: row.code, output: undefined};
+}
+async function observeStage<T>(options:ReviewOperationsOptions,job:ReviewJob,stage:string,work:()=>Promise<T>):Promise<T> {
+    const started=Date.now();
+    try{return await work();}catch(error){
+        options.log({operationId:job.id,stage:'operation.observe.'+stage,result:'failure',code:safeCode(error,'OPERATION_OBSERVATION_FAILED'),durationMs:Date.now()-started});throw error;
+    }
 }
 async function acceptReview(options: ReviewOperationsOptions, job: ReviewJob): Promise<ReviewJob> {
     const {item} = await options.service.item(job.boardId, job.itemId), command = job.command;

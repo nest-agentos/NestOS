@@ -32,7 +32,7 @@ export interface ReviewAdapter {
     prepareOperation?(input: {id: string; action: Exclude<ReviewAction, 'accept'>; context?: unknown; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot}): Promise<SubmissionRequest>;
     readOperation?(job: ReviewJob): Promise<unknown | undefined>;
     prepareAnalysis(input: {id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot}): Promise<SubmissionRequest>;
-    exchange?(job: ReviewJob, observation: import('@nestos/llm-session').SessionSubmissionObservation): Promise<import('@nestos/llm-session').SessionSubmissionObservation>;
+    exchange?(job: ReviewJob, observation: import('@nestos/llm-session').SessionSubmissionObservation, beforeResume?:()=>Promise<void>): Promise<import('@nestos/llm-session').SessionSubmissionObservation>;
     close?(): Promise<void>;
     readAnalysis(job: ReviewJob): Promise<unknown | undefined>;
 }

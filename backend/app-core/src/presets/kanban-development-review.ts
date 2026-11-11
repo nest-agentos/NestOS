@@ -72,11 +72,11 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
         },
         snapshot: (board, item) => snapshot(options, board, item), close: () => watches.dispose(),
         prepareAnalysis: input => prepareAnalysis(options, input), prepareOperation: async input => prepareAnalysis(options,{...input,...(input.action==='build'?{deployment:await managed?.describe?.(input.item)}:{})}),
-        exchange: options.submission ? async (job, observation) => {
+        exchange: options.submission ? async (job, observation, beforeResume) => {
             const record = await watch(job);
             return developmentChannelExchange({...options, submission: {...options.submission!,start:async request=>{requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))),'OPERATION_CANCELLING');return options.submission!.start(request);}}}, {id: job.id, record, service: options.service,
                 base: job.request!, observation, targetHead: job.snapshot.targetVersion,
-                beforeResume: async () => {requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))),'OPERATION_CANCELLING');requireValue((await snapshot(options, await options.service.read(job.boardId), (await options.service.item(job.boardId, job.itemId)).item)).version === job.snapshot.version, 'MERGE_PLAN_SOURCE_CHANGED');},
+                beforeResume: async () => {await beforeResume?.();requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))),'OPERATION_CANCELLING');requireValue((await snapshot(options, await options.service.read(job.boardId), (await options.service.item(job.boardId, job.itemId)).item)).version === job.snapshot.version, 'MERGE_PLAN_SOURCE_CHANGED');},
                 report: (stage, id, code) => journalCommand(options.journal, options.service, job.boardId, 'review-context-log:' + job.id + ':' + stage + ':' + id,
                     {type: 'message', itemId: job.itemId, message: t(('kanban.fileExchange.' + stage) as Parameters<typeof t>[0]) + (code ? ': ' + code : ''), recipientSessionIds: []})});
         } : undefined,

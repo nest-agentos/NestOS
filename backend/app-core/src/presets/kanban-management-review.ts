@@ -25,9 +25,12 @@ export function managementReviewAdapter(options:DevelopmentReviewOptions,scope:M
         ready:board=>scope.contributors.every(row=>board.items.some(item=>item.id===row.itemId&&['review','completed'].includes(item.status))),
         snapshot,prepareAnalysis:input=>prepareManagementOperation(options,scope,managed,{...input,action:'analyze'}),prepareOperation:input=>prepareManagementOperation(options,scope,managed,input),
         exchange:base.exchange?async(job,observation)=>{
-            const frozen=managementBatch(job.snapshot),actual=await snapshot(await options.service.read(job.boardId));
-            requireValue(actual.sourceVersion===job.snapshot.sourceVersion,'OPERATION_RESULT_SOURCE_CHANGED');
-            return base.exchange!({...job,itemId:frozen.sources[0].itemId,snapshot:frozen.sources[0].snapshot},observation);
+            const frozen=managementBatch(job.snapshot);
+            return base.exchange!({...job,itemId:frozen.sources[0].itemId,snapshot:frozen.sources[0].snapshot},observation,async()=>{
+                const actual=await snapshot(await options.service.read(job.boardId));
+                requireValue(actual.sourceVersion===job.snapshot.sourceVersion,'OPERATION_RESULT_SOURCE_CHANGED');
+                requireValue(actual.version===job.snapshot.version,'MERGE_PLAN_SOURCE_CHANGED');
+            });
         }:undefined,
         acceptanceCommands:board=>acceptanceCommands(options,scope,board),
         acceptanceVersion:undefined,readAnalysis:job=>readManagementOperation(options,scope,base,job),readOperation:job=>readManagementOperation(options,scope,base,job)};
