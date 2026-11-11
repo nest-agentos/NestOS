@@ -329,7 +329,7 @@ it('resumes a blocked planning conversation in the same session across host reop
  expect([...f.submitted.values()].filter(input=>input.request.expectedTarget!.id==='planner')).toHaveLength(1);
 });
 
-it('ensures a persistent decision coordination Session before a worktree preparation failure',async()=>{
+it('prepares the management workspace without bootstrapping a competing record conversation',async()=>{
  const fault=Object.assign(new Error('Git baseline unavailable'),{code:'GIT_WORKTREE_CREATE_FAILED'}),f=await fixture(false,undefined,fault),stages:string[]=[];
  await f.item('first');
  await f.command({type:'append-record',record:{id:'decision',kind:'decision',title:'Decision',content:'Scope',rationale:'Checked',itemIds:['first'],sources:[]}});
@@ -341,9 +341,21 @@ it('ensures a persistent decision coordination Session before a worktree prepara
  f.options.decisionConversations=()=>({openRecordCoordination,startRecordConversation:vi.fn(),recordConversations:async()=>[],scan:async()=>{},quiesce:async()=>{}}) as any;
  vi.mocked(f.preparation).mockImplementation(async()=>{stages.push('worktree');throw fault;});
  const reopened=await f.open();disposers.push(()=>reopened.dispose());
- expect(stages.slice(0,2)).toEqual(['communication','worktree']);
- expect(openRecordCoordination).toHaveBeenCalledWith('board',expect.objectContaining({recordId:'decision'}));
+ expect(stages).toEqual(['worktree']);
+ expect(openRecordCoordination).not.toHaveBeenCalled();
+ expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
  expect((await reopened.item('board','first')).item.analysis?.code).toBe('GIT_WORKTREE_CREATE_FAILED');
+});
+
+it('keeps busy workspace preparation pending and submits management once using the original identity',async()=>{
+ vi.useFakeTimers({toFake:['Date']});const f=await fixture(false,undefined,Object.assign(Error('Busy'),{code:'EBUSY',outcome:'not-committed'}));
+ await f.item('busy');await f.service.scan();
+ expect((await f.service.item('board','busy')).item.analysis).toMatchObject({state:'analyzing',recovery:{code:'EBUSY',exhausted:false}});
+ expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();const id=f.preparation.mock.calls.at(-1)![0].id;
+ f.preparation.mockResolvedValue(undefined as never);vi.setSystemTime(Date.now()+30000);await f.service.scan();
+ expect(f.preparation.mock.calls.at(-1)![0].id).toBe(id);
+ expect([...f.submitted.values()].filter(input=>input.request.expectedTarget!.id==='planner')).toHaveLength(1);
+ expect((await f.service.item('board','busy')).item.analysis?.state).not.toBe('failed');
 });
 
 it('settles missing planning output after successful execution without replaying it on restart',async()=>{

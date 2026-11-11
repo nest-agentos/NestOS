@@ -21,12 +21,21 @@ export async function prepareWorktree(journal: Journal, id: string, directory: s
     if (saved.phase === 'prepared') {
         const claim = randomUUID();
         saved = await journal.update<PreparedWorktree>(key, previous => previous!.phase === 'prepared' ? {...previous!, phase: 'creating', claim} : previous!);
-        if (saved.claim === claim) await git(process, ['worktree', 'add', '--relative-paths', '-b', saved.branch, saved.directory, saved.baseCommit]);
+        if (saved.claim === claim) await createClaimedWorktree(journal,key,saved,process);
     }
     const listing = await git(process, ['worktree', 'list', '--porcelain']);
     const entry = listing.split('\n\n').find(entry => entry.split('\n').includes('worktree ' + saved!.directory));
     if (!entry?.split('\n').includes('branch refs/heads/' + saved.branch)) throw new FSError('ECONFLICT', 'Worktree creation is unconfirmed; original intent retained');
     return journal.update<PreparedWorktree>(key, previous => ({...previous!, phase: 'ready'}));
+}
+
+async function createClaimedWorktree(journal:Journal,key:string,tree:PreparedWorktree,process:RemoteProcessHandle):Promise<void> {
+    try {await git(process,['worktree','add','--relative-paths','-b',tree.branch,tree.directory,tree.baseCommit]);}
+    catch(error) {
+        if((error as {outcome?:string})?.outcome==='not-committed')await journal.update<PreparedWorktree>(key,current=>
+            current?.phase==='creating'&&current.claim===tree.claim?{...current,phase:'prepared',claim:undefined}:current!);
+        throw error;
+    }
 }
 
 async function git(process: RemoteProcessHandle, args: string[]): Promise<string> {

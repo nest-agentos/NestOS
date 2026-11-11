@@ -69,7 +69,7 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
     const conversations=options?.decisionConversations?.({service,client,journal,log});
     const communication=options&&conversations?taskCommunication(service,journal,options,conversations.openRecordCoordination,log):undefined;
     const fixes=options?.collaboration?createTaskFix({service,journal,events,automation:options,log}):undefined;
-    const automation=options?createPersonalKanbanAutomation({...options,...(options.prepareAnalysis&&conversations?{prepareAnalysis:async input=>{const context=await workContext(journal,input.board,input.item,service);if(context.decision)await conversations.openRecordCoordination(context.decision.sourceBoardId,{recordId:context.decision.recordId,operationId:input.id});return options.prepareAnalysis!(input);}}:{}),fs,service,journal,workLog,log,serviceFor,deliveryReady:operations?.deliveryReady,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
+    const automation=options?createPersonalKanbanAutomation({...options,fs,service,journal,workLog,log,serviceFor,deliveryReady:operations?.deliveryReady,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
     const planning=options?planningSessionReader(service,journal,options):undefined;

@@ -37,3 +37,23 @@ it('classifies an unsupported relativeworktrees repository without leaking raw G
  try{await prepareWorktree(journal,'attempt','/workspace/_nestos/worktrees/attempt',process);}catch(error){expect(String(error)).not.toContain('PRIVATE_PATH');}
  expect(entries.size).toBe(0);
 });
+
+
+it('restores only an unstarted creation claim after busy admission and creates the original worktree once',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'nestos-worktree-busy-'));paths.push(root);
+ await run('git',['init','-q',root]);await run('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','--allow-empty','-qm','base']);
+ const entries=new Map<string,unknown>(),journal={get:async<T>(key:string)=>structuredClone(entries.get(key)) as T|undefined,
+  update:async<T>(key:string,change:(old:T|undefined)=>T)=>{const value=change(structuredClone(entries.get(key)) as T|undefined);entries.set(key,structuredClone(value));return value;}};
+ let admissions=0,creates=0;
+ const process={nativeShell:{exec:async(program:string,args:string[])=>{
+  if(args[0]==='worktree'&&args[1]==='add'&&++admissions===1)throw Object.assign(Error('Busy'),{code:'EBUSY',outcome:'not-committed'});
+  const result=await run(program,args.map(arg=>arg.replace('/workspace',root)),{cwd:root});
+  if(args[0]==='worktree'&&args[1]==='add')creates++;
+  return {stdout:result.stdout.replaceAll(root,'/workspace'),stderr:result.stderr,code:0};
+ }}} as RemoteProcessHandle;
+ const directory='/workspace/_nestos/worktrees/original';
+ await expect(prepareWorktree(journal,'original',directory,process)).rejects.toMatchObject({code:'EBUSY',outcome:'not-committed'});
+ const rejected=entries.get('worktree:original') as any;expect(rejected).toMatchObject({phase:'prepared',id:'original',branch:'work/original'});expect(rejected.claim).toBeUndefined();
+ const ready=await prepareWorktree(journal,'original',directory,process);
+ expect(ready).toMatchObject({phase:'ready',baseCommit:rejected.baseCommit,directory,branch:rejected.branch});expect(creates).toBe(1);expect(admissions).toBe(2);
+});

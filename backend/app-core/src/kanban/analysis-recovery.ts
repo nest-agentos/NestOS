@@ -15,6 +15,7 @@ export function recoverAnalysis(options: {fs: IFileSystem; journal: KanbanAutoma
         deferred: async recovery => {
             const current = await service.read(board.id), target = current.items.find(row => row.id === item.id);
             if (!active() || !target || target.control?.action === 'cancel' || ['completed', 'cancelled'].includes(target.status)) return;
+            options.journal.diagnostic({operationId:item.id,boardId:board.id,itemId:item.id,stage:'automation.analysis.defer',result:'success',code:recovery.code,durationMs:0});
             await service.execute(board.id, {operationId: 'analysis-recovery:' + item.id + ':' + current.revision, expectedRevision: current.revision,
                 command: {type: 'report-analysis', itemId: item.id, operationId: item.id, status: {itemId: item.id, state: 'analyzing', recovery}}});
         }}, work);

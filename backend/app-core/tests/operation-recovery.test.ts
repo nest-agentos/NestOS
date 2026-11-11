@@ -38,3 +38,20 @@ it('does not retry permissions, integrity errors, protocol failures or work afte
     const work = vi.fn(); await recoverOperation({...f.options, active: () => false}, work);
     expect(work).not.toHaveBeenCalled(); expect(f.options.deferred).not.toHaveBeenCalled();
 });
+
+it('defers confirmed busy admission using the existing operation identity and recovery budget',async()=>{
+    vi.useFakeTimers();const f=fixture(),busy=Object.assign(Error('Busy'),{code:'EBUSY',outcome:'not-committed'});
+    const work=vi.fn().mockRejectedValueOnce(busy).mockResolvedValue(undefined);
+    await recoverOperation({...f.options,code:()=> 'EBUSY'},work);
+    expect(f.rows.get(f.options.key)).toMatchObject({attempt:0,code:'EBUSY',exhausted:false});
+    await recoverOperation(f.options,work);expect(work).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1000);await recoverOperation(f.options,work);
+    expect(work).toHaveBeenCalledTimes(2);expect(f.rows.get(f.options.key)).toMatchObject({recovered:true});
+});
+
+it('does not infer safe admission from a bare busy code, uncertain cleanup or partial effects',()=>{
+    for(const outcome of [undefined,'unknown','partial'])expect(transientOperationFailure(Object.assign(Error('Busy'),{code:'EBUSY',outcome}))).toBe(false);
+    const busy=Object.assign(Error('Busy'),{code:'EBUSY',outcome:'not-committed'});
+    expect(transientOperationFailure(Object.assign(Error('Unknown'),{code:'EIO',outcome:'unknown',cause:busy}))).toBe(false);
+    expect(transientOperationFailure(Object.assign(Error('Denied'),{code:'EACCES',cause:busy}))).toBe(false);
+});

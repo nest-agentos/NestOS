@@ -31,11 +31,16 @@ export async function recoverOperation(options: Options, work: () => Promise<voi
 /** Reject permanent classifications even when a transport wraps them in EIO. */
 export function transientOperationFailure(error: unknown): boolean {
     const transient = new Set(['EIO', 'ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET', 'ECONNABORTED', 'ENETUNREACH', 'EHOSTUNREACH', 'CONNECTION_CLOSED']);
-    let retry = false;
+    let retry = false, uncertain = false;
     for (let depth = 0; depth < 8 && error instanceof Error; depth++, error = error.cause) {
-        const value = error as Error & {code?: string; remoteCode?: string; operation?: string};
+        const value = error as Error & {code?: string; remoteCode?: string; operation?: string; outcome?: string};
+        uncertain ||= value.outcome === 'unknown' || value.outcome === 'partial';
         if (value.operation === 'protocol') return false;
         for (const code of [value.code, value.remoteCode]) {
+            if (code === 'EBUSY') {
+                if (uncertain || value.outcome !== 'not-committed') return false;
+                retry = true;
+            }
             if (code && /^(EACCES|EPERM|EINVAL|ECAPABILITY|EROFS|STORAGE_CORRUPT|.*_INVALID|.*_MISMATCH|.*_DENIED)$/.test(code)) return false;
             if (code && transient.has(code)) retry = true;
         }
