@@ -30,7 +30,8 @@ export class ToolboxResources {
         private readonly inventory?: ToolboxInventory & { refresh(): Promise<void> },
         private readonly defaultDrawers: readonly Drawer[] = [], providerTemplates: readonly LLMProvider[] = [],
         installation: {toolPackages?: import('@nestos/app-contracts/services').ToolPackages; flowInstallations?: import('@nestos/app-contracts/services').FlowInstallations} = {},
-        private readonly remoteChanges?: (listener: () => void) => () => void) {
+        private readonly remoteChanges?: (listener: () => void) => () => void,
+        private readonly prepareAgentProject?: (agentId: string, projectId: string) => Promise<void>) {
         this.toolPackages = installation.toolPackages; this.flowInstallations = installation.flowInstallations;
         this.drawers = new ToolboxDrawers(settings); this.templates = new ProviderTemplates(providerTemplates, () => this.agents.getProviders(), this.agents);
     }
@@ -89,7 +90,7 @@ export class ToolboxResources {
             }
         }
     }
-    async create(kind: ToolboxKind, name: string, providerId?: string, providerTemplateId?: string): Promise<string> {
+    async create(kind: ToolboxKind, name: string, providerId?: string, providerTemplateId?: string, projectId?: string): Promise<string> {
         if (!name.trim()) throw new Error(t('toolbox.nameRequired'));
         name = name.trim();
         if (kind === 'cells') throw Object.assign(new Error('Use the Cells configuration editor to manage node connections'), {code: 'ECAPABILITY'});
@@ -105,6 +106,10 @@ export class ToolboxResources {
             return toolboxPath(kind, '/' + id);
         }
         if (kind === 'agents') {
+            if (projectId) {
+                if (!this.prepareAgentProject) throw new Error('Project-scoped Agent creation is unavailable');
+                await this.prepareAgentProject(id, projectId);
+            }
             await this.agents.saveAgent({ id, name, type: 'agent', description: '', config: {} });
             return toolboxPath(kind, this.agents.getAgentResourceId(id)!);
         }

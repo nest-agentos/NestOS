@@ -1,3 +1,4 @@
+import {agentProjectScopes} from '../configuration/agent-project-scope';
 import {configuredToolCatalog} from '../kernel/tool-commands';
 import {registerInputSourceExecution} from '../host/input-source-execution';
 import {registerResourceReferences} from '../host/resource-references';
@@ -71,7 +72,12 @@ export async function createConversationSystem(
         scheduleAgentInitialization: options.scheduleAgentInitialization,
         scheduleInvocationRecovery: options.scheduleInvocationRecovery,
         directAgentPolicy: options.directAgentPolicy ?? createNestosDirectAgentPolicy(),
-        agentResolution: options.agentResolution,
+        agentResolution: {...options.agentResolution, admitAgent: async (agentId, sessionId) => {
+            const folder = (await sessionRepository.getManifest(sessionId)).folder;
+            const project = folder ? await options.projects?.forFolder(folder) : undefined;
+            if (options.projects) await agentProjectScopes(vfs, options.projects).assert(agentId, project?.project.id, sessionId);
+            await options.agentResolution?.admitAgent?.(agentId, sessionId);
+        }},
         hostPorts: { translate: t, logger: createModuleLogger('llm-conversation'), traceBoot },
         loadArtifact: artifacts.loadArtifact,
         readContextBindings: createContextBindingReader(kernel.kernel),

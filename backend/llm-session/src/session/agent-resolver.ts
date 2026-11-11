@@ -35,6 +35,9 @@ export interface AgentResolutionFailure {
 }
 
 export interface AgentResolutionPolicy {
+    /** Host admission runs against current policy, including frozen identities. */
+    admitAgent?(agentId: string, sessionId: string): Promise<void>;
+
     /** Reject missing agents or provide a host-defined fallback. Default preserves the legacy fallback. */
     missingAgent?: 'reject' | ((agentId: string, failure: AgentResolutionFailure | null) => ExecutorConfig | Promise<ExecutorConfig>);
 }
@@ -56,6 +59,10 @@ export class AgentResolver {
         private readonly resolveMCPProfiles?: (sessionId: string, ids: string[]) => Promise<string[]>,
         private readonly host: SessionHost = createSessionHost(),
         private readonly policy: AgentResolutionPolicy = {}) {}
+
+    async assertAdmission(agentId: string, sessionId: string): Promise<void> {
+        await this.policy.admitAgent?.(agentId, sessionId);
+    }
 
     async getMCPToolIds(ids: string[], sessionId: string): Promise<string[]> {
         if (!ids.length) return [];

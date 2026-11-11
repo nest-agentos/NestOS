@@ -10,7 +10,8 @@ export class SessionCallTargets {
     private snapshot: CallTargetCatalog = {entries: [], loading: true, autoSelectFirst: false};
     private pending?: Promise<void>;
     private closed = false;
-    constructor(private readonly commands: ICommandBus, private readonly changed: () => void, private readonly autoSelectFirst = true) {
+    constructor(private readonly commands: ICommandBus, private readonly changed: () => void, private readonly autoSelectFirst = true,
+        private readonly filterAgents?: (ids: string[]) => Promise<string[]>) {
         this.snapshot = {...this.snapshot, autoSelectFirst};
     }
     getSnapshot(): CallTargetCatalog {return this.snapshot;}
@@ -29,7 +30,8 @@ export class SessionCallTargets {
         try {
             const catalog = await this.commands.execute<RootTargetCatalog>(SessionCommand.ListTargets);
             if (!catalog || !Array.isArray(catalog.entries) || !Array.isArray(catalog.issues)) throw new Error(t('callable.catalog.invalid'));
-            const entries = catalog.entries.map(entry => choice(entry));
+            const allowed = this.filterAgents ? new Set(await this.filterAgents(catalog.entries.filter(entry => entry.target.kind === 'agent').map(entry => entry.target.id))) : undefined;
+            const entries = catalog.entries.filter(entry => entry.target.kind !== 'agent' || !allowed || allowed.has(entry.target.id)).map(entry => choice(entry));
             if (!this.closed) this.snapshot = {entries, loading: false, autoSelectFirst: this.autoSelectFirst, label: t('chatInput.target.label'),
                 ...(catalog.issues.length ? entries.length ? {message: t('callable.catalog.partial', {count: catalog.issues.length})} : {error: t('callable.catalog.unavailable')} : {})};
             log.info('chat.targets.read', {operationId, stage: 'catalog', result: entries.length ? 'success' : 'unavailable',

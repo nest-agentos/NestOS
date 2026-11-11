@@ -15,6 +15,7 @@ import { decorateButton } from '../workbench/controls';
 import { showProjectDefaultSettings } from './project-default-settings';
 
 interface Actions {
+    scopeChanged?(projectId?: string): void;
     refresh?(): Promise<void>;
     projectRenamed?(from: ProjectFolder, to: ProjectFolder): void;
     projectSettings?(projectId: string): Promise<void>;
@@ -35,6 +36,7 @@ export interface ProjectNavigationOptions { reveal?: boolean; project?: ProjectF
 
 /** Project context replaces the contents of one sidebar; file details belong to main tabs. */
 export class ProjectNavigation {
+    readonly context = document.createElement('div');
     readonly header = document.createElement('div');
     readonly toolbarContainer = document.createElement('span');
     readonly options: Pick<VFSColumnsOptions, 'navigationToolbarOptions'>;
@@ -122,7 +124,8 @@ export class ProjectNavigation {
         this.menuContent.append(this.overflowSettings, this.retry);
         this.button(this.remoteState, t('diagnostics.projectStatus'), async () => {if (this.project) await this.actions.projectStatus?.(this.project.project.id);});
         this.remoteState.className = 'project-remote-status'; this.remoteState.hidden = true;
-        this.header.append(this.selector.element, this.up, this.create, this.settings, this.toolbarContainer);
+        this.context.append(this.selector.element);
+        this.header.append(this.up, this.create, this.settings, this.toolbarContainer);
     }
     private async configureSettings(): Promise<void> {
         if (this.settingsPending) return;
@@ -181,6 +184,7 @@ export class ProjectNavigation {
         if (signal.aborted || revision !== this.scopeRevision) return;
         this.project = project;
         this.updateSelector();
+        this.actions.scopeChanged?.(this.project?.project.id);
         if (this.actions.navigate) await this.actions.navigate(path);
         else await this.sync(path, { preserveProject: true });
     }
@@ -247,7 +251,8 @@ export class ProjectNavigation {
         this.projectActions.hidden = !project || !this.actions.projectMenu;
         for (const button of this.menu.querySelectorAll<HTMLButtonElement>('[data-project-action="import"], [data-project-action="export"]')) button.hidden = !project;
         this.retry.hidden = !pending; this.retry.textContent = t('project.retryDeletion', { count: pending });
-        this.updateSelector(); this.updateTransferControls();
+        this.updateSelector();
+        this.actions.scopeChanged?.(this.project?.project.id); this.updateTransferControls();
     }
     private async updateRemoteStatus(): Promise<void> {
         const projectId = this.project?.project.id, remote = this.projects.remoteMounts, revision = ++this.stateRead;

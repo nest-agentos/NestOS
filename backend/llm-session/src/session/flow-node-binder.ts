@@ -8,7 +8,7 @@ import { agentConnectionId, harnessAgentConfig, normalizeLegacyFields, preferred
 import type { TaskInput } from '../core/types';
 
 export type FlowIdentityResolver = Pick<AgentResolver, 'resolveExact' | 'getSkills' | 'getSystemPrompt'>
-    & Partial<Pick<AgentResolver, 'getMCPToolIds' | 'resolveHarnessConnection'>>;
+    & Partial<Pick<AgentResolver, 'getMCPToolIds' | 'resolveHarnessConnection' | 'assertAdmission'>>;
 
 interface BindingSetup {
     config: ExecutorConfig;
@@ -86,7 +86,7 @@ async function bindIsolatedInvocation(node: FlowNodeDefinition, defaults: FlowNo
     if (node.plugin !== 'builtin.agent') return {};
     const config = { ...record(node.config), invocationContext: undefined, messages: undefined, historyPolicy: 'none' };
     const agentId = stringValue(record(node.config).agentId);
-    if (agentId) await agents.resolveExact(agentId);
+    if (agentId) {await agents.assertAdmission?.(agentId, sessionId); await agents.resolveExact(agentId);}
     const flowDefaults = record(defaults);
     const bound = await bindAgentSource({ id: String(node.id), name: node.name,
         config, capabilities: node.capabilities ?? [] }, { flowDefaults: {
@@ -140,6 +140,7 @@ async function resolveIdentity(
     context: BindingContext,
 ): Promise<IdentityLayer> {
     const agentId = stringValue(config.agentId) ?? stringValue(context.flowDefaults.agentId);
+    if (agentId) await context.agents.assertAdmission?.(agentId, context.task.sessionId);
     const referencedAgent = agentId ? await resolveAgent(agentId, context.agents) : undefined;
     const skillIds = context.task.input.instructionConnectionBinding?.harnessConnection ? [] : unique([
         ...(context.setup.config.capabilityPolicy?.skillIds ?? []),

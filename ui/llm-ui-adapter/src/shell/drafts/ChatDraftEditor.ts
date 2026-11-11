@@ -74,7 +74,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         if (controls.commands && (config.sessionDraft.executorScope !== 'remote' || config.sessionDraft.promptHarness)) this.targets = new SessionCallTargets(controls.commands, () => {
             if (!this.closed && !this.transferred && this.active) refreshDraftTarget(this.view, this.callTargets());
             this.publish();
-        }, false);
+        }, false, config.filterExecutors);
     }
     async init(container: HTMLElement): Promise<void> {this.container = container; await this.render();}
     async render(): Promise<void> {
@@ -167,7 +167,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         const remote = this.config.sessionDraft?.executorScope === 'remote';
         const configuration = this.controls.configuration?.getConfigurationSnapshot();
         const [executors, connections] = await Promise.all([remote ? this.config.sessionDraft?.promptHarness
-            ? buildExecutorOptions(this.service, this.config.remoteAgents, configuration) : this.config.remoteAgents?.list() ?? [] : buildExecutorOptions(this.service, undefined, configuration),
+            ? buildExecutorOptions(this.service, this.config.remoteAgents, configuration, this.config.filterExecutors) : this.config.remoteAgents?.list() ?? [] : buildExecutorOptions(this.service, undefined, configuration, this.config.filterExecutors),
             remote ? [] : buildConnectionOptions(this.service, configuration)]);
         this.check(); if (generation !== this.configurationGeneration) return; if (!this.transferred) {this.executors = executors; this.connections = connections;}
         if (remote && this.config.remoteAgents?.models) {

@@ -12,6 +12,9 @@ import { DrawerActions } from '../toolbox/DrawerActions';
 interface AgentEntry { id: string; name: string; description?: string; source?: string; path?: string; remote?: boolean; group?: string }
 interface Options {
     backend: Pick<ApplicationBackend, 'toolboxView'>;
+    filter?(ids: string[]): Promise<string[]>;
+    projectId?(): string | undefined;
+    manage?(): Promise<void>;
     resourceId(id: string): string | undefined;
     navigate(request: NavigationRequest): Promise<void>;
     start(id: string): Promise<void>;
@@ -48,12 +51,17 @@ export class AgentDrawer {
         this.drawer = new Drawer({title: t('toolbox.agents'), showHeader: false, collapsible: false});
         this.element = this.drawer.element; this.element.classList.add('workbench-agents');
         this.rows.className = 'workbench-agents__list'; this.status.className = 'workbench-agents__status';
+        if (options.manage) {
+            const button = document.createElement('button'); button.type = 'button';
+            button.textContent = t('agentWorkspace.manageAll'); button.onclick = () => {void options.manage!().catch(error => this.report(error));};
+            this.drawer.content.append(button);
+        }
         this.status.setAttribute('role', 'status'); this.drawer.content.append(this.status, this.rows);
         const stop = options.usage?.subscribe?.(() => {void this.browser?.refresh();}); if (stop) this.cleanups.push(stop);
     }
     setExpanded(expanded: boolean): void {this.expanded = expanded; if (expanded) void this.refresh();}
     setVisible(visible: boolean): void {this.visible = visible; if (visible && this.expanded) void this.refresh();}
-    private invalidate(): void {this.dirty = true; if (this.visible && this.expanded) void this.refresh();}
+    invalidate(): void {this.dirty = true; if (this.visible && this.expanded) void this.refresh();}
     private async refresh(): Promise<void> {
         if (this.loading || !this.dirty || !this.visible || !this.expanded || this.abort.signal.aborted) return;
         this.loading = true; this.dirty = false; this.status.textContent = t('status.loading');
@@ -72,6 +80,10 @@ export class AgentDrawer {
             this.entries.push(...[...view.inventory.remoteAgents.values()].map(agent => ({id: agent.id, name: agent.name,
                 description: agent.description, source: agent.source, remote: true,
                 path: toolboxPath('agents', '/@remote/' + encodeURIComponent(agent.id) + '.agent')})));
+            if (this.options.filter) {
+                const allowed = new Set(await this.options.filter(this.entries.map(item => item.id)));
+                this.entries = this.entries.filter(item => allowed.has(item.id));
+            }
             await this.render(); this.status.textContent = ''; succeeded = this.loaded = true;
         } catch (error) {this.dirty = true; this.report(error);}
         finally {this.loading = false; if (succeeded && this.dirty) void this.refresh();}
@@ -181,10 +193,11 @@ export class AgentDrawer {
     private async create(): Promise<void> {
         await showNameDialog(t('workbench.createAgent'), t('workbench.name'), this.abort.signal, async name => {
             const view = await this.view.get(); if (this.abort.signal.aborted) return;
-            const path = await view.resources.create('agents', name); if (this.abort.signal.aborted) return;
+            const path = await view.resources.create('agents', name, undefined, undefined, this.options.projectId?.()); if (this.abort.signal.aborted) return;
             if (this.options.edit) {
                 const agent = (await view.resources.getAgents()).find(item => toolboxPath('agents', this.options.resourceId(item.id) ?? '') === path);
-                if (!agent) throw new Error(t('toolbox.unavailable')); await this.options.edit(agent.id);
+                if (!agent) throw new Error(t('toolbox.unavailable'));
+                await this.options.edit?.(agent.id);
             } else await this.options.navigate({target: 'toolbox', resourceId: path});
         });
     }

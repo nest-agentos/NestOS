@@ -67,6 +67,8 @@ export interface ApplicationBackend {
     warmNavigation(roots: string[]): Promise<void>;
     workbenchView(options?: { displayedFilesPolicy?: 'gitignore' | 'all'; chatControls?: boolean; initialNavigation?: boolean; initialSessionId?: string }): Promise<WorkbenchView>;
     openSessionView(sessionId: string): Promise<SessionOpenView>;
+    readAgentProjectScopes(ids: string[]): Promise<Record<string, import('./agent-project-scope').AgentProjectScope>>;
+    saveAgentProjectScope(id: string, scope: import('./agent-project-scope').AgentProjectScope): Promise<void>;
     readUiDocuments(names: string[]): Promise<Record<string, unknown>>;
     writeUiDocuments(documents: Record<string, unknown>): Promise<void>;
     settings(sources: readonly SettingsWorkspaceSource[]): Promise<SettingsPort>;

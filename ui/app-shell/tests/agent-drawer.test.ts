@@ -6,7 +6,7 @@ import type { ApplicationBackend } from '@nestos/app-contracts/services';
 
 const cleanup: Array<() => unknown> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close(); document.body.replaceChildren(); vi.unstubAllGlobals(); vi.restoreAllMocks();});
-function setup(pending?: Promise<unknown>) {
+function setup(pending?: Promise<unknown>, filter?: (ids: string[]) => Promise<string[]>) {
     const unsubscribe = vi.fn(), dispose = vi.fn(async () => {}), start = vi.fn(async () => {}), navigate = vi.fn(async () => {});
     let changed = () => {};
     const agents = [{id: 'writer', name: '写作', description: '整理文档'}, {id: 'coder', name: '编程', description: '分析代码'}];
@@ -19,7 +19,7 @@ function setup(pending?: Promise<unknown>) {
     ])}};
     const toolboxView = vi.fn(async () => {await pending; return view;});
     const drawer = new AgentDrawer({backend: {toolboxView} as unknown as ApplicationBackend, start, navigate, rename, remove,
-        resourceId: id => '/custom/' + id + '.agent'});
+        filter, resourceId: id => '/custom/' + id + '.agent'});
     document.body.append(drawer.element); cleanup.push(() => drawer.destroy());
     return {drawer, rename, remove, toolboxView, subscribe, unsubscribe, dispose, start, navigate, agents, drawers, changed: () => changed()};
 }
@@ -219,4 +219,20 @@ it('keeps actions beside search without a multi-select button and supports Shift
     row('coder').dispatchEvent(new MouseEvent('click', {bubbles: true, shiftKey: true}));
     expect(f.drawer.element.querySelectorAll('input[data-action="toggle-selection"]:checked')).toHaveLength(2);
     expect(f.start).not.toHaveBeenCalled();
+});
+
+it('refreshes project availability without replacing the search control or changing catalog order', async () => {
+    let allowed = ['writer', 'coder'];
+    const f = setup(undefined, async ids => ids.filter(id => allowed.includes(id))); f.drawer.setExpanded(true);
+    await vi.waitFor(() => expect(f.drawer.element.querySelectorAll('[data-item-id]')).toHaveLength(2));
+    const search = f.drawer.element.querySelector<HTMLInputElement>('input')!;
+    search.value = '文档'; search.dispatchEvent(new Event('input'));
+    await vi.waitFor(() => expect(f.drawer.element.querySelector('[data-item-id="writer"]')).not.toBeNull());
+    await vi.waitFor(() => expect(f.drawer.element.querySelector('[data-item-id="coder"]')).toBeNull());
+    allowed = ['coder']; f.drawer.invalidate();
+    await vi.waitFor(() => expect(f.drawer.element.querySelector('[data-item-id="writer"]')).toBeNull());
+    expect(f.drawer.element.querySelector('input')).toBe(search); expect(search.value).toBe('文档');
+    allowed = ['writer', 'coder']; f.drawer.invalidate();
+    await vi.waitFor(() => expect(f.drawer.element.querySelector('[data-item-id="writer"]')).not.toBeNull());
+    expect(f.drawer.element.querySelector('[data-item-id="coder"]')).toBeNull();
 });

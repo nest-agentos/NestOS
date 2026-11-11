@@ -29,3 +29,5 @@ export type * from './ports/diagnostics';
 export type * from './ports/events';
 
 export type * from './ports/server-terminal';
+
+export type {AgentProjectScope} from './ports/agent-project-scope';

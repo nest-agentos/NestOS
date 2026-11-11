@@ -1,3 +1,4 @@
+import {createAgentScopeEditor} from './agent-scope-editor';
 import {projectRemountFields,remountFailure} from './project-remount-fields';
 import {conversationLifetime} from './conversation-lifetime';
 import {parseProjectAction, type ProjectActionRoute} from './project-action-route';
@@ -206,6 +207,7 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly tabs: WorkbenchTabs<RetainedEditor>;
     private readonly sidebarLayout: WorkbenchSidebar;
     private readonly agentDrawer?: AgentDrawer;
+    private agentProjectId?: string;
     private readonly agentProjects: AgentProjectPreferences;
     private readonly agentOptions?: SessionWorkbenchOptions['agents'];
     private readonly agentCatalog;
@@ -340,6 +342,9 @@ export class SessionWorkbench implements WorkspaceController {
             this.agentDrawer = new AgentDrawer({backend: this.backend, resourceId: options.agents.resourceId,
                 usage: options.agents.usage, rename: options.agents.rename, remove: options.agents.remove, navigate: request => this.hostContext?.navigate(request) ?? Promise.resolve(),
                 edit: id => this.hostContext?.navigate({target: 'chat', resourceId: '@agent/' + encodeURIComponent(id)}) ?? this.openAgentSettings(id),
+                filter: ids => this.filterProjectAgents(this.agentProjectId, ids),
+                projectId: () => this.agentProjectId,
+                manage: () => this.hostContext?.navigate({target: 'toolbox', resourceId: '/agents'}) ?? Promise.resolve(),
                 start: id => this.startAgentDraft(id)});
             this.agentDrawer.setVisible(this.navigationVisible);
             this.sidebarLayout.addDrawer('agents', t('toolbox.agents'), this.agentDrawer.element,
@@ -1645,6 +1650,7 @@ export class SessionWorkbench implements WorkspaceController {
             report: error => this.report(error),
         });
         this.projectNavigation = new ProjectNavigation(this.projects!, () => this.sidebarUI, {
+            scopeChanged: id => {if (this.agentProjectId !== id) {this.agentProjectId = id; this.agentDrawer?.invalidate();}},
             refresh: () => this.refresh(),
             projectRenamed: (from, to) => this.remapProjectRoutes(folderBrowserPath(from.path), folderBrowserPath(to.path), to.name),
             projectSettings: id => this.projectSettingsDialog(id),
@@ -1666,6 +1672,7 @@ export class SessionWorkbench implements WorkspaceController {
             contentChanged: () => {}, importItems: context => this.importSelection(context), exportItems: context => this.exportSelection(context),
             createProject: path => this.createProject(path), report: error => this.report(error),
         });
+        this.sidebarLayout.mountContext(this.projectNavigation.context);
     }
     private familyMenu(id: string) {
         const run = (action: () => Promise<unknown>) => () => { void action().catch(error => this.report(error)); };
@@ -1894,11 +1901,11 @@ export class SessionWorkbench implements WorkspaceController {
         const definition = await this.agentOptions.read(agentId);
         if (!definition) throw new Error(t('toolbox.unavailable'));
         this.tabs.title('@agent/' + encodeURIComponent(agentId), definition.name);
-        return this.agentOptions.createEditor(mount, {target: {kind: 'entity', entityType: 'agent', id: agentId}, signal,
+        return createAgentScopeEditor(mount, agentId, this.backend, projects, (container, mountSettings) => this.agentOptions!.createEditor(container, {target: {kind: 'entity', entityType: 'agent', id: agentId}, signal,
             initialContent: JSON.stringify(definition), title: definition.name, hostContext: this.hostContext, mountSettings,
             mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts, () => this.toggleSidebar()),
             mountCompactNavigation: container => this.tabs.mountCompactNavigation(container, t('toolbox.agents'), () => this.toggleSidebar()),
-            onStartConversation: () => this.startAgentDraft(agentId)});
+            onStartConversation: () => this.startAgentDraft(agentId)}), () => this.agentDrawer?.invalidate(), () => this.showAgentSessions(agentId, this.agentProjectId));
     }
     private async showAgentSessions(agentId: string, projectId?: string): Promise<void> {
         const configured = projectId ?? await this.agentProjects.read(agentId);
@@ -1935,6 +1942,7 @@ export class SessionWorkbench implements WorkspaceController {
             const project = await this.agentDraftProject(agentId);
             if (!current()) return;
             stage = 'project.validate';
+            if (!(await this.filterProjectAgents(project.project.id, [agentId])).length) throw new Error(t('agentWorkspace.scopeDenied'));
             stage = 'draft.open';
             await this.startSessionDraft(folderBrowserPath(project.path), undefined, agentId, undefined, current);
             if (!current() || !this.active?.startsWith('draft:')) return;
@@ -1949,6 +1957,12 @@ export class SessionWorkbench implements WorkspaceController {
             if (current()) await this.restoreAgentLaunch(origin, scope);
             throw error;
         }
+    }
+    private async filterProjectAgents(projectId: string | undefined, ids: string[]): Promise<string[]> {
+        if (!this.backend.readAgentProjectScopes) return ids;
+        const scopes = await this.backend.readAgentProjectScopes(ids);
+        return ids.filter(id => scopes[id]?.kind !== 'selected' || !!projectId &&
+            (scopes[id] as {projectIds: string[]}).projectIds.includes(projectId));
     }
     private async agentDraftProject(agentId: string): Promise<ProjectFolder> {
         const current = this.projectNavigation?.currentProject(); if (current) return current;
@@ -1979,7 +1993,7 @@ export class SessionWorkbench implements WorkspaceController {
     private async localEditorOptions(prepared: SessionOpenView, context: FileSystemContextOwner, assets: FileSystemView,
         branch?: string, initialInputState?: EditorOptions['initialInputState'], signal?: AbortSignal): Promise<EditorOptions> {
         const manifest = prepared.manifest, id = manifest.id, project = prepared.project;
-        return {signal,
+        return {signal, filterExecutors: ids => this.filterProjectAgents(project?.project.id, ids),
             mountMoreMenu: this.familyActions ? container => this.familyActions!.mount(container, manifest) : undefined,
             mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts, () => this.toggleSidebar()),
             mountCompactNavigation: container => this.tabs.mountCompactNavigation(container, project?.displayName ?? project?.name ?? '', () => this.toggleSidebar()),
@@ -2134,7 +2148,7 @@ export class SessionWorkbench implements WorkspaceController {
             }}});
             const editor = await this.factory(mount, { signal: load.signal, hostContext: {...this.hostContext!, toggleSidebar: () => this.toggleSidebar()},
                 mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts, () => this.toggleSidebar()),
-                mountCompactNavigation: (container, label) => this.tabs.mountCompactNavigation(container, project.displayName ?? project.name, () => this.toggleSidebar(), label), sessionDraft: draftOptions, remoteAgents: this.remoteAgentControls(folder, project) });
+                mountCompactNavigation: (container, label) => this.tabs.mountCompactNavigation(container, project.displayName ?? project.name, () => this.toggleSidebar(), label), sessionDraft: draftOptions, filterExecutors: ids => this.filterProjectAgents(project.project.id, ids), remoteAgents: this.remoteAgentControls(folder, project) });
             try { load.check(); } catch (error) { await editor.destroy(); mount.remove(); throw error; }
             this.editor = receiver = editor; this.active = draftId; this.editor.focus?.();
             tab.conversationId = composer.id; tab.panel.dataset.conversationId = composer.id;

@@ -14,7 +14,7 @@ export function captureFlowIdentities(live: FlowIdentityResolver, sessionId: str
         return live.getMCPToolIds([id], sessionId);
     });
     return {
-        resolver: { resolveExact: agents.read, getSystemPrompt: prompts.read,
+        resolver: { assertAdmission: live.assertAdmission?.bind(live), resolveExact: agents.read, getSystemPrompt: prompts.read,
             ...(live.resolveHarnessConnection ? { resolveHarnessConnection: live.resolveHarnessConnection.bind(live) } : {}),
             getSkills: async (ids: string[]) => (await Promise.all(ids.map(id => skills.read(id)))).filter((skill): skill is LLMSkill => !!skill),
             getMCPToolIds: async (ids: string[]) => [...new Set((await Promise.all(ids.map(id => mcp.read(id)))).flat())] } satisfies FlowIdentityResolver,
@@ -31,7 +31,7 @@ function memo<K, V>(read: (key: K) => Promise<V>) {
 }
 
 /** Runtime binding can consume admitted definitions but cannot follow later source edits. */
-export function frozenFlowIdentities(snapshot: FlowIdentitySnapshot, dynamic?: FlowIdentityResolver): FlowIdentityResolver {
+export function frozenFlowIdentities(snapshot: FlowIdentitySnapshot, dynamic?: FlowIdentityResolver, admission?: Pick<FlowIdentityResolver, 'assertAdmission'>): FlowIdentityResolver {
     const read = async <T>(entries: Array<[string, T]>, id: string, admit?: () => Promise<T>): Promise<T> => {
         const found = entries.find(([key]) => key === id);
         if (!found) {
@@ -40,7 +40,7 @@ export function frozenFlowIdentities(snapshot: FlowIdentitySnapshot, dynamic?: F
         }
         return structuredClone(found[1]);
     };
-    return { resolveExact: id => read(snapshot.agents, id, dynamic && (() => dynamic.resolveExact(id))),
+    return { assertAdmission: (admission ?? dynamic)?.assertAdmission?.bind(admission ?? dynamic), resolveExact: id => read(snapshot.agents, id, dynamic && (() => dynamic.resolveExact(id))),
         ...(dynamic?.resolveHarnessConnection ? { resolveHarnessConnection: dynamic.resolveHarnessConnection.bind(dynamic) } : {}),
         getSystemPrompt: id => read(snapshot.prompts, id, dynamic && (() => dynamic.getSystemPrompt(id))),
         getSkills: async (ids, sessionId) => (await Promise.all(ids.map(id => read(snapshot.skills, id, dynamic &&

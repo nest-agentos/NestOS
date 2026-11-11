@@ -341,7 +341,7 @@ export class LLMWorkspaceEditor implements IEditor {
     private async initComponents(session: InitialSessionData['session']): Promise<Omit<InitialSessionData, 'session'>> {
         const initialSettings = session.settings;
         const [initialAgents, savedUIState] = await Promise.all([
-            buildExecutorOptions(this.agentService, this.options.remoteAgents, this.options.configuration?.getConfigurationSnapshot()),
+            buildExecutorOptions(this.agentService, this.options.remoteAgents, this.options.configuration?.getConfigurationSnapshot(), this.options.filterExecutors),
             this.stateManager.loadUIState(session.manifest),
         ]);
         this.operations = createOperationLedger({initial: savedUIState?.operations,
@@ -1020,10 +1020,10 @@ export class LLMWorkspaceEditor implements IEditor {
     }
     private async refreshAgents(): Promise<void> {
         if (!this.chatInput) return;
-        const agents = await buildExecutorOptions(this.agentService, this.options.remoteAgents, this.options.configuration?.getConfigurationSnapshot());
+        const agents = await buildExecutorOptions(this.agentService, this.options.remoteAgents, this.options.configuration?.getConfigurationSnapshot(), this.options.filterExecutors);
         const changed = this.chatInput.refreshAgents(
             agents,
-            (id) => agents.some(a => a.id === id) ? id : 'default'
+            (id) => id
         );
         await this.chatInput.refreshConnections();
         await this.chatInput.refreshCallTargets?.();

@@ -4,6 +4,8 @@ import type {SessionDraftControls} from './SessionDraftControls';
 
 /** NestOS conversation wiring extends the resource-neutral editor host contract. */
 export interface ChatEditorOptions<TSubmission = unknown, TInitial = unknown> extends HostEditorOptions<TSubmission, TInitial> {
+    /** Host projection of selectable executors for this editor's immutable context. */
+    filterExecutors?(ids: string[]): Promise<string[]>;
     conversation?: ConversationControls;
     remoteAgents?: RemoteAgentControls;
     /** A project draft remains separate from history until its first accepted submission. */
