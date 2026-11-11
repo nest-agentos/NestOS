@@ -59,6 +59,7 @@ function taskView(item:KanbanItemSummary|undefined):KanbanWorkResourceTask|undef
     return item?{id:item.id,number:item.number,title:item.title,status:item.status,taskType:kanbanTaskType(item),phase:item.task?.phase,progress:item.progress,archived:item.archivedAt!==undefined,deleted:item.deletedAt!==undefined}:undefined;
 }
 
-export async function associatedWorkResourceIds(journal:KanbanAutomationJournal,boardId:string,itemId:string):Promise<string[]>{
-    return (await journal.find<Association>(key(boardId),row=>row.boardId===boardId&&row.itemId===itemId)).map(row=>row.value.id);
+export async function associatedWorkResourceIds(journal:KanbanAutomationJournal,boardId:string,itemId:string|string[]):Promise<string[]>{
+    const owners=new Set(typeof itemId==='string'?[itemId]:itemId);
+    return (await journal.find<Association>(key(boardId),row=>row.boardId===boardId&&owners.has(row.itemId))).map(row=>row.value.id);
 }

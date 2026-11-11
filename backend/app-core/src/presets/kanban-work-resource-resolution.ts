@@ -6,8 +6,10 @@ type Resolution=NonNullable<KanbanWorkResource['resolution']>;
 export const workResourceResolutionKey=(board:string,item:string,id:string)=>'work-resource-resolution:'+JSON.stringify([board,item,id]);
 export async function resolvedWorkResources<T extends KanbanWorkResource&{itemId?:string}>(journal:KanbanAutomationJournal,board:string,item:string|undefined,rows:T[]):Promise<T[]> {
     if(!rows.length)return rows;
-    const saved=await journal.getMany<Resolution>(rows.map(row=>workResourceResolutionKey(board,item??row.itemId!,row.id)));
-    return rows.map((row,index)=>saved[index]&&row.state!=='cleaned'?{...row,resolution:saved[index],canCleanup:false}:row);
+    const primary=rows.map(row=>workResourceResolutionKey(board,row.owner?.itemId??item??row.itemId!,row.id));
+    const legacy=rows.map(row=>workResourceResolutionKey(board,item??row.itemId??row.owner?.itemId??'',row.id));
+    const keys=[...new Set([...primary,...legacy])],values=await journal.getMany<Resolution>(keys),saved=new Map(keys.map((key,index)=>[key,values[index]]));
+    return rows.map((row,index)=>{const resolution=saved.get(primary[index])??saved.get(legacy[index]);return resolution&&row.state!=='cleaned'?{...row,resolution,canCleanup:false}:row;});
 }
 /** Ignore only this association's finalization; never claim removal or change physical resources. */
 export async function ignoreWorkResource(options:{service:KanbanService;journal:KanbanAutomationJournal;workLog:KanbanWorkLog},board:string,request:KanbanWorkResourceCleanup,associated:()=>Promise<boolean>):Promise<void> {

@@ -40,7 +40,7 @@ async function fixture(withModule=false) {
     await journal.update('worktree:ready', () => tree);
     await journal.update('development-workspace:ready', () => ({directory, projectId: 'project',availableRepositories:withModule?[{path:'library'}]:[], context: {board: {id: 'board'}, task: {id: 'item'}}}));
     const item = {id: 'item', status: 'completed', revision: 1, externalRefs: [{system: 'nestos-remote-project', id: 'project'}, {system: 'nestos-worktree', id: 'ready'}]};
-    const service = {catalog:async()=>[],query:async()=>({items:[],total:0}),item: async () => ({item}), read: async () => ({members: [{kind: 'human', id: 'admin', roles: ['coordinator']}]}),
+    const service = {catalog:async()=>[],query:async()=>({items:[],total:0}),item: async () => ({item}), read: async () => ({items:[item],members: [{kind: 'human', id: 'admin', roles: ['coordinator']}]}),
         currentPrincipal: async () => ({kind: 'human', id: 'admin'}), workflow: async () => ({dispatches: {}})} as never;
     const workLog = {records: vi.fn(async () => ({items: []})), append: vi.fn(async () => {})};
     const mount = {at: '/', access: 'rw', connectionId: 'connection', serverProjectId: 'server-project', serverProjectRevision: 1, serverId: 'server'};
@@ -165,15 +165,15 @@ it('retries only a busy admission that the node confirms did not start', async (
     expect((await f.api.workResources('board', 'item'))[0]).toMatchObject({state: 'cleanup-ready'});
 });
 
-it('retains a resource owned by another board before contacting Git and refuses cleanup', async () => {
+it('excludes another boards resource before contacting Git and still refuses direct cleanup', async () => {
     const f=await fixture();
     const journal=new KanbanAutomationJournal(f.fs, kanbanJournalOptions);await journal.open();
     await journal.update('development-workspace:ready',()=>({directory:f.tree.directory,projectId:'project',context:{board:{id:'another-board'},task:{id:'another-task'}}}));
     f.commands.splice(0);
     const rows=await f.api.workResources('board','item');
-    expect(rows[0]).toMatchObject({ownership:'other',state:'retained',canCleanup:false,reasons:['WORKTREE_OTHER_OWNER']});
+    expect(rows).toEqual([]);expect(await f.api.workResources('board','item',{inspect:false})).toEqual([]);
     expect(f.commands).toEqual([]);
-    await expect(f.api.cleanupWorkResource('board',{itemId:'item',resourceId:'ready',version:rows[0].version,operationId:'foreign-cleanup'})).rejects.toMatchObject({code:'WORKTREE_OTHER_OWNER'});
+    await expect(f.api.cleanupWorkResource('board',{itemId:'item',resourceId:'ready',version:'0'.repeat(64),operationId:'foreign-cleanup'})).rejects.toMatchObject({code:'WORKTREE_NOT_ASSOCIATED'});
     expect(await stat(f.physical)).toBeDefined();expect(f.commands).toEqual([]);
 });
 
@@ -246,4 +246,27 @@ it('unregisters independently linked module worktrees and their owned work branc
  await f.api.cleanupWorkResource('board',{operationId:'linked-module-clean',itemId:'item',resourceId:'ready',version:resource.version});
  expect((await f.git(join(f.root,'library'),['worktree','list','--porcelain'])).stdout).not.toContain(join(f.physical,'library'));
  await expect(f.git(join(f.root,'library'),['rev-parse','--verify','refs/heads/work/ready'])).rejects.toBeDefined();
+});
+
+it('shows only a management task family, resolves child ownership, and preserves unresolved explicit associations',async()=>{
+ const f=await fixture(),manager={id:'manager',status:'completed',planning:{execution:'children'},externalRefs:[{system:'nestos-remote-project',id:'project'},{system:'nestos-worktree',id:'another-decision'},{system:'nestos-worktree',id:'another-board'},{system:'nestos-worktree',id:'unknown'}]};
+ Object.assign(f.item,{planning:{parentId:'manager'}});
+ const other={id:'other',planning:{execution:'children'},externalRefs:[]};
+ (f.service as any).read=async()=>({items:[manager,f.item,other],members:[{kind:'human',id:'admin',roles:['coordinator']}]});
+ (f.service as any).item=async(_board,id)=>({item:id==='manager'?manager:f.item});
+ for(const [id,board,owner] of [['another-decision','board','other'],['another-board','foreign','manager']])await f.journal.update('development-workspace:'+id,()=>({projectId:'project',context:{board:{id:board},task:{id:owner}}}));
+ f.commands.splice(0);const associated=await f.api.workResources('board','manager',{inspect:false});
+ expect(associated.map(row=>row.id).sort()).toEqual(['ready','unknown']);expect(f.commands).toEqual([]);
+ expect(associated.find(row=>row.id==='ready')?.owner).toEqual({boardId:'board',itemId:'item'});
+ const checked=await f.api.workResources('board','manager',{resourceId:'ready'});
+ expect(checked[0]).toMatchObject({owner:{boardId:'board',itemId:'item'},ownership:'current',state:'cleanup-ready'});
+ await expect(f.api.cleanupWorkResource('board',{operationId:'wrong-ignore-owner',itemId:'manager',resourceId:'ready',version:'',resolution:'ignore',reason:'Keep'})).rejects.toMatchObject({code:'WORKTREE_NOT_ASSOCIATED'});
+});
+
+it('retains historical parent-only ignore evidence without ignoring the actual child resource',async()=>{
+ const f=await fixture(),manager={id:'manager',status:'completed',planning:{execution:'children'},externalRefs:[]};Object.assign(f.item,{planning:{parentId:'manager'}});
+ (f.service as any).read=async()=>({items:[manager,f.item]});(f.service as any).item=async(_b,id)=>({item:id==='manager'?manager:f.item});
+ await f.journal.update('work-resource-resolution:'+JSON.stringify(['board','manager','ready']),()=>({kind:'ignored',operationId:'old-parent-ignore',actor:{kind:'human',id:'admin'},reason:'Retain in this group',at:1}));
+ expect((await f.api.workResources('board','manager',{inspect:false}))[0].resolution?.operationId).toBe('old-parent-ignore');
+ expect((await f.api.workResources('board','item',{inspect:false}))[0].resolution).toBeUndefined();
 });

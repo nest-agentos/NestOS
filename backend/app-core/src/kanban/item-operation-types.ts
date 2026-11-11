@@ -19,7 +19,7 @@ export interface ReviewJob {
     command?: import('@nestos/kanban/contracts').KanbanCommand; acceptanceVersion?: string; acceptanceScope?: 'source'|'runtime'; acceptanceEvidence?: unknown;
     commands?:import('@nestos/kanban/contracts').KanbanCommand[];
 }
-export interface ReviewSettings {revision: number; bindings: Partial<Record<ReviewAction, KanbanExternalReference>>; jobs: string[]; receipts: Record<string, string>}
+export interface ReviewSettings {invalidatedAnalysis?:{id:string;code:string};revision: number; bindings: Partial<Record<ReviewAction, KanbanExternalReference>>; jobs: string[]; receipts: Record<string, string>}
 export interface ReviewAdapter {
     relatedSession?(board:KanbanBoard,item:KanbanItem):Promise<string|undefined>;
     ready?(board:KanbanBoard,item:KanbanItem):boolean;

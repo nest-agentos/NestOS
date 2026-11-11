@@ -104,10 +104,10 @@ it('continues the original Session, requires every conflict choice, and invalida
     expect(f.submission.start).toHaveBeenCalledWith(expect.objectContaining({expectedSessionId: 'original'})); expect(f.published.start).not.toHaveBeenCalled();
     await f.api.scan(); await f.api.itemOperations('board', 'task'); await f.bind('merge');
     await expect(f.run('merge', 'no-choice', {confirmed: true})).rejects.toMatchObject({code: 'OPERATION_SELECTION_REQUIRED'});
-    f.snapshot.version = 'changed'; await expect(f.run('merge', 'stale-plan', {confirmed: true, selections: {file: 'integrate'}})).rejects.toMatchObject({code: 'OPERATION_SOURCE_CHANGED_REANALYZE'});
-    f.snapshot.version = 'scope'; await f.run('merge', 'merge', {confirmed: true, selections: {file: 'integrate'}});
+    f.snapshot.version = 'changed';f.snapshot.sourceVersion='changed-source';await expect(f.run('merge', 'stale-plan', {confirmed: true, selections: {file: 'integrate'}})).rejects.toMatchObject({code: 'OPERATION_SOURCE_CHANGED_REANALYZE'});
+    f.snapshot.version='scope';f.snapshot.sourceVersion='source';await f.run('analyze','fresh-analysis');await f.api.scan();await f.run('merge', 'merge', {confirmed: true, selections: {file: 'integrate'}});
     const input = f.published.start.mock.calls[0][0] as never as {request: {source: {values: {context: string}}}};
-    expect(JSON.parse(input.request.source.values.context).input).toMatchObject({approvalId: 'merge', analysisId: 'analyze', analysisDigest: sha256HexSync(JSON.stringify(f.plan)), selections: {file: 'integrate'}});
+    expect(JSON.parse(input.request.source.values.context).input).toMatchObject({approvalId: 'merge', analysisId: 'fresh-analysis', analysisDigest: sha256HexSync(JSON.stringify(f.plan)), selections: {file: 'integrate'}});
     f.complete('merge'); await f.api.scan(); const view = await f.api.itemOperations('board', 'task'); expect(view.operations.find(op => op.id === 'merge')).toMatchObject({state: 'succeeded', enabled: false});
 });
 it('checks the real running version before acceptance and journals canonical acceptance once', async () => {
@@ -450,4 +450,35 @@ it('projects configured scope order consistently for buttons, prerequisites and 
  const view=await f.api.itemOperations('board','task');expect(view.operations.map(row=>row.id)).toEqual(['analyze','merge','build','deploy','accept']);
  expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({dependsOn:[],enabled:true});
  expect(view.operations.find(row=>row.id==='build')).toMatchObject({dependsOn:['merge'],enabled:false});
+});
+
+it('distinguishes conflicts from an unmerged no-conflict plan and expires approval when the target changes',async()=>{
+ const f=await fixture();await f.acceptRuntime();f.plan.conflicts=[];await f.run('analyze');await f.api.scan();await f.bind('merge');
+ let view=await f.api.itemOperations('board','task');expect(view.operations.find(row=>row.id==='merge')?.statusText).toContain('无待决冲突');
+ f.snapshot.version='new-target-state';
+ await expect(f.run('merge','outdated-approval',{confirmed:true})).rejects.toMatchObject({code:'OPERATION_TARGET_CHANGED_REANALYZE'});
+ view=await f.api.itemOperations('board','task');expect(view.code).toBe('OPERATION_TARGET_CHANGED_REANALYZE');
+ expect(view.operations.find(row=>row.id==='merge')).toMatchObject({enabled:false,statusText:expect.stringContaining('已失效')});
+ expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({enabled:true,state:'ready',sessionId:'original'});
+ expect(await f.journal.get(jobKey('analyze'))).toMatchObject({state:'succeeded',result:{conflicts:[]}});
+ expect(await f.journal.get(jobKey('outdated-approval'))).toBeUndefined();expect(f.published.start).not.toHaveBeenCalled();
+ f.snapshot.version='scope';await f.run('analyze','reanalysis');await f.api.scan();
+ view=await f.api.itemOperations('board','task');expect(view.code).toBeUndefined();expect(view.operations.find(row=>row.id==='merge')?.enabled).toBe(true);
+});
+it('revokes the plan if the target changes between approval validation and request preparation',async()=>{
+ const f=await fixture();await f.acceptRuntime();await f.run('analyze');await f.api.scan();await f.bind('merge');
+ f.adapter.snapshot.mockResolvedValueOnce({...f.snapshot}).mockResolvedValueOnce({...f.snapshot,version:'raced',targetVersion:'raced-target'});
+ await expect(f.run('merge','raced-approval',{confirmed:true,selections:{file:'integrate'}})).rejects.toMatchObject({code:'OPERATION_TARGET_CHANGED_REANALYZE'});
+ expect((await f.api.itemOperations('board','task')).code).toBe('OPERATION_TARGET_CHANGED_REANALYZE');
+ expect(await f.journal.get(jobKey('raced-approval'))).toBeUndefined();expect(f.published.start).not.toHaveBeenCalled();
+});
+
+it('stops before external merge admission when the target changes after the request was frozen',async()=>{
+ const f=await fixture();await f.acceptRuntime();await f.run('analyze');await f.api.scan();await f.bind('merge');
+ f.adapter.snapshot.mockResolvedValueOnce({...f.snapshot}).mockResolvedValueOnce({...f.snapshot}).mockResolvedValueOnce({...f.snapshot,version:'admission-drift'});
+ const view=await f.run('merge','late-drift',{confirmed:true,selections:{file:'integrate'}});
+ expect(f.published.start).not.toHaveBeenCalled();expect(view.code).toBe('OPERATION_TARGET_CHANGED_REANALYZE');
+ expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({enabled:true,state:'ready'});
+ expect(view.operations.find(row=>row.id==='merge')).toMatchObject({enabled:false,state:'unavailable'});
+ expect(await f.journal.get(jobKey('late-drift'))).toMatchObject({phase:'settled',state:'failed',code:'OPERATION_TARGET_CHANGED_REANALYZE'});
 });

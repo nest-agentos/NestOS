@@ -1,3 +1,4 @@
+import {taskResourceFamily,ownedResourceReferences} from './kanban-work-resource-scope';
 import {readManagedBranches,inspectManagedBranches,removeManagedBranches,type ManagedBranch} from './kanban-work-resource-branches';
 import {ignoreWorkResource,resolvedWorkResources} from './kanban-work-resource-resolution';
 import {settleWorkspaceFinalization} from '../kanban/automatic-delivery';
@@ -51,19 +52,20 @@ export function developmentWorkResources(options: Options) {
 async function associations(options: Options, boardId: string, itemId: string,resourceId?:string): Promise<KanbanWorkResource[]> {
     const refs = (await references(options, boardId, itemId,!!resourceId)).filter(ref=>!resourceId||ref.id===resourceId), rows: KanbanWorkResource[] = [];
     for (let offset = 0; offset < refs.length; offset += 8) rows.push(...await Promise.all(refs.slice(offset, offset + 8).map(async (ref): Promise<KanbanWorkResource> => {
-        const [tree, cleanup] = await Promise.all([options.journal.get<PreparedWorktree>('worktree:' + ref.id), options.journal.get<Cleanup>('worktree-cleanup:' + ref.id)]);
-        return {archivedAt:tree?.archivedAt,id: ref.id, kind: 'git-worktree', title: tree?.branch ?? ref.id, location: tree?.directory ?? ref.id, version: '',
+        const [tree,cleanup,record]=await Promise.all([options.journal.get<PreparedWorktree>('worktree:'+ref.id),options.journal.get<Cleanup>('worktree-cleanup:'+ref.id),options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+ref.id)]);
+        const context=record?.context as {board?:{id?:string};task?:{id?:string}}|undefined,owner=context?.board?.id&&context.task?.id?{boardId:context.board.id,itemId:context.task.id}:undefined;
+        return {owner,archivedAt:tree?.archivedAt,id: ref.id, kind: 'git-worktree', title: tree?.branch ?? ref.id, location: tree?.directory ?? ref.id, version: '',
             state: cleanup?.phase === 'cleaned' ? 'cleaned' : 'associated', reasons: [], canCleanup: false,
             properties: tree ? [{label: t('kanban.workResourceBranch'), value: tree.branch}] : []};
     })));
     return rows;
 }
 async function references(options: Options, boardId: string, itemId:string,includePlanning=false):Promise<KanbanExternalReference[]> {
-    const {item} = await options.service.item(boardId, itemId), refs = [...item.externalRefs ?? []]; let cursor: string | undefined;
-    for(const id of await associatedWorkResourceIds(options.journal,boardId,itemId))refs.push({system:'nestos-worktree',id});
+    const {item} = await options.service.item(boardId, itemId),family=await taskResourceFamily(options.service,boardId,item),refs=[...family.values()].flatMap(row=>row.externalRefs??[]);let cursor:string|undefined;
+    for(const id of await associatedWorkResourceIds(options.journal,boardId,[...family.keys()]))refs.push({system:'nestos-worktree',id});
     if(['completed','cancelled'].includes(item.status))includePlanning=true;
     const workflow = await options.service.workflow(boardId);
-    for (const dispatch of Object.values(workflow.dispatches)) if (dispatch.itemId === itemId) {
+    for (const dispatch of Object.values(workflow.dispatches)) if (family.has(dispatch.itemId)) {
         const tree = await options.journal.get<PreparedWorktree>('worktree:' + dispatch.id);
         if (tree) refs.push({system: 'nestos-worktree', id: tree.id ?? dispatch.id});
     }
@@ -74,15 +76,18 @@ async function references(options: Options, boardId: string, itemId:string,inclu
     } while (cursor);
     const current=!includePlanning&&item.planning?.execution==='children'?await currentAnalysis(options.journal,boardId,itemId):undefined;
     const planning=new Set(includePlanning?[]:(await analysisHistory(options.journal,boardId,itemId)).filter(job=>job.id!==current?.id).map(job=>job.id));
-    return [...new Map(refs.filter(ref=>ref.system==='nestos-worktree'&&!planning.has(ref.id)).map(ref => [ref.id, ref])).values()];
+    const unique=[...new Map(refs.filter(ref=>ref.system==='nestos-worktree'&&!planning.has(ref.id)).map(ref => [ref.id, ref])).values()];
+    return ownedResourceReferences(options.journal,boardId,family,unique);
 }
 async function scope(options: Options, boardId: string, itemId: string, id: string, known?: KanbanExternalReference[]): Promise<ResourceScope> {
     requireValue(/^[\w-]{1,128}$/.test(id), 'WORKTREE_SCOPE_INVALID');
-    const {item} = await options.service.item(boardId, itemId);
+    let {item} = await options.service.item(boardId, itemId);
     requireValue((known ?? await references(options, boardId, itemId,true)).some(ref => ref.id === id), 'WORKTREE_NOT_ASSOCIATED');
     const record = await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + id);
     const tree = await options.journal.get<PreparedWorktree>('worktree:' + id);
     requireValue(record && tree && tree.directory === record.directory, 'WORKTREE_ASSOCIATION_UNKNOWN');
+    const context=record.context as {board?:{id?:string};task?:{id?:string}}|undefined;
+    if(context?.board?.id===boardId&&context.task?.id&&context.task.id!==item.id){const family=await taskResourceFamily(options.service,boardId,item);item=family.get(context.task.id)??item;}
     requireValue(tree.directory === '/workspace/_nestos/worktrees/' + id && tree.branch === 'work/' + id, 'WORKTREE_SCOPE_INVALID');
     requireValue(item.externalRefs?.some(ref => ref.system === 'nestos-remote-project' && ref.id === record.projectId), 'WORKTREE_PROJECT_CHANGED');
     return {id, item, record, tree};
@@ -132,7 +137,7 @@ async function cleanup(options: Options, boardId: string, request: KanbanWorkRes
     const started = Date.now(), owner = randomUUID(), operationId = /^[\w-]{1,128}$/.test(request.operationId) ? request.operationId : owner; let stage = 'authorize', claimed = false;
     try {
         if(request.resolution==='ignore'){
-            stage='ignore';await ignoreWorkResource(options,boardId,request,async()=>(await references(options,boardId,request.itemId,true)).some(ref=>ref.id===request.resourceId));
+            stage='ignore';await ignoreWorkResource(options,boardId,request,async()=>(await associations(options,boardId,request.itemId,request.resourceId)).some(row=>row.id===request.resourceId&&(!row.owner||row.owner.boardId===boardId&&row.owner.itemId===request.itemId)));
             const resources=await resolvedWorkResources(options.journal,boardId,request.itemId,await associations(options,boardId,request.itemId));
             await settleWorkspaceFinalization(options,boardId,request.itemId,resources);
             return resources.find(row=>row.id===request.resourceId)!;

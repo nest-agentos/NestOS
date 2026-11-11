@@ -1,3 +1,4 @@
+import {invalidateReviewAnalysis,revalidateMergeAdmission} from './item-operation-analysis';
 import {cancellationKey,pendingCancellation,blocksOperation,type ReviewCancellation} from './item-operation-cancellation';
 import {validateOperationResult} from './item-operation-results';
 import {indexResourceJob} from './resource-operation-index';
@@ -13,11 +14,15 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
     settings: ReviewSettings, request: KanbanItemOperationRequest, context?: unknown,expectedAcceptanceSource?:string): Promise<ReviewJob> {
     const snapshot = await preparationStage(options, request.operationId, 'snapshot', () => options.adapter.snapshot(board, item)), action = request.action as ReviewAction;
     if(action==='analyze'&&expectedAcceptanceSource!==undefined)await preparationStage(options,request.operationId,'acceptance-source',async()=>requireValue(snapshot.sourceVersion===expectedAcceptanceSource,'OPERATION_SOURCE_CHANGED_REBUILD'));
-    const base: ReviewJob = {id: request.operationId, boardId: board.id, itemId: item.id, scopeId:options.scopeId, action, snapshot,
+    const base: ReviewJob = {id: request.operationId, boardId: board.id, itemId: item.id, scopeId:options.scopeId, action, snapshot,operationContext:context,
         fingerprint: sha256HexSync(JSON.stringify(request)), phase:'prepared',state:'running',createdAt:Date.now(),...(request.followUp==='deploy'?{followUp:{action:'deploy' as const,state:'queued' as const}}:{})};
     if (action === 'deploy' || action === 'merge') {
-        const evidence = context as {sourceVersion?: string; targetVersion?: string};
-        requireValue(evidence?.sourceVersion === snapshot.sourceVersion && evidence.targetVersion === snapshot.targetVersion, 'OPERATION_SOURCE_CHANGED_REANALYZE');
+        const evidence=context as {analysisId?:string;sourceVersion?:string;targetVersion?:string};
+        const analysis=action==='merge'&&evidence?.analysisId?await options.journal.get<ReviewJob>(jobKey(evidence.analysisId)):undefined;
+        if(evidence?.sourceVersion!==snapshot.sourceVersion||evidence.targetVersion!==snapshot.targetVersion||analysis&&analysis.snapshot.version!==snapshot.version){
+            const code=evidence?.sourceVersion!==snapshot.sourceVersion?'OPERATION_SOURCE_CHANGED_REANALYZE':'OPERATION_TARGET_CHANGED_REANALYZE';
+            if(analysis)await invalidateReviewAnalysis(options,board.id,item.id,analysis.id,code,request.operationId);requireValue(false,code);
+        }
     }
     if(action==='deploy'&&options.adapter.managed){const managed=await options.adapter.managed.prepare({id:base.id,board,item,snapshot,context});if(managed)return {...base,operationContext:context,managed};}
     if (options.adapter.prepareOperation) {
@@ -54,6 +59,7 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
             if(board.executionControl?.paused)throw Object.assign(new Error('Delivery paused before admission'),{code:'AUTOMATIC_DELIVERY_PAUSED',executionOutcome:'not-started',retryable:true});
             requireValue(!board.lifecycle,'BOARD_STOPPING');
             const {item}=await options.service.item(record.boardId,record.itemId);requireValue(!item.deletedAt&&item.control?.action!=='cancel','TASK_CANCELLING');
+            await revalidateMergeAdmission(options,record);
             if(record.managed){await options.adapter.managed!.submit(record.managed);return;}if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
         inspect:async record=>{
             if(blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(record.id))))return {state:'unknown' as const,code:'OPERATION_CANCELLING'};
