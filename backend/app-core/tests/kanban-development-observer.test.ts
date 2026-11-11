@@ -39,9 +39,22 @@ async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, l
         projects: {get: async () => ({path: '/project'}) as never, openWorkspace: async () => ({fs, dispose: async () => {}}) as never}, wake() {}});
     closes.push(() => observer.dispose());
     const publish = async(id: string,type:string)=>{channels.report('attempt',id,{type,content:'Business message'});};
-    return {observer,fs, directory, scope, publish, channels, service, events, journal, observe: (outcome: 'running' | 'succeeded' | 'failed' | 'cancelled') => observer.observe({boardId: 'board', dispatch,
-        service, worker, observation: {outcome, ...(outcome === 'succeeded' ? {outputs: []} : {})}})};
+    return {observer,fs, directory, scope, publish, channels, service, events, journal, dispatch, observe: (outcome: 'running' | 'succeeded' | 'failed' | 'cancelled', executionSessionId?: string) => observer.observe({boardId: 'board', dispatch,
+        service, worker, observation: {outcome, executionSessionId, ...(outcome === 'succeeded' ? {outputs: []} : {})}})};
 }
+it('automatically registers result learnings only after the execution finishes', async () => {
+    const f = await fixture();
+    await f.service.execute('board', {operationId: 'bind-learning-session', expectedRevision: (await f.service.read('board')).revision,
+        command: {type: 'observe-execution', dispatchId: f.dispatch.id, fence: f.dispatch.fence, outcome: 'running', executionSessionId: 'session'}});
+    await f.service.execute('board', {operationId: 'link-learning-session', expectedRevision: (await f.service.read('board')).revision,
+        command: {type: 'link-reference', itemId: 'item', reference: {system: 'nestos-execution-session', id: 'session', revision: f.dispatch.id}}});
+    f.channels.report('attempt', 'learning-result', {type: 'result', content: 'Done', payload: {learnings: [{id: 'receipt', itemId: 'item',
+        event: 'Lost receipt', handling: 'Inspect original operation', reason: 'Avoid duplicate work', result: 'Recovered', conditions: 'Stable identity'}]}});
+    await f.observe('running', 'session');
+    expect((await f.service.records('board')).total).toBe(0);
+    expect(await f.observe('succeeded', 'session')).toMatchObject({outcome: 'succeeded'});
+    expect((await f.service.records('board', {itemId: 'item'})).total).toBe(1);
+});
 it('requires a result and native completion before returning a reviewable observation', async () => {
     const f = await fixture();
     expect(await f.observe('succeeded')).toMatchObject({outcome: 'unknown', code: 'WORKSPACE_RESULT_MISSING'});

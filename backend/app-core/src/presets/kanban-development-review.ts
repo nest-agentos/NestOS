@@ -34,7 +34,9 @@ import type {ProjectService} from '@nestos/app-contracts/services';
 import {developmentPolicy,requiresDevelopmentProject} from './kanban-development-policy';
 import {publishPromptBundle} from '../run/prompt-bundle';
 import {publishImmutableFile,freezePrompts} from '../run/prompt-bundle';
-import {readChannelResult} from '../run/channel-results';
+import {readChannelResult, channelMessages} from '../run/channel-results';
+import {registerSessionLearnings} from '../kanban/session-learnings';
+import {channelDigest} from '../run/channel-protocol';
 import {workResourceExecution} from './kanban-work-resource-execution';
 
 export interface DevelopmentReviewOptions {
@@ -151,7 +153,19 @@ async function readAnalysis(options: Options, job: ReviewJob): Promise<unknown |
     const board = await options.service.read(job.boardId), item = (await options.service.item(job.boardId, job.itemId)).item;
     requireValue((await snapshot(options, board, item)).version === job.snapshot.version, 'MERGE_PLAN_SOURCE_CHANGED');
     const current = await resource(options, item, board.id);
-    return readChannelResult(options.remote, current.record.projectId, job.id, options.journal);
+    return readReviewResult(options, current.record.projectId, job);
+}
+
+async function readReviewResult(options: Options, projectId: string, job: ReviewJob): Promise<unknown | undefined> {
+    const payload = await readChannelResult(options.remote, projectId, job.id, options.journal);
+    if ((payload as {learnings?: unknown} | undefined)?.learnings !== undefined) {
+        const publications = await channelMessages(options.remote, projectId, job.id);
+        const results = publications.filter(row => row.message.type === 'result'), result = results[0];
+        requireValue(results.length === 1 && channelDigest(result.message.payload) === channelDigest(payload), 'CHANNEL_RESULT_CHANGED');
+        await registerSessionLearnings({boardId: job.boardId, sessionId: job.sessionId ?? job.request?.expectedSessionId,
+            messageId: result.id, payload, publications, service: options.service, journal: options.journal});
+    }
+    return payload;
 }
 
 async function readOperation(options: Options, job: ReviewJob): Promise<unknown | undefined> {
@@ -159,7 +173,7 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
     const board = await options.service.read(job.boardId), item = (await options.service.item(job.boardId, job.itemId)).item;
     const current = await resource(options, item, board.id), folder = await options.projects.get(current.record.projectId), view = await options.projects.openWorkspace(folder.path);
     let result: unknown;
-    try {result=await operationReceipt(view.fs,current.record.directory+'/_nestos/kanban/review/'+job.id,await readChannelResult(options.remote,current.record.projectId,job.id,options.journal),options.journal,job.id);
+    try {result=await operationReceipt(view.fs,current.record.directory+'/_nestos/kanban/review/'+job.id,await readReviewResult(options,current.record.projectId,job),options.journal,job.id);
         if (job.action === 'build' && result && (result as {status?: string}).status === 'succeeded') await verifyBuildEvidence(view.fs, current.record.directory, result);}
     finally {await view.dispose();}
     if (result === undefined || ['blocked', 'failed'].includes((result as {status: string})?.status)) return result;
