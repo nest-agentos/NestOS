@@ -14,6 +14,7 @@ projects/remote-conversation-retry 对暂时性观察接线失败按 15 至 60 �
 
 ## 定位与铁律
 
+- **协调层边界**：app-core 的目标职责为组合接线、授权上下文传递和跨领域协调。执行机制归 Kernel/Session/Flow，领域规则归各领域模块，具体 Git 交付等业务归独立 Tool/领域包。优先复用已有公开接口；禁止新增执行队列或重复的重试、取消、恢复状态机。现有业务实现属于待迁移职责，不能据此继续扩大本层；迁移须保留稳定身份、批准、真实回执和故障恢复，不把业务规则下沉到 Kernel。现状与迁移边界见 [策略与机制边界](../../doc/design/application-policy-boundaries.md)。
 - **平台无关**：`src/` 内不出现 `node:*`、DOM、`window`、`localStorage`；宿主差异一律通过注入传入（`ApplicationKernelPlatform`：`createSessionProcesses` / `skillSourceForSession` / `configureSession` / `configure`）。
 - **依赖只朝下**：只依赖共享 `app-contracts`、`llm-context`、`common`、`vfs-core`、`durable-kernel`、`kernel-adapters`、`llm-flow`、`llm-session`、`llm-tasks`、`tools`、`driver-llm`、`vfs-sync`、`cells-driver`（harness 类型端口及纯 authorization 校验入口）；不得依赖 `app-shell`、UI 包或任何 app。
 - **用例与装配分开**：应用策略放入 configuration/projects/session 等可单测服务；`runtime/` 负责接线与生命周期，不内联业务用例。宿主差异通过端口注入，DOM、导航与确认交互归 app-shell。

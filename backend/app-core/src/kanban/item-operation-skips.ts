@@ -27,7 +27,7 @@ export function affectedOperations(graph:Record<string,string[]>,action:string):
 /** Only explicitly confirmed operations are waived, including historical policies. */
 export function effectiveOperationWaivers(waivers:KanbanOperationWaiver[],plan?:DeliveryPlan):KanbanOperationWaiver[] {
     const graph=operationDependencies(plan);
-    return waivers.filter(row=>Object.hasOwn(graph,row.action)).map(row=>{
+    return waivers.filter(row=>row.operations.some(operation=>Object.hasOwn(graph,operation.id))).map(row=>{
         const operations=row.operations.filter(op=>Object.hasOwn(graph,op.id));
         return {...row,acceptanceWaived:row.acceptanceWaived&&operations.some(op=>op.id==='accept'),operations};
     });

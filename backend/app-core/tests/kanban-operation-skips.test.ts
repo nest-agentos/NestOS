@@ -153,14 +153,17 @@ it.each(['succeeded','failed'] as const)('continues real submission after an acc
  vi.mocked(f.options.adapter.snapshot).mockResolvedValueOnce({version:'changed',sourceVersion:'changed-source',targetVersion:'t',context:{}});
  await expect(restored.runItemOperation('b',{...merge,operationId:'stale-merge',confirmed:true})).rejects.toMatchObject({code:'OPERATION_SOURCE_CHANGED_REANALYZE'});
  expect(f.options.submission.start).toHaveBeenCalledOnce();
- observation='running';await restored.runItemOperation('b',{...merge,confirmed:true});
+ view=await restored.itemOperations('b','task');expect(view.code).toBe('OPERATION_SOURCE_CHANGED_REANALYZE');
+ await restored.runItemOperation('b',{operationId:'reanalyze-after-waiver',itemId:'task',action:'analyze',expectedRevision:view.revision});await restored.scan();
+ view=await restored.itemOperations('b','task');
+ observation='running';await restored.runItemOperation('b',{...merge,expectedRevision:view.revision,confirmed:true});
  expect(f.options.cleanup).not.toHaveBeenCalled();expect((await f.service.item('b','task')).item.status).toBe('review');
  observation=outcome;await restored.scan();const item=(await f.service.item('b','task')).item;
  expect(item.status).toBe(outcome==='succeeded'?'completed':'review');
  if(outcome==='succeeded'){expect(item.acceptanceResult).toMatchObject({outcome:'waived',waiverId:'accept'});expect(f.options.cleanup).toHaveBeenCalledOnce();}
  else {expect(item.acceptanceResult).toBeUndefined();expect(f.options.cleanup).not.toHaveBeenCalled();}
  expect(item.operationWaivers![0].operations.map(row=>row.id)).toEqual(['accept']);
- expect(f.options.submission.start).toHaveBeenCalledTimes(2);
+ expect(f.options.submission.start).toHaveBeenCalledTimes(3);
 });
 it('cannot use an acceptance waiver to bypass an outstanding deployment',async()=>{
  const f=await fixture();await seedDelivery(f,['build']);
@@ -179,4 +182,11 @@ it('preserves the exact historical impact set without expanding or revoking conf
  const isolated={...history[0],dependencies:{accept:[]},operations:history[0].operations.slice(0,1)};
  expect(effectiveOperationWaivers([isolated])[0].operations).toEqual(isolated.operations);
  expect(history[0].operations.map(row=>row.id)).toEqual(['accept','analyze','merge','cleanup']);
+});
+
+it('retains an explicitly waived acceptance when the new plan only hands off the source',()=>{
+ const waiver={id:'old-build-waiver',action:'build',acceptanceWaived:true,operations:[{id:'build',cause:'direct'},{id:'deploy',cause:'dependency'},{id:'accept',cause:'dependency'}]} as any;
+ const result=effectiveOperationWaivers([waiver],{steps:['accept'],acceptance:'source'});
+ expect(result).toMatchObject([{id:waiver.id,acceptanceWaived:true,operations:[{id:'accept'}]}]);
+ expect(result[0].operations).toHaveLength(1);expect(waiver.operations).toHaveLength(3);
 });
