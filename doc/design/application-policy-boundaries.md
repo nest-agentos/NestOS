@@ -174,3 +174,5 @@ Flow 库恢复时是否发布修订属于应用策略，由 app-core/presets/res
 - `git-delivery` 独立模块拥有 GitSource/GitIntegration/GitCleanup 的规则与实现。上下文查询接受当前业务事实端口，清理接受授权、读取资源与执行屏障端口，没有对 app-core 的反向依赖。资源日志继续使用旧 key、schema 和操作身份，不迁移或重放在途执行。
 
 统一执行仍是 Session/Flow → Kernel → 已授权适配器。Git 领域的资源意图不调度 Task，不重派 unknown，Kernel 内不加入 Git/看板字段。httpd 启停监督器留在进程外；服务切换只有受信宿主端口可调用。
+
+Cells 的工作区互斥与原生输入交接属于节点执行机制。原生执行模式无法仅凭 readOnly 声明证明进程不可写，因此保留必要互斥；短命令收尾通过文件门的有界等待交接，原生输入只发送一次。宿主不复制重试循环或释放条件。追踪跨异步/队列恢复使用经过校验的 trace/span，上层稳定操作身份与节点原生回执继续分别保留。

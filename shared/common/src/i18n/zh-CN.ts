@@ -8,6 +8,7 @@ export const zhCN = {
     'kanban.errors.NATIVE_USAGE_LIMIT_EXCEEDED': '模型服务的账户使用额度已达上限；额度恢复后可重试本操作。',
     'kanban.errors.NATIVE_CONTEXT_LIMIT_EXCEEDED': '会话已达到上下文上限，请在操作会话中处理后重试。',
     'kanban.errors.NATIVE_CONNECTION_FAILED': '模型连接中断，请检查连接后重试。',
+    'kanban.errors.NATIVE_WORKSPACE_BUSY': '工作区仍被其他操作占用；请查看诊断中的持有操作，释放后在会话中继续。',
     'kanban.errors.NATIVE_TURN_FAILED': '本轮执行失败，请打开操作会话查看具体原因。',
     'kanban.errors.TIME_LOCAL_INVALID': '时间格式无效，请重新选择。',
     'kanban.errors.TIME_LOCAL_AMBIGUOUS': '该本地时间处于夏令时重复时段，请选择明确的时间。',

@@ -7,6 +7,7 @@ export const en: LocaleStrings = {
     'kanban.errors.NATIVE_USAGE_LIMIT_EXCEEDED': 'The model service account usage limit was reached. Retry this operation when quota is available.',
     'kanban.errors.NATIVE_CONTEXT_LIMIT_EXCEEDED': 'The context limit was reached. Resolve it in the operation conversation, then retry.',
     'kanban.errors.NATIVE_CONNECTION_FAILED': 'The model connection was interrupted. Check the connection and retry.',
+    'kanban.errors.NATIVE_WORKSPACE_BUSY': 'Another operation still holds the workspace. Check the blocking operation in diagnostics and continue in the conversation after it releases the workspace.',
     'kanban.errors.NATIVE_TURN_FAILED': 'This turn failed. Open the operation conversation for details.',
     'kanban.errors.TIME_LOCAL_INVALID': 'Invalid date and time. Choose a valid time.',
     'kanban.errors.TIME_LOCAL_AMBIGUOUS': 'This local time occurs twice during the daylight saving transition. Choose an unambiguous time.',
