@@ -57,7 +57,7 @@ export class NativeComposerCapabilities {
     private read(state: ConversationSnapshot, force: boolean) {
         return Promise.allSettled([
             state.supportsModels && this.controls.models
-                ? !force && this.modelScope === this.scope ? Promise.resolve(this.models) : this.controls.models()
+                ? !force && !this.failures && this.modelScope === this.scope ? Promise.resolve(this.models) : this.controls.models()
                 : Promise.resolve({models: []}),
             state.supportsSlashCommands && this.controls.commands ? this.controls.commands() : Promise.resolve([]),
         ] as const);

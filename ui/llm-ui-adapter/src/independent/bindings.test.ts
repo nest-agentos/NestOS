@@ -629,3 +629,16 @@ it('refreshes command metadata without rereading models in the same ownership sc
     await caps.load(state, true);
     expect(host.controls.models).toHaveBeenCalledTimes(2); caps.dispose();
 });
+
+it('retries failed model refreshes instead of treating the previous catalog as a successful retry', async () => {
+    vi.useFakeTimers(); const host = fixture(), state = {...host.state(), supportsModels: true};
+    host.controls.models = vi.fn(async () => ({models: []}));
+    const caps = new NativeComposerCapabilities(host.controls);
+    try {
+        await caps.load(state); vi.mocked(host.controls.models).mockRejectedValueOnce(new Error('Temporary'));
+        await caps.load(state, true); await caps.load(state);
+        expect(host.controls.models).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(1000); await caps.load(state);
+        expect(host.controls.models).toHaveBeenCalledTimes(3);
+    } finally {caps.dispose(); vi.useRealTimers();}
+});
