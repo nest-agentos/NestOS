@@ -155,6 +155,7 @@ export const en: LocaleStrings = {
     'kanban.decisionTable.tasks.execution': 'Execution tasks',
     'kanban.decisionTable.taskIssues': 'Issues',
     'kanban.decisionTable.noTasks': 'None',
+    'kanban.decisionTable.managementTasks': 'View management tasks ({count})',
     'kanban.decisionTable.taskCompletion': '{completed}/{total} completed',
     'kanban.decisionTable.reason.finalization-pending': 'Tasks completed; finalization in progress',
     'kanban.decisionTable.reason.confirmation-required': 'Tasks completed; delivery confirmation required',
