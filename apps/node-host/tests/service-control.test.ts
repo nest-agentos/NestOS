@@ -2,7 +2,7 @@ import {expect,it,vi} from 'vitest';
 import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {localServiceControl} from '@nestos/app-contracts/services';
+import {localServiceControl} from '../src/runtime/service-control';
 it('describes the running child version while the launcher still records its predecessor',async()=>{
     const root=await mkdtemp(path.join(tmpdir(),'nestos-service-version-'));
     try {

@@ -1,5 +1,5 @@
 import {tracedCellsFetch} from '../logging/request-trace';
-import {localServiceControl} from '@nestos/app-contracts/services';
+import {localServiceControl} from './service-control';
 import {namedCleanup} from './host-cleanup';
 import {NodeToolConnections} from './tool-connections';
 import {ToolOAuthApplications} from './tool-oauth-applications';
