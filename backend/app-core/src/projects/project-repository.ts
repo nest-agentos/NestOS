@@ -90,6 +90,11 @@ export class ProjectRepository {
             throw error;
         }
     }
+    async candidateId(name: string, requested?: string): Promise<string> {
+        const path = await this.identityRegistry(), used = (await this.list()).map(project => project.id);
+        await this.root.meta.seq!.walkEntries(path, entry => {used.push(entry.key); return true;});
+        return allocateProjectId(name, used, requested);
+    }
     private async identityRegistry(): Promise<string> {
         const path = '/etc/project-identities.seq';
         if (!await this.root.driver.exists(path)) {
@@ -139,14 +144,19 @@ export class ProjectRepository {
             if (!existing) await tx.setEntry(INFO, 'identity', JSON.stringify(identity));
         });
     }
-    async createRemote(identity: ProjectIdentity): Promise<void> {
+    async commitRemoteCreation(identity: ProjectIdentity): Promise<void> {
         this.invalidate();
         const directory = identity.navigationName ?? identity.name;
         const path = `${READONLY}/${directory}/info.seq`;
         if (!await this.root.driver.exists(path)) await this.root.driver.createFile({ parentPath: `${READONLY}/${directory}`, name: 'info.seq', type: 'seqfile', recursive: true });
-        const existing = await this.root.meta.seq!.getEntry(path, 'identity');
-        if (existing && this.decode(existing).id !== identity.id) throw new FSError('EEXIST', 'Readonly project already exists');
-        await this.root.meta.seq!.setEntry(path, 'identity', JSON.stringify(identity));
+        const registry = await this.identityRegistry();
+        try { await this.root.meta.seq!.transaction!(async tx => {
+            const existing = await tx.getEntry(path, 'identity');
+            if (existing && this.decode(existing).id !== identity.id) throw new FSError('EEXIST', 'Readonly project already exists');
+            if (!await tx.compareAndSet(registry, identity.id.toLowerCase(), {expected:null,value:identity.id}))
+                throw new FSError('EEXIST', 'Project ID already exists');
+            await tx.setEntry(path, 'identity', JSON.stringify(identity));
+        }); } finally {this.invalidate();}
     }
     async rename(project: StoredProject, name: string, navigationName?: string): Promise<void> {
         this.invalidate();

@@ -18,7 +18,7 @@ import {RemoteDraftRecovery} from './drafts/remote-submission';
 import type { ProjectRemoteMountService } from '@nestos/app-contracts/services';
 import { ProjectSessions } from './project-sessions';
 import { readProjectNavigation } from './navigation-view';
-import { randomUUID, t } from '@nestos/common';
+import { createModuleLogger, randomUUID, t } from '@nestos/common';
 import { FSError, createFileSystemView, normalizeVirtualPath, type IFileSystem, type OperationOptions } from '@nestos/vfs-core';
 import type { ISessionRepository, SessionFolder } from '@nestos/llm-session';
 import type { DirectoryMountService } from '@nestos/app-contracts/services';
@@ -41,13 +41,14 @@ export class ProjectService {
         if (remote) remote.rootValidator = async (id, mount) => {
             if (mount.access === 'rw' && (!mount.connectionId || !remote.connection(mount.connectionId).projects))
                 throw new FSError('ECAPABILITY', 'Writable remote projects require the server project protocol');
-            await this.assertIndependent(await this.get(id), [mount]);
+            await this.assertIndependent(this.remoteCreationCandidates.get(id) ?? await this.get(id), [mount]);
         };
     }
     private startupId?: string;
     private readonly personalProject: PersonalProject;
     private readonly defaultProjects: ProjectDefaults;
     private localCreation: Promise<unknown> = Promise.resolve();
+    private readonly remoteCreationCandidates = new Map<string, ProjectFolder>();
     readonly sessions: ProjectSessions;
     readonly drafts: ProjectDraftService;
     readonly favorites: ProjectFavorites;
@@ -319,31 +320,51 @@ export class ProjectService {
             const existing = await remote.findRemoteProject(connectionId, path);
             if (existing) {
                 const project = (await this.list()).find(item => item.project.id === existing);
-                if (project) return project;
+                if (project) return this.ensureRemoteNavigation(project,parent);
                 await remote.forgetProject(existing);
             }
-            const id = await this.projectRepository.allocateId(name, options?.projectId);
-            const projectPath = await this.remoteNavigationPath(name,parent,id);
-            const navigationName = projectPath.split('/').pop()!;
-            await this.projectRepository.createRemote({version:1,id,name:name.trim(),createdAt:Date.now(),
-                ...(navigationName !== name.trim() ? {navigationName} : {})});
-            let project: ProjectFolder | undefined;
-            try {
-                project = await this.repository.createFolder(projectPath, { id, directory: `project:${id}`, source: { kind: 'remote' } }) as ProjectFolder;
-                await remote.bindProject(id, connectionId, path, access, {...options,projectName:name.trim()});
-                await this.sessionFolder(project); return this.get(id);
-            }
-            catch (error) {
-                // A published grant must remain recoverable if view invalidation fails.
-                if (!remote.list(id).length) {
-                    const stored = (await this.projectRepository.list()).find(item => item.id === id);
-                    if (stored) await this.projectRepository.remove(stored);
-                    if (project) await this.repository.deleteFolder(project.path, true);
-                }
-                throw error;
-            }
+            return this.createRemoteCandidate(name,parent,connectionId,path,access,options);
         });
         this.localCreation = work; return work;
+    }
+    private async ensureRemoteNavigation(project: ProjectFolder, parent: string | null): Promise<ProjectFolder> {
+        if (!(await this.repository.listFolders()).some(folder=>folder.project?.id===project.project.id)) {
+            const path=normalizeVirtualPath(`${parent??''}/${project.path.split('/').pop()!}`);
+            const folder=await this.repository.createFolder(path,project.project) as ProjectFolder;
+            await this.sessionFolder(folder);
+        }
+        return this.get(project.project.id);
+    }
+    private async createRemoteCandidate(name: string, parent: string | null, connectionId: string, path: string,
+        access: 'ro' | 'rw', options?: OperationOptions & {createDirectory?: boolean; projectId?: string}): Promise<ProjectFolder> {
+        const remote=this.remoteMounts!, operationId=randomUUID(), started=Date.now(), log=createModuleLogger('project-creation');
+        const id=await this.projectRepository.candidateId(name,options?.projectId), projectPath=await this.remoteNavigationPath(name,parent,id);
+        const candidate: ProjectFolder={path:projectPath,name:name.trim(),parentPath:parent,updatedAt:Date.now(),
+            project:{id,directory:`project:${id}`,source:{kind:'remote'}}};
+        let stage='remote-bind'; this.remoteCreationCandidates.set(id,candidate);
+        log.info('project.remote.create',{operationId,projectId:id,connectionId,stage,result:'started',durationMs:0});
+        try {
+            await remote.bindProject(id,connectionId,path,access,{...options,projectName:name.trim()});
+            stage='identity-commit';
+            await this.projectRepository.commitRemoteCreation({version:1,id,name:name.trim(),createdAt:candidate.updatedAt,
+                ...(projectPath.split('/').pop()!==name.trim()?{navigationName:projectPath.split('/').pop()!}:{})});
+            stage='navigation-publish';
+            const project=await this.repository.createFolder(projectPath,candidate.project) as ProjectFolder;
+            await this.sessionFolder(project);
+            const ready=await this.get(id);
+            log.info('project.remote.create',{operationId,projectId:id,connectionId,stage,result:'success',durationMs:Date.now()-started});return ready;
+        } catch(error) {
+            log.error('project.remote.create',{operationId,projectId:id,connectionId,stage,result:'failure',
+                code:error instanceof FSError?error.code:'PROJECT_CREATION_FAILED',durationMs:Date.now()-started});
+            return this.rollbackRemoteCandidate(id,error);
+        } finally {this.remoteCreationCandidates.delete(id);}
+    }
+    private async rollbackRemoteCandidate(id: string, error: unknown): Promise<never> {
+        try {
+            const committed=(await this.projectRepository.list()).some(project=>project.id===id);
+            if (!committed && this.remoteMounts!.list(id).length) await this.remoteMounts!.forgetProject(id);
+        } catch(cleanup) {throw new AggregateError([error,cleanup],'Remote project creation requires recovery');}
+        throw error;
     }
 
     private async remoteNavigationPath(name: string, parent: string | null, id: string): Promise<string> {

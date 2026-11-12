@@ -5,7 +5,7 @@ import { createApplicationRuntime } from '../src/runtime/create-application-runt
 
 afterEach(() => { vi.restoreAllMocks(); });
 
-it('removes the remote identity if navigation creation fails before a grant is published', async () => {
+it('validates the remote source before publishing navigation or occupying an ID', async () => {
     const runtime = await createApplicationRuntime({ backend: new MemoryBackend(), ownerKind: 'web', remoteSourceProvider: {
         resolveCredential:()=>'fixture-secret', setCredential() {}, async dispose() {}, async open() { throw new Error('not contacted'); },
     } });
@@ -17,10 +17,12 @@ it('removes the remote identity if navigation creation fails before a grant is p
             if (path === '/Interrupted') throw new Error('index failed');
             return original(path, project);
         });
-        await expect(runtime.projects.createRemote('Interrupted', null, connection, '/docs')).rejects.toThrow('index failed');
+        await expect(runtime.projects.createRemote('Interrupted', null, connection, '/docs')).rejects.toThrow('not contacted');
+        expect(failure).not.toHaveBeenCalled();
         expect((await runtime.projects.list()).some(project => project.name === 'Interrupted')).toBe(false);
         const root = await runtime.vfs.openFileSystem('/');
         expect(await root.driver.exists('/home/admin/projects/.nestos/readonly/Interrupted')).toBe(false);
+        expect(await root.meta.seq!.getEntry('/etc/project-identities.seq','interrupted')).toBeNull();
         failure.mockRestore();
     } finally { await runtime.dispose(); }
 });
