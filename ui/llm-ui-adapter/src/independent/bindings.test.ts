@@ -618,3 +618,14 @@ it('releases native queue admission from durable evidence while its transport re
   expect(binding.source.getSnapshot().allowed).toContain('send');
  }finally{binding.dispose();}
 });
+
+it('refreshes command metadata without rereading models in the same ownership scope', async () => {
+    const host = fixture(), state = {...host.state(), supportsModels: true, supportsSlashCommands: true};
+    host.controls.models = vi.fn(async () => ({models: []}));
+    host.controls.commands = vi.fn(async () => []);
+    const caps = new NativeComposerCapabilities(host.controls); await caps.load(state);
+    await caps.load({...state, commandCatalogObservation: {complete: true}});
+    expect(host.controls.models).toHaveBeenCalledOnce(); expect(host.controls.commands).toHaveBeenCalledTimes(2);
+    await caps.load(state, true);
+    expect(host.controls.models).toHaveBeenCalledTimes(2); caps.dispose();
+});
