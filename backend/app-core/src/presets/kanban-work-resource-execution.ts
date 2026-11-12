@@ -1,9 +1,10 @@
 import {harnessExecutionConstraints} from '@nestos/cells-driver';
-import {resourceJobIndex} from '../kanban/resource-operation-index';
+import {resourceJobIndex} from '@nestos/kanban/integration';
 import {createModuleLogger} from '@nestos/common';
 const log=createModuleLogger('kanban-worktree');
 import {taskStat, type Kernel} from '@nestos/durable-kernel';
-import {jobKey,reviewKey,type ReviewSettings, type ReviewJob} from '../kanban/item-operation-types';
+import {type ReviewSettings, type ReviewJob} from '@nestos/kanban-development';
+import {jobKey,reviewKey} from '@nestos/kanban/integration';
 import {readContextCatalog, type ContextInspector} from '../projects/harness-context-catalog';
 import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallView} from '@nestos/llm-session/contracts';

@@ -1,17 +1,16 @@
 import type {IndependentCallInput, SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {KanbanExternalReference, KanbanItem, KanbanBoard, KanbanService} from '@nestos/kanban/contracts';
-import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
-import type {createPublishedOperation as publishedOperation, OperationObservation} from '@nestos/llm-session';
+import type {KanbanAutomationJournal,KanbanOperationRecord} from '@nestos/kanban/integration';
+import type {createPublishedOperation as publishedOperation} from '@nestos/llm-session';
 import type {createSessionSubmission as sessionSubmission} from '@nestos/llm-session';
 export type ReviewAction = 'build' | 'deploy' | 'accept' | 'analyze' | 'merge';
 export interface ReviewSnapshot {version: string; sourceVersion: string; targetVersion: string; context: unknown}
 export type {MergePlan} from '@nestos/git-delivery/contracts';
-export interface ReviewJob {
+export interface ReviewJob extends KanbanOperationRecord {
     scopeId?:string;
-    id: string; boardId: string; itemId: string; action: ReviewAction; fingerprint: string; snapshot: ReviewSnapshot;
-    phase: 'prepared' | 'submitting' | 'settled'; state: OperationObservation['state']; code?: string; sessionId?: string;
-    managed?:import('../runtime/service-control').ServiceSwitchRequest;
-    operationContext?: unknown; input?: IndependentCallInput; request?: SubmissionRequest; result?: unknown; createdAt: number;
+    action:ReviewAction;snapshot:ReviewSnapshot;
+    managed?:import('@nestos/app-contracts/services').ServiceSwitchRequest;
+    operationContext?: unknown; input?: IndependentCallInput; request?: SubmissionRequest;
     followUp?:{action:'deploy';state:'queued'|'started'|'failed';code?:string;request?:import('@nestos/kanban/contracts').KanbanItemOperationRequest};
     command?: import('@nestos/kanban/contracts').KanbanCommand; acceptanceVersion?: string; acceptanceScope?: 'source'|'runtime'; acceptanceEvidence?: unknown;
     commands?:import('@nestos/kanban/contracts').KanbanCommand[];
@@ -22,8 +21,8 @@ export interface ReviewAdapter {
     ready?(board:KanbanBoard,item:KanbanItem):boolean;
     acceptanceCommands?(board:KanbanBoard,item:KanbanItem):Promise<import('@nestos/kanban/contracts').KanbanCommand[]>;
     cancel?(job:ReviewJob,operationId:string):Promise<'accepted'|'cancelled'|'unknown'>;
-    managed?:{describe?(item:KanbanItem):Promise<import('../runtime/service-control').RuntimeServiceDescriptor|undefined>;prepare(input:{id:string;board:KanbanBoard;item:KanbanItem;snapshot:ReviewSnapshot;context:unknown}):Promise<import('../runtime/service-control').ServiceSwitchRequest|undefined>;
-        submit(request:import('../runtime/service-control').ServiceSwitchRequest):Promise<void>;
+    managed?:{describe?(item:KanbanItem):Promise<import('@nestos/app-contracts/services').RuntimeServiceDescriptor|undefined>;prepare(input:{id:string;board:KanbanBoard;item:KanbanItem;snapshot:ReviewSnapshot;context:unknown}):Promise<import('@nestos/app-contracts/services').ServiceSwitchRequest|undefined>;
+        submit(request:import('@nestos/app-contracts/services').ServiceSwitchRequest):Promise<void>;
         inspect(job:ReviewJob):Promise<import('@nestos/llm-session').OperationObservation>};
     supports?(board: KanbanBoard, item: KanbanItem): boolean;
     runningVersion?(): string | undefined;
@@ -36,8 +35,9 @@ export interface ReviewAdapter {
     close?(): Promise<void>;
     readAnalysis(job: ReviewJob): Promise<unknown | undefined>;
 }
-export interface DeliveryPlan {ordering?:'configured';manualAfter?:string;steps:string[];acceptance:'source'|'runtime';acceptanceLabel?:string;acceptanceConfirmation?:string}
+export interface DeliveryPlan {ordering?:'configured';manualAfter?:string;steps:string[];acceptance:'source'|'runtime';acceptanceLabel?:string;acceptanceConfirmation?:string|null}
 export interface ReviewOperationsOptions {
+    uncancellableActions?:string[];
     scopeId?:string;
     scopes?:OperationScopeProvider;
     cancelOperation?(job:ReviewJob,operationId:string):Promise<'accepted'|'cancelled'|'unknown'>;
@@ -53,13 +53,15 @@ export interface ReviewOperationsOptions {
     published: ReturnType<typeof publishedOperation>; submission: ReturnType<typeof sessionSubmission>; adapter: ReviewAdapter;
     log(event: {operationId: string; stage: string; result: 'success' | 'failure'; code?: string; durationMs: number}): void;
 }
-export interface ReviewOperationScope {completed?:boolean;id:string;label:string;contributors:Array<{itemId:string;title:string}>}
+export interface ReviewOperationScope {ready?:boolean;completed?:boolean;id:string;label:string;contributors:Array<{itemId:string;title:string}>}
+export type ResolvedOperationScope=Partial<Pick<ReviewOperationsOptions,'adapter'|'deliveryPlan'|'automaticTarget'|'cleanup'>>;
 export interface OperationScopeProvider {
     describe(board:string,item:string):Promise<{owner?:{boardId:string;itemId:string};permittedActions?:string[];scopes?:ReviewOperationScope[]}|undefined>;
-    resolve(board:string,item:string,scopeId:string):Promise<Partial<ReviewOperationsOptions>>;
+    resolve(board:string,item:string,scopeId:string):Promise<ResolvedOperationScope>;
     handoff?(board:KanbanBoard,item:KanbanItem):Promise<{boardId:string;itemId:string}|undefined>;
     dependencyReady?(board:string,item:KanbanItem):Promise<boolean|undefined>;
     close?():Promise<void>;
 }
-export const reviewKey = (board: string, item: string,scopeId?:string) => 'review-operations:' + JSON.stringify(scopeId?[board,item,scopeId]:[board,item]);
-export const jobKey = (id: string) => 'review-operation:' + id;
+
+
+export interface ReviewContext {scoped:boolean;cleanup?:import('@nestos/kanban/integration').ReviewCleanup;deliveryPlan?:DeliveryPlan;board: KanbanBoard; item: KanbanItem; archived: boolean; settings: ReviewSettings; jobs: ReviewJob[]; cancellations:import('@nestos/kanban/integration').ReviewCancellation[]}

@@ -4,7 +4,7 @@ import type {KanbanBoard,KanbanItem,KanbanService,KanbanDispatch} from '@nestos/
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {workProjectId} from '../kanban/task-projects';
 import {requireValue} from '../kanban/validation';
-import type {ReviewOperationScope} from '../kanban/item-operation-types';
+import type {ReviewOperationScope} from '@nestos/kanban-development';
 
 export interface ManagementContribution {itemId:string;title:string;dispatchId?:string;worktreeId?:string}
 export interface ManagementScope extends ReviewOperationScope {

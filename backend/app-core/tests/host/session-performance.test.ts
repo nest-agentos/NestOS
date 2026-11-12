@@ -1,3 +1,4 @@
+import {createSessionActivityReader} from '@nestos/llm-session';
 import {afterEach, expect, it, vi} from 'vitest';
 import {MemoryBackend} from '@nestos/vfs-core';
 import {sessionDirectoryStorage} from '@nestos/llm-session';
@@ -50,7 +51,7 @@ it('reads a running Session summary without waiting for its business Effect or o
     const events = vi.spyOn(kernel, 'readEvents'), history = vi.spyOn(kernel, 'taskHistory');
     const manifest = vi.spyOn(runtime.sessionRepository, 'getManifest');
     try {
-        const source = createLocalKanbanSessionSource(runtime.sessionRepository, kernel);
+        const source = createLocalKanbanSessionSource(runtime.sessionRepository,createSessionActivityReader(kernel));
         const result = await coldQuery(kernel, () => source.inspect({id: 'board'} as never, id));
         expect(result.sessionId).toBe(id); expect((await task.status()).task.exit).toBeUndefined();
         expect(manifest).toHaveBeenCalledExactlyOnceWith(id); expect(events).not.toHaveBeenCalled(); expect(history).not.toHaveBeenCalled();

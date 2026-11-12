@@ -1,4 +1,4 @@
-import type {ReviewAction} from '../kanban/item-operation-types';
+import type {ReviewAction} from '@nestos/kanban-development';
 /** Runtime identity and business policy stay in the frozen channel, not the message. */
 export function maintenanceInstruction(action:ReviewAction,additional:string[]=[]):string {
     const entry=action==='analyze'?'merge':action==='merge'?'integrate':action;

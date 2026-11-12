@@ -1,7 +1,7 @@
 import {reviewCancellation} from './kanban-review-cancellation';
 import {workProjectId} from '../kanban/task-projects';
 import {planningConversationControl} from './kanban-planning-control';
-import {cancellationKey,blocksOperation,type ReviewCancellation} from '../kanban/item-operation-cancellation';
+import {cancellationKey,blocksOperation,type ReviewCancellation} from '@nestos/kanban/integration';
 import {compatibleRuntimeDelivery} from './kanban-runtime-acceptance';
 import {retainedExecutionContexts} from '../projects/harness-context-selection';
 import {verifyFileDigest} from '../run/file-digest';
@@ -20,7 +20,7 @@ import type {IndependentCallService} from '@nestos/llm-session';
 import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {Kernel} from '@nestos/durable-kernel';
 import type {IFileSystem} from '@nestos/vfs-core';
-import type {ReviewAdapter, ReviewSnapshot, ReviewJob} from '../kanban/item-operation-types';
+import type {ReviewAdapter, ReviewSnapshot, ReviewJob} from '@nestos/kanban-development';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {readContextCatalog} from '../projects/harness-context-catalog';
@@ -42,14 +42,14 @@ import {workResourceExecution} from './kanban-work-resource-execution';
 export interface DevelopmentReviewOptions {
     connections?:Parameters<typeof planningConversationControl>[0]['connections'];
     cancelSubmission?:ReturnType<typeof import('@nestos/llm-session').createSubmissionControl>;
-    serviceControl?:import('../runtime/service-control').RuntimeServiceControl;
+    serviceControl?:import('@nestos/app-contracts/services').RuntimeServiceControl;
     submission?: ReturnType<typeof sessionSubmission>; wake?(): void;
     fs: IFileSystem; journal: KanbanAutomationJournal; service: KanbanService; calls: Pick<IndependentCallService, 'list'>;
     kernel: Pick<Kernel, 'sessionActivity' | 'inspectSession' | 'task'>; remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
     projects: Pick<ProjectService, 'get' | 'openWorkspace'>; runningVersion?: string;
 }
 type Options=DevelopmentReviewOptions;
-interface MaintenanceInput {extraPrompts?:import('../run/prompt-bundle').PromptFile[];deployment?:import('../runtime/service-control').RuntimeServiceDescriptor;id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot; action?: Exclude<import('../kanban/item-operation-types').ReviewAction, 'accept'>; context?: unknown}
+interface MaintenanceInput {extraPrompts?:import('../run/prompt-bundle').PromptFile[];deployment?:import('@nestos/app-contracts/services').RuntimeServiceDescriptor;id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot; action?: Exclude<import('@nestos/kanban-development').ReviewAction, 'accept'>; context?: unknown}
 interface ReviewResource {id: string; tree: PreparedWorktree; record: DevelopmentWorkspaceRecord}
 export function developmentReviewAdapter(options: Options): ReviewAdapter {
     const watches = new DirectorySubscriptions();

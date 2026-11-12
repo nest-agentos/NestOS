@@ -1,6 +1,7 @@
 import {taskRecoveryEligibility,activeRecoveryIssueIds} from '@nestos/kanban/integration';
 import {recoveryWorkspace} from './recovery-workspace';
-import {reviewKey,jobKey,type ReviewSettings,type ReviewJob} from './item-operation-types';
+import {type ReviewSettings,type ReviewJob} from '@nestos/kanban-development';
+import {reviewKey,jobKey} from '@nestos/kanban/integration';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanTaskRecovery,KanbanBoard,KanbanItem,KanbanDispatch} from '@nestos/kanban/contracts';
 import type {TaskRecoveryOptions} from './task-recovery-ports';

@@ -15,7 +15,7 @@ vi.mock('@nestos/git-delivery/repositories', () => ({gitWorkspace: async (_proce
 vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async () => ({value: {bindings: {original: {id: 'binding', branchId: 'main', connectionId: 'work-original', validity: mock.context ? 'valid' : 'invalid', nativeRef: {profileId: 'codex', sessionId: 'original-native'}, revision: 7, generation: 2}}}})}));
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); mock.dirty = mock.busy = mock.rejectGit = false; mock.context = true;mock.ancestry=0;});
-async function fixture(withExchange = false,serviceControl?:import('../src/runtime/service-control').RuntimeServiceControl) {
+async function fixture(withExchange = false,serviceControl?:import('@nestos/app-contracts/services').RuntimeServiceControl) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/');
     const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     await journal.update('worktree:original', () => ({id: 'original', directory: '/workspace/_nestos/worktrees/original', branch: 'work/original', phase: 'ready'}));

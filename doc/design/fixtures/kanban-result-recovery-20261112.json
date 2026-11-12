@@ -1,0 +1,29 @@
+{
+  "runtimeVersion": "20261112T153820-30fe3df2-dirty",
+  "task": {
+    "task": "KBT-2-107",
+    "status": "completed",
+    "phase": "completed",
+    "latestOutcome": "accepted",
+    "automatic": "completed",
+    "owner": {
+      "boardId": "development",
+      "itemId": "work-7ba6906e2d1ff924143ca41199ce3c2567adb817e6f60d17fec3f67275aad36c-0"
+    },
+    "acceptance": "passed"
+  },
+  "executionMode": {
+    "schema": 3,
+    "newModelSubmission": false,
+    "previousCancelledExecutionPreserved": true,
+    "formalPublicationOriginVerified": true,
+    "sourceDeliveryRechecked": true
+  },
+  "checks": {
+    "kanbanDomainTests": 250,
+    "hostAdapterTests": 102,
+    "kernelReconciliationTests": 159,
+    "performance": "core and ui passed",
+    "temporaryScopes": "closed"
+  }
+}

@@ -1,7 +1,7 @@
 import {expect,it,vi} from 'vitest';
 import {reviewCancellation} from '../src/presets/kanban-review-cancellation';
 import type {SubmissionControlRequest,ControlJournal} from '@nestos/llm-session';
-import type {ReviewJob} from '../src/kanban/item-operation-types';
+import type {ReviewJob} from '@nestos/kanban-development';
 function fixture(){
  const values=new Map<string,unknown>();
  const journal={get:async(key:string)=>structuredClone(values.get(key)),update:async(key:string,change:any)=>{const next=change(structuredClone(values.get(key)));values.set(key,structuredClone(next));return next;}};

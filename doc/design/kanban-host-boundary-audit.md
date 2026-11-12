@@ -57,7 +57,7 @@
 | [`index.ts`](../../backend/app-core/src/kanban/index.ts) | 12 |
 | [`host-policy.ts`](../../backend/app-core/src/kanban/host-policy.ts) | 2 |
 | [`automation-authority.ts`](../../backend/app-core/src/kanban/automation-authority.ts) | 25 |
-| [`automation-targets.ts`](../../backend/app-core/src/kanban/automation-targets.ts) | 20 |
+| [`automation-targets.ts`](../../backend/kanban-development/src/automation-targets.ts) | 20 |
 | [`notifications.ts`](../../backend/app-core/src/kanban/notifications.ts) | 58 |
 | [`health-events.ts`](../../backend/app-core/src/kanban/health-events.ts) | 19 |
 | [`work-log-policy.ts`](../../backend/app-core/src/kanban/work-log-policy.ts) | 15 |
@@ -74,12 +74,12 @@
 | [`harness-source.ts`](../../backend/app-core/src/kanban/harness-source.ts) | 55 |
 | [`session-source.ts`](../../backend/app-core/src/kanban/session-source.ts) | 32 |
 | [`native-session-activity.ts`](../../backend/app-core/src/kanban/native-session-activity.ts) | 37 |
-| [`related-session-executions.ts`](../../backend/app-core/src/kanban/related-session-executions.ts) | 65 |
+| [`related-session-executions.ts`](../../backend/app-core/src/session/execution-facts.ts) | 65 |
 | [`related-sessions.ts`](../../backend/app-core/src/kanban/related-sessions.ts) | 71 |
 | [`session-resource.ts`](../../backend/app-core/src/kanban/session-resource.ts) | 37 |
 | [`resource-catalog.ts`](../../backend/app-core/src/kanban/resource-catalog.ts) | 19 |
 | [`task-projects.ts`](../../backend/app-core/src/kanban/task-projects.ts) | 48 |
-| [`resource-operation-index.ts`](../../backend/app-core/src/kanban/resource-operation-index.ts) | 18 |
+| [`resource-operation-index.ts`](../../libraries/kanban/src/runtime/resource-operation-index.ts) | 18 |
 | [`planning-sessions.ts`](../../backend/app-core/src/kanban/planning-sessions.ts) | 22 |
 | [`decision-project-scope.ts`](../../backend/app-core/src/kanban/decision-project-scope.ts) | 21 |
 
@@ -94,7 +94,7 @@
 | [`published-executor.ts`](../../backend/app-core/src/kanban/published-executor.ts) | 80 |
 | [`published-work.ts`](../../backend/app-core/src/kanban/published-work.ts) | 79 |
 | [`continued-work.ts`](../../backend/app-core/src/kanban/continued-work.ts) | 40 |
-| [`session-operation.ts`](../../backend/app-core/src/kanban/session-operation.ts) | 29 |
+| [`session-operation.ts`](../../backend/app-core/src/projects/original-execution-session.ts) | 29 |
 
 ### 规划与上下文（混合：Kanban 规则 + 宿主适配）
 
@@ -153,12 +153,12 @@ build/deploy/accept/merge/cleanup 顺序、版本证据、合并计划、部署�
 
 | 文件 | 行数 |
 | --- | ---: |
-| [`item-operations.ts`](../../backend/app-core/src/kanban/item-operations.ts) | 217 |
-| [`item-operation-types.ts`](../../backend/app-core/src/kanban/item-operation-types.ts) | 51 |
-| [`item-operation-jobs.ts`](../../backend/app-core/src/kanban/item-operation-jobs.ts) | 118 |
-| [`item-operation-log.ts`](../../backend/app-core/src/kanban/item-operation-log.ts) | 15 |
-| [`automatic-delivery.ts`](../../backend/app-core/src/kanban/automatic-delivery.ts) | 111 |
-| [`automatic-delivery-target.ts`](../../backend/app-core/src/kanban/automatic-delivery-target.ts) | 29 |
+| [`item-operations.ts`](../../backend/kanban-development/src/item-operations.ts) | 217 |
+| [`item-operation-types.ts`](../../backend/kanban-development/src/item-operation-types.ts) | 51 |
+| [`item-operation-jobs.ts`](../../backend/kanban-development/src/item-operation-jobs.ts) | 118 |
+| [`item-operation-log.ts`](../../backend/kanban-development/src/item-operation-log.ts) | 15 |
+| [`automatic-delivery.ts`](../../libraries/kanban/src/runtime/automatic-delivery.ts) | 111 |
+| [`automatic-delivery-target.ts`](../../libraries/kanban/src/runtime/automatic-delivery-target.ts) | 29 |
 
 ## 目标边界
 
@@ -222,3 +222,8 @@ Kanban 不导入 Session、Cells、Kernel、应用包、业务提示词或部署
 - Chrome 真实 DOM、内存 SeqKanbanStore，100 条决策、1 个看板、2 个项目、无后台负载：冷打开 51.4ms/4 次逻辑调用，热切项目 31.2ms/3 次，进入任务会话 5.5ms/1 次。HTTP 请求均为 0，不代表线上网络页面性能；验收图及报告位于 `/tmp/nestos-kanban-filter-afkSYI/`。
 - Session 包 ESM/CJS 与声明文件构建通过；HTTP 制品 `20261109T025319-231df64f-dirty` 构建成功，使用 `--no-activate`，未切换线上运行版本。
 - 测试、RPC、浏览器及性能作用域已收到清理完成回执；Session、Kanban、宿主和 RPC 验证记录均为 closed/succeeded。
+
+
+## 2026-11-13 操作插件与执行边界
+
+上表行数保留审计时基线；已迁移文件的链接指向当前归属。软件开发操作已抽至独立 `kanban-development`，通用步骤、取消、清理、授权及版本恢复机制归 kanban 并由插件注入动作策略。app-core 的 kanban 接入不再导入 Kernel 或读取其 Task/effect；Session 提供正式执行观察端口，原生上下文选择及执行投影归宿主的通用 project/session 适配。完整契约见 [操作插件](kanban-operation-plugins.md)。

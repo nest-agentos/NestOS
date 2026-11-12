@@ -100,3 +100,31 @@ it('freezes only current provenance without copying unrelated planning candidate
  const huge={...f.source.context,task:{...f.source.context.task,acceptance:'Own requirement'.repeat(6000)}};
  await expect(freezeCommitContext(f.journal,{...f.source,executionId:'oversized-own-task',context:huge})).rejects.toMatchObject({code:'COMMIT_CONTEXT_LIMIT'});
 });
+
+it('resolves Kanban provenance and integrates independent commits while preserving unrelated dirty files and staging',async()=>{
+    const f=await fixture();
+    const other=await freezeCommitContext(f.journal,{projectId:'project',boardId:'board',itemId:'other-task',itemRevision:1,executionId:'other-execution',context:{task:{id:'other-task',responsibility:'Independent change',acceptance:'Verified'}}});
+    await writeFile(join(f.root,'independent'),'Committed baseline\n');
+    await f.git(f.root,['add','independent']);
+    await f.git(f.root,['commit','-m','feat(other): independent change\n\n'+other.trailers]);
+    const target=await f.git(f.root,['rev-parse','HEAD']);
+    await writeFile(join(f.root,'independent'),'User staged change\n');await f.git(f.root,['add','independent']);
+    await writeFile(join(f.root,'independent'),'User working change\n');
+    await writeFile(join(f.root,'untracked'),'User note\n');
+    const beforeStatus=await f.git(f.root,['status','--porcelain']),beforeIndex=await f.git(f.root,['show',':independent']);
+    const contexts=await preloadCommitContexts({...f.options as any,targetHead:target}) as {contexts:Array<{historical:{task:{id:string}}}>};
+    expect(contexts.contexts.map(row=>row.historical.task.id).sort()).toEqual(['other-task','task']);
+    await f.git(f.root,['stash','push','--include-untracked','--message','kanban-task-execution-merge','--','independent','untracked']);
+    const checkpoint=await f.git(f.root,['rev-parse','refs/stash']);
+    await f.git(f.root,['merge','--no-ff','work/task','-m','feat(task): integrate task\n\n'+f.context.trailers]);
+    const merged=await f.git(f.root,['rev-parse','HEAD']);
+    await f.git(f.root,['stash','apply','--index',checkpoint]);
+    const {verifyGitIntegration}=await import('@nestos/git-delivery/integration');
+    await verifyGitIntegration(f.process,{previousTarget:target,actualTarget:merged,reportedTarget:merged,sources:[{sourceHead:f.head,directory:f.record.directory,repositories:f.evidence}]});
+    expect(await f.git(f.root,['status','--porcelain'])).toBe(beforeStatus);
+    expect(await f.git(f.root,['show',':independent'])).toBe(beforeIndex);
+    const {readFile}=await import('node:fs/promises');
+    expect(await readFile(join(f.root,'independent'),'utf8')).toBe('User working change\n');
+    expect(await readFile(join(f.root,'untracked'),'utf8')).toBe('User note\n');
+    expect(parseCommitTrailers(await f.git(f.root,['show','-s','--format=%(trailers:only,unfold)',merged]))['NestOS-Task']).toBe('task');
+});

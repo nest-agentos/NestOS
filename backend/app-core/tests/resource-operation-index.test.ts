@@ -1,5 +1,5 @@
 import{expect,it,vi}from'vitest';
-import{initializeResourceIndex,indexResourceJob,resourceJobIndex}from'../src/kanban/resource-operation-index';
+import{initializeResourceIndex,indexResourceJob,resourceJobIndex}from'@nestos/kanban/integration';
 function fixture(){const records=new Map<string,any>();return {get:vi.fn(async(key:string)=>records.get(key)),update:vi.fn(async(key:string,change:any)=>{const value=change(records.get(key));records.set(key,value);return value;})} as any;}
 it('uses a newborn resource index without scanning unrelated history and deduplicates association writes',async()=>{
  const journal=fixture(),discover=vi.fn(async()=>({review:['unrelated'],lifecycle:[]}));await initializeResourceIndex(journal,'tree');

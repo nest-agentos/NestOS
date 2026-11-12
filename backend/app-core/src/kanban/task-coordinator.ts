@@ -3,7 +3,7 @@ import type {IndependentCallInput,SubmissionRequest} from '@nestos/llm-session/c
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import type {KanbanService} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal,KanbanWorkLog} from '@nestos/kanban/integration';
-import {originalSession} from './session-operation';
+
 import {workContext} from './work-context';
 import {requireValue} from './validation';
 import {readPlanningChannel} from '../run/planning-channel';
@@ -13,7 +13,7 @@ export function taskCoordinator(options:Options) {
     return createTaskCoordinator({service:options.service,journal:options.journal,prepare:(id,snapshot)=>prepare(options,id,snapshot),port:{
         start:async job=>{await options.collaboration!.submission.start(job.request as SubmissionRequest);},
         inspect:job=>inspect(options,job),
-        validate:(job,output)=>validateCoordinationResult(output,job.snapshot.children,['analyze','build','deploy','accept','merge']),
+        validate:(job,output)=>validateCoordinationResult(output,job.snapshot.children,[...new Set((options.operationPlugins??[]).flatMap(plugin=>plugin.actions.filter(action=>action.coordination!==false).map(action=>action.id)))]),
         classify:error=>({code:safeCode(error,'COORDINATION_FAILED'),disposition:(error as {executionOutcome?:string}).executionOutcome==='not-started'?'retry-unstarted':['COORDINATION_RESULT_INVALID','CHANNEL_RESULT_INVALID','CHANNEL_RESULT_CHANGED'].includes(safeCode(error,''))?'terminal':'unknown'}),
         report:async job=>{await options.notifyCoordination?.(job);if(job.phase!=='settled')return;const key='coordination-reported:'+job.id;if(await options.journal.get(key))return;
             await options.workLog?.append(options.service,job.boardId,job.itemId,{stage:'coordination.'+job.state,result:job.state==='succeeded'?'success':'failure',dispatchId:job.id,code:job.code,
@@ -24,7 +24,7 @@ export function taskCoordinator(options:Options) {
 async function prepare(options:Options,id:string,snapshot:CoordinationSnapshot) {
     const analysis=await currentAnalysis<IndependentCallInput>(options.journal,snapshot.boardId,snapshot.parent.id);
     requireValue(analysis?.input,'COORDINATION_SESSION_UNAVAILABLE');
-    const original=await originalSession(options,analysis.input);
+    const original=await options.originalSession(analysis.input);
     const fixId=await options.journal.get<string>('fix-session:'+original.sessionId);
     const fix=fixId?await options.journal.get<{accepted?:boolean;state:string}>('fix:'+fixId):undefined;
     requireValue(!fix||fix.accepted||fix.state==='cancelled','COLLABORATION_IN_USE');

@@ -1,3 +1,4 @@
+import {createIndependentCallExecutionReader} from '@nestos/llm-session';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import type {KanbanDiscoveryChange, KanbanScanInput, KanbanScanSession} from '@nestos/kanban/contracts';
@@ -141,11 +142,11 @@ it('runs a published Flow with an explicit local connection and reads only its d
     const prepared = {plan: {task: {program: {kind: 'flow.aggregate'}, input: {initialScheduler: {spec: {nodes: [
         {plugin: 'builtin.agent', config: {toolIds: [], connectionId: 'chosen'}}, {plugin: 'builtin.return', config: {}},
     ]}}}}}};
-    const calls = {prepareTaskCall: vi.fn(async () => prepared), submitPreparedTaskCall: vi.fn(async () => ({submission: {task: {taskId: 'caller'}}}))};
+    const calls = {prepareTaskCall: vi.fn(async () => prepared), submitPreparedTaskCall: vi.fn(async () => ({submission: {task: {sessionId:'scan-session',taskId: 'caller'}}}))};
     const kernel = {attachTask: vi.fn(async () => ({wait: async () => ({status: 'succeeded', output: {exit: {status: 'succeeded', output: {
         nodes: {__flow_return: {outputs: {changes: {outputName: 'changes', type: 'json', content: '{"changes":[]}'}}}},
     }}}})}))};
-    const executor = createPublishedKanbanExecutor({calls: calls as never, kernel: kernel as never,
+    const executor = createPublishedKanbanExecutor({calls: calls as never,execution:createIndependentCallExecutionReader({calls,kernel} as never),
         target: {kind: 'flow', id: 'scan', version: '1', digest: 'fixed'} as never, prepareSession: async () => 'scan-session'});
     const input = {runId: 'stable', connection: {kind: 'local', connectionId: 'chosen', allowContentTransfer: false}} as KanbanScanInput;
     expect(await executor.run(input)).toEqual([]);

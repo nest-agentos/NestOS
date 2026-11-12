@@ -1,3 +1,5 @@
+import {registerTaskResultRecovery} from '@nestos/kanban/integration';
+import {completedPublication} from './kanban-completed-result';
 import {currentNativeSessionReader} from '../kanban/native-session-observer';
 import {nativeSessionActivity} from '../kanban/native-session-activity';
 import {registerSessionLearnings} from '../kanban/session-learnings';
@@ -66,6 +68,8 @@ export function developmentObserver(options: Options) {
             itemId: item.id, attemptId: input.dispatch.id};
         const envelope=await options.remote.sessionChannel(projectId,'messages',{scopeId:workspace.channelId}) as {messages?:unknown;execution?:{status?:string;sessionId?:string;turnId?:string;observedAt?:number}};
         await nativeActivity.record(input.boardId,input.observation.executionSessionId??input.dispatch.executionSessionId,envelope.execution);
+        const completed=completedPublication(envelope as Parameters<typeof completedPublication>[0]);
+        if(completed)await registerTaskResultRecovery(journal,{boardId:input.boardId,itemId:item.id,dispatchId:input.dispatch.id,resultId:completed.id});
         const messages = await consumeChannelMessages(envelope,scope,journal,
             message => deliver(options, journal, input, message), async message => {await options.remote!.sessionChannel(projectId, 'acknowledge', {scopeId: workspace.channelId, id: message.id, ack: {status: 'delivered'}});});
             const unresolved = unresolvedWorkIssues(messages);

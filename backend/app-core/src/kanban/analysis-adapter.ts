@@ -4,9 +4,9 @@ import {transientOperationFailure} from '../run/operation-recovery';
 import {inheritWorkReferences} from './task-projects';
 import {formatPromptSections} from '@nestos/llm-context/prompt';
 import {DEFAULT_KANBAN_WORK_TYPES,type KanbanBoard,type KanbanItem,type KanbanService} from '@nestos/kanban/contracts';
-import {validateDecisionSource,analyzeItem as coordinateAnalysis,safeCode,type KanbanAutomationJournal,type KanbanAnalysisObservation} from '@nestos/kanban/integration';
+import {validateDecisionSource,analyzeItem as coordinateAnalysis,type KanbanAutomationJournal,type KanbanAnalysisObservation} from '@nestos/kanban/integration';
 import {t} from '@nestos/common';
-import {taskStat,type Kernel,type TaskCallResult} from '@nestos/durable-kernel';
+import {type IndependentCallExecutionReader} from '@nestos/llm-session';
 import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallInput} from '@nestos/llm-session/contracts';
 import type {TargetRef} from '@nestos/llm-flow/contracts';
@@ -17,7 +17,7 @@ export interface AnalysisOptions {
     readAnalysisOutput?(id:string):Promise<KanbanAnalysisObservation|undefined>;
     onAnalysis?: import('./personal-automation').PersonalKanbanAutomationOptions['onAnalysis'];
     prepareAnalysis?: import('./personal-automation').PersonalKanbanAutomationOptions['prepareAnalysis'];
-    journal: KanbanAutomationJournal; calls: IndependentCallService; kernel: Pick<Kernel, 'task'>;
+    journal: KanbanAutomationJournal; calls: IndependentCallService; execution:Pick<IndependentCallExecutionReader,'inspect'>;
     prepareSession(id: string): Promise<string>; active(): boolean;
     log(input: {operationId: string; stage: string; result: 'success' | 'failure'; code?: string; durationMs: number}): void;
 }
@@ -48,15 +48,11 @@ async function inspectAnalysis(options:AnalysisOptions,id:string,input:Independe
     const observed=await options.readAnalysisOutput?.(id);
     if(observed&&observed.state!=='running'&&observed.state!=='succeeded')return observed;
     if(observed?.state==='succeeded')await validateDecisionSource(service,(await workContext(options.journal,board,item)).decision);
-    const pending={state:'running' as const},admission=await options.calls.inspectTaskCallSubmission(input);
-    if(!options.active())return pending;
-    if(!admission)return {state:'unknown',code:'AUTOMATION_ADMISSION_UNKNOWN'};
-    const views=await options.calls.list({sessionId:id,branchId:'main'}),view=views.find(row=>row.input.request.submission?.id===id);
-    if(!options.active()||!view?.callerState?.settled||!view.executionTree?.settled)return pending;
-    const record=await options.kernel.task(admission.submission.task.sessionId,admission.submission.task.taskId);
-    if(!options.active()||!taskStat(record).settled)return pending;
-    const result=record.exit?.output as TaskCallResult|undefined;
-    if(record.exit?.status!=='succeeded'||result?.exit.status!=='succeeded')return {state:record.exit?.status==='cancelled'||result?.exit.status==='cancelled'?'cancelled':'failed',code:safeCode(result?.exit.error??record.exit?.error,'AUTOMATION_ANALYSIS_FAILED')};
+    const pending={state:'running' as const};if(!options.active())return pending;
+    const result=await options.execution.inspect(input);
+    if(!options.active()||result.outcome==='running')return pending;
+    if(result.outcome==='unknown')return {state:'unknown',code:result.code==='WORK_ADMISSION_UNKNOWN'?'AUTOMATION_ADMISSION_UNKNOWN':result.code};
+    if(result.outcome!=='succeeded')return {state:result.outcome,code:result.code??'AUTOMATION_ANALYSIS_FAILED'};
     requireValue(options.readAnalysisOutput,'SESSION_CHANNEL_RESULT_UNAVAILABLE');
     return observed??{state:'blocked',code:'PLANNING_RESULT_MISSING',reason:'PLANNING_RESULT_MISSING',handler:'self'};
 }

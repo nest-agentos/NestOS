@@ -155,4 +155,4 @@ export {stageInputAssets} from './runtime/input-assets';
 
 export {withProjectEnvironment} from './projects/project-environment';
 
-export type {RuntimeServiceControl,RuntimeServiceDescriptor,ServiceSwitchRequest} from './runtime/service-control';
+export type {RuntimeServiceControl,RuntimeServiceDescriptor,ServiceSwitchRequest} from '@nestos/app-contracts/services';

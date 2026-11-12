@@ -1,8 +1,9 @@
+import {developmentDeliveryPolicy} from '@nestos/kanban-development';
 import {cleanupGitResource,type GitCleanupReceipt as Cleanup,type GitRemovalBoundary} from '@nestos/git-delivery/cleanup';
 import {taskResourceFamily,ownedResourceReferences} from './kanban-work-resource-scope';
 import {readManagedBranches,inspectManagedBranches,type ManagedBranch} from '@nestos/git-delivery/branches';
 import {ignoreWorkResource,resolvedWorkResources} from './kanban-work-resource-resolution';
-import {settleWorkspaceFinalization} from '../kanban/automatic-delivery';
+import {settleWorkspaceFinalization} from '@nestos/kanban/integration';
 import {boardWorkResources as readBoardResources,associatedWorkResourceIds} from './kanban-work-resource-catalog';
 import {inspectRemovalModules} from '@nestos/git-delivery/modules';
 import {randomUUID, sha256HexSync, t, createModuleLogger} from '@nestos/common';
@@ -137,7 +138,7 @@ async function cleanup(options: Options, boardId: string, request: KanbanWorkRes
     if(request.resolution==='ignore'){
         await ignoreWorkResource(options,boardId,request,async()=>(await associations(options,boardId,request.itemId,request.resourceId)).some(row=>row.id===request.resourceId&&(!row.owner||row.owner.boardId===boardId&&row.owner.itemId===request.itemId)));
         const resources=await resolvedWorkResources(options.journal,boardId,request.itemId,await associations(options,boardId,request.itemId));
-        await settleWorkspaceFinalization(options,boardId,request.itemId,resources);return resources.find(row=>row.id===request.resourceId)!;
+        await settleWorkspaceFinalization({...options,finalizeAction:developmentDeliveryPolicy.finalizeAction},boardId,request.itemId,resources);return resources.find(row=>row.id===request.resourceId)!;
     }
     requireValue(request.resolution===undefined,'INVALID_WORK_RESOURCE_CLEANUP');
     return cleanupGitResource({journal:options.journal,authorize:async()=>{

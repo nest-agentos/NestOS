@@ -1,14 +1,16 @@
-import {invalidateReviewAnalysis,revalidateMergeAdmission} from './item-operation-analysis';
-import {cancellationKey,pendingCancellation,blocksOperation,type ReviewCancellation} from './item-operation-cancellation';
+import {developmentAnalysisPolicy} from './development-operation-policy';
+import {invalidateReviewAnalysis,revalidateMergeAdmission,settleRejectedMerge} from '@nestos/kanban/integration';
+import {cancellationKey,pendingCancellation,blocksOperation,type ReviewCancellation} from '@nestos/kanban/integration';
 import {validateOperationResult} from '@nestos/git-delivery/results';
-import {indexResourceJob} from './resource-operation-index';
+import {indexResourceJob} from '@nestos/kanban/integration';
 import {coordinateOperation} from '@nestos/kanban/integration';
 import type {KanbanBoard, KanbanItem, KanbanItemOperationRequest} from '@nestos/kanban/contracts';
 import {sha256HexSync} from '@nestos/common';
 import {automationTarget} from './automation-targets';
 import {requireValue} from './validation';
 import {safeCode} from '@nestos/kanban/integration';
-import {jobKey, type ReviewJob, type ReviewOperationsOptions, type ReviewSettings, type ReviewAction} from './item-operation-types';
+import { type ReviewJob, type ReviewOperationsOptions, type ReviewSettings, type ReviewAction} from './item-operation-types';
+import {jobKey} from '@nestos/kanban/integration';
 
 export async function prepareReviewJob(options: ReviewOperationsOptions, board: KanbanBoard, item: KanbanItem,
     settings: ReviewSettings, request: KanbanItemOperationRequest, context?: unknown,expectedAcceptanceSource?:string): Promise<ReviewJob> {
@@ -21,7 +23,7 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
         const analysis=action==='merge'&&evidence?.analysisId?await options.journal.get<ReviewJob>(jobKey(evidence.analysisId)):undefined;
         if(evidence?.sourceVersion!==snapshot.sourceVersion||evidence.targetVersion!==snapshot.targetVersion||analysis&&analysis.snapshot.version!==snapshot.version){
             const code=evidence?.sourceVersion!==snapshot.sourceVersion?'OPERATION_SOURCE_CHANGED_REANALYZE':'OPERATION_TARGET_CHANGED_REANALYZE';
-            if(analysis)await invalidateReviewAnalysis(options,board.id,item.id,analysis.id,code,request.operationId);requireValue(false,code);
+            if(analysis)await invalidateReviewAnalysis({...options,policy:developmentAnalysisPolicy},board.id,item.id,analysis.id,code,request.operationId);requireValue(false,code);
         }
     }
     if(action==='deploy'&&options.adapter.managed){const managed=await options.adapter.managed.prepare({id:base.id,board,item,snapshot,context});if(managed)return {...base,operationContext:context,managed};}
@@ -52,6 +54,7 @@ async function preparationStage<T>(options: ReviewOperationsOptions, operationId
 }
 export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
     if(pendingCancellation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))))return (await options.journal.get<ReviewJob>(jobKey(job.id)))??job;
+    const rejected=await settleRejectedMerge({...options,policy:developmentAnalysisPolicy},job);if(rejected)return rejected;
     const resource=(job.snapshot.context as {worktreeId?:string})?.worktreeId;if(resource)await indexResourceJob(options.journal,resource,'review',job.id);
     if(job.action==='accept')return acceptReview(options,job);
     return coordinateOperation({service:options.service,journal:options.journal,key:jobKey(job.id),record:job,port:{
@@ -59,7 +62,7 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
             if(board.executionControl?.paused)throw Object.assign(new Error('Delivery paused before admission'),{code:'AUTOMATIC_DELIVERY_PAUSED',executionOutcome:'not-started',retryable:true});
             requireValue(!board.lifecycle,'BOARD_STOPPING');
             const {item}=await options.service.item(record.boardId,record.itemId);requireValue(!item.deletedAt&&item.control?.action!=='cancel','TASK_CANCELLING');
-            await revalidateMergeAdmission(options,record);
+            await revalidateMergeAdmission({...options,policy:developmentAnalysisPolicy},record);
             if(record.managed){await options.adapter.managed!.submit(record.managed);return;}if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
         inspect:async record=>{
             if(blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(record.id))))return {state:'unknown' as const,code:'OPERATION_CANCELLING'};

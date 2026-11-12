@@ -10,8 +10,8 @@ export interface DevelopmentPolicy {
 export function developmentCatalog(): KanbanAutomationTarget[] {
     return [{reference: {system: 'nestos-work-preparation', id: 'git-worktree', revision: '1'}, label: t('kanban.gitWorktree'), options: [
         {name: 'profile', label: t('kanban.developmentProfile'), defaultValue: 'development'},
-        {name: 'commit', label: t('kanban.commitPolicy'), defaultValue: 'changes', choices: [
-            {value: 'changes', label: t('kanban.commitChanges')}, {value: 'worktree', label: t('kanban.commitWorktree')}]},
+        {name: 'commit', label: t('kanban.commitPolicy'), defaultValue: 'worktree', choices: [
+            {value: 'worktree', label: t('kanban.commitWorktree')}, {value: 'changes', label: t('kanban.commitChanges')}]},
         {name: 'modules', label: t('kanban.developmentModules'), defaultValue: ''}]}];
 }
 
@@ -23,7 +23,7 @@ export async function developmentPolicy(journal: PromptJournal, fs: IFileSystem,
     return journal.update<DevelopmentPolicy>(key, previous => previous ?? {version: 1, profile, commit: commit as DevelopmentPolicy['commit'], modules, prompts});
 }
 export function validateDevelopmentOptions(options: Record<string, string> = {}) {
-    const profile = options.profile || 'development', commit = options.commit || 'changes';
+    const profile = options.profile || 'development', commit = options.commit || 'worktree';
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(profile) || !['changes', 'worktree'].includes(commit)
         || Object.keys(options).some(key => !['profile', 'commit', 'modules'].includes(key))) throw failure('DEVELOPMENT_POLICY_INVALID');
     const modules = (options.modules ?? '').split(/[\n,]/).map(value => value.trim()).filter(Boolean);

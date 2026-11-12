@@ -1,6 +1,7 @@
+import {createSessionActivityReader,sessionExecutionPhase as sessionPhase} from '@nestos/llm-session';
 import {expect,it,vi} from 'vitest';
 import type {SessionActivity,EventEnvelope} from '@nestos/durable-kernel/contracts';
-import {createLocalKanbanSessionSource,sessionPhase} from '../src/kanban/session-source';
+import {createLocalKanbanSessionSource} from '../src/kanban/session-source';
 function activity():SessionActivity {
     return {sessionId:'execution',sessionStatus:'open',revision:1,asOfSequence:3,counts:{running:0,queued:0,created:0,waiting:0,paused:0,blocked:0,succeeded:0,failed:0,cancelled:0},pending:{approval:0,input:0,cleanup:0}};
 }
@@ -8,7 +9,7 @@ it('reads only execution Session metadata, excluding event bodies and manifest e
     const state=activity();state.counts.running=1;state.lastActivityAt=100;
     const events=[{sessionId:'execution',taskId:'internal',type:'task.started',occurredAt:100},{sessionId:'execution',taskId:'internal',type:'task.events.pruned',occurredAt:800},{sessionId:'execution',type:'session.identity.assigned',occurredAt:900}] as EventEnvelope[];
     const repository={getManifest:vi.fn(async()=>({id:'execution',title:'Execution',updatedAt:1000}))},kernel={sessionActivity:vi.fn(async()=>state),readEvents:vi.fn(async()=>({items:events,throughSequence:3}))};
-    const source=createLocalKanbanSessionSource(repository as never,kernel as never),result=await source.inspect({id:'board'} as never,'execution');
+    const source=createLocalKanbanSessionSource(repository as never,createSessionActivityReader(kernel as never)),result=await source.inspect({id:'board'} as never,'execution');
     expect(result).toMatchObject({sessionId:'execution',state:'running',lastActivityAt:100,stale:false});
     expect(JSON.stringify(result)).not.toContain('internal');expect(result).not.toHaveProperty('tasks');
     expect(kernel.readEvents).not.toHaveBeenCalled();
@@ -21,7 +22,7 @@ it('distinguishes Session waiting, pause, idle and completion without inferring 
 });
 it('reports missing Session identity separately from storage failures during binding',async()=>{
     const repository={getManifest:vi.fn().mockRejectedValueOnce(Object.assign(new Error('private path'),{code:'ENOENT'})).mockRejectedValueOnce(Object.assign(new Error('storage unavailable'),{code:'EIO'}))};
-    const source=createLocalKanbanSessionSource(repository as never,{sessionActivity:vi.fn()} as never);
+    const source=createLocalKanbanSessionSource(repository as never,createSessionActivityReader({sessionActivity:vi.fn()} as never));
     await expect(source.authorizeBinding!({id:'b'} as never,'missing')).rejects.toMatchObject({code:'SESSION_NOT_FOUND'});
     await expect(source.authorizeBinding!({id:'b'} as never,'missing')).rejects.toMatchObject({code:'EIO'});
 });

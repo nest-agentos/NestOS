@@ -365,3 +365,8 @@ export {createSessionSubmission,type SessionSubmissionOptions,type SessionSubmis
 export {createPublishedOperation,type PublishedOperationOptions,type OperationObservation} from './session/published-operation';
 
 export {createSubmissionControl,type SubmissionControlOptions,type SubmissionControlRequest,type SubmissionControlState,type ControlJournal} from './session/submission-control';
+
+export {reconcileIndependentCallExecution,type CallReconciliationDiagnostic} from './session/independent-call-reconciliation';
+export {inspectIndependentCallExecution,createIndependentCallExecutionReader,type IndependentCallExecutionReader,type IndependentCallExecutionPorts,type IndependentCallExecutionObservation} from './session/independent-call-observation';
+
+export {createSessionActivityReader,sessionExecutionPhase,type SessionExecutionPhase,type SessionActivitySummary,type SessionActivityReader} from './session/activity-reader';

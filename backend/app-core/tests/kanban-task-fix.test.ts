@@ -1,3 +1,4 @@
+import {originalSession} from '../src/projects/original-execution-session';
 import {kanbanControlOptions} from '../src/kanban/control-adapter';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {memoryChannels} from './helpers/session-channels';
@@ -35,6 +36,7 @@ async function fixture(group=false) {
     const submission={start:vi.fn(async()=>({sessionId:'original-main',outcome:'running' as const})),inspect:vi.fn(async()=>({sessionId:'original-main',outcome:'running' as const}))};
     const events=await UserEventService.open(fs),log=vi.fn(),channels=memoryChannels();
     const automation={submissionControl:async()=> 'cancelled',sessionChannel:channels.channel,calls,kernel:{sessionActivity:async()=>({counts:{running:0}})},collaboration:{submission,prepare:prepareWork},catalog:async()=>({entries:[{name:'Executor',target}],issues:[]}),projects:{get:async()=>({path:'/x1'}),openWorkspace:async()=>({fs,dispose:async()=>{}})}} as unknown as PersonalKanbanAutomationOptions;
+    automation.originalSession=input=>originalSession(automation as never,input);
     const options={fs,service,journal,events,automation,prepareSession:vi.fn(async(id:string)=>id),log};
     const fix=createTaskFix(options),run=()=>fix.fixTask('development',{itemId:'original',operationId:'open-fix'});
     const proposal={schema:'kanban.fix-proposal/1',title:'Fix validation',responsibility:'Repair validation',acceptance:'Regression passes',type:'fix',dependencies:['original']};

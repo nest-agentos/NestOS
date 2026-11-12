@@ -1,3 +1,4 @@
+import {createSessionActivityReader} from '@nestos/llm-session';
 import {expect,it,vi} from 'vitest';
 import {nativeSessionActivity} from '../src/kanban/native-session-activity';
 import {createLocalKanbanSessionSource} from '../src/kanban/session-source';
@@ -10,7 +11,7 @@ function fixture(){
 it('projects a later native turn instead of the original completed kernel call and timestamp',async()=>{
  const f=fixture();await f.activity.record('board','execution',{sessionId:'native',turnId:'later',status:'running',observedAt:900});
  const repository={getManifest:async()=>({id:'execution',title:'Execution',currentBranch:'main',createdAt:1})},kernel={sessionActivity:async()=>({sessionId:'execution',counts:{running:0},pending:{},latestExit:{status:'succeeded',at:100},lastActivityAt:100})};
- const source=createLocalKanbanSessionSource(repository as never,kernel as never,async()=>resource,f.activity.read);
+ const source=createLocalKanbanSessionSource(repository as never,createSessionActivityReader(kernel as never),async()=>resource,f.activity.read);
  expect(await source.inspect(board,'execution')).toMatchObject({state:'running',lastActivityAt:900,observedAt:1000,stale:false});
  await f.activity.record('board','execution',{sessionId:'native',turnId:'later',status:'completed',observedAt:1100});
  expect(await source.inspect(board,'execution')).toMatchObject({state:'completed',lastActivityAt:1100});

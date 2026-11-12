@@ -1,0 +1,76 @@
+{
+  "source": "working tree before commit",
+  "task": "Kanban operation plugins and execution/channel boundaries",
+  "checks": {
+    "kanban": 290,
+    "softwareDevelopment": 62,
+    "kanbanUI": 181,
+    "hostKanban": 429,
+    "sessionControlAndReconciliation": 18,
+    "cellsChannel": 18,
+    "coreUIPerformance": "passed",
+    "architecture": "checked separately"
+  },
+  "browser": {
+    "result": "passed",
+    "environment": "Google Chrome headless; actual Kanban domain, SeqFile store, review service and DOM; no HTTP transport",
+    "dataset": {
+      "boards": 1,
+      "tasks": 1,
+      "operations": 5,
+      "backgroundLoad": "none",
+      "buildSubmission": "suspended then admitted then unknown"
+    },
+    "metrics": [
+      {
+        "operation": "cold.open-operation-feedback",
+        "durationMs": 85.6,
+        "logicalApiCalls": 6,
+        "httpRequests": 0,
+        "methods": [
+          "catalog",
+          "query",
+          "item",
+          "currentPrincipal",
+          "itemOperations",
+          "query"
+        ]
+      },
+      {
+        "operation": "warm.click-pending-build",
+        "durationMs": 2.2,
+        "logicalApiCalls": 1,
+        "httpRequests": 0,
+        "methods": [
+          "runItemOperation"
+        ]
+      },
+      {
+        "operation": "warm.receive-build-admission",
+        "durationMs": 13.8,
+        "logicalApiCalls": 0,
+        "httpRequests": 0,
+        "methods": []
+      },
+      {
+        "operation": "warm.refresh-uncertain-build",
+        "durationMs": 7.2,
+        "logicalApiCalls": 1,
+        "httpRequests": 0,
+        "methods": [
+          "itemOperations"
+        ]
+      }
+    ],
+    "version": {
+      "branch": "v5.2",
+      "commit": "30fe3df",
+      "workingTree": "dirty"
+    },
+    "artifacts": "/tmp/nestos-kanban-filter-ZaL22Z"
+  },
+  "limits": [
+    "Browser fixture uses the real domain, SeqFile storage and DOM without HTTP transport.",
+    "Previously rejected native instructions are not replayed automatically."
+  ]
+}

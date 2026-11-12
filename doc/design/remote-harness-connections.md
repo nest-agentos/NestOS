@@ -220,3 +220,6 @@ C4Component
 项目注册复用 Cells 项目目录事务及导出元数据锁，不再与整个原生轮次争用节点文件排他锁；因此已有执行或审批等待不应阻止独立目录登记。目录创建使用原有受控 mkdir 与修订更新，目录身份固定和授权检查继续保留，重复登记沿用原项目身份。已有项目的挂载、访问权限及执行环境变更仍有执行准入约束。
 
 锁保护一致性不变量，而非某类文件名。普通读取不承诺快照；条件写需要内容修订核对；SeqFile 与元数据使用各自事务；原生进程的广泛物理访问不能用逻辑项目 ID 假装已隔离。注册失败由 Cells 分阶段记录 catalog-admission、directory-validation/create/pin、metadata-scope、catalog-persist，并使用既有 requestId/traceId 串联宿主绑定日志，不自动重试未知修改。
+
+
+进程 epoch 改变后，已持有 committed turn 回执的执行可只读核对原 Session/turn 的正式历史。当前连接仍须通过原项目授权，ContextBinding 的 owner、node/profile/workspace、持久 contextId 和目录均须匹配；未知提交、namespace 改变、其他轮次或缺失终态均继续保持未知。核对使用当前 transport epoch 读取，不重写原 journal epoch，也不执行 create/resume/turn；取得原轮次终态与完整输出后，经原 context settlement 和 Effect 结算通知原调用者。历史匹配的失败/取消仍保留失败/取消。

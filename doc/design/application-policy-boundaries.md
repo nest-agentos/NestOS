@@ -176,3 +176,21 @@ Flow 库恢复时是否发布修订属于应用策略，由 app-core/presets/res
 统一执行仍是 Session/Flow → Kernel → 已授权适配器。Git 领域的资源意图不调度 Task，不重派 unknown，Kernel 内不加入 Git/看板字段。httpd 启停监督器留在进程外；服务切换只有受信宿主端口可调用。
 
 Cells 的工作区互斥与原生输入交接属于节点执行机制。原生执行模式无法仅凭 readOnly 声明证明进程不可写，因此保留必要互斥；短命令收尾通过文件门的有界等待交接，原生输入只发送一次。宿主不复制重试循环或释放条件。追踪跨异步/队列恢复使用经过校验的 trace/span，上层稳定操作身份与节点原生回执继续分别保留。
+
+
+### 看板结果恢复的职责收敛
+
+| 事实或动作 | 所属模块 | 宿主接入 |
+|---|---|---|
+| 候选索引、任务/最新派发复核、暂停取消与恢复推进 | `@nestos/kanban` integration 的 task-result-recovery | app-core 只提供授权及证据端口 |
+| 原 Effect 结果未知、只核对不授权重放 | `@nestos/durable-kernel` 的 reconcile resolution | Harness 适配器读取原执行回执 |
+| 原生 Session/turn、节点 epoch、持久 namespace 与正式终态 | projects 的 Harness 适配层 | 当前项目授权、原身份历史读取 |
+| 后续原生轮次发布的完成结果 | Cells publication origin + completed-result 业务适配 | 核对 session/turn/operation 与结果摘要，不从聊天文本推断 |
+| 源码与工作树交付证据 | Git 交付端口 | completed-result 复用既有 verifyDelivery |
+
+app-core 的 task-recovery-results 不再遍历任务或决定状态推进，只将宿主的 frozen decision 自动授权、恢复证据和既有 recoverTask 接入看板模块。结果候选与待处理索引同事务维护；结束候选保留历史但退出后续扫描。Session continuation 适配仍在 app-core，因为它消费真实 Session/Kernel 契约，独立看板不引入这些依赖。
+
+
+### Kanban 操作插件与执行观察
+
+看板操作通过 `operationPlugins` 注册，软件开发规则及操作服务归独立 `@nestos/kanban-development`。kanban 只保存插件路由、版本绑定及通用协调事实；其他插件可定义自己的动作。Session 统一观察调用与执行树、核对不确定 effect；app-core/kanban 通过观察端口消费事实，不直接依赖 Kernel。具体契约和兼容边界见 [操作插件](kanban-operation-plugins.md)。

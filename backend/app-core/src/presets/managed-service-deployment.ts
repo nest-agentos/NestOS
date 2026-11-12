@@ -1,10 +1,10 @@
 import type {IFileSystem} from '@nestos/vfs-core';
-import type {RuntimeServiceControl} from '../runtime/service-control';
-import type {ReviewAdapter} from '../kanban/item-operation-types';
+import type {RuntimeServiceControl} from '@nestos/app-contracts/services';
+import type {ReviewAdapter} from '@nestos/kanban-development';
 import {readPrompt} from '../run/prompt-bundle';
 import {requireValue} from '../kanban/validation';
 /** Project declarations select a controller; only a trusted host port grants execution authority. */
-export function managedServiceDeployment(control:RuntimeServiceControl|undefined,open:(item:import('@nestos/kanban/contracts').KanbanItem)=>Promise<{fs:IFileSystem;dispose():Promise<void>}>,verify:(job:import('../kanban/item-operation-types').ReviewJob)=>Promise<void>):ReviewAdapter['managed'] {
+export function managedServiceDeployment(control:RuntimeServiceControl|undefined,open:(item:import('@nestos/kanban/contracts').KanbanItem)=>Promise<{fs:IFileSystem;dispose():Promise<void>}>,verify:(job:import('@nestos/kanban-development').ReviewJob)=>Promise<void>):ReviewAdapter['managed'] {
     if(!control)return;
     const describe=async(item:import('@nestos/kanban/contracts').KanbanItem)=>{
         const view=await open(item);

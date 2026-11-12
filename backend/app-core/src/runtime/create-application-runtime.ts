@@ -1,3 +1,7 @@
+import {createIndependentCallExecutionReader,createSessionActivityReader} from '@nestos/llm-session';
+import {originalSession} from '../projects/original-execution-session';
+import {createSessionExecutionReader} from '../session/execution-facts';
+import {developmentCompletedResult} from '../presets/kanban-completed-result';
 import {kanbanHarnessTarget} from '../presets/kanban-harness-target';
 import {kanbanHarnessSettings} from '../presets/kanban-harness-settings';
 import {NativeSessionRecovery} from '../projects/session-recovery';
@@ -24,8 +28,8 @@ import {developmentLifecycle} from '../presets/kanban-development-lifecycle';
 import {developmentWorkResources, developmentSessionResources} from '../presets/kanban-work-resources';
 import {developmentReviewAdapter} from '../presets/kanban-development-review';
 import {managementOperationScopes} from '../presets/kanban-management-operations';
-import {itemOperationReporter} from '../kanban/item-operation-log';
-import {createItemOperations} from '../kanban/item-operations';
+import {itemOperationReporter} from '@nestos/kanban-development';
+import {createItemOperations} from '@nestos/kanban-development';
 import {createPublishedOperation as publishedOperation} from '@nestos/llm-session';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {developmentCatalog, validateDevelopmentOptions, requiresDevelopmentProject} from '../presets/kanban-development-policy';
@@ -171,7 +175,7 @@ export interface ApplicationRuntime {
 export interface ApplicationRuntimeOptions {
     /** Trusted build identity of the running host, independent of a next-start release pointer. */
     runningVersion?: string;
-    serviceControl?:import('./service-control').RuntimeServiceControl;
+    serviceControl?:import('@nestos/app-contracts/services').RuntimeServiceControl;
     /** Optional host integrations own bindings and execution, never the portable board library. */
     configureKanban?(context: {fs: import('@nestos/vfs-core').IFileSystem; service: import('@nestos/kanban').KanbanModuleHandle;
         kernel: import('@nestos/durable-kernel').Kernel; calls?: import('@nestos/llm-session').IndependentCallService;
@@ -599,8 +603,10 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const verifyDevelopment = developmentBindings ? developmentDelivery(systemFS, developmentBindings.remote, developmentBindings.provider,options.runningVersion) : undefined;
         const continueDevelopment = developmentBindings && independentCalls ? developmentContinuation({...developmentBindings,
             journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), calls: independentCalls, kernel: kernelCore}) : undefined;
+        const callExecution=independentCalls?createIndependentCallExecutionReader({calls:independentCalls,kernel:kernelCore,log:event=>createModuleLogger('session').info('Execution reconciliation',event)}):undefined;
+        const resolveOriginalSession=(input:import('@nestos/llm-session/contracts').IndependentCallInput)=>originalSession({calls:independentCalls!,kernel:kernelCore},input);
         const lifecycleJournal = new KanbanAutomationJournal(systemFS, kanbanJournalOptions);
-        const lifecycle = independentCalls ? developmentLifecycle({remote:developmentBindings?.remote,journal: lifecycleJournal, events, calls: independentCalls, kernel: kernelCore,
+        const lifecycle = independentCalls ? developmentLifecycle({remote:developmentBindings?.remote,journal: lifecycleJournal, events, calls: independentCalls, execution:callExecution!,
             authorize: async (boardId, itemId): Promise<boolean|'cancelled'> => {
                 const board = await kanban.read(boardId), item = board.items.find(item => item.id === itemId);
                 return item?.status === 'cancelled' || item?.control?.action === 'cancel' ? 'cancelled' : board.automation?.enabled === true;
@@ -622,7 +628,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             wake: () => wakeKanban()});
         cleanupFns.push(() => developmentMessages.dispose());
         const executionResource=remoteConnections?kanbanSessionResource(projects,nativeSessionResource(kernelCore,projects,remoteConnections)):undefined;
-        const kanban = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,kernelCore, independentCalls ? {
+        const kanban = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,createSessionActivityReader(kernelCore), independentCalls ? {
             prepareTarget:developmentBindings?kanbanHarnessTarget(developmentBindings):undefined,
             boardSettings:remoteConnections?kanbanHarnessSettings(remoteConnections):undefined,
             sessionObservation:developmentBindings?developmentMessages.sessionObservation:undefined,
@@ -646,7 +652,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             relatedSessions: lifecycle ? (boardId, itemId) => lifecycle.sessions(boardId, itemId) : undefined,
             sessionExecutionResources: id => developmentSessionResources(new KanbanAutomationJournal(systemFS, kanbanJournalOptions), id),
             collaboration:developmentBindings?{submission:fileSubmission,prepare:input=>developmentOperations.run(()=>developmentSessionOperation({...developmentBindings,journal:lifecycleJournal})(input))}:undefined,
-            continuation: continueDevelopment ? {submission: sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore,
+            continuation: continueDevelopment ? {completedResult:developmentBindings&&verifyDevelopment?developmentCompletedResult({...developmentBindings,journal:lifecycleJournal,verifyDelivery:verifyDevelopment}):undefined,submission: sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore,
                 ensureWritable: conversationOptions.ensureWritable}),
                 prepare: input => developmentOperations.run(() => continueDevelopment(input))} : undefined,
             workResources: developmentBindings ? context => {
@@ -684,7 +690,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             callControl: (command, request) => commandBus.execute(command, request),
             callCancel: (command, request) => commandBus.execute(command, request),
             submissionControl: submissionControl({contexts:conversationContexts, repository:sessionRepository, kernel:kernelCore, ensureWritable:conversationOptions.ensureWritable}),
-            calls: independentCalls, kernel: kernelCore, sessions: sessionRepository,
+            calls: independentCalls,execution:callExecution!,originalSession:resolveOriginalSession,executionReader:()=>createSessionExecutionReader({repository:sessionRepository,kernel:kernelCore,resources:id=>developmentSessionResources(lifecycleJournal,id)}), sessions: sessionRepository,
             ensureReady: initializeProjects,
             prepareSession: async id => {await prepareChildExecution(id); return recovery.acquireLater(id);},
             catalog: () => commandBus.execute('session.targets.list'),

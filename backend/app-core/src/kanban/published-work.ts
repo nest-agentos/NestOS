@@ -1,9 +1,9 @@
+import {type IndependentCallExecutionReader} from '@nestos/llm-session';
 import {contextReferenceInstruction} from '../run/context-reference-instruction';
 import {formatPromptSections} from '@nestos/llm-context/prompt';
 import type {IndependentCallService} from '@nestos/llm-session';
-import type {IndependentCallInput, IndependentCallView} from '@nestos/llm-session/contracts';
+import type {IndependentCallInput} from '@nestos/llm-session/contracts';
 import type {TargetRef} from '@nestos/llm-flow/contracts';
-import {taskStat, type Kernel, type TaskCallResult} from '@nestos/durable-kernel';
 import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
 import type {KanbanExecutionPort, KanbanExecutionObservation} from '@nestos/kanban/execution';
 import {KanbanError} from '@nestos/kanban';
@@ -13,14 +13,14 @@ export interface PublishedKanbanWorkOptions {
     onSessionPrepared?(dispatch: KanbanDispatch, item: KanbanItem, sessionId: string): Promise<void>;
     title?(dispatch: KanbanDispatch, item: KanbanItem): string;
     observe?(dispatch: KanbanDispatch, observation: KanbanExecutionObservation): Promise<KanbanExecutionObservation>;
-    calls: Pick<IndependentCallService,'prepareTaskCall'|'submitPreparedTaskCall'|'inspectTaskCallSubmission'|'list'>; kernel: Pick<Kernel,'task'>;
+    calls: Pick<IndependentCallService,'prepareTaskCall'|'submitPreparedTaskCall'|'inspectTaskCallSubmission'|'list'>; execution:Pick<IndependentCallExecutionReader,'inspect'>;
     /** Stable Session preparation is owned by the host's existing session journal. */
     prepareSession(dispatchId: string): Promise<string>;
     binding(dispatch: KanbanDispatch, item: KanbanItem): Promise<{target: TargetRef; contextRef?: unknown; instruction?: string; dependencies?: unknown; overrides?: IndependentCallInput['request']['overrides']}>;
     context?(dispatch: KanbanDispatch, item: KanbanItem): Promise<unknown>;
     executionPolicy?: WorkExecutionPolicy;
 }
-/** Reuses the published Task-call admission and read-only execution-tree observation. */
+/** Reuse published admission and execution facts; uncertain effects only request fenced reconciliation. */
 export function createPublishedKanbanWorkExecutor(options: PublishedKanbanWorkOptions): KanbanExecutionPort {
     return {
         async prepare(dispatch: KanbanDispatch, item: KanbanItem): Promise<FrozenWork> {
@@ -50,23 +50,9 @@ export function createPublishedKanbanWorkExecutor(options: PublishedKanbanWorkOp
     };
 }
 async function inspectWork(options: PublishedKanbanWorkOptions, frozen: FrozenWork): Promise<KanbanExecutionObservation> {
-    const admission=await options.calls.inspectTaskCallSubmission(frozen.input);
-    if(!admission) return {outcome:'unknown',code:'WORK_ADMISSION_UNKNOWN'};
-    const views=await options.calls.list({sessionId:frozen.input.request.expectedSessionId!,branchId:frozen.input.request.expectedBranch});
-    const view=views.find(view=>view.input.request.submission?.id===frozen.dispatch.id);
-    const session={...(admission.executionSessionId?{executionSessionId:admission.executionSessionId}:{}),...(view?.controlCapabilities?{controlCapabilities:{pause:view.controlCapabilities.pause??'none',resume:view.controlCapabilities.resume===true}}:{})};
-    if(!view) return {...session,outcome:'unknown',code:'WORK_EXECUTION_VIEW_MISSING'};
-    if(view.callerState&&!view.callerState.settled) return {...session,outcome:'running'};
-    if(!treeSettled(view)) return {...session,outcome:'unknown',code:'WORK_EXECUTION_UNSETTLED'};
-    const record=await options.kernel.task(admission.submission.task.sessionId,admission.submission.task.taskId), stat=taskStat(record);
-    if(!stat.settled||!record.exit) return {...session,outcome:'unknown',code:'WORK_CALLER_UNSETTLED'};
-    if(record.exit!.status!=='succeeded') return {...session,outcome:record.exit!.status==='cancelled'?'cancelled':'failed',code:knownCode(record.exit.error,'WORK_CALLER_FAILED')};
-    const result=record.exit!.output as TaskCallResult|undefined;
-    if(!result?.exit) return {...session,outcome:'unknown',code:'WORK_RESULT_MISSING'};
-    if(result.exit.status!=='succeeded') return {...session,outcome:result.exit.status==='cancelled'?'cancelled':'failed',code:knownCode(result.exit.error,'WORK_EXECUTION_FAILED')};
-    return {...session,outcome:'succeeded',outputs:[]};
+    const {sessionId,output,...observation}=await options.execution.inspect(frozen.input);
+    return {...observation,...(sessionId?{executionSessionId:sessionId}:{}),...(observation.outcome==='succeeded'?{outputs:[]}:{})};
 }
-function treeSettled(view: IndependentCallView): boolean {return view.callerState?.settled===true&&view.executionTree?.settled===true;}
 function validateFrozen(value: unknown): FrozenWork {
     const frozen=value as FrozenWork;
     if(frozen?.schema!==1||!frozen.dispatch?.id||!frozen.policy||frozen.input?.request?.submission?.id!==frozen.dispatch.id) throw new KanbanError('INVALID_FROZEN_EXECUTION');return frozen;

@@ -1,3 +1,4 @@
+import {automaticDeliveryStatus} from '@nestos/kanban/integration';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it, vi} from 'vitest';
 import {mkdtemp, mkdir, writeFile, rm, stat} from 'node:fs/promises';
@@ -78,7 +79,8 @@ it('ignores each associated resource without claiming removal and immediately se
  await f.api.cleanupWorkResource('board',request);
  await expect(f.api.cleanupWorkResource('board',{...request,reason:'Changed reason'})).rejects.toMatchObject({code:'IDEMPOTENCY_CONFLICT'});
  await f.api.cleanupWorkResource('board',{...request,operationId:'ignore-ready',resourceId:'ready'});
- expect(await f.journal.get(key)).toMatchObject({done:true,step:1});
+ expect(await f.journal.get(key)).toMatchObject({step:1});
+ expect(await automaticDeliveryStatus(f.journal,'board','item')).toMatchObject({state:'completed'});
  expect(f.commands).toEqual([]);expect(await f.journal.get('worktree-cleanup:ready')).toBeUndefined();
  const rows=await f.api.workResources('board','item',{inspect:false});expect(rows.every(row=>row.resolution?.kind==='ignored')).toBe(true);
  await expect(f.api.cleanupWorkResource('board',{...request,operationId:'ignore-unrelated',resourceId:'unrelated'})).rejects.toMatchObject({code:'WORKTREE_NOT_ASSOCIATED'});

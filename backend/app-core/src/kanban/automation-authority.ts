@@ -1,7 +1,7 @@
 import type {KanbanActor, KanbanBoard, KanbanCommand} from '@nestos/kanban/contracts';
 import {sameAutomationBinding} from '@nestos/kanban/contracts';
 import type {RootTargetCatalog} from '@nestos/llm-session/contracts';
-import {automationTarget, assertAutomationPrincipals} from './automation-targets';
+import {automationTarget, assertAutomationPrincipals} from '@nestos/kanban-development';
 import {requireValue} from './validation';
 
 export async function authorizeAutomation(input: {actor: KanbanActor; board: KanbanBoard; command?: KanbanCommand; action: string},

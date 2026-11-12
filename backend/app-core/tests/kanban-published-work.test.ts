@@ -1,3 +1,4 @@
+import {inspectIndependentCallExecution} from '@nestos/llm-session';
 import {expect, it, vi} from 'vitest';
 import type {IndependentCallView, IndependentCallInput} from '@nestos/llm-session/contracts';
 import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
@@ -9,7 +10,7 @@ async function fixture() {
     const calls={prepareTaskCall:vi.fn<Calls['prepareTaskCall']>(),submitPreparedTaskCall:vi.fn<Calls['submitPreparedTaskCall']>(),inspectTaskCallSubmission:vi.fn<Calls['inspectTaskCallSubmission']>(),list:vi.fn<Calls['list']>()};
     const record={id:'caller',sessionId:'session',version:1,effects:{},exit:{status:'succeeded',output:{exit:{status:'succeeded'}}}} as unknown as TaskRecord;
     const task=vi.fn(async()=>record),prepareSession=vi.fn(async()=> 'session');
-    const executor=createPublishedKanbanWorkExecutor({calls,kernel:{task},prepareSession,binding:async()=>({target:{kind:'agent',id:'published-agent',version:'1',digest:'b'.repeat(64)}})});
+    const executor=createPublishedKanbanWorkExecutor({calls,execution:{inspect:input=>inspectIndependentCallExecution({calls,kernel:{task}},input)},prepareSession,binding:async()=>({target:{kind:'agent',id:'published-agent',version:'1',digest:'b'.repeat(64)}})});
     const frozen=await executor.prepare(dispatch,{id:'item',title:'Task'} as KanbanItem) as {input: IndependentCallInput};
     const admission={submission:{task:{sessionId:'session',taskId:'caller'}}} as Awaited<ReturnType<Calls['inspectTaskCallSubmission']>>;
     calls.inspectTaskCallSubmission.mockResolvedValue(admission);
@@ -74,7 +75,7 @@ it('distinguishes an unsubmitted shutdown from a committed receipt whose reply w
 it('passes only the frozen context reference without eagerly reading dependency bodies',async()=>{
     const f=await fixture(),context=vi.fn(async()=>({large:'sensitive body'.repeat(10000)}));
     const contextRef={scopeId:dispatch.id,sections:['task','context']};
-    const executor=createPublishedKanbanWorkExecutor({calls:f.calls,kernel:{task:f.task},prepareSession:f.prepareSession,context,
+    const executor=createPublishedKanbanWorkExecutor({calls:f.calls,execution:{inspect:input=>inspectIndependentCallExecution({calls:f.calls,kernel:{task:f.task}},input)},prepareSession:f.prepareSession,context,
         binding:async()=>({target:{kind:'agent',id:'worker',version:'1',digest:'b'.repeat(64)},contextRef})});
     const prepared=await executor.prepare(dispatch,{id:'item',title:'Task',responsibility:'large task body'.repeat(1000)} as KanbanItem) as {input:IndependentCallInput};
     const text=(prepared.input.request.source as {text:string}).text;expect(text).toContain('`task`, `context`');expect(text).not.toContain(dispatch.id);expect(text.length).toBeLessThan(200);
@@ -82,8 +83,20 @@ it('passes only the frozen context reference without eagerly reading dependency 
 });
 
 it('preserves explicitly supplied dependency data for custom context-reference bindings',async()=>{
- const f=await fixture(),executor=createPublishedKanbanWorkExecutor({calls:f.calls,kernel:{task:f.task},prepareSession:f.prepareSession,
+ const f=await fixture(),executor=createPublishedKanbanWorkExecutor({calls:f.calls,execution:{inspect:input=>inspectIndependentCallExecution({calls:f.calls,kernel:{task:f.task}},input)},prepareSession:f.prepareSession,
   binding:async()=>({target:{kind:'agent',id:'worker',version:'1',digest:'b'.repeat(64)},contextRef:{scopeId:dispatch.id,sections:['task']},dependencies:{checkpoint:'verified custom prerequisite'}})});
  const prepared=await executor.prepare(dispatch,{id:'item',title:'Task'} as KanbanItem) as {input:IndependentCallInput};
  expect((prepared.input.request.source as {text:string}).text).toContain('verified custom prerequisite');
+});
+
+it('reconciles an uncertain owned execution instead of presenting it as healthy running or resubmitting it',async()=>{
+ const f=await fixture(),resolveEffect=vi.fn(async()=>{});
+ f.view.callerState!.settled=false;
+ f.view.executionState={id:'owned',settled:false,blockedBy:'effect',control:{requested:'run'}} as IndependentCallView['executionState'];
+ f.calls.inspectTaskCallSubmission.mockResolvedValue({executionSessionId:'child-session',submission:{task:{sessionId:'session',taskId:'caller'}}} as never);
+ f.task.mockResolvedValue({id:'owned',sessionId:'child-session',effects:{original:{status:'indeterminate',attemptCount:1,error:{code:'EIO'},attempts:[{id:'original-attempt',finishedAt:Date.now()-60000,outcome:'indeterminate'}]}}} as unknown as TaskRecord);
+ const executor=createPublishedKanbanWorkExecutor({calls:f.calls,execution:{inspect:input=>inspectIndependentCallExecution({calls:f.calls,kernel:{task:f.task,resolveEffect}},input)},prepareSession:f.prepareSession,binding:async()=>({target:{kind:'agent',id:'worker',version:'1',digest:'b'.repeat(64)}})});
+ expect(await executor.inspect(f.frozen)).toEqual({executionSessionId:'child-session',outcome:'unknown',code:'WORK_EXECUTION_UNSETTLED'});
+ expect(resolveEffect).toHaveBeenCalledWith('child-session','owned',expect.objectContaining({effectId:'original',outcome:{type:'reconcile'}}));
+ expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();expect(f.calls.prepareTaskCall).not.toHaveBeenCalled();
 });

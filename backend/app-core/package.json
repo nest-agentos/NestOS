@@ -54,7 +54,8 @@
     "js-yaml": "^4.1.1",
     "@nestos/kanban": "workspace:*",
     "@nestos/mail": "workspace:*",
-    "@nestos/git-delivery": "workspace:*"
+    "@nestos/git-delivery": "workspace:*",
+    "@nestos/kanban-development": "workspace:*"
   },
   "devDependencies": {
     "@nestos/vfsdriver-indexeddb": "workspace:*",

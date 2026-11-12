@@ -1,0 +1,139 @@
+{
+  "scenarios": [
+    {
+      "report": {
+        "result": "passed",
+        "environment": "Google Chrome headless; actual DOM, MemoryBackend/SeqKanbanStore, in-process KanbanClient and injected authorized Session source; no HTTP transport",
+        "dataset": {
+          "boards": 1,
+          "managementTasks": 3,
+          "executionTasks": 24,
+          "waitingInput": 3,
+          "sessions": 6,
+          "backgroundLoad": "none"
+        },
+        "metrics": [
+          {
+            "operation": "cold.open-grouped-board",
+            "durationMs": 48.5,
+            "logicalApiCalls": 3,
+            "httpRequests": 0,
+            "methods": [
+              "catalog",
+              "query",
+              "queryActivity"
+            ]
+          },
+          {
+            "operation": "warm.open-management-task",
+            "durationMs": 59.4,
+            "logicalApiCalls": 4,
+            "httpRequests": 0,
+            "methods": [
+              "item",
+              "itemOperations",
+              "planningSession",
+              "queryActivity"
+            ]
+          },
+          {
+            "operation": "warm.open-original-execution-session",
+            "durationMs": 5.2,
+            "logicalApiCalls": 0,
+            "httpRequests": 0,
+            "methods": []
+          },
+          {
+            "operation": "warm.open-execution-task",
+            "durationMs": 5,
+            "logicalApiCalls": 4,
+            "httpRequests": 0,
+            "methods": [
+              "item",
+              "itemOperations",
+              "executionSession",
+              "queryActivity"
+            ]
+          },
+          {
+            "operation": "warm.return-board",
+            "durationMs": 5.1,
+            "logicalApiCalls": 3,
+            "httpRequests": 0,
+            "methods": [
+              "catalog",
+              "query",
+              "queryActivity"
+            ]
+          }
+        ],
+        "version": {
+          "branch": "v5.2",
+          "commit": "30fe3df",
+          "workingTree": "dirty"
+        }
+      },
+      "cleanup": "confirmed"
+    },
+    {
+      "report": {
+        "result": "passed",
+        "environment": "Google Chrome headless; actual Kanban domain, SeqFile store, review service and DOM; no HTTP transport",
+        "dataset": {
+          "boards": 1,
+          "tasks": 1,
+          "operations": 5,
+          "backgroundLoad": "none",
+          "buildSubmission": "suspended then admitted then unknown"
+        },
+        "metrics": [
+          {
+            "operation": "cold.open-operation-feedback",
+            "durationMs": 86.5,
+            "logicalApiCalls": 6,
+            "httpRequests": 0,
+            "methods": [
+              "catalog",
+              "query",
+              "item",
+              "currentPrincipal",
+              "itemOperations",
+              "query"
+            ]
+          },
+          {
+            "operation": "warm.click-pending-build",
+            "durationMs": 1.3,
+            "logicalApiCalls": 1,
+            "httpRequests": 0,
+            "methods": [
+              "runItemOperation"
+            ]
+          },
+          {
+            "operation": "warm.receive-build-admission",
+            "durationMs": 14.2,
+            "logicalApiCalls": 0,
+            "httpRequests": 0,
+            "methods": []
+          },
+          {
+            "operation": "warm.refresh-uncertain-build",
+            "durationMs": 6.2,
+            "logicalApiCalls": 1,
+            "httpRequests": 0,
+            "methods": [
+              "itemOperations"
+            ]
+          }
+        ],
+        "version": {
+          "branch": "v5.2",
+          "commit": "30fe3df",
+          "workingTree": "dirty"
+        }
+      },
+      "cleanup": "confirmed"
+    }
+  ]
+}

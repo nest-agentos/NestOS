@@ -1,0 +1,50 @@
+{
+  "result": "passed",
+  "environment": "Google Chrome headless; actual native request parser, adapter and shared interaction DOM; injected response port; no remote execution or HTTP transport",
+  "dataset": {
+    "approvals": 1,
+    "legacyApprovals": 1,
+    "commandLines": 1503,
+    "backgroundLoad": "none"
+  },
+  "metrics": [
+    {
+      "operation": "cold.render-long-command-approval",
+      "durationMs": 1.4,
+      "logicalApiCalls": 0,
+      "httpRequests": 0
+    },
+    {
+      "operation": "warm.expand-full-command",
+      "durationMs": 11.9,
+      "logicalApiCalls": 0,
+      "httpRequests": 0
+    },
+    {
+      "operation": "warm.render-legacy-request",
+      "durationMs": 0,
+      "logicalApiCalls": 0,
+      "httpRequests": 0
+    }
+  ],
+  "version": {
+    "branch": "v5.2",
+    "commit": "30fe3df",
+    "workingTree": "dirty"
+  },
+  "cleanup": "confirmed",
+  "validation": {
+    "focusedTests": 21,
+    "performance": "core and ui passed",
+    "compatibility": {
+      "passed": 107,
+      "failed": 4,
+      "baseline": "The same four failures reproduced with the original native-interactions implementation.",
+      "failures": [
+        "Two legacy approval fixtures omit advertised decisions",
+        "Prompt navigation injected-context assertion",
+        "Timestamp locale assertion"
+      ]
+    }
+  }
+}

@@ -2,7 +2,7 @@ import type {KanbanClient,KanbanTaskRecoveryRequest,KanbanTaskRecoveryResult} fr
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import type {ProjectService} from '@nestos/app-contracts/services';
-import type {RuntimeServiceDescriptor} from '../runtime/service-control';
+import type {RuntimeServiceDescriptor} from '@nestos/app-contracts/services';
 import type {ChannelResponse} from '../run/channel-protocol';
 export interface TaskRecoveryOptions {
     fs:import('@nestos/vfs-core').IFileSystem;service:KanbanClient;client():KanbanClient;journal:KanbanAutomationJournal;remote:ProjectRemoteMountService;

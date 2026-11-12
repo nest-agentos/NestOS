@@ -3,7 +3,7 @@ import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallInput,SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {Kernel} from '@nestos/durable-kernel';
 import {readContextCatalog} from '../projects/harness-context-catalog';
-import {requireValue} from './validation';
+function requireValue(value:unknown,code:string):asserts value {if(!value)throw Object.assign(new Error(code),{code});}
 export interface OriginalSessionOptions {calls:Pick<IndependentCallService,'inspectTaskCallSubmission'|'list'>;kernel:Pick<Kernel,'inspectSession'|'sessionActivity'>}
 /** Bind a new operation to the original Session. Never create a replacement on recovery failure. */
 export async function originalSession(options:OriginalSessionOptions,input:IndependentCallInput) {
@@ -27,3 +27,6 @@ export async function originalSession(options:OriginalSessionOptions,input:Indep
                 ...(binding?{harnessConversation:{mode:'resume',bindingId:binding.id,expectedBindingRevision:binding.revision,expectedGeneration:binding.generation}}:{})}};
     }};
 }
+
+export type OriginalExecutionSession=Awaited<ReturnType<typeof originalSession>>;
+export type OriginalSessionResolver=(input:IndependentCallInput)=>Promise<OriginalExecutionSession>;

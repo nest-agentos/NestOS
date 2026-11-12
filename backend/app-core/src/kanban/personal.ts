@@ -1,3 +1,4 @@
+import {createSoftwareDevelopmentPlugin} from '@nestos/kanban-development';
 import {recordFollowUps} from './record-follow-ups';
 import {assertWorkspaceCleanup} from './workspace-cleanup-blocker';
 import {workProjectId} from './task-projects';
@@ -29,13 +30,13 @@ import {createLocalKanbanSessionSource} from './session-source';
 import {planningSessionReader} from './planning-sessions';
 import {relatedKanbanSessions} from './related-sessions';
 /** The authenticated runtime owns this user store; project boards require their own binding. */
-export async function createPersonalKanban(fs: IFileSystem, events: UserEventService, diagnostics: DiagnosticJournal, sessions?: Pick<import('@nestos/llm-session/contracts').ISessionRepository, 'listSummaries'|'getManifest'>, kernel?: Pick<import('@nestos/durable-kernel').Kernel,'sessionActivity'>, automationOptions?: PersonalKanbanAutomationOptions) {
+export async function createPersonalKanban(fs: IFileSystem, events: UserEventService, diagnostics: DiagnosticJournal, sessions?: Pick<import('@nestos/llm-session/contracts').ISessionRepository, 'listSummaries'|'getManifest'>, activity?:import('@nestos/llm-session').SessionActivityReader, automationOptions?: PersonalKanbanAutomationOptions) {
     const store=await openPersonalKanbanStore(fs);await new KanbanExamples(store).seed();
     const journal=new KanbanAutomationJournal(fs,{...kanbanJournalOptions,diagnostic:event=>diagnostics.record({...event,module:'application',operation:'kanban.operation',level:event.result==='failure'?'warn':'info'})});
     let client:KanbanClient;
     const assertRestartIdle=restartBarrier(()=>client);
-    let operations:ReturnType<typeof import('./item-operations').createItemOperations>|undefined;
-    const base=personalOptions({store,journal,events,diagnostics,sessions,kernel,automationOptions:automationOptions?{...automationOptions,
+    let operations:ReturnType<typeof import('@nestos/kanban-development').createItemOperations>|undefined;
+    const base=personalOptions({store,journal,events,diagnostics,sessions,activity,automationOptions:automationOptions?{...automationOptions,
         relatedSessions:async(board,item)=>[...await automationOptions.relatedSessions?.(board,item)??[],...await operations?.sessions(board,item)??[]]}:undefined});
     const runtime=await assembleKanbanRuntime({...base,assertRestartIdle,fs,store,journal,directory:'/var/lib/kanban',actor:{kind:'human',id:'admin'},
         workLog:workLogOptions(events,base.log),resources:automationOptions?.projects?projectResourceCatalog(automationOptions.projects):undefined,
@@ -47,7 +48,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
     try{await runtime.service.scan();await reportKanbanHealth(events);}catch(error){await reportKanbanHealth(events,error);}
     return runtime.service;
 }
-function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanAutomationOptions|undefined,events:UserEventService,log:ReturnType<typeof personalOptions>['log'],setOperations:(value:ReturnType<typeof import('./item-operations').createItemOperations>|undefined)=>void,client:()=>KanbanClient):KanbanRuntimeExtension[] {
+function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanAutomationOptions|undefined,events:UserEventService,log:ReturnType<typeof personalOptions>['log'],setOperations:(value:ReturnType<typeof import('@nestos/kanban-development').createItemOperations>|undefined)=>void,client:()=>KanbanClient):KanbanRuntimeExtension[] {
     const {service,journal,workLog,fs,serviceFor}=context;
     const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,...resources}=resourcePorts??{};
     const operations=options?.itemOperations?.({service,journal,workLog,log,automaticTarget:(_board,item)=>workProjectId(item),automatic:async(board,item)=>{
@@ -65,22 +66,23 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
         if(state.waitingForUser)await events.journal.append('automatic-review:'+state.id,{type:'kanban.automatic.waiting-review',operationId:state.id,resourceId:'kanban:'+JSON.stringify(['personal:user-store',state.boardId,state.itemId]),notification:'info'});
         if(state.code&&state.code!=='OPERATION_CANCELLED')await events.journal.append('automatic:'+state.id+':'+state.code,{type:'kanban.automatic.blocked',operationId:state.id,resourceId:'kanban:'+JSON.stringify(['personal:user-store',state.boardId,state.itemId]),notification:'error'});
     }});setOperations(operations);
+    const operationPlugins=[...operations?[createSoftwareDevelopmentPlugin(()=>operations)]:[],...options?.operationPlugins??[]];
     const recovery=options?.taskRecovery?.({service,client,journal,log});
     const conversations=options?.decisionConversations?.({service,client,journal,log});
     const communication=options&&conversations?taskCommunication(service,journal,options,conversations.openRecordCoordination,log):undefined;
     const fixes=options?.collaboration?createTaskFix({service,journal,events,automation:options,log}):undefined;
-    const automation=options?createPersonalKanbanAutomation({...options,fs,service,journal,workLog,log,serviceFor,deliveryReady:operations?.deliveryReady,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
+    const automation=options?createPersonalKanbanAutomation({...options,operationPlugins,fs,service,journal,workLog,log,serviceFor,deliveryReady:operations?.deliveryReady,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
     const planning=options?planningSessionReader(service,journal,options):undefined;
-    return [{projectRecords:(board,page)=>recordFollowUps(journal,board,page,operations?.finalizationStatus),archiveItemResources,capabilities:{...(options?.boardSettings?{boardSettings:async(board:string)=>options.boardSettings!.catalog(await service.read(board))}:{}),...(recovery?{taskRecovery:recovery.taskRecovery,recoverTask:recovery.recoverTask,openTaskRecovery:recovery.openTaskRecovery}:{}),...(conversations?{startRecordConversation:conversations.startRecordConversation,openRecordCoordination:conversations.openRecordCoordination,...communication,recordConversations:conversations.recordConversations}:{}),...(planning?{planningSession:planning}:{}),...resources,...(operations?{itemOperations:operations.itemOperations,runItemOperation:operations.runItemOperation,bindItemOperation:operations.bindItemOperation}:{}),
+    return [{operationPlugins,projectRecords:(board,page)=>recordFollowUps(journal,board,page,operations?.finalizationStatus),archiveItemResources,capabilities:{...(options?.boardSettings?{boardSettings:async(board:string)=>options.boardSettings!.catalog(await service.read(board))}:{}),...(recovery?{taskRecovery:recovery.taskRecovery,recoverTask:recovery.recoverTask,openTaskRecovery:recovery.openTaskRecovery}:{}),...(conversations?{startRecordConversation:conversations.startRecordConversation,openRecordCoordination:conversations.openRecordCoordination,...communication,recordConversations:conversations.recordConversations}:{}),...(planning?{planningSession:planning}:{}),...resources,
         ...(resources?.cleanupWorkResource&&operations?{cleanupWorkResource:(board,request)=>request.resolution==='ignore'?resources.cleanupWorkResource!(board,request):operations.guardResource(board,request.itemId,()=>resources.cleanupWorkResource!(board,request))}:{}),
         ...(options?.continuation?{executionSession:async(board,item,query)=>{
             const detail=await service.executionSession(board,item,query),current=(await service.item(board,item)).item;
             const previous=Object.values((await service.workflow(board)).dispatches).filter(row=>row.itemId===item).sort((a,b)=>b.attempt-a.attempt)[0];
             return {...detail,...(['backlog','open'].includes(current.status)&&previous&&['failed','cancelled'].includes(previous.outcome)?{continuation:{previousDispatchId:previous.id}}:{})};
         }}:{}),...(fixes?{fixTask:fixes.fixTask,taskFixes:fixes.taskFixes,cancelFix:fixes.cancelFix}:{}),...(replies?{replyTask:replies}:{})},scan:async()=>{await conversations?.scan();await recovery?.scan();},quiesce:async()=>{await conversations?.quiesce();await recovery?.quiesce();release?.();}},
-        ...operations?[operations]:[],...automation?[{...automation,capabilities:{automationCatalog:automation.automationCatalog,analysisStatus:automation.analysisStatus}}]:[],...fixes?[fixes]:[],...replies?[replies]:[]];
+        ...automation?[{...automation,capabilities:{automationCatalog:automation.automationCatalog,analysisStatus:automation.analysisStatus}}]:[],...fixes?[fixes]:[],...replies?[replies]:[]];
 }
 
 
@@ -88,13 +90,13 @@ type PersonalOptions = {
     store: Awaited<ReturnType<typeof openPersonalKanbanStore>>; journal: KanbanAutomationJournal;
     events: UserEventService; diagnostics: DiagnosticJournal;
     sessions?: Pick<import('@nestos/llm-session/contracts').ISessionRepository, 'listSummaries' | 'getManifest'>;
-    kernel?: Pick<import('@nestos/durable-kernel').Kernel, 'sessionActivity'>; automationOptions?: PersonalKanbanAutomationOptions;
+    activity?:import('@nestos/llm-session').SessionActivityReader; automationOptions?: PersonalKanbanAutomationOptions;
 };
-function personalOptions({store, journal, events, diagnostics, sessions, kernel, automationOptions}: PersonalOptions) {
+function personalOptions({store, journal, events, diagnostics, sessions, activity, automationOptions}: PersonalOptions) {
     return {
-        executionSessions:sessions&&kernel?{source:{...createLocalKanbanSessionSource(sessions,kernel,automationOptions?.executionResource,automationOptions?.sessionObservation),
+        executionSessions:sessions&&activity?{source:{...createLocalKanbanSessionSource(sessions,activity,automationOptions?.executionResource,automationOptions?.sessionObservation),
             ...(automationOptions ? {related: relatedKanbanSessions({journal, calls: automationOptions.calls,
-                repository: automationOptions.sessions, kernel: automationOptions.kernel, resources: automationOptions.sessionExecutionResources,
+                executionReader:automationOptions.executionReader,
                 related: automationOptions.relatedSessions})} : {})}}:undefined,
         suggestions: async (_board, kind, search, limit) => {
             if (kind !== 'session') return undefined;

@@ -1,3 +1,4 @@
+import {recoverNativeTerminal} from './harness-terminal-recovery';
 import {HarnessConnectionCleanup} from './harness-connection-cleanup';
 import type { EffectExecutionContext, EffectSessionState } from '@nestos/durable-kernel';
 import type { ConnectionCancelResult, ConnectionReconcileResult, HarnessExecutionProvider, HarnessExecutionRequest, HarnessExecutionResult } from '@nestos/kernel-adapters/contracts';
@@ -80,7 +81,10 @@ class NativeHarnessExecutionProvider implements HarnessExecutionProvider {
     private async dispatch(request: HarnessExecutionRequest, context: EffectExecutionContext, journal: ExecutionJournal,
         acquired: HarnessConnectionAcquisition, exists: boolean, startedAt: number): Promise<HarnessExecutionResult> {
         if (!exists) await journal.initialize(acquired.epoch);
-        if (journal.data.epoch !== acquired.epoch) throw executionError('NATIVE_EPOCH_CHANGED');
+        if(journal.data.epoch!==acquired.epoch){
+            const result=await recoverNativeTerminal({acquired,journal,request,signal:context.abortSignal});
+            await diagnose(context,'observe-previous-epoch','completed',startedAt,undefined,executionCorrelation(request,journal));return result;
+        }
         const attachments = journal.data.turnId || journal.data.operations.turn ? undefined
             : await this.prepareInput(request, context, journal, acquired, startedAt);
         if (request.context?.conversation.mode === 'fork' && (!acquired.profile.capabilities.checkpointFork || !acquired.client.fork))

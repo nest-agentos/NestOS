@@ -9,6 +9,17 @@ const core = pkg('app-core'), shell = pkg('app-shell'), vfs = pkg('vfs-ui'), hos
 const packages = [core, shell, vfs, host, pkg('vfs-core'), pkg('vfs-sync')];
 const inspect = (source, text, file = source.dir + '/src/index.ts') => sourceErrors(source, file, text, packages);
 
+test('Kanban consumes Session observations and execution mechanisms reject business policy dependencies',()=>{
+    const file=core.dir+'/src/kanban/observer.ts';
+    for(const text of ["import type {Kernel} from '@nestos/durable-kernel'","import('@nestos/durable-kernel/contracts')"])
+        assert.match(inspect(core,text,file)[0],/Session execution observations/);
+    assert.equal(inspect(core,"import type {IndependentCallExecutionReader} from '@nestos/llm-session'",file).length,0);
+    for(const source of ['durable-kernel','kernel-adapters','llm-session','llm-flow','llm-tasks'])
+        for(const target of ['kanban','kanban-ui','git-delivery'])
+            assert.match(dependencyError('@nestos/'+source,'@nestos/'+target),/execution mechanisms/);
+    assert.equal(dependencyError('@nestos/kanban','@nestos/vfs-core'),undefined);
+});
+
 test('frontend shell cannot import runtime roots or host factories even as a type shortcut', () => {
     for (const expression of ["import type { Runtime } from '@nestos/app-core'", "import { createApplicationRuntime } from '@nestos/app-core'",
         "import('@nestos/app-core/host')"])

@@ -1,15 +1,16 @@
-import {finishReviewCleanup} from '../src/kanban/item-operation-cleanup';
-import {kanbanJournalOptions} from '../src/kanban/host-policy';
+import {finishReviewCleanup} from '@nestos/kanban/integration';
+const kanbanJournalOptions={directory:'/var/lib/kanban',artifactScheme:'nestos-kanban-artifact:'};
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {sha256HexSync} from '@nestos/common';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
-import {createItemOperations} from '../src/kanban/item-operations';
-import {jobKey, reviewKey, type ReviewOperationsOptions, type ReviewJob} from '../src/kanban/item-operation-types';
+import {createItemOperations} from '@nestos/kanban-development';
+import { type ReviewOperationsOptions, type ReviewJob} from '@nestos/kanban-development';
+import {jobKey, reviewKey} from '@nestos/kanban/integration';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});
-async function fixture() {
+async function fixture(configure?:(options:ReviewOperationsOptions)=>void) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
     const journal = new KanbanAutomationJournal(await manager.openFileSystem('/'), kanbanJournalOptions); await journal.open();
     const item = {id: 'task', title: 'Task', revision: 1, status: 'review'}, snapshot = {version: 'scope', sourceVersion: 'source', targetVersion: 'target', context: {worktreeId: 'original'}};
@@ -24,6 +25,7 @@ async function fixture() {
         prepareAnalysis: vi.fn(async () => request), readAnalysis: vi.fn(async () => plan)};
     const service = {read: async () => board, item: async () => ({item}), currentPrincipal: async () => actor, workflow: async () => ({dispatches: {execution: {id: 'execution', itemId: 'task', attempt: 1, outcome: 'succeeded'}}}), execute: vi.fn(async () => {item.status = 'completed'; item.revision++;})};
     const options = {journal, service, adapter, published, submission, log: vi.fn(), catalog: async () => ({entries: [{name: 'Project operation', target, input: {parameters: [{name: 'context', type: 'string'}]}}]})} as unknown as ReviewOperationsOptions;
+    configure?.(options);
     const api = createItemOperations(options); closes.push(() => api.quiesce());
     const run = async (action: string, id = action, extra = {}) => api.runItemOperation('board', {operationId: id, itemId: 'task', action, expectedRevision: (await api.itemOperations('board', 'task')).revision, ...extra});
     const bind = async (action: string) => api.bindItemOperation('board', {operationId: 'bind-' + action, itemId: 'task', action, expectedRevision: (await api.itemOperations('board', 'task')).revision, target: reference});
@@ -176,7 +178,7 @@ it('persists build-time replacement consent and starts the replacement once acro
     await f.api.quiesce();const restored=createItemOperations(f.options);closes.push(()=>restored.quiesce());await restored.scan();
     expect(f.published.start).toHaveBeenCalledTimes(2);
     const settings=await f.journal.get<any>(reviewKey('board','task')),id=settings.jobs.at(-1);
-    expect((await f.journal.get<ReviewJob>(jobKey('build-auto')))?.followUp).toMatchObject({state:'started',request:{operationId:id,confirmed:true}});
+    expect((await f.journal.get<ReviewJob>(jobKey('build-auto')))?.followUp).toMatchObject({state:'started',request:{operationId:id}});
     await restored.scan();expect(f.published.start).toHaveBeenCalledTimes(2);
     const view=await restored.itemOperations('board','task');expect(view.operations.find(op=>op.id==='build')?.runLabel).toBeTruthy();
 });
@@ -428,7 +430,7 @@ it('keeps management cleanup pending until every repository scope is finalized',
  f.options.automatic=async()=>true;(f.service as any).catalog=async()=>[{id:'board'}];f.options.cleanup=vi.fn(async()=>true);
  const api=createItemOperations(f.options);closes.push(()=>api.quiesce());
  await api.scan();expect(f.options.cleanup).not.toHaveBeenCalled();
- expect(await api.finalizationStatus('board','task')).toMatchObject({state:'waiting-confirmation',stage:'analyze'});
+ expect(await api.finalizationStatus('board','task')).toMatchObject({state:'running',stage:'build'});
  scopes[0].completed=true;await api.scan();expect(f.options.cleanup).toHaveBeenCalledOnce();
  expect(await api.finalizationStatus('board','task')).toMatchObject({state:'completed'});
  expect(f.published.start).not.toHaveBeenCalled();
@@ -496,4 +498,134 @@ it('stops before external merge admission when the target changes after the requ
  expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({enabled:true,state:'ready'});
  expect(view.operations.find(row=>row.id==='merge')).toMatchObject({enabled:false,state:'unavailable'});
  expect(await f.journal.get(jobKey('late-drift'))).toMatchObject({phase:'settled',state:'failed',code:'OPERATION_TARGET_CHANGED_REANALYZE'});
+});
+
+it('hands verified execution results to management automatically even when final integration is manual',async()=>{
+ const f=await fixture(options=>{
+  options.automatic=async()=>false;
+  options.deliveryPlan=async()=>({steps:['accept'],acceptance:'source',acceptanceConfirmation:null});
+  options.scopes={describe:async()=>({owner:{boardId:'board',itemId:'manager'},permittedActions:['accept','cancel']}),resolve:async()=>({}),handoff:async()=>({boardId:'board',itemId:'manager'})};
+ });
+ Object.assign(await f.options.service.read('board'),{automation:{enabled:true},items:[f.item]});
+ f.options.service.catalog=async()=>[{id:'board'}] as never;
+ const before=await f.api.itemOperations('board','task');
+ expect(before.owner?.itemId).toBe('manager');expect(before.operations).toEqual([]);expect(f.service.execute).not.toHaveBeenCalled();
+ for(let step=0;step<4;step++)await f.api.scan();
+ expect(f.item.status).toBe('completed');expect(f.service.execute).toHaveBeenCalledOnce();
+ expect(f.service.execute.mock.calls[0][1].command).toMatchObject({type:'accept-execution',dispatchId:'execution',accept:true});
+ const after=await f.api.itemOperations('board','task');expect(after.operations).toEqual([]);
+ expect(f.published.start).not.toHaveBeenCalled();expect(f.submission.start).not.toHaveBeenCalled();
+});
+it('keeps handoff failures actionable without presenting them as product acceptance',async()=>{
+ const {readOperationScopes}=await import('../src/item-operation-scopes');
+ const f=await fixture();f.options.scopes={describe:async()=>({owner:{boardId:'board',itemId:'manager'}}),resolve:async()=>({})};
+ const view=await readOperationScopes(f.options,'board','task',async()=>({revision:'r',operations:[{id:'accept',label:'Acceptance',state:'failed',enabled:true,code:'EACCES',confirmation:'Confirm acceptance'}]}));
+ expect(view.operations[0]).toMatchObject({id:'accept',group:{id:'handoff'},code:'EACCES'});expect(view.operations[0].confirmation).toBeUndefined();
+ const blocked=await readOperationScopes(f.options,'board','task',async()=>({revision:'r',operations:[],automatic:{state:'blocked',stage:'accept',code:'EACCES'}}));
+ expect(blocked.code).toBe('EACCES');
+});
+
+it('does not require a product acceptance checkbox to retry a proven source handoff',async()=>{
+ const f=await fixture(options=>{options.deliveryPlan=async()=>({steps:['accept'],acceptance:'source',acceptanceConfirmation:null});});
+ const view=await f.api.itemOperations('board','task');expect(view.operations[0].confirmation).toBeUndefined();
+ await f.run('accept','handoff-retry');expect(f.service.execute).toHaveBeenCalledOnce();
+});
+
+async function automaticAnalysisFixture(){
+ const f=await fixture(options=>{
+  options.automatic=async()=>true;
+  options.deliveryPlan=async()=>({ordering:'configured',steps:['analyze','merge','accept','cleanup'],acceptance:'source',acceptanceConfirmation:null});
+  options.cleanup=vi.fn(async()=>true);options.reportAutomatic=vi.fn();
+  options.adapter.prepareOperation=vi.fn(async input=>({expectedSessionId:'original',expectedBranch:'main',submission:{id:input.id,source:{kind:'conversation',ownerId:'original',id:input.id}}}));
+  options.adapter.readOperation=vi.fn(async job=>job.action==='analyze'?{...job.snapshot,summary:'No unresolved choices',conflicts:[]}:{schema:'nestos.kanban.operation-result/1',operationId:job.id,status:'succeeded',sourceVersion:job.snapshot.sourceVersion,targetVersion:job.snapshot.targetVersion,targetHead:'merged'});
+ });
+ Object.assign(await f.options.service.read('board'),{automation:{enabled:true},items:[f.item]});
+ f.options.service.catalog=async()=>[{id:'board'}] as never;
+ return f;
+}
+async function scans(api:ReturnType<typeof createItemOperations>,count=10){for(let n=0;n<count;n++)await api.scan();}
+const submittedActions=(f:Awaited<ReturnType<typeof automaticAnalysisFixture>>)=>f.submission.start.mock.calls.map(([request])=>request.submission.id.includes('-analyze')?'analyze':'merge');
+it('automatically refreshes target drift, resumes the original Session and survives restart without extra verification',async()=>{
+ const f=await automaticAnalysisFixture();await scans(f.api,2);
+ f.snapshot.version='target-2-state';f.snapshot.targetVersion='target-2';await f.api.scan();
+ const saved=await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['board','task']));
+ expect(saved).toMatchObject({step:0,revisionEpoch:expect.any(String)});expect(saved.code).toBeUndefined();
+ await f.api.quiesce();const resumed=createItemOperations(f.options);closes.push(()=>resumed.quiesce());await scans(resumed);
+ expect(submittedActions(f)).toEqual(['analyze','analyze','merge']);
+ expect(f.submission.start.mock.calls.every(([request])=>request.expectedSessionId==='original')).toBe(true);
+ const last=await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['board','task']));expect(last.revisionEpoch).toBe(saved.revisionEpoch);
+ expect(f.item.status).toBe('completed');expect(f.options.reportAutomatic).not.toHaveBeenCalledWith(expect.objectContaining({code:'OPERATION_TARGET_CHANGED_REANALYZE'}));
+});
+it('reanalyses a source change in the configured integration chain without adding functional verification',async()=>{
+ const f=await automaticAnalysisFixture();await scans(f.api,2);
+ f.snapshot.sourceVersion='source-2';f.snapshot.version='source-2-state';await scans(f.api);
+ expect(submittedActions(f)).toEqual(['analyze','analyze','merge']);
+ const merge=f.submission.start.mock.calls.at(-1)![0],job=await f.journal.get<ReviewJob>(jobKey(merge.submission.id));
+ expect(job?.snapshot.sourceVersion).toBe('source-2');expect(f.item.status).toBe('completed');
+});
+it('retries analysis after read-only version drift rather than requesting user confirmation',async()=>{
+ const f=await automaticAnalysisFixture(),read=f.options.adapter.readOperation!;let stale=true;
+ f.options.adapter.readOperation=vi.fn(async job=>{if(job.action==='analyze'&&stale){stale=false;f.snapshot.version='during-analysis';throw Object.assign(Error('changed'),{code:'MERGE_PLAN_SOURCE_CHANGED'});}return read(job);});
+ await scans(f.api);expect(submittedActions(f)).toEqual(['analyze','analyze','merge']);
+ expect(f.options.reportAutomatic).not.toHaveBeenCalledWith(expect.objectContaining({code:'MERGE_PLAN_SOURCE_CHANGED'}));
+});
+it('uses a formal not-started receipt for drift at merge admission and never resends the rejected request',async()=>{
+ const f=await automaticAnalysisFixture();await scans(f.api,2);
+ const original={...f.snapshot};f.adapter.snapshot.mockResolvedValueOnce(original).mockResolvedValueOnce(original).mockImplementationOnce(async()=>{f.snapshot.targetVersion='raced';f.snapshot.version='raced-state';return {...f.snapshot};});
+ await f.api.scan();const state=await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['board','task'])),rejected=state.requests.merge.operationId;
+ expect(await f.journal.get('review-merge-not-started:'+rejected)).toMatchObject({code:'OPERATION_TARGET_CHANGED_REANALYZE'});
+ await scans(f.api);expect(submittedActions(f)).toEqual(['analyze','analyze','merge']);
+ expect(f.submission.start.mock.calls.some(([request])=>request.submission.id===rejected)).toBe(false);
+});
+it('waits for the retained Session to become idle with the same analysis identity and without notifying the user',async()=>{
+ const f=await automaticAnalysisFixture();await scans(f.api,2);f.snapshot.version='drift';
+ const prepare=f.options.adapter.prepareOperation!,attempts:string[]=[];let busy=true;
+ f.options.adapter.prepareOperation=vi.fn(async input=>{if(input.action==='analyze'){attempts.push(input.id);if(busy){busy=false;throw Object.assign(Error('busy'),{code:'OPERATION_ORIGINAL_SESSION_BUSY'});}}return prepare(input);});
+ await scans(f.api);expect(attempts).toHaveLength(2);expect(attempts[0]).toBe(attempts[1]);
+ expect(submittedActions(f)).toEqual(['analyze','analyze','merge']);
+ expect(f.options.reportAutomatic).not.toHaveBeenCalledWith(expect.objectContaining({code:'OPERATION_ORIGINAL_SESSION_BUSY'}));
+});
+it('never replaces an unknown merge with a fresh request when the target changes',async()=>{
+ const f=await automaticAnalysisFixture();await scans(f.api,2);
+ f.submission.start.mockImplementation(async request=>{if(request.submission.id.includes('-merge'))throw Object.assign(Error('private transport error'),{code:'ETIMEDOUT'});return {sessionId:'original',outcome:'running'};});
+ f.submission.inspect.mockResolvedValue({sessionId:'original',outcome:'unknown'});
+ await f.api.scan();f.snapshot.version='changed-with-unknown';f.snapshot.targetVersion='new-target';
+ const settings=await f.journal.get<any>(reviewKey('board','task'));
+ await f.journal.update(reviewKey('board','task'),old=>({...old as any,invalidatedAnalysis:{id:settings.jobs[0],code:'OPERATION_TARGET_CHANGED_REANALYZE'}}));await scans(f.api);
+ expect(submittedActions(f)).toEqual(['analyze','merge']);
+ const state=await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['board','task']));expect(state.revisionEpoch).toBeUndefined();
+ expect((await f.journal.get<ReviewJob>(jobKey(state.requests.merge.operationId)))?.phase).toBe('submitting');
+});
+
+it('does not treat a failed merge without a matching admission proof as unstarted',async()=>{
+ const f=await automaticAnalysisFixture();await scans(f.api,2);const original={...f.snapshot};
+ f.adapter.snapshot.mockResolvedValueOnce(original).mockResolvedValueOnce(original).mockImplementationOnce(async()=>{f.snapshot.version='unconfirmed-drift';return {...f.snapshot};});
+ await f.api.scan();const state=await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['board','task']));
+ await f.journal.update('review-merge-not-started:'+state.requests.merge.operationId,old=>({...old as object,fingerprint:'wrong-operation'}));
+ await scans(f.api,4);expect(submittedActions(f)).toEqual(['analyze']);
+ expect((await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['board','task']))).revisionEpoch).toBeUndefined();
+});
+
+it('recovers a crash between the not-started receipt and runner settlement without inspecting or starting that merge',async()=>{
+ const f=await automaticAnalysisFixture();await scans(f.api,2);const original={...f.snapshot};
+ f.adapter.snapshot.mockResolvedValueOnce(original).mockResolvedValueOnce(original).mockImplementationOnce(async()=>{f.snapshot.version='crash-window';return {...f.snapshot};});
+ await f.api.scan();const state=await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['board','task'])),id=state.requests.merge.operationId;
+ await f.journal.update<ReviewJob>(jobKey(id),old=>({...old!,phase:'submitting',state:'unknown',code:undefined}));
+ await f.api.quiesce();const resumed=createItemOperations(f.options);closes.push(()=>resumed.quiesce());await scans(resumed);
+ expect(submittedActions(f)).toEqual(['analyze','analyze','merge']);
+ expect(f.submission.inspect.mock.calls.some(([request])=>request.submission.id===id)).toBe(false);
+ expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'operation.merge.admission-recovery',result:'success'}));
+});
+
+it('starts a ready management scope without a prior manual action and refreshes its analysis automatically',async()=>{
+ const f=await automaticAnalysisFixture();Object.assign(f.item,{status:'open',planning:{execution:'children'}});let ready=false,cleaned=false;
+ f.options.scopes={describe:async()=>({scopes:[{id:'repository-auto',label:'Repository',contributors:[],ready,completed:cleaned}]}),resolve:async()=>({adapter:{...f.options.adapter,ready:()=>ready}})};
+ f.options.cleanup=vi.fn(async()=>{cleaned=true;return true;});
+ const before=await f.api.itemOperations('board','task');expect(before.scopes).toHaveLength(1);
+ await f.api.scan();expect(f.submission.start).not.toHaveBeenCalled();
+ ready=true;await scans(f.api,2);expect(submittedActions(f)).toEqual(['analyze']);
+ f.snapshot.version='scope-target-drift';f.snapshot.targetVersion='new-target';await scans(f.api);
+ expect(submittedActions(f)).toEqual(['analyze','analyze','merge']);
+ expect(f.submission.start.mock.calls.every(([request])=>request.expectedSessionId==='original')).toBe(true);
+ expect(await f.journal.get('automatic-delivery:'+JSON.stringify(['board','task','repository-auto']))).toMatchObject({step:4});
 });

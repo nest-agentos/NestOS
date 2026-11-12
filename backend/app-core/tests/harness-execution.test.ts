@@ -320,3 +320,28 @@ it('yields native observation at a shutdown safe point and resumes the original 
  complete(f);delete f.context.waitForObservation;
  expect(await f.make().reconcile(request,f.context)).toMatchObject({status:'completed'});expect(f.client.turn).toHaveBeenCalledOnce();
 });
+
+it('recovers only the admitted terminal turn across transport epoch replacement without replaying native mutations',async()=>{
+ const f=fixture();f.client.eventSnapshot=vi.fn(async()=>{throw Object.assign(new Error('connection unavailable'),{code:'EIO'});});
+ await expect(f.make().execute(request,f.context)).rejects.toMatchObject({code:'EIO'});
+ f.data.epoch='replacement';f.data.history.turns=[{id:'native-turn',status:'completed',items:[{id:'final',type:'agentMessage',text:'Original result'}]}];
+ const result=await f.make().reconcile(request,f.context);
+ expect(result).toMatchObject({status:'completed',result:{sessionId:'native-session',turnId:'native-turn',text:'Original result'}});
+ expect(f.client.create).toHaveBeenCalledOnce();expect(f.client.turn).toHaveBeenCalledOnce();expect(f.client.resume).not.toHaveBeenCalled();
+ expect(f.client.read).toHaveBeenCalledWith('claude','native-session',expect.objectContaining({epoch:'replacement'}));
+ const journal=f.records.get(harnessExecutionJournalKey(f.context))!.value as any;expect(journal.epoch).toBe('service-epoch');
+});
+it('does not use another turn or a missing terminal result to settle a replaced transport epoch',async()=>{
+ const f=fixture();f.client.eventSnapshot=vi.fn(async()=>{throw Object.assign(new Error('connection unavailable'),{code:'EIO'});});
+ await expect(f.make().execute(request,f.context)).rejects.toMatchObject({code:'EIO'});
+ f.data.epoch='replacement';f.data.history.turns=[{id:'other-turn',status:'completed',items:[]}];
+ expect(await f.make().reconcile(request,f.context)).toMatchObject({status:'unknown',code:'NATIVE_EPOCH_CHANGED'});
+ expect(f.client.turn).toHaveBeenCalledOnce();expect(f.client.create).toHaveBeenCalledOnce();
+});
+it('preserves a failed original native turn across epoch replacement',async()=>{
+ const f=fixture();f.client.eventSnapshot=vi.fn(async()=>{throw Object.assign(new Error('connection unavailable'),{code:'EIO'});});
+ await expect(f.make().execute(request,f.context)).rejects.toMatchObject({code:'EIO'});
+ f.data.epoch='replacement';f.data.history.turns=[{id:'native-turn',status:'failed',error:{message:'Failed'},items:[]}];
+ await expect(f.make().reconcile(request,f.context)).rejects.toMatchObject({code:'NATIVE_TURN_FAILED'});
+ expect(f.client.turn).toHaveBeenCalledOnce();
+});

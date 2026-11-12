@@ -5,10 +5,11 @@ import type {KanbanBoard, KanbanItem, KanbanWorkflowState, KanbanSessionAssociat
 import type {KanbanSessionSource} from '@nestos/kanban/activity';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {collaborationRelations, safeCode} from '@nestos/kanban/integration';
-import {relatedExecutionReader, type SessionExecutionOptions} from './related-session-executions';
+import type {createSessionExecutionReader} from '../session/execution-facts';
 import {requireValue} from './validation';
 
-interface Options extends SessionExecutionOptions {
+interface Options {
+    executionReader():ReturnType<typeof createSessionExecutionReader>;
     journal: KanbanAutomationJournal;
     calls: Pick<IndependentCallService, 'inspectTaskCallSubmission'>;
     related?(boardId: string, itemId: string): Promise<KanbanSessionAssociation[]>;
@@ -29,7 +30,7 @@ export function relatedKanbanSessions(options: Options): NonNullable<KanbanSessi
     };
 }
 async function collect(options: Options, board: KanbanBoard, item: KanbanItem, workflow: KanbanWorkflowState): Promise<KanbanSessionAssociation[]> {
-    const read = relatedExecutionReader(options), rows: KanbanSessionAssociation[] = [], pending: Array<() => Promise<void>> = [];
+    const read = options.executionReader(), rows: KanbanSessionAssociation[] = [], pending: Array<() => Promise<void>> = [];
     const append = executionAppender(read, rows);
     for (const ref of item.externalRefs ?? []) {
         const dispatch = workflow.dispatches[ref.revision ?? ''];
@@ -58,7 +59,7 @@ async function collect(options: Options, board: KanbanBoard, item: KanbanItem, w
     const failure = results.find(row => row.status === 'rejected'); if (failure?.status === 'rejected') throw failure.reason;
     return rows;
 }
-function executionAppender(read: ReturnType<typeof relatedExecutionReader>, rows: KanbanSessionAssociation[]) {
+function executionAppender(read: ReturnType<typeof createSessionExecutionReader>, rows: KanbanSessionAssociation[]) {
     return async (sessionId: string, execution: KanbanSessionExecution) => {
         const started = Date.now();
         try {rows.push({sessionId, purpose: execution.purpose, execution: await read(sessionId, execution)});}

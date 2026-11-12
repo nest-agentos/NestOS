@@ -1,0 +1,88 @@
+{
+  "result": "passed",
+  "environment": "Google Chrome headless; actual DOM, MemoryBackend/SeqKanbanStore, in-process KanbanClient and injected authorized Session source; no HTTP transport",
+  "dataset": {
+    "boards": 1,
+    "managementTasks": 3,
+    "executionTasks": 24,
+    "waitingInput": 3,
+    "sessions": 6,
+    "backgroundLoad": "none"
+  },
+  "metrics": [
+    {
+      "operation": "cold.open-grouped-board",
+      "durationMs": 48.4,
+      "logicalApiCalls": 3,
+      "httpRequests": 0,
+      "methods": [
+        "catalog",
+        "query",
+        "queryActivity"
+      ]
+    },
+    {
+      "operation": "warm.open-management-task",
+      "durationMs": 57.4,
+      "logicalApiCalls": 3,
+      "httpRequests": 0,
+      "methods": [
+        "item",
+        "planningSession",
+        "queryActivity"
+      ]
+    },
+    {
+      "operation": "warm.open-original-execution-session",
+      "durationMs": 5.3,
+      "logicalApiCalls": 0,
+      "httpRequests": 0,
+      "methods": []
+    },
+    {
+      "operation": "warm.open-execution-task",
+      "durationMs": 5,
+      "logicalApiCalls": 3,
+      "httpRequests": 0,
+      "methods": [
+        "item",
+        "executionSession",
+        "queryActivity"
+      ]
+    },
+    {
+      "operation": "warm.return-board",
+      "durationMs": 5,
+      "logicalApiCalls": 3,
+      "httpRequests": 0,
+      "methods": [
+        "catalog",
+        "query",
+        "queryActivity"
+      ]
+    }
+  ],
+  "version": {
+    "branch": "v5.2",
+    "commit": "30fe3df",
+    "workingTree": "dirty"
+  },
+  "cleanup": "confirmed",
+  "limits": {
+    "durationMsExclusive": 5000,
+    "logicalApiCallsExclusive": 30
+  },
+  "scope": "Isolated Kanban component browser acceptance; no production HTTP or persistent user dataset measurement.",
+  "packages": {
+    "kanban": "2ea3826",
+    "kanban-ui": "11d6960"
+  },
+  "sourceDigests": {
+    "libraries/kanban/src/queries.ts": "b24618f2f3022ac99f6f3e62d76c910379cdccdd729b9b93a5b1f633a2223225",
+    "libraries/kanban/src/query-groups.ts": "6055e893c9966a7eb7273459831992f93d1aba66ca62b18cef134f4ef2b00e45",
+    "libraries/kanban-ui/src/view.ts": "fb6616b6f16c00e3d06d530870406711ddcd6c72e47bf0919be6c5f71f06715a",
+    "libraries/kanban-ui/src/forms.ts": "bf3f4d7784bb45c71b0ec26596e8def387c6dbbd90cf04cfec040945226635c2",
+    "libraries/kanban-ui/src/index.ts": "57a27d7297b093eaabfc1b9959406de5e2dbc5a3b83df4380776b2df6983c5f0",
+    "scripts/fixtures/kanban-task-hierarchy.ts": "53b4af5a17df5eee5ea06d353295af6e656a956110b74ebf9b0eafafbf906f5c"
+  }
+}

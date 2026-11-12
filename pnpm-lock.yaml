@@ -623,6 +623,9 @@ importers:
       '@nestos/kanban':
         specifier: workspace:*
         version: link:../../libraries/kanban
+      '@nestos/kanban-development':
+        specifier: workspace:*
+        version: link:../kanban-development
       '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../kernel-adapters
@@ -694,6 +697,40 @@ importers:
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(@microsoft/api-extractor@7.55.1(@types/node@20.19.43))(jiti@1.21.7)(postcss@8.5.16)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@20.19.43)(jiti@1.21.7)(jsdom@27.4.0)(tsx@4.20.6)(yaml@2.8.2)
+
+  backend/kanban-development:
+    dependencies:
+      '@nestos/app-contracts':
+        specifier: workspace:*
+        version: link:../../shared/app-contracts
+      '@nestos/common':
+        specifier: workspace:*
+        version: link:../../shared/common
+      '@nestos/git-delivery':
+        specifier: workspace:*
+        version: link:../git-delivery
+      '@nestos/kanban':
+        specifier: workspace:*
+        version: link:../../libraries/kanban
+      '@nestos/llm-flow':
+        specifier: workspace:*
+        version: link:../llm-flow
+      '@nestos/llm-session':
+        specifier: workspace:*
+        version: link:../llm-session
+    devDependencies:
+      '@nestos/vfs-core':
+        specifier: workspace:*
+        version: link:../../libraries/vfs-core
+      '@types/node':
+        specifier: ^20.19.25
+        version: 20.19.43
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

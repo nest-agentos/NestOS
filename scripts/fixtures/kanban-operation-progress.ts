@@ -3,7 +3,7 @@ import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {createKanbanModule,SeqKanbanStore} from '@nestos/kanban';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {KanbanWorkbench} from '@nestos/kanban-ui';
-import {createItemOperations} from '../../backend/app-core/src/kanban/item-operations';
+import {createItemOperations} from '../../backend/kanban-development/src/index';
 const wait=async(ready:()=>boolean)=>{for(let n=0;n<1000;n++){if(ready())return;await new Promise(resolve=>setTimeout(resolve,5));}throw Error('WAIVER_UI_NOT_READY');};
 async function run(){
  const {manager}=await createVFS({rootBackend:new MemoryBackend()}),fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs);

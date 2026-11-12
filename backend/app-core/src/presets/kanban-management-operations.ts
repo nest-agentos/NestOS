@@ -1,8 +1,8 @@
 import {repositoryDeliveryPlan} from '@nestos/git-delivery/policy';
 import {sha256HexSync,t} from '@nestos/common';
 import type {KanbanBoard,KanbanItem} from '@nestos/kanban/contracts';
-import type {OperationScopeProvider,ReviewAdapter,ReviewJob,ReviewOperationsOptions,DeliveryPlan,ReviewSettings} from '../kanban/item-operation-types';
-import {reviewKey,jobKey} from '../kanban/item-operation-types';
+import type {OperationScopeProvider,ReviewAdapter,ReviewJob,ReviewOperationsOptions,DeliveryPlan,ReviewSettings,ResolvedOperationScope} from '@nestos/kanban-development';
+import {reviewKey,jobKey} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {managementReviewAdapter} from './kanban-management-review';
 import type {DevelopmentReviewOptions} from './kanban-development-review';
@@ -26,11 +26,11 @@ class ManagementOperations implements OperationScopeProvider {
         if(!requiresDevelopmentProject(board)||isManagementVerifier(item))return;
         const owner=managementOwner(board,item);if(!owner)return;
         if(owner.id!==item.id)return {owner:{boardId,itemId:owner.id},permittedActions:['accept','cancel']};
-        return {scopes:(await managementScopes({...this.options,projectLabel:this.projectLabel,repositoryKey:this.repositoryKey},board,owner)).map(scope=>({...scope,completed:scope.stage==='cleaned'}))};
+        return {scopes:(await managementScopes({...this.options,projectLabel:this.projectLabel,repositoryKey:this.repositoryKey},board,owner)).map(scope=>({...scope,ready:scope.contributors.every(source=>board.items.some(row=>row.id===source.itemId&&['review','completed'].includes(row.status))),completed:scope.stage==='cleaned'}))};
     };
     deliveryPlan=async(board:KanbanBoard,item:KanbanItem):Promise<DeliveryPlan>=>{
         const base=await this.options.basePlan(board,item),owner=requiresDevelopmentProject(board)?managementOwner(board,item):undefined;
-        return owner&&owner.id!==item.id&&!isManagementVerifier(item)?{steps:['accept'],acceptance:'source',acceptanceLabel:t('kanban.operationHandoff'),acceptanceConfirmation:t('kanban.operationConfirmHandoff')}:base;
+        return owner&&owner.id!==item.id&&!isManagementVerifier(item)?{steps:['accept'],acceptance:'source',acceptanceLabel:t('kanban.operationHandoff'),acceptanceConfirmation:null}:base;
     };
     handoff=async(board:KanbanBoard,item:KanbanItem)=>{
         const owner=requiresDevelopmentProject(board)?managementOwner(board,item):undefined;
@@ -47,7 +47,7 @@ class ManagementOperations implements OperationScopeProvider {
         return hasManagementReceipt(this.options,route.owner,item.id,'deploy');
     };
     close=async()=>{await Promise.all([...this.adapters.values()].map(adapter=>adapter.close?.()));this.adapters.clear();};
-    resolve=async(board:string,item:string,id:string):Promise<Partial<ReviewOperationsOptions>>=>{
+    resolve=async(board:string,item:string,id:string):Promise<ResolvedOperationScope>=>{
         const saved=await this.options.journal.get<ManagementScope>(managementScopeKey(id)),route=await this.describe(board,item);
         const scope=saved??route?.scopes?.find(row=>row.id===id);
         requireValue(scope&&scope.boardId===board&&scope.ownerId===item,'OPERATION_SCOPE_INVALID');

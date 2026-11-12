@@ -2,7 +2,7 @@ import type {IndependentCallService} from '@nestos/llm-session';
 import type {IndependentCallInput} from '@nestos/llm-session/contracts';
 import type {TargetRef, DagRunSpec} from '@nestos/llm-flow/contracts';
 import {nodeOutputEntries} from '@nestos/llm-flow/contracts';
-import type {Kernel, TaskCallResult} from '@nestos/durable-kernel';
+import type {IndependentCallExecutionReader} from '@nestos/llm-session';
 import type {KanbanDiscoveryChange, KanbanScanConnection, KanbanScanInput} from '@nestos/kanban/contracts';
 import type {KanbanScanExecutor} from '@nestos/kanban/discovery';
 import {requireValue} from './validation';
@@ -10,7 +10,7 @@ import {KanbanError} from '@nestos/kanban';
 import {KanbanScanNotStartedError} from '@nestos/kanban/discovery';
 
 interface PublishedOptions {
-    calls: IndependentCallService; kernel: Kernel; target: TargetRef;
+    calls: IndependentCallService; execution:Pick<IndependentCallExecutionReader,'wait'|'settled'>; target: TargetRef;
     /** Prepare an isolated scanner Session, excluded by the project's source catalog. */
     prepareSession(runId: string): Promise<string>;
 }
@@ -31,11 +31,9 @@ export function createPublishedKanbanExecutor(options: PublishedOptions): Kanban
             verifyScanPlan(prepared.plan.task, input.connection);
         } catch (error) {throw new KanbanScanNotStartedError(error instanceof KanbanError ? error.code : 'SCANNER_PREPARATION_FAILED');}
         const admission = await options.calls.submitPreparedTaskCall(request);
-        const caller = await options.kernel.attachTask(sessionId, admission.submission.task.taskId);
-        const exit = await caller.wait({until: 'settled', timeoutMs: 150000});
-        const result = exit.output as TaskCallResult | undefined;
-        requireValue(exit.status === 'succeeded' && result?.exit.status === 'succeeded', 'SCANNER_FLOW_FAILED');
-        return parseOutput(result.exit.output);
+        const result=await options.execution.wait(admission,150000);
+        requireValue(result.outcome==='succeeded','SCANNER_FLOW_FAILED');
+        return parseOutput(result.output);
     }};
 }
 function parseOutput(output: unknown): KanbanDiscoveryChange[] | import('@nestos/kanban/contracts').KanbanDiscoveryResult {
@@ -73,8 +71,5 @@ function verifyScanPlan(value: unknown, connection: KanbanScanConnection): void 
 
 async function hasSettled(options: PublishedOptions, input: KanbanScanInput): Promise<boolean> {
     const sessionId = await options.prepareSession(input.runId);
-    const callers = (await options.kernel.listSessionTasks(sessionId)).filter(task => task.program.kind === 'kernel.call');
-    if (!callers.length) return false;
-    for (const caller of callers) if (!(await (await options.kernel.attachTask(sessionId, caller.id)).stat()).settled) return false;
-    return true;
+    return options.execution.settled(sessionId);
 }

@@ -1,0 +1,6 @@
+import {selectDeliverySteps,type AutomaticDeliveryPolicy} from '@nestos/kanban/integration';
+export const developmentDeliveryPolicy:AutomaticDeliveryPolicy={steps:['build','deploy','accept','analyze','merge','cleanup'],finalizeAction:'cleanup',handoffAction:'accept',refreshAction:'analyze',refreshableActions:['analyze','merge'],refreshCodes:['OPERATION_SOURCE_CHANGED_REANALYZE','OPERATION_TARGET_CHANGED_REANALYZE','MERGE_PLAN_SOURCE_CHANGED'],unstartedCodes:['OPERATION_ORIGINAL_SESSION_BUSY','OPERATION_WORKSPACE_BUSY','OPERATION_STALE_REFRESH']};
+export const operationSteps=(configured=developmentDeliveryPolicy.steps,ordering?:'configured')=>selectDeliverySteps(configured,developmentDeliveryPolicy.steps,ordering);
+
+export const developmentAnalysisPolicy={analysisAction:'analyze',integrationAction:'merge',refreshCodes:developmentDeliveryPolicy.refreshCodes,sourceChangedCode:'OPERATION_SOURCE_CHANGED_REANALYZE',targetChangedCode:'OPERATION_TARGET_CHANGED_REANALYZE',staleCode:'MERGE_PLAN_SOURCE_CHANGED',initialPrerequisites:['accept']};
+export const developmentAuthority={confirmationActions:['deploy','merge'],followUpActions:{build:'deploy'},acceptanceAction:'accept',canonicalSteps:developmentDeliveryPolicy.steps};

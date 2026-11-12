@@ -9,7 +9,7 @@ import { WORKSPACE_GROUPS } from './workspace-packages.mjs';
 
 const application = new Set(['@nestos/app-core', '@nestos/app-shell', '@nestos/app-settings']);
 const coreDependencies = new Set(['app-contracts', 'common', 'llm-context', 'vfs-core', 'durable-kernel', 'kernel-adapters',
-    'llm-flow', 'llm-session', 'llm-tasks', 'tools', 'driver-llm', 'vfs-sync', 'cells-driver', 'kanban', 'mail', 'git-delivery'].map(name => '@nestos/' + name));
+    'llm-flow', 'llm-session', 'llm-tasks', 'tools', 'driver-llm', 'vfs-sync', 'cells-driver', 'kanban', 'kanban-development', 'mail', 'git-delivery'].map(name => '@nestos/' + name));
 // Portable codecs are allowed explicitly; native I/O still requires host ports.
 coreDependencies.add('js-yaml');
 const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionStorage', 'navigator',
@@ -17,6 +17,8 @@ const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionSt
 
 export function dependencyError(source, target) {
     if (source === target) return;
+    if (['@nestos/durable-kernel','@nestos/kernel-adapters','@nestos/llm-tasks','@nestos/llm-flow','@nestos/llm-session'].includes(source)
+        && ['@nestos/kanban','@nestos/kanban-ui','@nestos/git-delivery'].includes(target)) return 'execution mechanisms must not depend on Kanban or delivery policy';
     if (source === '@nestos/git-delivery' && !['@nestos/common','@nestos/vfs-core','@nestos/tools'].includes(target)) return 'git-delivery owns Git rules and receives execution through ports; it must not depend on application or execution runtimes';
     if (source === '@nestos/device-tty' && target.startsWith('@nestos/')) return 'device-tty must use owned contracts and must not depend on application packages';
     if (source === '@nestos/image-parser' && target.startsWith('@nestos/') && target !== '@nestos/vfs-core') return 'image-parser only accepts optional VFS host adaptation';
@@ -38,6 +40,7 @@ export function dependencyError(source, target) {
     if (source === '@nestos/mdxeditor' && target.startsWith('@nestos/') && target !== '@nestos/ui-common') return 'mdxeditor must receive host capabilities through its public ports';
     if (source === '@nestos/vfs-ui' && !['@nestos/vfs-core','@nestos/ui-common'].includes(target)) return 'vfs-ui must not depend on host packages; use its public ports';
     if (source === '@nestos/mail' && !['@nestos/vfs-core', '@nestos/ui-common', '@nestos/mdxeditor'].includes(target)) return 'mail only depends on VFS and UI ports';
+    if (source === '@nestos/kanban-development' && !['@nestos/kanban','@nestos/git-delivery','@nestos/common','@nestos/llm-session','@nestos/llm-flow','@nestos/app-contracts'].includes(target)) return 'software-development is an operation plugin and must use public host ports';
     if (source === '@nestos/kanban' && target !== '@nestos/vfs-core') return 'kanban may only depend on vfs-core; execution and application policy require host ports';
     if (source === '@nestos/kanban-ui' && !['@nestos/kanban','@nestos/ui-common','@nestos/mdxeditor'].includes(target)) return 'kanban-ui may only depend on Kanban contracts, ui-common and mdxeditor';
     if (source === '@nestos/app-core' && !coreDependencies.has(target)) return 'app-core may only depend on its platform-neutral capabilities';
@@ -62,6 +65,9 @@ function ownerOf(file, packages) {
 }
 
 export function importError(source, file, specifier, packages) {
+    if (source.name === '@nestos/app-core' && file.startsWith(resolve(source.dir,'src/kanban')+sep)
+        && (specifier === '@nestos/durable-kernel' || specifier.startsWith('@nestos/durable-kernel/')))
+        return 'Kanban adapters must consume Session execution observations, not Kernel tasks or effects';
     if (source.name === '@nestos/image-parser' && specifier === '@nestos/vfs-core' && file !== resolve(source.dir, 'src/vfs.ts'))
         return 'image-parser VFS types and runtime stay in the optional vfs entry';
     if (source.name === '@nestos/llm-ui' && !specifier.startsWith('.') && !['@nestos/mdxeditor', '@nestos/ui-common', '@nestos/ui-common/navigation.css'].includes(specifier))

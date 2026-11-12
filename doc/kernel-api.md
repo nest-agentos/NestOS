@@ -934,3 +934,6 @@ Flow 声明 `flow.scheduler`，调用意图声明 `session.flow.admission`，独
 ### 执行树只读结算投影
 
 `taskExecutionStat(task, tasks)` 只核对相同 Session/rootTaskId 的树，返回 settled、indeterminate 和经过安全分类的 code。根 Task 有 exit 不能代替后代 Effect 的收尾；缺少原 Task 或存在 leased/indeterminate/cleanupPending 时不报告 settled。该函数不启动、恢复或取得执行租约。
+
+
+`resolveEffect({requestId,effectId,outcome:{type:"reconcile"}})` 用于只重新核对原未知 Effect，稳定请求幂等且不授予 replayAuthorized。核对适配器缺失时保持未知，不按 idempotent-retry 绕过；适配器必须取得真实结果或正式未启动证据才能继续推进。权限、祖先取消、暂停、原操作身份及执行期限约束沿原链路保留。

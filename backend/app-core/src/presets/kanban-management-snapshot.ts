@@ -1,6 +1,6 @@
 import {combineGitSnapshots,type GitSnapshot} from '@nestos/git-delivery/snapshots';
 import type {KanbanBoard,KanbanItem,KanbanService} from '@nestos/kanban/contracts';
-import type {ReviewSnapshot} from '../kanban/item-operation-types';
+import type {ReviewSnapshot} from '@nestos/kanban-development';
 import {requireValue} from '../kanban/validation';
 import {managementTaskOwner as managementOwner} from '@nestos/kanban/integration';
 import {type ManagementScope} from './kanban-management-scope-catalog';

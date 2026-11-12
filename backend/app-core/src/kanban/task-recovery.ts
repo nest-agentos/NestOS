@@ -1,3 +1,4 @@
+import {resumeCompletedResults} from './task-recovery-results';
 import {recoveryWorkspace} from './recovery-workspace';
 import {sha256HexSync} from '@nestos/common';
 import {resumeCollaborationRepairs,journalCommand} from '@nestos/kanban/integration';
@@ -12,7 +13,7 @@ export function createTaskRecovery(options:TaskRecoveryOptions) {
     const recoverTask=(boardId:string,request:KanbanTaskRecoveryRequest)=>serial(request.operationId,()=>recover(options,boardId,request));
     const channels=taskRecoveryChannels(options,{recoverTask,inspect:taskRecoveryState,active:()=>!stopped});
     return {taskRecovery:(board:string,item:string)=>taskRecoveryState(options,board,item),recoverTask,openTaskRecovery:channels.open,
-        scan:async()=>{await channels.recover();await resumeRepairs(options,()=>!stopped,recoverTask);for(const row of await options.journal.find<RecoveryIntent>('task-recovery-operation:',value=>!value.done)){if(stopped)return;await serial(row.value.request.operationId,()=>settle(options,row.value));}},
+        scan:async()=>{await channels.recover();await resumeCompletedResults(options,{active:()=>!stopped,inspect:taskRecoveryState,recoverTask});await resumeRepairs(options,()=>!stopped,recoverTask);for(const row of await options.journal.find<RecoveryIntent>('task-recovery-operation:',value=>!value.done)){if(stopped)return;await serial(row.value.request.operationId,()=>settle(options,row.value));}},
         quiesce:async()=>{stopped=true;await channels.close();await Promise.allSettled([...pending.values()]);}};
 }
 async function recover(options:TaskRecoveryOptions,boardId:string,request:KanbanTaskRecoveryRequest):Promise<KanbanTaskRecoveryResult> {

@@ -3,9 +3,9 @@ import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {createKanbanModule,SeqKanbanStore} from '@nestos/kanban';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {KanbanCommand,KanbanItemOperationRequest} from '@nestos/kanban/contracts';
-import {createItemOperations} from '../src/kanban/item-operations';
-import {operationDependencies,operationSkipDependencies,affectedOperations,effectiveOperationWaivers} from '../src/kanban/item-operation-skips';
-import type {ReviewOperationsOptions} from '../src/kanban/item-operation-types';
+import {createItemOperations} from '@nestos/kanban-development';
+import {operationDependencies,operationSkipDependencies,affectedOperations,effectiveOperationWaivers} from '@nestos/kanban-development';
+import type {ReviewOperationsOptions} from '@nestos/kanban-development';
 const closes:Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});
 async function fixture(){

@@ -1,3 +1,4 @@
+import {createIndependentCallExecutionReader} from '@nestos/llm-session';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {memoryChannels} from './helpers/session-channels';
 import {afterEach, expect, it, vi} from 'vitest';
@@ -25,7 +26,8 @@ it('runs cancellation finalization independently and reconciles a lost response 
     const channels=memoryChannels(),remote={sessionChannel:channels.channel};
     const options = {remote,journal, events, authorize: async () => cancelled ? 'cancelled' as const : authorized, stop, calls: calls as never, prepareSession: vi.fn(async (id: string) => id), kernel: {
         task: async () => ({id: 'caller', sessionId: hookId, version: 1, effects: {}, exit: {status: 'succeeded', output: {exit: {status: 'succeeded'}}}}) as unknown as TaskRecord}};
-    const first = developmentLifecycle(options);
+    Object.assign(options,{execution:createIndependentCallExecutionReader(options as never)});
+    const first = developmentLifecycle(options as never);
     const item = {id: 'item', title: 'Task'} as KanbanItem;
     await first.enqueue('board', dispatch, item, {outcome: 'cancelled'});
     await first.enqueue('board', dispatch, item, {outcome: 'cancelled'});
@@ -33,7 +35,7 @@ it('runs cancellation finalization independently and reconciles a lost response 
     await first.scan(); expect(calls.submitPreparedTaskCall).not.toHaveBeenCalled();
     authorized = true;
     await first.scan(); await first.dispose();
-    const second = developmentLifecycle(options); closes.push(() => second.dispose());
+    const second = developmentLifecycle(options as never); closes.push(() => second.dispose());
     await second.scan(); await second.scan();
     expect(calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
     expect(calls.prepareTaskCall).toHaveBeenCalledTimes(1);

@@ -3,8 +3,7 @@ import {journalCommand,safeCode} from '@nestos/kanban/integration';
 import type {KanbanBoard,KanbanItem,KanbanItemOperationRequest,KanbanItemOperation,KanbanOperationWaiver} from '@nestos/kanban/contracts';
 import type {DeliveryPlan,ReviewJob,ReviewOperationsOptions} from './item-operation-types';
 import {requireValue} from './validation';
-const defaultSteps=['build','deploy','accept','analyze','merge','cleanup'];
-export const operationSteps=(configured:string[]=defaultSteps,ordering?:'configured')=>(ordering==='configured'?[...new Set(configured)]:defaultSteps).filter(id=>defaultSteps.includes(id)&&configured.includes(id));
+import {operationSteps} from './development-operation-policy';
 export function operationGroup(id:string):NonNullable<KanbanItemOperation['group']> {
     const stage=id==='analyze'||id==='cleanup'?'merge':id;
     return {id:stage,label:t(('kanban.operationStage.'+stage) as Parameters<typeof t>[0])};

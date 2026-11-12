@@ -6,7 +6,7 @@ import type {KanbanItem, KanbanBoard, KanbanWorkflowState} from '@nestos/kanban/
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {relatedKanbanSessions} from '../src/kanban/related-sessions';
 import {analysisHistory} from '@nestos/kanban/integration';
-import {relatedExecutionReader} from '../src/kanban/related-session-executions';
+import {createSessionExecutionReader as relatedExecutionReader} from '../src/session/execution-facts';
 import {developmentSessionResources} from '../src/presets/kanban-work-resources';
 import {harnessExecutionJournalKey} from '../src/projects/harness-execution-journal';
 import {developmentLifecycleSessions} from '../src/presets/kanban-development-lifecycle';
@@ -21,7 +21,7 @@ async function fixture() {
     const kernel = {inspectSession:vi.fn(async (session:string)=>({snapshot:async()=>({tasks:tasks.get(session)??[]}),
         getShared:async(key:string)=>shared.has(session+'/'+key)?{version:1,value:shared.get(session+'/'+key)}:undefined}))};
     const calls = {inspectTaskCallSubmission:vi.fn(async (input:any)=>({executionSessionId:'node-'+input.request.expectedSessionId}))};
-    return {fs,journal,bodies,shared,tasks,repository,kernel,calls};
+    return {fs,journal,bodies,shared,tasks,repository,kernel,calls,executionReader:()=>relatedExecutionReader({repository,kernel} as never)};
 }
 const board = {id:'b'} as KanbanBoard;
 const item = {id:'work',externalRefs:[{system:'nestos-execution-session',id:'main',revision:'d1'},

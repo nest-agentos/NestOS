@@ -1,3 +1,6 @@
+import {createIndependentCallExecutionReader,createSessionActivityReader} from '@nestos/llm-session';
+import {originalSession} from '../src/projects/original-execution-session';
+import {createSessionExecutionReader} from '../src/session/execution-facts';
 import {promptData} from './helpers/prompt-data';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {readChannelResult} from '../src/run/channel-results';
@@ -48,13 +51,13 @@ async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: E
         const output = planner ? {message: {content: invalid ? 'INVALID PRIVATE' : JSON.stringify(analysis??{ready: true, dependencies: item.id === 'second' ? ['first'] : [], reason: 'Uses the prerequisite result',
             estimate: {complexity: 1, workUnits: 1, durationMs: 60000, confidence: 'high'}})}} : {message: {content: 'Verified result'}};
         return {id, sessionId: _session, version: 1, effects: {}, exit: {status: 'succeeded', output: {exit: {status: 'succeeded', output}}}} as unknown as TaskRecord;
-    })} as unknown as PersonalKanbanAutomationOptions['kernel'];
+    })} as unknown as import('@nestos/durable-kernel').Kernel;
     const fileJournal=new KanbanAutomationJournal(fs, kanbanJournalOptions);await fileJournal.open();
     const preparation = vi.fn<NonNullable<PersonalKanbanAutomationOptions['prepareAnalysis']>>(async () => {throw prepareFailure;});
-    const options: PersonalKanbanAutomationOptions = {prepareAnalysis: prepareFailure ? preparation : undefined, observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:vi.fn(async id=>{const output=await readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal);return output===undefined?undefined:{state:'succeeded',output};}),calls, kernel, sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
+    const options: PersonalKanbanAutomationOptions = {prepareAnalysis: prepareFailure ? preparation : undefined, observeWork:async input=>input.observation.outcome==='succeeded'?{...input.observation,outputs:await fileJournal.artifact(input.dispatch.id,{file:'result.yaml',content:'Verified result'})}:input.observation,readAnalysisOutput:vi.fn(async id=>{const output=await readChannelResult({sessionChannel:channels.channel},'project',id,fileJournal);return output===undefined?undefined:{state:'succeeded',output};}),calls,execution:createIndependentCallExecutionReader({calls,kernel}),originalSession:input=>originalSession({calls,kernel},input),executionReader:()=>createSessionExecutionReader({repository:options.sessions,kernel}), sessions: {ensureSession: vi.fn(async id => id), getManifest: vi.fn(async id => ({id, title: id})), listSummaries: async () => []} as unknown as PersonalKanbanAutomationOptions['sessions'],
         prepareSession: vi.fn(async () => true), catalog: vi.fn(async () => targets)};
     const diagnostics = new DiagnosticJournal();
-    const open = () => createPersonalKanban(fs, events, diagnostics, options.sessions, kernel, options);
+    const open = () => createPersonalKanban(fs, events, diagnostics, options.sessions, createSessionActivityReader(kernel), options);
     const service = await open(); disposers.push(() => service.dispose());
     await service.create({id: 'board', title: 'Work', scope: {kind: 'system'}, members: [{kind: 'human', id: 'admin', responsibility: 'Manage', roles: ['worker', 'reviewer', 'coordinator']}], policy: {requireEstimate: true}});
     const command = async (value: KanbanCommand, api = service) => api.execute('board', {operationId: randomUUID(), expectedRevision: (await api.read('board')).revision, command: value});

@@ -1,7 +1,8 @@
+import {developmentDeliveryPolicy} from '@nestos/kanban-development';
 import type {KanbanRecordPage} from '@nestos/kanban/contracts';
 import {recordFinalization,safeCode,type KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {randomUUID} from '@nestos/common';
-import {automaticDeliveryStatuses} from './automatic-delivery';
+import {automaticDeliveryStatuses} from '@nestos/kanban/integration';
 
 /** Finalization facts supplement completion; they never reopen a settled task group. */
 export async function recordFollowUps(journal:KanbanAutomationJournal,board:string,page:KanbanRecordPage,status?:(board:string,item:string)=>Promise<import('@nestos/kanban/contracts').KanbanItemOperations['automatic']>):Promise<KanbanRecordPage> {
@@ -10,7 +11,7 @@ export async function recordFollowUps(journal:KanbanAutomationJournal,board:stri
     const started=Date.now(),operationId=randomUUID();
     let statuses:Awaited<ReturnType<typeof automaticDeliveryStatuses>>,readFailed=false;
     try {
-        statuses=status?await Promise.all(targets.map(target=>status(target.boardId,target.itemId))):await automaticDeliveryStatuses(journal,targets);
+        statuses=status?await Promise.all(targets.map(target=>status(target.boardId,target.itemId))):await automaticDeliveryStatuses(journal,targets,developmentDeliveryPolicy.steps);
         journal.diagnostic({operationId,boardId:board,stage:'record.follow-ups.read',result:'success',count:targets.length,durationMs:Date.now()-started});
     }catch(error){readFailed=true;const code=safeCode(error,'RECORD_FOLLOW_UPS_FAILED');journal.diagnostic({operationId,boardId:board,stage:'record.follow-ups.read',result:'failure',code,durationMs:Date.now()-started});statuses=targets.map(()=>({state:'blocked',stage:'unknown',code}));}
     return {...page,items:page.items.map(record=>{

@@ -1,6 +1,6 @@
 import {t} from '@nestos/common';
 import {requireValue} from './errors';
-export interface DeliveryPlan {ordering?:'configured';manualAfter?:string;steps:string[];acceptance:'source'|'runtime';acceptanceLabel?:string;acceptanceConfirmation?:string}
+export interface DeliveryPlan {ordering?:'configured';manualAfter?:string;steps:string[];acceptance:'source'|'runtime';acceptanceLabel?:string;acceptanceConfirmation?:string|null}
 export interface DeliveryItem {externalRefs?:Array<{system:string;id:string;revision?:string}>}
 export interface FrozenDeliveryPolicy {prompts:{files:Array<{name:string;content:string}>}}
 export interface DeliveryProfile extends DeliveryPlan {id:string;label:string;readOnly?:boolean}
@@ -19,11 +19,11 @@ export function deliveryProfile(policy:FrozenDeliveryPolicy,item:DeliveryItem):D
     const selected=deliveryPolicy(policy)?.profiles.find(profile=>profile.id===refs[0].id);
     requireValue(refs.length===1&&refs[0].revision==='1'&&selected,'DELIVERY_PROFILE_UNAVAILABLE');return selected.id==='source'?{...selected,acceptanceLabel:t('kanban.operationAcceptSource'),acceptanceConfirmation:t('kanban.operationConfirmSource')}:selected;
 }
-/** Frozen decision choices override the default release-and-independent-verifier shape. */
+/** Frozen decision choices override the default release without optional verification. */
 export function decisionDeliveryPolicy(policy:FrozenDeliveryPolicy,context:unknown):Policy|undefined {
     const base=deliveryPolicy(policy);if(!base)return;
     const snapshot=(context as {decision?:{snapshot?:{verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'}}})?.decision?.snapshot;
-    const verificationLevel=snapshot?.verificationLevel??'full',deliveryMode=snapshot?.deliveryMode??'release';
+    const verificationLevel=snapshot?.verificationLevel??'none',deliveryMode=snapshot?.deliveryMode??'release';
     requireValue(['full','quick','none'].includes(verificationLevel)&&['release','source','build'].includes(deliveryMode),'DELIVERY_PREFERENCES_INVALID');
     requireValue(verificationLevel==='none'?deliveryMode==='source'||deliveryMode==='build'||deliveryMode==='release':deliveryMode==='release','DELIVERY_PREFERENCES_INVALID');
     return {...base,verificationLevel,deliveryMode,instruction:base.preferenceInstruction??base.instruction};
@@ -62,6 +62,7 @@ export function verifyReadOnlyDelivery(record:{context?:unknown},repositories:im
 /** Select the integrated repository chain from frozen contributor policies. */
 export function repositoryDeliveryPlan(plans:DeliveryPlan[]):DeliveryPlan {
     const build=plans.some(plan=>plan.steps.includes('build')),deploy=plans.some(plan=>plan.steps.includes('deploy'));
-    return {ordering:'configured',steps:['analyze','merge',...build?['build']:[],...deploy?['deploy']:[],'accept','cleanup'],acceptance:deploy?'runtime':'source',
-        ...(plans.some(plan=>plan.manualAfter==='build')?{manualAfter:'build'}:{})};
+    const manual=plans.some(plan=>plan.manualAfter==='build');
+    const steps=manual?['build','analyze','merge',...deploy?['deploy']:[],'accept','cleanup']:['analyze','merge',...build?['build']:[],...deploy?['deploy']:[],'accept','cleanup'];
+    return {ordering:'configured',steps,acceptance:deploy?'runtime':'source',...(manual?{manualAfter:'build'}:{})};
 }

@@ -27,9 +27,10 @@ it('resolves project overrides, freezes original contents and verifies remote pu
     await fs.driver.writeContent(directory + '/prompts/task.md', 'Tampered');
     await expect(publishPromptBundle(fs, directory, restored.prompts, {commit: restored.commit})).rejects.toMatchObject({code: 'PROMPT_SNAPSHOT_CHANGED'});
 });
-it('defaults to uncommitted changes and rejects invalid paths and options', async () => {
+it('defaults to Session-owned local commits while preserving explicit changes-only policies', async () => {
     const {fs, journal} = await fixture();
-    expect((await developmentPolicy(journal, fs, fs, 'default')).commit).toBe('changes');
+    expect((await developmentPolicy(journal, fs, fs, 'default')).commit).toBe('worktree');
+    expect((await developmentPolicy(journal,fs,fs,'explicit',{commit:'changes'})).commit).toBe('changes');
     await expect(developmentPolicy(journal, fs, fs, 'bad-profile', {profile: '../escape'})).rejects.toMatchObject({code: 'DEVELOPMENT_POLICY_INVALID'});
     await expect(developmentPolicy(journal, fs, fs, 'bad-module', {modules: '../other'})).rejects.toMatchObject({code: 'MODULE_PATH_INVALID'});
     await expect(developmentPolicy(journal, fs, fs, 'bad-mode', {commit: 'push'})).rejects.toMatchObject({code: 'DEVELOPMENT_POLICY_INVALID'});

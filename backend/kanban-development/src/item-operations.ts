@@ -1,21 +1,29 @@
-import {invalidateReviewAnalysis} from './item-operation-analysis';
+import {developmentAnalysisPolicy,developmentAuthority} from './development-operation-policy';
+import {developmentDeliveryPolicy} from './development-operation-policy';
+import {requireOperationAuthority,type OperationOrigin} from '@nestos/kanban/integration';
+import {operation,latestReviewJob as latest} from './item-operation-projection';
+import type {ReviewContext as Context} from './item-operation-types';
+import {discoverOperationScopes} from './item-operation-discovery';
+import {invalidateReviewAnalysis,prepareAutomaticReanalysis} from '@nestos/kanban/integration';
 import {readOperationScopes,operationRequestOptions,scopedOperationOptions,scopedFinalizationStatus} from './item-operation-scopes';
-import {finishReviewCleanup,reviewCleanupKey,type ReviewCleanup} from './item-operation-cleanup';
-import {cancellationKey,pendingCancellation,cancellationSupported,requestCancellation,scanCancellations,type ReviewCancellation} from './item-operation-cancellation';
-import {operationDependencies,operationSteps,operationGroup,affectedOperations,effectiveOperationWaivers,projectOperationSkips,skipItemOperations,applySkipIntent} from './item-operation-skips';
-import {automaticDelivery,automaticDeliveryStatus} from './automatic-delivery';
+import {finishReviewCleanup,reviewCleanupKey,type ReviewCleanup} from '@nestos/kanban/integration';
+import {cancellationKey,pendingCancellation,cancellationSupported,requestCancellation,scanCancellations,type ReviewCancellation} from '@nestos/kanban/integration';
+import {operationDependencies,operationGroup,affectedOperations,effectiveOperationWaivers,projectOperationSkips,skipItemOperations,applySkipIntent} from './item-operation-skips';
+import {automaticDelivery,automaticDeliveryStatus} from '@nestos/kanban/integration';
 import {safeCode,journalCommand} from '@nestos/kanban/integration';
 import {sha256HexSync, t} from '@nestos/common';
-import type {KanbanItemOperations, KanbanItemOperation, KanbanItemOperationRequest, KanbanItemOperationBinding, KanbanBoard, KanbanItem, KanbanSessionAssociation} from '@nestos/kanban/contracts';
+import type {KanbanItemOperations, KanbanItemOperation, KanbanItemOperationRequest, KanbanItemOperationBinding, KanbanItem, KanbanSessionAssociation} from '@nestos/kanban/contracts';
 import {automationTarget, automationCatalog} from './automation-targets';
 import {requireValue} from './validation';
 import {prepareReviewJob, advanceReviewJob} from './item-operation-jobs';
-import {reviewKey, jobKey, type ReviewJob, type ReviewSettings, type ReviewOperationsOptions, type ReviewAction, type MergePlan} from './item-operation-types';
+import { type ReviewJob, type ReviewSettings, type ReviewOperationsOptions, type ReviewAction, type MergePlan} from './item-operation-types';
+import {reviewKey, jobKey} from '@nestos/kanban/integration';
 
 const actions: ReviewAction[] = ['build', 'deploy', 'accept', 'analyze', 'merge'];
 const initial = (): ReviewSettings => ({revision: 0, bindings: {}, jobs: [], receipts: {}});
-interface Context {scoped:boolean;cleanup?:ReviewCleanup;deliveryPlan?:import('./item-operation-types').DeliveryPlan;board: KanbanBoard; item: KanbanItem; archived: boolean; settings: ReviewSettings; jobs: ReviewJob[]; cancellations:ReviewCancellation[]}
-export function createItemOperations(options: ReviewOperationsOptions) {
+
+export function createItemOperations(input: ReviewOperationsOptions) {
+    const options=input;options.uncancellableActions??=['accept'];
     let stopped = false; const tails = new Map<string, Promise<unknown>>();
     const queue = <T>(board: string, item: string, work: () => Promise<T>, lane='run'): Promise<T> => {
         requireValue(!stopped, 'SERVICE_STOPPING'); const key = JSON.stringify([board,item,lane]);
@@ -27,18 +35,23 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         const result=await work(await operationRequestOptions(options,board,request));
         return request.scopeId?read(board,request.itemId):result;
     };
-    const createAutomatic=(scoped:ReviewOperationsOptions)=>automaticDelivery({...scoped,handoff:scoped.scopes?.handoff,
-        automatic:scoped.automatic?async(board,item)=>{const scopes=(await scoped.scopes?.describe(board.id,item.id))?.scopes;return (!scopes||scopes.length>0&&scopes.every(scope=>scope.completed))&&!!await scoped.automatic?.(board,item);}:undefined,
-        confirmActions:scoped.scopeId?['merge','accept']:undefined,settle:(board,item)=>settleDeliveryAcceptance(scoped,board,item),
+    const createAutomatic=(scoped:ReviewOperationsOptions)=>automaticDelivery({...scoped,policy:developmentDeliveryPolicy,handoff:scoped.scopes?.handoff,
+        automatic:scoped.automatic||scoped.scopes?.handoff?async(board,item)=>{
+            const route=await scoped.scopes?.describe(board.id,item.id);
+            if(route?.owner&&scoped.scopes?.handoff)return true;
+            const scopes=route?.scopes;return (!scopes||scopes.length>0&&scopes.every(scope=>scope.completed))&&!!await scoped.automatic?.(board,item);
+        }:undefined,
+        reanalysis:(board,item,id)=>queue(board,item,()=>prepareAutomaticReanalysis({...scoped,policy:developmentAnalysisPolicy},board,item,id)),
+        settle:(board,item)=>settleDeliveryAcceptance(scoped,board,item),
         target:scoped.automaticTarget,plan:scoped.deliveryPlan,cleanup:(board,item,id)=>cleanupAfterSubmission(scoped,board,item,id),active:()=>!stopped,
         report:scoped.reportAutomatic,retryPrecondition:(board,item,action,code)=>recoverAcceptancePrecondition(scoped,board,item,action,code),
-        view:(board,item)=>queue(board,item,async()=>view(scoped,await load(scoped,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(scoped,board,request,true))});
+        view:(board,item)=>queue(board,item,async()=>view(scoped,await load(scoped,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(scoped,board,request,'automatic'))});
     const automatic=createAutomatic(options);
     const contexts=async(board:string,item:string)=>{
         const route=await options.scopes?.describe(board,item),scopes=route?.scopes??[];
         return Promise.all([load(options,board,item,false),...scopes.map(async scope=>load(await scopedOperationOptions(options,board,item,scope.id),board,item,false))]);
     };
-    return {finalizationStatus:(board:string,item:string)=>scopedFinalizationStatus(options,board,item),deliveryReady:async(board:string,item:KanbanItem)=>(await options.scopes?.dependencyReady?.(board,item))??automatic.ready(board,item),itemOperations: (board: string, item: string) => {
+    return {applies:(board:import('@nestos/kanban/contracts').KanbanBoard,item:KanbanItem)=>options.adapter.supports?.(board,item)!==false,finalizationStatus:(board:string,item:string)=>scopedFinalizationStatus(options,board,item),deliveryReady:async(board:string,item:KanbanItem)=>options.adapter.supports?.(await options.service.read(board),item)===false?true:(await options.scopes?.dependencyReady?.(board,item))??automatic.ready(board,item),itemOperations: (board: string, item: string) => {
         requireValue(!stopped, 'SERVICE_STOPPING');
         return read(board,item);
     },
@@ -47,7 +60,8 @@ export function createItemOperations(options: ReviewOperationsOptions) {
         async scan() {
             await scanCancellations(options,()=>!stopped);
             for(const intent of await options.journal.get<Array<{key:string;board:string}>>('review-skip-intents')??[]){if(stopped)return;try{await applySkipIntent(options,intent.key,intent.board);}catch{/* The frozen intent retains its failure; other scopes must continue. */}}
-            for (const scope of await options.journal.get<Array<{board: string; item: string;scopeId?:string}>>('review-operation-scopes') ?? []) {
+            const registered=await options.journal.get<Array<{board:string;item:string;scopeId?:string}>>('review-operation-scopes')??[];
+            for (const scope of registered) {
                 if (stopped) return;
                 const started=Date.now();try{
                 await queue(scope.board, scope.item, async () => {const scoped=await scopedOperationOptions(options,scope.board,scope.item,scope.scopeId);const context = await load(scoped, scope.board, scope.item, false);
@@ -56,6 +70,7 @@ export function createItemOperations(options: ReviewOperationsOptions) {
                 if(!stopped&&scope.scopeId){const scoped=await scopedOperationOptions(options,scope.board,scope.item,scope.scopeId);await createAutomatic(scoped).scanScope(scope.board,scope.item);}
                 }catch(error){options.log({operationId:scope.scopeId??scope.item,stage:'operation.scope.scan',result:'failure',code:safeCode(error,'OPERATION_OBSERVATION_FAILED'),durationMs:Date.now()-started});}
             }
+            await discoverOperationScopes(options,registered,()=>!stopped,(scoped,board,item)=>createAutomatic(scoped).scanScope(board,item));
             if(!stopped)await automatic.scan();
         },
         guardResource: <T>(board: string, item: string, work: () => Promise<T>) => queue(board, item, async () => {
@@ -78,12 +93,6 @@ async function load(options: ReviewOperationsOptions, board: string, item: strin
     const cancellations=(await options.journal.getMany<ReviewCancellation>(jobs.map(job=>cancellationKey(job.id)))).filter((row):row is ReviewCancellation=>!!row);
     requireValue(cancellations.every(row=>row.boardId===board&&row.itemId===item&&jobs.some(job=>job.id===row.runId)),'OPERATION_SCOPE_MISMATCH');
     return {scoped:!!options.scopeId,cleanup,cancellations,deliveryPlan:await options.deliveryPlan?.(definition,entry.item),board: definition, item: entry.item, archived: !!entry.archive, settings, jobs};
-}
-function latest(context:Context,action:ReviewAction):ReviewJob|undefined {
-    const job=context.jobs.filter(row=>row.action===action).at(-1);if(!job||job.phase!=='settled')return job;
-    const steps=operationSteps(context.deliveryPlan?.steps,context.deliveryPlan?.ordering),ancestors=steps.slice(0,steps.indexOf(action));
-    const position=context.jobs.indexOf(job);
-    return context.jobs.some((row,index)=>index>position&&ancestors.includes(row.action))?undefined:job;
 }
 function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision,context.cleanup,context.deliveryPlan,context.cancellations, context.jobs.map(job => [job.id, job.phase, job.state, job.code,job.result,job.followUp?.state,job.followUp?.code])]));}
 async function view(options: ReviewOperationsOptions, context: Context): Promise<KanbanItemOperations> {
@@ -111,48 +120,10 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     });
     const halted=operationHalt(context,activeWaivers);
     const audit={...(context.settings.invalidatedAnalysis?{code:context.settings.invalidatedAnalysis.code}:{}),...(halted?{halted:{runId:halted.runId,state:halted.state==='cancelled'?'cancelled' as const:'cancelling' as const}}:{}),waivers:activeWaivers,waiverHistory:context.item.operationWaivers,acceptance:context.item.acceptanceResult,skippedActions:[...new Set(activeWaivers.flatMap(row=>row.operations.map(op=>op.id)))].filter(id=>{const entry=operations.find(row=>row.id===id);return entry?entry.state==='skipped':!active;})};
-    const automatic=await automaticDeliveryStatus(options.journal,context.board.id,context.item.id,options.scopeId);
+    const automatic=await automaticDeliveryStatus(options.journal,context.board.id,context.item.id,options.scopeId,developmentDeliveryPolicy.steps);
     if(options.adapter.prepareOperation)return {revision:revision(context),operations,automatic,...audit};
     const catalog = await options.catalog(), flows = catalog.entries.filter(entry => entry.target.kind === 'flow' && entry.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'));
     return {revision: revision(context),operations,automatic,...audit,targets: automationCatalog({...catalog, entries: flows}).targets};
-}
-function prerequisitesSatisfied(context:Context,action:string,waivers:NonNullable<KanbanItem['operationWaivers']>):boolean {
-    const graph=operationDependencies(context.deliveryPlan),settled=new Set(Object.keys(graph).filter(id=>
-        latest(context,id as ReviewAction)?.state==='succeeded'&&(id!=='analyze'||context.settings.invalidatedAnalysis?.id!==latest(context,'analyze')?.id)||id==='accept'&&!context.scoped&&context.item.status==='completed'));
-    const skipped=new Set(waivers.flatMap(row=>row.operations.map(op=>op.id)));
-    for(const [id,deps] of Object.entries(graph))if(skipped.has(id)&&deps.every(dep=>settled.has(dep)))settled.add(id);
-    return (graph[action]??[]).every(dep=>settled.has(dep));
-}
-function operation(context: Context, action: ReviewAction, active: boolean, supported: boolean, agent = false,waivers:NonNullable<KanbanItem['operationWaivers']>=[]): KanbanItemOperation {
-    const job=latest(context,action),binding=context.settings.bindings[action],analysis=latest(context,'analyze');
-    const invalidated=!!analysis&&context.settings.invalidatedAnalysis?.id===analysis.id,plan=invalidated?undefined:analysis?.result as MergePlan|undefined;
-    const ready=prerequisitesSatisfied(context,action,waivers)&&(action!=='deploy'||latest(context,'build')?.state==='succeeded')
-        &&(action!=='merge'||!!plan&&latest(context,'analyze')?.state==='succeeded')&&(action!=='accept'||context.item.status==='review'||!!context.deliveryPlan&&context.item.planning?.execution==='children');
-    const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && (!context.scoped&&context.item.status === 'completed'||job?.state==='succeeded') || action === 'merge' && job?.state === 'succeeded';
-    const enabled = (!context.deliveryPlan||context.deliveryPlan.steps.includes(action)) && supported && !context.archived && !finished && !active && ready && (!configurable || !!binding);
-    const built=latest(context,'build'),auto=built?.followUp,autoPending=action==='deploy'&&auto?.state==='queued'&&built?.state==='succeeded'&&(!job||job.createdAt<built.createdAt);
-    return {...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...(!context.deliveryPlan?.manualAfter?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
-        state:action==='merge'&&invalidated&&(!job||job.phase==='settled')?'unavailable':action==='analyze'&&invalidated?(enabled?'ready':'unavailable'):autoPending?'running':action==='deploy'&&auto?.state==='failed'?'failed':action === 'accept' && !context.scoped&&context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
-        statusText:operationStatusText(context,action),progress:operationProgress(job,autoPending),
-        code:action==='deploy'&&auto?.state==='failed'?auto.code:job?.code==='WORKSPACE_CONTEXT_PENDING'?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId??(action==='merge'?latest(context,'analyze')?.sessionId:undefined), configurable, binding, openSessionOnRun: agent || action === 'analyze',
-        reason: job?.phase&&job.phase!=='settled'||autoPending ? undefined : enabled || finished ? undefined : t(!supported ? 'kanban.operationNeedsDelivery' : active ? 'kanban.operationBusy' : configurable && !binding ? 'kanban.operationNeedsFlow' : 'kanban.operationNeedsPrevious'),
-        summary:action==='analyze'||action==='merge'?plan?plan.summary+'\n'+t('kanban.operationVersions',{source:plan.sourceVersion,target:plan.targetVersion}):undefined:resultSummary(job?.result),
-        fields: action === 'merge' && plan ? plan.conflicts.map(conflict => ({id: conflict.id, label: conflict.path + ' · ' + conflict.reason, choices: conflict.options})) : undefined,
-        confirmation: action === 'deploy' ? t('kanban.operationConfirmDeploy') : action === 'accept' ? context.deliveryPlan?.acceptanceConfirmation??t('kanban.operationConfirmAcceptance') : action === 'merge' ? t(plan?.conflicts.length?'kanban.operationConfirmMerge':'kanban.operationConfirmMergeNoConflicts') : undefined};
-}
-function operationStatusText(context:Context,action:ReviewAction):string|undefined {
-    const job=latest(context,action),analysis=latest(context,'analyze'),plan=analysis?.result as MergePlan|undefined;
-    if(action==='analyze'&&!job)return t('kanban.operationAnalysisOnly');
-    if(action!=='merge')return;
-    if(analysis&&context.settings.invalidatedAnalysis?.id===analysis.id)return t('kanban.operationMergePlanExpired');
-    if(job?.state==='succeeded')return t('kanban.operationMergeVerified');
-    if(job&&job.phase!=='settled')return t(job.state==='unknown'?'kanban.operationMergeUnverified':'kanban.operationMergeExecuting');
-    if(analysis?.state==='succeeded'&&plan)return plan.conflicts.length?t('kanban.operationMergeConflicts',{count:plan.conflicts.length}):t('kanban.operationMergeNoConflicts');
-}
-
-function resultSummary(result: unknown): string | undefined {
-    const value = result as {summary?: string; version?: string} | undefined;
-    return [typeof value?.summary === 'string' ? value.summary.slice(0, 8000) : undefined, typeof value?.version === 'string' ? t('kanban.operationVersion', {version: value.version}) : undefined].filter(Boolean).join('\n') || undefined;
 }
 async function authorize(options: ReviewOperationsOptions, context: Context): Promise<void> {
     const actor = await options.service.currentPrincipal();
@@ -176,7 +147,8 @@ async function bind(options: ReviewOperationsOptions, board: string, request: Ka
     });
     return view(options, await load(options, board, request.itemId, false));
 }
-async function run(options: ReviewOperationsOptions, board: string, request: KanbanItemOperationRequest, automatic=false): Promise<KanbanItemOperations> {
+async function run(options: ReviewOperationsOptions, board: string, request: KanbanItemOperationRequest, origin:OperationOrigin='manual'): Promise<KanbanItemOperations> {
+    const automatic=origin!=='manual';
     const context = await load(options, board, request.itemId, false); await authorize(options, context);
     if(automatic)requireValue(!context.board.executionControl?.paused,'AUTOMATIC_DELIVERY_PAUSED');
     requireValue(!context.board.lifecycle || request.action === 'accept'||request.action==='cancel','BOARD_STOPPING');
@@ -208,7 +180,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     const entry = operation(context, request.action as ReviewAction, context.jobs.some(job => job.phase !== 'settled'), options.adapter.supports?.(context.board, context.item) !== false && (options.adapter.ready?.(context.board,context.item)??['review', 'completed'].includes(context.item.status)), !!options.adapter.prepareOperation,waivers);
     requireValue(!waivers.some(row=>row.operations.some(op=>op.id===request.action)),'OPERATION_SKIPPED');
     requireValue(entry.enabled, 'OPERATION_PREREQUISITE_REQUIRED');
-    if (entry.confirmation) requireValue(request.confirmed === true, 'OPERATION_CONFIRMATION_REQUIRED');
+    await requireOperationAuthority({...options,...developmentAuthority},context,request,origin);
     requireValue(request.followUp===undefined||request.action==='build'&&request.followUp==='deploy'&&!context.deliveryPlan?.manualAfter,'OPERATION_REQUEST_INVALID');
     const input = await operationInput(options, context, request), job = prior ?? (request.action === 'accept' ? await acceptanceJob(options, context, request)
         : await prepareReviewJob(options, context.board, context.item, context.settings, request, input,request.action==='analyze'?latest(context,'accept')?.snapshot.sourceVersion:undefined));
@@ -231,7 +203,7 @@ async function operationInput(options: ReviewOperationsOptions, context: Context
     const current = await options.adapter.snapshot(context.board, context.item);
     if(current.version!==analysis.snapshot.version){
         const code=current.sourceVersion!==analysis.snapshot.sourceVersion?'OPERATION_SOURCE_CHANGED_REANALYZE':'OPERATION_TARGET_CHANGED_REANALYZE';
-        await invalidateReviewAnalysis(options,context.board.id,context.item.id,analysis.id,code,request.operationId);requireValue(false,code);
+        await invalidateReviewAnalysis({...options,policy:developmentAnalysisPolicy},context.board.id,context.item.id,analysis.id,code,request.operationId);requireValue(false,code);
     }
     return {approvalId: request.operationId, analysisId: analysis.id, analysisDigest: sha256HexSync(JSON.stringify(plan)),
         sourceVersion: current.sourceVersion, targetVersion: current.targetVersion, selections, plan};
@@ -286,9 +258,9 @@ async function followUp(options:ReviewOperationsOptions,board:string,item:string
     const id='deploy-'+sha256HexSync(build.id).slice(0,48),deployed=latest(context,'deploy');
     if(deployed&&deployed.createdAt>=build.createdAt){await markFollowUp(options,build,'started');return;}
     if(context.jobs.some(job=>job.phase!=='settled'))return;
-    const request=build.followUp.request??{operationId:id,itemId:item,scopeId:options.scopeId,action:'deploy',expectedRevision:revision(context),confirmed:true};
+    const request=build.followUp.request??{operationId:id,itemId:item,scopeId:options.scopeId,action:'deploy',expectedRevision:revision(context)};
     await options.journal.update<ReviewJob>(jobKey(build.id),old=>({...old!,followUp:{...old!.followUp!,request:old!.followUp!.request??request}}));
-    try{await run(options,board,request,true);await markFollowUp(options,build,'started');}
+    try{await run(options,board,request,{followUp:build.id});await markFollowUp(options,build,'started');}
     catch(error){
         if(await options.journal.get<ReviewJob>(jobKey(id)))return;
         const code=safeCode(error,'OPERATION_AUTO_DEPLOY_FAILED');if(code==='AUTOMATIC_DELIVERY_PAUSED')return;await markFollowUp(options,build,'failed',code);
@@ -333,12 +305,6 @@ async function settleDeliveryAcceptance(options:ReviewOperationsOptions,board:st
     }
     const merged=latest(context,'merge');
     if(merged?.state==='succeeded'&&!waivers.some(row=>row.operations.some(op=>op.id==='cleanup')))await finishReviewCleanup(options,board,item,merged.id);
-}
-
-function operationProgress(job:ReviewJob|undefined,queued:boolean):KanbanItemOperation['progress'] {
-    const stage=queued?'queued':!job||job.phase==='settled'?undefined:job.code==='WORKSPACE_CONTEXT_PENDING'?'waiting-context':job.state==='unknown'?'reconciling':job.phase==='prepared'?'preparing':'running';
-    if(!stage)return;
-    return {stage,label:t(('kanban.operationProgress.'+stage) as Parameters<typeof t>[0]),...(!queued&&job?.createdAt?{requestedAt:job.createdAt}:{})};
 }
 
 function cancellationView(options:ReviewOperationsOptions,context:Context,entry:KanbanItemOperation):KanbanItemOperation {

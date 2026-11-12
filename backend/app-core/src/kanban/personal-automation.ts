@@ -11,15 +11,17 @@ import {executionSessionReference} from '@nestos/app-contracts';
 import {t} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {IndependentCallService,SessionRepository} from '@nestos/llm-session';
-import type {Kernel} from '@nestos/durable-kernel';
+import type {IndependentCallExecutionReader} from '@nestos/llm-session';
+import type {OriginalSessionResolver} from '../projects/original-execution-session';
 import type {RootTargetCatalog} from '@nestos/llm-session/contracts';
 import type {KanbanActor,KanbanBoard,KanbanItem,KanbanService} from '@nestos/kanban/contracts';
 import {createPublishedKanbanWorkExecutor} from './published-work';
 import {analyzeItem} from './analysis-adapter';
-import {automationCatalog,automationTarget} from './automation-targets';
+import {automationCatalog,automationTarget} from '@nestos/kanban-development';
 import {requireValue} from './validation';
 import {withContinuedWork,type ContinueWorkOptions} from './continued-work';
 export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
+    operationPlugins?:import('@nestos/kanban/integration').KanbanOperationPlugin[];
     prepareTarget?(input:{board:KanbanBoard;dispatch:import('@nestos/kanban/contracts').KanbanDispatch;target:import('@nestos/llm-flow/contracts').TargetRef}):Promise<import('@nestos/llm-flow/contracts').TargetRef>;
     boardSettings?:{catalog(board:KanbanBoard):Promise<import('@nestos/kanban/contracts').KanbanBoardSettingsCatalog>;validate(board:KanbanBoard,settings:Record<string,string>):Promise<void>};
     taskRecovery?(context:{service:import('@nestos/kanban/contracts').KanbanClient;client():import('@nestos/kanban/contracts').KanbanClient;journal:KanbanAutomationJournal;log:import('./task-recovery-ports').TaskRecoveryOptions['log']}):ReturnType<typeof import('./task-recovery').createTaskRecovery>;
@@ -29,14 +31,15 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     archiveSession?(sessionId:string,operationId:string):Promise<void>;
     sessionChannel?: import('@nestos/app-contracts/services').ProjectRemoteMountPort['sessionChannel'];
     itemOperations?(context: {service: KanbanService; journal: KanbanAutomationJournal; workLog: KanbanWorkLog;
-        automaticTarget?:import('./item-operation-types').ReviewOperationsOptions['automaticTarget'];automatic?:import('./item-operation-types').ReviewOperationsOptions['automatic'];cleanup?:import('./item-operation-types').ReviewOperationsOptions['cleanup'];reportAutomatic?:import('./item-operation-types').ReviewOperationsOptions['reportAutomatic'];
-        log: import('./item-operation-types').ReviewOperationsOptions['log']}): ReturnType<typeof import('./item-operations').createItemOperations>;
+        automaticTarget?:import('@nestos/kanban-development').ReviewOperationsOptions['automaticTarget'];automatic?:import('@nestos/kanban-development').ReviewOperationsOptions['automatic'];cleanup?:import('@nestos/kanban-development').ReviewOperationsOptions['cleanup'];reportAutomatic?:import('@nestos/kanban-development').ReviewOperationsOptions['reportAutomatic'];
+        log: import('@nestos/kanban-development').ReviewOperationsOptions['log']}): ReturnType<typeof import('@nestos/kanban-development').createItemOperations>;
     relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
     sessionObservation?:import('./native-session-activity').NativeSessionReader;
+    executionReader():ReturnType<typeof import('../session/execution-facts').createSessionExecutionReader>;
     sessionExecutionResources?(id: string): Promise<Array<{label: string; value: string}>>;
     collaboration?: {submission:ReturnType<typeof import('@nestos/llm-session').createSessionSubmission>;
         prepare(input:{id:string;originId:string;sessionId:string;nativeSessionId?:string;context:unknown;item:KanbanItem;board:KanbanBoard}):Promise<string>};
-    continuation?: Pick<ContinueWorkOptions, 'submission' | 'prepare'>;
+    continuation?: Pick<ContinueWorkOptions, 'submission' | 'prepare' | 'completedResult'>;
     workResources?(context: {service: KanbanService; workLog: KanbanWorkLog; journal: KanbanAutomationJournal}): Pick<import('@nestos/kanban/contracts').KanbanClient, 'workResources' | 'cleanupWorkResource' | 'boardWorkResources'> & {archiveItemResources?(boardId:string,itemId:string,operationId:string):Promise<void>};
     enqueueTaskReply?(request:import('@nestos/llm-session/contracts').SubmissionRequest):Promise<void>;
     registerInstructionGate?(gate:(sessionId:string,input:import('@nestos/llm-session/contracts').SessionInstruction)=>Promise<boolean>):()=>void;
@@ -53,7 +56,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     prepareWork?(input: {board?:Pick<KanbanBoard,'id'|'settings'>;context?:unknown;dispatch: import('@nestos/kanban/contracts').KanbanDispatch; item: KanbanItem;
         reportActivity?(fact: WorkLogFact): Promise<void>; stage?: 'decision' | 'task' | 'fix'; options?: Record<string, string>; preparation: import('@nestos/kanban/contracts').KanbanExternalReference; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target:import('@nestos/llm-flow/contracts').TargetRef;contextRef?:unknown}>;
     projects?: Pick<import('@nestos/app-contracts/services').ProjectService, 'list' | 'get'> & Partial<Pick<import('@nestos/app-contracts/services').ProjectService,'openWorkspace'>>;
-    calls: IndependentCallService; kernel: Kernel; sessions: SessionRepository;
+    calls: IndependentCallService; execution:IndependentCallExecutionReader; originalSession:OriginalSessionResolver; sessions: SessionRepository;
     prepareSession(id: string): Promise<boolean>; catalog(): Promise<RootTargetCatalog>;
     ensureReady?(): Promise<void>;
 }
@@ -101,6 +104,6 @@ async function createExecutor(options:Options,context:KanbanExecutorContext,prep
             }
             return {target:await options.prepareTarget?.({board,dispatch,target})??target};
         }});
-    const executor = options.continuation ? withContinuedWork(primary, {...options.continuation, calls: options.calls, kernel: options.kernel, observe}) : primary;
+    const executor = options.continuation ? withContinuedWork(primary, {...options.continuation, calls: options.calls, originalSession:options.originalSession, observe}) : primary;
     return executor;
 }

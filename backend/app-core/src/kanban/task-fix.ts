@@ -2,7 +2,7 @@ import {currentCoordination,KanbanCollaboration,createTaskFix as createFixRuntim
 import type {KanbanDispatch} from '@nestos/kanban/contracts';
 import type {SessionInstruction,IndependentCallInput,SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {Options} from './task-fix-contracts';
-import {originalSession} from './session-operation';
+
 import {acceptSnapshot} from './task-fix-acceptance';
 import {observeFixMessages} from './task-fix-messages';
 import {confirmFix} from './task-fix-confirmation';
@@ -15,7 +15,7 @@ export function createTaskFix(options:Options) {
         async prepare(dispatch:KanbanDispatch) {
             const fix=await new KanbanCollaboration(options.service,options.journal).fix(dispatch.id);
             requireValue(fix.origin&&options.automation.collaboration,'CONTINUATION_UNSUPPORTED');
-            const original=await originalSession(options.automation,fix.origin.input as IndependentCallInput);
+            const original=await options.automation.originalSession(fix.origin.input as IndependentCallInput);
             const owner=await options.journal.get<string>('fix-session:'+original.sessionId);
             if(owner&&owner!==fix.id){const active=await new KanbanCollaboration(options.service,options.journal).fix(owner);requireValue(active.accepted||active.state==='cancelled','COLLABORATION_IN_USE');}
             const instruction=await options.automation.collaboration.prepare({id:fix.id,originId:fix.origin.id,...original,

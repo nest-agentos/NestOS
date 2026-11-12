@@ -3,8 +3,8 @@ import {deliveryProfile,type DeliveryProfile as Profile} from '@nestos/git-deliv
 import {savedManagementScopes} from './kanban-management-scope-catalog';
 import type {KanbanBoard,KanbanItem} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
-import type {DeliveryPlan,ReviewJob,ReviewSettings} from '../kanban/item-operation-types';
-import {jobKey,reviewKey} from '../kanban/item-operation-types';
+import type {DeliveryPlan,ReviewJob,ReviewSettings} from '@nestos/kanban-development';
+import {jobKey,reviewKey} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 export function developmentDeliveryPlan(journal:KanbanAutomationJournal,service:{workflow(board:string):Promise<import('@nestos/kanban/contracts').KanbanWorkflowState>}) {

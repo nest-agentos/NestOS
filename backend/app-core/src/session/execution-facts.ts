@@ -1,9 +1,9 @@
 import {taskStat, type Kernel, type TaskRecord} from '@nestos/durable-kernel';
 import type {ISessionRepository, Round} from '@nestos/llm-session/contracts';
-import type {KanbanSessionExecution} from '@nestos/kanban/contracts';
+export interface SessionExecutionFact {id:string;roundId?:string;turnId?:string;state?:import('@nestos/llm-session').SessionExecutionPhase;createdAt?:number;completedAt?:number;resources?:Array<{label:string;value:string}>}
 import {readContextCatalog} from '../projects/harness-context-catalog';
 import {harnessExecutionJournalKey, type ExecutionJournalData} from '../projects/harness-execution-journal';
-import {requireValue} from './validation';
+function requireValue(value:unknown,code:string):asserts value {if(!value)throw Object.assign(new Error(code),{code});}
 
 export interface SessionExecutionOptions {
     repository: Pick<ISessionRepository, 'readDocument'>;
@@ -13,16 +13,16 @@ export interface SessionExecutionOptions {
 type Snapshot = Awaited<ReturnType<Awaited<ReturnType<Kernel['inspectSession']>>['snapshot']>>;
 interface Readers {snapshot(id: string): Promise<Snapshot>; catalog(id: string): ReturnType<typeof readContextCatalog>}
 /** One cold snapshot per Session. Round bodies and Kernel records never leave this projection. */
-export function relatedExecutionReader(options: SessionExecutionOptions) {
+export function createSessionExecutionReader(options: SessionExecutionOptions) {
     const readers = {snapshot: cachedReader((id: string) => options.kernel.inspectSession(id).then(reader => reader.snapshot())),
         catalog: cachedReader((id: string) => readContextCatalog(options.kernel, id))};
-    return (sessionId: string, execution: KanbanSessionExecution) => projectExecution(options, readers, sessionId, execution);
+    return <T extends SessionExecutionFact>(sessionId:string,execution:T):Promise<T&SessionExecutionFact>=>projectExecution(options,readers,sessionId,execution) as Promise<T&SessionExecutionFact>;
 }
 function cachedReader<T>(read: (id: string) => Promise<T>): (id: string) => Promise<T> {
     const cache = new Map<string, Promise<T>>();
     return id => {let value = cache.get(id); if (!value) {value = read(id); cache.set(id, value);} return value;};
 }
-async function projectExecution(options: SessionExecutionOptions, readers: Readers, sessionId: string, execution: KanbanSessionExecution): Promise<KanbanSessionExecution> {
+async function projectExecution(options: SessionExecutionOptions, readers: Readers, sessionId: string, execution: SessionExecutionFact): Promise<SessionExecutionFact> {
     requireValue(/^[\w.:-]{1,256}$/.test(execution.id), 'SESSION_RELATION_ID_INVALID');
     const [raw, resources] = await Promise.all([options.repository.readDocument(sessionId, `round-${execution.id}.json`), options.resources?.(execution.id)]);
     if (!raw) return {...execution, ...(resources?.length ? {resources} : {})};
@@ -41,7 +41,7 @@ async function projectExecution(options: SessionExecutionOptions, readers: Reade
         ...(turnId ? {turnId} : {}), ...(resources?.length ? {resources} : {})};
 }
 
-function executionState(round: Round, task: TaskRecord | undefined, snapshot: Snapshot | undefined): NonNullable<KanbanSessionExecution['state']> {
+function executionState(round: Round, task: TaskRecord | undefined, snapshot: Snapshot | undefined): NonNullable<SessionExecutionFact['state']> {
     if (!task) return round.status === 'pending' ? 'queued' : round.status;
     const stat = taskStat(task), descendants = snapshot?.tasks.filter(row => task.rootTaskId ? row.rootTaskId === task.rootTaskId : row.id === task.id) ?? [];
     if (stat.settled && descendants.every(row => taskStat(row).settled) && task.exit)

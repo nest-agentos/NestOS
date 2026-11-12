@@ -1,3 +1,4 @@
+import {originalSession} from '../src/projects/original-execution-session';
 import {promptData} from './helpers/prompt-data';
 import {kanbanControlOptions} from '../src/kanban/control-adapter';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
@@ -69,6 +70,7 @@ it('transfers a linked answer through the original Session queue, retaining a re
     await f.journal.update('development-workspace:original',()=>({projectId:'x1',directory:'/workspace/work'}));
     await f.journal.update('managed-agent:work-original',()=>({target:{kind:'agent',id:'worker',version:'1',digest:'a'.repeat(64)}}));
     const enqueue=vi.fn(async()=>{}),options={calls:{inspectTaskCallSubmission:async()=>({executionSessionId:'original-session'}),list:async()=>[{receipt:{executionSessionId:'original-session'},callerState:{settled:true},executionTree:{settled:true},input:{request:{expectedSessionId:'original',expectedBranch:'main',expectedTarget:{kind:'agent',id:'worker',version:'1',digest:'a'.repeat(64)},submission:{id:'original'}}}}]},kernel:{sessionActivity:async()=>({counts:{}})},sessionChannel:vi.fn(),projects:{get:async()=>({path:'/x1'}),openWorkspace:async()=>({fs:f.fs,dispose:async()=>{}})},enqueueTaskReply:enqueue};
+    Object.assign(options,{originalSession:(input:any)=>originalSession(options as never,input)});
     const replies=taskReplies(f.service,f.journal,options as never),request={itemId:'t',attemptId:'original',replyTo:'question',operationId:'answer',content:'Use the verified input'};
     await replies('b',request);
     const source=(enqueue.mock.calls[0][0] as {source:{text:string}}).source;

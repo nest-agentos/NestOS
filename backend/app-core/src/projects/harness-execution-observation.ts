@@ -82,14 +82,15 @@ function historyRowTexts(turn: HistoryRow, turnId: string): NativeText[] {
     }
     return texts;
 }
-export async function refreshNativeHistory(run: NativeExecution): Promise<boolean> {
+export async function refreshNativeHistory(run: NativeExecution,readEpoch?:string): Promise<boolean> {
     const { client, profile } = run.acquired, data = run.journal.data;
     const cursors = new Set<string>();
     let cursor: string | undefined, texts: NativeText[] = [], terminal = data.terminal, terminalCode=data.terminalCode, active = false;
     do {
         run.signal.throwIfAborted();
-        const history = await client.read(profile.id, data.sessionId!, { ...nativeOptions(run), ...(cursor ? { cursor } : {}) });
+        const history = await client.read(profile.id, data.sessionId!, { ...nativeOptions(run),...(readEpoch?{epoch:readEpoch}:{}), ...(cursor ? { cursor } : {}) });
         if (history.session.id !== data.sessionId) throw executionError('NATIVE_SESSION_MISMATCH');
+        if(readEpoch&&run.request.connection.directory&&!history.session.cwd?.endsWith('/'+run.request.connection.directory))throw executionError('CONTEXT_NATIVE_SCOPE_CHANGED');
         if (!cursor) active = history.session.activeTurnId === data.turnId;
         const update = historyChanges(data, history);
         texts = mergeTexts(update.texts ?? [], texts); terminal = terminal ?? update.terminal; terminalCode=terminalCode??update.terminalCode;

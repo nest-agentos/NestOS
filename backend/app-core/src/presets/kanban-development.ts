@@ -1,7 +1,7 @@
 import {createModuleLogger} from '@nestos/common';
 import {freezeKanbanHarness,harnessSettingKey} from './kanban-harness-settings';
 import {registerWorkResource} from './kanban-work-resource-catalog';
-import {initializeResourceIndex} from '../kanban/resource-operation-index';
+import {initializeResourceIndex} from '@nestos/kanban/integration';
 import {decisionDeliveryPolicy, selectedDeliveryProfile} from '@nestos/git-delivery/policy';
 import {deliveryEvidence} from './kanban-delivery-plan';
 import {planningSections} from './kanban-planning-sections';
@@ -72,7 +72,7 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
     await developmentStage(input.dispatch.id, 'harness.profiles', () => requireDevelopmentHarness(options, projectId, profileId));
     const folder = await options.projects.get(projectId), view = await developmentStage(input.dispatch.id, 'workspace.open', () => options.projects.openWorkspace(folder.path));
     try {
-        const policy = await developmentStage(input.dispatch.id, 'policy.freeze', () => developmentPolicy(journal,options.fs,view.fs,input.dispatch.id,{...input.options,...(input.stage===undefined&&(input.context as {decision?:{snapshot?:{completion?:string}}})?.decision?.snapshot?.completion==='automatic'?{commit:'worktree'}:{})}));
+        const policy = await developmentStage(input.dispatch.id, 'policy.freeze', () => developmentPolicy(journal,options.fs,view.fs,input.dispatch.id,input.options));
         let context=input.context;
         if(contextProjects)context={...context as object,projectBindings:projectIds!.map((id,index)=>({id,cellProjectId:contextProjects[index].projectId}))};
         const selected=await developmentStage(input.dispatch.id,'delivery.policy',async()=>decisionDeliveryPolicy(policy,context));

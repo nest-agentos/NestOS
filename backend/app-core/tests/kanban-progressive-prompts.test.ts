@@ -36,3 +36,28 @@ it.each(['task.md', 'task-merge-post.md', 'operation-result.md'])('makes the con
  expect(sections['session-learnings.md']).toContain('formally associated Task IDs');
  expect(sections['session-learnings.md'].split(/\s+/).length).toBeLessThan(90);
 });
+
+it('keeps automatic local commit guidance concise and separate from integration authority',()=>{
+ const task=kanbanConfigurationDefaults['task.md'],rules=kanbanConfigurationDefaults['workspace-rules.md'],delivery=kanbanConfigurationDefaults['delivery.md'];
+ expect(task.length).toBeLessThan(900);expect(rules.length).toBeLessThan(1600);expect(task.length+rules.length+delivery.length).toBeLessThan(4000);
+ expect(delivery).toContain('automatically commits task-owned changes');expect(delivery).toContain('no repeat confirmation');
+ expect(delivery).toContain('`changes` explicitly leaves edits uncommitted');expect(delivery).toContain('children before parent gitlinks');
+ expect(delivery).toContain('policy.gitIdentity');expect(delivery).toContain('commit-trailers.txt');
+ expect(delivery).toContain('does not authorize merge, push');expect(delivery).toContain('without edits, commits');
+ expect(rules).not.toContain('commit-trailers.txt');
+});
+
+it('defaults to no optional verification and keeps conflict guidance short and discoverable',()=>{
+ expect(kanbanConfigurationDefaults['decision-propose.md']).toContain('without optional verification');
+ expect(kanbanConfigurationDefaults['decision-actions.md']).toContain('Do not ask about verification unless requested');
+ expect(kanbanConfigurationDefaults['task-merge-pre.md']).toContain('kanban.context.resolve');
+ expect(kanbanConfigurationDefaults['task-merge-pre.md'].length).toBeLessThan(900);
+ expect(kanbanConfigurationDefaults['task-integrate-pre.md']).toContain('restore and verify content and staging');
+ expect(kanbanConfigurationDefaults['task-integrate-pre.md'].length).toBeLessThan(1000);
+});
+
+it('keeps automatic reanalysis instructions short without asking to confirm routine version drift',()=>{
+ expect(kanbanConfigurationDefaults['task-merge-pre.md']).toContain('refreshes stale analysis automatically');
+ expect(kanbanConfigurationDefaults['task-integrate-pre.md']).toContain('Report version drift for host reanalysis');
+ expect(kanbanConfigurationDefaults['task-merge-pre.md']).not.toContain('separate merge confirmation');
+});

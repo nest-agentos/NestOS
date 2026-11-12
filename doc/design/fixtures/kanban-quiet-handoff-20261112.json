@@ -1,0 +1,80 @@
+{
+  "result": "passed",
+  "environment": "Google Chrome headless; actual DOM, MemoryBackend/SeqKanbanStore, in-process KanbanClient and injected authorized Session source; no HTTP transport",
+  "dataset": {
+    "boards": 1,
+    "managementTasks": 3,
+    "executionTasks": 24,
+    "waitingInput": 3,
+    "sessions": 6,
+    "backgroundLoad": "none"
+  },
+  "metrics": [
+    {
+      "operation": "cold.open-grouped-board",
+      "durationMs": 52.5,
+      "logicalApiCalls": 3,
+      "httpRequests": 0,
+      "methods": [
+        "catalog",
+        "query",
+        "queryActivity"
+      ]
+    },
+    {
+      "operation": "warm.open-management-task",
+      "durationMs": 66.9,
+      "logicalApiCalls": 4,
+      "httpRequests": 0,
+      "methods": [
+        "item",
+        "itemOperations",
+        "planningSession",
+        "queryActivity"
+      ]
+    },
+    {
+      "operation": "warm.open-original-execution-session",
+      "durationMs": 5.3,
+      "logicalApiCalls": 0,
+      "httpRequests": 0,
+      "methods": []
+    },
+    {
+      "operation": "warm.open-execution-task",
+      "durationMs": 4.9,
+      "logicalApiCalls": 4,
+      "httpRequests": 0,
+      "methods": [
+        "item",
+        "itemOperations",
+        "executionSession",
+        "queryActivity"
+      ]
+    },
+    {
+      "operation": "warm.return-board",
+      "durationMs": 5,
+      "logicalApiCalls": 3,
+      "httpRequests": 0,
+      "methods": [
+        "catalog",
+        "query",
+        "queryActivity"
+      ]
+    }
+  ],
+  "version": {
+    "branch": "v5.2",
+    "commit": "30fe3df",
+    "workingTree": "dirty"
+  },
+  "cleanup": "confirmed",
+  "scope": "Isolated component acceptance with the operation projection enabled; no production HTTP timing.",
+  "assertions": [
+    "execution result handoff has no acceptance form",
+    "management link remains available",
+    "original execution Session identity preserved",
+    "user participation precedes definitions"
+  ]
+}

@@ -14,6 +14,7 @@ export interface ConversationCommandOutputRef {version: 1; epoch: string; reques
 export interface ConversationCommandOutput {commandId: string; ref?: ConversationCommandOutputRef; unavailable?: {code: string; bytes?: number}; truncated: boolean}
 export interface ConversationCommandOutputPage {ref: ConversationCommandOutputRef; offset: number; data: string; nextOffset: number | null}
 export interface ConversationRequest {
+    approval?:{kind:'command'|'file-change';reason?:string;command?:string;path?:string;cwd?:string;toolName?:string};
     id: string | number; kind: 'approval' | 'input' | 'unsupported'; detail: string; title?: string;
     decisions?: string[]; unsupportedDecisionCount?: number; responding?: boolean;
     questions?: Array<{id: string; question: string; header?: string; multiSelect?: boolean; isSecret?: boolean; isOther?: boolean;

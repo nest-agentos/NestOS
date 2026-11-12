@@ -6,7 +6,7 @@ pnpm monorepo：前端包位于 `ui/`，后端包位于 `backend/`，共享应�
 | 目录 | 模块 |
 |---|---|
 | `ui/` | app-shell、app-settings、llm-ui-adapter、mdx-adapter、ui-common-adapter |
-| `backend/` | app-core、git-delivery、llm-context、llm-session、llm-flow、llm-tasks、kernel-adapters、tools、sanbox、sync-adapters |
+| `backend/` | app-core、kanban-development、git-delivery、llm-context、llm-session、llm-flow、llm-tasks、kernel-adapters、tools、sanbox、sync-adapters |
 | `shared/` | app-contracts、common、app-transport |
 | `libraries/` | driver-llm、cells-driver、vfs-core、vfs-sync、vfsdriver-indexeddb、vfsdriver-local、vfs-ui、mdxeditor、llm-ui、image-parser、durable-kernel、device-tty、kanban、kanban-ui、mail、ui-common |
 | `apps/` | web-app、tauri-app、cli、http-app、demo、node-host（共享 Node 宿主适配包） |
@@ -53,6 +53,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 | `@nestos/kanban-ui` | 独立 DOM 看板界面，仅消费 kanban/contracts、ui-common 和 mdxeditor（只读 Markdown 渲染）；宿主注入本地/远程客户端、文案、图标、窗口与导航。 |
 | `@nestos/app-contracts` | 共享应用 DTO、事件、设置端口、身份与纯变换；不加载后端执行或 UI 实现。 |
 | `@nestos/app-transport` | 平台中立的 HTTP/SSE 与能力 RPC，应用描述/selector 注入机制，不加载 Node 或 UI。 |
+| `@nestos/kanban-development` | 软件开发操作插件：构建、部署、验收、合并分析、合并及清理；向 Kanban 注册插件，接收已授权的 Session/Git/部署端口，不依赖 app-core 或 Kernel。 |
 | `@nestos/git-delivery` | Git 交付领域：工作树、源与批次快照、提交来源、合并与 gitlink 核验、归档及清理回执；仅消费进程/日志/VFS 端口，不依赖 app-core 或执行运行时。 |
 | `@nestos/app-core` | 无 UI 应用核心：NestOS profile、RunDefinition、共享 Session 文件/目录服务，以及统一装配 `createApplicationRuntime`（VFS/LLM/Session/Flow）与 headless `createKernelRuntime`（durable-kernel + kernel-adapters + Flow programs）。Web/Tauri/CLI 共用。 |
 | `@nestos/app-shell` | Web/Tauri UI shell：`initApp()`（宿主注入 services/localBackend，不创建 Runtime）、workspace 策略、路由、Workbench/编辑器装配；通过 shared/app-contracts 的独立服务接口与宿主注入端口调用后端。 |
@@ -76,7 +77,7 @@ VFS 驱动的内部运行依赖仅为 vfs-core；vfs-ui 另复用 ui-common 的�
 
 VFS `IPlugin` 可以提供变更提示，但不能替代跨窗口扫描、恢复日志与条件提交。core 不内置同步业务。
 
-协作看板核心位于独立库 `@nestos/kanban`，仅依赖 vfs-core；应用端口直接引用库自包含的 KanbanClient，`@nestos/app-core/kanban` 显式装配 Session/Flow/Kernel、远程存储、调度与 notify，身份授权由宿主注入。项目/系统看板及相关 Session 登记独立于聊天 Session 生命周期，运行时装配用户个人看板，Web/桌面通过共享看板工作区和 RPC 访问，AI 协作默认关闭，按看板显式绑定并启用后才自动分析依赖与派发。见[Kanban 协调模块](design/kanban-coordination.md)。
+协作看板核心位于独立库 `@nestos/kanban`，仅依赖 vfs-core；应用端口直接引用库自包含的 KanbanClient，`@nestos/app-core/kanban` 显式装配 Session 观察端口、操作插件、远程存储、调度与 notify，身份授权由宿主注入。项目/系统看板及相关 Session 登记独立于聊天 Session 生命周期，运行时装配用户个人看板，Web/桌面通过共享看板工作区和 RPC 访问，AI 协作默认关闭，按看板显式绑定并启用后才自动分析依赖与派发。见[Kanban 协调模块](design/kanban-coordination.md)。
 
 邮件归档核心位于独立库 `@nestos/mail`：公开 contracts、VFS SeqFile 摘要/搜索索引与可选 ui 入口。app-core 只绑定用户授权的邮件空间、索引路径及共享租约，app-shell 只注入 MDXEditor、文案、图标和路由；RPC 通过 MailClient 返回每页 20 个主题摘要，正文按需读取。详见 [邮件模块](../libraries/mail/README.md)。
 

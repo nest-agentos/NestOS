@@ -1,4 +1,4 @@
-import {indexResourceJob} from '../kanban/resource-operation-index';
+import {indexResourceJob} from '@nestos/kanban/integration';
 import {lifecyclePromptFiles} from '../run/prompt-lifecycle';
 import {developmentObservation} from './kanban-development-log';
 import {t} from '@nestos/common';
@@ -13,7 +13,7 @@ import {currentChannelBinding,openDevelopmentChannel,type DevelopmentWorkspaceRe
 import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import {failure, hasMarkdownSection} from '../run/prompt-bundle';
 
-interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'kernel' | 'prepareSession'> {remote?:Pick<ProjectRemoteMountService,'sessionChannel'>;authorize?(boardId: string, itemId: string): Promise<boolean|'cancelled'>; stop?(executionId: string, operationId: string): Promise<boolean>; journal: KanbanAutomationJournal; events: UserEventService}
+interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'execution' | 'prepareSession'> {remote?:Pick<ProjectRemoteMountService,'sessionChannel'>;authorize?(boardId: string, itemId: string): Promise<boolean|'cancelled'>; stop?(executionId: string, operationId: string): Promise<boolean>; journal: KanbanAutomationJournal; events: UserEventService}
 interface Job {id: string; boardId: string; dispatch: KanbanDispatch; stage: string; request: unknown; phase: 'prepared' | 'submitting' | 'settled'; done?: boolean; observation?: KanbanExecutionObservation}
 /** Terminal hooks are independent calls; cancellation never sends into the stopped turn. */
 interface State {stopped: boolean; pending?: Promise<void>; executor: ReturnType<typeof createPublishedKanbanWorkExecutor>}

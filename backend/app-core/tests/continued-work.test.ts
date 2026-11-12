@@ -1,3 +1,4 @@
+import {originalSession} from '../src/projects/original-execution-session';
 import {expect, it, vi, afterEach} from 'vitest';
 import {withContinuedWork} from '../src/kanban/continued-work';
 import {createSessionSubmission as sessionSubmission} from '@nestos/llm-session';
@@ -14,6 +15,7 @@ function fixture() {
         list: vi.fn(async () => [{callerState: {settled: true}, executionTree: {settled: true}}])}, kernel: {sessionActivity: vi.fn(async () => ({counts: {running: 0}}))},
         prepare: vi.fn(async () => 'Frozen continuation instruction'), observe: vi.fn(async (_dispatch, result) => result)} as any;
     const dispatch = {id: 'continuation', itemId: 'item', continuation: {previousDispatchId: 'original'}}, item = {id: 'item'};
+    options.originalSession=(input:any)=>originalSession(options,input);
     return {primary, original, submission, options, dispatch, item, executor: withContinuedWork(primary as any, options)};
 }
 it('continues the original execution Session with explicit context selection and a fresh stable submission', async () => {
@@ -88,4 +90,12 @@ it('retains the sole confirmed native binding while preserving a failed unconfir
  expect(frozen.request.overrides.harnessConversation).toEqual({mode:'resume',bindingId:'canonical',expectedBindingRevision:10,expectedGeneration:1});
  context.bindings.unconfirmed={...context.bindings.unconfirmed as object,activeOperation:{}};
  await expect(f.executor.prepareContinuation!(f.dispatch as any,f.item as any,f.original)).rejects.toMatchObject({code:'CONTINUATION_CONTEXT_AMBIGUOUS'});
+});
+it('restores an already completed formal result without starting another model turn',async()=>{
+ const f=fixture();context.bindings={binding:{id:'binding',branchId:'main',validity:'valid',revision:3,generation:1,nativeRef:{sessionId:'native-original'}}};
+ f.options.completedResult={prepare:vi.fn(async()=>({resultId:'formal-result',turnId:'completed-later-turn'})),inspect:vi.fn(async()=>({outcome:'succeeded',executionSessionId:'original-execution',outputs:[]}))};
+ const frozen=await f.executor.prepareContinuation!(f.dispatch as any,f.item as any,f.original) as any;expect(frozen.schema).toBe(3);
+ expect(await f.executor.start(frozen)).toMatchObject({outcome:'succeeded'});
+ const restored=withContinuedWork(f.primary as any,f.options);expect(await restored.inspect(JSON.parse(JSON.stringify(frozen)))).toMatchObject({outcome:'succeeded'});
+ expect(f.submission.start).not.toHaveBeenCalled();expect(f.submission.inspect).not.toHaveBeenCalled();expect(f.options.prepare).not.toHaveBeenCalled();
 });
