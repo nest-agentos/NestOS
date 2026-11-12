@@ -170,7 +170,7 @@ export const en: LocaleStrings = {
     'kanban.decisionTable.activityHelp': 'Latest decision, task or Session business event; page refreshes do not count as activity.',
     'kanban.decisionTable.archivedAt': 'Archived at',
     'kanban.decisionTable.viewTask': 'View affected task',
-    'kanban.decisionTable.taskSession': 'Open task Session',
+    'kanban.decisionTable.taskSession': 'Resolve in conversation',
     'kanban.decisionTable.state.waiting': 'Waiting to execute',
     'kanban.decisionTable.state.running': 'In progress',
     'kanban.decisionTable.state.needs-action': 'Needs attention',

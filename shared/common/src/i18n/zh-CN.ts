@@ -171,7 +171,7 @@ export const zhCN = {
     'kanban.decisionTable.activityHelp': '最近一次决策、任务或会话业务事件；页面刷新不计入活动时间。',
     'kanban.decisionTable.archivedAt': '归档于',
     'kanban.decisionTable.viewTask': '查看对应任务',
-    'kanban.decisionTable.taskSession': '进入任务 Session',
+    'kanban.decisionTable.taskSession': '进入会话处理',
     'kanban.decisionTable.state.waiting': '等待执行',
     'kanban.decisionTable.state.running': '执行中',
     'kanban.decisionTable.state.needs-action': '待处理',
