@@ -229,15 +229,18 @@ async function settleCancellation(f:Awaited<ReturnType<typeof fixture>>) {
     for(let pass=0;pass<3;pass++)await scanTaskControls(kanbanControlOptions({calls:{list:async()=>[]}},f.journal),f.journal,await f.service.read('source'),f.service);
     await f.open().scan();
 }
-it('archives generated tasks with the decision and deletes archived descendants on a later request',async()=>{
+it('rejects archiving active decisions, preserves settled tasks and keeps deletion separate',async()=>{
     const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
     const run=await f.open().runRecord('source',{recordId:'decision',operationId:'run',expectedRevision:2});
     await f.command({type:'create-item',item:{id:'unrelated',title:'Unrelated',responsibility:'Keep',acceptance:'Keep'}});
-    await f.open().controlRecord('source',{recordId:'decision',operationId:'archive',action:'archive'});await settleCancellation(f);
+    await expect(f.open().controlRecord('source',{recordId:'decision',operationId:'archive-active',action:'archive'})).rejects.toMatchObject({code:'RECORD_EXECUTION_UNSETTLED'});
+    await f.open().controlRecord('source',{recordId:'decision',operationId:'cancel-before-archive',action:'cancel'});await settleCancellation(f);
+    const retained=await f.service.read('source');
+    await f.open().controlRecord('source',{recordId:'decision',operationId:'archive',action:'archive'});
     expect((await f.service.record('source','decision')).archivedAt).toBeTypeOf('number');
     expect((await f.service.records('source')).items).toHaveLength(0);
-    expect((await f.service.query('source',{view:'archive'})).total).toBe(1);
-    expect((await f.service.read('source')).items.map(item=>item.id)).toEqual(['unrelated']);
+    expect((await f.service.query('source',{view:'archive'})).total).toBe(0);
+    expect((await f.service.read('source')).items).toEqual(retained.items);
     await f.open().controlRecord('source',{recordId:'decision',operationId:'delete',action:'delete'});await f.open().scan();
     expect((await f.service.record('source','decision')).deletedAt).toBeTypeOf('number');
     await f.open().controlRecord('source',{recordId:'decision',operationId:'delete',action:'delete'});

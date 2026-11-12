@@ -47,6 +47,14 @@ it('exposes user-bound Kanban commands, queries and system notifications through
         expect(await kanban.analysisStatus(board.id, 'card')).toBeNull();
         const notifications = await remote.backend.events.listNotifications(); expect(notifications.items).toHaveLength(1);
         expect(notifications.items[0].event.value.type).toBe('kanban.create-item'); expect(JSON.stringify(notifications)).not.toContain('PRIVATE_');
+        await kanban.execute(board.id,{operationId:'archive-fixture-create',expectedRevision:(await kanban.read(board.id)).revision,command:{type:'append-record',record:{id:'archive-fixture',kind:'decision',title:'Closed proposal',content:'Scope',rationale:'Done',itemIds:[],sources:[]}}});
+        await kanban.execute(board.id,{operationId:'archive-fixture-reject',expectedRevision:(await kanban.read(board.id)).revision,command:{type:'review-record',recordId:'archive-fixture',accept:false}});
+        const archiveRevision=(await kanban.record(board.id,'archive-fixture')).revision;
+        expect(await kanban.archiveRecords(board.id,{operationId:'archive-rpc',records:[{recordId:'archive-fixture',expectedRevision:archiveRevision}]})).toMatchObject({items:[{recordId:'archive-fixture',outcome:'archived'}]});
+        expect((await kanban.records(board.id)).items.some((row:{id:string})=>row.id==='archive-fixture')).toBe(false);
+        expect((await kanban.records(board.id,{includeArchived:true})).items.find((row:{id:string})=>row.id==='archive-fixture')).toMatchObject({status:'rejected',archivedAt:expect.any(Number)});
+        expect((await kanban.record(board.id,'archive-fixture')).status).toBe('rejected');
+
         const sessionId = await runtime.sessionRepository.createSession('Autocomplete planning session');
         const sessions = await kanban.suggest(board.id, {kind: 'session', search: 'Autocomplete planning'});
         expect(sessions.items[0]).toMatchObject({id: sessionId, label: 'Autocomplete planning session'});
