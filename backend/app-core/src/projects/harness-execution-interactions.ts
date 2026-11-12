@@ -1,3 +1,4 @@
+import {harnessApprovalDecisions, resolveHarnessApprovalDecision} from '@nestos/cells-driver';
 import { sha256HexSync } from '@nestos/common';
 import type { EffectExecutionContext, JsonValue } from '@nestos/durable-kernel';
 import type { HarnessEvent, HarnessEvents } from '@nestos/cells-driver';
@@ -43,12 +44,14 @@ function checkedApproval(request: HarnessEvent['message'], response: JsonValue):
 }
 function approvalResponse(request: HarnessEvent['message'], response: Record<string, JsonValue>): Record<string, JsonValue> {
     const offered = request.params?.decisions ?? request.params?.availableDecisions;
-    if (!Array.isArray(offered) || !offered.every(value => typeof value === 'string')) throw executionError('NATIVE_DECISIONS_UNKNOWN');
+    if (!Array.isArray(offered)) throw executionError('NATIVE_DECISIONS_UNKNOWN');
+    const options = harnessApprovalDecisions(offered);
+    if (!options.length) throw executionError('NATIVE_DECISIONS_UNKNOWN');
     assertConsistentApproval(response);
     const choices = approvalChoices(response);
-    const selected = choices.find(value => offered.includes(value));
-    if (!selected) throw executionError('NATIVE_RESPONSE_INVALID');
-    return { decision: selected };
+    const selected = choices.find(value => options.includes(value));
+    try { return { decision: resolveHarnessApprovalDecision(options, selected ?? response.decision) }; }
+    catch { throw executionError('NATIVE_RESPONSE_INVALID'); }
 }
 function assertConsistentApproval(response: Record<string, JsonValue>): void {
     if (typeof response.approved !== 'boolean' || response.decision === undefined) return;

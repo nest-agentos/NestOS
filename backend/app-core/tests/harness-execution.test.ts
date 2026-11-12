@@ -152,6 +152,20 @@ describe('durable native Harness execution', () => {
         expect(f.client.respond).toHaveBeenCalledWith('claude', 'question-1', { decision: 'accept' }, expect.objectContaining({ epoch: 'service-epoch' }));
     });
 
+    it.each(['accept', 'cancel'])('accepts explicit %s from mixed native approval choices', async decision => {
+        const f = fixture(); interaction(f);
+        const policy = {acceptWithExecpolicyAmendment: {execpolicy_amendment: ['/bin/bash', '-lc', 'python3 script.py']}};
+        delete f.data.requests[0].params!.decisions;
+        f.data.requests[0].params!.availableDecisions = ['accept', policy, 'cancel'];
+        vi.mocked(f.client.respond).mockImplementation(async (_profile, _id, _answer, options) => { f.committed(options, {}); complete(f); });
+        const running = f.make().execute(request, f.context);
+        await vi.waitFor(() => expect(f.records.has(request.notificationKey)).toBe(true));
+        const id = (f.records.get(request.notificationKey)!.value as any).id;
+        await f.state.set(`${request.notificationKey}.response.${encodeURIComponent(id)}`, {decision});
+        await running;
+        expect(vi.mocked(f.client.respond).mock.calls[0][2]).toEqual({decision});
+    });
+
     it.each([true, false])('rejects boolean approval %j when its decision is not advertised', async answer => {
         const f = fixture(); interaction(f);
         f.data.requests[0].params!.decisions = [answer ? 'decline' : 'accept'];

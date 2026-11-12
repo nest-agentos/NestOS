@@ -5,9 +5,11 @@ import {t} from '@nestos/common';
 
 export function nativeInteraction(request: ConversationRequest, revision = 0): InteractionView {
     const base = {id: `${typeof request.id}:${request.id}`, revision, state: 'pending' as const, responding: request.responding,
-        title: request.title ?? t('harness.interaction'), detail: request.detail};
+        title: request.title ?? t(request.kind === 'approval' ? 'harness.approval' : 'harness.interaction'), detail: request.detail};
     if (request.kind === 'unsupported') return {...base, kind: 'unsupported'};
-    if (request.kind === 'approval') return {...base, kind: 'approval', decisions: (request.decisions ?? ['accept', 'decline']).map(id => ({id, label: decisionLabel(id)}))};
+    if (request.kind === 'approval') return {...base, kind: 'approval',
+        detail: [request.detail, request.unsupportedDecisionCount ? t('harness.partialApproval') : ''].filter(Boolean).join('\n'),
+        decisions: (request.decisions ?? []).map(id => ({id, label: decisionLabel(id)}))};
     return {...base, kind: 'input', fields: (request.questions ?? []).map(questionField)};
 }
 function questionField(q: NonNullable<ConversationRequest['questions']>[number]): InputField {
@@ -22,7 +24,7 @@ export function nativeResponse(response: InteractionResponse): Record<string, un
         : {answers: Object.fromEntries(Object.entries(response.values).map(([id, value]) => [id, {answers: Array.isArray(value) ? value : [value]}]))};
 }
 function decisionLabel(id: string): string {
-    if (id === 'accept') return t('harness.approve');
+    if (['accept', 'allow', 'approve'].includes(id)) return t('harness.approve');
     if (id === 'acceptForSession') return t('harness.approveForSession');
     return t(id === 'cancel' ? 'harness.cancelInteraction' : 'harness.decline');
 }

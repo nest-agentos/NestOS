@@ -15,7 +15,7 @@ export interface ConversationCommandOutput {commandId: string; ref?: Conversatio
 export interface ConversationCommandOutputPage {ref: ConversationCommandOutputRef; offset: number; data: string; nextOffset: number | null}
 export interface ConversationRequest {
     id: string | number; kind: 'approval' | 'input' | 'unsupported'; detail: string; title?: string;
-    decisions?: string[]; responding?: boolean;
+    decisions?: string[]; unsupportedDecisionCount?: number; responding?: boolean;
     questions?: Array<{id: string; question: string; header?: string; multiSelect?: boolean; isSecret?: boolean; isOther?: boolean;
         options?: Array<{label: string; description?: string}>}>;
 }
