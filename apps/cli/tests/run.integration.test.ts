@@ -23,7 +23,7 @@ describe('CLI run', () => {
         await writeFile(path.join(workspace, '_agent/AGENT.md'), 'Project rule: verify public interfaces.');
         await writeFile(path.join(workspace, '_agent/skills/review/SKILL.md'),
             '---\nname: Review\ndescription: Review changes\n---\nSkill rule: record validation evidence.');
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, config(port));
         expect(await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true })).toBe(0);
@@ -38,7 +38,7 @@ describe('CLI run', () => {
         const { server } = mockServer(() => raw);
         const port = await startServer(server);
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-schema-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         const value = parse(config(port));
         value.agents[0].response_format = { type: 'json_schema', json_schema: { name: 'report',
             schema: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } } } };
@@ -60,7 +60,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-run-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, config(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -80,7 +80,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-run-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, config(port, { budget: 1 }), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -93,7 +93,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-rag-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, ragConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -121,7 +121,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-rag-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, parallelRagConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -152,7 +152,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-route-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, routeConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -172,7 +172,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-routecond-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, routeConditionConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -187,7 +187,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-loop-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, loopConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -207,7 +207,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-spawn-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, spawnConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -223,7 +223,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-onfailure-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, onFailureConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -241,7 +241,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-compensate-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, compensateConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -256,7 +256,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-saga-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, compensateChainConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -272,7 +272,7 @@ describe('CLI run', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-supervisor-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, supervisorConfig(port), 'utf8');
         const code = await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true });
@@ -1016,7 +1016,7 @@ describe('CLI export', () => {
         const server = createServer((_request, response) => respondSse(response, 'done'));
         const port = await startServer(server);
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-export-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, config(port), 'utf8');
         expect(await runCommand({ file: configPath, stateDir: path.join(workspace, '.nestos'), headless: true, json: true })).toBe(0);

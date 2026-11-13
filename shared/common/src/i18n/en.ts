@@ -2571,7 +2571,7 @@ export const en: LocaleStrings = {
     "project.sync.content.tooLarge": "Exceeds the 256 KiB text comparison limit; use an external viewer.",
     "project.sync.content.unavailable": "This version is not cached or is unavailable. Retain the conflict and refresh the preview, or compare externally.",
     "project.sync.directoryUpgrade": "This server supports directory downloads only. Upgrade cells to enable two-way synchronization, uploads and conflict comparison.",
-    "project.sync.invalidTargetPath": "Enter a project-relative directory without absolute paths, empty segments, ., .. or .mindos.",
+    "project.sync.invalidTargetPath": "Enter a project-relative directory without absolute paths, empty segments, ., .. or .nestos.",
     "project.sync.reason.CONTENT_CONFLICT": "Content differs; choose which version to retain",
     "project.sync.reason.TYPE_CONFLICT": "File/directory type conflict; fix the directory structure first",
     "project.sync.reason.DIRECTORY_GROUP_BLOCKED": "A parent or child conflicts; fix the directory structure first",

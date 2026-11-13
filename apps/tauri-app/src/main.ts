@@ -60,7 +60,7 @@ function lazyEditorFactory(load: () => Promise<EditorFactory>): EditorFactory {
 }
 
 const entryAt = performance.now();
-const documentAt = performance.getEntriesByName('mindos.document')[0]?.startTime;
+const documentAt = performance.getEntriesByName('nestos.document')[0]?.startTime;
 void recordDiagnostic('bootstrap.entry', {
     timeOrigin: performance.timeOrigin, entryMs: Math.round(entryAt),
     documentMs: documentAt === undefined ? undefined : Math.round(documentAt),

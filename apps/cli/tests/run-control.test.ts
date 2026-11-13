@@ -96,7 +96,7 @@ function startRun(configPath: string, stateDir: string): ChildProcess {
 async function layout(prefix: string): Promise<{ workspace: string; stateDir: string; configPath: string }> {
     const workspace = await mkdtemp(path.join(tmpdir(), prefix));
     roots.push(workspace);
-    return { workspace, stateDir: path.join(workspace, '.nestos'), configPath: path.join(workspace, 'mindos.yml') };
+    return { workspace, stateDir: path.join(workspace, '.nestos'), configPath: path.join(workspace, 'nestos.yml') };
 }
 
 async function latestRun(stateDir: string): Promise<string> {

@@ -66,7 +66,7 @@ HttpFSBackend 不重复实现项目权限和虚拟路径映射；服务端不信
 
 ```toml
 listen = "127.0.0.1:8787"
-allowed_origins = ["https://mindos.example.com"]
+allowed_origins = ["https://nestos.example.com"]
 
 username = "workbench"
 token_env = "FS_SERVER_TOKEN"     # legacy Bearer; password / password_env for Basic

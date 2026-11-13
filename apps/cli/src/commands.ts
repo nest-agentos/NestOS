@@ -109,14 +109,14 @@ export async function validateCommand(options: CommandOptions): Promise<number> 
         return report.valid ? 0 : 1;
     }
     // --offline skips the environment check so configs can be validated without API keys set.
-    const loaded = await loadWorkflow(options.file ?? 'mindos.yml', !options.offline);
+    const loaded = await loadWorkflow(options.file ?? 'nestos.yml', !options.offline);
     print(options, { valid: true, name: loaded.workflow.config.name, tasks: loaded.workflow.config.tasks.length });
     return 0;
 }
 
 /** 打印编译后的 DAG 结构（节点 + 边），不执行 —— 等价于 run --dry-run 的诉求。 */
 export async function graphCommand(options: CommandOptions): Promise<number> {
-    const loaded = await loadWorkflow(options.file ?? 'mindos.yml', !options.offline);
+    const loaded = await loadWorkflow(options.file ?? 'nestos.yml', !options.offline);
     const dag = compileDag(loaded.workflow);
     print(options, {
         name: loaded.workflow.config.name,
@@ -130,7 +130,7 @@ export async function graphCommand(options: CommandOptions): Promise<number> {
 }
 
 export async function runCommand(options: CommandOptions): Promise<number> {
-    const file = options.file ?? 'mindos.yml';
+    const file = options.file ?? 'nestos.yml';
     if (file.toLowerCase().endsWith('.flow')) return runFlowCommand(file, options);
     if (options.paramsFile) throw new Error('--params is only supported for .flow inputs');
     if (options.connectionBindingsFile) throw new Error('--connection-bindings is only supported for .flow inputs');

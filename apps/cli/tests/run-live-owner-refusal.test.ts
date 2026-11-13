@@ -88,7 +88,7 @@ function spawnCli(args: string[]): ChildProcess {
 async function layout(prefix: string): Promise<{ stateDir: string; configPath: string }> {
     const workspace = await mkdtemp(path.join(tmpdir(), prefix));
     roots.push(workspace);
-    return { stateDir: path.join(workspace, '.nestos'), configPath: path.join(workspace, 'mindos.yml') };
+    return { stateDir: path.join(workspace, '.nestos'), configPath: path.join(workspace, 'nestos.yml') };
 }
 
 async function latestRun(stateDir: string): Promise<string> {

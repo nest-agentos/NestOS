@@ -26,7 +26,7 @@ describe('HITL run → respond → resume', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-hitl-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, hitlConfig(port, downstream), 'utf8');
 

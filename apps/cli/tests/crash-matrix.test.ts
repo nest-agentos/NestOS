@@ -175,7 +175,7 @@ it.each([
     });
     servers.push(server);
     const port = await listenForTest(server), root = await workspace('nestos-memory-unreceipted-');
-    const stateDir = path.join(root, '.nestos'), configPath = path.join(root, 'mindos.yml');
+    const stateDir = path.join(root, '.nestos'), configPath = path.join(root, 'nestos.yml');
     const config = parse(singleNodeConfig(port));
     Object.assign(config.agents[0], { tools: ['memory_write', 'memory_remove'], stream: false, approval: 'none',
         memory_policy: { namespace_id: 'agent', read_scopes: ['project'], write_scopes: ['project'] } });
@@ -222,7 +222,7 @@ it.each(['write', 'remove'] as const)('preserves a committed memory %s across CL
     });
     servers.push(server);
     const port = await listenForTest(server), root = await workspace('nestos-crash-memory-');
-    const stateDir = path.join(root, '.nestos'), configPath = path.join(root, 'mindos.yml');
+    const stateDir = path.join(root, '.nestos'), configPath = path.join(root, 'nestos.yml');
     const config = parse(singleNodeConfig(port));
     Object.assign(config.agents[0], { tools: ['memory_write', 'memory_remove'], stream: false, approval: 'none',
         memory_policy: { namespace_id: 'agent', read_scopes: ['project'], write_scopes: ['project'] } });
@@ -258,7 +258,7 @@ it('recovers a run killed while the first Effect is in flight', async () => {
 
     const root = await workspace('nestos-crash-effect-');
     const stateDir = path.join(root, '.nestos');
-    const configPath = path.join(root, 'mindos.yml');
+    const configPath = path.join(root, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, singleNodeConfig(port), 'utf8');
 
@@ -313,7 +313,7 @@ it('cancels a Run blocked on an indeterminate Effect and refuses to replay it', 
 
     const root = await workspace('nestos-crash-cancel-');
     const stateDir = path.join(root, '.nestos');
-    const configPath = path.join(root, 'mindos.yml');
+    const configPath = path.join(root, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, singleNodeConfig(port), 'utf8');
 
@@ -349,7 +349,7 @@ it('does not re-apply a graph patch when replaying a crashed spawned node', asyn
 
     const root = await workspace('nestos-crash-spawn-');
     const stateDir = path.join(root, '.nestos');
-    const configPath = path.join(root, 'mindos.yml');
+    const configPath = path.join(root, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, spawnConfig(port), 'utf8');
 
@@ -382,7 +382,7 @@ it('reconciles a run killed after the reply was delivered but before it committe
 
     const root = await workspace('nestos-crash-commit-');
     const stateDir = path.join(root, '.nestos');
-    const configPath = path.join(root, 'mindos.yml');
+    const configPath = path.join(root, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, singleNodeConfig(port), 'utf8');
 
@@ -406,7 +406,7 @@ it('continues a loop from the last committed iteration after a kill', async () =
 
     const root = await workspace('nestos-crash-loop-');
     const stateDir = path.join(root, '.nestos');
-    const configPath = path.join(root, 'mindos.yml');
+    const configPath = path.join(root, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, loopConfig(port), 'utf8');
 
@@ -442,7 +442,7 @@ it('preserves budget accounting across a crash and resume', async () => {
 
     const root = await workspace('nestos-crash-budget-');
     const stateDir = path.join(root, '.nestos');
-    const configPath = path.join(root, 'mindos.yml');
+    const configPath = path.join(root, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     // Each reply reports 3 tokens; a 9-token budget on the entry node allows three
     // iterations. A resumed run must not restart the counter.
@@ -509,7 +509,7 @@ it.each(['root-created', 'capability-bound', 'task-started', 'graph-patched', 'd
         });
         servers.push(server);
         const port = await listenForTest(server), root = await workspace('nestos-submit-gap-');
-        const stateDir = path.join(root, '.nestos'), configPath = path.join(root, 'mindos.yml');
+        const stateDir = path.join(root, '.nestos'), configPath = path.join(root, 'nestos.yml');
         const config = parse(singleNodeConfig(port));
         Object.assign(config.agents[0], { stream: false, approval: 'none' });
         if (delegation) config.tasks[0].delegation = { agent: 'worker', instruction: 'Handle one payload',
@@ -558,7 +558,7 @@ it('does not replay a completed loop iteration whose checkpoint was killed befor
     const model = crashingServer({ request: -1, when: 'before-reply' }, (_prompt, index) => `answer-${index}`);
     servers.push(model.server);
     const port = await listenForTest(model.server), root = await workspace('nestos-loop-checkpoint-');
-    const stateDir = path.join(root, '.nestos'), configPath = path.join(root, 'mindos.yml');
+    const stateDir = path.join(root, '.nestos'), configPath = path.join(root, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, loopConfig(port));
     const child = startSchedulerCrash(configPath, stateDir, '', 'entry#2');

@@ -152,7 +152,7 @@ async function setup(writes: boolean, workspaceBlock = '', tool: 'Bash' | 'Write
     roots.push(root);
     await initRepo(root);
     const stateDir = path.join(root, '.nestos');
-    const configPath = path.join(root, 'mindos.yml');
+    const configPath = path.join(root, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, config(port, workspaceBlock, tool), 'utf8');
     return { root, stateDir, configPath, canonical: target => realpath(target).catch(() => target) };
@@ -294,7 +294,7 @@ it('re-attaches the recorded worktree when a crashed host resumes', async () => 
     roots.push(root);
     await initRepo(root);
     const stateDir = path.join(root, '.nestos');
-    const configPath = path.join(root, 'mindos.yml');
+    const configPath = path.join(root, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, config(port, '    cleanup: keep\n'), 'utf8');
 

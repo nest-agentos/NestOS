@@ -82,14 +82,14 @@ describe('resolveRespondValue', () => {
 describe('validate --offline', () => {
     it('validates without API keys when --offline is set', async () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'nestos-offline-'));
-        const configPath = path.join(dir, 'mindos.yml');
+        const configPath = path.join(dir, 'nestos.yml');
         await writeFile(configPath, offlineConfig(), 'utf8');
         await expect(validateCommand({ file: configPath, offline: true })).resolves.toBe(0);
     });
 
     it('fails without --offline when the API key env is missing', async () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'nestos-offline-'));
-        const configPath = path.join(dir, 'mindos.yml');
+        const configPath = path.join(dir, 'nestos.yml');
         await writeFile(configPath, offlineConfig(), 'utf8');
         await expect(validateCommand({ file: configPath })).rejects.toThrow('environment variable');
     });
@@ -98,7 +98,7 @@ describe('validate --offline', () => {
 describe('graph command', () => {
     it('prints the compiled DAG without executing', async () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'nestos-graph-'));
-        const configPath = path.join(dir, 'mindos.yml');
+        const configPath = path.join(dir, 'nestos.yml');
         await writeFile(configPath, graphConfig(), 'utf8');
         const writes: string[] = [];
         const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
@@ -124,7 +124,7 @@ describe('run lifecycle commands', () => {
         const port = await startServer(server);
 
         const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-lifecycle-'));
-        const configPath = path.join(workspace, 'mindos.yml');
+        const configPath = path.join(workspace, 'nestos.yml');
         process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
         await writeFile(configPath, runConfig(port), 'utf8');
 

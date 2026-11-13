@@ -121,7 +121,7 @@ it('assembles project rules and auto-loaded Skills into the CLI run and persists
         'Check every changed interface.',
         '', '## Compact Instructions', '- [红线] Preserve access checks.', '- Background note.',
     ].join('\n'), 'utf8');
-    const configPath = path.join(workspace, 'mindos.yml');
+    const configPath = path.join(workspace, 'nestos.yml');
     const stateDir = path.join(workspace, '.nestos');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, config(port), 'utf8');

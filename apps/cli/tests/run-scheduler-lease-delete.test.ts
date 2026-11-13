@@ -82,7 +82,7 @@ async function startCrashedRun(ttlMs: string): Promise<{ stateDir: string; runId
     const workspace = await mkdtemp(path.join(tmpdir(), 'nestos-lease-delete-'));
     roots.push(workspace);
     const stateDir = path.join(workspace, '.nestos');
-    const configPath = path.join(workspace, 'mindos.yml');
+    const configPath = path.join(workspace, 'nestos.yml');
     process.env.NESTOS_TEST_API_KEY = 'test-secret-value';
     await writeFile(configPath, config(port), 'utf8');
 
