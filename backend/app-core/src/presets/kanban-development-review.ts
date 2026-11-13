@@ -6,7 +6,7 @@ import {compatibleRuntimeDelivery} from './kanban-runtime-acceptance';
 import {retainedExecutionContexts} from '../projects/harness-context-selection';
 import {verifyFileDigest} from '../run/file-digest';
 import {verifyReadOnlyDelivery} from '@nestos/git-delivery/policy';
-import {managedServiceDeployment} from './managed-service-deployment';
+import {managedServiceDeployment,verifyManagedBuildArtifact} from './managed-service-deployment';
 import {operationReceipt} from '../run/operation-receipt';
 import {maintenanceInstruction} from './kanban-maintenance';
 import {journalCommand} from '@nestos/kanban/integration';
@@ -174,7 +174,11 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
     const current = await resource(options, item, board.id), folder = await options.projects.get(current.record.projectId), view = await options.projects.openWorkspace(folder.path);
     let result: unknown;
     try {result=await operationReceipt(view.fs,current.record.directory+'/_nestos/kanban/review/'+job.id,await readReviewResult(options,current.record.projectId,job),options.journal,job.id);
-        if (job.action === 'build' && result && (result as {status?: string}).status === 'succeeded') await verifyBuildEvidence(view.fs, current.record.directory, result);}
+        if (job.action === 'build' && result && (result as {status?: string}).status === 'succeeded') {
+            const frozen=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+job.id);
+            const deployment=(frozen?.context as {operation?:{deployment?:import('@nestos/app-contracts/services').RuntimeServiceDescriptor}})?.operation?.deployment;
+            if(!await verifyManagedBuildArtifact(options.serviceControl,deployment,result))await verifyBuildEvidence(view.fs,current.record.directory,result);
+        }}
     finally {await view.dispose();}
     if (result === undefined || ['blocked', 'failed'].includes((result as {status: string})?.status)) return result;
     const actual = await snapshot(options, board, item);

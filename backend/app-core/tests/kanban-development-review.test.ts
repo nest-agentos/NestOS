@@ -230,3 +230,23 @@ it('observes active management and continuation turns without acquiring Git exec
  expect(await api.exchange!(job,{sessionId:'original-session',outcome:'succeeded'})).toMatchObject({outcome:'running'});
  expect(f.submission.start).toHaveBeenCalledOnce();
 });
+
+it('verifies source-checkout artifacts through the frozen service capability rather than the execution worktree',async()=>{
+ const deployment={id:'service',version:'running',artifact:{format:'service-release/1',manifest:'release.json',store:{base:'source-checkout' as const,path:'release/httpd'}}};
+ const verifyArtifact=vi.fn(async()=>{}),control={describe:async()=>deployment,verifyArtifact,submit:async()=>{},inspect:async()=>({state:'running' as const})};
+ const f=await fixture(false,control);await f.fs.driver.createFile({parentPath:'/workspace/_nestos/etc',name:'deployment.json',content:JSON.stringify({schema:1,serviceId:'service'}),recursive:true});
+ const snapshot=await f.api.snapshot(f.board,f.item),request=await f.api.prepareOperation!({id:'service-proof',action:'build',board:f.board,item:f.item,snapshot});
+ const payload={operationId:'service-proof',status:'succeeded',version:'candidate',evidence:{path:'release/httpd/candidate/release.json',sha256:'a'.repeat(64)}};
+ f.channels.report('service-proof','result',{type:'result',content:'Built',payload});
+ const job={id:'service-proof',action:'build',boardId:'board',itemId:'task',request,snapshot} as never;
+ expect(await f.api.readOperation!(job)).toEqual(payload);
+ expect(verifyArtifact).toHaveBeenCalledWith({operationId:'service-proof',serviceId:'service',version:'candidate',sha256:'a'.repeat(64)});
+ verifyArtifact.mockRejectedValueOnce(Object.assign(Error('digest mismatch'),{code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'}));
+ await expect(f.api.readOperation!(job)).rejects.toMatchObject({code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
+});
+it('does not let a build receipt redirect the frozen service artifact path',async()=>{
+ const {verifyManagedBuildArtifact}=await import('../src/presets/managed-service-deployment');
+ const verifyArtifact=vi.fn(),control={verifyArtifact} as any,deployment={id:'service',version:'running',artifact:{format:'release',manifest:'release.json',store:{base:'source-checkout' as const,path:'release/httpd'}}};
+ await expect(verifyManagedBuildArtifact(control,deployment,{operationId:'build',version:'candidate',evidence:{path:'other/candidate/release.json',sha256:'a'.repeat(64)}})).rejects.toMatchObject({code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
+ expect(verifyArtifact).not.toHaveBeenCalled();
+});
