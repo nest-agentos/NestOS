@@ -1,6 +1,7 @@
 import type {TwinCollectionExecutor, TwinScannerTool} from '@nestos/app-contracts';
 import {sha256HexSync} from '@nestos/llm-context';
-import type {IToolService} from '@nestos/tools/contracts';
+import type {ToolDefinition} from '@nestos/llm-context';
+import type {IToolService, ToolMeta} from '@nestos/tools/contracts';
 import type {ToolPackageInfo} from '@nestos/app-contracts/services';
 export type CollectionToolCatalog = Pick<IToolService, 'listTools' | 'getToolDefinitions' | 'getToolDefaults'>;
 /** Catalog metadata is safe to project; executable handlers and credentials remain in the Session scope. */
@@ -12,9 +13,13 @@ export function collectionTools(catalog: CollectionToolCatalog): TwinScannerTool
         const parameters = definition.function?.parameters ?? definition.parameters ?? {type: 'object', properties: {}};
         const defaults = catalog.getToolDefaults?.(meta.id);
         return [{...(defaults && Object.keys(defaults).length ? {defaults: defaults as TwinScannerTool['defaults']} : {}), name: meta.name || meta.id, description: meta.description, source: meta.type,
-            target: {kind: 'tool' as const, id: meta.id, version: meta.version!, digest: sha256HexSync(JSON.stringify([meta, definition]))},
+            target: {kind: 'tool' as const, id: meta.id, version: meta.version!, digest: toolTargetDigest(meta, definition)},
             parameters: structuredClone(parameters) as TwinScannerTool['parameters']}];
     });
+}
+/** Freeze the published tool identity only; host-resolved runtime metadata (process isolation, timeout, enabled gate, tags) must not churn a saved target. */
+export function toolTargetDigest(meta: ToolMeta, definition: ToolDefinition): string {
+    return sha256HexSync(JSON.stringify({id: meta.id, version: meta.version, name: meta.name, description: meta.description, type: meta.type, definition}));
 }
 export function validateCollectionTool(catalog: CollectionToolCatalog, executor: TwinCollectionExecutor): void {
     if (executor.target.kind !== 'tool') return;

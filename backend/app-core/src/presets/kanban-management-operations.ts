@@ -26,7 +26,8 @@ class ManagementOperations implements OperationScopeProvider {
         if(!requiresDevelopmentProject(board)||isManagementVerifier(item))return;
         const owner=await managementOwner(this.options.service,board,item);if(!owner)return;
         if(owner.id!==item.id)return {owner:{boardId,itemId:owner.id},permittedActions:['accept','cancel']};
-        return {scopes:(await managementScopes({...this.options,projectLabel:this.projectLabel,repositoryKey:this.repositoryKey},board,owner)).map(scope=>({...scope,ready:scope.contributors.every(source=>board.items.some(row=>row.id===source.itemId&&['review','completed'].includes(row.status))),completed:scope.stage==='cleaned'}))};
+        const scopes=await managementScopes({...this.options,projectLabel:this.projectLabel,repositoryKey:this.repositoryKey},board,owner);
+        return {finalized:scopes.length>0&&scopes.every(scope=>scope.completed===true),scopes:scopes.map(scope=>({...scope,ready:scope.contributors.every(source=>board.items.some(row=>row.id===source.itemId&&['review','completed'].includes(row.status))),completed:scope.completed===true||scope.stage==='cleaned'}))};
     };
     deliveryPlan=async(board:KanbanBoard,item:KanbanItem):Promise<DeliveryPlan>=>{
         const base=await this.options.basePlan(board,item),owner=requiresDevelopmentProject(board)?await managementOwner(this.options.service,board,item):undefined;

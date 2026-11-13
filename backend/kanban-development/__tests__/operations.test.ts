@@ -699,3 +699,20 @@ it('retires settled cancelled tasks before attempting parent resolution',async()
  await f.api.scan();expect(describe).not.toHaveBeenCalled();expect(await f.journal.get('review-operation-scopes')).toEqual([]);
  expect(await f.journal.get(jobKey('cancelled-settled'))).toMatchObject({phase:'settled',state:'succeeded'});
 });
+
+it('requires complete explicit waivers for the accepted dispatch before adopting historical completion',async()=>{
+ const {fullyWaivedDevelopmentDelivery:complete}=await import('../src/development-operation-policy');
+ const dispatch={id:'dispatch',itemId:'task',outcome:'accepted'},waiver={id:'waiver',dispatchId:'dispatch',acceptanceWaived:true,operations:['build','deploy','merge','accept','cleanup'].map(id=>({id}))};
+ const item={id:'task',status:'completed',acceptanceResult:{dispatchId:'dispatch',outcome:'waived',waiverId:'waiver'},operationWaivers:[waiver]} as any;
+ expect(complete(item,dispatch as any)).toBe(true);
+ expect(complete(item,{...dispatch,id:'next'} as any)).toBe(false);
+ expect(complete({...item,operationWaivers:[{...waiver,operations:waiver.operations.filter(row=>row.id!=='merge')}]},dispatch as any)).toBe(false);
+ expect(complete({...item,status:'review'},dispatch as any)).toBe(false);
+});
+it('does not create a duplicate group finalizer after all management scopes are settled',async()=>{
+ const f=await fixture();f.item.status='completed';Object.assign(f.item,{planning:{execution:'children'}});
+ f.options.automatic=async()=>true;f.options.cleanup=vi.fn(async()=>true);
+ f.options.scopes={describe:async()=>({finalized:true,scopes:[{id:'already-settled',label:'Repository',contributors:[],completed:true}]}),resolve:vi.fn()};
+ f.options.service.catalog=async()=>[{id:'board'}] as never;f.options.service.read=async()=>({...f.board,automation:{enabled:true},items:[f.item]}) as never;
+ await f.api.scan();expect(f.options.cleanup).not.toHaveBeenCalled();expect(f.submission.start).not.toHaveBeenCalled();expect(f.published.start).not.toHaveBeenCalled();
+});

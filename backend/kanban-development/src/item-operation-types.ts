@@ -56,7 +56,7 @@ export interface ReviewOperationsOptions {
 export interface ReviewOperationScope {ready?:boolean;completed?:boolean;id:string;label:string;contributors:Array<{itemId:string;title:string}>}
 export type ResolvedOperationScope=Partial<Pick<ReviewOperationsOptions,'adapter'|'deliveryPlan'|'automaticTarget'|'cleanup'>>;
 export interface OperationScopeProvider {
-    describe(board:string,item:string):Promise<{owner?:{boardId:string;itemId:string};permittedActions?:string[];scopes?:ReviewOperationScope[]}|undefined>;
+    describe(board:string,item:string):Promise<{owner?:{boardId:string;itemId:string};finalized?:boolean;permittedActions?:string[];scopes?:ReviewOperationScope[]}|undefined>;
     resolve(board:string,item:string,scopeId:string):Promise<ResolvedOperationScope>;
     handoff?(board:KanbanBoard,item:KanbanItem):Promise<{boardId:string;itemId:string}|undefined>;
     dependencyReady?(board:string,item:KanbanItem):Promise<boolean|undefined>;

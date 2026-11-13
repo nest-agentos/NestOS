@@ -1,4 +1,5 @@
 import {managementOwner} from '../kanban/task-owner';
+import {waivedManagementDelivery} from './kanban-management-completion';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanService,KanbanDispatch} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
@@ -40,7 +41,8 @@ export async function managementScopes(options:{service:KanbanService;journal:Ka
         const receipts=await options.journal.getMany(rows.map(row=>integratedContributionKey(board.id,owner.id,row.dispatchId??row.itemId)));
         const pending=rows.filter((_row,index)=>!receipts[index]);if(!pending.length)continue;
         const id='repository-'+sha256HexSync(JSON.stringify([board.id,owner.id,repository,pending.map(row=>[row.itemId,row.dispatchId])])).slice(0,40);
-        current.push({schema:1,id,boardId:board.id,ownerId:owner.id,projectId,label:await options.projectLabel(projectId),contributors:pending});
+        const completed=await waivedManagementDelivery(options.journal,board,owner,rows,workflow,id);
+        current.push({schema:1,id,boardId:board.id,ownerId:owner.id,projectId,label:await options.projectLabel(projectId),contributors:pending,...(completed?{completed:true}:{})});
     }
     const previous=await savedManagementScopes(options.journal,board.id,owner.id);
     return [...previous.filter(scope=>!current.some(row=>row.id===scope.id)),...current];

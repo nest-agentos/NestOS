@@ -40,6 +40,7 @@ export function createItemOperations(input: ReviewOperationsOptions) {
         automatic:scoped.automatic||scoped.scopes?.handoff?async(board,item)=>{
             const route=await scoped.scopes?.describe(board.id,item.id);
             if(route?.owner&&scoped.scopes?.handoff)return true;
+            if(route?.finalized)return false;
             const scopes=route?.scopes;return (!scopes||scopes.length>0&&scopes.every(scope=>scope.completed))&&!!await scoped.automatic?.(board,item);
         }:undefined,
         reanalysis:(board,item,id)=>queue(board,item,()=>prepareAutomaticReanalysis({...scoped,policy:developmentAnalysisPolicy},board,item,id)),

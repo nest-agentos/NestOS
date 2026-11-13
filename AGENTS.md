@@ -12,7 +12,7 @@
 
 ## 开发原则
 SOLID / DRY / KISS / YAGNI / CoC / LoD — 函数≤30行，圈复杂度≤10
-
+- avoid unneccesary secondary labels and descriptions. let the layout do the explain.
 - 浏览器可达代码使用内部 ID 工具：应用层使用 `@nestos/common.randomUUID()`，独立包使用包内兼容工具；Session 内部沿用 `ulid`。禁止直接调用 `crypto.randomUUID()`（包括可选调用，它仍可能抛错）。`pnpm uuid:check` 已加入架构检查；Node 专用 `node:crypto` 不受此限制。
 
 - 非通用业务通过独立的外部 Tool 包与 Flow 定义接入；新增核心代码只提供通用机制，不内置具体业务的字段、提示词、模板、打包实现或按工具名分支。

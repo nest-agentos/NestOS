@@ -16,3 +16,13 @@ export async function releasableDevelopmentTarget(options:Pick<import('./item-op
     return (!finalizer||item.status==='completed')&&!item.deletedAt&&item.status!=='cancelled'&&item.planning?.execution==='children'&&state.executionId===item.id
         &&projects.length===1&&projects[0].id===scope.target&&options.adapter.supports?.(board,item)===true;
 }
+
+/** Historical waivers settle delivery only for the accepted dispatch, never a new handoff. */
+export function fullyWaivedDevelopmentDelivery(item:import('@nestos/kanban/contracts').KanbanItem,dispatch:import('@nestos/kanban/contracts').KanbanDispatch|undefined):boolean {
+    const acceptance=item.acceptanceResult;
+    if(item.status!=='completed'||dispatch?.itemId!==item.id||dispatch.outcome!=='accepted'||acceptance?.outcome!=='waived'||acceptance.dispatchId!==dispatch.id)return false;
+    const waivers=(item.operationWaivers??[]).filter(row=>row.dispatchId===dispatch.id);
+    if(!waivers.some(row=>row.id===acceptance.waiverId&&row.acceptanceWaived&&row.operations.some(op=>op.id==='accept')))return false;
+    const waived=new Set(waivers.flatMap(row=>row.operations.map(op=>op.id)));
+    return developmentDeliveryPolicy.steps.filter(action=>action!==developmentDeliveryPolicy.refreshAction).every(action=>waived.has(action));
+}

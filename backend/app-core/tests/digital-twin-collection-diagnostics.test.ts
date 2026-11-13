@@ -15,6 +15,14 @@ function catalog(overrides: Partial<ToolMeta> = {}): CollectionToolCatalog {
 const currentDigest = () => collectionTools(catalog())[0].target.digest;
 const frozen = (digest: string, version = '1') => ({target: {kind: 'tool' as const, id: 'google.collect', version, digest}});
 
+it('keeps the frozen target digest stable across host runtime metadata and moves it when the schema changes', () => {
+    const base = currentDigest();
+    expect(collectionTools(catalog({executionIsolation: 'process'}))[0].target.digest).toBe(base);
+    expect(collectionTools(catalog({timeoutMs: 99_000, tags: ['other'], icon: 'x'}))[0].target.digest).toBe(base);
+    const moved = {type: 'function' as const, function: {name: 'google.collect', description: 'Collect', parameters: {type: 'object', properties: {calendarId: {type: 'string'}}}}};
+    expect(collectionTools({...catalog(), getToolDefinitions: () => [moved as never]})[0].target.digest).not.toBe(base);
+});
+
 it('reports which identity component diverged from the current tool catalog', () => {
     expect(describeCollectionTarget(catalog(), frozen(currentDigest()))).toMatchObject({catalogMatch: 'exact', catalogSize: 1, catalogVersion: '1'});
     expect(describeCollectionTarget(catalog(), frozen('other-digest'))).toMatchObject({catalogMatch: 'digest', targetId: 'google.collect', targetVersion: '1'});

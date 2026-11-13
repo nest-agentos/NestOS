@@ -84,3 +84,25 @@ it('retains deleted parent identity for cancelled task history',async()=>{
  const parent={id:'deleted-manager',deletedAt:1,planning:{execution:'children'}},child={id:'cancelled-child',status:'cancelled',planning:{parentId:parent.id}};
  expect(await resolve({item:async()=>({item:parent})} as never,{id:'board',items:[child]} as never,child as never)).toBe(parent);
 });
+
+it('preserves completed historical delivery waivers when discovering management scopes',async()=>{
+ const f=await fixture();(f.owner as any).status='completed';
+ for(const item of f.items.slice(1,3)){
+  const dispatchId=item.id+'-dispatch',waiverId='waived-'+item.id;
+  Object.assign(item,{acceptanceResult:{dispatchId,outcome:'waived',waiverId},operationWaivers:[{id:waiverId,dispatchId,acceptanceWaived:true,operations:['build','deploy','merge','accept','cleanup'].map(id=>({id}))}]});
+ }
+ const completed=await managementScopes(f.options as never,f.board as never,f.owner as never);
+ expect(completed.find(scope=>scope.projectId==='repo-one')?.completed).toBe(true);
+ expect(completed.find(scope=>scope.projectId==='repo-two')?.completed).not.toBe(true);
+ await f.journal.update('review-operations:'+JSON.stringify(['board','a']),()=>({jobs:['unknown-delivery']}));
+ await f.journal.update('review-operation:unknown-delivery',()=>({phase:'submitting'}));
+ expect((await managementScopes(f.options as never,f.board as never,f.owner as never)).find(scope=>scope.projectId==='repo-one')?.completed).not.toBe(true);
+ await f.journal.update('review-operation:unknown-delivery',()=>({phase:'settled'}));
+ const id=completed.find(scope=>scope.projectId==='repo-one')!.id,key='automatic-delivery:'+JSON.stringify(['board','manager',id]);
+ await f.journal.update(key,()=>({id:'extra',steps:['analyze'],step:0,code:'OPERATION_OUTCOME_UNKNOWN',requests:{analyze:{operationId:'missing-proof',action:'analyze'}}}));
+ expect((await managementScopes(f.options as never,f.board as never,f.owner as never)).find(scope=>scope.projectId==='repo-one')?.completed).not.toBe(true);
+ await f.journal.update(key,old=>({...old as object,code:'WORKTREE_MISSING'}));
+ expect((await managementScopes(f.options as never,f.board as never,f.owner as never)).find(scope=>scope.projectId==='repo-one')?.completed).toBe(true);
+ f.dispatches.a={...f.dispatches.a,id:'a-next',attempt:2};
+ expect((await managementScopes(f.options as never,f.board as never,f.owner as never)).find(scope=>scope.projectId==='repo-one')?.completed).not.toBe(true);
+});
