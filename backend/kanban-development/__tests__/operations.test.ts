@@ -631,12 +631,27 @@ it('starts a ready management scope without a prior manual action and refreshes 
 });
 
 it('only retires a proven independent legacy finalizer for the same software target',async()=>{
- const {releasableDevelopmentFinalizer}=await import('../src/development-operation-policy');
+ const {releasableDevelopmentTarget}=await import('../src/development-operation-policy');
  const item={id:'old',status:'completed',planning:{execution:'children'},externalRefs:[{system:'nestos-remote-project',id:'project'}]};
  const options={service:{read:async()=>({id:'board'}),item:async()=>({item})},adapter:{supports:()=>true}} as any;
- const scope={id:'auto',boardId:'board',itemId:'old',target:'project'},state={id:'auto',executionId:'old',steps:['cleanup'],step:0,cleanupPrecondition:true} as any;
- expect(await releasableDevelopmentFinalizer(options,scope,state)).toBe(true);
- expect(await releasableDevelopmentFinalizer(options,{...scope,target:'other-project'},state)).toBe(false);
- expect(await releasableDevelopmentFinalizer({...options,adapter:{}},scope,state)).toBe(false);
- item.status='backlog';expect(await releasableDevelopmentFinalizer(options,scope,state)).toBe(false);
+ const scope={id:'auto',boardId:'board',itemId:'old',target:'project'},state={id:'auto',executionId:'old',steps:['cleanup'],step:0,cleanupPrecondition:true,requests:{}} as any;
+ expect(await releasableDevelopmentTarget(options,scope,state)).toBe(true);
+ expect(await releasableDevelopmentTarget(options,{...scope,target:'other-project'},state)).toBe(false);
+ expect(await releasableDevelopmentTarget({...options,adapter:{}},scope,state)).toBe(false);
+ item.status='backlog';expect(await releasableDevelopmentTarget(options,scope,state)).toBe(false);
+});
+
+
+it('releases missing-worktree analysis only before a delivery job exists',async()=>{
+ const {releasableDevelopmentTarget}=await import('../src/development-operation-policy');
+ const item={id:'owner',status:'backlog',planning:{execution:'children'},externalRefs:[{system:'nestos-remote-project',id:'project'}]};
+ const journal={get:vi.fn(async()=>undefined)},options={service:{read:async()=>({id:'board'}),item:async()=>({item})},adapter:{supports:()=>true},journal} as any;
+ const scope={id:'auto',boardId:'board',itemId:'owner',target:'project',scopeId:'repository'},state={id:'auto',executionId:'owner',steps:['analyze','merge'],step:0,code:'WORKTREE_MISSING',requests:{analyze:{operationId:'analysis'}}} as any;
+ expect(await releasableDevelopmentTarget(options,scope,state)).toBe(true);
+ expect(journal.get).toHaveBeenCalledWith(jobKey('analysis'));
+ journal.get.mockResolvedValue({phase:'submitting'} as never);
+ expect(await releasableDevelopmentTarget(options,scope,state)).toBe(false);
+ journal.get.mockResolvedValue(undefined);
+ expect(await releasableDevelopmentTarget(options,scope,{...state,code:'UNKNOWN'})).toBe(false);
+ expect(await releasableDevelopmentTarget(options,{...scope,target:'other'},state)).toBe(false);
 });
