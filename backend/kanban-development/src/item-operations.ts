@@ -1,5 +1,5 @@
 import {developmentAnalysisPolicy,developmentAuthority} from './development-operation-policy';
-import {developmentDeliveryPolicy} from './development-operation-policy';
+import {developmentDeliveryPolicy,releasableDevelopmentFinalizer} from './development-operation-policy';
 import {requireOperationAuthority,type OperationOrigin} from '@nestos/kanban/integration';
 import {operation,latestReviewJob as latest} from './item-operation-projection';
 import type {ReviewContext as Context} from './item-operation-types';
@@ -35,7 +35,7 @@ export function createItemOperations(input: ReviewOperationsOptions) {
         const result=await work(await operationRequestOptions(options,board,request));
         return request.scopeId?read(board,request.itemId):result;
     };
-    const createAutomatic=(scoped:ReviewOperationsOptions)=>automaticDelivery({...scoped,policy:developmentDeliveryPolicy,handoff:scoped.scopes?.handoff,
+    const createAutomatic=(scoped:ReviewOperationsOptions)=>automaticDelivery({...scoped,policy:developmentDeliveryPolicy,releasableTarget:(scope,state)=>releasableDevelopmentFinalizer(options,scope,state),handoff:scoped.scopes?.handoff,
         automatic:scoped.automatic||scoped.scopes?.handoff?async(board,item)=>{
             const route=await scoped.scopes?.describe(board.id,item.id);
             if(route?.owner&&scoped.scopes?.handoff)return true;

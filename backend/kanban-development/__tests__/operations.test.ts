@@ -629,3 +629,14 @@ it('starts a ready management scope without a prior manual action and refreshes 
  expect(f.submission.start.mock.calls.every(([request])=>request.expectedSessionId==='original')).toBe(true);
  expect(await f.journal.get('automatic-delivery:'+JSON.stringify(['board','task','repository-auto']))).toMatchObject({step:4});
 });
+
+it('only retires a proven independent legacy finalizer for the same software target',async()=>{
+ const {releasableDevelopmentFinalizer}=await import('../src/development-operation-policy');
+ const item={id:'old',status:'completed',planning:{execution:'children'},externalRefs:[{system:'nestos-remote-project',id:'project'}]};
+ const options={service:{read:async()=>({id:'board'}),item:async()=>({item})},adapter:{supports:()=>true}} as any;
+ const scope={id:'auto',boardId:'board',itemId:'old',target:'project'},state={id:'auto',executionId:'old',steps:['cleanup'],step:0,cleanupPrecondition:true} as any;
+ expect(await releasableDevelopmentFinalizer(options,scope,state)).toBe(true);
+ expect(await releasableDevelopmentFinalizer(options,{...scope,target:'other-project'},state)).toBe(false);
+ expect(await releasableDevelopmentFinalizer({...options,adapter:{}},scope,state)).toBe(false);
+ item.status='backlog';expect(await releasableDevelopmentFinalizer(options,scope,state)).toBe(false);
+});
