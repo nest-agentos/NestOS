@@ -418,6 +418,10 @@ pnpm httpd:activate <版本ID>   # 下次启动使用此版本
 
 恢复继续使用各模块已有的持久阶段与幂等身份。Kanban 决策与派发保留原 run/operation/session ID，提交回执仍核对后再前进；Kernel 已完成 Task 不重跑，未完成任务从已提交状态续办。扫描器在已提交的提取批次边界退出，把同一 run 及源偏移保留为 queued，重启继续未完成批次；安全停止不调用取消已接纳提取的接口。显式强停没有安全确认，不能假定当前外部副作用已完成，仍走既有 unknown/核对协议。
 
+### 原生依赖构建环境
+
+HTTP release 在隔离安装目录中修复并加载核对 `better-sqlite3`、`node-pty`、`sharp`，通过后才发布候选；不从其他 checkout 复制未经本次核对的绑定。Linux `node-pty` 需要 Python 3、make 和 C/C++ 编译器；Debian/Ubuntu 构建机安装 `build-essential python3`。执行镜像的 harness 层预装这些工具，base 层保持运行环境用途。缺少 make 时构建返回 `NATIVE_BUILD_TOOLCHAIN_MISSING` 并保留具体原因与补齐建议，失败不会切换服务。已保留的 VM 根盘需要实际升级，修改镜像配方不会立即改变现有 cell。
+
 ### 在 worktree 中验证
 
 `_nestos/worktrees/<dispatch>` 是 Git worktree，`release/`（含 `local-libraries/` 与 `httpd/`）默认落在各自检出内，因此新 worktree 首次构建是冷启动；此外 `lib:build` 需要根依赖（`yaml`），原生模块指纹与 deploy 的原生运行时复制都取自当前检出，所以 worktree 至少要 `pnpm install --ignore-scripts` 一次。按代价从轻到重选择：

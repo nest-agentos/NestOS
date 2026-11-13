@@ -28,3 +28,11 @@ test('multiple damaged native dependencies are repaired together',()=>{
     ensureNativeRuntime('/source',{...f,log(){}});
     assert.deepEqual(f.calls[1].args.slice(-2),['better-sqlite3','node-pty']);
 });
+
+test('missing native compiler tools retain the concrete cause and recovery action',()=>{
+    const f=runner([{status:1,output:'package=node-pty result=failure'},{status:1,output:'gyp ERR! stack Error: not found: make'}]),logs=[];
+    assert.throws(()=>ensureNativeRuntime('/source',{...f,operationId:'missing-tools',log:value=>logs.push(value)}),error=>
+        error.code==='NATIVE_BUILD_TOOLCHAIN_MISSING'&&error.missingTools[0]==='make'&&error.message.includes('build-essential')&&error.message.includes('not found: make'));
+    assert.match(logs.at(-1),/operationId=missing-tools.*result=failure.*code=NATIVE_BUILD_TOOLCHAIN_MISSING missing=make.*durationMs=/);
+    assert.equal(f.calls.length,2);
+});

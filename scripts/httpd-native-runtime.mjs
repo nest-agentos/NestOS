@@ -22,8 +22,11 @@ export function ensureNativeRuntime(source,{operationId='unknown',env=process.en
     if(rebuilt.output)log(rebuilt.output);
     const checked=rebuilt.status===0?probe():rebuilt;
     if(checked.status!==0){
-        log(`[HTTPBuild] operationId=${operationId} stage=native.prepare result=failure packages=${selected.join(',')} code=NATIVE_RUNTIME_PREPARATION_FAILED durationMs=${Date.now()-started}`);
-        throw Object.assign(new Error(`NATIVE_RUNTIME_PREPARATION_FAILED: ${selected.join(',')}; ${checked.output.trim()}`),{code:'NATIVE_RUNTIME_PREPARATION_FAILED'});
+        const missingMake=/not found: make|make: (?:command )?not found|spawn make ENOENT/i.test(checked.output);
+        const code=missingMake?'NATIVE_BUILD_TOOLCHAIN_MISSING':'NATIVE_RUNTIME_PREPARATION_FAILED';
+        const remedy=missingMake?' Install build-essential and python3 in the build environment; then retry the build.':'';
+        log(`[HTTPBuild] operationId=${operationId} stage=native.prepare result=failure packages=${selected.join(',')} code=${code}${missingMake?' missing=make':''} durationMs=${Date.now()-started}`);
+        throw Object.assign(new Error(`${code}: ${selected.join(',')}; ${checked.output.trim()}${remedy}`),{code,...(missingMake?{missingTools:['make']}:{})});
     }
     log(`[HTTPBuild] operationId=${operationId} stage=native.prepare result=success cache=rebuilt durationMs=${Date.now()-started}`);
 }
