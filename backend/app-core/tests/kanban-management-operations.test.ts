@@ -71,3 +71,10 @@ it('coalesces project aliases bound to the same authorized repository root',asyn
  const f=await fixture(),scopes=await managementScopes({...f.options,repositoryKey:()=> 'server/repository'} as never,f.board as never,f.owner as never);
  expect(scopes).toHaveLength(1);expect(scopes[0].contributors.map(item=>item.itemId)).toEqual(['a','b','c']);
 });
+
+it('resolves archived parent identities through the item API instead of the visible board',async()=>{
+ const {managementOwner:resolve}=await import('../src/presets/kanban-management-owner');
+ const parent={id:'archived-manager',status:'completed',planning:{execution:'children'}},child={id:'archived-child',planning:{parentId:parent.id}},item=vi.fn(async()=>({item:parent,archive:{archivedAt:1}}));
+ expect(await resolve({item} as never,{id:'board',items:[]} as never,child as never)).toBe(parent);
+ expect(item).toHaveBeenCalledWith('board',parent.id);
+});

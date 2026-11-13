@@ -655,3 +655,40 @@ it('releases missing-worktree analysis only before a delivery job exists',async(
  expect(await releasableDevelopmentTarget(options,scope,{...state,code:'UNKNOWN'})).toBe(false);
  expect(await releasableDevelopmentTarget(options,{...scope,target:'other'},state)).toBe(false);
 });
+
+it('retires settled archived scopes without resolving ownership or replaying completion',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build','archive-settled');f.complete('archive-settled');await f.api.scan();
+ const job=await f.journal.get<ReviewJob>(jobKey('archive-settled'));
+ f.options.service.item=async()=>({item:f.item,archive:{archivedAt:1}} as never);
+ const describe=vi.fn(async()=>{throw Error('Archived ownership must not be rediscovered');});f.options.scopes={describe,resolve:vi.fn()};
+ const saved=await f.journal.get(reviewKey('board','task')),starts=f.published.start.mock.calls.length;
+ await f.api.scan();await f.api.scan();
+ expect(describe).not.toHaveBeenCalled();expect(await f.journal.get('review-operation-scopes')).toEqual([]);
+ expect(await f.journal.get(jobKey('archive-settled'))).toEqual(job);expect(await f.journal.get(reviewKey('board','task'))).toEqual(saved);
+ expect(f.published.start).toHaveBeenCalledTimes(starts);
+ expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'operation.scope.archived',boardId:'board',itemId:'task',result:'success',count:1}));
+});
+it('keeps unknown archived operations registered and only observes the original execution',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build','archive-unknown');
+ f.options.service.item=async()=>({item:f.item,archive:{archivedAt:1}} as never);
+ f.published.inspect.mockResolvedValue({state:'unknown'} as never);const starts=f.published.start.mock.calls.length;
+ await f.api.scan();await f.api.scan();
+ expect(f.published.start).toHaveBeenCalledTimes(starts);expect(f.published.inspect).toHaveBeenCalled();
+ expect(await f.journal.get('review-operation-scopes')).toEqual([{board:'board',item:'task'}]);
+ expect(await f.journal.get(jobKey('archive-unknown'))).toMatchObject({phase:'submitting',state:'unknown'});
+});
+it('rejects new delivery operations for archived tasks',async()=>{
+ const f=await fixture();f.options.service.item=async()=>({item:f.item,archive:{archivedAt:1}} as never);
+ await expect(f.api.runItemOperation('board',{itemId:'task',operationId:'archived-new',action:'build',expectedRevision:'a'.repeat(64)})).rejects.toMatchObject({code:'ITEM_ARCHIVED'});
+ expect(f.published.start).not.toHaveBeenCalled();expect(f.submission.start).not.toHaveBeenCalled();
+});
+it('retains prepared archived work without admission or context continuation',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build','archive-prepared');
+ await f.journal.update<ReviewJob>(jobKey('archive-prepared'),old=>({...old!,phase:'prepared'}));
+ f.options.service.item=async()=>({item:f.item,archive:{archivedAt:1}} as never);
+ const starts=f.published.start.mock.calls.length;f.published.inspect.mockClear();
+ await f.api.scan();expect(f.published.start).toHaveBeenCalledTimes(starts);expect(f.published.inspect).not.toHaveBeenCalled();
+ expect(await f.journal.get(jobKey('archive-prepared'))).toMatchObject({phase:'prepared'});
+ expect(await f.journal.get('review-operation-scopes')).toEqual([{board:'board',item:'task'}]);
+ expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'operation.scope.archived-pending',code:'ARCHIVED_OPERATION_UNSETTLED',count:1}));
+});

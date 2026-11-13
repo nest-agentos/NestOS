@@ -8,7 +8,7 @@ import {managementReviewAdapter} from './kanban-management-review';
 import type {DevelopmentReviewOptions} from './kanban-development-review';
 import {requiresDevelopmentProject} from './kanban-development-policy';
 import {managementBatch} from './kanban-management-snapshot';
-import {managementTaskOwner as managementOwner} from '@nestos/kanban/integration';
+import {managementOwner} from './kanban-management-owner';
 import {managementScopes,savedManagementScopes,managementScopeKey,integratedContributionKey,isManagementVerifier,type ManagementScope} from './kanban-management-scope-catalog';
 
 interface Options extends DevelopmentReviewOptions {
@@ -24,16 +24,16 @@ class ManagementOperations implements OperationScopeProvider {
     describe=async(boardId:string,itemId:string)=>{
         const board=await this.options.service.read(boardId),item=(await this.options.service.item(boardId,itemId)).item;
         if(!requiresDevelopmentProject(board)||isManagementVerifier(item))return;
-        const owner=managementOwner(board,item);if(!owner)return;
+        const owner=await managementOwner(this.options.service,board,item);if(!owner)return;
         if(owner.id!==item.id)return {owner:{boardId,itemId:owner.id},permittedActions:['accept','cancel']};
         return {scopes:(await managementScopes({...this.options,projectLabel:this.projectLabel,repositoryKey:this.repositoryKey},board,owner)).map(scope=>({...scope,ready:scope.contributors.every(source=>board.items.some(row=>row.id===source.itemId&&['review','completed'].includes(row.status))),completed:scope.stage==='cleaned'}))};
     };
     deliveryPlan=async(board:KanbanBoard,item:KanbanItem):Promise<DeliveryPlan>=>{
-        const base=await this.options.basePlan(board,item),owner=requiresDevelopmentProject(board)?managementOwner(board,item):undefined;
+        const base=await this.options.basePlan(board,item),owner=requiresDevelopmentProject(board)?await managementOwner(this.options.service,board,item):undefined;
         return owner&&owner.id!==item.id&&!isManagementVerifier(item)?{steps:['accept'],acceptance:'source',acceptanceLabel:t('kanban.operationHandoff'),acceptanceConfirmation:null}:base;
     };
     handoff=async(board:KanbanBoard,item:KanbanItem)=>{
-        const owner=requiresDevelopmentProject(board)?managementOwner(board,item):undefined;
+        const owner=requiresDevelopmentProject(board)?await managementOwner(this.options.service,board,item):undefined;
         return owner&&owner.id!==item.id&&!isManagementVerifier(item)?{boardId:board.id,itemId:owner.id}:undefined;
     };
     dependencyReady=async(board:string,item:KanbanItem)=>{
@@ -95,7 +95,7 @@ async function requireUpstreamIntegration(options:Options,scope:ManagementScope,
         for(const dependency of item.planning?.dependencies??[]){
             if(ids.has(dependency))continue;
             const other=(await options.service.item(board.id,dependency)).item;
-            if(managementOwner(board,other)?.id!==scope.ownerId||isManagementVerifier(other))continue;
+            if((await managementOwner(options.service,board,other))?.id!==scope.ownerId||isManagementVerifier(other))continue;
             const latest=Object.values(workflow.dispatches).filter(row=>row.itemId===dependency).sort((a,b)=>b.attempt-a.attempt)[0];
             requireValue(latest&&await options.journal.get(integratedContributionKey(board.id,scope.ownerId,latest.id)),'OPERATION_UPSTREAM_INTEGRATION_REQUIRED');
         }

@@ -51,7 +51,7 @@ export interface ReviewOperationsOptions {
     service: KanbanService; journal: KanbanAutomationJournal;
     catalog(): Promise<import('@nestos/llm-session/contracts').RootTargetCatalog>;
     published: ReturnType<typeof publishedOperation>; submission: ReturnType<typeof sessionSubmission>; adapter: ReviewAdapter;
-    log(event: {operationId: string; stage: string; result: 'success' | 'failure'; code?: string; durationMs: number}): void;
+    log(event: {operationId: string; boardId?:string;itemId?:string;count?:number;stage: string; result: 'success' | 'failure'; code?: string; durationMs: number}): void;
 }
 export interface ReviewOperationScope {ready?:boolean;completed?:boolean;id:string;label:string;contributors:Array<{itemId:string;title:string}>}
 export type ResolvedOperationScope=Partial<Pick<ReviewOperationsOptions,'adapter'|'deliveryPlan'|'automaticTarget'|'cleanup'>>;

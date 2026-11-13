@@ -1,4 +1,4 @@
-import {managementTaskOwner as managementOwner} from '@nestos/kanban/integration';
+import {managementOwner} from './kanban-management-owner';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanService,KanbanDispatch} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
@@ -17,10 +17,10 @@ export const managementScopesKey=(board:string,item:string)=>'management-operati
 export const integratedContributionKey=(board:string,item:string,dispatch:string)=>'management-integrated:'+JSON.stringify([board,item,dispatch]);
 
 
-function contributions(board:KanbanBoard,owner:KanbanItem,dispatches:KanbanDispatch[]):Map<string,ManagementContribution[]> {
+async function contributions(service:KanbanService,board:KanbanBoard,owner:KanbanItem,dispatches:KanbanDispatch[]):Promise<Map<string,ManagementContribution[]>> {
     const groups=new Map<string,ManagementContribution[]>();
     for(const item of board.items){
-        if(item.deletedAt||item.status==='cancelled'||isManagementVerifier(item)||item.planning?.execution==='children'||managementOwner(board,item)?.id!==owner.id)continue;
+        if(item.deletedAt||item.status==='cancelled'||isManagementVerifier(item)||item.planning?.execution==='children'||(await managementOwner(service,board,item))?.id!==owner.id)continue;
         const projectId=workProjectId(item);if(!projectId)continue;
         const dispatch=dispatches.filter(row=>row.itemId===item.id).sort((a,b)=>b.attempt-a.attempt)[0];
         const refs=item.externalRefs?.filter(ref=>ref.system==='nestos-worktree')??[],worktree=refs.length===1?refs[0]:undefined;
@@ -30,7 +30,7 @@ function contributions(board:KanbanBoard,owner:KanbanItem,dispatches:KanbanDispa
     return groups;
 }
 export async function managementScopes(options:{service:KanbanService;journal:KanbanAutomationJournal;projectLabel(id:string):Promise<string>;repositoryKey?(id:string):string},board:KanbanBoard,owner:KanbanItem):Promise<ManagementScope[]> {
-    const workflow=await options.service.workflow(board.id),groups=contributions(board,owner,Object.values(workflow.dispatches));
+    const workflow=await options.service.workflow(board.id),groups=await contributions(options.service,board,owner,Object.values(workflow.dispatches));
     const repositories=new Map<string,{projectId:string;rows:ManagementContribution[]}>();
     for(const [projectId,rows] of groups){const key=options.repositoryKey?.(projectId)??projectId,group=repositories.get(key);
         if(group)group.rows.push(...rows);else repositories.set(key,{projectId,rows});}
