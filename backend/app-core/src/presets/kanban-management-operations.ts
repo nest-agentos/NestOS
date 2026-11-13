@@ -8,7 +8,7 @@ import {managementReviewAdapter} from './kanban-management-review';
 import type {DevelopmentReviewOptions} from './kanban-development-review';
 import {requiresDevelopmentProject} from './kanban-development-policy';
 import {managementBatch} from './kanban-management-snapshot';
-import {managementOwner} from './kanban-management-owner';
+import {managementOwner} from '../kanban/task-owner';
 import {managementScopes,savedManagementScopes,managementScopeKey,integratedContributionKey,isManagementVerifier,type ManagementScope} from './kanban-management-scope-catalog';
 
 interface Options extends DevelopmentReviewOptions {

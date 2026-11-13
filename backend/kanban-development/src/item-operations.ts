@@ -4,7 +4,7 @@ import {requireOperationAuthority,type OperationOrigin} from '@nestos/kanban/int
 import {operation,latestReviewJob as latest} from './item-operation-projection';
 import type {ReviewContext as Context} from './item-operation-types';
 import {discoverOperationScopes} from './item-operation-discovery';
-import {scanArchivedScope} from './item-operation-archive';
+import {scanRetiredScope} from './item-operation-retirement';
 import {invalidateReviewAnalysis,prepareAutomaticReanalysis} from '@nestos/kanban/integration';
 import {readOperationScopes,operationRequestOptions,scopedOperationOptions,scopedFinalizationStatus} from './item-operation-scopes';
 import {finishReviewCleanup,reviewCleanupKey,type ReviewCleanup} from '@nestos/kanban/integration';
@@ -65,7 +65,7 @@ export function createItemOperations(input: ReviewOperationsOptions) {
             for (const scope of registered) {
                 if (stopped) return;
                 const started=Date.now();let archived=false;try{
-                await queue(scope.board, scope.item, async () => {if(await scanArchivedScope(options,scope,advanceReviewJob)){archived=true;return;}const scoped=await scopedOperationOptions(options,scope.board,scope.item,scope.scopeId);const context = await load(scoped, scope.board, scope.item, false);
+                await queue(scope.board, scope.item, async () => {if(await scanRetiredScope(options,scope,advanceReviewJob)){archived=true;return;}const scoped=await scopedOperationOptions(options,scope.board,scope.item,scope.scopeId);const context = await load(scoped, scope.board, scope.item, false);
                     for (const job of context.jobs) {if (stopped) return; if (job.phase !== 'settled') {if(job.phase==='prepared'&&(await options.service.read(scope.board)).executionControl?.paused)continue;await advanceReviewJob(scoped, job);} else await scoped.report?.(job);}
                     if(!stopped){await followUp(scoped,scope.board,scope.item);await settleDeliveryAcceptance(scoped,scope.board,scope.item);}});
                 if(!stopped&&!archived&&scope.scopeId){const scoped=await scopedOperationOptions(options,scope.board,scope.item,scope.scopeId);await createAutomatic(scoped).scanScope(scope.board,scope.item);}
@@ -134,7 +134,7 @@ async function authorize(options: ReviewOperationsOptions, context: Context): Pr
 async function bind(options: ReviewOperationsOptions, board: string, request: KanbanItemOperationBinding) {
     const context = await load(options, board, request.itemId, false); await authorize(options, context);requireValue(!context.archived,'ITEM_ARCHIVED');
     requireValue(!context.board.lifecycle || request.action === 'accept','BOARD_STOPPING');
-    requireValue(context.item.deletedAt === undefined && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
+    requireValue(context.item.deletedAt === undefined && context.item.status !== 'cancelled' && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
     requireValue(['build', 'deploy', 'merge'].includes(request.action), 'OPERATION_BINDING_FORBIDDEN');
     requireValue(!context.jobs.some(job => job.phase !== 'settled'), 'OPERATION_IN_USE');
     const catalog = await options.catalog(), target = automationTarget(request.target, catalog); requireValue(target.kind === 'flow', 'OPERATION_FLOW_REQUIRED');
@@ -154,7 +154,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     requireValue(!context.archived||request.action==='cancel','ITEM_ARCHIVED');
     if(automatic)requireValue(!context.board.executionControl?.paused,'AUTOMATIC_DELIVERY_PAUSED');
     requireValue(!context.board.lifecycle || request.action === 'accept'||request.action==='cancel','BOARD_STOPPING');
-    requireValue(request.action==='cancel'||context.item.deletedAt === undefined && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
+    requireValue(request.action==='cancel'||context.item.deletedAt === undefined && context.item.status !== 'cancelled' && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
     requireValue(/^[\w-]{1,128}$/.test(request.operationId) && (actions.includes(request.action as ReviewAction)||request.action==='skip'||request.action==='cancel'||request.action==='cleanup'), 'OPERATION_REQUEST_INVALID');
     if(request.action==='cleanup'){
         requireValue(request.expectedRevision===revision(context),'OPERATION_STALE_REFRESH');

@@ -2,7 +2,7 @@ import {combineGitSnapshots,type GitSnapshot} from '@nestos/git-delivery/snapsho
 import type {KanbanBoard,KanbanItem,KanbanService} from '@nestos/kanban/contracts';
 import type {ReviewSnapshot} from '@nestos/kanban-development';
 import {requireValue} from '../kanban/validation';
-import {managementTaskOwner as managementOwner} from '@nestos/kanban/integration';
+import {managementOwner} from '../kanban/task-owner';
 import {type ManagementScope} from './kanban-management-scope-catalog';
 
 export interface ManagementSource {itemId:string;dispatchId:string;snapshot:ReviewSnapshot}
@@ -14,7 +14,7 @@ export async function managementBatchSnapshot(scope:ManagementScope,board:Kanban
     const workflow=await service.workflow(board.id),sources:ManagementSource[]=[];
     for(const contribution of scope.contributors){
         const {item}=await service.item(board.id,contribution.itemId);
-        requireValue(!item.deletedAt&&item.status!=='cancelled'&&managementOwner(board,item)?.id===scope.ownerId,'OPERATION_SCOPE_CHANGED');
+        requireValue(!item.deletedAt&&item.status!=='cancelled'&&(await managementOwner(service,board,item))?.id===scope.ownerId,'OPERATION_SCOPE_CHANGED');
         const latest=Object.values(workflow.dispatches).filter(row=>row.itemId===item.id).sort((a,b)=>b.attempt-a.attempt)[0];
         requireValue(latest&&latest.id===contribution.dispatchId&&['succeeded','accepted'].includes(latest.outcome??''),'OPERATION_SOURCES_NOT_READY');
         const evidence=await snapshot(item);

@@ -1,4 +1,4 @@
-import {managementOwner} from './kanban-management-owner';
+import {managementOwner} from '../kanban/task-owner';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanService,KanbanDispatch} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';

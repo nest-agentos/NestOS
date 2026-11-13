@@ -73,8 +73,14 @@ it('coalesces project aliases bound to the same authorized repository root',asyn
 });
 
 it('resolves archived parent identities through the item API instead of the visible board',async()=>{
- const {managementOwner:resolve}=await import('../src/presets/kanban-management-owner');
+ const {managementOwner:resolve}=await import('../src/kanban/task-owner');
  const parent={id:'archived-manager',status:'completed',planning:{execution:'children'}},child={id:'archived-child',planning:{parentId:parent.id}},item=vi.fn(async()=>({item:parent,archive:{archivedAt:1}}));
  expect(await resolve({item} as never,{id:'board',items:[]} as never,child as never)).toBe(parent);
  expect(item).toHaveBeenCalledWith('board',parent.id);
+});
+
+it('retains deleted parent identity for cancelled task history',async()=>{
+ const {managementOwner:resolve}=await import('../src/kanban/task-owner');
+ const parent={id:'deleted-manager',deletedAt:1,planning:{execution:'children'}},child={id:'cancelled-child',status:'cancelled',planning:{parentId:parent.id}};
+ expect(await resolve({item:async()=>({item:parent})} as never,{id:'board',items:[child]} as never,child as never)).toBe(parent);
 });

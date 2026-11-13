@@ -666,7 +666,7 @@ it('retires settled archived scopes without resolving ownership or replaying com
  expect(describe).not.toHaveBeenCalled();expect(await f.journal.get('review-operation-scopes')).toEqual([]);
  expect(await f.journal.get(jobKey('archive-settled'))).toEqual(job);expect(await f.journal.get(reviewKey('board','task'))).toEqual(saved);
  expect(f.published.start).toHaveBeenCalledTimes(starts);
- expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'operation.scope.archived',boardId:'board',itemId:'task',result:'success',count:1}));
+ expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'operation.scope.retired',boardId:'board',itemId:'task',result:'success',count:1}));
 });
 it('keeps unknown archived operations registered and only observes the original execution',async()=>{
  const f=await fixture();await f.bind('build');await f.run('build','archive-unknown');
@@ -690,5 +690,12 @@ it('retains prepared archived work without admission or context continuation',as
  await f.api.scan();expect(f.published.start).toHaveBeenCalledTimes(starts);expect(f.published.inspect).not.toHaveBeenCalled();
  expect(await f.journal.get(jobKey('archive-prepared'))).toMatchObject({phase:'prepared'});
  expect(await f.journal.get('review-operation-scopes')).toEqual([{board:'board',item:'task'}]);
- expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'operation.scope.archived-pending',code:'ARCHIVED_OPERATION_UNSETTLED',count:1}));
+ expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'operation.scope.inactive-pending',code:'INACTIVE_OPERATION_UNSETTLED',count:1}));
+});
+
+it('retires settled cancelled tasks before attempting parent resolution',async()=>{
+ const f=await fixture();await f.bind('build');await f.run('build','cancelled-settled');f.complete('cancelled-settled');await f.api.scan();f.item.status='cancelled';
+ const describe=vi.fn(async()=>{throw Error('Deleted parent must not affect settled cancellation');});f.options.scopes={describe,resolve:vi.fn()};
+ await f.api.scan();expect(describe).not.toHaveBeenCalled();expect(await f.journal.get('review-operation-scopes')).toEqual([]);
+ expect(await f.journal.get(jobKey('cancelled-settled'))).toMatchObject({phase:'settled',state:'succeeded'});
 });

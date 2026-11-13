@@ -1,9 +1,10 @@
 import type {KanbanClient,KanbanRecordConversation} from '@nestos/kanban/contracts';
-import {safeCode,managementTaskOwner,type KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {safeCode,type KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
 import {planningSessionReader} from './planning-sessions';
 import {workContext} from './work-context';
 import {requireValue} from './validation';
+import {managementOwner} from './task-owner';
 type Request={itemId:string;operationId:string};
 type Log=(event:{operationId:string;boardId:string;stage:string;result:'success'|'failure';code?:string;durationMs:number})=>void;
 /** Routing is advisory; native execution receipts still control task settlement. */
@@ -11,7 +12,7 @@ export function taskCommunication(service:KanbanClient,journal:KanbanAutomationJ
     const coordinate=async(boardId:string,request:Request)=>{
         const board=await service.read(boardId),item=(await service.item(boardId,request.itemId)).item,context=await workContext(journal,board,item,service);
         requireValue(context.decision,'DECISION_LINK_UNAVAILABLE');
-        const owner=managementTaskOwner(board,item)??item;
+        const owner=await managementOwner(service,board,item)??item;
         const current=owner.purpose==='planning'||owner.planning?.execution==='children'
             ?await planningSessionReader(service,journal,options)(boardId,owner.id):undefined;
         if(current)return {id:current.analysisId,boardId,recordId:context.decision.recordId,sessionId:current.sessionId,

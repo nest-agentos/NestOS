@@ -44,4 +44,6 @@
 
 构建产物位置按准备阶段冻结的服务描述符解析。`artifact.store.base=source-checkout` 由受信任 `RuntimeServiceControl.verifyArtifact` 在服务自己的制品库核对完整发布包及清单摘要；不得相对执行工作树拼接。回执中的版本与证据路径必须匹配冻结的库路径和清单名，模型不能选择宿主目录。未声明宿主制品库的普通工作树产物仍通过原文件摘要检查。
 
-任务身份与可见列表独立：`resolveManagementTaskOwner` 优先使用当前快照，缺失祖先通过 `service.item(boardId, parentId)` 精确读取归档记录，不读取全部归档，也不重写 ID 或 `parentId`。`OPERATION_OWNER_INVALID` 保留兼容码，诊断增加 `boardId/itemId/parentId/reason/parentArchived`，区分缺失、删除、循环与身份不匹配。归档扫描在插件解析前检查原操作记录；全部结算后仅移除扫描登记，保留身份、请求和回执。未结算记录只观察原提交，不启动准备中的操作、上下文续轮、后续交付或清理；缺失操作记录仍保留责任并记录具体原因。
+任务身份与可见列表独立：`resolveManagementTaskOwner` 优先使用当前快照，缺失祖先通过 `service.item(boardId, parentId)` 精确读取归档记录，不读取全部归档，也不重写 ID 或 `parentId`。`OPERATION_OWNER_INVALID` 保留兼容码，诊断增加 `boardId/itemId/parentId/reason/parentArchived`，区分缺失、删除、循环与身份不匹配。归档、取消和删除后的扫描在插件解析前检查原操作记录；全部结算后仅移除扫描登记，保留身份、请求和回执。未结算记录只观察原提交，不启动准备中的操作、上下文续轮、后续交付或清理；缺失操作记录仍保留责任并记录具体原因。
+
+归档、已取消与删除任务的历史读取可解析已删除父任务的保留身份，历史引用不会因停止执行而改变；活动任务遇到已删除父任务仍返回明确诊断，不能据此取得新执行授权。
