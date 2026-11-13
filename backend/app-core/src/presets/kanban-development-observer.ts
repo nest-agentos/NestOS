@@ -24,6 +24,7 @@ import type {UserEventService} from '../events/service';
 type Input = Parameters<NonNullable<PersonalKanbanAutomationOptions['observeWork']>>[0];
 interface Options {exchange?: ReturnType<typeof import('./kanban-channel-exchange').developmentWorkExchange>;
     verifyDelivery?(dispatchId: string): Promise<void>;
+    handoffReports?(board:string,item:string,dispatch:string,service:import('@nestos/kanban/contracts').KanbanService):Promise<unknown>;
     lifecycle?: Pick<ReturnType<typeof import('./kanban-development-lifecycle').developmentLifecycle>, 'enqueue' | 'scan' | 'dispose' | 'settled'>;
     kernel: ContextInspector; fs: IFileSystem; events: UserEventService; projects: Pick<ProjectService, 'get' | 'openWorkspace'> & Partial<Pick<ProjectService,'forFolder'>>;
     remote?: Pick<import('../projects/remote-mounts').ProjectRemoteMountService, 'projectHarness' | 'sessionChannel'> & Partial<Pick<import('../projects/remote-mounts').ProjectRemoteMountService,'sessionStatus'>>; wake(): void}
@@ -97,7 +98,7 @@ export function developmentObserver(options: Options) {
             } catch (error) {
                 return {...input.observation, outcome: 'unknown', outputs: undefined, code: (error as {code: string}).code};
             }
-            try {await options.verifyDelivery?.(input.dispatch.id);}
+            try {await options.verifyDelivery?.(input.dispatch.id);await options.handoffReports?.(input.boardId,item.id,input.dispatch.id,input.service);}
             catch (error) {
                 const raw = (error as {code?: unknown})?.code;
                 const code = typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'DELIVERY_VERIFICATION_FAILED';

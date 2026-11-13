@@ -1,7 +1,8 @@
+import {deliverSoftwareReports} from '@nestos/kanban-development';
 import {automaticDeliveryStatus} from '@nestos/kanban/integration';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {afterEach, expect, it, vi} from 'vitest';
-import {mkdtemp, mkdir, writeFile, rm, stat} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, rm, stat, readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFile} from 'node:child_process';
@@ -33,16 +34,18 @@ async function fixture(withModule=false,withGenerated=false) {
     const commands: string[][] = [];
     const process = {release: vi.fn(async () => {}), nativeShell: {exec: async (_name: string, args: string[], options: {cwd: string}) => {
         commands.push(args); const actual = args.map(value => value.replaceAll('/workspace', root));
-        try {const r = await git(options.cwd.replace('/workspace', root), actual); return {code: 0, stdout: r.stdout.replaceAll(root, '/workspace'), stderr: r.stderr};}
+        try {const r = await exec(_name, actual, {cwd: options.cwd.replace('/workspace', root)}); return {code: 0, stdout: r.stdout.replaceAll(root, '/workspace'), stderr: r.stderr};}
         catch (error) {const r = error as {code: number; stdout: string; stderr: string}; return {code: r.code, stdout: r.stdout ?? '', stderr: r.stderr ?? ''};}
     }}} as never;
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/');
     await fs.driver.createFile({parentPath: directory + '/_nestos/kanban/inbox', name: 'result.yaml', content: 'Retained evidence', recursive: true});
+    await mkdir(join(physical,'_nestos/kanban/artifacts'),{recursive:true});
+    await writeFile(join(physical,'_nestos/kanban/artifacts/report.json'),'Retained evidence');
     const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     await journal.update('worktree:ready', () => tree);
     await journal.update('development-workspace:ready', () => ({directory, projectId: 'project',availableRepositories:withModule?[{path:'library'}]:[], context: {board: {id: 'board'}, task: {id: 'item'}}}));
     const item = {id: 'item', status: 'completed', revision: 1, externalRefs: [{system: 'nestos-remote-project', id: 'project'}, {system: 'nestos-worktree', id: 'ready'}]};
-    const service = {catalog:async()=>[],query:async()=>({items:[],total:0}),item: async () => ({item}), read: async () => ({items:[item],members: [{kind: 'human', id: 'admin', roles: ['coordinator']}]}),
+    const service = {catalog:async()=>[],query:async()=>({items:[],total:0}),item: async () => ({item}), execute:vi.fn(async (_board,request)=>{item.externalRefs.push(request.command.reference);}), read: async () => ({id:'board',revision:1,items:[item],members: [{kind: 'human', id: 'admin', roles: ['coordinator']}]}),
         currentPrincipal: async () => ({kind: 'human', id: 'admin'}), workflow: async () => ({dispatches: {}})} as never;
     const workLog = {records: vi.fn(async () => ({items: []})), append: vi.fn(async () => {})};
     const mount = {at: '/', access: 'rw', connectionId: 'connection', serverProjectId: 'server-project', serverProjectRevision: 1, serverId: 'server'};
@@ -54,7 +57,7 @@ async function fixture(withModule=false,withGenerated=false) {
     return {root, physical, fs, tree, process, git, item, service, workLog, journal, commands, api: developmentWorkResources(options)};
 }
 it('checks real Git ancestry, uncommitted changes and ignored files before offering cleanup', async () => {
-    const f = await fixture(); expect(worktreeBlockers(await inspectWorktree(f.process, f.tree))).toEqual([]);
+    const f = await fixture(); expect(worktreeBlockers(await inspectWorktree(f.process, f.tree, '_nestos/kanban/'))).toEqual([]);
     await writeFile(join(f.physical, 'file.txt'), 'Uncommitted');
     expect(worktreeBlockers(await inspectWorktree(f.process, f.tree))).toContain('WORKTREE_DIRTY');
     await f.git(f.physical, ['add', 'file.txt']); await f.git(f.physical, ['commit', '-m', 'test: unintegrated']);
@@ -101,12 +104,15 @@ it('excludes only archived protocol evidence without enumerating ignored depende
     expect(worktreeBlockers(await inspectWorktree(f.process, f.tree, '_nestos/kanban/'))).toContain('WORKTREE_UNTRACKED_IGNORED');
     expect(f.commands.some(args => args[0] === 'ls-files' && args.includes('--directory'))).toBe(true);
 });
-it('archives evidence before safe removal, deletes only the merged branch and returns the original receipt on retry', async () => {
+it('hands compressed reports to management before safe removal, deletes only the merged branch and returns the original receipt on retry', async () => {
     const f = await fixture(), preview = (await f.api.workResources('board', 'item'))[0];
     expect(preview).toMatchObject({id: 'ready', state: 'cleanup-ready', canCleanup: true});
     const request = {operationId: 'cleanup-one', itemId: 'item', resourceId: 'ready', version: preview.version};
     expect(await f.api.cleanupWorkResource('board', request)).toMatchObject({state: 'cleaned', canCleanup: false});
-    expect(new TextDecoder().decode(await f.fs.driver.readContent('/var/lib/kanban/worktree-archives/ready/inbox/result.yaml', {encoding: 'binary'}))).toBe('Retained evidence');
+    const receipt=await f.journal.get<any>('worktree-cleanup:ready');
+    const bundle=receipt.delivery.replace('/workspace',f.root);
+    expect((await exec('tar',['-xOzf',bundle,'_nestos/kanban/artifacts/report.json'])).stdout).toBe('Retained evidence');
+    expect(f.item.externalRefs).toContainEqual(expect.objectContaining({system:'nestos-software-reports',id:'ready'}));
     await expect(stat(f.physical)).rejects.toMatchObject({code: 'ENOENT'});
     expect(f.commands.filter(args => args[0] === 'worktree' && args[1] === 'remove')).toEqual([['worktree', 'remove', f.tree.directory]]);
     await f.api.cleanupWorkResource('board', request);
@@ -126,14 +132,10 @@ it('refuses unfinished tasks, changed previews and sessions that become busy bef
     expect(f.commands.some(args => args[0] === 'worktree' && args[1] === 'remove')).toBe(false);
     expect((await stat(f.physical)).isDirectory()).toBe(true);
 });
-it('keeps the directory intact when evidence cannot be archived', async () => {
+it('keeps the directory intact when report handoff fails', async () => {
     const f = await fixture(), resource = (await f.api.workResources('board', 'item'))[0];
-    const create = f.fs.driver.createFile.bind(f.fs.driver);
-    vi.spyOn(f.fs.driver, 'createFile').mockImplementation(async options => {
-        if (options.parentPath?.startsWith('/var/lib/kanban/worktree-archives/')) throw Object.assign(new Error('disk unavailable'), {code: 'EIO'});
-        return create(options);
-    });
-    await expect(f.api.cleanupWorkResource('board', {operationId: 'archive-failure', itemId: 'item', resourceId: 'ready', version: resource.version})).rejects.toMatchObject({code: 'EIO'});
+    vi.spyOn(f.service as any,'execute').mockRejectedValue(Object.assign(new Error('disk unavailable'),{code:'EIO'}));
+    await expect(f.api.cleanupWorkResource('board', {operationId: 'handoff-failure', itemId: 'item', resourceId: 'ready', version: resource.version})).rejects.toMatchObject({code:'EIO'});
     expect((await stat(f.physical)).isDirectory()).toBe(true);
     expect(f.commands.some(args => args[0] === 'worktree' && args[1] === 'remove')).toBe(false);
     expect((await f.api.workResources('board', 'item'))[0]).toMatchObject({state: 'cleanup-ready', canCleanup: true});
@@ -216,9 +218,9 @@ it('removes populated modules only after proving clean files and integration int
  expect(f.commands).toContainEqual(['worktree','remove','--force',f.tree.directory]);await expect(stat(f.physical)).rejects.toMatchObject({code:'ENOENT'});
  expect((await f.git(join(f.root,'library'),['status','--porcelain'])).stdout).toBe('');
 });
-it('retains ignored files inside populated modules instead of treating a clean parent as disposable',async()=>{
+it('allows ignored module files only within the settled owned software worktree',async()=>{
  const f=await fixture(true);await mkdir(join(f.physical,'library/cache'));await writeFile(join(f.physical,'library/cache/private'),'Retain');
- const resource=(await f.api.workResources('board','item'))[0];expect(resource).toMatchObject({canCleanup:false,reasons:expect.arrayContaining(['WORKTREE_UNTRACKED_IGNORED'])});
+ const resource=(await f.api.workResources('board','item'))[0];expect(resource).toMatchObject({canCleanup:true});
  expect(f.commands.some(args=>args[0]==='worktree'&&args[1]==='remove')).toBe(false);
 });
 
@@ -283,10 +285,31 @@ it('cleans declared generated dependencies and build outputs while preserving ex
  expect(await f.api.cleanupWorkResource('board',{operationId:'generated-cleanup',itemId:'item',resourceId:'ready',version:preview.version})).toMatchObject({state:'cleaned'});
  expect((await stat(join(external,'keep'))).isFile()).toBe(true);expect(f.commands.some(args=>args[0]==='clean')).toBe(false);
 });
-it('keeps undeclared ignored data and active generated workspaces retained',async()=>{
+it('retains active workspaces and permits all remaining ignored files after settlement',async()=>{
  const f=await fixture(false,true);await mkdir(join(f.physical,'node_modules'),{recursive:true});await writeFile(join(f.physical,'node_modules/generated'),'Dependency');
  native.reasons=['WORKTREE_IN_USE'];expect((await f.api.workResources('board','item'))[0]).toMatchObject({canCleanup:false,reasons:['WORKTREE_IN_USE']});native.reasons=[];
  await mkdir(join(f.physical,'cache'),{recursive:true});await writeFile(join(f.physical,'cache/user-data'),'Keep');
- const row=(await f.api.workResources('board','item'))[0];expect(row).toMatchObject({canCleanup:false,reasons:['WORKTREE_UNTRACKED_IGNORED']});
- expect(row.properties).toContainEqual(expect.objectContaining({value:'cache/'}));
+ const row=(await f.api.workResources('board','item'))[0];expect(row).toMatchObject({canCleanup:true});
+});
+
+it('compresses large reports and excludes reproducible browser bundles before clearing the rest',async()=>{
+ const f=await fixture();await writeFile(join(f.physical,'_nestos/kanban/artifacts/report.json'),'a'.repeat(1200000));
+ await mkdir(join(f.physical,'_nestos/kanban/artifacts/browser/dist'),{recursive:true});await writeFile(join(f.physical,'_nestos/kanban/artifacts/browser/dist/bundle.js'),'b'.repeat(5300000));
+ const [row]=await f.api.workResources('board','item');await f.api.cleanupWorkResource('board',{operationId:'large-report',itemId:'item',resourceId:'ready',version:row.version});
+ const receipt=await f.journal.get<any>('worktree-cleanup:ready'),bundle=receipt.delivery.replace('/workspace',f.root);
+ expect((await stat(bundle)).size).toBeLessThan(10000);expect((await exec('tar',['-tzf',bundle])).stdout).not.toContain('bundle.js');
+ await expect(stat(f.physical)).rejects.toMatchObject({code:'ENOENT'});
+});
+
+it('reuses a verified compressed handoff and refuses changed package bytes',async()=>{
+ const f=await fixture(),options={journal:f.journal,service:f.service,process:f.process,directory:f.tree.directory,resourceId:'ready',owner:{boardId:'board',itemId:'item'}};
+ const first=await deliverSoftwareReports(options);expect(await deliverSoftwareReports(options)).toBe(first);
+ expect((f.service as any).execute).toHaveBeenCalledOnce();
+ await writeFile(first!.replace('/workspace',f.root),'Corrupted');
+ await expect(deliverSoftwareReports(options)).rejects.toMatchObject({code:'SOFTWARE_REPORT_DIGEST_MISMATCH'});
+ expect((await stat(f.physical)).isDirectory()).toBe(true);
+});
+it('reports configurable transfer budgets without deleting source evidence',async()=>{
+ const f=await fixture();await expect(deliverSoftwareReports({journal:f.journal,service:f.service,process:f.process,directory:f.tree.directory,resourceId:'ready',owner:{boardId:'board',itemId:'item'},budget:{maxFiles:1,maxBytes:1}})).rejects.toMatchObject({code:'SOFTWARE_REPORT_BUDGET_EXCEEDED'});
+ expect(await readFile(join(f.physical,'_nestos/kanban/artifacts/report.json'),'utf8')).toBe('Retained evidence');
 });

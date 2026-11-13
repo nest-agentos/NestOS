@@ -1083,6 +1083,7 @@ export const zhCN = {
     'kanban.eventsHelp': '事件记录（最早 200 条中的本事项记录）',
     'kanban.closePlan': '验收规划目标',
 
+    'kanban.workResourceDelivery': '交付报告',
     'kanban.workResourceRetainedPath': '保留路径',
     'kanban.workResourceTitle': '初始化',
     'kanban.workResourceArchive': '归档',

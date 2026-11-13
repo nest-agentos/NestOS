@@ -7,8 +7,8 @@ export {coordinator,worker,automationCatalog,automationTarget,assertAutomationPr
 export type {MergePlan} from '@nestos/git-delivery/contracts';
 
 export {createSoftwareDevelopmentPlugin} from './plugin';
-export {removableDevelopmentArtifacts} from './generated-artifacts';
 export {default as developmentPrompts} from './prompts/development.json';
 export {default as maintenancePrompts} from './prompts/maintenance.json';
 export {default as managementPrompts} from './prompts/management.json';
 export {developmentCatalog} from './development-catalog';
+export {deliverSoftwareReports,disposableSoftwareFiles} from './report-delivery';

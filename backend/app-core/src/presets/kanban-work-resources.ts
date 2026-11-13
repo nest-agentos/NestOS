@@ -1,4 +1,4 @@
-import {developmentDeliveryPolicy,removableDevelopmentArtifacts} from '@nestos/kanban-development';
+import {developmentDeliveryPolicy,disposableSoftwareFiles} from '@nestos/kanban-development';
 import {cleanupGitResource,type GitCleanupReceipt as Cleanup,type GitRemovalBoundary} from '@nestos/git-delivery/cleanup';
 import {taskResourceFamily,ownedResourceReferences} from './kanban-work-resource-scope';
 import {readManagedBranches,inspectManagedBranches,type ManagedBranch} from '@nestos/git-delivery/branches';
@@ -17,7 +17,7 @@ import {workResourceExecution, type ResourceExecutionOptions} from './kanban-wor
 import {inspectWorktree, worktreeBlockers} from '@nestos/git-delivery/inspection';
 import {removeGitWorktree} from '@nestos/git-delivery/removal';
 import type {PreparedWorktree} from '@nestos/git-delivery/worktrees';
-import {archiveWorktree} from '@nestos/git-delivery/archives';
+import {handoffDevelopmentReports} from './kanban-report-delivery';
 import type {RemoteFileSourceProvider} from '../projects/remote-mounts';
 
 const log = createModuleLogger('kanban-work-resources');
@@ -118,7 +118,7 @@ async function inspect(options: Options, boardId: string, resource: ResourceScop
     const ownership = context?.board?.id && context?.task?.id ? context.board.id === boardId && context.task.id === item.id ? 'current' as const : 'other' as const : 'unknown' as const;
     const base = {id,archivedAt:tree.archivedAt, ownership,...(context?.board?.id&&context.task?.id?{owner:{boardId:context.board.id,itemId:context.task.id}}:{}), kind: 'git-worktree', title: tree.branch, location: record.directory,
         properties: [{label: t('kanban.workResourceBranch'), value: tree.branch}, {label: t('kanban.workResourceProject'), value: (await options.projects.get(record.projectId)).name}]};
-    if (saved) return {...base, properties: [...base.properties, ...(saved.archive ? [{label: t('kanban.workResourceArchive'), value: saved.archive}] : [])], version: saved.version, state: saved.phase === 'cleaned' ? 'cleaned' : 'unknown', canCleanup: false,
+    if (saved) return {...base, properties: [...base.properties, ...(saved.delivery?[{label:t('kanban.workResourceDelivery'),value:saved.delivery}]:[]),...(saved.archive ? [{label: t('kanban.workResourceArchive'), value: saved.archive}] : [])], version: saved.version, state: saved.phase === 'cleaned' ? 'cleaned' : 'unknown', canCleanup: false,
         reasons: saved.phase === 'cleaned' ? [] : ['WORKTREE_CLEANUP_UNCONFIRMED']};
     if (ownership !== 'current') return {...base, version: sha256HexSync(JSON.stringify([id, ownership, item.revision])), state: 'retained', canCleanup: false, reasons: [ownership === 'other' ? 'WORKTREE_OTHER_OWNER' : 'WORKTREE_ASSOCIATION_UNVERIFIED']};
     if (await sharedReference(options, boardId, id, item.id)) return {...base,version:sha256HexSync(JSON.stringify([id,'shared',item.revision])),state:'retained',canCleanup:false,reasons:['WORKTREE_SHARED']};
@@ -155,8 +155,8 @@ async function reportCleanup(options: Options, boardId: string, resource: Resour
 async function remove(options: Options, resource: ResourceScope, boundary:GitRemovalBoundary, boardId: string, version: string): Promise<void> {
     const {id, record, tree} = resource, folder = await options.projects.get(record.projectId), view = await options.projects.openWorkspace(folder.path);
     try {
-        const archive = await archiveWorktree(view.fs, options.fs, record.directory, id);
-        await boundary.retainArchive(archive);
+        const delivery=await handoffDevelopmentReports(options,options.service,boardId,resource.item.id,id);
+        if(delivery)await boundary.retainDelivery(delivery);
         await developmentWorkspace(options.remote, options.provider, record.projectId, async process => {
             const declared=await readManagedBranches(view.fs,record.directory,id,['.',...record.repositories?.map(row=>row.path)??[],...record.availableRepositories?.map(row=>row.path)??[]]);
             const {state,modules,temporary,reasons}=await removalState(process,resource,declared);
@@ -165,7 +165,6 @@ async function remove(options: Options, resource: ResourceScope, boundary:GitRem
             const latest = (await options.service.item(boardId, resource.item.id)).item;
             requireValue(['completed','cancelled'].includes(latest.status) && sha256HexSync(JSON.stringify([state.version,modules?.version,temporary.version,latest.revision,latest.status,[]])) === version, 'WORKTREE_STATE_CHANGED');
             requireValue(!(await workResourceExecution(options, id, record.projectId)).length, 'WORKTREE_IN_USE');
-            await archiveWorktree(view.fs, options.fs, record.directory, id);
             await boundary.beginRemoval();
             await removeGitWorktree(process,tree,temporary,modules);
         });
@@ -173,8 +172,8 @@ async function remove(options: Options, resource: ResourceScope, boundary:GitRem
 }
 async function removalState(process:import('../projects/remote-mounts').RemoteProcessHandle,resource:ResourceScope,branches:ManagedBranch[]=[]) {
     const state=await inspectWorktree(process,resource.tree,'_nestos/kanban/');
-    const removable=await removableDevelopmentArtifacts(process,resource.tree.directory,state.ignoredPaths??[],resource.id);
-    const modules=state.initializedModules?await inspectRemovalModules(process,resource.tree.directory,[...resource.record.repositories??[],...resource.record.availableRepositories??[]],(directory,paths)=>removableDevelopmentArtifacts(process,directory,paths,resource.id)):undefined;
+    const removable=disposableSoftwareFiles(state.ignoredPaths??[]);
+    const modules=state.initializedModules?await inspectRemovalModules(process,resource.tree.directory,[...resource.record.repositories??[],...resource.record.availableRepositories??[]],async(_directory,paths)=>disposableSoftwareFiles(paths)):undefined;
     const temporary=await inspectManagedBranches(process,branches);
     const reasons=[...temporary.reasons,...worktreeBlockers(state,removable).filter(reason=>reason!=='WORKTREE_INITIALIZED_MODULES'||!modules),...modules?.reasons??[]];
     const retainedPaths=[...(state.ignoredPaths??[]).filter(path=>!removable.includes(path)),...modules?.modules.flatMap(module=>(module.retainedIgnored??[]).map(path=>module.path+'/'+path))??[]];

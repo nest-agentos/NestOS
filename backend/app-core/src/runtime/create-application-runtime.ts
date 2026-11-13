@@ -33,6 +33,7 @@ import {createItemOperations} from '@nestos/kanban-development';
 import {createPublishedOperation as publishedOperation} from '@nestos/llm-session';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {developmentCatalog} from '@nestos/kanban-development';
+import {handoffDevelopmentReports} from '../presets/kanban-report-delivery';
 import {validateDevelopmentOptions, requiresDevelopmentProject} from '../presets/kanban-development-policy';
 import {prepareHarnessDraftConnection} from '../projects/harness-draft-connection';
 import {reportKanbanHealth, kanbanFailureCode} from '../kanban/health-events';
@@ -625,6 +626,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const developmentMessages = developmentObserver({exchange: developmentBindings && independentCalls ? developmentWorkExchange({...developmentBindings,
             journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), kernel: kernelCore, calls: independentCalls, submission: fileSubmission,
             recovery:async(board,item)=>{if(!recoveryClient?.taskRecovery)throw Object.assign(new Error('Recovery service is starting'),{code:'RECOVERY_SERVICE_STARTING'});return recoveryClient.taskRecovery(board,item);}}) : undefined, kernel: kernelCore, fs: systemFS, events, projects, remote: remoteConnections, lifecycle,
+            handoffReports:developmentBindings?(board,item,id,service)=>handoffDevelopmentReports({...developmentBindings,journal:new KanbanAutomationJournal(systemFS,kanbanJournalOptions)},service,board,item,id):undefined,
             verifyDelivery: verifyDevelopment ? id => developmentOperations.run(() => verifyDevelopment(id)) : undefined,
             wake: () => wakeKanban()});
         cleanupFns.push(() => developmentMessages.dispose());

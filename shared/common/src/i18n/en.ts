@@ -1082,6 +1082,7 @@ export const en: LocaleStrings = {
     'kanban.eventsHelp': 'Item events from the earliest 200 board events',
     'kanban.closePlan': 'Complete goal',
 
+    'kanban.workResourceDelivery': 'Delivered reports',
     'kanban.workResourceRetainedPath': 'Retained path',
     'kanban.workResourceTitle': 'Initialization',
     'kanban.workResourceArchive': 'Archive',

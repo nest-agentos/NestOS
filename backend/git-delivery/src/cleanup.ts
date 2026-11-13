@@ -2,10 +2,10 @@ import {createModuleLogger,randomUUID} from '@nestos/common';
 import type {GitJournal} from './contracts';
 import {requireValue} from './errors';
 const log=createModuleLogger('git-delivery');
-export interface GitCleanupReceipt {operationId:string;boardId:string;itemId:string;version:string;phase:'prepared'|'removing'|'cleaned';archive?:string;owner?:string}
+export interface GitCleanupReceipt {operationId:string;boardId:string;itemId:string;version:string;phase:'prepared'|'removing'|'cleaned';archive?:string;delivery?:string;owner?:string}
 export interface GitCleanupRequest {operationId:string;itemId:string;resourceId:string;version:string}
 export interface GitCleanupView {version:string;canCleanup:boolean;reasons:string[]}
-export interface GitRemovalBoundary {retainArchive(path:string):Promise<void>;beginRemoval():Promise<void>}
+export interface GitRemovalBoundary {retainArchive(path:string):Promise<void>;retainDelivery(path:string):Promise<void>;beginRemoval():Promise<void>}
 export interface GitCleanupPorts<R extends {id:string},V extends GitCleanupView> {
     journal:GitJournal;authorize():Promise<void>;resource():Promise<R>;inspect(resource:R):Promise<V>;
     remove(resource:R,boundary:GitRemovalBoundary):Promise<void>;completed(resource:R):Promise<void>;
@@ -20,8 +20,9 @@ export async function cleanupGitResource<R extends {id:string},V extends GitClea
             requireValue(old.phase==='cleaned','WORKTREE_CLEANUP_UNCONFIRMED');await ports.completed(resource);return ports.inspect(resource);}
         stage='validate';const current=await ports.inspect(resource);requireValue(current.canCleanup,current.reasons[0]??'WORKTREE_CLEANUP_BLOCKED');requireValue(current.version===request.version,'WORKTREE_STATE_CHANGED');
         const saved=await ports.journal.update<GitCleanupReceipt>(key,value=>value??{operationId:request.operationId,boardId,itemId:request.itemId,version:request.version,phase:'prepared',owner});
-        requireValue(saved.owner===owner,'WORKTREE_CLEANUP_UNCONFIRMED');claimed=true;stage='archive-and-remove';
+        requireValue(saved.owner===owner,'WORKTREE_CLEANUP_UNCONFIRMED');claimed=true;stage='handoff-and-remove';
         await ports.remove(resource,{retainArchive:async archive=>{await ports.journal.update<GitCleanupReceipt>(key,value=>({...value!,archive}));},
+            retainDelivery:async delivery=>{await ports.journal.update<GitCleanupReceipt>(key,value=>({...value!,delivery}));},
             beginRemoval:async()=>{await ports.journal.update<GitCleanupReceipt>(key,value=>({...value!,phase:'removing'}));}});
         await ports.journal.update<GitCleanupReceipt>(key,value=>({...value!,phase:'cleaned'}));await ports.completed(resource);return ports.inspect(resource);
     }catch(error){if(claimed)await releasePrepared(ports.journal,key,owner,request.operationId);log.warn('Cleanup failed',{operation:'git.cleanup',operationId:request.operationId,stage,result:'failure',code:safeCode(error),durationMs:Date.now()-started});throw error;}
