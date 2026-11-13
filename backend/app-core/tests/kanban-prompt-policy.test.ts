@@ -1,5 +1,5 @@
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
-import defaults from '../src/resources/kanban/kanban-development-prompts.json';
+import {developmentPrompts as defaults} from '@nestos/kanban-development';
 import {afterEach, expect, it} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';

@@ -250,3 +250,16 @@ it('does not let a build receipt redirect the frozen service artifact path',asyn
  await expect(verifyManagedBuildArtifact(control,deployment,{operationId:'build',version:'candidate',evidence:{path:'other/candidate/release.json',sha256:'a'.repeat(64)}})).rejects.toMatchObject({code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
  expect(verifyArtifact).not.toHaveBeenCalled();
 });
+
+it('keeps customized management acceptance prompts when adding plugin defaults',async()=>{
+ const f=await fixture(),snapshot=await f.api.snapshot(f.board,f.item);
+ const {ensureKanbanConfiguration}=await import('../src/presets/kanban-global-configuration');await ensureKanbanConfiguration(f.fs);
+ const path='/workspace/_nestos/etc/kanban/development';
+ const manifest=JSON.parse(await readPrompt(f.fs,'/etc/kanban/development/profile.json'));manifest.files.push('management-integration-pre.md');
+ await f.fs.driver.createFile({parentPath:path,name:'profile.json',content:JSON.stringify(manifest),recursive:true});
+ await f.fs.driver.createFile({parentPath:path,name:'management-integration-pre.md',content:'Project acceptance rules',recursive:true});
+ await f.api.prepareOperation!({id:'custom-acceptance',action:'build',board:f.board,item:f.item,snapshot,extraPrompts:[{name:'management-integration-pre.md',content:'Plugin default',sha256:sha256HexSync('Plugin default'),source:'plugin'}]} as never);
+ const policy=await f.journal.get<any>('development-policy:custom-acceptance');
+ expect(policy.prompts.files.filter(file=>file.name==='management-integration-pre.md')).toMatchObject([{content:'Project acceptance rules'}]);
+ const published=await readPrompt(f.fs,'/workspace/_nestos/worktrees/original/_nestos/kanban/review/custom-acceptance/prompts/management-integration-pre.md');expect(published).toBe('Project acceptance rules');
+});

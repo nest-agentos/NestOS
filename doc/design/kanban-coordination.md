@@ -113,7 +113,7 @@ workflow(boardId) 读取计划、派发、ready 和 completedPlans。核心只�
 
 个人看板的更多菜单提供「AI 协作」：选择已发布的规划与执行 Agent/Flow 后启用。默认关闭，不因绑定执行 Session 或打开页面启动模型；启用会处理该看板已有及新增的可执行待办。看板配置保存冻结的发布版本与摘要、协调/执行主体及验收模式，RPC 公开 automationCatalog 和 analysisStatus；核心只保存通用外部引用，不导入模型或 Session。
 
-规划调用通过现有 IndependentCallService 执行。产品分析默认值位于 `backend/app-core/src/resources/kanban/kanban-development-prompts.json` 的 planning.md，通过全局 `/etc/kanban/<profile>/planning.md` 或项目 `_nestos/etc/kanban/<profile>/planning.md` 覆盖；新执行重新读取，旧执行使用冻结快照，改文件无需重新编译。MCP planning section 投影冻结的 planning.md，不另保留 TypeScript 内联规则。候选目录按需读取，不反复传送整个看板正文；上下文超过 200 项明确报 AUTOMATION_CONTEXT_LIMIT。规划的 clarification 通过 MCP 持久化，具体问题、选项和简短建议同时出现在可见会话中；收到后续答复并解决全部问题后才发布 ready=true 的 result payload，宿主核验并采纳。不得把报告成功或轮次结束当成规划或任务完成。规划结果只能增加前置依赖，不能移除人工依赖；引用、自依赖、环路、估算及来源校验失败保留具体错误。提示词不能替代正式授权和校验。
+规划调用通过现有 IndependentCallService 执行。产品分析默认值位于 `backend/kanban-development/src/prompts/development.json` 的 planning.md，通过全局 `/etc/kanban/<profile>/planning.md` 或项目 `_nestos/etc/kanban/<profile>/planning.md` 覆盖；新执行重新读取，旧执行使用冻结快照，改文件无需重新编译。MCP planning section 投影冻结的 planning.md，不另保留 TypeScript 内联规则。候选目录按需读取，不反复传送整个看板正文；上下文超过 200 项明确报 AUTOMATION_CONTEXT_LIMIT。规划的 clarification 通过 MCP 持久化，具体问题、选项和简短建议同时出现在可见会话中；收到后续答复并解决全部问题后才发布 ready=true 的 result payload，宿主核验并采纳。不得把报告成功或轮次结束当成规划或任务完成。规划结果只能增加前置依赖，不能移除人工依赖；引用、自依赖、环路、估算及来源校验失败保留具体错误。提示词不能替代正式授权和校验。
 
 分析记录位于用户 `/var/lib/kanban/automation.seq`，冻结调用身份、原输入、事项修订、规划快照签名、阶段与结果。先保存 prepared，再原子取得 submitting，才提交模型调用；响应丢失及重启仅核对同一身份，不重新发送。事项或规划快照变化时拒绝迟到结果，再按新修订分析。已在途的原分析优先观察，不同时为同一事项启动替代分析。分析依据由 analysisStatus 返回，不写入诊断正文。
 

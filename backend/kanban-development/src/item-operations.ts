@@ -117,7 +117,7 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
         const cleanup=context.cleanup,merged=latest(context,'merge');
         if(entry.id==='merge'&&cleanup&&merged&&cleanup.runId===merged.id&&cleanup.state!=='succeeded')return {...entry,group:operationGroup(entry.id),label:t('kanban.operationCleanup'),state:cleanup.state==='failed'?'failed' as const:'running' as const,
             code:cleanup.code,progress:cleanup.state==='running'?{stage:'running' as const,label:t('kanban.operationProgress.cleanup')}:undefined,runAction:'cleanup',runLabel:t('kanban.operationRetryCleanup'),confirmation:undefined,
-            enabled:cleanup.state==='failed'&&!active,cancel:undefined,fields:undefined,skip:undefined};
+            enabled:cleanup.state==='failed'&&!active,statusText:undefined,summary:undefined,cancel:undefined,fields:undefined,skip:undefined};
         return {...entry,group:operationGroup(entry.id)};
     });
     const halted=operationHalt(context,activeWaivers);

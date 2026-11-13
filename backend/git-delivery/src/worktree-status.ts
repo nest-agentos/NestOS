@@ -6,7 +6,7 @@ import {requireValue} from './errors';
 
 export interface WorktreeStatus {
     exists: boolean; branch: string; head?: string; targetBranch: string; targetHead: string;
-    dirty: boolean; unmerged: boolean; initializedModules: boolean; ignoredFiles: number; version: string;
+    dirty: boolean; unmerged: boolean; initializedModules: boolean; ignoredFiles: number; ignoredPaths?:string[]; version: string;
 }
 /** Check actual repository facts; task completion cannot substitute for integration. */
 export async function inspectWorktree(process: RemoteProcessHandle, tree: PreparedWorktree, managedDirectory?: string): Promise<WorktreeStatus> {
@@ -25,6 +25,7 @@ export async function inspectWorktree(process: RemoteProcessHandle, tree: Prepar
     requireValue(merged.code === 0 || merged.code === 1, 'WORKTREE_INTEGRATION_UNKNOWN');
     return status({...base, head: head.trim(), dirty: !!changes, unmerged: merged.code === 1,
         initializedModules: modules.split('\n').some(line => line && !line.startsWith('-')),
+        ignoredPaths:ignored.split('\0').filter(path => path && !(managedDirectory && path.startsWith(managedDirectory))),
         ignoredFiles: ignored.split('\0').filter(path => path && !(managedDirectory && path.startsWith(managedDirectory))).length});
 }
 function status(value: Omit<WorktreeStatus, 'version'>): WorktreeStatus {return {...value, version: sha256HexSync(JSON.stringify(value))};}
@@ -33,7 +34,7 @@ async function queries(process: RemoteProcessHandle, cwd: string, args: string[]
     for (const command of args) rows.push((await gitWorkspace(process, cwd, command)).stdout);
     return rows;
 }
-export function worktreeBlockers(state: WorktreeStatus): string[] {
+export function worktreeBlockers(state: WorktreeStatus,removableIgnored:readonly string[]=[]): string[] {
     return [!state.exists && 'WORKTREE_MISSING', state.dirty && 'WORKTREE_DIRTY', state.unmerged && 'WORKTREE_NOT_INTEGRATED',
-        state.initializedModules && 'WORKTREE_INITIALIZED_MODULES', state.ignoredFiles > 0 && 'WORKTREE_UNTRACKED_IGNORED'].filter((value): value is string => !!value);
+        state.initializedModules && 'WORKTREE_INITIALIZED_MODULES', (state.ignoredPaths?state.ignoredPaths.some(path=>!removableIgnored.includes(path)):state.ignoredFiles>0) && 'WORKTREE_UNTRACKED_IGNORED'].filter((value): value is string => !!value);
 }

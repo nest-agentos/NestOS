@@ -387,6 +387,7 @@ it('retries failed post-merge cleanup without resending the merge or deleting Se
  f.complete('submit');await f.api.scan();
  let view=await f.api.itemOperations('board','task');
  expect(view.operations.find(row=>row.id==='merge')).toMatchObject({state:'failed',runAction:'cleanup',code:'WORKTREE_DIRTY',group:{id:'merge'}});
+ expect(view.operations.find(row=>row.id==='merge')?.statusText).toBeUndefined();expect(view.operations.find(row=>row.id==='merge')?.summary).toBeUndefined();
  const submissions=f.published.start.mock.calls.length;
  await f.api.scan();expect(f.options.cleanup).toHaveBeenCalledOnce();
  view=await f.run('cleanup','retry-cleanup');expect(view.operations.find(row=>row.id==='merge')?.state).toBe('succeeded');

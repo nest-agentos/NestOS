@@ -5,7 +5,7 @@ import {readPrompt,failure} from '../run/prompt-bundle';
 const log=createModuleLogger('kanban-configuration');
 export const KANBAN_CONFIGURATION_DIRECTORY='/etc/kanban';
 
-/** Only a changed shipped bundle replaces global defaults; ordinary restarts preserve edits. */
+/** Upgrade unmodified defaults; explicit recovery alone replaces user customization. */
 export function ensureKanbanConfiguration(fs:IFileSystem,readonly=false):Promise<void> {
     return installConfiguration(fs,{readonly,force:false});
 }
@@ -16,17 +16,23 @@ async function installConfiguration(fs:IFileSystem,options:{readonly:boolean;for
     const operationId=randomUUID(),started=Date.now(),version=sha256HexSync(JSON.stringify(kanbanConfigurationDefaults));
     const marker=KANBAN_CONFIGURATION_DIRECTORY+'/.defaults.json',stage=options.force?'restore':'upgrade';
     try {
+        let installed:{version?:string;files?:Record<string,string>;restore?:boolean}={};
         if(!options.force&&await fs.driver.exists(marker)){
-            let installed:{version?:string};try{installed=JSON.parse(await readPrompt(fs,marker));}catch{throw failure('KANBAN_CONFIGURATION_VERSION_INVALID');}
+            try{installed=JSON.parse(await readPrompt(fs,marker));}catch{throw failure('KANBAN_CONFIGURATION_VERSION_INVALID');}
             if(!installed||typeof installed.version!=='string')throw failure('KANBAN_CONFIGURATION_VERSION_INVALID');
             if(installed.version===version)return;
         }
         if(options.readonly)throw failure('KANBAN_CONFIGURATION_UPGRADE_REQUIRED');
-        await write(fs,KANBAN_CONFIGURATION_DIRECTORY,'.defaults.json',JSON.stringify({schema:1,version:'pending',targetVersion:version,generation:operationId})+'\n');
+        const force=options.force||installed.version==='pending'&&installed.restore===true;
+        await write(fs,KANBAN_CONFIGURATION_DIRECTORY,'.defaults.json',JSON.stringify({schema:1,version:'pending',targetVersion:version,generation:operationId,files:installed.files,restore:force})+'\n');
         const directory=KANBAN_CONFIGURATION_DIRECTORY+'/development';
-        for(const [name,content] of Object.entries(kanbanConfigurationDefaults))await write(fs,directory,name,content);
-        await write(fs,directory,'profile.json',JSON.stringify({schema:1,files:Object.keys(kanbanConfigurationDefaults)},null,2)+'\n');
-        await write(fs,KANBAN_CONFIGURATION_DIRECTORY,'.defaults.json',JSON.stringify({schema:1,version,generation:operationId})+'\n');
+        const defaults={...kanbanConfigurationDefaults,'profile.json':JSON.stringify({schema:1,files:Object.keys(kanbanConfigurationDefaults)},null,2)+'\n'};
+        for(const [name,content] of Object.entries(defaults)){
+            const path=directory+'/'+name,exists=await fs.driver.exists(path);
+            if(force||!exists||installed.files?.[name]===sha256HexSync(await readPrompt(fs,path)))await write(fs,directory,name,content);
+        }
+        const files=Object.fromEntries(Object.entries(defaults).map(([name,content])=>[name,sha256HexSync(content)]));
+        await write(fs,KANBAN_CONFIGURATION_DIRECTORY,'.defaults.json',JSON.stringify({schema:1,version,generation:operationId,files})+'\n');
         log.info('Global configuration installed',{operation:'kanban.configuration',operationId,stage,result:'success',count:Object.keys(kanbanConfigurationDefaults).length,durationMs:Date.now()-started});
     }catch(error){
         const code=(error as {code?:string}).code??(options.force?'KANBAN_CONFIGURATION_RESTORE_FAILED':'KANBAN_CONFIGURATION_UPGRADE_FAILED');

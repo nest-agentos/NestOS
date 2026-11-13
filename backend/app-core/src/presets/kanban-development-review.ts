@@ -131,7 +131,7 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
     try {
         const basePolicy = await developmentPolicy(options.journal, options.fs, view.fs, input.id,
             {profile: current.record.policy.profile, commit: current.record.policy.commit, modules: current.record.policy.modules.join(',')});
-        const policy=input.extraPrompts?.length?{...basePolicy,prompts:await freezePrompts(options.journal,'review-prompts:'+input.id,async()=>[...basePolicy.prompts.files,...input.extraPrompts!])}:basePolicy;
+        const policy=input.extraPrompts?.length?{...basePolicy,prompts:await freezePrompts(options.journal,'review-prompts:'+input.id,async()=>[...basePolicy.prompts.files,...input.extraPrompts!.filter(file=>!basePolicy.prompts.files.some(saved=>saved.name===file.name))])}:basePolicy;
         const preload = await options.journal.get('merge-context-preload:' + input.id) ?? (!input.action || input.action === 'analyze' ? await developmentWorkspace(options.remote, options.provider, current.record.projectId, process =>
             preloadCommitContexts({...options, record: current.record, process, targetHead: input.snapshot.targetVersion})) : {contexts: [], unresolved: []});
         const context = await options.journal.update('merge-context-preload:' + input.id, old => old ?? preload);

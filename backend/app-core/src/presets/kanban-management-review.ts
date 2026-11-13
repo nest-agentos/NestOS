@@ -13,7 +13,7 @@ import {managedServiceDeployment} from './managed-service-deployment';
 import {maintenanceInstruction} from './kanban-maintenance';
 import {managementBatchSnapshot,managementBatch} from './kanban-management-snapshot';
 import {freezeManagementScope,type ManagementScope} from './kanban-management-scope-catalog';
-import prompts from '../resources/kanban/kanban-management-prompts.json';
+import {managementPrompts as prompts} from '@nestos/kanban-development';
 
 /** Each repository uses the existing execution, receipt, cancellation and controller mechanisms. */
 export function managementReviewAdapter(options:DevelopmentReviewOptions,scope:ManagementScope):ReviewAdapter {

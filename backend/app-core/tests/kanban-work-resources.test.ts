@@ -15,11 +15,12 @@ const native = vi.hoisted(() => ({reasons: [] as string[]}));
 vi.mock('../src/presets/kanban-work-resource-execution', () => ({workResourceExecution: vi.fn(async () => native.reasons)}));
 const exec = promisify(execFile), closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); vi.restoreAllMocks(); native.reasons = [];});
-async function fixture(withModule=false) {
+async function fixture(withModule=false,withGenerated=false) {
     const root = await mkdtemp(join(tmpdir(), 'nestos-resource-')); closes.push(() => rm(root, {recursive: true, force: true}));
     const git = async (cwd: string, args: string[]) => exec('git', args, {cwd});
     await git(root, ['init', '-b', 'main']); await git(root, ['config', 'user.name', 'Fixture']); await git(root, ['config', 'user.email', 'fixture@example.invalid']);
     await writeFile(join(root, '.gitignore'), '/_nestos/\n/cache/\n'); await writeFile(join(root, 'file.txt'), 'Original');
+    if(withGenerated){await writeFile(join(root,'.gitignore'),'/_nestos/\n/cache/\nnode_modules/\napps/cli/dist/\n');await writeFile(join(root,'package.json'),JSON.stringify({private:true,packageManager:'pnpm@10.20.0'}));await mkdir(join(root,'apps/cli'),{recursive:true});await writeFile(join(root,'apps/cli/package.json'),JSON.stringify({scripts:{build:'tsup'},bin:{nestos:'./dist/cli.js'},dependencies:{example:'1'}}));}
     await git(root, ['add', '.']); await git(root, ['commit', '-m', 'test: base']);
     if(withModule){const module=await mkdtemp(join(tmpdir(),'nestos-module-'));closes.push(()=>rm(module,{recursive:true,force:true}));
         await git(module,['init','-b','main']);await git(module,['config','user.name','Fixture']);await git(module,['config','user.email','fixture@example.invalid']);
@@ -271,4 +272,21 @@ it('retains historical parent-only ignore evidence without ignoring the actual c
  await f.journal.update('work-resource-resolution:'+JSON.stringify(['board','manager','ready']),()=>({kind:'ignored',operationId:'old-parent-ignore',actor:{kind:'human',id:'admin'},reason:'Retain in this group',at:1}));
  expect((await f.api.workResources('board','manager',{inspect:false}))[0].resolution?.operationId).toBe('old-parent-ignore');
  expect((await f.api.workResources('board','item',{inspect:false}))[0].resolution).toBeUndefined();
+});
+
+it('cleans declared generated dependencies and build outputs while preserving external symlink targets',async()=>{
+ const f=await fixture(false,true);const {symlink}=await import('node:fs/promises');
+ const external=await mkdtemp(join(tmpdir(),'nestos-external-'));closes.push(()=>rm(external,{recursive:true,force:true}));await writeFile(join(external,'keep'),'User data');
+ await mkdir(join(f.physical,'node_modules'),{recursive:true});await symlink(external,join(f.physical,'node_modules/external'));
+ await mkdir(join(f.physical,'apps/cli/dist'),{recursive:true});await writeFile(join(f.physical,'apps/cli/dist/cli.js'),'Generated');
+ const preview=(await f.api.workResources('board','item'))[0];expect(preview.canCleanup).toBe(true);
+ expect(await f.api.cleanupWorkResource('board',{operationId:'generated-cleanup',itemId:'item',resourceId:'ready',version:preview.version})).toMatchObject({state:'cleaned'});
+ expect((await stat(join(external,'keep'))).isFile()).toBe(true);expect(f.commands.some(args=>args[0]==='clean')).toBe(false);
+});
+it('keeps undeclared ignored data and active generated workspaces retained',async()=>{
+ const f=await fixture(false,true);await mkdir(join(f.physical,'node_modules'),{recursive:true});await writeFile(join(f.physical,'node_modules/generated'),'Dependency');
+ native.reasons=['WORKTREE_IN_USE'];expect((await f.api.workResources('board','item'))[0]).toMatchObject({canCleanup:false,reasons:['WORKTREE_IN_USE']});native.reasons=[];
+ await mkdir(join(f.physical,'cache'),{recursive:true});await writeFile(join(f.physical,'cache/user-data'),'Keep');
+ const row=(await f.api.workResources('board','item'))[0];expect(row).toMatchObject({canCleanup:false,reasons:['WORKTREE_UNTRACKED_IGNORED']});
+ expect(row.properties).toContainEqual(expect.objectContaining({value:'cache/'}));
 });

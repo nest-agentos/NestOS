@@ -2,17 +2,18 @@ import {afterEach,it,expect,vi} from 'vitest';
 import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {readPrompt} from '../src/run/prompt-bundle';
 import {ensureKanbanConfiguration} from '../src/presets/kanban-global-configuration';
+import {kanbanConfigurationDefaults} from '../src/resources/catalog';
 import {resolveKanbanConfiguration} from '../src/presets/kanban-configuration-files';
 const closes:Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of closes.splice(0))await close();});
 async function fixture(){const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());return manager.openFileSystem('/');}
-it('preserves edits on normal restart and replaces global configuration when the shipped version changes',async()=>{
+it('preserves customized prompts across restarts and shipped-default upgrades',async()=>{
     const fs=await fixture(),path='/etc/kanban/development/planning.md';
     await ensureKanbanConfiguration(fs);const original=await readPrompt(fs,path);
     await fs.driver.writeContent(path,'Tuned prompt');await ensureKanbanConfiguration(fs);
     expect(await readPrompt(fs,path)).toBe('Tuned prompt');
     await fs.driver.writeContent('/etc/kanban/.defaults.json',JSON.stringify({schema:1,version:'previous'}));
-    await ensureKanbanConfiguration(fs);expect(await readPrompt(fs,path)).toBe(original);
+    await ensureKanbanConfiguration(fs);expect(await readPrompt(fs,path)).toBe('Tuned prompt');
     await ensureKanbanConfiguration(fs,true);
 });
 it('ships only declared data files and conventional lifecycle hooks, honoring project overrides',async()=>{
@@ -50,4 +51,15 @@ it('rejects pending and racing same-version configuration replacements',async()=
         return result;
     });
     await expect(resolveKanbanConfiguration(fs,fs,'development')).rejects.toMatchObject({code:'KANBAN_CONFIGURATION_CHANGED'});spy.mockRestore();
+});
+
+it('updates only unedited defaults and retains initialization prompt customization',async()=>{
+ const fs=await fixture();await ensureKanbanConfiguration(fs);const root='/etc/kanban/development';
+ await fs.driver.writeContent(root+'/planning.md','Custom planning');
+ await fs.driver.createFile({parentPath:root,name:'task-pre.md',content:'Custom initialization',recursive:true});
+ const original=kanbanConfigurationDefaults['task.md'];
+ try{kanbanConfigurationDefaults['task.md']='Updated task default';await ensureKanbanConfiguration(fs);
+  expect(await readPrompt(fs,root+'/task.md')).toBe('Updated task default');expect(await readPrompt(fs,root+'/planning.md')).toBe('Custom planning');
+  expect((await resolveKanbanConfiguration(fs,fs,'development')).find(file=>file.name==='task-pre.md')?.content).toBe('Custom initialization');
+ }finally{kanbanConfigurationDefaults['task.md']=original;}
 });

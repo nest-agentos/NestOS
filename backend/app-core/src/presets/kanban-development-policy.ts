@@ -1,18 +1,10 @@
 import {resolveKanbanConfiguration} from './kanban-configuration-files';
-import {t} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
-import type {KanbanAutomationTarget, KanbanBoard} from '@nestos/kanban/contracts';
+import type {KanbanBoard} from '@nestos/kanban/contracts';
 import {freezePrompts, failure, type PromptJournal, type PromptBundle} from '../run/prompt-bundle';
 
 export interface DevelopmentPolicy {
     version: 1; profile: string; commit: 'changes' | 'worktree'; modules: string[]; prompts: PromptBundle;
-}
-export function developmentCatalog(): KanbanAutomationTarget[] {
-    return [{reference: {system: 'nestos-work-preparation', id: 'git-worktree', revision: '1'}, label: t('kanban.gitWorktree'), options: [
-        {name: 'profile', label: t('kanban.developmentProfile'), defaultValue: 'development'},
-        {name: 'commit', label: t('kanban.commitPolicy'), defaultValue: 'worktree', choices: [
-            {value: 'worktree', label: t('kanban.commitWorktree')}, {value: 'changes', label: t('kanban.commitChanges')}]},
-        {name: 'modules', label: t('kanban.developmentModules'), defaultValue: ''}]}];
 }
 
 export async function developmentPolicy(journal: PromptJournal, fs: IFileSystem, project: IFileSystem, id: string,
