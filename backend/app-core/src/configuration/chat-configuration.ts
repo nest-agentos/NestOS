@@ -4,7 +4,7 @@ import { isRootCallable } from '@nestos/llm-flow/contracts';
 import {publishedAgentDefinition} from '@nestos/kernel-adapters/contracts';
 
 /** One host observation supplies all metadata needed by chat selectors. */
-export async function createChatConfigurationView(service: IAgentConfigService): Promise<ChatConfigurationView> {
+export async function createChatConfigurationView(service: IAgentConfigService, policyChanges?: (listener: () => void) => () => void): Promise<ChatConfigurationView> {
     let current: ChatConfigurationSnapshot;
     let closed = false, dirty = false, pending: Promise<void> | undefined;
     const listeners = new Set<() => void>();
@@ -25,12 +25,13 @@ export async function createChatConfigurationView(service: IAgentConfigService):
             if (dirty && !closed) void refresh().catch(() => console.warn('[ChatConfiguration] Refresh failed'));
         });
     };
+    const stopPolicy = policyChanges?.(() => {void refresh().catch(() => console.warn('[ChatConfiguration] Policy refresh failed'));});
     const unsubscribe = service.onChange(() => { void refresh().catch(() => console.warn('[ChatConfiguration] Refresh failed')); });
-    try { await refresh(); } catch (error) { closed = true; unsubscribe(); throw error; }
+    try { await refresh(); } catch (error) { closed = true; unsubscribe(); stopPolicy?.(); throw error; }
     return {
         getConfigurationSnapshot: () => current,
         subscribe: listener => { listeners.add(listener); return () => { listeners.delete(listener); }; },
-        dispose: async () => { closed = true; unsubscribe(); listeners.clear(); await pending; },
+        dispose: async () => { closed = true; unsubscribe(); stopPolicy?.(); listeners.clear(); await pending; },
     };
 }
 

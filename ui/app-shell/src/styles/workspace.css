@@ -552,3 +552,15 @@
     .workbench-opened-sheet__navigation .app-sidebar { padding-inline: 8px; box-sizing: border-box; }
     .workbench-opened-sheet__navigation .main-nav-list { flex-wrap: nowrap; overflow-x: auto; }
 }
+
+.agent-scope-editor .agent-project-settings label { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+.agent-project-settings input[type="search"] { width: 100%; min-height: 40px; font: inherit; }
+
+.agent-scope-editor { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.agent-scope-editor > nav { display: flex; gap: 8px; padding: 8px 16px; flex: 0 0 auto; }
+.agent-scope-editor > nav button { min-height: 40px; padding: 8px 16px; color: inherit; background: transparent; border: 1px solid var(--mm-border-color, #e2e8f0); border-radius: 6px; cursor: pointer; }
+.agent-scope-editor > nav button[aria-selected="true"] { font-weight: 700; border-color: var(--mm-color-primary, #3b82f6); }
+.agent-scope-editor__configuration { flex: 1; min-height: 0; overflow: auto; }
+.agent-scope-editor > [role="tabpanel"][hidden] { display: none; }
+
+.agent-project-settings label[hidden] { display: none; }

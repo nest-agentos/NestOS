@@ -50,6 +50,7 @@ export interface SessionChatBindingOptions {
     /** The host resolves the selected Agent's published Flow signature. */
     readonly inputContract?: () => ComposerInputContract | undefined;
     /** Enable the published Agent/Flow selector through the existing Session command port. */
+    readonly filterAgents?: (ids: string[]) => Promise<string[]>;
     readonly targetSelection?: boolean;
     readonly autoSelectFirstTarget?: boolean;
     readonly onTargetsChanged?: (catalog: import('@nestos/llm-ui').CallTargetCatalog) => void;
@@ -94,7 +95,7 @@ class SessionChatBinding {
         this.sessionId = options.session.id;
         this.branch = this.currentBranch();
         this.operations = this.createLedger(options.operations);
-        if (options.targetSelection) this.targets = new SessionCallTargets(options.commands, () => {options.onTargetsChanged?.(this.targets!.getSnapshot()); this.publish();}, options.autoSelectFirstTarget !== false);
+        if (options.targetSelection) this.targets = new SessionCallTargets(options.commands, () => {options.onTargetsChanged?.(this.targets!.getSnapshot()); this.publish();}, options.autoSelectFirstTarget !== false, options.filterAgents);
         this.source = new ChatProjection(this.sessionId, options.onError, this.targets ? () => this.refreshTargets() : undefined);
         this.actions = {...options.history, send: (input, context) => this.send(input, context), reconcile: id => this.reconcile(id) };
         if (options.prepareSend) this.actions.prepareSend = options.prepareSend;
@@ -236,6 +237,9 @@ class SessionChatBinding {
         if (this.options.readOnly) return rejected(context, 'READ_ONLY', 'Conversation is read-only');
         if (!this.current() || context.viewId !== this.source.getSnapshot().viewId)
             return rejected(context, 'STALE_VIEW', 'Observation binding expired');
+        if (input.target?.kind === 'agent' && this.options.filterAgents &&
+            !(await this.options.filterAgents([input.target.id])).includes(input.target.id))
+            return rejected(context, 'AGENT_PROJECT_SCOPE_DENIED', t('agentWorkspace.scopeDenied'));
         const choice = input.target && this.targets?.find(input.target);
         if (this.targets && (!input.target || !choice)) return rejected(context, 'STALE_CALL_TARGET', 'Published call target changed; select it again');
         const contract = this.targets ? choice?.inputContract : this.options.inputContract?.();

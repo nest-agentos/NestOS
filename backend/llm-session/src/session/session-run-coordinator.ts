@@ -172,7 +172,7 @@ export class SessionRunCoordinator {
         const revision = task.input.instructionFlowBinding?.definition
             ?? await new FlowDefinitionStore(this.flowStore).loadRevision(flow.flowId, flow.revision);
         if (!revision) throw Object.assign(new Error('Published Flow revision is unavailable'), {code: 'CALL_TARGET_UNAVAILABLE'});
-        const plan = task.input.instructionFlowBinding?.plan, identities = plan ? frozenFlowIdentities(plan.identities) : this.agents;
+        const plan = task.input.instructionFlowBinding?.plan, identities = plan ? frozenFlowIdentities(plan.identities, undefined, this.agents) : this.agents;
         return this.runs.prepareDag({task, config, roundId, log: new RoundLog(this.engine, task.sessionId), contextFiles}, flow.parameters,
             snapshot => this.flowSpecification(task, {config, roundId}, revision, snapshot, identities));
     }
@@ -184,6 +184,7 @@ export class SessionRunCoordinator {
     publishedAgentTarget(target?: import('@nestos/llm-flow/contracts').TargetRef) {return this.agents.publishedTarget(target);}
 
     private async resolveSelectedIdentity(input: Pick<TaskInput, 'agentId' | 'target' | 'expectedTarget' | 'source' | 'sendIntent' | 'sessionId'>): Promise<ExecutorConfig> {
+        if (input.target?.kind !== 'flow') await this.agents.assertAdmission(input.agentId, input.sessionId);
         const target = input.target;
         let identity: ExecutorConfig;
         if (target?.kind === 'flow') {
@@ -337,7 +338,7 @@ export class SessionRunCoordinator {
             throw new Error(parameterIssues.map(issue => issue.message).join('; '));
         }
         const plan = task.input.instructionFlowBinding?.plan;
-        const identities = plan ? frozenFlowIdentities(plan.identities) : this.agents;
+        const identities = plan ? frozenFlowIdentities(plan.identities, undefined, this.agents) : this.agents;
         const dynamicIdentities = plan ? frozenFlowIdentities(plan.identities, this.agents) : identities;
         const createSpec = (snapshot: ContextSnapshot) => this.flowSpecification(task, setup, revision, snapshot, identities);
         return this.runs.executeDag(execution, flow.parameters, createSpec,
@@ -470,6 +471,7 @@ export class SessionRunCoordinator {
     }
 
     private async resolveConfig(input: TaskInput): Promise<ExecutorConfig> {
+        if (input.target?.kind !== 'flow') await this.agents.assertAdmission(input.agentId, input.sessionId);
         const accepted = input.instructionConnectionBinding?.harnessAgent;
         if (accepted) {
             if (!isHarnessAgentSnapshot(accepted) || accepted.id !== input.agentId)

@@ -1,3 +1,4 @@
+import {createAgentScopeEditor} from '../projects/agent-scope-editor';
 import {projectActionPath} from '../projects/project-action-route';
 import {CellsSettingsEditor} from '@nestos/app-settings';
 import {MCPDiagnosticsControls} from './mcp-diagnostics';
@@ -60,7 +61,11 @@ function configurationFactories(options: Options, inventory: ToolboxInventory, r
         if (config.target?.kind === 'file' && config.target.path.startsWith('/@remote/')) {
             const editor = new RemoteAgentDetailsEditor(element, inventory, config, options.services.projects); await editor.init(element); return editor;
         }
-        return options.factories.agents(element, config);
+        const id = config.target?.kind === 'entity' ? config.target.id :
+            (await resources.getAgents()).find(agent => agentService.getAgentResourceId?.(agent.id) === (config.target?.kind === 'file' ? config.target.path : undefined))?.id;
+        if (!id || !options.services.projects) return options.factories.agents(element, config);
+        return createAgentScopeEditor(element, id, options.backend, options.services.projects,
+            (container, mountSettings) => options.factories.agents(container, {...config, mountSettings}), () => {});
     }, prompts: create('SystemPromptSettingsEditor'), providers: create('ProviderSettingsEditor', mediaProbeExamples), connections: create('ConnectionSettingsEditor'),
         mcp: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
             const remote = options.services.projects?.remoteMounts;

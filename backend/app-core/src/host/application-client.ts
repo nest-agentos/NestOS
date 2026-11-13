@@ -1,3 +1,4 @@
+import {agentProjectScopes} from '../configuration/agent-project-scope';
 import {mailView} from './mail-view';
 import {kanbanConfigurationResources} from '../presets/kanban-configuration-resources';
 import {KanbanExamples} from '../presets/kanban-examples';
@@ -106,7 +107,7 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
                 const chat = settings?.chatControls ? {privilegedCommands: new PrivilegedCommandService(kernel.kernel, agentService,
                     {sessions: kernel.sessions, mcpServers: () => agentService.getMCPServers(), prepareSession: services.prepareSession?.bind(services)}),
                     sessionSkills: createSessionSkillControls(kernel.kernel, kernel.sessions),
-                    configuration: options.preload ? await owned.own(await createChatConfigurationView(agentService)) : undefined} : undefined;
+                    configuration: options.preload ? await owned.own(await createChatConfigurationView(agentService, listener => agentProjectScopes(vfs, projects).subscribe(listener))) : undefined} : undefined;
                 const connections = projects?.remoteMounts ? await owned.own(observeConnections(projects.remoteMounts)) : undefined;
                 await scope.own({dispose: () => owned.close()});
                 return {...view, browser, initialSession, chat, connections};
@@ -116,6 +117,11 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
             }
         },
         openSessionView: async id => scope.own(await openSessionView(services, id)),
+        readAgentProjectScopes: ids => agentProjectScopes(vfs, projects).read(ids),
+        saveAgentProjectScope: (id, value) => {
+            if (options.configurationReadonly) throw new FSError('EACCES', 'Configuration is read-only');
+            return agentProjectScopes(vfs, projects).save(id, value);
+        },
         readUiDocuments: names => readUiDocuments(vfs, names),
         writeUiDocuments: documents => writeUiDocuments(vfs, documents),
         settings: sources => settingsService(services, sources, options, scope),
@@ -173,7 +179,11 @@ async function toolboxView(services: LocalApplicationServices, scope: ViewScope)
         const skills = await resources.own(new SkillsEngine(agentService));
         const toolbox = new ToolboxResources({ ...inventory.sources, agents, skills, flows: services.flowEngine.engine },
             agentService, services.commandBus, await vfs.openFileSystem('/etc'), inventory, createNestosFlowDrawers(), createNestosProviderTemplates(), {toolPackages: services.toolPackages, flowInstallations: services.flowInstallations},
-            listener => projects?.remoteMounts?.onChange(listener) ?? (() => {}));
+            listener => {
+                const remote = projects?.remoteMounts?.onChange(listener), policy = agentProjectScopes(vfs, projects).subscribe(listener);
+                return () => {remote?.(); policy();};
+            },
+            (id, projectId) => agentProjectScopes(vfs, projects).save(id, {kind: 'selected', projectIds: [projectId]}));
         const files = await resources.own(createToolboxFiles(toolbox.sources));
         const initial = await toolbox.navigation(false);
         return scope.own({ inventory, resources: toolbox, files, initial, dispose: () => resources.close() });

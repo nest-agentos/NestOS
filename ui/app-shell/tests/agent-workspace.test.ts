@@ -1,3 +1,4 @@
+import {SessionCommand} from '@nestos/llm-session/contracts';
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
 import {MemoryBackend} from '@nestos/vfs-core';
@@ -31,19 +32,20 @@ async function setup({realDraft = false, mobile = false} = {}) {
     cleanup.push(() => workbench.destroy()); await workbench.start();
     return {runtime, backend, workbench, sidebar, main, layout, navigate, factory};
 }
-it('opens agent settings inside the workbench, saves its default project, and filters only sessions', async () => {
+it('opens agent settings inside the workbench, saves its project scope, and filters only sessions', async () => {
     const f = await setup(), project = await f.runtime.projects.create('Writing');
     const agent = (await f.runtime.agentService.getAgents())[0], folder = await f.runtime.projects.sessionFolder(project);
     await f.runtime.sessionRepository.createSession('Created by this agent', folder, null, undefined, {agentId: agent.id});
     await f.runtime.sessionRepository.createSession('Different agent', folder, null, undefined, {agentId: 'other'});
+    await f.workbench.openResource(folderBrowserPath(project.path));
     await f.workbench.openResource('@agent/' + encodeURIComponent(agent.id));
     expect(f.main.querySelector('.agent-config-editor')).not.toBeNull(); expect(f.navigate).not.toHaveBeenCalled();
-    const select = f.main.querySelector<HTMLSelectElement>('[data-field="agent-default-project"]')!;
-    select.value = project.project.id; select.dispatchEvent(new Event('change', {bubbles: true}));
+    f.main.querySelector<HTMLInputElement>('input[type=radio][value=selected]')!.click();
+    f.main.querySelector<HTMLInputElement>(`input[type=checkbox][value="${project.project.id}"]`)!.click();
     f.main.querySelector<HTMLButtonElement>('[data-action="show-agent-sessions"]')!.click();
     const root = folderBrowserPath(project.path);
     await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe(root));
-    expect(await new AgentProjectPreferences(f.backend).read(agent.id)).toBe(project.project.id);
+    expect((await f.backend.readAgentProjectScopes([agent.id]))[agent.id]).toEqual({kind: 'selected', projectIds: [project.project.id]});
     const browser = (f.workbench as any).browser, rows = await browser.fs.driver.getChildren(root);
     expect(rows.some((row: any) => resolveBrowserTarget(row.path).kind === 'favorites')).toBe(true);
     expect(rows.some((row: any) => resolveBrowserTarget(row.path).kind === 'project-files')).toBe(true);
@@ -51,7 +53,7 @@ it('opens agent settings inside the workbench, saves its default project, and fi
     expect(sessions.filter((row: any) => resolveBrowserTarget(row.path).kind === 'session').map((row: any) => row.metadata.title)).toEqual(['Created by this agent']);
     expect(f.sidebar.querySelector('.workbench-agent-filter')?.textContent).toContain(agent.name);
     await new AgentProjectPreferences(f.backend).save('other', (await f.runtime.projects.personal()).project.id);
-    expect(await new AgentProjectPreferences(f.backend).read(agent.id)).toBe(project.project.id);
+    expect((await f.backend.readAgentProjectScopes([agent.id]))[agent.id]).toEqual({kind: 'selected', projectIds: [project.project.id]});
     const clear = f.sidebar.querySelector<HTMLButtonElement>('.workbench-agent-filter button')!; clear.click();
     await vi.waitFor(() => expect(f.sidebar.querySelector<HTMLElement>('.workbench-agent-filter')!.hidden).toBe(true));
     const all = await browser.fs.driver.getChildren(projectConversationsPath(project.path));
@@ -77,14 +79,15 @@ it('saves agent settings and project before opening chat without replacing its e
     const files = [{id: attachmentId, name: 'notes.txt', type: 'text/plain', lastModified: 1}];
     await draft.save!(JSON.stringify({version: 2, config: {text: '保留原来的输入', agentId: 'default', settings: {}}, files}));
     const saveAgent = vi.spyOn(f.runtime.agentService, 'saveAgent'), createSession = vi.spyOn(f.runtime.sessionRepository, 'createSession');
+    await f.workbench.openResource(folderBrowserPath(project.path));
     await f.workbench.openResource(route);
     const configuration = f.main.querySelector<HTMLElement>('.agent-config-editor')!;
     expect(configuration.dataset.editorMobileNavigation).toBe('embedded');
     expect(configuration.querySelector('[data-agent-compact-navigation] .workbench-compact-navigation')).not.toBeNull();
     const name = configuration.querySelector<HTMLInputElement>('[name="name"]')!;
     name.value = 'Updated writer'; name.dispatchEvent(new Event('input', {bubbles: true}));
-    const select = configuration.querySelector<HTMLSelectElement>('[data-field="agent-default-project"]')!;
-    select.value = project.project.id; select.dispatchEvent(new Event('change', {bubbles: true}));
+    f.main.querySelector<HTMLInputElement>('input[type=radio][value=selected]')!.click();
+    f.main.querySelector<HTMLInputElement>(`input[type=checkbox][value="${project.project.id}"]`)!.click();
     const start = configuration.querySelector<HTMLButtonElement>('[data-agent-start-chat]')!;
     start.click(); start.click();
     await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('draft:' + project.project.id));
@@ -94,7 +97,7 @@ it('saves agent settings and project before opening chat without replacing its e
     });
     expect(saveAgent).toHaveBeenCalledOnce();
     expect(await f.runtime.agentService.getAgentConfig(agent.id)).toMatchObject({name: 'Updated writer'});
-    expect(await new AgentProjectPreferences(f.backend).read(agent.id)).toBe(project.project.id);
+    expect((await f.backend.readAgentProjectScopes([agent.id]))[agent.id]).toEqual({kind: 'selected', projectIds: [project.project.id]});
     expect(f.main.querySelector<HTMLTextAreaElement>('.llm-input__textarea')!.value).toBe('保留原来的输入');
     expect(new TextDecoder().decode(await draft.attachments.read(attachmentId))).toBe('Keep the attachment');
     expect(createSession).not.toHaveBeenCalled(); expect(f.factory).toHaveBeenCalledOnce();
@@ -173,4 +176,20 @@ it('keeps a newer configuration active when an earlier chat launch is resolving 
         expect(f.main.querySelector<HTMLElement>('.workbench-tabs__panel:not([hidden]) .agent-config-editor')
             ?.querySelector<HTMLInputElement>('[name="name"]')!.value).toBe(agents[1].name);
     } finally {release(); folders.mockRestore();}
+});
+
+it('keeps an opened Session selector bound to its own project when the sidebar project changes', async () => {
+    const f = await setup(), alpha = await f.runtime.projects.create('Scope Alpha'), beta = await f.runtime.projects.create('Scope Beta');
+    const [a, b] = await f.runtime.agentService.getAgents();
+    await f.backend.saveAgentProjectScope(a.id, {kind: 'selected', projectIds: [alpha.project.id]});
+    await f.backend.saveAgentProjectScope(b.id, {kind: 'selected', projectIds: [beta.project.id]});
+    const folder = await f.runtime.projects.sessionFolder(alpha);
+    const id = await f.runtime.sessionRepository.createSession('Retained Session', folder, null, undefined, {agentId: a.id});
+    await f.runtime.commandBus.execute(SessionCommand.Bind, {sessionId: id});
+    await f.workbench.openResource(folderBrowserPath(folder) + '/' + id);
+    const filter = f.factory.mock.calls.at(-1)![1].filterExecutors!;
+    expect(await filter([a.id, b.id])).toEqual([a.id]);
+    await f.workbench.openResource(folderBrowserPath(beta.path));
+    expect(await filter([a.id, b.id])).toEqual([a.id]);
+    expect(await f.runtime.sessionRepository.getManifest(id)).toMatchObject({folder, createdWithAgentId: a.id});
 });

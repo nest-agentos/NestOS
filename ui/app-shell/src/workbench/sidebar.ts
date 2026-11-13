@@ -19,6 +19,7 @@ export class WorkbenchSidebar {
             windowManagement: windows});
         this.navigation = this.view.navigation;
     }
+    mountContext(element: HTMLElement): void {this.sidebar.prepend(element);}
     get activeView(): string {return this.view.activeView;}
     setViewChanged(listener: (kind: string) => void): void {this.view.setViewChanged(listener);}
     selectView(kind: string): void {this.view.selectView(kind);}

@@ -364,7 +364,7 @@ export class SessionDraftEditor extends IEditor {
     private executors(): Promise<Awaited<ReturnType<typeof buildExecutorOptions>>> {
         const scope = this.options.sessionDraft?.executorScope;
         return scope === 'remote' ? this.options.remoteAgents?.list() ?? Promise.resolve([])
-            : buildExecutorOptions(this.service, scope === 'local' ? undefined : this.options.remoteAgents, this.flowControls?.configuration?.getConfigurationSnapshot());
+            : buildExecutorOptions(this.service, scope === 'local' ? undefined : this.options.remoteAgents, this.flowControls?.configuration?.getConfigurationSnapshot(), this.options.filterExecutors);
     }
     setText(text: string): void {
         if (this.confirmed) {this.delegate?.setText(text); return;}

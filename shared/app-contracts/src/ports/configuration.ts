@@ -39,7 +39,7 @@ export interface ToolboxResources {
     getAgents(): Promise<AgentDefinition[]>;
     hasProvider(id: string): boolean;
     setToolGrant(tool: ToolGrantTarget, agentId: string, enabled: boolean): Promise<void>;
-    create(kind: ToolboxKind, name: string, providerId?: string, providerTemplateId?: string): Promise<string>;
+    create(kind: ToolboxKind, name: string, providerId?: string, providerTemplateId?: string, projectId?: string): Promise<string>;
     createInDrawer(kind: ToolboxKind, name: string, drawer: string, providerId?: string, providerTemplateId?: string): Promise<string>;
     export(paths: string[], drawers?: Array<{
         kind: DrawerKind;

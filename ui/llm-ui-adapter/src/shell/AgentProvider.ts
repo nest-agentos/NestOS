@@ -12,6 +12,7 @@ export async function buildExecutorOptions(
     agentService: IAgentConfigService,
     remote?: import('../contracts').RemoteAgentControls,
     configuration?: ChatConfigurationSnapshot,
+    filter?: (ids: string[]) => Promise<string[]>,
 ): Promise<ExecutorOption[]> {
     const allAgents = configuration?.agents ?? agentService.listAgents();
     const agents = allAgents.filter(isRootCallable);
@@ -49,7 +50,9 @@ export async function buildExecutorOptions(
         });
     }
 
-    return [...options, ...await remote?.list() ?? []];
+    const all = [...options, ...await remote?.list() ?? []];
+    const allowed = filter ? new Set(await filter(all.map(item => item.id))) : undefined;
+    return allowed ? all.filter(item => allowed.has(item.id)) : all;
 }
 
 export function validateAgentId(agentService: IAgentConfigService, id: string): string {

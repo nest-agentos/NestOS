@@ -187,3 +187,11 @@ MCP 配置是唯一连接权威，`/etc/fs` 只保存项目授权；旧连接迁
 聊天冷启动链：`app-shell.initApp` → `backend.openView` → 先登记源观察、并行文档/工作台、无旧绑定时激活、并行恢复读模型 → 返回快照及水位 → `OpenedViewProjection.start` 登记一次 observeView → 宿主补发并经 SSE 持续更新 → 本地分发给组件。已有编辑器切换继续走 openSessionView/保存/activate；不同 HTTP 客户端保持各自绑定。详见 [HTTP 打开与观察聚合](./http-app.md#打开与观察聚合已实现)。
 
 HTTP v15 轻入口并行启动 SSE/初始 POST、Shell 模块与当前编辑器代码；POST 携带目标与已知数据摘要，宿主一次完成准备、激活、观察登记和能力导出。前端安装缓存校准后的服务图，再将 initialView 交给 initApp；首帧骨架保持至当前导航完成，后续变化复用同一 SSE。
+
+### Agent 项目可用范围
+
+宿主通过 `ApplicationBackend.readAgentProjectScopes` / `saveAgentProjectScope` 管理范围，保存在 `/etc/agent-project-scopes/<Agent ID SHA-256>.json`，不写入可移植 Agent 定义或发布快照。缺省为所有项目；指定项目至少一个，以项目稳定 ID 关联，改名不改授权。项目内创建先保存范围再保存 Agent，失败不会短暂暴露为全局 Agent。
+
+`app-core/configuration/agent-project-scope.ts` 在聊天准入、排队执行复验、Flow 节点和委派模板绑定中检查当前范围。Session 的通用 `agentResolution.admitAgent` 只传递 Agent / Session 身份，项目解析与策略留在宿主；冻结执行定义不能保留已撤销范围。拒绝使用 `AGENT_PROJECT_SCOPE_DENIED`，保留历史读取并要求用户选择其他智能体。该策略不替代文件、连接和远程执行器授权。
+
+工作台将项目选择放在项目／智能体页签上方，启动列表和会话调用目标经宿主投影，管理全部智能体仍使用完整目录。会话选择器绑定会话自己的项目，切换 sidebar 不修改会话；当前项目快捷启动复用原草稿、Session ID 和附件。配置／项目页签由 app-shell 装配，独立 llm-ui 不包含项目业务。策略变更使宿主列表观察失效，发送前再次检查。
