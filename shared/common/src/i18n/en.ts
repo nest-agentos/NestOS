@@ -1,9 +1,11 @@
+import {STARTUP_EN} from './startup-strings';
 // @file: common/i18n/en.ts
 // English locale strings (fallback / international).
 
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    ...STARTUP_EN,
     "kanban.decisionTable.state.waiting-approval": "Awaiting approval",
     "kanban.decisionTable.reason.authorization-required": "The session needs your approval.",
     "kanban.viewAuthorization": "Review approval",
@@ -1977,10 +1979,6 @@ export const en: LocaleStrings = {
     "fileRecovery.copy": "Copy recovery text",
     "fileRecovery.discard": "Discard recovery copy",
     "fileRecovery.unavailable": "Local recovery storage failed. Keep this page open and copy unsaved edits.",
-    "httpApp.starting": "Starting NestOS…",
-    "httpApp.startupFailed": "NestOS failed to start",
-    "httpApp.moduleLoadFailed": "A page module could not load. The page version may have changed or the network was interrupted. Reload the page; if it still fails, check the network and browser certificate.",
-    "httpApp.moduleRepairFailed": "Page modules could not be fetched again. Check the network and browser certificate, then retry. Drafts will be kept.",
     "httpApp.updated": "A module needed by this page failed to load. Save open edits before reloading.",
     "httpApp.disconnected": "The page lost its connection to the HTTP service and is waiting for recovery. Chat persistence, session leases and digital twin updates may be unavailable.",
     "httpApp.viewError": "Page data could not be updated. Reload the page. Unsent input remains on this page.",
@@ -1996,7 +1994,6 @@ export const en: LocaleStrings = {
     "httpApp.autoRecoveryFailed": "Automatic recovery did not complete: {reason}",
     "httpApp.viewExpiredReady": "The service is ready. Reload to restore the connection. Copy any unsaved input and edits first.",
     "httpApp.retry": "Reconnect now",
-    "httpApp.reload": "Reload",
     "httpApp.checkConnection": "Check connection",
     "recovery.title": "System recovery and maintenance",
     "recovery.help": "Select files or configurations below, then use the page actions to restore or refresh their status.",

@@ -1,7 +1,7 @@
 import {withSessionRecovery} from './session-recovery';
 import {createSessionRecoveryClient} from '@nestos/app-transport/http';
 import {BrowserRequestTrace} from './request-trace';
-import { randomUUID } from '@nestos/common';
+import { randomUUID } from '@nestos/common/startup';
 import {HttpViewClient, SnapshotCache, ViewExpiredError} from '@nestos/app-transport/http';
 import {RPC_VERSION} from '@nestos/app-transport/rpc';
 import {setFileRecoveryOwner} from '@nestos/app-shell/startup';

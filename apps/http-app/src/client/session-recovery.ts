@@ -1,4 +1,4 @@
-import {randomUUID} from '@nestos/common';
+import {randomUUID} from '@nestos/common/startup';
 import type {HostedApplicationClient, NativeSessionRecoveryPort, ProjectConversationPort, ProjectConversationSnapshot} from '@nestos/app-contracts/services';
 import {FSError} from '@nestos/vfs-core';
 /** Bind session commands to the authenticated business API while keeping view observations borrowed. */

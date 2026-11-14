@@ -1,4 +1,4 @@
-import {t} from '@nestos/common';
+import {startupText as t} from '@nestos/common/startup';
 import {isModuleLoadFailure, startupModuleRecovery} from './startup-module-recovery';
 
 /** Observe results recorded by the HTML handlers, including failures before module loading. */

@@ -108,6 +108,8 @@ MCP 的自动连接开关位于详情顶部，使用既有自动保存控制器�
 2. `shared/common/src/i18n/en.ts` — 添加相同 key (TypeScript 静态校验)
 3. 组件中使用 `t('new.key')`
 
+默认中文词典同步可用，英文词典在 `await setLocale('en')` 时按需加载；加载失败保留原语言并返回具体错误码。切换后再渲染界面。`translatedValues` 为显式异步的跨语言兼容查询，普通展示直接使用 `t()`。启动入口使用 `@nestos/common/startup` 的轻量工具和少量启动提示，避免为身份与 bootstrap 请求提前引入完整文案；启动提示的单一来源位于 `startup-strings.ts`，由两份完整词典复用。
+
 ## 新增图标
 
 `shared/common/src/i18n/icons.ts` — 添加新图标常量，禁止组件硬编码 emoji

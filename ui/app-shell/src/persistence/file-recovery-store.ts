@@ -1,4 +1,4 @@
-import {randomUUID} from '@nestos/common';
+import {randomUUID} from '@nestos/common/startup';
 
 export interface FileRecovery { base: string; text: string; savedAt?: number; retentionStartedAt?: number; }
 let recoveryOwner = '';

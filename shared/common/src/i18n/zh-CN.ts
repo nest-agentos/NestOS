@@ -1,3 +1,4 @@
+import {STARTUP_ZH} from './startup-strings';
 // @file: common/i18n/zh-CN.ts
 // Chinese (Simplified) locale strings.
 //
@@ -5,6 +6,7 @@
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    ...STARTUP_ZH,
     "kanban.decisionTable.state.waiting-approval": "等待授权",
     "kanban.decisionTable.reason.authorization-required": "会话正在等待你的授权。",
     "kanban.viewAuthorization": "查看授权",
@@ -1978,10 +1980,6 @@ export const zhCN = {
     "fileRecovery.copy": "复制恢复副本",
     "fileRecovery.discard": "丢弃恢复副本",
     "fileRecovery.unavailable": "无法保存本地恢复副本。请保留当前页面并复制未保存的内容。",
-    "httpApp.starting": "正在启动 NestOS…",
-    "httpApp.startupFailed": "NestOS 启动失败",
-    "httpApp.moduleLoadFailed": "页面模块加载失败，可能是页面版本已更新或网络中断。请点击“重新加载”；若仍失败，请检查网络和浏览器证书。",
-    "httpApp.moduleRepairFailed": "页面模块重新获取失败，请检查网络和浏览器证书后重试；草稿不会被删除。",
     "httpApp.updated": "页面所需模块加载失败。请先保存已打开的编辑内容，再重新加载。",
     "httpApp.disconnected": "页面与 HTTP 服务的连接已中断，正在等待服务恢复。聊天保存、会话续租和数字分身更新可能暂不可用。",
     "httpApp.viewError": "页面数据更新失败，请重新加载页面。未发送内容仍保留在当前页面。",
@@ -1997,7 +1995,6 @@ export const zhCN = {
     "httpApp.autoRecoveryFailed": "自动恢复未完成：{reason}",
     "httpApp.viewExpiredReady": "服务已就绪，需要重新加载页面恢复连接。请先复制未保存的输入和编辑内容。",
     "httpApp.retry": "立即重连",
-    "httpApp.reload": "重新加载",
     "httpApp.checkConnection": "检查连接",
     "recovery.title": "系统恢复与维护",
     "recovery.help": "勾选下方文件或配置后，使用顶部按钮统一恢复或刷新状态。",

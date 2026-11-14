@@ -1,4 +1,4 @@
-import {createModuleLogger, randomUUID} from '@nestos/common';
+import {createModuleLogger, randomUUID} from '@nestos/common/startup';
 
 const log = createModuleLogger('startup-modules');
 export const isModuleLoadFailure = (message: string): boolean =>

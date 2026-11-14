@@ -1,0 +1,250 @@
+{
+  "scenario": "Authenticated decision board cold browser startup; first decision rows visible and active board not busy, plus 250ms settle",
+  "recordedAt": "2026-11-14T16:43:00+08:00",
+  "conditions": {
+    "viewport": [
+      390,
+      844
+    ],
+    "mobile": true,
+    "cpuSlowdown": 4,
+    "latencyMs": 100,
+    "downloadBytesPerSecond": 200000,
+    "uploadBytesPerSecond": 100000,
+    "browser": "Headless Chrome via Playwright/CDP",
+    "origin": "localhost HTTPS with client certificate",
+    "data": "Existing development decision board, 11 visible rows",
+    "cache": "Fresh browser context; warm host SQLite/OS caches; no business result cache added",
+    "backgroundLoad": "No synthetic load; host background activity not controlled"
+  },
+  "before": {
+    "version": "20261114T075951-f9923e69-dirty",
+    "readyMs": 4819.795393,
+    "logicalApiCalls": 6,
+    "httpApiRequests": 6,
+    "pageErrors": [],
+    "rowCount": 11,
+    "staticEncodedBytes": 606607,
+    "resources": [
+      {
+        "name": "/assets/index-CUHSyK1Q.js",
+        "initiator": "script",
+        "start": 163.09999990463257,
+        "duration": 3171.4000000953674,
+        "transfer": 271346,
+        "encoded": 271046,
+        "decoded": 1012977,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/hosted-application-uW_Q6Img.js",
+        "initiator": "other",
+        "start": 163.80000019073486,
+        "duration": 2841.0999999046326,
+        "transfer": 200251,
+        "encoded": 199951,
+        "decoded": 782046,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/index-4tOJi43m.css",
+        "initiator": "link",
+        "start": 176.40000009536743,
+        "duration": 1523.6999998092651,
+        "transfer": 69283,
+        "encoded": 68983,
+        "decoded": 361729,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/hosted-application-DUU-nFma.css",
+        "initiator": "link",
+        "start": 164.80000019073486,
+        "duration": 1212.2999997138977,
+        "transfer": 49524,
+        "encoded": 49224,
+        "decoded": 312536,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/context-menu-CsZGf3fk.js",
+        "initiator": "other",
+        "start": 164.90000009536743,
+        "duration": 560.2999997138977,
+        "transfer": 17703,
+        "encoded": 17403,
+        "decoded": 55560,
+        "encoding": "br"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/api/identity",
+        "kind": null,
+        "methods": [],
+        "startMs": 3451.6209360000003,
+        "durationMs": 94.95118199999979
+      },
+      {
+        "path": "/api/application",
+        "kind": "bootstrap",
+        "methods": [],
+        "startMs": 3552.63457,
+        "durationMs": 768.0854310000004
+      },
+      {
+        "path": "/api/application",
+        "kind": "bindings",
+        "methods": [
+          "onChange"
+        ],
+        "startMs": 4700.868197,
+        "durationMs": 119.42029100000036
+      },
+      {
+        "path": "/api/application",
+        "kind": "queries",
+        "methods": [
+          "readEvents"
+        ],
+        "startMs": 4701.153283000001,
+        "durationMs": 130.8280109999996
+      }
+    ],
+    "longestMainThreadTasks": [
+      {
+        "name": "v8.evaluateModule",
+        "durationMs": 97.052
+      },
+      {
+        "name": "Layout",
+        "durationMs": 61.164
+      }
+    ]
+  },
+  "after": {
+    "version": "20261114T084039-3f03e8b0-dirty",
+    "readyMs": 4330.969013,
+    "logicalApiCalls": 6,
+    "httpApiRequests": 6,
+    "pageErrors": [],
+    "rowCount": 11,
+    "staticEncodedBytes": 525682,
+    "resources": [
+      {
+        "name": "/assets/hosted-application-Dew-l4iE.js",
+        "initiator": "other",
+        "start": 153.60000038146973,
+        "duration": 2768,
+        "transfer": 200316,
+        "encoded": 200016,
+        "decoded": 782204,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/index-BOZu07gJ.js",
+        "initiator": "script",
+        "start": 152.7000002861023,
+        "duration": 2686.199999809265,
+        "transfer": 189966,
+        "encoded": 189666,
+        "decoded": 674927,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/index-4tOJi43m.css",
+        "initiator": "link",
+        "start": 166,
+        "duration": 1533.6000003814697,
+        "transfer": 69283,
+        "encoded": 68983,
+        "decoded": 361729,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/hosted-application-DUU-nFma.css",
+        "initiator": "link",
+        "start": 153.7000002861023,
+        "duration": 1208,
+        "transfer": 49524,
+        "encoded": 49224,
+        "decoded": 312536,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/context-menu-DdU5ukgf.js",
+        "initiator": "other",
+        "start": 154.60000038146973,
+        "duration": 599.5,
+        "transfer": 18093,
+        "encoded": 17793,
+        "decoded": 56698,
+        "encoding": "br"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/api/identity",
+        "kind": null,
+        "methods": [],
+        "startMs": 2970.076273,
+        "durationMs": 93.24516099999983
+      },
+      {
+        "path": "/api/application",
+        "kind": "bootstrap",
+        "methods": [],
+        "startMs": 3069.412854,
+        "durationMs": 751.9613589999994
+      },
+      {
+        "path": "/api/application",
+        "kind": "bindings",
+        "methods": [
+          "onChange"
+        ],
+        "startMs": 4213.500574,
+        "durationMs": 113.15694600000006
+      },
+      {
+        "path": "/api/application",
+        "kind": "queries",
+        "methods": [
+          "readEvents"
+        ],
+        "startMs": 4213.773917,
+        "durationMs": 124.61986900000011
+      }
+    ],
+    "longestMainThreadTasks": [
+      {
+        "name": "v8.evaluateModule",
+        "durationMs": 110.156
+      },
+      {
+        "name": "Layout",
+        "durationMs": 58.668
+      }
+    ]
+  },
+  "limitations": [
+    "One before/after sample; not a claim about real phone or public network latency",
+    "First API starts after the entry module loads; entry still includes the default Chinese catalog and transport code",
+    "English catalog is a separate dynamic chunk and absent from initial resources",
+    "API durations measured at browser include network and body transfer"
+  ],
+  "validation": {
+    "performanceCore": "passed",
+    "performanceTransport": "passed",
+    "performanceUi": "67 passed; isolated rerun after initial combined run exceeded one stat-read budget 129 > 120; no threshold changed",
+    "localeTests": 3,
+    "vfsCoreTests": 229,
+    "workspaceTypecheck": "passed",
+    "nativeConversationReadOnlySmoke": {
+      "durationMs": 1060.704261,
+      "httpApiRequests": 2,
+      "errors": []
+    },
+    "temporaryScopeCleanup": "confirmed"
+  }
+}

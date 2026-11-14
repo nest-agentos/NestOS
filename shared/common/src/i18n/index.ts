@@ -1,3 +1,5 @@
+import {createModuleLogger} from '../utils/MemoryLogger';
+import {randomUUID} from '../utils/random';
 // @file: common/i18n/index.ts
 // Lightweight i18n — no runtime dependencies, tree-shakeable.
 //
@@ -6,32 +8,42 @@
 //
 //   t('skill.toast.saved')               // '已保存'
 //   t('skill.toast.imported', { count: 3 }) // '已导入 3 个 Skill'
-//   setLocale('en');                     // switch to English
+//   await setLocale('en');                     // switch to English
 
 import { zhCN } from './zh-CN';
-import { en }   from './en';
 import type { LocaleStrings } from './zh-CN';
 export type { LocaleKey, LocaleStrings } from './zh-CN';
 
-export type Locale = 'zh-CN' | 'en';
+import {getLocale,setLocaleCode} from './locale';
+export {getLocale} from './locale';
+export type {Locale} from './locale';
+import type {Locale} from './locale';
 
-const LOCALES: Record<Locale, LocaleStrings> = { 'zh-CN': zhCN as LocaleStrings, en };
-
-let _locale: Locale = 'zh-CN';
-
-/** Set the active locale. Affects all subsequent t() calls. */
-export function setLocale(locale: Locale): void {
-    _locale = locale;
+const LOCALES:Partial<Record<Locale,LocaleStrings>>={'zh-CN':zhCN};
+let changing=0;const log=createModuleLogger('i18n');
+/** Switching language loads its catalog first; a newer selection supersedes an older load. */
+export async function setLocale(locale:Locale):Promise<void> {
+    if(!['zh-CN','en'].includes(locale))throw Object.assign(new Error('LOCALE_UNSUPPORTED'),{code:'LOCALE_UNSUPPORTED'});
+    const generation=++changing;
+    if(LOCALES[locale]){setLocaleCode(locale);return;}
+    const strings=await loadLocale(locale);
+    if(generation===changing){LOCALES[locale]=strings;setLocaleCode(locale);}
 }
-
-/** Known historical labels, for migrating persisted names without changing the active locale. */
-export function translatedValues(key: import('./zh-CN').LocaleKey): readonly string[] {
-    return [...new Set(Object.values(LOCALES).map(strings => strings[key]))];
+async function loadLocale(locale:Locale):Promise<LocaleStrings> {
+    if(LOCALES[locale])return LOCALES[locale]!;
+    const started=Date.now(),operationId=randomUUID();
+    try {
+        const strings=locale==='en'?(await import('./en')).en:zhCN;LOCALES[locale]=strings;
+        log.info('locale.load',{operationId,stage:'catalog',result:'success',durationMs:Date.now()-started});return strings;
+    }catch{
+        log.warn('locale.load',{operationId,stage:'catalog',result:'failure',code:'LOCALE_MODULE_LOAD_FAILED',durationMs:Date.now()-started});
+        throw Object.assign(new Error('LOCALE_MODULE_LOAD_FAILED'),{code:'LOCALE_MODULE_LOAD_FAILED'});
+    }
 }
-
-/** Get the currently active locale. */
-export function getLocale(): Locale {
-    return _locale;
+/** Legacy label inspection is explicit and does not add inactive catalogs to startup. */
+export async function translatedValues(key:import('./zh-CN').LocaleKey):Promise<readonly string[]> {
+    const catalogs=await Promise.all([loadLocale('zh-CN'),loadLocale('en')]);
+    return [...new Set(catalogs.map(strings=>strings[key]))];
 }
 
 /**
@@ -46,7 +58,7 @@ export function getLocale(): Locale {
  *   t('skill.toast.imported', { count: 3 }) // '已导入 3 个 Skill'
  */
 export function t(key: import('./zh-CN').LocaleKey, params?: Record<string, string | number>): string {
-    const strings = LOCALES[_locale] ?? LOCALES['zh-CN'];
+    const strings = LOCALES[getLocale()] ?? LOCALES['zh-CN'];
     let str: string = (strings as Record<string, string>)[key]
         ?? (LOCALES['zh-CN'] as Record<string, string>)[key]
         ?? key;

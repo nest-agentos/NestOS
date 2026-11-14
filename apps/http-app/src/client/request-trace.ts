@@ -1,4 +1,4 @@
-import {createModuleLogger, randomUUID, NAVIGATION_EVENTS} from '@nestos/common';
+import {createModuleLogger, randomUUID, NAVIGATION_EVENTS} from '@nestos/common/startup';
 const log = createModuleLogger('http-client');
 const traceId = () => randomUUID().replaceAll('-', '');
 /** A navigation owns a trace; each fetch captures its own immutable child span. */
