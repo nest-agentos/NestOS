@@ -1,0 +1,196 @@
+{
+  "date": "2026-11-14",
+  "sourceCommit": "16d9782c",
+  "version": "20261114T071823-16d9782c-dirty",
+  "dataScale": {
+    "decisionRows": 11
+  },
+  "initialRead": {
+    "documents": [
+      "theme",
+      "nestos_assistant_menu_v1"
+    ],
+    "eventBaseline": true,
+    "decision": {
+      "sections": [
+        "page",
+        "catalog",
+        "projects"
+      ],
+      "sort": "activity-desc",
+      "attentionOnly": false,
+      "archived": false
+    },
+    "deliveredIn": "bootstrap",
+    "crossRequestBusinessCache": false,
+    "freshQueriesAfterInitialConsumption": true
+  },
+  "events": {
+    "networkStream": "one existing SSE per view",
+    "notificationWindowMs": 16,
+    "factDelivery": "ordered readEvents pages and local batch fanout",
+    "removedAssistantSubscriptions": [
+      "ISessionRepository.subscribe",
+      "KernelViewPort.onChanged",
+      "DigitalTwinService.onChange"
+    ],
+    "nonterminalActivityHint": "session.activity.changed",
+    "cursor": "advance only after successful delivery; reset boundaries preserved"
+  },
+  "controlledMobile": {
+    "viewport": "390x844",
+    "freshBrowser": true,
+    "network": {
+      "latencyMs": 100,
+      "downloadBytesPerSecond": 200000,
+      "uploadBytesPerSecond": 100000
+    },
+    "cpuSlowdown": 4,
+    "background": "normal daemon load; third run overlapped with independent public read probe",
+    "previous": {
+      "logicalCalls": 12,
+      "httpRequests": 12,
+      "durationMs": [
+        5170.561111,
+        4869.069806,
+        4835.218537
+      ]
+    },
+    "runs": [
+      {
+        "host": "first access after restart",
+        "durationMs": 4857.471633,
+        "httpRequests": 6,
+        "logicalCalls": 6,
+        "methods": {
+          "onChange": 1,
+          "readEvents": 1,
+          "assistantOverview": 1
+        },
+        "errors": [],
+        "cleanup": "succeeded"
+      },
+      {
+        "host": "warm",
+        "durationMs": 4748.850506,
+        "httpRequests": 6,
+        "logicalCalls": 6,
+        "methods": {
+          "onChange": 1,
+          "readEvents": 1,
+          "assistantOverview": 1
+        },
+        "errors": [],
+        "cleanup": "succeeded"
+      },
+      {
+        "host": "warm",
+        "durationMs": 4834.438063,
+        "httpRequests": 6,
+        "logicalCalls": 6,
+        "methods": {
+          "onChange": 1,
+          "readEvents": 1,
+          "assistantOverview": 1
+        },
+        "errors": [],
+        "cleanup": "succeeded"
+      }
+    ],
+    "underFiveSeconds": true,
+    "layout": {
+      "viewport": 390,
+      "documentWidth": 390,
+      "tableWidth": 368,
+      "statusBounds": {
+        "left": 23,
+        "right": 367
+      },
+      "sessionBounds": {
+        "left": 23,
+        "right": 367
+      }
+    },
+    "actualWarmExample": {
+      "serverMs": {
+        "bootstrapWithReadStartup": 170,
+        "ApplicationEvents.onChange": 8,
+        "ApplicationEvents.readEvents": 0,
+        "assistantOverview": 11
+      },
+      "serverRequestMs": {
+        "bootstrapWithReadStartup": 211,
+        "ApplicationEvents.onChange": 9,
+        "ApplicationEvents.readEvents": 34,
+        "assistantOverview": 51
+      }
+    },
+    "backendReadStagesMs": {
+      "eventBaseline": [
+        0,
+        1
+      ],
+      "documents": [
+        9,
+        15
+      ],
+      "decisionNormalSamples": [
+        88,
+        104,
+        121,
+        89
+      ],
+      "decisionConcurrentBrowserSamples": [
+        189,
+        189
+      ]
+    }
+  },
+  "publicDevelopmentMachineProbe": {
+    "origin": "https://176.122.169.169:2000",
+    "durationMs": 9037.073468,
+    "logicalCalls": 5,
+    "httpRequests": 5,
+    "errors": []
+  },
+  "publicLimit": "Still exceeds five seconds. This route does not reproduce the phone network; delayed assistant reads may start after the initial observation boundary.",
+  "backgroundTwentySeconds": {
+    "initialLogical": 5,
+    "totalLogical": 10,
+    "laterMethods": {
+      "readEvents": 3,
+      "assistantOverview": 2,
+      "decisionSnapshot": 1
+    },
+    "noIndependentAssistantSubscriptions": true
+  },
+  "validation": {
+    "kanbanUI": 208,
+    "shellEventsAssistantAndWindows": 70,
+    "startupAndAssistantProjection": 4,
+    "initialRoutes": 11,
+    "authenticatedViewAPI": 31,
+    "performanceSuites": {
+      "budget": 6,
+      "core": 60,
+      "transport": 31,
+      "ui": 67
+    },
+    "workspaceTypecheck": "passed",
+    "moduleBoundaries": "passed",
+    "docs": "passed",
+    "temporaryProcessRecovery": "one nested test scope recovered through registered ownership; final performance run cleanup confirmed",
+    "browserScopes": "all succeeded",
+    "authenticatedHTTPFinal": {
+      "files": 4,
+      "tests": 53,
+      "result": "passed",
+      "temporaryScope": "succeeded"
+    }
+  },
+  "remaining": [
+    "Public development-machine probe 9037ms exceeds five seconds.",
+    "Static resource loading dominates controlled mobile latency; request reduction alone does not remove that cost.",
+    "Underlying storage operation counts are not yet completely instrumented; fewer RPCs must not be presented as proportionally fewer storage reads."
+  ]
+}
