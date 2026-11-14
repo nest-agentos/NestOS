@@ -1,7 +1,8 @@
-import {ACTION_ICONS, CHAT_ICONS, PROJECT_ACTION_ICONS, t, createModuleLogger} from '@nestos/common';
+import {ACTION_ICONS, CHAT_ICONS, PROJECT_ACTION_ICONS, KANBAN_TYPE_ICONS, t, createModuleLogger} from '@nestos/common';
 import type {KanbanPresentation, KanbanUIOptions} from '@nestos/kanban-ui';
 const log = createModuleLogger('kanban');
 export const kanbanPresentation: KanbanPresentation = {
+    typeIcons: KANBAN_TYPE_ICONS,
     resourceRole: (reference,references) => reference.system==='nestos-remote-project'&&references.some(ref=>ref.system==='nestos-primary-project')?t(references.some(ref=>ref.system==='nestos-primary-project'&&ref.id===reference.id)?'kanban.primaryProject':'kanban.secondaryProject'):undefined,
     resourceLabel: (reference,resources) => {
         if(reference.system!=='nestos-remote-project')return;
@@ -10,7 +11,7 @@ export const kanbanPresentation: KanbanPresentation = {
     },
     resourceOrder: (reference,references) => references.some(ref=>ref.system==='nestos-primary-project'&&ref.id===reference.id)?0:1,
     text: (key, values) => t(`kanban.${key}` as Parameters<typeof t>[0], values),
-    icons: {skip: ACTION_ICONS.markRead, clock: ACTION_ICONS.clock, refreshView: ACTION_ICONS.refreshView, more: CHAT_ICONS.more, close: ACTION_ICONS.close, back: ACTION_ICONS.back, copy: CHAT_ICONS.copy, link: ACTION_ICONS.link, archive: PROJECT_ACTION_ICONS.archive, delete: CHAT_ICONS.delete, run: ACTION_ICONS.run, pause: ACTION_ICONS.pause, resume: ACTION_ICONS.run, fix: ACTION_ICONS.fix, edit: ACTION_ICONS.edit},
+    icons: {session: ACTION_ICONS.chat, skip: ACTION_ICONS.markRead, clock: ACTION_ICONS.clock, refreshView: ACTION_ICONS.refreshView, more: CHAT_ICONS.more, close: ACTION_ICONS.close, back: ACTION_ICONS.back, copy: CHAT_ICONS.copy, link: ACTION_ICONS.link, archive: PROJECT_ACTION_ICONS.archive, delete: CHAT_ICONS.delete, run: ACTION_ICONS.run, pause: ACTION_ICONS.pause, resume: ACTION_ICONS.run, fix: ACTION_ICONS.fix, edit: ACTION_ICONS.edit},
     statusIcons: {running: ACTION_ICONS.refreshView, completed: ACTION_ICONS.markRead, cancelled: ACTION_ICONS.close,
         error: PROJECT_ACTION_ICONS.warning, unknown: PROJECT_ACTION_ICONS.warning, 'waiting-input': PROJECT_ACTION_ICONS.warning,
         'waiting-dependency': ACTION_ICONS.clock, paused: ACTION_ICONS.pause, queued: ACTION_ICONS.clock,

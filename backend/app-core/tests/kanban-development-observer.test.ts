@@ -28,7 +28,8 @@ async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, l
     let seq = 0;
     const command = async (client: KanbanService, command: KanbanCommand) => client.execute('board', {
         operationId: 'request-' + ++seq, expectedRevision: (await client.read('board')).revision, command});
-    await command(service, {type: 'publish-plan', plan: {schema: 'kanban.plan/1', id: 'plan', revision: 1, sealed: true,
+    await command(service, {type:'create-item',item:{id:'management-root',taskType:'coordination',title:'Manage work',responsibility:'Coordinate',acceptance:'All children accepted'}});
+    await command(service, {type: 'publish-plan', plan: {schema: 'kanban.plan/1',rootItemId:'management-root', id: 'plan', revision: 1, sealed: true,
         items: [{id: 'item', title: 'Task', responsibility: 'Work', acceptance: 'Evidence', assignee: principal, dependsOn: [], outputs: ['result']}]}});
     await command(service, {type: 'link-reference', itemId: 'item', reference: {system: 'nestos-remote-project', id: 'project'}});
     await command(worker, {type: 'prepare-dispatch', itemId: 'item', dispatchId: 'attempt'});

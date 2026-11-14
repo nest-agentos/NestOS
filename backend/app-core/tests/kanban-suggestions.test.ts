@@ -25,10 +25,10 @@ it('searches titles and IDs without returning item bodies, distinguishes duplica
     expect((await f.service.suggest('board', {kind: 'item', search: 'two'})).items[0].id).toBe('two');
     await expect(f.service.suggest('board', {kind: 'item', limit: 51})).rejects.toThrow('INVALID_LIMIT');
 });
-it('filters parent ranks and excludes self and dependents from dependency completion', async () => {
+it('offers only management parents and excludes self and dependents from dependency completion', async () => {
     const f = await fixture(); await f.add('goal', 'initiative'); await f.add('feature', 'feature'); await f.add('one'); await f.add('two', 'task', ['one']);
-    expect((await f.service.suggest('board', {kind: 'parent', childKind: 'task', excludeItemId: 'one'})).items.map(row => row.id)).toEqual(['feature', 'goal']);
-    expect((await f.service.suggest('board', {kind: 'parent', childKind: 'initiative'})).items).toEqual([]);
+    expect((await f.service.suggest('board', {kind: 'parent', childKind: 'task', excludeItemId: 'one'})).items.map(row => row.id)).toEqual(['feature', 'goal','two']);
+    expect((await f.service.suggest('board', {kind: 'parent', childKind: 'initiative'})).items.map(row=>row.id)).toEqual(['feature','goal','one','two']);
     const choices = await f.service.suggest('board', {kind: 'dependency', excludeItemId: 'one'});
     expect(choices.items.some(row => row.id === 'one' || row.id === 'two')).toBe(false);
     await expect(f.run({type: 'plan-item', itemId: 'one', planning: {kind: 'task', priority: 2, dependencies: ['two'], references: []}})).rejects.toThrow('DEPENDENCY_CYCLE');

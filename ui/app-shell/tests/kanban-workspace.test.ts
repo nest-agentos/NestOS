@@ -15,7 +15,7 @@ async function fixture(source?: import('@nestos/app-core/kanban').KanbanSessionS
     const store = await SeqKanbanStore.open(await manager.openFileSystem('/'));
     const service = createNestOSKanban({store, actor: {kind: 'human', id: 'admin'}, authorize: async () => {}, log: vi.fn(),executionSessions:source?{source}:undefined});
     const sidebar = document.createElement('aside'), editor = document.createElement('main'); document.body.append(sidebar, editor);
-    const selected = vi.fn(), openSession = vi.fn(async () => {}), workbench = new KanbanWorkbench({presentation: kanbanPresentation, executionReference: executionSessionReference, service, sidebar, editor, selected, openSession});
+    const selected = vi.fn(), openSession = vi.fn(async () => {}), workbench = new KanbanWorkbench({presentation: kanbanPresentation, service, sidebar, editor, selected, openSession});
     cleanups.push(async () => {await workbench.destroy(); await manager.dispose();}); await workbench.start();
     return {service, sidebar, editor, workbench, selected, openSession};
 }
@@ -44,9 +44,13 @@ it('creates durable boards and cards, claims, completes, archives and restores u
     await click(f.editor, '[data-action=new-item]'); input(f.editor, 'title', 'First card'); input(f.editor, 'responsibility', 'Do the work'); input(f.editor, 'acceptance', 'Result verified');
     await submit(f.editor, 'item'); expect(f.editor.querySelector('[data-form=item]')).toBeNull();
     const board = (await f.service.list())[0], id = board.items[0].id;
-    expect(board.items[0].status).toBe('backlog'); await click(f.editor, '[data-action=ready]'); await submit(f.editor, 'claim');
+    expect(board.items[0].status).toBe('backlog');
+    await click(f.editor,'[data-action=new-child]');input(f.editor,'title','Execute');input(f.editor,'responsibility','Work');input(f.editor,'acceptance','Verify');await submit(f.editor,'item');
+    const child=(await f.service.read(board.id)).items.find(item=>item.title==='Execute')!;
+    await click(f.editor, '[data-action=ready]'); await submit(f.editor, 'claim');
     input(f.editor, 'resultRef', 'record://verified'); await submit(f.editor, 'submit');
-    expect((await f.service.item(board.id, id)).item.status).toBe('completed');
+    expect((await f.service.item(board.id, child.id)).item.status).toBe('completed');
+    await click(f.editor,`[data-panel] [data-item="${id}"]`);
     f.editor.querySelector<HTMLButtonElement>('[data-action=archive]')!.click();await vi.waitFor(()=>expect(document.querySelector('.settings-modal-confirm')).not.toBeNull());document.querySelector<HTMLButtonElement>('.settings-modal-confirm')!.click();await idle(f.editor); expect((await f.service.item(board.id, id)).archive).toBeDefined();
     await click(f.editor, '[data-action=restore]'); expect((await f.service.item(board.id, id)).archive).toBeUndefined();
 });
@@ -61,7 +65,8 @@ it('preserves unsaved input on notifications, failed writes and rejected navigat
 });
 it('links a Session and routes the existing identity without opening a second conversation', async () => {
     const f = await fixture(); const board = await f.service.create({id: 'b', title: 'Board', scope: {kind: 'system'}, members: [{kind: 'human', id: 'admin', responsibility: 'Work'}], policy: {requireEstimate: false}});
-    await f.service.execute('b', {operationId: 'new', expectedRevision: board.revision, command: {type: 'create-item', item: {id: 'card', title: 'Card', responsibility: 'Work', acceptance: 'Done'}}});
+    await f.service.execute('b',{operationId:'management',expectedRevision:board.revision,command:{type:'create-item',item:{id:'management-root',title:'Manage',responsibility:'Coordinate',acceptance:'Accepted children'}}});
+    await f.service.execute('b', {operationId: 'new', expectedRevision: board.revision+1, command: {type: 'create-item', item: {id: 'card', title: 'Card', responsibility: 'Work', acceptance: 'Done'},planning:{kind:'task',parentId:'management-root',priority:2,dependencies:[],references:[]}}});
     await f.workbench.openResource('/board/b/card');
     const sessionSearch = f.editor.querySelector<HTMLInputElement>('[data-form=session] [role=combobox]')!;
     sessionSearch.value = 'existing-session'; sessionSearch.dispatchEvent(new Event('input', {bubbles: true})); sessionSearch.focus();
@@ -73,24 +78,32 @@ it('links a Session and routes the existing identity without opening a second co
 });
 it('shows an actionable unavailable state when the host has not been updated', async () => {
     const sidebar = document.createElement('aside'), editor = document.createElement('main'); document.body.append(sidebar, editor);
-    const workbench = new KanbanWorkbench({presentation: kanbanPresentation, executionReference: executionSessionReference, sidebar, editor, selected: vi.fn(), openSession: vi.fn()}); await workbench.start();
+    const workbench = new KanbanWorkbench({presentation: kanbanPresentation, sidebar, editor, selected: vi.fn(), openSession: vi.fn()}); await workbench.start();
     expect(editor.textContent).toContain(t('kanban.unavailable')); await workbench.destroy();
 });
-it('binds an execution Session through the inspector, shows session-only activity and filters the board',async()=>{
+it('shows backend execution Sessions without a manual binding flow and filters the board',async()=>{
     let state='running' as const;
-    const inspect=vi.fn(async(_board:unknown,id:string)=>({sessionId:id,title:'Execution conversation',state,lastActivityAt:Date.now()-120000,observedAt:Date.now(),stale:false}));
+    const createdAt=Date.now()-3600000,lastActivityAt=Date.now()-120000;
+    const inspect=vi.fn(async(_board:unknown,id:string)=>({sessionId:id,title:'Execution conversation',state,createdAt,lastActivityAt,observedAt:Date.now(),stale:false}));
     const f=await fixture({inspect});await click(f.editor,'[data-action=new-board]');input(f.editor,'title','Sessions');await submit(f.editor,'board');
     await click(f.editor,'[data-action=new-item]');input(f.editor,'title','Work');input(f.editor,'responsibility','Build');input(f.editor,'acceptance','Reviewed');await submit(f.editor,'item');
-    expect(f.editor.textContent).toContain(t('kanban.noExecutionSession'));
-    const search=f.editor.querySelector<HTMLInputElement>('[data-form=execution-session] [role=combobox]')!;
-    search.closest<HTMLDetailsElement>('details')!.open=true;search.value='execution-session';search.dispatchEvent(new Event('input',{bubbles:true}));search.focus();
-    await vi.waitFor(()=>expect(f.editor.querySelector('[data-form=execution-session] [role=option]')).not.toBeNull());
-    f.editor.querySelector<HTMLButtonElement>('[data-form=execution-session] [role=option]')!.click();await submit(f.editor,'execution-session');
-    expect(f.editor.querySelector('[data-execution-session]')!.textContent).toContain(t('kanban.enterSession'));
+    await click(f.editor,'[data-action=new-child]');input(f.editor,'title','Execute');input(f.editor,'responsibility','Build');input(f.editor,'acceptance','Reviewed');await submit(f.editor,'item');
+    expect(f.editor.querySelector('[data-form=execution-session]')).toBeNull();
+    expect(f.editor.textContent).not.toContain(t('kanban.noExecutionSession'));
+    const board = (await f.service.list())[0], item = board.items.find(item=>item.taskType==='execution')!;
+    await f.service.execute(board.id, {operationId: 'execution-prepared', expectedRevision: board.revision,
+        command: {type: 'link-reference', itemId: item.id, reference: executionSessionReference('execution-session', 'dispatch')}});
+    await f.workbench.openResource(`/board/${board.id}/${item.id}`);
+    await vi.waitFor(() => expect(f.editor.querySelector('[data-execution-session] [data-session]')?.getAttribute('aria-label')).toBe(t('kanban.enterSession')));
+    expect(f.editor.querySelector('[data-execution-session]')!.textContent).toBe('');
     await click(f.editor,'[data-execution-session] [data-session]');expect(f.openSession).toHaveBeenCalledWith('execution-session');
-    await click(f.editor,'[data-action=close-panel]');await vi.waitFor(()=>expect(f.editor.querySelector('.kanban__card-session')?.textContent).toContain(t('kanban.sessionState.running')));
+    await click(f.editor,'[data-action=close-panel]');await vi.waitFor(()=>expect(f.editor.querySelector('[data-item-card="'+item.id+'"] .kanban__card-session')?.getAttribute('title')).toContain(t('kanban.sessionState.running')));
+    const sessionRow=f.editor.querySelector('[data-item-card="'+item.id+'"] .kanban__card-session')!;
+    expect(sessionRow.querySelector('[data-session]')?.textContent).toBe(t('kanban.enterSession'));
+    expect(sessionRow.querySelector('[data-session-created]')?.getAttribute('datetime')).toBe(new Date(createdAt).toISOString());
+    expect(sessionRow.querySelector('[data-session-activity]')?.getAttribute('datetime')).toBe(new Date(lastActivityAt).toISOString());
     const filter=f.editor.querySelector<HTMLSelectElement>('[name=execution]')!;filter.value='recent';await submit(f.editor,'filter');
-    expect(f.editor.querySelectorAll('[data-item]')).toHaveLength(1);
+    expect(f.editor.querySelectorAll('[data-task-type=execution][data-item-card]')).toHaveLength(1);
     expect(f.editor.querySelector('[data-content]')!.textContent).not.toContain('taskId');expect(inspect).toHaveBeenCalled();
 });
 it('retries a card write with the same operation and item identities after a lost response', async () => {
@@ -161,13 +174,13 @@ it('shows stable references, copies references and links, and opens work by its 
     const board=await f.service.create({id:'numbered',title:'Referenced board',scope:{kind:'system'},members:[{kind:'human',id:'admin',responsibility:'Manage',roles:['worker','coordinator']}]});
     await f.service.execute(board.id,{operationId:'numbered-item',expectedRevision:board.revision,command:{type:'create-item',item:{id:'work',title:'Referenced work',responsibility:'Do',acceptance:'Verify'}}});
     f.workbench.invalidateFromEvents();
-    await vi.waitFor(()=>expect(f.editor.textContent).toContain('KBT-1-1'));
+    await vi.waitFor(()=>expect(f.editor.textContent).toContain('KBC-1-1'));
     const writeText=vi.fn(async()=>{});Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
     const form=f.sidebar.querySelector<HTMLFormElement>('[data-form=reference]')!;
     form.querySelector<HTMLInputElement>('input')!.value='KBT-1-1';form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
     await vi.waitFor(()=>expect(f.editor.querySelector('[data-panel] h3')?.textContent).toContain('Referenced work'));
     await click(f.editor,'[data-panel] .kanban__menu > summary');
-    await click(f.editor,'[data-panel] [data-action=copy-reference]');expect(writeText).toHaveBeenLastCalledWith('KBT-1-1');
+    await click(f.editor,'[data-panel] [data-action=copy-reference]');expect(writeText).toHaveBeenLastCalledWith('KBC-1-1');
     await click(f.editor,'[data-panel] [data-action=copy-link]');expect(writeText).toHaveBeenLastCalledWith(expect.stringContaining('#/kanban/%2Fboard%2Fnumbered%2Fwork'));
     writeText.mockRejectedValueOnce(new Error('Denied'));
     await click(f.editor,'[data-panel] [data-action=copy-reference]');expect(f.editor.querySelector('[data-panel-error]')?.textContent).toContain('COPY_FAILED');

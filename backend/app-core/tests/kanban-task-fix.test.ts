@@ -27,8 +27,8 @@ async function fixture(group=false) {
     await command({type:'create-item',item:{id:'original',title:'Original',responsibility:'Build original',acceptance:'Verify original',externalRefs:[{system:'nestos-remote-project',id:'x1'},{system:'nestos-execution-session',id:'original-main',revision:'main-attempt'}]}});
     await command({type:'request-run',itemId:'original'});await command({type:'admit-item',itemId:'original',trigger:'manual'});
     const originalInput={title:'Original',request:{expectedSessionId:'main-attempt',expectedBranch:'main',expectedTarget:target,target,submission:{id:'main-attempt'}}} as IndependentCallInput;
-    if(!group)await command({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'original-plan',revision:1,sealed:true,items:[{id:'original',expectedRevision:(await service.item('development','original')).item.revision,title:'Original',responsibility:'Build original',acceptance:'Verify original',assignee:{kind:'human',id:'admin'},dependsOn:[]}]}});
-    if(!group)await command({type:'prepare-dispatch',itemId:'original',dispatchId:'main-attempt'});
+    await journal.update('analysis-current:'+JSON.stringify(['development','original']),()=> 'group-analysis');
+    await journal.update('group-analysis',()=>({id:'main-attempt',input:originalInput,status:{state:'ready',itemId:'original'}}));
     const calls={prepareTaskCall:vi.fn(),submitPreparedTaskCall:vi.fn(),
         inspectTaskCallSubmission:vi.fn(async()=>({executionSessionId:'original-main',submission:{task:{sessionId:'main-attempt',taskId:'root'}}})),
         list:vi.fn(async()=>[{input:originalInput,callerState:{settled:true},executionTree:{settled:true}}])};
@@ -39,7 +39,7 @@ async function fixture(group=false) {
     automation.originalSession=input=>originalSession(automation as never,input);
     const options={fs,service,journal,events,automation,prepareSession:vi.fn(async(id:string)=>id),log};
     const fix=createTaskFix(options),run=()=>fix.fixTask('development',{itemId:'original',operationId:'open-fix'});
-    const proposal={schema:'kanban.fix-proposal/1',title:'Fix validation',responsibility:'Repair validation',acceptance:'Regression passes',type:'fix',dependencies:['original']};
+    const proposal={schema:'kanban.coordination-proposal/1',type:'append',tasks:[{key:'repair',title:'Fix validation',responsibility:'Repair validation',acceptance:'Regression passes',dependsOn:[]}]};
     const instruction=(text='完成',id='confirm'):SessionInstruction=>({id,text,files:[],agentId:'executor',branch:'main',createdAt:1,state:'pending'});
     let proposalRevision=0;const publish=async(id:string,value=proposal)=>{const messageId='proposal-'+ ++proposalRevision;channels.report(id,messageId,{type:'proposal',content:'Fix proposal',payload:value});return messageId;};
     return {fix,run,channels,fs,service,journal,events,calls,prepareWork,options,instruction,publish,proposal,log,submission,command};
@@ -58,11 +58,11 @@ it('creates nothing before exact confirmation, freezes once and roundtrips the f
     expect((await f.service.read('development')).items).toHaveLength(1);
     expect(await f.fix.intercept(fix.sessionId,f.instruction())).toBe(true);
     const file=await f.journal.get<Record<string,unknown>>('fix-definition:'+fix.id);
-    expect(file).toMatchObject({schema:'kanban.fix/1',sourceSessionId:fix.sessionId,confirmation:{messageId:'confirm',content:'完成'},board:{id:'development'},resource:{id:'x1'},type:'fix',dependencies:['original']});
-    const created=(await f.service.read('development')).items.find(item=>item.planning?.kind==='fix')!;
-    expect(created).toMatchObject({status:'backlog',title:f.proposal.title,planning:{dependencies:['original']}});
+    expect(file).toMatchObject({schema:'kanban.fix/1',sourceSessionId:fix.sessionId,confirmation:{messageId:'confirm',content:'完成'},board:{id:'development'},resource:{id:'x1'},type:'append',children:[{title:'Fix validation'}]});
+    const created=(await f.service.read('development')).items.find(item=>item.id!=='original')!;
+    expect(created).toMatchObject({status:'backlog',title:f.proposal.tasks[0].title,planning:{parentId:'original',dependencies:[]}});
     expect(created.launch!.startAt-created.createdAt).toBe(300000);expect('fixOf' in created).toBe(false);
-    expect((await f.service.query('development',{view:'all',kind:'fix'})).items[0].task?.phase).toBe('waiting-dependency');
+    expect((await f.service.query('development',{view:'all',parentId:'original'})).items[0].task?.phase).toBe('waiting-start');
     await f.fix.intercept(fix.sessionId,f.instruction());await createTaskFix(f.options).scan();
     expect((await f.service.read('development')).items).toHaveLength(2);
     expect((await f.events.listNotifications()).items.filter(row=>row.event.value.type==='kanban.fix.accepted')).toHaveLength(1);
@@ -74,10 +74,10 @@ it('retains the confirmation snapshot and original operation after a journal wri
     vi.spyOn(f.journal,'update').mockImplementation(async(key,change)=>{if(fail&&key.startsWith('fix-definition:'))throw Object.assign(new Error('Disk failed'),{code:'EIO'});return original(key,change);});
     await expect(f.fix.intercept(fix.sessionId,f.instruction())).rejects.toMatchObject({code:'EIO'});
     expect((await f.service.read('development')).items).toHaveLength(1);
-    await f.publish(fix.id,{...f.proposal,title:'Later input'});
+    await f.publish(fix.id,{...f.proposal,tasks:[{...f.proposal.tasks[0],title:'Later input'}]});
     fail=false;await createTaskFix(f.options).scan();
-    const task=(await f.service.read('development')).items.find(item=>item.planning?.kind==='fix')!;expect(task.title).toBe(f.proposal.title);
-    expect((await f.journal.get<Record<string,unknown>>('fix-definition:'+fix.id))!.title).toBe(f.proposal.title);
+    const task=(await f.service.read('development')).items.find(item=>item.id!=='original')!;expect(task.title).toBe(f.proposal.tasks[0].title);
+    expect((await f.journal.get<any>('fix-definition:'+fix.id))!.children[0].title).toBe(f.proposal.tasks[0].title);
 });
 it('repairs notification failure after the business commit without a duplicate task or false acknowledgement',async()=>{
     const f=await fixture(),fix=await f.run(),directory=await f.publish(fix.id),transaction=f.events.journal.transaction.bind(f.events.journal);
@@ -87,9 +87,9 @@ it('repairs notification failure after the business commit without a duplicate t
     fail=false;await createTaskFix(f.options).scan();expect((await f.service.read('development')).items).toHaveLength(2);
     expect(f.channels.ensure(fix.id).acks.has(directory)).toBe(true);
 });
-it('refuses a proposal that omits the original prerequisite and never guesses another board or project',async()=>{
-    const f=await fixture(),fix=await f.run();await f.publish(fix.id,{...f.proposal,dependencies:[]});
-    await expect(f.fix.intercept(fix.sessionId,f.instruction())).rejects.toMatchObject({code:'FIX_DEPENDENCY_REQUIRED'});
+it('refuses a proposal that references an unavailable prerequisite and never guesses another board or project',async()=>{
+    const f=await fixture(),fix=await f.run();await f.publish(fix.id,{...f.proposal,tasks:[{...f.proposal.tasks[0],dependsOn:['missing']}]});
+    await expect(f.fix.intercept(fix.sessionId,f.instruction())).rejects.toMatchObject({code:'AUTOMATION_SUBTASK_DEPENDENCY_INVALID'});
     expect((await f.service.read('development')).items).toHaveLength(1);
 });
 
@@ -97,7 +97,7 @@ it('uses the original associated decision snapshot and content even when the cur
     const f=await fixture(),board=await f.service.read('development');
     await f.service.execute('development',{operationId:'decision-link',expectedRevision:board.revision,command:{type:'link-reference',itemId:'original',reference:{system:'nestos-decision-run',id:'decision-run'}}});
     await f.journal.update('record-context:decision-run',()=>({sourceBoardId:'development',recordId:'decision',recordRevision:3,runId:'decision-run'}));
-    await f.journal.update('record-runs:development',()=>[{id:'decision-run',record:{id:'decision',revision:3,title:'Approved decision',content:'Original approved scope',kind:'decision',status:'confirmed'}}]);
+    await f.journal.update('record-runs:development',()=>[{id:'decision-run',recordId:'decision',boardId:'development',createdAt:1,updatedAt:1,record:{id:'decision',revision:3,title:'Approved decision',content:'Original approved scope',kind:'decision',status:'confirmed'}}]);
     await f.run();expect(f.prepareWork.mock.calls[0][0]).toMatchObject({context:{decision:{recordId:'decision',recordRevision:3,record:{content:'Original approved scope'}}}});
 });
 it('consumes fix clarifications through the channel and repairs their receipts without blocking the original main execution',async()=>{
@@ -170,7 +170,7 @@ it('creates a repair only from the confirmed group Session proposal and atomical
  await f.command({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:'failed',code:'VERIFICATION_FAILED'});
  await f.journal.update('analysis-current:'+JSON.stringify(['development',parent.id]),()=> 'group-analysis');
  const originalInput=(await f.calls.list())[0].input;await f.journal.update('group-analysis',()=>({id:'main-attempt',input:originalInput,status:{state:'ready',itemId:parent.id}}));
- const fix=await f.run();expect(fix.sessionId).toBe('original-main');
+ const fix=await f.fix.fixTask('development',{itemId:'failed-child',operationId:'request-repair'});expect(fix.sessionId).toBe('original-main');expect(fix.itemId).toBe(parent.id);
  f.channels.report(fix.id,'repair-proposal',{type:'proposal',content:'Repair delivery before recheck',payload:{schema:'kanban.coordination-proposal/1',type:'repair',repairItemId:'failed-child',tasks:[{key:'delivery',title:'Repair delivery',responsibility:'Correct delivery evidence',acceptance:'Formal receipt',dependsOn:[]}]}});
  expect((await f.service.query('development',{view:'all',parentId:parent.id})).total).toBe(1);
  await f.fix.intercept(fix.sessionId,f.instruction());
@@ -180,4 +180,11 @@ it('creates a repair only from the confirmed group Session proposal and atomical
  expect((await f.service.workflow('development')).dispatches[dispatch.id].outcome).toBe('failed');
  expect(await f.journal.get('repair-resumption:'+fix.id)).toMatchObject({boardId:'development',itemId:'failed-child',done:false});
  await f.fix.intercept(fix.sessionId,f.instruction());expect((await f.service.query('development',{view:'all',parentId:parent.id})).total).toBe(2);
+});
+
+it('reports a precise routing failure without starting a repair or leaking private error content',async()=>{
+    const f=await fixture();vi.spyOn(f.service,'item').mockRejectedValueOnce(Object.assign(Error('PRIVATE_ROUTING_BODY'),{code:'EACCES'}));
+    await expect(f.run()).rejects.toMatchObject({code:'EACCES'});expect(f.submission.start).not.toHaveBeenCalled();
+    expect(f.log).toHaveBeenCalledWith(expect.objectContaining({stage:'task.repair.management',result:'failure',code:'EACCES'}));
+    expect(JSON.stringify(f.log.mock.calls)).not.toContain('PRIVATE_ROUTING_BODY');
 });

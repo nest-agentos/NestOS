@@ -15,8 +15,10 @@ async function fixture(review: 'independent' | 'assignee' = 'independent') {
     const service = createKanbanModule({store, actor: {kind: 'human', id: 'admin'}, now: () => time++, authorize: async () => {}, log: vi.fn()});
     await service.create({id: 'board', title: 'Development', policy: {review}, scope: {kind: 'system'}, members: [{kind: 'human', id: 'admin', responsibility: 'Manage', roles: ['coordinator','worker','reviewer']}, {kind: 'human', id: 'reviewer', responsibility: 'Review', roles: ['coordinator','reviewer']}]});
     const command = async (command: KanbanCommand) => service.execute('board', {operationId: 'request-' + ++sequence, expectedRevision: (await service.read('board')).revision, command});
-    const create = async (id: string, parentId?: string, kind = 'task') => command({type: 'create-item', item: {id, title: id, responsibility: 'Work', acceptance: 'Verified'},
-        planning: {kind, priority: 2, dependencies: [], references: [], ...(parentId ? {parentId} : {})}});
+    const create = async (id: string, parentId?: string, kind = 'task') => {
+        if(!parentId&&kind==='task'){if(!(await service.read('board')).items.some(item=>item.id==='management-root'))await command({type:'create-item',item:{id:'management-root',taskType:'coordination',title:'Manage work',responsibility:'Coordinate',acceptance:'All children accepted'}});parentId='management-root';}
+        return command({type: 'create-item', item: {id, title: id, responsibility: 'Work', acceptance: 'Verified'},
+        planning: {kind, priority: 2, dependencies: [], references: [], ...(parentId ? {parentId} : {})}});};
     const records = (query?: KanbanRecordQuery) => logs.records(service, 'board', query);
     const reviewer = createKanbanModule({store, actor: {kind: 'human', id: 'reviewer'}, now: () => time++, authorize: async () => {}, log: vi.fn()});
     return {fs, service, reviewer, command, create, logs, records, diagnostic};
@@ -35,7 +37,7 @@ it('persists created, cancelled and blocked logs and aggregates child work under
 it('logs real execution transitions and bindings while omitting unchanged renewals', async () => {
     const f = await fixture(); await f.create('task');
     const principal = {kind: 'human' as const, id: 'admin'};
-    await f.command({type: 'publish-plan', plan: {schema: 'kanban.plan/1', id: 'plan', revision: 1, sealed: true,
+    await f.command({type: 'publish-plan', plan: {schema: 'kanban.plan/1',rootItemId:'management-root', id: 'plan', revision: 1, sealed: true,
         items: [{id: 'task', title: 'task', responsibility: 'Work', acceptance: 'Verified', expectedRevision: 1, assignee: principal, dependsOn: [], outputs: []}]}});
     await f.command({type: 'prepare-dispatch', itemId: 'task', dispatchId: 'dispatch', estimate: {complexity: 1, workUnits: 1, durationMs: 60000, confidence: 'high'}});
     await f.command({type: 'link-reference', itemId: 'task', reference: {system: 'nestos-execution-session', id: 'session', revision: 'dispatch'}});
@@ -61,14 +63,14 @@ it('merges manual and automatic logs without skipping or duplicating entries acr
     const first = await f.records({kind: 'log', limit: 2});
     const second = await f.records({kind: 'log', limit: 2, cursor: first.nextCursor});
     expect([...first.items,...second.items].map(row => row.title)).toEqual(['three · 任务已创建','two · 任务已创建','Manual note','one · 任务已创建']);
-    expect(second.nextCursor).toBeUndefined(); expect(first.total).toBe(4);
+    expect(second.nextCursor).toBeDefined(); expect(first.total).toBe(5);
     expect(JSON.stringify(f.diagnostic.mock.calls)).not.toContain('PRIVATE_CONTENT');
     await f.create('four'); await expect(f.records({kind: 'log', limit: 2, cursor: first.nextCursor})).rejects.toMatchObject({code: 'CURSOR_STALE'});
 });
 it('does not consume the coordination record budget and keeps authorization on derived records', async () => {
     const f = await fixture(); await f.create('task');
     for (let index = 0; index < 205; index++) await f.logs.append(f.service, 'board', 'task', {stage: 'execution.running', result: 'success', dispatchId: 'attempt-' + index});
-    expect((await f.records({kind: 'log', limit: 200})).total).toBe(206);
+    expect((await f.records({kind: 'log', limit: 200})).total).toBe(207);
     expect((await f.service.records('board', {limit: 200})).total).toBe(0);
     const row = (await f.records({kind: 'log'})).items[0];
     const denied = {...f.service, records: vi.fn(async () => {throw Object.assign(new Error('PRIVATE'), {code: 'EACCES'});})};
@@ -85,12 +87,12 @@ it('retries projection after a transactional persistence failure without repeati
         }}))),
     }}} as typeof f.fs, workLogOptions(undefined,f.diagnostic));
     await expect(broken.synchronize('board', f.service)).rejects.toMatchObject({code: 'EIO'});
-    expect((await f.records({kind: 'log'})).total).toBe(1); expect((await f.service.read('board')).items).toHaveLength(1);
+    expect((await f.records({kind: 'log'})).total).toBe(2); expect((await f.service.read('board')).items).toHaveLength(2);
     expect(JSON.stringify(f.diagnostic.mock.calls)).not.toContain('PRIVATE_STORAGE_BODY');
 });
 it.each(['succeeded', 'cancelled'] as const)('records the %s execution outcome independently from acceptance', async outcome => {
     const f = await fixture(); await f.create('task');
-    await f.command({type: 'publish-plan', plan: {schema: 'kanban.plan/1', id: 'plan', revision: 1, sealed: true, items: [{id: 'task', title: 'task', responsibility: 'Work', acceptance: 'Verified', expectedRevision: 1,
+    await f.command({type: 'publish-plan', plan: {schema: 'kanban.plan/1',rootItemId:'management-root', id: 'plan', revision: 1, sealed: true, items: [{id: 'task', title: 'task', responsibility: 'Work', acceptance: 'Verified', expectedRevision: 1,
         assignee: {kind: 'human', id: 'admin'}, dependsOn: [], outputs: []}]}});
     await f.command({type: 'prepare-dispatch', itemId: 'task', dispatchId: 'dispatch', estimate: {complexity: 1, workUnits: 1, durationMs: 60000, confidence: 'high'}});
     const dispatch = (await f.service.workflow('board')).dispatches.dispatch;
@@ -107,7 +109,7 @@ it.each(['succeeded', 'cancelled'] as const)('records the %s execution outcome i
 
 it('reports automatic acceptance as completed instead of waiting for a second review', async () => {
     const f = await fixture('assignee'); await f.create('task');
-    await f.command({type: 'publish-plan', plan: {schema: 'kanban.plan/1', id: 'plan', revision: 1, sealed: true, items: [{id: 'task', title: 'task', responsibility: 'Work', acceptance: 'Verified', expectedRevision: 1,
+    await f.command({type: 'publish-plan', plan: {schema: 'kanban.plan/1',rootItemId:'management-root', id: 'plan', revision: 1, sealed: true, items: [{id: 'task', title: 'task', responsibility: 'Work', acceptance: 'Verified', expectedRevision: 1,
         assignee: {kind: 'human', id: 'admin'}, dependsOn: [], outputs: []}]}});
     await f.command({type: 'prepare-dispatch', itemId: 'task', dispatchId: 'dispatch', estimate: {complexity: 1, workUnits: 1, durationMs: 60000, confidence: 'high'}});
     const dispatch = (await f.service.workflow('board')).dispatches.dispatch;
@@ -128,7 +130,7 @@ it('backfills old bindings as an observed snapshot instead of inventing a histor
 
 it('repairs a legacy completion projection once without changing board state or dispatching work',async()=>{
     const f=await fixture();await f.create('task');
-    await f.command({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'plan',revision:1,sealed:true,items:[{id:'task',title:'task',responsibility:'Work',acceptance:'Verified',expectedRevision:1,
+    await f.command({type:'publish-plan',plan:{schema:'kanban.plan/1',rootItemId:'management-root',id:'plan',revision:1,sealed:true,items:[{id:'task',title:'task',responsibility:'Work',acceptance:'Verified',expectedRevision:1,
         assignee:{kind:'human',id:'admin'},dependsOn:[],outputs:[]}]}});
     await f.command({type:'prepare-dispatch',itemId:'task',dispatchId:'dispatch',estimate:{complexity:1,workUnits:1,durationMs:60000,confidence:'high'}});
     const dispatch=(await f.service.workflow('board')).dispatches.dispatch;
@@ -143,7 +145,7 @@ it('repairs a legacy completion projection once without changing board state or 
     const reopened=new KanbanWorkLog(f.fs, workLogOptions(undefined,undefined));await reopened.open();
     const after=await reopened.records(legacy,'board',{kind:'log'}),completed=after.items.filter(row=>row.activity?.stage==='task.completed');
     expect(after.total).toBe(before.total+1);expect(completed).toHaveLength(1);
-    expect(completed[0]).toMatchObject({createdAt:board.items[0].closedAt,activity:{dispatchId:'dispatch',fields:{evidence:'accepted-dispatch'}}});
+    expect(completed[0]).toMatchObject({createdAt:board.items.find(item=>item.id==='task')!.closedAt,activity:{dispatchId:'dispatch',fields:{evidence:'accepted-dispatch'}}});
     expect((await reopened.records(legacy,'board',{kind:'log'})).total).toBe(after.total);expect(execute).not.toHaveBeenCalled();
     expect(await f.service.read('board')).toEqual(board);expect(await f.service.workflow('board')).toEqual(workflow);
 });
@@ -151,7 +153,7 @@ it('repairs a legacy completion projection once without changing board state or 
 it('records cleanup for deleted tasks and keeps retries idempotent', async () => {
     const f = await fixture(); await f.create('retired');
     await f.command({type: 'cancel-item', itemId: 'retired', reason: 'Stopped'});
-    await f.command({type: 'delete-item', itemId: 'retired'});
+    await f.command({type: 'delete-item', itemId: 'management-root'});
     const fact = {stage: 'worktree.cleaned', result: 'success' as const, dispatchId: 'cleanup-retired'};
     await f.logs.append(f.service, 'board', 'retired', fact);
     await f.logs.append(f.service, 'board', 'retired', fact);

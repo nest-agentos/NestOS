@@ -14,7 +14,8 @@ async function fixture(){
  const service=createKanbanModule({store,actor,authorize:async()=>{},verifyOutputs:async()=>true,log(){}}),worker=createKanbanModule({store,actor:{kind:'service',id:'worker'},authorize:async()=>{},log(){}});
  await service.create({id:'b',title:'Board',scope:{kind:'system'},policy:{requireEstimate:false},members:[{...actor,responsibility:'Review',roles:['coordinator','reviewer']},{kind:'service',id:'worker',responsibility:'Work',roles:['worker','coordinator']}]});
  let serial=0;const command=async(cmd:KanbanCommand,api=service)=>api.execute('b',{operationId:'seed-'+ ++serial,expectedRevision:(await api.read('b')).revision,command:cmd});
- await command({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'p',revision:1,sealed:true,items:[{id:'task',title:'Task',responsibility:'Work',acceptance:'Delivery',assignee:{kind:'service',id:'worker'},dependsOn:[]}]}});
+    await command({type:'create-item',item:{id:'management-root',taskType:'coordination',title:'Manage work',responsibility:'Coordinate',acceptance:'All children accepted'}});
+ await command({type:'publish-plan',plan:{schema:'kanban.plan/1',rootItemId:'management-root',id:'p',revision:1,sealed:true,items:[{id:'task',title:'Task',responsibility:'Work',acceptance:'Delivery',assignee:{kind:'service',id:'worker'},dependsOn:[]}]}});
  await command({type:'prepare-dispatch',itemId:'task',dispatchId:'d'},worker);
  await command({type:'observe-execution',dispatchId:'d',fence:(await service.workflow('b')).dispatches.d.fence,outcome:'succeeded'});
  const journal=new KanbanAutomationJournal(fs);await journal.open();

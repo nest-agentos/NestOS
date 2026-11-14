@@ -41,7 +41,7 @@ it('waits for sustained idle, adds a source-linked proposal and commits its wate
 });
 it('supports explicit automatic admission while default proposals remain unclaimable', async () => {
     const f = await fixture(true); await f.scanner.scan(); f.tick(101); await f.scanner.scan();
-    expect((await f.service.read('b')).items[0].status).toBe('open');
+    expect((await f.service.read('b')).items[0].status).toBe('backlog');expect((await f.service.read('b')).items[0].taskType).toBe('coordination');
 });
 it('does not scan active, waiting, unknown or scanner-owned sessions', async () => {
     const f = await fixture();

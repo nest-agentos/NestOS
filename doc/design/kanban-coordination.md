@@ -58,7 +58,7 @@ scope 支持 system、project，以及 `{kind:'collection', namespace, id}`。�
 
 ### 工作类型、列与业务引用
 
-workTypes 配置 `{id,label,rank,executable}`，defaultWorkType 指定缺省类型。默认兼容 initiative/feature/task，显示为 Goal/Group/Action；业务可替换为课题/实验、活动/执行项或请求/处理项。父类型 rank 必须小于子类型，避免循环；是否可认领由 executable 决定，核心不按软件功能名分支。
+workTypes 配置 `{id,label,rank,executable}`，defaultWorkType 指定缺省类型。类型和 rank 仅保留为兼容的工作分类元数据；任务关系固定为顶层管理任务和直属执行任务。管理任务不可认领，执行任务必须归属一个管理任务且不能再创建子任务；核心不按软件功能名分支。
 
 columns 只定义名称及标准阶段的展示映射，必须恰好覆盖全部阶段。执行机制保持固定，业务的多轮审批、跨系统动作或复杂路由由 Flow 表达。
 
@@ -94,7 +94,7 @@ planning 携带类型、父项、area、milestone、priority（0 最高，4 最�
 
 ```json
 {
-  "schema": "kanban.plan/1", "id": "delivery", "revision": 1,
+  "schema": "kanban.plan/1", "id": "delivery", "rootItemId": "management-task", "revision": 1,
   "decisionId": "decision-1", "sealed": true,
   "items": [
     {"id": "contract", "title": "确认接口", "responsibility": "发布约定", "acceptance": "评审通过", "assignee": {"kind": "service", "id": "builder"}, "dependsOn": [], "outputs": ["schema"]},
@@ -477,9 +477,9 @@ NestOS 将已提交的看板事件投影到独立的 `/var/lib/kanban/work-log.s
 
 ### 决策、项目与自动拆分
 
-决策表单通过 `recordResources()` 提供远程项目多选；NestOS 校验所选项目真实存在且来源为 remote。决策运行可明确选择新看板；多项目生成汇总目标与每项目一个任务。开发任务通过 `itemResources(boardId, parentId?)` 提供单选项目，子任务继承并锁定父任务项目；HTTP 与 CLI 命令同样复验，不能绕过界面限制。资源约束属于 NestOS 应用策略，独立 Kanban 库仅保存不透明引用。
+决策表单通过 `recordResources()` 提供远程项目多选；NestOS 校验所选项目真实存在且来源为 remote。决策运行可明确选择新看板；多项目由同一个管理任务统一规划，执行任务保留明确项目归属。开发任务通过 `itemResources(boardId, parentId?)` 提供单选项目，子任务继承并锁定父任务项目；HTTP 与 CLI 命令同样复验，不能绕过界面限制。资源约束属于 NestOS 应用策略，独立 Kanban 库仅保存不透明引用。
 
-默认层级包含 goal、group、task、subtask。复杂任务的分析结果可返回 2–16 个 subtasks，各项包含局部 key、title、responsibility、acceptance、dependsOn 和可选 estimate；估算策略启用时每项均须估算。宿主校验依赖闭环，生成稳定子任务身份，继承项目并原子发布计划。模型不能为子任务指定其他项目。父任务持久保存 `planning.execution: children`，不再领取或执行；只对依赖满足的叶子任务创建 Agent、worktree 和 Session。所有子任务独立验收完成后自动汇总关闭父任务；失败、取消、待验收均不冒充完成，重启不重新执行父任务。
+任务层级固定为管理任务 → 执行任务，旧层级在宿主启动时显式迁移并保留身份、会话和历史。管理任务的分析结果可返回 1–16 个直属执行任务，各项包含局部 key、title、responsibility、acceptance、dependsOn 和可选 estimate；估算策略启用时每项均须估算。宿主校验依赖闭环，生成稳定子任务身份，继承项目并原子发布计划。模型不能为子任务指定其他项目。同级任务用 dependsOn 描述依赖；就绪任务在 WIP 与执行资源限额内并行，优先级只排序已就绪任务，编号不承担依赖语义。修补请求统一交回管理任务，在其原会话中安排同级修补与复验。决策的可选优先级在创建管理任务时继承。父任务持久保存 `planning.execution: children`，不再领取或执行；只对依赖满足的叶子任务创建 Agent、worktree 和 Session。所有子任务独立验收完成后自动汇总关闭父任务；失败、取消、待验收均不冒充完成，重启不重新执行父任务。
 
 新任务使用当前内置默认提示词或显式作者覆盖，并冻结本次实际内容；不自动迁移旧作者文件。工作树保留审计 manifest 与提示词副本，实际通信与上下文位于 Cells scope。
 

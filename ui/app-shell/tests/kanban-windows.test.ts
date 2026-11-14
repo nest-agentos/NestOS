@@ -21,7 +21,8 @@ async function fixture(initialResource = '/board/b/card', shared?: {service: Ret
         notifications: {sourceId:'test:personal',journal:events.journal}});
     if (!shared) {
     const board = await service.create({id: 'b', title: 'Board', scope: {kind: 'system'}, members: [{kind: 'human', id: 'admin', responsibility: 'Work',roles:['coordinator','worker']}]});
-    await service.execute(board.id, {operationId: 'create', expectedRevision: board.revision, command: {type: 'create-item', item: {id: 'card', title: 'A long item title', responsibility: 'Work', acceptance: 'Done'}}});
+    await service.execute(board.id,{operationId:'management',expectedRevision:board.revision,command:{type:'create-item',item:{id:'management-root',title:'Manage',responsibility:'Coordinate',acceptance:'Accepted children'}}});
+    await service.execute(board.id, {operationId: 'create', expectedRevision: board.revision+1, command: {type: 'create-item', item: {id: 'card', title: 'A long item title', responsibility: 'Work', acceptance: 'Done'},planning:{kind:'task',parentId:'management-root',priority:2,dependencies:[],references:[]}}});
     }
     const editor = document.createElement('main'), sidebar = document.createElement('aside'); document.body.append(sidebar, editor);
     const registry = new WorkbenchWindows(), selected = vi.fn(), queries = vi.spyOn(service, 'queryActivity'); let workbench!: KanbanWindowWorkbench;
@@ -41,7 +42,7 @@ async function deleteBoard(f: Awaited<ReturnType<typeof fixture>>) {
 async function idle(active: () => HTMLElement) {await vi.waitFor(() => expect(active().hasAttribute('aria-busy')).toBe(false));}
 it('shares real opened windows with the shell and navigates item, board and catalog through the common header', async () => {
     const f = await fixture();
-    await f.workbench.openResource('/board/b/card'); expect(f.queries).toHaveBeenCalledTimes(1);
+    await f.workbench.openResource('/board/b/card'); expect(f.queries).not.toHaveBeenCalled();
     expect(f.registry.items().map(item => item.id)).toEqual(['/board/b/card']);
     expect(f.sidebar.querySelector('.vfs-window-management')).not.toBeNull();
     expect(f.active().querySelector('[data-panel] .kanban__panel-header .workbench-window-list')).not.toBeNull();
@@ -56,6 +57,7 @@ it('shares real opened windows with the shell and navigates item, board and cata
     await f.registry.items().find(item => item.id === '/board/b/card')!.activate();
     const board = await f.service.read('b'), {item} = await f.service.item('b', 'card');
     expect(f.active().querySelector('[data-panel] h3')?.textContent).toBe(kanbanReference(board, item) + item.title);
+    expect(f.active().querySelector('[data-panel] h3 [data-entity-type=execution] svg')).not.toBeNull();
 });
 
 it('opens sibling context tabs from the shared catalog without redundant principal or catalog reads', async () => {
@@ -87,7 +89,7 @@ it('keeps filter, scroll and unsaved forms when switching windows and refuses to
 });
 it('marks hidden windows dirty without querying them until activated, and unregisters all window metadata', async () => {
     const f = await fixture('/board/b'); await f.workbench.openResource('/board/b/card');
-    f.workbench.setVisible(false); const query = vi.spyOn(f.service, 'queryActivity');
+    f.workbench.setVisible(false); const query = vi.spyOn(f.service, 'query');
     f.workbench.invalidateFromEvents(); expect(query).not.toHaveBeenCalled();
     f.workbench.setVisible(true); await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(1)); await idle(f.active);
     await f.workbench.destroy(); expect(f.registry.items()).toHaveLength(0);

@@ -20,7 +20,8 @@ async function fixture() {
         members: [{kind: 'human', id: 'admin', responsibility: 'Manage', roles: ['worker', 'coordinator']}, {kind: 'service', id: 'planner', responsibility: 'Discover', roles: ['worker', 'reviewer']}],
         policy: {requireEstimate: false, review: 'assignee'}});
     const run = async (command: KanbanCommand, api = service) => api.execute('b', {operationId: `op-${++serial}`, expectedRevision: (await api.read('b')).revision, command});
-    const create = () => run({type: 'create-item', stage: 'open', item: {id: 'work', title: 'Human scope', responsibility: 'Human work', acceptance: 'Human verification'}});
+    await run({type:'create-item',item:{id:'management-root',taskType:'coordination',title:'Manage work',responsibility:'Coordinate',acceptance:'All children accepted'}});
+    const create = () => run({type: 'create-item', stage: 'open',planning:{kind:'task',parentId:'management-root',priority:2,dependencies:[],references:[]}, item: {id: 'work', title: 'Human scope', responsibility: 'Human work', acceptance: 'Human verification'}});
     const discover = async (changes: KanbanDiscoveryChange[], records?: KanbanRecordInput[], api = scanner) => {
         const board = await service.read('b'), runId = `run-${++serial}`, batch = {runId, leaseToken: 'lease', changes, records, checkpoints: [{sessionId: 's', revision: 'r1'}], autoCreate: false};
         const request = {operationId: runId, expectedRevision: board.revision, command: {type: 'apply-discovery' as const, batch}};
@@ -34,42 +35,42 @@ const update = (): KanbanDiscoveryChange => ({action: 'update', itemId: 'work', 
 const record = (id: string, kind: 'log' | 'decision' = 'decision'): KanbanRecordInput => ({id, kind, title: 'PRIVATE_TITLE', content: 'PRIVATE_CONTENT', rationale: 'PRIVATE_REASON', itemIds: ['work'], sources});
 it('keeps accepted human text unchanged until review, then returns Ready work to backlog', async () => {
     const f = await fixture(); await f.create(); let board = await f.discover([update()]);
-    expect(board.items[0]).toMatchObject({title: 'Human scope', status: 'open'});
-    const proposal = board.items[0].amendments![0]; expect(proposal.status).toBe('pending');
+    expect(board.items.find(item=>item.id==='work')!).toMatchObject({title: 'Human scope', status: 'open'});
+    const proposal = board.items.find(item=>item.id==='work')!.amendments![0]; expect(proposal.status).toBe('pending');
     board = await f.run({type: 'review-amendment', itemId: 'work', amendmentId: proposal.id, accept: true});
-    expect(board.items[0]).toMatchObject({...proposed, status: 'backlog'});
-    expect(board.items[0].amendments![0].status).toBe('accepted');
+    expect(board.items.find(item=>item.id==='work')!).toMatchObject({...proposed, status: 'backlog'});
+    expect(board.items.find(item=>item.id==='work')!.amendments![0].status).toBe('accepted');
     expect(JSON.stringify(await f.events.listNotifications())).not.toContain('Proposed work');
 });
 it('protects running work and retains rejected amendment fingerprints across scans', async () => {
-    const f = await fixture(); await f.create(); const owner = (await f.run({type: 'claim', itemId: 'work'})).items[0].owner;
-    const changed = await f.discover([update()]), id = changed.items[0].amendments![0].id;
-    expect(changed.items[0]).toMatchObject({title: 'Human scope', status: 'claimed', owner});
+    const f = await fixture(); await f.create(); const owner = (await f.run({type: 'claim', itemId: 'work'})).items.find(item=>item.id==='work')!.owner;
+    const changed = await f.discover([update()]), id = changed.items.find(item=>item.id==='work')!.amendments![0].id;
+    expect(changed.items.find(item=>item.id==='work')!).toMatchObject({title: 'Human scope', status: 'claimed', owner});
     await expect(f.run({type: 'review-amendment', itemId: 'work', amendmentId: id, accept: true})).rejects.toThrow('TASK_DEFINITION_FROZEN');
     await f.run({type: 'review-amendment', itemId: 'work', amendmentId: id, accept: false, reason: 'Keep current scope'});
-    const again = await f.discover([update()]); expect(again.items[0].amendments).toHaveLength(1);
-    expect(again.items[0].amendments![0].status).toBe('rejected');
+    const again = await f.discover([update()]); expect(again.items.find(item=>item.id==='work')!.amendments).toHaveLength(1);
+    expect(again.items.find(item=>item.id==='work')!.amendments![0].status).toBe('rejected');
 });
 it('rejects stale text merges and automated self approval', async () => {
-    const f = await fixture(); await f.create(); const a = (await f.discover([update()])).items[0].amendments![0].id;
+    const f = await fixture(); await f.create(); const a = (await f.discover([update()])).items.find(item=>item.id==='work')!.amendments![0].id;
     await expect(f.run({type: 'review-amendment', itemId: 'work', amendmentId: a, accept: true}, f.scanner)).rejects.toThrow('INDEPENDENT_REVIEW_REQUIRED');
-    const b = (await f.discover([{...update(), title: 'A different accepted proposal'}])).items[0].amendments![1].id;
+    const b = (await f.discover([{...update(), title: 'A different accepted proposal'}])).items.find(item=>item.id==='work')!.amendments![1].id;
     await f.run({type: 'review-amendment', itemId: 'work', amendmentId: b, accept: true});
     await expect(f.run({type: 'review-amendment', itemId: 'work', amendmentId: a, accept: true})).rejects.toThrow('AMENDMENT_STALE');
 });
 it('directly updates only the same producer’s unconfirmed proposal', async () => {
     const f = await fixture(); await f.discover([{...update(), action: 'create'}]);
     let board = await f.discover([{...update(), title: 'Reworded draft'}]);
-    expect(board.items[0].title).toBe('Reworded draft'); expect(board.items[0].amendments).toBeUndefined();
+    expect(board.items.find(item=>item.id==='work')!.title).toBe('Reworded draft'); expect(board.items.find(item=>item.id==='work')!.amendments).toBeUndefined();
     await f.run({type: 'publish-proposal', itemId: 'work'});
-    board = await f.discover([update()]); expect(board.items[0].title).toBe('Reworded draft'); expect(board.items[0].amendments).toHaveLength(1);
+    board = await f.discover([update()]); expect(board.items.find(item=>item.id==='work')!.title).toBe('Reworded draft'); expect(board.items.find(item=>item.id==='work')!.amendments).toHaveLength(1);
 });
 it('does not respawn rejected or archived proposals under a different extracted ID', async () => {
     const f = await fixture(); await f.discover([{...update(), action: 'create'}]);
     await f.run({type: 'cancel-item', itemId: 'work', reason: 'Not needed'});
-    expect((await f.discover([{...update(), action: 'create', itemId: 'another-id'}])).items).toHaveLength(1);
+    expect((await f.discover([{...update(), action: 'create', itemId: 'another-id'}])).items).toHaveLength(2);
     await f.run({type: 'archive-items', itemIds: ['work'], reason: 'Historical rejection'});
-    expect((await f.discover([{...update(), action: 'create', itemId: 'third-id'}])).items).toHaveLength(0);
+    expect((await f.discover([{...update(), action: 'create', itemId: 'third-id'}])).items.filter(item=>item.id!=='management-root')).toHaveLength(0);
     expect((await f.store.read('b'))!.discovery!.pending).toBeUndefined();
 });
 it('keeps Flow logs and decisions as drafts and confirms or supersedes decisions atomically', async () => {
@@ -88,7 +89,7 @@ it('preserves linked context across card archival and binds record pagination to
     const f = await fixture(); await f.create(); await f.run({type: 'append-record', record: record('one', 'log')});
     await f.run({type: 'append-record', record: {...record('two', 'log'), title: 'Other log'}});
     const page = await f.service.records('b', {itemId: 'work', limit: 1}); expect(page.nextCursor).toBeDefined();
-    await f.run({type: 'cancel-item', itemId: 'work', reason: 'Stop'}); await f.run({type: 'archive-items', itemIds: ['work'], reason: 'Close'});
+    await f.run({type: 'cancel-item', itemId: 'work', reason: 'Stop'}); await f.run({type: 'archive-items', itemIds: ['management-root'], reason: 'Close'});
     expect((await f.service.records('b', {itemId: 'work'})).total).toBe(2);
     await expect(f.service.records('b', {itemId: 'work', limit: 1, cursor: page.nextCursor})).rejects.toThrow('CURSOR_STALE');
 });
@@ -110,7 +111,7 @@ it('does not merge equal descriptions across different planning milestones', asy
     const planning = {kind: 'task', priority: 2, dependencies: [], references: [], milestone: 'first-release'};
     await f.discover([{...update(), action: 'create', planning}]);
     const board = await f.discover([{...update(), action: 'create', itemId: 'next-release', planning: {...planning, milestone: 'next-release'}}]);
-    expect(board.items).toHaveLength(2);
+    expect(board.items).toHaveLength(3);
 });
 
 it('deduplicates the same extracted record but retains equal log text from a new source message', async () => {

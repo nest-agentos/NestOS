@@ -19,8 +19,9 @@ import {parseAnalysis} from '@nestos/kanban/integration';
 import type {PersonalKanbanAutomationOptions} from '../src/kanban/personal-automation';
 
 const disposers: Array<() => Promise<void>> = [];
-afterEach(async () => {for (const close of disposers.splice(0)) await close(); vi.useRealTimers();});
+afterEach(async () => {for (const close of disposers.splice(0)) await close(); vi.useRealTimers();vi.restoreAllMocks();});
 async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: Error) {
+    if(!vi.isFakeTimers())vi.useFakeTimers({toFake:['Date']});
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); disposers.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/'), events = await UserEventService.open(fs);
     const channels=memoryChannels();
@@ -65,52 +66,54 @@ async function fixture(autoAccept = false, analysis?:unknown, prepareFailure?: E
     const settings: KanbanAutomationSettings = {enabled: true, autoAccept, planner: catalog.targets[0].reference, executor: catalog.targets[1].reference, coordinator: catalog.coordinator, worker: catalog.worker};
     await command({type: 'configure-automation', settings});
     const item = async (id: string) => {await command({type: 'create-item', item: {id, title: id, responsibility: 'Deliver ' + id, acceptance: 'Evidence verified'}});return command({type:'request-run',itemId:id});};
-    return {options,journal:fileJournal,events,service, command, item, calls, kernel, preparation, analysisOutput:options.readAnalysisOutput!, submitted, completed, settings, open, diagnostics,
+    const scan=async(api=service)=>{await api.scan();const board=await api.read('board');if(board.items.some(item=>item.taskType==='execution'&&item.status==='backlog'&&!item.owner)){vi.setSystemTime(Date.now()+300001);await api.scan();}};
+    const executionItem=async(parentId:string,api=service)=>{const board=await api.read('board');return api.item('board',board.items.find(item=>item.planning?.parentId===parentId)!.id);};
+    return {scan,executionItem,options,journal:fileJournal,events,service, command, item, calls, kernel, preparation, analysisOutput:options.readAnalysisOutput!, submitted, completed, settings, open, diagnostics,
         lose: () => {loseReply = true; hideAdmission = true;}, reveal: () => {hideAdmission = false;}, invalid: () => {invalid = true;},
         executions: () => [...submitted.entries()].filter(([, input]) => input.request.expectedTarget!.id === 'executor')};
 }
 
 it('analyzes newly added work, waits for independent acceptance and passes prerequisite evidence to the next execution', async () => {
     const f = await fixture(); await f.item('first'); await f.item('second');
-    await f.service.scan(); expect(f.executions()).toHaveLength(1);
+    await f.scan(); expect(f.executions()).toHaveLength(1);
     const first = f.executions()[0][0]; f.completed.add(first);
-    await f.service.scan();
-    expect((await f.service.item('board', 'first')).item.status).toBe('review');
-    expect((await f.service.item('board', 'second')).item.planning?.dependencies).toEqual(['first']);
+    await f.scan();
+    expect((await f.executionItem('first')).item.status).toBe('review');
+    expect((await f.executionItem('second')).item.planning?.dependencies).toEqual(['first']);
     expect(f.executions()).toHaveLength(1);
     await f.command({type: 'accept-execution', dispatchId: first, accept: true});
-    await f.service.scan(); expect(f.executions()).toHaveLength(2);
+    await f.scan(); expect(f.executions()).toHaveLength(2);
     const second = f.executions()[1], request = promptData(second[1].request.source.text,'Task');
     expect(request.dependencies[0].outputs[0].value).toEqual({file:'result.yaml',content:'Verified result'});
     expect((await f.service.item('board', 'first')).item.id).toBe('first');
-    f.completed.add(second[0]); await f.service.scan();
-    expect((await f.service.item('board', 'second')).item.status).toBe('review');
+    f.completed.add(second[0]); await f.scan();
+    expect((await f.executionItem('second')).item.status).toBe('review');
 });
 
 it('persists an uncertain analysis and only inspects its original admission after reopening', async () => {
-    const f = await fixture(); await f.item('first'); f.lose(); await f.service.scan();
+    const f = await fixture(); await f.item('first'); f.lose(); await f.scan();
     expect(await f.service.analysisStatus!('board', 'first')).toMatchObject({state: 'unknown', code: 'AUTOMATION_ADMISSION_UNKNOWN'});
     expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
     await f.service.dispose(); const reopened = await f.open(); disposers.push(() => reopened.dispose());
-    await reopened.scan(); expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
-    f.reveal(); await reopened.scan(); expect(f.executions()).toHaveLength(1);
+    await f.scan(reopened); expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
+    f.reveal(); await f.scan(reopened); expect(f.executions()).toHaveLength(1);
     expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(2);
 });
 
 it('pauses new dispatches while observing existing execution, and auto-accepts only when explicitly configured', async () => {
-    const f = await fixture(true); await f.item('first'); await f.service.scan(); const id = f.executions()[0][0];
+    const f = await fixture(true); await f.item('first'); await f.scan(); const id = f.executions()[0][0];
     await expect(f.command({type: 'configure-automation', settings: {...f.settings, autoAccept: false}})).rejects.toMatchObject({code: 'PLAN_EXECUTION_UNSETTLED'});
     await f.command({type: 'configure-automation', settings: {...f.settings, enabled: false}});
-    await f.item('second'); f.completed.add(id); await f.service.scan();
-    expect((await f.service.item('board', 'first')).item.status).toBe('completed'); expect(f.executions()).toHaveLength(1);
-    await f.command({type: 'configure-automation', settings: f.settings}); await f.service.scan(); expect(f.executions()).toHaveLength(2);
+    await f.item('second'); f.completed.add(id); await f.scan();
+    expect((await f.executionItem('first')).item.status).toBe('completed'); expect(f.executions()).toHaveLength(1);
+    await f.command({type: 'configure-automation', settings: f.settings}); await f.scan(); expect(f.executions()).toHaveLength(2);
 });
 
 it('records invalid planner output without dispatching work or leaking its text into diagnostics', async () => {
-    const f = await fixture(); await f.item('first'); f.invalid(); await f.service.scan();
+    const f = await fixture(); await f.item('first'); f.invalid(); await f.scan();
     expect(await f.service.analysisStatus!('board', 'first')).toMatchObject({state: 'failed', code: 'AUTOMATION_ANALYSIS_INVALID'});
     expect(JSON.stringify(await f.diagnostics.query())).not.toContain('PRIVATE');
-    expect(f.executions()).toHaveLength(0); await f.service.scan(); expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
+    expect(f.executions()).toHaveLength(0); await f.scan(); expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
     expect(() => parseAnalysis({ready: true, dependencies: [12], reason: 'Invalid'})).toThrow('AUTOMATION_DEPENDENCIES_INVALID');
 });
 
@@ -121,14 +124,14 @@ it('freezes the original definition at analysis admission and refuses a racing e
         await expect(f.command({type:'edit-item',itemId:'first',title:'Updated',responsibility:'Updated work',acceptance:'New checks'})).rejects.toMatchObject({code:'TASK_DEFINITION_FROZEN'});
         return submit(input);
     });
-    await f.service.scan();expect(f.executions()).toHaveLength(1);
+    await f.scan();expect(f.executions()).toHaveLength(1);
     expect((await f.service.item('board','first')).item.title).toBe('first');
 });
 
 it('admits one planning call when two observers reconcile the same durable item concurrently', async () => {
     const f = await fixture(); await f.item('first'); const second = await f.open(); disposers.push(() => second.dispose());
-    await Promise.allSettled([f.service.scan(), second.scan()]);
-    await f.service.scan();
+    await Promise.allSettled([f.scan(), f.scan(second)]);
+    await f.scan();
     expect([...f.submitted.values()].filter(input => input.request.expectedTarget!.id === 'planner')).toHaveLength(1);
     expect(f.executions()).toHaveLength(1);
     expect(await f.service.analysisStatus!('board', 'first')).toMatchObject({state: 'ready'});
@@ -161,17 +164,17 @@ it('rejects a chat-only planning Flow without an authorized file result', async 
 }, 15000);
 
 it('never resubmits successful or accepted work during polling and host recovery',async()=>{
-    const f=await fixture();await f.item('first');await f.service.scan();const dispatch=f.executions()[0][0];
-    f.completed.add(dispatch);await f.service.scan();
-    expect((await f.service.item('board','first')).item.status).toBe('review');
+    const f=await fixture();await f.item('first');await f.scan();const dispatch=f.executions()[0][0];
+    f.completed.add(dispatch);await f.scan();
+    expect((await f.executionItem('first')).item.status).toBe('review');
     const submissions=f.calls.submitPreparedTaskCall.mock.calls.length;
-    for(let index=0;index<3;index++)await f.service.scan();
+    for(let index=0;index<3;index++)await f.scan();
     expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(submissions);
     await f.command({type:'accept-execution',dispatchId:dispatch,accept:true});
-    expect((await f.service.item('board','first')).item.status).toBe('completed');
+    expect((await f.executionItem('first')).item.status).toBe('completed');
     const workflow=await f.service.workflow('board');expect(workflow.ready).toEqual([]);
     await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());
-    for(let index=0;index<3;index++)await reopened.scan();
+    for(let index=0;index<3;index++)await f.scan(reopened);
     expect(await reopened.workflow('board')).toEqual(workflow);expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(submissions);
 });
 
@@ -183,19 +186,18 @@ it('decomposes complex work into single-project subtasks, gates dependencies on 
     const reference={system:'nestos-remote-project',id:'one'};
     await f.command({type:'create-item',item:{id:'parent',title:'Parent',responsibility:'Complex work',acceptance:'Children accepted',externalRefs:[reference]}});
     await f.command({type:'request-run',itemId:'parent'});
-    await f.service.scan();const board=await f.service.read('board'),children=board.items.filter(item=>item.planning?.parentId==='parent');
-    expect(children).toHaveLength(2);expect(children.every(item=>item.planning?.kind==='subtask'&&JSON.stringify(item.externalRefs?.filter(ref=>ref.system==='nestos-remote-project'))===JSON.stringify([reference]))).toBe(true);
-    for(const child of children)await f.command({type:'request-run',itemId:child.id});
-    await f.service.scan();
+    await f.scan();const board=await f.service.read('board'),children=board.items.filter(item=>item.planning?.parentId==='parent');
+    expect(children).toHaveLength(2);expect(children.every(item=>item.taskType==='execution'&&JSON.stringify(item.externalRefs?.filter(ref=>ref.system==='nestos-remote-project'))===JSON.stringify([reference]))).toBe(true);
+    await f.scan();
     expect(f.executions()).toHaveLength(1);expect((await f.service.item('board','parent')).item.planning?.execution).toBe('children');
-    const first=f.executions()[0][0];f.completed.add(first);await f.service.scan();expect(f.executions()).toHaveLength(1);
+    const first=f.executions()[0][0];f.completed.add(first);await f.scan();expect(f.executions()).toHaveLength(1);
     expect((await f.service.item('board','parent')).item.status).not.toBe('completed');
-    await f.command({type:'accept-execution',dispatchId:first,accept:true});await f.service.scan();expect(f.executions()).toHaveLength(2);
-    const second=f.executions()[1][0];f.completed.add(second);await f.service.scan();
+    await f.command({type:'accept-execution',dispatchId:first,accept:true});await f.scan();expect(f.executions()).toHaveLength(2);
+    const second=f.executions()[1][0];f.completed.add(second);await f.scan();
     expect((await f.service.item('board','parent')).item.status).not.toBe('completed');
-    await f.command({type:'accept-execution',dispatchId:second,accept:true});await f.service.scan();
+    await f.command({type:'accept-execution',dispatchId:second,accept:true});await f.scan();
     expect((await f.service.item('board','parent')).item.status).toBe('completed');
-    await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());await reopened.scan();
+    await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());await f.scan(reopened);
     expect(f.executions()).toHaveLength(2);expect((await reopened.workflow('board')).ready).toEqual([]);
 });
 it('rejects cyclic model decomposition before creating any children or starting execution',async()=>{
@@ -203,7 +205,7 @@ it('rejects cyclic model decomposition before creating any children or starting 
     const f=await fixture(false,{ready:true,dependencies:[],reason:'Invalid cycle',subtasks:[
         {key:'a',title:'A',responsibility:'Work',acceptance:'Checked',dependsOn:['b'],estimate},
         {key:'b',title:'B',responsibility:'Work',acceptance:'Checked',dependsOn:['a'],estimate}]});
-    await f.item('parent');await f.service.scan();expect((await f.service.read('board')).items).toHaveLength(1);expect(f.executions()).toHaveLength(0);
+    await f.item('parent');await f.scan();expect((await f.service.read('board')).items).toHaveLength(1);expect(f.executions()).toHaveLength(0);
     expect(await f.service.analysisStatus!('board','parent')).toMatchObject({state:'failed',code:'DEPENDENCY_CYCLE'});
 });
 
@@ -212,14 +214,14 @@ it('executes manually created subtasks and aggregates their accepted results wit
     await f.command({type:'create-item',item:{id:'child',title:'Child scope',responsibility:'Only child work',acceptance:'Child evidence'},
         planning:{kind:'subtask',parentId:'parent',priority:2,dependencies:[],references:[]}});
     await f.command({type:'request-run',itemId:'child'});
-    await f.service.scan();expect(f.executions()).toHaveLength(1);
+    await f.scan();expect(f.executions()).toHaveLength(1);
     const [dispatch,input]=f.executions()[0];
     expect(input.request.source.text).toContain('Only child work');
-    f.completed.add(dispatch);await f.service.scan();
+    f.completed.add(dispatch);await f.scan();
     expect((await f.service.item('board','parent')).item.status).toBe('backlog');
     await f.command({type:'accept-execution',dispatchId:dispatch,accept:true});
     await expect(f.command({type:'archive-items',itemIds:['child'],reason:'Verified'})).rejects.toThrow('SUBTASK_CLEANUP_VIA_GROUP');
-    await f.service.scan();expect((await f.service.item('board','parent')).item.status).toBe('completed');
+    await f.scan();expect((await f.service.item('board','parent')).item.status).toBe('completed');
     await f.command({type:'archive-items',itemIds:['parent'],reason:'Verified group'});
     expect((await f.service.item('board','parent')).archive?.reason).toBe('Verified group');
     expect((await f.service.item('board','child')).archive?.reason).toBe('Verified group');
@@ -229,11 +231,11 @@ it('executes manually created subtasks and aggregates their accepted results wit
 it('projects two explicit EFFECT_TIMEOUT analysis attempts to the root task, work log and notifications without dispatch or silent retry',async()=>{
     const f=await fixture();await f.item('timeout');
     vi.mocked(f.kernel.task).mockResolvedValue({id:'caller',sessionId:'session',version:1,effects:{},exit:{status:'failed',error:{code:'EFFECT_TIMEOUT'}}} as never);
-    await f.service.scan();
+    await f.scan();
     expect((await f.service.item('board','timeout')).item.analysis).toMatchObject({state:'failed',code:'EFFECT_TIMEOUT'});
     expect((await f.service.query('board',{view:'all',phase:'error'})).items.map(item=>item.id)).toContain('timeout');
-    await f.service.scan();expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
-    await f.command({type:'retry-analysis',itemId:'timeout',retryId:'second-analysis'});await f.service.scan();
+    await f.scan();expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
+    await f.command({type:'retry-analysis',itemId:'timeout',retryId:'second-analysis'});await f.scan();
     expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(2);expect(f.executions()).toHaveLength(0);
     expect(f.calls.prepareTaskCall.mock.calls[0][1]).toMatchObject({timeoutMs:null});
     expect((await f.events.listNotifications()).items.filter(row=>row.event.value.type==='kanban.report-analysis')).toHaveLength(2);
@@ -243,7 +245,7 @@ it('projects two explicit EFFECT_TIMEOUT analysis attempts to the root task, wor
 
 it.each(['ENOENT', 'EACCES'])('keeps a permanent Cells preparation fault %s as an error without cancelling the task', async code => {
     const f = await fixture(false, undefined, Object.assign(new Error('Cells unavailable'), {code}));
-    await f.item('unavailable'); await f.service.scan(); await f.service.scan();
+    await f.item('unavailable'); await f.scan(); await f.scan();
     const item = await f.service.item('board', 'unavailable');
     expect(item.item.status).toBe('backlog'); expect(item.task).toMatchObject({phase: 'error', reason: code});
     expect(item.item.analysis).toMatchObject({state: 'failed', code});
@@ -254,13 +256,13 @@ it.each(['ENOENT', 'EACCES'])('keeps a permanent Cells preparation fault %s as a
 it('retains the analysis identity and retry budget across reopening, then reports an exhausted preparation timeout', async () => {
     vi.useFakeTimers({toFake: ['Date']});
     const f = await fixture(false, undefined, Object.assign(new Error('Cells unavailable'), {code: 'ETIMEDOUT'}));
-    await f.item('unavailable'); await f.service.scan();
+    await f.item('unavailable'); await f.scan();
     expect((await f.service.item('board', 'unavailable')).item.analysis).toMatchObject({state: 'analyzing',
         recovery: {attempt: 0, limit: 10, code: 'ETIMEDOUT'}});
     await f.service.dispose(); const reopened = await f.open(); disposers.push(() => reopened.dispose());
-    await reopened.scan(); expect(f.preparation).toHaveBeenCalledTimes(1);
+    await f.scan(reopened); expect(f.preparation).toHaveBeenCalledTimes(1);
     for (let retry = 1; retry <= 10; retry++) {
-        vi.setSystemTime(Date.now() + 30000); await reopened.scan();
+        vi.setSystemTime(Date.now() + 30000); await f.scan(reopened);
         expect(f.preparation).toHaveBeenCalledTimes(retry + 1);
         if (retry < 10) expect((await reopened.item('board', 'unavailable')).item.analysis)
             .toMatchObject({state: 'analyzing', recovery: {attempt: retry, code: 'ETIMEDOUT'}});
@@ -269,45 +271,45 @@ it('retains the analysis identity and retry budget across reopening, then report
     expect(item.item.status).toBe('backlog'); expect(item.task).toMatchObject({phase: 'error', reason: 'ETIMEDOUT'});
     expect(item.item.analysis).toMatchObject({state: 'failed', code: 'ETIMEDOUT'}); expect(item.item.control).toBeUndefined();
     expect(new Set(vi.mocked(f.preparation).mock.calls.map(([input]) => input.id)).size).toBe(1);
-    await reopened.scan(); expect(f.preparation).toHaveBeenCalledTimes(11);
+    await f.scan(reopened); expect(f.preparation).toHaveBeenCalledTimes(11);
     expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
 });
 
 it('retains one planning session while waiting for clarification and resumes the approved plan after host recovery',async()=>{
     const f=await fixture(false,{ready:false,reason:'Confirm scope',dependencies:[]});
-    await f.item('first');await f.service.scan();
+    await f.item('first');await f.scan();
     const firstInput=[...f.submitted.values()][0],planningId=firstInput.request.submission!.id;
     expect(await f.service.analysisStatus!('board','first')).toMatchObject({state:'clarification'});
     expect(await f.service.planningSession!('board','first')).toMatchObject({analysisId:planningId,state:'waiting-input',sessionId:'execution-'+planningId});
     await expect(f.command({type:'retry-analysis',itemId:'first',retryId:randomUUID()})).rejects.toMatchObject({code:'ANALYSIS_CLARIFICATION_PENDING'});
-    await f.service.scan();expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);expect(f.executions()).toHaveLength(0);
+    await f.scan();expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);expect(f.executions()).toHaveLength(0);
     await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());
-    await reopened.scan();expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
+    await f.scan(reopened);expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
     // Unrelated work must not invalidate this item's frozen planning definition.
     await f.command({type:'create-item',item:{id:'unrelated',title:'Other',responsibility:'Other',acceptance:'Other'}},reopened);
     vi.mocked(f.analysisOutput).mockResolvedValue({state:'succeeded',output:{ready:true,reason:'Confirmed scope',dependencies:[],estimate:{complexity:1,workUnits:1,durationMs:60000,confidence:'high'}}});
-    await reopened.scan();expect(f.executions()).toHaveLength(1);
+    await f.scan(reopened);expect(f.executions()).toHaveLength(1);
     expect(await reopened.planningSession!('board','first')).toMatchObject({analysisId:planningId,state:'completed'});
-    await reopened.scan();expect(f.executions()).toHaveLength(1);
+    await f.scan(reopened);expect(f.executions()).toHaveLength(1);
 });
 
 it('recovers clarification projection conflicts without restarting the planning session',async()=>{
     const f=await fixture(false,{ready:false,reason:'Confirm scope',dependencies:[]});
-    await f.item('first');await f.service.scan();
+    await f.item('first');await f.scan();
     const session=await f.service.planningSession!('board','first');
     // The same durable report must be applicable again after an interrupted synchronization.
     await f.command({type:'report-analysis',itemId:'first',operationId:'sync-fault',status:{itemId:'first',state:'failed',code:'IDEMPOTENCY_CONFLICT'}});
-    await f.service.scan();
+    await f.scan();
     expect((await f.service.item('board','first')).task?.phase).toBe('waiting-input');
     expect(await f.service.planningSession!('board','first')).toMatchObject({sessionId:session!.sessionId,state:'waiting-input'});
     expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
     expect(f.executions()).toHaveLength(0);
-    await f.service.scan();expect((await f.service.item('board','first')).task?.phase).toBe('waiting-input');
+    await f.scan();expect((await f.service.item('board','first')).task?.phase).toBe('waiting-input');
 });
 it('does not create development subtasks from an unclarified planning result',async()=>{
     const tasks=['one','two'].map(key=>({key,title:key,responsibility:'Work '+key,acceptance:'Verify '+key,dependsOn:[]}));
     const f=await fixture(false,{ready:false,reason:'Confirm product scope',dependencies:[],subtasks:tasks});
-    await f.item('first');await f.service.scan();await f.service.scan();
+    await f.item('first');await f.scan();await f.scan();
     expect((await f.service.item('board','first')).task?.phase).toBe('waiting-input');
     expect((await f.service.query('board',{view:'all',parentId:'first'})).total).toBe(0);
     expect(Object.keys((await f.service.workflow('board')).plans)).toHaveLength(0);
@@ -316,18 +318,18 @@ it('does not create development subtasks from an unclarified planning result',as
 
 it('resumes a blocked planning conversation in the same session across host reopening without another admission',async()=>{
  const f=await fixture();vi.mocked(f.analysisOutput).mockResolvedValue({state:'blocked',code:'PLANNING_ERROR_REPORTED',reason:'Git needs repair'} as never);
- await f.item('first');await f.service.scan();
+ await f.item('first');await f.scan();
  const original=await f.service.planningSession!('board','first');
  expect(original).toMatchObject({state:'waiting-input'});
  expect((await f.service.item('board','first')).task).toMatchObject({phase:'error',reason:'PLANNING_ERROR_REPORTED'});
  expect(f.executions()).toHaveLength(0);
  await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());
- await reopened.scan();expect(await reopened.planningSession!('board','first')).toMatchObject({sessionId:original!.sessionId,state:'waiting-input'});
- vi.mocked(f.analysisOutput).mockResolvedValue({state:'running'} as never);await reopened.scan();
+ await f.scan(reopened);expect(await reopened.planningSession!('board','first')).toMatchObject({sessionId:original!.sessionId,state:'waiting-input'});
+ vi.mocked(f.analysisOutput).mockResolvedValue({state:'running'} as never);await f.scan(reopened);
  expect(await reopened.planningSession!('board','first')).toMatchObject({sessionId:original!.sessionId,state:'running'});
  expect(f.executions()).toHaveLength(0);
  vi.mocked(f.analysisOutput).mockResolvedValue({state:'succeeded',output:{ready:true,reason:'Git checked; scope confirmed',dependencies:[],estimate:{complexity:1,workUnits:1,durationMs:60000,confidence:'high'}}});
- await reopened.scan();expect(f.executions()).toHaveLength(1);
+ await f.scan(reopened);expect(f.executions()).toHaveLength(1);
  expect(await reopened.planningSession!('board','first')).toMatchObject({sessionId:original!.sessionId,state:'completed'});
  expect([...f.submitted.values()].filter(input=>input.request.expectedTarget!.id==='planner')).toHaveLength(1);
 });
@@ -352,10 +354,10 @@ it('prepares the management workspace without bootstrapping a competing record c
 
 it('keeps busy workspace preparation pending and submits management once using the original identity',async()=>{
  vi.useFakeTimers({toFake:['Date']});const f=await fixture(false,undefined,Object.assign(Error('Busy'),{code:'EBUSY',outcome:'not-committed'}));
- await f.item('busy');await f.service.scan();
+ await f.item('busy');await f.scan();
  expect((await f.service.item('board','busy')).item.analysis).toMatchObject({state:'analyzing',recovery:{code:'EBUSY',exhausted:false}});
  expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();const id=f.preparation.mock.calls.at(-1)![0].id;
- f.preparation.mockResolvedValue(undefined as never);vi.setSystemTime(Date.now()+30000);await f.service.scan();
+ f.preparation.mockResolvedValue(undefined as never);vi.setSystemTime(Date.now()+30000);await f.scan();
  expect(f.preparation.mock.calls.at(-1)![0].id).toBe(id);
  expect([...f.submitted.values()].filter(input=>input.request.expectedTarget!.id==='planner')).toHaveLength(1);
  expect((await f.service.item('board','busy')).item.analysis?.state).not.toBe('failed');
@@ -363,20 +365,20 @@ it('keeps busy workspace preparation pending and submits management once using t
 
 it('settles missing planning output after successful execution without replaying it on restart',async()=>{
  const f=await fixture();vi.mocked(f.analysisOutput).mockResolvedValue(undefined);
- await f.item('missing-result');await f.service.scan();
+ await f.item('missing-result');await f.scan();
  expect((await f.service.item('board','missing-result')).task).toMatchObject({phase:'error',reason:'PLANNING_RESULT_MISSING'});
  expect(f.executions()).toHaveLength(0);expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
- await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());await reopened.scan();
+ await f.service.dispose();const reopened=await f.open();disposers.push(()=>reopened.dispose());await f.scan(reopened);
  expect(await reopened.analysisStatus!('board','missing-result')).toMatchObject({state:'blocked',code:'PLANNING_RESULT_MISSING'});
  expect(f.calls.submitPreparedTaskCall).toHaveBeenCalledTimes(1);
  vi.mocked(f.analysisOutput).mockResolvedValue({state:'succeeded',output:{ready:true,dependencies:[],reason:'Published in original session',estimate:{complexity:1,workUnits:1,durationMs:60000,confidence:'high'}}});
- await reopened.scan();expect(f.executions()).toHaveLength(1);
+ await f.scan(reopened);expect(f.executions()).toHaveLength(1);
  expect([...f.submitted.values()].filter(input=>input.request.expectedTarget!.id==='planner')).toHaveLength(1);
 });
 
 it('uses verified channel failure even while the parent call has not settled',async()=>{
  const f=await fixture();vi.mocked(f.analysisOutput).mockResolvedValue({state:'blocked',code:'PLANNING_RESULT_MISSING',handler:'self'});
- vi.mocked(f.calls.list).mockResolvedValue([]);await f.item('channel-completed');await f.service.scan();
+ vi.mocked(f.calls.list).mockResolvedValue([]);await f.item('channel-completed');await f.scan();
  expect(await f.service.analysisStatus!('board','channel-completed')).toMatchObject({state:'blocked',code:'PLANNING_RESULT_MISSING'});
  expect(f.executions()).toHaveLength(0);
 });

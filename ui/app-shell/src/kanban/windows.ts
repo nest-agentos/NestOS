@@ -1,5 +1,4 @@
 import {KanbanWorkbench as KanbanView, type KanbanUIOptions} from '@nestos/kanban-ui';
-import {executionSessionReference} from '@nestos/app-contracts';
 import {ACTION_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
 import {WorkbenchTabs, type WorkbenchTab} from '../workbench/tabs';
 import type {WorkbenchWindowBinding} from '../workbench/windows';
@@ -88,7 +87,7 @@ export class KanbanWindowWorkbench {
             catalogPrepared: boards => {this.boardSnapshots=boards;this.navigation.prepare(boards);},
             getBoardSnapshot: id => this.boardSnapshots?.find(board => board.id === id),
             itemOperationsAvailable: (_board, item) => !!item.externalRefs?.some(ref => ref.system === "nestos-worktree"),
-            presentation: kanbanPresentation, executionReference: executionSessionReference, reviewGuidance: this.options.reviewGuidance ?? kanbanReviewGuidance,
+            presentation: kanbanPresentation, reviewGuidance: this.options.reviewGuidance ?? kanbanReviewGuidance,
             openSession: async id => {this.tabs.keep(tab.id); await this.options.openSession(id);},
             navigate: path => this.navigate(path), changed: () => this.updatePage(tab),
             selected: () => this.updatePage(tab), committed: () => {this.boardSnapshots = undefined; this.availableBoards = undefined; this.navigation.invalidate();},

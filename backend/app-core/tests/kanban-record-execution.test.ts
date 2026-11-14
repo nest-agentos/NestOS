@@ -344,3 +344,11 @@ it('routes attention dismissal through the runtime without cancelling or recreat
  const after=await runtime.service.read('source');expect(after.items).toEqual(before.items);
  expect(await runtime.service.recordExecutions!('source','decision')).toHaveLength(1);
 });
+
+it('inherits the optional decision priority when materializing its management task',async()=>{
+    const f=await fixture();await f.command({type:'set-record-priority',recordId:'decision',priority:0});
+    await f.command({type:'review-record',recordId:'decision',accept:true});
+    const record=await f.service.record('source','decision');
+    const run=await f.open().runRecord('source',{operationId:'priority-run',recordId:'decision',expectedRevision:record.revision});
+    expect((await f.service.item(run.boardId,run.rootItemId!)).item).toMatchObject({taskType:'coordination',planning:{priority:0}});
+});

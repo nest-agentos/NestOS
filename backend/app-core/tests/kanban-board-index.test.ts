@@ -16,7 +16,7 @@ it('migrates legacy records once and reads only references belonging to the requ
     await fs.meta.seq!.setEntries('/var/lib/kanban/automation.seq', {
         'review-operation:a': JSON.stringify({boardId: 'a', itemId: 'task', phase: 'prepared'}),
         'review-operation:b': JSON.stringify({boardId: 'b', itemId: 'other', phase: 'prepared'}),
-        'record-runs:a': JSON.stringify([{sourceBoardId: 'a', boardId: 'child', state: 'running'}]),
+        'record-runs:a': JSON.stringify([{id:'legacy-run',recordId:'decision',createdAt:1,updatedAt:1,sourceBoardId: 'a', boardId: 'child', state: 'running'}]),
     });
     await journal.open();
     // Corrupt an unrelated source after migration: scoped reads and reopen must never parse it.

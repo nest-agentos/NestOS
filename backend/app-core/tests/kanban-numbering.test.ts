@@ -31,17 +31,17 @@ it('numbers work, logs and decisions separately and preserves references through
     const f=await fixture(), api=f.service(), board=await api.create(f.input('b'));
     await f.run(api,'b',f.item('first'));await f.run(api,'b',f.item('second'));
     const first=(await api.item('b','first')).item;expect(first.number).toBe(1);
-    await f.run(api,'b',{type:'close-plan',itemId:'first',resultRef:'verified'});
+    await f.store.update('b','finish-first','finish-first',state=>{state!.board.items.find(item=>item.id==='first')!.status='completed';return state!;});
     await f.run(api,'b',{type:'archive-items',itemIds:['first'],reason:'Delivered'});
     expect((await api.resolve('KB-1#1')).itemId).toBe('first');
     expect((await api.item('b','first')).item.number).toBe(1);
     await f.run(api,'b',{type:'restore-item',itemId:'first'});
-    expect(kanbanReference(board,(await api.item('b','first')).item)).toBe('KBT-1-1');
+    expect(kanbanReference(board,(await api.item('b','first')).item)).toBe('KBC-1-1');
     expect((await api.resolve('KBT-1-1')).itemId).toBe('first');
     for(const kind of ['log','decision'] as const) await f.run(api,'b',{type:'append-record',record:{id:kind,kind,title:kind,content:'Notes',rationale:kind==='decision'?'Reason':undefined,itemIds:['first'],sources:[]}});
     expect((await api.resolve('kb-1/l-1')).recordId).toBe('log');expect((await api.resolve('KB-1/D-1')).recordId).toBe('decision');
-    expect((await api.query('b',{view:'all',search:'KBT-1-2'})).items.map(item=>item.id)).toEqual(['second']);
-    expect((await api.suggest('b',{kind:'item',search:'KBT-1-2'})).items[0].id).toBe('second');
+    expect((await api.query('b',{view:'all',search:'KBC-1-2'})).items.map(item=>item.id)).toEqual(['second']);
+    expect((await api.suggest('b',{kind:'item',search:'KBC-1-2'})).items[0].id).toBe('second');
     expect((await api.suggest('b',{kind:'decision',search:'KBD-1-1'})).items).toEqual([]);
 });
 it('does not accept caller-assigned numbers, consume numbers on failed writes or reuse deleted numbers',async()=>{
@@ -63,7 +63,7 @@ it('keeps references scoped to their store and checks board access before resolv
 
 it('backfills legacy identities on the next write and preserves old archive references',async()=>{
     const f=await fixture(), api=f.service();await api.create(f.input('b'));await f.run(api,'b',f.item('old'));
-    await f.run(api,'b',{type:'close-plan',itemId:'old',resultRef:'verified'});
+    await f.store.update('b','finish-old','finish-old',state=>{state!.board.items.find(item=>item.id==='old')!.status='completed';return state!;});
     await f.run(api,'b',{type:'archive-items',itemIds:['old'],reason:'Done'});
     const state=(await f.store.read('b'))!;delete state.board.number;delete state.numbering;
     for(const item of state.archiveIndex!) delete item.number;

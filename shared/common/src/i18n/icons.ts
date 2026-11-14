@@ -180,6 +180,13 @@ export const ENTITY_ICONS = {
     model:   '🔮',
 } as const;
 
+export const KANBAN_TYPE_ICONS = {
+    execution: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="7" fill="#fff0df"/><path d="m14 5-2 3 3 3 3-2a5 5 0 0 1-6 6l-4 4a2 2 0 0 1-3-3l4-4a5 5 0 0 1 5-7Z" fill="#f6ca91" stroke="#a86d33" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+    coordination: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#e5f5ee"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#4a9278" stroke-width="1.5"/><path d="m16 8-2.5 6-5.5 2 2-5.5Z" fill="#ec9d7c" stroke="#b26e51" stroke-width="1.3" stroke-linejoin="round"/><circle cx="12" cy="12" r="1.3" fill="#fff"/></svg>',
+    decision: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="7" fill="#fff7d9"/><path d="M8.5 14.5a6 6 0 1 1 7 0L15 17H9Z" fill="#ffdf81" stroke="#ac852b" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 19h6m-5 2h4M12 7v5" fill="none" stroke="#ac852b" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    log: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="7" fill="#eaf2ff"/><rect x="6" y="4" width="13" height="16" rx="2" fill="#fff" stroke="#6487b3" stroke-width="1.5"/><path d="M5 8h3m-3 4h3m-3 4h3m4-8h4m-4 4h4m-4 4h2" stroke="#6487b3" stroke-width="1.5" stroke-linecap="round"/></svg>',
+} as const;
+
 // ── Slash commands ────────────────────────────────────────────────────────────
 // One entry per slash command identity (`SlashCommandDef.icon`). Command tables
 // must reference these instead of inlining emoji, so a command's icon is always

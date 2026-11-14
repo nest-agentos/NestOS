@@ -25,24 +25,25 @@ async function fixture(extra: Partial<KanbanBoardInput> = {}, notifications = fa
     await service.create(input);
     const run = async (command: KanbanCommand, actor = alice) => serviceFor(actor).execute('work', {
         operationId: `op-${++serial}`, expectedRevision: (await service.read('work')).revision, command});
+    await run({type:'create-item',item:{id:'management-root',taskType:'coordination',title:'Manage work',responsibility:'Coordinate',acceptance:'All children accepted'},planning:{kind:'campaign',priority:2,dependencies:[],references:[]}});
     const create = async (id = 'request', planning?: KanbanPlanning) => run({type: 'create-item', stage: 'open',
-        item: {id, title: 'PRIVATE_TITLE', responsibility: 'PRIVATE_DESCRIPTION', acceptance: 'Verified request'}, planning});
+        item: {id, title: 'PRIVATE_TITLE', responsibility: 'PRIVATE_DESCRIPTION', acceptance: 'Verified request'}, planning:{...{kind:'request',parentId:'management-root',priority:2,dependencies:[],references:[]},...planning}});
     return {service, serviceFor, events, store, options, input, log, create, run, tick: (ms: number) => {now += ms;}};
 }
 it('supports human ownership and independent review without fabricated Agent or Session identities', async () => {
     const f = await fixture(); await f.create();
-    const claimed = await f.run({type: 'claim', itemId: 'request'}), item = claimed.items[0];
+    const claimed = await f.run({type: 'claim', itemId: 'request'}), item = claimed.items.find(item=>item.id==='request')!;
     expect(item.owner).toMatchObject({kind: 'human', id: 'alice'}); expect(item.owner).not.toHaveProperty('sessionId');
     await f.run({type: 'submit', itemId: 'request', token: item.owner!.token, resultRef: 'record://verified'});
-    expect((await f.run({type: 'review', itemId: 'request', accept: true}, bob)).items[0].status).toBe('completed');
+    expect((await f.run({type: 'review', itemId: 'request', accept: true}, bob)).items.find(item=>item.id==='request')!.status).toBe('completed');
 });
 it('transfers work to a service and fences the previous human owner', async () => {
     const f = await fixture({policy: {review: 'assignee', requireEstimate: false}}); await f.create();
-    const token = (await f.run({type: 'claim', itemId: 'request'})).items[0].owner!.token;
+    const token = (await f.run({type: 'claim', itemId: 'request'})).items.find(item=>item.id==='request')!.owner!.token;
     await f.run({type: 'request-transfer', itemId: 'request', token, target: {kind: 'service', id: 'robot'}});
     const moved = await f.run({type: 'accept-transfer', itemId: 'request'}, robot);
     await expect(f.run({type: 'renew', itemId: 'request', token})).rejects.toThrow('OWNER_MISMATCH');
-    expect((await f.run({type: 'submit', itemId: 'request', token: moved.items[0].owner!.token, resultRef: 'record://result'}, robot)).items[0].status).toBe('completed');
+    expect((await f.run({type: 'submit', itemId: 'request', token: moved.items.find(item=>item.id==='request')!.owner!.token, resultRef: 'record://result'}, robot)).items.find(item=>item.id==='request')!.status).toBe('completed');
 });
 it('counts assignee WIP by principal rather than missing agentId fields', async () => {
     const f = await fixture(); await f.create('one'); await f.create('two'); await f.create('three');
@@ -65,8 +66,8 @@ it('blocks new ownership until unblocked and preserves actual execution state', 
     await f.run({type: 'unblock-item', itemId: 'request'});
     const board = await f.run({type: 'claim', itemId: 'request'});
     await expect(f.run({type: 'block-item', itemId: 'request', reason: 'Waiting'}, robot)).rejects.toThrow('OWNER_MISMATCH');
-    await f.run({type: 'block-item', itemId: 'request', token: board.items[0].owner!.token, reason: 'Waiting'});
-    expect((await f.service.read('work')).items[0].status).toBe('claimed');
+    await f.run({type: 'block-item', itemId: 'request', token: board.items.find(item=>item.id==='request')!.owner!.token, reason: 'Waiting'});
+    expect((await f.service.read('work')).items.find(item=>item.id==='request')!.status).toBe('claimed');
 });
 it('requires explicit Agent execution identity and explicit valid column mappings', async () => {
     const f = await fixture();
@@ -110,7 +111,7 @@ it('recovers a deleted board event after journal failure without reviving the bo
 it('does not roll back committed domain work when the system event journal fails, then catches up', async () => {
     const f = await fixture({}, true), transact = vi.spyOn(f.events.journal, 'transaction');
     transact.mockRejectedValueOnce(Object.assign(new Error('PRIVATE_ERROR'), {code: 'EIO'}));
-    expect((await f.create()).items).toHaveLength(1);
+    expect((await f.create()).items).toHaveLength(2);
     expect(JSON.stringify(f.log.mock.calls)).not.toContain('PRIVATE_ERROR');
     f.tick(11); await f.service.scan();
     expect((await f.events.listNotifications()).items).toHaveLength(1);
@@ -158,7 +159,7 @@ it('links business records without creating artificial conversation identities',
     await f.run({type: 'link-reference', itemId: 'request', reference: {system: 'support', id: 'case-42', revision: 'v1'}});
     await f.run({type: 'link-reference', itemId: 'request', reference: {system: 'support', id: 'case-42', revision: 'v1'}});
     const page = await f.service.query('work', {reference: {system: 'support', id: 'case-42'}});
-    expect(page.total).toBe(1); expect(page.items[0].externalRefs).toHaveLength(1);
+    expect(page.total).toBe(1); expect(page.items.find(item=>item.id==='request')!.externalRefs).toHaveLength(1);
 });
 it('allows humans to release their own work but requires settled execution proof for automation', async () => {
     const f = await fixture(); await f.create('human'); await f.create('automated');
@@ -173,7 +174,7 @@ it('allows humans to release their own work but requires settled execution proof
 });
 it('notifies expired transfers even though the pending request was automatically cleared', async () => {
     const f = await fixture({policy: {requireEstimate: false, transferTimeoutMs: 10}}, true); await f.create();
-    const token = (await f.run({type: 'claim', itemId: 'request'})).items[0].owner!.token;
+    const token = (await f.run({type: 'claim', itemId: 'request'})).items.find(item=>item.id==='request')!.owner!.token;
     await f.run({type: 'request-transfer', itemId: 'request', token, target: {kind: 'service', id: 'robot'}});
     f.tick(11); await f.service.scan();
     expect((await f.events.listNotifications()).items.some(i => i.event.value.type === 'kanban.escalated.transfer-timeout')).toBe(true);

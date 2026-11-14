@@ -9,13 +9,14 @@ import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createBoardDeletion, withBoardDeletion} from '@nestos/kanban/integration';
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0)) await close();});
-async function fixture() {
+async function fixture(execution=false) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
     let check: () => Promise<void> = async () => {};
     const core = createKanbanModule({store, actor: {kind: 'human', id: 'admin'}, authorize: async () => {}, verifyDeletion: () => check(), log: vi.fn()});
     await core.create({id: 'b', title: 'PRIVATE_TITLE', scope: {kind: 'system'}, members: [{kind: 'human', id: 'admin', responsibility: 'Manage', roles: ['coordinator', 'worker']}], policy: {requireEstimate: false}});
-    await core.execute('b', {operationId: 'task', expectedRevision: 1, command: {type: 'create-item', item: {id: 't', title: 'Task', responsibility: 'Work', acceptance: 'Done'}}});
+    if(execution)await core.execute('b',{operationId:'management',expectedRevision:1,command:{type:'create-item',item:{id:'management-root',title:'Manage',responsibility:'Coordinate',acceptance:'Accepted children'}}});
+    await core.execute('b', {operationId: 'task', expectedRevision: execution?2:1, command: {type: 'create-item', item: {id: 't', title: 'Task', responsibility: 'Work', acceptance: 'Done'},...(execution?{planning:{kind:'task',parentId:'management-root',priority:2,dependencies:[],references:[]}}:{})}});
     const resources: KanbanWorkResource[] = [], cleanup = vi.fn(async (_board: string, request) => {const resource = resources.find(row => row.id === request.resourceId)!; resource.state = 'cleaned'; resource.canCleanup = false; return resource;});
     const session = vi.fn(async () => ({history: [], sessions: []}));
     const service: KanbanClient = {...core, workResources: async () => structuredClone(resources), cleanupWorkResource: cleanup, executionSession: session};
@@ -45,7 +46,7 @@ it('rejects stale previews and bypassing confirmation', async () => {
 it('shows pending maintenance and decisions and refuses deletion', async () => {
     const f = await fixture();
     await f.journal.update('review-operation:job', () => ({boardId: 'b', itemId: 't', phase: 'submitting'}));
-    await f.journal.update('record-runs:another', () => [{sourceBoardId: 'another', boardId: 'b', state: 'running'}]);
+    await f.journal.update('record-runs:another', () => [{id:'legacy-run',recordId:'decision',createdAt:1,updatedAt:1,sourceBoardId: 'another', boardId: 'b', state: 'running'}]);
     const preview = await f.api.previewDeletion('b');
     expect(preview.blockers.map(row => row.code)).toEqual(expect.arrayContaining(['BOARD_MAINTENANCE_ACTIVE', 'BOARD_DECISION_UNSETTLED']));
     await expect(f.api.deleteBoard('b', await f.request())).rejects.toMatchObject({code: 'BOARD_MAINTENANCE_ACTIVE'});
@@ -139,10 +140,10 @@ it('retains unknown and foreign resources without blocking logical deletion or c
     expect((await f.journal.get<{preview:{resources:unknown[]}}>('board-deletion:b'))?.preview.resources).toHaveLength(2);
 });
 it('still blocks unsettled execution when all resource ownership is unknown', async () => {
-    const f=await fixture();f.resources.push({...resource('unknown',false),ownership:'unknown',state:'unknown'});
-    await f.core.execute('b',{operationId:'claim',expectedRevision:2,command:{type:'claim',itemId:'t'}}).catch(async () => {
-        await f.core.execute('b',{operationId:'ready',expectedRevision:2,command:{type:'set-stage',itemId:'t',stage:'open'}});
-        await f.core.execute('b',{operationId:'claim-ready',expectedRevision:3,command:{type:'claim',itemId:'t'}});
+    const f=await fixture(true);f.resources.push({...resource('unknown',false),ownership:'unknown',state:'unknown'});
+    await f.core.execute('b',{operationId:'claim',expectedRevision:(await f.core.read('b')).revision,command:{type:'claim',itemId:'t'}}).catch(async () => {
+        await f.core.execute('b',{operationId:'ready',expectedRevision:(await f.core.read('b')).revision,command:{type:'set-stage',itemId:'t',stage:'open'}});
+        await f.core.execute('b',{operationId:'claim-ready',expectedRevision:(await f.core.read('b')).revision,command:{type:'claim',itemId:'t'}});
     });
     const preview=await f.api.previewDeletion('b');expect(preview.blockers).toContainEqual({code:'BOARD_EXECUTION_ACTIVE',itemId:'t'});
     await expect(f.api.deleteBoard('b',await f.request())).rejects.toMatchObject({code:'BOARD_EXECUTION_ACTIVE'});
@@ -174,13 +175,14 @@ it('persists pending deletion, freezes new work and automatically deletes only a
     expect(await f.journal.get('board-stop:b')).toMatchObject({phase:'done'});
 });
 it('whole-board cancellation freezes scheduling and cancels original tasks without deleting the board',async()=>{
-    const f=await fixture();
-    await f.core.execute('b',{operationId:'plan',expectedRevision:2,command:{type:'publish-plan',plan:{schema:'kanban.plan/1',id:'p',revision:1,sealed:true,items:[{id:'t',expectedRevision:1,title:'Task',responsibility:'Work',acceptance:'Done',assignee:{kind:'human',id:'admin'},dependsOn:[]}]}}});
+    const f=await fixture(true);
+    await f.core.execute('b',{operationId:'plan',expectedRevision:(await f.core.read('b')).revision,command:{type:'publish-plan',plan:{schema:'kanban.plan/1',rootItemId:'management-root',id:'p',revision:1,sealed:true,items:[{id:'t',expectedRevision:1,title:'Task',responsibility:'Work',acceptance:'Done',assignee:{kind:'human',id:'admin'},dependsOn:[]}]}}});
     await f.core.execute('b',{operationId:'dispatch',expectedRevision:(await f.core.read('b')).revision,command:{type:'prepare-dispatch',itemId:'t',dispatchId:'original'}});
     await f.api.cancelBoard!('b',{operationId:'cancel-board',expectedRevision:(await f.api.read('b')).revision});
     expect((await f.api.item('b','t')).item.control?.action).toBe('cancel');
     const {scanTaskControls}=await import('@nestos/kanban/integration');
     await scanTaskControls(kanbanControlOptions({calls:{list:async()=>[{receipt:{executionSessionId:'original'},input:{request:{submission:{id:'original'}}},callerState:{settled:true},executionTree:{settled:true}}] as never}},f.journal),f.journal,await f.core.read('b'),f.core);
+    await scanTaskControls(kanbanControlOptions({calls:{list:async()=>[]}},f.journal),f.journal,await f.core.read('b'),f.core);
     await f.api.scan();
     const board=await f.api.read('b');
     expect(board.lifecycle).toMatchObject({intent:'cancel',phase:'ready'});expect(board.deletedAt).toBeUndefined();

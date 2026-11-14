@@ -1,4 +1,4 @@
-import {currentCoordination,KanbanCollaboration,createTaskFix as createFixRuntime} from '@nestos/kanban/integration';
+import {safeCode,currentCoordination,KanbanCollaboration,createTaskFix as createFixRuntime} from '@nestos/kanban/integration';
 import type {KanbanDispatch} from '@nestos/kanban/contracts';
 import type {SessionInstruction,IndependentCallInput,SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {Options} from './task-fix-contracts';
@@ -9,7 +9,8 @@ import {confirmFix} from './task-fix-confirmation';
 import {freezeFix} from './task-fix-preparation';
 import {kanbanControlOptions} from './control-adapter';
 import {requireValue} from './validation';
-/** Fix is a scoped round in the original Session, never a replacement execution. */
+import {managementOwner} from './task-owner';
+/** Observe existing repair rounds; route new repair requests through management. */
 export function createTaskFix(options:Options) {
     const executor={
         async prepare(dispatch:KanbanDispatch) {
@@ -33,14 +34,25 @@ export function createTaskFix(options:Options) {
         }},
         freeze:(board,request)=>freezeFix(options,board,request),confirm:(fix,input)=>confirmFix(options,fix,input),
         observe:fix=>observeFixMessages(options,fix),accept:fix=>acceptSnapshot(options,fix),log:options.log});
-    return {...runtime,fixTask:async(boardId:string,request:{itemId:string;operationId:string})=>{
-        const item=(await options.service.item(boardId,request.itemId)).item;
-        if(item.planning?.parentId){const parent=(await options.service.item(boardId,item.planning.parentId)).item;if(parent.planning?.execution==='children')request={...request,itemId:parent.id};}
-        const current=await currentCoordination(options.journal,boardId,request.itemId),input=current?.request as SubmissionRequest|undefined;
-        if(current&&current.phase!=='settled'&&input?.expectedSessionId)return {id:current.id,boardId,itemId:request.itemId,sessionId:input.expectedSessionId,state:'clarifying' as const,code:current.code};
-        return runtime.fixTask(boardId,request);
-    }};
+    return {...runtime,fixTask:(boardId:string,request:{itemId:string;operationId:string})=>requestManagementRepair(options,runtime,boardId,request)};
 }
+async function requestManagementRepair(options:Options,runtime:ReturnType<typeof createFixRuntime<SessionInstruction>>,boardId:string,request:{itemId:string;operationId:string}) {
+    const started=Date.now();
+    try {
+        const board=await options.service.read(boardId),item=(await options.service.item(boardId,request.itemId)).item;
+        const owner=await managementOwner(options.service,board,item);
+        requireValue(owner?.taskType==='coordination'&&!owner.planning?.parentId,'MANAGEMENT_TASK_REQUIRED');
+        request={...request,itemId:owner.id};
+        const current=await currentCoordination(options.journal,boardId,owner.id),input=current?.request as SubmissionRequest|undefined;
+        const fix=current&&current.phase!=='settled'&&input?.expectedSessionId
+            ?{id:current.id,boardId,itemId:owner.id,sessionId:input.expectedSessionId,state:'clarifying' as const,code:current.code}
+            :await runtime.fixTask(boardId,request);
+        options.log({operationId:request.operationId,boardId,stage:'task.repair.management',result:'success',durationMs:Date.now()-started});return fix;
+    } catch(error) {
+        options.log({operationId:request.operationId,boardId,stage:'task.repair.management',result:'failure',code:safeCode(error,'MANAGEMENT_REPAIR_FAILED'),durationMs:Date.now()-started});throw error;
+    }
+}
+
 async function observe(options:Options,value:unknown,start:boolean) {
     const frozen=value as {schema:number;request:SubmissionRequest};
     requireValue(frozen?.schema===3&&frozen.request?.submission?.id,'INVALID_FROZEN_EXECUTION');

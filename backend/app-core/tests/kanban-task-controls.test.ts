@@ -19,7 +19,8 @@ async function fixture() {
     const actor={kind:'human' as const,id:'admin'},service=createKanbanModule({store,actor,authorize:async()=>{},log(){}});
     await service.create({id:'b',title:'Board',scope:{kind:'system'},members:[{...actor,roles:['coordinator','reviewer','worker'],responsibility:'Work'}],policy:{requireEstimate:false}});
     let serial=0;const run=async(command:KanbanCommand)=>service.execute('b',{operationId:'op-'+ ++serial,expectedRevision:(await service.read('b')).revision,command});
-    await run({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'p',revision:1,sealed:true,items:[{id:'t',title:'Task',responsibility:'Build',acceptance:'Verify',assignee:actor,dependsOn:[]}]}});
+    await run({type:'create-item',item:{id:'management-root',taskType:'coordination',title:'Manage work',responsibility:'Coordinate',acceptance:'All children accepted'}});
+    await run({type:'publish-plan',plan:{schema:'kanban.plan/1',rootItemId:'management-root',id:'p',revision:1,sealed:true,items:[{id:'t',title:'Task',responsibility:'Build',acceptance:'Verify',assignee:actor,dependsOn:[]}]}});
     await run({type:'prepare-dispatch',itemId:'t',dispatchId:'original'});
     let acknowledged=false,lose=false,unsupported=false,boundary=false;
     const calls={list:vi.fn(async()=>[{input:{request:{submission:{id:'original'}}},receipt:{executionSessionId:'original-session'},executionState:{id:'original-task',controlEpoch:2,control:{requested:boundary?'pause':'run',acknowledged:!boundary}},controlCapabilities:{pause:unsupported?'none':'boundary',resume:!unsupported,withdrawPause:true}}])};

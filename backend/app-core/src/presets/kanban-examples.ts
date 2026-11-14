@@ -7,6 +7,8 @@ import {kanbanDemo as demo} from '../resources/catalog';
 const log = createModuleLogger('kanban-examples');
 const resourceId = 'kanban:nestos-demo';
 const actor = {kind: 'human' as const, id: 'admin'};
+const managers=new Set(demo.items.flatMap(entry=>'parentId' in entry.planning&&entry.planning.parentId?[entry.planning.parentId]:[]));
+const defaultManager=demo.items.find(entry=>managers.has(entry.id))!.id;
 const content: KanbanContent = {
     id: demo.id, version: demo.version,
     board: {id: demo.id, title: demo.title, scope: {kind: 'system'},
@@ -14,8 +16,8 @@ const content: KanbanContent = {
         workTypes: demo.workTypes as KanbanWorkType[], defaultWorkType: 'task', policy: {requireEstimate: false, review: 'assignee'},
         notifications: demo.notifications as KanbanNotificationPolicy},
     items: demo.items.map(entry => ({introduced: 'introduced' in entry ? Number(entry.introduced) : 1,
-        command: {type: 'create-item', item: {id: entry.id, title: entry.title, responsibility: entry.responsibility, acceptance: entry.acceptance},
-            planning: {...entry.planning, priority: entry.planning.priority as 0 | 1 | 2 | 3 | 4}, stage: 'stage' in entry ? entry.stage as 'backlog' | 'open' : undefined},
+        command: {type: 'create-item', item: {taskType:managers.has(entry.id)?'coordination':'execution',id: entry.id, title: entry.title, responsibility: entry.responsibility, acceptance: entry.acceptance},
+            planning: {...entry.planning,parentId:managers.has(entry.id)?undefined:('parentId' in entry.planning?entry.planning.parentId:undefined)??defaultManager,execution:managers.has(entry.id)?'children':'direct', priority: entry.planning.priority as 0 | 1 | 2 | 3 | 4}, stage: 'stage' in entry ? entry.stage as 'backlog' | 'open' : undefined},
         blocked: 'blocked' in entry ? String(entry.blocked) : undefined,
         completion: 'example' in entry ? {resultRef: demo.resultRef, archiveReason: entry.example === 'archived' ? demo.archiveReason : undefined} : undefined})),
     records: demo.records.map(({introduced, ...record}) => ({introduced, confirmed: 'confirmExample' in record && record.confirmExample,
