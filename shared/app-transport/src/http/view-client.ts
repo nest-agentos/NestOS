@@ -1,4 +1,4 @@
-import type {ApplicationViewEvent, OpenViewRequest} from '@nestos/app-contracts/services';
+import type {ApplicationViewEvent, OpenViewRequest, StartupReadRequest} from '@nestos/app-contracts/services';
 import {SnapshotCache, type CachedReply} from './snapshot-cache';
 import {ApplicationObservation} from './application-observation';
 import type { HostedApplicationClient } from '@nestos/app-contracts/services';
@@ -14,7 +14,7 @@ import { ViewExpiredError } from './view-expired';
 type NotificationPacket = Partial<CallbackRequest> & Pick<Reply, 'updates'> & { calls?: Call[]; viewEvents?: ApplicationViewEvent[]; updatesRead?: string };
 const maxNotificationCount = 256;
 const maxEventBytes = 2 * 1024 * 1024;
-export interface HttpViewStartOptions {initialView?: OpenViewRequest; snapshots?: SnapshotCache;}
+export interface HttpViewStartOptions {initialRead?:StartupReadRequest; initialView?: OpenViewRequest; snapshots?: SnapshotCache;}
 
 /** HTTP commands are never automatically replayed after an unknown outcome. */
 export class HttpViewClient {
@@ -59,7 +59,7 @@ export class HttpViewClient {
     async start(options: HttpViewStartOptions = {}): Promise<HostedApplicationClient> {
         const snapshots = options.snapshots ?? new SnapshotCache(); await snapshots.load();
         const stream = this.startEventStream(); void stream.catch(() => {});
-        const packet = await this.post({kind: 'bootstrap', initialView: options.initialView, knownSnapshots: snapshots.known()});
+        const packet = await this.post({kind: 'bootstrap', initialView: options.initialView, initialRead: options.initialRead, knownSnapshots: snapshots.known()});
         const reply = await this.expandBootstrap(packet, snapshots);
         if (reply.error) throw new Error(reply.error.message);
         this.peer.applyUpdates(reply.updates);

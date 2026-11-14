@@ -121,3 +121,22 @@ it('logs a classified projection write failure with correlation metadata and no 
         expect(JSON.stringify(warn.mock.calls)).not.toContain('PRIVATE_BODY');
     } finally {append.mockRestore(); warn.mockRestore();}
 });
+it('delivers ordered batches, keeps a failed batch cursor, and respects reset boundaries',async()=>{
+ const {service}=await fixture(),baseline=await service.eventBaseline(),receive=vi.fn(),reset=vi.fn();
+ const receiveBatch=vi.fn().mockRejectedValueOnce(new Error('consumer failure')).mockResolvedValue(undefined),failure=vi.fn();
+ await service.journal.transaction(async tx=>{await tx.append('a',{type:'task.failed'});await tx.append('b',{type:'task.succeeded'});});
+ const feed=new ApplicationEventFeed(service,baseline,{receive,receiveBatch,reset,failure});cleanup.push(async()=>feed.close());
+ await expect(feed.start()).rejects.toThrow('consumer failure');expect(feed.getCursor()).toEqual(baseline);
+ const retry=new ApplicationEventFeed(service,baseline,{receive,receiveBatch,reset,failure});cleanup.push(async()=>retry.close());await retry.start();
+ expect(receiveBatch.mock.calls[1][0].map((row:any)=>row.id)).toEqual(['a','b']);expect(retry.getCursor().sequence).toBe(baseline.sequence+2);
+ await service.journal.transaction(async tx=>{await tx.append('c',{type:'runtime.reset'});await tx.append('d',{type:'scanner.changed'});});await retry.refresh();
+ expect(reset).toHaveBeenCalledOnce();expect(receive).toHaveBeenCalledWith(expect.objectContaining({id:'c'}));expect(receiveBatch).toHaveBeenLastCalledWith([expect.objectContaining({id:'d'})]);
+});
+it('publishes activity hints without terminal Kernel facts and skips UI-only repository updates',async()=>{
+ const {attachRuntimeEvents}=await import('../../../backend/app-core/src/events/runtime-events');const {service,fs}=await fixture();
+ let kernelChanged!:(event:{sessionId:string;reason:string})=>void,repositoryChanged!:(event:{kind:string})=>void;
+ const sources={kernel:{kernel:{onChanged:(listener:typeof kernelChanged)=>{kernelChanged=listener;return ()=>{};},async *listSessions(){},inspectSession:async()=>({readEvents:async()=>({items:[],throughSequence:0})})}},sessionRepository:{subscribe:(listener:typeof repositoryChanged)=>{repositoryChanged=listener;return ()=>{};}}} as never;
+ const projection=await attachRuntimeEvents(service,sources,fs);cleanup.push(()=>projection.dispose());const baseline=await service.eventBaseline();
+ repositoryChanged({kind:'ui-state'});kernelChanged({sessionId:'awaiting-approval',reason:'structure'});kernelChanged({sessionId:'awaiting-approval',reason:'structure'});await projection.flush();
+ const page=await service.readEvents(baseline);expect(page.events.map(row=>row.value)).toEqual([{type:'session.activity.changed',resourceId:'awaiting-approval'}]);
+});

@@ -1,11 +1,11 @@
-import {initialViewRequest, INITIAL_CHAT_DOCUMENTS, parseWorkspaceHash} from '@nestos/app-shell/startup';
+import {initialReadRequest, initialViewRequest, INITIAL_CHAT_DOCUMENTS, parseWorkspaceHash} from '@nestos/app-shell/startup';
 import {ROUTE_ALIASES} from 'nestos-web/workspaces';
 import {parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts';
 
 export function initialView(hash: string) {
     const route = parseWorkspaceHash(hash, 'start');
     const chat = route.slug === 'chat' || Object.hasOwn(ROUTE_ALIASES, route.slug);
-    return {request: chat ? initialViewRequest(INITIAL_CHAT_DOCUMENTS, route.resource) : undefined,
+    return {initialRead:chat?undefined:initialReadRequest(route),request: chat ? initialViewRequest(INITIAL_CHAT_DOCUMENTS, route.resource) : undefined,
         editor: chat ? chatEditor(route.resource) : route.slug};
 }
 

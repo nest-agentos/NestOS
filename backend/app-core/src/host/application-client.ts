@@ -1,3 +1,4 @@
+import {readStartup} from './startup-read';
 import {agentProjectScopes} from '../configuration/agent-project-scope';
 import {mailView} from './mail-view';
 import {kanbanConfigurationResources} from '../presets/kanban-configuration-resources';
@@ -69,6 +70,7 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
     let opening = false;
     const backend: ApplicationBackend = {
         events: services.events,
+        readStartup: request => readStartup(backend,services,request),
         diagnostics: services.diagnostics,
         flowInstallations: services.flowInstallations,
         assistantOverview: () => assistantOverview(services),

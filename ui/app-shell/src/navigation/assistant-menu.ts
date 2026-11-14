@@ -1,7 +1,7 @@
 import {ASSISTANT_ADD_EVENT, type ShortcutRequest} from './assistant-actions';
 import {setTimePresentation, navigationItem} from '@nestos/ui-common-adapter';
 import {ACTION_ICONS, createModuleLogger, escapeHTML, randomUUID, t} from '@nestos/common';
-import type {ApplicationBackend, ApplicationServices, AssistantEvent, AssistantOverview} from '@nestos/app-contracts/services';
+import type {ApplicationBackend, ApplicationServices, AssistantEvent, AssistantOverview, ApplicationEventFact} from '@nestos/app-contracts/services';
 import type {VfsJsonStore} from '../persistence/vfs-json-store';
 import {assistantLabel as label, shortcutEditor, readShortcutForm, updateShortcutFields, filterTargetChoices, filterSessionChoices, type AssistantChoices} from './assistant-editor';
 import {matchesShortcutQuery, shortcutSearchValues, validShortcutTarget, ASSISTANT_MENU_DOCUMENT, emptyAssistantState, readAssistantState, shortcutNavigation, type AssistantShortcut, type AssistantMenuState} from './assistant-shortcuts';
@@ -24,6 +24,7 @@ function redact(value: string): string {
 interface Options {
     services: ApplicationServices; backend: ApplicationBackend; documents: Pick<VfsJsonStore, 'read' | 'write' | 'flush'>;
     current(): {workspace: string; resource: string; title: string}; navigate(target: {target: string; resourceId?: string}): Promise<void>;
+    events?:{subscribe(listener:(events:readonly ApplicationEventFact[])=>void):()=>void};
     home?(): Promise<void>; signal: AbortSignal;
 }
 export function installAssistantMenu(options: Options): () => void {const menu = new AssistantMenu(options); menu.install(); return () => menu.close();}
@@ -60,7 +61,8 @@ class AssistantMenu {
         document.addEventListener('visibilitychange', () => {if (!document.hidden) this.schedule();}, {signal});
         this.options.signal.addEventListener('abort', () => this.close(), {once: true});
         const services = this.options.services;
-        this.releases.push(services.sessionRepository.subscribe?.(event => {if(event?.kind!=='ui-state')this.schedule();}) ?? (() => {}),
+        if(this.options.events)this.releases.push(this.options.events.subscribe(events=>{if(events.some(assistantConsumesEvent))this.schedule();}));
+        else this.releases.push(services.sessionRepository.subscribe?.(event => {if(event?.kind!=='ui-state')this.schedule();}) ?? (() => {}),
             services.kernel?.kernel?.onChanged?.(event => {if (event.reason === 'structure') this.schedule();}) ?? (() => {}),
             services.digitalTwin?.onChange(() => this.schedule()) ?? (() => {}));
         if (!this.options.backend.assistantOverview) {this.stale = true; this.error = label('eventsUnavailable');}
@@ -313,4 +315,9 @@ class AssistantMenu {
         if (this.closed) return; this.closed = true; clearTimeout(this.timer); this.lifetime.abort();
         for (const release of this.releases.reverse()) release(); this.dialog.remove();
     }
+}
+
+/** Global assistant reads are invalidated by semantic hints, never by document/UI writes. */
+export function assistantConsumesEvent(event:ApplicationEventFact):boolean {
+    return /^(?:session\.|task\.|repository\.|scanner\.)/.test(event.type)||['runtime.reset','source.reset'].includes(event.type);
 }

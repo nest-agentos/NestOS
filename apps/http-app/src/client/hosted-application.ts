@@ -33,8 +33,8 @@ export async function startApplicationClient(onProgress: (message: string) => vo
 async function mount(connection: ApplicationConnection, onProgress: (message: string) => void,
     onShellReady?: () => void, recovery?: AppRecoveryState): Promise<AppHandle> {
     try {
-        const [{services, backend, flowLibrary, fileTemplates, initialView}] = await Promise.all([connection.ready, stylesReady()]);
-        const app = await initApp({services, backend, fileTemplates, workspaces: WORKSPACES, initialView, recovery,
+        const [{services, backend, flowLibrary, fileTemplates, initialView, initialRead}] = await Promise.all([connection.ready, stylesReady()]);
+        const app = await initApp({services, backend, fileTemplates, workspaces: WORKSPACES, initialView, initialRead, recovery,
             ui: createBrowserUI(flowLibrary), defaultSlug: 'start', startPage: true, onProgress, onShellReady,
             onEditorReady: markEditorReady, routeAliases: ROUTE_ALIASES});
         app.onDestroy(() => connection.close(), 'sources');

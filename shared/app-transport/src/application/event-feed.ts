@@ -2,6 +2,7 @@ import type {ApplicationEvents, ApplicationEventFact} from '@nestos/app-contract
 import type {EventCursor, JournalEvent} from '@nestos/vfs-core';
 
 export interface EventFeedHandlers {
+    receiveBatch?(events: readonly JournalEvent<ApplicationEventFact>[]):void|Promise<void>;
     receive(event: JournalEvent<ApplicationEventFact>): void | Promise<void>;
     /** Reload domain snapshots; called when retention or a new storage incarnation invalidates the cursor. */
     reset(): void | Promise<void>;
@@ -45,13 +46,34 @@ export class ApplicationEventFeed {
                 if (this.closed) return;
                 this.cursor = baseline; this.dirty = true; continue;
             }
-            for (const event of page.events) {
-                if (this.closed) return;
-                if (event.value.type === 'runtime.reset' || event.value.type === 'source.reset') await this.handlers.reset();
-                await this.handlers.receive(event);
-                this.cursor = {streamId: page.cursor.streamId, sequence: event.sequence};
-            }
+            await this.deliverPage(page.events,page.cursor.streamId);
             this.dirty ||= page.more;
         }
     }
+    private async deliverPage(events:JournalEvent<ApplicationEventFact>[],streamId:string):Promise<void> {
+        let batch:JournalEvent<ApplicationEventFact>[]=[];
+        for(const event of events) {
+            if(this.closed)return;
+            if(event.value.type==='runtime.reset'||event.value.type==='source.reset') {
+                await this.deliverBatch(batch,streamId);batch=[];if(this.closed)return;
+                await this.handlers.reset();if(this.closed)return;
+                await this.handlers.receive(event);if(this.closed)return;
+                this.cursor={streamId,sequence:event.sequence};
+            }else batch.push(event);
+        }
+        await this.deliverBatch(batch,streamId);
+    }
+    private async deliverBatch(events:JournalEvent<ApplicationEventFact>[],streamId:string):Promise<void> {
+        if(this.closed||!events.length)return;
+        if(this.handlers.receiveBatch) {
+            await this.handlers.receiveBatch(events);if(this.closed)return;
+            this.cursor={streamId,sequence:events[events.length-1].sequence};return;
+        }
+        for(const event of events) {
+            if(this.closed)return;
+            await this.handlers.receive(event);if(this.closed)return;
+            this.cursor={streamId,sequence:event.sequence};
+        }
+    }
+
 }

@@ -134,6 +134,7 @@ export interface BootWorkspaceParts {
 export interface AppOptions {
     studyGeneration?: StudyCreationOptions;
     recovery?: import('./workbench/recovery').AppRecoveryState;
+    initialRead?:import('@nestos/app-contracts/services').StartupReadResult;
     initialView?: import('@nestos/app-contracts/services').OpenedApplicationView;
     fileTypes?: import('./config/file-registry').AppFileTypeConfig[];
     /** Host UI for selecting a server/project and persisting a fresh binding. */

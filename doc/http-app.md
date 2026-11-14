@@ -245,6 +245,8 @@ llm-ui 通过可选 `readTaskAttachment` 回调消费该能力，没有注入时
 
 `session.flow.invocations` 纳入共享只读命令集合，查询不触发全域失效。RPC 的订阅屏障也使用动态查询分类：只读命令不等待先前订阅，写命令继续等待订阅确认，不自动重试。OCR 设置表单与附件管理共享一个 Agent 配置源订阅，每个消费者退出时移除自身监听，最后一个消费者退出时释放源订阅。
 
+bootstrap 可携带声明式 `initialRead`（UI 文档、事件基线、决策查询条件），由 app-core 经原授权端口准备并随同首个能力图返回；宿主不复制领域规则。响应按部分保留 value 或安全 code，不增加跨请求业务读取缓存。`application.complete.rpcOperations` 分别登记 `ApplicationBackend.readStartup` 与可选的 `ApplicationBackend.openView`；组合读取的逐部分耗时记录为 `application.startup.read`，带 operationId、stage、result、code 与 durationMs，不记录文档名或查询参数。
+
 JSON 应用请求的 `request.complete` 新增可选 `bodyReadMs`（请求体接收及解析）、`viewReadyMs`（等待应用视图）、`rpcMs`（能力执行、快照及 JSON 响应生成）和 `responseFlushMs`（响应提交至 Node finish/close）。`application.complete.durationMs` 保留原含义，通过 requestId 关联。请求体阶段进一步记录 `bodyBytes`、`bodyChunks`、`bodyFirstByteMs`、`bodyReceiveMs`、`bodyParseMs`，区分首块等待、接收完成与 JSON 解析耗时；失败请求同样记录安全元数据，不记录正文。flush 不代表浏览器收到或渲染完成，客户端证书验证也不计入这些阶段；日志不记录文档、命令参数、共享键或用户内容。部署新版本后可据此区分此前 1 秒级 HTTP 请求与毫秒级 RPC 之间的差异。
 
 浏览器每次连接分配 `browserSessionId`，初始加载及每次 hash 导航建立独立 `traceId`；导航中的并发请求各有 `spanId`，通过经过校验的 W3C `traceparent` 传递。Node 为每次 HTTP 请求生成独立 `requestId`，`AsyncLocalStorage` 隔离并发请求；批量 RPC 各自拥有子 span，审计、业务诊断和模块日志继承关联字段。错误响应同时返回 requestId/traceId，响应头提供 `X-Request-ID`/`X-Trace-ID`。这些字段只用于诊断，不参与身份认证或授权。

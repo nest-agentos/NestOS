@@ -11,7 +11,7 @@ const releases: Array<() => void> = [];
 afterEach(() => {for (const close of releases.splice(0)) close(); document.body.replaceChildren(); vi.restoreAllMocks();});
 const event = (id: string, kind: AssistantEvent['kind'] = 'completion', priority = 4): AssistantEvent => ({id, revision: 'v1', kind, source: 'sessions', title: '<img src=x onerror=alert(1)>',
     at: 1000, priority, requiresAction: kind === 'approval', target: {target: 'chat', resourceId: id}});
-function setup(initial = [event('done'), event('approval', 'approval', 0), event('failed', 'failure', 2), event('older')], state: AssistantMenuState = emptyAssistantState()) {
+function setup(initial = [event('done'), event('approval', 'approval', 0), event('failed', 'failure', 2), event('older')], state: AssistantMenuState = emptyAssistantState(), events?: {subscribe(listener:(events:readonly import('@nestos/app-contracts/services').ApplicationEventFact[])=>void):()=>void}) {
     document.body.innerHTML = '<aside class="app-sidebar"><div class="app-sidebar__brand">NestOS</div><ul class="main-nav-list"></ul></aside>';
     HTMLDialogElement.prototype.showModal = function () {this.open = true;};
     HTMLDialogElement.prototype.close = function () {this.open = false; this.dispatchEvent(new Event('close'));};
@@ -20,7 +20,7 @@ function setup(initial = [event('done'), event('approval', 'approval', 0), event
     let changed!: (event?: {kind:string}) => void; const unsubscribe = vi.fn();
     const projects = {list: async () => [{project: {id: 'project'}, name: 'Project', path: '/renamed'}], get: vi.fn(async () => ({project: {id: 'project'}, path: '/renamed'}))};
     const abort = new AbortController();
-    releases.push(installAssistantMenu({backend: {assistantOverview} as never, services: {projects, kernel: {kernel: {onChanged: () => unsubscribe}},
+    releases.push(installAssistantMenu({events,backend: {assistantOverview} as never, services: {projects, kernel: {kernel: {onChanged: () => unsubscribe}},
         sessionRepository: {subscribe: (callback: (event?: {kind:string}) => void) => {changed = callback; return unsubscribe;}, listSummaries: async () => [{id: 'existing', title: 'Existing', folder: '/renamed', updatedAt: 1}]}} as never,
         documents: {read: async () => state, write, flush}, current: () => ({workspace: 'chat', resource: 'current', title: 'Current page'}), navigate, signal: abort.signal}));
     const open = () => document.querySelector<HTMLButtonElement>('.assistant-launcher')!.click();
@@ -248,4 +248,14 @@ it('does not reread assistant facts for UI-only session state changes',async()=>
  const f=setup();await vi.waitFor(()=>expect(f.assistantOverview).toHaveBeenCalledOnce());
  f.changed({kind:'ui-state'});await new Promise(resolve=>setTimeout(resolve,550));expect(f.assistantOverview).toHaveBeenCalledOnce();
  f.changed({kind:'updated'});await vi.waitFor(()=>expect(f.assistantOverview).toHaveBeenCalledTimes(2));
+});
+
+it('shares the application event feed and coalesces a mixed batch without remote domain subscriptions',async()=>{
+ let receive!:(events:readonly import('@nestos/app-contracts/services').ApplicationEventFact[])=>void;
+ const stop=vi.fn(),subscribe=vi.fn(listener=>{receive=listener;return stop;});
+ const f=setup(undefined,undefined,{subscribe});await vi.waitFor(()=>expect(f.assistantOverview).toHaveBeenCalledOnce());
+ expect(subscribe).toHaveBeenCalledOnce();receive([{type:'node:created'},{type:'kanban.changed'}]);
+ await new Promise(resolve=>setTimeout(resolve,500));expect(f.assistantOverview).toHaveBeenCalledOnce();
+ receive([{type:'session.activity.changed'},{type:'task.failed'},{type:'scanner.changed'}]);
+ await vi.waitFor(()=>expect(f.assistantOverview).toHaveBeenCalledTimes(2));f.abort.abort();expect(stop).toHaveBeenCalledOnce();
 });

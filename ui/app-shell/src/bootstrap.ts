@@ -127,8 +127,8 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const startupWorkspace = workspaces.find(ws => ws.elementId === routeMap[startupRoute.slug]);
     const initialDocuments = startupWorkspace?.type === 'chat'
         ? INITIAL_CHAT_DOCUMENTS : ['theme', 'nestos_assistant_menu_v1'];
-    const prefetchedDocuments = !options.initialView && startupWorkspace?.type !== 'chat' ? new VfsJsonStore(backend) : undefined;
-    const eventPreparation = applicationEvents?.prepare(!!options.initialView);
+    const prefetchedDocuments = !options.initialRead?.documents?.value && !options.initialView && startupWorkspace?.type !== 'chat' ? new VfsJsonStore(backend) : undefined;
+    const eventPreparation = applicationEvents?.prepare(!!options.initialView,options.initialRead?.eventBaseline?.value);
     prefetchedDocuments?.prefetch(initialDocuments);
     await eventPreparation;
     const opened = options.initialView ?? (startupWorkspace?.type === 'chat' && typeof backend.openView === 'function' ? await openInitialView(backend, initialDocuments, startupRoute.resource) : undefined);
@@ -145,8 +145,9 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     // UI state lives beside the theme in `etc:/ui`, so Web and Tauri share one
     // inspectable store instead of the webview's localStorage.
     const uiDocs = prefetchedDocuments ?? new VfsJsonStore(backend);
+    if(options.initialRead?.documents?.value)uiDocs.seed(options.initialRead.documents.value);
     if (opened) uiDocs.seed(opened.documents);
-    else if (!prefetchedDocuments) uiDocs.prefetch(initialDocuments);
+    else if (!prefetchedDocuments&&!options.initialRead?.documents?.value) uiDocs.prefetch(initialDocuments);
     const executorUsage = new ExecutorUsage(uiDocs);
     cleanupFns.push(() => uiDocs.flush());
     const themeReady = themeService.init(uiDocs);
@@ -367,7 +368,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
 
         if (strategyType === 'kanban') {
-            const module = createKanbanWorkspace({service: services.kanban, sidebar: sidebarEl, editor: editorEl,
+            const module = createKanbanWorkspace({initialDecision:options.initialRead?.request.decision?{...options.initialRead.request.decision,...options.initialRead.decision}:undefined,service: services.kanban, sidebar: sidebarEl, editor: editorEl,
                 windows: windowBinding, initialResource, sessionUrl, referenceLink: kanbanReferenceLink(services.projects),
                 openSessionInteraction:sessionInteractionDialog(services.projects,id=>handleNavigationRequest({target:'chat',resourceId:id,options:{newTab:true}})),
                 selected: path => selectionHistory(elementId, path, 'push'),
@@ -861,7 +862,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const initialRevision = navigationRevision;
     options.onShellReady?.();
     await initialLoad;
-    cleanupFns.push(installAssistantMenu({services, backend, documents: uiDocs, signal: navigationSignal,
+    cleanupFns.push(installAssistantMenu({services, backend, events:applicationEvents, documents: uiDocs, signal: navigationSignal,
         current: () => {
             const workspace = reverseRouteMap[visibleWorkspaceId ?? ''] ?? resolvedDefault;
             const resource = managerCache.get(visibleWorkspaceId ?? '')?.getActiveResourceId() ?? '';

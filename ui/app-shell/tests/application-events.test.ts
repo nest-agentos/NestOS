@@ -99,3 +99,12 @@ it('routes kanban facts to kanban views without treating notifications as execut
     expect(workspaceConsumesEvent('kanban', {type: 'task.failed'})).toBe(false);
     expect(workspaceConsumesEvent('chat', {type: 'kanban.claim'})).toBe(false);
 });
+
+it('uses the prepared baseline and distributes an ordered page batch through one upstream subscription',async()=>{
+ const f=await fixture(),receive=vi.fn();const baseline=await f.journal.baseline();
+ await f.bridge.prepare(false,baseline);const stop=f.bridge.subscribe(receive);
+ await f.journal.transaction(async tx=>{await tx.append('one',{type:'repository.changed'});await tx.append('two',{type:'scanner.changed'});});
+ await f.bridge.start();expect(f.source.eventBaseline).not.toHaveBeenCalled();expect(f.source.onChange).toHaveBeenCalledOnce();
+ expect(receive).toHaveBeenCalledExactlyOnceWith([{type:'repository.changed'},{type:'scanner.changed'}]);expect(f.invalidate).toHaveBeenCalledTimes(2);
+ stop();await f.journal.append('three',{type:'task.failed'});await f.bridge.refresh();expect(receive).toHaveBeenCalledOnce();
+});

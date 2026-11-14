@@ -16,15 +16,20 @@ export class ShellApplicationEvents {
     private started = false;
     private needsReset = false;
     generation = 0;
+    private readonly listeners=new Set<(events:readonly ApplicationEventFact[])=>void|Promise<void>>();
+    subscribe(listener:(events:readonly ApplicationEventFact[])=>void|Promise<void>):()=>void {
+        if(this.closed)return ()=>{};
+        this.listeners.add(listener);return ()=>{this.listeners.delete(listener);};
+    }
     constructor(private readonly source: ApplicationEvents,
         private readonly invalidate: (event: ApplicationEventFact) => void | Promise<void>,
         private readonly visible: () => boolean) {}
 
     /** Capture before loading snapshots; preloaded snapshots need a fresh invalidation. */
-    async prepare(preloaded = false): Promise<void> {
+    async prepare(preloaded = false,baseline?:EventCursor): Promise<void> {
         const started = Date.now();
         this.needsReset = preloaded;
-        try {this.cursor = await this.source.eventBaseline();}
+        try {this.cursor = baseline??await this.source.eventBaseline();}
         catch (error) {this.needsReset = true; this.report('baseline', error, started);}
     }
     async start(): Promise<void> {
@@ -40,7 +45,7 @@ export class ShellApplicationEvents {
             .finally(() => {this.pending = undefined;});
     }
     close(): void {
-        this.closed = true; clearInterval(this.timer); this.feed?.close();
+        this.closed = true; clearInterval(this.timer); this.feed?.close();this.listeners.clear();
     }
     private async connect(): Promise<void> {
         const started = Date.now(), operationId = randomUUID();
@@ -50,6 +55,7 @@ export class ShellApplicationEvents {
         if (this.closed) return;
         if (this.feed) {await this.feed.refresh(); return;}
         const feed = new ApplicationEventFeed(this.source, this.cursor, {
+            receiveBatch: events => this.deliverBatch(events.map(event=>event.value)),
             receive: event => ['runtime.reset', 'source.reset'].includes(event.value.type) ? undefined : this.deliver(event.value),
             reset: () => this.deliver(reset), failure: error => this.report('consume', error),
         });
@@ -58,10 +64,13 @@ export class ShellApplicationEvents {
         catch (error) {this.cursor = feed.getCursor(); feed.close(); this.feed = undefined; throw error;}
         if (!this.closed) log.info('events.subscribe', {operationId, stage: 'ready', result: 'success', durationMs: Date.now() - started});
     }
-    private async deliver(event: ApplicationEventFact): Promise<void> {
-        if (this.closed) return;
-        this.generation++;
-        await this.invalidate(event);
+    private deliver(event:ApplicationEventFact):Promise<void> {return this.deliverBatch([event]);}
+    private async deliverBatch(events:readonly ApplicationEventFact[]):Promise<void> {
+        if(this.closed)return;
+        this.generation+=events.length;
+        const work=events.map(event=>this.invalidate(event));
+        for(const listener of this.listeners)work.push(Promise.resolve().then(()=>listener(events)));
+        await Promise.all(work);
     }
     private report(stage: string, error: unknown, started = Date.now()): void {
         if (this.closed) return;

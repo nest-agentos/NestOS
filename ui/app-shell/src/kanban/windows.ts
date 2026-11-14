@@ -94,6 +94,7 @@ export class KanbanWindowWorkbench {
             selected: () => this.updatePage(tab), committed: () => {this.boardSnapshots = undefined; this.availableBoards = undefined; this.navigation.invalidate();},
             mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts),
         });
+        this.options.initialDecision=undefined;
         tab.value = {view, ready: Promise.resolve()}; this.tabs.setIcon(tab.id, ACTION_ICONS.kanbanView);
         this.tabs.location(tab.id, tab.id); this.syncVisibility();
         tab.value.ready = view.start().then(() => this.updatePage(tab)).catch(error => {tab.failed = true; throw error;});

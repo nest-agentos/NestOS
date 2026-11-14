@@ -14,3 +14,8 @@ it('retains flow preloading and skips chat on the workspace landing page', () =>
     expect(initialView('#/flows').editor).toBe('flows');
     expect(initialView('#/workbench').editor).toBeUndefined();
 });
+it('declares only route-required startup reads and includes decision query conditions',()=>{
+ const decision=initialView('#/kanban/'+encodeURIComponent('/board/development/@decision'));
+ expect(decision.initialRead).toEqual(expect.objectContaining({documents:['theme','nestos_assistant_menu_v1'],eventBaseline:true,decision:{boardId:'development',query:expect.objectContaining({sort:'activity-desc',sections:['page','catalog','projects'],attentionOnly:false,archived:false})}}));
+ expect(initialView('#/flows').initialRead?.decision).toBeUndefined();expect(initialView('#/workbench').initialRead).toBeUndefined();
+});

@@ -22,7 +22,7 @@ class RuntimeEventProjection {
             if (!this.closed && event.reason !== 'content') {this.dirty.add(event.sessionId); this.scheduleKernel();}
         }));
         this.releases.push(this.sources.sessionRepository.subscribe?.(change => {
-            if (!this.closed) this.enqueue('repository', () => this.service.journal.append(randomUUID(),
+            if (!this.closed&&change?.kind!=='ui-state') this.enqueue('repository', () => this.service.journal.append(randomUUID(),
                 {type: 'repository.changed', resourceId: change?.sessionId}));
         }) ?? (() => {}));
         this.releases.push(files.onAny?.(event => {
@@ -71,13 +71,23 @@ class RuntimeEventProjection {
                 code: safeCode(error), durationMs: Date.now() - started});}
         });
     }
-    private async drain(): Promise<void> {
-        for (const id of [...this.dirty]) {
-            this.dirty.delete(id);
-            try {await projectKernelEvents(this.service, this.sources.kernel.kernel, id);}
-            catch (error) {if (!['SESSION_NOT_FOUND', 'ENOENT'].includes(safeCode(error))) {this.dirty.add(id); throw error;}}
+    private async drain():Promise<void> {
+        const changed:string[]=[];
+        try {
+            for(const id of [...this.dirty]) {
+                this.dirty.delete(id);
+                try {await projectKernelEvents(this.service,this.sources.kernel.kernel,id);changed.push(id);}
+                catch(error){if(!['SESSION_NOT_FOUND','ENOENT'].includes(safeCode(error))){this.dirty.add(id);throw error;}}
+            }
+        }finally {
+            if(changed.length)try {
+                await this.service.journal.transaction(async tx=>{
+                    for(const id of changed)await tx.append(randomUUID(),{type:'session.activity.changed',resourceId:id});
+                });
+            }catch(error){for(const id of changed)this.dirty.add(id);throw error;}
         }
     }
+
 }
 export async function attachRuntimeEvents(service: UserEventService, sources: Sources, files: IFileSystem) {
     const projection = new RuntimeEventProjection(service, sources);

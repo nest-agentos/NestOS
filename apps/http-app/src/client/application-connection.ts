@@ -55,7 +55,7 @@ export function connectApplication() {
         const key = `mindos.snapshot-cache.v${RPC_VERSION}:${userId}`;
         const snapshots = new SnapshotCache({read: () => sessionStorage.getItem(key), write: value => sessionStorage.setItem(key, value)});
         started = true;
-        return client.start({initialView: route.request, snapshots}).then(root => withSessionRecovery(root, createSessionRecoveryClient(tracing.wrap(fetcher)), sessionRecoveryRequests));
+        return client.start({initialView: route.request, initialRead:route.initialRead, snapshots}).then(root => withSessionRecovery(root, createSessionRecoveryClient(tracing.wrap(fetcher)), sessionRecoveryRequests));
     }).then(root => {performance.mark('nestos:data-ready'); return root;});
     return {ready, editor: route.editor, subscribeStatus: (listener: (state: ConnectionState) => void) => status.subscribe(listener),
         close: async () => {listeners.abort(); status.close(); await client.close().catch(error => {if (started) throw error;});}};

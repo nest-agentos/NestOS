@@ -99,8 +99,8 @@ export class ViewApi {
         finally {
             recordRequestPhase(response, 'rpcMs', Date.now() - started);
             this.audit?.write({...diagnosticContext(),event: 'application.complete', requestId: String(response.getHeader('X-Request-ID') ?? ''),
-                rpcKind: 'bootstrap', rpcBatchSize: body.initialView ? 1 : 0,
-                rpcOperations: body.initialView ? ['ApplicationBackend.openView'] : [], durationMs: Date.now() - started});
+                rpcKind: 'bootstrap', rpcBatchSize: Number(!!body.initialView)+Number(!!body.initialRead),
+                rpcOperations: [...(body.initialView?['ApplicationBackend.openView']:[]),...(body.initialRead?['ApplicationBackend.readStartup']:[])], durationMs: Date.now() - started});
         }
     }
     private async invoke(client: Client, body: ApplicationRequest, response: ServerResponse): Promise<void> {

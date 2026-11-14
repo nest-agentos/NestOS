@@ -3,3 +3,5 @@ export {INITIAL_CHAT_DOCUMENTS} from './persistence/documents';
 export {parseWorkspaceHash} from './navigation/workspace-route';
 
 export {setFileRecoveryOwner} from './persistence/file-recovery-store';
+
+export {initialReadRequest} from './lifecycle/startup-read';

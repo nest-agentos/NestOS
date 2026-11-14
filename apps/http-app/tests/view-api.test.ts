@@ -566,3 +566,18 @@ it('preserves navigation trace through authenticated RPC audit and business fail
     await vi.waitFor(()=>expect(server.events.find(value=>value.event==='request.complete'&&value.requestId===failure.requestId)).toMatchObject({traceId:failure.traceId}));
     expect(JSON.stringify(auditEvents)).not.toContain('not.a.registered.command');
 });
+it('returns declared startup reads in the authenticated bootstrap without follow-up queries and isolates a failed section',async()=>{
+ const posts:string[]=[];
+ const fetcher:typeof fetch=async(input,init)=>{
+  if(init?.method==='POST')posts.push(JSON.parse(String(init.body)).kind);
+  return auth.fetcher(input,init);
+ };
+ const http=new HttpViewClient('startup-read',server.origin+'/api/application',fetcher);clients.push(http);
+ const request={documents:['theme'],eventBaseline:true,decision:{boardId:'missing-startup-board',query:{sections:['page'] as Array<'page'>}}};
+ const root=await http.start({initialRead:request});
+ expect(posts).toEqual(['bootstrap']);expect(root.initialRead?.request).toEqual(request);
+ expect(root.initialRead?.documents).toHaveProperty('value');expect(root.initialRead?.eventBaseline?.value?.sequence).toEqual(expect.any(Number));
+ expect(root.initialRead?.decision?.code).toEqual(expect.any(String));expect(root.initialRead?.decision?.value).toBeUndefined();
+ const next=await root.backend.readStartup!({documents:['theme']});expect(next.documents).toHaveProperty('value');expect(next.eventBaseline).toBeUndefined();
+ expect(posts).toEqual(['bootstrap','queries']);
+});
