@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { gzip, gunzipSync } from 'node:zlib';
+import { gzip, gunzipSync, brotliDecompressSync } from 'node:zlib';
 import type { ServerResponse } from 'node:http';
 import { serveStatic } from '@nestos/node-host/http';
 
@@ -30,4 +30,23 @@ it('revalidates HTML and refreshes cached bytes after a deployment', async () =>
     const second = response(); await serveStatic(second as unknown as ServerResponse, 'GET', directory, '/', false, headers.ETag);
     expect(second.writeHead.mock.calls[0][0]).toBe(200); expect(second.end.mock.calls[0][0].toString()).toContain('after deployment');
     expect(second.writeHead.mock.calls[0][1].ETag).not.toBe(headers.ETag);
+});
+
+it('negotiates Brotli and keeps validators separate for each wire representation', async () => {
+    const content = 'export const label = "repeatable module";\n'.repeat(1000);
+    await writeFile(path.join(directory, 'assets/app-abcdefgh.js'), content);
+    const br = response(); await serveStatic(br as unknown as ServerResponse, 'GET', directory, '/assets/app-abcdefgh.js', 'gzip, deflate, br');
+    const headers = br.writeHead.mock.calls[0][1];
+    expect(headers['Content-Encoding']).toBe('br'); expect(headers.Vary).toBe('Accept-Encoding');
+    expect(brotliDecompressSync(br.end.mock.calls[0][0]).toString()).toBe(content);
+    const gzipReply = response(); await serveStatic(gzipReply as unknown as ServerResponse, 'GET', directory, '/assets/app-abcdefgh.js', 'br;q=0,gzip;q=1', headers.ETag);
+    expect(gzipReply.writeHead.mock.calls[0][0]).toBe(200); expect(gzipReply.writeHead.mock.calls[0][1]['Content-Encoding']).toBe('gzip');
+    const head = response(); await serveStatic(head as unknown as ServerResponse, 'HEAD', directory, '/assets/app-abcdefgh.js', 'br', headers.ETag);
+    expect(head.writeHead.mock.calls[0][0]).toBe(304); expect(head.end).toHaveBeenCalledWith(undefined);
+});
+it.each(['br;q=0,gzip;q=0', 'br;q=invalid', '*;q=0', 'identity;q=1,br;q=0.5'])('does not apply an excluded encoding: %s', async accept => {
+    await writeFile(path.join(directory, 'index.html'), '<title>Identity</title>');
+    const reply = response(); await serveStatic(reply as unknown as ServerResponse, 'GET', directory, '/', accept);
+    expect(reply.writeHead.mock.calls[0][1]['Content-Encoding']).toBeUndefined();
+    expect(reply.end.mock.calls[0][0].toString()).toBe('<title>Identity</title>');
 });

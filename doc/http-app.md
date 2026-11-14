@@ -544,7 +544,7 @@ Session getSnapshot 是唯一历史快照，getSessions、getStatus 和 isGenera
 
 项目 lookup 预热读取内存挂载目录，不再扫描持久项目目录。OCR 后端服务共享首次配置读取；readSettings、label、ready 不写默认值，显式打开配置才 prepareConfiguration，识别不恢复已删除提示词。空输入框订阅也不创建 OCR 服务。工具箱投影内容未变化时跳过写入和元数据事件。
 
-静态 hash 资源使用私有 immutable 缓存，HTML 使用 no-cache 和 ETag 重新验证；gzip 结果按文件身份、大小、修改时间和编码缓存，最多 64 项 / 16 MiB。所有请求仍先通过证书认证。API 响应继续 no-store。
+静态 hash 资源使用私有 immutable 缓存，HTML 使用 no-cache 和 ETag 重新验证；文本静态资源按 Accept-Encoding 的质量权重选择 Brotli 或 gzip，同权重优先 Brotli，明确 q=0 的编码不使用；不同编码保留各自 ETag，响应设置 Vary: Accept-Encoding。压缩结果沿用按文件身份、大小、修改时间和编码区分的有界存储，最多 64 项 / 16 MiB。所有请求仍先通过证书认证。API 响应继续 no-store。
 
 项目与全部项目切换通过 `SessionBrowserPort.readDirectory` 一次聚合目录节点、透明分组、项目归属和导航；按钮、搜索和侧栏复用该结果，不分别查询 `forFolder`。目录种子按 revision 单次消费，变化事件或读取期间发生变更会使种子失效；普通子目录保持按需读取，显式刷新重新核对来源。返回种子用行索引复用已传输的摘要，不复制聊天历史或附件正文。后端 `directory-view` 日志记录聚合阶段、数量、错误分类和耗时。
 

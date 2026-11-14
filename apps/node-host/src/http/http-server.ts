@@ -68,7 +68,7 @@ async function serve(request: IncomingMessage, response: ServerResponse, options
     if (pathname === '/api/health') { json(response, 200, { ready: true, ...options.build }); return; }
     if (pathname.startsWith('/api/')) throw new FSError('ENOENT', 'Unknown API route');
     if (request.method !== 'GET' && request.method !== 'HEAD') { response.writeHead(405); response.end(); return; }
-    await serveStatic(response, request.method, options.staticDir, pathname, request.headers['accept-encoding']?.includes('gzip') ?? false, request.headers['if-none-match']);
+    await serveStatic(response, request.method, options.staticDir, pathname, request.headers['accept-encoding'] ?? false, request.headers['if-none-match']);
 }
 function validateOrigin(request: IncomingMessage): void {
     if (request.headers.origin && request.headers.origin !== `https://${request.headers.host}`) throw new FSError('EACCES', 'Cross-origin requests are denied');
