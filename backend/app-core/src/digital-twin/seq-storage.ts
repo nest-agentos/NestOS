@@ -1,5 +1,5 @@
 import { randomUUID } from '@nestos/common';
-import { FSError, type IFileSystem, type ISeqFileTransaction } from '@nestos/vfs-core';
+import { FSError, type IFileSystem, type ISeqFileTransaction, type ISeqFileReadTransaction } from '@nestos/vfs-core';
 import { decodeIdentity, identity } from './codec';
 import type { TwinIdentity } from './contracts';
 
@@ -40,11 +40,23 @@ export class TwinSeqStorage {
 
     file(name: TwinFile): string { return `${this.root}/${name}.seq`; }
 
+    async read<T>(run: (tx: ISeqFileReadTransaction, current: TwinIdentity) => Promise<T>): Promise<T> {
+        const seq = this.fs.meta.seq;
+        if (!seq?.readTransaction) throw new Error('Twin requires read-only SeqFile snapshots');
+        return seq.readTransaction(async tx => {
+            const current = decodeIdentity(await tx.getEntry(this.file('authority'),'twin'));
+            this.assertBinding(current); return run(tx,current);
+        },this.file('authority'));
+    }
+    private assertBinding(current: TwinIdentity): void {
+        if (current.ownerId !== this.bound.ownerId || current.twinId !== this.bound.twinId
+            || current.incarnation !== this.bound.incarnation) throw new Error('Twin binding expired');
+    }
+
     async transaction<T>(run: (tx: ISeqFileTransaction, current: TwinIdentity) => Promise<T>): Promise<T> {
         return this.fs.meta.seq!.transaction!(async tx => {
             const current = decodeIdentity(await tx.getEntry(this.file('authority'), 'twin'));
-            if (current.ownerId !== this.bound.ownerId || current.twinId !== this.bound.twinId
-                || current.incarnation !== this.bound.incarnation) throw new Error('Twin binding expired');
+            this.assertBinding(current);
             return run(tx, current);
         });
     }

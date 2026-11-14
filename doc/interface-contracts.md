@@ -24,7 +24,7 @@
 | `IFSMetaDriver` | `assets/tags/seq/refs/watcher` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/services/fs-meta-driver.ts` | `FileSystemView.meta` | `llm-session`、`mdx-adapter` |
 | `IFile` | `read()/write()`（extends `IIOStream`） | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/IFile.ts` | `FileHandle`、`MDXFileHandle` | `mdx-adapter`、`llm-session` |
 | `FileDiscoverySource` / `FileDiscoveryOptions` | `list/stat/readIgnoreFile/rootFor`；`includeIgnored/excludeDirectories/signal` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/services/file-discovery.ts` | VFS 适配器、tools Node 适配器 | `discoverFiles` → 工具搜索及 llm-ui 文件候选 |
-| `IIOStream` | `read()/write()/readStream?/close?` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/` | 文件/设备句柄 | 文件↔LLM↔TTY 互拷 |
+| `IIOStream` | `read()/write()/readStream?/ioctl?/close?` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/` | 文件/设备句柄 | 文件↔LLM↔TTY 互拷、版本化控制 |
 | `IDeviceDriver` | `open()/ioctl()/close()` | `https://github.com/nest-agentos/vfs-core/blob/main/interfaces/device/` | `LLMDeviceDriver`、TTY driver | `kernel-adapters`、`app-core` |
 
 ## LLM 契约（能力包公开入口）

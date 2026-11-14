@@ -1,0 +1,409 @@
+{
+  "recordedAt": "2026-11-14T18:33:00+08:00",
+  "status": "Working-tree storage benchmark; not a production page measurement",
+  "nodeSqlite": {
+    "scenario": "SeqFile host-storage page read; complete legacy JSON walk versus native indexed projection",
+    "dataset": {
+      "rows": 1200,
+      "coldBytesPerRow": 4096,
+      "pageSize": 20
+    },
+    "conditions": {
+      "node": "v26.12.1",
+      "cache": "Warm SQLite and OS caches; no business-result cache",
+      "timing": "Seven interleaved rounds; byte-count instrumentation disabled during timing",
+      "backgroundLoad": "No synthetic load; normal host background activity uncontrolled",
+      "scope": "Storage only, not full-page performance or RPC counts"
+    },
+    "schema": {
+      "version": 1,
+      "keyPrefix": "run:",
+      "columns": {
+        "epoch": {
+          "type": "integer",
+          "nullable": false
+        },
+        "recordId": {
+          "type": "text",
+          "nullable": false
+        },
+        "state": {
+          "type": "integer",
+          "nullable": false
+        },
+        "time": {
+          "type": "integer",
+          "nullable": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "state_epoch_time",
+          "columns": [
+            {
+              "column": "state",
+              "direction": "asc"
+            },
+            {
+              "column": "epoch",
+              "direction": "asc"
+            },
+            {
+              "column": "time",
+              "direction": "desc"
+            }
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "query": {
+      "select": [
+        "state",
+        "time"
+      ],
+      "where": {
+        "and": [
+          {
+            "column": "state",
+            "op": "eq",
+            "value": 1
+          },
+          {
+            "column": "epoch",
+            "op": "eq",
+            "value": 1
+          }
+        ]
+      },
+      "orderBy": [
+        {
+          "column": "time",
+          "direction": "desc"
+        }
+      ],
+      "limit": 20
+    },
+    "migrationMs": 95.53301700000003,
+    "databaseAllocatedBytes": {
+      "before": 5697536,
+      "after": 5955584
+    },
+    "metrics": {
+      "old": {
+        "nativeReadStatements": 3,
+        "nativeResultJsonBytes": 5133305,
+        "returnedJsonBytes": 1365,
+        "sidecarOperations": {
+          "getMetaExt": 0,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 0,
+          "getRecordFields": 2,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 1,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "rowControl": 0,
+          "clearRecordSubtree": 0,
+          "getRecordKeys": 0,
+          "transaction": 0,
+          "readTransaction": 1,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "medianMs": 14.941493999999977,
+        "samplesMs": [
+          24.386487999999986,
+          13.874854000000028,
+          14.941493999999977,
+          10.409268999999995,
+          28.636263999999983,
+          9.46243499999997,
+          18.067060000000026
+        ]
+      },
+      "current": {
+        "nativeReadStatements": 4,
+        "nativeResultJsonBytes": 1796,
+        "returnedJsonBytes": 1365,
+        "sidecarOperations": {
+          "getMetaExt": 0,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 0,
+          "getRecordFields": 2,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "rowControl": 1,
+          "clearRecordSubtree": 0,
+          "getRecordKeys": 0,
+          "transaction": 0,
+          "readTransaction": 1,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "medianMs": 0.3990739999999846,
+        "samplesMs": [
+          0.4607529999999542,
+          0.29366199999998344,
+          0.3990739999999846,
+          0.26324399999998604,
+          0.5003980000000183,
+          0.307879000000014,
+          0.4546799999999962
+        ]
+      }
+    },
+    "queryPlan": [
+      "SEARCH vfs_rows_1 USING COVERING INDEX vfs_rows_1_i0 (path=? AND c2=? AND c0=?)"
+    ],
+    "equalResults": true
+  },
+  "betterSqlite": {
+    "scenario": "SeqFile host-storage page read; complete legacy JSON walk versus native indexed projection",
+    "dataset": {
+      "rows": 1200,
+      "coldBytesPerRow": 4096,
+      "pageSize": 20
+    },
+    "conditions": {
+      "node": "v26.12.1",
+      "cache": "Warm SQLite and OS caches; no business-result cache",
+      "timing": "Seven interleaved rounds; byte-count instrumentation disabled during timing",
+      "backgroundLoad": "No synthetic load; normal host background activity uncontrolled",
+      "scope": "Storage only, not full-page performance or RPC counts"
+    },
+    "schema": {
+      "version": 1,
+      "keyPrefix": "run:",
+      "columns": {
+        "epoch": {
+          "type": "integer",
+          "nullable": false
+        },
+        "recordId": {
+          "type": "text",
+          "nullable": false
+        },
+        "state": {
+          "type": "integer",
+          "nullable": false
+        },
+        "time": {
+          "type": "integer",
+          "nullable": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "state_epoch_time",
+          "columns": [
+            {
+              "column": "state",
+              "direction": "asc"
+            },
+            {
+              "column": "epoch",
+              "direction": "asc"
+            },
+            {
+              "column": "time",
+              "direction": "desc"
+            }
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "query": {
+      "select": [
+        "state",
+        "time"
+      ],
+      "where": {
+        "and": [
+          {
+            "column": "state",
+            "op": "eq",
+            "value": 1
+          },
+          {
+            "column": "epoch",
+            "op": "eq",
+            "value": 1
+          }
+        ]
+      },
+      "orderBy": [
+        {
+          "column": "time",
+          "direction": "desc"
+        }
+      ],
+      "limit": 20
+    },
+    "migrationMs": 108.448645,
+    "databaseAllocatedBytes": {
+      "before": 5697536,
+      "after": 5955584
+    },
+    "metrics": {
+      "old": {
+        "nativeReadStatements": 3,
+        "nativeResultJsonBytes": 5133305,
+        "returnedJsonBytes": 1365,
+        "sidecarOperations": {
+          "getMetaExt": 0,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 0,
+          "getRecordFields": 2,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 1,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "rowControl": 0,
+          "clearRecordSubtree": 0,
+          "getRecordKeys": 0,
+          "transaction": 0,
+          "readTransaction": 1,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "medianMs": 14.852885000000015,
+        "samplesMs": [
+          21.68282300000004,
+          15.14476400000001,
+          39.630412000000035,
+          9.535145999999997,
+          14.615941999999961,
+          14.852885000000015,
+          9.60824500000001
+        ]
+      },
+      "current": {
+        "nativeReadStatements": 4,
+        "nativeResultJsonBytes": 1796,
+        "returnedJsonBytes": 1365,
+        "sidecarOperations": {
+          "getMetaExt": 0,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 0,
+          "getRecordFields": 2,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "rowControl": 1,
+          "clearRecordSubtree": 0,
+          "getRecordKeys": 0,
+          "transaction": 0,
+          "readTransaction": 1,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "medianMs": 0.5215380000000778,
+        "samplesMs": [
+          0.5964220000000182,
+          0.3264949999999658,
+          0.5378289999999879,
+          0.31181699999996226,
+          0.6844199999999319,
+          0.3267759999999953,
+          0.5215380000000778
+        ]
+      }
+    },
+    "queryPlan": [
+      "SEARCH vfs_rows_1 USING COVERING INDEX vfs_rows_1_i0 (path=? AND c2=? AND c0=?)"
+    ],
+    "equalResults": true
+  },
+  "limitations": [
+    "SQL read-result byte counts are serialized query results, not physical disk IO",
+    "Native read statements increase from 3 to 4 because schema lookup is required; logical sidecar operations stay equal",
+    "Raw source strings remain stored; hot columns and indexes add space",
+    "Existing business read paths have not been migrated automatically",
+    "One fixed data shape, seven interleaved timing rounds, uncontrolled ordinary host background load"
+  ],
+  "verification": {
+    "core": 237,
+    "localDriver": 68,
+    "indexedDbDriver": 24,
+    "relatedApplication": 266,
+    "authenticatedRpc": 37,
+    "nodeSqliteAndCapability": 3,
+    "performance": {
+      "core": 60,
+      "transport": 31,
+      "ui": 67,
+      "cleanup": "confirmed"
+    },
+    "workspaceTypecheck": "passed",
+    "moduleBoundaries": "passed",
+    "docs": "passed",
+    "exactBatchSidecar": {
+      "readSnapshots": {
+        "before": 2,
+        "after": 1
+      },
+      "getRecordFieldsIncludingRecovery": {
+        "before": 5,
+        "after": 3
+      },
+      "metadataReadsAfter": 0
+    }
+  }
+}

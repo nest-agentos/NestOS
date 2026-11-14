@@ -1,3 +1,4 @@
+import {seqKeys} from '@nestos/vfs-core/seq';
 import type { IFileSystem } from '@nestos/vfs-core';
 import type { Tag } from '@nestos/app-contracts/settings';
 
@@ -12,15 +13,15 @@ export class LabelStore {
     async list(): Promise<Tag[]> {
         if (!await this.files.driver.exists(TAG_STORE_PATH)) return this.legacy();
         const seq = this.files.meta.seq;
-        if (!seq?.transaction) throw new Error('Tag definitions require transactional SeqFiles');
-        const tags = await seq.transaction(async tx => {
+        if (!seq?.readTransaction) throw new Error('Tag definitions require read-only SeqFile snapshots');
+        const tags = await seq.readTransaction(async tx => {
             const version = await tx.getEntry(TAG_STORE_PATH, 'schema');
             if (version === null) return null;
             if (version !== SCHEMA_VERSION) throw new Error('Unsupported tag catalog version');
             const result: Tag[] = [];
             await tx.walkEntries(TAG_STORE_PATH, entry => { result.push(JSON.parse(entry.value)); return true; }, { keyPrefix: PREFIX });
             return result;
-        });
+        },TAG_STORE_PATH);
         return tags ?? this.legacy();
     }
 
@@ -56,12 +57,7 @@ export class LabelStore {
         const seq = this.files.meta.seq;
         if (!seq?.transaction) throw new Error('Tag definitions require transactional SeqFiles');
         await seq.transaction(async tx => {
-            const existing: string[] = [];
-            await tx.walkEntries(TAG_STORE_PATH, entry => {
-                if (entry.key.startsWith(PREFIX)) existing.push(entry.key);
-                return true;
-            }, { keyPrefix: PREFIX });
-            for (const key of existing) await tx.deleteEntry(TAG_STORE_PATH, key);
+            for await (const key of seqKeys(tx,TAG_STORE_PATH,PREFIX)) await tx.deleteEntry(TAG_STORE_PATH,key);
             for (const tag of tags) {
                 await tx.setEntry(TAG_STORE_PATH, PREFIX + tag.id, JSON.stringify(definition(tag)));
             }

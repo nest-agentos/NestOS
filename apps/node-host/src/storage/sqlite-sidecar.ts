@@ -3,6 +3,9 @@ import {storageStartupError} from './startup-error';
 import { RECORD_FIELD_RANGE,recordPrefixBounds,RECORD_PAGE_SQL, recordPageValues, decodeRecordPage, type RecordPageRow } from '@nestos/vfsdriver-local';
 import type { ISidecarDb, MetaExtRow } from '@nestos/vfsdriver-local';
 import { DDL, SCHEMA_VERSION, PATH_DATA_EXISTS, movePathStatements } from '@nestos/vfsdriver-local';
+import {structuredRowControl,structuredRowError,clearStructuredRecords} from '@nestos/vfsdriver-local';
+import {ordinaryRecordField} from '@nestos/vfs-core/seq/driver';
+import {recordKeysQuery} from '@nestos/vfsdriver-local';
 
 interface StatementSync {
     get(...values: unknown[]): unknown;
@@ -11,6 +14,7 @@ interface StatementSync {
 }
 
 interface DatabaseSync {
+    readonly isTransaction?: boolean;
     exec(sql: string): void;
     prepare(sql: string): StatementSync;
     close(): void;
@@ -19,6 +23,13 @@ interface DatabaseSync {
 type DatabaseSyncConstructor = new (path: string) => DatabaseSync;
 
 export class NodeSqliteSidecarDb implements ISidecarDb {
+    async getRecordKeys(path: string, options: import('@nestos/vfs-core/protocol').RecordKeysOptions): Promise<string[]> {
+        const query = recordKeysQuery(path,options);
+        return (this.prepare(query.sql).all(...query.values) as Array<{field:string}>).map(row => row.field);
+    }
+    async rowControl(path: string, command: import('@nestos/vfs-core/seq').SeqRowCommand, input?: unknown): Promise<unknown> {
+        return structuredRowControl(this.db,path,command,input);
+    }
     private readonly statements = new Map<string, StatementSync>();
     private constructor(private readonly db: DatabaseSync) {}
 
@@ -135,10 +146,11 @@ export class NodeSqliteSidecarDb implements ISidecarDb {
     }
 
     async setRecordField(itemPath: string, field: string, value: unknown): Promise<void> {
-        this.prepare(`
+        ordinaryRecordField(field);
+        try {this.prepare(`
             INSERT INTO records(path, field, value) VALUES (?, ?, ?)
             ON CONFLICT(path, field) DO UPDATE SET value = excluded.value
-        `).run(itemPath, field, JSON.stringify(value));
+        `).run(itemPath, field, JSON.stringify(value));} catch (error) {throw structuredRowError(error);}
     }
 
     async deleteRecordField(itemPath: string, field: string): Promise<void> {
@@ -160,8 +172,9 @@ export class NodeSqliteSidecarDb implements ISidecarDb {
     }
 
     async clearRecordFields(itemPath: string): Promise<void> {
-        this.prepare('DELETE FROM records WHERE path = ?').run(itemPath);
+        clearStructuredRecords(this.db,itemPath);
     }
+    async clearRecordSubtree(itemPath: string): Promise<void> {clearStructuredRecords(this.db,itemPath,true);}
 
     async readTransaction<T>(operation: (db: ISidecarDb) => Promise<T>): Promise<T> {
         this.db.exec('BEGIN');

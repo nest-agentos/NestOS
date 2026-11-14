@@ -1,6 +1,6 @@
 import { randomUUID } from '@nestos/common';
 import { sha256HexSync } from '@nestos/llm-context';
-import type { IFileSystem, ISeqFileTransaction } from '@nestos/vfs-core';
+import type { IFileSystem, ISeqFileTransaction, ISeqFileReadTransaction } from '@nestos/vfs-core';
 import { decodeCleanup, decodeRecord, epoch, identity, payload, recordKey, recordRef, refs, MAX_FORGET_RECORDS } from './codec';
 import type { TwinCleanup, TwinCommit, TwinCommitReceipt, TwinForget, TwinRecord, TwinRecordFamily, TwinRecordRef,
     TwinRecordWrite, TwinStore } from './contracts';
@@ -25,13 +25,16 @@ export class SeqTwinStore implements TwinStore {
         return new SeqTwinStore(await TwinSeqStorage.open(fs, twinId, ownerId, progress));
     }
 
-    async inspect() { return this.storage.transaction(async (_tx, current) => current); }
+    async inspect() { return this.storage.read(async (_tx, current) => current); }
 
     async read(ref: TwinRecordRef): Promise<TwinRecord | null> {
         ref = structuredClone(ref); recordRef(ref);
-        return this.storage.transaction(async tx => {
-            if (await tx.getEntry(this.storage.file('authority'), `forgotten/${recordKey(ref)}`)) return null;
-            const revision = await tx.getEntry(this.storage.file('knowledge'), `head/${recordKey(ref)}`);
+        return this.storage.read(async tx => {
+            const [forgotten,revision] = await tx.getEntriesMany([
+                {fileIdOrPath:this.storage.file('authority'),key:`forgotten/${recordKey(ref)}`},
+                {fileIdOrPath:this.storage.file('knowledge'),key:`head/${recordKey(ref)}`},
+            ]);
+            if (forgotten) return null;
             if (!revision) return null;
             const record = decodeRecord(await tx.getEntry(this.storage.file('knowledge'), versionKey(ref, revision)), ref);
             if (!record || record.revision !== revision) throw new Error('Twin version missing or inconsistent');
@@ -41,7 +44,7 @@ export class SeqTwinStore implements TwinStore {
 
     async count(family: TwinRecordFamily): Promise<number> {
         recordRef({family, id: 'validate'});
-        return this.storage.transaction(tx => this.pages.count(tx, family));
+        return this.storage.read(tx => this.pages.count(tx, family));
     }
     async list(family: TwinRecordFamily, options: { offset?: number; limit?: number; reverse?: boolean } = {}): Promise<TwinRecord[]> {
         recordRef({ family, id: 'validate' });
@@ -49,18 +52,27 @@ export class SeqTwinStore implements TwinStore {
         if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
             throw new Error('Invalid Twin page');
         }
-        return this.storage.transaction(async tx => {
-            const ids = await this.pages.list(tx, family, offset, limit, options.reverse), result: TwinRecord[] = [];
-            for (const id of ids) {
-                const ref = { family, id };
-                if (await tx.getEntry(this.storage.file('authority'), `forgotten/${recordKey(ref)}`)) continue;
-                const revision = await tx.getEntry(this.storage.file('knowledge'), `head/${recordKey(ref)}`);
-                if (!revision) throw new Error('Twin index has no head');
-                const record = decodeRecord(await tx.getEntry(this.storage.file('knowledge'), versionKey(ref, revision)), ref);
-                if (!record || record.revision !== revision) throw new Error('Twin index version inconsistent');
-                result.push(record);
-            }
-            return result;
+        return this.storage.read(async tx => {
+            const refs = (await this.pages.list(tx,family,offset,limit,options.reverse)).map(id => ({family,id}));
+            return this.readListed(tx,refs);
+        });
+    }
+
+    private async readListed(tx: ISeqFileReadTransaction, refs: TwinRecordRef[]): Promise<TwinRecord[]> {
+        const headers = await tx.getEntriesMany(refs.flatMap(ref => [
+            {fileIdOrPath:this.storage.file('authority'),key:`forgotten/${recordKey(ref)}`},
+            {fileIdOrPath:this.storage.file('knowledge'),key:`head/${recordKey(ref)}`},
+        ]));
+        const selected = refs.flatMap((ref,index) => {
+            if (headers[index*2]) return [];
+            const revision = headers[index*2+1]; if (!revision) throw new Error('Twin index has no head');
+            return [{ref,revision}];
+        });
+        const bodies = await tx.getEntriesMany(selected.map(({ref,revision}) => ({fileIdOrPath:this.storage.file('knowledge'),key:versionKey(ref,revision)})));
+        return selected.map(({ref,revision},index) => {
+            const record = decodeRecord(bodies[index],ref);
+            if (!record || record.revision !== revision) throw new Error('Twin index version inconsistent');
+            return record;
         });
     }
 

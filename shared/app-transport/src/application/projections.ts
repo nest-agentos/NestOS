@@ -21,7 +21,13 @@ export function installViewProjections(kind: string, proxy: any): void {
         const read = proxy.getSessionBaseline;
         proxy.getSessionBaseline = () => {const baseline = read(); return {...baseline, snapshot: readSessionHistory(baseline.snapshot)};};
     }
-    if (kind === 'IFileSystem' || kind === 'FileSystemView') proxy.openFile = (path: string) => createFile(proxy, path);
+    if (kind === 'IFileSystem' || kind === 'FileSystemView') {
+        proxy.openFile = (path: string) => createFile(proxy,path);
+        // Structured controls are host-only until the application protocol exposes them.
+        proxy.capabilities = {...proxy.capabilities,structuredSeqFiles:false,seqKeyPages:false};
+        const capabilitiesAt = proxy.capabilitiesAt;
+            proxy.capabilitiesAt = async (...args: unknown[]) => ({...await capabilitiesAt(...args),structuredSeqFiles:false,seqKeyPages:false});
+    }
     if (kind === 'IAgentManagementService' || kind === 'IConnectionService') {
         proxy.findAgent = (id: string) => proxy.listAgents?.().find((item: any) => item.id === id);
         proxy.findConnection = (id: string) => proxy.listConnections().find((item: any) => item.id === id);

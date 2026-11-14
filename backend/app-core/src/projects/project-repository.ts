@@ -1,3 +1,4 @@
+import {seqKeys} from '@nestos/vfs-core/seq';
 import {createModuleLogger, randomUUID} from '@nestos/common';
 import {allocateProjectId} from './project-id';
 import { moveSessionDataDirectory } from '@nestos/llm-session';
@@ -92,7 +93,7 @@ export class ProjectRepository {
     }
     async candidateId(name: string, requested?: string): Promise<string> {
         const path = await this.identityRegistry(), used = (await this.list()).map(project => project.id);
-        await this.root.meta.seq!.walkEntries(path, entry => {used.push(entry.key); return true;});
+        for await (const key of seqKeys(this.root.meta.seq!,path)) used.push(key);
         return allocateProjectId(name, used, requested);
     }
     private async identityRegistry(): Promise<string> {
@@ -107,7 +108,7 @@ export class ProjectRepository {
         const path = await this.identityRegistry(), projects = await this.list();
         return this.root.meta.seq!.transaction!(async tx => {
             const used = projects.map(p => p.id);
-            await tx.walkEntries(path, entry => {used.push(entry.key); return true;});
+            for await (const key of seqKeys(tx,path)) used.push(key);
             const id = allocateProjectId(name, used, requested);
             await tx.setEntry(path, id.toLowerCase(), id);
             return id;

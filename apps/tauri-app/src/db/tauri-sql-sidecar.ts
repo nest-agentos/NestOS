@@ -1,4 +1,4 @@
-import { RECORD_PAGE_SQL, recordPageValues, decodeRecordPage, type RecordPageRow } from '@nestos/vfsdriver-local';
+import { RECORD_PAGE_SQL, recordPageValues, decodeRecordPage, recordKeysQuery, RECORD_FIELD_RANGE, recordPrefixBounds, type RecordPageRow } from '@nestos/vfsdriver-local';
 /**
  * @file apps/tauri-app/src/db/tauri-sql-sidecar.ts
  *
@@ -87,6 +87,10 @@ const DDL_STATEMENTS = [
 const SCHEMA_OBJECTS = ['_schema_version', 'meta_ext', 'meta_tags', 'records', 'idx_meta_tags_tag', 'idx_records_path'];
 
 export class TauriSqlSidecarDb implements ISidecarDb {
+    async getRecordKeys(path: string, options: import('@nestos/vfs-core').RecordKeysOptions): Promise<string[]> {
+        const query = recordKeysQuery(path,options);
+        return (await this.db.select<Array<{field:string}>>(query.sql,query.values)).map(row => row.field);
+    }
     private constructor(private readonly db: SidecarConnection, private readonly databaseUrl?: string, private readonly scope?: number) {}
 
     // ── Factory ────────────────────────────────────────────────────────────────
@@ -275,8 +279,8 @@ export class TauriSqlSidecarDb implements ISidecarDb {
     async listRecordFields(path: string, prefix = ''): Promise<Array<{ field: string; value: unknown }>> {
         const rows = await this.db.select<Array<{ field: string; value: string }>>(
             `SELECT field, value FROM records
-             WHERE path = ? AND field LIKE ? ESCAPE '\\' ORDER BY field`,
-            [path, `${escapeLike(prefix)}%`],
+             WHERE path = ? AND ${RECORD_FIELD_RANGE} ORDER BY field`,
+            [path,...recordPrefixBounds(prefix)],
         );
         return rows.map(row => ({ field: row.field, value: JSON.parse(row.value) }));
     }
@@ -355,8 +359,4 @@ export class TauriSqlSidecarDb implements ISidecarDb {
         if (!this.databaseUrl) throw new Error('Cannot close an unidentified sidecar database');
         await this.db.close();
     }
-}
-
-function escapeLike(value: string): string {
-    return value.replace(/[\\%_]/g, match => `\\${match}`);
 }

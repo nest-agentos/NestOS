@@ -1,4 +1,4 @@
-import type { ISeqFileTransaction } from '@nestos/vfs-core';
+import type { ISeqFileTransaction, ISeqFileReadTransaction } from '@nestos/vfs-core';
 import type { TwinRecordFamily, TwinRecordRef } from './contracts';
 import { recordKey } from './codec';
 
@@ -30,10 +30,10 @@ export class TwinSeqPages {
         await tx.deleteEntry(this.path, `page/${ref.family}/${page}/${String(ordinal).padStart(16, '0')}`);
         await tx.deleteEntry(this.path, key); await this.save(tx, ref.family, directory);
     }
-    async count(tx: ISeqFileTransaction, family: TwinRecordFamily): Promise<number> {
+    async count(tx: ISeqFileReadTransaction, family: TwinRecordFamily): Promise<number> {
         return Object.values((await this.directory(tx, family)).counts).reduce((sum, count) => sum + count, 0);
     }
-    async list(tx: ISeqFileTransaction, family: TwinRecordFamily, offset: number, limit: number, reverse = false): Promise<string[]> {
+    async list(tx: ISeqFileReadTransaction, family: TwinRecordFamily, offset: number, limit: number, reverse = false): Promise<string[]> {
         if (reverse) {
             const total = await this.count(tx, family), length = Math.min(limit, Math.max(0, total - offset));
             return length ? (await this.list(tx, family, total - offset - length, length)).reverse() : [];
@@ -51,7 +51,7 @@ export class TwinSeqPages {
         }
         return ids;
     }
-    private async directory(tx: ISeqFileTransaction, family: TwinRecordFamily): Promise<Directory> {
+    private async directory(tx: ISeqFileReadTransaction, family: TwinRecordFamily): Promise<Directory> {
         const raw = await tx.getEntry(this.path, `directory/${family}`);
         if (!raw) return { next: 0, counts: {} };
         const value = JSON.parse(raw) as Directory;

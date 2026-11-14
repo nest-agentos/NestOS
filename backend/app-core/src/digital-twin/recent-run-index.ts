@@ -1,3 +1,4 @@
+import {seqKeys} from '@nestos/vfs-core/seq';
 import {randomUUID} from '@nestos/common';
 import type {ISeqFileTransaction} from '@nestos/vfs-core';
 import type {TwinRecord} from './contracts';
@@ -34,9 +35,7 @@ export class RecentRunIndex {
             selected.push(summarize(row)); selected.sort((a, b) => Number(b.payload.createdAt) - Number(a.payload.createdAt));
             groups.set(group, selected.slice(0, 5));
         }
-        const stale: string[] = [];
-        await tx.walkEntries(this.indexPath, row => {stale.push(row.key); return true;}, {keyPrefix: 'recent-runs/plan/'});
-        for (const name of stale) await tx.deleteEntry(this.indexPath, name);
+        for await (const name of seqKeys(tx,this.indexPath,'recent-runs/plan/')) await tx.deleteEntry(this.indexPath,name);
         for (const [id, rows] of groups) await tx.setEntry(this.indexPath, key(id), JSON.stringify(rows));
         await tx.setEntry(this.indexPath, 'recent-runs/groups', JSON.stringify([...groups.keys()]));
         await tx.setEntry(this.indexPath, ready, '1');
