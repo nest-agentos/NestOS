@@ -267,3 +267,10 @@ it('rereads failed Session observations after HTTP reconnect and removes its rec
  await f.workbench.destroy();const closed=read.mock.calls.length;window.dispatchEvent(new Event('nestos:http-reconnected'));
  await Promise.resolve();expect(read.mock.calls.length).toBe(closed);
 });
+it('keeps another board event from refreshing the current body and still reloads it for its own board',async()=>{
+ const f=await fixture('/board/b');await idle(f.active);f.queries.mockClear();
+ f.workbench.invalidateFromEvents({resourceId:'kanban:'+JSON.stringify(['test:personal','other',null])} as never);
+ await Promise.resolve();await Promise.resolve();expect(f.queries).not.toHaveBeenCalled();
+ f.workbench.invalidateFromEvents({resourceId:'kanban:'+JSON.stringify(['test:personal','b',null])} as never);
+ await vi.waitFor(()=>expect(f.queries).toHaveBeenCalledOnce());
+});

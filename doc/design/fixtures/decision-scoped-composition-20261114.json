@@ -1,0 +1,163 @@
+{
+  "date": "2026-11-14",
+  "sourceCommit": "8e215cf2",
+  "version": "20261114T065924-8e215cf2-dirty",
+  "dataScale": {
+    "decisionRows": 11
+  },
+  "contract": {
+    "initialSections": [
+      "page",
+      "catalog",
+      "projects"
+    ],
+    "pollSections": [
+      "page"
+    ],
+    "conditions": [
+      "resource",
+      "cursor",
+      "sort",
+      "attentionOnly",
+      "archived",
+      "locale"
+    ],
+    "crossRequestBusinessCache": false
+  },
+  "controlledMobile": {
+    "viewport": "390x844",
+    "freshBrowser": true,
+    "network": {
+      "latencyMs": 100,
+      "downloadBytesPerSecond": 200000,
+      "uploadBytesPerSecond": 100000
+    },
+    "cpuSlowdown": 4,
+    "background": "normal daemon background load",
+    "baseline": {
+      "durationMs": [
+        4900.944592,
+        4904.213983,
+        4912.034527
+      ],
+      "logicalCalls": 15,
+      "httpRequests": 14
+    },
+    "runs": [
+      {
+        "condition": "fresh browser and first user access after daemon restart",
+        "durationMs": 5170.561111,
+        "httpRequests": 12,
+        "logicalCalls": 12,
+        "methods": {
+          "eventBaseline": 1,
+          "readUiDocuments": 1,
+          "decisionSnapshot": 1,
+          "subscribe": 1,
+          "onChanged": 1,
+          "readEvents": 1,
+          "onChange": 2,
+          "assistantOverview": 1
+        },
+        "cleanup": "succeeded",
+        "errors": []
+      },
+      {
+        "condition": "fresh browser and warm host",
+        "durationMs": 4869.0698059999995,
+        "httpRequests": 12,
+        "logicalCalls": 12,
+        "methods": {
+          "eventBaseline": 1,
+          "readUiDocuments": 1,
+          "decisionSnapshot": 1,
+          "subscribe": 1,
+          "onChanged": 1,
+          "readEvents": 1,
+          "onChange": 2,
+          "assistantOverview": 1
+        },
+        "cleanup": "succeeded",
+        "errors": []
+      },
+      {
+        "condition": "fresh browser and warm host",
+        "durationMs": 4835.218537000001,
+        "httpRequests": 12,
+        "logicalCalls": 12,
+        "methods": {
+          "eventBaseline": 1,
+          "readUiDocuments": 1,
+          "decisionSnapshot": 1,
+          "subscribe": 1,
+          "onChanged": 1,
+          "readEvents": 1,
+          "onChange": 2,
+          "assistantOverview": 1
+        },
+        "cleanup": "succeeded",
+        "errors": []
+      }
+    ],
+    "layout": {
+      "viewport": 390,
+      "documentWidth": 390,
+      "tableWidth": 368,
+      "statusBounds": {
+        "left": 23,
+        "right": 367
+      },
+      "sessionBounds": {
+        "left": 23,
+        "right": 367
+      }
+    },
+    "allColdRunsUnderFiveSeconds": false
+  },
+  "publicDevelopmentMachineProbe": {
+    "origin": "https://176.122.169.169:2000",
+    "durationMs": 8783.379281,
+    "logicalCalls": 9,
+    "httpRequests": 9,
+    "methods": [
+      "eventBaseline",
+      "readUiDocuments",
+      "decisionSnapshot",
+      "subscribe",
+      "onChanged",
+      "readEvents",
+      "assistantOverview"
+    ],
+    "errors": []
+  },
+  "publicLimit": "Development machine route; does not reproduce the phone network. Still exceeds the 5 second gate.",
+  "twentySecondBackground": {
+    "initialLogical": 11,
+    "totalLogical": 16,
+    "laterMethods": {
+      "decisionSnapshot": 1,
+      "readEvents": 2,
+      "assistantOverview": 2
+    },
+    "catalogOrProjectsReread": false
+  },
+  "checks": {
+    "kanbanDomain": 322,
+    "publicRuntimeAndSnapshot": 20,
+    "kanbanUI": 207,
+    "shellTargeted": 61,
+    "boardEventScope": 17,
+    "httpBodyAndAuthorization": 32,
+    "rpcConcurrency": 27,
+    "performance": 66,
+    "workspaceTypecheck": "passed",
+    "moduleBoundaries": "passed",
+    "docs": "passed",
+    "styles": "passed",
+    "temporaryScopes": "succeeded"
+  },
+  "remaining": [
+    "First access after daemon restart measured 5171ms; warm-host controlled runs passed.",
+    "Public route measured 8783ms and has not passed full page performance acceptance."
+  ]
+}
