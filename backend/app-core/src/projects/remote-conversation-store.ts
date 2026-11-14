@@ -11,7 +11,10 @@ export class RemoteConversationStore {
     private uncertainWrite?: {before: string | null; after: string};
     private conflicted = false;
     private writes: Promise<void> = Promise.resolve();
-    constructor(private readonly fs: IFileSystem, private readonly key: string,private readonly remote?:ClientStatePort) {}
+    private boundSessionId?: string;
+    constructor(private readonly fs: IFileSystem, private readonly key: string,private readonly remote?:ClientStatePort,
+        private readonly bindIdentity?: (sessionId: string) => Promise<void>) {}
+    get usesNodeQueue(): boolean { return !!this.remote?.queueSession; }
     private readonly path = remoteConversationRecoveryPath;
     load(): Promise<RemoteConversationRecovery | undefined> {
         return this.serialize(() => this.read());
@@ -60,7 +63,7 @@ export class RemoteConversationStore {
     }
     private async write(record: RemoteConversationRecovery): Promise<void> {
         await this.reconcileWrite();
-        if(this.record.instructionQueue?.owner!=='cells')this.checkQueueRevision(record);
+        if(!this.usesNodeQueue)this.checkQueueRevision(record);
         validateSubmissions(record);
         if (record.deletedSessionIds !== undefined && (!Array.isArray(record.deletedSessionIds) || record.deletedSessionIds.length > 16401
             || record.deletedSessionIds.some(id => typeof id !== 'string' || !id))) throw new FSError('EINVAL', 'Invalid native deletion recovery');
@@ -69,7 +72,13 @@ export class RemoteConversationStore {
             try { await this.fs.driver.createFile({parentPath: '/etc/fs', name: 'harness-conversations.seq', type: 'seqfile', recursive: true}); }
             catch (error) { if ((error as {code?: string}).code !== 'EEXIST') throw error; }
         }
-        const remoteRecord=this.remote?.queueSession && this.record.instructionQueue?.owner==='cells'?Object.fromEntries(Object.entries(record).filter(([key])=>key!=='instructionQueue')):record;
+        // Queue snapshots are read models. Node commands are the only queue write port.
+        const {instructionQueue, ...metadata} = record;
+        if (this.usesNodeQueue && !record.sessionId && instructionQueue?.items.length) {
+            const error = new FSError('ECONFLICT', 'A native queue requires a persisted session binding');
+            this.log('queue-binding', Date.now(), record, error); throw error;
+        }
+        const remoteRecord=this.usesNodeQueue?metadata:record;
         const value = JSON.stringify(remoteRecord);
         if(this.remote)return this.writeRemote(record,value);
         const before = this.raw, started = Date.now();
@@ -97,6 +106,7 @@ export class RemoteConversationStore {
             await this.fs.meta.seq!.transaction!(tx=>tx.compareAndSet(this.path,this.key,{expected:legacy,value:JSON.stringify(remoteIndex(value))}));
         }
         this.raw=raw;this.record=raw?JSON.parse(raw):{};validateSubmissions(this.record);
+        await this.bindSession();
         if(this.record.sessionId && await this.remote!.registerSession?.(this.record.sessionId)){
             raw=await this.remote!.read('recovery');this.raw=raw;this.record=raw?JSON.parse(raw):{};validateSubmissions(this.record);}
         if(this.record.sessionId && this.remote!.queueSession)this.record.instructionQueue=await this.remote!.queueSession(this.record.sessionId,{action:'read'});
@@ -113,12 +123,20 @@ export class RemoteConversationStore {
         try{if(!await this.remote!.compare('recovery',before,value))throw new FSError('ECONFLICT','Remote conversation changed on its harness node');}
         catch(error){this.uncertainWrite={before,after:value};this.log('remote-persist',started,record,error);throw error;}
         this.raw=value;this.replaceRecord(record);
+        await this.bindSession();
         if(record.sessionId && await this.remote!.registerSession?.(record.sessionId)){
             const current=await this.remote!.read('recovery');this.raw=current;this.record=current?JSON.parse(current):{};
             if(this.remote!.queueSession)this.record.instructionQueue=await this.remote!.queueSession(record.sessionId,{action:'read'});}
         try{await this.fs.meta.seq!.transaction!(tx=>tx.compareAndSet(this.path,this.key,{expected:pending,value:JSON.stringify(remoteIndex(this.record))}));}
         catch(error){this.log('recovery-index',started,record,error);}
         this.log('remote-persist',started,record);
+    }
+    private async bindSession(): Promise<void> {
+        const sessionId = this.record.sessionId;
+        if (!this.bindIdentity || !sessionId || this.boundSessionId === sessionId) return;
+        const started = Date.now();
+        try {await this.bindIdentity(sessionId); this.boundSessionId = sessionId; this.log('session-bind', started, this.record);}
+        catch (error) {this.log('session-bind', started, this.record, error); throw error;}
     }
     private checkQueueRevision(record: RemoteConversationRecovery): void {
         const before = this.record.instructionQueue, after = record.instructionQueue;
@@ -156,7 +174,7 @@ export class RemoteConversationStore {
         const code = typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'JOURNAL_WRITE_UNCONFIRMED';
         const remote = (error as {remoteCode?: unknown})?.remoteCode;
         const remoteCode = typeof remote === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(remote) ? remote : undefined;
-        const fields = {operation: 'harness.journal', stage, result: error ? 'unconfirmed' : 'confirmed',
+        const fields = {operation: 'harness.journal', stage, result: error ? 'unconfirmed' : 'confirmed', sessionId: record.sessionId,
             operationId: record.pending?.requestId ?? record.controls?.at(-1)?.requestId ?? record.submission?.id,
             durationMs: Date.now() - started, code: error ? code : undefined, remoteCode};
         if (error) console.warn('[Harness] Recovery write', fields); else console.info('[Harness] Recovery write', fields);

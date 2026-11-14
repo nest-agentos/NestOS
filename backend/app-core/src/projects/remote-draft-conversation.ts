@@ -5,7 +5,8 @@ import {FSError} from '@nestos/vfs-core';
 import {diagnosticFailure} from '../diagnostics/failure';
 import {reportRemoteFailure} from './remote-diagnostics';
 
-export function remoteConversationJournal(recovery: RemoteConversationStore, epoch: string, draft: boolean, checkAccess = () => {}, sessionId?: string): HarnessConversationJournal {
+export function remoteConversationJournal(recovery: RemoteConversationStore, epoch: string, draft: boolean, checkAccess = () => {}, sessionId?: string, prepareSubmission?: () => Promise<void>): HarnessConversationJournal {
+    let prepared = false;
     return {epoch, instructions:{
         enqueue:item=>recovery.queueSession({action:'enqueue',item,input:JSON.stringify([item.text,item.attachments,item.selection??null,item.commandKind??null,...(item.allowSteer?[true]:[])])}),
         edit:(edit,binding)=>recovery.queueSession({action:'edit',edit:{...edit,...(binding?{commandBinding:binding}:{})}}),
@@ -19,9 +20,13 @@ export function remoteConversationJournal(recovery: RemoteConversationStore, epo
             catch (error) {console.warn('[Harness] Session binding', {operation: 'harness.journal', stage: 'session-bind', result: 'failure', sessionId, ...diagnosticFailure(error), durationMs: Date.now() - started}); throw error;}
             console.info('[Harness] Session binding', {operation: 'harness.journal', stage: 'session-bind', result: 'success', sessionId, durationMs: Date.now() - started});
         }
-        if (draft && record?.submittedTurnId && !hasRecoveryWork(record)) { await recovery.save({}); return undefined; }
+        if (draft && !recovery.usesNodeQueue && record?.submittedTurnId && !hasRecoveryWork(record)) { await recovery.save({}); return undefined; }
         return record;
-    }, save: record => {checkAccess(); return recovery.save({...record, submittedTurnId: record.submittedTurnId ?? recovery.submittedTurnId});}};
+    }, save: async record => {
+        checkAccess();
+        if (record.pending && prepareSubmission && !prepared) {await prepareSubmission(); prepared = true;}
+        return recovery.save({...record, submittedTurnId: record.submittedTurnId ?? recovery.submittedTurnId});
+    }};
 }
 
 function hasRecoveryWork(record: import('@nestos/cells-driver').HarnessRecovery): boolean {

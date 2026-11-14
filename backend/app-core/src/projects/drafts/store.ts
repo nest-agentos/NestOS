@@ -1,6 +1,6 @@
 import {moveProjectDraft} from './move';
 import { emptyDraft, decodeDraftRecord } from './record-codec';
-import { randomUUID } from '@nestos/common';
+import { randomUUID, sha256HexSync } from '@nestos/common';
 import {nativeIdentityKey} from './remote-identity';
 import { FSError, type IFileSystem } from '@nestos/vfs-core';
 
@@ -107,7 +107,8 @@ export class ProjectDraftStore {
                     return current;
                 }
                 const next: ProjectDraftRecord = {...current, state: 'submitting', sessionId: current.id,
-                    submissionId: randomUUID(), title, ...(harnessConnectionId ? {harnessConnectionId} : {}), ...(remoteTarget ? {remoteTarget} : {})};
+                    submissionId: randomUUID(), submissionDraftHash: sha256HexSync(current.data), title,
+                    ...(harnessConnectionId ? {harnessConnectionId} : {}), ...(remoteTarget ? {remoteTarget} : {})};
                 if (!await tx.compareAndSet(this.path, 'draft', {expected: raw, value: JSON.stringify(next)})) throw conflict();
                 return next;
             });
@@ -121,6 +122,8 @@ export class ProjectDraftStore {
             const old = this.record;
             if (!remote && (!old.sessionId || !old.submissionId || old.state !== 'submitting')) return;
             const next = emptyDraft();
+            const edited = !!old.submissionDraftHash && old.submissionDraftHash !== sha256HexSync(old.data);
+            if (edited) {next.data = old.data; next.attachmentScopeId = old.attachmentScopeId ?? old.id;}
             const event: ProjectDraftPromotion = { type: 'project.draftPromoted', projectId: this.projectId,
                 draftId: old.id, sessionId: old.sessionId ?? old.id, submissionId: old.submissionId ?? remote!.turnId, nextDraftId: next.id, state: 'promoted',
                 ...(remote ? {remote} : {}) };
@@ -131,7 +134,7 @@ export class ProjectDraftStore {
                 if (remote) await tx.setEntry(this.path, nativeIdentityKey(remote), old.id);
                 return event;
             });
-            if (promoted) await this.removeAttachments(old.attachmentScopeId ?? old.id);
+            if (promoted && !edited) await this.removeAttachments(old.attachmentScopeId ?? old.id);
             return promoted;
         });
     }

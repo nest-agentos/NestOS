@@ -9,6 +9,7 @@ export interface ProjectDraftRecord {
     attachmentScopeId?: string;
     harnessConnectionId?: string;
     remoteTarget?: RemoteDraftTarget;
+    submissionDraftHash?: string;
 }
 /** Transaction adapter used by project policy; no VFS types cross this port. */
 export interface DraftStore {

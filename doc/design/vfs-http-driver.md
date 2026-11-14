@@ -103,7 +103,7 @@ endpoint 只能由用户/可信宿主配置，不接受 Agent 指定的任意服
 
 - v1 只操作能无损表示为 UTF-8 的宿主名称。不做有损 OsStr 转换；列表以独立 warnings 汇报不可表示/不支持条目的计数，不为其制造可寻址的替代名称。完整遍历调用者必须获知存在被排除的条目。
 - 客户端和 VFS 不执行 Unicode NFC/NFD 归一化，不自行改大小写；服务器也不通过字符串改写伪造底层名称。
-- VFS 挂载名、alias 和虚拟路由按大小写敏感匹配。进入来源后遵守其真实名称等价关系，不能承诺大小写不敏感磁盘能区分 a 与 A。导出须声明 nameSemantics；无法可靠支持其路径等价规则时，不启用强版本写入。v1 取值表只有 `source`（该导出为独占可写，版本键遵从来源自身的名称等价规则）；缺失或未列入的取值一律不启用强条件写入，导出按只读处理，新增语义须先补入取值表。
+- VFS 挂载名、alias 和虚拟路由按大小写敏感匹配。进入来源后遵守其真实名称等价关系，不能承诺大小写不敏感磁盘能区分 a 与 A。导出须声明 nameSemantics；无法可靠支持其路径等价规则时，不启用强版本写入。v1 取值表只有 `source`（该导出支持条件写入，版本键遵从来源自身的名称等价规则）；缺失或未列入的取值一律不启用强条件写入，导出按只读处理，新增语义须先补入取值表。
 - 来源的缓存键、revision 键和挂载名称冲突检查必须使用一致的物理条目身份/名称等价规则。大小写不敏感来源不能对同一物理文件分配两个互不相关的版本状态。非 UTF-8 排除、名称归一化和大小写均纳入平台验收。
 
 ## 5. vfs-core 后端接口收敛
@@ -318,19 +318,17 @@ If-Match 使用强比较，If-Range 不匹配会忽略 Range；以上行为依�
 
 ## 8. 写入与外部修改的一致性
 
-可写版本使用同目录临时文件接收内容。上传结束后取得协调锁，检查取消与版本条件，再进入提交区原子替换，最后记录结果。读/上传不持有全局锁；首版可用每导出的短提交锁统一协调 rename、remove 和 replace，之后根据竞争指标细化，避免过早实现复杂路径锁。
+可写版本使用同目录临时文件接收内容。上传及流式读取不持有导出级提交锁。创建通过 `RENAME_NOREPLACE` 原子拒绝覆盖；条件替换只协调目标路径与目标 inode，取得后重新核对身份和 revision，再原子发布。SeqFile 依靠该 SQLite 文件的事务及版本复核。目录遍历、rename 和 unlink 的命名空间顺序交给 Linux，应用不取得祖先目录读锁。
 
-### 8.1 exclusive 的前提与 writer lock
+### 8.1 资源边界
 
-`access = "rw"` 要求所有修改经过唯一 fs-server，且该实例持有导出对应的 OS 排他 writer lock。锁必须是持有句柄期间有效、进程退出由 OS 释放的锁，不能只凭某个 lock 文件存在判断。拿不到锁则拒绝启用可写导出，不静默降级为无锁写入。
+`access = "rw"` 授权写入，不再要求导出根生命周期 writer lock；进程启动也不对根目录加 `flock`。不同可写能力可以打开同一根，普通文件条件替换的合作写者通过目标 inode 的短暂 advisory lock 协调。锁句柄取得后重新检查路径仍指向该 inode，防止旧句柄通过条件校验。创建不需要 inode 锁，使用内核原子操作即可。同实例仍拒绝配置中重叠导出与重复别名。
 
-锁定位以物理根身份为准，不以 alias 或不同拼写的 root 为准；不同实例导出同一根必须竞争同一锁。同实例拒绝物理重叠的可写导出。锁存放位置必须受保护且不能被协议删除或替换；能力不可靠的网络文件系统不启用 exclusive。父子根在不同实例间并不能靠两个不同根锁自动互斥，首版部署约束禁止这种重叠，不能声称根锁已解决它。
-
-OS/advisory lock 只能约束遵守同一锁协议的参与者，不能阻止 IDE/Git 或特权进程绕过协议写文件。因此 exclusive 同时要求部署控制写入者；单靠配置声明或单靠锁都不够。不能保证该前提的目录以 shared 只读方式导出，不启用强 CAS。
+网络文件系统、外部编辑器、Git 及原生命令可能不遵守 advisory lock；因此这些入口间没有强事务保证。指纹包含 inode、大小、mtime、ctime，能够在下次观察时使旧条件失效，不能证明校验与发布间没有非合作写者。保留协议中的历史 `exclusive/source` 能力名称不表示拥有整个目录或能排除外部写入。
 
 ### 8.2 revision 分配与失效算法
 
-每个 exclusive 导出维护有界内存状态，无需数据库：
+每个可写导出维护有界内存状态，无需数据库：
 
 ```text
 ExportRevisionState
@@ -339,12 +337,12 @@ ExportRevisionState
   entries: canonical entry key -> generation
 ```
 
-1. key 使用同一根内的真实条目身份/规范路径，遵守第 4.1 节名称等价规则。取值、首次分配和修改均在导出协调锁内完成；generation 在本 epoch 内不复用，溢出前更换 epoch 并清空状态。
+1. key 使用同一根内的真实条目身份/规范路径，遵守第 4.1 节名称等价规则。版本表仅在取值、首次分配和修改时短暂协调，不覆盖文件正文与数据库事务；generation 在本 epoch 内不复用，溢出前更换 epoch 并清空状态。
 2. 已存在文件首次 stat/read 时分配 generation；返回以引号包围的不透明强 ETag，编码 epoch 与 generation。不存在路径返回缺失，不分配“文件版本”。全局 counter 只负责生成唯一值，entries 才是当前路径版本的真相。
-3. replace/create 发布成功后分配新 generation；delete 删除对应状态；rename 失效旧路径和目标路径状态。目录 rename/delete 失效全部后代，后续访问分配新值。受影响父目录的列表版本同样失效；版本不随路径移动保持不变。
+3. replace/create 发布成功后使用新 inode 的 generation；旧句柄不代表新路径。后续 stat 检查 inode、大小、mtime、ctime；观察到指纹变化时分配新 generation。纯目录移动不要求为未修改的后代分配新版本。
 4. entries 淘汰后，下一次访问分配新 generation；旧 If-Match 必须冲突，即使内容实际未变。先重新加载或分配当前状态再比较，禁止从请求中的 revision 恢复被淘汰条目。这允许保守冲突，不允许版本倒退或复用。
 5. 服务重启或无法确定发布/版本更新是否一致时更换 epoch，所有旧条件失效。提交锁内先完成必要准备，再发布文件、更新内存版本和结果；发布后失败不能声称未提交，应失效 epoch 并报告实际已知结果或 unknown。
-6. 读取在短锁内打开目标文件句柄并取得对应 revision，再释放锁流式读该句柄；exclusive v1 只通过替换创建新内容，不原地 patch 旧 inode。平台不能保持这种读取/替换语义时须使用受控快照或拒绝该能力，不能单独 stat 后再打开路径。
+6. 读取在短锁内打开目标文件句柄并取得对应 revision，再释放锁流式读该句柄；普通文件通过替换创建新内容，SeqFile 则使用 SQLite 的一致性快照。平台不能保持这种读取/替换语义时须使用受控快照或拒绝该能力，不能单独 stat 后再打开路径。
 
 同一 epoch 内内容未变而版本因淘汰变化是允许的保守失效；相同强 ETag 不能对应不同字节。受管流所持版本可以用于本次返回，即使内存映射后来淘汰；下一次条件操作因此冲突是允许的。重启、删除再建、目录移动、淘汰、名称别名均须覆盖测试。
 
@@ -448,7 +446,7 @@ processMounts 必须区分 VFS 可访问性与本地进程目录能力。HTTP �
 
 - 完整 replace、条件创建/覆盖、mkdir/rename/delete，真实能力协商。
 - operationId、状态查询、显式取消、提交区、临时文件清理与 unknown 结果处理。
-- exclusive revision、数字版本兼容迁移、编辑器冲突提示和未保存内容保留。
+- 文件 revision、数字版本兼容迁移、编辑器冲突提示和未保存内容保留。
 
 ### 阶段 C：按测量扩展
 
@@ -464,7 +462,7 @@ processMounts 必须区分 VFS 可访问性与本地进程目录能力。HTTP �
 | 取消 | 发送前、排队中、批量部分取消、响应 body 中、分页中、上传中、等待锁、提交边界、共享视图独立取消 |
 | 不确定结果 | 提交后响应丢失、cancel 先到、服务重启、状态过期、重复 ID、同 ID 不同控制字段/不同 body、不重复执行 |
 | 文件正确性 | 空文件、二进制、非 UTF-8 排除、Unicode 不归一化、大小写来源别名、Range 200/206/412/416、大目录、只读拒绝 |
-| 写入一致性 | 并发条件覆盖仅一个成功、generation 淘汰、旧 epoch、删除再建、目录 rename 后代失效、writer lock 竞争、临时文件/崩溃清理 |
+| 写入一致性 | 并发条件覆盖仅一个成功、generation 淘汰、旧 epoch、删除再建、目录移动后的身份核对、目标 inode 协调竞争、临时文件/崩溃清理 |
 | 项目授权 | 工作台/Agent 路径一致、Session 继承、忙时拒绝变更、撤权失效、挂载后同名冲突、断线不回退、卸载不删文件 |
 | 连续操作结束 | 多请求无隐式原子性、nextCursor=null、流截断、上传 EOF 不等于提交、终态重复取消、无远程句柄泄漏 |
 | 协议约束 | 剩余 budget 传播、只读重试上限、修改不自动重试、no-store、拒绝重定向、日志脱敏、无强版本禁止分段拼装 |
@@ -479,7 +477,7 @@ processMounts 必须区分 VFS 可访问性与本地进程目录能力。HTTP �
 | 意见 | 处理 |
 |---|---|
 | revision 缺少文件 generation 闭环 | 采纳，第 8 节明确 entries、首次分配、淘汰、移动、重启与读取绑定 |
-| exclusive 需要 writer lock | 采纳并限定保证：根锁不约束非合作外部写入者，也不自动覆盖跨实例父子根 |
+| writer 协调 | 目标文件条件更新使用 inode 协调；导出根不持锁，外部非合作写入不在事务保证内 |
 | stat/symlink 歧义 | 采纳，第 5 节固定最终项检查与中间链接拒绝，不把 cap-std 当作默认 no-follow |
 | 挂载后冲突 | 采纳，第 10.1 节固定挂载优先、保留结构名称、可见诊断；不在冲突时自动切换来源 |
 | operationId 指纹过重 | 采纳简化，不读第二份 body；重复 ID 返回原状态引用的 409，不把原结果冒充新内容成功 |
@@ -501,7 +499,7 @@ processMounts 必须区分 VFS 可访问性与本地进程目录能力。HTTP �
 |---|---|
 | 核心 | `FileStorageBackend` / `FileReader` / 可选 `FileMutations`，旧接口的 `FileStorageAdapter`；OperationOptions 与视图独立取消；文件读取回传 opaque revision，FileHandle/工具/编辑器使用读到的 revision 保存 |
 | HTTP | exports、批量 stat、目录分页、二进制内容、单段 Range、If-Match；Basic 用户名/密码与兼容 Bearer 身份、Origin 白名单、no-store、禁止重定向、body 上限、剩余 deadline、只读有限重试 |
-| 可写 | exclusive 根锁、epoch + inode generation；条件 replace、mkdir、禁止覆盖的 rename、文件/空目录 remove；operationId 注册/状态/取消/过期、临时上传清理，响应丢失返回 unknown |
+| 可写 | 目标文件协调、epoch + inode generation；条件 replace、mkdir、禁止覆盖的 rename、文件/空目录 remove；operationId 注册/状态/取消/过期、临时上传清理，响应丢失返回 unknown |
 | 项目 | ProjectRemoteMountService；挂载名称保留、远程优先、同名诊断、断线占位、Session 继承、重连与撤权；连接描述符存 `/etc/fs/remote/<connectionId>.seq`，项目挂载存 `/etc/fs/projects/<projectId>.seq`；索引与记录事务 CAS 防止覆盖其他管理端更新 |
 | 三端 | Web/Tauri 注入 provider；CLI HTTP runtime、工作流 runtime 与 `nestos fs list/read/stat/status`；项目带远程挂载时不为 Agent 装配宿主 Shell/TTY |
 | 工作台 | 工具箱 → MCP 多实例配置；新建本地/远程项目，按连接和路径去重，会话仅在项目内创建；默认只读，显式授权读写；凭据不入项目配置；关闭对话框取消连接；冲突或未知结果时保留编辑内容 |
@@ -509,7 +507,7 @@ processMounts 必须区分 VFS 可访问性与本地进程目录能力。HTTP �
 实现收窄与后续扩展：
 
 - v1 结构修改统一使用 `POST /v1/fs/:alias/mutate` 的 action，完整内容使用 `PUT content`。无 begin/end/commit 指令，无跨请求事务。重复 ID 一律 409，不消费第二份 body 来比较内容。
-- 服务端每个 `[[exports]]` 自带读权限，`access = "rw"` 的条目额外授权写；与项目/Session 权限取交集。写导出必须独占锁，普通共享目录只读。独占锁不能拦截非合作外部写入，父子根跨实例互斥仍是部署约束。
+- 服务端每个 `[[exports]]` 自带读权限，`access = "rw"` 的条目额外授权写；与项目/Session 权限取交集。可写能力不持有导出目录锁；同文件条件更新单独协调，外部非合作写入不在事务保证内。
 - 文件替换只退休旧 inode generation；mkdir/rename/remove 保守清空导出 revision 表，使其他旧版本也可能冲突。重启或 10 万条表淘汰后旧版本失效。暂不持久化 operation 状态；保留一小时、最多 4096 条，满载拒绝新操作，不淘汰活动操作。
 - replace 的 committed 只承诺原子可见性，不承诺断电持久性。保留 `.itookit-upload-` 命名空间，正常错误/取消清理临时文件，独占启动时有界扫描崩溃遗留。尚未开放递归删除、append、patch；不以客户端读改写模拟原子能力。
 - 旧 LocalFS/IndexedDB 继续走兼容接口，其部分既有 I/O 不响应 AbortSignal；本轮不声称任意本地系统调用可立即取消。分页 UI、搜索/订阅端点、原生 Tauri transport 和流式应用消费者属于阶段 C。
@@ -537,7 +535,7 @@ Settings 与断线状态补充后的回归：app-core 174 项、app-shell 420 �
 
 MCP 配置以稳定 ID 区分，名称不承担类型或身份判断，可维护多个实例。一个配置可被多个项目引用；被引用配置禁止删除或修改地址、账号、凭据引用及移除 cells 标记。MCP catalog 是连接配置的唯一来源，挂载授权仍保存在 `/etc/fs/projects/`；旧 `/etc/fs/remote/` 记录迁移后清理。凭据更新检查关联会话并撤销旧视图。
 
-Rust 服务端采用单用户配置：顶层凭据可为内联 `password`、环境变量 `password_env = "ENV"`（至少 8 字节，二者只能选一种），或旧 Bearer 的 `token` / `token_env`（至少 24 字节，与密码互斥且不设置 `username`）；用户名取 `username`，未写时读 `FS_SERVER_USER`。导出目录写成一个扁平 `[[exports]]` 列表，`alias` 默认取目录名、`access` 默认 `ro`，`rw` 直接申请独占锁，因此不再有 per-client 授权与 `writer_policy` 二次配置。Basic 内容采用 UTF-8 编码，跨机器部署使用 HTTPS；不在 URL 或日志输出密码。Web/Tauri/CLI 共用相同认证实现。密码保存在运行期凭据缓存，重启后重新输入；CLI 在没有本地密码时仍可由凭据引用环境变量注入。
+Rust 服务端采用单用户配置：顶层凭据可为内联 `password`、环境变量 `password_env = "ENV"`（至少 8 字节，二者只能选一种），或旧 Bearer 的 `token` / `token_env`（至少 24 字节，与密码互斥且不设置 `username`）；用户名取 `username`，未写时读 `FS_SERVER_USER`。导出目录写成一个扁平 `[[exports]]` 列表，`alias` 默认取目录名、`access` 默认 `ro`，`rw` 直接启用文件级条件写入，因此不再有 per-client 授权与 `writer_policy` 二次配置。Basic 内容采用 UTF-8 编码，跨机器部署使用 HTTPS；不在 URL 或日志输出密码。Web/Tauri/CLI 共用相同认证实现。密码保存在运行期凭据缓存，重启后重新输入；CLI 在没有本地密码时仍可由凭据引用环境变量注入。
 
 命名连接补充验收：app-core 175 项、app-shell 421 项通过；HTTP 驱动单元测试 6 项、Rust 服务端 9 项通过。测试包含连接名称选择、同路径并发去重、不同路径隔离、Session 继承、目录删除后释放引用、catalog 重载、Basic 错误用户名/密码拒绝与禁止 Bearer 降级。工作台/CLI 类型检查、Rust clippy、文档/样式/架构边界检查通过。
 

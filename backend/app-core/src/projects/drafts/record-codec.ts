@@ -17,6 +17,8 @@ export function decodeDraftRecord(raw: string | null): { record: ProjectDraftRec
         || saved.submissionId !== undefined && !identity(saved.submissionId) || saved.title !== undefined && typeof saved.title !== 'string') throw invalid();
     if (saved.attachmentScopeId !== undefined && !identity(saved.attachmentScopeId)) throw invalid();
     if (saved.submissionId && !saved.sessionId) throw invalid();
+    if (saved.submissionDraftHash !== undefined && (!saved.submissionId || typeof saved.submissionDraftHash !== 'string'
+        || !/^[a-f0-9]{64}$/.test(saved.submissionDraftHash))) throw invalid();
     if (saved.harnessConnectionId !== undefined && (!identity(saved.harnessConnectionId) || saved.state !== 'submitting')) throw invalid();
     const remoteTarget = decodeRemoteTarget(saved.remoteTarget);
     if (remoteTarget && (!saved.sessionId || !saved.submissionId)) throw invalid();
@@ -24,7 +26,7 @@ export function decodeDraftRecord(raw: string | null): { record: ProjectDraftRec
     if (saved.state !== undefined && saved.state !== state) throw invalid();
     return { migrated: saved.version !== 1 || saved.id === undefined, record: { version: 1, id: saved.id as string ?? randomUUID(), state, data: saved.data,
         ...(saved.sessionId ? { sessionId: saved.sessionId as string, title: saved.title as string | undefined,
-            submissionId: saved.submissionId as string | undefined } : {}), ...(saved.attachmentScopeId ? {attachmentScopeId: saved.attachmentScopeId as string} : {}), ...(saved.harnessConnectionId ? {harnessConnectionId: saved.harnessConnectionId as string} : {}), ...(remoteTarget ? {remoteTarget} : {}) } };
+            submissionId: saved.submissionId as string | undefined } : {}), ...(saved.submissionDraftHash ? {submissionDraftHash: saved.submissionDraftHash as string} : {}), ...(saved.attachmentScopeId ? {attachmentScopeId: saved.attachmentScopeId as string} : {}), ...(saved.harnessConnectionId ? {harnessConnectionId: saved.harnessConnectionId as string} : {}), ...(remoteTarget ? {remoteTarget} : {}) } };
 }
 function decodeRemoteTarget(value: unknown): RemoteDraftTarget | undefined {
     if (value === undefined) return;

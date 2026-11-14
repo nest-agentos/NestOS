@@ -55,13 +55,13 @@ Cells 用 `projectRemountPaths: 1` 协商此能力。旧节点只展示可用的
 
 ## 执行与后续 VMM
 
-`ProjectLauncher` 是 bash 与 harness 共用的启动端口，输入为已经授权并解析的目录 Plan 与保留锁，输出为受监管的启动命令和能力句柄。当前实现为 bubblewrap，目录通过 fd 挂载并核对持久目录身份。将来 VMM 应实现同一端口及相应生命周期，不能接受客户端提交宿主目录或任意 backend。当前没有实现 VMM。
+`ProjectLauncher` 是 bash 与 harness 共用的启动端口，输入为已经授权并解析的目录 Plan 与保留的目录能力，输出为受监管的启动命令和能力句柄。当前实现为 bubblewrap，目录通过 fd 挂载并核对持久目录身份。将来 VMM 应实现同一端口及相应生命周期，不能接受客户端提交宿主目录或任意 backend。当前没有实现 VMM。
 
 项目 Codex app-server 在外层项目沙箱中运行；其 native sandbox 设为 danger-full-access，让真正的目录边界由外层沙箱统一执行，native approval 仍为 on-request。审批无法扩大外层挂载。明确的 harness home 挂到 `/harness`，运行时系统目录和 harness 可执行文件也在权限范围内；不会因为配置 executable 而挂载它的整个父目录。部署需使用可独立运行的 native executable。
 
 默认隔离网络；`projects.network=true` 明确允许联网，并只读提供解析器和证书文件。命令和运行时 home 来自部署配置，远程请求不能修改。没有可用的 bubblewrap/user namespaces 时执行拒绝启动，不能退回直接宿主执行。
 
-文件访问、受管命令和原生 turn 仅共享 FileGate 的生命周期登记，可并发准入，不再取得节点级文件/执行排他锁。不同任务创建自己的文件或准备工作树不会因其他 turn 或命令运行而返回 EBUSY。同一原生 Session 的变更顺序、请求幂等回执、权限和路径边界仍分别校验；项目拓扑变更及服务关闭等待在途生命周期释放，未知进程归属仍禁止新准入。多持有者诊断分别记录 operationId、Session、请求关联、PID 和持有时长，释放一个执行不会抹掉另一个的记录。
+文件访问、受管命令和原生 turn 仅共享 FileGate 的生命周期登记，可并发准入，不再取得节点级文件/执行排他锁。不同任务创建自己的文件或准备工作树不会因其他 turn 或命令运行而返回 EBUSY。同一原生 Session 的变更顺序、请求幂等回执、权限和路径边界仍分别校验；项目拓扑变更只核对本项目的在途生命周期；节点关闭排空全部已接纳工作。清理未知时封闭涉及的项目，不把无关项目一并封闭。多持有者诊断分别记录 operationId、Session、请求关联、PID 和持有时长，释放一个执行不会抹掉另一个的记录。
 
 普通文件使用文件系统原子创建/替换和现有版本条件；SeqFile 继续依靠 SQLite 事务与 expected revision 的提交检查，不增加跨执行的长期锁。原生进程直接写文件不自动遵守 HTTP 的版本条件，并发读取也不是内容快照；多个任务应使用独立工作树，共享 Git 元数据与目标分支继续遵守 Git 自身锁和宿主的版本、批准、结果验证。不能把此变更宣称为任意原生命令与文件 API 之间的强事务隔离。弱 revision 继续核对大小、mtime 和 ctime。
 
@@ -331,7 +331,7 @@ DSH 原生 workspace 还会按原 cwd 的规范化结果过滤成员；仅将项
 
 cells 0.3.2 的 `access` CLI 管理 `principals`、exports、grants 与 public，复用运行时授权编译器。CLI 参数与输出归 cli，配置修改用例和安全文件替换归 admin；HTTP 文件访问和原生执行仍在既有机制内校验，不引入在线 ACL 写入口。旧单用户配置通过显式 init 迁到 owner，保留凭据、目录权限、项目身份与会话归属；修改后需重启。
 
-`list` / `validate` / `check` 针对磁盘上的配置，不对运行中进程宣称已应用；只读打开 export 避免争抢运行服务的写锁，且不会初始化项目、同步库或启动模型。itookit 无需复制目录授权管理策略，通过固定 HTTP 能力发现读取 principal/grant revision 与有效权限。
+`list` / `validate` / `check` 针对磁盘上的配置，不对运行中进程宣称已应用；只读打开 export，不创建写入恢复状态，且不会初始化项目、同步库或启动模型。itookit 无需复制目录授权管理策略，通过固定 HTTP 能力发现读取 principal/grant revision 与有效权限。
 
 ## 工作台提交与观察的恢复边界
 
@@ -626,3 +626,5 @@ Cells 节点详情中的项目挂载目录按挂载记录显示，而不是按�
 适配层把原因、事实字段和折叠详情投影到通用 InteractionView，独立 llm-ui 不识别原生协议。页面优先展示原生标题/操作类型、原因与已知路径，完整命令默认折叠且只在展开时按纯文本挂载；不支持的其他授权选项放在次要详情。两种聊天视图共用该呈现，原请求 ID、可用决策及响应回执保持原协议；查看和展开详情不创建审批、不自动放行，也不触发额外 RPC。未知答复仍按原 requestId 核对。
 
 [浏览器记录](fixtures/native-approval-20261112.json)覆盖含 1503 行命令的授权、缺失原因的旧请求、详情展开及原身份答复：初始渲染 1.4 ms、展开 11.9 ms，无额外逻辑 API 或 HTTP 请求；未执行实际命令，作用域清理已确认。专项测试及 core/UI 性能套件通过。完整兼容回归另有 4 项失败，已用改动前的 native-interactions 实现复现相同结果，涉及缺少已声明决策的旧夹具、注入上下文过滤断言及时间格式断言；本次没有放宽可授权选项或调整这些无关行为。
+
+会话、通道与文件正文的存储及并发边界见 [资源存储与锁](cells-resource-storage.md)。

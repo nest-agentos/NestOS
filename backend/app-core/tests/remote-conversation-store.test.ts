@@ -181,3 +181,20 @@ it.each([false, true])('preserves Cells ownership across stale saves and a lost 
         expect((await store.load())?.instructionQueue).toEqual(queue);
     } finally {await manager.dispose();}
 });
+
+it('treats native queues as read models even before an ownership marker has been observed', async () => {
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    try {
+        const fs = await manager.openFileSystem('/'); let raw: string | null = JSON.stringify({sessionId: 'native'});
+        const queue = {revision: 0, paused: false, items: [], receipts: []};
+        const remote = {read: async () => raw, queueSession: vi.fn(async () => structuredClone(queue)),
+            compare: vi.fn(async (_key: string, before: string | null, after: string | null) => {
+                if (after && Object.hasOwn(JSON.parse(after), 'instructionQueue')) throw new Error('HARNESS_QUEUE_OWNED_BY_CELLS');
+                if (raw !== before) return false; raw = after; return true;
+            })};
+        const store = new RemoteConversationStore(fs, 'unmarked', remote), loaded = await store.load();
+        await store.save({...loaded, draft: 'Input', instructionQueue: {...queue, revision: 999, paused: true}});
+        expect(JSON.parse(raw!)).toEqual({sessionId: 'native', draft: 'Input'});
+        expect(await store.load()).toMatchObject({instructionQueue: queue});
+    } finally {await manager.dispose();}
+});

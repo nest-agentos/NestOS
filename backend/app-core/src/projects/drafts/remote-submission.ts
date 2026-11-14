@@ -13,9 +13,18 @@ export function remoteConversationKey(projectId: string, target: RemoteDraftTarg
 
 /** Freeze the authorized executor before any native operation can escape the host. */
 export async function prepareRemoteDraft(fs: IFileSystem, projectId: string, draftId: string, target: RemoteDraftTarget, title?: string): Promise<ProjectDraftRecord> {
-    const store = new ProjectDraftStore(fs, projectId), record = await store.load();
-    if (record.id !== draftId) throw new FSError('ECONFLICT', 'Project draft identity changed');
-    return store.begin(preparedTitle(title), target);
+    const started = Date.now();
+    try {
+        const store = new ProjectDraftStore(fs, projectId), record = await store.load();
+        if (record.id !== draftId) throw new FSError('ECONFLICT', 'Project draft identity changed');
+        const prepared = await store.begin(preparedTitle(title), target);
+        log.info('draft.prepare', {operationId: prepared.submissionId, projectId, stage: 'freeze-target', result: 'success', durationMs: Date.now() - started});
+        return prepared;
+    } catch (error) {
+        log.warn('draft.prepare', {operationId: draftId, projectId, stage: 'freeze-target', result: 'failure',
+            code: error instanceof FSError ? error.code : 'REMOTE_DRAFT_PREPARE_FAILED', durationMs: Date.now() - started});
+        throw error;
+    }
 }
 
 /** Recovery reads the submission target, never a later input preference. */

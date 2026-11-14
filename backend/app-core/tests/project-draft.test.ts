@@ -114,3 +114,21 @@ it('recovers cleanup interrupted after draft replacement without deleting curren
         expect(new Uint8Array(await fs.driver.readContent('/var/lib/projects/a/draft-attachments/successor/current', { encoding: 'binary' }))).toEqual(new Uint8Array([2]));
     } finally { await manager.dispose(); }
 });
+
+it('promotes the submitted identity while retaining newer draft data and its attachment scope', async () => {
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    try {
+        const fs = await manager.openFileSystem('/'), store = new ProjectDraftStore(fs, 'a');
+        const original = await store.load(); await store.saveData('Original input'); await store.begin('Title');
+        const asset = await store.putAttachment(new Uint8Array([1, 2, 3]).buffer);
+        await store.saveData(JSON.stringify({text: 'Later input', asset}));
+        const reopened = new ProjectDraftStore(fs, 'a'); await reopened.load();
+        expect(await reopened.promote()).toMatchObject({sessionId: original.id});
+        const next = await reopened.load();
+        expect(next.id).not.toBe(original.id); expect(next.attachmentScopeId).toBe(original.id);
+        expect(JSON.parse(next.data)).toEqual({text: 'Later input', asset});
+        expect(new Uint8Array(await reopened.readAttachment(asset))).toEqual(new Uint8Array([1, 2, 3]));
+        await reopened.reset();
+        expect(await fs.driver.exists(`/var/lib/projects/a/draft-attachments/${original.id}`)).toBe(false);
+    } finally {await manager.dispose();}
+});

@@ -10,7 +10,7 @@ import {ConversationComposerStore, withConversationComposer} from './conversatio
 import type { ProjectConversationPort } from '@nestos/app-contracts/services';
 import { observeConversation } from './conversation-view';
 import {prepareRemoteDraft, remoteConversationKey} from './drafts/remote-submission';
-import {readConversationIdentity} from './drafts/remote-identity';
+import {bindConversationIdentity, readConversationIdentity} from './drafts/remote-identity';
 import { RemoteConversationStore } from './remote-conversation-store';
 import type {RemoteConversationRecoveryTarget} from './remote-conversation-recovery';
 import {RemoteConversationRecoveryLoop} from './remote-conversation-retry';
@@ -736,10 +736,10 @@ export class ProjectRemoteMountService {
             const root = this.list(projectId).find(m => m.at === '/')!;
             const conversationId = sessionId ? await readConversationIdentity(this.store, projectId, {
                 connectionId: root.connectionId!, serverProjectId: root.serverProjectId!, principalId: root.authorization?.principalId,
-                profileId: profile.id, nativeSessionId: sessionId}) : draftId;
+                profileId: profile.id, nativeSessionId: sessionId}) : draftId ?? randomUUID();
             const target = {connectionId: root.connectionId!, serverProjectId: root.serverProjectId!,
                 ...(root.authorization ? {principalId: root.authorization.principalId} : {}), profileId: conversationId ? profile.id : profileId};
-            const preparedDraft = draftId ? await prepareRemoteDraft(this.store, projectId, draftId, target, draftTitle) : undefined;
+            const prepareSubmission = draftId ? async () => {await prepareRemoteDraft(this.store, projectId, draftId, target, draftTitle);} : undefined;
             const guarded = this.guardHarness(client, projectId, fingerprint, root.connectionId!);
             const checkAccess = () => {
                 if (this.closed || fingerprint !== JSON.stringify(this.list(projectId))) throw new FSError('ECONFLICT', 'Project authorization changed');
@@ -748,14 +748,16 @@ export class ProjectRemoteMountService {
             stateClient=this.provider.projects(await this.resolveConnection(root.connectionId!,options));
             const stateProject=await stateClient.read(root.serverProjectId!,options);
             if(stateProject.revision!==root.serverProjectRevision)throw new FSError('ECONFLICT','Remote harness state binding changed');
-            const owner=remoteConversationKey(projectId,target,conversationId??sessionId??'@new');
+            const owner=remoteConversationKey(projectId,target,conversationId??sessionId!);
             const writable=(profile.projectCapabilities?.sessionControl??root.access==='rw')&&!readOnly;
             const remoteState=remoteClientState(stateClient,stateProject,owner,checkAccess,profile.id,writable);
-            const recovery = new RemoteConversationStore(this.store,owner,remoteState);
+            const bindIdentity = !sessionId && conversationId ? (nativeSessionId: string) => bindConversationIdentity(this.store, projectId,
+                {...target, nativeSessionId}, conversationId) : undefined;
+            const recovery = new RemoteConversationStore(this.store,owner,remoteState,bindIdentity);
             const conversation = await this.provider.conversation(sessionId ? guarded : draftHarness(guarded, recovery), profile, profile.workspaces[0].id, sessionId, writable,
-                remoteConversationJournal(recovery, descriptor.epoch, !sessionId && !draftId, checkAccess, writable ? sessionId : undefined));
+                remoteConversationJournal(recovery, descriptor.epoch, false, checkAccess, writable ? sessionId : undefined, prepareSubmission));
             const composer = new ConversationComposerStore(remoteState,!readOnly,checkAccess,{fs:this.store,projectId,owner});
-            const observed = observeConversation(sessionId ? conversation : draftConversation(conversation, recovery, preparedDraft?.title), this.estimateUsage, conversationId,
+            const observed = observeConversation(sessionId ? conversation : draftConversation(conversation, recovery, draftTitle), this.estimateUsage, conversationId,
                 () => { void this.sessionStatus.refresh(projectId); });
             return withConversationComposer(observed,composer,()=>stateClient!.close());
         } catch (error) { await stateClient?.close();await client.close(); throw error; }

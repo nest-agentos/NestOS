@@ -113,7 +113,7 @@ Linux 当前 bubblewrap 路径可表达虚拟挂载；macOS 当前 Seatbelt 实�
 
 需要统一 `/workspace` 语义的环境必须使用真正支持该映射的后端，例如容器或虚拟机。无法提供时，报告能力不足，或明确选择一套所有工具共享的 host-mapped 路径；后者不能冒充 virtual-root，也不能只翻译 Bash 的 cwd 而让命令参数仍落入另一命名空间。
 
-源目录直接挂载意味着 Bash 与文件 API 都可能修改它。MVP 采用普通文件系统一致性，不承诺跨工具事务、时间点快照或写入回滚。只允许在后端真实支持时宣告条件写入；不能在开放 Bash 写入后继续使用“独占 HTTP writer 的内存 revision”冒充强 CAS。现有 HTTP exclusive 写入契约保留：当前实现通过服务端文件/进程互斥门隔离两条写入通道，进程完整回收后使此前的 revision 全部失效。外部进程不得绕过服务修改 exclusive export。
+源目录直接挂载意味着 Bash 与文件 API 都可能修改它。MVP 采用普通文件系统一致性，不承诺跨工具事务、时间点快照或写入回滚。只允许在后端真实支持时宣告条件写入；不能在开放 Bash 写入后继续使用“独占 HTTP writer 的内存 revision”冒充强 CAS。当前普通文件使用原子替换与目标文件条件校验；命令和文件 API 不通过节点级内容互斥门串行执行。进程回收后保守失效旧 revision；不能把指纹校验或 advisory lock 宣称为对非合作外部写者的跨入口强事务。
 
 ## 6. cells 的最小职责
 
@@ -185,8 +185,8 @@ PTY、自动 materialization、增量传输、缓存和结果导出，分别按�
 - `GET /v1/processes/:epoch/:id` 查询，`POST .../cancel` 取消。状态为 running/exited/cancelled/timed-out/failed/unknown。ID 绑定认证身份和启动 epoch；重复启动只返回既有状态。取消可先于启动形成拒绝执行记录。启动 POST 不自动重试；响应丢失时以原 ID 取消并报告 unknown，不能伪称没有执行。
 - 首版最多运行一个命令，命令最长 300 秒，stdout/stderr 各 64 KiB；超量触发取消并标记 truncated。状态查询返回最终有界输出，目前不提供实时流、stdin 或 PTY。最多保留 1024 条请求记录，达到上限拒绝新命令，需管理员重启；重启 epoch 改变，旧请求不得重放。
 - 文件 API 与命令由进程级读写门互斥。流式下载持有读门至结束，上传/后台阻塞提交持有读门至清理完成；命令期间所有 export 的 stat/list/read/mutation 返回 EBUSY。进程回收后、开放读门前，清空所有 export revision 映射，旧条件写入返回冲突。回收失败保持关闭文件门并报告 unknown。
-- bubblewrap 使用独立 PID/网络/用户命名空间、只读运行库、临时 HOME、环境白名单和禁用后续 user namespace。首版一条命令最多使用一个 rw export（可含多个子目录）；其他 export 必须 ro。该 rw export 的独占锁经 `--sync-fd` 保留给 monitor，避免 daemon 死亡后旧命令未退出时新服务器取得同一 export 的执行权。readonly 依赖不能通过其他 rw 别名绕过。
-- 这是受限目录命令能力，不等同于完整的多租户加固：未提供 cgroup 内存/CPU/磁盘配额、seccomp 策略、自动依赖安装或网络白名单。部署使用非特权服务用户，并保留 exclusive export 的单一写入边界。
+- bubblewrap 使用独立 PID/网络/用户命名空间、只读运行库、临时 HOME、环境白名单和禁用后续 user namespace。首版一条命令最多使用一个 rw export（可含多个子目录）；其他 export 必须 ro。monitor 经 `--sync-fd` 保留目录能力，导出根不再持有生命周期 advisory lock。进程取消与回收仍由原有监管链负责。readonly 依赖不能通过其他 rw 别名绕过。
+- 这是受限目录命令能力，不等同于完整的多租户加固：未提供 cgroup 内存/CPU/磁盘配额、seccomp 策略、自动依赖安装或网络白名单。部署使用非特权服务用户，目录能力及目标文件条件写入不等于多租户隔离或跨入口事务。
 - app-core 将项目路径 `/` 映射到 `/workspace`、已有项目内嵌挂载 `/ref` 映射到 `/workspace/ref`；不会悄悄改为 sibling。协议支持显式 sibling，但当前项目 UI 没有自动迁移入口。远端执行要求 Session 处于 active 且具有唯一 `/workspace` 用户挂载，取得文件上下文后再次校验授权记录；空授权、已禁用授权或额外本地用户挂载均拒绝远端执行。Session readonly 继续向进程端衰减，不能提升为 rw。
 - 项目收藏夹属于导航，见 [收藏夹契约](project-favorites.md)，不影响执行授权。
 
