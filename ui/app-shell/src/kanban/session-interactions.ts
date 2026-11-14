@@ -1,6 +1,6 @@
 import {resolveBrowserTarget} from '@nestos/app-contracts';
 import type {ProjectService} from '@nestos/app-contracts/services';
-import {NativeInteractionPanel} from '@nestos/llm-ui-adapter';
+import type {NativeInteractionPanel} from '@nestos/llm-ui-adapter';
 import {Modal} from '@nestos/ui-common';
 import {randomUUID,t} from '@nestos/common';
 
@@ -9,7 +9,7 @@ export function sessionInteractionDialog(projects:ProjectService,openSession:(id
     return async(resource:string,signal?:AbortSignal):Promise<void>=>{
         const target=resolveBrowserTarget(resource);
         if(target.kind!=='remote'||!target.nativeSessionId||!target.profileId)throw Object.assign(new Error('Session interaction target unavailable'),{code:'EINVAL'});
-        const project=await projects.forFolder(target.folder);
+        const [{NativeInteractionPanel}, project] = await Promise.all([import('@nestos/llm-ui-adapter'), projects.forFolder(target.folder)]);
         if(!project||project.path!==target.folder||target.archived||!projects.remoteMounts)throw Object.assign(new Error('Session binding unavailable'),{code:'EACCES'});
         const controls=await projects.remoteMounts.projectConversation(project.project.id,target.profileId,target.nativeSessionId,{timeoutMs:3000});
         let panel:NativeInteractionPanel|undefined,modal:Modal|undefined;

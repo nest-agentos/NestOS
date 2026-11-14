@@ -1,5 +1,4 @@
 import {type OcrSettingsState,type OcrControls} from '@nestos/app-contracts/services';
-import {renderOcrSettings, readOcrSettings} from '@nestos/llm-ui-adapter/settings';
 
 import { OcrAccess } from './ocr-access';
 import { editOcrPrompt } from './ocr-prompt-dialog';
@@ -48,6 +47,7 @@ async function deletionImpact(service: OcrService, agents: IAgentManagementServi
 }
 async function showConfiguration(service: OcrService,
     openSettings: OcrControls['openSettings']): Promise<boolean> {
+    const {renderOcrSettings, readOcrSettings} = await import('@nestos/llm-ui-adapter/settings');
     const id = 'ocr-' + randomUUID(), body = `<div id="${id}">${renderOcrSettings(await configurationState(service), id)}</div>`;
     return new Promise(resolve => {
         const modal = new Modal(t('ocr.configure'), body, {

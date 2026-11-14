@@ -56,10 +56,8 @@ export interface ToolboxPreferences { filter: ToolboxFilter; queries: Partial<Re
  * reads it at construction, so the host prefetches the document first.
  */
 export interface ToolboxPreferencesPort { load(): unknown; save(preferences: ToolboxPreferences): void }
-/** Document name under `etc:/ui` for {@link ToolboxPreferences}. */
-export const TOOLBOX_PREFERENCES_DOC = 'mindos_toolbox_v1.preferences';
-/** Browser snapshot scope; kept separate from the preference document. */
-export const TOOLBOX_SCOPE = 'nestos:toolbox:v1';
+export {TOOLBOX_SCOPE, TOOLBOX_PREFERENCES_DOC} from './documents';
+import {TOOLBOX_SCOPE} from './documents';
 
 /** Tolerate a missing or hand-edited document: unknown fields fall back to defaults. */
 function preferences(data: unknown): ToolboxPreferences {

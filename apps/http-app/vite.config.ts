@@ -1,4 +1,5 @@
 import { moduleSeparationPlugin } from '../../scripts/check-module-separation.mjs';
+import {preloadShell} from '../../scripts/preload-shell.mjs';
 import {firstPaintStyles} from '../../scripts/first-paint.mjs';
 import { httpBuildGraph } from '../../scripts/httpd-build-graph.mjs';
 import { readFileSync } from 'node:fs';
@@ -17,7 +18,7 @@ export default defineConfig({
                 .replace('src/styles/index.css', './src/style.css')
                 .replace(/\s*<link rel="(?:manifest|apple-touch-icon)"[^>]+>/g, '');
         } },
-    }, firstPaintStyles(), httpBuildGraph()],
+    }, firstPaintStyles(), preloadShell('/client/hosted-application.ts'), httpBuildGraph()],
     resolve: {
         alias: workspaceAliases(__dirname),
         dedupe: ['@codemirror/state', '@codemirror/view'],

@@ -39,12 +39,11 @@ import {unavailableConversationCleanup} from './kanban/unavailable-conversation'
 import {sessionUrl, kanbanReferenceLink,projectDecisionsPath} from './kanban/links';
 import {sessionInteractionDialog} from './kanban/session-interactions';
 import {createKanbanWorkspace} from './kanban';
-import { TOOLBOX_SCOPE } from './toolbox/ToolboxWorkbench';
+import { TOOLBOX_SCOPE, TOOLBOX_PREFERENCES_DOC } from './toolbox/documents';
 import { TOOLBOX_KINDS, legacyToolboxRoute, toolboxSettingsRoute } from './toolbox/routes';
-import { SESSION_BROWSER_SCOPE } from './projects/SessionWorkbench';
+import { SESSION_BROWSER_SCOPE } from './persistence/documents';
 import { VfsUIPersistence } from './persistence/vfs-ui-state-store';
 import { VfsJsonStore } from './persistence/vfs-json-store';
-import { TOOLBOX_PREFERENCES_DOC } from './toolbox/ToolboxWorkbench';
 import { setupHitlVfsBridge } from './workspaces/hitl-bridge';
 import { createWorkspaceModule, restoreWorkspaceResource, type WorkspaceHandle } from './workspaces/module';
 import { workspaceRoot, type WorkspaceController, type WorkspaceCreation } from '@nestos/app-contracts';
