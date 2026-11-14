@@ -364,16 +364,25 @@ export class RpcPeer {
                 this.retireRemote(update.$retired); continue;
             }
             if (update && !Array.isArray(update) && typeof update === 'object' && update.$patch) {
-                const patch = update.$patch as unknown as DescriptorPatch, previous = this.descriptors.get(patch.id);
-                if (!previous) throw new FSError('ECAPABILITY', 'Unknown view patch target');
-                if ((previous.version ?? 0) >= patch.version) continue;
-                const pending = this.pendingPatches.get(patch.id) ?? [];
-                if (pending.length >= 64) throw new FSError('ECAPABILITY', 'View update gap is too large');
-                pending.push(patch); this.pendingPatches.set(patch.id, pending);
+                this.queuePatch(update.$patch as unknown as DescriptorPatch);
             } else this.decode(update);
         }
         this.drainPatches();
         for (const ready of this.updateWaiters) ready();
+    }
+    /** Notification updates may precede the HTTP reply declaring their target. */
+    private queuePatch(patch: DescriptorPatch): void {
+        const identity = typeof patch.id === 'string' && patch.id.startsWith(this.side === 'client' ? 'server:' : 'client:');
+        const versions = [patch.baseVersion, patch.version].every(Number.isSafeInteger) && patch.baseVersion >= 0 && patch.version > patch.baseVersion;
+        if (!identity || !versions || !Array.isArray(patch.changes)) throw new FSError('ECAPABILITY', 'Invalid view patch identity');
+        const previous = this.descriptors.get(patch.id);
+        if (previous && (previous.version ?? 0) >= patch.version) return;
+        if (!this.pendingPatches.has(patch.id) && this.pendingPatches.size >= 64) throw new FSError('ECAPABILITY', 'Too many pending view targets');
+        const bytes = [...this.pendingPatches.values()].flat().reduce((sum, value) => sum + wireSize(value as unknown as WireValue), wireSize(patch as unknown as WireValue));
+        if (bytes > 2 * 1024 * 1024) throw new FSError('ECAPABILITY', 'Pending view updates exceed byte limit');
+        const pending = this.pendingPatches.get(patch.id) ?? [];
+        if (pending.length >= 64) throw new FSError('ECAPABILITY', 'View update gap is too large');
+        pending.push(patch); this.pendingPatches.set(patch.id, pending);
     }
     private retiredUpdate(update: WireValue): boolean {
         if (!update || typeof update !== 'object' || Array.isArray(update)) return false;
@@ -390,7 +399,8 @@ export class RpcPeer {
         for (const [id, patches] of this.pendingPatches) {
             patches.sort((a, b) => a.version - b.version);
             while (patches.length) {
-                const descriptor = this.descriptors.get(id)!, patch = patches[0];
+                const descriptor = this.descriptors.get(id), patch = patches[0];
+                if (!descriptor) break;
                 if (patch.version <= (descriptor.version ?? 0)) { patches.shift(); continue; }
                 if (patch.baseVersion !== (descriptor.version ?? 0)) break;
                 patches.shift(); this.hydrate(applyDescriptorPatch(descriptor, patch));
