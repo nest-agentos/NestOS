@@ -22,7 +22,7 @@ import type {PersonalKanbanAutomationOptions} from '../kanban/personal-automatio
 import type {UserEventService} from '../events/service';
 
 type Input = Parameters<NonNullable<PersonalKanbanAutomationOptions['observeWork']>>[0];
-interface Options {exchange?: ReturnType<typeof import('./kanban-channel-exchange').developmentWorkExchange>;
+interface Options {learningService(): import('@nestos/kanban/contracts').KanbanService; exchange?: ReturnType<typeof import('./kanban-channel-exchange').developmentWorkExchange>;
     verifyDelivery?(dispatchId: string): Promise<void>;
     handoffReports?(board:string,item:string,dispatch:string,service:import('@nestos/kanban/contracts').KanbanService):Promise<unknown>;
     lifecycle?: Pick<ReturnType<typeof import('./kanban-development-lifecycle').developmentLifecycle>, 'enqueue' | 'scan' | 'dispose' | 'settled'>;
@@ -94,7 +94,7 @@ export function developmentObserver(options: Options) {
             const result = results[0];
             if (result) try {
                 await registerSessionLearnings({boardId: input.boardId, sessionId: input.observation.executionSessionId ?? input.dispatch.executionSessionId,
-                    messageId: result.id, payload: result.message.payload, publications, service: input.service, journal});
+                    messageId: result.id, payload: result.message.payload, publications, service: options.learningService(), journal});
             } catch (error) {
                 return {...input.observation, outcome: 'unknown', outputs: undefined, code: (error as {code: string}).code};
             }

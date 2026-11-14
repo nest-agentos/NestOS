@@ -12,12 +12,16 @@ import {developmentObserver} from '../src/presets/kanban-development-observer';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});
-async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, lifecycle?: Parameters<typeof developmentObserver>[0]['lifecycle'], exchange?: Parameters<typeof developmentObserver>[0]['exchange']) {
+async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, lifecycle?: Parameters<typeof developmentObserver>[0]['lifecycle'], exchange?: Parameters<typeof developmentObserver>[0]['exchange'], deniedLearning = false) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions);
     await journal.open();
     const actor = {kind: 'human' as const, id: 'admin'}, principal = {kind: 'service' as const, id: 'worker'};
     const service = createKanbanModule({store, actor, authorize: async () => {}});
+    const coordinator = Object.assign(Object.create(service), {execute: vi.fn(async (board: string, request: Parameters<KanbanService['execute']>[1]) => {
+        if (request.command.type === 'append-record') throw Object.assign(new Error('Coordinator cannot append records'), {code: 'FORBIDDEN'});
+        return service.execute(board, request);
+    })});
     const worker = createKanbanModule({store, actor: principal, authorize: async () => {}});
     await service.create({id: 'board', title: 'Board', scope: {kind: 'system'}, policy: {requireEstimate: false, review: 'independent'},
         members: [{...actor, responsibility: 'Review', roles: ['coordinator', 'reviewer']}, {...principal, responsibility: 'Work', roles: ['worker']}]});
@@ -34,16 +38,17 @@ async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, l
     const channels=memoryChannels();
     await journal.update('development-workspace:attempt',()=>({channelId:'attempt',projectId:'project',directory:'/workspace/_nestos/worktrees/attempt',policy:{commit:'changes',prompts:{version:1,files:[]}},repositories:[],availableRepositories:[]}));
     const events = await UserEventService.open(fs);
-    const observer = developmentObserver({fs, events, verifyDelivery, lifecycle, exchange, kernel: {inspectSession: async () => ({getShared: async () => undefined})},
+    let learningService = deniedLearning ? coordinator : service;
+    const observer = developmentObserver({learningService: () => learningService, fs, events, verifyDelivery, lifecycle, exchange, kernel: {inspectSession: async () => ({getShared: async () => undefined})},
         remote:{sessionChannel:channels.channel,projectHarness:async()=>({subscribeChannel:()=>()=>{},close:async()=>{}}) as never},
         projects: {get: async () => ({path: '/project'}) as never, openWorkspace: async () => ({fs, dispose: async () => {}}) as never}, wake() {}});
     closes.push(() => observer.dispose());
     const publish = async(id: string,type:string)=>{channels.report('attempt',id,{type,content:'Business message'});};
-    return {observer,fs, directory, scope, publish, channels, service, events, journal, dispatch, observe: (outcome: 'running' | 'succeeded' | 'failed' | 'cancelled', executionSessionId?: string) => observer.observe({boardId: 'board', dispatch,
-        service, worker, observation: {outcome, executionSessionId, ...(outcome === 'succeeded' ? {outputs: []} : {})}})};
+    return {observer,coordinator,authorizeLearning: () => {learningService = service;},fs, directory, scope, publish, channels, service, events, journal, dispatch, observe: (outcome: 'running' | 'succeeded' | 'failed' | 'cancelled', executionSessionId?: string) => observer.observe({boardId: 'board', dispatch,
+        service: coordinator, worker, observation: {outcome, executionSessionId, ...(outcome === 'succeeded' ? {outputs: []} : {})}})};
 }
-it('automatically registers result learnings only after the execution finishes', async () => {
-    const f = await fixture();
+it.each([false,true])('registers terminal learnings with the host record service and recovers a rejected frozen receipt (%s)', async denied => {
+    const f = await fixture(undefined, undefined, undefined, denied);
     await f.service.execute('board', {operationId: 'bind-learning-session', expectedRevision: (await f.service.read('board')).revision,
         command: {type: 'observe-execution', dispatchId: f.dispatch.id, fence: f.dispatch.fence, outcome: 'running', executionSessionId: 'session'}});
     await f.service.execute('board', {operationId: 'link-learning-session', expectedRevision: (await f.service.read('board')).revision,
@@ -52,6 +57,11 @@ it('automatically registers result learnings only after the execution finishes',
         event: 'Lost receipt', handling: 'Inspect original operation', reason: 'Avoid duplicate work', result: 'Recovered', conditions: 'Stable identity'}]}});
     await f.observe('running', 'session');
     expect((await f.service.records('board')).total).toBe(0);
+    if (denied) {
+        expect(await f.observe('succeeded', 'session')).toMatchObject({outcome: 'unknown', code: 'FORBIDDEN'});
+        expect((await f.service.records('board')).total).toBe(0); f.authorizeLearning();
+    }
+    expect(await f.observe('succeeded', 'session')).toMatchObject({outcome: 'succeeded'});
     expect(await f.observe('succeeded', 'session')).toMatchObject({outcome: 'succeeded'});
     expect((await f.service.records('board', {itemId: 'item'})).total).toBe(1);
 });

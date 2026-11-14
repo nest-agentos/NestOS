@@ -632,7 +632,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             }}) : undefined;
         const fileSubmission = sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore, ensureWritable: conversationOptions.ensureWritable});
         let recoveryClient:import('@nestos/kanban/contracts').KanbanClient|undefined;
-        const developmentMessages = developmentObserver({exchange: developmentBindings && independentCalls ? developmentWorkExchange({...developmentBindings,
+        const developmentMessages = developmentObserver({learningService: (): import('@nestos/kanban/contracts').KanbanService => kanban, exchange: developmentBindings && independentCalls ? developmentWorkExchange({...developmentBindings,
             journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), kernel: kernelCore, calls: independentCalls, submission: fileSubmission,
             recovery:async(board,item)=>{if(!recoveryClient?.taskRecovery)throw Object.assign(new Error('Recovery service is starting'),{code:'RECOVERY_SERVICE_STARTING'});return recoveryClient.taskRecovery(board,item);}}) : undefined, kernel: kernelCore, fs: systemFS, events, projects, remote: remoteConnections, lifecycle,
             handoffReports:developmentBindings?(board,item,id,service)=>handoffDevelopmentReports({...developmentBindings,journal:new KanbanAutomationJournal(systemFS,kanbanJournalOptions)},service,board,item,id):undefined,

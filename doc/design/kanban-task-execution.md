@@ -6,7 +6,7 @@
 
 开发执行的 `delivery.md` 及后续维护结果入口按需引用 `session-learnings.md`，要求 Session 在最终报告前按需回顾经验；没有可复用信息时省略 `payload.learnings` 或传空数组。每条包含稳定 `id`、明确 `itemId`、简明 `event/handling/reason/result/conditions` 和可选的当前 scope 报告 ID 列表 `evidence`，最多八条，每个正文字段最多 1200 字符。发布前必须剔除秘密、个人信息及整段对话。
 
-`@nestos/kanban/integration.registerSessionLearnings` 拥有校验、脱敏、任务归属和幂等登记；宿主 `backend/app-core/src/kanban/session-learnings.ts` 仅注入通道摘要及日志，在开发观察器收到最终报告且执行成功后登记；`kanban-development-review.ts` 同样接入原 Session 后续分析、构建、替换及合并阶段的正式收尾结果。宿主使用执行回执的 Session 身份，复验目标 Task 的正式执行关联及 dispatch，拒绝凭标题归属；多 Task 必须逐条明确归属，未关联不创建 Task。记录复用 `append-record`、`itemIds`、`sources`，从 Task 详情的历史记录进入，保留来源 Session、报告 ID 和摘要；额外证据必须是当前通道实际存在的报告。经验登记不执行完成或验收命令。
+`@nestos/kanban/integration.registerSessionLearnings` 拥有校验、脱敏、任务归属和幂等登记；宿主 `backend/app-core/src/kanban/session-learnings.ts` 仅注入通道摘要及日志，在开发观察器收到最终报告且执行成功后登记；`kanban-development-review.ts` 同样接入原 Session 后续分析、构建、替换及合并阶段的正式收尾结果。宿主使用执行回执的 Session 身份，复验目标 Task 的正式执行关联及 dispatch，拒绝凭标题归属；多 Task 必须逐条明确归属，未关联不创建 Task。经验写入通过宿主当前用户已授权的记录服务完成；观察器的自动协调身份继续用于任务协调，不扩大其 `append-record` 权限。权限失败保留原任务、原报告及幂等请求，修复后核对原回执继续登记。记录复用 `append-record`、`itemIds`、`sources`，从 Task 详情的历史记录进入，保留来源 Session、报告 ID 和摘要；额外证据必须是当前通道实际存在的报告。经验登记不执行完成或验收命令。
 
 登记身份由 board、Session、Task 与经验稳定 ID 派生；正文先经过凭据形态剔除，再冻结摘要并复用 journal 命令回执。相同身份的内容变更拒绝覆盖；丢失写入回执时使用原操作身份恢复。`learning-…:status` 保存登记成功或待恢复的阶段和安全错误分类；失败不会返回成功登记，开发观察器保留待核对状态供后续扫描重试。日志仅含操作身份、阶段、结果、错误码及耗时，不输出正文或原始异常。已有任务执行结果与独立验收仍由原机制管理。
 
