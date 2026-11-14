@@ -1,0 +1,311 @@
+{
+  "date": "2026-11-14",
+  "browserSessionId": "e9596357-fd31-452f-aa10-f74494fdc204",
+  "version": "20261114T075951-f9923e69-dirty",
+  "observedWindow": "2026-11-14 16:07:33–16:08:08 GMT+8",
+  "initialAPIRequests": 6,
+  "initialRPCs": [
+    "readStartup",
+    "ApplicationEvents.onChange",
+    "ApplicationEvents.readEvents",
+    "assistantOverview"
+  ],
+  "initialBackendMs": {
+    "bootstrap": 164,
+    "subscribe": 6,
+    "readEvents": 0,
+    "assistantOverview": 5
+  },
+  "initialRequestBodyFirstByteMs": {
+    "subscribe": 180,
+    "readEvents": 186
+  },
+  "subsequentOperations": {
+    "readEvents": 3,
+    "decisionSnapshot": 1,
+    "assistantOverview": 1
+  },
+  "staticToIdentityGapMs": 4124,
+  "gapLimit": "Adjacent static requests have no browserSessionId; this is an inferred server-time window, not measured download/parse time or client-ready time.",
+  "completeClientReadyMs": null,
+  "audit": [
+    {
+      "time": "2026-11-14T08:07:34.227Z",
+      "event": "application.complete",
+      "requestId": "4191e65f-e71d-4489-979b-fa2a46726c4e",
+      "traceId": "31b8a0ead4a34666ace7aef83d4cbab6",
+      "durationMs": 164,
+      "rpcOperations": [
+        "ApplicationBackend.readStartup"
+      ]
+    },
+    {
+      "time": "2026-11-14T08:07:34.227Z",
+      "event": "request.complete",
+      "requestId": "4191e65f-e71d-4489-979b-fa2a46726c4e",
+      "traceId": "31b8a0ead4a34666ace7aef83d4cbab6",
+      "route": "/api/application",
+      "durationMs": 164,
+      "bodyReadMs": 0,
+      "bodyFirstByteMs": 0,
+      "bodyParseMs": 0,
+      "rpcMs": 164
+    },
+    {
+      "time": "2026-11-14T08:07:35.540Z",
+      "event": "application.call",
+      "requestId": "cff897d4-ba58-4936-9977-c450cd438abd",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 1,
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:35.545Z",
+      "event": "application.complete",
+      "requestId": "cff897d4-ba58-4936-9977-c450cd438abd",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 6,
+      "rpcOperations": [
+        "ApplicationEvents.onChange"
+      ],
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:35.545Z",
+      "event": "application.call",
+      "requestId": "3222d94d-dc99-4afc-99da-e97bd1ecf84c",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 0,
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:35.545Z",
+      "event": "application.complete",
+      "requestId": "3222d94d-dc99-4afc-99da-e97bd1ecf84c",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 0,
+      "rpcOperations": [
+        "ApplicationEvents.readEvents"
+      ],
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:35.545Z",
+      "event": "request.complete",
+      "requestId": "cff897d4-ba58-4936-9977-c450cd438abd",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "route": "/api/application",
+      "durationMs": 187,
+      "bodyReadMs": 181,
+      "bodyFirstByteMs": 180,
+      "bodyParseMs": 0,
+      "rpcMs": 6
+    },
+    {
+      "time": "2026-11-14T08:07:35.545Z",
+      "event": "request.complete",
+      "requestId": "3222d94d-dc99-4afc-99da-e97bd1ecf84c",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "route": "/api/application",
+      "durationMs": 187,
+      "bodyReadMs": 186,
+      "bodyFirstByteMs": 186,
+      "bodyParseMs": 0,
+      "rpcMs": 0
+    },
+    {
+      "time": "2026-11-14T08:07:38.608Z",
+      "event": "application.call",
+      "requestId": "be357291-ca4b-4f89-817e-d52a295e5f16",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 4,
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:38.609Z",
+      "event": "application.complete",
+      "requestId": "be357291-ca4b-4f89-817e-d52a295e5f16",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 5,
+      "rpcOperations": [
+        "ApplicationBackend.assistantOverview"
+      ],
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:38.609Z",
+      "event": "request.complete",
+      "requestId": "be357291-ca4b-4f89-817e-d52a295e5f16",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "route": "/api/application",
+      "durationMs": 6,
+      "bodyReadMs": 0,
+      "bodyFirstByteMs": 0,
+      "bodyParseMs": 0,
+      "rpcMs": 5
+    },
+    {
+      "time": "2026-11-14T08:07:51.325Z",
+      "event": "application.call",
+      "requestId": "956bfa1d-d055-41f4-8e01-6b7b7b97875a",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 0,
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:51.325Z",
+      "event": "application.complete",
+      "requestId": "956bfa1d-d055-41f4-8e01-6b7b7b97875a",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 0,
+      "rpcOperations": [
+        "ApplicationEvents.readEvents"
+      ],
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:51.325Z",
+      "event": "request.complete",
+      "requestId": "956bfa1d-d055-41f4-8e01-6b7b7b97875a",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "route": "/api/application",
+      "durationMs": 1,
+      "bodyReadMs": 0,
+      "bodyFirstByteMs": 0,
+      "bodyParseMs": 0,
+      "rpcMs": 0
+    },
+    {
+      "time": "2026-11-14T08:07:52.237Z",
+      "event": "application.call",
+      "requestId": "c59ca105-5a99-4c20-804e-5c5c3bd6feb0",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 0,
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:52.238Z",
+      "event": "application.complete",
+      "requestId": "c59ca105-5a99-4c20-804e-5c5c3bd6feb0",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 1,
+      "rpcOperations": [
+        "ApplicationEvents.readEvents"
+      ],
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:52.238Z",
+      "event": "request.complete",
+      "requestId": "c59ca105-5a99-4c20-804e-5c5c3bd6feb0",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "route": "/api/application",
+      "durationMs": 354,
+      "bodyReadMs": 352,
+      "bodyFirstByteMs": 352,
+      "bodyParseMs": 0,
+      "rpcMs": 1
+    },
+    {
+      "time": "2026-11-14T08:07:52.325Z",
+      "event": "application.call",
+      "requestId": "4763dff1-2d2a-49ec-8ae3-6755a86de7d0",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 86,
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:52.326Z",
+      "event": "application.complete",
+      "requestId": "4763dff1-2d2a-49ec-8ae3-6755a86de7d0",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 87,
+      "rpcOperations": [
+        "KanbanService.decisionSnapshot"
+      ],
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:52.326Z",
+      "event": "request.complete",
+      "requestId": "4763dff1-2d2a-49ec-8ae3-6755a86de7d0",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "route": "/api/application",
+      "durationMs": 87,
+      "bodyReadMs": 0,
+      "bodyFirstByteMs": 0,
+      "bodyParseMs": 0,
+      "rpcMs": 87
+    },
+    {
+      "time": "2026-11-14T08:07:52.760Z",
+      "event": "application.call",
+      "requestId": "c31cd8f9-5b07-40e6-b49e-5e5267ce9aa5",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 3,
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:52.761Z",
+      "event": "application.complete",
+      "requestId": "c31cd8f9-5b07-40e6-b49e-5e5267ce9aa5",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 4,
+      "rpcOperations": [
+        "ApplicationBackend.assistantOverview"
+      ],
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:07:52.761Z",
+      "event": "request.complete",
+      "requestId": "c31cd8f9-5b07-40e6-b49e-5e5267ce9aa5",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "route": "/api/application",
+      "durationMs": 194,
+      "bodyReadMs": 188,
+      "bodyFirstByteMs": 189,
+      "bodyParseMs": 0,
+      "rpcMs": 4
+    },
+    {
+      "time": "2026-11-14T08:08:06.205Z",
+      "event": "application.call",
+      "requestId": "96b309f1-7636-4519-bd23-b4197123158f",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 0,
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:08:06.205Z",
+      "event": "application.complete",
+      "requestId": "96b309f1-7636-4519-bd23-b4197123158f",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "durationMs": 0,
+      "rpcOperations": [
+        "ApplicationEvents.readEvents"
+      ],
+      "rpcErrorCount": 0
+    },
+    {
+      "time": "2026-11-14T08:08:06.205Z",
+      "event": "request.complete",
+      "requestId": "96b309f1-7636-4519-bd23-b4197123158f",
+      "traceId": "27d98a7f162541b5bfafacd8fa738501",
+      "route": "/api/application",
+      "durationMs": 1,
+      "bodyReadMs": 0,
+      "bodyFirstByteMs": 0,
+      "bodyParseMs": 0,
+      "rpcMs": 0
+    },
+    {
+      "time": "2026-11-14T08:08:07.726Z",
+      "event": "request.aborted",
+      "requestId": "fd95e81a-507d-41e2-91dc-883876d76474",
+      "traceId": "31b8a0ead4a34666ace7aef83d4cbab6",
+      "route": "/api/application/events",
+      "durationMs": 33668
+    }
+  ]
+}

@@ -1,0 +1,567 @@
+{
+  "date": "2026-11-14",
+  "sourceCommit": "f9923e69",
+  "version": "20261114T075951-f9923e69-dirty",
+  "schema": "Normalized logical execution rows, immutable cold details, current/by-record/active covering keys in the existing SQLite records(path,field,value) table; no application-specific physical SQL columns added.",
+  "benchmark": {
+    "dataset": {
+      "historyRuns": 1200,
+      "requestedRecords": 2,
+      "sqlite": "node:sqlite",
+      "durability": "normal",
+      "host": "warm SQLite and OS page cache",
+      "businessResultCache": false
+    },
+    "baseline": [
+      {
+        "durationMs": 18.79440900000003,
+        "bytes": 7038267,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 1,
+          "getRecordFields": 4,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      },
+      {
+        "durationMs": 19.954683999999986,
+        "bytes": 7038267,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 1,
+          "getRecordFields": 4,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      },
+      {
+        "durationMs": 20.245521999999994,
+        "bytes": 7038267,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 1,
+          "getRecordFields": 4,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      },
+      {
+        "durationMs": 15.911882999999989,
+        "bytes": 7038267,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 1,
+          "getRecordFields": 4,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      },
+      {
+        "durationMs": 14.827515000000005,
+        "bytes": 7038267,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 1,
+          "getRecordFields": 4,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      }
+    ],
+    "optimized": [
+      {
+        "durationMs": 1.0765239999999494,
+        "bytes": 358,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 0,
+          "getRecordFields": 5,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      },
+      {
+        "durationMs": 0.3251030000000128,
+        "bytes": 358,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 0,
+          "getRecordFields": 5,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      },
+      {
+        "durationMs": 0.28599800000006326,
+        "bytes": 358,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 0,
+          "getRecordFields": 5,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      },
+      {
+        "durationMs": 0.2887640000000147,
+        "bytes": 358,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 0,
+          "getRecordFields": 5,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      },
+      {
+        "durationMs": 0.293521999999939,
+        "bytes": 358,
+        "sidecar": {
+          "getMetaExt": 1,
+          "getMetaExtMany": 0,
+          "upsertMetaExt": 0,
+          "deleteMetaExt": 0,
+          "movePathData": 0,
+          "assertPathDataVacant": 0,
+          "syncTags": 0,
+          "getAllDistinctTags": 0,
+          "queryByTag": 0,
+          "listTagEntries": 0,
+          "getRecordField": 0,
+          "getRecordFields": 5,
+          "getRecordFieldsMany": 0,
+          "setRecordField": 0,
+          "deleteRecordField": 0,
+          "listRecordFields": 0,
+          "listRecordFieldsPage": 0,
+          "clearRecordFields": 0,
+          "transaction": 0,
+          "readTransaction": 2,
+          "begin": 0,
+          "commit": 0,
+          "rollback": 0,
+          "healthCheck": 0,
+          "close": 0
+        },
+        "count": 2
+      }
+    ],
+    "migrationMs": 304.80257,
+    "checkpoint": {
+      "durationMs": 1.1409869999999955,
+      "sidecar": {
+        "getMetaExt": 0,
+        "getMetaExtMany": 0,
+        "upsertMetaExt": 0,
+        "deleteMetaExt": 0,
+        "movePathData": 0,
+        "assertPathDataVacant": 0,
+        "syncTags": 0,
+        "getAllDistinctTags": 0,
+        "queryByTag": 0,
+        "listTagEntries": 0,
+        "getRecordField": 2,
+        "getRecordFields": 0,
+        "getRecordFieldsMany": 0,
+        "setRecordField": 4,
+        "deleteRecordField": 1,
+        "listRecordFields": 1,
+        "listRecordFieldsPage": 0,
+        "clearRecordFields": 0,
+        "transaction": 0,
+        "readTransaction": 0,
+        "begin": 1,
+        "commit": 1,
+        "rollback": 0,
+        "healthCheck": 0,
+        "close": 0
+      },
+      "writeCount": 5
+    },
+    "recovery": {
+      "durationMs": 0.838006000000064,
+      "sidecar": {
+        "getMetaExt": 2,
+        "getMetaExtMany": 0,
+        "upsertMetaExt": 0,
+        "deleteMetaExt": 0,
+        "movePathData": 0,
+        "assertPathDataVacant": 0,
+        "syncTags": 0,
+        "getAllDistinctTags": 0,
+        "queryByTag": 0,
+        "listTagEntries": 0,
+        "getRecordField": 0,
+        "getRecordFields": 9,
+        "getRecordFieldsMany": 0,
+        "setRecordField": 0,
+        "deleteRecordField": 0,
+        "listRecordFields": 1,
+        "listRecordFieldsPage": 0,
+        "clearRecordFields": 0,
+        "transaction": 0,
+        "readTransaction": 4,
+        "begin": 0,
+        "commit": 0,
+        "rollback": 0,
+        "healthCheck": 0,
+        "close": 0
+      },
+      "count": 1
+    },
+    "queryPlan": [
+      "SEARCH records USING INDEX sqlite_autoindex_records_1 (path=? AND field=?)"
+    ],
+    "queryPlanPrefixBefore": [
+      "SEARCH records USING INDEX idx_records_path (path=?)"
+    ],
+    "queryPlanPrefixAfter": [
+      "SEARCH records USING INDEX idx_records_path (path=? AND field>? AND field<?)"
+    ]
+  },
+  "summary": {
+    "baseline": {
+      "medianMs": 18.79440900000003,
+      "bytes": 7038267
+    },
+    "optimized": {
+      "medianMs": 0.293521999999939,
+      "bytes": 358
+    }
+  },
+  "controlledMobile": {
+    "viewport": "390x844",
+    "latencyMs": 100,
+    "downloadBytesPerSecond": 200000,
+    "cpuSlowdown": 4,
+    "runs": [
+      {
+        "host": "first access after restart",
+        "durationMs": 4840.694787,
+        "httpRequests": 6,
+        "methods": {
+          "onChange": 1,
+          "readEvents": 1,
+          "assistantOverview": 1
+        },
+        "errors": [],
+        "scope": "succeeded"
+      },
+      {
+        "host": "warm",
+        "durationMs": 4835.137753,
+        "httpRequests": 6,
+        "methods": {
+          "onChange": 1,
+          "readEvents": 1,
+          "assistantOverview": 1
+        },
+        "errors": [],
+        "scope": "succeeded"
+      },
+      {
+        "host": "warm",
+        "durationMs": 4736.160199999999,
+        "httpRequests": 7,
+        "methods": {
+          "onChange": 1,
+          "readEvents": 2,
+          "assistantOverview": 1
+        },
+        "errors": [],
+        "scope": "succeeded"
+      }
+    ],
+    "logicalCalls": "one per observed API request in these runs; no RPC batches",
+    "note": "Third run followed the read-only diagnostic probe and observed an extra event replay; it is retained rather than excluded."
+  },
+  "live": [
+    {
+      "page": {
+        "durationMs": 98.39732800000002,
+        "rows": 11
+      },
+      "measurements": [
+        {
+          "stage": "record.progress.storage",
+          "events": [
+            {
+              "operationId": "51511f8b-cb9d-46f3-a36c-2c6161713527",
+              "requestId": "b36f2acb-9c54-4165-a8b7-69bd8a2ac9f3",
+              "result": "success",
+              "durationMs": 1,
+              "count": 10,
+              "readCount": 1,
+              "bytes": 4246
+            },
+            {
+              "operationId": "ee9ffbac-1913-4a58-98d2-a611365b0036",
+              "requestId": "3d854ff2-d9e7-4d0b-b437-dc5beaacc7b6",
+              "result": "success",
+              "durationMs": 3,
+              "count": 10,
+              "readCount": 1,
+              "bytes": 4246
+            },
+            {
+              "operationId": "bcbe97f2-f22b-4892-92a1-cb026432f2bd",
+              "requestId": "2e4a54b8-397d-4d72-b35f-3624d31a556d",
+              "result": "success",
+              "durationMs": 3,
+              "count": 10,
+              "readCount": 1,
+              "bytes": 4246
+            }
+          ]
+        },
+        {
+          "stage": "record.items.storage",
+          "events": [
+            {
+              "operationId": "0e8d8ed3-f652-42e2-b56b-f2b0166d4eaf",
+              "requestId": "b36f2acb-9c54-4165-a8b7-69bd8a2ac9f3",
+              "result": "success",
+              "durationMs": 5,
+              "count": 2,
+              "readCount": 1
+            },
+            {
+              "operationId": "68ac3850-df6d-4b84-b027-01d044d7625f",
+              "requestId": "3d854ff2-d9e7-4d0b-b437-dc5beaacc7b6",
+              "result": "success",
+              "durationMs": 5,
+              "count": 2,
+              "readCount": 1
+            },
+            {
+              "operationId": "7280d2ff-a1b2-4b09-b5a3-22418876340a",
+              "requestId": "2e4a54b8-397d-4d72-b35f-3624d31a556d",
+              "result": "success",
+              "durationMs": 5,
+              "count": 2,
+              "readCount": 1
+            }
+          ]
+        },
+        {
+          "stage": "record.runs.migrate",
+          "events": [
+            {
+              "operationId": "e0ce3ed8-3c04-4f2e-a60a-2ef9425d2af7",
+              "result": "success",
+              "durationMs": 14,
+              "count": 25
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "kanbanFullTestsBeforeHostBinding": 334,
+    "hostBindingAndPublicRuntime": 16,
+    "sqliteLocal": 61,
+    "sqliteNodeAndCLI": 5,
+    "hostExecutionAndDiagnostic": 38,
+    "authenticatedHTTPAndRestart": 33,
+    "performance": "core/transport/ui passed, cleanup confirmed",
+    "types": "changed packages and prior workspace check passed",
+    "temporaryScopes": "successful final runs cleaned; profiling script error was corrected separately"
+  },
+  "limits": [
+    "Synthetic warm SQLite/OS-cache benchmark is not whole-page speedup.",
+    "Storage statement count did not fall proportionally; payload and JSON parsing work fell.",
+    "Old binaries need offline legacy-format restoration before rollback after this schema migration.",
+    "Public network under-five-second acceptance remains unresolved."
+  ]
+}
