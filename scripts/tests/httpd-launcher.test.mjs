@@ -15,9 +15,26 @@ async function fixture(){
  const env={...process.env,NESTOS_HTTPD_CONTROL_DIR:path.join(root,'control')},runners=[];
  const run=(command,args=[])=>{const child=spawn(process.execPath,['runner.mjs',command,...args],{cwd:root,env,stdio:'ignore'});runners.push(child);return child;};
  const state=async()=>{const dirs=await import('node:fs/promises').then(fs=>fs.readdir(env.NESTOS_HTTPD_CONTROL_DIR)).catch(()=>[]);return dirs.length?readFile(path.join(env.NESTOS_HTTPD_CONTROL_DIR,dirs[0],'release.json'),'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return;throw error;}):undefined;};
+ const saveState=async value=>{const {readdir}=await import('node:fs/promises');const [directory]=await readdir(env.NESTOS_HTTPD_CONTROL_DIR);await writeFile(path.join(env.NESTOS_HTTPD_CONTROL_DIR,directory,'release.json'),JSON.stringify(value));};
  const wait=async predicate=>{const end=Date.now()+6000;while(Date.now()<end){const s=await state();if(s&&await predicate(s))return s;await sleep(20);}throw new Error('STATE_TIMEOUT');};
- return{root,releases,run,state,wait,close:async()=>{const stop=run('stop',['--timeout-ms','3000']);await Promise.race([once(stop,'exit'),sleep(3500)]);for(const p of runners)if(p.exitCode===null&&!p.signalCode)p.kill('SIGKILL');const s=await state();if(s?.child&&await processIdentity(s.child.pid))process.kill(s.child.pid,'SIGKILL');await rm(root,{recursive:true,force:true});}};
+ return{root,releases,run,state,saveState,wait,close:async()=>{const stop=run('stop',['--timeout-ms','3000']);await Promise.race([once(stop,'exit'),sleep(3500)]);for(const p of runners)if(p.exitCode===null&&!p.signalCode)p.kill('SIGKILL');const s=await state();if(s?.child&&await processIdentity(s.child.pid))process.kill(s.child.pid,'SIGKILL');await rm(root,{recursive:true,force:true});}};
 }
+for(const command of ['start','restart'])test(`${command} resets an exhausted budget after the launcher stopped`,async()=>{const f=await fixture();try{
+ const first=f.run('start');await f.wait(s=>s.healthyAt);
+ const exited=once(first,'exit'),stop=f.run('stop',['--timeout-ms','5000']);assert.equal((await once(stop,'exit'))[0],0);await exited;
+ const previous=await f.state();await f.saveState({...previous,restarts:3,healthyAt:1});
+ await writeFile(path.join(f.releases,'current.json'),'{"id":"next"}');f.run(command);
+ const recovered=await f.wait(s=>s.childRelease==='next'&&s.healthyAt>1);
+ assert.equal(recovered.restarts,1);assert.equal(recovered.serviceId,previous.serviceId);assert.deepEqual(recovered.receipts,previous.receipts);
+ }finally{await f.close();}});
+test('launcher recovery preserves the retry limit for a running service',async()=>{const f=await fixture();try{
+ const first=f.run('start');const running=await f.wait(s=>s.healthyAt);
+ const exited=once(first,'exit');process.kill(first.pid,'SIGKILL');await exited;
+ process.kill(running.child.pid,'SIGTERM');while(await processIdentity(running.child.pid))await sleep(20);
+ await f.saveState({...await f.state(),desiredState:'running',restarts:3});
+ const resumed=f.run('start');assert.equal((await once(resumed,'exit'))[0],1);
+ const stopped=await f.state();assert.equal(stopped.desiredState,'stopped');assert.equal(stopped.restarts,3);
+ }finally{await f.close();}});
 test('switches once, rolls a bad candidate back and does not restart after stop',async()=>{const f=await fixture();try{
  f.run('start');const first=await f.wait(s=>s.healthyAt);const launcher=first.launcher.pid;
  const change=f.run('switch',['next','--expected-current','first','--operation-id','switch-next','--timeout-ms','5000']);assert.equal((await once(change,'exit'))[0],0);

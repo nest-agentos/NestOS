@@ -35,7 +35,7 @@ async function startChild(root,releases,id,args){
     child.stdout.on('data',chunk=>{output.write(chunk);process.stdout.write(chunk);});child.stderr.on('data',chunk=>{output.write(chunk);process.stderr.write(chunk);});
     child.once('error',error=>lifecycleLog({stage:'launcher.spawn',result:'failure',code:error.code??'HTTPD_SPAWN_FAILED'}));child.once('close',()=>output.close());
     try{const record=await registerHttpd(root,'release',child.pid,entry,args);
-        await changeLaunch(root,'release',state=>({...state,child:record,childRelease:id}));child.send('start');return record;
+        await changeLaunch(root,'release',state=>({...state,child:record,childRelease:id,healthyAt:undefined}));child.send('start');return record;
     }catch(error){child.kill('SIGTERM');throw error;}
 }
 async function healthy(root,id,probe,timeoutMs){
@@ -66,8 +66,10 @@ export async function runLauncher(root,releases,args){
     await changeLaunch(root,'release',async old=>{
         if(await launcherAlive(old))throw launchFailure('HTTPD_ALREADY_RUNNING');
         const hosts=await runningHttpd(root,'release',releases);if(hosts.some(host=>host.birth!==old?.child?.birth))throw launchFailure('HTTPD_ALREADY_RUNNING');
+        const fresh=old?.desiredState!=='running'&&(!old?.operation||terminal.has(old.operation.phase));
+        if(fresh&&old?.restarts)lifecycleLog({operationId:randomUUID(),stage:'launcher.retry.reset',result:'success',previousRestarts:old.restarts,durationMs:0});
         return {...old,schema:1,root:path.resolve(root),mode:'release',serviceId:old?.serviceId??'httpd-'+randomUUID(),args:old?.operation&&!terminal.has(old.operation.phase)?old.args:args,
-            desiredState:old?.operation&&!terminal.has(old.operation.phase)?old.desiredState:'running',currentRelease:old?.desiredState==='running'?old.currentRelease:await selected(releases),launcher:identity,receipts:old?.receipts??{},restarts:old?.restarts??0};
+            desiredState:old?.operation&&!terminal.has(old.operation.phase)?old.desiredState:'running',currentRelease:old?.desiredState==='running'?old.currentRelease:await selected(releases),launcher:identity,receipts:old?.receipts??{},restarts:fresh?0:old?.restarts??0,healthyAt:fresh?undefined:old?.healthyAt};
     });
     const probe=launchHealth(root,(await readLaunch(root,'release')).args,'release');
     const stop=()=>{void changeLaunch(root,'release',old=>({...old,desiredState:'stopped'})).catch(error=>lifecycleLog({stage:'launcher.stop',result:'failure',code:error.code}));};
@@ -81,7 +83,7 @@ async function loop(root,releases,probe){
         if(state.operation&&!terminal.has(state.operation.phase)){try{await switchRelease(root,releases,state.operation,probe,probe.timeoutMs??120000);}catch(error){const current=await readLaunch(root,'release');if(state.operation.previous&&state.operation.phase!=='rollback'&&(!await alive(current.child)||current.childRelease!==state.operation.previous))await updateOperation(root,state.operation.id,{phase:'rollback',code:error.code??'HTTPD_SWITCH_FAILED'});else await finish(root,state.operation.id,'failure',error.code??'HTTPD_SWITCH_FAILED');}continue;}
         if(!await alive(state.child)){
             if(state.child)await unregisterHttpd(root,'release',state.child);
-            if(state.restarts>=3){await changeLaunch(root,'release',old=>({...old,desiredState:'stopped'}));throw launchFailure('HTTPD_RESTART_LIMIT');}
+            if(state.restarts>=3){await changeLaunch(root,'release',old=>({...old,desiredState:'stopped'}));throw Object.assign(launchFailure('HTTPD_RESTART_LIMIT'),{message:'HTTPD_RESTART_LIMIT: Three automatic startup attempts failed. Inspect the runtime log, fix the startup error, then run pnpm httpd again.'});}
             if(state.restarts)await pause(Math.min(8000,1000*2**state.restarts));
             await changeLaunch(root,'release',old=>({...old,restarts:old.restarts+1}));await startChild(root,releases,state.currentRelease,state.args);
             const good=await healthy(root,state.currentRelease,probe,probe.timeoutMs??120000);if(!good){await stopChild(root,releases);continue;}

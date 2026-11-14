@@ -75,6 +75,7 @@ import { createRemoteExecutionProvider } from '../projects/execution/remote-prov
 import { ProjectExecutionService } from '../projects/execution/service';
 import type { ProjectExecutionProvider } from '../projects/execution/contracts';
 import { attachProjectDraftRecovery } from './project-draft-recovery';
+import { diagnosticFailure } from '../diagnostics/failure';
 import { ProjectRemoteMountService, type RemoteFileSourceProvider } from '../projects/remote-mounts';
 import { HarnessConnectionService } from '../projects/harness-connections';
 import { createHarnessExecutionProvider } from '../projects/harness-execution';
@@ -229,7 +230,10 @@ export interface ApplicationRuntimeOptions {
 export async function createApplicationRuntime(options: ApplicationRuntimeOptions): Promise<ApplicationRuntime> {
     const diagnostics = new DiagnosticJournal();
     const policy = applicationStartupPolicy(options.startupMode);
-    const startup = new StartupCoordinator();
+    const startup = new StartupCoordinator({trace: traceBoot, report: (stage, error) => {
+        diagnostics.record({module: 'application', operation: 'application.startup', stage, result: 'failure', level: 'warn',
+            ...diagnosticFailure(error instanceof AggregateError ? error.errors[0] : error)});
+    }});
     const cleanupFns: CleanupStep[] = [];
     const sourceCleanupFns: Array<() => void | Promise<void>> = [];
     let remoteConnections: ProjectRemoteMountService | undefined;
@@ -573,9 +577,12 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             id => recovery.acquireMetadataLease(id), { canRelease: id => conversationIdle(kernel.kernel, id) });
         cleanupFns.push(cleanupStep('conversations.dispose', disposeConversations));
         cleanupFns.push(cleanupStep('conversationContexts.close', () => conversationContexts.close()));
-        await startup.schedule(policy.invocations, 'instructions.recover', async () => {
+        await startup.schedule(policy.remoteConversations, 'remote.instructions.recover', async () => {
             await initializeProjects();
             await traceBoot('remote.instructions.recover', async () => remoteConnections?.recoverConversations());
+        });
+        await startup.schedule(policy.invocations, 'instructions.recover', async () => {
+            await initializeProjects();
             cleanupFns.push(await traceBoot('flowSchedulers.recover', () => recoverFlowSchedulers(kernel.kernel, commandBus, id => recovery.acquireLater(id))));
             await traceBoot('instructionQueues.recover', () => recoverInstructionQueues(instructionQueueSessions, kernel.kernel, conversationContexts));
         });
@@ -586,8 +593,10 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 .catch(error => console.warn(`[Shell] Session ${event.payload.sessionId} recovery failed; writes remain blocked`, error));
         });
         cleanupFns.push(unsubscribeSessionLease);
-        cleanupFns.push(await attachProjectDraftRecovery(projects.drafts, sessionManager, false));
-        await startup.schedule(policy.drafts, 'projects.drafts.recover', async () => { await initializeProjects(); await projects.drafts.recover(); });
+        const draftRecovery = await attachProjectDraftRecovery(projects.drafts, sessionManager, false, {periodic: true,
+            report: event => diagnostics.record({...event, module: 'application', operation: 'projects.drafts.recover', level: event.result === 'failure' ? 'warn' : 'info'})});
+        cleanupFns.push(draftRecovery);
+        await startup.schedule(policy.drafts, 'projects.drafts.recover', async () => { await initializeProjects(); await draftRecovery.recover(); });
 
         // Seed the default essay-review workflow so users have a runnable example.
         await traceBoot('seedDefaultFlows', () => seedDefaultFlows(new FlowDefinitionStore(flowEngine, kernel.dagPlugins), id => installations.ensure(id)));
@@ -722,6 +731,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             recovery.stopBackground();
             kernelCore.beginObservationDrain();
             const requests = [
+                stop('draftRecovery.close', draftRecovery),
                 stop('sessionRecovery.close', () => sessionRecovery.close()),
                 stop('startup.close', () => startup.close()),
                 stop('kanban.quiesce', () => kanban.quiesce()),

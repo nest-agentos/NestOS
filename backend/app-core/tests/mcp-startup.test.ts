@@ -3,7 +3,7 @@ import { MemoryBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { mockMCPDiscovery } from './helpers/mcp-discovery';
 
-async function startupFixture() {
+async function startupFixture(mode: 'interactive' | 'server' = 'interactive') {
     const backend = new MemoryBackend();
     for (const path of ['/etc', '/etc/llm', '/etc/llm/.mcp']) await backend.mkdir(path);
     await backend.write('/etc/llm/.mcp/remote.json', new TextEncoder().encode(JSON.stringify({ id: 'remote', name: 'Remote',
@@ -14,13 +14,13 @@ async function startupFixture() {
         fileProtocol: 'fs-agent-http-v1', harness: true, projects: true, projectProtocol: 'fs-agent-project-v1' });
     const transport = fetch.getMockImplementation()!;
     fetch.mockImplementation(async (...args) => { await gate; return transport(...args); });
-    const runtime = await createApplicationRuntime({ backend, ownerKind: 'cli', startupMode: 'interactive', digitalTwinAutoStart: false,
+    const runtime = await createApplicationRuntime({ backend, ownerKind: 'cli', startupMode: mode, digitalTwinAutoStart: false,
         remoteSourceProvider: { setCredential() {}, dispose: async () => {}, open: async () => { throw new Error('not used'); } } });
     return { runtime, fetch, release };
 }
 
-it('keeps Cells configuration independent of MCP discovery', async () => {
-    const { runtime, fetch, release } = await startupFixture();
+it.each(['interactive', 'server'] as const)('keeps %s startup and Cells configuration independent of stalled MCP discovery', async mode => {
+    const { runtime, fetch, release } = await startupFixture(mode);
     const remote = runtime.projects.remoteMounts!, changed = vi.fn();
     const stop = remote.onChange(changed);
     try {

@@ -4,6 +4,7 @@ import { Kernel } from '@nestos/durable-kernel';
 import { DirectoryMountService } from '../src/vfs/directory-mounts';
 import { SessionRepository, VFSAgentService } from '@nestos/llm-session';
 import { ProjectRemoteMountService } from '../src/projects/remote-mounts';
+import { ProjectDraftService } from '../src/projects/drafts/service';
 import { createApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { createInfrastructure } from '../src/runtime/infrastructure';
 import type { ApplicationPlatformServices } from '../src/runtime/create-application-runtime';
@@ -36,6 +37,21 @@ describe('application infrastructure', () => {
 });
 
 describe('host application startup', () => {
+    it('starts the server with offline draft recovery and stalled remote observations', async () => {
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => {release = resolve;});
+        const recovery = vi.spyOn(ProjectDraftService.prototype, 'recover').mockRejectedValue(Object.assign(new Error('offline'), {code: 'ECONNREFUSED'}));
+        const remote = vi.spyOn(ProjectRemoteMountService.prototype, 'recoverConversations').mockImplementation(() => gate);
+        let runtime: Awaited<ReturnType<typeof createApplicationRuntime>> | undefined;
+        try {
+            runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'httpd', startupMode: 'server', digitalTwinAutoStart: false,
+                remoteSourceProvider: {setCredential() {}, dispose: async () => {}, open: async () => {throw new Error('offline');}}});
+            expect(await runtime.vfs.openFileSystem('/')).toBeDefined();
+            await vi.waitFor(() => expect(recovery).toHaveBeenCalled());
+            expect(remote).toHaveBeenCalled();
+            expect((await runtime.diagnostics.query()).events).toContainEqual(expect.objectContaining({operation: 'projects.drafts.recover', code: 'ECONNREFUSED'}));
+        } finally {release(); await runtime?.dispose(); recovery.mockRestore(); remote.mockRestore();}
+    });
     it('keeps Agent scanning out of deferred boot and initializes on first asynchronous use', async () => {
         const initialize = vi.spyOn(VFSAgentService.prototype, 'init');
         const runtime = await createApplicationRuntime({ backend: new MemoryBackend(), ownerKind: 'web',

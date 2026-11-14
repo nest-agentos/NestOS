@@ -1,4 +1,5 @@
 import {preparedTitle} from './title';
+import {mapConcurrent} from '../../utils/map-concurrent';
 import { FSError } from '@nestos/vfs-core';
 import type { ISessionRepository } from '@nestos/llm-session';
 import { type SessionSubmission } from '@nestos/llm-flow/contracts';
@@ -67,8 +68,13 @@ export class ProjectDraftService {
         if (event.submission?.source.kind !== 'project-draft' || event.submission.id !== event.roundId) return;
         await this.reconcile(event.submission.source.ownerId, event.sessionId, event.roundId);
     }
-    async recover(sessionId?: string, roundId?: string): Promise<void> {
-        for (const projectId of await this.projectIds()) await this.reconcile(projectId, sessionId, roundId);
+    async recover(sessionId?: string, roundId?: string, deferred?: (projectId: string, error: unknown) => void): Promise<void> {
+        const failures: unknown[] = [];
+        await mapConcurrent(await this.projectIds(), 4, async projectId => {
+            try { await this.reconcile(projectId, sessionId, roundId); }
+            catch (error) { failures.push(error); deferred?.(projectId, error); }
+        });
+        if (failures.length) throw new AggregateError(failures, 'Project draft recovery deferred');
     }
     async reconcile(projectId: string, sessionId?: string, roundId?: string): Promise<void> {
         const draft = this.store(projectId), record = await draft.load();

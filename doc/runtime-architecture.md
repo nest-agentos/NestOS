@@ -168,7 +168,7 @@ C4Component
 
 ### 独立 httpd 与 CLI `-d`
 
-二者调用同一个 `apps/node-host/http`。HTTP 宿主使用 `startupMode: 'server'`；LLM、设备、MCP 首次连接尝试、项目、Skill、Agent、调用恢复和草稿初始化完成后才 listen。MCP 不可达可降级，本地必要初始化失败则释放资源并拒绝启动。静态页面使用完整 HTTP Web UI，不再伪装 Tauri invoke，也不提供第二套 SQL/FS bridge。
+二者调用同一个 `apps/node-host/http`。HTTP 宿主使用 `startupMode: 'server'`；本地 LLM 配置、设备、项目索引、Skill、Agent 与本地调用恢复完成后 listen。MCP、远程会话观察和项目草稿回执恢复在独立后台任务中执行，不依赖远端节点可达；节点离线仅影响其绑定资源。草稿按 15/30/60 秒退避定时核对，远程观察仅重试失败目标，保留持久身份与授权边界；关闭时取消定时器并排空核对。本地必要初始化失败仍释放资源并拒绝启动。静态页面使用完整 HTTP Web UI，不再伪装 Tauri invoke，也不提供第二套 SQL/FS bridge。
 
 日志文件按 cli-local、cli-remote、httpd-cli、httpd-dev/release、tauri-dev/release 命名。CLI 操作诊断与服务端审计分开，Tauri LLM 日志仅保存状态、时长和字节数。命令、认证、生命周期及日志路径见 [CLI 与 HTTP 模式](http-mode.md)，协议见 [HTTP 应用宿主](http-app.md)。
 

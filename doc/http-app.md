@@ -485,7 +485,9 @@ HTTP release 在隔离构建完成后保留已选择版本及最近另一版本�
 
 Safari 可能把失败的 modulepreload 留在内存缓存中，普通刷新仍会重复失败（[WebKit 270357](https://bugs.webkit.org/show_bug.cgi?id=270357)）。启动失败页的重新加载按钮先以 `cache: reload` 重新获取已捕获失败项及页面模块，再重新加载文档；仅允许同源 `assets/` 下的 hash JS/CSS，去除查询参数，不执行响应正文、不清理草稿或浏览器数据。请求逐个消费，总时限 15 秒、单个 8 秒；网络/认证失败保留错误页及重试，已退役的 404 模块转为重新加载当前 HTML。诊断记录阶段、数量、结果和安全资源名；宿主审计的 asset 字段也只记录 hash JS/CSS 文件名，不记录用户路径和查询参数。Safari 18 同代 WebKit 回归已复现一次 503 导致普通刷新仍失败，调用实际修复模块后恢复成功。
 
-httpd 使用 `startupMode: 'server'`：LLM 配置与设备、MCP 首次自动连接尝试、依赖的项目目录、Skill、Agent、会话调用恢复和项目草稿初始化完成后才创建监听。失败向启动入口传播，关闭 Runtime、存储、日志并释放目录锁，不打印服务已启动，也不开放健康检查。远端 MCP 首次尝试失败作为已观测的连接状态保留，不要求所有远端服务可达；持续任务恢复、周期扫描与分身分析不等待业务运行结束。Web/Tauri 的交互式延迟初始化策略保持独立。
+httpd 使用 `startupMode: 'server'`：本地 LLM 配置与设备、项目索引、Skill、Agent 和本地会话调用恢复完成后创建监听。本地必要初始化失败向启动入口传播，关闭 Runtime、存储、日志并释放目录锁。MCP 连接、远程会话观察及草稿回执恢复独立在后台进行，外部服务离线或连接超时不阻止监听，也不阻塞本地执行恢复、后台 worker 或其他节点的资源操作；不可用范围仅限对应连接及绑定资源。Web/Tauri 的交互式延迟初始化策略保持独立。
+
+运行时独占一组草稿恢复定时检查，失败按 15/30/60 秒退避，成功后回到 15 秒检查；同一轮不重入，各项目并发隔离失败。远程会话观察复用已有恢复循环，仅重试暂时失败的目标，包括 `fetch` 的 `cause.code` 网络错误，不重新接线已恢复目标。每轮重新读取原持久记录并核对授权、会话及回执，不重发结果未知的执行或改写身份；授权失效不能通过重试放行。草稿诊断记录项目 ID、operationId、阶段、安全错误分类和耗时，不记录草稿或网络响应正文。关闭运行时先取消定时器并等待已开始的核对，再释放存储。
 
 默认只监听 HTTPS `0.0.0.0:2000`，backlog 为 4096。TLS 验证客户端证书与 clients.json 的 SHA-256 指纹，没有匿名或明文入口。CA、密钥、浏览器导入包和审计日志位于数据根之外。
 
@@ -668,6 +670,8 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 `pnpm httpd` 常驻启动器管理 release 子进程。`pnpm httpd:status` 返回服务 ID、当前版本和切换回执；`pnpm httpd:switch <release-id> --operation-id <id> --expected-current <version>` 请求版本切换。`httpd:restart` 选取构建后的 release，不重新构建。旧宿主在安全点退出后才启动候选版本，健康检查失败自动回退原版本。
 
 控制状态位于 `$XDG_CONFIG_HOME/nestos/httpd-launchers/<项目路径摘要>/release.json`（默认 `~/.config`），可用 `NESTOS_HTTPD_CONTROL_DIR` 覆盖；文件权限 0600，独立于 worktree 和 release。状态保存服务 ID、目标版本、进程身份和幂等回执；启动器重启接管已登记的候选进程，继续核对。显式 stop 持久化停止意图，不会被守护循环复活；未到安全点仍等待，只有显式 `--force` 可升级停止。
+
+自动启动尝试连续三次未能稳定运行时，启动器记录停止意图并返回 `HTTPD_RESTART_LIMIT`。先查运行日志中的启动错误，修复后再次执行 `pnpm httpd` 或 `pnpm httpd:restart`，会重置已停止服务的重试计数并启动当前选择的 release，无需删除控制状态。启动器崩溃后接管仍处于运行或版本切换中的服务时保留重试计数；每个新子进程重新计量健康持续时间，避免旧进程的健康时间掩盖连续失败。
 
 健康配置在 `nestos.json` 的 `http.launcher.health`：可选 `url`、`ca`、`cert`、`key`、`timeoutMs`；默认使用本机 `/api/health` 和 http.certDir 下的客户端证书，验证实际 version 与目标一致。`/api/health` 另返回稳定 serviceId 供显式项目目标配置使用，它不是授权凭据。
 

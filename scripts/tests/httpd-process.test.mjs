@@ -78,6 +78,7 @@ test('restart waits for the former host to exit and registers exactly one replac
         await writeFile(path.join(root, 'scripts/httpd-runtime.mjs'), `export const hostArguments=()=>[],hostEnvironment=()=>process.env,runtimePaths=()=>({runtime:'unused'}),runtimeLog=()=>({write(){},close(){}}),releaseDirectory=(r,id)=>r+'/'+id,releasesRoot=root=>root+'/release/httpd',verifyRelease=()=>{};`);
         await writeFile(path.join(root,'scripts/httpd-launch-health.mjs'),'export const launchHealth=()=>async()=>true;');
         await writeFile(path.join(root, 'scripts/httpd-build.mjs'), 'export function buildHttpRelease() {}');
+        await writeFile(path.join(root, 'scripts/httpd-native-runtime.mjs'), 'export function ensureNativeRuntime() {}');
         await writeFile(path.join(root, 'tools/temporary-process/node/index.mjs'), 'export async function recover() {}');
         await writeFile(path.join(releases, 'current.json'), '{"id":"fixture"}');
         await writeFile(entry, "process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);");
