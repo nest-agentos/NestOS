@@ -2,13 +2,13 @@
   {
     "directory": "ui-common",
     "name": "@nestos/ui-common",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
     "directory": "vfs-core",
     "name": "@nestos/vfs-core",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
@@ -32,25 +32,25 @@
   {
     "directory": "cells-driver",
     "name": "@nestos/cells-driver",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
     "directory": "vfs-sync",
     "name": "@nestos/vfs-sync",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
     "directory": "driver-llm",
     "name": "@nestos/driver-llm",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
     "directory": "mdxeditor",
     "name": "@nestos/mdxeditor",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
@@ -62,19 +62,19 @@
   {
     "directory": "image-parser",
     "name": "@nestos/image-parser",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
     "directory": "durable-kernel",
     "name": "@nestos/durable-kernel",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
     "directory": "device-tty",
     "name": "@nestos/device-tty",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "workspace": true
   },
   {
