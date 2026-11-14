@@ -89,5 +89,22 @@
   ],
   "applicationReleaseId": "20261114T103823-94866a5c-dirty",
   "toolingTests": 5,
-  "git": "Current branches of all 21 attached submodules pushed; no force push; backup and worktree branches excluded"
+  "git": "Current branches of all 21 attached submodules pushed; no force push; backup and worktree branches excluded",
+  "verification": {
+    "standaloneInstall": {
+      "packages": 16,
+      "result": "passed",
+      "lifecycleScripts": "disabled"
+    },
+    "standaloneRuntime": {
+      "result": "passed",
+      "checks": [
+        "ESM and CommonJS public exports",
+        "FSError identity across subpaths",
+        "Memory structured ioctl and bounded key pages",
+        "Node SQLite typed projection and key index"
+      ]
+    },
+    "temporaryProcessCleanup": "confirmed"
+  }
 }
