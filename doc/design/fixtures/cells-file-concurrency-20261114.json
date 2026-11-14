@@ -1,0 +1,51 @@
+{
+  "version": "20261113T173544-dd9578e2-dirty",
+  "dataset": "existing development board and KBC-2-108; desktop Chrome; normal background scans",
+  "metrics": [
+    {
+      "scenario": "open-existing-pending-operation",
+      "durationMs": 260.51671799999986,
+      "logicalApiCalls": 12,
+      "httpRequests": 6
+    },
+    {
+      "scenario": "check-original-receipt",
+      "durationMs": 252.919214,
+      "logicalApiCalls": 1,
+      "httpRequests": 1
+    }
+  ],
+  "blocker": "GIT_IDENTITY_MISSING",
+  "recoveryButton": true,
+  "originalSession": true,
+  "recoveryContext": true,
+  "pageErrorNames": [],
+  "dataScale": {
+    "board": "development",
+    "items": 29,
+    "openedOperationOwner": "KBC-2-108",
+    "viewport": "1280x900",
+    "hostState": "warm; operation pane first open in fresh browser context",
+    "backgroundLoad": "normal runtime monitors; no concurrent verification suites"
+  },
+  "cells": {
+    "target": "cr1/cell-x1",
+    "binarySha256": "259490d0cb3ab3e46b520ed58ddfbc073d872ea2ef28102df5e4070c232f9b1a",
+    "unrelatedCommandDuringWrites": "running",
+    "directoryAndSeqWritesMs": 108,
+    "logicalWriteCalls": 2,
+    "writeHttpRequests": 2,
+    "commandReaped": true,
+    "temporaryResourceCleanup": "confirmed"
+  },
+  "validation": {
+    "rust": "cargo test --tests (including library tests): succeeded",
+    "workspaceTypecheck": "pnpm typecheck: succeeded",
+    "performanceSuites": [
+      "core",
+      "transport",
+      "ui"
+    ],
+    "browserScopeCleanup": "confirmed"
+  }
+}

@@ -9,9 +9,14 @@ export async function channelMessages(remote: Pick<ProjectRemoteMountService, 's
     if (value.messages.some(row => !row || typeof row.id !== 'string' || !row.message || typeof row.message.type !== 'string')) throw failure('CHANNEL_MESSAGES_INVALID');
     return value.messages;
 }
-export async function readChannelResult(remote: Pick<ProjectRemoteMountService, 'sessionChannel'>, projectId: string, scopeId: string, journal: PromptJournal): Promise<unknown | undefined> {
-    const results = (await channelMessages(remote, projectId, scopeId)).filter(row => row.message.type === 'result');
-    if (!results.length) return undefined;
+export async function readChannelResult(remote: Pick<ProjectRemoteMountService, 'sessionChannel'>, projectId: string, scopeId: string, journal: PromptJournal, options:{reportErrors?:boolean}={}): Promise<unknown | undefined> {
+    const messages=await channelMessages(remote,projectId,scopeId),results=messages.filter(row => row.message.type === 'result');
+    if (!results.length) {
+        const error=options.reportErrors?messages.filter(row=>row.message.type==='error').map(row=>row.message.payload as {operationId?:unknown;code?:unknown}|undefined)
+            .reverse().find(value=>value?.operationId===scopeId&&typeof value.code==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(value.code)):undefined;
+        if(error)throw failure(error.code as string);
+        return undefined;
+    }
     if (results.length !== 1 || !Object.hasOwn(results[0].message, 'payload')) throw failure('CHANNEL_RESULT_INVALID');
     const payload = results[0].message.payload, digest = channelDigest(payload);
     const saved = await journal.update<{digest: string; payload: unknown}>('channel-result:' + scopeId, old => {

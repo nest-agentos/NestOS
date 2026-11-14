@@ -52,12 +52,12 @@ async function preparationStage<T>(options: ReviewOperationsOptions, operationId
         options.log({operationId, stage: 'prepare.' + stage, result: 'failure', code: safeCode(error, 'OPERATION_PREPARATION_FAILED'), durationMs: Date.now() - started}); throw error;
     }
 }
-export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
+export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob,observeOnly=false):Promise<ReviewJob> {
     if(pendingCancellation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))))return (await options.journal.get<ReviewJob>(jobKey(job.id)))??job;
     const rejected=await settleRejectedMerge({...options,policy:developmentAnalysisPolicy},job);if(rejected)return rejected;
     const resource=(job.snapshot.context as {worktreeId?:string})?.worktreeId;if(resource)await indexResourceJob(options.journal,resource,'review',job.id);
     if(job.action==='accept')return acceptReview(options,job);
-    return coordinateOperation({service:options.service,journal:options.journal,key:jobKey(job.id),record:job,port:{
+    return coordinateOperation({observeOnly,service:options.service,journal:options.journal,key:jobKey(job.id),record:job,port:{
         start:async record=>{requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(record.id))),'OPERATION_CANCELLING');const board=await options.service.read(record.boardId);
             if(board.executionControl?.paused)throw Object.assign(new Error('Delivery paused before admission'),{code:'AUTOMATIC_DELIVERY_PAUSED',executionOutcome:'not-started',retryable:true});
             requireValue(!board.lifecycle,'BOARD_STOPPING');
@@ -80,7 +80,7 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
         },classify:reviewFailure,report:options.report}});
 }
 function reviewFailure(error:unknown):import('@nestos/kanban/integration').KanbanOperationFailure {
-    const code=safeCode(error,'OPERATION_OBSERVATION_FAILED'),receipt=error as {executionOutcome?:string;retryable?:boolean;result?:unknown};
+    const code=safeCode(error,safeCode((error as {cause?:unknown})?.cause,'OPERATION_OBSERVATION_FAILED')),receipt=error as {executionOutcome?:string;retryable?:boolean;result?:unknown};
     const unstarted=receipt?.executionOutcome==='not-started';
     const retry=unstarted&&receipt.retryable===true;
     const terminal=['FILE_EXCHANGE_SCOPE_INVALID','FILE_EXCHANGE_REQUEST_CHANGED','FILE_EXCHANGE_RESPONSE_CHANGED','FILE_EXCHANGE_RESULT_CONFLICT','FILE_EXCHANGE_LIMIT','FILE_EXCHANGE_CONTEXT_CHANGED'].includes(code)

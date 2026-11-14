@@ -157,6 +157,17 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     requireValue(!context.board.lifecycle || request.action === 'accept'||request.action==='cancel','BOARD_STOPPING');
     requireValue(request.action==='cancel'||context.item.deletedAt === undefined && context.item.status !== 'cancelled' && context.item.control?.action !== 'cancel', 'TASK_CANCELLING');
     requireValue(/^[\w-]{1,128}$/.test(request.operationId) && (actions.includes(request.action as ReviewAction)||request.action==='skip'||request.action==='cancel'||request.action==='cleanup'), 'OPERATION_REQUEST_INVALID');
+    if(request.reconcile){
+        const job=context.jobs.find(row=>row.id===request.reconcile!.runId);
+        requireValue(job&&job.action===request.action,'OPERATION_SCOPE_MISMATCH');
+        requireValue(request.expectedRevision===revision(context),'OPERATION_STALE_REFRESH');
+        requireValue(job.phase==='submitting'||job.phase==='settled','OPERATION_RECOVERY_UNAVAILABLE');
+        const started=Date.now();
+        const observed=job.phase==='submitting'?await advanceReviewJob(options,job,true):job;
+        options.log({operationId:job.id,boardId:board,itemId:request.itemId,stage:'operation.reconcile',result:observed.state==='unknown'||observed.state==='failed'?'failure':'success',code:observed.code,durationMs:Date.now()-started});
+        await settleDeliveryAcceptance(options,board,request.itemId);
+        return view(options,await load(options,board,request.itemId,false));
+    }
     if(request.action==='cleanup'){
         requireValue(request.expectedRevision===revision(context),'OPERATION_STALE_REFRESH');
         const merged=latest(context,'merge');requireValue(merged?.state==='succeeded'&&context.cleanup?.runId===merged.id&&!context.jobs.some(job=>job.phase!=='settled'),'OPERATION_PREREQUISITE_REQUIRED');
@@ -235,6 +246,9 @@ async function acceptanceJob(options: ReviewOperationsOptions, context: Context,
 }
 
 function validateRequest(request: KanbanItemOperationRequest | KanbanItemOperationBinding): void {
+    if('reconcile'in request)requireValue(!!request.reconcile&&typeof request.reconcile.runId==='string'&&/^[\w-]{1,128}$/.test(request.reconcile.runId)
+        &&!('target'in request)&&!request.cancel&&!request.skip&&request.confirmed!==true&&request.followUp===undefined
+        &&(!request.selections||!Object.keys(request.selections).length),'OPERATION_REQUEST_INVALID');
     requireValue(request?.scopeId===undefined||typeof request.scopeId==='string'&&/^[\w-]{1,128}$/.test(request.scopeId),'OPERATION_SCOPE_INVALID');
     requireValue(request && typeof request === 'object' && typeof request.itemId === 'string' && request.itemId.length > 0 && request.itemId.length <= 256
         && typeof request.operationId === 'string' && /^[\w-]{1,128}$/.test(request.operationId) && !['__proto__', 'constructor', 'prototype'].includes(request.operationId)

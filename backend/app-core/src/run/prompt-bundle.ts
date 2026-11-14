@@ -1,19 +1,51 @@
-import {randomUUID, sha256HexSync} from '@nestos/common';
+import {createModuleLogger, randomUUID, sha256HexSync} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 
 export interface PromptFile {name: string; content: string; sha256: string; source: string}
 export interface PromptBundle {version: 1; files: PromptFile[]}
 export interface PromptJournal {get<T>(key: string): Promise<T | undefined>; update<T>(key: string, change: (old: T | undefined) => T): Promise<T>}
 
+const promptLog = createModuleLogger('PromptBundle');
+const MAX_READ_ATTEMPTS = 3;
+
 export async function readPrompt(fs: IFileSystem, path: string, onRevision?: (revision: string | undefined) => void): Promise<string> {
+    const operationId = randomUUID(), started = Date.now();
+    for (let attempt = 1; attempt <= MAX_READ_ATTEMPTS; attempt++) {
+        const snapshot = await readPromptSnapshot(fs, path);
+        if (!snapshot.conflicts.length) {
+            let content: string;
+            try {content = new TextDecoder('utf-8', {fatal: true}).decode(snapshot.bytes);}
+            catch {throw failure('PROMPT_ENCODING_INVALID');}
+            if (attempt > 1) promptLog.info('Prompt snapshot verified', {operation: 'prompt.read', operationId,
+                stage: 'snapshot.verify', result: 'success', attempt, durationMs: Date.now() - started});
+            onRevision?.(snapshot.revision);
+            return content;
+        }
+        promptLog.warn('Prompt snapshot changed', {operation: 'prompt.read', operationId, stage: 'snapshot.verify',
+            result: 'failure', code: 'PROMPT_READ_CONFLICT', attempt, retrying: attempt < MAX_READ_ATTEMPTS,
+            conflicts: snapshot.conflicts, expectedBytes: snapshot.expectedBytes, actualBytes: snapshot.bytes.byteLength,
+            durationMs: Date.now() - started});
+    }
+    throw failure('PROMPT_READ_CONFLICT');
+}
+
+/** Validators may expire after unrelated remote mutations; re-read the entire snapshot. */
+async function readPromptSnapshot(fs: IFileSystem, path: string) {
     const node = await fs.driver.getNode(path);
     if (node?.type !== 'file' || node.size < 1 || node.size > 65536) throw failure('PROMPT_FILE_INVALID');
-    const bytes = await fs.driver.readContent(path, {encoding: 'binary', length: node.size, onRevision});
+    let revision: string | undefined;
+    const bytes = await fs.driver.readContent(path, {encoding: 'binary', representation: 'bytes', length: node.size,
+        onRevision: value => {revision = value;}});
     const after = await fs.driver.getNode(path);
-    if (bytes.byteLength !== node.size || after?.type !== 'file' || after.revision !== node.revision || after.size !== node.size || after.modifiedAt !== node.modifiedAt)
-        throw failure('PROMPT_READ_CONFLICT');
-    try {return new TextDecoder('utf-8', {fatal: true}).decode(bytes);}
-    catch {throw failure('PROMPT_ENCODING_INVALID');}
+    const conflicts: string[] = [];
+    if (bytes.byteLength !== node.size) conflicts.push('READ_LENGTH_CHANGED');
+    if (after?.type !== 'file') conflicts.push('FILE_TYPE_CHANGED');
+    else {
+        if (after.revision !== node.revision || revision !== undefined && revision !== node.revision) conflicts.push('REVISION_CHANGED');
+        if (after.size !== node.size) conflicts.push('FILE_SIZE_CHANGED');
+        if (after.modifiedAt !== node.modifiedAt) conflicts.push('FILE_MTIME_CHANGED');
+    }
+    return {bytes, revision, conflicts, expectedBytes: node.size};
 }
 
 /** Freeze before transmission; a restart never resolves current authoring files again. */

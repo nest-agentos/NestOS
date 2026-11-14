@@ -26,6 +26,7 @@ import {requireValue} from '../kanban/validation';
 import {readContextCatalog} from '../projects/harness-context-catalog';
 import {snapshotGitSource} from '@nestos/git-delivery/snapshots';
 import {verifyGitIntegration} from '@nestos/git-delivery/integration';
+import {readGitCommitIdentity} from '@nestos/git-delivery/identity';
 import type {PreparedWorktree} from '@nestos/git-delivery/worktrees';
 import {currentChannelBinding, openDevelopmentChannel, type DevelopmentWorkspaceRecord} from './kanban-development';
 import {developmentWorkspace} from './kanban-development-workspace';
@@ -53,9 +54,10 @@ interface MaintenanceInput {extraPrompts?:import('../run/prompt-bundle').PromptF
 interface ReviewResource {id: string; tree: PreparedWorktree; record: DevelopmentWorkspaceRecord}
 export function developmentReviewAdapter(options: Options): ReviewAdapter {
     const watches = new DirectorySubscriptions();
-    const watch = async (job: ReviewJob) => {
+    const watch = async (job: ReviewJob, terminal=false) => {
         const record = await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + job.id);
         requireValue(record?.communicationDirectory, 'OPERATION_WORKSPACE_UNAVAILABLE');
+        if(terminal)await readChannelResult(options.remote,record.projectId,job.id,options.journal,{reportErrors:true});
         await watches.ensure(job.id, async () => {const client = await options.remote.projectHarness(record.projectId);
             requireValue(client.subscribeChannel, 'SESSION_CHANNEL_REQUIRED');
             const stop = client.subscribeChannel(job.id, () => options.wake?.());
@@ -73,7 +75,7 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
         snapshot: (board, item) => snapshot(options, board, item), close: () => watches.dispose(),
         prepareAnalysis: input => prepareAnalysis(options, input), prepareOperation: async input => prepareAnalysis(options,{...input,...(input.action==='build'?{deployment:await managed?.describe?.(input.item)}:{})}),
         exchange: options.submission ? async (job, observation, beforeResume) => {
-            const record = await watch(job);
+            const record = await watch(job,observation.outcome==='succeeded');
             return developmentChannelExchange({...options, submission: {...options.submission!,start:async request=>{requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))),'OPERATION_CANCELLING');return options.submission!.start(request);}}}, {id: job.id, record, service: options.service,
                 base: job.request!, observation, targetHead: job.snapshot.targetVersion,
                 beforeResume: async () => {await beforeResume?.();requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))),'OPERATION_CANCELLING');requireValue((await snapshot(options, await options.service.read(job.boardId), (await options.service.item(job.boardId, job.itemId)).item)).version === job.snapshot.version, 'MERGE_PLAN_SOURCE_CHANGED');},
@@ -127,6 +129,9 @@ async function prepareAnalysis(options: Options, input: MaintenanceInput): Promi
 }
 async function freezeAnalysis(options: Options, current: ReviewResource,
     input: MaintenanceInput, sessionId: string, directory: string,nativeSessionId:string): Promise<void> {
+    const existing=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+input.id);
+    const gitIdentity=existing?existing.gitIdentity:current.record.gitIdentity??(input.action==='merge'
+        ?await developmentWorkspace(options.remote,options.provider,current.record.projectId,readGitCommitIdentity):undefined);
     const folder = await options.projects.get(current.record.projectId), view = await options.projects.openWorkspace(folder.path);
     try {
         const basePolicy = await developmentPolicy(options.journal, options.fs, view.fs, input.id,
@@ -142,7 +147,7 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
         await publishPromptBundle(view.fs, directory, policy.prompts, {operationId: input.id, phase:input.action??'analyze',...(input.deployment?{deployment:input.deployment}:{}),receiptPath:'_nestos/kanban/review/'+input.id+'/result.json',approval: approvalText ? {path: 'operation-input.json', sha256: sha256HexSync(approvalText)} : null, boardId: input.board.id,
             itemId: input.item.id, sessionId, input: current.record.context, commitContexts: {path: 'commit-contexts.json', sha256: sha256HexSync(contextText)}, sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, resources: input.snapshot.context});
         await options.journal.update('worktree:' + input.id, old => old ?? current.tree);
-        const record = await options.journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.id, old => old ?? {...current.record, channelId: input.id, worktreeId: current.id, communicationDirectory: directory, policy,
+        const record = await options.journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.id, old => old ?? {...current.record,gitIdentity, channelId: input.id, worktreeId: current.id, communicationDirectory: directory, policy,
             context: {...current.record.context as object, operation: {operationId: input.id, phase:input.action??'analyze',...(input.deployment?{deployment:input.deployment}:{}),receiptPath:'_nestos/kanban/review/'+input.id+'/result.json',approval: input.context ?? null,
                 sourceVersion: input.snapshot.sourceVersion, targetVersion: input.snapshot.targetVersion, commitContexts: context, resources: input.snapshot.context}}});
         await openDevelopmentChannel(options.remote, input.id, record, {runId: input.id, itemId: input.item.id, attemptId: input.id}, input.item,
@@ -157,7 +162,7 @@ async function readAnalysis(options: Options, job: ReviewJob): Promise<unknown |
 }
 
 async function readReviewResult(options: Options, projectId: string, job: ReviewJob): Promise<unknown | undefined> {
-    const payload = await readChannelResult(options.remote, projectId, job.id, options.journal);
+    const payload = await readChannelResult(options.remote, projectId, job.id, options.journal,{reportErrors:true});
     if ((payload as {learnings?: unknown} | undefined)?.learnings !== undefined) {
         const publications = await channelMessages(options.remote, projectId, job.id);
         const results = publications.filter(row => row.message.type === 'result'), result = results[0];

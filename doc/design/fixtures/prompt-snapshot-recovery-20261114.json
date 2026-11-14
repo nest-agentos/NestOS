@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "date": "2026-11-14",
+  "httpdVersion": "20261113T234828-dd9578e2-dirty",
+  "scenario": {
+    "cell": "cr1:cx1",
+    "item": "KBC-2-110",
+    "dataset": "Existing development board; desktop Chrome 1280x900; normal background scans; warm host and fresh operation pane"
+  },
+  "reproduction": {
+    "action": "Create and remove a separate directory during a read of an unchanged 305-byte prompt",
+    "beforeFix": "PROMPT_READ_CONFLICT",
+    "sizeAndMtimeChanged": false,
+    "revisionChanged": true,
+    "afterFix": "Full snapshot re-read succeeded with unchanged content",
+    "cleanup": "confirmed"
+  },
+  "implementation": {
+    "maxSnapshotReadAttempts": 3,
+    "checks": [
+      "file type",
+      "read length",
+      "file size",
+      "mtime",
+      "before/read/after revisions",
+      "UTF-8",
+      "immutable content equality"
+    ],
+    "initialPlanningStageExplicit": true
+  },
+  "recovery": {
+    "scopeId": "988c344c-a776-4c74-9fbf-495c5281ca14",
+    "sessionId": "01a1d74c-4ffb-7be2-8ab1-350cf685adb5",
+    "followupTurnId": "01a1d74f-ca59-7a13-80b4-2ca791bd2c69",
+    "reportId": "kbc-2-110-plan-20261113-01",
+    "reportReady": true,
+    "hostAnalysisState": "ready",
+    "newTaskDispatchOnMissingReport": false
+  },
+  "browser": {
+    "metrics": [
+      {
+        "scenario": "open-failed-planning",
+        "durationMs": 102.1590229999997,
+        "logicalApiCalls": 9,
+        "httpRequests": 5
+      },
+      {
+        "scenario": "retry-planning-admission",
+        "durationMs": 1277.5951140000002,
+        "logicalApiCalls": 15,
+        "httpRequests": 9
+      },
+      {
+        "scenario": "open-recovered-planning",
+        "durationMs": 288.9921589999999,
+        "logicalApiCalls": 12,
+        "httpRequests": 6
+      }
+    ],
+    "pageErrors": [],
+    "cleanup": "confirmed"
+  },
+  "validation": {
+    "targetedTests": {
+      "filesPassed": 4,
+      "testsPassed": 38
+    },
+    "typecheck": "passed",
+    "docsCheck": "passed",
+    "performance": {
+      "core": "passed",
+      "transport": "passed",
+      "ui": "passed",
+      "cleanup": "confirmed"
+    },
+    "additionalWholePackageRun": {
+      "passed": 2032,
+      "failed": 2,
+      "skipped": 13,
+      "failedFile": "backend/app-core/tests/conversation-early-interaction.test.ts",
+      "targetedRerun": "same two failures; corresponding code not changed in this fix"
+    }
+  },
+  "temporaryDriverNote": "The continuation browser waited for a hidden composer to clear and timed out after a single send. Native history independently confirmed exactly one admitted follow-up turn; it completed and published the report above. Browser scope cleanup was confirmed; no resend was performed."
+}

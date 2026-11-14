@@ -51,3 +51,18 @@ it('does not archive a native session which is still running',async()=>{
     await expect(nativeSessionArchive(f.kernel,f.projects,remote as unknown as ProjectRemoteMountService,journal)('s','archive-op')).rejects.toMatchObject({code:'SESSION_ARCHIVE_STILL_RUNNING'});
     expect(archive).not.toHaveBeenCalled();
 });
+
+it.each([0,2])('distinguishes %s matching projects without contacting a guessed native target',async(count)=>{
+ const {nativeSessionArchive}=await import('../src/projects/session-archive'),f=await fixture();
+ vi.mocked(f.projects.list).mockResolvedValue(Array.from({length:count},(_,index)=>({path:'/project-'+index,project:{id:'project-'+index}})) as any);
+ const remote=Object.assign(f.remote,{projectHarness:vi.fn()}),journal={get:async()=>undefined,update:vi.fn()};
+ await expect(nativeSessionArchive(f.kernel,f.projects,remote as unknown as ProjectRemoteMountService,journal as never)('s','archive-op')).rejects.toMatchObject({code:count?'SESSION_ARCHIVE_BINDING_AMBIGUOUS':'SESSION_ARCHIVE_PROJECT_UNAVAILABLE'});
+ expect(remote.projectHarness).not.toHaveBeenCalled();expect(journal.update).not.toHaveBeenCalled();
+});
+it('retains a frozen archive operation when its project binding no longer matches',async()=>{
+ const {nativeSessionArchive}=await import('../src/projects/session-archive'),f=await fixture();
+ const saved={phase:'prepared',projectId:'x1',nodeConnectionId:'old-node',workspaceId:'workspace',profileId:'codex',sessionId:'native-one',epoch:'epoch'};
+ const remote=Object.assign(f.remote,{projectHarness:vi.fn()}),journal={get:async()=>saved,update:vi.fn()};
+ await expect(nativeSessionArchive(f.kernel,f.projects,remote as unknown as ProjectRemoteMountService,journal as never)('s','archive-op')).rejects.toMatchObject({code:'SESSION_ARCHIVE_BINDING_CHANGED'});
+ expect(remote.projectHarness).not.toHaveBeenCalled();expect(journal.update).not.toHaveBeenCalled();
+});

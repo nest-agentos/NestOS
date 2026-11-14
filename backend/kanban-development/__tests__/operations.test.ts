@@ -38,6 +38,36 @@ async function fixture(configure?:(options:ReviewOperationsOptions)=>void) {
     };
     return {acceptRuntime, api, options, journal, item, actor, published, submission, adapter, snapshot, plan, reference, run, bind, complete, result, service};
 }
+it('manually reconciles the original operation without starting it again, then accepts its validated receipt',async()=>{
+    const f=await fixture();await f.bind('build');await f.run('build','original-build');
+    f.published.inspect.mockResolvedValue({state:'succeeded'} as never);await f.api.scan();
+    let view=await f.api.itemOperations('board','task'),entry=view.operations.find(row=>row.id==='build')!;
+    expect(entry).toMatchObject({enabled:false,state:'unknown',recovery:{runId:'original-build'}});
+    const frozen=await f.journal.get<ReviewJob>(jobKey('original-build'));
+    view=await f.api.runItemOperation('board',{operationId:'check-original',itemId:'task',action:'build',expectedRevision:view.revision,reconcile:{runId:'original-build'}});
+    expect(view.operations.find(row=>row.id==='build')).toMatchObject({state:'unknown',runId:'original-build'});
+    f.complete('original-build');
+    view=await f.api.runItemOperation('board',{operationId:'check-receipt',itemId:'task',action:'build',expectedRevision:view.revision,reconcile:{runId:'original-build'}});
+    expect(view.operations.find(row=>row.id==='build')).toMatchObject({state:'succeeded',runId:'original-build'});
+    expect((await f.journal.get<ReviewJob>(jobKey('original-build')))?.fingerprint).toBe(frozen?.fingerprint);
+    expect(f.published.start).toHaveBeenCalledOnce();expect(f.submission.start).not.toHaveBeenCalled();
+});
+it('rejects reconciliation with stale state, another action or a mixed execution request',async()=>{
+    const f=await fixture();await f.bind('build');await f.run('build');
+    const view=await f.api.itemOperations('board','task');
+    const request={operationId:'check',itemId:'task',action:'build',expectedRevision:view.revision,reconcile:{runId:'build'}};
+    await expect(f.api.runItemOperation('board',{...request,expectedRevision:'0'.repeat(64)})).rejects.toMatchObject({code:'OPERATION_STALE_REFRESH'});
+    await expect(f.api.runItemOperation('board',{...request,action:'merge'})).rejects.toMatchObject({code:'OPERATION_SCOPE_MISMATCH'});
+    expect(()=>f.api.runItemOperation('board',{...request,confirmed:true})).toThrow('OPERATION_REQUEST_INVALID');
+    expect(f.published.start).toHaveBeenCalledOnce();
+});
+it('reports fetch connection errors specifically during original operation reconciliation',async()=>{
+    const f=await fixture();await f.bind('build');await f.run('build');
+    f.published.inspect.mockRejectedValue(new TypeError('private endpoint',{cause:Object.assign(Error('private'),{code:'ECONNREFUSED'})}));
+    await f.api.scan();
+    expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='build')).toMatchObject({state:'unknown',code:'ECONNREFUSED',recovery:{runId:'build'}});
+    expect(JSON.stringify(vi.mocked(f.options.log).mock.calls)).not.toContain('private endpoint');
+});
 it('does not start anything on query and requires a compatible frozen Flow binding', async () => {
     const f = await fixture(), view = await f.api.itemOperations('board', 'task');
     expect(view.operations.find(op => op.id === 'build')).toMatchObject({enabled: false, configurable: true});

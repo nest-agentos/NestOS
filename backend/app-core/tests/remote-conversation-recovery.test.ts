@@ -64,14 +64,16 @@ it('refuses startup recovery against another remote principal before opening a c
     expect(events.persistence).toBe('ready'); expect(events.events).toContainEqual(expect.objectContaining({operation: 'remote.queue.recover', code: 'ECONFLICT'}));
 });
 
-it('retries only transiently deferred targets with backoff and leaves recovered observers alone', async () => {
+it.each(['direct', 'fetch-cause'] as const)('retries only transiently deferred targets (%s) and leaves recovered observers alone', async kind => {
     const f = await fixture(); vi.useFakeTimers();
     const second = new RemoteConversationStore(f.fs, JSON.stringify(['project', 'connection', 'export', 'principal', 'codex', 'second']));
     await second.load(); await second.save({...await f.store.load(), sessionId: 'second'});
     const send = vi.fn(), read = vi.fn(async () => ({})), close = vi.fn(async () => {});
     let attempts = 0;
     const open = vi.fn(async target => {
-        if (target.sessionId === 'second' && ++attempts < 3) throw Object.assign(new Error('Private transport'), {code: 'EIO'});
+        if (target.sessionId === 'second' && ++attempts < 3) throw kind === 'direct'
+            ? Object.assign(new Error('Private transport'), {code: 'EIO'})
+            : new TypeError('fetch failed', {cause: Object.assign(new Error('Private endpoint'), {code: 'ECONNREFUSED'})});
         return {read, close, send, snapshot: () => ({})} as never;
     });
     const loop = new RemoteConversationRecoveryLoop(f.fs, open, () => {}); cleanup.push(() => loop.close());

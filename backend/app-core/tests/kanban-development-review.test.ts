@@ -9,6 +9,7 @@ import {developmentReviewAdapter} from '../src/presets/kanban-development-review
 import {managementReviewAdapter} from '../src/presets/kanban-management-review';
 const mock = vi.hoisted(() => ({dirty: false, busy: false, context: true, rejectGit:false, ancestry:0, process: {}}));
 vi.mock('../src/presets/kanban-development-workspace', () => ({developmentWorkspace: async (_remote, _provider, _project, work) => work(mock.process)}));
+vi.mock('@nestos/git-delivery/identity',()=>({readGitCommitIdentity:vi.fn(async()=>({name:'Project Automation',email:'automation@example.invalid'}))}));
 vi.mock('../src/presets/kanban-work-resource-execution', () => ({workResourceExecution: async () => mock.busy ? ['OPERATION_ORIGINAL_SESSION_BUSY'] : []}));
 vi.mock('@nestos/git-delivery/inspection', () => ({inspectWorktree: async () => ({exists: true, head: 'source-head', targetHead: 'target-head', targetBranch: 'main'})}));
 vi.mock('@nestos/git-delivery/repositories', () => ({gitWorkspace: async (_process,_directory,args) => {if(mock.rejectGit)throw Object.assign(new Error('Git should only run at execution boundaries'),{code:'TEST_GIT_DURING_OBSERVATION'});return {stdout: mock.dirty ? ' M file' : '',code:args[0]==='merge-base'&&args[2]==='source-head'?mock.ancestry:0};}, verifyWorktreeDelivery: async () => [{path: '.', fingerprint: 'delivery'}]}));
@@ -116,6 +117,22 @@ it('accepts already-integrated delivery without inventing a target commit and re
  const job={id:'merge-confirm',action:'merge',boardId:'board',itemId:'task',request,snapshot} as never;
  expect(await f.api.readOperation!(job)).toEqual(payload);mock.ancestry=1;
  await expect(f.api.readOperation!(job)).rejects.toMatchObject({code:'OPERATION_RESULT_MERGE_UNCONFIRMED'});
+});
+it('freezes a configured Git identity for integration even when development intentionally kept changes uncommitted',async()=>{
+    const f=await fixture(),snapshot=await f.api.snapshot(f.board,f.item);
+    await f.api.prepareOperation!({id:'merge-identity',action:'merge',board:f.board,item:f.item,snapshot});
+    expect(await f.journal.get('development-workspace:merge-identity')).toMatchObject({gitIdentity:{name:'Project Automation',email:'automation@example.invalid'}});
+    expect(f.channels.channel).toHaveBeenCalledWith('project','open',expect.objectContaining({scopeId:'merge-identity',snapshot:expect.objectContaining({policy:expect.objectContaining({gitIdentity:{name:'Project Automation',email:'automation@example.invalid'}})})}));
+    expect(f.submission.start).not.toHaveBeenCalled();
+});
+it('reports a completed operation blocker before opening native observation or resuming its Session',async()=>{
+    const f=await fixture(true),snapshot=await f.api.snapshot(f.board,f.item);
+    const request=await f.api.prepareOperation!({id:'merge-blocked',action:'merge',board:f.board,item:f.item,snapshot});
+    const harness=vi.spyOn(f.options.remote,'projectHarness');
+    f.channels.report('merge-blocked','missing-identity',{type:'error',content:'Private detail',payload:{operationId:'merge-blocked',code:'GIT_IDENTITY_MISSING'}});
+    await expect(f.api.exchange!({id:'merge-blocked',action:'merge',boardId:'board',itemId:'task',request,snapshot} as never,
+        {sessionId:'original-session',outcome:'succeeded'})).rejects.toMatchObject({code:'GIT_IDENTITY_MISSING'});
+    expect(harness).not.toHaveBeenCalled();expect(f.submission.start).not.toHaveBeenCalled();
 });
 
 it('resolves the canonical dispatch workspace without requiring a duplicate card reference',async()=>{

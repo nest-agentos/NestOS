@@ -23,7 +23,7 @@ export function developmentAnalysis(options: Options,wake:()=>void=()=>{}) {
         const workspace=await journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+input.id);
         requireValue(workspace,'SESSION_CHANNEL_WORKSPACE_REQUIRED');
         await watch(input.id,workspace.projectId);
-        return {target:prepared.target,contextRef:{scopeId:input.id,section:'planning-input'},instruction:'Read `decision.md` via `session_context` and follow its references as needed.'};
+        return {target:prepared.target,contextRef:{scopeId:input.id,section:'planning-input'},instruction:'Current stage: active planning. Read `decision.md` via `session_context` and execute its main instructions and references. Lifecycle sections such as postload apply only when explicitly requested in a later lifecycle call. Finish through the planning report protocol.'};
     };
     async function watch(id:string,projectId:string) {
         await watches.ensure(id,async()=>{

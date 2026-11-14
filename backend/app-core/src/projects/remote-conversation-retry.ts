@@ -1,10 +1,11 @@
 import {createModuleLogger, randomUUID} from '@nestos/common';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {ProjectConversationPort} from '@nestos/app-contracts/services';
+import {diagnosticFailure} from '../diagnostics/failure';
 import {recoverRemoteConversationQueues, type RemoteConversationRecoveryTarget, type RemoteRecoveryDiagnostic} from './remote-conversation-recovery';
 
 const log = createModuleLogger('remote-conversation-recovery');
-const transient = new Set(['EIO', 'ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET', 'ECONNABORTED', 'ENETUNREACH', 'EHOSTUNREACH']);
+const transient = new Set(['EIO', 'ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET', 'ECONNABORTED', 'ENETUNREACH', 'EHOSTUNREACH', 'ENOTFOUND', 'NETWORK_ERROR']);
 
 /** Retry observation attachment only; the persisted journal remains the recovery index. */
 export class RemoteConversationRecoveryLoop {
@@ -40,7 +41,7 @@ export class RemoteConversationRecoveryLoop {
             });
         } catch (error) {
             this.retryAll = canRetry(error);
-            const code = (error as {code?: string})?.code;
+            const code = diagnosticFailure(error).code;
             const event: RemoteRecoveryDiagnostic = {operationId: randomUUID(), stage: 'scan', result: 'deferred',
                 code: transient.has(code ?? '') ? code : 'RECOVERY_SCAN_FAILED', durationMs: Date.now() - started};
             log.warn('remote.queue.recover', event); this.diagnostic(event);
@@ -54,6 +55,5 @@ export class RemoteConversationRecoveryLoop {
     }
 }
 function canRetry(error: unknown): boolean {
-    const failure = error as {code?: string};
-    return transient.has(failure?.code ?? '');
+    return transient.has(diagnosticFailure(error).code);
 }
