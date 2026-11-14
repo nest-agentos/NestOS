@@ -98,6 +98,7 @@ const agentLog = createModuleLogger('agent-workspace');
 const sidebarLog = createModuleLogger('workbench-sidebar');
 
 /** Stable identity of the sidebar's restored UI state; the host persists it per scope. */
+import type {WorkbenchSources} from './workbench-sources';
 import {SESSION_BROWSER_SCOPE} from '../persistence/documents';
 export {SESSION_BROWSER_SCOPE} from '../persistence/documents';
 
@@ -136,6 +137,8 @@ function compareSessionEntries(a: VFSNodeUI, b: VFSNodeUI): number | undefined {
 }
 
 export interface SessionWorkbenchOptions {
+    opening?: import('@nestos/app-contracts/services').ConversationWorkbenchView;
+    sources?: WorkbenchSources;
     onUnavailableResource?(path:string):Promise<boolean>;
     openProjectDecisions?(projectId:string):Promise<void>;
     initialResource?: string;
@@ -165,7 +168,7 @@ export interface SessionWorkbenchOptions {
     deferNavigation?: boolean;
     prepareSession?(sessionId: string): Promise<boolean>;
     /** Host-owned snapshot storage; omitted means the sidebar restores nothing. */
-    uiPersistence?: UIPersistencePort;
+    uiPersistence?: UIPersistencePort & Pick<WorkbenchStatePort, 'begin'>;
     workbenchState?: WorkbenchStatePort;
     windows?: import('../workbench/windows').WorkbenchWindowBinding;
     agents?: {resourceId(id: string): string | undefined; usage?: EditorOptions['executorUsage'];
@@ -284,6 +287,11 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly sessionsReady: Promise<ProjectSessions>;
     private readonly backend: ApplicationBackend;
     private readonly initialResource?: string;
+    private readonly presentationState?: WorkbenchStatePort;
+    private readonly opening?: import('@nestos/app-contracts/services').ConversationWorkbenchView;
+    private readonly sources?: WorkbenchSources;
+    private initialConversation?: import('@nestos/app-contracts/services').PreparedConversation;
+    private initialFailure?: import('@nestos/app-contracts/services').ConversationWorkbenchView['failure'];
     private initialSession?: SessionOpenView;
     private initialData?: import('@nestos/app-contracts/services').SessionEditorInitialData;
     private chatConfiguration?: WorkbenchChatControls['configuration'];
@@ -293,7 +301,10 @@ export class SessionWorkbench implements WorkspaceController {
         this.backend = options.backend;
         this.agentOptions = options.agents; this.agentProjects = new AgentProjectPreferences(this.backend);
         this.agentCatalog = lazyResource(() => this.backend.toolboxView(), view => view.dispose());
-        this.initialResource = options.initialResource;
+        this.presentationState = options.workbenchState;
+        this.initialResource = options.initialResource; this.opening = options.opening; this.sources = options.sources;
+        this.initialFailure = options.opening?.failure;
+        this.initialConversation = options.opening?.native && options.sources?.conversation(options.opening.native);
         this.taskView = new SessionTaskView(this.backend, {
             begin: () => { const version = ++this.contentVersion; return () => !this.closed && version === this.contentVersion; },
             mount: panel => this.tabs.content.replaceChildren(panel),
@@ -379,7 +390,7 @@ export class SessionWorkbench implements WorkspaceController {
 
     async start(): Promise<void> {
         this.sessions ??= await this.sessionsReady;
-        const view = await this.backend.workbenchView({ displayedFilesPolicy: 'gitignore', chatControls: !!this.createFactory,
+        const view = this.opening?.workbench ?? await this.backend.workbenchView({ displayedFilesPolicy: 'gitignore', chatControls: !!this.createFactory,
             initialNavigation: this.resourceNavigationVisible, initialSessionId: initialSessionId(this.initialResource) });
         this.initialSession = view.initialSession;
         this.initialData = view.initialData;
@@ -388,12 +399,12 @@ export class SessionWorkbench implements WorkspaceController {
         this.sessionSkills ??= view.chat?.sessionSkills;
         this.remoteStatus = new RemoteSessionStatusView(harnessObservation, this.projects, () => this.sidebarUI?.refreshList(),
             (id, icon, tooltip) => this.tabs.setStatus(id, icon, tooltip),
-            (id, title) => this.tabs.title(id, title), view.connections);
+            (id, title) => this.tabs.title(id, title), this.opening ? undefined : view.connections);
         this.browser = view.browser;
         this.lifecycle = view.lifecycle;
         this.search = view.search;
         this.navigationFiles = createFileSystemView({ viewId: 'session-navigation:admin', mounts: [
-            { mountId: 'sessions', at: '/', fs: this.browser.fs, access: 'rw' },
+            { mountId: 'sessions', at: '/', fs: this.sources?.files(this.browser.fs) ?? this.browser.fs, access: 'rw' },
             ...(this.flows && !this.projects ? [{ mountId: 'flows', at: '/@flows', fs: this.flows.fs, access: 'rw' as const }] : []),
         ] });
         this.directorySeeds = directorySnapshot(this.navigationFiles);
@@ -591,6 +602,7 @@ export class SessionWorkbench implements WorkspaceController {
             if (this.projects) this.showWelcome();
             else this.message('选择一个会话，或新建会话');
         }
+        await this.sources?.start();
         this.remoteStatus.setNavigationVisible(this.resourceNavigationVisible);
         if (this.navigationVisible) await this.setNavigationVisible(true);
         else this.sidebarUI.setVisible?.(false);
@@ -611,6 +623,8 @@ export class SessionWorkbench implements WorkspaceController {
         if (!visible || this.closed) {
             this.sidebarLayout.navigation.inert = false; this.projectNavigation?.cancelPending(); this.searchPanel?.cancel(); return;
         }
+        const finish = this.uiPersistence?.begin?.();
+        try {
         let prepared: ProjectNavigationView | undefined;
         if (!this.navigationReady && this.startNavigation) {
             this.navigationTask ??= this.startNavigation().catch(error => { this.navigationTask = undefined; throw error; });
@@ -623,7 +637,9 @@ export class SessionWorkbench implements WorkspaceController {
             if (performance.now() - this.navigationReadAt >= 15000) this.navigationDirty = true;
             if (this.navigationDirty || this.viewRefresh.dirty) await this.refresh();
         }
+        await this.fileNavigation;
         await this.localActivity.refresh();
+        } finally {finish?.();}
     }
     /**
      * Stop a running Session and keep every record. Deletion is a separate action; this
@@ -897,6 +913,7 @@ export class SessionWorkbench implements WorkspaceController {
     async setVisible(visible: boolean): Promise<void> {
         if (this.visible === visible || this.closed) return;
         this.visible = visible;
+        await this.opening?.setVisible(visible);
         this.agentDrawer?.setVisible(visible && this.navigationVisible);
         this.remoteStatus?.setVisible(visible);
         if (!visible) this.searchPanel?.cancel();
@@ -1001,15 +1018,16 @@ export class SessionWorkbench implements WorkspaceController {
         const branch = options.branch ?? route.branch;
         const id = target.kind === 'session' ? target.sessionId : path;
         const directoryTarget = target.kind === 'folder' || target.kind === 'favorites' || target.kind === 'project-conversations' || target.kind === 'remote' && !target.nativeSessionId && !target.draft;
-        let opened: SessionOpenView | undefined;
+        let opened: SessionOpenView | undefined, finishPresentation: (() => void) | undefined;
         const operation = this.tail.then(async () => {
+            finishPresentation = this.presentationState?.begin?.();
             if (this.closed) throw new Error('Session workspace closed');
             load.check();
             if (options.newTab) {
                 if (this.tabs.current) this.tabs.keep(this.tabs.current.id);
                 this.tabs.keep(id);
             }
-            this.openingProjects = new Map();
+            this.openingProjects = new Map(this.initialConversation?.resourceId === path ? [[this.initialConversation.project.path, Promise.resolve(this.initialConversation.project)]] : []);
             if (id === this.active && !options.reload && !this.tabs.current?.failed && (branch === undefined || branch === this.activeBranch)) {
                 if (target.kind === 'project-files' || target.kind === 'files') this.scheduleFileNavigation(path, options.fileNavigation);
                 else if (directoryTarget) {
@@ -1075,10 +1093,16 @@ export class SessionWorkbench implements WorkspaceController {
                 this.active = path; this.activeBranch = undefined; this.onSelect(path); this.scheduleFileNavigation(path, options.fileNavigation); return;
             }
             if (target.kind === 'remote') {
-                const project = await this.projectForOpen(target.folder); load.check();
+                const failure = this.initialFailure; this.initialFailure = undefined;
+                if (failure?.resourceId === path) throw Object.assign(new FSError('EIO', failure.code), failure);
+                const prepared = this.initialConversation?.resourceId === path ? this.initialConversation : this.opening
+                    ? this.sources!.conversation(await this.opening.openConversation(path)) : undefined;
+                if (prepared === this.initialConversation) this.initialConversation = undefined;
+                const project = prepared?.project ?? await this.projectForOpen(target.folder); load.check();
                 if (!project || project.path !== target.folder) throw Object.assign(new FSError('ENOENT',t('kanban.errors.DECISION_CONVERSATION_PROJECT_MISSING')),{reason:'REMOTE_PROJECT_MISSING'});
-                if(!target.profileId)throw new FSError('EINVAL','Remote profile is required');
-                const controls = conversationLifetime(await this.projects!.remoteMounts!.projectConversation(project.project.id, target.profileId, target.nativeSessionId, {signal: load.signal, timeoutMs: 3000}, target.archived));
+                if (!target.profileId) throw new FSError('EINVAL','Remote profile is required');
+                if (prepared) this.openingProjects?.set(project.path, Promise.resolve(project));
+                const controls = conversationLifetime(prepared?.conversation ?? await this.projects!.remoteMounts!.projectConversation(project.project.id, target.profileId, target.nativeSessionId, {signal: load.signal, timeoutMs: 3000}, target.archived));
                 let remoteEditor: IEditor | undefined;
                 try {
                     const mount = await this.editorMount(target.folder); load.check();
@@ -1087,7 +1111,7 @@ export class SessionWorkbench implements WorkspaceController {
                     if (controls.conversationId) {tab.panel.dataset.conversationId = controls.conversationId; mount.dataset.conversationId = controls.conversationId;}
                     const root = this.projects!.remoteMounts!.list(project.project.id).find(m => m.at === '/')!;
                     const serverName = this.projects!.remoteMounts!.connectionName(root.connectionId!) ?? project.displayName ?? project.name;
-                    remoteEditor = await this.factory(mount, {conversation: controls, signal: load.signal,
+                    remoteEditor = await this.factory(mount, {conversation: controls, conversationInitial: prepared, signal: load.signal,
                         conversationSource: {kind: controls.kind, label: harnessPresentation(controls.kind, target.profileId).label},
                         mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts, () => this.toggleSidebar()),
                         mountCompactNavigation: container => this.tabs.mountCompactNavigation(container, project.displayName ?? project.name, () => this.toggleSidebar()),
@@ -1212,7 +1236,7 @@ export class SessionWorkbench implements WorkspaceController {
             this.activeBranch = target.kind === 'session' ? branch ?? manifest.currentBranch ?? 'main' : undefined;
             this.onSelect(this.getActiveResourceId()!);
             this.scheduleNavigation(path, {reveal: true, preserveProject: true});
-        });
+        }).finally(() => finishPresentation?.());
         const result = operation.then(() => {
             if (this.viewLoads.isCurrent(load) && this.tabs.current) {
                 this.pendingTarget = undefined;
@@ -1578,12 +1602,14 @@ export class SessionWorkbench implements WorkspaceController {
         if(target.kind!=='remote'||!target.nativeSessionId)return;
         const started=performance.now(),operationId=randomUUID(),revision=this.navigationFiles!.revision;
         try{
-            const data=await this.browser.readDirectory(folderBrowserPath(target.folder),{projectId:this.projectNavigation?.currentProject()?.project.id??null,includeAncestors:true});
+            const projectId=this.projectNavigation?.currentProject()?.project.id??null;
+            const data=this.opening&&this.sources ? this.sources.navigation(await this.opening.readNavigation({resourceId:path,projectId,expandedPaths:this.uiPersistence?.load?.()?.expandedFolderIds}))
+                : await this.browser.readDirectory(folderBrowserPath(target.folder),{projectId,includeAncestors:true});
             if(this.closed||(this.pendingNavigation?.path??this.active??this.initialResource)!==path)return;
             const stale=revision!==this.navigationFiles!.revision||data.directories.some(directory=>directory.stale);
             this.directorySeeds?.seed(data.directories.map(directory=>({...directory,nodes:directory.nodes??(directory.entryIndices??[]).map(index=>data.nodes[index]),revision:this.navigationFiles!.revision,stale:stale||directory.stale})));
             const navigation=data.navigation&&{...data.navigation,path};
-            sidebarLog.debug('project.navigation.prepare',{operationId,stage:'navigation.prepare',result:'success',count:data.directories.length,stale,durationMs:Math.round(performance.now()-started)});
+            sidebarLog.debug('project.navigation.prepare',{operationId,stage:'navigation.prepare',result:'success',count:data.directories.length,stale,revision,currentRevision:this.navigationFiles!.revision,sourceRevision:this.browser.fs.revision,preparedRevision:data.directories[0]?.revision,durationMs:Math.round(performance.now()-started)});
             return stale ? undefined : navigation;
         }catch(error){const code=(error as {code?:unknown})?.code;sidebarLog.warn('project.navigation.prepare',{operationId,stage:'navigation.prepare',result:'failure',code:typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'NAVIGATION_PREPARE_FAILED',durationMs:Math.round(performance.now()-started)});}
     }

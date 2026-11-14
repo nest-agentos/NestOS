@@ -25,6 +25,7 @@ const log = createModuleLogger('native-chat-editor');
 type Binding = Awaited<ReturnType<typeof createNativeChatBinding>>;
 /** Product shell owns navigation/storage; the shared ChatView owns the conversation DOM. */
 export class IndependentConversationEditor extends BaseSettingsEditor<ConversationControls> {
+    private readonly prepared: EditorOptions['conversationInitial'];
     private view?: ChatView;
     private binding?: Binding;
     private operations;
@@ -41,7 +42,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
     private historyBranches?: RemoteHistoryBranches;
     private readonly events = new Map<EditorEvent, Set<(payload: unknown) => void>>();
     constructor(container: HTMLElement, controls: ConversationControls, options: EditorOptions, private store: NativeChatStore, private handoff?: RetainedWorkspaceHandoff, private ocrControls?: import('@nestos/app-contracts/services').OcrControls) {
-        super(container, controls, options); this.owned = !handoff; this.operations = store.ledger();
+        super(container, controls, options); this.prepared = options.conversationInitial; this.owned = !handoff; this.operations = store.ledger();
     }
     async init(container: HTMLElement): Promise<void> {this.container = container; await this.render();}
     async render(): Promise<void> {
@@ -50,7 +51,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
         this.options.signal?.throwIfAborted();
         const owner = this;
         this.historyBranches = new RemoteHistoryBranches(this.container, this.service, this.options, action => this.runBranch(action), error => this.fail(error));
-        this.binding = await createNativeChatBinding({conversationId: sessionId, controls: this.service,
+        this.binding = await createNativeChatBinding({conversationId: sessionId, controls: this.service, initial: this.prepared,
             get readOnly() {return !!owner.options.readOnly;}, reservedNativeCommands: ['branch', 'branches'],
             commandProviders: [{source: {id: 'nestos-branches', label: t('harness.branches')},
                 commands: state => [{id: 'branch', name: 'branch', description: t('branch.create'), revision: 0, kind: 'action', disabled: !state.canFork},

@@ -10,11 +10,12 @@ export class NativeMetricsObserver {
     private busy = false;
     private active = true;
     private closed = false;
-    constructor(private readonly controls: ConversationControls, private readonly changed: (state: ConversationSnapshot) => void) {}
+    constructor(private readonly controls: ConversationControls, private readonly changed: (state: ConversationSnapshot) => void, private prepared = false) {}
     observe(state: ConversationSnapshot): void {
         this.state = state;
         this.key = state.supportsMetrics && state.sessionId && this.controls.refreshMetrics
             ? JSON.stringify([state.sessionId, state.observation?.activeTurnId ?? null, state.observation?.lastResult ?? null]) : undefined;
+        if (this.prepared) {this.prepared = false; this.completed = this.key;}
         this.schedule();
     }
     private schedule(): void {

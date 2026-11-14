@@ -7,6 +7,7 @@ export interface ChatEditorOptions<TSubmission = unknown, TInitial = unknown> ex
     /** Host projection of selectable executors for this editor's immutable context. */
     filterExecutors?(ids: string[]): Promise<string[]>;
     conversation?: ConversationControls;
+    conversationInitial?: Pick<import('@nestos/app-contracts/services').PreparedConversation, 'draft' | 'models' | 'commands' | 'issues'>;
     remoteAgents?: RemoteAgentControls;
     /** A project draft remains separate from history until its first accepted submission. */
     sessionDraft?: SessionDraftControls<TSubmission>;

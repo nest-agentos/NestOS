@@ -1,12 +1,6 @@
+import {bindViewSources, overlay} from './view-sources';
 import {FlowInvocationCommand} from '@nestos/llm-session/contracts';
 import type {SessionPresentationState, ApplicationBackend, ApplicationServices, ApplicationViewEvent, ApplicationViewSources, OpenedApplicationView, WorkbenchView} from '@nestos/app-contracts/services';
-
-function overlay<T extends object>(target: T, overrides: Partial<T>): T {
-    return new Proxy(target, {get(value, key) {
-        if (Object.hasOwn(overrides, key)) return Reflect.get(overrides, key);
-        const item = Reflect.get(value, key, value); return typeof item === 'function' ? item.bind(value) : item;
-    }});
-}
 
 /** Remote events enter once; existing components retain their local subscription contracts. */
 export class OpenedViewProjection {
@@ -28,7 +22,7 @@ export class OpenedViewProjection {
         this.cursor = view.cursor;
         this.recovery = view.initial?.taskAttachment; this.flows = view.initial?.flowInvocations; this.skills = view.initial?.skills;
         this.services = this.bindServices(services);
-        this.prepared = this.bindWorkbench(view.workbench);
+        this.prepared = view.conversationWorkbench ? undefined : this.bindWorkbench(view.workbench);
         this.backend = overlay(backend, {
             workbenchView: settings => {const ready = this.prepared; this.prepared = undefined; return ready ? Promise.resolve(ready) : backend.workbenchView(settings);},
             taskAttachment: async (id, key) => {
@@ -79,8 +73,8 @@ export class OpenedViewProjection {
         }
     }
     private bindServices(source: ApplicationServices): ApplicationServices {
-        const sessionManager = overlay(source.sessionManager, {
-            onGlobalEvent: listener => this.subscribe('global', listener), onEvent: listener => this.subscribe('session', listener),
+        const bound = bindViewSources(source, (topic, listener) => this.subscribe(topic, listener));
+        const sessionManager = overlay(bound.sessionManager, {
             getSnapshot: () => {
                 const baseline = this.hydrating ? this.view.observation.getSessionBaseline?.() : undefined;
                 if (baseline) {this.snapshotCursor = baseline.cursor; return baseline.snapshot;}
@@ -94,21 +88,12 @@ export class OpenedViewProjection {
             }
             return source.commandBus.execute(name, args);
         }) as ApplicationServices['commandBus']['execute']});
-        return {...source, sessionManager, commandBus,
+        return {...bound, sessionManager, commandBus,
             agentService: overlay(source.agentService, {onChange: listener => this.subscribe('agents', listener)}),
-            llmDriver: overlay(source.llmDriver, {onChange: listener => this.subscribe('agents', listener)}),
-            sessionRepository: overlay(source.sessionRepository, {subscribe: listener => this.subscribe('repository', listener)}),
-            sessionFiles: overlay(source.sessionFiles, {subscribe: listener => this.subscribe('files', listener)}),
-            kernel: {...source.kernel, kernel: overlay(source.kernel.kernel, {onChanged: listener => this.subscribe('kernel', listener)})},
-            projects: this.bindProjects(source.projects)};
+            llmDriver: overlay(source.llmDriver, {onChange: listener => this.subscribe('agents', listener)})
+        };
     }
-    private bindProjects(source: ApplicationServices['projects']): ApplicationServices['projects'] {
-        return overlay(source, {
-            favorites: overlay(source.favorites, {subscribe: listener => this.subscribe('favorites', listener)}),
-            drafts: overlay(source.drafts, {onPromoted: listener => this.subscribe('draft', listener)}),
-            remoteMounts: source.remoteMounts ? overlay(source.remoteMounts, {onChange: listener => this.subscribe('mounts', listener)}) : undefined,
-        });
-    }
+
     private bindWorkbench(view: WorkbenchView): WorkbenchView {
         const chat = view.chat;
         return {...view, initialData: this.view.initial,

@@ -1,11 +1,13 @@
 import { createFile } from '@nestos/vfs-core';
 import { favoriteKey, projectNavigation, projectFileSource, projectWorkspaceAccess, toolGrant } from '@nestos/app-contracts';
 import type { ProjectFavoriteTarget,RemoteSessionStatus } from '@nestos/app-contracts/services';
+import {installWorkbenchObservers} from './workbench-observers';
 import {readSessionHistory} from './session-history';
 import {shareFileObservers,shareChangeObservers} from './file-observers';
 
 /** Synchronous UI reads project already loaded snapshots; writes always cross the port. */
 export function installViewProjections(kind: string, proxy: any): void {
+    if (kind === 'ConversationWorkbenchView') installWorkbenchObservers(proxy);
     if (['IFileSystem', 'FileSystemView', 'IFSDriver'].includes(kind)) shareFileObservers(proxy);
     if(kind==='ProjectRemoteMountService')shareChangeObservers(proxy);
     if (kind === 'SessionManagementPort') {

@@ -58,3 +58,10 @@ it('preserves an ancestor access failure instead of publishing a partial snapsho
     f.getChildren.mockImplementation(async path => {if (path === '/') throw new FSError('EACCES', 'Denied'); return original(path);});
     await expect(readDirectoryView(f.fs, f.projects, f.root.path, {includeAncestors: true})).rejects.toMatchObject({code: 'EACCES'});
 });
+it('retains the requested directory when an independently expanded directory is unavailable', async () => {
+    const f = fixture(), original = f.getChildren.getMockImplementation()!;
+    f.getChildren.mockImplementation(async path => {if (path === '/unavailable') throw new FSError('EACCES', 'Private directory'); return original(path);});
+    const view = await readDirectoryView(f.fs, f.projects, f.root.path, {includePaths: ['/unavailable']});
+    expect(view.nodes.map(row => row.path)).toEqual([f.files.path, f.session.path]);
+    expect(view.directoryFailures).toEqual([{path: '/unavailable', code: 'EACCES'}]); expect(view.navigation?.projects).toHaveLength(1);
+});

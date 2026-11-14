@@ -33,3 +33,5 @@ export type * from './ports/server-terminal';
 export type * from './ports/service-control';
 
 export type {AgentProjectScope} from './ports/agent-project-scope';
+
+export type * from './ports/conversation-workbench';

@@ -274,6 +274,10 @@ HarnessExecutionProvider.reconcile 返回 ConnectionReconcileResult；Effect 桥
 
 HTTP v15 的 bootstrap 可携带 OpenViewRequest 并返回 HostedApplicationClient.initialView，先登记观察再导出能力；HttpViewClient 将 SSE viewEvents 适配为本地 ApplicationViewObservation。纯数据按 SHA-256 校准，句柄每个连接独立，见 [一次打开同步握手](./http-app.md#一次打开同步握手与首帧v14)。
 
+既有原生会话使用 `ApplicationBackend.openConversationWorkbench` 返回有生命周期的 `ConversationWorkbenchView`：一次准备工作台、目标会话、草稿、可用输入能力和 UI 文档；`readNavigation` 单独准备侧栏及其关注项目状态。冷路由可由 `openView({resourceId})` 一并返回同一视图。应用层组合独立领域端口，不把看板、harness、布局存储合并成业务服务；发送、授权响应、取消仍走原领域命令及回执。
+
+该视图通过有界 `eventSnapshot` 和现有传输观察更新分发会话、文件与远程状态，前端适配已有订阅接口，不逐个登记远程监听。事件缺口触发只读重新核对；关闭释放观察和资源，隐藏暂停连接关注。会话不可用保留工作台并返回具体分类，非关键输入目录失败单独报告；展开的其他目录失败不会使目标目录失败。目录准备复用 `SessionBrowserPort.readDirectory` 的单次查询作用域，快照修订只在所属文件系统内比较，不跨作用域比较。导航过程中的 UI 文档变化按事务合并保存；这不是跨请求业务缓存。
+
 `ApplicationViewObservation.getSessionBaseline` 返回成对快照/水位，调用者只读使用；传输按公开 `observeView` 的事件更新行投影，不读取具体宿主的内部会话源。`KernelInspectionPort` 仅供 `LocalApplicationServices` 的宿主聚合使用，不属于前端 `KernelViewPort`，也不注册为远程能力。
 
 工作台 `SessionBrowserPort.setSessionFilter(agentId?)` 只改变该观察实例的会话投影；RPC 显式登记此方法。项目会话列表在分页前匹配不可变 `ConversationManifest.createdWithAgentId`，`ProjectSearchQuery.agentId` 对会话搜索执行同一条件，文件检索不受影响。宿主 `EditorOptions.mountSettings` 挂载默认项目偏好并参与保存/销毁；`SessionDraftControls.scope` 为草稿提供项目选择候选及切换回调。

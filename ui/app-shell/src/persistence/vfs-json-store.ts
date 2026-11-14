@@ -12,6 +12,7 @@ export class VfsJsonStore {
     private reading = false;
     private writing?: Promise<void>;
     private suspended = false;
+    private transactionDepth = 0;
     constructor(private readonly backend: DocumentPort) {}
 
     /** Batch the current route's known documents, consuming each prepared read once. */
@@ -60,14 +61,25 @@ export class VfsJsonStore {
         this.prefetched.delete(name);
         this.preloads.delete(name);
         this.pending.set(name, content);
-        if (!this.writing) {
+        if (!this.writing && !this.transactionDepth) {
             this.writing = Promise.resolve().then(() => this.drain());
             void this.writing.catch(error => {if (!this.suspended) console.error('[ui-state] failed to persist', error);});
         }
     }
+    /** Save the final presentation state when one navigation transaction settles. */
+    begin(): () => void {
+        this.transactionDepth++; let closed = false;
+        return () => {
+            if (closed) return; closed = true;
+            if (!--this.transactionDepth && this.pending.size && !this.writing) {
+                this.writing = Promise.resolve().then(() => this.drain());
+                void this.writing.catch(() => console.error('[ui-state] presentation persistence failed'));
+            }
+        };
+    }
     private async drain(): Promise<void> {
         try {
-            while (this.pending.size) {
+            while (this.pending.size && !this.transactionDepth) {
                 const batch = [...this.pending].slice(0, 32);
                 await this.backend.writeUiDocuments(Object.fromEntries(batch.map(([name, content]) => [name, JSON.parse(content)])));
                 for (const [name, content] of batch) {
@@ -80,7 +92,8 @@ export class VfsJsonStore {
     /** Retry failed writes, and report failures to the caller retaining the draft. */
     async flush(): Promise<void> {
         if (this.suspended) {await this.writing?.catch(() => {}); return;}
-        if (!this.writing && this.pending.size) this.writing = this.drain();
+        if (this.transactionDepth) {await this.writing; return;}
+        if (!this.writing && this.pending.size) this.writing = Promise.resolve().then(() => this.drain());
         await this.writing;
     }
     /** A dead view must not retry presentation writes while its replacement is opening. */

@@ -304,3 +304,70 @@ it('shares remote mount change subscriptions and releases only after the last li
     a(); expect(released).not.toHaveBeenCalled();
     b(); await vi.waitFor(() => expect(released).toHaveBeenCalledOnce());
 });
+
+it('delivers workbench changes through view snapshots without per-consumer subscription RPCs', async () => {
+    const listeners = new Set<() => void>(); let events: any[] = [];
+    const view = {documents: {}, native: undefined, workbench: {}, observation: {}, cursor: 0,
+        readNavigation: vi.fn(), openConversation: vi.fn(), dispose: vi.fn(async () => {listeners.clear();}),
+        eventSnapshot: () => ({cursor: events.at(-1)?.sequence ?? 0, firstSequence: events[0]?.sequence ?? 1, events}),
+        subscribe: async (listener: () => void) => {listeners.add(listener); return () => {listeners.delete(listener);}}};
+    const {root, server, client, calls} = await pair(view), first = vi.fn(), second = vi.fn();
+    const a = await root.subscribe(first), b = await root.subscribe(second);
+    expect(listeners.size).toBe(1); expect(calls).toHaveLength(0);
+    events = [{sequence: 1, topic: 'mounts', value: {kind: 'status', projectId: 'p'}}];
+    for (const listener of listeners) listener(); client.applyUpdates(await server.refresh());
+    await vi.waitFor(() => {expect(first).toHaveBeenCalledWith(events[0]); expect(second).toHaveBeenCalledOnce();});
+    a(); events = [...events, {sequence: 2, topic: 'conversation', value: {resourceId: '/folder:p/@harness/native/session'}}];
+    for (const listener of listeners) listener(); client.applyUpdates(await server.refresh());
+    await vi.waitFor(() => expect(second).toHaveBeenCalledTimes(2)); expect(first).toHaveBeenCalledOnce();
+    expect(calls).toHaveLength(0); b(); await root.dispose(); expect(listeners.size).toBe(0);
+});
+it('reports a workbench event gap and resumes at the current snapshot without replaying commands', async () => {
+    const listeners = new Set<() => void>(); let firstSequence = 1, cursor = 0, events: any[] = [];
+    const view = {documents: {}, workbench: {}, cursor: 0, readNavigation: vi.fn(), openConversation: vi.fn(), dispose: async () => {},
+        eventSnapshot: () => ({cursor, firstSequence, events}), subscribe: async (listener: () => void) => {listeners.add(listener); return () => listeners.delete(listener);}};
+    const {root, server, client, calls} = await pair(view), failed = vi.fn(), received = vi.fn(), stop = await root.subscribe(received, failed);
+    cursor = 300; firstSequence = 45; events = [{sequence: cursor, topic: 'mounts', value: undefined}];
+    for (const listener of listeners) listener(); client.applyUpdates(await server.refresh());
+    await vi.waitFor(() => expect(failed).toHaveBeenCalledWith({code: 'WORKBENCH_OBSERVATION_GAP'})); expect(received).not.toHaveBeenCalled();
+    cursor++; events = [...events, {sequence: cursor, topic: 'conversation', value: {resourceId: '/folder:p/@harness/native/session'}}];
+    for (const listener of listeners) listener(); client.applyUpdates(await server.refresh());
+    await vi.waitFor(() => expect(received).toHaveBeenCalledOnce()); expect(calls).toHaveLength(0); stop();
+});
+
+it('applies native request snapshots before notifying the composed workbench consumer', async () => {
+    const viewListeners = new Set<() => void>(), nativeListeners = new Set<() => void>();
+    let state = {sessionId: 's', requests: [{id: 'approval', kind: 'approval'}]}, events: any[] = [];
+    const conversation = {snapshot: () => state, respond: vi.fn(), subscribe: (listener: () => void) => {nativeListeners.add(listener); return () => nativeListeners.delete(listener);}};
+    const view = {documents: {}, workbench: {}, native: {conversation}, cursor: 0, readNavigation: vi.fn(), openConversation: vi.fn(), dispose: async () => {},
+        eventSnapshot: () => ({cursor: events.at(-1)?.sequence ?? 0, firstSequence: 1, events}),
+        subscribe: async (listener: () => void) => {viewListeners.add(listener); return () => viewListeners.delete(listener);}};
+    const {root, server, client, calls} = await pair(view), observed = vi.fn(() => root.native.conversation.snapshot().requests.length);
+    const stop = await root.subscribe(observed); state = {sessionId: 's', requests: []}; events = [{sequence: 1, topic: 'conversation', value: {resourceId: 's'}}];
+    for (const listener of viewListeners) listener(); for (const listener of nativeListeners) listener();
+    client.applyUpdates(await server.refresh()); await vi.waitFor(() => expect(observed).toHaveBeenCalledOnce());
+    expect(observed.mock.results[0].value).toBe(0); expect(calls).toHaveLength(0); stop();
+});
+
+it('waits for the opening reply when SSE patches for a new view arrive first', async () => {
+    let client!: RpcPeer, deliver!: (reply: Reply) => void, opened!: (reply: Reply) => void;
+    const ready = new Promise<Reply>(resolve => {opened = resolve;}), listeners = new Set<() => void>(); let events: any[] = [];
+    const view = {documents: {}, workbench: {}, cursor: 0, readNavigation: vi.fn(), openConversation: vi.fn(), dispose: async () => {},
+        eventSnapshot: () => ({cursor: events.at(-1)?.sequence ?? 0, firstSequence: 1, events}),
+        subscribe: async (listener: () => void) => {listeners.add(listener); return () => listeners.delete(listener);}};
+    const server = new RpcPeer('server', call => client.handle(call));
+    client = new RpcPeer('client', async call => {
+        const reply = await server.handle(call);
+        if (call.method !== 'openConversationWorkbench') return reply;
+        opened(reply); return new Promise(resolve => {deliver = resolve;});
+    }, undefined, installViewProjections); peers.push(server, client);
+    const boot = await server.bootstrap({workbenchView: vi.fn(), toolboxView: vi.fn(), taskDetails: vi.fn(), openConversationWorkbench: async () => view});
+    client.applyUpdates(boot.updates); const root = client.decode(boot.value!), opening = root.openConversationWorkbench({});
+    const response = await ready; events = [{sequence: 1, topic: 'mounts', value: {kind: 'status'}}];
+    for (const listener of listeners) listener(); const notification = await server.refresh();
+    expect(notification.some(update => update && typeof update === 'object' && '$patch' in update)).toBe(true);
+    expect(() => client.applyUpdates(notification)).not.toThrow();
+    const applied = client.waitUpdates(notification); deliver(response); const workspace = await opening; await applied;
+    const received = vi.fn(), stop = await workspace.subscribe(received);
+    await vi.waitFor(() => expect(received).toHaveBeenCalledWith(events[0])); stop();
+});

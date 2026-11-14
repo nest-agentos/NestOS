@@ -49,6 +49,8 @@ await runtime.dispose();
 
 `workbenchView` 返回侧栏文件视图、生命周期、检索、导航/当前项目、可选聊天控制和首目录数据；`openSessionView` 准备元信息与文件租约，activate 在旧编辑器保存后绑定并装配消息/设置；`readUiDocuments/writeUiDocuments` 只存储不透明 UI 文档；`toolboxView` 在后端完成工具箱装配并统一释放资源；`taskDetails/taskEvents` 返回任务状态、摘要与分页关键事件，UI 不把刚读到的任务和事件传回后端加工。界面布局、导航和交互仍归 app-shell。
 
+既有原生会话的 `ConversationWorkbenchView` 在 app-core/host 组合工作台和项目会话，独立提供导航准备与统一观察；app-shell 仅适配到现有 UI 端口并管理呈现事务。类型归 app-contracts，能力编码与本地事件分发归 app-transport，具体 harness 及看板策略继续各自独立。授权和执行命令不属于导航读取，不能由打开、订阅或缺口核对自动提交。
+
 `ProjectService.navigation` 返回准备好的项目列表、目标归属、会话路径、离线项目、删除待办与不透明分组加载路径；前端不读取全量 Session 清单来判断当前归属，不按内部目录名补载分组。`navigationTransparent` 只表达应用投影的透明容器，通用 vfs-ui 不解释该业务标记。`invalidateNavigation` 是异步失效屏障，列表读取必须等待其确认。`sessionTasks` 在后端完成任务分页与字段裁剪，任务详情和事件分页由独立的 SessionTaskView 展示。
 
 `createSessionDraft` 统一解析来源项目并创建带初始输入的会话；身份与初始输入通过 SessionRepository 同一事务提交。引用文本的排版、页面跳转和未提交输入仍属于前端。ViewRefresh 只协调可见页面刷新，不保存业务真相、不取消后端执行。

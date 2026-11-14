@@ -25,7 +25,7 @@ export class NativeComposerCapabilities {
     private modelScope?: string;
     private models: ConversationModelCatalog = {models: []};
     private commands: ConversationSlashCommand[] = [];
-    constructor(private readonly controls: ConversationControls, private readonly report?: (error: unknown) => void) {}
+    constructor(private readonly controls: ConversationControls, private readonly report?: (error: unknown) => void, private prepared?: import('../contracts').EditorOptions['conversationInitial']) {}
     load(state: ConversationSnapshot, force = false): Promise<boolean> {
         const scope = JSON.stringify([state.sessionId, state.supportsModels, state.supportsSlashCommands, state.observation?.scope]);
         const key = JSON.stringify([scope, state.slashCommands, state.commandCatalogObservation]);
@@ -34,7 +34,9 @@ export class NativeComposerCapabilities {
         if (scope !== this.scope) {if (!state.supportsModels) {this.models = {models: []}; this.modelScope = undefined;} this.commands = []; this.failures = 0; this.retryAt = 0; ++this.commandRevision;}
         const sameScope = this.scope === scope;
         this.scope = scope; this.key = key; const generation = ++this.generation;
-        const work = this.read(state, force, sameScope).then(([models, commands]) => {
+        const prepared = this.prepared; this.prepared = undefined;
+        const reading = prepared && !force ? Promise.allSettled([Promise.resolve(prepared.models ?? {models: []}), Promise.resolve(prepared.commands ?? [])] as const) : this.read(state, force, sameScope);
+        const work = reading.then(([models, commands]) => {
             if (generation !== this.generation) return false;
             if (models.status === 'fulfilled') {this.models = models.value; this.modelScope = scope;}
             else this.report?.(models.reason);

@@ -1,3 +1,4 @@
+import {WorkbenchSources} from './workbench-sources';
 import {t} from '@nestos/common';
 import type { ApplicationServices } from '@nestos/app-contracts/services';
 import type { AppUI } from '../types';
@@ -6,7 +7,7 @@ import { setupHitlVfsBridge } from '../workspaces/hitl-bridge';
 import { createWorkspaceModule, type WorkspaceModule } from '../workspaces/module';
 import { SessionWorkbench, type SessionWorkbenchOptions } from './SessionWorkbench';
 
-interface ProjectModuleOptions extends Pick<SessionWorkbenchOptions, 'onUnavailableResource' | 'openProjectDecisions' | 'sidebar' | 'container' | 'factory' | 'createFactory' | 'fileFactory' | 'onSelect' | 'onBeforeNavigate' | 'hostContext' | 'sessionSkills' | 'onSidebarReady' | 'initialResource' | 'deferNavigation' | 'uiPersistence' | 'workbenchState' | 'windows' | 'projectSyncSetup' | 'projectSyncDirectory'> {
+interface ProjectModuleOptions extends Pick<SessionWorkbenchOptions, 'opening' | 'onUnavailableResource' | 'openProjectDecisions' | 'sidebar' | 'container' | 'factory' | 'createFactory' | 'fileFactory' | 'onSelect' | 'onBeforeNavigate' | 'hostContext' | 'sessionSkills' | 'onSidebarReady' | 'initialResource' | 'deferNavigation' | 'uiPersistence' | 'workbenchState' | 'windows' | 'projectSyncSetup' | 'projectSyncDirectory'> {
     backend: import('@nestos/app-contracts/services').ApplicationBackend;
     services: Pick<ApplicationServices, 'sessionRepository' | 'sessionFiles' | 'kernel' | 'directoryMounts' | 'sessionManager' | 'flowEngine' | 'projects' | 'commandBus' | 'projectSync' | 'digitalTwin' | 'prepareSession' | 'agentService'>;
     executorUsage?: import('@nestos/ui-common-adapter').EditorOptions['executorUsage'];
@@ -16,8 +17,9 @@ interface ProjectModuleOptions extends Pick<SessionWorkbenchOptions, 'onUnavaila
 
 /** Project UI, memory interaction and event subscriptions share one lifetime. */
 export function createProjectModule(options: ProjectModuleOptions): WorkspaceModule {
-    const { services } = options, { sessionManager } = services;
-    const workbench = new SessionWorkbench({ ...options, repository: services.sessionRepository,
+    const sources = options.opening && new WorkbenchSources(options.opening);
+    const services = sources ? sources.services(options.services as ApplicationServices) : options.services, {sessionManager} = services;
+    const workbench = new SessionWorkbench({ ...options, sources, repository: services.sessionRepository,
         files: services.sessionFiles, kernel: services.kernel.kernel, directoryMounts: services.directoryMounts,
         prepareSession: services.prepareSession,
         projects: services.projects, digitalTwin: services.digitalTwin, projectSync: services.projectSync,
@@ -34,5 +36,5 @@ export function createProjectModule(options: ProjectModuleOptions): WorkspaceMod
             navigate: id => options.hostContext?.navigate({ target: 'chat', resourceId: id }) ?? Promise.resolve() }) },
     });
     const release = setupHitlVfsBridge(sessionManager, (id, waiting) => workbench.setWaitingInput(id, waiting));
-    return createWorkspaceModule(workbench, async () => { release(); await workbench.destroy(); });
+    return createWorkspaceModule(workbench, async () => { release(); sources?.close(); await workbench.destroy(); await options.opening?.dispose(); });
 }

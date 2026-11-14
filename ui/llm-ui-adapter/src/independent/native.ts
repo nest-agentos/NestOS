@@ -40,6 +40,7 @@ export interface NativeChatBindingOptions {
     readonly reservedNativeCommands?: readonly string[];
     readonly commandProviders?: readonly NativeCommandProvider[];
     readonly controls: ConversationControls;
+    readonly initial?: import('../contracts').EditorOptions['conversationInitial'];
     readonly operations: OperationLedger;
     /** Hosts reconcile this stable ID through the native or contributed command owner. */
     readonly reconcile: NonNullable<ConversationActions['reconcile']>;
@@ -49,8 +50,10 @@ export interface NativeChatBindingOptions {
 export async function createNativeChatBinding(options: NativeChatBindingOptions) {
     const source = new ChatProjection(options.conversationId, options.onError);
     const lifetime = new AbortController();
+    let preparedNotice = options.initial?.issues.commands ? {code: options.initial.issues.commands, message: t('harness.commandsPartial', {code: options.initial.issues.commands})}
+        : options.initial?.issues.models ? {code: options.initial.issues.models, message: t('chatInput.model') + ' · ' + t('harness.observationFailed', {code: options.initial.issues.models})} : undefined;
     let closed = false, generation = 0, native: NativeSnapshot | undefined;
-    const capabilities = new NativeComposerCapabilities(options.controls, options.onError);
+    const capabilities = new NativeComposerCapabilities(options.controls, options.onError, options.initial);
     const contributions = (state: NativeSnapshot) => options.commandProviders?.map(provider => ({source: provider.source, commands: provider.commands(state)})) ?? [];
     const commands = (state: NativeSnapshot) => capabilities.compose(state, contributions(state)).filter(command =>
         command.source.id !== 'harness' || !options.reservedNativeCommands?.includes(command.name));
@@ -64,7 +67,7 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
         if (closed) return;
         native = state;
         const catalog = commands(state);
-        source.publish({ composerIndicators: nativeComposerIndicators(state), title: state.title, selectors: capabilities.selectors(), error: nativeResultNotice(state) ?? nativeQueueNotice(state) ?? nativeCatalogNotice(state),
+        source.publish({ composerIndicators: nativeComposerIndicators(state), title: state.title, selectors: capabilities.selectors(), error: nativeResultNotice(state) ?? nativeQueueNotice(state) ?? nativeCatalogNotice(state) ?? preparedNotice,
             commands: state.supportsSlashCommands || options.commandProviders?.length ? catalog : undefined,
             operationReceipts: nativeReceipts(state, options.operations, options.conversationId),
             operationMessages: [...(nativeQueueMessages(state, options.operations, options.conversationId) ?? []), ...nativeSteeringPreviews(state, options.operations, options.conversationId)],
@@ -82,14 +85,15 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
     };
     const metrics = new NativeMetricsObserver(options.controls, state => {
         if (!closed && native && native.sessionId === state.sessionId) publish({...native, metrics: state.metrics, metricsError: state.metricsError});
-    });
+    }, !!options.initial);
     const loadCapabilities = async (state: NativeSnapshot, force = false) => {
         if (await capabilities.load(state, force) && !closed && native) publish(options.controls.snapshot?.() ?? native);
     };
     const refresh = async (initial = false, forceCapabilities = true) => {
+        if (forceCapabilities) preparedNotice = undefined;
         const captured = ++generation, started = Date.now(), operationId = randomUUID(), stage = initial ? 'history' : 'events';
         try {
-            const state = await (initial ? options.controls.read() : options.controls.refresh());
+            const state = initial && !native && options.initial && options.controls.snapshot ? options.controls.snapshot() : await (initial ? options.controls.read() : options.controls.refresh());
             if (captured === generation) {publish(state); await loadCapabilities(state, forceCapabilities);}
             observationLog.info('chat.native.observe', {operationId, conversationId: options.conversationId, stage,
                 result: captured === generation ? 'success' : 'superseded', messageCount: state.messages.length, durationMs: Date.now() - started});

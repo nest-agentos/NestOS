@@ -22,13 +22,14 @@ export class VfsUIPersistence {
         return this.snapshots.get(scopeId);
     }
     /** Prefetch, then hand the browser a port whose `load` is synchronous. */
-    async port(scopeId: string): Promise<UIPersistencePort> {
+    async port(scopeId: string): Promise<UIPersistencePort & Pick<WorkbenchStatePort, 'begin'>> {
         await this.load(scopeId);
-        return { load: () => this.snapshots.get(scopeId), save: snapshot => this.store.write(docName(scopeId), snapshot) };
+        return { load: () => this.snapshots.get(scopeId), save: snapshot => this.store.write(docName(scopeId), snapshot), begin: () => this.store.begin() };
     }
     async workbenchPort(scopeId: string): Promise<WorkbenchStatePort> {
         let snapshot = readWorkbenchSnapshot(await this.store.read(`${scopeId}.workbench`));
-        return { load: () => snapshot, save: value => { snapshot = value; this.store.write(`${scopeId}.workbench`, value); } };
+        return {load: () => snapshot, save: value => {snapshot = value; this.store.write(`${scopeId}.workbench`, value);},
+            begin: () => this.store.begin()};
     }
     /** Wait for already-queued writes (shutdown and tests). */
     async flush(): Promise<void> { await this.store.flush(); }

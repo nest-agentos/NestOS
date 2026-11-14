@@ -65,6 +65,7 @@ export interface ApplicationBackend {
     mailView(): Promise<import('@nestos/mail/contracts').MailClient>;
     navigationView(options: { root: string; scope: string }): Promise<import('./navigation').NavigationView>;
     warmNavigation(roots: string[]): Promise<void>;
+    openConversationWorkbench?(request: import('./conversation-workbench').ConversationWorkbenchRequest): Promise<import('./conversation-workbench').ConversationWorkbenchView>;
     workbenchView(options?: { displayedFilesPolicy?: 'gitignore' | 'all'; chatControls?: boolean; initialNavigation?: boolean; initialSessionId?: string }): Promise<WorkbenchView>;
     openSessionView(sessionId: string): Promise<SessionOpenView>;
     readAgentProjectScopes(ids: string[]): Promise<Record<string, import('./agent-project-scope').AgentProjectScope>>;

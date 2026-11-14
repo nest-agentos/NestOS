@@ -26,8 +26,8 @@ export class NativeChatStore {
     static supported(controls: ConversationControls): boolean {
         return !!(controls.readComposerDraft && controls.saveComposerDraft && controls.putComposerAsset && controls.readComposerAsset);
     }
-    static async open(controls: ConversationControls, conversationId?: string): Promise<NativeChatStore | undefined> {
-        const state = await controls.readComposerDraft!(), store = new NativeChatStore(controls, state);
+    static async open(controls: ConversationControls, conversationId?: string, prepared?: ConversationComposerDraft): Promise<NativeChatStore | undefined> {
+        const state = prepared ?? await controls.readComposerDraft!(), store = new NativeChatStore(controls, state);
         store.document = state.data ? JSON.parse(state.data) : {};
         const id = conversationId ?? controls.snapshot?.()?.sessionId;
         if (id) store.identity(id);

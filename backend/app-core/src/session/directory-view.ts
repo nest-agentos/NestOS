@@ -7,7 +7,7 @@ import {recentConversationPreview} from '../projects/conversation-directory';
 const log = createModuleLogger('directory-view');
 /** Flatten virtual containers locally; no browser round trip is needed for each group. */
 export async function readDirectoryView(fs: IFileSystem, projects: ProjectService | undefined, path: string,
-    options: {projectId?: string | null;includeAncestors?:boolean} = {}, navigationRead?: () => Promise<ProjectNavigationView | undefined>, operationId = randomUUID()): Promise<SessionDirectoryView> {
+    options: {projectId?: string | null;includeAncestors?:boolean; includePaths?: readonly string[]} = {}, navigationRead?: () => Promise<ProjectNavigationView | undefined>, operationId = randomUUID()): Promise<SessionDirectoryView> {
     const started = performance.now(), revision = fs.revision;
     const directories = new Map<string, NavigationDirectory & {path: string}>();
     try {
@@ -15,12 +15,13 @@ export async function readDirectoryView(fs: IFileSystem, projects: ProjectServic
         if (directory.status === 'rejected') throw directory.reason;
         if (prepared.status === 'rejected') throw prepared.reason;
         if(options.includeAncestors)for(const parent of ancestorPaths(path))if(!directories.has(parent))await flatten(fs,parent,directories);
+        const directoryFailures = await readIncluded(fs, options.includePaths ?? [], directories, operationId, started);
         const nodes = directory.value, navigation = prepared.value;
         const folder = browserTargetFolder(resolveBrowserTarget(path), path);
         const project = navigation?.projects.filter(item => folder === item.path || folder.startsWith(item.path + '/'))
             .sort((a, b) => b.path.length - a.path.length)[0] ?? null;
         const stale = fs.revision !== revision;
-        const result = {node: directories.get(path)!.node!, nodes, project, navigation,
+        const result = {...(directoryFailures.length ? {directoryFailures} : {}), node: directories.get(path)!.node!, nodes, project, navigation,
             directories: directorySeeds(directories, nodes, fs.revision, stale)};
         log.info('directory.read', {operation: 'browser.directory', operationId, stage: 'aggregate', result: 'success', count: nodes.length, directoryCount: directories.size,
             durationMs: Math.round(performance.now() - started)});
@@ -31,6 +32,20 @@ export async function readDirectoryView(fs: IFileSystem, projects: ProjectServic
             code: typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'DIRECTORY_READ_FAILED', durationMs: Math.round(performance.now() - started)});
         throw error;
     }
+}
+async function readIncluded(fs: IFileSystem, paths: readonly string[], directories: Map<string, NavigationDirectory & {path: string}>, operationId: string, started: number): Promise<NonNullable<SessionDirectoryView['directoryFailures']>> {
+    if (paths.length > 64 || paths.some(path => typeof path !== 'string' || path.length > 4096)) throw new FSError('EINVAL', 'Invalid directory interests');
+    const failures: NonNullable<SessionDirectoryView['directoryFailures']> = [];
+    for (const path of new Set(paths)) if (!directories.has(path)) {
+        try {await flatten(fs, path, directories);}
+        catch (error) {
+            const raw = (error as {code?: unknown})?.code;
+            const code = typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'DIRECTORY_READ_FAILED';
+            failures.push({path, code});
+            log.warn('directory.read', {operation: 'browser.directory', operationId, stage: 'included', result: 'failure', code, durationMs: Math.round(performance.now() - started)});
+        }
+    }
+    return failures;
 }
 function ancestorPaths(path:string):string[] {
     const parts=path.split('/').filter(Boolean);

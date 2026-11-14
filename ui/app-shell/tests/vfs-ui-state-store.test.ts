@@ -103,3 +103,25 @@ it('never retries failed presentation writes after suspending an expired view', 
     store.suspend(); store.write('layout', {selected: 'closing'}); await store.flush();
     expect(writeUiDocuments).toHaveBeenCalledOnce();
 });
+it('persists only the final workbench layout within a nested opening scope', async () => {
+    const readUiDocuments = vi.fn(async () => ({})), writeUiDocuments = vi.fn(async () => {});
+    const documents = new VfsJsonStore({readUiDocuments, writeUiDocuments}), store = new VfsUIPersistence(documents);
+    const port = await store.workbenchPort('opening'), outer = port.begin!(), inner = port.begin!();
+    port.save({version: 1, tabs: [{id: 'native', title: 'Loading', pinned: false}]});
+    inner(); inner(); await documents.flush(); expect(writeUiDocuments).not.toHaveBeenCalled();
+    port.save({version: 1, tabs: [{id: 'native', title: 'Original conversation', pinned: false}]});
+    outer(); outer(); await documents.flush();
+    expect(writeUiDocuments).toHaveBeenCalledExactlyOnceWith({'opening.workbench': {version: 1, tabs: [{id: 'native', title: 'Original conversation', pinned: false}]}});
+});
+
+it('groups restored navigation and final selection into one presentation write', async () => {
+    const writeUiDocuments = vi.fn(async (_values: Record<string, unknown>) => {}), documents = new VfsJsonStore({readUiDocuments: async () => ({}), writeUiDocuments});
+    const state = new VfsUIPersistence(documents), navigation = await state.port('opening'), layout = await state.workbenchPort('opening');
+    const end = navigation.begin!();
+    navigation.save({version: 1, activeId: null, expandedFolderIds: ['/project']});
+    await Promise.resolve(); expect(writeUiDocuments).not.toHaveBeenCalled();
+    layout.save({version: 1, tabs: []}); navigation.save({version: 1, activeId: '/project/session', expandedFolderIds: ['/project']});
+    end(); await documents.flush();
+    expect(writeUiDocuments).toHaveBeenCalledOnce();
+    expect(writeUiDocuments.mock.calls[0][0]).toMatchObject({'opening.ui': {activeId: '/project/session'}, 'opening.workbench': {tabs: []}});
+});

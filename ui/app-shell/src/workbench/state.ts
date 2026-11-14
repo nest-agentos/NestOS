@@ -12,6 +12,8 @@ export interface WorkbenchSnapshot {
 export interface WorkbenchStatePort {
     load(): WorkbenchSnapshot | undefined;
     save(snapshot: WorkbenchSnapshot): void;
+    /** Merge intermediate presentation changes within one resource opening. */
+    begin?(): () => void;
 }
 export function readWorkbenchSnapshot(value: unknown): WorkbenchSnapshot | undefined {
     if (!value || typeof value !== 'object') return;

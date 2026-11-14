@@ -2,12 +2,14 @@ import {FSError} from '@nestos/vfs-core';
 import {FlowInvocationCommand, SessionCommand} from '@nestos/llm-session/contracts';
 import type {SessionPresentationState, ApplicationBackend, LocalApplicationServices, OpenedApplicationView, OpenViewRequest, WorkbenchView} from '@nestos/app-contracts/services';
 import {ViewObservation} from './view-observation';
+import {ConversationWorkbench} from './conversation-workbench';
 import {taskAttachment} from './task-attachment';
 
 /** A cold view can activate immediately because it cannot replace an existing editor binding. */
 export async function openView(services: LocalApplicationServices, backend: ApplicationBackend, request: OpenViewRequest): Promise<OpenedApplicationView> {
     if (request.workbench.initialSessionId && services.sessionManager.getSnapshot().sessionId)
         throw new FSError('EBUSY', 'Cold view opening requires an unbound client');
+    if (request.resourceId) return openNativeView(services, backend, request);
     const observation = new ViewObservation(services);
     let workbench: WorkbenchView | undefined;
     try {
@@ -74,4 +76,17 @@ async function closeOpenedView(observation: ViewObservation, view?: WorkbenchVie
         view?.chat?.configuration?.dispose(), view?.browser.dispose()]);
     const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
     if (errors.length) throw new AggregateError(errors, 'Opened view cleanup failed');
+}
+
+async function openNativeView(services: LocalApplicationServices, backend: ApplicationBackend, request: OpenViewRequest): Promise<OpenedApplicationView> {
+    const observation = new ViewObservation(services), opening = new ConversationWorkbench(services);
+    const dispose = async () => {
+        const results = await Promise.allSettled([observation.dispose(), opening.dispose()]);
+        const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
+        if (errors.length) throw new AggregateError(errors, 'Native initial view cleanup failed');
+    };
+    try {
+        await opening.initialize(backend, {resourceId: request.resourceId!, documents: request.documents, displayedFilesPolicy: request.workbench.displayedFilesPolicy});
+        return {documents: opening.documents, workbench: opening.workbench, conversationWorkbench: opening, observation, cursor: observation.getViewCursor(), dispose};
+    } catch (error) {await dispose(); throw error;}
 }

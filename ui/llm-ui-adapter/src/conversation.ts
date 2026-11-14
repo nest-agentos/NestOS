@@ -10,7 +10,7 @@ export async function createConversationEditor(container: HTMLElement, controls:
     let editor: IEditor | undefined;
     try {
         const retained = handoff && 'kind' in handoff ? handoff : undefined;
-        const store = NativeChatStore.supported(controls) ? await NativeChatStore.open(controls, retained?.conversationId) : undefined;
+        const store = NativeChatStore.supported(controls) ? await NativeChatStore.open(controls, retained?.conversationId, options.conversationInitial?.draft) : undefined;
         if (retained && !store) throw Object.assign(new Error('Native host must support durable drafts to adopt a ChatView'), {code: 'NATIVE_DRAFT_PORT_REQUIRED'});
         if (store && (!handoff || retained)) editor = new IndependentConversationEditor(container, controls, options, store, retained, ocr);
         else {

@@ -1,3 +1,4 @@
+import {resolveBrowserTarget} from '@nestos/app-contracts';
 import {mountContentTitleBar} from './workbench/content-titlebar';
 import {lazyScannerPackages} from './digital-twin/lazy-packages';
 import {ACTION_ICONS, randomUUID} from '@nestos/common';
@@ -428,10 +429,16 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                 options.onWorkspaceReady?.({ editor: editorEl });
                 return true;
             };
+            const target = initialResource && resolveBrowserTarget(initialResource);
+            const initialOpening = opened?.conversationWorkbench;
+            const opening = initialOpening && (initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === initialResource ? initialOpening
+                : target && target.kind === 'remote' && target.nativeSessionId && backend.openConversationWorkbench
+                ? await backend.openConversationWorkbench({resourceId: initialResource!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore'}) : undefined;
+            if (opening) uiDocs.seed(opening.documents);
             const [uiPersistence, workbenchState] = await traceBoot('workspace.chatState (parallel)', () => Promise.all([
                 uiState.port(SESSION_BROWSER_SCOPE), uiState.workbenchPort(SESSION_BROWSER_SCOPE),
             ]));
-            const module = createProjectModule({ services, backend, createFactory: createChatFactory, initialResource, deferNavigation: !!initialResource, projectSyncSetup: options.projectSyncSetup, projectSyncDirectory: options.projectSyncDirectory, sidebar: sidebarEl, container: editorEl,
+            const module = createProjectModule({ services, backend, opening, createFactory: createChatFactory, initialResource, deferNavigation: !!initialResource, projectSyncSetup: options.projectSyncSetup, projectSyncDirectory: options.projectSyncDirectory, sidebar: sidebarEl, container: editorEl,
                 onUnavailableResource:services.kanban?unavailableConversationCleanup(services.kanban):undefined,
                 openProjectDecisions:services.kanban?id=>handleNavigationRequest({target:'kanban',resourceId:projectDecisionsPath(id)}):undefined,
                 executorUsage, agentFactory,

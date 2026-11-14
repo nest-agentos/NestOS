@@ -655,3 +655,20 @@ it('projects updated complete native commands without feeding the catalog back i
     await caps.load({...updated, commandCatalogObservation: {complete: false}});
     expect(host.controls.commands).toHaveBeenCalledTimes(2); caps.dispose();
 });
+
+it('uses freshly prepared history and catalogs without repeating reads, while explicit refresh revalidates', async () => {
+    const host = fixture(), command = {name: 'status', description: 'State', kind: 'action' as const};
+    host.emit({supportsModels: true, supportsSlashCommands: true, supportsMetrics: true});
+    host.controls.read = vi.fn(async () => host.state()); host.controls.models = vi.fn(async () => ({models: []}));
+    host.controls.commands = vi.fn(async () => [command]); host.controls.refreshMetrics = vi.fn(async () => host.state());
+    const binding = await createNativeChatBinding({...host.options, initial: {models: {models: []}, commands: [command], issues: {}}});
+    expect(binding.source.getSnapshot().commands?.some(row => row.name === 'status')).toBe(true);
+    for (const read of [host.controls.read, host.controls.models, host.controls.commands, host.controls.refreshMetrics]) expect(read).not.toHaveBeenCalled();
+    await binding.source.refresh(); expect(host.controls.models).toHaveBeenCalledOnce(); expect(host.controls.commands).toHaveBeenCalledOnce(); binding.dispose();
+});
+it('keeps prepared metadata errors local to capabilities and clears them after explicit refresh', async () => {
+    const host = fixture(); host.emit({supportsModels: true}); host.controls.models = vi.fn(async () => ({models: []}));
+    const binding = await createNativeChatBinding({...host.options, initial: {issues: {models: 'EACCES'}}});
+    expect(binding.source.getSnapshot().error?.code).toBe('EACCES'); expect(binding.source.getSnapshot().allowed).toContain('send');
+    await binding.source.refresh(); expect(binding.source.getSnapshot().error).toBeUndefined(); binding.dispose();
+});

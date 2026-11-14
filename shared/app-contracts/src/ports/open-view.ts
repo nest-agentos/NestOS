@@ -2,6 +2,7 @@ import type {ApplicationServices, ApplicationBackend} from './application-client
 import type {WorkbenchView, SessionEditorInitialData} from './session';
 
 export interface OpenViewRequest {
+    resourceId?: string;
     documents: string[];
     workbench: NonNullable<Parameters<ApplicationBackend['workbenchView']>[0]>;
     branch?: string;
@@ -13,7 +14,10 @@ export interface ApplicationViewSources {
     favorites: undefined;
     kernel: Parameters<Parameters<ApplicationServices['kernel']['kernel']['onChanged']>[0]>[0];
     draft: Parameters<Parameters<ApplicationServices['projects']['drafts']['onPromoted']>[0]>[0];
-    mounts: undefined;
+    mounts: import('./projects').ProjectRemoteMountChange | undefined;
+    navigation: import('@nestos/vfs-core').FSEvent;
+    conversation: {resourceId: string};
+    remoteStatus: {projectId: string; rows: readonly import('@nestos/cells-driver/harness').HarnessStatusRow[]};
     session: Parameters<Parameters<ApplicationServices['sessionManager']['onEvent']>[0]>[0];
     global: Parameters<Parameters<ApplicationServices['sessionManager']['onGlobalEvent']>[0]>[0];
     agents: undefined;
@@ -31,6 +35,7 @@ export interface ApplicationViewObservation {
     dispose(): Promise<void>;
 }
 export interface OpenedApplicationView {
+    conversationWorkbench?: import('./conversation-workbench').ConversationWorkbenchView;
     connectionInterests?: string[];
     documents: Record<string, unknown>;
     workbench: WorkbenchView;

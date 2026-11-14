@@ -29,7 +29,17 @@ export class ViewObservation implements ApplicationViewObservation {
             this.releases.push(services.projects.favorites.subscribe(() => this.publish('favorites', undefined)));
             this.releases.push(services.projects.drafts.onPromoted(event => this.publish('draft', event)));
         }
-        if (services.projects?.remoteMounts) this.releases.push(services.projects.remoteMounts.onChange(() => this.publish('mounts', undefined)));
+        if (services.projects?.remoteMounts) this.releases.push(services.projects.remoteMounts.onChange(change => this.publish('mounts', change)));
+    }
+    addSource<K extends keyof ApplicationViewSources>(topic: K, subscribe: (listener: (value: ApplicationViewSources[K]) => void) => () => void): () => void {
+        if (this.closed) throw new FSError('EIO', 'View observation closed');
+        const release = subscribe(value => this.publish(topic, value)); let closed = false;
+        const stop = () => {
+            if (closed) return; closed = true;
+            const index = this.releases.indexOf(stop); if (index >= 0) this.releases.splice(index, 1);
+            release();
+        };
+        this.releases.push(stop); return stop;
     }
     async addChat(view: WorkbenchView, sessionId?: string): Promise<void> {
         if (view.chat?.configuration) this.releases.push(view.chat.configuration.subscribe(() => this.publish('configuration', undefined)));
@@ -38,6 +48,7 @@ export class ViewObservation implements ApplicationViewObservation {
             if (this.closed) stop(); else this.releases.push(stop);
         }
     }
+    eventSnapshot() {return {cursor: this.sequence, firstSequence: this.history[0]?.event.sequence ?? this.sequence + 1, events: this.history.map(row => row.event)};}
     getViewCursor(): number { return this.sequence; }
     getSessionBaseline() {return {cursor: this.sequence, snapshot: this.services.sessionManager.getSnapshot()};}
     changedSince(after: number, topics: ApplicationViewEvent['topic'][], sessionId?: string): boolean {

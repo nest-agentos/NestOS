@@ -43,6 +43,7 @@ import { openSessionView } from './session-view';
 import { observeConnections } from './connection-observation';
 import { readUiDocuments, writeUiDocuments } from './ui-documents';
 import { ViewScope } from './view-scope';
+import {ConversationWorkbench} from './conversation-workbench';
 import { taskDetails, taskEvents, sessionTasks } from './task-view';
 import { createSessionDraft } from '../session/create-session-draft';
 import { createChatConfigurationView } from '../configuration/chat-configuration';
@@ -97,6 +98,7 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
         mailView: () => mailView(vfs).then(view => scope.own(view)),
         navigationView: options => navigationView(vfs, options),
         warmNavigation: roots => warmNavigation(vfs, roots),
+        openConversationWorkbench: async request => scope.own(await new ConversationWorkbench(services).initialize(backend, request)),
         workbenchView: async settings => {
             const owned = new ViewScope();
             try {
