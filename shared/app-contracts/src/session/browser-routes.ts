@@ -1,4 +1,5 @@
-import { FSError, normalizeVirtualPath } from '@nestos/vfs-core';
+import {FSError} from '@nestos/vfs-core/protocol';
+import {normalizeVirtualPath} from '@nestos/vfs-core/path';
 import { workspacePath } from '../vfs/workspace-namespace';
 
 export type BrowserTarget =

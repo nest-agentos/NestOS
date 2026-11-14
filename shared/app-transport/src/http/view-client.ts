@@ -10,11 +10,12 @@ import { installViewProjections } from '../application/projections';
 import { QueryBatcher } from './query-batcher';
 import { installFileTransport } from './file-transport';
 import { ViewExpiredError } from './view-expired';
+import type {PreparedHttpBootstrap} from './startup';
 
 type NotificationPacket = Partial<CallbackRequest> & Pick<Reply, 'updates'> & { calls?: Call[]; viewEvents?: ApplicationViewEvent[]; updatesRead?: string };
 const maxNotificationCount = 256;
 const maxEventBytes = 2 * 1024 * 1024;
-export interface HttpViewStartOptions {initialRead?:StartupReadRequest; initialView?: OpenViewRequest; snapshots?: SnapshotCache;}
+export interface HttpViewStartOptions {initialRead?:StartupReadRequest; initialView?: OpenViewRequest; snapshots?: SnapshotCache; prepared?: PreparedHttpBootstrap;}
 
 /** HTTP commands are never automatically replayed after an unknown outcome. */
 export class HttpViewClient {
@@ -57,9 +58,11 @@ export class HttpViewClient {
         }), async updates => { this.peer.applyUpdates(updates); await this.peer.waitUpdates(updates); });
     }
     async start(options: HttpViewStartOptions = {}): Promise<HostedApplicationClient> {
-        const snapshots = options.snapshots ?? new SnapshotCache(); await snapshots.load();
+        const snapshots = options.prepared?.snapshots ?? options.snapshots ?? new SnapshotCache();
+        const prepared = options.prepared?.claim(this.clientId, this.url, this.abort.signal);
+        if (!options.prepared) await snapshots.load();
         const stream = this.startEventStream(); void stream.catch(() => {});
-        const packet = await this.post({kind: 'bootstrap', initialView: options.initialView, initialRead: options.initialRead, knownSnapshots: snapshots.known()});
+        const packet = await (prepared ?? this.post({kind: 'bootstrap', initialView: options.initialView, initialRead: options.initialRead, knownSnapshots: snapshots.known()}));
         const reply = await this.expandBootstrap(packet, snapshots);
         if (reply.error) throw new Error(reply.error.message);
         this.peer.applyUpdates(reply.updates);

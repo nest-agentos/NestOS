@@ -1,4 +1,4 @@
-import {parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts';
+import {parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts/routing';
 import type {ApplicationBackend, OpenedApplicationView} from '@nestos/app-contracts/services';
 
 export function openInitialView(backend: ApplicationBackend, documents: string[], resource?: string): Promise<OpenedApplicationView> {

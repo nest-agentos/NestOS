@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./http": "./src/http/index.ts",
     "./application": "./src/application/index.ts",
-    "./rpc": "./src/rpc/index.ts"
+    "./rpc": "./src/rpc/index.ts",
+    "./http/startup": "./src/http/startup.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

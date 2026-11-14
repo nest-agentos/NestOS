@@ -58,6 +58,7 @@
     "./workspaces": "./src/config/modules.ts",
     "./skill-tools": "./src/kernel/browser-skill-tools.ts",
     "./style.css": "./src/styles/index.css",
-    "./index.html": "./index.html"
+    "./index.html": "./index.html",
+    "./routes": "./src/config/route-aliases.ts"
   }
 }

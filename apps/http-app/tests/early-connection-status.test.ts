@@ -13,7 +13,7 @@ afterEach(async () => {
 async function connection() {
     vi.spyOn(console, 'error').mockImplementation(() => {}); history.replaceState({}, '', '/#/start');
     const server = new RpcPeer('server', async () => ({})); releases.push(() => server.close());
-    const bootstrap = await server.bootstrap({execute: async () => {}, list: () => []});
+    const bootstrap = await server.bootstrap({services: {projects: {}}, commands: {execute: async () => {}, list: () => []}});
     let controller!: ReadableStreamDefaultController<Uint8Array>, expired = false;
     vi.stubGlobal('fetch', async (_url: unknown, init?: RequestInit) => {
         if (String(_url) === '/api/identity') return Response.json({userId: 'admin'});
@@ -22,7 +22,7 @@ async function connection() {
         return Response.json(bootstrap);
     });
     const client = connectApplication(); releases.push(() => client.close()); const root = await client.ready;
-    return {client, root: root as unknown as {execute(name: string): Promise<void>},
+    return {client, root: (root as unknown as {commands: {execute(name: string): Promise<void>}}).commands,
         corrupt: () => controller.enqueue(new TextEncoder().encode('data: invalid\n\n')), expire: () => {expired = true;}};
 }
 

@@ -5,6 +5,17 @@ const traceId = () => randomUUID().replaceAll('-', '');
 export class BrowserRequestTrace {
     readonly browserSessionId = randomUUID();
     private navigation = traceId();
+    bootstrap(packet: Promise<unknown>): void {
+        const started = Date.now(), operationId = this.browserSessionId;
+        void packet.then(() => {
+            performance.mark('nestos:bootstrap-received');
+            log.info('HTTP bootstrap received', {operation:'http.bootstrap', operationId, stage:'response.decode', result:'success', durationMs:Date.now()-started});
+        }, error => {
+            const code = (error as {code?:string})?.code;
+            log.warn('HTTP bootstrap failed', {operation:'http.bootstrap', operationId, stage:'response.decode', result:'failure',
+                code:code && /^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'BOOTSTRAP_FAILED', durationMs:Date.now()-started});
+        });
+    }
     bindNavigation(signal: AbortSignal): void {
         window.addEventListener(NAVIGATION_EVENTS.START, event => this.beginNavigation((event as CustomEvent<{operationId:string}>).detail?.operationId), {signal});
     }

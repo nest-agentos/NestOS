@@ -4,7 +4,7 @@ import {
 } from '@nestos/app-shell/workspaces';
 import type { WorkspaceConfig } from '@nestos/app-shell';
 
-export const ROUTE_ALIASES = {home: 'llm-workspace', projects: 'llm-workspace', workbench: 'llm-workspace'};
+export {ROUTE_ALIASES} from './route-aliases';
 
 export const WORKSPACES: WorkspaceConfig[] = [
     WS_SETTINGS,

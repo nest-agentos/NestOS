@@ -20,7 +20,8 @@
       "types": "./src/services.ts",
       "import": "./src/services.ts",
       "default": "./src/services.ts"
-    }
+    },
+    "./routing": "./src/routing.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

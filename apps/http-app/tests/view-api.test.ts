@@ -9,6 +9,7 @@ import { createApplicationApi } from '@nestos/node-host/http';
 import { createCertificates } from '@nestos/node-host/http';
 import { NodeSqliteSidecarDb } from '@nestos/node-host/storage';
 import { HttpViewClient, SnapshotCache, ViewExpiredError } from '@nestos/app-transport/http';
+import {PreparedHttpBootstrap} from '@nestos/app-transport/http/startup';
 import { authenticatedFetch, close, secureServers } from './tls-fixture';
 import {ArtifactCommand, FlowLibraryCommand, InputAssetCommand, type ExecutionArtifactPage, type ExecutionArtifactChunk} from '@nestos/app-contracts';
 import {FlowCommand, validFlowImages, type FlowDraft, type FlowRevision, type DurableFlowSnapshot} from '@nestos/llm-flow/contracts';
@@ -30,6 +31,22 @@ beforeEach(async () => {
 });
 afterEach(async () => { await Promise.all(clients.splice(0).map(client => client.close())); await api.close(); auth.close(); await close(server.server); await backend.close(); await rm(directory, { recursive: true, force: true }); });
 async function client(id: string) { const peer = new HttpViewClient(id, server.origin + '/api/application', auth.fetcher); clients.push(peer); return peer.start(); }
+
+it('adopts an authenticated bootstrap prepared before RPC and SSE without repeating the startup read', async () => {
+    const posts: string[] = [], url = server.origin + '/api/application';
+    const fetcher: typeof fetch = async (input, init) => {
+        if (init?.method === 'POST') posts.push(JSON.parse(String(init.body)).kind);
+        return auth.fetcher(input, init);
+    };
+    const prepared = new PreparedHttpBootstrap({clientId:'early-authenticated', url, fetcher,
+        initialRead:{documents:['theme'],eventBaseline:true}});
+    await prepared.packet; expect(posts).toEqual(['bootstrap']);
+    const http = new HttpViewClient('early-authenticated', url, fetcher); clients.push(http);
+    const root = await http.start({prepared});
+    expect(root.initialRead?.documents).toHaveProperty('value');
+    expect(root.initialRead?.eventBaseline?.value?.sequence).toEqual(expect.any(Number));
+    expect(posts).toEqual(['bootstrap']);
+});
 
 it('queries an explicit Session context catalog through authenticated RPC while preserving another bound queue', async () => {
     const root = await client('context-catalog'), commands = root.services.commandBus;

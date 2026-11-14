@@ -1,6 +1,6 @@
 import {initialReadRequest, initialViewRequest, INITIAL_CHAT_DOCUMENTS, parseWorkspaceHash} from '@nestos/app-shell/startup';
-import {ROUTE_ALIASES} from 'nestos-web/workspaces';
-import {parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts';
+import {ROUTE_ALIASES} from 'nestos-web/routes';
+import {parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts/routing';
 
 export function initialView(hash: string) {
     const route = parseWorkspaceHash(hash, 'start');
