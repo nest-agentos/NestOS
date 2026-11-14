@@ -1,0 +1,614 @@
+{
+  "date": "2026-11-14",
+  "sourceCommit": "a2d9d4e",
+  "version": "20261114T055846-533cd05e-dirty",
+  "scope": "Repair KBT-2-111 terminal learning authorization and mobile decision presentation; reduce initial assets without adding business caches.",
+  "task": {
+    "before": {
+      "item": {
+        "id": "sub-150ba5ada13443c9301344effdbe84f4f1be0b2d",
+        "status": "claimed",
+        "task": {
+          "phase": "unknown",
+          "reason": "FORBIDDEN",
+          "cleanupAllowed": false,
+          "startAt": 1794614073268,
+          "dispatchId": "6e54f36f-f47c-4ff4-bd1f-ea4b7024d722",
+          "sessionId": "node-01M7BNBQEJ8R4CEXRXA9A0QS7R",
+          "actions": [
+            "cancel",
+            "pause",
+            "fix",
+            "open-session"
+          ]
+        }
+      },
+      "dispatch": [
+        {
+          "id": "6e54f36f-f47c-4ff4-bd1f-ea4b7024d722",
+          "outcome": "unknown",
+          "code": "FORBIDDEN",
+          "executionSessionId": "node-01M7BNBQEJ8R4CEXRXA9A0QS7R",
+          "attempt": 1,
+          "principal": {
+            "kind": "service",
+            "id": "kanban-worker"
+          }
+        }
+      ]
+    },
+    "after": {
+      "item": {
+        "id": "sub-150ba5ada13443c9301344effdbe84f4f1be0b2d",
+        "status": "completed",
+        "task": {
+          "phase": "completed",
+          "actions": [
+            "delete",
+            "fix",
+            "open-session"
+          ],
+          "completion": "accepted",
+          "cleanupAllowed": true,
+          "startAt": 1794614073268,
+          "dispatchId": "6e54f36f-f47c-4ff4-bd1f-ea4b7024d722",
+          "sessionId": "node-01M7BNBQEJ8R4CEXRXA9A0QS7R"
+        }
+      },
+      "dispatch": [
+        {
+          "id": "6e54f36f-f47c-4ff4-bd1f-ea4b7024d722",
+          "outcome": "accepted",
+          "executionSessionId": "node-01M7BNBQEJ8R4CEXRXA9A0QS7R",
+          "attempt": 1,
+          "principal": {
+            "kind": "service",
+            "id": "kanban-worker"
+          }
+        }
+      ]
+    },
+    "rootCause": "The development observer used its restricted automation coordinator service for append-record while registering a verified terminal result learning. Host-authorized recording now uses a separate injected service, keeping coordinator permissions unchanged.",
+    "recovery": "Original frozen receipt was reconciled; existing automation then accepted the same dispatch. Read-only probes issued no development, approval, acceptance or deployment commands.",
+    "management": "The child execution is completed/accepted. Its decision still reports the existing management summary/settlement stage, independently of child completion.",
+    "cleanup": {
+      "id": "a8b18dd5-fe59-4e34-a056-697554289532",
+      "reason": "command-ended",
+      "outcome": "succeeded",
+      "exitCode": 0
+    }
+  },
+  "changes": [
+    "Keep permission-blocked unknown results actionable without turning them into confirmed failures or successes.",
+    "Render narrow decision tables with status, diagnostics and session actions inside the viewport; retain sorting and timestamps.",
+    "Move presentation constants away from concrete workbench imports. Load OCR settings, native interaction panels and Flow parameter UI only on use.",
+    "Preload only the unconditional shell and static dependencies/styles; retain lazy optional editors.",
+    "Remove duplicate global editor/settings stylesheet imports; their own entries retain styles.",
+    "Negotiate Brotli/gzip with quality exclusions, representation-specific ETags and Vary; preserve authentication and existing bounded static representation storage.",
+    "Use upstream Font Awesome SVGs for eight shell icons and their aliases; keep the full font fallback for other icons."
+  ],
+  "performance": {
+    "counting": "Count every API request, and each RPC in a batch separately. The final harness corrects an earlier count that reported HTTP requests as logical calls.",
+    "measurement": "Start before page.goto in a new Chrome context. End elapsed time when the first decision row is present, startup is gone and the active Kanban is no longer busy. Continue request collection through 250 ms settlement; health version lookup and explicit font fallback probe occur afterward.",
+    "host": "Warm running release, normal background scans; 11 existing decision rows; mobile viewport 390x844, fresh browser per run.",
+    "controlledNetwork": {
+      "latencyMs": 100,
+      "downloadBytesPerSecond": 200000,
+      "uploadBytesPerSecond": 100000,
+      "cpuSlowdown": 4,
+      "samples": [
+        {
+          "version": "20261114T055846-533cd05e-dirty",
+          "durationMs": 4900.944592000001,
+          "logicalApiCalls": 15,
+          "httpRequests": 14,
+          "methods": {
+            "eventBaseline": 1,
+            "readUiDocuments": 1,
+            "recordResources": 1,
+            "catalog": 1,
+            "recordConversations": 1,
+            "subscribe": 1,
+            "onChanged": 1,
+            "records": 1,
+            "onChange": 2,
+            "readEvents": 1,
+            "assistantOverview": 1
+          },
+          "decisionRows": 11,
+          "encodedStaticBytes": 604863,
+          "resources": [
+            {
+              "name": "/assets/index-CiA-qyWO.js",
+              "initiator": "script",
+              "start": 147.2999997138977,
+              "duration": 3157.800000190735,
+              "transfer": 266652,
+              "encoded": 266352,
+              "decoded": 998389,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/hosted-application-C7urvO1P.js",
+              "initiator": "other",
+              "start": 148.59999990463257,
+              "duration": 2863.9000000953674,
+              "transfer": 203202,
+              "encoded": 202902,
+              "decoded": 791454,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/index-4tOJi43m.css",
+              "initiator": "link",
+              "start": 158.19999980926514,
+              "duration": 1526.8000001907349,
+              "transfer": 69283,
+              "encoded": 68983,
+              "decoded": 361729,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/hosted-application-DUU-nFma.css",
+              "initiator": "link",
+              "start": 149,
+              "duration": 1220.5,
+              "transfer": 49524,
+              "encoded": 49224,
+              "decoded": 312536,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/context-menu-BuzaUFAj.js",
+              "initiator": "other",
+              "start": 149,
+              "duration": 568.5999999046326,
+              "transfer": 17702,
+              "encoded": 17402,
+              "decoded": 55560,
+              "encoding": "br"
+            }
+          ],
+          "layout": {
+            "viewport": 390,
+            "documentWidth": 390,
+            "tableWidth": 368,
+            "statusBounds": {
+              "left": 23,
+              "right": 367
+            },
+            "sessionBounds": {
+              "left": 23,
+              "right": 367
+            }
+          },
+          "pageErrors": [],
+          "cleanup": {
+            "id": "a3357e23-ea3a-4e4b-9e9a-4cdbf1282989",
+            "reason": "command-ended",
+            "outcome": "succeeded",
+            "exitCode": 0
+          }
+        },
+        {
+          "version": "20261114T055846-533cd05e-dirty",
+          "durationMs": 4904.213983,
+          "logicalApiCalls": 15,
+          "httpRequests": 14,
+          "methods": {
+            "eventBaseline": 1,
+            "readUiDocuments": 1,
+            "recordResources": 1,
+            "catalog": 1,
+            "recordConversations": 1,
+            "subscribe": 1,
+            "onChanged": 1,
+            "records": 1,
+            "onChange": 2,
+            "readEvents": 1,
+            "assistantOverview": 1
+          },
+          "decisionRows": 11,
+          "encodedStaticBytes": 604863,
+          "resources": [
+            {
+              "name": "/assets/index-CiA-qyWO.js",
+              "initiator": "script",
+              "start": 146.89999961853027,
+              "duration": 3157.2000002861023,
+              "transfer": 266652,
+              "encoded": 266352,
+              "decoded": 998389,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/hosted-application-C7urvO1P.js",
+              "initiator": "other",
+              "start": 147.59999990463257,
+              "duration": 2864.199999809265,
+              "transfer": 203202,
+              "encoded": 202902,
+              "decoded": 791454,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/index-4tOJi43m.css",
+              "initiator": "link",
+              "start": 156.59999990463257,
+              "duration": 1528.0999999046326,
+              "transfer": 69283,
+              "encoded": 68983,
+              "decoded": 361729,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/hosted-application-DUU-nFma.css",
+              "initiator": "link",
+              "start": 147.69999980926514,
+              "duration": 1222,
+              "transfer": 49524,
+              "encoded": 49224,
+              "decoded": 312536,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/context-menu-BuzaUFAj.js",
+              "initiator": "other",
+              "start": 148.69999980926514,
+              "duration": 568.1999998092651,
+              "transfer": 17702,
+              "encoded": 17402,
+              "decoded": 55560,
+              "encoding": "br"
+            }
+          ],
+          "layout": {
+            "viewport": 390,
+            "documentWidth": 390,
+            "tableWidth": 368,
+            "statusBounds": {
+              "left": 23,
+              "right": 367
+            },
+            "sessionBounds": {
+              "left": 23,
+              "right": 367
+            }
+          },
+          "pageErrors": [],
+          "cleanup": {
+            "id": "dff8af8f-c79c-4847-97de-b745de5cf944",
+            "reason": "command-ended",
+            "outcome": "succeeded",
+            "exitCode": 0
+          }
+        },
+        {
+          "version": "20261114T055846-533cd05e-dirty",
+          "durationMs": 4912.034527000001,
+          "logicalApiCalls": 15,
+          "httpRequests": 14,
+          "methods": {
+            "eventBaseline": 1,
+            "readUiDocuments": 1,
+            "recordResources": 1,
+            "catalog": 1,
+            "recordConversations": 1,
+            "subscribe": 1,
+            "onChanged": 1,
+            "records": 1,
+            "onChange": 2,
+            "readEvents": 1,
+            "assistantOverview": 1
+          },
+          "decisionRows": 11,
+          "encodedStaticBytes": 604863,
+          "resources": [
+            {
+              "name": "/assets/index-CiA-qyWO.js",
+              "initiator": "script",
+              "start": 153.80000019073486,
+              "duration": 3157.5999999046326,
+              "transfer": 266652,
+              "encoded": 266352,
+              "decoded": 998389,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/hosted-application-C7urvO1P.js",
+              "initiator": "other",
+              "start": 154.59999990463257,
+              "duration": 2864.5,
+              "transfer": 203202,
+              "encoded": 202902,
+              "decoded": 791454,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/index-4tOJi43m.css",
+              "initiator": "link",
+              "start": 163.40000009536743,
+              "duration": 1527.8000001907349,
+              "transfer": 69283,
+              "encoded": 68983,
+              "decoded": 361729,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/hosted-application-DUU-nFma.css",
+              "initiator": "link",
+              "start": 154.7000002861023,
+              "duration": 1221.5999999046326,
+              "transfer": 49524,
+              "encoded": 49224,
+              "decoded": 312536,
+              "encoding": "br"
+            },
+            {
+              "name": "/assets/context-menu-BuzaUFAj.js",
+              "initiator": "other",
+              "start": 155.40000009536743,
+              "duration": 569,
+              "transfer": 17702,
+              "encoded": 17402,
+              "decoded": 55560,
+              "encoding": "br"
+            }
+          ],
+          "layout": {
+            "viewport": 390,
+            "documentWidth": 390,
+            "tableWidth": 368,
+            "statusBounds": {
+              "left": 23,
+              "right": 367
+            },
+            "sessionBounds": {
+              "left": 23,
+              "right": 367
+            }
+          },
+          "pageErrors": [],
+          "cleanup": {
+            "id": "5fe18f0d-8afe-46f0-8cfc-6c6cbe1bf47a",
+            "reason": "command-ended",
+            "outcome": "succeeded",
+            "exitCode": 0
+          }
+        }
+      ],
+      "withinBudget": true
+    },
+    "staticBefore": {
+      "encodedBytes": 1381380,
+      "note": "Original first paint from the same dataset before deferred modules, styles and SVG changes; original static responses used gzip."
+    },
+    "staticAfter": {
+      "encodedBytes": 604863,
+      "reductionPercent": 56.2
+    },
+    "intermediateControlledFailuresMs": [
+      6010,
+      5730,
+      5429
+    ],
+    "unthrottledLocal": {
+      "durationMs": 1004.0501060000001,
+      "fontFallback": {
+        "initialFont": false,
+        "fallback": {
+          "family": "\"Font Awesome 7 Free\"",
+          "contentCode": 63414,
+          "width": 20,
+          "loaded": true
+        }
+      },
+      "cleanup": {
+        "id": "7772f310-9df5-41f9-a170-ab9109504489",
+        "reason": "command-ended",
+        "outcome": "succeeded",
+        "exitCode": 0
+      }
+    },
+    "proxiedPublic": {
+      "version": "20261114T055846-533cd05e-dirty",
+      "durationMs": 10762.820267,
+      "logicalApiCalls": 16,
+      "httpRequests": 15,
+      "methods": {
+        "eventBaseline": 1,
+        "readUiDocuments": 1,
+        "recordResources": 1,
+        "catalog": 1,
+        "recordConversations": 1,
+        "subscribe": 1,
+        "onChanged": 1,
+        "onChange": 2,
+        "records": 1,
+        "assistantOverview": 1,
+        "readEvents": 1,
+        "reportClientDiagnostic": 1
+      },
+      "decisionRows": 11,
+      "encodedStaticBytes": 604863,
+      "resources": [
+        {
+          "name": "/assets/index-CiA-qyWO.js",
+          "initiator": "script",
+          "start": 3402.6000003814697,
+          "duration": 1996.1999998092651,
+          "transfer": 266652,
+          "encoded": 266352,
+          "decoded": 998389,
+          "encoding": "br"
+        },
+        {
+          "name": "/assets/hosted-application-C7urvO1P.js",
+          "initiator": "other",
+          "start": 3402.9000000953674,
+          "duration": 3537.9000000953674,
+          "transfer": 203202,
+          "encoded": 202902,
+          "decoded": 791454,
+          "encoding": "br"
+        },
+        {
+          "name": "/assets/index-4tOJi43m.css",
+          "initiator": "link",
+          "start": 3405.2000002861023,
+          "duration": 4211.299999713898,
+          "transfer": 69283,
+          "encoded": 68983,
+          "decoded": 361729,
+          "encoding": "br"
+        },
+        {
+          "name": "/assets/hosted-application-DUU-nFma.css",
+          "initiator": "link",
+          "start": 3402.9000000953674,
+          "duration": 2547.300000190735,
+          "transfer": 49524,
+          "encoded": 49224,
+          "decoded": 312536,
+          "encoding": "br"
+        },
+        {
+          "name": "/assets/context-menu-BuzaUFAj.js",
+          "initiator": "other",
+          "start": 3402.9000000953674,
+          "duration": 4477.900000095367,
+          "transfer": 17702,
+          "encoded": 17402,
+          "decoded": 55560,
+          "encoding": "br"
+        }
+      ],
+      "layout": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "tableWidth": 368,
+        "statusBounds": {
+          "left": 23,
+          "right": 367
+        },
+        "sessionBounds": {
+          "left": 23,
+          "right": 367
+        }
+      },
+      "pageErrors": [],
+      "withinBudget": false,
+      "path": "176.122.169.169:2000 accessed through the development host system proxy. Direct access from this host fails. This is not the users phone network.",
+      "cleanup": {
+        "id": "bce6728b-def9-4fd5-814d-4895f1d73e53",
+        "reason": "command-ended",
+        "outcome": "succeeded",
+        "exitCode": 0
+      }
+    },
+    "remaining": "The development host proxied public route still exceeds five seconds. Real handset OS/browser/network and refreshed timing are requested; mobile direct-path performance is not claimed as verified."
+  },
+  "nativeStyleRegression": {
+    "metric": {
+      "durationMs": 1075.2324339999998,
+      "httpRequests": 1,
+      "methods": [
+        "openConversationWorkbench"
+      ]
+    },
+    "inputWidth": 360,
+    "errors": [],
+    "operation": "Read-only original conversation navigation; no message, approval or acceptance submitted",
+    "cleanup": {
+      "id": "8eb776cf-7655-4983-9f31-65756551dc34",
+      "reason": "command-ended",
+      "outcome": "succeeded",
+      "exitCode": 0
+    }
+  },
+  "checks": {
+    "typecheck": "Workspace passed; node-host/http-app and shell/adapter repeated after their respective changes.",
+    "performance": {
+      "core": 60,
+      "transport": 30,
+      "ui": 66
+    },
+    "targeted": [
+      {
+        "suite": "Observer authorization and original-receipt recovery",
+        "passed": 14,
+        "cleanup": {
+          "id": "14099572-baca-4086-a6a4-7e30048ad890",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "Record progress and learning registration",
+        "passed": 44,
+        "cleanup": {
+          "id": "16fef373-d004-45d9-8c7b-3376dffbe9ea",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "Decision rendering and duration",
+        "passed": 25,
+        "cleanup": {
+          "id": "8bf9ea1d-bc3e-42c4-b474-5d63a70c2f0d",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "OCR and bootstrap navigation",
+        "passed": 38,
+        "cleanup": {
+          "id": "686edb59-c73b-497f-880b-ab2012ffbe3d",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "Original native interaction panel",
+        "passed": 3,
+        "cleanup": {
+          "id": "70ebf781-27dd-44bc-b65e-89419f28cf0f",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "Lazy Flow launcher",
+        "passed": 1,
+        "cleanup": {
+          "id": "8963ec18-d24a-4e1a-b580-dbbbbfedfa19",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "Static content negotiation and conditional requests",
+        "passed": 7,
+        "cleanup": {
+          "id": "a0942c22-3c2c-4877-a9da-9d583155f298",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      }
+    ],
+    "shellPreload": "node --test scripts/tests/preload-shell.test.mjs: 1 passed; built HTML contains shell module/style preloads.",
+    "modules": "14 passed and graph separation verified",
+    "styles": "passed",
+    "docs": "passed"
+  },
+  "repository": "No push. Unrelated tools/fc-server pointer retained and excluded from commits."
+}
