@@ -1,3 +1,4 @@
+import {KANBAN_EXECUTION_SESSION} from '@nestos/app-contracts';
 import {createSoftwareDevelopmentPlugin} from '@nestos/kanban-development';
 import {recordFollowUps} from './record-follow-ups';
 import {assertWorkspaceCleanup} from './workspace-cleanup-blocker';
@@ -8,7 +9,7 @@ import type {KanbanClient} from '@nestos/kanban/contracts';
 import {sha256HexSync} from '@nestos/common';
 import {workContext} from './work-context';
 import {KanbanError} from '@nestos/kanban';
-import {assembleKanbanRuntime,KanbanAutomationJournal,type KanbanRuntimeContext,type KanbanRuntimeExtension} from '@nestos/kanban/integration';
+import {assembleKanbanRuntime,createRecordReadSource,KanbanAutomationJournal,type KanbanRuntimeContext,type KanbanRuntimeExtension} from '@nestos/kanban/integration';
 import {kanbanControlOptions} from './control-adapter';
 import {workLogOptions} from './work-log-policy';
 import {kanbanJournalOptions} from './host-policy';
@@ -42,6 +43,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
         workLog:workLogOptions(events,base.log),resources:automationOptions?.projects?projectResourceCatalog(automationOptions.projects):undefined,
         requiresItemResource:automationOptions?.requiresItemResource,archiveSession:automationOptions?.archiveSession,
         control:kanbanControlOptions(automationOptions??{calls:{list:async()=>[]}},journal),
+        prepareRecordReads:service=>createRecordReadSource(service,{...base,referenceSystem:KANBAN_EXECUTION_SESSION}),
         createService:options=>createNestOSKanban({...options,notifications:base.notifications}),
         extensions:context=>personalExtensions(context,automationOptions,events,base.log,value=>{operations=value;},()=>client)});
     client=runtime.service;
