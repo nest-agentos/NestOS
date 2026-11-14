@@ -40,6 +40,7 @@ export class KanbanWindowWorkbench {
     }
     async start(): Promise<void> {
         const initial=this.options.initialResource;
+        if(initial?.includes('/@decision')&&this.options.service?.decisionSnapshot){await this.openResource(initial);await this.navigation.start(this.boardSnapshots);return;}
         if(initial&&initial!=='/') {await Promise.all([this.navigation.start(),this.openResource(initial)]);return;}
         await this.navigation.start();
         const board=this.boardSnapshots?.length===1?this.boardSnapshots[0]:undefined;
@@ -64,7 +65,11 @@ export class KanbanWindowWorkbench {
         }
     }
     getActiveResourceId(): string {return this.tabs.current?.id ?? '/';}
-    invalidateFromEvents(): void {this.boardSnapshots = undefined; this.availableBoards = undefined; this.navigation.invalidate(); for (const tab of this.tabs.values()) tab.value?.view.invalidateFromEvents();}
+    invalidateFromEvents(event?:import('@nestos/app-contracts/services').ApplicationEventFact): void {
+        const board=eventBoard(event?.resourceId);
+        this.boardSnapshots=undefined;this.availableBoards=undefined;this.navigation.invalidate();
+        for(const tab of this.tabs.values())if(!board||!tab.id.startsWith('/board/')||decodeURIComponent(tab.id.split('/')[2])===board)tab.value?.view.invalidateFromEvents();
+    }
     setVisible(visible: boolean): void {this.visible = visible; this.navigation.setVisible(visible); this.syncVisibility();}
     captureRecovery(): unknown {
         for (const tab of this.tabs.values()) tab.value?.view.captureRecovery();
@@ -80,6 +85,7 @@ export class KanbanWindowWorkbench {
         const editor = document.createElement('div'); tab.panel.append(editor);
         const view = new KanbanView({...this.options, sidebar: undefined, editor, initialResource: tab.id,
             openSettings:async id=>{this.tabs.keep(tab.id);this.navigation.openSettings(id);},
+            catalogPrepared: boards => {this.boardSnapshots=boards;this.navigation.prepare(boards);},
             getBoardSnapshot: id => this.boardSnapshots?.find(board => board.id === id),
             itemOperationsAvailable: (_board, item) => !!item.externalRefs?.some(ref => ref.system === "nestos-worktree"),
             presentation: kanbanPresentation, executionReference: executionSessionReference, reviewGuidance: this.options.reviewGuidance ?? kanbanReviewGuidance,
@@ -160,4 +166,9 @@ export class KanbanWindowWorkbench {
 function parentPath(path: string): string {
     if(path.startsWith('/@resource/'))return '/';
     const parts = path.split('/'); return parts.length > 3 ? parts.slice(0, 3).join('/') : '/';
+}
+
+function eventBoard(resource:string|undefined):string|undefined {
+    if(!resource?.startsWith('kanban:'))return;
+    try{const value=JSON.parse(resource.slice(7));return Array.isArray(value)&&typeof value[1]==='string'?value[1]:undefined;}catch{return;}
 }

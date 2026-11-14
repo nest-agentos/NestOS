@@ -257,7 +257,7 @@ export class ViewApi {
 }
 async function readApplicationBody(request: IncomingMessage, response: ServerResponse) {
     const started = Date.now();
-    try { return await readJson(request); }
+    try { return await readJson(request,metrics=>{for(const [key,value] of Object.entries(metrics))if(typeof value==='number')recordRequestPhase(response,key as keyof typeof metrics,value);}); }
     finally { recordRequestPhase(response, 'bodyReadMs', Date.now() - started); }
 }
 function validCall(call: Call | undefined): call is Call {

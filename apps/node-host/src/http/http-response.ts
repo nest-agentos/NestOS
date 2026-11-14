@@ -8,18 +8,29 @@ import {createModuleLogger, randomUUID} from '@nestos/common';
 
 const compress = promisify(gzip), log = createModuleLogger('http-response');
 
-export async function readJson(request: IncomingMessage): Promise<{ method?: unknown; args?: unknown }> {
-    const bytes = await readBytes(request);
+export interface JsonReadMetrics {bodyBytes:number;bodyChunks:number;bodyFirstByteMs?:number;bodyReceiveMs:number;bodyParseMs:number}
+export async function readJson(request: IncomingMessage, report?: (metrics:JsonReadMetrics)=>void): Promise<{ method?: unknown; args?: unknown }> {
+    const started=performance.now(),metrics:JsonReadMetrics={bodyBytes:0,bodyChunks:0,bodyReceiveMs:0,bodyParseMs:0};
+    let receiving=true;
     try {
-        const value = JSON.parse(bytes.toString('utf8'));
-        if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid request');
-        return value;
-    } catch { throw new FSError('EINVAL', 'Malformed JSON request'); }
+        const bytes=await readBytes(request,size=>{
+            metrics.bodyBytes+=size;metrics.bodyChunks++;
+            if(metrics.bodyChunks===1)metrics.bodyFirstByteMs=Math.round(performance.now()-started);
+        });
+        metrics.bodyReceiveMs=Math.round(performance.now()-started);receiving=false;
+        const parsing=performance.now();
+        try {
+            const value=JSON.parse(bytes.toString('utf8'));
+            if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Invalid request');
+            return value;
+        }catch{throw new FSError('EINVAL','Malformed JSON request');}
+        finally{metrics.bodyParseMs=Math.round(performance.now()-parsing);}
+    }finally{if(receiving)metrics.bodyReceiveMs=Math.round(performance.now()-started);report?.(metrics);}
 }
-export async function readBytes(request: IncomingMessage): Promise<Buffer> {
+export async function readBytes(request: IncomingMessage, observe?:(size:number)=>void): Promise<Buffer> {
     const chunks: Buffer[] = []; let size = 0;
     for await (const chunk of request) {
-        const bytes = Buffer.from(chunk); size += bytes.length;
+        const bytes = Buffer.from(chunk); size += bytes.length;observe?.(bytes.length);
         if (size > MAX_BODY_BYTES) throw new FSError('EFBIG', 'HTTP request is too large');
         chunks.push(bytes);
     }

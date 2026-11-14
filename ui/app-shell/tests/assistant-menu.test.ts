@@ -17,14 +17,14 @@ function setup(initial = [event('done'), event('approval', 'approval', 0), event
     HTMLDialogElement.prototype.close = function () {this.open = false; this.dispatchEvent(new Event('close'));};
     const overview: AssistantOverview = {events: initial, scanners: [{id: 'scan', name: 'My scanner', workspaceId: 'team', workspaceName: 'Team'}], unavailable: []};
     const write = vi.fn(), flush = vi.fn(async () => {}), navigate = vi.fn(async () => {}), assistantOverview = vi.fn(async () => structuredClone(overview));
-    let changed!: () => void; const unsubscribe = vi.fn();
+    let changed!: (event?: {kind:string}) => void; const unsubscribe = vi.fn();
     const projects = {list: async () => [{project: {id: 'project'}, name: 'Project', path: '/renamed'}], get: vi.fn(async () => ({project: {id: 'project'}, path: '/renamed'}))};
     const abort = new AbortController();
     releases.push(installAssistantMenu({backend: {assistantOverview} as never, services: {projects, kernel: {kernel: {onChanged: () => unsubscribe}},
-        sessionRepository: {subscribe: (callback: () => void) => {changed = callback; return unsubscribe;}, listSummaries: async () => [{id: 'existing', title: 'Existing', folder: '/renamed', updatedAt: 1}]}} as never,
+        sessionRepository: {subscribe: (callback: (event?: {kind:string}) => void) => {changed = callback; return unsubscribe;}, listSummaries: async () => [{id: 'existing', title: 'Existing', folder: '/renamed', updatedAt: 1}]}} as never,
         documents: {read: async () => state, write, flush}, current: () => ({workspace: 'chat', resource: 'current', title: 'Current page'}), navigate, signal: abort.signal}));
     const open = () => document.querySelector<HTMLButtonElement>('.assistant-launcher')!.click();
-    return {overview, write, flush, navigate, assistantOverview, open, changed: () => changed(), abort, projects};
+    return {overview, write, flush, navigate, assistantOverview, open, changed: (event?: {kind:string}) => changed(event), abort, projects};
 }
 it('shows the same count on desktop/mobile, only previews the three most important items, and leaves approvals actionable', async () => {
     const f = setup(); await vi.waitFor(() => expect(document.querySelector('[data-assistant-count]')!.textContent).toBe('4'));
@@ -242,4 +242,10 @@ it('keeps the destination failure code and detail instead of one generic open er
     f.navigate.mockRejectedValueOnce(new Error('数字分身加载失败：TWIN_VIEW_READ_FAILED'));
     document.querySelector<HTMLButtonElement>('[data-assistant-event=failed]')!.click();
     await vi.waitFor(() => expect(document.querySelector('.assistant-menu__error')!.textContent).toContain('TWIN_VIEW_READ_FAILED'));
+});
+
+it('does not reread assistant facts for UI-only session state changes',async()=>{
+ const f=setup();await vi.waitFor(()=>expect(f.assistantOverview).toHaveBeenCalledOnce());
+ f.changed({kind:'ui-state'});await new Promise(resolve=>setTimeout(resolve,550));expect(f.assistantOverview).toHaveBeenCalledOnce();
+ f.changed({kind:'updated'});await vi.waitFor(()=>expect(f.assistantOverview).toHaveBeenCalledTimes(2));
 });

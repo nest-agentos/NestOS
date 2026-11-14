@@ -355,6 +355,7 @@ it('records registered RPC names and batch size without recording UI document co
     const writes = auditEvents.filter(event => event.rpcOperations?.includes('ApplicationBackend.writeUiDocuments'));
     expect(writes).toHaveLength(1); expect(writes[0]).toMatchObject({ rpcKind: 'call', rpcBatchSize: 1 });
     await vi.waitFor(() => expect(server.events.find(event => event.requestId === writes[0].requestId)).toMatchObject({
+        bodyBytes: expect.any(Number),bodyChunks:expect.any(Number),bodyFirstByteMs:expect.any(Number),bodyReceiveMs:expect.any(Number),bodyParseMs:expect.any(Number),
         bodyReadMs: expect.any(Number), viewReadyMs: expect.any(Number), rpcMs: expect.any(Number), responseFlushMs: expect.any(Number),
     }));
     expect(JSON.stringify(auditEvents)).not.toContain('private-document');

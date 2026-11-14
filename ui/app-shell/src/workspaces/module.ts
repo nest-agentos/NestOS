@@ -1,9 +1,10 @@
+import type {ApplicationEventFact} from '@nestos/app-contracts/services';
 import type {RecoveryParticipant} from '../workbench/recovery';
 import type { WorkspaceController, WorkspaceCreation, WorkspaceOpenOptions } from '@nestos/app-contracts';
 
 /** Route recovery is a shell capability; ordinary resource operations remain strict. */
 export type WorkspaceHandle = WorkspaceController & Partial<WorkspaceCreation> & RecoveryParticipant & {
-    invalidateFromEvents?(): void;
+    invalidateFromEvents?(event?:ApplicationEventFact): void;
     restoreResource?(id: string, options?: WorkspaceOpenOptions): Promise<void>;
     getNavigationScope?(): string;
     restoreNavigationScope?(scope: string): Promise<void>;
@@ -20,7 +21,7 @@ export function createWorkspaceModule(controller: WorkspaceHandle, dispose: () =
     const destroy = () => disposal ??= Promise.resolve().then(dispose);
     return { dispose: destroy, workbench: {
         start: initialResource => controller.start(initialResource), destroy,
-        ...(controller.invalidateFromEvents ? {invalidateFromEvents: () => controller.invalidateFromEvents!()} : {}),
+        ...(controller.invalidateFromEvents ? {invalidateFromEvents: event => controller.invalidateFromEvents!(event)} : {}),
         ...(controller.captureRecovery ? {captureRecovery: () => controller.captureRecovery!()} : {}),
         ...(controller.restoreRecovery ? {restoreRecovery: (state: unknown) => controller.restoreRecovery!(state)} : {}),
         ...(controller.suspendForRecovery ? {suspendForRecovery: () => controller.suspendForRecovery!()} : {}),

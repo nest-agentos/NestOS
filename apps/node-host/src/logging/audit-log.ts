@@ -14,11 +14,12 @@ export interface AuditEvent {
     rpcCommands?: string[]; rpcErrorCount?: number; rpcErrorCodes?: string[];
     uploads?: Array<{mimeType: string; bytes?: number}>;
     providerRequestId?: string;
+    bodyBytes?:number;bodyChunks?:number;bodyFirstByteMs?:number;bodyReceiveMs?:number;bodyParseMs?:number;
     bodyReadMs?: number; viewReadyMs?: number; rpcMs?: number; responseFlushMs?: number;
 }
 export interface AuditPort { write(event: AuditEvent): void; close(): Promise<void>; }
 
-type RequestPhase = 'bodyReadMs' | 'viewReadyMs' | 'rpcMs';
+type RequestPhase = 'bodyReadMs' | 'viewReadyMs' | 'rpcMs' | 'bodyBytes' | 'bodyChunks' | 'bodyFirstByteMs' | 'bodyReceiveMs' | 'bodyParseMs';
 const requestTimings = new WeakMap<ServerResponse, { phases: Partial<Record<RequestPhase, number>>; queuedAt?: number }>();
 function requestTiming(response: ServerResponse) {
     let value = requestTimings.get(response);

@@ -371,3 +371,17 @@ it('waits for the opening reply when SSE patches for a new view arrive first', a
     const received = vi.fn(), stop = await workspace.subscribe(received);
     await vi.waitFor(() => expect(received).toHaveBeenCalledWith(events[0])); stop();
 });
+
+it('transports one scoped decision query while another independent query is still pending', async () => {
+    let finish!:()=>void; const slow = new Promise<void>(resolve=>{finish=resolve;});
+    const service={overview:vi.fn(),related:vi.fn(),scan:vi.fn(),execute:vi.fn(),
+        decisionSnapshot:vi.fn(async(_board:string,query:any)=>{if(query.cursor==='slow')await slow;return {page:{revision:1,total:0,items:[],decisionRows:[]},observedAt:1};})};
+    const {root,calls,client}=await pair(service);
+    const first=root.decisionSnapshot('b',{sections:['page'],cursor:'slow'});
+    try {
+        await vi.waitFor(()=>expect(service.decisionSnapshot).toHaveBeenCalledOnce());
+        expect((await root.decisionSnapshot('b',{sections:['catalog']})).page.total).toBe(0);
+        expect(calls.filter(call=>call.method==='decisionSnapshot')).toHaveLength(2);
+        expect(client.remoteQuery(calls.find(call=>call.method==='decisionSnapshot')!)).toBe(true);expect(service.execute).not.toHaveBeenCalled();
+    } finally {finish();await first;}
+});

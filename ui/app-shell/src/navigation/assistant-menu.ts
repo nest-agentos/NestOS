@@ -60,7 +60,7 @@ class AssistantMenu {
         document.addEventListener('visibilitychange', () => {if (!document.hidden) this.schedule();}, {signal});
         this.options.signal.addEventListener('abort', () => this.close(), {once: true});
         const services = this.options.services;
-        this.releases.push(services.sessionRepository.subscribe?.(() => this.schedule()) ?? (() => {}),
+        this.releases.push(services.sessionRepository.subscribe?.(event => {if(event?.kind!=='ui-state')this.schedule();}) ?? (() => {}),
             services.kernel?.kernel?.onChanged?.(event => {if (event.reason === 'structure') this.schedule();}) ?? (() => {}),
             services.digitalTwin?.onChange(() => this.schedule()) ?? (() => {}));
         if (!this.options.backend.assistantOverview) {this.stale = true; this.error = label('eventsUnavailable');}

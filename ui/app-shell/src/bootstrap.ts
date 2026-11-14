@@ -119,7 +119,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const applicationEvents = backend.events ? new ShellApplicationEvents(backend.events, event => {
         for (const [id, manager] of managerCache) {
             const kind = workspaces.find(workspace => workspace.elementId === id)?.type;
-            if (workspaceConsumesEvent(kind, event)) manager.invalidateFromEvents?.();
+            if (workspaceConsumesEvent(kind, event)) manager.invalidateFromEvents?.(event);
         }
     }, () => !document.hidden) : undefined;
     cleanupFns.push(() => applicationEvents?.close());
@@ -855,6 +855,12 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         const lastId = entryResource(id);
         updateHistory(id, lastId, 'push'); void performNavigation(id, lastId ?? undefined);
     }));
+    const initialRoute = parseWorkspaceHash(location.hash, resolvedDefault);
+    const initWs = resolveTarget(initialRoute.slug, initialRoute.resource);
+    const initialLoad = performNavigation(initWs, initialRoute.resource, initialRoute.slug);
+    const initialRevision = navigationRevision;
+    options.onShellReady?.();
+    await initialLoad;
     cleanupFns.push(installAssistantMenu({services, backend, documents: uiDocs, signal: navigationSignal,
         current: () => {
             const workspace = reverseRouteMap[visibleWorkspaceId ?? ''] ?? resolvedDefault;
@@ -864,12 +870,6 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }, navigate: request => handleNavigationRequest(request, true),
         home: options.startPage ? async () => {rememberCurrentPage(); updateHistory(START_PAGE_ID, null, 'push'); await performNavigation(START_PAGE_ID);} : undefined,
     }));
-    const initialRoute = parseWorkspaceHash(location.hash, resolvedDefault);
-    const initWs = resolveTarget(initialRoute.slug, initialRoute.resource);
-    const initialLoad = performNavigation(initWs, initialRoute.resource, initialRoute.slug);
-    const initialRevision = navigationRevision;
-    options.onShellReady?.();
-    await initialLoad;
     if (options.recovery) managerCache.get(initWs)?.assertRecovery?.();
     if (initialRevision === navigationRevision) {
         const presentation = options.recovery?.presentation;

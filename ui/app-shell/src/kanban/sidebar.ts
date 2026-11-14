@@ -47,9 +47,14 @@ export class KanbanSidebar {
             ]});
         this.refresh = new ViewRefresh({visible: () => this.visible && !this.closed, run: () => this.load(), report: error => this.failure(error)});
     }
-    async start(): Promise<void> {
-        await this.reload(); if (this.closed) return;
+    async start(prepared?: readonly KanbanBoardSummary[]): Promise<void> {
+        if(prepared)this.prepare(prepared);else await this.reload(); if (this.closed) return;
         await this.browser.start(); this.started = true; this.select(this.selected);
+    }
+    prepare(boards:readonly KanbanBoardSummary[]):void {
+        if(this.closed)return;
+        this.boards=[...boards];this.controls?.update(this.boards);this.options.catalogChanged?.(boards);
+        this.nodes=boards.map(board=>nodeForBoard(board,!!this.options.service?.previewDeletion&&!!this.options.service?.deleteBoard));
     }
     openSettings(boardId?:string):void {this.controls?.open(this.boards,boardId);}
     select(path: string): void {
@@ -80,8 +85,7 @@ export class KanbanSidebar {
         try {
             const boards = await this.options.service?.catalog() ?? [];
             if (this.closed || !this.visible || generation !== this.generation) {this.refresh.mark('interrupted'); return;}
-            this.boards = boards; this.controls?.update(boards); this.options.catalogChanged?.(boards);
-            this.nodes = boards.map(board => nodeForBoard(board, !!this.options.service?.previewDeletion && !!this.options.service?.deleteBoard));
+            this.prepare(boards);
             if (this.started) await this.browser.refresh();
             if (this.closed) return;
             this.select(this.selected); this.status.hidden = true;
