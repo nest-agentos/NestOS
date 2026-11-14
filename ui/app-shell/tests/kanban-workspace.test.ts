@@ -112,9 +112,13 @@ it('opens decision discussion before displaying a session-created decision and k
     await click(f.editor, '[data-action=new-log]'); input(f.editor, 'title', 'Investigation'); input(f.editor, 'content', 'Checked the current implementation.'); await submit(f.editor, 'record');
     let records = await f.service.records(board.id, {itemId: id}); expect(records.items).toHaveLength(1); expect(records.items[0].status).toBe('confirmed');
     const start=vi.fn(async()=>({id:'discussion',boardId:board.id,state:'clarifying',resourceId:'/native/decision',createdAt:1}));
-    Object.assign(f.service,{startRecordConversation:start});
+    const reference = {system: 'project', id: 'decision-project'};
+    Object.assign(f.service,{startRecordConversation:start, recordResources: async () => [{reference, label: 'Decision project'}]});
     await click(f.editor, '[data-item]'); await click(f.editor, '[data-action=new-decision]');
-    expect(start).toHaveBeenCalledWith(board.id,{operationId:expect.any(String)});expect(f.openSession).toHaveBeenCalledWith('/native/decision');
+    await vi.waitFor(() => expect(f.editor.querySelector('[name=primaryResource]')).not.toBeNull());
+    expect(start).not.toHaveBeenCalled(); expect(f.openSession).not.toHaveBeenCalled();
+    await submit(f.editor, 'decision-conversation');
+    expect(start).toHaveBeenCalledWith(board.id,{operationId:expect.any(String), resources: [reference], primaryResource: reference});expect(f.openSession).toHaveBeenCalledWith('/native/decision');
     expect((await f.service.records(board.id,{kind:'decision'})).total).toBe(0);
     const latest=await f.service.read(board.id);
     await f.service.execute(board.id,{operationId:'session-proposal',expectedRevision:latest.revision,command:{type:'append-record',record:{id:'session-decision',kind:'decision',title:'Choose a bounded scope',content:'Ship the smallest verified change.',rationale:'Reduce uncertainty.',itemIds:[id],sources:[],externalRefs:[]}}});
@@ -126,7 +130,7 @@ it('opens decision discussion before displaying a session-created decision and k
     await vi.waitFor(()=>expect(f.editor.querySelector('[data-related-records]')!.textContent).toContain('Investigation'));
     expect(f.editor.querySelector('[data-related-records]')!.textContent).toContain('Choose a bounded scope');
     await click(f.editor, '[data-action=close-panel]'); await click(f.editor, '[data-context=decision]');
-    expect(f.editor.querySelector('.kanban__record-list')!.textContent).toContain('Choose a bounded scope');
+    await vi.waitFor(() => expect(f.editor.querySelector('.kanban__decision-table')?.textContent).toContain('Choose a bounded scope'));
 });
 it('uses a modal inspector, preserves column scroll and prevents Escape from discarding a draft', async () => {
     const f = await fixture(); await click(f.editor, '[data-action=new-board]'); input(f.editor, 'title', 'Board'); await submit(f.editor, 'board');

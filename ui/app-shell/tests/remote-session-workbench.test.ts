@@ -1,4 +1,5 @@
-import { createTestWorkbench } from './helpers/application';
+import { SessionWorkbench } from '../src/projects/SessionWorkbench';
+import { bindApplicationBackend } from '@nestos/app-core/host';
 // @vitest-environment jsdom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { t } from '@nestos/common';
@@ -40,7 +41,19 @@ it('browses mounted native history pages, opens their conversations and routes a
         : {sessions:[...sessionList],nextCursor:'older/before+='}),read:vi.fn(async () => ({session:{...native},turns:[{items:[{id:'a',type:'agentMessage',text:'Remote native history'}]}]})),
         fork:vi.fn(async (_profile,id,name) => {const session={...native,id:'branched-native',title:name ?? 'Alternative',parentSessionId:id};sessionList.push(session);return {session};}),create:vi.fn(async () => {const session={...native,id:'new-native'};sessionList.push(session);return {session};}),resume:vi.fn(async () => ({session:{...native}})),turn:vi.fn(async () => ({turnId:'t'})),eventSnapshot:vi.fn(async () => ({epoch:'ev',cursor:0,gap:false,events:[],requests:[]})),respond:vi.fn(),interrupt:vi.fn(),operation:vi.fn(),close:vi.fn(async () => {})};
     vi.mocked(peer.read).mockImplementation(async (_profile,id) => ({session:{...native,id},turns:[{items:[{id:'a',type:'agentMessage',text:'Remote native history'}]}]}));
-    const client = {register:async () => record,read:async () => record,roots:async () => ({roots: [{alias: 'docs', access: 'rw'}]}),harness:() => peer,close:async () => {}} as unknown as ProjectClient;
+    const state = new Map<string, string>();
+    const clientState: NonNullable<ProjectClient['clientState']> = async (_project, input) => {
+        const value = state.get(input.key) ?? null;
+        if (input.action === 'read') return {value};
+        if (value !== input.expected) return {applied: false};
+        if (input.value == null) state.delete(input.key); else state.set(input.key, input.value);
+        return {applied: true};
+    };
+    const queueSession: NonNullable<ProjectClient['queueSession']> = async (_project, input) => {
+        expect(input.action).toBe('read');
+        return {owner: 'cells', revision: 0, paused: false, items: [], receipts: []};
+    };
+    const client = {register:async () => record,read:async () => record,roots:async () => ({roots: [{alias: 'docs', access: 'rw'}]}),harness:() => peer,clientState,queueSession,close:async () => {}} as unknown as ProjectClient;
     const runtime = await createApplicationRuntime({backend:new MemoryBackend(),ownerKind:'web',remoteSourceProvider:{setCredential() {},resolveCredential:()=>'secret',dispose:async () => {},projects:() => client,
         conversation:(...args) => new HarnessConversation(...args),discover:async connection => ({version:1,fileProtocol:'fs-agent-http-v1',httpEndpoint:connection.endpoint.replace(/\/mcp$/,''),serverId:'node',harness:true,projects:true,projectProtocol:'fs-agent-project-v1'}),
         open:async () => ({fs: fileSource.fs, dispose: async () => {}})}});
@@ -54,13 +67,14 @@ it('browses mounted native history pages, opens their conversations and routes a
     const sidebar=document.createElement('div'),main=document.createElement('div');document.body.append(sidebar,main);
     const factory = vi.fn(createLLMFactory(runtime.agentService, {sessionRepository: runtime.sessionRepository,
         sessionManager: runtime.sessionManager, commandBus: runtime.commandBus}));
-    const workbench=createTestWorkbench({ sidebar,container:main,repository:runtime.sessionRepository,files:runtime.sessionFiles,projects:runtime.projects,kernel:runtime.kernel.kernel,factory,onSelect() {},hostContext:undefined,fileFactory:factory});
+    const backend = bindApplicationBackend(runtime);
+    const workbench=new SessionWorkbench({ backend, sidebar,container:main,repository:runtime.sessionRepository,files:runtime.sessionFiles,projects:runtime.projects,kernel:runtime.kernel.kernel,factory,onSelect() {},hostContext:undefined,fileFactory:factory});
     try {
         const remote=runtime.projects.remoteMounts!,connection=await remote.saveConnection({name:'Server',endpoint:'https://files.test',username:'u'},'secret');
         const project=await runtime.projects.createRemote('Notes',null,connection,'/docs/project','rw');
         const preview = (resource: string) => projectConversationEntryPath(projectConversationsPath(project.path, {recent: true}), resource);
         await workbench.start();
-        const selector = sidebar.querySelector<HTMLSelectElement>('.workbench-project-navigation select')!;
+        const selector = sidebar.querySelector<HTMLSelectElement>(`select[aria-label="${t('project.workspace')}"]`)!;
         const initialScope = selector.value;
         const localPath = folderBrowserPath((await runtime.projects.current())!.path), remotePath = folderBrowserPath(project.path);
         await workbench.openResource(localPath);
@@ -89,11 +103,11 @@ it('browses mounted native history pages, opens their conversations and routes a
         selector.value = initialScope; selector.dispatchEvent(new Event('change', {bubbles: true}));
         await vi.waitFor(() => expect(workbench.getActiveResourceId()).toBe(initialScope));
         const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const driver = (workbench as unknown as {browser: {fs: {driver: {getChildren(path: string): Promise<unknown[]>}}}}).browser.fs.driver;
-        const children = driver.getChildren.bind(driver), failure = new FSError('EIO', 'Remote directory unavailable');
-        const listFailure = vi.spyOn(driver, 'getChildren').mockImplementation(async path => {
+        const browser = (workbench as unknown as {browser: {readDirectory(path: string, options?: {refresh?: boolean}): Promise<unknown>}}).browser;
+        const readDirectory = browser.readDirectory.bind(browser), failure = new FSError('EIO', 'Remote directory unavailable');
+        const listFailure = vi.spyOn(browser, 'readDirectory').mockImplementation(async (path, options) => {
             if (path === remotePath) throw failure;
-            return children(path);
+            return readDirectory(path, options);
         });
         try {
             await expect(workbench.openResource(remotePath, {reload: true})).rejects.toBe(failure);
