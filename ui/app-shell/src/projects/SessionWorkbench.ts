@@ -205,7 +205,7 @@ interface RetainedEditor {
 export class SessionWorkbench implements WorkspaceController {
     private remoteStatus!: RemoteSessionStatusView;
     private searchPanel?: ProjectSearchPanel;
-    private readonly navigationFilters = new NavigationFilters();
+    private readonly navigationFilters = new NavigationFilters(undefined, {iconOnly: true});
     private search?: import('@nestos/app-contracts/services').ProjectSearch;
     private readonly dialogs = new AbortController();
     private readonly tabs: WorkbenchTabs<RetainedEditor>;
@@ -437,7 +437,7 @@ export class SessionWorkbench implements WorkspaceController {
             },
             titleHeader: this.projectNavigation?.header, toolbarContainer: this.projectNavigation?.toolbarContainer,
             toolbarOptions: this.projectNavigation?.options.navigationToolbarOptions,
-            navigationHeader: {layout: 'inline', primaryAction: 'create-project', filter: this.searchPanel ? this.navigationFilters.trigger : undefined,
+            navigationHeader: {layout: 'inline', primaryAction: 'create-project', searchLeading: this.searchPanel ? this.navigationFilters.trigger : undefined,
                 summary: this.navigationFilters.summary, results: this.searchPanel?.element, menu: this.projectNavigation?.overflow},
             rowCreation: { visible: node => !isFlowPath(node.id) && ['project-files', 'files'].includes(resolveBrowserTarget(node.id).kind),
                 run: (node, type) => this.createDirectoryEntry(node.id, type) },

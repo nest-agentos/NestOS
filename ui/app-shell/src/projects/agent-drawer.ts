@@ -8,6 +8,7 @@ import { lazyResource } from '../lifecycle/lazy-resource';
 import { showNameDialog } from '../files/project-dialog';
 import { nestOSVFSPresentation } from '../browser/vfs-presentation';
 import { DrawerActions } from '../toolbox/DrawerActions';
+import { decorateButton } from '../workbench/controls';
 
 interface AgentEntry { id: string; name: string; description?: string; source?: string; path?: string; remote?: boolean; group?: string }
 interface Options {
@@ -51,11 +52,6 @@ export class AgentDrawer {
         this.drawer = new Drawer({title: t('toolbox.agents'), showHeader: false, collapsible: false});
         this.element = this.drawer.element; this.element.classList.add('workbench-agents');
         this.rows.className = 'workbench-agents__list'; this.status.className = 'workbench-agents__status';
-        if (options.manage) {
-            const button = document.createElement('button'); button.type = 'button';
-            button.textContent = t('agentWorkspace.manageAll'); button.onclick = () => {void options.manage!().catch(error => this.report(error));};
-            this.drawer.content.append(button);
-        }
         this.status.setAttribute('role', 'status'); this.drawer.content.append(this.status, this.rows);
         const stop = options.usage?.subscribe?.(() => {void this.browser?.refresh();}); if (stop) this.cleanups.push(stop);
     }
@@ -99,6 +95,7 @@ export class AgentDrawer {
         if (this.browser) {await this.browser.refresh(); return;}
         this.browser = createVFSBrowser({container: this.rows, title: t('toolbox.agents'), presentation: nestOSVFSPresentation,
             searchPlaceholder: t('workbench.findAgents'),
+            navigationHeader: {layout: 'inline', searchLeading: this.manageButton()},
             appearance: {showTitle: false, showTimestamp: false, menuVisibility: 'always'},
             sort: {by: 'lastModified', direction: 'desc'}, selection: false,
             source: {children: async parent => parent === null ? this.entries.map(agent => this.node(agent)) : [],
@@ -108,6 +105,13 @@ export class AgentDrawer {
                 if (agent) void this.activate(agent);},
         });
         await this.browser.start();
+    }
+    private manageButton(): HTMLButtonElement | undefined {
+        if (!this.options.manage) return;
+        const button = document.createElement('button'); button.type = 'button';
+        decorateButton(button, TOOLBOX_ICONS.agents, t('agentWorkspace.manageAll'), true);
+        button.addEventListener('click', () => {void this.options.manage!().catch(error => this.report(error));}, {signal: this.abort.signal});
+        return button;
     }
     private actions(): BrowserAction[] {
         const toolbar = (id: string, label: string, run: () => Promise<void>, iconHTML?: string): BrowserAction =>
