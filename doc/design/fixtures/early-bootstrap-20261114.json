@@ -1,0 +1,315 @@
+{
+  "scenario": "Authenticated decision page cold browser startup; same first-row and board-not-busy condition, 250ms settle",
+  "recordedAt": "2026-11-14T17:05:00+08:00",
+  "conditions": {
+    "viewport": [
+      390,
+      844
+    ],
+    "cpuSlowdown": 4,
+    "latencyMs": 100,
+    "downloadBytesPerSecond": 200000,
+    "uploadBytesPerSecond": 100000,
+    "origin": "Local HTTPS with client certificate",
+    "data": "Existing development board; 11 rendered rows",
+    "cache": "Fresh browser context, warm host caches; no new business result cache",
+    "backgroundLoad": "No synthetic load; normal host background activity uncontrolled"
+  },
+  "before": {
+    "version": "20261114T084039-3f03e8b0-dirty",
+    "readyMs": 4330.969013,
+    "logicalApiCalls": 6,
+    "httpApiRequests": 6,
+    "rowCount": 11,
+    "pageErrors": [],
+    "staticRequestCount": 5,
+    "staticEncodedBytes": 525682,
+    "resources": [
+      {
+        "name": "/assets/hosted-application-Dew-l4iE.js",
+        "initiator": "other",
+        "start": 153.60000038146973,
+        "duration": 2768,
+        "transfer": 200316,
+        "encoded": 200016,
+        "decoded": 782204,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/index-BOZu07gJ.js",
+        "initiator": "script",
+        "start": 152.7000002861023,
+        "duration": 2686.199999809265,
+        "transfer": 189966,
+        "encoded": 189666,
+        "decoded": 674927,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/index-4tOJi43m.css",
+        "initiator": "link",
+        "start": 166,
+        "duration": 1533.6000003814697,
+        "transfer": 69283,
+        "encoded": 68983,
+        "decoded": 361729,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/hosted-application-DUU-nFma.css",
+        "initiator": "link",
+        "start": 153.7000002861023,
+        "duration": 1208,
+        "transfer": 49524,
+        "encoded": 49224,
+        "decoded": 312536,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/context-menu-DdU5ukgf.js",
+        "initiator": "other",
+        "start": 154.60000038146973,
+        "duration": 599.5,
+        "transfer": 18093,
+        "encoded": 17793,
+        "decoded": 56698,
+        "encoding": "br"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/api/identity",
+        "kind": null,
+        "methods": [],
+        "startMs": 2970.076273,
+        "durationMs": 93.24516099999983
+      },
+      {
+        "path": "/api/application",
+        "kind": "bootstrap",
+        "methods": [],
+        "startMs": 3069.412854,
+        "durationMs": 751.9613589999994
+      },
+      {
+        "path": "/api/application",
+        "kind": "bindings",
+        "methods": [
+          "onChange"
+        ],
+        "startMs": 4213.500574,
+        "durationMs": 113.15694600000006
+      },
+      {
+        "path": "/api/application",
+        "kind": "queries",
+        "methods": [
+          "readEvents"
+        ],
+        "startMs": 4213.773917,
+        "durationMs": 124.61986900000011
+      }
+    ],
+    "longestMainThreadTasks": [
+      {
+        "name": "v8.evaluateModule",
+        "durationMs": 110.156
+      },
+      {
+        "name": "Layout",
+        "durationMs": 58.668
+      }
+    ]
+  },
+  "after": {
+    "version": "20261114T090239-fc200cf1-dirty",
+    "readyMs": 4020.2394189999995,
+    "logicalApiCalls": 6,
+    "httpApiRequests": 6,
+    "rowCount": 11,
+    "pageErrors": [],
+    "staticRequestCount": 9,
+    "staticEncodedBytes": 529649,
+    "resources": [
+      {
+        "name": "/assets/hosted-application-Cmpvg4Ye.js",
+        "initiator": "other",
+        "start": 149.80000019073486,
+        "duration": 3327.0999999046326,
+        "transfer": 200867,
+        "encoded": 200567,
+        "decoded": 784783,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/icons-DaHgZWow.js",
+        "initiator": "other",
+        "start": 149.90000009536743,
+        "duration": 3079,
+        "transfer": 153180,
+        "encoded": 152880,
+        "decoded": 545721,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/index-4tOJi43m.css",
+        "initiator": "link",
+        "start": 160.2000002861023,
+        "duration": 2101.199999809265,
+        "transfer": 69283,
+        "encoded": 68983,
+        "decoded": 361729,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/hosted-application-DUU-nFma.css",
+        "initiator": "link",
+        "start": 149.80000019073486,
+        "duration": 1414.2999997138977,
+        "transfer": 49524,
+        "encoded": 49224,
+        "decoded": 312536,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/context-menu-D9iyKKZ9.js",
+        "initiator": "other",
+        "start": 150.90000009536743,
+        "duration": 648.6999998092651,
+        "transfer": 18113,
+        "encoded": 17813,
+        "decoded": 56755,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/index-3azQeCvO.js",
+        "initiator": "script",
+        "start": 149,
+        "duration": 418.09999990463257,
+        "transfer": 16153,
+        "encoded": 15853,
+        "decoded": 44817,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/live-connection-D16uF2zU.js",
+        "initiator": "script",
+        "start": 607.4000000953674,
+        "duration": 664.1999998092651,
+        "transfer": 15786,
+        "encoded": 15486,
+        "decoded": 51265,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/capabilities-C5xAjtZt.js",
+        "initiator": "other",
+        "start": 150.90000009536743,
+        "duration": 408.59999990463257,
+        "transfer": 8677,
+        "encoded": 8377,
+        "decoded": 33326,
+        "encoding": "br"
+      },
+      {
+        "name": "/assets/selectors-xS9ZUoTa.js",
+        "initiator": "script",
+        "start": 608.4000000953674,
+        "duration": 333.69999980926514,
+        "transfer": 766,
+        "encoded": 466,
+        "decoded": 1103,
+        "encoding": "br"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/api/identity",
+        "kind": null,
+        "methods": [],
+        "startMs": 614.6078829999999,
+        "durationMs": 138.3727190000002
+      },
+      {
+        "path": "/api/application",
+        "kind": "bootstrap",
+        "methods": [],
+        "startMs": 759.9842309999999,
+        "durationMs": 2320.690861
+      },
+      {
+        "path": "/api/application",
+        "kind": "bindings",
+        "methods": [
+          "onChange"
+        ],
+        "startMs": 3800.3009030000003,
+        "durationMs": 117.97562799999923
+      },
+      {
+        "path": "/api/application",
+        "kind": "queries",
+        "methods": [
+          "readEvents"
+        ],
+        "startMs": 3800.510365,
+        "durationMs": 132.5114169999997
+      },
+      {
+        "path": "/api/application",
+        "kind": "queries",
+        "methods": [
+          "assistantOverview"
+        ],
+        "startMs": 4171.826355,
+        "durationMs": 144.1363199999996
+      }
+    ],
+    "longestMainThreadTasks": [
+      {
+        "name": "Layout",
+        "durationMs": 62.237
+      }
+    ]
+  },
+  "limits": [
+    "Single before/after pair, not proof of real phone public network speed",
+    "Static request count rises because RPC and shared modules are loaded separately; logical API and API HTTP counts stay at six",
+    "Early bootstrap now overlaps static downloads; its browser duration includes contention for simulated bandwidth",
+    "UI performance first run overlapped build/typecheck and exceeded editor time budget at 5163ms; isolated full UI rerun passed unchanged thresholds"
+  ],
+  "validation": {
+    "httpRegression": 25,
+    "httpsAndRecoveryIntegration": 54,
+    "preparedBootstrapFinal": 7,
+    "workspaceTypecheck": "passed",
+    "modulesCheck": "passed",
+    "performanceCore": "passed",
+    "performanceTransport": "passed",
+    "performanceUi": "67 passed on isolated rerun",
+    "temporaryScopes": "cleanup confirmed",
+    "nativeConversationReadOnlySmoke": {
+      "first": {
+        "durationMs": 2555.04517,
+        "httpApiRequests": 3,
+        "methods": [
+          "openConversationWorkbench",
+          "assistantOverview",
+          "reportClientDiagnostic"
+        ],
+        "pageErrors": []
+      },
+      "repeat": {
+        "durationMs": 1204.27507,
+        "httpApiRequests": 2,
+        "methods": [
+          "openConversationWorkbench",
+          "assistantOverview"
+        ],
+        "pageErrors": [],
+        "capturedDiagnostics": []
+      },
+      "limitation": "One extra diagnostic call occurred in the first sample and did not recur; no claim that all navigation API counts decreased"
+    }
+  }
+}
