@@ -32,8 +32,9 @@ export class NativeComposerCapabilities {
         if (key === this.key && this.pending) return this.pending;
         if (!force && key === this.key && (this.pending || Date.now() < this.retryAt || !this.failures)) return this.pending ?? Promise.resolve(false);
         if (scope !== this.scope) {if (!state.supportsModels) {this.models = {models: []}; this.modelScope = undefined;} this.commands = []; this.failures = 0; this.retryAt = 0; ++this.commandRevision;}
+        const sameScope = this.scope === scope;
         this.scope = scope; this.key = key; const generation = ++this.generation;
-        const work = this.read(state, force).then(([models, commands]) => {
+        const work = this.read(state, force, sameScope).then(([models, commands]) => {
             if (generation !== this.generation) return false;
             if (models.status === 'fulfilled') {this.models = models.value; this.modelScope = scope;}
             else this.report?.(models.reason);
@@ -54,12 +55,14 @@ export class NativeComposerCapabilities {
         const commands = state.supportsSlashCommands && this.controls.commands ? await this.controls.commands() : [];
         if (generation === this.generation) this.setCommands(commands);
     }
-    private read(state: ConversationSnapshot, force: boolean) {
+    private read(state: ConversationSnapshot, force: boolean, sameScope: boolean) {
         return Promise.allSettled([
             state.supportsModels && this.controls.models
                 ? !force && !this.failures && this.modelScope === this.scope ? Promise.resolve(this.models) : this.controls.models()
                 : Promise.resolve({models: []}),
-            state.supportsSlashCommands && this.controls.commands ? this.controls.commands() : Promise.resolve([]),
+            state.supportsSlashCommands && this.controls.commands
+                ? !force && sameScope && state.commandCatalogObservation?.complete ? Promise.resolve(state.slashCommands ?? []) : this.controls.commands()
+                : Promise.resolve([]),
         ] as const);
     }
     selectors(): readonly SelectorView[] | undefined {

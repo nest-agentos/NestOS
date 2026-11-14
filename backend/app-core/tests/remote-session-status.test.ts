@@ -165,3 +165,10 @@ it('releases a failed cold read and discards metadata after an authorization cha
  await status.read('project');expect(status.get('project','p','s')).toBeUndefined();
  expect(port.close).toHaveBeenCalledTimes(2);expect(vi.getTimerCount()).toBe(0);await status.dispose();
 });
+
+it('shares cached project rows across lookup consumers and discards them when authorization changes',async()=>{
+    const {status,change}=fixture(),stop=status.subscribe('project',()=>{});await vi.advanceTimersByTimeAsync(0);
+    expect(status.records('project')).toHaveLength(1);expect(status.records('project')[0].observation).toEqual(status.get('project','p','s'));
+    change('new-grant');expect(status.records('project')).toEqual([]);expect(status.get('project','p','s')).toBeUndefined();
+    stop();await status.dispose();
+});

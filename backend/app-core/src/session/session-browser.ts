@@ -743,7 +743,7 @@ export async function createSessionBrowser(deps: SessionBrowserDependencies): Pr
         await rename(path, segment, options);
     };
     return Object.assign(owner, { transferItems: (mode: 'copy' | 'move', ids: string[], destination: string) => backend.transfer(mode, ids, destination),
-        readDirectory: (path: string, options?: {projectId?: string | null; refresh?: boolean}) => {
+        readDirectory: (path: string, options?: {projectId?: string | null; refresh?: boolean;includeAncestors?:boolean}) => {
             if (options?.refresh) backend.refreshNavigation();
             return backend.readQuery(path, options ?? {}, (_backend, fs, context) => readDirectoryView(fs, deps.projects, path, options, () => context.navigation(), context.operationId));
         },

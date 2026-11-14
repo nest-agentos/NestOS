@@ -1,0 +1,308 @@
+{
+  "date": "2026-11-14",
+  "version": "20261114T031116-dd9578e2-dirty",
+  "scope": "Follow-up for the two limitations in kanban-native-approval-20261114.json",
+  "queueRecovery": {
+    "rootCause": "The node-queue fixture did not implement thread/unsubscribe; resource handoff could not reach its unloaded state.",
+    "fix": "Implement the fixture protocol including thread/closed and an unsubscribed receipt; retain existing timeouts and crash/replay assertions.",
+    "passed": 453,
+    "skipped": 1,
+    "temporaryScopeReceipt": {
+      "id": "095e0442-b502-4bc5-b232-8c2753940c41",
+      "reason": "command-ended",
+      "outcome": "succeeded",
+      "exitCode": 0
+    }
+  },
+  "navigation": {
+    "intermediateFullReadyLogicalCalls": 40,
+    "measurementEnd": "Original authorization card visible, navigation no longer inert, plus 250 ms settlement. Each batched RPC counts separately. Health-version lookup is outside the measured interaction.",
+    "changes": [
+      "Do not enumerate native Session routes as filesystem directories.",
+      "Health notifications update availability without structural reloads.",
+      "Read project status metadata in one project projection rather than per row.",
+      "Return directory ancestors and project navigation in one read; hand results directly through initialization, without adding a navigation TTL or status index cache.",
+      "Share remote mount change subscriptions with independent consumer lifetimes.",
+      "Reuse project identity reads only inside the same serialized open.",
+      "Do not read local executor recency when opening an existing native conversation.",
+      "Reuse complete command snapshots and in-flight same-turn metric reads; explicit refresh remains supported."
+    ],
+    "runs": [
+      {
+        "nativeDirectoryCalls": 0,
+        "version": "20261114T031116-dd9578e2-dirty",
+        "dataset": "Existing development board KBD-2-10 and bound native execution; fresh Chrome context 1280x900; warm host; normal background scans",
+        "status": "等待授权（\n10h\n）",
+        "requestId": "number:0",
+        "choices": [
+          "批准本次",
+          "取消当前执行"
+        ],
+        "hasNativeDetails": true,
+        "mobile": {
+          "clientWidth": 358,
+          "scrollWidth": 358,
+          "viewport": 390,
+          "width": 358
+        },
+        "metrics": [
+          {
+            "scenario": "open-decision-with-live-authorization",
+            "durationMs": 822.3056110000002,
+            "logicalApiCalls": 4,
+            "httpRequests": 3,
+            "methods": {
+              "recordResources": 1,
+              "catalog": 1,
+              "recordConversations": 1,
+              "records": 1
+            }
+          },
+          {
+            "scenario": "open-original-authorization-dialog",
+            "durationMs": 217.25822700000026,
+            "logicalApiCalls": 4,
+            "httpRequests": 4,
+            "methods": {
+              "forFolder": 1,
+              "projectConversation": 1,
+              "read": 1,
+              "subscribe": 1
+            }
+          },
+          {
+            "scenario": "open-original-chat-authorization",
+            "durationMs": 1051.7701109999998,
+            "logicalApiCalls": 28,
+            "httpRequests": 27,
+            "methods": {
+              "executionSession": 1,
+              "readUiDocuments": 1,
+              "onGlobalEvent": 1,
+              "workbenchView": 1,
+              "onChange": 1,
+              "subscribe": 6,
+              "forFolder": 1,
+              "onChanged": 1,
+              "onPromoted": 1,
+              "update": 3,
+              "projectConversation": 1,
+              "readComposerDraft": 1,
+              "read": 1,
+              "refreshMetrics": 1,
+              "models": 1,
+              "commands": 2,
+              "readDirectory": 1,
+              "onAny": 1,
+              "records": 1,
+              "writeUiDocuments": 1
+            }
+          }
+        ],
+        "pageErrors": [],
+        "liveActions": "Viewed the same request in the decision modal and original chat. No approve, reject, send or cancel was submitted."
+      },
+      {
+        "nativeDirectoryCalls": 0,
+        "version": "20261114T031116-dd9578e2-dirty",
+        "dataset": "Existing development board KBD-2-10 and bound native execution; fresh Chrome context 1280x900; warm host; normal background scans",
+        "status": "等待授权（\n10h\n）",
+        "requestId": "number:0",
+        "choices": [
+          "批准本次",
+          "取消当前执行"
+        ],
+        "hasNativeDetails": true,
+        "mobile": {
+          "clientWidth": 358,
+          "scrollWidth": 358,
+          "viewport": 390,
+          "width": 358
+        },
+        "metrics": [
+          {
+            "scenario": "open-decision-with-live-authorization",
+            "durationMs": 822.1135249999998,
+            "logicalApiCalls": 4,
+            "httpRequests": 3,
+            "methods": {
+              "recordResources": 1,
+              "catalog": 1,
+              "recordConversations": 1,
+              "records": 1
+            }
+          },
+          {
+            "scenario": "open-original-authorization-dialog",
+            "durationMs": 217.2712779999997,
+            "logicalApiCalls": 4,
+            "httpRequests": 4,
+            "methods": {
+              "forFolder": 1,
+              "projectConversation": 1,
+              "read": 1,
+              "subscribe": 1
+            }
+          },
+          {
+            "scenario": "open-original-chat-authorization",
+            "durationMs": 1189.413697,
+            "logicalApiCalls": 28,
+            "httpRequests": 27,
+            "methods": {
+              "executionSession": 1,
+              "readUiDocuments": 1,
+              "onGlobalEvent": 1,
+              "workbenchView": 1,
+              "onChange": 1,
+              "subscribe": 6,
+              "forFolder": 1,
+              "onChanged": 1,
+              "onPromoted": 1,
+              "update": 3,
+              "projectConversation": 1,
+              "readComposerDraft": 1,
+              "read": 1,
+              "refreshMetrics": 1,
+              "models": 1,
+              "commands": 1,
+              "readDirectory": 1,
+              "onAny": 1,
+              "writeUiDocuments": 2,
+              "records": 1
+            }
+          }
+        ],
+        "pageErrors": [],
+        "liveActions": "Viewed the same request in the decision modal and original chat. No approve, reject, send or cancel was submitted."
+      },
+      {
+        "dataScale": {
+          "decisionRows": 11,
+          "navigationRows": 26,
+          "targetDecisions": 1,
+          "targetNativeSessions": 1
+        },
+        "nativeDirectoryCalls": 0,
+        "version": "20261114T031116-dd9578e2-dirty",
+        "dataset": "Existing development board KBD-2-10 and bound native execution; fresh Chrome context 1280x900; warm host; normal background scans",
+        "status": "等待授权（\n10h\n）",
+        "requestId": "number:0",
+        "choices": [
+          "批准本次",
+          "取消当前执行"
+        ],
+        "hasNativeDetails": true,
+        "mobile": {
+          "clientWidth": 358,
+          "scrollWidth": 358,
+          "viewport": 390,
+          "width": 358
+        },
+        "metrics": [
+          {
+            "scenario": "open-decision-with-live-authorization",
+            "durationMs": 824.0336730000004,
+            "logicalApiCalls": 4,
+            "httpRequests": 3,
+            "methods": {
+              "recordResources": 1,
+              "catalog": 1,
+              "recordConversations": 1,
+              "records": 1
+            }
+          },
+          {
+            "scenario": "open-original-authorization-dialog",
+            "durationMs": 216.17117599999983,
+            "logicalApiCalls": 4,
+            "httpRequests": 4,
+            "methods": {
+              "forFolder": 1,
+              "projectConversation": 1,
+              "read": 1,
+              "subscribe": 1
+            }
+          },
+          {
+            "scenario": "open-original-chat-authorization",
+            "durationMs": 1045.808239,
+            "logicalApiCalls": 28,
+            "httpRequests": 27,
+            "methods": {
+              "executionSession": 1,
+              "readUiDocuments": 1,
+              "onGlobalEvent": 1,
+              "workbenchView": 1,
+              "onChange": 1,
+              "subscribe": 6,
+              "forFolder": 1,
+              "onChanged": 1,
+              "onPromoted": 1,
+              "update": 3,
+              "projectConversation": 1,
+              "readComposerDraft": 1,
+              "read": 1,
+              "refreshMetrics": 1,
+              "models": 1,
+              "commands": 1,
+              "readDirectory": 1,
+              "onAny": 1,
+              "writeUiDocuments": 2,
+              "records": 1
+            }
+          }
+        ],
+        "pageErrors": [],
+        "liveActions": "Viewed the same request in the decision modal and original chat. No approve, reject, send or cancel was submitted."
+      }
+    ],
+    "temporaryScopeReceipts": [
+      {
+        "id": "f4ea4969-beeb-474f-8e55-7a2b0a7f16f8",
+        "reason": "command-ended",
+        "outcome": "succeeded",
+        "exitCode": 0
+      },
+      {
+        "id": "7ea3a971-f76c-4b01-9083-ba02484b465b",
+        "reason": "command-ended",
+        "outcome": "succeeded",
+        "exitCode": 0
+      },
+      {
+        "id": "e5eed165-2d50-407a-9f0a-a20cfd85c345",
+        "reason": "command-ended",
+        "outcome": "succeeded",
+        "exitCode": 0
+      }
+    ]
+  },
+  "verification": {
+    "workspaceTypecheck": "passed; subsequent changed UI packages also checked",
+    "directoryTestsPassed": 5,
+    "navigationAndBootstrapTestsPassed": 42,
+    "nativeBindingAndMetricsTestsPassed": 50,
+    "transportViewTestsPassed": 22,
+    "performance": {
+      "core": 60,
+      "transport": 26,
+      "ui": 66,
+      "cleanup": "confirmed"
+    },
+    "docsCheck": "passed",
+    "stylesCheck": "passed",
+    "diffCheck": "passed"
+  },
+  "deployment": {
+    "release": "20261114T031116-dd9578e2-dirty",
+    "finalSwitchReceipt": "ca6bb55b-819f-4cba-84c1-e3488c4aa359",
+    "finalSwitch": "graceful, succeeded",
+    "earlierSwitch": "A prior old process stalled in scanner discovery quiesce; the existing switch was resumed with explicit --force. The final release subsequently switched gracefully."
+  },
+  "notClaimed": [
+    "The whole app-shell test suite has not been certified. An exploratory legacy remote-session-workbench fixture uses old UI selectors and lacks current remote state/node-queue ports; it was left unchanged.",
+    "The proposed backend use-case interface target of two to three calls is a design target, not the measured current implementation."
+  ],
+  "liveAuthorizationSubmitted": false
+}

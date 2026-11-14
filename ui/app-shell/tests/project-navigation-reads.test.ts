@@ -37,7 +37,7 @@ it('keeps all-project sidebar sessions after refresh and shares project rows wit
         const ui = (workbench as unknown as { sidebarUI: import('@nestos/vfs-ui').VFSUIShell }).sidebarUI;
         await ui.expandPath(path); await workbench.refresh();
         expect(sidebar.textContent).toContain('Visible conversation');
-        expect(sidebar.querySelector<HTMLSelectElement>('.workbench-project-navigation select')!.value).toBe('/');
+        expect(sidebar.querySelector<HTMLSelectElement>('select.vfs-scope-selector')!.value).toBe('/');
         await workbench.openResource(path); await (workbench as unknown as { fileNavigation: Promise<void> }).fileNavigation;
         const panel = main.querySelector<HTMLElement>('.workbench-tabs__panel:not([hidden])')!;
         await projects.sessions.create('Fresh conversation', await projects.sessionFolder(project));
@@ -72,7 +72,7 @@ it('resolves project folders from one organization snapshot per sync and refresh
         expect(navigation.toolbarContainer.hidden).toBe(false);
         expect(navigation.header.querySelector<HTMLButtonElement>('[data-project-action="settings"]')?.hidden).toBe(false);
         expect(navigation.header.querySelector('[data-project-action="settings"]')).not.toBeNull();
-        const selector = navigation.header.querySelector('select')!;
+        const selector = navigation.context.querySelector('select')!;
         expect(selector.querySelector('option[value="/"]')?.textContent).toBe('所有项目');
         expect(selector.querySelector('option[value="@new-project"]')).toBeNull();
         await navigation.refresh();
@@ -116,7 +116,7 @@ it('boots when the persisted selection names a route this build no longer serves
     const kernel = { onChanged: () => () => {}, async *listSessions() {} };
     const workbench = createTestWorkbench({  sidebar: sidebar, container: main, repository: repository, files: files,
         factory: factory as never, onSelect: () => {}, hostContext: undefined, kernel: kernel as never,
-        fileFactory: factory as never, directoryMounts: mounts, projects: projects, uiPersistence: { load: () => restored } });
+        fileFactory: factory as never, directoryMounts: mounts, projects: projects, uiPersistence: { load: () => restored, save() {} } });
     try {
         await workbench.start();
         expect(sidebar.querySelector('.vfs-sidebar__navigation')).toBeTruthy();
@@ -150,7 +150,7 @@ it('opens project files before blocked navigation and discards stale navigation 
     const blocked = new Promise<void>(resolve => { releaseNavigation = resolve; });
     const workbench = createTestWorkbench({  sidebar: sidebar, container: main, repository: repository, files: files,
         factory: factory as never, onSelect: () => {}, hostContext: undefined, kernel: kernel as never,
-        fileFactory: factory as never, directoryMounts: mounts, projects: projects, uiPersistence: { load: () => restored } });
+        fileFactory: factory as never, directoryMounts: mounts, projects: projects, uiPersistence: { load: () => restored, save() {} } });
     try {
         await workbench.start();
         expect(openFiles).not.toHaveBeenCalled();
@@ -257,7 +257,7 @@ it('renders directory entries before blocked sidebar navigation and ignores its 
         await workbench.openResource('/'); release();
         await (workbench as unknown as {fileNavigation: Promise<void>}).fileNavigation;
         expect(workbench.getActiveResourceId()).toBe('/');
-        expect(sidebar.querySelector<HTMLSelectElement>('.workbench-project-navigation select')!.value).toBe('/'); navigation.mockRestore();
+        expect(sidebar.querySelector<HTMLSelectElement>('select.vfs-scope-selector')!.value).toBe('/'); navigation.mockRestore();
         const ui = (workbench as unknown as {sidebarUI: import('@nestos/vfs-ui').VFSUIShell}).sidebarUI;
         await ui.selectPath(directory); await ui.refresh();
         expect(workbench.getActiveResourceId()).toBe('/');
@@ -278,7 +278,7 @@ it('keeps project selection separate from entry and exposes creation only in its
         factory: async () => ({ destroy() {} }) as never, onSelect() {} });
     try {
         await workbench.start();
-        const selector = sidebar.querySelector<HTMLSelectElement>('.workbench-project-navigation select')!;
+        const selector = sidebar.querySelector<HTMLSelectElement>('select.vfs-scope-selector')!;
         const createProject = () => sidebar.querySelector<HTMLButtonElement>('[data-action="create-project"]')!;
         const up = () => sidebar.querySelector<HTMLButtonElement>('[data-action="project-up"]')!;
         const createSession = () => sidebar.querySelector<HTMLButtonElement>('.workbench-project-navigation__create')!;
@@ -329,7 +329,7 @@ it('ignores a cached project choice cancelled before its navigation commits with
     try {
         await navigation.refresh();
         const lookup = vi.spyOn(projects, 'forFolder');
-        const selector = navigation.header.querySelector('select')!; selector.value = folderBrowserPath(project.path);
+        const selector = navigation.context.querySelector('select')!; selector.value = folderBrowserPath(project.path);
         selector.dispatchEvent(new Event('change')); await Promise.resolve(); navigation.cancelPending(); await vi.waitFor(() => expect(selector.disabled).toBe(false));
         expect(commands.navigate).not.toHaveBeenCalled(); expect(navigation.currentProject()).toBeUndefined(); expect(selector.value).toBe('/');
         expect(lookup).not.toHaveBeenCalled(); lookup.mockRestore();
@@ -363,10 +363,50 @@ it('restores the original project scope without opening a parent directory or re
         await workbench.restoreNavigationScope('/');
         await (workbench as unknown as {fileNavigation: Promise<void>}).fileNavigation;
         expect(workbench.getNavigationScope()).toBe('/'); expect(sidebar.inert).toBe(false);
-        expect(sidebar.querySelector<HTMLSelectElement>('.workbench-project-navigation select')!.value).toBe('/');
+        expect(sidebar.querySelector<HTMLSelectElement>('select.vfs-scope-selector')!.value).toBe('/');
         expect(workbench.getActiveResourceId()).toBe(route);
         expect(main.querySelector('.workbench-tabs__panel:not([hidden])')).toBe(file);
         expect(factory).toHaveBeenCalledOnce(); expect(destroy).not.toHaveBeenCalled(); expect(before).toHaveBeenCalledTimes(2);
         await workbench.restoreNavigationScope(projectPath); expect(workbench.getNavigationScope()).toBe(projectPath);
     } finally {await workbench.destroy(); await mounts.dispose(); await files.dispose(); await repository.dispose(); await manager.dispose(); sidebar.remove(); main.remove();}
+});
+
+it('selects the known project for an absent native row without probing native route directories',async()=>{
+    const {manager}=await createVFS({rootBackend:new MemoryBackend()}),root=await manager.openFileSystem('/');
+    const repository=new SessionRepository(root);await repository.init();
+    const {projects,mounts,files}=await projectServices(root,repository);await projects.ensureStartup();
+    const project=await projects.create('Native target'),projectRoot=folderBrowserPath(project.path);
+    const sidebar=document.createElement('aside'),main=document.createElement('main');document.body.append(sidebar,main);
+    const workbench=createTestWorkbench({sidebar,container:main,repository,files,projects,directoryMounts:mounts,kernel:{onChanged:()=>()=>{},async *listSessions(){}} as never,factory:async()=>({destroy(){}}) as never,onSelect(){}});
+    try{
+        await workbench.start();await workbench.setNavigationVisible(true);
+        const internal=workbench as unknown as {sidebarUI:import('@nestos/vfs-ui').VFSUIShell;navigationFiles:IFileSystem;selectPath(path:string):Promise<void>;fileNavigation:Promise<void>};
+        await internal.fileNavigation;
+        const selection=vi.spyOn(internal.sidebarUI,'selectPath'),children=vi.spyOn(internal.navigationFiles.driver,'getChildren'),type=vi.spyOn(internal.navigationFiles.driver,'getNodeType');
+        await internal.selectPath(projectRoot+'/@harness/codex/not-in-recent-items');
+        expect(selection).toHaveBeenLastCalledWith(projectRoot);
+        expect(children.mock.calls.some(args=>args[0].includes('@harness'))).toBe(false);
+        expect(type.mock.calls.some(args=>args[0].includes('@harness'))).toBe(false);
+    }finally{await workbench.destroy();await mounts.dispose();await files.dispose();await repository.dispose();await manager.dispose();sidebar.remove();main.remove();}
+});
+
+it('updates connection health without reloading directories and still reloads on configuration changes',async()=>{
+    const {manager}=await createVFS({rootBackend:new MemoryBackend()}),root=await manager.openFileSystem('/');
+    const repository=new SessionRepository(root);await repository.init();
+    const {projects,mounts,files}=await projectServices(root,repository);await projects.ensureStartup();
+    const listeners=new Set<(change?:{kind:'status'|'configuration'})=>void>();
+    const remote={list:()=>[],projectOffline:()=>false,degraded:()=>false,diagnostics:new Map(),loadWarnings:[],connections:()=>[],onChange:(listener:(change?:{kind:'status'|'configuration'})=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};}};
+    Object.assign(projects,{remoteMounts:remote});
+    const sidebar=document.createElement('aside'),main=document.createElement('main');document.body.append(sidebar,main);
+    const workbench=createTestWorkbench({sidebar,container:main,repository,files,projects,directoryMounts:mounts,kernel:{onChanged:()=>()=>{},async *listSessions(){}} as never,factory:async()=>({destroy(){}}) as never,onSelect(){}});
+    try{
+        await workbench.start();await workbench.setNavigationVisible(true);await new Promise(resolve=>setTimeout(resolve,150));
+        const internal=workbench as unknown as {sidebarUI:import('@nestos/vfs-ui').VFSUIShell;browser:{invalidateNavigation():Promise<void>}};
+        const refresh=vi.spyOn(internal.sidebarUI,'refresh'),invalidate=vi.spyOn(internal.browser,'invalidateNavigation');
+        for(const listener of listeners)listener({kind:'status'});
+        await new Promise(resolve=>setTimeout(resolve,150));
+        expect(refresh).not.toHaveBeenCalled();expect(invalidate).not.toHaveBeenCalled();
+        for(const listener of listeners)listener();
+        await vi.waitFor(()=>expect(refresh).toHaveBeenCalled());expect(invalidate).toHaveBeenCalledOnce();
+    }finally{await workbench.destroy();await mounts.dispose();await files.dispose();await repository.dispose();await manager.dispose();sidebar.remove();main.remove();}
 });

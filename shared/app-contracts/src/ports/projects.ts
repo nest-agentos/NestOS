@@ -286,6 +286,7 @@ export interface ProjectDraftComposer {
     }>;
 }
 
+export interface ProjectRemoteMountChange {kind:'configuration'|'status';projectId?:string}
 export interface ProjectRemoteMountService {
     nodeOverview(id: string, options?: OperationOptions): Promise<CellsNodeOverview>;
     confirmAuthorizationRefresh(id: string, proposalId: string, options?: OperationOptions): Promise<void>;
@@ -340,7 +341,7 @@ export interface ProjectRemoteMountService {
     inspectProjectAccess(projectId: string, options?: OperationOptions): Promise<void>;
     projectStatus(projectId: string): Promise<import('./diagnostics').RemoteProjectStatus>;
     assertUnmountable(projectId: string): Promise<void>;
-    onChange(listener: () => void): () => void;
+    onChange(listener: (change?:ProjectRemoteMountChange) => void): () => void;
     checkConnections(projectId: string, options?: OperationOptions): Promise<void>;
     add(projectId: string, input: Omit<ProjectRemoteMount, 'mountId' | 'credentialRef' | 'access'> & {
         access?: 'ro' | 'rw';
@@ -407,6 +408,7 @@ export interface ExecutionCapabilities {
 }
 
 export interface RemoteSessionStatus {
+    records?(projectId:string):readonly HarnessStatusRow[];
     get(projectId: string, profileId: string, sessionId: string): HarnessObservation | undefined;
     record(projectId: string, profileId: string, sessionId: string): HarnessStatusRow | undefined;
     fileVersion(projectId: string): string | undefined;

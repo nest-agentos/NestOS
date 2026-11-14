@@ -1,0 +1,64 @@
+{
+  "version": "20261114T002159-dd9578e2-dirty",
+  "dataset": "Existing development board KBC-2-110; normal background scans; warm host and fresh detail pane",
+  "metrics": [
+    {
+      "scenario": "open-compact-management-task",
+      "durationMs": 696.3213090000004,
+      "logicalApiCalls": 14,
+      "httpRequests": 6
+    }
+  ],
+  "desktop": {
+    "headerSingleLine": true,
+    "metadata": "cr1:cx1✏️07:49进入管理会话查看决策",
+    "modifiedTime": "2026-11-13T23:49:33.366Z",
+    "timestampTooltip": "事项更新 · 11/14/2026, 07:49:33 GMT+8\n创建时间 · 11/14/2026, 01:05:45 GMT+8",
+    "commentsExpanded": true,
+    "visibleEmptyRelations": false,
+    "childRows": [
+      {
+        "id": "sub-150ba5ada13443c9301344effdbe84f4f1be0b2d",
+        "state": "运行中",
+        "reference": "KBT-2-111",
+        "activity": "2026-11-13T23:54:51.218Z",
+        "session": true,
+        "duplicateProject": false
+      }
+    ],
+    "progress": "0",
+    "primaryControlCount": 1,
+    "secondaryRunCount": 0
+  },
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "childRows": [
+      {
+        "width": 313,
+        "scrollWidth": 313,
+        "clientWidth": 313
+      }
+    ]
+  },
+  "manualReasonsCollapsed": true,
+  "pageErrorNames": [],
+  "validation": {
+    "kanbanUITests": {
+      "filesPassed": 25,
+      "testsPassed": 184
+    },
+    "build": "passed",
+    "typecheck": "passed",
+    "workspaceTypecheck": "passed",
+    "stylesCheck": "passed",
+    "docsCheck": "passed",
+    "performanceUI": "passed",
+    "temporaryProcessCleanup": "confirmed"
+  },
+  "screenshots": {
+    "desktop": "/tmp/x1-compact-desktop.png",
+    "mobile": "/tmp/x1-compact-mobile.png"
+  }
+}

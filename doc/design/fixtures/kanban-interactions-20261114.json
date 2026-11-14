@@ -1,0 +1,230 @@
+{
+  "version": "20261114T012730-dd9578e2-dirty",
+  "dataset": "Existing development board and KBC-2-110; desktop Chrome 1280x900 and mobile width 390; normal background scans; warm host and fresh detail pane",
+  "metrics": [
+    {
+      "scenario": "open-direct-delivery-rows",
+      "durationMs": 411.3733900000002,
+      "logicalApiCalls": 14,
+      "httpRequests": 6
+    },
+    {
+      "scenario": "reload-delivery-status",
+      "durationMs": 563.4651570000001,
+      "logicalApiCalls": 2,
+      "httpRequests": 2
+    },
+    {
+      "scenario": "open-decision-table",
+      "durationMs": 217.6998639999997,
+      "logicalApiCalls": 4,
+      "httpRequests": 4
+    },
+    {
+      "scenario": "sort-project-desc",
+      "durationMs": 206.40670899999986,
+      "logicalApiCalls": 3,
+      "httpRequests": 3
+    },
+    {
+      "scenario": "sort-project-asc",
+      "durationMs": 214.69086900000002,
+      "logicalApiCalls": 3,
+      "httpRequests": 3
+    },
+    {
+      "scenario": "sort-progress-desc",
+      "durationMs": 227.39320399999997,
+      "logicalApiCalls": 3,
+      "httpRequests": 3
+    },
+    {
+      "scenario": "sort-progress-asc",
+      "durationMs": 206.31969299999946,
+      "logicalApiCalls": 3,
+      "httpRequests": 3
+    },
+    {
+      "scenario": "open-stale-native-session",
+      "durationMs": 303.35506500000065,
+      "logicalApiCalls": 15,
+      "httpRequests": 13
+    }
+  ],
+  "desktop": {
+    "scopes": [
+      {
+        "id": "repository-657462ead44bc06cd6e17c0cefbadccc13728cab",
+        "headingSingleLine": true,
+        "refreshTitle": "重新读取交付状态",
+        "rows": [
+          {
+            "id": "analyze",
+            "visible": true,
+            "icon": true,
+            "name": "提交",
+            "buttonLabel": "分析合并方案",
+            "session": true,
+            "scrollWidth": 477,
+            "clientWidth": 477
+          },
+          {
+            "id": "build",
+            "visible": true,
+            "icon": true,
+            "name": "构建",
+            "buttonLabel": "构建验收版本",
+            "session": true,
+            "scrollWidth": 477,
+            "clientWidth": 477
+          },
+          {
+            "id": "deploy",
+            "visible": true,
+            "icon": true,
+            "name": "替换",
+            "buttonLabel": "替换当前服务",
+            "session": true,
+            "scrollWidth": 477,
+            "clientWidth": 477
+          },
+          {
+            "id": "accept",
+            "visible": true,
+            "icon": true,
+            "name": "验收",
+            "buttonLabel": "验收通过",
+            "session": true,
+            "scrollWidth": 477,
+            "clientWidth": 477
+          }
+        ]
+      }
+    ],
+    "accordionCount": 0,
+    "oldRefreshLabel": false,
+    "scrollWidth": 564,
+    "clientWidth": 564
+  },
+  "mobile": {
+    "scopes": [
+      {
+        "id": "repository-657462ead44bc06cd6e17c0cefbadccc13728cab",
+        "headingSingleLine": true,
+        "refreshTitle": "重新读取交付状态",
+        "rows": [
+          {
+            "id": "analyze",
+            "visible": true,
+            "icon": true,
+            "name": "提交",
+            "buttonLabel": "分析合并方案",
+            "session": true,
+            "scrollWidth": 288,
+            "clientWidth": 288
+          },
+          {
+            "id": "build",
+            "visible": true,
+            "icon": true,
+            "name": "构建",
+            "buttonLabel": "构建验收版本",
+            "session": true,
+            "scrollWidth": 288,
+            "clientWidth": 288
+          },
+          {
+            "id": "deploy",
+            "visible": true,
+            "icon": true,
+            "name": "替换",
+            "buttonLabel": "替换当前服务",
+            "session": true,
+            "scrollWidth": 288,
+            "clientWidth": 288
+          },
+          {
+            "id": "accept",
+            "visible": true,
+            "icon": true,
+            "name": "验收",
+            "buttonLabel": "验收通过",
+            "session": true,
+            "scrollWidth": 288,
+            "clientWidth": 288
+          }
+        ]
+      }
+    ],
+    "accordionCount": 0,
+    "oldRefreshLabel": false,
+    "scrollWidth": 375,
+    "clientWidth": 375
+  },
+  "childHint": "最近活动 · 11/14/2026, 07:54:51 GMT+8\n创建时间 · 11/14/2026, 07:49:33 GMT+8",
+  "sorts": [
+    {
+      "field": "project",
+      "direction": "desc",
+      "aria": "descending"
+    },
+    {
+      "field": "project",
+      "direction": "asc",
+      "aria": "ascending"
+    },
+    {
+      "field": "progress",
+      "direction": "desc",
+      "aria": "descending"
+    },
+    {
+      "field": "progress",
+      "direction": "asc",
+      "aria": "ascending"
+    }
+  ],
+  "durationHint": "已确认\n本轮执行历时，包含排队和等待时间。\n本轮开始 · 11/13/2026, 18:30:06 GMT+8\n本轮尚未结束",
+  "directStaleLink": "cleanup offered; original entry retained",
+  "orphanCleanup": "offered; keep chosen; no record changed",
+  "pageErrors": [],
+  "temporaryScopeReceipt": {
+    "id": "b3c8cc16-8228-41ea-8d1b-be69996b719d",
+    "reason": "command-ended",
+    "outcome": "succeeded",
+    "exitCode": 0
+  },
+  "verification": {
+    "kanbanUI": {
+      "filesPassed": 27,
+      "testsPassed": 203,
+      "finalSortTestsPassed": 22
+    },
+    "kanbanCore": {
+      "filesPassed": 36,
+      "testsPassed": 301
+    },
+    "affectedAppCoreTestsPassed": 30,
+    "appShellCleanupTestsPassed": 4,
+    "httpRPCTestsPassed": 3,
+    "performance": {
+      "coreTestsPassed": 60,
+      "transportTestsPassed": 24,
+      "uiTestsPassed": 66
+    },
+    "workspaceTypecheck": "passed",
+    "kanbanUITypecheck": "passed",
+    "stylesCheck": "passed",
+    "docsCheck": "passed"
+  },
+  "limits": {
+    "liveDestructiveActions": "No execution, cancellation, waiver, attention dismissal or cleanup command was submitted against live data. Cleanup dialogs were cancelled by choosing Keep.",
+    "broaderAppCoreSuite": "An earlier broad app-core run had two failures in conversation-early-interaction.test.ts; the 30 affected app-core tests passed. No full-suite success is claimed."
+  },
+  "screenshots": [
+    "/tmp/x1-operation-rows-desktop.png",
+    "/tmp/x1-operation-rows-mobile.png",
+    "/tmp/x1-decision-table-final.png",
+    "/tmp/x1-stale-session-cleanup-final.png"
+  ]
+}

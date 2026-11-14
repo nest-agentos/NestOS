@@ -7,13 +7,14 @@ import {recentConversationPreview} from '../projects/conversation-directory';
 const log = createModuleLogger('directory-view');
 /** Flatten virtual containers locally; no browser round trip is needed for each group. */
 export async function readDirectoryView(fs: IFileSystem, projects: ProjectService | undefined, path: string,
-    options: {projectId?: string | null} = {}, navigationRead?: () => Promise<ProjectNavigationView | undefined>, operationId = randomUUID()): Promise<SessionDirectoryView> {
+    options: {projectId?: string | null;includeAncestors?:boolean} = {}, navigationRead?: () => Promise<ProjectNavigationView | undefined>, operationId = randomUUID()): Promise<SessionDirectoryView> {
     const started = performance.now(), revision = fs.revision;
     const directories = new Map<string, NavigationDirectory & {path: string}>();
     try {
         const [directory, prepared] = await Promise.allSettled([flatten(fs, path, directories), navigationRead ? navigationRead() : projects?.navigation({path, projectId: options.projectId})]);
         if (directory.status === 'rejected') throw directory.reason;
         if (prepared.status === 'rejected') throw prepared.reason;
+        if(options.includeAncestors)for(const parent of ancestorPaths(path))if(!directories.has(parent))await flatten(fs,parent,directories);
         const nodes = directory.value, navigation = prepared.value;
         const folder = browserTargetFolder(resolveBrowserTarget(path), path);
         const project = navigation?.projects.filter(item => folder === item.path || folder.startsWith(item.path + '/'))
@@ -30,6 +31,11 @@ export async function readDirectoryView(fs: IFileSystem, projects: ProjectServic
             code: typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'DIRECTORY_READ_FAILED', durationMs: Math.round(performance.now() - started)});
         throw error;
     }
+}
+function ancestorPaths(path:string):string[] {
+    const parts=path.split('/').filter(Boolean);
+    if(parts.length>16)throw new FSError('ELOOP','Directory ancestry exceeds snapshot bound');
+    return Array.from({length:parts.length},(_,index)=>'/'+parts.slice(0,index).join('/'));
 }
 function directorySeeds(directories: Map<string, NavigationDirectory & {path: string}>, entries: FSNode[], revision: number, stale: boolean): SessionDirectoryView['directories'] {
     const indices = new Map(entries.map((entry, index) => [entry, index]));

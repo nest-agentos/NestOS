@@ -2,7 +2,7 @@ import {createModuleLogger} from '@nestos/common';
 import {resolveBrowserTarget} from '@nestos/app-contracts';
 import type {KanbanBoard,KanbanExecutionSession,KanbanSessionPhase} from '@nestos/kanban/contracts';
 import type {PromptJournal} from '../run/prompt-bundle';
-export type NativeSessionObservation=Pick<KanbanExecutionSession,'state'|'lastActivityAt'|'observedAt'|'stale'|'code'>;
+export type NativeSessionObservation=Pick<KanbanExecutionSession,'state'|'lastActivityAt'|'observedAt'|'stale'|'code'|'interactionIds'>;
 export type NativeSessionReader=(board:KanbanBoard,sessionId:string,resourceId?:string)=>Promise<NativeSessionObservation|undefined>;
 interface Execution {sessionId?:string;turnId?:string|null;status?:string;observedAt?:number}
 interface Evidence {nativeSessionId:string;turnId?:string;state:KanbanSessionPhase;lastActivityAt?:number;observedAt:number}

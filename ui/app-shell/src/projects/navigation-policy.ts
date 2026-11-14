@@ -3,6 +3,13 @@ import { ACTION_ICONS, FILE_ICONS, getLocale, t } from '@nestos/common';
 import { resolveBrowserTarget, WORKSPACE_PATH } from '@nestos/app-contracts';
 import type { VFSNodeUI } from '@nestos/vfs-ui';
 
+/** Native routes are not directory trees; reveal known rows or their project ancestor. */
+export function navigationSelectionPath(path:string,projectRoot:string|undefined,known:boolean,alias?:string):string {
+    if(alias)return alias;
+    if(known||resolveBrowserTarget(path).kind!=='remote')return path;
+    return projectRoot??'/';
+}
+
 /** Fixed project entries keep their order independently of user sort direction. */
 export function navigationPriority(path: string): number {
     const target = resolveBrowserTarget(path);

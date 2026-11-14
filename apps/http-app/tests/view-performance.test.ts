@@ -10,12 +10,12 @@ import {observeConversation} from '../../../backend/app-core/src/projects/conver
 const peers: RpcPeer[] = [];
 afterEach(async () => { vi.useRealTimers(); await Promise.all(peers.splice(0).map(peer => peer.close())); });
 async function pair(value: unknown) {
-    let client!: RpcPeer;
+    let client!: RpcPeer;const calls:Call[]=[];
     const server = new RpcPeer('server', call => client.handle(call));
-    client = new RpcPeer('client', call => server.handle(call), undefined, installViewProjections);
+    client = new RpcPeer('client', call => {calls.push(call);return server.handle(call);}, undefined, installViewProjections);
     peers.push(server, client);
     const boot = await server.bootstrap(value); client.applyUpdates(boot.updates);
-    return { server, client, root: client.decode(boot.value!) };
+    return { server, client, root: client.decode(boot.value!),calls };
 }
 function models() {
     let changed = () => {};
@@ -274,4 +274,33 @@ it('installs earlier event bindings before commands while independent queries re
     register(); await sent;
     await vi.waitFor(() => expect(received).toHaveBeenCalledWith('completed'));
     stop();
+});
+
+it('projects a whole project status snapshot locally instead of issuing per-session lookups',async()=>{
+    const listeners=new Set<()=>void>();
+    let rows=Array.from({length:1000},(_,index)=>({profileId:'profile',sessionId:'session-'+index,title:'Session '+index,observation:{execution:'idle'}}));
+    const records=vi.fn((project:string)=>project==='project'?rows:[]),get=vi.fn(),record=vi.fn();
+    const status={records,get,record,fileVersion:()=>undefined,subscribe:(_project:string,listener:()=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};}};
+    const {root,server,client,calls}=await pair(status),release=root.subscribe('project',()=>{});
+    for(let index=0;index<1000;index++){root.get('project','profile','session-'+index);root.record('project','profile','session-'+index);}
+    await vi.waitFor(()=>expect(root.get('project','profile','session-999')).toEqual({execution:'idle'}));
+    expect(calls.filter(call=>call.method==='records')).toHaveLength(1);
+    expect(root.record('project','profile','session-999')).toEqual(root.record('project','profile','session-999'));expect(get).not.toHaveBeenCalled();expect(record).not.toHaveBeenCalled();
+    rows=rows.map(row=>({...row,observation:{execution:'running'}}));for(const listener of listeners)listener();client.applyUpdates(await server.refresh());
+    expect(root.get('project','profile','session-999')).toEqual({execution:'running'});expect(root.record('project','profile','session-999').title).toBe('Session 999');
+    expect(root.get('other','profile','session-999')).toBeUndefined();await vi.waitFor(()=>expect(records).toHaveBeenCalledWith('other'));
+    release();
+});
+
+it('shares remote mount change subscriptions and releases only after the last listener', async () => {
+    const listeners = new Set<(event: unknown) => void>(), released = vi.fn();
+    const mounts = {projectConversation: async () => null, connections: () => [],
+        onChange: (listener: (event: unknown) => void) => {listeners.add(listener); return () => {listeners.delete(listener); released();};}};
+    const {root, calls} = await pair(mounts), first = vi.fn(), second = vi.fn();
+    const a = root.onChange(first), b = root.onChange(second);
+    await vi.waitFor(() => expect(calls.filter(call => call.method === 'onChange')).toHaveLength(1));
+    await Promise.all([...listeners].map(listener => listener({kind: 'status', projectId: 'work'})));
+    await vi.waitFor(() => {expect(first).toHaveBeenCalledWith({kind: 'status', projectId: 'work'}); expect(second).toHaveBeenCalledOnce();});
+    a(); expect(released).not.toHaveBeenCalled();
+    b(); await vi.waitFor(() => expect(released).toHaveBeenCalledOnce());
 });

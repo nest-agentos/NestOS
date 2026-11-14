@@ -10,7 +10,12 @@ export const kanbanPresentation: KanbanPresentation = {
     },
     resourceOrder: (reference,references) => references.some(ref=>ref.system==='nestos-primary-project'&&ref.id===reference.id)?0:1,
     text: (key, values) => t(`kanban.${key}` as Parameters<typeof t>[0], values),
-    icons: {refreshView: ACTION_ICONS.refreshView, more: CHAT_ICONS.more, close: ACTION_ICONS.close, back: ACTION_ICONS.back, copy: CHAT_ICONS.copy, link: ACTION_ICONS.link, archive: PROJECT_ACTION_ICONS.archive, delete: CHAT_ICONS.delete, run: ACTION_ICONS.run, pause: ACTION_ICONS.pause, resume: ACTION_ICONS.run, fix: ACTION_ICONS.fix, edit: ACTION_ICONS.edit},
+    icons: {skip: ACTION_ICONS.markRead, clock: ACTION_ICONS.clock, refreshView: ACTION_ICONS.refreshView, more: CHAT_ICONS.more, close: ACTION_ICONS.close, back: ACTION_ICONS.back, copy: CHAT_ICONS.copy, link: ACTION_ICONS.link, archive: PROJECT_ACTION_ICONS.archive, delete: CHAT_ICONS.delete, run: ACTION_ICONS.run, pause: ACTION_ICONS.pause, resume: ACTION_ICONS.run, fix: ACTION_ICONS.fix, edit: ACTION_ICONS.edit},
+    statusIcons: {running: ACTION_ICONS.refreshView, completed: ACTION_ICONS.markRead, cancelled: ACTION_ICONS.close,
+        error: PROJECT_ACTION_ICONS.warning, unknown: PROJECT_ACTION_ICONS.warning, 'waiting-input': PROJECT_ACTION_ICONS.warning,
+        'waiting-dependency': ACTION_ICONS.clock, paused: ACTION_ICONS.pause, queued: ACTION_ICONS.clock,
+        'waiting-start': ACTION_ICONS.clock, preparing: ACTION_ICONS.refreshView, analyzing: ACTION_ICONS.refreshView,
+        review: ACTION_ICONS.markRead, pausing: ACTION_ICONS.pause, resuming: ACTION_ICONS.run, cancelling: ACTION_ICONS.close},
     referenceUrl: path => `${location.href.split('#')[0]}#/kanban/${encodeURIComponent(path)}`,
     log: event => {if (event.result === 'failure') log.warn('kanban.ui', event); else log.debug('kanban.ui', event);},
 };

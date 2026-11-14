@@ -1,12 +1,13 @@
 import { createFile } from '@nestos/vfs-core';
 import { favoriteKey, projectNavigation, projectFileSource, projectWorkspaceAccess, toolGrant } from '@nestos/app-contracts';
-import type { ProjectFavoriteTarget } from '@nestos/app-contracts/services';
+import type { ProjectFavoriteTarget,RemoteSessionStatus } from '@nestos/app-contracts/services';
 import {readSessionHistory} from './session-history';
-import {shareFileObservers} from './file-observers';
+import {shareFileObservers,shareChangeObservers} from './file-observers';
 
 /** Synchronous UI reads project already loaded snapshots; writes always cross the port. */
 export function installViewProjections(kind: string, proxy: any): void {
     if (['IFileSystem', 'FileSystemView', 'IFSDriver'].includes(kind)) shareFileObservers(proxy);
+    if(kind==='ProjectRemoteMountService')shareChangeObservers(proxy);
     if (kind === 'SessionManagementPort') {
         const read = proxy.getSnapshot;
         proxy.getSnapshot = () => readSessionHistory(read());
@@ -30,12 +31,18 @@ export function installViewProjections(kind: string, proxy: any): void {
         proxy.workspaceAccess = (project: Parameters<typeof projectWorkspaceAccess>[0], access?: 'ro' | 'rw') => projectWorkspaceAccess(project, proxy.remoteMounts, access);
     }
     if (kind === 'ToolboxResources') proxy.toolGrant = toolGrant;
+    if(kind==='RemoteSessionStatus'&&typeof proxy.records==='function')installRemoteStatus(proxy);
     if (kind === 'ToolboxDrawers') {
         proxy.get = (id: string) => proxy.snapshot().find((drawer: any) => drawer.id === id);
         proxy.list = (kind: string) => proxy.snapshot().filter((drawer: any) => drawer.kind === kind);
         proxy.forPath = (path: string) => proxy.snapshot().find((drawer: any) => drawer.paths.includes(path));
     }
     if (kind === 'ProjectFavorites') installFavorites(proxy);
+}
+function installRemoteStatus(proxy:any):void {
+    proxy.record=(projectId:string,profileId:string,sessionId:string)=>(proxy.records(projectId)??[])
+        .find((row:NonNullable<ReturnType<RemoteSessionStatus['record']>>)=>row.profileId===profileId&&row.sessionId===sessionId);
+    proxy.get=(projectId:string,profileId:string,sessionId:string)=>proxy.record(projectId,profileId,sessionId)?.observation;
 }
 function installFavorites(proxy: any): void {
     proxy.hasSession = (id: string) => Object.values(proxy.snapshot() as Record<string, Array<{ target: ProjectFavoriteTarget }>>)

@@ -4,7 +4,7 @@ import {CellsDraftChecks} from './cells-draft-checks';
 import {inspectAuthorization} from './authorization-inspection';
 import {DiagnosticJournal} from '../diagnostics/journal';
 import {diagnosticFailure} from '../diagnostics/failure';
-import type {DiagnosticEvent, RemoteProjectStatus} from '@nestos/app-contracts/services';
+import type {DiagnosticEvent, RemoteProjectStatus,ProjectRemoteMountChange} from '@nestos/app-contracts/services';
 import {ConversationRegistry} from './conversation-registry';
 import {ConversationComposerStore, withConversationComposer} from './conversation-composer-store';
 import type { ProjectConversationPort } from '@nestos/app-contracts/services';
@@ -101,7 +101,7 @@ export class ProjectRemoteMountService {
     private readonly authorizationInspections = new Map<string, {fingerprint: string; value: import('@nestos/app-contracts/services').RemoteAuthorizationInspection}>();
     private readonly observations = new Map<string, {checkedAt: number; lastSuccessAt?: number; failure?: DiagnosticEvent}>();
     private readonly connectionStates = new Map<string, RemoteConnectionStatus>();
-    private readonly listeners = new Set<() => void>();
+    private readonly listeners = new Set<(change?:ProjectRemoteMountChange) => void>();
     private readonly probes = new Map<string, Promise<void>>();
     readonly diagnostics = new Map<string, string[]>();
     /** Entries dropped while loading the catalog, so a single bad record cannot block startup. */
@@ -477,7 +477,6 @@ export class ProjectRemoteMountService {
             const client = await this.openProjectHarness(projectId, options);
             if (this.clearIssue(projectId, 'harness-open')) {
                 this.eventLog.record({module: 'cells', operation: 'project.harness', stage: 'harness-open', result: 'success', level: 'info', projectId, operationId, durationMs: Date.now() - started});
-                for (const listener of this.listeners) listener();
             }
             return this.guardHarness(client, projectId, JSON.stringify(this.list(projectId)), this.list(projectId).find(mount => mount.at === '/')!.connectionId!);
         }
@@ -485,7 +484,7 @@ export class ProjectRemoteMountService {
             if (!cancelledByCaller(options)) {
                 const changed = this.setIssue(projectId, this.recordFailure(error, {stage: 'harness-open', projectId, operationId, durationMs: Date.now() - started,
                     connectionId: this.list(projectId).find(mount => mount.at === '/')?.connectionId}));
-                if (changed) for (const listener of this.listeners) listener();
+                if (changed) this.statusChanged(projectId);
             }
             throw error;
         }
@@ -786,7 +785,7 @@ export class ProjectRemoteMountService {
             const failure = this.recordFailure(error, {stage: `harness.${method}`, projectId, connectionId, profileId, operationId, durationMs: Date.now() - started,
                 ...(['resume', 'turn', 'steer', 'rename', 'read', 'inspect'].includes(method) && typeof args[1] === 'string' ? {sessionId: args[1]} : {})});
             if (['profiles', 'list', 'sessions'].includes(method)) {
-                if (this.setIssue(projectId, failure)) for (const listener of this.listeners) listener();
+                if (this.setIssue(projectId, failure)) this.statusChanged(projectId);
             }
             throw error;
         }
@@ -802,7 +801,7 @@ export class ProjectRemoteMountService {
         if (!previous || !issues?.delete(key)) return false;
         this.eventLog.record({module: 'cells', operation: 'remote.operation.recovered', stage, projectId, profileId,
             connectionId: previous.connectionId, result: 'success', level: 'info'});
-        for (const listener of this.listeners) listener(); return true;
+        this.statusChanged(projectId); return true;
     }
     projectOffline(projectId: string): boolean { return this.list(projectId).some(mount => this.status(mount.mountId) === 'offline'); }
     /** A project whose mounts shadow each other or lost a source; it stays usable and reports why. */
@@ -811,7 +810,7 @@ export class ProjectRemoteMountService {
     connectionStatus(id: string): RemoteConnectionStatus { return this.connectionStates.get(id) ?? 'unknown'; }
     /** Read-only precheck for destructive callers: fails while any affected Session is busy. */
     async assertUnmountable(projectId: string): Promise<void> { await this.beforeChange(projectId); }
-    onChange(listener: () => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+    onChange(listener: (change?:ProjectRemoteMountChange) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
     async checkConnections(projectId: string, options?: OperationOptions): Promise<void> {
         if (this.closed) return;
         const scope = operationScope({timeoutMs: 3000, ...options});
@@ -871,7 +870,7 @@ export class ProjectRemoteMountService {
             if (value.reason !== 'unverified') this.eventLog.record({module: 'cells', operation: 'project.authorization', projectId, connectionId: root.connectionId,
                 mountId: root.mountId, stage: 'authorization-inspect', operationId, result: value.code ? 'failure' : 'success', level: value.code ? 'error' : 'info',
                 code: value.code, causeCodes: value.causeCodes, reason: value.reason, durationMs: Date.now() - started});
-            for (const listener of this.listeners) listener();
+            this.statusChanged(projectId);
         } catch (error) {
             if (!cancelledByCaller(options)) this.recordFailure(error, {stage: 'authorization-inspect', projectId, connectionId: root.connectionId, operationId, durationMs: Date.now() - started});
         }
@@ -921,12 +920,13 @@ export class ProjectRemoteMountService {
     }
     private setStatus(id: string, status: RemoteConnectionStatus) {
         if (this.status(id) === status || this.closed) return;
-        this.states.set(id, status); for (const listener of this.listeners) listener();
+        this.states.set(id, status); this.statusChanged(this.mountProject(id));
     }
     private setConnectionStatus(id: string, status: RemoteConnectionStatus) {
         if (this.connectionStatus(id) === status || this.closed) return;
-        this.connectionStates.set(id, status); for (const listener of this.listeners) listener();
+        this.connectionStates.set(id, status); this.statusChanged();
     }
+    private statusChanged(projectId?:string):void {for(const listener of this.listeners)listener({kind:'status',...(projectId?{projectId}:{})});}
     add(projectId: string, input: Omit<ProjectRemoteMount, 'mountId' | 'credentialRef' | 'access'> & { access?: 'ro' | 'rw' },
         secret: string, base: IFileSystem, options?: OperationOptions): Promise<void> {
         return this.serial(async () => {

@@ -1,4 +1,5 @@
 import {EditorOptions} from './contracts';
+export {NativeInteractionPanel} from './native-interaction-panel';
 import {IndependentSessionEditor} from './shell/IndependentSessionEditor';
 import {ChatDraftEditor} from './shell/drafts/ChatDraftEditor';
 import {createConversationEditor} from './conversation';

@@ -2,12 +2,24 @@ import type {FSEvent} from '@nestos/vfs-core';
 
 type Listener = (event: FSEvent) => void;
 type Stop = (() => void) & {ready?: Promise<unknown>};
-interface Registration {listener: Listener}
+interface Registration<T=FSEvent> {listener: (event:T)=>void}
 interface Connection {stop?: Stop}
 type Subscribe = (listener: Listener) => Stop;
 interface ProxyObservers {onAny?: Subscribe; on?: unknown}
 interface Group {onAny: Subscribe; on(type: string, listener: Listener): Stop; update(subscribe: Subscribe): void}
 const groups = new WeakMap<object, Group>();
+type Subscription<T>=(listener:(event:T)=>void)=>Stop;
+const changes=new WeakMap<object,ReturnType<typeof sharedSubscriptions<unknown>>>();
+
+/** Configuration/status listeners share one remote registration per capability. */
+export function shareChangeObservers(proxy:{onChange?:Subscription<unknown>}):void {
+    if(!proxy.onChange)return;
+    let group=changes.get(proxy);
+    if(group&&proxy.onChange===group.subscribe)return;
+    if(group)group.update(proxy.onChange.bind(proxy));
+    else{group=sharedSubscriptions(proxy.onChange.bind(proxy));changes.set(proxy,group);}
+    proxy.onChange=group.subscribe;
+}
 
 /** One remote callback per capability, with independent local event interests. */
 export function shareFileObservers(proxy: ProxyObservers): void {
@@ -19,8 +31,12 @@ export function shareFileObservers(proxy: ProxyObservers): void {
     proxy.onAny = group.onAny; proxy.on = group.on;
 }
 function observerGroup(initial: Subscribe): Group {
+    const group=sharedSubscriptions(initial);
+    return {onAny:group.subscribe,on:(type,listener)=>group.subscribe(event=>{if(event.type===type)listener(event);}),update:group.update};
+}
+function sharedSubscriptions<T>(initial:Subscription<T>) {
     let subscribe = initial;
-    const listeners = new Set<Registration>(); let connection: Connection | undefined;
+    const listeners = new Set<Registration<T>>(); let connection: Connection | undefined;
     const connect = () => {
         if (connection) return;
         const active: Connection = {}; connection = active;
@@ -29,7 +45,7 @@ function observerGroup(initial: Subscribe): Group {
             void active.stop.ready?.catch(() => {if (connection === active) connection = undefined;});
         } catch (error) {connection = undefined; throw error;}
     };
-    const onAny: Subscribe = listener => {
+    const onAny: Subscription<T> = listener => {
         const registration = {listener}; listeners.add(registration);
         try {connect();} catch (error) {listeners.delete(registration); throw error;}
         return () => {
@@ -37,9 +53,9 @@ function observerGroup(initial: Subscribe): Group {
             const previous = connection; connection = undefined; previous?.stop?.();
         };
     };
-    return {onAny, on: (type, listener) => onAny(event => {if (event.type === type) listener(event);}), update: next => {subscribe = next;}};
+    return {subscribe:onAny,update:(next:Subscription<T>)=>{subscribe=next;}};
 }
-function deliver(listeners: Set<Registration>, event: FSEvent): void {
+function deliver<T>(listeners: Set<Registration<T>>, event: T): void {
     let failed = false, failure: unknown;
     for (const registration of [...listeners]) {
         if (!listeners.has(registration)) continue;

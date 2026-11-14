@@ -1,0 +1,139 @@
+{
+  "before": {
+    "nativeApprovalCards": 1,
+    "decision": "KBD-2-10",
+    "decisionState": "running",
+    "problem": "Native approval was visible only inside the original Session; decision progress omitted it."
+  },
+  "desktop": {
+    "version": "20261114T015414-dd9578e2-dirty",
+    "dataset": "Existing development board KBD-2-10 and bound native execution; fresh Chrome context 1280x900; warm host; normal background scans",
+    "status": "等待授权（\n8h\n）",
+    "requestId": "number:0",
+    "choices": [
+      "批准本次",
+      "取消当前执行"
+    ],
+    "hasNativeDetails": true,
+    "metrics": [
+      {
+        "scenario": "open-decision-with-live-authorization",
+        "durationMs": 822.137475,
+        "logicalApiCalls": 5,
+        "httpRequests": 4
+      },
+      {
+        "scenario": "open-original-authorization-dialog",
+        "durationMs": 218.784357,
+        "logicalApiCalls": 4,
+        "httpRequests": 4
+      },
+      {
+        "scenario": "open-original-chat-authorization",
+        "durationMs": 893.1396939999995,
+        "logicalApiCalls": 26,
+        "httpRequests": 24
+      }
+    ],
+    "pageErrors": [],
+    "liveActions": "Viewed the same request in the decision modal and original chat. No approve, reject, send or cancel was submitted."
+  },
+  "mobile": {
+    "version": "20261114T015414-dd9578e2-dirty",
+    "dataset": "Existing development board KBD-2-10 and bound native execution; fresh Chrome context 390x844; warm host; normal background scans",
+    "status": "等待授权（\n8h\n）",
+    "requestId": "number:0",
+    "choices": [
+      "批准本次",
+      "取消当前执行"
+    ],
+    "hasNativeDetails": true,
+    "mobile": {
+      "width": 358,
+      "viewport": 390,
+      "clientWidth": 358,
+      "scrollWidth": 358
+    },
+    "metrics": [
+      {
+        "scenario": "open-decision-with-live-authorization",
+        "durationMs": 220.38941300000033,
+        "logicalApiCalls": 5,
+        "httpRequests": 4
+      },
+      {
+        "scenario": "open-original-authorization-dialog",
+        "durationMs": 228.86867799999982,
+        "logicalApiCalls": 4,
+        "httpRequests": 4
+      },
+      {
+        "scenario": "open-original-chat-authorization",
+        "durationMs": 822.7305360000005,
+        "logicalApiCalls": 25,
+        "httpRequests": 23
+      }
+    ],
+    "pageErrors": [],
+    "liveActions": "Viewed the same request in the decision modal and original chat. No approve, reject, send or cancel was submitted."
+  },
+  "temporaryScopeReceipts": [
+    {
+      "id": "b80e4eb5-f5dc-4edf-9621-c27edaa9ac52",
+      "reason": "command-ended",
+      "outcome": "succeeded",
+      "exitCode": 0
+    },
+    {
+      "id": "3708f440-5dfc-4d58-aecd-6e2b5b8fe05e",
+      "reason": "command-ended",
+      "outcome": "succeeded",
+      "exitCode": 0
+    }
+  ],
+  "verification": {
+    "kanbanCoreTestsPassed": 309,
+    "kanbanUITestsPassed": 204,
+    "finalDecisionRenderingTestsPassed": 25,
+    "nativeInteractionPanelTestsPassed": 6,
+    "dialogLifecycleTestsPassed": 3,
+    "nativeSessionObserverTestsPassed": 4,
+    "driverStateAndInteractionTestsPassed": 39,
+    "workspaceTypecheck": "passed",
+    "stylesCheck": "passed",
+    "docsCheck": "passed",
+    "performance": {
+      "coreTestsPassed": 60,
+      "transportTestsPassed": 24,
+      "uiTestsPassed": 66
+    }
+  },
+  "screenshots": [
+    "/tmp/x1-decision-authorization-final.png",
+    "/tmp/x1-decision-authorization-dialog.png",
+    "/tmp/x1-decision-authorization-mobile-table.png",
+    "/tmp/x1-decision-authorization-mobile.png"
+  ],
+  "originalLimitations": [
+    {
+      "check": "Full cells-driver test suite",
+      "passed": 452,
+      "failed": 1,
+      "skipped": 1,
+      "failure": "harness-node-queue.test.ts: CELLS_QUEUE_FIXTURE_TIMEOUT; reproduced in isolation. Full-suite success is not claimed."
+    },
+    {
+      "check": "Mixed viewport transition followed by original chat navigation",
+      "result": "Over logical API budget",
+      "logicalApiCalls": 44,
+      "httpRequests": 38,
+      "durationMs": 793.922464,
+      "notes": "Resizing desktop to mobile and back before chat navigation also loads project navigation metadata. Fixed desktop and fixed mobile scenarios above pass. No baseline attribution is claimed."
+    }
+  ],
+  "limitations": [],
+  "followUp": {
+    "evidence": "kanban-navigation-recovery-20261114.json",
+    "status": "Original queue-recovery and mixed-viewport budget failures resolved; use follow-up full-sidebar-ready measurements."
+  }
+}

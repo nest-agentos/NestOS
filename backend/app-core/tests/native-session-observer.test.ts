@@ -29,3 +29,8 @@ it('does not read a different native scope or resurrect expired shared metadata'
  f.status.read.mockImplementation(async()=>{f.set(expired);});
  expect(await f.read(board,'execution',resource)).toMatchObject({state:'unknown',stale:true,code:'NATIVE_ACTIVITY_STALE',lastActivityAt:100});
 });
+
+it('passes native approval identity through metadata without inventing activity or exposing the command',async()=>{
+ const f=fixture();f.set({...f.fresh,execution:'waiting-approval',interactionIds:['epoch:number:0']});
+ expect(await f.read(board,'execution',resource)).toMatchObject({state:'waiting-approval',interactionIds:['epoch:number:0'],lastActivityAt:100,stale:false});
+});

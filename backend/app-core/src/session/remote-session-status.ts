@@ -20,10 +20,13 @@ export class RemoteSessionStatus {
     get(projectId: string, profileId: string, sessionId: string): HarnessObservation | undefined {
         return this.record(projectId, profileId, sessionId)?.observation;
     }
+    /** One authorized metadata snapshot serves all visible rows in a project. */
+    records(projectId:string):readonly HarnessStatusRow[] {
+        const watch=this.projection(projectId);
+        return watch&&watch.identity===this.identity(projectId)?watch.rows:[];
+    }
     record(projectId: string, profileId: string, sessionId: string): HarnessStatusRow | undefined {
-        const watch = this.projection(projectId);
-        if (!watch || watch.identity !== this.identity(projectId)) return;
-        return watch.rows.find(row => row.profileId === profileId && row.sessionId === sessionId);
+        return this.records(projectId).find(row => row.profileId === profileId && row.sessionId === sessionId);
     }
     fileVersion(projectId: string): string | undefined {
         const watch = this.projection(projectId);

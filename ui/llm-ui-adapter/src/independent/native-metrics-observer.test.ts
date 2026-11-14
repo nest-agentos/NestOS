@@ -34,3 +34,12 @@ it('coalesces a changed turn during an in-flight read and drops responses after 
     await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2));
     observer.dispose(); finish(base); await Promise.resolve(); expect(changed).toHaveBeenCalledOnce();
 });
+
+it('reuses an in-flight metrics read across visibility changes at the same turn', async () => {
+    let finish!: (state: ConversationSnapshot) => void;
+    const read = vi.fn(() => new Promise<ConversationSnapshot>(resolve => {finish = resolve;})), changed = vi.fn();
+    const observer = new NativeMetricsObserver({refreshMetrics: read} as never, changed);
+    observer.observe(base); observer.setActive(false); observer.setActive(true); finish(base);
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledOnce());
+    observer.observe(base); expect(read).toHaveBeenCalledOnce(); observer.dispose();
+});

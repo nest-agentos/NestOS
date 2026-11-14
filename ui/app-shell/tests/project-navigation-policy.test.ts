@@ -1,10 +1,19 @@
 import {expect, it} from 'vitest';
 import type {VFSNodeUI} from '@nestos/vfs-ui';
 import {resolveBrowserTarget} from '@nestos/app-contracts';
-import {fileFirst, navigationPriority, projectItems} from '../src/projects/navigation-policy';
+import {fileFirst, navigationPriority, projectItems,navigationSelectionPath} from '../src/projects/navigation-policy';
 import { ACTION_ICONS, FILE_ICONS, t } from '@nestos/common';
 
 const item = (id: string) => ({id, metadata: {title: id, createdAt: '', lastModified: '', custom: {}}}) as VFSNodeUI;
+
+it('selects a visible native row or its project without treating a Session route as directories',()=>{
+    const path='/folder:cx1/@harness/codex/native',root='/folder:cx1';
+    expect(navigationSelectionPath(path,root,false)).toBe(root);
+    expect(navigationSelectionPath(path,undefined,false)).toBe('/');
+    expect(navigationSelectionPath(path,root,true)).toBe(path);
+    expect(navigationSelectionPath(path,root,false,root+'/@recent/native')).toBe(root+'/@recent/native');
+    const file=root+'/@files/workspace/src/app.ts';expect(navigationSelectionPath(file,root,false)).toBe(file);
+});
 
 it('labels fixed entries with localized names and icons while preserving routes and literal file names', () => {
     const root = '/folder:Project', favorites = item(root + '/@favorites'), files = item(root + '/@files');

@@ -86,11 +86,11 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
     const loadCapabilities = async (state: NativeSnapshot, force = false) => {
         if (await capabilities.load(state, force) && !closed && native) publish(options.controls.snapshot?.() ?? native);
     };
-    const refresh = async (initial = false) => {
+    const refresh = async (initial = false, forceCapabilities = true) => {
         const captured = ++generation, started = Date.now(), operationId = randomUUID(), stage = initial ? 'history' : 'events';
         try {
             const state = await (initial ? options.controls.read() : options.controls.refresh());
-            if (captured === generation) {publish(state); await loadCapabilities(state, true);}
+            if (captured === generation) {publish(state); await loadCapabilities(state, forceCapabilities);}
             observationLog.info('chat.native.observe', {operationId, conversationId: options.conversationId, stage,
                 result: captured === generation ? 'success' : 'superseded', messageCount: state.messages.length, durationMs: Date.now() - started});
         } catch (error) {
@@ -111,7 +111,7 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
     });
     const providerStops = options.commandProviders?.flatMap(provider => provider.subscribe ? [provider.subscribe(() => {if (native) publish(native);})] : []) ?? [];
     const offLedger = options.operations.subscribe(() => { if (native) publish(native); });
-    try { await refresh(true); } catch (error) { closed = true; metrics.dispose(); capabilities.dispose();
+    try { await refresh(true, false); } catch (error) { closed = true; metrics.dispose(); capabilities.dispose();
         try {releaseBinding([...(off ? [off] : []), offLedger, ...providerStops]);}
         catch (cleanup) {throw new AggregateError([error, cleanup], 'Native binding initialization failed');}
         throw error; }

@@ -147,7 +147,7 @@ export interface SessionLifecycleDependencies {
 export interface SessionBrowserPort extends VfsContracts.FileSystemSourceOwner {
     transferItems: (mode: "copy" | "move", ids: string[], destination: string) => Promise<void>;
     /** Current directory and project navigation prepared beside storage in one read. */
-    readDirectory?(path: string, options?: {projectId?: string | null; refresh?: boolean}): Promise<SessionDirectoryView>;
+    readDirectory?(path: string, options?: {projectId?: string | null; refresh?: boolean;includeAncestors?:boolean}): Promise<SessionDirectoryView>;
     readFileDirectory: (path: string, options?: FileDirectoryOptions) => Promise<{
         node: FSNode;
         nodes: FSNode[];

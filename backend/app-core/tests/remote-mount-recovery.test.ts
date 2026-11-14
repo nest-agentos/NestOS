@@ -31,10 +31,12 @@ async function fixture() {
 }
 
 it('recovers existing and newly opened workspaces after a transient directory timeout with one shared probe', async () => {
-    const f = await fixture();
+    const f = await fixture(),changes:Array<{kind:string;projectId?:string}|undefined>=[];
+    const stop=f.remote.onChange(change=>{changes.push(change);});
     try {
         f.timeout(); await expect(f.workspace.fs.driver.getChildren('/workspace/reference')).rejects.toMatchObject({code: 'ETIMEDOUT'});
         expect(f.remote.projectOffline(f.project.project.id)).toBe(true);
+        expect(changes).toContainEqual({kind:'status',projectId:f.project.project.id});
         const before = f.probes(), now = Date.now(); vi.spyOn(Date, 'now').mockReturnValue(now + 3001); f.reconnect();
         const [text, second] = await Promise.all([
             f.workspace.fs.driver.readContent('/workspace/reference/note.md', {encoding: 'utf-8'}),
@@ -44,8 +46,9 @@ it('recovers existing and newly opened workspaces after a transient directory ti
             expect(text).toBe('retained content');
             expect(await second.fs.driver.readContent('/workspace/reference/note.md', {encoding: 'utf-8'})).toBe(text);
             expect(f.remote.projectOffline(f.project.project.id)).toBe(false); expect(f.probes() - before).toBe(1);
+            expect(changes.every(change=>change?.kind==='status')).toBe(true);
         } finally {await second.dispose();}
-    } finally {await f.workspace.dispose(); await f.runtime.dispose();}
+    } finally {stop();await f.workspace.dispose(); await f.runtime.dispose();}
 });
 
 it('retains timeout classification and bounds repeated checks while the remote remains unavailable', async () => {

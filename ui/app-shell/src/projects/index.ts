@@ -6,7 +6,7 @@ import { setupHitlVfsBridge } from '../workspaces/hitl-bridge';
 import { createWorkspaceModule, type WorkspaceModule } from '../workspaces/module';
 import { SessionWorkbench, type SessionWorkbenchOptions } from './SessionWorkbench';
 
-interface ProjectModuleOptions extends Pick<SessionWorkbenchOptions, 'openProjectDecisions' | 'sidebar' | 'container' | 'factory' | 'createFactory' | 'fileFactory' | 'onSelect' | 'onBeforeNavigate' | 'hostContext' | 'sessionSkills' | 'onSidebarReady' | 'initialResource' | 'deferNavigation' | 'uiPersistence' | 'workbenchState' | 'windows' | 'projectSyncSetup' | 'projectSyncDirectory'> {
+interface ProjectModuleOptions extends Pick<SessionWorkbenchOptions, 'onUnavailableResource' | 'openProjectDecisions' | 'sidebar' | 'container' | 'factory' | 'createFactory' | 'fileFactory' | 'onSelect' | 'onBeforeNavigate' | 'hostContext' | 'sessionSkills' | 'onSidebarReady' | 'initialResource' | 'deferNavigation' | 'uiPersistence' | 'workbenchState' | 'windows' | 'projectSyncSetup' | 'projectSyncDirectory'> {
     backend: import('@nestos/app-contracts/services').ApplicationBackend;
     services: Pick<ApplicationServices, 'sessionRepository' | 'sessionFiles' | 'kernel' | 'directoryMounts' | 'sessionManager' | 'flowEngine' | 'projects' | 'commandBus' | 'projectSync' | 'digitalTwin' | 'prepareSession' | 'agentService'>;
     executorUsage?: import('@nestos/ui-common-adapter').EditorOptions['executorUsage'];

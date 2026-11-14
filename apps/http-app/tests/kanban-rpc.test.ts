@@ -9,7 +9,7 @@ it('exposes user-bound Kanban commands, queries and system notifications through
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'web', startupMode: 'interactive', digitalTwinAutoStart: false});
     const operationView = {revision: 'snapshot', operations: [{id: 'merge', label: 'Merge', state: 'waiting-confirmation', enabled: true, fields: [{id: 'file', label: 'File', choices: [{id: 'keep', label: 'Keep'}]}]}]};
     const operationPorts = {itemOperations: vi.fn(async () => operationView), runItemOperation: vi.fn(async () => operationView), bindItemOperation: vi.fn(async () => operationView)};
-    const recoveryPorts={taskRecovery:vi.fn(async()=>({itemId:'card',revision:'r',related:[],canRetry:true,canSelectCurrentVersion:false})),recoverTask:vi.fn(async()=>({operationId:'retry',state:'pending'})),startRecordConversation:vi.fn(async()=>({id:'discussion',boardId:'rpc-board',state:'clarifying',createdAt:1,resourceId:'/native/original'})),recordConversations:vi.fn(async()=>[]),previewTaskRestart:vi.fn(async()=>({itemId:'card',version:'v',affected:[{id:'card',title:'Card',status:'cancelled',started:true}]})),restartTask:vi.fn(async()=>({operationId:'restart',itemId:'card',state:'stopping',affectedIds:['card']}))};
+    const recoveryPorts={controlRecordConversation:vi.fn(async()=>{}),taskRecovery:vi.fn(async()=>({itemId:'card',revision:'r',related:[],canRetry:true,canSelectCurrentVersion:false})),recoverTask:vi.fn(async()=>({operationId:'retry',state:'pending'})),startRecordConversation:vi.fn(async()=>({id:'discussion',boardId:'rpc-board',state:'clarifying',createdAt:1,resourceId:'/native/original'})),recordConversations:vi.fn(async()=>[]),previewTaskRestart:vi.fn(async()=>({itemId:'card',version:'v',affected:[{id:'card',title:'Card',status:'cancelled',started:true}]})),restartTask:vi.fn(async()=>({operationId:'restart',itemId:'card',state:'stopping',affectedIds:['card']}))};
     Object.assign(runtime.kanban!, operationPorts,recoveryPorts);
     const view = await openApplicationView(runtime), report = vi.fn();
     let server!: RpcPeer;
@@ -22,6 +22,8 @@ it('exposes user-bound Kanban commands, queries and system notifications through
         expect(await kanban.recoverTask('rpc-board',{operationId:'retry',itemId:'card',action:'retry',expectedRevision:'r'})).toMatchObject({state:'pending'});
         expect(await kanban.startRecordConversation('rpc-board',{operationId:'discussion'})).toMatchObject({resourceId:'/native/original'});
         expect(await kanban.recordConversations('rpc-board')).toEqual([]);
+        const conversationControl={conversationId:'discussion',operationId:'ack-discussion',action:'dismiss-attention',fingerprint:'a'.repeat(64)};
+        await kanban.controlRecordConversation('rpc-board',conversationControl);expect(recoveryPorts.controlRecordConversation).toHaveBeenCalledWith('rpc-board',conversationControl);
         expect(await kanban.previewTaskRestart('rpc-board','card')).toMatchObject({version:'v'});
         const restart={operationId:'restart',itemId:'card',version:'v',confirmed:true};
         expect(await kanban.restartTask('rpc-board',restart)).toMatchObject({state:'stopping'});expect(recoveryPorts.restartTask).toHaveBeenCalledWith('rpc-board',restart);
@@ -69,6 +71,9 @@ it('exposes user-bound Kanban commands, queries and system notifications through
         expect(await kanban.itemOperations(board.id, 'card')).toEqual(operationView);
         const operation = {operationId: 'merge-review', itemId: 'card', action: 'merge', expectedRevision: 'snapshot', confirmed: true, selections: {file: 'keep'}};
         expect(await kanban.runItemOperation(board.id, operation)).toEqual(operationView); expect(operationPorts.runItemOperation).toHaveBeenCalledWith(board.id, operation);
+        const reconciliation={operationId:'check-original-merge',itemId:'card',action:'merge',expectedRevision:'snapshot',reconcile:{runId:'merge-review'}};
+        expect(await kanban.runItemOperation(board.id,reconciliation)).toEqual(operationView);
+        expect(operationPorts.runItemOperation).toHaveBeenLastCalledWith(board.id,reconciliation);
         const binding = {operationId: 'bind-review', itemId: 'card', action: 'merge', expectedRevision: 'snapshot', target: {system: 'nestos-published-flow', id: 'merge-project', revision: '1'}};
         expect(await kanban.bindItemOperation(board.id, binding)).toEqual(operationView); expect(operationPorts.bindItemOperation).toHaveBeenCalledWith(board.id, binding);
         const current = await kanban.read(board.id);

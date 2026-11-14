@@ -34,7 +34,9 @@ import { createFileChatHandler } from './projects/file-chat';
 import { createOcrControls } from './configuration/ocr-controls';
 import { ConfigurationDeletionDialog } from './configuration/delete-dialog';
 import {createPageWindows} from './workspaces/page-windows';
+import {unavailableConversationCleanup} from './kanban/unavailable-conversation';
 import {sessionUrl, kanbanReferenceLink,projectDecisionsPath} from './kanban/links';
+import {sessionInteractionDialog} from './kanban/session-interactions';
 import {createKanbanWorkspace} from './kanban';
 import { TOOLBOX_SCOPE } from './toolbox/ToolboxWorkbench';
 import { TOOLBOX_KINDS, legacyToolboxRoute, toolboxSettingsRoute } from './toolbox/routes';
@@ -175,7 +177,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             kernel: kernel.kernel, readTaskAttachment: backend.taskAttachment?.bind(backend), ...controls,
         });
         const withMarkdown = createEditorSwapFactory(createDocumentChatFactory(factory, services, backend, options.ui.prepareChatSubmission, request => handleNavigationRequest(request)), backend);
-        return async (container, config) => { await executorUsage.load(); return withMarkdown(container, {...config, executorUsage}); };
+        return async (container, config) => { if (!('conversation' in config) || !config.conversation) await executorUsage.load(); return withMarkdown(container, {...config, executorUsage}); };
     };
     const agentFactory = options.ui.createAgentEditor(agentService, { defaultToolIds: DEFAULT_HARNESS_TOOL_IDS,
         listFlows: () => commandBus.execute<import('@nestos/llm-flow/contracts').FlowDraft[]>(FlowCommand.DraftList),
@@ -367,6 +369,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         if (strategyType === 'kanban') {
             const module = createKanbanWorkspace({service: services.kanban, sidebar: sidebarEl, editor: editorEl,
                 windows: windowBinding, initialResource, sessionUrl, referenceLink: kanbanReferenceLink(services.projects),
+                openSessionInteraction:sessionInteractionDialog(services.projects,id=>handleNavigationRequest({target:'chat',resourceId:id,options:{newTab:true}})),
                 selected: path => selectionHistory(elementId, path, 'push'),
                 openSession: id => handleNavigationRequest({target: 'chat', resourceId: id, options: {newTab: true}})});
             own(module.dispose); await module.workbench.start(); managerCache.set(elementId, module.workbench);
@@ -429,6 +432,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                 uiState.port(SESSION_BROWSER_SCOPE), uiState.workbenchPort(SESSION_BROWSER_SCOPE),
             ]));
             const module = createProjectModule({ services, backend, createFactory: createChatFactory, initialResource, deferNavigation: !!initialResource, projectSyncSetup: options.projectSyncSetup, projectSyncDirectory: options.projectSyncDirectory, sidebar: sidebarEl, container: editorEl,
+                onUnavailableResource:services.kanban?unavailableConversationCleanup(services.kanban):undefined,
                 openProjectDecisions:services.kanban?id=>handleNavigationRequest({target:'kanban',resourceId:projectDecisionsPath(id)}):undefined,
                 executorUsage, agentFactory,
                 fileFactory: defaultEditorFactory, createFlowContextMenu: options.ui.createFlowContextMenu,

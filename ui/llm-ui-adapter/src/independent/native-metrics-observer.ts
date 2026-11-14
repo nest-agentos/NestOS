@@ -26,7 +26,10 @@ export class NativeMetricsObserver {
         const operationId = randomUUID(), started = Date.now();
         try {
             const state = await this.controls.refreshMetrics!();
-            if (!this.closed && this.active && state.sessionId === sessionId && this.state?.sessionId === sessionId) this.changed(state);
+            if (!this.closed && this.active && state.sessionId === sessionId && this.state?.sessionId === sessionId) {
+                if(this.key===key)this.completed=key;
+                this.changed(state);
+            }
         } catch (error) {
             const raw = (error as {code?: string})?.code;
             const code = raw && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'HARNESS_METRICS_UNAVAILABLE';

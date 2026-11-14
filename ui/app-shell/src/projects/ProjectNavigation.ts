@@ -326,6 +326,10 @@ export class ProjectNavigation {
         await this.apply(snapshot, revision);
     }
     currentProject(): ProjectFolder | undefined { return this.project; }
+    refreshAvailability():void {
+        this.offlinePaths=new Set(this.projectChoices.filter(project=>this.projects.remoteMounts?.projectOffline(project.project.id)).map(project=>folderBrowserPath(project.path)));
+        this.updateCreation();this.ui()?.refreshList();
+    }
     registeredProjects(): readonly ProjectFolder[] { return this.projectChoices; }
 }
 function findNode(items: VFSNodeUI[], id: string): VFSNodeUI | undefined {

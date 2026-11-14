@@ -19,16 +19,16 @@ export async function decisionConversationViews(options:DecisionConversationOpti
         const recovered=row.state==='blocked'&&!reports.pendingReports.length?{state:row.recordId?'confirmed' as const:proposal?'draft' as const:'clarifying' as const,code:undefined}:{};
         const lastActivityAt=Math.max(row.lastActivityAt??row.createdAt,saved?.lastActivityAt??0,proposal?.lastActivityAt??0,cancellation?.lastActivityAt??0);
         const view={...row,lastActivityAt,...(binding?.purpose==='coordination'?{purpose:'coordination' as const,recordId:binding.recordId}:{}),...recovered,...(reports.pendingReports.length&&!['cancelled','cancelling'].includes(row.state)?reports:{pendingReports:[]}),...state,...(title?{title}:{}),...(sessionId?{sessionId}:{})};
-        if(!sessionId||view.resourceId||!binding)return view;
+        if(!sessionId||!binding)return view;
         const started=Date.now();
         try {
             if(!folders.has(binding.projectId))folders.set(binding.projectId,options.projects.get(binding.projectId));
             const folder=await folders.get(binding.projectId)!;
-            return {...view,resourceId:remoteSessionPath(folder.path,binding.profileId,sessionId)};
+            return {...view,resources:view.resources??[{system:'nestos-remote-project',id:binding.projectId}],resourceId:remoteSessionPath(folder.path,binding.profileId,sessionId)};
         }catch(error){
             const raw=(error as {code?:string})?.code,code=raw&&/^[A-Z][A-Z0-9_]{0,79}$/.test(raw)?raw:'DECISION_SESSION_LINK_FAILED';
             options.log({operationId:row.id,boardId:row.boardId,stage:'decision.conversation.link',result:'failure',code,durationMs:Date.now()-started});
-            return view;
+            return code==='ENOENT'?{...view,resources:view.resources??[{system:'nestos-remote-project',id:binding.projectId}],unavailable:{kind:'project' as const,code:'DECISION_CONVERSATION_PROJECT_MISSING',cleanupAllowed:!view.recordId}}:view;
         }
     }));
 }

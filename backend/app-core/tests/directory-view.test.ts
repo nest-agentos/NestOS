@@ -16,7 +16,7 @@ function fixture() {
     const project = {path: '/Work', name: 'Work', project: {id: 'work'}};
     const navigation = vi.fn(async () => ({path: root.path, projects: [project], loadPaths: [], offlineProjectIds: [], pendingDeletions: 0}));
     const projects = {navigation} as unknown as ProjectService;
-    return {fs, projects, root, files, conversation, session, getNode, getChildren, navigation, project, children};
+    return {fs, projects, root, files, conversation, session, getNode, getChildren, navigation, project, children, values, node};
 }
 it('prepares the flattened directory and project once while keeping ordinary directories lazy', async () => {
     const f = fixture(), view = await readDirectoryView(f.fs, f.projects, f.root.path, {projectId: null});
@@ -42,4 +42,19 @@ it('rejects cyclic virtual containers and preserves real read failures', async (
     await expect(readDirectoryView(f.fs, f.projects, f.root.path)).rejects.toMatchObject({code: 'ELOOP'});
     const error = new FSError('EACCES', 'Denied'); f.getChildren.mockRejectedValueOnce(error);
     await expect(readDirectoryView(f.fs, f.projects, f.root.path)).rejects.toBe(error);
+});
+
+it('includes ancestor seeds in one response without changing the requested entries', async () => {
+    const f = fixture(); f.values.set('/', f.node('/')); f.children.set('/', [f.root]);
+    const view = await readDirectoryView(f.fs, f.projects, f.root.path, {includeAncestors: true});
+    expect(view.nodes.map(row => row.path)).toEqual([f.files.path, f.session.path]);
+    expect(view.directories.map(row => row.path)).toContain('/');
+    expect(view.directories.find(row => row.path === '/')?.nodes).toEqual([f.root]);
+    expect(f.navigation).toHaveBeenCalledOnce();
+    expect(f.getChildren.mock.calls.filter(([path]) => path === '/')).toHaveLength(1);
+});
+it('preserves an ancestor access failure instead of publishing a partial snapshot', async () => {
+    const f = fixture(), original = f.getChildren.getMockImplementation()!;
+    f.getChildren.mockImplementation(async path => {if (path === '/') throw new FSError('EACCES', 'Denied'); return original(path);});
+    await expect(readDirectoryView(f.fs, f.projects, f.root.path, {includeAncestors: true})).rejects.toMatchObject({code: 'EACCES'});
 });

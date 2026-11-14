@@ -619,14 +619,15 @@ it('releases native queue admission from durable evidence while its transport re
  }finally{binding.dispose();}
 });
 
-it('refreshes command metadata without rereading models in the same ownership scope', async () => {
+it('consumes a complete command snapshot without rereading it and preserves forced refresh', async () => {
     const host = fixture(), state = {...host.state(), supportsModels: true, supportsSlashCommands: true};
     host.controls.models = vi.fn(async () => ({models: []}));
     host.controls.commands = vi.fn(async () => []);
     const caps = new NativeComposerCapabilities(host.controls); await caps.load(state);
     await caps.load({...state, commandCatalogObservation: {complete: true}});
-    expect(host.controls.models).toHaveBeenCalledOnce(); expect(host.controls.commands).toHaveBeenCalledTimes(2);
+    expect(host.controls.models).toHaveBeenCalledOnce(); expect(host.controls.commands).toHaveBeenCalledOnce();
     await caps.load(state, true);
+    expect(host.controls.commands).toHaveBeenCalledTimes(2);
     expect(host.controls.models).toHaveBeenCalledTimes(2); caps.dispose();
 });
 
@@ -641,4 +642,16 @@ it('retries failed model refreshes instead of treating the previous catalog as a
         await vi.advanceTimersByTimeAsync(1000); await caps.load(state);
         expect(host.controls.models).toHaveBeenCalledTimes(3);
     } finally {caps.dispose(); vi.useRealTimers();}
+});
+
+it('projects updated complete native commands without feeding the catalog back into another query', async () => {
+    const host = fixture(), state = {...host.state(), supportsSlashCommands: true};
+    const command = {name: 'status', description: 'State', kind: 'action' as const};
+    host.controls.commands = vi.fn(async () => [command]);
+    const caps = new NativeComposerCapabilities(host.controls); await caps.load(state);
+    const updated = {...state, slashCommands: [{...command, revision: 'next'}], commandCatalogObservation: {complete: true}};
+    await caps.load(updated); expect(host.controls.commands).toHaveBeenCalledOnce();
+    expect(caps.resolve('status')).toMatchObject({revision: 'next'});
+    await caps.load({...updated, commandCatalogObservation: {complete: false}});
+    expect(host.controls.commands).toHaveBeenCalledTimes(2); caps.dispose();
 });

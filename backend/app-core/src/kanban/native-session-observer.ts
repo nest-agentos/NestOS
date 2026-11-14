@@ -40,5 +40,5 @@ function projectObservation(observation:HarnessObservation,previous:NativeSessio
     const stale=observation.stale||observation.connection!=='online'||Date.now()-observation.observedAt>30_000;
     const state=observation.execution==='idle'?observation.lastResult??'idle':observation.execution;
     return {state:stale&&state==='running'?'unknown':state,lastActivityAt:previous?.lastActivityAt,
-        observedAt:observation.observedAt,stale,code:observation.refreshError?.code??(stale?'NATIVE_ACTIVITY_STALE':undefined)};
+        interactionIds:observation.interactionIds,observedAt:observation.observedAt,stale,code:observation.refreshError?.code??(stale?'NATIVE_ACTIVITY_STALE':undefined)};
 }

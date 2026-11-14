@@ -1,3 +1,4 @@
+import {unavailableDecisionReference} from './decision-conversation-availability';
 import {promptReferenceSections} from '../run/prompt-reference-sections';
 import {selectKanbanHarness,freezeKanbanHarness,harnessSettingKey} from '../presets/kanban-harness-settings';
 import {remoteSessionPath} from '@nestos/app-contracts';
@@ -13,7 +14,7 @@ import {diagnosticFailure} from '../diagnostics/failure';
 import {decisionProjectScope,requireDecisionProjectContext} from './decision-project-scope';
 
 export function decisionConversationTransport(options:DecisionConversationOptions,advance:RecordConversationPort['advance']):RecordConversationPort {
-    return {prepare:(id,board,resources,primary)=>prepare(options,id,board,resources,primary),start:(binding,first,active)=>start(options,binding as DecisionConversationBinding,first,active),advance,
+    return {referenceUnavailable:value=>unavailableDecisionReference(options,value as DecisionConversation),prepare:(id,board,resources,primary)=>prepare(options,id,board,resources,primary),start:(binding,first,active)=>start(options,binding as DecisionConversationBinding,first,active),advance,
         watch:async(value,wake)=>{const binding=value.binding as DecisionConversationBinding,client=await options.remote.projectHarness(binding.projectId);
             try {requireValue(client.subscribeChannel,'SESSION_CHANNEL_REQUIRED');const stop=client.subscribeChannel(binding.id,wake);return async()=>{stop();await client.close();};}
             catch(error){await client.close();throw error;}},close:async()=>{}};
