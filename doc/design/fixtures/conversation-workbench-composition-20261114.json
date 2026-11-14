@@ -1,0 +1,355 @@
+{
+  "date": "2026-11-14",
+  "sourceCommit": "58d3584",
+  "runningVersion": "20261114T043315-fdfe85b4-dirty",
+  "releaseNote": "The tested release was built from the integration working tree immediately before the source commit. Runtime version was verified via authenticated /api/health, independently of the release pointer.",
+  "goal": {
+    "mainReadCalls": 2,
+    "maximumWithPresentationSave": 3,
+    "businessCacheAdded": false
+  },
+  "measurement": "Count every RPC separately, including batched RPCs; count bootstrap/control requests once and separately record HTTP requests. Decision-to-conversation measurement starts at the navigation click and ends after the original authorization is visible, navigation is no longer inert, and 250 ms settlement. Health lookup is outside measurement. Cold measurement starts before page.goto and includes application bootstrap.",
+  "implementation": [
+    "Backend-owned ConversationWorkbenchView prepares fresh conversation/history/draft/input metadata and UI documents; readNavigation reuses the existing scoped browser directory query.",
+    "Global and per-view observation adapters reuse existing domain ports. Bounded event snapshots feed local consumers without per-consumer subscription RPCs. Missing event history triggers readonly reconciliation, never command replay.",
+    "Conversation open failures preserve the base workspace. Optional input metadata failures and unrelated expanded-directory failures remain local.",
+    "Navigation UI changes are saved in one presentation transaction. Query-scoped revisions are never compared to another filesystem revision.",
+    "Existing authorization, sending, interruption and execution commands retain their independent domain ports and original receipts."
+  ],
+  "runs": [
+    {
+      "version": "20261114T043315-fdfe85b4-dirty",
+      "dataScale": {
+        "decisionRows": 11,
+        "navigationRows": 26,
+        "targetDecisions": 1,
+        "targetNativeSessions": 1
+      },
+      "dataset": "Existing development board KBD-2-10 and bound native execution; fresh Chrome context 1280x900; warm host; normal background scans",
+      "metrics": [
+        {
+          "scenario": "open-decision-with-live-authorization",
+          "durationMs": 222.80198599999994,
+          "logicalApiCalls": 4,
+          "httpRequests": 3,
+          "methods": {
+            "recordResources": 1,
+            "catalog": 1,
+            "recordConversations": 1,
+            "records": 1
+          }
+        },
+        {
+          "scenario": "open-original-authorization-dialog",
+          "durationMs": 219.81982500000004,
+          "logicalApiCalls": 4,
+          "httpRequests": 4,
+          "methods": {
+            "forFolder": 1,
+            "projectConversation": 1,
+            "read": 1,
+            "subscribe": 1
+          }
+        },
+        {
+          "scenario": "open-original-chat-authorization",
+          "durationMs": 1066.4760919999999,
+          "logicalApiCalls": 3,
+          "httpRequests": 3,
+          "methods": {
+            "openConversationWorkbench": 1,
+            "readNavigation": 1,
+            "writeUiDocuments": 1
+          }
+        }
+      ],
+      "nativeDirectoryCalls": 0,
+      "authorization": {
+        "requestId": "number:0",
+        "choices": [
+          "批准本次",
+          "取消当前执行"
+        ],
+        "hasNativeDetails": true
+      },
+      "mobile": {
+        "clientWidth": 358,
+        "scrollWidth": 358,
+        "viewport": 390,
+        "width": 358
+      },
+      "pageErrors": [],
+      "cleanup": {
+        "id": "a88bee48-8353-4121-96cc-38485bae938a",
+        "reason": "command-ended",
+        "outcome": "succeeded",
+        "exitCode": 0
+      }
+    },
+    {
+      "version": "20261114T043315-fdfe85b4-dirty",
+      "dataScale": {
+        "decisionRows": 11,
+        "navigationRows": 26,
+        "targetDecisions": 1,
+        "targetNativeSessions": 1
+      },
+      "dataset": "Existing development board KBD-2-10 and bound native execution; fresh Chrome context 1280x900; warm host; normal background scans",
+      "metrics": [
+        {
+          "scenario": "open-decision-with-live-authorization",
+          "durationMs": 219.22801299999992,
+          "logicalApiCalls": 4,
+          "httpRequests": 3,
+          "methods": {
+            "recordResources": 1,
+            "catalog": 1,
+            "recordConversations": 1,
+            "records": 1
+          }
+        },
+        {
+          "scenario": "open-original-authorization-dialog",
+          "durationMs": 216.10100300000022,
+          "logicalApiCalls": 4,
+          "httpRequests": 4,
+          "methods": {
+            "forFolder": 1,
+            "projectConversation": 1,
+            "read": 1,
+            "subscribe": 1
+          }
+        },
+        {
+          "scenario": "open-original-chat-authorization",
+          "durationMs": 691.8192129999998,
+          "logicalApiCalls": 2,
+          "httpRequests": 2,
+          "methods": {
+            "openConversationWorkbench": 1,
+            "readNavigation": 1
+          }
+        }
+      ],
+      "nativeDirectoryCalls": 0,
+      "authorization": {
+        "requestId": "number:0",
+        "choices": [
+          "批准本次",
+          "取消当前执行"
+        ],
+        "hasNativeDetails": true
+      },
+      "mobile": {
+        "clientWidth": 358,
+        "scrollWidth": 358,
+        "viewport": 390,
+        "width": 358
+      },
+      "pageErrors": [],
+      "cleanup": {
+        "id": "360b94df-3bee-47cd-bc9c-fe06e4f33c01",
+        "reason": "command-ended",
+        "outcome": "succeeded",
+        "exitCode": 0
+      }
+    },
+    {
+      "version": "20261114T043315-fdfe85b4-dirty",
+      "dataScale": {
+        "decisionRows": 11,
+        "navigationRows": 26,
+        "targetDecisions": 1,
+        "targetNativeSessions": 1
+      },
+      "dataset": "Existing development board KBD-2-10 and bound native execution; fresh Chrome context 1280x900; warm host; normal background scans",
+      "metrics": [
+        {
+          "scenario": "open-decision-with-live-authorization",
+          "durationMs": 331.9038049999999,
+          "logicalApiCalls": 4,
+          "httpRequests": 3,
+          "methods": {
+            "recordResources": 1,
+            "catalog": 1,
+            "recordConversations": 1,
+            "records": 1
+          }
+        },
+        {
+          "scenario": "open-original-authorization-dialog",
+          "durationMs": 216.35346800000025,
+          "logicalApiCalls": 4,
+          "httpRequests": 4,
+          "methods": {
+            "forFolder": 1,
+            "projectConversation": 1,
+            "read": 1,
+            "subscribe": 1
+          }
+        },
+        {
+          "scenario": "open-original-chat-authorization",
+          "durationMs": 1067.3585650000005,
+          "logicalApiCalls": 3,
+          "httpRequests": 3,
+          "methods": {
+            "openConversationWorkbench": 1,
+            "readNavigation": 1,
+            "writeUiDocuments": 1
+          }
+        }
+      ],
+      "nativeDirectoryCalls": 0,
+      "authorization": {
+        "requestId": "number:0",
+        "choices": [
+          "批准本次",
+          "取消当前执行"
+        ],
+        "hasNativeDetails": true
+      },
+      "mobile": {
+        "clientWidth": 358,
+        "scrollWidth": 358,
+        "viewport": 390,
+        "width": 358
+      },
+      "pageErrors": [],
+      "cleanup": {
+        "id": "bd552bb4-e5fa-4acd-966e-fbec5fc61791",
+        "reason": "command-ended",
+        "outcome": "succeeded",
+        "exitCode": 0
+      }
+    }
+  ],
+  "cold": {
+    "version": "20261114T043315-fdfe85b4-dirty",
+    "metric": {
+      "scenario": "cold-native-route-full-page",
+      "durationMs": 1266.174519,
+      "logicalApiCalls": 10,
+      "httpRequests": 10,
+      "methods": {
+        "eventBaseline": 1,
+        "onChange": 2,
+        "readEvents": 1,
+        "readNavigation": 1,
+        "assistantOverview": 1,
+        "writeUiDocuments": 1
+      }
+    },
+    "pageErrors": [],
+    "choices": [
+      "批准本次",
+      "取消当前执行"
+    ],
+    "cleanup": {
+      "id": "28833922-e25f-44f7-ba28-fa27c70bc0f9",
+      "reason": "command-ended",
+      "outcome": "succeeded",
+      "exitCode": 0
+    }
+  },
+  "checks": {
+    "workspaceTypecheck": "passed",
+    "latestCoreAndShellTypecheck": "passed",
+    "modules": 14,
+    "docs": "passed",
+    "styles": "passed",
+    "performance": {
+      "core": 60,
+      "transport": 30,
+      "ui": 66,
+      "cleanup": "confirmed; UI repeated after presentation transaction changes"
+    },
+    "targeted": [
+      {
+        "suite": "view publication and error handling",
+        "passed": 17,
+        "cleanup": {
+          "id": "618d6977-3422-4d93-a504-bb8a5e823058",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "composed navigation and directory failure isolation",
+        "passed": 11,
+        "cleanup": {
+          "id": "65cdaff3-3b5f-44ac-9544-2709254ff4c0",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "latest lifecycle and session-view",
+        "passed": 10,
+        "cleanup": {
+          "id": "54aaebe0-5a9b-47bd-adb1-6696e39bcb30",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "presentation transactions",
+        "passed": 9,
+        "cleanup": {
+          "id": "6ab19e6c-8e72-462f-bb6b-d7c1ff14e44f",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "native bindings and store",
+        "passed": 53,
+        "cleanup": {
+          "id": "d9b377c3-b96b-47b1-a066-bdbd6ffe8150",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "native metrics",
+        "passed": 4,
+        "cleanup": {
+          "id": "263ebe88-96b4-4157-b49c-84a7da67db89",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "Kanban participation projection",
+        "passed": 8,
+        "cleanup": {
+          "id": "43e22ca9-613e-4c8f-8bf0-419234a1c265",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      },
+      {
+        "suite": "Kanban participation UI",
+        "passed": 27,
+        "cleanup": {
+          "id": "d9d03469-6840-4e43-acd7-f7156b1a86d9",
+          "reason": "command-ended",
+          "outcome": "succeeded",
+          "exitCode": 0
+        }
+      }
+    ]
+  },
+  "scope": "No live approval/rejection/send/cancel was submitted. Existing authorization identity and choices were inspected in the decision dialog and original chat. No push was performed. Unrelated tools/fc-server pointer was preserved and excluded from commits.",
+  "limits": [
+    "The two/three-call target applies to navigation from an already loaded application into the existing native conversation; whole-app cold startup includes independent global services and is measured separately.",
+    "Measurements use a warm host and fresh Chrome contexts with the fixed existing dataset; they do not establish large-scale or cold-storage performance."
+  ]
+}
