@@ -176,6 +176,8 @@ export const zhCN = {
     'kanban.decisionTable.reason.confirmation-required': '任务已完成，等待交付确认',
     'kanban.decisionTable.phase': '任务进展',
     'kanban.decisionTable.sort': '排序方式',
+    'kanban.decisionTable.sort.title-asc': '标题：升序',
+    'kanban.decisionTable.sort.title-desc': '标题：降序',
     'kanban.decisionTable.sort.activity-desc': '最近活动：从新到旧',
     'kanban.decisionTable.sort.activity-asc': '最近活动：从旧到新',
     'kanban.decisionTable.sort.created-desc': '创建时间：从新到旧',
