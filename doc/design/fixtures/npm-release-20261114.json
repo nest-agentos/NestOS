@@ -103,10 +103,23 @@
         "FSError identity across subpaths",
         "Memory structured ioctl and bounded key pages",
         "Node SQLite typed projection and key index"
-      ],
-      "registryCoreVersion": "0.5.2"
+      ]
     },
-    "temporaryProcessCleanup": "confirmed"
+    "temporaryProcessCleanup": "confirmed",
+    "publicRegistryConsumer": {
+      "result": "passed",
+      "packageCount": 16,
+      "resolvedUrls": "All 16 @nestos entries in package-lock.json resolve to registry.npmjs.org",
+      "cache": "Default npm cache retained; installation does not substitute for uncached public tarball checks",
+      "lifecycleScripts": "disabled",
+      "runtimeChecks": [
+        "ESM and CommonJS public exports",
+        "FSError identity across subpaths",
+        "Memory structured ioctl and bounded key pages",
+        "Node SQLite typed projection and key index"
+      ],
+      "temporaryProcessCleanup": "confirmed"
+    }
   },
   "publication": {
     "result": "accepted",
@@ -116,7 +129,7 @@
     "note": "npm returned processing notices. Public visibility and downloads are verified separately; do not retry publishing these versions."
   },
   "registryVerification": {
-    "checkedAt": "2026-11-14T11:27:10.017Z",
+    "checkedAt": "2026-11-14T11:29:29.470Z",
     "packages": [
       {
         "name": "@nestos/cells-driver",
@@ -249,6 +262,7 @@
         "name": "nestos",
         "version": "0.5.3",
         "status": "pending",
+        "versionEndpointStatus": 404,
         "metadataStatus": 404
       }
     ]
