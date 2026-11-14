@@ -1,3 +1,4 @@
+import {clean} from '../src/diagnostics/codec';
 import {afterEach, expect, it, vi} from 'vitest';
 import {MemoryBackend, FSError, createFileSystemSource, type OperationOptions} from '@nestos/vfs-core';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
@@ -155,4 +156,11 @@ it('publishes an unchanged harness failure only once so navigation cannot trigge
         expect(changed).toHaveBeenCalledOnce();
         expect(await remote.projectStatus('project-a')).toMatchObject({status: 'degraded', issue: {code: 'ECAPABILITY'}});
     } finally {stop();}
+});
+
+it('keeps safe storage measurements and excludes invalid values and body fields',()=>{
+ const value={id:'storage',timestamp:1,operationId:'read',module:'application',operation:'kanban.operation',stage:'record.progress.storage',result:'success',level:'info',count:2,readCount:1,writeCount:0,bytes:358,body:'PRIVATE_CONTENT'};
+ expect(clean(value)).toMatchObject({count:2,readCount:1,writeCount:0,bytes:358});expect(JSON.stringify(clean(value))).not.toContain('PRIVATE');
+ const invalid=clean({...value,count:-1,readCount:Infinity,writeCount:0.5,bytes:Number.MAX_SAFE_INTEGER+1});
+ for(const key of ['count','readCount','writeCount','bytes'])expect(invalid).not.toHaveProperty(key);
 });

@@ -24,6 +24,7 @@ export function clean(value: unknown): DiagnosticEvent {
     if (Array.isArray(v.causeCodes)) event.causeCodes = v.causeCodes.filter(code => typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code)).slice(0, 8);
     if (typeof v.rpcCode === 'number' && Number.isSafeInteger(v.rpcCode)) event.rpcCode = v.rpcCode;
     if (typeof v.durationMs === 'number' && Number.isFinite(v.durationMs)) event.durationMs = Math.max(0, Math.round(v.durationMs));
+    for(const key of ['count','readCount','writeCount','bytes'] as const)if(Number.isSafeInteger(v[key])&&v[key]!>=0)event[key]=v[key];
     if (v.series) event.series = cleanSeries(v.series, event);
     return event;
 }

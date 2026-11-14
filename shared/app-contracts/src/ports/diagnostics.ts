@@ -23,6 +23,7 @@ export interface DiagnosticEvent {
     spanId?: string;
     parentSpanId?: string;
     browserSessionId?: string;
+    count?:number;readCount?:number;writeCount?:number;bytes?:number;
     durationMs?: number;
     series?: DiagnosticSeries;
 }
