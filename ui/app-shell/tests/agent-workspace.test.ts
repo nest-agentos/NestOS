@@ -1,4 +1,5 @@
 import {SessionCommand} from '@nestos/llm-session/contracts';
+import {t} from '@nestos/common';
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
 import {MemoryBackend} from '@nestos/vfs-core';
@@ -176,6 +177,25 @@ it('keeps a newer configuration active when an earlier chat launch is resolving 
         expect(f.main.querySelector<HTMLElement>('.workbench-tabs__panel:not([hidden]) .agent-config-editor')
             ?.querySelector<HTMLInputElement>('[name="name"]')!.value).toBe(agents[1].name);
     } finally {release(); folders.mockRestore();}
+});
+
+it('shows all agents in place by clearing the shared project scope', async () => {
+    const f = await setup(), alpha = await f.runtime.projects.create('Scope Alpha'), beta = await f.runtime.projects.create('Scope Beta');
+    const [a, b] = await f.runtime.agentService.getAgents();
+    await f.backend.saveAgentProjectScope(a.id, {kind: 'selected', projectIds: [alpha.project.id]});
+    await f.backend.saveAgentProjectScope(b.id, {kind: 'selected', projectIds: [beta.project.id]});
+    const path = folderBrowserPath(alpha.path); await f.workbench.openResource(path);
+    f.sidebar.querySelector<HTMLButtonElement>('[data-sidebar-view=agents]')!.click();
+    const row = (id: string) => f.sidebar.querySelector(`[data-item-id="${id}"]`);
+    await vi.waitFor(() => expect(row(a.id)).not.toBeNull()); expect(row(b.id)).toBeNull();
+    const search = f.sidebar.querySelector<HTMLInputElement>('.workbench-agents input[type=search]')!;
+    search.value = b.name; search.dispatchEvent(new Event('input'));
+    f.sidebar.querySelector<HTMLButtonElement>(`button[aria-label="${t('agentWorkspace.showAll')}"]`)!.click();
+    await vi.waitFor(() => expect(row(b.id)).not.toBeNull());
+    expect(f.sidebar.querySelector<HTMLSelectElement>(`select[aria-label="${t('project.workspace')}"]`)!.value).toBe('/');
+    expect(f.workbench.getNavigationScope()).toBe('/'); expect(f.workbench.getActiveResourceId()).toBe(path);
+    expect(search.isConnected).toBe(true); expect(search.value).toBe(b.name); expect(f.navigate).not.toHaveBeenCalled();
+    expect(f.sidebar.querySelector<HTMLButtonElement>('[data-sidebar-view=agents]')!.getAttribute('aria-selected')).toBe('true');
 });
 
 it('keeps an opened Session selector bound to its own project when the sidebar project changes', async () => {

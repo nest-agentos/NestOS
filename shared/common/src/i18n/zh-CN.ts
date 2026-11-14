@@ -2420,6 +2420,7 @@ export const zhCN = {
     'agentWorkspace.scopeRecordInvalid': '智能体项目范围记录无效，请在项目设置中重新保存范围',
     'agentWorkspace.configuration': '配置',
     'agentWorkspace.manageAll': '管理全部智能体',
+    'agentWorkspace.showAll': '显示所有智能体',
     'agentWorkspace.scopeDenied': '此智能体不适用于当前项目，请选择其他智能体或调整项目范围',
     'agentWorkspace.allProjects': '所有项目',
     'agentWorkspace.selectedProjects': '指定项目',

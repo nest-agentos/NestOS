@@ -356,9 +356,9 @@ export class SessionWorkbench implements WorkspaceController {
             this.agentDrawer = new AgentDrawer({backend: this.backend, resourceId: options.agents.resourceId,
                 usage: options.agents.usage, rename: options.agents.rename, remove: options.agents.remove, navigate: request => this.hostContext?.navigate(request) ?? Promise.resolve(),
                 edit: id => this.hostContext?.navigate({target: 'chat', resourceId: '@agent/' + encodeURIComponent(id)}) ?? this.openAgentSettings(id),
-                filter: ids => this.filterProjectAgents(this.agentProjectId, ids),
+                filter: ids => this.agentProjectId ? this.filterProjectAgents(this.agentProjectId, ids) : Promise.resolve(ids),
                 projectId: () => this.agentProjectId,
-                manage: () => this.hostContext?.navigate({target: 'toolbox', resourceId: '/agents'}) ?? Promise.resolve(),
+                manage: async () => {this.projectNavigation?.selectScope('/');},
                 start: id => this.startAgentDraft(id)});
             this.agentDrawer.setVisible(this.navigationVisible);
             this.sidebarLayout.addDrawer('agents', t('toolbox.agents'), this.agentDrawer.element,

@@ -109,7 +109,7 @@ export class AgentDrawer {
     private manageButton(): HTMLButtonElement | undefined {
         if (!this.options.manage) return;
         const button = document.createElement('button'); button.type = 'button';
-        decorateButton(button, TOOLBOX_ICONS.agents, t('agentWorkspace.manageAll'), true);
+        decorateButton(button, TOOLBOX_ICONS.agents, t('agentWorkspace.showAll'), true);
         button.addEventListener('click', () => {void this.options.manage!().catch(error => this.report(error));}, {signal: this.abort.signal});
         return button;
     }

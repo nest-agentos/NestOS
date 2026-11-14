@@ -2419,6 +2419,7 @@ export const en: LocaleStrings = {
     'agentWorkspace.scopeRecordInvalid': 'Agent project scope is invalid. Save the scope again in project settings.',
     'agentWorkspace.configuration': 'Configuration',
     'agentWorkspace.manageAll': 'Manage all agents',
+    'agentWorkspace.showAll': 'Show all agents',
     'agentWorkspace.scopeDenied': 'This agent is unavailable in this project. Choose another agent or change its project scope.',
     'agentWorkspace.allProjects': 'All projects',
     'agentWorkspace.selectedProjects': 'Selected projects',
