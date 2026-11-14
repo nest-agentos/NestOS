@@ -1,0 +1,16 @@
+/*! Font Awesome Free 7.1.0 by Fonticons, Inc.; icons CC BY 4.0: https://fontawesome.com/license/free */
+/* Use the existing SVGs for shell icons; other icons keep the complete font fallback. */
+.fa-gear, .fa-cog { --nestos-shell-icon: url("@fortawesome/fontawesome-free/svgs/solid/gear.svg"); }
+.fa-lock { --nestos-shell-icon: url("@fortawesome/fontawesome-free/svgs/solid/lock.svg"); }
+.fa-pen-to-square, .fa-edit { --nestos-shell-icon: url("@fortawesome/fontawesome-free/svgs/solid/pen-to-square.svg"); }
+.fa-envelope { --nestos-shell-icon: url("@fortawesome/fontawesome-free/svgs/solid/envelope.svg"); }
+.fa-ellipsis, .fa-ellipsis-h { --nestos-shell-icon: url("@fortawesome/fontawesome-free/svgs/solid/ellipsis.svg"); }
+.fa-circle-user, .fa-user-circle { --nestos-shell-icon: url("@fortawesome/fontawesome-free/svgs/solid/circle-user.svg"); }
+.fa-comment-dots, .fa-commenting { --nestos-shell-icon: url("@fortawesome/fontawesome-free/svgs/solid/comment-dots.svg"); }
+.fa-toolbox { --nestos-shell-icon: url("@fortawesome/fontawesome-free/svgs/solid/toolbox.svg"); }
+:is(.fa, .fas, .fa-solid):is(.fa-gear, .fa-cog, .fa-lock, .fa-pen-to-square, .fa-edit, .fa-envelope, .fa-ellipsis, .fa-ellipsis-h, .fa-circle-user, .fa-user-circle, .fa-comment-dots, .fa-commenting, .fa-toolbox) { font-family: inherit; }
+:is(.fa, .fas, .fa-solid):is(.fa-gear, .fa-cog, .fa-lock, .fa-pen-to-square, .fa-edit, .fa-envelope, .fa-ellipsis, .fa-ellipsis-h, .fa-circle-user, .fa-user-circle, .fa-comment-dots, .fa-commenting, .fa-toolbox)::before {
+    content: ""; display: inline-block; width: 1em; height: 1em; background-color: currentColor;
+    -webkit-mask: var(--nestos-shell-icon) center / contain no-repeat;
+    mask: var(--nestos-shell-icon) center / contain no-repeat;
+}
