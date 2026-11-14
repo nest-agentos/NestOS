@@ -42,7 +42,8 @@ export class RpcPeer {
     private readonly eventCallbacks = new Set<string>();
     private readonly notificationTails = new Map<string, Promise<unknown>>();
     private readonly cleanupFunctions = new WeakSet<object>();
-    private readonly callbackUses = new Map<string, { active: number; persistent: number }>();
+    private readonly callbackUses = new Map<string, { active: number; persistent: number; subscribed: boolean }>();
+    private readonly retiredSubscriptions = new CapabilityRetirements();
     private readonly emitted = new Map<string, Descriptor>();
     private readonly dirty = new Set<string>();
     private readonly domains = new Set<ViewDomain>();
@@ -524,8 +525,8 @@ export class RpcPeer {
     private acquireCallbacks(values: WireValue[], persistent: boolean): Set<string> {
         const callbacks = this.argumentCallbacks(values);
         for (const key of callbacks) {
-            const use = this.callbackUses.get(key) ?? { active: 0, persistent: 0 };
-            use.active++; if (persistent) use.persistent++;
+            const use = this.callbackUses.get(key) ?? { active: 0, persistent: 0, subscribed: false };
+            use.active++; if (persistent) {use.persistent++; use.subscribed = true;}
             this.callbackUses.set(key, use);
         }
         return callbacks;
@@ -534,6 +535,7 @@ export class RpcPeer {
         const use = this.callbackUses.get(key); if (!use) return;
         if (active) use.active--; if (persistent) use.persistent--;
         if (!use.active && !use.persistent) {
+            if (use.subscribed) this.retiredSubscriptions.add(key);
             const handle = this.handles.get(key); if (handle) this.ids.delete(handle.value);
             this.lifetime.release(key); this.retired.add(key); this.localRetirements.add(key);
             this.handles.delete(key); this.callbackUses.delete(key); this.eventCallbacks.delete(key); this.dirty.delete(key);
@@ -554,6 +556,7 @@ export class RpcPeer {
         this.operations++;
         try {
             this.applyReleased(call.released);
+            if (call.notification && call.method === 'call' && this.retiredSubscriptions.has(call.target)) return {value: null};
             const handle = this.publicHandle(call);
             if (handle.schema.methods[call.method] === 'refresh') this.dirty.add(call.target);
             if (!this.query(call) && !subscriptionMode(handle.schema.methods[call.method]) && handle.schema.methods[call.method] !== 'iterator') {
@@ -655,7 +658,7 @@ export class RpcPeer {
         this.closed = true;
         for (const ready of this.updateWaiters) ready();
         await Promise.allSettled([...this.releases].map(release => release()));
-        this.releases.clear(); this.pendingBindings.clear(); this.subscriptionReleases.clear(); this.observerReleases.clear(); this.lifetime.clear(); this.retired.clear(); this.localRetirements.clear(); this.remoteRetirements.clear(); this.handles.clear(); this.remote.clear();
+        this.releases.clear(); this.pendingBindings.clear(); this.subscriptionReleases.clear(); this.observerReleases.clear(); this.lifetime.clear(); this.retired.clear(); this.retiredSubscriptions.clear(); this.localRetirements.clear(); this.remoteRetirements.clear(); this.handles.clear(); this.remote.clear();
         this.remoteCleanups.clear(); this.pendingUnsubscriptions.clear(); this.descriptors.clear(); this.emitted.clear(); this.dirty.clear(); this.pendingPatches.clear(); this.domains.clear();
         this.callbackUses.clear(); this.listeners.clear(); this.eventCallbacks.clear(); this.notificationTails.clear(); this.projectionsLoaded.clear(); this.lookupArgs.clear();
     }

@@ -34,3 +34,20 @@ it('bounds missing bases and rejects oversized or foreign pending patches withou
         expect(() => client.applyUpdates([{$patch: {...patch.$patch, id: 'server:large:1', changes: [{path: ['fields', 'data'], value: 'x'.repeat(2 * 1024 * 1024)}]}}])).toThrow('Pending view updates exceed byte limit');
     } finally {await client.close(); vi.useRealTimers();}
 });
+it('drops queued notifications only for formally closed subscription callbacks', async () => {
+    let client!: RpcPeer; const packets: any[] = [], listeners = new Set<(event: unknown) => void>();
+    const source = {getChildren: async () => [], getNode: async () => null, writeContent: async () => {}, search: async () => [],
+        onAny: (listener: (event: unknown) => void) => {listeners.add(listener); return () => listeners.delete(listener);}};
+    const server = new RpcPeer('server', async call => {packets.push(call); return {};});
+    client = new RpcPeer('client', call => server.handle(call), undefined, installViewProjections);
+    try {
+        const boot = await server.bootstrap(source); client.applyUpdates(boot.updates); const root = client.decode(boot.value!), received = vi.fn();
+        const stop = root.onAny(received); await vi.waitFor(() => expect(listeners.size).toBe(2));
+        for (const listener of listeners) listener({type: 'updated', path: '/'});
+        await vi.waitFor(() => expect(packets).toHaveLength(1));
+        stop(); await client.whenIdle();
+        expect((await client.handle(packets[0])).error).toBeUndefined(); expect(received).not.toHaveBeenCalled();
+        expect((await client.handle({...packets[0], notification: false})).error?.remoteCode).toBe('RPC_CAPABILITY_RETIRED');
+        expect((await client.handle({...packets[0], target: 'client:unknown:999'})).error?.remoteCode).toBe('RPC_CAPABILITY_NOT_FOUND');
+    } finally {await Promise.all([client.close(), server.close()]);}
+});
