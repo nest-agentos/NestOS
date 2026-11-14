@@ -98,3 +98,5 @@ ioctl 复用 VFS operation 事件，记录 operationId、固定 command、record
 固定 1200 行、每行 4096 字节冷内容、每页 20 行的宿主存储基准：Node SQLite 的 SQL 读取结果序列化大小从 5,133,305 B 降至 1,796 B，中位耗时从约 14.94 ms 降至 0.40 ms；查询计划命中覆盖索引。SQL 读取语句由 3 增至 4，增加的是 schema 读取，未宣称 SQL 次数降低。两种路径返回同样的页面 DTO；这不是网络或整页同比提速，已有页面未因此自动改用新查询。详见[基准与条件](fixtures/seq-rows-20261114.json)。
 
 按键批量读取继续使用 getEntries/getEntriesMany，按列过滤和排序的历史查询使用 query。相关现状：[Kanban 存储](kanban-coordination.md)、[VFS 读取成本](vfs-sidecar-read-cost.md)。
+
+发布版本 `20261114T103400-b1d47357-dirty` 已通过证书健康检查。手机模拟（390×844、CPU 4×、100 ms 延迟、200 KB/s、全新浏览器上下文）决策页 11 行：4.02 s、6 次逻辑调用、6 个 HTTP 请求，无浏览器错误，与上一版基本持平；原有会话只读打开 1.05 s、2 个请求。该页面仍使用已有精确键和前缀索引，不能用新结构化查询基准推断整页提速。验收作用域完成清理后才记录结果。

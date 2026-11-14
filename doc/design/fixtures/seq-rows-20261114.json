@@ -405,5 +405,58 @@
       },
       "metadataReadsAfter": 0
     }
+  },
+  "releaseAcceptance": {
+    "version": "20261114T103400-b1d47357-dirty",
+    "health": "Authenticated GET /api/health returned ready=true and this version",
+    "decisionPage": {
+      "conditions": {
+        "viewport": "390x844",
+        "cpuThrottle": 4,
+        "latencyMs": 100,
+        "downloadBytesPerSecond": 200000,
+        "uploadBytesPerSecond": 100000,
+        "cache": "Fresh browser context; first authenticated user request after process restart; normal uncontrolled host background load",
+        "dataScale": {
+          "decisionRows": 11
+        }
+      },
+      "before": {
+        "durationMs": 4020.239,
+        "logicalCalls": 6,
+        "httpRequests": 6,
+        "fixture": "early-bootstrap-20261114.json"
+      },
+      "current": {
+        "durationMs": 4021.9556549999998,
+        "logicalCalls": 6,
+        "httpRequests": 6,
+        "errors": []
+      },
+      "layout": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "tableWidth": 368,
+        "statusBounds": {
+          "left": 23,
+          "right": 367
+        },
+        "sessionBounds": {
+          "left": 23,
+          "right": 367
+        }
+      }
+    },
+    "originalConversation": {
+      "durationMs": 1049.5072349999998,
+      "httpRequests": 2,
+      "methods": [
+        "openConversationWorkbench",
+        "assistantOverview"
+      ],
+      "errors": [],
+      "writes": "No message, approval or acceptance submitted"
+    },
+    "temporaryProcessCleanup": "confirmed by bounded scopes before their result was returned"
   }
 }
