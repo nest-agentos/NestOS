@@ -1,5 +1,5 @@
 {
-  "status": "prepared; npm second-factor authentication pending",
+  "status": "All 17 npm publish operations accepted; public registry distribution pending",
   "packages": [
     {
       "name": "@nestos/ui-common",
@@ -103,8 +103,154 @@
         "FSError identity across subpaths",
         "Memory structured ioctl and bounded key pages",
         "Node SQLite typed projection and key index"
-      ]
+      ],
+      "registryCoreVersion": "0.5.2"
     },
     "temporaryProcessCleanup": "confirmed"
+  },
+  "publication": {
+    "result": "accepted",
+    "packageCount": 17,
+    "nestosExitCode": 0,
+    "librariesExitCode": 0,
+    "note": "npm returned processing notices. Public visibility and downloads are verified separately; do not retry publishing these versions."
+  },
+  "registryVerification": {
+    "checkedAt": "2026-11-14T11:27:10.017Z",
+    "packages": [
+      {
+        "name": "@nestos/cells-driver",
+        "version": "0.5.2",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "b94b1491498a85ad02b9155e68dcac77b9286e5d9350edb5cbdeee763969003e"
+      },
+      {
+        "name": "@nestos/device-tty",
+        "version": "0.5.2",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "91b0a9d635637c93796f9e42cb4de5c01435e4e093dd8964ec839619ba046d76"
+      },
+      {
+        "name": "@nestos/driver-llm",
+        "version": "0.5.2",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "8cdec943a5129a9f94ec915a0c49f1371c0801ba3369d795875e5cda340205f4"
+      },
+      {
+        "name": "@nestos/durable-kernel",
+        "version": "0.5.2",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "885ed8028b92564382024d0698f2c260e14ff89f2d1e8f5308fde7f5fde4b5ca"
+      },
+      {
+        "name": "@nestos/image-parser",
+        "version": "0.5.2",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "e3571b5b91e75d70d6d3ac16327458b869089d85f49129571737ab76bbb816c3"
+      },
+      {
+        "name": "@nestos/kanban",
+        "version": "0.5.4",
+        "status": "pending",
+        "metadataStatus": 200,
+        "tarballStatus": 404
+      },
+      {
+        "name": "@nestos/kanban-ui",
+        "version": "0.5.4",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "9a9db14d4956163940ab0b13e523e727cda9f1b5de064295a0a1b057c9875460"
+      },
+      {
+        "name": "@nestos/llm-ui",
+        "version": "0.5.1",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "4b4dc9348da2142c93f2cbe5c611a641663c6132f33e38800b3b48efc294db0c"
+      },
+      {
+        "name": "@nestos/mail",
+        "version": "0.5.1",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "410c3e0ea5575f600fc79d2492004294b78e68233acac48d87ad8a9c62ec2115"
+      },
+      {
+        "name": "@nestos/mdxeditor",
+        "version": "0.5.2",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "28f52dbad1d39d1cf335cdd69c87a57af97ce71982835e5f78d94ec1731c21fa"
+      },
+      {
+        "name": "@nestos/ui-common",
+        "version": "0.5.2",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "3b10e36b24de2a6f43ecf858e5a3fbc2fa4c1faaae4cc36b04d963884701a28f"
+      },
+      {
+        "name": "@nestos/vfs-core",
+        "version": "0.5.2",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "f6c9a5f54c9620b3029790a027585128c70bc8b3f83033756197616afd9cf98e"
+      },
+      {
+        "name": "@nestos/vfs-sync",
+        "version": "0.5.2",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "de091de8cdf05c3c9b88915cfa8c16274c93d0fa83d66947077ce902601b4c25"
+      },
+      {
+        "name": "@nestos/vfs-ui",
+        "version": "0.5.1",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "1719eecabc22770fe305574ef724849f224c5011226d759e5a13bb56fdc55a0f"
+      },
+      {
+        "name": "@nestos/vfsdriver-indexeddb",
+        "version": "0.5.1",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "038bbfc36300c37da450abc41a58d38b5c7b35f8dde41a00391578a3e0af8918"
+      },
+      {
+        "name": "@nestos/vfsdriver-local",
+        "version": "0.5.1",
+        "status": "verified",
+        "metadataStatus": 200,
+        "tarballStatus": 200,
+        "sha256": "f815cce4d202455d67aa5dc9cec5b78803ca6c5539eb90f9650a5b5c56766d10"
+      },
+      {
+        "name": "nestos",
+        "version": "0.5.3",
+        "status": "pending",
+        "metadataStatus": 404
+      }
+    ]
   }
 }
