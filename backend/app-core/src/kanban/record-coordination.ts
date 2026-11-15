@@ -10,8 +10,8 @@ export function recordCoordination(options:DecisionConversationOptions) {
         const record=await options.service.record(boardId,request.recordId);
         requireValue(record.kind==='decision'&&record.status!=='draft'&&!record.deletedAt,'DECISION_NOT_CONFIRMED');
         const client=options.client(),targets=new Map<string,{boardId:string;itemId:string}>();
-        for(const itemId of record.itemIds){const {item}=await client.item(boardId,itemId);if(item.purpose==='planning'||item.planning?.execution==='children')targets.set(JSON.stringify([boardId,itemId]),{boardId,itemId});}
-        for(const run of await client.recordExecutions?.(boardId,record.id)??[])if(run.rootItemId)targets.set(JSON.stringify([run.boardId,run.rootItemId]),{boardId:run.boardId,itemId:run.rootItemId});
+        for(const itemId of record.itemIds){const {item,archive}=await client.item(boardId,itemId);if(archive||item.deletedAt||item.status==='cancelled')continue;if(item.purpose==='planning'||item.planning?.execution==='children')targets.set(JSON.stringify([boardId,itemId]),{boardId,itemId});}
+        for(const run of await client.recordExecutions?.(boardId,record.id)??[])if(run.rootItemId&&run.archivedAt===undefined&&run.state!=='cancelled')targets.set(JSON.stringify([run.boardId,run.rootItemId]),{boardId:run.boardId,itemId:run.rootItemId});
         requireValue(targets.size===1,targets.size?'MANAGEMENT_SESSION_SELECTION_REQUIRED':'MANAGEMENT_SESSION_NOT_READY');
         const target=[...targets.values()][0],session=await client.planningSession?.(target.boardId,target.itemId);
         requireValue(session?.resourceId&&session.sessionId,'MANAGEMENT_SESSION_NOT_READY');

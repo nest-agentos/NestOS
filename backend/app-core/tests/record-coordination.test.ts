@@ -169,3 +169,14 @@ it('answers the current phase channel while retaining the logical management and
  await conversations.scan();await vi.waitFor(()=>expect(subscribeChannel).toHaveBeenLastCalledWith('coordinate-new',expect.any(Function)));
  expect(stop).toHaveBeenCalledOnce();expect(enqueue).toHaveBeenCalledOnce();
 });
+
+it('ignores cancelled and archived historical management runs when resolving the current Session',async()=>{
+ const f=await fixture();await f.command({type:'create-item',item:{id:'historical',taskType:'coordination',title:'Previous',responsibility:'Previous',acceptance:'Checked'}});
+ await f.command({type:'link-record',recordId:'decision',itemId:'historical'});
+ const planningSession=vi.fn(async()=>({analysisId:'current',sessionId:'native',resourceId:'/native/current',state:'completed'}));
+ const client={...f.service,item:async(board:string,id:string)=>{const value=await f.service.item(board,id);return id==='historical'?{...value,archive:{at:1},item:{...value.item,status:'cancelled'}}:value;},planningSession,
+  recordExecutions:async()=>[{id:'old',boardId:'b',rootItemId:'historical',state:'cancelled',archivedAt:1},{id:'new',boardId:'b',rootItemId:'group',state:'running'}]};
+ f.options.client=()=>client;
+ expect(await recordCoordination(f.options)('b',{recordId:'decision',operationId:'resolve'})).toMatchObject({sessionId:'native'});
+ expect(planningSession).toHaveBeenCalledExactlyOnceWith('b','group');
+});
