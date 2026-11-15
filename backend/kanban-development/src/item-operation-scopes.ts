@@ -1,3 +1,5 @@
+import {cleanupReviewStatus} from './cleanup-review';
+import {reviewCleanupKey,type ReviewCleanup} from '@nestos/kanban/integration';
 import {developmentDeliveryPolicy} from './development-operation-policy';
 import {sha256HexSync,t} from '@nestos/common';
 import {safeCode} from '@nestos/kanban/integration';
@@ -41,7 +43,7 @@ export async function scopedFinalizationStatus(options:ReviewOperationsOptions,b
     const route=await options.scopes?.describe(board,item);
     if(!route?.scopes?.length)return automaticDeliveryStatus(options.journal,board,item,undefined,developmentDeliveryPolicy.steps);
     const statuses=await Promise.all(route.scopes.map(async scope=>scope.completed?{state:'completed' as const,stage:'completed'}:
-        await automaticDeliveryStatus(options.journal,board,item,scope.id,developmentDeliveryPolicy.steps)??{state:'running' as const,stage:scope.ready===false?'waiting-dependency':'analyze'}));
+        cleanupReviewStatus(await options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item,scope.id)))??await automaticDeliveryStatus(options.journal,board,item,scope.id,developmentDeliveryPolicy.steps)??{state:'running' as const,stage:scope.ready===false?'waiting-dependency':'analyze'}));
     return statuses.find(row=>row.state==='blocked')??statuses.find(row=>row.state==='waiting-confirmation')
         ??statuses.find(row=>row.state==='running')??{state:'completed',stage:'completed'};
 }

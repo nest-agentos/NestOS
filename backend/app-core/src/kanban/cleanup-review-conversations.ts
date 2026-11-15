@@ -10,7 +10,7 @@ const savedKey=(id:string)=>'software-cleanup-review:'+id;
 /** The native durable queue owns submission and recovery; these records only freeze authority and receipts. */
 export async function requestManagementCleanup(options:DecisionConversationOptions,input:CleanupReviewInput,selected?:string[]):Promise<Saved> {
  const started=Date.now(),id=cleanupReviewId(input),saved=await options.journal.get<Saved>(savedKey(id));
- const review=saved??await freeze(options,id,input,selected);
+ const review=saved??await freezeReview(options,id,input,selected);
  if(await options.journal.get('software-cleanup-submitted:'+id))return review;
  try {
  const port=await options.remote.projectConversation(review.projectId,review.profileId,review.sessionId);
@@ -96,4 +96,13 @@ export async function completeManagementCleanup(options:DecisionConversationOpti
  await client.runItemOperation!(input.boardId,{itemId:input.itemId,scopeId:input.scopeId,pluginId:root.pluginId,operationId:'finish-'+saved.id,action:'cleanup',expectedRevision:view.revision});
  const status=await options.journal.get<ReviewCleanup>(reviewCleanupKey(input.boardId,input.itemId,input.scopeId));
  return {state:status?.state==='succeeded'?'completed':status?.state==='failed'?'blocked':'pending',code:status?.code,resources:saved.resources.map(row=>row.id)};
+}
+
+async function freezeReview(options:DecisionConversationOptions,id:string,input:CleanupReviewInput,selected?:string[]):Promise<Saved>{
+ try{return await freeze(options,id,input,selected);}
+ catch(error){
+  const code=safeCode(error,'CLEANUP_REVIEW_UNAVAILABLE');
+  if(['CLEANUP_REVIEW_SCOPE_INVALID','CLEANUP_REVIEW_SESSION_CHANGED','CLEANUP_REVIEW_RESOURCE_INVALID','MANAGEMENT_SESSION_NOT_READY'].includes(code))throw Object.assign(Error(code),{code,cleanupReviewUnavailable:true});
+  throw error;
+ }
 }

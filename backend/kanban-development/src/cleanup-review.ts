@@ -9,3 +9,8 @@ export async function finishCleanupReview(journal:KanbanAutomationJournal,input:
  const key=reviewCleanupKey(input.boardId,input.itemId,input.scopeId);
  await journal.update<ReviewCleanup>(key,old=>{if(!old||![old.operationId,old.reviewOperationId].includes(input.operationId)||old.runId!==input.runId)throw Object.assign(Error('Cleanup review changed'),{code:'CLEANUP_REVIEW_CHANGED'});return {...old,reviewState:'reviewed',state:'running',code:undefined};});
 }
+
+export function cleanupReviewStatus(cleanup:ReviewCleanup|undefined):import('@nestos/kanban/contracts').KanbanItemOperations['automatic'] {
+ if(!cleanup?.reviewState||cleanup.state==='succeeded')return;
+ return {state:cleanup.state==='failed'?'blocked':'running',stage:'cleanup',code:cleanup.code};
+}

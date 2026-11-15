@@ -1,3 +1,4 @@
+import {cleanupReviewStatus} from './cleanup-review';
 import {operationRuntimeVersion} from './item-operation-runtime';
 import {developmentAnalysisPolicy,developmentAuthority} from './development-operation-policy';
 import {developmentDeliveryPolicy,releasableDevelopmentTarget} from './development-operation-policy';
@@ -100,7 +101,7 @@ async function load(options: ReviewOperationsOptions, board: string, item: strin
 function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision,context.cleanup,context.deliveryPlan,context.cancellations, context.jobs.map(job => [job.id, job.phase, job.state, job.code,job.result,job.followUp?.state,job.followUp?.code])]));}
 async function view(options: ReviewOperationsOptions, context: Context): Promise<KanbanItemOperations> {
     if (context.archived || options.adapter.supports?.(context.board, context.item) === false) return {revision: revision(context), operations: []};
-    const active = context.jobs.some(job => job.phase !== 'settled')||context.cancellations.some(pendingCancellation), supported = options.adapter.ready?.(context.board,context.item)??['review', 'completed'].includes(context.item.status);
+    const active = context.cleanup?.reviewState==='pending'||context.jobs.some(job => job.phase !== 'settled')||context.cancellations.some(pendingCancellation), supported = options.adapter.ready?.(context.board,context.item)??['review', 'completed'].includes(context.item.status);
     const activeWaivers=await currentWaivers(options,context);
     const related=await options.adapter.relatedSession?.(context.board,context.item),sessionResources=new Map<string,Promise<string|undefined>>();
     const raw = await Promise.all(actions.map(async action => {
@@ -123,7 +124,7 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     });
     const halted=operationHalt(context,activeWaivers);
     const audit={...(context.settings.invalidatedAnalysis?{code:context.settings.invalidatedAnalysis.code}:{}),...(halted?{halted:{runId:halted.runId,state:halted.state==='cancelled'?'cancelled' as const:'cancelling' as const}}:{}),waivers:activeWaivers,waiverHistory:context.item.operationWaivers,acceptance:context.item.acceptanceResult,skippedActions:[...new Set(activeWaivers.flatMap(row=>row.operations.map(op=>op.id)))].filter(id=>{const entry=operations.find(row=>row.id===id);return entry?entry.state==='skipped':!active;})};
-    const automatic=await automaticDeliveryStatus(options.journal,context.board.id,context.item.id,options.scopeId,developmentDeliveryPolicy.steps);
+    const automatic=cleanupReviewStatus(context.cleanup)??await automaticDeliveryStatus(options.journal,context.board.id,context.item.id,options.scopeId,developmentDeliveryPolicy.steps);
     if(options.adapter.prepareOperation)return {revision:revision(context),operations,automatic,...audit};
     const catalog = await options.catalog(), flows = catalog.entries.filter(entry => entry.target.kind === 'flow' && entry.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'));
     return {revision: revision(context),operations,automatic,...audit,targets: automationCatalog({...catalog, entries: flows}).targets};
@@ -192,7 +193,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     if (prior && context.settings.jobs.includes(prior.id)) {requireValue(prior.fingerprint === sha256HexSync(JSON.stringify(request)), 'IDEMPOTENCY_CONFLICT'); return view(options, context);}
     requireValue(request.expectedRevision === revision(context), 'OPERATION_STALE_REFRESH');
     const waivers=await currentWaivers(options,context);
-    const entry = operation(context, request.action as ReviewAction, context.jobs.some(job => job.phase !== 'settled'), options.adapter.supports?.(context.board, context.item) !== false && (options.adapter.ready?.(context.board,context.item)??['review', 'completed'].includes(context.item.status)), !!options.adapter.prepareOperation,waivers);
+    const entry = operation(context, request.action as ReviewAction, context.cleanup?.reviewState==='pending'||context.jobs.some(job => job.phase !== 'settled'), options.adapter.supports?.(context.board, context.item) !== false && (options.adapter.ready?.(context.board,context.item)??['review', 'completed'].includes(context.item.status)), !!options.adapter.prepareOperation,waivers);
     requireValue(!waivers.some(row=>row.operations.some(op=>op.id===request.action)),'OPERATION_SKIPPED');
     requireValue(entry.enabled, 'OPERATION_PREREQUISITE_REQUIRED');
     await requireOperationAuthority({...options,...developmentAuthority},context,request,origin);

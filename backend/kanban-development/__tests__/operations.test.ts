@@ -755,3 +755,17 @@ it('verifies a task target runtime instead of confusing it with the board host v
  expect((await f.api.itemOperations('board','task')).operations.find(op=>op.id==='deploy')).toMatchObject({state:'succeeded'});
  expect((await f.api.itemOperations('board','task')).operations.find(op=>op.id==='accept')).toMatchObject({state:'succeeded'});
 });
+
+it('projects reopened cleanup review ahead of historical completion and blocks unrelated delivery operations',async()=>{
+ const {reviewCleanupKey}=await import('@nestos/kanban/integration');
+ const f=await fixture();await f.acceptRuntime();
+ await f.journal.update(reviewCleanupKey('board','task'),()=>({runId:'merge',operationId:'review',attempt:1,state:'running',reviewState:'pending'}));
+ const view=await f.api.itemOperations('board','task');
+ expect(view.automatic).toMatchObject({state:'running',stage:'cleanup'});
+ expect(view.operations.find(row=>row.id==='build')?.enabled).toBe(false);
+ await expect(f.run('build','unrelated-rebuild')).rejects.toMatchObject({code:'OPERATION_PREREQUISITE_REQUIRED'});
+ const scopes=[{id:'repository',label:'Repository',contributors:[],completed:false}];
+ f.options.scopes={describe:async()=>({scopes}),resolve:async()=>({})};
+ await f.journal.update(reviewCleanupKey('board','task','repository'),()=>({runId:'merge',operationId:'review',attempt:1,state:'failed',reviewState:'reviewed',code:'WORKTREE_DIRTY'}));
+ expect(await f.api.finalizationStatus('board','task')).toMatchObject({state:'blocked',stage:'cleanup',code:'WORKTREE_DIRTY'});
+});
