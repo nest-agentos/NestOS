@@ -72,3 +72,36 @@ it('suspends metadata interests while hidden and releases each registration once
     await view.setVisible(true); expect(subscribe).toHaveBeenCalledTimes(2);
     await view.dispose(); expect(released).toHaveBeenCalledTimes(2);
 });
+
+it('opens files through one owned observation without preparing a conversation or chat controls', async () => {
+    const f = fixture(), chatFactory = vi.fn(async () => ({configuration: {subscribe: vi.fn(() => () => {}), dispose: vi.fn(async () => {})}}));
+    const view = await new ConversationWorkbench(f.services, chatFactory as any).initialize(f.backend, {resourceId: '/folder:P/@files/note.md', documents: ['layout']});
+    expect(f.backend.workbenchView).toHaveBeenCalledWith(expect.objectContaining({chatControls: false, initialNavigation: false}));
+    expect(f.projects.remoteMounts.projectConversation).not.toHaveBeenCalled(); expect(chatFactory).not.toHaveBeenCalled();
+    await view.readNavigation({projectId: null});
+    expect(f.browser.readDirectory).toHaveBeenCalledWith('/folder:P', expect.objectContaining({includeAncestors: true}));
+    const [one, two] = await Promise.all([view.prepareChat(), view.prepareChat()]);
+    expect(one).toBe(two); expect(chatFactory).toHaveBeenCalledOnce();
+    await view.dispose(); expect(one.configuration!.dispose).toHaveBeenCalledOnce();
+});
+it('closes late lazy chat preparation and never publishes it into a disposed workbench', async () => {
+    const f = fixture(), dispose = vi.fn(async () => {}); let finish!: () => void;
+    const chatFactory = vi.fn(() => new Promise<any>(resolve => {finish = () => resolve({configuration: {dispose}});}));
+    const view = await new ConversationWorkbench(f.services, chatFactory).initialize(f.backend, {resourceId: '/folder:P/@files/note.md', documents: []});
+    const opening = view.prepareChat(); await view.dispose(); finish();
+    await expect(opening).rejects.toMatchObject({code: 'EIO'}); expect(dispose).toHaveBeenCalledOnce(); expect(view.workbench.chat).toBeUndefined();
+});
+it('releases observations and the prepared browser when document loading fails', async () => {
+    const f = fixture(); vi.mocked(f.backend.readUiDocuments).mockRejectedValueOnce(new FSError('EACCES', 'Denied'));
+    await expect(new ConversationWorkbench(f.services).initialize(f.backend, {resourceId: '/folder:P/@files/note.md', documents: ['layout']})).rejects.toMatchObject({code: 'EACCES'});
+    expect(f.browser.dispose).toHaveBeenCalledOnce(); expect(f.stop).toHaveBeenCalled(); expect(f.projects.remoteMounts.projectConversation).not.toHaveBeenCalled();
+});
+it('shares the cold file view observation instead of attaching a second set of domain sources', async () => {
+    const {openView} = await import('../../src/host/open-view');
+    const f = fixture(), resourceId = '/folder:P/@files/note.md';
+    const opening = await openView(f.services, f.backend, {resourceId, documents: [], workbench: {initialNavigation: false}},
+        request => new ConversationWorkbench(f.services).initialize(f.backend, request));
+    expect(opening.conversationWorkbench?.native).toBeUndefined(); expect(opening.workbench.chat).toBeUndefined();
+    expect(opening.observation.getViewCursor()).toBe(opening.conversationWorkbench?.cursor);
+    await opening.dispose(); expect(f.stop).toHaveBeenCalledTimes(10); expect(f.browser.dispose).toHaveBeenCalledOnce();
+});

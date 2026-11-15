@@ -431,7 +431,9 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             };
             const target = initialResource && resolveBrowserTarget(initialResource);
             const initialOpening = opened?.conversationWorkbench;
-            const opening = initialOpening && (initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === initialResource ? initialOpening
+            const opening = initialOpening && (initialOpening.resourceId ?? initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === initialResource ? initialOpening
+                : target && backend.openWorkbench
+                ? await backend.openWorkbench({resourceId: initialResource!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore'})
                 : target && target.kind === 'remote' && target.nativeSessionId && backend.openConversationWorkbench
                 ? await backend.openConversationWorkbench({resourceId: initialResource!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore'}) : undefined;
             if (opening) uiDocs.seed(opening.documents);

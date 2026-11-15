@@ -12,7 +12,7 @@ export interface PreparedConversation {
     commands?: Awaited<ReturnType<NonNullable<ProjectConversationPort['commands']>>>;
     issues: Partial<Record<'models' | 'commands' | 'metrics', string>>;
 }
-export interface ConversationWorkbenchRequest {
+export interface WorkbenchOpenRequest {
     resourceId: string;
     documents: string[];
     displayedFilesPolicy?: 'gitignore' | 'all';
@@ -26,7 +26,8 @@ export interface WorkbenchNavigationView extends SessionDirectoryView {
     statuses: Record<string, readonly import('@nestos/cells-driver/harness').HarnessStatusRow[]>;
 }
 /** Application composition owns observation and resources; command ports stay independent. */
-export interface ConversationWorkbenchView {
+export interface ResourceWorkbenchView {
+    resourceId: string;
     documents: Record<string, unknown>;
     workbench: WorkbenchView;
     native?: PreparedConversation;
@@ -34,8 +35,13 @@ export interface ConversationWorkbenchView {
     eventSnapshot(): {cursor: number; firstSequence: number; events: ApplicationViewEvent[]};
     subscribe(listener: (event: ApplicationViewEvent) => void, failed?: (failure: {code: string}) => void): Promise<() => void>;
     cursor: number;
+    prepareChat(): Promise<NonNullable<WorkbenchView['chat']>>;
     openConversation(resourceId: string): Promise<PreparedConversation>;
     readNavigation(request: WorkbenchNavigationRequest): Promise<WorkbenchNavigationView>;
     setVisible(visible: boolean): Promise<void>;
     dispose(): Promise<void>;
 }
+
+/** Compatibility names for existing conversation callers. */
+export type ConversationWorkbenchRequest = WorkbenchOpenRequest;
+export type ConversationWorkbenchView = ResourceWorkbenchView;

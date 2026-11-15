@@ -395,7 +395,16 @@ export class SessionWorkbench implements WorkspaceController {
         this.initialSession = view.initialSession;
         this.initialData = view.initialData;
         this.chatConfiguration = view.chat?.configuration;
-        if (this.createFactory) this.factory = this.createFactory(view.chat!);
+        if (this.createFactory) {
+            let factory: Promise<EditorFactory> | undefined;
+            this.factory = view.chat ? this.createFactory(view.chat) : async (...args) => {
+                const ready = await (factory ??= this.opening!.prepareChat().then(chat => {
+                    this.sessionSkills ??= chat.sessionSkills;
+                    return this.createFactory!(chat);
+                }).catch(error => {factory = undefined; throw error;}));
+                return ready(...args);
+            };
+        }
         this.sessionSkills ??= view.chat?.sessionSkills;
         this.remoteStatus = new RemoteSessionStatusView(harnessObservation, this.projects, () => this.sidebarUI?.refreshList(),
             (id, icon, tooltip) => this.tabs.setStatus(id, icon, tooltip),
@@ -582,7 +591,7 @@ export class SessionWorkbench implements WorkspaceController {
             void this.promoteDraftTab(event).catch(error => this.report(error));
         }));
         this.startNavigation = async () => {
-            const prepared=await this.prepareNativeNavigation();
+            const prepared=await this.prepareResourceNavigation();
             if(this.closed)return;
             await traceBoot('sessionWorkbench.sidebar', () => this.sidebarUI!.start());
             if (this.closed) return;
@@ -1595,11 +1604,11 @@ export class SessionWorkbench implements WorkspaceController {
             ? snapshot.projects.find(item => item.project.id === this.projectNavigation?.currentProject()?.project.id) : view?.project ?? undefined);
         return {...snapshot, project, loadPaths: project ? [projectConversationsPath(project.path, {recent: true})] : []};
     }
-    private async prepareNativeNavigation():Promise<ProjectNavigationView|undefined>{
+    private async prepareResourceNavigation():Promise<ProjectNavigationView|undefined>{
         const path=this.pendingNavigation?.path??this.active??this.initialResource;
         if(!path||!path.startsWith('/')||!this.browser?.readDirectory||!this.projects)return;
         const target=resolveBrowserTarget(path);
-        if(target.kind!=='remote'||!target.nativeSessionId)return;
+        if(target.kind!=='project-files'&&(target.kind!=='remote'||!target.nativeSessionId))return;
         const started=performance.now(),operationId=randomUUID(),revision=this.navigationFiles!.revision;
         try{
             const projectId=this.projectNavigation?.currentProject()?.project.id??null;

@@ -44,7 +44,7 @@ import { openSessionView } from './session-view';
 import { observeConnections } from './connection-observation';
 import { readUiDocuments, writeUiDocuments } from './ui-documents';
 import { ViewScope } from './view-scope';
-import {ConversationWorkbench} from './conversation-workbench';
+import {ResourceWorkbench} from './conversation-workbench';
 import { taskDetails, taskEvents, sessionTasks } from './task-view';
 import { createSessionDraft } from '../session/create-session-draft';
 import { createChatConfigurationView } from '../configuration/chat-configuration';
@@ -67,6 +67,19 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
     const { vfs, agentService, sessionRepository: repository, projects, kernel, commandBus } = services;
     const lifecycle = () => new SessionLifecycleService({ repository, kernel: kernel.kernel });
     const textGeneration = scope.own(createTextGeneration(services));
+    const prepareChat = async (owned?: ViewScope) => ({
+        privilegedCommands: new PrivilegedCommandService(kernel.kernel, agentService,
+            {sessions: kernel.sessions, mcpServers: () => agentService.getMCPServers(), prepareSession: services.prepareSession?.bind(services)}),
+        sessionSkills: createSessionSkillControls(kernel.kernel, kernel.sessions),
+        configuration: options.preload ? await ownChatConfiguration(owned) : undefined,
+    });
+    const ownChatConfiguration = async (owned?: ViewScope) => {
+        const configuration = await createChatConfigurationView(agentService, listener => agentProjectScopes(vfs, projects).subscribe(listener));
+        return owned ? owned.own(configuration) : configuration;
+    };
+    const createWorkbench = (request: Parameters<NonNullable<ApplicationBackend['openWorkbench']>>[0]) =>
+        new ResourceWorkbench(services, () => prepareChat()).initialize(backend, request);
+    const openWorkbench: NonNullable<ApplicationBackend['openWorkbench']> = async request => scope.own(await createWorkbench(request));
     let opening = false;
     const backend: ApplicationBackend = {
         events: services.events,
@@ -91,7 +104,7 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
         openView: async request => {
             if (opening) throw new FSError('EBUSY', 'A view is already opening');
             opening = true;
-            try { return await scope.own(await openView(services, backend, request)); }
+            try { return await scope.own(await openView(services, backend, request, createWorkbench)); }
             finally { opening = false; }
         },
         prepareSessionBranch: request => prepareSessionBranch(services, request),
@@ -100,7 +113,8 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
         mailView: () => mailView(vfs).then(view => scope.own(view)),
         navigationView: options => navigationView(vfs, options),
         warmNavigation: roots => warmNavigation(vfs, roots),
-        openConversationWorkbench: async request => scope.own(await new ConversationWorkbench(services).initialize(backend, request)),
+        openWorkbench,
+        openConversationWorkbench: openWorkbench,
         workbenchView: async settings => {
             const owned = new ViewScope();
             try {
@@ -108,10 +122,7 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
                     settings?.initialSessionId ? () => prepareInitialSession(services, settings.initialSessionId!) : undefined);
                 const browser = await owned.own(view.browser);
                 const initialSession = view.initialSession ? await owned.own(view.initialSession) : undefined;
-                const chat = settings?.chatControls ? {privilegedCommands: new PrivilegedCommandService(kernel.kernel, agentService,
-                    {sessions: kernel.sessions, mcpServers: () => agentService.getMCPServers(), prepareSession: services.prepareSession?.bind(services)}),
-                    sessionSkills: createSessionSkillControls(kernel.kernel, kernel.sessions),
-                    configuration: options.preload ? await owned.own(await createChatConfigurationView(agentService, listener => agentProjectScopes(vfs, projects).subscribe(listener))) : undefined} : undefined;
+                const chat = settings?.chatControls ? await prepareChat(owned) : undefined;
                 const connections = projects?.remoteMounts ? await owned.own(observeConnections(projects.remoteMounts)) : undefined;
                 await scope.own({dispose: () => owned.close()});
                 return {...view, browser, initialSession, chat, connections};

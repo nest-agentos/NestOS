@@ -598,3 +598,30 @@ it('returns declared startup reads in the authenticated bootstrap without follow
  const next=await root.backend.readStartup!({documents:['theme']});expect(next.documents).toHaveProperty('value');expect(next.eventBaseline).toBeUndefined();
  expect(posts).toEqual(['bootstrap','queries']);
 });
+
+it('opens a file workbench with one observation and keeps component subscriptions local', async () => {
+    const {WorkbenchSources} = await import('../../../ui/app-shell/src/projects/workbench-sources');
+    const {folderBrowserPath} = await import('@nestos/app-contracts');
+    const requests: string[] = [];
+    const peer = new HttpViewClient('file-workbench', server.origin + '/api/application', async (input, init) => {
+        if (init?.method === 'POST') requests.push(JSON.parse(String(init.body)).kind);
+        return auth.fetcher(input, init);
+    }); clients.push(peer);
+    const root = await peer.start(), project = await root.services.projects.personal();
+    const opening = await root.backend.openWorkbench!({resourceId: folderBrowserPath(project.path) + '/@files/note.md', documents: ['file-workbench.ui']});
+    expect(opening.native).toBeUndefined(); expect(opening.workbench.chat).toBeUndefined();
+    const sources = new WorkbenchSources(opening), bound = sources.services(root.services); await sources.start();
+    const received = vi.fn(), stops: Array<() => void> = [], before = requests.length;
+    for (let index = 0; index < 12; index++) stops.push(bound.sessionRepository.subscribe(received));
+    stops.push(bound.sessionManager.onGlobalEvent(() => {}), bound.sessionFiles.subscribe(() => {}),
+        bound.kernel.kernel.onChanged(() => {}), bound.projects.favorites.subscribe(() => {}),
+        bound.projects.drafts.onPromoted(() => {}), sources.files(opening.workbench.browser.fs).onAny!(() => {}));
+    await new Promise(resolve => setTimeout(resolve, 20)); expect(requests.length).toBe(before);
+    await root.services.projects.sessions.create('Observation fixture', project.path);
+    await vi.waitFor(() => expect(received).toHaveBeenCalled());
+    const navigation = await opening.readNavigation({projectId: project.project.id});
+    expect(navigation.navigation?.path).toBe(opening.resourceId);
+    expect(await opening.prepareChat()).toHaveProperty('sessionSkills');
+    stops.forEach(stop => stop()); sources.close(); await opening.dispose();
+    await expect(opening.readNavigation({projectId: null})).rejects.toMatchObject({code: 'ECAPABILITY'});
+});

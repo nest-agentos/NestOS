@@ -6,9 +6,11 @@ import {ViewScope} from './view-scope';
 import {ViewObservation} from './view-observation';
 import {prepareConversation} from './prepare-conversation';
 
-const log = createModuleLogger('conversation-workbench');
+const log = createModuleLogger('resource-workbench');
 /** Composition of independent domain ports with one explicit observation lifetime. */
-export class ConversationWorkbench implements ConversationWorkbenchView {
+export class ResourceWorkbench implements ConversationWorkbenchView {
+    resourceId = '';
+    private chatPreparation?: Promise<NonNullable<WorkbenchView['chat']>>;
     documents: Record<string, unknown> = {};
     native?: PreparedConversation;
     failure?: ConversationWorkbenchView['failure'];
@@ -22,24 +24,56 @@ export class ConversationWorkbench implements ConversationWorkbenchView {
     private closing?: Promise<void>;
     private readonly resources = new ViewScope();
     private readonly statusStops = new Map<string, () => void>();
-    constructor(private readonly services: LocalApplicationServices) {this.eventSource = new ViewObservation(services);}
+    constructor(private readonly services: LocalApplicationServices, private readonly chatFactory?: () => Promise<NonNullable<WorkbenchView['chat']>>) {this.eventSource = new ViewObservation(services);}
     async initialize(backend: ApplicationBackend, request: ConversationWorkbenchRequest): Promise<this> {
+        const started = performance.now(), operationId = randomUUID();
         try {
-            const results = await Promise.allSettled([backend.workbenchView({chatControls: true, initialNavigation: false, displayedFilesPolicy: request.displayedFilesPolicy}), backend.readUiDocuments(request.documents)]);
-            if (results[0].status === 'fulfilled') {
-                this.workbench = results[0].value;
-                await this.resources.own({dispose: () => closeWorkbench(this.workbench)});
+            this.resourceId = request.resourceId;
+            const target = resolveBrowserTarget(request.resourceId);
+            const native = target.kind === 'remote' && !!target.nativeSessionId;
+            const chatControls = !['project-files', 'files', 'folder', 'favorites', 'favorite'].includes(target.kind);
+            await this.prepareView(backend, request, chatControls);
+            if (native) {
+                try {this.native = await this.openConversation(request.resourceId);}
+                catch (error) {this.failedOpening(request.resourceId, error);}
             }
-            const failure = results.find(result => result.status === 'rejected');
-            if (failure?.status === 'rejected') throw failure.reason;
-            this.documents = (results[1] as PromiseFulfilledResult<Record<string, unknown>>).value;
-            this.eventSource.addSource('navigation', listener => this.workbench.browser.fs.onAny?.(listener) ?? (() => {}));
-            try {this.native = await this.openConversation(request.resourceId);}
-            catch (error) {this.failedOpening(request.resourceId, error);}
+            await this.eventSource.addChat(this.workbench);
             if (this.closed) throw new FSError('EIO', 'Workbench closed');
             this.cursor = this.eventSource.getViewCursor();
+            log.info('resource.open', {operation: 'workbench.open', operationId, stage: 'prepare', result: 'success', resourceKind: target.kind, durationMs: Math.round(performance.now() - started)});
             return this;
-        } catch (error) {await this.dispose(); throw error;}
+        } catch (error) {
+            const raw = (error as {code?: unknown})?.code;
+            log.warn('resource.open', {operation: 'workbench.open', operationId, stage: 'prepare', result: 'failure', code: typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'WORKBENCH_OPEN_FAILED', durationMs: Math.round(performance.now() - started)});
+            await this.dispose(); throw error;
+        }
+    }
+    private async prepareView(backend: ApplicationBackend, request: ConversationWorkbenchRequest, chatControls: boolean): Promise<void> {
+        const results = await Promise.allSettled([backend.workbenchView({chatControls, initialNavigation: false, displayedFilesPolicy: request.displayedFilesPolicy}), backend.readUiDocuments(request.documents)]);
+        if (results[0].status === 'fulfilled') {
+            this.workbench = results[0].value;
+            await this.resources.own({dispose: () => closeWorkbench(this.workbench)});
+        }
+        const failure = results.find(result => result.status === 'rejected');
+        if (failure?.status === 'rejected') throw failure.reason;
+        this.documents = (results[1] as PromiseFulfilledResult<Record<string, unknown>>).value;
+        this.eventSource.addSource('navigation', listener => this.workbench.browser.fs.onAny?.(listener) ?? (() => {}));
+    }
+    async prepareChat(): Promise<NonNullable<WorkbenchView['chat']>> {
+        if (this.closed) throw new FSError('EIO', 'Workbench closed');
+        if (this.workbench.chat) return this.workbench.chat;
+        if (!this.chatFactory) throw new FSError('ECAPABILITY', 'Chat preparation unavailable');
+        return this.chatPreparation ??= this.loadChat().catch(error => {this.chatPreparation = undefined; throw error;});
+    }
+    private async loadChat(): Promise<NonNullable<WorkbenchView['chat']>> {
+        const chat = await this.chatFactory!();
+        if (this.closed) {await chat.configuration?.dispose(); throw new FSError('EIO', 'Workbench closed');}
+        try {
+            await this.eventSource.addChat({...this.workbench, chat});
+            if (this.closed) throw new FSError('EIO', 'Workbench closed');
+            this.workbench.chat = chat;
+            return chat;
+        } catch (error) {await chat.configuration?.dispose(); throw error;}
     }
     private failedOpening(resourceId: string, error: unknown): void {
         const raw = (error as {code?: unknown})?.code, reason = (error as {reason?: unknown})?.reason;
@@ -47,6 +81,7 @@ export class ConversationWorkbench implements ConversationWorkbenchView {
         this.failure = {resourceId, code, ...(reason === 'REMOTE_PROJECT_MISSING' ? {reason} : {})};
         log.warn('conversation.unavailable', {operation: 'workbench.conversation', operationId: randomUUID(), stage: 'open', result: 'failure', code, durationMs: 0});
     }
+    get observation(): ViewObservation {return this.eventSource;}
     eventSnapshot() {return this.eventSource.eventSnapshot();}
     subscribe(listener: Parameters<ViewObservation['observeView']>[1]) {return this.eventSource.observeView(this.eventSource.getViewCursor(), listener);}
     async openConversation(resourceId: string): Promise<PreparedConversation> {
@@ -62,10 +97,10 @@ export class ConversationWorkbench implements ConversationWorkbenchView {
     }
     async readNavigation(request: WorkbenchNavigationRequest): Promise<WorkbenchNavigationView> {
         if (this.closed) throw new FSError('EIO', 'Workbench closed');
-        const paths = this.navigationPaths(request.expandedPaths ?? []), resourceId = request.resourceId ?? this.native?.resourceId;
+        const paths = this.navigationPaths(request.expandedPaths ?? []), resourceId = request.resourceId ?? this.native?.resourceId ?? this.resourceId;
         if (resourceId !== undefined && (typeof resourceId !== 'string' || resourceId.length > 4096)) throw new FSError('EINVAL', 'Invalid navigation target');
         const target = resourceId && resolveBrowserTarget(resourceId);
-        const path = target && target.kind === 'remote' ? folderBrowserPath(target.folder) : '/';
+        const path = target && (target.kind === 'remote' || target.kind === 'project-files' || target.kind === 'favorites' || target.kind === 'favorite') ? folderBrowserPath(target.folder) : '/';
         const started = performance.now(), operationId = randomUUID();
         try {
             const data = await this.workbench.browser.readDirectory!(path, {projectId: request.projectId, includeAncestors: true, includePaths: paths});
@@ -121,3 +156,5 @@ async function closeWorkbench(view: WorkbenchView): Promise<void> {
     const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
     if (errors.length) throw new AggregateError(errors, 'Workbench resource cleanup failed');
 }
+
+export {ResourceWorkbench as ConversationWorkbench};

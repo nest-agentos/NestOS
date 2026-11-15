@@ -10,7 +10,7 @@ export function initialViewRequest(documents: string[], resource?: string) {
     try {
         const route = resource && !resource.startsWith('@project/') ? parseSessionRoute(resource) : undefined;
         const target = route && resolveBrowserTarget(route.path);
-        if (target?.kind === 'remote' && target.nativeSessionId) initialResource = route!.path;
+        if (target && (target.kind === 'remote' && target.nativeSessionId || ['project-files', 'favorites', 'favorite', 'folder'].includes(target.kind))) initialResource = route!.path;
         if (target?.kind === 'session') {initialSessionId = target.sessionId; branch = route?.branch;}
     } catch { /* The normal resource loader owns malformed-route diagnostics. */ }
     return {documents, resourceId: initialResource, branch, taskAttachmentKey: 'ui.privileged.active-task',
