@@ -92,7 +92,10 @@ async function createTextEditor(context: FileSystemContextOwner, path: string, c
 }
 
 export function localizeRemoteWriteError(error: unknown): unknown {
-    const receipt = error as { code?: string; outcome?: string; operationId?: string };
-    if (receipt.outcome === 'unknown') return new Error(`${t('remote.writeUnknown')} ${receipt.operationId ?? ''}`);
-    return receipt.code === 'ECONFLICT' ? new Error(t('remote.writeConflict')) : error;
+    const receipt = error as { code?: string; remoteCode?: string; outcome?: string; operationId?: string };
+    const key = receipt.outcome === 'unknown' || receipt.outcome === 'partial' ? 'remote.writeUnknown'
+        : receipt.code === 'ECONFLICT' ? 'remote.writeConflict' : receipt.code === 'EBUSY' ? 'webdav.writeLocked'
+        : receipt.code === 'EROFS' || receipt.code === 'EACCES' ? 'webdav.writeDenied' : undefined;
+    if (!key) return error;
+    return Object.assign(new Error(`${t(key)} ${receipt.remoteCode ?? ''} ${receipt.operationId ?? ''}`.trim()), receipt);
 }

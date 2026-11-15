@@ -1,6 +1,7 @@
 import {createAgentScopeEditor} from '../projects/agent-scope-editor';
 import {projectActionPath} from '../projects/project-action-route';
 import {CellsSettingsEditor} from '@nestos/app-settings';
+import {showWebDavMountDialog} from '../files/webdav-mount-dialog';
 import {MCPDiagnosticsControls} from './mcp-diagnostics';
 import { RemoteAgentDetailsEditor } from './RemoteAgentDetailsEditor';
 import { MCPConfigurationControlsRegistry } from './mcp-controls';
@@ -56,6 +57,7 @@ function configurationFactories(options: Options, inventory: ToolboxInventory, r
     };
     return { ...options.factories, cells: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
         const editor = new CellsSettingsEditor(element, options.services.projects?.remoteMounts, config, {saved: id => openCells(id), removed: () => openCells(),
+            mount: id => showWebDavMountDialog(options.services.projects!,id),
             project: (mount,action) => options.navigate({target:'chat',resourceId:projectActionPath(mount.projectId,action,mount.mountId)})}); await editor.init(element); return editor;
     }, agents: async (element: HTMLElement, config: import('@nestos/ui-common-adapter').EditorOptions) => {
         if (config.target?.kind === 'file' && config.target.path.startsWith('/@remote/')) {

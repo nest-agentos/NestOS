@@ -9,7 +9,7 @@ export function remoteProjectFields(projects: ProjectService, parent: HTMLElemen
         ['local', t('remote.localProject')], ['remote', t('remote.remoteProject')],
     ]);
     const fields = document.createElement('div'); parent.append(fields); fields.hidden = true;
-    const connection = selectField(fields, 'remote.connection', (projects.remoteMounts?.connections() ?? []).map(item => [item.id, item.name]));
+    const connection = selectField(fields, 'remote.connection', (projects.remoteMounts?.connections() ?? []).filter(item => item.protocol !== 'webdav').map(item => [item.id, item.name]));
     const label = document.createElement('label'); label.textContent = t('remote.projectPath');
     const path = document.createElement('input'); path.placeholder = '/alias/project'; path.required = false; path.setAttribute('aria-label', t('remote.projectPath')); label.append(path); fields.append(label);
     const hint = document.createElement('p'); hint.textContent = t(connection.options.length ? 'remote.projectPathHint' : 'remote.connectionEmpty'); fields.append(hint);

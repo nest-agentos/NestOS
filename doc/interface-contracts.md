@@ -181,7 +181,7 @@ HTTP 外挂的条件写入、取消与项目授权见 [HTTP VFS 设计](design/v
 
 ## 外部 harness 端口
 
-Cells 节点的传输、业务操作和文件来源接口见 [节点插件边界](../tools/cells/doc/plugins.md#传输协调与业务端口)。业务插件不挂载 HTTP Router；文件读取通过 `FileSource` 接入，本地实现已迁移，WebDAV 客户端与 Linux 挂载尚未实现。
+Cells 节点的传输、业务操作和文件来源接口见 [节点插件边界](../tools/cells/doc/plugins.md#传输协调与业务端口)。业务插件不挂载 HTTP Router；文件读取通过 `FileSource` 接入。NestOS 的独立 [WebDAV 文件连接](webdav.md) 复用凭据和 VFS，显式挂载且不跨重启恢复；Linux davfs2 实机验收单独记录，不能用客户端回归替代。
 
 `CellsDriver` 由宿主装配并注入远程来源服务，统一凭据，暴露文件/进程 provider、sync 与 harness。`HarnessClient`、`HarnessProfile`、`HarnessSession`、`HarnessEvents`、`HarnessReceipt` 位于 cells-driver `/harness` 公共入口，app-core 消费该端口，分别装配原生会话展示和持久远程执行；UI不持有底层凭据。
 

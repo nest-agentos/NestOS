@@ -1,11 +1,12 @@
 import { FSError, normalizeVirtualPath } from '@nestos/vfs-core';
 
 export interface RemoteFileSystemConfig {
+    protocol?: 'cells' | 'webdav';
     anonymous?: boolean;
     authorization?: import('@nestos/cells-driver').RemoteAuthorization;
     id: string; name: string; endpoint: string; username?: string; credentialRef: string; serverId?: string; projects?: boolean;
 }
-export type RemoteFileSystemInput = Pick<RemoteFileSystemConfig, 'name' | 'endpoint' | 'username' | 'anonymous'>;
+export type RemoteFileSystemInput = Pick<RemoteFileSystemConfig, 'name' | 'endpoint' | 'username' | 'anonymous' | 'protocol'>;
 
 /** Unverified bearer accounts must never collapse into the same absent username. */
 export function remoteCredentialIdentity(connection: Pick<RemoteFileSystemConfig, 'username' | 'credentialRef' | 'anonymous' | 'authorization'>): string {
@@ -25,6 +26,7 @@ export function canReaddressConnection(before:RemoteFileSystemConfig,after:Remot
 export function normalizeConnection(input: RemoteFileSystemInput): RemoteFileSystemInput {
     // Stored catalogs and dialog input both arrive as untrusted shapes: reject them as FSError,
     // never as a TypeError from reading a property of undefined.
+    if (input?.protocol !== undefined && !['cells', 'webdav'].includes(input.protocol)) throw new FSError('EINVAL', 'Invalid file protocol');
     const name = typeof input?.name === 'string' ? input.name.trim() : '';
     const username = typeof input?.username === 'string' ? input.username.trim() : '';
     const address = typeof input?.endpoint === 'string' ? input.endpoint.trim() : '';
@@ -37,7 +39,7 @@ export function normalizeConnection(input: RemoteFileSystemInput): RemoteFileSys
         throw new FSError('EINVAL', 'Invalid remote endpoint');
     if (input.anonymous !== undefined && typeof input.anonymous !== 'boolean' || input.anonymous && username)
         throw new FSError('EINVAL', 'Invalid anonymous connection');
-    return { name, ...(username ? {username} : {}), ...(input.anonymous ? {anonymous: true} : {}), endpoint: endpoint.href.replace(/\/+$/, '') };
+    return { name, ...(input.protocol ? {protocol: input.protocol} : {}), ...(username ? {username} : {}), ...(input.anonymous ? {anonymous: true} : {}), endpoint: endpoint.href.replace(/\/+$/, '') };
 }
 
 /** The first component names a server export, never a physical host directory. */

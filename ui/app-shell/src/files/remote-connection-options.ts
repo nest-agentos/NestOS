@@ -15,7 +15,7 @@ export function remoteConnectionOptions(projects: ProjectService, parent: HTMLEl
     const status = document.createElement('p'); status.setAttribute('role', 'status'); parent.append(status);
     let pending: AbortController | undefined;
     const pages = new Map<string, DirectoryPage>();
-    const connections = projects.remoteMounts!.connections();
+    const connections = projects.remoteMounts!.connections().filter(connection => connection.protocol !== 'webdav');
     const options = new Map(Array.from(select.options).map(option => [option.value, option]));
     for (const connection of connections) options.get(connection.id)!.disabled = true;
     select.onchange = () => ready(pages.get(select.value));

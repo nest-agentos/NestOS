@@ -45,6 +45,7 @@ function link(m:Mount,action:string,label:string):string {
 function mountRow(m:Mount,interactive:boolean):string {
     const projectLabel=t(m.problem?`diagnostics.problem.${m.problem}`:`remote.state.${m.projectStatus}`);
     const actions=interactive?[
+        m.unmount==='directory'?link(m,'reconnect',t('mount.dialog.reconnect')):'',
         m.canRemount?link(m,'remount',t('remote.remountAs')):'',
         m.unmount?link(m,m.unmount==='project'?'unmount':'detach',t(m.unmount==='project'?'remote.unmountProject':'cells.unmountDirectory')):''
     ].filter(Boolean).join(' '):'';

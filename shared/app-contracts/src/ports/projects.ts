@@ -172,6 +172,7 @@ export interface ProjectRemoteMount extends RemoteFileConnection {
 }
 
 export interface RemoteFileConnection {
+    protocol?: 'cells' | 'webdav';
     anonymous?: boolean;
     authorization?: import('@nestos/cells-driver').RemoteAuthorization;
     endpoint: string;
@@ -379,9 +380,10 @@ export interface CellsNodeOverview {
         | {state: 'unsupported' | 'unavailable'; code?: string};
 }
 
-export type RemoteFileSystemInput = Pick<RemoteFileSystemConfig, 'name' | 'endpoint' | 'username' | 'anonymous'>;
+export type RemoteFileSystemInput = Pick<RemoteFileSystemConfig, 'name' | 'endpoint' | 'username' | 'anonymous' | 'protocol'>;
 
 export interface RemoteFileSystemConfig {
+    protocol?: 'cells' | 'webdav';
     anonymous?: boolean;
     authorization?: import('@nestos/cells-driver').RemoteAuthorization;
     id: string;

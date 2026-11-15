@@ -13,14 +13,19 @@ export function installFileTransport(peer: RpcPeer, url: string, clientId: strin
         const response = await fetcher(`${url}/files?clientId=${encodeURIComponent(clientId)}&version=${RPC_VERSION}`, {
             method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'X-View-Call': encodeURIComponent(JSON.stringify(call)) },
             body: content, signal: options?.signal ? AbortSignal.any([abort, options.signal]) : abort }).catch(error => {
-                if (!abort.aborted && !options?.signal?.aborted) disconnected?.(error); throw error;
+                if (!abort.aborted && !options?.signal?.aborted) disconnected?.(error);
+                if (write) throw Object.assign(new Error('File upload result unknown; keep local changes and inspect the remote file'), {outcome:'unknown', code:'EIO'});
+                throw error;
             });
         if ((response.headers.get('X-NestOS-View-Expired') ?? response.headers.get('X-MindOS-View-Expired')) === '1') disconnected?.(new Error('View expired'));
         if (response.ok && !write) {
             const bytes = await response.arrayBuffer(), header = response.headers.get('X-File-Revision');
             await options?.onRevision?.(header ? JSON.parse(decodeURIComponent(header)) ?? undefined : undefined); return bytes;
         }
-        const reply = await response.json() as Reply & { fileRevision?: string };
+        const reply = await response.json().catch(error => {
+            if (write) throw Object.assign(new Error('File upload acknowledgement unavailable; inspect the remote file'), {outcome:'unknown', code:'EIO'});
+            throw error;
+        }) as Reply & { fileRevision?: string };
         if (!response.ok || reply.error) throw Object.assign(new Error(reply.error?.message ?? 'File transfer failed'), reply.error);
         peer.applyUpdates(reply.updates); await peer.waitUpdates(reply.updates);
         await options?.onRevision?.(reply.fileRevision); return peer.decode(reply.value ?? null);

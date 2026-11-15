@@ -1,6 +1,7 @@
 import {randomUUID} from '@nestos/common/startup';
 
-export interface FileRecovery { base: string; text: string; savedAt?: number; retentionStartedAt?: number; }
+export interface FileRecovery { base: string; text: string; savedAt?: number; retentionStartedAt?: number;
+    pendingOperation?: {operationId?: string; outcome:'unknown'|'partial'}; }
 let recoveryOwner = '';
 /** Hosts set a stable authenticated scope before opening editors. */
 export function setFileRecoveryOwner(owner: string): void {recoveryOwner = owner;}

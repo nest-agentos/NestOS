@@ -5,6 +5,11 @@ import {STARTUP_EN} from './startup-strings';
 import type { LocaleStrings } from './zh-CN';
 
 export const en: LocaleStrings = {
+    "webdav.writeLocked": "The resource is locked or busy. Local changes are retained; wait for release, then reload and compare.",
+    "webdav.writeDenied": "The server denied the write. Local changes are retained; check credentials and read-only permissions.",
+    "webdav.protocol": "File protocol",
+    "webdav.mount": "Mount WebDAV",
+    "webdav.mountHint": "Mounted for this runtime only; mount again after restart. Existing files are not overwritten; only empty directories can be deleted. Metadata, recursive deletion and cross-source moves are unsupported.",
     ...STARTUP_EN,
     "kanban.decisionTable.state.waiting-approval": "Awaiting approval",
     "kanban.decisionTable.reason.authorization-required": "The session needs your approval.",
