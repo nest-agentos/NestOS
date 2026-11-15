@@ -193,3 +193,13 @@ it('repairs only the original retained Session directory after proven legacy wor
  expect(value.sessionId).toBe('native');expect(await f.options.fs.driver.exists(value.binding.directory+'/.nestos-management-context')).toBe(true);
  await expect(retainManagementDirectory(f.options,{...value,binding:{...value.binding,directory:'/unrelated'}})).rejects.toMatchObject({code:'MANAGEMENT_DIRECTORY_BINDING_CHANGED'});
 });
+
+it('archives execution Sessions while preserving all aliases of the original management Session',async()=>{
+ const f=await fixture(),{cleanupExecutionSessions}=await import('../src/kanban/cleanup-execution-sessions');
+ await f.journal.update('analysis-current:'+JSON.stringify(['b','group']),()=> 'analysis:original');
+ await f.journal.update('analysis:original',()=>({id:'original',input:{},status:{state:'ready'}}));
+ const archiveSession=vi.fn(async()=>{}),options={...f.options,archiveSession,calls:{inspectTaskCallSubmission:async()=>({executionSessionId:'management'})},executionResource:async(id:string)=>id==='execution'?'/native/execution':'/native/management'};
+ const service={...f.service,executionSession:async()=>({current:{sessionId:'management-alias'},sessions:[{sessionId:'execution'}],history:[{sessionId:'management'}]})} as any;
+ expect(await cleanupExecutionSessions(service,f.journal,options,'b','group','cleanup')).toBe(true);
+ expect(archiveSession).toHaveBeenCalledExactlyOnceWith('execution',expect.any(String));
+});
