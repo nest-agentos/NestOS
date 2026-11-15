@@ -1,3 +1,4 @@
+import {previewExecutionCheckWaiver,confirmExecutionCheckWaiver} from './execution-check-waiver';
 import {beginManagementCleanup,readManagementCleanup,completeManagementCleanup} from './cleanup-review-conversations';
 import {createModuleLogger} from '@nestos/common';
 import {safeCode} from '@nestos/kanban/integration';
@@ -32,6 +33,8 @@ export async function resolveKanbanPluginRequest(options:DecisionConversationOpt
         ],
     ]}];
     if(management)plugins.push({id:'delivery',version:'1',description:'Bound management task delivery operations, analysis, integration and receipt reconciliation.',methods:[
+        method('verification.preview','Preview named execution checks to waive; preserve failed evidence and original task identity.',schema({itemId:string,checks:{type:'array',items:string,maxItems:16},reason:string},['itemId','checks','reason']),input=>previewExecutionCheckWaiver(options,management,input),'command'),
+        method('verification.waive','After exact user confirmation, record the waiver and notify the original executor; does not mark execution successful.',schema({previewId:string},['previewId']),input=>confirmExecutionCheckWaiver(options,management,input),'command'),
         method('cleanup.start','Ask the original management Session to review explicitly selected retained resources.',schema({itemId:string,scopeId:string,resourceIds:{type:'array',items:string,maxItems:16}},['itemId','scopeId','resourceIds']),input=>beginManagementCleanup(options,management,input.params,input.id),'command'),
         method('cleanup.read','Read the frozen cleanup review and host status.',schema({reviewId:string},['reviewId']),input=>readManagementCleanup(options,management,input.params.reviewId)),
         method('cleanup.complete','Finish a cleanup attempt; the host checks and removes actual resources before reporting success.',schema({reviewId:string},['reviewId']),input=>completeManagementCleanup(options,management,input.params.reviewId),'command'),

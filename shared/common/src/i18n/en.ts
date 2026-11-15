@@ -889,6 +889,7 @@ export const en: LocaleStrings = {
     "kanban.operationSkipDirect": "Explicitly skipped",
     "kanban.operationSkipDependency": "Skipped due to dependency",
     "kanban.operationSkipConfirm": "Confirm these steps are not required; retain the reason and original execution history.",
+    "kanban.executionChecksWaived": "Execution checks waived (not verified)",
     "kanban.operationAcceptanceWaived": "Completed with waivers (acceptance waived)",
     "kanban.operationHasWaivers": "This task has operation waivers. All remaining requirements still apply.",
     "kanban.operationWaiverHistory": "Skip and waiver history",

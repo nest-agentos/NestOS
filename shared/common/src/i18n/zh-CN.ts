@@ -890,6 +890,7 @@ export const zhCN = {
     "kanban.operationSkipDirect": "主动跳过",
     "kanban.operationSkipDependency": "因依赖跳过",
     "kanban.operationSkipConfirm": "确认这些步骤本次无需执行，并保留原因及原执行记录。",
+    "kanban.executionChecksWaived": "专项验证已豁免（未验证）",
     "kanban.operationAcceptanceWaived": "已完成 · 有豁免（验收已豁免）",
     "kanban.operationHasWaivers": "此任务有操作豁免，未跳过的要求仍须满足。",
     "kanban.operationWaiverHistory": "跳过与豁免记录",

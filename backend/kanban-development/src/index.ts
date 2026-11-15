@@ -13,3 +13,4 @@ export {default as managementPrompts} from './prompts/management.json';
 export {developmentCatalog} from './development-catalog';
 export {deliverSoftwareReports,disposableSoftwareFiles} from './report-delivery';
 export {cleanupReviewId,cleanupReviewInstruction,finishCleanupReview,type CleanupReviewInput} from './cleanup-review';
+export {verificationWaiverConfirmation,verificationWaiverInstruction} from './verification-waiver';
