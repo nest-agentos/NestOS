@@ -678,7 +678,7 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 
 `pnpm httpd` 常驻启动器管理 release 子进程。`pnpm httpd:status` 返回服务 ID、当前版本和切换回执；`pnpm httpd:switch <release-id> --operation-id <id> --expected-current <version>` 请求版本切换。`httpd:restart` 选取构建后的 release，不重新构建。旧宿主在安全点退出后才启动候选版本，健康检查失败自动回退原版本。
 
-控制状态位于 `$XDG_CONFIG_HOME/nestos/httpd-launchers/<项目路径摘要>/release.json`（默认 `~/.config`），可用 `NESTOS_HTTPD_CONTROL_DIR` 覆盖；文件权限 0600，独立于 worktree 和 release。状态保存服务 ID、目标版本、进程身份和幂等回执；启动器重启接管已登记的候选进程，继续核对。显式 stop 持久化停止意图，不会被守护循环复活；未到安全点仍等待，只有显式 `--force` 可升级停止。
+控制状态位于 `$XDG_CONFIG_HOME/nestos/httpd-launchers/<项目路径摘要>/release.json`（默认 `~/.config`），可用 `NESTOS_HTTPD_CONTROL_DIR` 覆盖；文件权限 0600，独立于 worktree 和 release。状态保存服务 ID、目标版本、进程身份和幂等回执；启动器重启接管已登记的候选进程，继续核对。显式 stop 持久化停止意图，不会被守护循环复活；未到安全点时最多等待 15 秒，然后按登记身份强制退出并确认死亡；启动器不再无限等待。
 
 自动启动尝试连续三次未能稳定运行时，启动器记录停止意图并返回 `HTTPD_RESTART_LIMIT`。先查运行日志中的启动错误，修复后再次执行 `pnpm httpd` 或 `pnpm httpd:restart`，会重置已停止服务的重试计数并启动当前选择的 release，无需删除控制状态。启动器崩溃后接管仍处于运行或版本切换中的服务时保留重试计数；每个新子进程重新计量健康持续时间，避免旧进程的健康时间掩盖连续失败。
 
