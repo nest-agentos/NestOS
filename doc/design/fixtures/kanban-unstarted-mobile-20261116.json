@@ -1,0 +1,118 @@
+{
+  "date": "2026-11-16",
+  "version": "20261115T230624-d97aabc7",
+  "recordPolicy": "Direct deletion and archival apply to records with no linked work items or persisted execution intents. Prepared/running/unknown work still requires settlement. Tombstones and original status/history are retained.",
+  "actualTarget": {
+    "recordId": "kanban-secondary-project-display",
+    "hadHistoricalExecution": true,
+    "archived": true,
+    "nativeHistoryRetained": true
+  },
+  "realLifecycle": {
+    "operation": "decision.unstarted.real",
+    "results": [
+      {
+        "state": "draft",
+        "archived": false,
+        "deleted": true,
+        "repeatedOriginalRequest": "confirmed",
+        "executionCount": 0
+      },
+      {
+        "state": "confirmed",
+        "archived": true,
+        "deleted": true,
+        "repeatedOriginalRequest": "confirmed",
+        "executionCount": 0
+      }
+    ],
+    "targetArchived": true,
+    "cleanup": "confirmed"
+  },
+  "mobile": {
+    "operation": "kanban.mobile.empty-columns",
+    "passed": true,
+    "mobile": [
+      {
+        "empty": true,
+        "hidden": true
+      },
+      {
+        "empty": true,
+        "hidden": true
+      },
+      {
+        "empty": true,
+        "hidden": true
+      },
+      {
+        "empty": true,
+        "hidden": true
+      },
+      {
+        "empty": true,
+        "hidden": true
+      },
+      {
+        "empty": true,
+        "hidden": true
+      },
+      {
+        "empty": true,
+        "hidden": true
+      }
+    ],
+    "desktop": [
+      {
+        "empty": true,
+        "hidden": false
+      },
+      {
+        "empty": true,
+        "hidden": false
+      },
+      {
+        "empty": true,
+        "hidden": false
+      },
+      {
+        "empty": true,
+        "hidden": false
+      },
+      {
+        "empty": true,
+        "hidden": false
+      },
+      {
+        "empty": true,
+        "hidden": false
+      },
+      {
+        "empty": true,
+        "hidden": false
+      }
+    ],
+    "elapsedMs": 331,
+    "logicalApiCalls": 6,
+    "httpApplicationPosts": 5,
+    "httpRequests": 5,
+    "apiHttpRequests": 5,
+    "performancePassed": true,
+    "cache": "new context, authenticated start warmed, production board",
+    "dataset": "development board; unmatched search used only to verify empty columns; original search restored"
+  },
+  "validation": {
+    "kanbanTests": 364,
+    "kanbanUiTests": 220,
+    "targetedDeletionRetryTests": 16,
+    "performance": {
+      "core": 60,
+      "transport": 32,
+      "ui": 67
+    },
+    "packageTypechecks": "passed",
+    "styles": "passed",
+    "temporaryScopes": "closed",
+    "fixtures": "tombstoned using public API; no executions or Sessions created"
+  }
+}
