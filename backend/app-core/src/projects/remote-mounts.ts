@@ -1,3 +1,4 @@
+import {CellsProjectDraftStore} from './drafts/cells-store';
 import {CellsAuthorizationRefreshes} from './cells-authorization-refresh';
 import {remoteClientState} from './remote-client-state';
 import {CellsDraftChecks} from './cells-draft-checks';
@@ -9,12 +10,13 @@ import {ConversationRegistry} from './conversation-registry';
 import {ConversationComposerStore, withConversationComposer} from './conversation-composer-store';
 import type { ProjectConversationPort } from '@nestos/app-contracts/services';
 import { observeConversation } from './conversation-view';
-import {prepareRemoteDraft, remoteConversationKey} from './drafts/remote-submission';
+import {remoteConversationKey} from './drafts/remote-submission';
 import {bindConversationIdentity, readConversationIdentity} from './drafts/remote-identity';
 import { RemoteConversationStore } from './remote-conversation-store';
 import type {RemoteConversationRecoveryTarget} from './remote-conversation-recovery';
 import {RemoteConversationRecoveryLoop} from './remote-conversation-retry';
 import {draftHarness, draftConversation, remoteConversationJournal} from './remote-draft-conversation';
+import {remoteFirstInput} from './remote-first-input';
 import { RemoteSessionStatus } from '../session/remote-session-status';
 import { RemoteConnectionUnavailableError, reportRemoteFailure, remoteLog, type CellsConnectionDiagnostic } from './remote-diagnostics';
 import type { ExecutionCapabilities, ProjectExecutionContext } from './execution/contracts';
@@ -691,6 +693,23 @@ export class ProjectRemoteMountService {
         });
         await this.conversationRecovery.recover();
     }
+    private projectDraftStore(projectId: string): CellsProjectDraftStore {
+        return new CellsProjectDraftStore(this.store, projectId, input => this.projectDraft(projectId, input));
+    }
+    async projectDraft(projectId: string, input: Parameters<NonNullable<ProjectClient['draft']>>[1]): ReturnType<NonNullable<ProjectClient['draft']>> {
+        const root = this.list(projectId).find(mount => mount.at === '/');
+        if (!root?.connectionId || !root.serverProjectId || !this.provider.projects) throw new FSError('ECAPABILITY', 'Cells project drafts are unavailable');
+        const fingerprint = JSON.stringify(this.list(projectId));
+        this.checkHarnessAccess(projectId, fingerprint, root.connectionId);
+        const client = this.provider.projects(await this.resolveConnection(root.connectionId, {timeoutMs: 10000}));
+        try {
+            this.checkHarnessAccess(projectId, fingerprint, root.connectionId);
+            const project = {id: root.serverProjectId, revision: root.serverProjectRevision!};
+            if (!client.draft && input.action === 'resolve') return {conversationId: null};
+            if (!client.draft) throw new FSError('ECAPABILITY', 'Cells project drafts are unavailable');
+            return await client.draft(project, input);
+        } finally {await client.close();}
+    }
     async readConversationRecovery(projectId: string, target: import('./drafts/contracts').RemoteDraftTarget, conversationId: string) {
         const fingerprint = JSON.stringify(this.list(projectId));
         const checkAccess = () => {
@@ -717,8 +736,9 @@ export class ProjectRemoteMountService {
         if (!root || root.connectionId !== target.connectionId || root.serverProjectId !== target.serverProjectId
             || root.authorization?.principalId !== target.principalId)
             throw new FSError('ECONFLICT', 'Remote queue authorization binding changed');
-        const identity = await readConversationIdentity(this.store, target.projectId, {connectionId: target.connectionId,
-            serverProjectId: target.serverProjectId, principalId: target.principalId, profileId: target.profileId, nativeSessionId: target.sessionId});
+        const identity = (await this.projectDraft(target.projectId, {action: 'resolve', profileId: target.profileId, sessionId: target.sessionId})).conversationId
+            ?? await readConversationIdentity(this.store, target.projectId, {connectionId: target.connectionId,
+                serverProjectId: target.serverProjectId, principalId: target.principalId, profileId: target.profileId, nativeSessionId: target.sessionId});
         if ((identity ?? target.sessionId) !== target.conversationId)
             throw new FSError('ECONFLICT', 'Remote queue conversation identity changed');
         return this.projectConversation(target.projectId, target.profileId, target.sessionId, {timeoutMs: 10000});
@@ -734,12 +754,18 @@ export class ProjectRemoteMountService {
             const profile = descriptor.profiles.find(p => (p.id === profileId || p.aliases?.includes(profileId)) && p.projectRuntime);
             if (!profile) throw new FSError('ECAPABILITY', 'Project harness profile unavailable');
             const root = this.list(projectId).find(m => m.at === '/')!;
-            const conversationId = sessionId ? await readConversationIdentity(this.store, projectId, {
+            const cellsIdentity = sessionId ? (await this.projectDraft(projectId, {action: 'resolve', profileId: profile.id, sessionId})).conversationId : undefined;
+            const conversationId = cellsIdentity ?? (sessionId ? await readConversationIdentity(this.store, projectId, {
                 connectionId: root.connectionId!, serverProjectId: root.serverProjectId!, principalId: root.authorization?.principalId,
-                profileId: profile.id, nativeSessionId: sessionId}) : draftId ?? randomUUID();
+                profileId: profile.id, nativeSessionId: sessionId}) : draftId ?? randomUUID());
             const target = {connectionId: root.connectionId!, serverProjectId: root.serverProjectId!,
                 ...(root.authorization ? {principalId: root.authorization.principalId} : {}), profileId: conversationId ? profile.id : profileId};
-            const prepareSubmission = draftId ? async () => {await prepareRemoteDraft(this.store, projectId, draftId, target, draftTitle);} : undefined;
+            const prepareSubmission = draftId ? async () => {
+                const drafts = this.projectDraftStore(projectId);
+                const record = await drafts.load();
+                if (record.id !== draftId) throw new FSError('ECONFLICT', 'Cells draft identity changed');
+                await drafts.begin(draftTitle ?? '', target);
+            } : undefined;
             const guarded = this.guardHarness(client, projectId, fingerprint, root.connectionId!);
             const checkAccess = () => {
                 if (this.closed || fingerprint !== JSON.stringify(this.list(projectId))) throw new FSError('ECONFLICT', 'Project authorization changed');
@@ -750,12 +776,17 @@ export class ProjectRemoteMountService {
             if(stateProject.revision!==root.serverProjectRevision)throw new FSError('ECONFLICT','Remote harness state binding changed');
             const owner=remoteConversationKey(projectId,target,conversationId??sessionId!);
             const writable=(profile.projectCapabilities?.sessionControl??root.access==='rw')&&!readOnly;
-            const remoteState=remoteClientState(stateClient,stateProject,owner,checkAccess,profile.id,writable);
+            const stateNamespace = !sessionId || cellsIdentity ? JSON.stringify(['conversation', conversationId, profile.id]) : owner;
+            const remoteState=remoteClientState(stateClient,stateProject,stateNamespace,checkAccess,profile.id,writable);
             const bindIdentity = !sessionId && conversationId ? (nativeSessionId: string) => bindConversationIdentity(this.store, projectId,
                 {...target, nativeSessionId}, conversationId) : undefined;
             const recovery = new RemoteConversationStore(this.store,owner,remoteState,bindIdentity);
+            const firstInput = draftId ? remoteFirstInput(draftId, profile.id, input => {
+                if (!stateClient!.draft) throw new FSError('ECAPABILITY', 'Cells first-input submission is unavailable');
+                return stateClient!.draft(stateProject, input);
+            }, checkAccess) : undefined;
             const conversation = await this.provider.conversation(sessionId ? guarded : draftHarness(guarded, recovery), profile, profile.workspaces[0].id, sessionId, writable,
-                remoteConversationJournal(recovery, descriptor.epoch, false, checkAccess, writable ? sessionId : undefined, prepareSubmission));
+                remoteConversationJournal(recovery, descriptor.epoch, false, checkAccess, writable ? sessionId : undefined, prepareSubmission, firstInput));
             const composer = new ConversationComposerStore(remoteState,!readOnly,checkAccess,{fs:this.store,projectId,owner});
             const observed = observeConversation(sessionId ? conversation : draftConversation(conversation, recovery, draftTitle), this.estimateUsage, conversationId,
                 () => { void this.sessionStatus.refresh(projectId); });

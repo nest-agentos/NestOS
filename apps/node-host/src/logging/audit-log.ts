@@ -7,7 +7,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 export interface AuditEvent {
     traceId?: string; spanId?: string; parentSpanId?: string; browserSessionId?: string;
     userId?: string; operationId?: string; stage?: string; result?: string; count?: number; bytes?: number;
-    event: string; requestId?: string; remoteAddress?: string; method?: string; route?: string;
+    event: string; requestId?: string; clientRequestId?: string; remoteAddress?: string; method?: string; route?: string;
     status?: number; durationMs?: number; operation?: string; code?: string; certificate?: string; parentRequestId?: string;
     asset?: string; strictPathChecks?: boolean;
     rpcKind?: string; rpcBatchSize?: number; rpcOperations?: string[];
@@ -75,12 +75,17 @@ export function auditRequest(audit: AuditPort, request: IncomingMessage, respons
     const pathname = new URL(request.url ?? '/', 'https://localhost').pathname;
     const asset = /^\/assets\/[\w.-]+-[\w-]{8,}\.(?:js|css)$/.test(pathname) ? pathname.slice('/assets/'.length) : undefined;
     response.setHeader('X-Request-ID', requestId);
+    const rawClientId = request.headers['x-nestos-client-request-id'];
+    const clientRequestId = typeof rawClientId === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(rawClientId) ? rawClientId : undefined;
+    if (clientRequestId) response.setHeader('X-NestOS-Client-Request-ID', clientRequestId);
+    if (route.startsWith('/api/application')) audit.write({...context,event:'request.received',requestId,clientRequestId,
+        remoteAddress,method:request.method,route,stage:'request.headers',result:'received'});
     let finished = false;
     const record = () => {
         if (finished) return; finished = true;
         const parent = request.headers['x-parent-request-id'];
         const timing = requestTimings.get(response);
-        audit.write({ ...context, event: response.writableFinished ? 'request.complete' : 'request.aborted', requestId,
+        audit.write({ ...context, event: response.writableFinished ? 'request.complete' : 'request.aborted', requestId,clientRequestId,
             ...timing?.phases, ...(timing?.queuedAt !== undefined ? {responseFlushMs: Date.now() - timing.queuedAt} : {}),
             ...(typeof parent === 'string' && /^[a-f0-9-]{36}$/.test(parent) ? { parentRequestId: parent } : {}),
             remoteAddress, method: request.method, route, ...(asset ? {asset} : {}),

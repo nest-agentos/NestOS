@@ -288,6 +288,7 @@ export interface ProjectDraftComposer {
 
 export interface ProjectRemoteMountChange {kind:'configuration'|'status';projectId?:string}
 export interface ProjectRemoteMountService {
+    projectDraft?(projectId: string, input: Parameters<NonNullable<import('@nestos/cells-driver').ProjectClient['draft']>>[1]): ReturnType<NonNullable<import('@nestos/cells-driver').ProjectClient['draft']>>;
     nodeOverview(id: string, options?: OperationOptions): Promise<CellsNodeOverview>;
     confirmAuthorizationRefresh(id: string, proposalId: string, options?: OperationOptions): Promise<void>;
     mountedProjectIds(): string[];
@@ -498,7 +499,7 @@ export declare function exportRemoteSession(projects: ProjectService, folder: st
 }>;
 
 /** UI capabilities exclude credential injection, host change hooks and source composition. */
-export type ProjectRemoteMountPort = Omit<ProjectRemoteMountService, 'mountedProjectIds' | 'beforeMCPChange' | 'beforeMCPDelete' | 'setMCPCredential' | 'compose'>;
+export type ProjectRemoteMountPort = Omit<ProjectRemoteMountService, 'projectDraft' | 'mountedProjectIds' | 'beforeMCPChange' | 'beforeMCPDelete' | 'setMCPCredential' | 'compose'>;
 
 /** Business recovery uses stable session identities, never browser capability handles. */
 export interface NativeSessionRecoveryTarget {projectId: string; profileId: string; sessionId: string}

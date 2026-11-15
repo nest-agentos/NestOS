@@ -79,6 +79,18 @@ async function nativeConversation(client: ApplicationClient, args: string[]): Pr
     const [action, projectId, profileId, sessionId, value] = args;
     const remote = client.services.projects.remoteMounts;
     if (!remote) throw new Error('Remote projects unavailable');
+    if (['draft','send-draft','reconcile-draft'].includes(action)) {
+        const project = await client.services.projects.get(required(projectId, 'project id'));
+        const draft = action === 'reconcile-draft' ? {id: required(sessionId, 'original draft id'), locked: true}
+            : await client.services.projects.drafts.open(project.project.id, project.path);
+        if (action === 'draft') return {draftId: draft.id, locked: draft.locked};
+        const conversation = await remote.projectConversation(project.project.id, required(profileId, 'profile id'), undefined, undefined, false, draft.id);
+        try {
+            await conversation.read();
+            return action === 'send-draft' ? await conversation.send(required(sessionId, 'message'))
+                : await conversation.reconcile(required(value, 'operation id'));
+        } finally {await conversation.close();}
+    }
     if (action === 'profiles' || action === 'list' || action === 'create') {
         const harness = await remote.projectHarness(required(projectId, 'project id'));
         try {

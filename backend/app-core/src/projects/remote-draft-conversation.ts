@@ -5,9 +5,9 @@ import {FSError} from '@nestos/vfs-core';
 import {diagnosticFailure} from '../diagnostics/failure';
 import {reportRemoteFailure} from './remote-diagnostics';
 
-export function remoteConversationJournal(recovery: RemoteConversationStore, epoch: string, draft: boolean, checkAccess = () => {}, sessionId?: string, prepareSubmission?: () => Promise<void>): HarnessConversationJournal {
+export function remoteConversationJournal(recovery: RemoteConversationStore, epoch: string, draft: boolean, checkAccess = () => {}, sessionId?: string, prepareSubmission?: () => Promise<void>, firstInput?: HarnessConversationJournal['firstInput']): HarnessConversationJournal {
     let prepared = false;
-    return {epoch, instructions:{
+    return {epoch, firstInput, instructions:{
         enqueue:item=>recovery.queueSession({action:'enqueue',item,input:JSON.stringify([item.text,item.attachments,item.selection??null,item.commandKind??null,...(item.allowSteer?[true]:[])])}),
         edit:(edit,binding)=>recovery.queueSession({action:'edit',edit:{...edit,...(binding?{commandBinding:binding}:{})}}),
     }, recoverSession: input=>{checkAccess();return recovery.recoverSession(input);}, load: async () => {

@@ -592,13 +592,25 @@ DSH 展示投影不将明确来源为 agent-instructions、runtime-context、too
 
 业务状态的解释归调用方，Cells 继续提供原生执行状态；两者不能相互替代。条件关闭通道在事务中核对 expectedExecutionRevision 与空闲状态，避免检查后新轮次启动造成错误释放。
 
+### Codex 空会话首次输入与诊断
+
+没有绑定任务通道的新会话仍在 `thread/start` 时显式使用禁用的 `cells_session` 配置，与后续 `session_config` 的配置基线一致；没有实际配置变化时不能为刷新 MCP 而卸载再恢复空 thread。尚无 rollout 的空 thread 被卸载后，原生 CLI 可能拒绝 resume/read，Cells 不得将该失败标成输入已接纳，也不得自动重发。
+
+`channel.native.configure` 记录配置比较（unchanged/rebind）、是否已有基线及重绑结果；`harness.native.completed` 补充 thread/unsubscribe 的阶段回执。原生错误中的已知“thread not loaded”“thread not found”分别归为 `HARNESS_SESSION_NOT_LOADED`、`HARNESS_SESSION_NOT_FOUND`；保留 method、rpcCode、阶段、耗时与请求关联，不记录原始异常或 MCP 配置/凭据。httpd CLI 的 `conversation show ... --connect ...` 复用浏览器真实端口，可验证原错误链；隔离 fixture 的 CLI profiles/create/send/show 回归验证首次输入不卸载空 thread，不试发用户真实消息。回归见[HTTP CLI 空会话测试](../../apps/http-app/tests/cli-native-empty-session.test.ts)。
+
+### 本机原生 Session 发现
+
+Cells 在所在机器读取运行 Cells 的操作系统用户的原生数据；未显式设置 harness home 时，按有效用户账号解析 `~/.claude`、`~/.codex`、`~/.dsh`，不使用 httpd 用户目录。显式配置的私有 home 仍作为该 profile 的本机数据目录。Claude 校验历史文件的真实 cwd；Codex 只读本机 `state_<version>.sqlite` 的会话索引；托管 DSH 读取本机 projection cache 与 workspace 归档元数据。旧版本尚无相应本地索引时复用同一配置 home 的原生查询。读取发现目录不会启动原生执行器、创建或续用 Session；原生查询回退单独遵循原有生命周期。
+
+项目根目录和任意子目录中的 Session 均属于项目；使用路径分量边界，排除同前缀相邻目录及越界符号链接。发现仅投影元数据，不改写 Session cwd。续用、刷新 channel 和分支保留原工作目录；隔离宿主通过已授权的源路径挂载使原物理目录可达，不改成项目根目录。会话列表和本机只读元数据不能证明执行完成，原生接纳与终态继续读取真实回执。
+
 ### 远程会话客户端状态
 
 `projectClientState: 1` 声明固定 API `project_client_state`，按获授权的项目、principal 和私有 key 保存不透明值。读取和 CAS 均核对项目 revision，写入要求 rw；此能力不暴露给 agent MCP。客户端状态用于远程输入草稿、发送回执与指令队列，原生聊天历史仍只由 harness 保存。小记录原位保存，大记录按唯一代次分块并核验摘要；NestOS 本机只保留会话定位和是否需要恢复的索引，不保存正文。旧本机记录先复制并核验远端结果，再移除本机当前正文；迁移失败保留原输入以便继续核对。
 
 Cells 接管指令队列后，客户端恢复记录不再携带 `instructionQueue`；同一 Session 的连续元数据保存和丢回复核对必须保留已确认的队列所有权，不能用旧快照或不含队列的客户端记录覆盖。原生 turn/command 已接纳后，草稿提升记录写入失败只表示元数据未确认，不能把该次存储的 `not-committed` 当作原生未执行；保留原 pending 身份，通过原回执核对，不重新发送。回归见 [恢复存储](../../backend/app-core/tests/remote-conversation-store.test.ts)与[草稿接纳](../../backend/app-core/tests/remote-draft-conversation.test.ts)。恢复写入日志同时保留本地错误码和安全的远端错误码，以区分传输错误与队列所有权拒绝。
 
-新建操作（包括 resume、输入及交互答复）在冻结操作身份前查询当前节点 epoch，不复用打开会话时固定的 journal epoch；已有 pending、控制和输出回执仍携带原 epoch 查询，禁止因重启自动重放。首次输入接纳后，草稿提升和清空检查遇到远端状态索引时必须读取同一连接、主体和项目 revision 下的权威回执；只向草稿策略投影 sessionId、submittedTurnId 和 pending，不传递正文。提升原子保留原 UUID 到原生 Session 的映射，并创建一个新 UUID 的空白“新会话”。
+新建操作（包括 resume、输入及交互答复）在冻结操作身份前查询当前节点 epoch，不复用打开会话时固定的 journal epoch；已有 pending、控制和输出回执仍携带原 epoch 查询，禁止因重启自动重放。`projectDrafts: 1` 将远程项目当前草稿及其身份交由 Cells 的 `project_draft` 管理，httpd 通过项目 revision 授权代理。首次输入接纳后，Cells 核对恢复记录与原生 ExecutionState 的 request/session/turn 证据，原子保存原 UUID 到原生 Session 的映射、转正回执与一个新 UUID 的草稿；只有已提交输入被清理，等待期间的新编辑及其附件保留。未知提交不转正、不自动重发。此变更不迁移旧 httpd 远程项目草稿，成功读取节点草稿后丢弃旧草稿；正式历史保留。详见[项目草稿](project-session-drafts.md#cells-项目草稿)。
 
 “新会话”右键菜单通过 app-shell 的现有 contextMenu 扩展提供“复位”，不修改 vfs-ui。确认后调用 ProjectDraftComposer.clear，以 CAS 替换当前草稿并清理其附件，再关闭旧编辑器并打开空白草稿；不删除原生会话或历史。当前草稿身份已改变或远程提交结果未知时拒绝清空，读取权威状态失败也保留原草稿。`@new` 是稳定入口，实际草稿身份保存在内部 UUID 中。
 

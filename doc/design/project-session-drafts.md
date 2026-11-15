@@ -2,6 +2,18 @@
 
 本文对应“项目固定新会话 → 首条消息持久提交 → 正式会话与下一份草稿”的实现。产品行为见 [Session 浏览设计](vfs-session-browser.md#项目内的新会话草稿)。
 
+## Cells 项目草稿
+
+本地项目沿用本文的 httpd/VFS 草稿服务。远程 Cells 项目通过 `projectDrafts: 1` / `project_draft` 查询节点当前草稿；Cells 分配 UUID、保存正文与分块附件、冻结首次提交目标，并用事务保存转正回执、原 UUID 到原生 Session 的映射及下一份空草稿。httpd 仅适配项目授权、导航与转正通知，不再为远程项目分配草稿 ID。旧 httpd 远程项目草稿在成功读取 Cells 草稿后丢弃，不迁移；已有正式 Session、原生历史及映射投影保留。
+
+原生首次输入必须同时匹配节点恢复记录和 `ExecutionState.admitted_turn` 的真实 request/session/turn 证据，未知提交不能转正或复位。Cells 队列回执保留原生 attemptId，草稿恢复同样校验真实接纳，不能将排队接纳冒充原生输入已执行。Node 的 promotion/resolve 查询可在 httpd 重启或回复丢失后恢复映射与 UI 投影。由 NestOS Agent/Flow 驱动的正式 Session 仍先由 httpd 验证 `hasCommittedSubmission`，再以固定 submissionId 请求 Cells 退休对应草稿；不伪造原生 Session。
+
+支持 `projectDraftFirstInput: 1` 的节点通过 `project_draft(action=submit)` 接收首条输入。httpd 先冻结原草稿及目标，再携带稳定 operationId 提交；Cells 持久记录创建、首条派发、清理和终结阶段，两个原生子请求的身份由该 operationId 确定。原生接受首条内容后，正式映射、转正、后继草稿和统一回执同事务发布；创建成功本身不向 httpd 发布原生绑定。`action=submission` 只核对原回执，不能再次派发原输入；创建后尚未派发便中断时，核对后清理空会话，返回未提交。
+
+首条明确拒绝时，Cells 在原生修改锁内复核历史为空，再删除该临时会话；清理结果未知时保留待核对阶段，不能声称已删除或重新创建。清理成功后保留原草稿身份，用户下次明确发送才创建新的原生会话。旧流程遗留的 rejected 空会话在打开草稿时核对原生回执后移除，丢弃该旧草稿并由 Cells 分配新草稿；旧客户端命名空间写入退休标记，阻止迟到写入重新建立失效绑定。已有 turn、在途或结果未知的会话不自动删除。
+
+实现见 [Cells 草稿存储](../../backend/app-core/src/projects/drafts/cells-store.ts)、[Cells 权威草稿](../../tools/cells/src/plugin/projects/drafts.rs)。跨项目草稿 move 目前仅支持原本地存储链路；Cells 草稿拒绝跨节点搬移，避免复制或重新分配原身份。
+
 ## 审查与调整
 
 | 原问题 | 调整 |

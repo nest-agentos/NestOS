@@ -47,7 +47,9 @@ export class RemoteConversationStore {
         if(!this.remote?.recoverSession)throw new FSError('ECAPABILITY','Cells recovery unavailable');
         await this.remote.recoverSession(input);await this.load();
     }
-    get submittedTurnId(): string | undefined { return this.record.submittedTurnId; }
+    get submittedTurnId(): string | undefined {
+        return this.record.submittedTurnId ?? (this.usesNodeQueue ? this.record.instructionQueue?.receipts.find(row => row.turnId)?.turnId : undefined);
+    }
     submitted(turnId: string): Promise<void> {
         return this.serialize(async () => {
             await this.reconcileWrite();

@@ -48,7 +48,7 @@ export class HttpViewClient {
         this.queries = this.batcher('queries'); this.bindings = this.batcher('bindings');
         this.peer = new RpcPeer('client', call => this.peer.remoteQuery(call) ? this.queries.query(call)
             : this.peer.remoteBinding(call) ? this.bindings.query(call) : this.post({ kind: 'call', call }),
-            error => console.error('[View]', error), installViewProjections);
+            error => console.error('[View]', safeFailure(error)), installViewProjections);
         installFileTransport(this.peer, this.url, this.clientId, this.abort.signal, (input, init) => this.request(input, init));
     }
     private batcher(kind: 'queries' | 'bindings'): QueryBatcher {
@@ -98,12 +98,27 @@ export class HttpViewClient {
         };
     }
     private async post(body: {kind: string; [key: string]: unknown}): Promise<Reply & { replies?: Reply[] }> {
-        const response = await this.request(this.url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const calls = body.kind === 'call' ? [body.call as Call] : (body.calls ?? []) as Call[];
+        const method = calls.length === 1 ? calls[0]?.method : undefined;
+        const response = await this.request(this.url, { method: 'POST', headers: { 'Content-Type': 'application/json',
+            'X-NestOS-RPC-Kind':body.kind,...(calls.some(call => call?.method === 'reportClientDiagnostic') ? {'X-NestOS-Diagnostic':'1'} : {}),
+            ...(method && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(method) ? {'X-NestOS-RPC-Method':method} : {}) },
             body: JSON.stringify({ ...body, clientId: this.clientId, version: RPC_VERSION }), signal: this.abort.signal }).catch(error => {
                 if (body.kind === 'call' && (error as {code?:string})?.code === 'HTTP_CONNECTION_LOST') Object.assign(error, {outcome:'unknown'});
                 throw error;
             });
-        const reply = await response.json() as Reply & { replies?: Reply[] };
+        let reply: Reply & {replies?: Reply[]};
+        try {reply = await response.json() as typeof reply;}
+        catch (error) {
+            const detail = error as {code?:string;name?:string;clientRequestId?:string};
+            const code = detail.code && ['HTTP_RESPONSE_INVALID','HTTP_RESPONSE_READ_FAILED','HTTP_REQUEST_ABORTED'].includes(detail.code) ? detail.code
+                : detail.name === 'SyntaxError' ? 'HTTP_RESPONSE_INVALID' : detail.name === 'AbortError' ? 'HTTP_REQUEST_ABORTED' : 'HTTP_RESPONSE_READ_FAILED';
+            const invalid = code === 'HTTP_RESPONSE_INVALID';
+            const failure = Object.assign(new Error(`Application response could not be ${invalid?'decoded':'read'} (HTTP ${response.status})`),
+                {code,stage:invalid?'response.decode':'response.body',requestId:response.headers.get('X-Request-ID') ?? undefined,
+                    ...(body.kind === 'call' ? {outcome:'unknown'} : {}),clientRequestId:(error as {clientRequestId?:string})?.clientRequestId});
+            throw failure;
+        }
         if (!response.ok) throw Object.assign(new Error(reply.error?.message ?? 'View request failed'), reply.error);
         return reply;
     }
@@ -112,7 +127,9 @@ export class HttpViewClient {
         const response = await this.fetcher(input, init).catch(error => {
             if (this.abort.signal.aborted || init?.signal?.aborted) throw error;
             const network = error instanceof TypeError || (error as {name?:string})?.name === 'NetworkError';
-            const failure = network ? Object.assign(new Error('Application connection interrupted'), {code:'HTTP_CONNECTION_LOST',stage:'transport.fetch',cause:error}) : error;
+            const clientRequestId = (error as {clientRequestId?:string})?.clientRequestId;
+            const failure = network ? Object.assign(new Error('Application connection interrupted'), {code:'HTTP_CONNECTION_LOST',stage:'transport.fetch',cause:error,
+                ...(typeof clientRequestId === 'string' && /^[a-f0-9-]{36}$/.test(clientRequestId) ? {clientRequestId} : {})}) : error;
             this.showDisconnected(failure);
             throw failure;
         });
@@ -279,14 +296,14 @@ export class HttpViewClient {
         if (this.closing || this.expired || this.updateFailed) return;
         this.updateFailed = true;
         this.abort.abort(); this.wake?.();
-        console.error('[View] Update failed', error);
+        console.error('[View] Update failed', safeFailure(error));
         this.onUpdateError?.(error);
     }
     private showDisconnected(error: unknown): void {
         if (this.closing || this.disconnected) return;
         this.disconnected = true;
         this.streamAbort.abort();
-        console.error('[View] Connection lost', error);
+        console.error('[View] Connection lost', safeFailure(error));
         this.onDisconnected?.(error);
     }
     close(): Promise<void> { return this.closeTask ??= this.closeView(); }
@@ -309,4 +326,12 @@ export class HttpViewClient {
             finally { clearTimeout(timer!); }
         }
     }
+}
+function safeFailure(error: unknown): Record<string, unknown> {
+    const value = error as {code?:unknown;name?:unknown;stage?:unknown;clientRequestId?:unknown;requestId?:unknown};
+    const result: Record<string,unknown> = {code:typeof value?.code==='string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(value.code)?value.code:'HTTP_VIEW_FAILED'};
+    for(const key of ['requestId','clientRequestId'] as const) if(typeof value?.[key]==='string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value[key] as string)) result[key]=value[key];
+    if(typeof value?.name==='string' && ['Error','TypeError','SyntaxError','AbortError','NetworkError','TimeoutError'].includes(value.name))result.errorType=value.name;
+    if(typeof value?.stage==='string' && ['transport.fetch','response.headers','response.body','response.decode'].includes(value.stage))result.stage=value.stage;
+    return result;
 }

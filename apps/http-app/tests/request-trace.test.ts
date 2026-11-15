@@ -5,6 +5,8 @@ import {diagnosticContext} from '@nestos/common';
 import {BrowserRequestTrace} from '../src/client/request-trace';
 import {requestTrace,traceRequest,tracedCellsFetch} from '../../node-host/src/logging/request-trace';
 import {auditRequest} from '../../node-host/src/logging/audit-log';
+import {RequestDiagnostics} from '../src/client/request-diagnostics';
+import {reportClientDiagnostic} from '../../../backend/app-core/src/host/client-diagnostic';
 const response=()=>Object.assign(new EventEmitter(),{headers:new Map<string,string>(),setHeader(name:string,value:string){this.headers.set(name,value);},getHeader(name:string){return this.headers.get(name);},statusCode:200,writableFinished:true});
 it('uses a navigation operation as the backend trace even when pushState emits no hashchange',async()=>{
     const browser=new BrowserRequestTrace(),headers:Headers[]=[];
@@ -51,4 +53,62 @@ it('preserves trace metadata when a Cells transport fails without logging the ex
     await expect(traceRequest(request(),response() as unknown as ServerResponse,()=>tracedCellsFetch((async()=>{throw Object.assign(Error('PRIVATE_BODY'),{code:'ECONNRESET'});}) as typeof fetch,event=>records.push(event))('https://cells.invalid/private/name'))).rejects.toThrow('PRIVATE_BODY');
     expect(records[0]).toMatchObject({traceId:'11111111111111111111111111111111',result:'failure',code:'ECONNRESET',route:'/v1/resource'});
     expect(JSON.stringify(records)).not.toMatch(/PRIVATE_BODY|private\/name/);
+});
+it('correlates a browser failure before the origin receives it and reports only safe metadata after reconnect',async()=>{
+    const browser=new BrowserRequestTrace(),records:any[]=[],headers:Headers[]=[];
+    const fetcher=browser.wrap(vi.fn(async(_url,init)=>{headers.push(new Headers(init?.headers));throw new TypeError('PRIVATE_INPUT_AND_TOKEN');}) as typeof fetch);
+    const input={method:'POST',headers:{Authorization:'Bearer PRIVATE_TOKEN','X-NestOS-RPC-Kind':'call','X-NestOS-RPC-Method':'saveComposerDraft'},body:JSON.stringify({text:'PRIVATE_INPUT'})};
+    await expect(fetcher('https://example.invalid/api/application?token=PRIVATE_QUERY',input)).rejects.toMatchObject({clientRequestId:expect.any(String)});
+    browser.setReporter(async event=>{reportClientDiagnostic(event);records.push(event);});
+    await vi.waitFor(()=>expect(records).toHaveLength(1));
+    expect(records[0]).toMatchObject({operationId:headers[0].get('X-NestOS-Client-Request-ID'),stage:'transport.fetch',code:'HTTP_CONNECTION_LOST',
+        http:{browserSessionId:browser.browserSessionId,route:'/api/application',method:'POST',rpcMethod:'saveComposerDraft',requestBytes:new TextEncoder().encode(input.body).byteLength}});
+    expect(JSON.stringify(records)).not.toMatch(/PRIVATE|Bearer|example.invalid|token=/);
+});
+it('distinguishes an upstream HTML 503 from a response decoding failure without logging its body',async()=>{
+    const browser=new BrowserRequestTrace(),records:any[]=[];
+    const fetcher=browser.wrap(async()=>new Response('<html>PRIVATE_UPSTREAM_BODY</html>',{status:503,headers:{'content-type':'text/html'}}));
+    const response=await fetcher('/api/application',{method:'POST'});
+    await expect(response.json()).rejects.toMatchObject({code:'HTTP_RESPONSE_INVALID',message:'Application response could not be decoded (HTTP 503)'});
+    browser.setReporter(async event=>{reportClientDiagnostic(event);records.push(event);});
+    await vi.waitFor(()=>expect(records).toHaveLength(2));
+    expect(records.map(r=>r.stage)).toEqual(['response.headers','response.decode']);
+    expect(records.every(r=>r.http.status===503 && r.http.responseType==='html' && !r.requestId)).toBe(true);
+    expect(JSON.stringify(records)).not.toContain('PRIVATE');
+});
+it('bounds deferred reports across reload and retains a failed report without a retry loop or replaying input',async()=>{
+    const queue=new RequestDiagnostics();let saved='';queue.restore({read:()=>null,write:value=>{saved=value;}});
+    const record={operation:'http.request',operationId:'11111111-1111-4111-8111-111111111111',stage:'transport.fetch',code:'HTTP_CONNECTION_LOST',result:'failure' as const,durationMs:1,
+        http:{browserSessionId:'11111111-1111-4111-8111-111111111111',traceId:'1'.repeat(32),spanId:'2'.repeat(16),occurredAt:1,method:'POST' as const,route:'/api/application' as const}};
+    for(let i=0;i<20;i++)queue.add({...record,durationMs:i});
+    expect(JSON.parse(saved)).toHaveLength(16);
+    const next=new RequestDiagnostics();next.restore({read:()=>saved,write:value=>{saved=value;}});
+    const reporter=vi.fn().mockRejectedValueOnce(Error('PRIVATE_REPORT_ERROR')).mockResolvedValue(undefined);next.setReporter(reporter);
+    await vi.waitFor(()=>expect(reporter).toHaveBeenCalledOnce());expect(JSON.parse(saved)).toHaveLength(16);
+    await vi.waitFor(()=>{next.flush();expect(JSON.parse(saved)).toEqual([]);});expect(reporter).toHaveBeenCalledTimes(17);
+    expect(reporter.mock.calls[0][0].durationMs).toBe(4);
+});
+it('records receipt of application headers before completion, even if the response later aborts',()=>{
+    const req=request(),res=response(),records:any[]=[];
+    req.headers['x-nestos-client-request-id']='11111111-1111-4111-8111-111111111111';
+    auditRequest({write:event=>records.push(event),close:async()=>{}},req,res as unknown as ServerResponse,'/api/application');
+    expect(records).toMatchObject([{event:'request.received',clientRequestId:req.headers['x-nestos-client-request-id'],stage:'request.headers'}]);
+    res.writableFinished=false;res.emit('close');
+    expect(records[1]).toMatchObject({event:'request.aborted',requestId:records[0].requestId,clientRequestId:records[0].clientRequestId});
+});
+it('distinguishes interrupted response bytes from malformed JSON',async()=>{
+    const browser=new BrowserRequestTrace(),records:any[]=[];
+    const fetcher=browser.wrap(async()=>new Response(new ReadableStream({start(controller){controller.error(new TypeError('PRIVATE_STREAM_BODY'));}}),{headers:{'content-type':'application/json'}}));
+    const response=await fetcher('/api/application');
+    await expect(response.json()).rejects.toMatchObject({code:'HTTP_RESPONSE_READ_FAILED',stage:'response.body'});
+    browser.setReporter(async event=>{reportClientDiagnostic(event);records.push(event);});await vi.waitFor(()=>expect(records).toHaveLength(1));
+    expect(records[0]).toMatchObject({stage:'response.body',code:'HTTP_RESPONSE_READ_FAILED'});expect(JSON.stringify(records)).not.toContain('PRIVATE');
+});
+it('does not recursively queue failures of diagnostic reports or replay the failed application request',async()=>{
+    const browser=new BrowserRequestTrace(),fetch=vi.fn().mockRejectedValueOnce(new TypeError('PRIVATE_INITIAL'))
+        .mockRejectedValueOnce(new TypeError('PRIVATE_REPORT')).mockImplementation(async()=>new Response('{}'));
+    const wrapped=browser.wrap(fetch);await expect(wrapped('/api/application')).rejects.toBeInstanceOf(TypeError);
+    const report=vi.fn(async()=>{await wrapped('/api/application',{headers:{'X-NestOS-Diagnostic':'1'}});});browser.setReporter(report);
+    await vi.waitFor(()=>expect(report).toHaveBeenCalledOnce());await new Promise(resolve=>setTimeout(resolve,10));expect(fetch).toHaveBeenCalledTimes(2);
+    await wrapped('/api/health');await vi.waitFor(()=>expect(report).toHaveBeenCalledTimes(2));expect(fetch).toHaveBeenCalledTimes(4);
 });

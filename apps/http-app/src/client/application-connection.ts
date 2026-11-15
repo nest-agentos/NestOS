@@ -16,7 +16,7 @@ export function connectApplication() {
     const clientId = randomUUID();
     let live: ReturnType<typeof import('./live-connection').adoptConnection> | undefined;
     const preparing = identity.then(userId => {
-        listeners.signal.throwIfAborted(); setFileRecoveryOwner(userId);
+        listeners.signal.throwIfAborted(); setFileRecoveryOwner(userId); tracing.restore(userId);
         const key = `mindos.snapshot-cache.v${RPC_VERSION}:${userId}`;
         const snapshots = new SnapshotCache({read: () => sessionStorage.getItem(key), write: value => sessionStorage.setItem(key, value)});
         const prepared = new PreparedHttpBootstrap({clientId, fetcher, snapshots, initialView: route.request, initialRead: route.initialRead});
@@ -25,7 +25,10 @@ export function connectApplication() {
     const ready = Promise.all([preparing, import('./live-connection')]).then(([prepared, module]) => {
         listeners.signal.throwIfAborted(); live = module.adoptConnection(prepared, fetcher, status, listeners.signal);
         return live.ready;
-    }).then(root => {performance.mark('nestos:data-ready'); return root;});
+    }).then(root => {
+        const report = root.backend.reportClientDiagnostic?.bind(root.backend); if (report) tracing.setReporter(report);
+        performance.mark('nestos:data-ready'); return root;
+    });
     let closing: Promise<void> | undefined;
     return {ready, editor: route.editor, subscribeStatus: (listener: (state: ConnectionState) => void) => status.subscribe(listener),
         close: () => closing ??= (async () => {

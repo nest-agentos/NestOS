@@ -10,3 +10,8 @@ it.each([{...diagnostic,prompt:'secret'}, {...diagnostic,code:'secret content'},
  const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
  expect(()=>reportClientDiagnostic(value as never)).toThrow(expect.objectContaining({code:'CLIENT_DIAGNOSTIC_INVALID'}));expect(warn).not.toHaveBeenCalled();
 });
+it.each([{route:'/private/secret?token=secret'},{rpcMethod:'private message body'},{prompt:'private message body'},{status:0},{requestBytes:Infinity}])('rejects unsafe nested HTTP diagnostic fields',extra=>{
+ const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ const http={browserSessionId:'11111111-1111-4111-8111-111111111111',traceId:'1'.repeat(32),spanId:'2'.repeat(16),occurredAt:1,method:'POST',route:'/api/application',...extra};
+ expect(()=>reportClientDiagnostic({...diagnostic,http} as never)).toThrow(expect.objectContaining({code:'CLIENT_DIAGNOSTIC_INVALID'}));expect(warn).not.toHaveBeenCalled();
+});

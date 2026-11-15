@@ -1,3 +1,4 @@
+import {CellsProjectDraftStore} from './drafts/cells-store';
 import {navigationFolders} from './navigation-folders';
 import {LEGACY_LOCAL_PROJECT_NAMES} from '@nestos/app-contracts';
 import {ProjectEnvironmentStore} from './project-environment';
@@ -67,7 +68,8 @@ export class ProjectService {
             if (!this.remoteMounts?.readConversationRecovery) throw new FSError('ECAPABILITY', 'Remote draft recovery is unavailable');
             return this.remoteMounts.readConversationRecovery(id, target, draftId);
         });
-        this.drafts = new ProjectDraftService(id => new ProjectDraftStore(root, id), repository, async () => (await this.list()).map(item => item.project.id), async (id, request) => {
+        this.drafts = new ProjectDraftService(id => this.remoteMounts?.projectDraft && this.remoteMounts.list(id).some(m => m.at === '/')
+            ? new CellsProjectDraftStore(root, id, input => this.remoteMounts!.projectDraft!(id, input)) : new ProjectDraftStore(root, id), repository, async () => (await this.list()).filter(item => !this.remoteMounts?.list(item.project.id).some(m => m.at === '/' && m.access !== 'rw')).map(item => item.project.id), async (id, request) => {
             const project = await this.get(id);
             if (request?.harness) {
                 if (!this.harnessDraftConnection) throw new FSError('ECAPABILITY', 'Project harness preparation is unavailable');

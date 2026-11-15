@@ -76,11 +76,22 @@ pnpm cli project list --connect https://host:2000 \
 
 ## 无 UI 验证原生远程会话
 
+### 首条发送中断的关联日志
+
+浏览器为每个请求生成 `X-NestOS-Client-Request-ID`，同时携带导航 trace/span 和 browserSessionId。httpd 审计的 `request.received` 在认证后、读取正文前落下该 clientRequestId，`request.complete` / `request.aborted` 保留同一关联及处理、响应阶段耗时。已有 Cells 请求继续通过 traceId 和 parentRequestId 关联。
+
+浏览器 `http-client` 日志记录固定路由、RPC kind/method、请求字节数、响应类型/大小、HTTP 状态、阶段及耗时，不记录 URL 参数、请求头或正文。正常请求与发送准备过程仅记 debug，失败保留 warn；节点草稿读取、目录发现和未变化的 channel 比较同样仅记 debug，首次提交与清理回执保留正常级别。`transport.fetch` 表示未取得响应，`response.body` 表示读取响应中断，`response.decode` 表示无法解析 JSON；HTML/文本错误页的状态和类型会保留，原始错误及页面正文不进入日志。没有源站 requestId 的 503 与有源站回执的业务错误可以据此区分，但不能仅凭日志缺失断定具体网络设备故障。
+
+失败元数据在当前用户的 sessionStorage 中最多保存 16 条，重连后通过既有 `reportClientDiagnostic` 补报到运行日志 `[ClientDiagnostic]` 的 `http` 字段；每次最多补报 2 条，报告失败保留待办且不自行循环，不重发业务请求。旧浏览器会话和原请求 trace 保存在该字段，报告请求本身使用新的服务端 trace。UI 的 `chat.draft.prepare` 另记录草稿保存、执行器检查、编辑器交接和输入准备各阶段；下一次失败可用 clientRequestId 对照浏览器、httpd 审计和补报日志定位。
+
 下列命令均可在末尾添加本地 `--profile` 或上述远程连接参数：
 
 ```bash
 pnpm cli project list
 pnpm cli conversation profiles <project-id>
+pnpm cli conversation draft <project-id> <profile-id>
+pnpm cli conversation send-draft <project-id> <profile-id> "首条内容"
+pnpm cli conversation reconcile-draft <project-id> <profile-id> <original-draft-id> <operation-id>
 pnpm cli conversation create <project-id> <profile-id> <workspace-id>
 pnpm cli conversation list <project-id> <profile-id>
 pnpm cli conversation show <project-id> <profile-id> <native-session-id>
@@ -88,7 +99,7 @@ pnpm cli conversation send <project-id> <profile-id> <native-session-id> "测试
 pnpm cli conversation reconcile <project-id> <profile-id> <native-session-id>
 ```
 
-`create` 使用 profiles 返回的 workspace ID，显式创建真实原生会话并返回 session；操作携带 epoch 与唯一 requestId。`list` 可追加上一页返回的 cursor。`show` 返回后端快照，包括 canSend、pending、disconnected 和 observation。`send` 调用与 llm-ui 相同的 `ProjectConversationPort.send()`，保留后端错误 code、remoteCode、outcome、requestId；结果未知时用 `reconcile` 查询回执，不自动再次发送。还支持 branches、fork、interrupt。发送、分支和中断均为真实操作，读取命令不会试发消息。turn 被接受只表示提交成功，模型最终回复或失败需继续检查原生事件与会话状态。
+`draft` 查询 Cells 当前草稿 ID，不创建原生会话。`send-draft` 复用 UI 的项目草稿首次发送链路，由 Cells 统一创建并提交首条内容；不需要先调用 `create`。结果未知时使用 `reconcile-draft` 查询原 operation ID，不重复发送。`create` 使用 profiles 返回的 workspace ID，显式创建真实原生会话并返回 session；操作携带 epoch 与唯一 requestId。`list` 可追加上一页返回的 cursor。`show` 返回后端快照，包括 canSend、pending、disconnected 和 observation。`send` 调用与 llm-ui 相同的 `ProjectConversationPort.send()`，保留后端错误 code、remoteCode、outcome、requestId；结果未知时用 `reconcile` 查询回执，不自动再次发送。还支持 branches、fork、interrupt。发送、分支和中断均为真实操作，读取命令不会试发消息。turn 被接受只表示提交成功，模型最终回复或失败需继续检查原生事件与会话状态。
 
 这可以分离界面问题与后端问题：若 CLI 同样返回 `HARNESS_SESSION_BUSY`，应处理原生线程的 active writer；若同一端口发送成功而 UI 无回显，再检查界面订阅和投影。复查当前运行 httpd 的挂载、授权和占用状态应使用 `--connect`，本地模式用于隔离验证同一实现。
 

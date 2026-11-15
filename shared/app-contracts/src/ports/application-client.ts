@@ -97,6 +97,12 @@ export interface ClientDiagnostic {
     operation: string; operationId: string; sessionId?: string; stage: string;
     code: string; result: 'retrying' | 'failure'; durationMs: number;
     remoteCode?: string; requestId?: string;
+    http?: {
+        browserSessionId: string; traceId: string; spanId: string; occurredAt: number;
+        method: 'GET' | 'POST' | 'OTHER'; route: '/api/application' | '/api/application/events' | '/api/application/files' | '/api/health' | '/api/identity' | '/resource';
+        rpcKind?: string; rpcMethod?: string; requestBytes?: number; status?: number; contentLength?: number;
+        responseType?: 'json' | 'html' | 'text' | 'other'; errorKind?: 'abort' | 'network' | 'type' | 'other'; online?: boolean;
+    };
 }
 
 /** Omit selectors to read the latest round in the selected (or current) branch. */

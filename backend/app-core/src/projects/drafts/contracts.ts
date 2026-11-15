@@ -13,6 +13,8 @@ export interface ProjectDraftRecord {
 }
 /** Transaction adapter used by project policy; no VFS types cross this port. */
 export interface DraftStore {
+    readonly remote?: boolean;
+    recoverPromotion?(): Promise<ProjectDraftPromotion | undefined>;
     putAttachment(content: ArrayBuffer): Promise<string>;
     readAttachment(id: string): Promise<ArrayBuffer>;
     load(): Promise<ProjectDraftRecord>;

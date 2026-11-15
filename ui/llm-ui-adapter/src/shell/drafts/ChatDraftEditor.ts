@@ -2,6 +2,7 @@ import {type EditorOptions} from '../../contracts';
 import {mountDraftHeader} from './draft-header';
 import {mountEditorTitleBar} from '../content-titlebar';
 import {draftLoading} from './draft-loading';
+import {draftPreparationDiagnostics} from './preparation-diagnostics';
 import {remotePromptTargets, draftHarnessTarget} from './remote-prompt-targets';
 import {resolveChatImageResize} from '../../components/input/image-processing-session';
 import {chatAttachmentMenu} from '../chat-attachment-menu';
@@ -230,17 +231,22 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     private async prepare(input: ChatSubmission, draft: ComposerDraft): Promise<SendPreparation | null> {
         this.check(); if (!this.active) throw new Error('Project draft is hidden');
         this.preparing = true; this.submissionStarted = true; this.draftHeader?.update();
+        const diagnostic = draftPreparationDiagnostics(this.source.conversationId,input.text.length,input.attachments.length);
         try {
         await this.view.flushDraft();
+        diagnostic.step('executor.validate');
         const agentId = input.target?.kind === 'flow' ? undefined : input.target?.kind === 'agent' ? input.target.id : input.selection?.executorId ?? draft.selection?.executorId ?? this.store.preferences(draft).agentId;
         if (this.config.sessionDraft?.executorScope === 'remote' && input.target?.kind !== 'flow' && !this.executors.some(item => item.id === agentId))
             throw new Error(t('toolbox.unavailable'));
-        const target = await this.materialize(agentId, draft); this.check();
-        if (target.resumeOnly || await target.editor.commands.prepareChatInput?.(input, draft)) return null;
+        diagnostic.step('editor.materialize'); const target = await this.materialize(agentId, draft); this.check();
+        diagnostic.step('input.prepare');
+        if (target.resumeOnly || await target.editor.commands.prepareChatInput?.(input, draft)) {diagnostic.step('complete'); return null;}
+        diagnostic.step('submission.prepare');
         const prepared = await target.editor.commands.preparedSubmission?.();
         const submission = target.submission ?? prepared as SessionSubmission | undefined;
-        return {operationId: submission?.id ?? randomUUID(), viewId: this.bindingViewId()};
-        } finally {this.preparing = false; this.draftHeader?.update();}
+        const result = {operationId: submission?.id ?? randomUUID(), viewId: this.bindingViewId()}; diagnostic.step('complete'); return result;
+        } catch (error) {diagnostic.fail(error); throw error;}
+        finally {this.preparing = false; this.draftHeader?.update();}
     }
     private bindingViewId(): string {
         const binding = this.delegate?.commands.chatBindingIdentity?.() as {viewId: string} | undefined;

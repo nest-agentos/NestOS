@@ -8,6 +8,7 @@ import type { ProjectDraftPromotion, ProjectDraftRecord, ProjectDraftComposer, D
 
 /** Reconcile from durable evidence; notifications never create successor drafts. */
 export class ProjectDraftService {
+    private readonly published = new Map<string, string>();
     private readonly listeners = new Set<(event: ProjectDraftPromotion) => void>();
     constructor(private readonly store: (projectId: string) => DraftStore, private readonly sessions: Pick<ISessionRepository, 'ensureSession' | 'readDocument' | 'getManifest' | 'saveSessionSettings'>,
         private readonly projectIds: () => Promise<string[]>, private readonly assertLocal?: (projectId: string, request?: Parameters<ProjectDraftComposer['prepare']>[0]) => Promise<string | void>,
@@ -33,14 +34,14 @@ export class ProjectDraftService {
             move: async targetProjectId => {
                 if (!(await this.projectIds()).includes(targetProjectId)) throw new FSError('ENOENT', 'Target project not found');
                 const current = await this.store(projectId).load();
-                if (current.id === identity) await this.assertResettable?.(projectId, current);
+                if (!store.remote && current.id === identity) await this.assertResettable?.(projectId, current);
                 if (!store.moveTo) throw new FSError('ECAPABILITY', 'Draft project switching is unavailable');
                 await store.moveTo(targetProjectId);
             },
             save: data => store.saveData(data), clear: async () => {
                 const current = await this.store(projectId).load();
                 if (current.id !== identity) throw new FSError('ECONFLICT', 'Project draft identity changed');
-                await this.assertResettable?.(projectId, current);
+                if (!store.remote) await this.assertResettable?.(projectId, current);
                 await store.reset(); identity = (await store.load()).id; resumeOnly = false; locked = false; return identity;
             },
             prepare: async request => {
@@ -54,7 +55,7 @@ export class ProjectDraftService {
             },
         };
     }
-    async ensure(projectId: string): Promise<void> { await this.store(projectId).load(); }
+    async ensure(projectId: string): Promise<void> { const store = this.store(projectId); if (!store.remote) await store.load(); }
     onPromoted(listener: (event: ProjectDraftPromotion) => void): () => void {
         this.listeners.add(listener); return () => this.listeners.delete(listener);
     }
@@ -78,7 +79,9 @@ export class ProjectDraftService {
     }
     async reconcile(projectId: string, sessionId?: string, roundId?: string): Promise<void> {
         const draft = this.store(projectId), record = await draft.load();
-        const remote = await this.remoteReceipt?.(projectId, record);
+        this.publish(await draft.recoverPromotion?.());
+        if (draft.remote && !record.harnessConnectionId) {this.publish(await draft.promote()); return;}
+        const remote = draft.remote ? undefined : await this.remoteReceipt?.(projectId, record);
         if (remote) {this.publish(await draft.promote(remote)); return;}
         if (record.remoteTarget || record.state !== 'submitting' || !record.sessionId || !record.submissionId) return;
         if (sessionId && record.sessionId !== sessionId || roundId && record.submissionId !== roundId) return;
@@ -91,7 +94,9 @@ export class ProjectDraftService {
         }
     }
     private publish(event?: ProjectDraftPromotion): void {
-        if (event) for (const listener of this.listeners) {
+        if (!event || this.published.get(event.projectId) === event.draftId) return;
+        this.published.set(event.projectId, event.draftId);
+        for (const listener of this.listeners) {
             try {listener(event);} catch (error) {console.warn('Project draft notification failed', error);}
         }
     }
