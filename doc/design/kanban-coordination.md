@@ -1175,3 +1175,9 @@ HTTP 侧栏中的远程会话状态按项目共享只读元数据快照，客户
 一页决策的任务组进度与交互投影共用本次读取计划中的事实集：已授权的相同任务摘要不重复取，补读只请求缺少的 ID，跨版本数据拒绝混合。不同看板最多 8 路并发，每个看板保留分块顺序；没有跨请求业务结果缓存，自定义 Activity 服务保留自己的实现。日志只记录 operationId、阶段、结果、安全错误码、耗时、读取/写入次数及字节数，不记录冻结正文、参数或配置值。`readCount` 为逻辑存储/摘要调用数，SQLite sidecar 操作计数另行记录，不能混同 HTTP 请求数。
 
 本地 SQLite 两种适配器的字段前缀读取使用 BINARY 范围上下界（同时用于分页总数与页内容），不再使用 `LIKE` 扫描整个路径分区。查询计划须包含 `path=? AND field>? AND field<?`；中文、emoji、大小写、通配字符、最大 Unicode 码点与 NUL 前缀均有回归。自定义 Activity 服务可以通过 `prepareRecordReads` 显式提供本次页面读取器，NestOS 宿主按自己的执行绑定命名空间接入，不绕过既有授权或会话来源。
+
+### 未转正式决策的草稿删除
+
+决策列表中的会话草稿可以单选或通过本页全选选择，使用“删除所选草稿”一次确认；正式决策继续使用已有归档入口。确认说明原始 Session 与历史保留，不会取消仍在运行的会话。`KanbanClient.removeRecordConversations` 一次批量 RPC 接纳最多 100 条，每条携带独立、稳定的 operationId、conversationId 和所见 fingerprint，返回逐条 removed/failed/unknown；失败或结果未知保留选择，用户重试沿用原请求身份，不自动重发执行。
+
+后台通过已有 `controlRecordConversation(remove-draft)` 核验看板协调者、条目归属、fingerprint、原生接纳是否已确定及正式决策关联。宿主复查发布 journal、协调关联和实际提案记录，避免发布 ACK 丢失导致误删。会话引用墓碑与回执原子提交，移除后停止看板观察，扫描和重启不能重新创建草稿；不调用 Session 删除或中断，也不取消正式任务。失效项目引用仍可以使用原有、须有缺失证据的 cleanup-reference 流程。

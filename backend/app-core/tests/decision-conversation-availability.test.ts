@@ -30,3 +30,18 @@ it('validates persisted discussion links even when an old resource URL already e
  expect(view.resourceId).toBe(f.value.resourceId);expect(view.resources).toEqual([{system:'nestos-remote-project',id:'project'}]);
  expect(JSON.stringify(log.mock.calls)).not.toContain('PRIVATE_BODY');
 });
+
+it('verifies draft removal against publication journals and actual records without contacting Cells',async()=>{
+ const {verifyDecisionDraftRemoval}=await import('../src/kanban/decision-conversation-availability');
+ const f=fixture(),getMany=vi.fn(async()=>[undefined,undefined,undefined] as unknown[]),record=vi.fn(async()=>{throw Object.assign(Error('Missing'),{code:'RECORD_NOT_FOUND'});});
+ const options={...f,journal:{getMany},service:{record}};
+ await verifyDecisionDraftRemoval(options as never,f.value as never);expect(f.remote.projectHarness).not.toHaveBeenCalled();
+ getMany.mockResolvedValueOnce([{recordId:'saved'},undefined,undefined]);
+ await expect(verifyDecisionDraftRemoval(options as never,f.value as never)).rejects.toMatchObject({code:'CONVERSATION_HAS_RECORD'});
+ getMany.mockResolvedValueOnce([undefined,undefined,{record:{id:'proposal'}}]);
+ await verifyDecisionDraftRemoval(options as never,f.value as never);expect(record).toHaveBeenCalledWith('board','proposal');
+ getMany.mockResolvedValueOnce([undefined,undefined,{record:{id:'proposal'}}]);record.mockResolvedValueOnce({id:'proposal'} as never);
+ await expect(verifyDecisionDraftRemoval(options as never,f.value as never)).rejects.toMatchObject({code:'CONVERSATION_HAS_RECORD'});
+ getMany.mockRejectedValueOnce(Object.assign(Error('Offline'),{code:'EIO'}));
+ await expect(verifyDecisionDraftRemoval(options as never,f.value as never)).rejects.toMatchObject({code:'EIO'});
+});

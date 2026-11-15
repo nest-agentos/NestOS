@@ -128,3 +128,15 @@ it('round-trips board settings through the declared RPC capability with revision
         await expect(remote.execute(board.id,{...request,operationId:'stale-save'})).rejects.toMatchObject({code:'REVISION_CONFLICT'});expect(report).not.toHaveBeenCalled();
     }finally{await client.close();await server.close();await view.close();await runtime.dispose();}
 },15000);
+
+it('round-trips draft removal as one declared mutation RPC with per-entry receipts',async()=>{
+    const removeRecordConversations=vi.fn(async()=>({items:[{conversationId:'draft',outcome:'removed'}]})),report=vi.fn(),calls:unknown[]=[];let server!:RpcPeer;
+    const client=new RpcPeer('client',call=>{calls.push(call);return server.handle(call);},report,installViewProjections);
+    server=new RpcPeer('server',async call=>{client.applyUpdates(await server.refresh());return client.handle(call);},report);
+    try {
+        const boot=await server.bootstrap({overview:async()=>({}),related:async()=>[],scan:async()=>{},execute:async()=>{},removeRecordConversations});client.applyUpdates(boot.updates);
+        const remote=client.decode(boot.value!),request={requests:[{conversationId:'draft',operationId:'remove-draft',action:'remove-draft',fingerprint:'a'.repeat(64),confirmed:true}]};
+        calls.length=0;expect(await remote.removeRecordConversations('board',request)).toEqual({items:[{conversationId:'draft',outcome:'removed'}]});
+        expect(removeRecordConversations).toHaveBeenCalledExactlyOnceWith('board',request);expect(calls).toHaveLength(1);expect(report).not.toHaveBeenCalled();
+    }finally{await client.close();await server.close();}
+});
