@@ -181,6 +181,8 @@ HTTP 外挂的条件写入、取消与项目授权见 [HTTP VFS 设计](design/v
 
 ## 外部 harness 端口
 
+Cells 节点的传输、业务操作和文件来源接口见 [节点插件边界](../tools/cells/doc/plugins.md#传输协调与业务端口)。业务插件不挂载 HTTP Router；文件读取通过 `FileSource` 接入，本地实现已迁移，WebDAV 客户端与 Linux 挂载尚未实现。
+
 `CellsDriver` 由宿主装配并注入远程来源服务，统一凭据，暴露文件/进程 provider、sync 与 harness。`HarnessClient`、`HarnessProfile`、`HarnessSession`、`HarnessEvents`、`HarnessReceipt` 位于 cells-driver `/harness` 公共入口，app-core 消费该端口，分别装配原生会话展示和持久远程执行；UI不持有底层凭据。
 
 创建仅使用服务端声明的 workspaceId；继续先核对 native cwd 授权并拒绝抢占活跃会话；发送、响应和中断必须属于本服务接管的会话。只读历史不触发 resume。修改必须使用当前 epoch/requestId，未知结果查询 operation 收据，禁止自动重放。事件有独立 epoch、递增 seq 与 cursor；gap 要求刷新历史，不能宣称完整输出。客户端关闭不代表原生 turn 停止。
