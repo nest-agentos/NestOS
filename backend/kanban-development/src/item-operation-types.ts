@@ -46,6 +46,7 @@ export interface ReviewOperationsOptions {
     automaticTarget?(board:KanbanBoard,item:KanbanItem):string|undefined;
     automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;
     cleanup?(board:string,item:string,id:string):Promise<boolean>;
+    cleanupReview?:import('@nestos/kanban/integration').ReviewCleanupPorts['cleanupReview'];
     reportAutomatic?(state:{id:string;boardId:string;itemId:string;step:number;waitingForUser?:boolean;code?:string;done?:boolean;handoff?:{boardId:string;itemId:string;at:number}}):Promise<void>;
     report?(job: ReviewJob): Promise<void>;
     sessionResource?(sessionId: string): Promise<string | undefined>;

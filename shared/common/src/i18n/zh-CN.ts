@@ -846,6 +846,7 @@ export const zhCN = {
     "kanban.operationCancel": "停止此操作及后续依赖操作",
     'kanban.operationCleanup': '清理工作树',
     'kanban.operationRetryCleanup': '重试清理',
+    'kanban.operationProgress.cleanupReview': '管理会话正在分析并尝试清理',
     'kanban.operationProgress.cleanup': 'Git 提交已完成，正在清理工作树；Session 和交付记录会保留。',
     'kanban.operationStage.build': '构建',
     'kanban.operationStage.deploy': '替换',

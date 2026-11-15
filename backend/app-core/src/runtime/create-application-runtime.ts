@@ -1,3 +1,4 @@
+import {requestManagementCleanup} from '../kanban/cleanup-review-conversations';
 import {createIndependentCallExecutionReader,createSessionActivityReader} from '@nestos/llm-session';
 import {originalSession} from '../projects/original-execution-session';
 import {createSessionExecutionReader} from '../session/execution-facts';
@@ -640,7 +641,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             wake: () => wakeKanban()});
         cleanupFns.push(() => developmentMessages.dispose());
         const executionResource=remoteConnections?kanbanSessionResource(projects,nativeSessionResource(kernelCore,projects,remoteConnections)):undefined;
-        const kanban = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,createSessionActivityReader(kernelCore), independentCalls ? {
+        const kanban:import('@nestos/kanban').KanbanModuleHandle = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,createSessionActivityReader(kernelCore), independentCalls ? {
             prepareTarget:developmentBindings?kanbanHarnessTarget(developmentBindings):undefined,
             boardSettings:remoteConnections?kanbanHarnessSettings(remoteConnections):undefined,
             sessionObservation:developmentBindings?developmentMessages.sessionObservation:undefined,
@@ -651,7 +652,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 const review={...developmentBindings,...context,cancelSubmission:submissionControl({contexts:conversationContexts,repository:sessionRepository,kernel:kernelCore,ensureWritable:conversationOptions.ensureWritable}),calls:independentCalls,kernel:kernelCore,runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission,wake:()=>wakeKanban()};
                 const scopes=managementOperationScopes({...review,basePlan:developmentDeliveryPlan(context.journal,context.service)});
                 const report=itemOperationReporter(context);
-                return createItemOperations({...context,scopes,cancelOperation:async(job,id)=>{const request=job.input!.request;const result=await controlCall({calls:independentCalls,callControl:(command,input)=>commandBus.execute(command,input),callCancel:(command,input)=>commandBus.execute(command,input)},context.journal,request.expectedSessionId!,id,'cancel',request.submission!.id);return result==='cancelled'?'cancelled':result==='unknown'?'unknown':'accepted';},deliveryPlan:scopes.deliveryPlan,
+                return createItemOperations({...context,scopes,cleanupReview:input=>requestManagementCleanup({...developmentBindings,...context,client:()=>kanban,executionResource},input).then(()=>{}),cancelOperation:async(job,id)=>{const request=job.input!.request;const result=await controlCall({calls:independentCalls,callControl:(command,input)=>commandBus.execute(command,input),callCancel:(command,input)=>commandBus.execute(command,input)},context.journal,request.expectedSessionId!,id,'cancel',request.submission!.id);return result==='cancelled'?'cancelled':result==='unknown'?'unknown':'accepted';},deliveryPlan:scopes.deliveryPlan,
                 adapter:developmentReviewAdapter(review),
                 published: publishedOperation({calls: independentCalls, kernel: kernelCore, ensureSession: (id, title) => sessionRepository.ensureSession(id, title),
                     prepareSession: async id => {await initializeProjects(); await prepareChildExecution(id); return recovery.acquireLater(id);}}),

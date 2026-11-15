@@ -1,3 +1,4 @@
+import {beginManagementCleanup,readManagementCleanup,completeManagementCleanup} from './cleanup-review-conversations';
 import {createModuleLogger} from '@nestos/common';
 import {safeCode} from '@nestos/kanban/integration';
 const log=createModuleLogger('kanban-session-plugins');
@@ -31,6 +32,9 @@ export async function resolveKanbanPluginRequest(options:DecisionConversationOpt
         ],
     ]}];
     if(management)plugins.push({id:'delivery',version:'1',description:'Bound management task delivery operations, analysis, integration and receipt reconciliation.',methods:[
+        method('cleanup.start','Ask the original management Session to review explicitly selected retained resources.',schema({itemId:string,scopeId:string,resourceIds:{type:'array',items:string,maxItems:16}},['itemId','scopeId','resourceIds']),input=>beginManagementCleanup(options,management,input.params,input.id),'command'),
+        method('cleanup.read','Read the frozen cleanup review and host status.',schema({reviewId:string},['reviewId']),input=>readManagementCleanup(options,management,input.params.reviewId)),
+        method('cleanup.complete','Finish a cleanup attempt; the host checks and removes actual resources before reporting success.',schema({reviewId:string},['reviewId']),input=>completeManagementCleanup(options,management,input.params.reviewId),'command'),
         method('read','Read plugin views, repository scopes, enabled actions and confirmations.',schema({itemId:string},['itemId']),input=>resolveCoordinationRequest(options,management,{...input,method:'coordination.operations.read'})),
         method('run','Invoke the enabled operation using its returned revision and real confirmation; retain request identity on uncertainty.',schema({itemId:string,request:schema({action:string,expectedRevision:string,pluginId:string,scopeId:string,selections:{type:'object',additionalProperties:string},followUp:string,reconcile:schema({runId:string},['runId'])},['action','expectedRevision'])},['itemId','request']),input=>resolveCoordinationRequest(options,management,{...input,method:'coordination.operations.run'}),'command'),
     ]});

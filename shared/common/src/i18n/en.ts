@@ -845,6 +845,7 @@ export const en: LocaleStrings = {
     "kanban.operationCancel": "Stop this operation and dependent steps",
     'kanban.operationCleanup': 'Clean worktree',
     'kanban.operationRetryCleanup': 'Retry cleanup',
+    'kanban.operationProgress.cleanupReview': 'Management Session is reviewing cleanup',
     'kanban.operationProgress.cleanup': 'Git submission completed. Cleaning the worktree while retaining the Session and delivery records.',
     'kanban.operationStage.build': 'Build',
     'kanban.operationStage.deploy': 'Replace',
