@@ -974,6 +974,8 @@ export const zhCN = {
     "kanban.errors.OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE": "原生会话上下文不可续接，请检查原会话。",
     "kanban.errors.OPERATION_WORKSPACE_UNAVAILABLE": "原工作区不存在或已清理。",
     "kanban.errors.OPERATION_REQUEST_INVALID": "操作请求格式无效。",
+    "kanban.errors.OPERATION_RESULT_SCOPE_MISMATCH": "操作期间目标仓库或工作区状态发生变化，结果未被确认。请重新分析后再提交。",
+    "kanban.errors.OPERATION_RESULT_SOURCE_CHANGED": "操作期间来源任务的代码发生变化，结果未被确认。请重新分析。",
     "kanban.errors.MERGE_PLAN_SOURCE_CHANGED": "合并分析期间版本发生变化，请重新分析。",
     "kanban.errors.MERGE_PLAN_INVALID": "会话未提供有效的合并分析结果。",
     "kanban.errors.OPERATION_RESULT_INVALID": "流程返回的操作结果格式不正确。",

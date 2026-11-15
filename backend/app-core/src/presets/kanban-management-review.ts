@@ -49,10 +49,19 @@ async function prepareManagementOperation(options:DevelopmentReviewOptions,scope
     return {...request,source:{...request.source,text:maintenanceInstruction(input.action,['management-integration-pre.md'])}};
 }
 async function readManagementOperation(options:DevelopmentReviewOptions,scope:ManagementScope,base:ReviewAdapter,job:ReviewJob):Promise<unknown|undefined> {
-    const frozen=managementBatch(job.snapshot);requireValue(frozen.scopeId===scope.id&&frozen.ownerId===job.itemId,'OPERATION_SCOPE_MISMATCH');
+    const started=Date.now(),frozen=managementBatch(job.snapshot);requireValue(frozen.scopeId===scope.id&&frozen.ownerId===job.itemId,'OPERATION_SCOPE_MISMATCH');
     const definition=await options.service.read(job.boardId),actual=await managementBatchSnapshot(scope,definition,options.service,item=>developmentReviewSnapshot(options,definition,item));
     requireValue(actual.sourceVersion===job.snapshot.sourceVersion,'OPERATION_RESULT_SOURCE_CHANGED');
-    if(job.action!=='merge')requireValue(actual.version===job.snapshot.version,'OPERATION_RESULT_SCOPE_MISMATCH');
+    if(job.action!=='merge'&&actual.version!==job.snapshot.version){
+        const code=job.action==='analyze'?'MERGE_PLAN_SOURCE_CHANGED':'OPERATION_RESULT_SCOPE_MISMATCH';
+        const previous=job.snapshot.context as {targetBranch?:string;targetWorktree?:{statusDigest?:string}};
+        const current=actual.context as typeof previous;
+        log.warn('Repository changed during operation',{operationId:job.id,scopeId:scope.id,stage:'management.snapshot.verify',result:'failure',code,action:job.action,
+            expectedTargetVersion:job.snapshot.targetVersion,actualTargetVersion:actual.targetVersion,
+            targetChanged:actual.targetVersion!==job.snapshot.targetVersion,targetBranchChanged:current.targetBranch!==previous.targetBranch,
+            targetWorktreeChanged:current.targetWorktree?.statusDigest!==previous.targetWorktree?.statusDigest,durationMs:Date.now()-started});
+        requireValue(false,code);
+    }
     const result=await base.readOperation!({...job,itemId:frozen.sources[0].itemId,snapshot:frozen.sources[0].snapshot});
     if(job.action==='merge'&&result&&(result as {status?:string}).status==='succeeded'){
         const started=Date.now();

@@ -973,6 +973,8 @@ export const en: LocaleStrings = {
     "kanban.errors.OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE": "The original native context cannot be resumed.",
     "kanban.errors.OPERATION_WORKSPACE_UNAVAILABLE": "The original workspace is missing or has been cleaned.",
     "kanban.errors.OPERATION_REQUEST_INVALID": "Invalid operation request.",
+    "kanban.errors.OPERATION_RESULT_SCOPE_MISMATCH": "The target repository or worktree changed during this operation. Its result was not confirmed. Analyze again before submitting.",
+    "kanban.errors.OPERATION_RESULT_SOURCE_CHANGED": "The source task code changed during this operation. Its result was not confirmed. Analyze again.",
     "kanban.errors.MERGE_PLAN_SOURCE_CHANGED": "Source or target changed during analysis. Analyze again.",
     "kanban.errors.MERGE_PLAN_INVALID": "The session did not return a valid merge analysis.",
     "kanban.errors.OPERATION_RESULT_INVALID": "The workflow returned an invalid operation result.",
