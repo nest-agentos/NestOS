@@ -35,8 +35,9 @@ async function prepareSnapshots(peer: RpcPeer, services: ApplicationServices, do
 function prepareProjectSnapshots(peer: RpcPeer, services: ApplicationServices, projectIds: readonly string[]): void {
     const remote = services.projects.remoteMounts;
     if (!remote) return;
-    for (const connection of remote.connections()) for (const name of ['connection', 'connectionName', 'connectionDiagnostic', 'connectionStatus'])
-        peer.remember(remote, name, [connection.id]);
+    const connections = remote.connections().map(connection => [connection.id]);
+    for (const name of ['connection', 'connectionName', 'connectionDiagnostic', 'connectionStatus'])
+        peer.replaceLookups(remote, name, connections);
     for (const id of projectIds) {
         for (const name of ['list', 'projectOffline', 'degraded']) peer.remember(remote, name, [id]);
         peer.remember(remote.sessionStatus, 'fileVersion', [id]);

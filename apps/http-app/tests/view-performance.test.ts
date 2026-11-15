@@ -385,3 +385,18 @@ it('transports one scoped decision query while another independent query is stil
         expect(client.remoteQuery(calls.find(call=>call.method==='decisionSnapshot')!)).toBe(true);expect(service.execute).not.toHaveBeenCalled();
     } finally {finish();await first;}
 });
+
+it('retires obsolete selector arguments without poisoning mutation receipts or rereading unchanged selectors', async () => {
+    const rows = new Map([['one', {id: 'one'}], ['two', {id: 'two'}]]);
+    const service = {connections: () => [...rows.values()], projectConversation: vi.fn(),
+        connection: vi.fn((id: string) => {if (!rows.has(id)) throw Object.assign(Error('Removed'), {code: 'ENOENT'}); return rows.get(id);}),
+        removeConnection: async (id: string) => {rows.delete(id); server.replaceLookups(service, 'connection', [...rows.keys()].map(key => [key]));}};
+    const {server, client, root} = await pair(service);
+    server.replaceLookups(service, 'connection', [['one'], ['two']]); client.applyUpdates(await server.refresh());
+    expect(root.connection('one')).toEqual({id: 'one'});
+    await expect(root.removeConnection('one')).resolves.toBeUndefined(); expect(root.connections()).toEqual([{id: 'two'}]);
+    expect(() => root.connection('one')).toThrow(expect.objectContaining({code: 'ECAPABILITY'}));
+    expect(root.connection('two')).toEqual({id: 'two'}); service.connection.mockClear();
+    server.replaceLookups(service, 'connection', [['two']]); expect(await server.refresh()).toEqual([]);
+    expect(service.connection).not.toHaveBeenCalled();
+});

@@ -461,6 +461,18 @@ export class RpcPeer {
         argsByKey.set(key, args); this.lookupArgs.set(id, argsByKey);
         this.dirty.add(id);
     }
+    /** Replace an authoritative selector set, retiring arguments for removed records. */
+    replaceLookups(value: object, method: string, argumentsList: readonly unknown[][]): void {
+        const id = this.ids.get(value); if (!id) return;
+        if (this.handles.get(id)?.schema.methods[method] !== 'lookup') throw new FSError('ECAPABILITY', 'Expected a lookup method');
+        const current = this.lookupArgs.get(id) ?? new Map<string, unknown[]>();
+        const next = new Map(argumentsList.map(args => [`${method}:${JSON.stringify(args)}`, args]));
+        let changed = false;
+        for (const key of current.keys()) if (key.startsWith(method + ':') && !next.has(key)) {current.delete(key); changed = true;}
+        for (const [key, args] of next) if (!current.has(key)) {current.set(key, args); changed = true;}
+        this.lookupArgs.set(id, current);
+        if (changed) this.dirty.add(id);
+    }
     private subscription(id: string, name: string, args: unknown[]): { ready: Promise<unknown>; stop(): void } {
         let stopped = false;
         const callback = [...args].reverse().find(arg => typeof arg === 'function') as (...args: any[]) => void;

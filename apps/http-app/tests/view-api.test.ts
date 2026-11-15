@@ -625,3 +625,14 @@ it('opens a file workbench with one observation and keeps component subscription
     stops.forEach(stop => stop()); sources.close(); await opening.dispose();
     await expect(opening.readNavigation({projectId: null})).rejects.toMatchObject({code: 'ECAPABILITY'});
 });
+
+it('returns a successful connection deletion after retiring its seeded lookups', async () => {
+    const root = await client('retire-connection-lookups'), remote = root.services.projects.remoteMounts!;
+    const id = await remote.saveConnection({name: 'Selector deletion fixture', protocol: 'webdav', endpoint: 'https://dav.invalid/fixture/'}, 'PRIVATE_DELETE_CREDENTIAL');
+    expect(remote.connection(id).name).toBe('Selector deletion fixture');
+    await expect(remote.removeConnection(id)).resolves.toBeUndefined();
+    expect(remote.connections().some(connection => connection.id === id)).toBe(false);
+    expect(() => remote.connection(id)).toThrow(expect.objectContaining({code: 'ECAPABILITY'}));
+    expect(await root.backend.readUiDocuments(['unrelated.ui'])).toEqual({'unrelated.ui': undefined});
+    expect(JSON.stringify(auditEvents)).not.toContain('PRIVATE_DELETE_CREDENTIAL');
+});
