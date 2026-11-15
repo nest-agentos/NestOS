@@ -313,3 +313,13 @@ it('reports configurable transfer budgets without deleting source evidence',asyn
  const f=await fixture();await expect(deliverSoftwareReports({journal:f.journal,service:f.service,process:f.process,directory:f.tree.directory,resourceId:'ready',owner:{boardId:'board',itemId:'item'},budget:{maxFiles:1,maxBytes:1}})).rejects.toMatchObject({code:'SOFTWARE_REPORT_BUDGET_EXCEEDED'});
  expect(await readFile(join(f.physical,'_nestos/kanban/artifacts/report.json'),'utf8')).toBe('Retained evidence');
 });
+
+it('preserves the retained management Session directory after delivery and rejects ordinary cleanup',async()=>{
+ const f=await fixture();await f.journal.update('record-conversation:ready',()=>({id:'ready',sessionId:'native-management',binding:{retainedPlanning:true}}));
+ const [resource]=await f.api.workResources('board','item',{inspect:true});
+ expect(resource).toMatchObject({state:'retained',canCleanup:false,reasons:['WORKTREE_MANAGEMENT_SESSION_RETAINED']});
+ await expect(f.api.cleanupWorkResource('board',{operationId:'remove-manager',itemId:'item',resourceId:'ready',version:resource.version})).rejects.toMatchObject({code:'WORKTREE_MANAGEMENT_SESSION_RETAINED'});
+ expect((await stat(f.physical)).isDirectory()).toBe(true);
+ await f.journal.update('record-conversation:ready',old=>({...old as object,clearedAt:1}));
+ expect((await f.api.workResources('board','item',{inspect:true}))[0].canCleanup).toBe(true);
+});

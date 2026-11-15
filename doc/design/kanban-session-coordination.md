@@ -108,3 +108,5 @@ repository 只能为项目根或本次已授权的模块路径，分支名只能
 管理入口统一通过管理任务的 planningSession 解析原生绑定并登记通道观察。决策级 openRecordCoordination 不创建额外 Session；多个管理任务要求从具体任务进入，尚未产生原生绑定时返回 MANAGEMENT_SESSION_NOT_READY。读取失败不能转成创建替代会话。
 
 项目 deployment.json 的 schema 2 支持 defaultServiceId 与按管理任务 ID 的 bindings；schema 1 继续兼容。可信宿主通过 NESTOS_SERVICE_MODULES 或管理员私有 ~/.config/nestos/service-modules.json 加载独立 RuntimeServiceControl 模块（条目含 id、绝对 module 路径与私有 options），项目只能选择已登记目标，不能提供控制器代码。构建冻结目标描述和命令，核验后的回执带 deployment.serviceId，部署前改绑会要求重建。部署和验收读取任务目标的真实运行版本，不使用看板宿主版本代替。Cells 具体构建、Firecracker 切换与进程哈希核验在 tools/cells-deployment 外部插件；核心不按组件名分支。失败摘要就近显示，不仅藏在悬停说明中。
+
+软件交付清理只处置执行资源。当前管理任务的规划目录已承载持续管理会话，软件插件的宿主资源端口将其标为 WORKTREE_MANAGEMENT_SESSION_RETAINED，自动清理跳过该资源；管理会话显式归档/移除关联后才按原归属、空闲、Git 及回执检查处置。历史版本已删除 Git 工作树时，只对已验证的 retainedPlanning 绑定与 cleaned 回执恢复原路径的会话目录锚点；会话上下文仍取 Cells 的持久通道快照，不创建新 Session、不恢复 Git 工作树、不改会话 ID 或目录路径。

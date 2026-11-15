@@ -180,3 +180,16 @@ it('ignores cancelled and archived historical management runs when resolving the
  expect(await recordCoordination(f.options)('b',{recordId:'decision',operationId:'resolve'})).toMatchObject({sessionId:'native'});
  expect(planningSession).toHaveBeenCalledExactlyOnceWith('b','group');
 });
+
+it('repairs only the original retained Session directory after proven legacy worktree cleanup',async()=>{
+ const f=await fixture(),{retainManagementDirectory}=await import('../src/kanban/retained-management-directory');
+ const value={...f.conversation,id:'original',binding:{...f.conversation.binding,retainedPlanning:true,directory:'/workspace/_nestos/worktrees/original',channelId:'current'}};
+ f.options.projects={get:async()=>({path:'/project'}),openWorkspace:async()=>({fs:f.options.fs,dispose:async()=>{}})};
+ expect(await retainManagementDirectory(f.options,value)).toBe(false);
+ expect(await f.options.fs.driver.exists(value.binding.directory)).toBe(false);
+ await f.journal.update('worktree-cleanup:original',()=>({phase:'cleaned'}));
+ expect(await retainManagementDirectory(f.options,value)).toBe(true);
+ expect(await retainManagementDirectory(f.options,value)).toBe(false);
+ expect(value.sessionId).toBe('native');expect(await f.options.fs.driver.exists(value.binding.directory+'/.nestos-management-context')).toBe(true);
+ await expect(retainManagementDirectory(f.options,{...value,binding:{...value.binding,directory:'/unrelated'}})).rejects.toMatchObject({code:'MANAGEMENT_DIRECTORY_BINDING_CHANGED'});
+});

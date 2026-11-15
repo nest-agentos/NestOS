@@ -1183,6 +1183,7 @@ export const en: LocaleStrings = {
     'kanban.workResourceState.unknown': 'Needs verification',
     'kanban.workResourceReason.WORK_RESOURCE_NODE_BUSY': 'The node is busy; recheck later. Cleanup has not been approved.',
     'kanban.workResourceReason.WORKTREE_MISSING': 'Worktree is missing without a cleanup receipt',
+    'kanban.workResourceReason.WORKTREE_MANAGEMENT_SESSION_RETAINED': 'Retained by the management Session; delivery does not remove this directory',
     'kanban.workResourceReason.WORKTREE_DIRTY': 'Uncommitted or untracked changes prevent cleanup',
     'kanban.workResourceReason.WORKTREE_NOT_INTEGRATED': 'Commits have not been integrated into the target branch',
     'kanban.workResourceReason.WORKTREE_INITIALIZED_MODULES': 'Initialized modules require preserving and checking their results first',

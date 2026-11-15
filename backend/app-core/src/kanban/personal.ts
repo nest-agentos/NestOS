@@ -1,3 +1,4 @@
+import {retainedManagementDirectory} from '../presets/kanban-management-retention';
 import {KANBAN_EXECUTION_SESSION} from '@nestos/app-contracts';
 import {createSoftwareDevelopmentPlugin} from '@nestos/kanban-development';
 import {recordFollowUps} from './record-follow-ups';
@@ -62,7 +63,7 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
         for(const session of new Set([execution.current?.sessionId,...execution.sessions?.map(row=>row.sessionId)??[],...execution.history.map(row=>row.sessionId)].filter((id):id is string=>!!id))){try{await options.archiveSession?.(session,id+'-archive-'+sha256HexSync(session).slice(0,12));}catch(error){if(['SESSION_ARCHIVE_STILL_RUNNING','SESSION_ARCHIVE_OUTCOME_UNKNOWN'].includes((error as {code:string}).code))return false;throw error;}}
         const rows=await resources.workResources?.(board,item,{inspect:true})??[];
         if(rows.length&&!resources.cleanupWorkResource)return false;
-        for(const row of rows){if(row.state==='cleaned'||row.resolution?.kind==='ignored')continue;assertWorkspaceCleanup(row);await resources.cleanupWorkResource?.(board,{itemId:item,resourceId:row.id,version:row.version,operationId:id+'-cleanup-'+sha256HexSync(row.id).slice(0,12)});}
+        for(const row of rows){if(row.state==='cleaned'||row.resolution?.kind==='ignored'||row.reasons.includes(retainedManagementDirectory))continue;assertWorkspaceCleanup(row);await resources.cleanupWorkResource?.(board,{itemId:item,resourceId:row.id,version:row.version,operationId:id+'-cleanup-'+sha256HexSync(row.id).slice(0,12)});}
         return true;
     },reportAutomatic:async state=>{
         await workLog.append(service,state.boardId,state.itemId,{stage:state.handoff?'automatic.handoff':state.done?'automatic.completed':state.waitingForUser?'automatic.waiting-review':'automatic.blocked',result:state.code&&state.code!=='OPERATION_CANCELLED'?'failure':'success',dispatchId:state.id,code:state.code});

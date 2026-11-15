@@ -1,3 +1,4 @@
+import {managementWorkspaceRetained,retainedManagementDirectory} from './kanban-management-retention';
 import {developmentDeliveryPolicy,disposableSoftwareFiles} from '@nestos/kanban-development';
 import {cleanupGitResource,type GitCleanupReceipt as Cleanup,type GitRemovalBoundary} from '@nestos/git-delivery/cleanup';
 import {taskResourceFamily,ownedResourceReferences} from './kanban-work-resource-scope';
@@ -121,6 +122,7 @@ async function inspect(options: Options, boardId: string, resource: ResourceScop
     if (saved) return {...base, properties: [...base.properties, ...(saved.delivery?[{label:t('kanban.workResourceDelivery'),value:saved.delivery}]:[]),...(saved.archive ? [{label: t('kanban.workResourceArchive'), value: saved.archive}] : [])], version: saved.version, state: saved.phase === 'cleaned' ? 'cleaned' : 'unknown', canCleanup: false,
         reasons: saved.phase === 'cleaned' ? [] : ['WORKTREE_CLEANUP_UNCONFIRMED']};
     if (ownership !== 'current') return {...base, version: sha256HexSync(JSON.stringify([id, ownership, item.revision])), state: 'retained', canCleanup: false, reasons: [ownership === 'other' ? 'WORKTREE_OTHER_OWNER' : 'WORKTREE_ASSOCIATION_UNVERIFIED']};
+    if(await managementWorkspaceRetained(options.journal,boardId,resource))return {...base,version:sha256HexSync(JSON.stringify([id,'management-session',item.revision])),state:'retained',canCleanup:false,reasons:[retainedManagementDirectory]};
     if (await sharedReference(options, boardId, id, item.id)) return {...base,version:sha256HexSync(JSON.stringify([id,'shared',item.revision])),state:'retained',canCleanup:false,reasons:['WORKTREE_SHARED']};
     const declarations=await managedBranches(options,resource);
     const {state,modules,temporary,reasons,retainedPaths}=await developmentWorkspace(options.remote,options.provider,record.projectId,process=>removalState(process,resource,declarations));

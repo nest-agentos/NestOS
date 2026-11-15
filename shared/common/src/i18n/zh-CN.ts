@@ -1184,6 +1184,7 @@ export const zhCN = {
     'kanban.workResourceState.unknown': '待核对',
     'kanban.workResourceReason.WORK_RESOURCE_NODE_BUSY': '节点当前忙，稍后重新核对；尚未确认可以清理',
     'kanban.workResourceReason.WORKTREE_MISSING': '工作树不存在，缺少清理回执',
+    'kanban.workResourceReason.WORKTREE_MANAGEMENT_SESSION_RETAINED': '管理会话仍保留此目录，交付完成不会自动删除',
     'kanban.workResourceReason.WORKTREE_DIRTY': '有未提交或未跟踪的修改，不能清理',
     'kanban.workResourceReason.WORKTREE_NOT_INTEGRATED': '提交尚未合入目标分支，不能清理',
     'kanban.workResourceReason.WORKTREE_INITIALIZED_MODULES': '包含已初始化的独立模块，须先保留并核对模块成果',
