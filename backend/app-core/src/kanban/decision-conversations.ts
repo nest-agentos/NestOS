@@ -1,4 +1,4 @@
-import {retainManagementDirectory} from './retained-management-directory';
+import {retainedManagementChannel} from './retained-management-directory';
 import {adoptPlanningConversation,retainAnsweredRequests} from './adopt-planning-conversation';
 import {resolveKanbanPluginRequest} from './session-request-plugins';
 import {recordCoordination} from './record-coordination';
@@ -51,8 +51,7 @@ export function decisionConversations(options:DecisionConversationOptions) {
 
 async function currentConversationChannel(options:DecisionConversationOptions,value:DecisionConversation):Promise<string> {
     if(!value.binding.retainedPlanning)return value.binding.channelId??value.id;
-    const started=Date.now();await retainManagementDirectory(options,value);
-    const current=await options.remote.sessionChannel(value.binding.projectId,'current',{cwd:value.binding.directory}) as {scopeId?:string;execution?:{sessionId?:string}};
+    const started=Date.now(),{channel:current}=await retainedManagementChannel(options,value);
     if(!current.scopeId||current.execution?.sessionId!==value.sessionId)throw Object.assign(new Error('Retained Session channel changed'),{code:'COORDINATION_CHANNEL_CHANGED'});
     if(current.scopeId!==value.binding.channelId){
         await retainAnsweredRequests(options,value.binding.projectId,current.scopeId);

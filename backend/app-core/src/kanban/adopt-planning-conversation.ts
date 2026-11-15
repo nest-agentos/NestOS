@@ -1,4 +1,4 @@
-import {retainManagementDirectory} from './retained-management-directory';
+import {retainedManagementChannel} from './retained-management-directory';
 import {channelRequests} from '../run/channel-protocol';
 import type {DecisionConversationOptions,DecisionConversation} from './decision-conversation-ports';
 import type {KanbanPlanningSession} from '@nestos/kanban/contracts';
@@ -12,9 +12,8 @@ export function adoptPlanningConversation(options:DecisionConversationOptions,st
     const analysis=await currentAnalysis(options.journal,board,item);if(analysis?.id!==session.analysisId||analysis.phase!=='settled')return;
     const workspace=await options.journal.get<import('../presets/kanban-development').DevelopmentWorkspaceRecord>('development-workspace:'+session.analysisId);
     const context=workspace?.context as {decision?:{recordId:string;sourceBoardId:string}}|undefined;if(!workspace||!context?.decision||!session.resourceId)return;
-    const repaired=saved&&saved.resourceId===session.resourceId?await retainManagementDirectory(options,saved):false;
     const choice=await options.journal.get<{profileId:string}>('kanban-harness-choice:'+session.analysisId);requireValue(choice,'KANBAN_HARNESS_BINDING_CHANGED');
-    const channel=await options.remote.sessionChannel(workspace.projectId,'current',{cwd:workspace.directory}) as {scopeId:string;execution?:{sessionId?:string}};
+    const {channel,repaired}=saved?.binding.retainedPlanning&&saved.resourceId===session.resourceId?await retainedManagementChannel(options,saved):{channel:await options.remote.sessionChannel(workspace.projectId,'current',{cwd:workspace.directory}) as {scopeId:string;execution?:{sessionId?:string}},repaired:false};
     const native=channel.execution?.sessionId;requireValue(native&&session.resourceId.endsWith('/'+encodeURIComponent(choice.profileId)+'/'+encodeURIComponent(native)),'PLANNING_SOURCE_UNVERIFIED');
     requireValue(channel.scopeId,'CHANNEL_SCOPE_REQUIRED');if(saved?.binding.channelId===channel.scopeId&&saved.binding.retainedPlanning){if(repaired)await start(saved.boardId,{operationId:saved.id});return;}
     const record=await options.service.record(context.decision.sourceBoardId,context.decision.recordId),harness=await options.remote.projectHarness(workspace.projectId);
