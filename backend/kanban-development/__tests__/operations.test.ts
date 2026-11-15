@@ -747,3 +747,11 @@ it('does not create a duplicate group finalizer after all management scopes are 
  f.options.service.catalog=async()=>[{id:'board'}] as never;f.options.service.read=async()=>({...f.board,automation:{enabled:true},items:[f.item]}) as never;
  await f.api.scan();expect(f.options.cleanup).not.toHaveBeenCalled();expect(f.submission.start).not.toHaveBeenCalled();expect(f.published.start).not.toHaveBeenCalled();
 });
+
+it('verifies a task target runtime instead of confusing it with the board host version',async()=>{
+ const f=await fixture();f.options.adapter.runningVersion=()=> 'unrelated-board-host';
+ f.options.adapter.runtimeVersion=async()=> 'candidate';
+ await f.acceptRuntime();
+ expect((await f.api.itemOperations('board','task')).operations.find(op=>op.id==='deploy')).toMatchObject({state:'succeeded'});
+ expect((await f.api.itemOperations('board','task')).operations.find(op=>op.id==='accept')).toMatchObject({state:'succeeded'});
+});

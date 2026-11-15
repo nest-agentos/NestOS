@@ -1,3 +1,4 @@
+import {operationRuntimeVersion} from './item-operation-runtime';
 import {developmentAnalysisPolicy,developmentAuthority} from './development-operation-policy';
 import {developmentDeliveryPolicy,releasableDevelopmentTarget} from './development-operation-policy';
 import {requireOperationAuthority,type OperationOrigin} from '@nestos/kanban/integration';
@@ -231,9 +232,9 @@ async function acceptanceJob(options: ReviewOperationsOptions, context: Context,
         const integrated=merged?.state==='succeeded'&&merged.snapshot.sourceVersion===deployed.snapshot.sourceVersion&&targetHead&&snapshot.targetVersion===targetHead;
         requireValue(snapshot.version===deployed.snapshot.version||integrated,'OPERATION_SOURCE_CHANGED_REBUILD');
         version=(deployed.result as {version:string}).version;
-        if(options.adapter.runningVersion?.()!==version){
+        if(await operationRuntimeVersion(options,context.board.id,context.item.id)!==version){
             const replacement=await options.adapter.acceptanceVersion?.(context.board,context.item,version!);
-            requireValue(replacement&&replacement.version===options.adapter.runningVersion?.(),'OPERATION_RUNNING_VERSION_MISMATCH');
+            requireValue(replacement&&replacement.version===await operationRuntimeVersion(options,context.board.id,context.item.id),'OPERATION_RUNNING_VERSION_MISMATCH');
             version=replacement.version;acceptanceEvidence=replacement.receipt;
         }
     }
@@ -294,7 +295,7 @@ async function recoverAcceptancePrecondition(options:ReviewOperationsOptions,boa
     const context=await load(options,board,item,false),deployed=latest(context,'deploy');
     const expected=(deployed?.result as {version?:string})?.version;if(!expected)return false;
     const proof=await options.adapter.acceptanceVersion(context.board,context.item,expected);
-    return !!proof&&proof.version===options.adapter.runningVersion?.();
+    return !!proof&&proof.version===await operationRuntimeVersion(options,board,item);
 }
 
 async function currentWaivers(options:ReviewOperationsOptions,context:Context) {

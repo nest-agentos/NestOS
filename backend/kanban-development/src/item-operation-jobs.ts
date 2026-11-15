@@ -1,3 +1,4 @@
+import {operationRuntimeVersion} from './item-operation-runtime';
 import {developmentAnalysisPolicy} from './development-operation-policy';
 import {invalidateReviewAnalysis,revalidateMergeAdmission,settleRejectedMerge} from '@nestos/kanban/integration';
 import {cancellationKey,pendingCancellation,blocksOperation,type ReviewCancellation} from '@nestos/kanban/integration';
@@ -71,12 +72,12 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
             const recoverReplacement=record.action==='deploy'&&record.request&&observation.state==='unknown';
             const output=(observation.state==='succeeded'||recoverReplacement)&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
             const receipt=output as {status?:string;version?:string}|undefined;
-            return {...observation,...(recoverReplacement&&receipt?.status==='succeeded'&&options.adapter.runningVersion?.()===receipt.version?{state:'succeeded' as const}:{}),executionId:observation.sessionId,output};
-        },validate:(record,output)=>{
+            return {...observation,...(recoverReplacement&&receipt?.status==='succeeded'&&await operationRuntimeVersion(options,record.boardId,record.itemId)===receipt.version?{state:'succeeded' as const}:{}),executionId:observation.sessionId,output};
+        },validate:async(record,output)=>{
             const expectedVersion=record.action==='deploy'?(record.request||record.managed?(record.operationContext as {version:string}).version
                 :JSON.parse((record.input!.request.source as {values:Record<string,string>}).values.context).input.version):undefined;
             validateOperationResult({id:record.id,action:record.action,snapshot:record.snapshot,requireStatus:!!record.request,expectedVersion},output);
-            if(record.action==='deploy')requireValue(options.adapter.runningVersion?.()===(output as {version:string}).version,'OPERATION_RESULT_RUNNING_VERSION_MISMATCH');
+            if(record.action==='deploy')requireValue(await operationRuntimeVersion(options,record.boardId,record.itemId)===(output as {version:string}).version,'OPERATION_RESULT_RUNNING_VERSION_MISMATCH');
         },classify:reviewFailure,report:options.report}});
 }
 function reviewFailure(error:unknown):import('@nestos/kanban/integration').KanbanOperationFailure {
@@ -106,7 +107,7 @@ async function acceptReview(options: ReviewOperationsOptions, job: ReviewJob): P
     if (!(item.status === 'completed' && accepted)) {
         const current = await options.adapter.snapshot(await options.service.read(job.boardId), item);
         const code = current.version !== job.snapshot.version ? 'OPERATION_SOURCE_CHANGED_REBUILD'
-            : job.acceptanceScope!=='source'&&options.adapter.runningVersion?.() !== job.acceptanceVersion ? 'OPERATION_RUNNING_VERSION_MISMATCH' : undefined;
+            : job.acceptanceScope!=='source'&&await operationRuntimeVersion(options,job.boardId,job.itemId) !== job.acceptanceVersion ? 'OPERATION_RUNNING_VERSION_MISMATCH' : undefined;
         if (code) return save(options, job, {...job, phase: 'settled', state: 'failed', code});
         // Acceptance evidence is committed with delivery only after the submission stage settles.
     }

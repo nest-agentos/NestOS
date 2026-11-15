@@ -1,23 +1,23 @@
-import {randomUUID} from '@nestos/common';
+import {safeCode} from '@nestos/kanban/integration';
 import {requireValue} from './validation';
-import {PRIMARY_PROJECT_REFERENCE,REMOTE_PROJECT_REFERENCE} from './resource-catalog';
 import type {DecisionConversationOptions} from './decision-conversation-ports';
-import type {KanbanRecordConversations} from '@nestos/kanban/integration';
-/** One durable communication Session per decision, independent of planning/execution worktrees. */
-export function recordCoordination(options:DecisionConversationOptions,conversations:KanbanRecordConversations) {
+/** All entry points resolve the management task's retained Session; reading never creates one. */
+export function recordCoordination(options:DecisionConversationOptions) {
     return async(boardId:string,request:{recordId:string;operationId:string})=>{
+        const started=Date.now();
+        try{
         requireValue(/^[\w-]{1,128}$/.test(request.operationId),'INVALID_OPERATION_ID');
-        const started=Date.now(),record=await options.service.record(boardId,request.recordId);
+        const record=await options.service.record(boardId,request.recordId);
         requireValue(record.kind==='decision'&&record.status!=='draft'&&!record.deletedAt,'DECISION_NOT_CONFIRMED');
-        const resources=record.externalRefs?.filter(ref=>ref.system===REMOTE_PROJECT_REFERENCE)??[];
-        const primaryId=record.externalRefs?.find(ref=>ref.system===PRIMARY_PROJECT_REFERENCE)?.id??(resources.length===1?resources[0].id:undefined);
-        requireValue(primaryId,'DECISION_PRIMARY_PROJECT_REQUIRED');
-        const id=await options.journal.update<string>('record-coordination:'+JSON.stringify([boardId,record.id]),old=>old??randomUUID());
-        await options.journal.update('record-coordination-scope:'+id,old=>old??{recordId:record.id});
-        const saved=await options.journal.get<import('@nestos/kanban/integration').SavedRecordConversation>('record-conversation:'+id);
-        if(saved?.sessionId&&saved.resourceId)return {id:saved.id,boardId,recordId:record.id,sessionId:saved.sessionId,resourceId:saved.resourceId,state:saved.state,createdAt:saved.createdAt,purpose:'coordination' as const};
-        const result=await conversations.startRecordConversation(boardId,{operationId:id,resources,primaryResource:{system:REMOTE_PROJECT_REFERENCE,id:primaryId}});
-        options.log({operationId:id,boardId,stage:'coordination.conversation.open',result:'success',durationMs:Date.now()-started});
-        return {...result,recordId:record.id,purpose:'coordination' as const};
+        const client=options.client(),targets=new Map<string,{boardId:string;itemId:string}>();
+        for(const itemId of record.itemIds){const {item}=await client.item(boardId,itemId);if(item.purpose==='planning'||item.planning?.execution==='children')targets.set(JSON.stringify([boardId,itemId]),{boardId,itemId});}
+        for(const run of await client.recordExecutions?.(boardId,record.id)??[])if(run.rootItemId)targets.set(JSON.stringify([run.boardId,run.rootItemId]),{boardId:run.boardId,itemId:run.rootItemId});
+        requireValue(targets.size===1,targets.size?'MANAGEMENT_SESSION_SELECTION_REQUIRED':'MANAGEMENT_SESSION_NOT_READY');
+        const target=[...targets.values()][0],session=await client.planningSession?.(target.boardId,target.itemId);
+        requireValue(session?.resourceId&&session.sessionId,'MANAGEMENT_SESSION_NOT_READY');
+        options.log({operationId:request.operationId,boardId,stage:'coordination.conversation.resolve',result:'success',durationMs:Date.now()-started});
+        return {id:session.analysisId,boardId:target.boardId,recordId:record.id,sessionId:session.sessionId,resourceId:session.resourceId,
+            state:session.state==='waiting-input'?'blocked' as const:'confirmed' as const,createdAt:session.createdAt??record.createdAt,purpose:'coordination' as const};
+        }catch(error){options.log({operationId:request.operationId,boardId,stage:'coordination.conversation.resolve',result:'failure',code:safeCode(error,'MANAGEMENT_SESSION_UNAVAILABLE'),durationMs:Date.now()-started});throw error;}
     };
 }

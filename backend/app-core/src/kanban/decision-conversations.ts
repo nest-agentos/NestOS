@@ -43,7 +43,7 @@ export function decisionConversations(options:DecisionConversationOptions) {
         return conversation.binding.purpose==='coordination'?{recordId:conversation.binding.recordId,state:reports.pendingReports.length?'blocked':'confirmed',purpose:'coordination',...reports}:decisionConversationState(options,conversation.id,conversation.boardId);
     });
     const conversations=createRecordConversations({...options,port});
-    return {adoptPlanning:adoptPlanningConversation(options,conversations.startRecordConversation),removeRecordConversations:conversations.removeRecordConversations,controlRecordConversation:conversations.controlRecordConversation,openRecordCoordination:recordCoordination(options,conversations),startRecordConversation:conversations.startRecordConversation,scan:conversations.scan,quiesce:conversations.quiesce,recordConversations:async(boardId:string)=>{
+    return {adoptPlanning:adoptPlanningConversation(options,conversations.startRecordConversation),removeRecordConversations:conversations.removeRecordConversations,controlRecordConversation:conversations.controlRecordConversation,openRecordCoordination:recordCoordination(options),startRecordConversation:conversations.startRecordConversation,scan:conversations.scan,quiesce:conversations.quiesce,recordConversations:async(boardId:string)=>{
         return decisionConversationViews(options,await conversations.recordConversations(boardId));
     }};
 }

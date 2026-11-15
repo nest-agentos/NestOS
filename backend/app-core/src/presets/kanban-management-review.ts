@@ -21,7 +21,7 @@ export function managementReviewAdapter(options:DevelopmentReviewOptions,scope:M
     const snapshot=async(board:KanbanBoard)=>managementBatchSnapshot(scope,board,options.service,item=>developmentReviewSnapshot(options,board,item));
     const managed=managedServiceDeployment(options.serviceControl,async()=>options.projects.openWorkspace((await options.projects.get(scope.projectId)).path),
         async job=>requireValue((await snapshot(await options.service.read(job.boardId))).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD'));
-    return {...base,managed,relatedSession:async(board)=>(await options.service.workflow(board.id)).dispatches[scope.contributors[0].dispatchId??'']?.executionSessionId,supports:(_board,item)=>item.id===scope.ownerId,
+    return {...base,managed,runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??base.runningVersion?.(),relatedSession:async(board)=>(await options.service.workflow(board.id)).dispatches[scope.contributors[0].dispatchId??'']?.executionSessionId,supports:(_board,item)=>item.id===scope.ownerId,
         ready:board=>scope.contributors.every(row=>board.items.some(item=>item.id===row.itemId&&['review','completed'].includes(item.status))),
         snapshot,prepareAnalysis:input=>prepareManagementOperation(options,scope,managed,{...input,action:'analyze'}),prepareOperation:input=>prepareManagementOperation(options,scope,managed,input),
         exchange:base.exchange?async(job,observation)=>{

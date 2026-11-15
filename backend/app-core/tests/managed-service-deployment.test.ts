@@ -16,3 +16,16 @@ it('selects only an explicitly declared authorized service and verifies source b
  const result=await managed.inspect({id:'switch',managed:request,snapshot:{sourceVersion:'s',targetVersion:'t'}} as never);expect(result).toMatchObject({state:'succeeded',output:{operationId:'switch',version:'candidate'}});expect(verify).toHaveBeenCalledOnce();
  verify.mockRejectedValueOnce(Object.assign(new Error('changed'),{code:'OPERATION_SOURCE_CHANGED_REBUILD'}));await expect(managed.inspect({managed:request} as never)).rejects.toMatchObject({code:'OPERATION_SOURCE_CHANGED_REBUILD'});
 });
+
+it('binds each task to its selected controller and rejects changing a successfully built target',async()=>{
+ const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());const fs=await manager.openFileSystem('/');
+ const describe=vi.fn(async(id?:string)=>({id:id!,version:'running'}));
+ const managed=managedServiceDeployment({describe,submit:vi.fn(),inspect:vi.fn()},async()=>({fs,dispose:async()=>{}}),async()=>{})!;
+ await fs.driver.createFile({parentPath:'/workspace/_nestos/etc',name:'deployment.json',recursive:true,content:JSON.stringify({schema:2,defaultServiceId:'web',bindings:{task:'node'}})});
+ expect(await managed.describe!({id:'task'} as never)).toMatchObject({id:'node'});
+ expect(await managed.describe!({id:'other'} as never)).toMatchObject({id:'web'});
+ const input={id:'switch',item:{id:'task'},context:{version:'candidate',deployment:{serviceId:'node'}}} as never;
+ expect(await managed.prepare(input)).toMatchObject({serviceId:'node',targetVersion:'candidate'});
+ await fs.driver.writeContent('/workspace/_nestos/etc/deployment.json',JSON.stringify({schema:2,defaultServiceId:'web'}));
+ await expect(managed.prepare(input)).rejects.toMatchObject({code:'SERVICE_TARGET_CHANGED_REBUILD'});
+});

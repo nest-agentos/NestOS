@@ -67,9 +67,9 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
     };
     const managed=managedServiceDeployment(options.serviceControl,async item=>{const projectId=workProjectId(item);requireValue(projectId,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(projectId)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
     const cancel=options.cancelSubmission&&options.connections?reviewCancellation({journal:options.journal,submission:options.cancelSubmission,native:planningConversationControl({remote:options.remote,connections:options.connections},options.journal)}):undefined;
-    return {managed,cancel,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
+    return {managed,cancel,runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??options.runningVersion,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
         acceptanceVersion:async(board,item,expectedVersion)=>{
-            const current=await resource(options,item,board.id),target=await managed?.describe?.(item),proof=await options.serviceControl?.provenance?.(expectedVersion);
+            const current=await resource(options,item,board.id),target=await managed?.describe?.(item),proof=await options.serviceControl?.provenance?.(expectedVersion,target?.id);
             if(!target||!proof||proof.serviceId!==target.id||proof.version!==target.version||proof.version!==options.runningVersion)return;
             return developmentWorkspace(options.remote,options.provider,current.record.projectId,process=>compatibleRuntimeDelivery(process,current.record,proof,expectedVersion));
         },
@@ -183,7 +183,8 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
         if (job.action === 'build' && result && (result as {status?: string}).status === 'succeeded') {
             const frozen=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+job.id);
             const deployment=(frozen?.context as {operation?:{deployment?:import('@nestos/app-contracts/services').RuntimeServiceDescriptor}})?.operation?.deployment;
-            if(!await verifyManagedBuildArtifact(options.serviceControl,deployment,result))await verifyBuildEvidence(view.fs,current.record.directory,result);
+            if(!await verifyManagedBuildArtifact(options.serviceControl,deployment,result,job.snapshot.targetVersion))await verifyBuildEvidence(view.fs,current.record.directory,result);
+            if(deployment)result={...result as object,deployment:{serviceId:deployment.id}};
         }}
     finally {await view.dispose();}
     if (result === undefined || ['blocked', 'failed'].includes((result as {status: string})?.status)) return result;

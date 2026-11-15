@@ -20,7 +20,7 @@ export function localServiceControl():RuntimeServiceControl|undefined {
             const started=Date.now();
             try{if(request.serviceId!==serviceId)throw Object.assign(new Error('Wrong service'),{code:'HTTPD_SERVICE_MISMATCH'});
                 await check();const {runtime}=await load(),directory=runtime.releaseDirectory(runtime.releasesRoot(root),request.version);
-                runtime.verifyRelease(directory);verifyArtifactDigest(path.join(directory,'release.json'),request.sha256);
+                const manifest=runtime.verifyRelease(directory);if(request.sourceVersion&&manifest.commit!==request.sourceVersion)throw Object.assign(new Error('Artifact source changed'),{code:'OPERATION_RESULT_SOURCE_CHANGED'});verifyArtifactDigest(path.join(directory,'release.json'),request.sha256);
                 console.info('[HTTPServiceControl]',JSON.stringify({operation:'artifact.verify',operationId:request.operationId,stage:'source-checkout',result:'success',durationMs:Date.now()-started}));
             }catch(error){console.warn('[HTTPServiceControl]',JSON.stringify({operation:'artifact.verify',operationId:request.operationId,stage:'source-checkout',result:'failure',code:(error as {code?:string}).code??'SERVICE_ARTIFACT_INVALID',durationMs:Date.now()-started}));throw error;}
         },

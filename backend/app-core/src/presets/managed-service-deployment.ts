@@ -9,12 +9,16 @@ export function managedServiceDeployment(control:RuntimeServiceControl|undefined
     const describe=async(item:import('@nestos/kanban/contracts').KanbanItem)=>{
         const view=await open(item);
         try{const file='/workspace/_nestos/etc/deployment.json';if(!await view.fs.driver.exists(file))return;
-            const config=JSON.parse(await readPrompt(view.fs,file));requireValue(config?.schema===1&&typeof config.serviceId==='string','DEPLOYMENT_CONFIGURATION_INVALID');
-            const target=await control.describe();return config.serviceId===target.id?target:undefined;
+            const config=JSON.parse(await readPrompt(view.fs,file));requireValue(config?.schema===1||config?.schema===2,'DEPLOYMENT_CONFIGURATION_INVALID');
+            const serviceId=config.schema===1?config.serviceId:config.bindings?.[item.id]??config.defaultServiceId;
+            requireValue(typeof serviceId==='string'&&/^[\w.-]{1,128}$/.test(serviceId),'DEPLOYMENT_CONFIGURATION_INVALID');
+            const target=await control.describe(serviceId);return serviceId===target.id?target:undefined;
         }finally{await view.dispose();}
     };
     return {describe,prepare:async input=>{
-        const target=await describe(input.item);if(!target)return;
+        const target=await describe(input.item);
+        const frozen=(input.context as {deployment?:{serviceId?:string}})?.deployment;
+        requireValue(!frozen?.serviceId||frozen.serviceId===target?.id,'SERVICE_TARGET_CHANGED_REBUILD');if(!target)return;
         const version=(input.context as {version?:string})?.version;requireValue(version,'OPERATION_RESULT_VERSION_REQUIRED');
         return {operationId:input.id,serviceId:target.id,expectedVersion:target.version,targetVersion:version};
     },submit:request=>control.submit(request),inspect:async job=>{
@@ -25,11 +29,11 @@ export function managedServiceDeployment(control:RuntimeServiceControl|undefined
 }
 
 /** Resolve only the artifact location frozen by the trusted deployment descriptor. */
-export async function verifyManagedBuildArtifact(control:RuntimeServiceControl|undefined,deployment:import('@nestos/app-contracts/services').RuntimeServiceDescriptor|undefined,result:unknown):Promise<boolean> {
+export async function verifyManagedBuildArtifact(control:RuntimeServiceControl|undefined,deployment:import('@nestos/app-contracts/services').RuntimeServiceDescriptor|undefined,result:unknown,sourceVersion?:string):Promise<boolean> {
     const artifact=deployment?.artifact;if(artifact?.store?.base!=='source-checkout')return false;
     const value=result as {operationId?:string;version?:string;artifact?:unknown;evidence?:{path?:string;sha256?:string}};
     requireValue(typeof value.version==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$/.test(value.version),'OPERATION_RESULT_VERSION_REQUIRED');
     requireValue(value.evidence?.path===artifact.store.path+'/'+value.version+'/'+artifact.manifest&&typeof value.evidence.sha256==='string'&&/^[a-f0-9]{64}$/.test(value.evidence.sha256),'OPERATION_RESULT_ARTIFACT_UNVERIFIED');
     requireValue(typeof value.operationId==='string'&&!!control?.verifyArtifact,'SERVICE_ARTIFACT_VERIFICATION_UNAVAILABLE');
-    await control!.verifyArtifact!({operationId:value.operationId!,serviceId:deployment!.id,version:value.version!,sha256:value.evidence!.sha256!});return true;
+    await control!.verifyArtifact!({operationId:value.operationId!,serviceId:deployment!.id,version:value.version!,sha256:value.evidence!.sha256!,...(sourceVersion?{sourceVersion}:{})});return true;
 }

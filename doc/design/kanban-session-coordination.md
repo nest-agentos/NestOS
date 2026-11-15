@@ -104,3 +104,7 @@ repository 只能为项目根或本次已授权的模块路径，分支名只能
 决策列表默认显示未归档记录，可切换已归档范围。多选只允许已结束并完成必要收尾的决策；运行或无法核对时禁用选择，并由后端再次检查。归档只隐藏决策，不停止执行、不归档会话和任务、不清理工作区；按 ID 和显式包含归档的 MCP 查询继续保留完整追溯。批量归档共享一次请求，逐项回执和稳定操作身份沿既有 journal 保留。
 
 管理会话保持同一原生 Session 身份和工作目录，规划、协调及交付是不同阶段。阶段切换可以更换内部通道 scope，宿主读取并核对当前通道与原 Session 的绑定后迁移订阅，不继续监听旧规划通道，也不创建替代会话。观察端按绑定的 watchKey 更新订阅；原生会话空闲事件用于发现后续通道变更。请求回执按实际通道 scope 持久化和续办，逻辑管理会话身份保持不变。
+
+管理入口统一通过管理任务的 planningSession 解析原生绑定并登记通道观察。决策级 openRecordCoordination 不创建额外 Session；多个管理任务要求从具体任务进入，尚未产生原生绑定时返回 MANAGEMENT_SESSION_NOT_READY。读取失败不能转成创建替代会话。
+
+项目 deployment.json 的 schema 2 支持 defaultServiceId 与按管理任务 ID 的 bindings；schema 1 继续兼容。可信宿主通过 NESTOS_SERVICE_MODULES 或管理员私有 ~/.config/nestos/service-modules.json 加载独立 RuntimeServiceControl 模块（条目含 id、绝对 module 路径与私有 options），项目只能选择已登记目标，不能提供控制器代码。构建冻结目标描述和命令，核验后的回执带 deployment.serviceId，部署前改绑会要求重建。部署和验收读取任务目标的真实运行版本，不使用看板宿主版本代替。Cells 具体构建、Firecracker 切换与进程哈希核验在 tools/cells-deployment 外部插件；核心不按组件名分支。失败摘要就近显示，不仅藏在悬停说明中。

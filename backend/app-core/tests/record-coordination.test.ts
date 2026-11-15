@@ -21,15 +21,15 @@ async function fixture(){
  const request=(method:string,params:any={},id=method)=>resolveCoordinationRequest(options,conversation,{id,scopeId:conversation.id,method,params});
  return {journal,service,options,conversation,command,read,request};
 }
-it('creates one retained communication identity without a planning admission or a worktree',async()=>{
- const f=await fixture(),start=vi.fn(async(_board:string,request:any)=>{const row={id:request.operationId,boardId:'b',createdAt:1,sessionId:'native',resourceId:'/native/original',state:'confirmed'};await f.journal.update('record-conversation:'+row.id,()=>row);return row;});
- const open=recordCoordination(f.options,{startRecordConversation:start} as any);
- const first=await open('b',{recordId:'decision',operationId:'open-1'});
- expect(first).toMatchObject({purpose:'coordination',recordId:'decision',resourceId:'/native/original'});
- expect(await f.journal.get('record-coordination-scope:'+first.id)).toEqual({recordId:'decision'});
- const reopened=recordCoordination(f.options,{startRecordConversation:start} as any);
- expect(await reopened('b',{recordId:'decision',operationId:'open-2'})).toMatchObject({id:first.id,sessionId:'native'});
- expect(start).toHaveBeenCalledOnce();
+it('resolves the original management Session and never creates a separate coordination Session',async()=>{
+ const f=await fixture(),planningSession=vi.fn(async()=>({analysisId:'planning',sessionId:'native',resourceId:'/native/original',state:'completed'}));
+ f.options.client=()=>({...f.service,planningSession});const open=recordCoordination(f.options);
+ expect(await open('b',{recordId:'decision',operationId:'open-1'})).toMatchObject({id:'planning',sessionId:'native',resourceId:'/native/original'});
+ expect(await open('b',{recordId:'decision',operationId:'open-2'})).toMatchObject({id:'planning',sessionId:'native'});
+ expect(await f.journal.get('record-coordination:'+JSON.stringify(['b','decision']))).toBeUndefined();
+ planningSession.mockResolvedValueOnce(undefined as any);
+ await expect(open('b',{recordId:'decision',operationId:'not-ready'})).rejects.toMatchObject({code:'MANAGEMENT_SESSION_NOT_READY'});
+ await expect(open('b',{recordId:'other',operationId:'no-task'})).rejects.toMatchObject({code:'MANAGEMENT_SESSION_NOT_READY'});
 });
 it('reads concrete pre-session preparation failures and requests a fenced retry of the original group',async()=>{
  const f=await fixture();await f.command({type:'report-analysis',itemId:'group',operationId:'failed',status:{itemId:'group',state:'failed',code:'GIT_WORKTREE_CREATE_FAILED'}});
@@ -64,26 +64,6 @@ it('confirms a scoped follow-up after all original tasks completed without chang
  const children=(await f.service.read('b')).items.filter(item=>item.planning?.parentId==='group');
  expect(children).toHaveLength(2);expect(await f.service.item('b','original-child')).toEqual(completed);expect(children.find(item=>item.id!=='original-child')!.externalRefs).toContainEqual({system:'nestos-remote-project',id:'project'});
  f.conversation.id='foreign';await expect(f.request('coordination.confirm-fix',params,'foreign-confirm')).rejects.toMatchObject({code:'ITEM_NOT_IN_DECISION'});
-});
-
-it('keeps the native coordination Session usable after worktree cleanup and recovers an uncertain create receipt',async()=>{
- const {decisionConversations}=await import('../src/kanban/decision-conversations');
- const f=await fixture();let failCreate=true;
- const create=vi.fn(async(..._args:any[])=>{if(failCreate){failCreate=false;throw Object.assign(Error('Lost reply'),{code:'HTTP_CONNECTION_LOST'});}return {session:{id:'native-persistent'}};});
- const operation=vi.fn(async()=>({outcome:'committed',result:{session:{id:'native-persistent'}}}));
- const enqueue=vi.fn(async()=>{}),close=async()=>{},stop=vi.fn();
- const mount={at:'/',serverId:'cell',serverProjectId:'cell-project',serverProjectRevision:1,connectionId:'node',authorization:{principalId:'owner',revision:'auth'}};
- f.options.projects={get:async()=>({path:'/project',project:{id:'project',source:{kind:'remote'}}}),openWorkspace:async()=>({fs:f.options.fs,dispose:async()=>{}})};
- f.options.remote={list:()=>[mount],projectHarness:async()=>({profiles:async()=>({epoch:'epoch',profiles:[{id:'codex',projectRuntime:true,capabilities:{create:true,sessionChannels:true,workingDirectory:true},workspaces:[{id:'cell-project'}]}]}),create,operation,close,subscribeChannel:()=>stop}),projectConversation:async()=>({enqueue,read:f.read,close}),sessionChannel:async(_p:string,method:string,args:any)=>method==='open'?{projectContext:{projects:args.contextProjects.map((row:any)=>({...row,directory:'/real/project'}))}}:method==='requests'?{requests:[]}:method==='messages'?{messages:[]}:{}};
- const conversations=decisionConversations(f.options);closes.push(()=>conversations.quiesce());
- await expect(conversations.openRecordCoordination('b',{recordId:'decision',operationId:'first'})).rejects.toMatchObject({code:'HTTP_CONNECTION_LOST'});
- const recovered=await conversations.openRecordCoordination('b',{recordId:'decision',operationId:'second'});
- expect(recovered).toMatchObject({sessionId:'native-persistent',purpose:'coordination'});expect(create).toHaveBeenCalledOnce();expect(operation).toHaveBeenCalledOnce();
- await f.journal.update('worktree:old',()=>({state:'cleaned'}));
- const reopened=await conversations.openRecordCoordination('b',{recordId:'decision',operationId:'third'});
- expect(reopened.sessionId).toBe(recovered.sessionId);expect(enqueue).toHaveBeenCalledOnce();
- expect((await conversations.recordConversations('b')).find(row=>row.id===recovered.id)).toMatchObject({purpose:'coordination',recordId:'decision'});
- expect(create.mock.calls[0][2]).toMatchObject({directory:'_nestos/kanban/conversations/'+recovered.id});
 });
 
 it('routes a recoverable execution blocker to its executor and a settled failure to coordination',async()=>{

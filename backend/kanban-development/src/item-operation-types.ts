@@ -26,6 +26,7 @@ export interface ReviewAdapter {
         inspect(job:ReviewJob):Promise<import('@nestos/llm-session').OperationObservation>};
     supports?(board: KanbanBoard, item: KanbanItem): boolean;
     runningVersion?(): string | undefined;
+    runtimeVersion?(board:KanbanBoard,item:KanbanItem):Promise<string|undefined>;
     snapshot(board: KanbanBoard, item: KanbanItem): Promise<ReviewSnapshot>;
     acceptanceVersion?(board:KanbanBoard,item:KanbanItem,expectedVersion:string):Promise<{version:string;receipt:unknown}|undefined>;
     prepareOperation?(input: {id: string; action: Exclude<ReviewAction, 'accept'>; context?: unknown; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot}): Promise<SubmissionRequest>;

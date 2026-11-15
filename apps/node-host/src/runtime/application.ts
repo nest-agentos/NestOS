@@ -1,3 +1,4 @@
+import {serviceControlModules} from './service-control-modules';
 import {tracedCellsFetch} from '../logging/request-trace';
 import {localServiceControl} from './service-control';
 import {namedCleanup} from './host-cleanup';
@@ -55,7 +56,7 @@ export async function createNodeRuntime(source: IStorageBackend, root?: string, 
         await packages.initialize();
         const additionalTools = mergeNodePackageTools(packages.userTools([...createStandardNodeTools(), ...await loadNodeToolModules(undefined, options.toolConnections),
             ...options.kernelPlatform?.additionalTools ?? []]), packages.initialTools(), BUILTIN_TOOLS);
-        const runtime = await createApplicationRuntime({remoteSourceProvider: createCellsDriver(undefined, tracedCellsFetch(undefined,event=>traceAudit?.write(event))), ownerKind:'cli',runningVersion:process.env.NESTOS_HTTPD_VERSION,...options,serviceControl:options.configurationReadonly?undefined:options.serviceControl??localServiceControl(),backend: borrowed,
+        const runtime = await createApplicationRuntime({remoteSourceProvider: createCellsDriver(undefined, tracedCellsFetch(undefined,event=>traceAudit?.write(event))), ownerKind:'cli',runningVersion:process.env.NESTOS_HTTPD_VERSION,...options,serviceControl:options.configurationReadonly?undefined:options.serviceControl??serviceControlModules(localServiceControl()),backend: borrowed,
             toolDependencies: options.toolDependencies ?? packages,
             kernelPlatform: { ...options.kernelPlatform, additionalTools, configure: async (kernel, services) => {
                 await packages.bind(kernel); await options.kernelPlatform?.configure?.(kernel, services);
