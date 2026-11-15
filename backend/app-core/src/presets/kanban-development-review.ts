@@ -193,7 +193,7 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
     if (job.action !== 'merge') requireValue(actual.version === job.snapshot.version, 'OPERATION_RESULT_SCOPE_MISMATCH');
     else {
         await developmentWorkspace(options.remote,options.provider,current.record.projectId,process=>verifyGitIntegration(process,{
-            incompleteCode:'OPERATION_RESULT_MERGE_UNCONFIRMED',previousTarget:job.snapshot.targetVersion,actualTarget:actual.targetVersion,reportedTarget:(result as {targetHead?:string}).targetHead,
+            operationId:job.id,incompleteCode:'OPERATION_RESULT_MERGE_UNCONFIRMED',previousTarget:job.snapshot.targetVersion,actualTarget:actual.targetVersion,reportedTarget:(result as {targetHead?:string}).targetHead,
             sources:[actual.context as import('@nestos/git-delivery/contracts').GitSource],approval:job.operationContext as import('@nestos/git-delivery/contracts').GitApproval}));
     }
     return result;

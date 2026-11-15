@@ -82,6 +82,6 @@ async function acceptanceCommands(options:DevelopmentReviewOptions,scope:Managem
 }
 export async function verifyManagementMerge(options:Pick<DevelopmentReviewOptions,'remote'|'provider'>,job:ReviewJob,actual:ReviewSnapshot,result:unknown):Promise<void> {
     const batch=managementBatch(job.snapshot),target=(result as {targetHead?:string}).targetHead;
-    await developmentWorkspace(options.remote,options.provider,batch.projectId,process=>verifyGitIntegration(process,{previousTarget:job.snapshot.targetVersion,
+    await developmentWorkspace(options.remote,options.provider,batch.projectId,process=>verifyGitIntegration(process,{operationId:job.id,previousTarget:job.snapshot.targetVersion,
         actualTarget:actual.targetVersion,reportedTarget:target,sources:batch.sources.map(source=>source.snapshot.context as GitSource),approval:job.operationContext as GitApproval}));
 }
