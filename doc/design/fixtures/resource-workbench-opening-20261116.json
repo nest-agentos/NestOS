@@ -1,0 +1,325 @@
+{
+  "date": "2026-11-16",
+  "runningVersion": "20261115T222509-5ba8fc07",
+  "dataset": {
+    "projectCount": 6,
+    "ownedMounts": 1,
+    "ownedDirectories": 1,
+    "markdownFiles": 1,
+    "initialFileBytes": 37,
+    "savedFileBytes": 40,
+    "remote": "real Cells cell-x1 tlj WebDAV; independent owned validation directory",
+    "comparison": "original and first final comparison share the same file; final selector-receipt release repeats the same size and shape with a new owned fixture"
+  },
+  "measurement": {
+    "browser": "Chrome desktop, new context for each sample; mTLS; LAN",
+    "warmEntry": "authenticated start page warmed for 5s, then open file; 250ms drain included",
+    "coldEntry": "direct file deep link, including document/JS/CSS startup; running host and filesystem warm; 250ms drain included",
+    "counts": "logicalApiCalls includes application RPCs (each batch member), file transfer requests and other API requests; apiHttpRequests counts all API HTTP; httpRequests includes static resources",
+    "backgroundLoad": "production host; no concurrent build or large test suite during measured browser samples",
+    "thresholds": {
+      "elapsedMsExclusive": 5000,
+      "logicalApiCallsExclusive": 30
+    }
+  },
+  "before": [
+    {
+      "operation": "workbench.file.browser",
+      "sample": 1,
+      "version": "20261115T190821-a418cf0c",
+      "readyMs": 838,
+      "elapsedMs": 1089,
+      "rpcCalls": 40,
+      "fileRequests": 1,
+      "otherAPIRequests": 0,
+      "logicalApiCalls": 41,
+      "apiHttpRequests": 32,
+      "httpRequests": 41,
+      "bindings": 11,
+      "failures": [],
+      "passed": false,
+      "methodCounts": {
+        "readUiDocuments": 1,
+        "onGlobalEvent": 1,
+        "workbenchView": 1,
+        "onChange": 1,
+        "subscribe": 5,
+        "forFolder": 9,
+        "onChanged": 1,
+        "onPromoted": 1,
+        "update": 2,
+        "openWorkspace": 1,
+        "onAny": 2,
+        "getNodeType": 6,
+        "getChildren": 4,
+        "navigation": 2,
+        "readFileDirectory": 2,
+        "writeUiDocuments": 1
+      }
+    },
+    {
+      "operation": "workbench.file.browser",
+      "sample": 2,
+      "version": "20261115T190821-a418cf0c",
+      "readyMs": 813,
+      "elapsedMs": 1064,
+      "rpcCalls": 38,
+      "fileRequests": 1,
+      "otherAPIRequests": 0,
+      "logicalApiCalls": 39,
+      "apiHttpRequests": 30,
+      "httpRequests": 39,
+      "bindings": 11,
+      "failures": [],
+      "passed": false,
+      "methodCounts": {
+        "readUiDocuments": 1,
+        "onGlobalEvent": 1,
+        "workbenchView": 1,
+        "onChange": 1,
+        "subscribe": 5,
+        "forFolder": 9,
+        "onChanged": 1,
+        "onPromoted": 1,
+        "update": 2,
+        "openWorkspace": 1,
+        "onAny": 2,
+        "getNodeType": 4,
+        "getChildren": 3,
+        "navigation": 2,
+        "readFileDirectory": 3,
+        "writeUiDocuments": 1
+      }
+    },
+    {
+      "operation": "workbench.file.browser",
+      "sample": 3,
+      "version": "20261115T190821-a418cf0c",
+      "readyMs": 376,
+      "elapsedMs": 627,
+      "rpcCalls": 37,
+      "fileRequests": 1,
+      "otherAPIRequests": 0,
+      "logicalApiCalls": 38,
+      "apiHttpRequests": 29,
+      "httpRequests": 38,
+      "bindings": 11,
+      "failures": [],
+      "passed": false,
+      "methodCounts": {
+        "readUiDocuments": 1,
+        "onGlobalEvent": 1,
+        "workbenchView": 1,
+        "onChange": 1,
+        "subscribe": 5,
+        "forFolder": 9,
+        "onChanged": 1,
+        "onPromoted": 1,
+        "update": 2,
+        "openWorkspace": 1,
+        "onAny": 2,
+        "getNodeType": 4,
+        "getChildren": 3,
+        "navigation": 2,
+        "readFileDirectory": 3
+      }
+    }
+  ],
+  "after": [
+    {
+      "operation": "workbench.file.browser",
+      "sample": 1,
+      "version": "20261115T222509-5ba8fc07",
+      "readyMs": 830,
+      "elapsedMs": 1080,
+      "rpcCalls": 15,
+      "fileRequests": 1,
+      "otherAPIRequests": 0,
+      "logicalApiCalls": 16,
+      "apiHttpRequests": 12,
+      "httpRequests": 21,
+      "bindings": 1,
+      "failures": [],
+      "passed": true,
+      "methodCounts": {
+        "openWorkbench": 1,
+        "forFolder": 7,
+        "openWorkspace": 1,
+        "onAny": 1,
+        "readNavigation": 1,
+        "readFileDirectory": 3,
+        "writeUiDocuments": 1
+      }
+    },
+    {
+      "operation": "workbench.file.browser",
+      "sample": 2,
+      "version": "20261115T222509-5ba8fc07",
+      "readyMs": 353,
+      "elapsedMs": 604,
+      "rpcCalls": 8,
+      "fileRequests": 1,
+      "otherAPIRequests": 0,
+      "logicalApiCalls": 9,
+      "apiHttpRequests": 9,
+      "httpRequests": 18,
+      "bindings": 1,
+      "failures": [],
+      "passed": true,
+      "methodCounts": {
+        "openWorkbench": 1,
+        "forFolder": 1,
+        "openWorkspace": 1,
+        "onAny": 1,
+        "readNavigation": 1,
+        "readFileDirectory": 3
+      }
+    },
+    {
+      "operation": "workbench.file.browser",
+      "sample": 3,
+      "version": "20261115T222509-5ba8fc07",
+      "readyMs": 356,
+      "elapsedMs": 607,
+      "rpcCalls": 8,
+      "fileRequests": 1,
+      "otherAPIRequests": 0,
+      "logicalApiCalls": 9,
+      "apiHttpRequests": 9,
+      "httpRequests": 18,
+      "bindings": 1,
+      "failures": [],
+      "passed": true,
+      "methodCounts": {
+        "openWorkbench": 1,
+        "forFolder": 1,
+        "openWorkspace": 1,
+        "onAny": 1,
+        "readNavigation": 1,
+        "readFileDirectory": 3
+      }
+    }
+  ],
+  "cold": [
+    {
+      "operation": "workbench.file.cold-browser",
+      "version": "20261115T222509-5ba8fc07",
+      "readyMs": 996,
+      "elapsedMs": 1246,
+      "rpcCalls": 15,
+      "logicalApiCalls": 18,
+      "apiHttpRequests": 14,
+      "httpRequests": 33,
+      "fileRequests": 1,
+      "bindings": 2,
+      "failures": [],
+      "passed": true,
+      "cache": "new browser context; direct file deep link; full page startup; warm running host and filesystem; 250ms drain included",
+      "methodCounts": {
+        "forFolder": 7,
+        "openWorkspace": 1,
+        "onAny": 1,
+        "onChange": 1,
+        "readEvents": 1,
+        "readNavigation": 1,
+        "readFileDirectory": 2
+      }
+    },
+    {
+      "operation": "workbench.file.cold-browser",
+      "version": "20261115T222509-5ba8fc07",
+      "readyMs": 1034,
+      "elapsedMs": 1284,
+      "rpcCalls": 17,
+      "logicalApiCalls": 20,
+      "apiHttpRequests": 16,
+      "httpRequests": 35,
+      "fileRequests": 1,
+      "bindings": 2,
+      "failures": [],
+      "passed": true,
+      "cache": "new browser context; direct file deep link; full page startup; warm running host and filesystem; 250ms drain included",
+      "methodCounts": {
+        "forFolder": 7,
+        "openWorkspace": 1,
+        "onAny": 1,
+        "onChange": 1,
+        "readEvents": 1,
+        "readNavigation": 1,
+        "readFileDirectory": 3,
+        "assistantOverview": 1
+      }
+    },
+    {
+      "operation": "workbench.file.cold-browser",
+      "version": "20261115T222509-5ba8fc07",
+      "readyMs": 981,
+      "elapsedMs": 1231,
+      "rpcCalls": 18,
+      "logicalApiCalls": 21,
+      "apiHttpRequests": 17,
+      "httpRequests": 36,
+      "fileRequests": 1,
+      "bindings": 2,
+      "failures": [],
+      "passed": true,
+      "cache": "new browser context; direct file deep link; full page startup; warm running host and filesystem; 250ms drain included",
+      "methodCounts": {
+        "forFolder": 7,
+        "openWorkspace": 1,
+        "onAny": 1,
+        "onChange": 1,
+        "readEvents": 1,
+        "readNavigation": 1,
+        "readFileDirectory": 3,
+        "writeUiDocuments": 1,
+        "assistantOverview": 1
+      }
+    }
+  ],
+  "hot": {
+    "operation": "workbench.file.browser.hot",
+    "readyMs": 22,
+    "elapsedMs": 272,
+    "logicalApiCalls": 3,
+    "apiHttpRequests": 3,
+    "httpRequests": 3
+  },
+  "functional": {
+    "saveReadback": "passed",
+    "fileToExistingConversation": {
+      "operation": "workbench.file-to-existing-conversation",
+      "result": "passed",
+      "sentMessages": 0
+    },
+    "connectionDeletionReceipt": "succeeded; no retry",
+    "cleanup": {
+      "operation": "webdav.production.cleanup.verify",
+      "mountAbsent": true,
+      "connectionAbsent": true,
+      "directoryAbsent": true,
+      "result": "confirmed"
+    },
+    "credentialCopyRemoved": true,
+    "baselineWorktreeRemoved": true
+  },
+  "validation": {
+    "workspaceTypecheck": "passed before final selector-only changes; transport, node-host and HTTP typechecks passed again after selectors",
+    "coreLifecycle": 10,
+    "applicationEventsAndRealHttpsShell": 11,
+    "authenticatedHttpApi": 34,
+    "performance": {
+      "core": 60,
+      "transport": 32,
+      "ui": 67
+    },
+    "moduleBoundaries": "passed",
+    "temporaryScopes": "closed; owned server/browser processes reaped"
+  },
+  "limitations": [
+    "Three existing UI failures were reproduced using c9a765b UI source: project-workbench-ui stale select expectation; session-workbench partial getNode fixture; remote-session-workbench draft expectation. Full UI matrix is not claimed green.",
+    "Intermediate f51a8575 cold probes included an editor-readiness timeout and an explicit CSS preload failure (factory-mF8UoFbR.css). No network root-cause fix is claimed; all three final-release cold samples passed without errors.",
+    "Desktop LAN measurements do not prove public-network or physical-phone performance.",
+    "No absolute storage I/O or WebDAV request reduction is claimed from browser API counts. Directory preview still may enumerate lightweight entries before selecting visible metadata."
+  ]
+}
