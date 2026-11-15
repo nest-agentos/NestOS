@@ -81,3 +81,6 @@ localhost-recording*.json
 # Local host profiles; committed examples remain available under their own names.
 /nestos.json
 /nestos.multiuser.json
+
+# Worktree-local dependency and bounded verification caches
+/.cache/

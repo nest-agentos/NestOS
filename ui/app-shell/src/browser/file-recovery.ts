@@ -30,6 +30,7 @@ class FileRecoveryBinding {
     private failed: boolean;
     private closed = false;
     private conflict = false;
+    private pendingOperation?: FileRecovery['pendingOperation'];
     private readonly stops: Array<() => void>;
     private readonly guard = (event: BeforeUnloadEvent) => {
         if (this.pending || this.failed) {event.preventDefault(); event.returnValue = '';}
@@ -37,14 +38,15 @@ class FileRecoveryBinding {
     constructor(private readonly editor: IEditor, private readonly panel: HTMLElement, private store: FileRecoveryStore,
         private readonly scope: string, original: string, private readonly readOnly: boolean, private draft?: FileRecovery, unavailable = false) {
         this.base = sha256HexSync(original); this.failed = unavailable;
-        this.stops = [editor.on('change', () => this.capture()), editor.on('saveError', () => this.capture()), editor.on('saved', () => this.saved()), editor.on('contentLoaded', () => this.saved())];
+        this.pendingOperation=draft?.pendingOperation;
+        this.stops = [editor.on('change', () => this.capture()), editor.on('saveError', error => this.saveFailed(error)), editor.on('saved', () => this.saved()), editor.on('contentLoaded', () => this.saved())];
         window.addEventListener('beforeunload', this.guard);
         if (unavailable) this.failure();
-        if (draft && draft.text !== original) {
-            if (draft.base === this.base && !readOnly) {editor.setText(draft.text); editor.setDirty?.(true);}
+        if (draft && (draft.text !== original || draft.pendingOperation)) {
+            if (draft.base === this.base && !readOnly && !draft.pendingOperation) {editor.setText(draft.text); editor.setDirty?.(true);}
             else {
                 this.conflict = true; editor.setReadOnly(true);
-                showConflict(panel, draft.text, async () => {await this.store.clear(); this.conflict = false; editor.setReadOnly(readOnly);});
+                showConflict(panel, draft.text, async () => {await this.store.clear(); this.pendingOperation=undefined; this.conflict = false; editor.setReadOnly(readOnly);},draft.pendingOperation);
             }
         } else if (draft) this.enqueue(() => this.store.clear());
     }
@@ -56,11 +58,18 @@ class FileRecoveryBinding {
     }
     private capture(): void {
         if (this.conflict) return;
-        const record = {base: this.base, text: this.editor.getText()}, store = this.store;
+        const record = this.record(), store = this.store;
         this.enqueue(() => store.write(record));
     }
+    private record(): FileRecovery {return {base:this.base,text:this.editor.getText(),...(this.pendingOperation?{pendingOperation:this.pendingOperation}:{})};}
+    private saveFailed(error: unknown): void {
+        const receipt=error as {outcome?:string;operationId?:string}|undefined;
+        if(receipt?.outcome==='unknown'||receipt?.outcome==='partial') this.pendingOperation={outcome:receipt.outcome,
+            ...(typeof receipt.operationId==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(receipt.operationId)?{operationId:receipt.operationId}:{})};
+        this.capture();
+    }
     private saved(): void {
-        if (this.conflict) return;
+        if (this.conflict || this.pendingOperation) return;
         if (this.editor.isDirty?.()) {this.capture(); return;}
         this.base = sha256HexSync(this.editor.getText());
         const store = this.store; this.enqueue(() => store.clear());
@@ -73,20 +82,21 @@ class FileRecoveryBinding {
     }
     move(path: string): void {
         const previous = this.store, next = new FileRecoveryStore(this.scope, path); this.store = next;
-        const record = this.conflict && this.draft ? this.draft : {base: this.base, text: this.editor.getText()};
+        const record = this.conflict && this.draft ? this.draft : this.record();
         this.enqueue(async () => {await next.write(record); await previous.clear();});
     }
     snapshot(): unknown {
-        return {...(this.conflict && this.draft ? this.draft : {base: this.base, text: this.editor.getText()}), mode: this.editor.getMode()};
+        return {...(this.conflict && this.draft ? this.draft : this.record()), mode: this.editor.getMode()};
     }
     restore(snapshot: unknown): void {
-        const state = snapshot as {base: string; text: string; mode: 'edit' | 'render'};
-        if (this.editor.getText() === state.text) {
+        const state = snapshot as FileRecovery & {mode: 'edit' | 'render'};
+        this.pendingOperation=state.pendingOperation;
+        if (this.editor.getText() === state.text && !state.pendingOperation) {
             void this.editor.switchToMode(state.mode).catch(() => this.failure()); return;
         }
-        if (state.base !== this.base || this.readOnly) {
+        if (state.base !== this.base || this.readOnly || state.pendingOperation) {
             this.draft = state; this.conflict = true; this.editor.setReadOnly(true);
-            showConflict(this.panel, state.text, async () => {await this.store.clear(); this.conflict = false; this.editor.setReadOnly(this.readOnly);});
+            showConflict(this.panel, state.text, async () => {await this.store.clear(); this.pendingOperation=undefined; this.conflict = false; this.editor.setReadOnly(this.readOnly);},state.pendingOperation);
             return;
         }
         this.editor.setText(state.text); this.editor.setDirty(true); this.capture();
@@ -95,10 +105,10 @@ class FileRecoveryBinding {
     release(): void {this.closed = true; this.stops.forEach(stop => stop()); window.removeEventListener('beforeunload', this.guard);}
 }
 
-function showConflict(panel: HTMLElement, text: string, discard: () => Promise<void>): void {
+function showConflict(panel: HTMLElement, text: string, discard: () => Promise<void>, pending?: FileRecovery['pendingOperation']): void {
     panel.querySelector('.file-recovery')?.remove();
     const details = document.createElement('details'); details.className = 'file-recovery'; details.open = true;
-    const summary = document.createElement('summary'); summary.textContent = t('fileRecovery.conflict');
+    const summary = document.createElement('summary'); summary.textContent = pending ? `${t('remote.writeUnknown')} ${pending.operationId??''}` : t('fileRecovery.conflict');
     const draft = document.createElement('textarea'); draft.value = text; draft.readOnly = true; draft.setAttribute('aria-label', t('fileRecovery.draft'));
     const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = t('fileRecovery.copy');
     copy.onclick = () => { draft.focus(); draft.select(); void navigator.clipboard?.writeText(text).catch(() => {}); };

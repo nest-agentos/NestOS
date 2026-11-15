@@ -29,7 +29,7 @@ import { canReaddressConnection, normalizeConnection, remoteCredentialIdentity, 
 import type { HarnessClient } from '@nestos/cells-driver/harness';
 import type { ProjectClient, RemoteProject, HarnessConversationPort, HarnessProfile, HarnessConversationJournal } from '@nestos/cells-driver';
 
-export interface RemoteFileConnection { endpoint: string; alias: string; credentialRef: string; username?: string; anonymous?: boolean; authorization?: import('@nestos/cells-driver').RemoteAuthorization; }
+export interface RemoteFileConnection { protocol?: 'cells' | 'webdav'; endpoint: string; alias: string; credentialRef: string; username?: string; anonymous?: boolean; authorization?: import('@nestos/cells-driver').RemoteAuthorization; }
 
 /** One directory grant as the execution node must expose it to a process. */
 export interface RemoteProcessMount { alias: string; path: string; at: string; access: 'ro' | 'rw' }
@@ -132,7 +132,7 @@ export class ProjectRemoteMountService {
             const valid = mounts.filter(mount => {
                 try {
                     validateMount(mount);
-                    return true;
+                    return mount.protocol !== 'webdav' && connections.find(c => c.id === mount.connectionId)?.protocol !== 'webdav';
                 } catch { this.loadWarnings.push(`INVALID_MOUNT:${projectId}`); return false; }
             });
             if (valid.length) projects[projectId] = valid;
@@ -187,7 +187,8 @@ export class ProjectRemoteMountService {
     list(projectId: string): ProjectRemoteMount[] {
         return structuredClone((this.catalog.projects[projectId] ?? []).map(mount => {
             const connection = mount.connectionId && this.connections().find(item => item.id === mount.connectionId);
-            if (connection) return { ...mount, endpoint:connection.endpoint, username:connection.username, credentialRef:connection.credentialRef,serverId:connection.serverId };
+            if (connection) return { ...mount, ...(connection.protocol==='webdav'?{anonymous:connection.anonymous,authorization:undefined}:{}),
+                protocol:connection.protocol, endpoint:connection.endpoint, username:connection.username, credentialRef:connection.credentialRef,serverId:connection.serverId };
             return mount.connectionId ? { ...mount, endpoint:'',credentialRef:'' } : mount;
         }));
     }
@@ -198,7 +199,7 @@ export class ProjectRemoteMountService {
         const projects = await this.projectSummaries?.() ?? [];
         const mounts = (await Promise.all(projects.map(project => this.overviewMounts(id,project)))).flat();
         let statistics: import('@nestos/app-contracts/services').CellsNodeOverview['statistics'] = {state:'unsupported'};
-        if (this.provider.nodeStatus) {
+        if (connection.protocol !== 'webdav' && this.provider.nodeStatus) {
             try { statistics = {state:'available',value:await this.provider.nodeStatus(connection, options)}; }
             catch (error) {
                 checkOperation(options);
@@ -316,7 +317,7 @@ export class ProjectRemoteMountService {
     async checkDraft(input: RemoteFileSystemInput, password: string, id?: string, options?: OperationOptions): Promise<void> {
         const value = normalizeConnection(input);
         const current=id?this.connection(id):undefined,key=await this.draftChecks.key(value,password,id,current);
-        if(this.provider.discoverDraft){
+        if(value.protocol !== 'webdav' && this.provider.discoverDraft){
             const descriptor=await this.provider.discoverDraft({...value,credentialRef:current?.credentialRef??''},password,options);
             checkOperation(options);this.draftChecks.remember(key,descriptor);return;
         }
@@ -324,7 +325,7 @@ export class ProjectRemoteMountService {
         const restore=password?this.provider.setCredential(credentialRef,password):undefined;
         try {
             let descriptor:import('@nestos/cells-driver').CellsDescriptor|undefined;
-            if(this.provider.discover)descriptor=await this.provider.discover({...value,credentialRef},options);
+            if(value.protocol !== 'webdav' && this.provider.discover)descriptor=await this.provider.discover({...value,credentialRef},options);
             else if(this.provider.checkDraft)await this.provider.checkDraft({...value,credentialRef},password,options);
             else throw new FSError('ECAPABILITY','Connection checks unavailable');
             checkOperation(options);this.draftChecks.remember(key,descriptor);
@@ -338,7 +339,7 @@ export class ProjectRemoteMountService {
     saveConnection(input: RemoteFileSystemInput, password: string, id?: string, options?:{requireTested?:boolean}): Promise<string> {
         return this.serial(async () => {
             const value = normalizeConnection(input), existing = id ? this.connections().find(connection => connection.id === id) : undefined;
-            const unchanged=!!existing&&!password&&existing.endpoint===value.endpoint&&existing.username===value.username&&!!existing.anonymous===!!value.anonymous;
+            const unchanged=!!existing&&!password&&(existing.protocol??'cells')===(value.protocol??'cells')&&existing.endpoint===value.endpoint&&existing.username===value.username&&!!existing.anonymous===!!value.anonymous;
             const proof=options?.requireTested?this.draftChecks.read(await this.draftChecks.key(value,password,id,existing)):undefined;
             if(options?.requireTested&&!unchanged&&!proof)throw new FSError('ECONFLICT','CELLS_TEST_REQUIRED');
             if (!existing && !password && !value.anonymous) throw new FSError('EINVAL', 'Password required');
@@ -347,13 +348,13 @@ export class ProjectRemoteMountService {
                 throw new FSError('EEXIST', 'Remote file system already configured');
             const affected = this.connectionProjects(id);
             if (id && !existing && !affected.length) throw new FSError('ENOENT', 'Cells connection not found');
-            if (affected.length && existing && existing.endpoint !== value.endpoint) throw new FSError('EBUSY', 'Referenced endpoint cannot change');
+            if (affected.length && existing && (existing.endpoint !== value.endpoint || (existing.protocol??'cells') !== (value.protocol??'cells'))) throw new FSError('EBUSY', 'Referenced endpoint cannot change');
             for (const projectId of affected) await this.beforeChange(projectId);
             let next: RemoteFileSystemConfig = { ...(unchanged?existing:{}), ...value, id: id ?? randomUUID(), credentialRef: existing?.credentialRef ?? randomUUID() };
             const restore = password ? this.provider.setCredential(next.credentialRef, password) : undefined;
             try {
                 if (affected.length && !existing && !this.provider.discover) throw new FSError('ECAPABILITY', 'Cells discovery is required to recover a referenced connection');
-                if (this.provider.discover && !(options?.requireTested&&unchanged)) {
+                if (value.protocol !== 'webdav' && this.provider.discover && !(options?.requireTested&&unchanged)) {
                     const descriptor = options?.requireTested?proof?.descriptor:await this.provider.discover(next, {timeoutMs: 10_000});
                     if(!descriptor)throw new FSError('ECONFLICT','CELLS_TEST_REQUIRED');
                     next = {...next, endpoint: descriptor.httpEndpoint, serverId: descriptor.serverId ?? undefined, projects: descriptor.projects, authorization: descriptor.authorization};
@@ -444,6 +445,7 @@ export class ProjectRemoteMountService {
             if (this.findRemoteProject(connectionId, path)) throw new FSError('EEXIST', 'Remote path already belongs to a project');
             await this.beforeChange(projectId); checkOperation(options);
             const connection = this.connection(connectionId);
+            if (connection.protocol === 'webdav') throw new FSError('ECAPABILITY', 'Mount WebDAV explicitly into a local project directory');
             const mount: ProjectRemoteMount = { endpoint: connection.endpoint, username: connection.username, anonymous:connection.anonymous, authorization:connection.authorization, credentialRef: connection.credentialRef,serverId:connection.serverId,
                 connectionId, ...remoteProjectPath(path), access, at: '/', mountId: randomUUID() };
             await this.rootValidator?.(projectId, mount);
@@ -964,11 +966,13 @@ export class ProjectRemoteMountService {
         secret: string, base: IFileSystem, options?: OperationOptions): Promise<void> {
         return this.serial(async () => {
             checkOperation(options); await this.beforeChange(projectId);
-            const id = randomUUID(), mount: ProjectRemoteMount = { ...input, mountId: id, credentialRef: id, access: input.access ?? 'ro' };
+            const id = randomUUID(), connection = input.connectionId ? this.connection(input.connectionId) : undefined;
+            const mount: ProjectRemoteMount = { ...input, ...(connection ? {endpoint:connection.endpoint,protocol:connection.protocol,username:connection.username,anonymous:connection.anonymous,authorization:connection.authorization} : {}), mountId: id, credentialRef: connection?.credentialRef ?? id, access: input.access ?? 'ro' };
+            if (mount.protocol === 'webdav' && mount.at === '/') throw new FSError('EINVAL', 'WebDAV requires an explicit directory mount point');
             validateMount(mount);
             if (mount.at === '/') await this.rootValidator?.(projectId, mount);
             if (this.list(projectId).some(item => item.at === mount.at) || await base.driver.exists(mount.at, options)) throw new FSError('EEXIST', 'MOUNT_POINT_CONFLICT');
-            const restore = this.provider.setCredential(id, secret);
+            const restore = connection ? undefined : this.provider.setCredential(id, secret);
             let owner: FileSystemSourceOwner;
             try { owner = await this.provider.open(mount, options); }
             catch (error) { restore?.(); throw error; }
@@ -998,7 +1002,7 @@ export class ProjectRemoteMountService {
             await this.beforeChange(projectId);
             const mount = this.list(projectId).find(item => item.mountId === mountId);
             if (!mount) throw new FSError('ENOENT', 'Remote mount not found');
-            const restore = this.provider.setCredential(mount.credentialRef, secret);
+            const restore = secret ? this.provider.setCredential(mount.credentialRef, secret) : undefined;
             let next: FileSystemSourceOwner;
             try { next = await this.provider.open(mount, options); }
             catch (error) { restore?.(); throw error; }
@@ -1133,7 +1137,8 @@ export class ProjectRemoteMountService {
     }
     private async persist(catalog: Catalog, credential?: { id: string; password: string }) {
         const next = { ...catalog, revision: this.catalog.revision + 1 };
-        await this.catalogStore.save(next, credential);
+        const projects = Object.fromEntries(Object.entries(next.projects).map(([id, mounts]) => [id, mounts.filter(mount => mount.protocol !== 'webdav')]));
+        await this.catalogStore.save({...next, projects}, credential);
         this.catalog = next;
     }
 
@@ -1145,6 +1150,7 @@ export class ProjectRemoteMountService {
 }
 
 function validateMount(mount: ProjectRemoteMount): void {
+    if (mount?.protocol !== undefined && !['cells','webdav'].includes(mount.protocol)) throw new FSError('EINVAL','Invalid mount protocol');
     if (mount?.serverProjectId !== undefined && (!/^[a-zA-Z0-9_-]{1,128}$/.test(mount.serverProjectId) || !Number.isSafeInteger(mount.serverProjectRevision) || mount.serverProjectRevision!<1)) throw new FSError('EINVAL','Invalid server project reference');
     if (!mount || !['ro', 'rw'].includes(mount.access) || typeof mount.mountId !== 'string' || typeof mount.credentialRef !== 'string'
         || !(mount.at === '/' && mount.connectionId || /^\/[a-zA-Z0-9_-]+$/.test(mount.at)) || ['attachments', 'etc', 'var', 'dev', 'run', 'history', 'session'].includes(mount.at.slice(1))) throw new FSError('EINVAL', 'Invalid remote mount');

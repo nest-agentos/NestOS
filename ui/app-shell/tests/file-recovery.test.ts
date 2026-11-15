@@ -11,10 +11,10 @@ afterEach(async () => {for (const release of cleanup.splice(0)) await release();
 
 async function file(original = 'Server content', path = '/note.md') {
     const mount = document.createElement('div'); document.body.append(mount);
-    const events = new Map<string, Set<() => void>>(); let text = original, saved = original;
-    const emit = (type: string) => events.get(type)?.forEach(listener => listener());
+    const events = new Map<string, Set<(value?:unknown) => void>>(); let text = original, saved = original;
+    const emit = (type: string, value?:unknown) => events.get(type)?.forEach(listener => listener(value));
     const factory = vi.fn(async () => ({
-        on(type: string, listener: () => void) {if (!events.has(type)) events.set(type, new Set()); events.get(type)!.add(listener); return () => events.get(type)!.delete(listener);},
+        on(type: string, listener: (value?:unknown) => void) {if (!events.has(type)) events.set(type, new Set()); events.get(type)!.add(listener); return () => events.get(type)!.delete(listener);},
         getText: () => text, setText: (next: string) => {text = next; emit('change');}, isDirty: () => text !== saved,
         setReadOnly: vi.fn(), updateNodeId: vi.fn(), destroy: vi.fn(async () => {}),
     }));
@@ -109,4 +109,17 @@ it('keeps the HTTP swap separate from the active recovery draft and retains its 
     expect(backup).toBe('Another draft'); expect(openEditorSwap).toHaveBeenCalledOnce();
     expect(openEditorSwap).toHaveBeenCalledWith({files: {}, path: '/old.md'});
     await editor.destroy(); expect(closeSwap).toHaveBeenCalledOnce();
+});
+
+it.each(['unknown','partial'] as const)('preserves %s operation identity and blocks automatic draft resubmission after reopening', async outcome => {
+    const first=await file(); first.editor.setText('Uncertain local changes');
+    first.emit('saveError', {outcome,operationId:'original-write'});
+    await vi.waitFor(async()=>expect((await first.store.read())?.pendingOperation).toEqual({outcome,operationId:'original-write'}));
+    const next=await file();
+    expect(next.editor.getText()).toBe('Server content');
+    expect(next.mount.querySelector('textarea')!.value).toBe('Uncertain local changes');
+    expect(next.mount.textContent).toContain('original-write');
+    expect((await next.factory.mock.results[0].value).setReadOnly).toHaveBeenCalledWith(true);
+    next.emit('contentLoaded');
+    await vi.waitFor(async()=>expect((await first.store.read())?.pendingOperation?.operationId).toBe('original-write'));
 });

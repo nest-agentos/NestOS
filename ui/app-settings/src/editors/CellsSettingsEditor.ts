@@ -10,6 +10,7 @@ type Auth='bearer'|'basic'|'anonymous';
 type Mount=CellsNodeOverview['mounts'][number];
 type ProjectAction='open'|'status'|'remount'|'unmount'|'detach';
 interface Navigation {
+    mount?(id:string):Promise<void>;
     saved?(id:string):Promise<void>; removed?():Promise<void>;
     project?(mount:Mount,action:ProjectAction):Promise<void>;
 }
@@ -48,13 +49,15 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
         if(this.selected)await this.refreshOverview();
     }
     private toolbar():string {
-        return `<div class="cells-node__toolbar">${['check','refresh','remove'].map(action=>`<button type="button" class="settings-btn settings-btn--secondary" data-cells-action="${action}">${escapeHTML(t(`cells.${action}` as Parameters<typeof t>[0]))}</button>`).join('')}</div>`;
+        const mount=this.service?.connections().find(node=>node.id===this.selected)?.protocol==='webdav'&&this.navigation.mount
+            ? `<button type="button" class="settings-btn" data-cells-action="mount">${escapeHTML(t('webdav.mount'))}</button>`:'';
+        return `<div class="cells-node__toolbar">${mount}${['check','refresh','remove'].map(action=>`<button type="button" class="settings-btn settings-btn--secondary" data-cells-action="${action}">${escapeHTML(t(`cells.${action}` as Parameters<typeof t>[0]))}</button>`).join('')}</div>`;
     }
     private field(key:'name'|'endpoint'|'username'|'password',type='text'):string {
         return `<label class="cells-node__field" data-cells-field="${key}"><span>${escapeHTML(t(`cells.${key}`))}</span><input name="${key}" type="${type}" autocomplete="${key==='password'?'new-password':'off'}" ${key==='name'||key==='endpoint'?'required':''}></label>`;
     }
     private formTemplate():string {
-        return `<form class="cells-node__form" data-cells-form>${this.field('name')}${this.field('endpoint')}
+        return `<form class="cells-node__form" data-cells-form>${this.field('name')}<label class="cells-node__field">${escapeHTML(t('webdav.protocol'))}<select name="protocol"><option value="cells">Cells</option><option value="webdav">WebDAV</option></select></label>${this.field('endpoint')}
             <label class="cells-node__field">${escapeHTML(t('cells.auth'))}<select name="auth">${(['bearer','basic','anonymous'] as const).map(auth=>`<option value="${auth}">${escapeHTML(t(`cells.auth.${auth}`))}</option>`).join('')}</select></label>
             ${this.field('username')}${this.field('password','password')}<p class="cells-node__hint">${escapeHTML(t('cells.credentialHint'))}</p>
             <div class="cells-node__actions"><button type="button" class="settings-btn settings-btn--secondary" data-cells-action="test">${escapeHTML(t('cells.test'))}</button><button type="submit" class="settings-btn" data-cells-save>${escapeHTML(t('cells.save'))}</button><button type="button" class="settings-btn settings-btn--secondary" data-cells-action="cancel">${escapeHTML(t('cells.cancel'))}</button></div></form>`;
@@ -64,6 +67,7 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
     private fill(node:ReturnType<ProjectRemoteMountPort['connections']>[number]|undefined):void {
         for(const key of ['name','endpoint','username'] as const)this.control(key).value=node?.[key]??'';
         this.control('auth').value=this.originalAuth;this.authFields();
+        this.control('protocol').value=node?.protocol??'cells';
     }
     private authFields():void {
         const auth=this.control('auth').value;
@@ -77,6 +81,7 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
         this.addEventListener(this.form(),'submit',event=>{event.preventDefault();void this.run('save',()=>this.save(true));});
         this.addEventListener(this.form(),'input',()=>{this.dirty=true;this.saveButton();});
         this.addEventListener(this.control('auth'),'change',()=>{this.dirty=true;this.authFields();this.saveButton();});
+        this.addEventListener(this.control('protocol'),'change',()=>{this.dirty=true;this.saveButton();});
         this.addEventListener(this.container,'click',event=>{
             const mountAction=(event.target as HTMLElement).closest<HTMLElement>('[data-cells-project-action]');
             if(mountAction){void this.run('project',()=>this.openProject(mountAction));return;}
@@ -86,6 +91,7 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
             if(action==='authorization')void this.run('authorization',()=>this.confirmAuthorization());
             if(action==='configure'){this.container.querySelector<HTMLDetailsElement>('.cells-node__configuration')!.open=true;this.control('endpoint').focus();}
             if(action==='refresh')void this.refreshOverview();
+            if(action==='mount')void this.run('project',async()=>{await this.navigation.mount?.(this.selected!);await this.refreshOverview();});
             if(action==='check')void this.run('check',async()=>{await this.service!.checkConnection(this.selected!);await this.refreshOverview();});
             if(action==='remove'&&confirm(t('cells.removeConfirm')))void this.run('remove',async()=>{
                 await this.service!.removeConnection(this.selected!);this.dirty=false;await this.navigation.removed?.();});
@@ -126,12 +132,15 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
     private async openProject(element:HTMLElement):Promise<void> {
         const {cellsProject:projectId,cellsMount:mountId,cellsProjectAction:action}=element.dataset;
         const mount=this.mounts.find(item=>item.projectId===projectId&&item.mountId===mountId);
+        if(mount&&action==='reconnect'){
+            await this.service!.reconnect(mount.projectId,mount.mountId,'',{timeoutMs:10000});await this.refreshOverview();return;
+        }
         if(!mount||!['open','status','remount','unmount','detach'].includes(action??''))return;
         if(action==='remount'&&!mount.canRemount||action==='unmount'&&mount.unmount!=='project'||action==='detach'&&mount.unmount!=='directory')return;
         await this.navigation.project?.(mount,action as ProjectAction);
         if(action!=='open'&&!this.closed)await this.refreshOverview();
     }
-    private fingerprint():string {return JSON.stringify(['endpoint','auth','username','password'].map(key=>this.control(key).value));}
+    private fingerprint():string {return JSON.stringify(['protocol','endpoint','auth','username','password'].map(key=>this.control(key).value));}
     private canSave():boolean {return this.testedFingerprint===this.fingerprint()||!!this.selected&&this.fingerprint()===this.originalFingerprint;}
     private saveButton():void {const button=this.container.querySelector<HTMLButtonElement>('[data-cells-save]');if(button)button.disabled=this.busy||!this.service||!this.canSave();}
     private async testDraft():Promise<void> {
@@ -142,7 +151,8 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
     private draft(){
         const value=(key:string)=>this.control(key).value,auth=value('auth') as Auth,password=auth==='anonymous'?'':value('password');
         if(auth!=='anonymous'&&(!this.selected||auth!==this.originalAuth)&&!password)throw new Error(t('cells.credentialRequired'));
-        return {input:{name:value('name'),endpoint:value('endpoint'),...(auth==='basic'?{username:value('username')}:{}),...(auth==='anonymous'?{anonymous:true}:{})},password,auth};
+        const protocol=value('protocol') as 'cells'|'webdav';
+        return {input:{protocol,name:value('name'),endpoint:value('endpoint'),...(auth==='basic'?{username:value('username')}:{}),...(auth==='anonymous'?{anonymous:true}:{})},password,auth};
     }
     private async save(navigate=false):Promise<void> {
         if(!this.service)throw new Error(t('cells.unavailable'));

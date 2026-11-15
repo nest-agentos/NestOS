@@ -6,7 +6,7 @@ import type {RemoteFileSystemConfig,RemoteFileSystemInput} from './remote-connec
 export class CellsDraftChecks {
     private readonly proofs=new Map<string,{at:number;descriptor?:CellsDescriptor}>();
     async key(input:RemoteFileSystemInput,password:string,id?:string,current?:RemoteFileSystemConfig):Promise<string> {
-        const bytes=new TextEncoder().encode(JSON.stringify([id,input.endpoint,input.username,!!input.anonymous,password,
+        const bytes=new TextEncoder().encode(JSON.stringify([id,input.protocol,current?.protocol,input.endpoint,input.username,!!input.anonymous,password,
             current?.credentialRef,current?.endpoint,current?.username,current?.anonymous,current?.authorization]));
         return sha256Hex(bytes.buffer);
     }

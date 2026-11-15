@@ -6,6 +6,11 @@ import {STARTUP_ZH} from './startup-strings';
 // Interpolation syntax:   {param}  e.g. '已导入 {count} 个 Skill'
 
 export const zhCN = {
+    "webdav.writeLocked": "文件被锁定或仍被其他操作占用。已保留本地修改；等待释放后重新读取并比较。",
+    "webdav.writeDenied": "服务拒绝写入。已保留本地修改；请检查凭据和只读权限。",
+    "webdav.protocol": "文件协议",
+    "webdav.mount": "挂载 WebDAV",
+    "webdav.mountHint": "仅本次运行挂载；重启后需重新挂载。不覆盖已有文件；目录须为空才能删除。不支持元数据、递归删除及跨来源移动。",
     ...STARTUP_ZH,
     "kanban.decisionTable.state.waiting-approval": "等待授权",
     "kanban.decisionTable.reason.authorization-required": "会话正在等待你的授权。",
