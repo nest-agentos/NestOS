@@ -1,3 +1,5 @@
+import {adoptPlanningConversation} from './adopt-planning-conversation';
+import {resolveKanbanPluginRequest} from './session-request-plugins';
 import {recordCoordination} from './record-coordination';
 import {resolveCoordinationRequest} from './coordination-conversation-requests';
 import {readConversationIssues} from '../run/conversation-issues';
@@ -22,7 +24,7 @@ export function decisionConversations(options:DecisionConversationOptions) {
             const started=Date.now(),key='decision-response:'+conversation.id+':'+row.request.id;
             let response=await options.journal.get<ChannelResponse>(key);
             if(!response) {
-                try{response={id:row.request.id,scopeId:conversation.id,requestDigest:row.requestDigest,status:'ok',payload:JSON.parse(JSON.stringify(await (conversation.binding.purpose==='coordination'?resolveCoordinationRequest:resolveDecisionRequest)({...options,active},conversation,row.request))),error:null};}
+                try{response={id:row.request.id,scopeId:conversation.id,requestDigest:row.requestDigest,status:'ok',payload:JSON.parse(JSON.stringify(await (row.request.method.startsWith('kanban.')?resolveKanbanPluginRequest:conversation.binding.purpose==='coordination'?resolveCoordinationRequest:resolveDecisionRequest)({...options,active},conversation,row.request))),error:null};}
                 catch(error){const code=safeCode(error,'DECISION_REQUEST_FAILED');
                     options.log({operationId:row.request.id,boardId:conversation.boardId,stage:'decision.request.resolve',result:'failure',code,durationMs:Date.now()-started});
                     if(['EIO','HTTP_CONNECTION_LOST','ETIMEOUT','SERVICE_STOPPING'].includes(code))throw error;
@@ -39,7 +41,7 @@ export function decisionConversations(options:DecisionConversationOptions) {
         return conversation.binding.purpose==='coordination'?{recordId:conversation.binding.recordId,state:reports.pendingReports.length?'blocked':'confirmed',purpose:'coordination',...reports}:decisionConversationState(options,conversation.id,conversation.boardId);
     });
     const conversations=createRecordConversations({...options,port});
-    return {removeRecordConversations:conversations.removeRecordConversations,controlRecordConversation:conversations.controlRecordConversation,openRecordCoordination:recordCoordination(options,conversations),startRecordConversation:conversations.startRecordConversation,scan:conversations.scan,quiesce:conversations.quiesce,recordConversations:async(boardId:string)=>{
+    return {adoptPlanning:adoptPlanningConversation(options,conversations.startRecordConversation),removeRecordConversations:conversations.removeRecordConversations,controlRecordConversation:conversations.controlRecordConversation,openRecordCoordination:recordCoordination(options,conversations),startRecordConversation:conversations.startRecordConversation,scan:conversations.scan,quiesce:conversations.quiesce,recordConversations:async(boardId:string)=>{
         return decisionConversationViews(options,await conversations.recordConversations(boardId));
     }};
 }

@@ -1,3 +1,4 @@
+import {validateDecisionDependencies} from '@nestos/kanban/integration';
 import {confirmRecordExecution,itemsWithinRoots,itemWithinRoots} from '@nestos/kanban/integration';
 import {conversationIssuesKey,conversationIssueView,type ConversationIssueState} from '../run/conversation-issues';
 import {requireUserConfirmation} from './decision-conversation-confirmation';
@@ -24,7 +25,7 @@ export async function resolveDecisionRequest(options:DecisionConversationOptions
         const selected=request.params.itemIds;
         requireValue(selected===undefined||Array.isArray(selected)&&selected.length<=1&&selected.every(id=>typeof id==='string'),'INVALID_DETAIL_SELECTION');
         const tasks=record?itemsWithinRoots(board.items,record.itemIds,{includeDeleted:true}):[];
-        return {conversationId:conversation.id,...await decisionConversationState(options,conversation.id,board.id),actions:{cancel:{method:'decision.cancel',params:{},confirmation:(await conversationPolicy(options.fs)).cancelDecision}},projectIds:conversation.binding.projectIds,conversationProjectId:conversation.binding.projectId,board:{id:board.id,title:board.title},record,...(!link&&proposal?{proposal}:{}),total:tasks.length,
+        return {capabilities:{discover:'kanban.discover',describe:'kanban.describe',invoke:'kanban.invoke'},conversationId:conversation.id,...await decisionConversationState(options,conversation.id,board.id),actions:{cancel:{method:'decision.cancel',params:{},confirmation:(await conversationPolicy(options.fs)).cancelDecision}},projectIds:conversation.binding.projectIds,conversationProjectId:conversation.binding.projectId,board:{id:board.id,title:board.title},record,...(!link&&proposal?{proposal}:{}),total:tasks.length,
             tasks:(Array.isArray(selected)?tasks.filter(item=>selected.includes(item.id)):tasks.slice(0,50)).map(item=>({id:item.id,title:item.title.slice(0,160),status:item.status,revision:item.revision,projectIds:item.externalRefs?.filter(ref=>ref.system===REMOTE_PROJECT_REFERENCE).map(ref=>ref.id)??[],admittedAt:item.launch?.admittedAt,editing:item.launch?.editing,
                 ...(Array.isArray(selected)&&selected.includes(item.id)?{responsibility:item.responsibility,acceptance:item.acceptance,planning:item.planning}:{})}))};
     }
@@ -48,14 +49,15 @@ async function command(options:DecisionConversationOptions,conversation:Decision
     }
 }
 async function propose(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest) {
-    const value=request.params as {id:string;title:string;content:string;rationale:string;projectIds:string[];verificationMode:string};
-    requireValue(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.id)&&Array.isArray(value.projectIds)&&value.projectIds.length>0&&value.projectIds.length<=16,'DECISION_PROPOSAL_INVALID');
+    const value=request.params as {id:string;title:string;content:string;rationale:string;projectIds:string[];verificationMode:string;dependsOn?:import('@nestos/kanban/contracts').KanbanDecisionDependency[]};
+    requireValue(typeof value.id==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.id)&&Array.isArray(value.projectIds)&&value.projectIds.length>0&&value.projectIds.length<=16,'DECISION_PROPOSAL_INVALID');
     requireValue(new Set(value.projectIds).size===value.projectIds.length,'DECISION_PROPOSAL_INVALID');
+    const dependsOn=await validateDecisionDependencies(options.service,conversation.boardId,value.id,value.dependsOn);
     const scope=conversation.binding.projectIds;
     requireValue(!scope||scope.length===value.projectIds.length&&value.projectIds.every(id=>scope.includes(id)),'DECISION_PROJECT_SCOPE_MISMATCH');
     const externalRefs=value.projectIds.map(id=>({system:REMOTE_PROJECT_REFERENCE,id}));await validateRemoteReferences(options.projects,{externalRefs});
     if(scope){decisionProjectScope(options.remote,conversation.binding.projectId,scope);externalRefs.push({system:PRIMARY_PROJECT_REFERENCE,id:conversation.binding.projectId});}
-    const selected=kanbanVerificationOptions(value.verificationMode),record:KanbanRecordInput={id:value.id,kind:'decision',completion:'automatic',title:value.title,content:value.content,rationale:value.rationale,itemIds:[],externalRefs,discussionSessionId:conversation.resourceId,...selected,
+    const selected=kanbanVerificationOptions(value.verificationMode),record:KanbanRecordInput={id:value.id,kind:'decision',...(dependsOn.length?{dependsOn}:{}),completion:'automatic',title:value.title,content:value.content,rationale:value.rationale,itemIds:[],externalRefs,discussionSessionId:conversation.resourceId,...selected,
         sources:[{sessionId:conversation.resourceId!,messageId:request.id,revision:channelDigest(request),role:'assistant'}]};
     const previous=await options.journal.get<Link>(linkKey(conversation.id));requireValue(!previous,'DECISION_ALREADY_CONFIRMED');
     requireValue([value.title,value.content,value.rationale].every(text=>typeof text==='string'&&text.trim().length>0),'DECISION_PROPOSAL_INVALID');
@@ -70,6 +72,7 @@ async function confirm(options:DecisionConversationOptions,conversation:Decision
     let link=previous;
     if(!link){
         requireValue(proposal,'DECISION_PROPOSAL_REQUIRED');
+        await validateDecisionDependencies(options.service,conversation.boardId,proposal.record.id,proposal.record.dependsOn);
         if(conversation.binding.projectIds)decisionProjectScope(options.remote,conversation.binding.projectId,conversation.binding.projectIds);
         await validateRemoteReferences(options.projects,{externalRefs:proposal.record.externalRefs});
         await command(options,conversation,request,{type:'append-record',record:proposal.record});

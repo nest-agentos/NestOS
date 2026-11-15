@@ -178,3 +178,29 @@ it('projects proposal activity from durable changes and keeps it stable across r
   expect((await decisionConversationViews(f.options,rows))[0].lastActivityAt).toBe(20000);
  }finally{time.mockRestore();}
 });
+it('discovers plugin schemas on demand, queries prerequisites and freezes dependency references in the confirmed decision',async()=>{
+ const f=await fixture(),{resolveKanbanPluginRequest}=await import('../src/kanban/session-request-plugins');
+ f.conversation.binding.projectId='one';
+ const call=(method:string,params:any={},id=method)=>resolveKanbanPluginRequest(f.options,f.conversation,{id,scopeId:'conversation',method,params});
+ const discovery=await call('kanban.discover') as any;expect(discovery.plugins.map((row:any)=>row.id)).toEqual(['decisions']);expect(JSON.stringify(discovery)).not.toContain('inputSchema');
+ expect(await call('kanban.describe',{pluginId:'decisions',method:'propose'})).toMatchObject({inputSchema:{properties:{dependsOn:{type:'array'}}}});
+ await f.service.execute('b',{operationId:'server-create',expectedRevision:(await f.service.read('b')).revision,command:{type:'append-record',record:{id:'server',kind:'decision',title:'WebDAV Server',content:'Server',rationale:'Check',itemIds:[],sources:[],externalRefs:[{system:'nestos-remote-project',id:'one'}]}}});
+ await f.service.execute('b',{operationId:'server-confirm',expectedRevision:(await f.service.read('b')).revision,command:{type:'review-record',recordId:'server',accept:true}});
+ expect(await call('kanban.invoke',{pluginId:'decisions',method:'search',input:{query:'WebDAV'}})).toMatchObject({decisions:[{id:'server',completed:false}]});
+ const proposal=await call('kanban.invoke',{pluginId:'decisions',method:'propose',input:{id:'client',title:'Client',content:'Mount',rationale:'Check',projectIds:['one'],verificationMode:'release',dependsOn:[{boardId:'b',recordId:'server'}]}},'preview-client') as any;
+ expect(proposal.record.dependsOn).toEqual([{boardId:'b',recordId:'server',title:'WebDAV Server'}]);
+ f.read.mockResolvedValue({messages:[{id:'confirm-client',role:'user',text:'确认决策'}]});
+ await call('kanban.invoke',{pluginId:'decisions',method:'confirm',input:{proposalDigest:proposal.proposalDigest}},'confirm-client');
+ expect(await f.service.record('b','client')).toMatchObject({status:'confirmed',dependsOn:[{boardId:'b',recordId:'server'}]});
+});
+it('adds a scoped host plugin without adding a top-level MCP tool or eagerly exposing its schema',async()=>{
+ const f=await fixture(),{resolveKanbanPluginRequest}=await import('../src/kanban/session-request-plugins'),run=vi.fn(async()=>({state:'ok'}));
+ f.options.requestPlugins=()=>[{id:'example',version:'1',description:'Example capability',methods:[{id:'inspect',kind:'query',description:'Inspect',inputSchema:{type:'object',properties:{selection:{type:'string'}}},run}]}];
+ const invoke=(method:string,params:any)=>resolveKanbanPluginRequest(f.options,f.conversation,{id:'request',scopeId:'conversation',method,params});
+ const available=await invoke('kanban.discover',{});expect(JSON.stringify(available)).not.toContain('selection');
+ expect(await invoke('kanban.invoke',{pluginId:'example',method:'inspect',input:{selection:'known'}})).toEqual({state:'ok'});
+ expect(run).toHaveBeenCalledWith(expect.objectContaining({id:'request',params:{selection:'known'}}));
+ await expect(invoke('kanban.invoke',{pluginId:'unknown',method:'inspect',input:{}})).rejects.toMatchObject({code:'CHANNEL_PLUGIN_UNAVAILABLE'});
+ const plugin=f.options.requestPlugins()[0];f.options.requestPlugins=()=>[{...plugin,version:'2'}];
+ await expect(invoke('kanban.invoke',{pluginId:'example',method:'inspect',input:{selection:'known'}})).rejects.toMatchObject({code:'CHANNEL_PLUGIN_VERSION_CHANGED'});expect(run).toHaveBeenCalledOnce();
+});

@@ -124,7 +124,7 @@ it('routes delivery analysis through the current client, repository scope and du
  const f=await fixture(),view={pluginId:'software',revision:'outer',operations:[],scopes:[{id:'repo',label:'Repository',contributors:[],view:{revision:'v1',operations:[{id:'analyze',label:'Submit',state:'failed',enabled:true}]}}]};
  const read=vi.fn(async()=>view),run=vi.fn().mockRejectedValueOnce(Object.assign(Error('lost'),{code:'HTTP_CONNECTION_LOST',outcome:'unknown'})).mockResolvedValue(view);
  f.options.client=()=>({...f.service,itemOperations:read,runItemOperation:run});
- expect(await f.request('coordination.read')).toMatchObject({deliveryOperations:{read:'coordination.operations.read'}});
+ expect(await f.request('coordination.read')).toMatchObject({capabilities:{discover:'kanban.discover'}});
  expect(await f.request('coordination.operations.read',{itemId:'group'})).toBe(view);
  const params={itemId:'group',request:{pluginId:'software',scopeId:'repo',action:'analyze',expectedRevision:'v1'}};
  await expect(f.request('coordination.operations.run',params,'analysis')).rejects.toMatchObject({code:'HTTP_CONNECTION_LOST'});
@@ -153,4 +153,16 @@ it('rejects stale revisions and reconciles an unknown delivery without starting 
  params.request.expectedRevision='latest';await expect(f.request('coordination.operations.run',params)).rejects.toMatchObject({code:'OPERATION_PREREQUISITE_REQUIRED'});
  await f.request('coordination.operations.run',{...params,request:{...params.request,reconcile:{runId:'original'}}},'reconcile');
  expect(run).toHaveBeenCalledExactlyOnceWith('b',expect.objectContaining({reconcile:{runId:'original'}}));
+});
+it('adopts the existing settled planning channel without creating or moving a native Session',async()=>{
+ const f=await fixture(),{adoptPlanningConversation}=await import('../src/kanban/adopt-planning-conversation');
+ await f.journal.update('analysis-current:'+JSON.stringify(['b','group']),()=> 'analysis:original');
+ await f.journal.update('analysis:original',()=>({id:'original',phase:'settled'}));
+ await f.journal.update('development-workspace:original',()=>({projectId:'project',directory:'/workspace/original',context:{decision:{sourceBoardId:'b',recordId:'decision'}}}));
+ await f.journal.update('kanban-harness-choice:original',()=>({profileId:'codex'}));
+ const create=vi.fn(),close=vi.fn(async()=>{});f.options.remote={...f.options.remote,sessionChannel:vi.fn(async()=>({execution:{sessionId:'native'}})),projectHarness:async()=>({create,profiles:async()=>({epoch:'current'}),close}),list:()=>[{at:'/',serverProjectId:'workspace'}]};
+ const start=vi.fn(async()=>{}),adopt=adoptPlanningConversation(f.options,start),value={analysisId:'original',resourceId:'/folder:project/@harness/codex/native'} as any;
+ await adopt('b','group',value);await adopt('b','group',value);
+ expect(await f.journal.get('record-conversation:original')).toMatchObject({sessionId:'native',resourceId:value.resourceId,binding:{id:'original',purpose:'coordination',recordId:'decision',directory:'/workspace/original'}});
+ expect(create).not.toHaveBeenCalled();expect(start).toHaveBeenCalledOnce();expect(f.options.remote.sessionChannel).toHaveBeenCalledOnce();
 });

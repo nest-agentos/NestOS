@@ -4,6 +4,7 @@ import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import type {KanbanClient} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal,SavedRecordConversation} from '@nestos/kanban/integration';
 export interface DecisionConversationOptions {
+    requestPlugins?(conversation:DecisionConversation):readonly import('../run/channel-request-plugins').ChannelRequestPlugin[];
     active?():boolean;fs:IFileSystem;projects:Pick<ProjectService,'list'|'get'|'openWorkspace'>;remote:ProjectRemoteMountService;
     journal:KanbanAutomationJournal;service:KanbanClient;client():KanbanClient;
     executionResource?(id:string,branch:string,board?:import('@nestos/kanban/contracts').KanbanBoard):Promise<string|undefined>;

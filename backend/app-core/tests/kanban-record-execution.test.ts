@@ -363,3 +363,23 @@ it('edits delivery after materialization, resolves it from the management task, 
  expect(await f.open().recordDelivery('source',original.itemIds![0])).toMatchObject({boardId:'source',recordId:'decision',mode:'source',editable:true});
  const saved=await f.journal.run<{record:{deliveryOptions?:unknown}}>('source',original.id);expect(saved?.record.deliveryOptions).toBeUndefined();
 });
+it('keeps a confirmed dependent decision entirely unmaterialized until its prerequisite completes',async()=>{
+ const f=await fixture(),api=f.open();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const upstream=await api.runRecord('source',{operationId:'upstream',recordId:'decision',expectedRevision:(await f.service.record('source','decision')).revision});
+ await f.command({type:'append-record',record:{id:'dependent',kind:'decision',title:'Client',content:'Client scope',rationale:'Verified',itemIds:[],sources:[],externalRefs:[{system:'nestos-remote-project',id:'one'}],dependsOn:[{boardId:'source',recordId:'decision',title:'Goal'}]}});
+ await f.command({type:'review-record',recordId:'dependent',accept:true});
+ const waiting=await api.runRecord('source',{operationId:'dependent-run',recordId:'dependent',expectedRevision:(await f.service.record('source','dependent')).revision});
+ expect(waiting).toMatchObject({state:'blocked',code:'DECISION_DEPENDENCY_WAITING',dependencies:[{recordId:'decision',state:'waiting'}]});
+ expect(waiting.rootItemId).toBeUndefined();expect((await f.service.read('source')).items).toHaveLength(1);expect((await f.service.record('source','dependent')).itemIds).toEqual([]);
+ await api.scan();expect((await f.service.read('source')).items.some(row=>row.id===waiting.rootItemId)).toBe(false);
+ await completeCoordination(f,upstream.rootItemId!);await api.scan();
+ const resumed=(await api.recordExecutions('source','dependent'))[0];expect(resumed.id).toBe(waiting.id);expect(resumed.code).toBeUndefined();
+ expect(resumed.rootItemId).toBeDefined();expect((await f.service.read('source')).items.some(row=>row.id===resumed.rootItemId)).toBe(true);await api.quiesce();
+});
+it('cancels a dependency wait without creating any management work or Session',async()=>{
+ const f=await fixture(),api=f.open();await f.command({type:'review-record',recordId:'decision',accept:true});
+ await f.command({type:'append-record',record:{id:'waiting',kind:'decision',title:'Wait',content:'Scope',rationale:'Check',itemIds:[],sources:[],externalRefs:[{system:'nestos-remote-project',id:'one'}],dependsOn:[{boardId:'source',recordId:'decision'}]}});await f.command({type:'review-record',recordId:'waiting',accept:true});
+ const run=await api.runRecord('source',{operationId:'wait',recordId:'waiting',expectedRevision:(await f.service.record('source','waiting')).revision});
+ await api.controlRecord('source',{operationId:'cancel-wait',recordId:'waiting',action:'cancel',expectedRevision:(await f.service.record('source','waiting')).revision});
+ expect((await f.service.record('source','waiting')).status).toBe('cancelled');expect((await f.service.read('source')).items.some(row=>row.id===run.rootItemId)).toBe(false);await api.quiesce();
+});

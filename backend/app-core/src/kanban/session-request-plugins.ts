@@ -1,0 +1,47 @@
+import {createModuleLogger} from '@nestos/common';
+import {safeCode} from '@nestos/kanban/integration';
+const log=createModuleLogger('kanban-session-plugins');
+import type {ChannelRequestMethod,ChannelRequestPlugin} from '../run/channel-request-plugins';
+import {resolveChannelPlugin} from '../run/channel-request-plugins';
+import {channelDigest} from '../run/channel-protocol';
+import type {ChannelRequest} from '../run/channel-protocol';
+import type {DecisionConversationOptions,DecisionConversation} from './decision-conversation-ports';
+import {resolveDecisionRequest} from './decision-conversation-requests';
+import {resolveCoordinationRequest} from './coordination-conversation-requests';
+import {queryDecisions} from './decision-query';
+import {requireValue} from './validation';
+const string={type:'string'};
+function schema(properties:Record<string,unknown>,required:string[]=[]):Record<string,unknown>{return {type:'object',properties,required,additionalProperties:false};}
+/** Native MCP tools stay fixed; trusted host plugins advertise only schemas requested by the model. */
+export async function resolveKanbanPluginRequest(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest) {
+    const context=await options.journal.get<{recordId:string}>('decision-conversation-record:'+conversation.id);
+    const management=conversation.binding.purpose==='coordination'?conversation:context?{...conversation,binding:{...conversation.binding,purpose:'coordination' as const,recordId:context.recordId}}:undefined;
+    const method=(id:string,description:string,inputSchema:Record<string,unknown>,run:ChannelRequestMethod['run'],kind:'query'|'command'='query'):ChannelRequestMethod=>({id,kind,description,inputSchema,run});
+    const decision=(id:string)=>(input:ChannelRequest)=>resolveDecisionRequest(options,conversation,{...input,method:'decision.'+id});
+    const plugins:ChannelRequestPlugin[]=[{id:'decisions',version:'1',description:'Query decisions; scoped draft previews and dependency-aware confirmation.',methods:[
+        method('search','Find authorized related decisions and formal completion.',schema({query:string,boardId:string,limit:{type:'integer',minimum:1,maximum:50}}),input=>queryDecisions(options,conversation,input.params)),
+        method('read','Read an existing decision without creating or starting it.',schema({boardId:string,recordId:string},['recordId']),async input=>{
+            requireValue(typeof input.params.recordId==='string','DECISION_QUERY_INVALID');
+            return options.service.record(typeof input.params.boardId==='string'?input.params.boardId:conversation.boardId,input.params.recordId);
+        }),
+        ...conversation.binding.purpose==='coordination'?[]:[
+            method('status','Read this draft, confirmation and available actions.',schema({}),decision('read')),
+            method('propose','Preview one decision. dependsOn blocks all planning until upstream delivery completes.',schema({id:string,title:string,content:string,rationale:string,projectIds:{type:'array',items:string},verificationMode:{enum:['release','quick','full','build','source']},dependsOn:{type:'array',maxItems:16,items:schema({boardId:string,recordId:string},['boardId','recordId'])}},['id','title','content','rationale','projectIds','verificationMode']),decision('propose'),'command'),
+            method('confirm','Create only after the real user says the exact returned confirmation. Read the execution receipt.',schema({proposalDigest:string},['proposalDigest']),decision('confirm'),'command'),
+        ],
+    ]}];
+    if(management)plugins.push({id:'delivery',version:'1',description:'Bound management task delivery operations, analysis, integration and receipt reconciliation.',methods:[
+        method('read','Read plugin views, repository scopes, enabled actions and confirmations.',schema({itemId:string},['itemId']),input=>resolveCoordinationRequest(options,management,{...input,method:'coordination.operations.read'})),
+        method('run','Invoke the enabled operation using its returned revision and real confirmation; retain request identity on uncertainty.',schema({itemId:string,request:schema({action:string,expectedRevision:string,pluginId:string,scopeId:string,selections:{type:'object',additionalProperties:string},followUp:string,reconcile:schema({runId:string},['runId'])},['action','expectedRevision'])},['itemId','request']),input=>resolveCoordinationRequest(options,management,{...input,method:'coordination.operations.run'}),'command'),
+    ]});
+    const available=[...plugins,...options.requestPlugins?.(conversation)??[]];
+    if(request.method==='kanban.invoke'){const plugin=available.find(row=>row.id===request.params.pluginId);requireValue(plugin,'CHANNEL_PLUGIN_UNAVAILABLE');
+        const route={pluginId:plugin.id,version:plugin.version,method:request.params.method,digest:channelDigest(request)};
+        await options.journal.update('session-plugin-route:'+conversation.id+':'+request.id,old=>{requireValue(!old||channelDigest(old)===channelDigest(route),'CHANNEL_PLUGIN_VERSION_CHANGED');return old??route;});}
+    return resolveLogged(request,available,conversation.id);
+}
+async function resolveLogged(request:ChannelRequest,plugins:ChannelRequestPlugin[],scopeId:string) {
+    const started=Date.now(),plugin=plugins.find(row=>row.id===request.params.pluginId);
+    try{const value=await resolveChannelPlugin(request,plugins);log.info('Session plugin resolved',{operationId:request.id,scopeId,stage:'session.plugin.resolve',result:'success',pluginId:plugin?.id,method:plugin?.methods.find(row=>row.id===request.params.method)?.id,durationMs:Date.now()-started});return value;}
+    catch(error){log.warn('Session plugin rejected',{operationId:request.id,scopeId,stage:'session.plugin.resolve',result:'failure',code:safeCode(error,'CHANNEL_PLUGIN_FAILED'),durationMs:Date.now()-started});throw error;}
+}
