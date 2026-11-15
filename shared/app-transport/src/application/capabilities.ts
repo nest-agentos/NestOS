@@ -19,7 +19,7 @@ export const CAPABILITIES: Readonly<Record<string, CapabilitySchema>> = {
         methods: {eventSnapshot: 'snapshot', subscribe: 'async-subscribe', readNavigation: 'query', prepareChat: 'async', openConversation: 'async', setVisible: 'async', dispose: 'async'}},
     "OpenedApplicationView": {markers: ['workbench', 'observation', 'cursor', 'dispose'],
         domain: 'opened-view', invalidates: [],
-        fields: ['conversationWorkbench', 'documents', 'workbench', 'initial', 'taskAttachmentKey', 'connectionInterests', 'observation', 'cursor'], methods: {dispose: 'async'}},
+        fields: ['eventBaseline', 'conversationWorkbench', 'documents', 'workbench', 'initial', 'taskAttachmentKey', 'connectionInterests', 'observation', 'cursor'], methods: {dispose: 'async'}},
     "ApplicationViewObservation": {markers: ['getViewCursor', 'getSessionBaseline', 'observeView', 'dispose'], fields: [], scopedObserver: true, observer: observeApplication,
         snapshotView: applicationSnapshot, sharedSnapshots: true,
         methods: {getViewCursor: 'snapshot', getSessionBaseline: 'snapshot', observeView: 'async-subscribe', dispose: 'async'}},

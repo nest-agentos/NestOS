@@ -1,4 +1,4 @@
-import {resolveBrowserTarget} from '@nestos/app-contracts';
+import {parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts';
 import {mountContentTitleBar} from './workbench/content-titlebar';
 import {lazyScannerPackages} from './digital-twin/lazy-packages';
 import {ACTION_ICONS, randomUUID} from '@nestos/common';
@@ -128,7 +128,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const initialDocuments = startupWorkspace?.type === 'chat'
         ? INITIAL_CHAT_DOCUMENTS : ['theme', 'nestos_assistant_menu_v1'];
     const prefetchedDocuments = !options.initialRead?.documents?.value && !options.initialView && startupWorkspace?.type !== 'chat' ? new VfsJsonStore(backend) : undefined;
-    const eventPreparation = applicationEvents?.prepare(!!options.initialView,options.initialRead?.eventBaseline?.value);
+    const eventPreparation = applicationEvents?.prepare(!!options.initialView,options.initialView?.eventBaseline??options.initialRead?.eventBaseline?.value);
     prefetchedDocuments?.prefetch(initialDocuments);
     await eventPreparation;
     const opened = options.initialView ?? (startupWorkspace?.type === 'chat' && typeof backend.openView === 'function' ? await openInitialView(backend, initialDocuments, startupRoute.resource) : undefined);
@@ -429,11 +429,14 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                 options.onWorkspaceReady?.({ editor: editorEl });
                 return true;
             };
-            const target = initialResource && resolveBrowserTarget(initialResource);
+            const resourcePath = initialResource && !initialResource.startsWith('@') && !initialResource.startsWith('draft:')
+                ? parseSessionRoute(initialResource).path : undefined;
+            const target = resourcePath ? resolveBrowserTarget(resourcePath) : undefined;
             const initialOpening = opened?.conversationWorkbench;
+            const preparedLocal = !!target && target.kind === 'session' && opened?.initial?.sessionId === target.sessionId;
             const opening = initialOpening && (initialOpening.resourceId ?? initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === initialResource ? initialOpening
-                : target && backend.openWorkbench
-                ? await backend.openWorkbench({resourceId: initialResource!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore'})
+                : target && !preparedLocal && backend.openWorkbench
+                ? await backend.openWorkbench({resourceId: resourcePath!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore'})
                 : target && target.kind === 'remote' && target.nativeSessionId && backend.openConversationWorkbench
                 ? await backend.openConversationWorkbench({resourceId: initialResource!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore'}) : undefined;
             if (opening) uiDocs.seed(opening.documents);

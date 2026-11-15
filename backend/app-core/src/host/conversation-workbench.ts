@@ -66,14 +66,21 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
         return this.chatPreparation ??= this.loadChat().catch(error => {this.chatPreparation = undefined; throw error;});
     }
     private async loadChat(): Promise<NonNullable<WorkbenchView['chat']>> {
-        const chat = await this.chatFactory!();
-        if (this.closed) {await chat.configuration?.dispose(); throw new FSError('EIO', 'Workbench closed');}
+        const started = performance.now(), operationId = randomUUID();
+        let chat: WorkbenchView['chat'];
         try {
+            chat = await this.chatFactory!();
+            if (this.closed) throw new FSError('EIO', 'Workbench closed');
             await this.eventSource.addChat({...this.workbench, chat});
             if (this.closed) throw new FSError('EIO', 'Workbench closed');
             this.workbench.chat = chat;
+            log.info('chat.prepare', {operation: 'workbench.chat.prepare', operationId, stage: 'controls', result: 'success', durationMs: Math.round(performance.now() - started)});
             return chat;
-        } catch (error) {await chat.configuration?.dispose(); throw error;}
+        } catch (error) {
+            const raw = (error as {code?: unknown})?.code;
+            log.warn('chat.prepare', {operation: 'workbench.chat.prepare', operationId, stage: 'controls', result: 'failure', code: typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'WORKBENCH_CHAT_PREPARATION_FAILED', durationMs: Math.round(performance.now() - started)});
+            await chat?.configuration?.dispose(); throw error;
+        }
     }
     private failedOpening(resourceId: string, error: unknown): void {
         const raw = (error as {code?: unknown})?.code, reason = (error as {reason?: unknown})?.reason;

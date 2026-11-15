@@ -108,3 +108,11 @@ it('uses the prepared baseline and distributes an ordered page batch through one
  expect(receive).toHaveBeenCalledExactlyOnceWith([{type:'repository.changed'},{type:'scanner.changed'}]);expect(f.invalidate).toHaveBeenCalledTimes(2);
  stop();await f.journal.append('three',{type:'task.failed'});await f.bridge.refresh();expect(receive).toHaveBeenCalledOnce();
 });
+
+it('replays from the baseline captured before preloaded snapshots without resetting the whole workspace', async () => {
+    const f = await fixture(), baseline = await f.journal.baseline();
+    await f.journal.append('during-snapshot', {type: 'repository.changed'});
+    await f.bridge.prepare(true, baseline); await f.bridge.start();
+    expect(f.source.eventBaseline).not.toHaveBeenCalled();
+    expect(f.invalidate).toHaveBeenCalledExactlyOnceWith({type: 'repository.changed'});
+});

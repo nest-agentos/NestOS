@@ -276,7 +276,7 @@ HarnessExecutionProvider.reconcile 返回 ConnectionReconcileResult；Effect 桥
 
 HTTP v15 的 bootstrap 可携带 OpenViewRequest 并返回 HostedApplicationClient.initialView，先登记观察再导出能力；HttpViewClient 将 SSE viewEvents 适配为本地 ApplicationViewObservation。纯数据按 SHA-256 校准，句柄每个连接独立，见 [一次打开同步握手](./http-app.md#一次打开同步握手与首帧v14)。
 
-文件、目录和原生会话共用 `ApplicationBackend.openWorkbench`，返回有生命周期的 `ResourceWorkbenchView`；原 `openConversationWorkbench` 为兼容入口并委托同一实现。一次准备必要工作台能力和 UI 文档，只有原生会话准备目标会话及其输入能力；文件视图后续转入会话时通过 `prepareChat` 惰性准备聊天控制。组件在本地按主题分发一个观察源，不逐个登记远程订阅；`readNavigation` 单独准备侧栏及其关注项目状态。冷路由可由 `openView({resourceId})` 一并返回同一视图。应用层组合独立领域端口，不把看板、harness、布局存储合并成业务服务；发送、授权响应、取消仍走原领域命令及回执。
+文件、目录和原生会话共用 `ApplicationBackend.openWorkbench`，返回有生命周期的 `ResourceWorkbenchView`；原 `openConversationWorkbench` 为兼容入口并委托同一实现。一次准备必要工作台能力和 UI 文档，只有原生会话准备目标会话及其输入能力；文件视图后续转入会话时通过 `prepareChat` 惰性准备聊天控制。组件在本地按主题分发一个观察源，不逐个登记远程订阅；`readNavigation` 单独准备侧栏及其关注项目状态。冷路由可由 `openView({resourceId})` 一并返回同一视图。 `OpenedApplicationView.eventBaseline` 在准备任何首屏快照前读取，供全局事件流补读；它与工作台局部观察游标独立，不跨流比较。基线可用时不再为首屏强制清空导航，基线缺失或事件缺口仍执行保守重读。应用层组合独立领域端口，不把看板、harness、布局存储合并成业务服务；发送、授权响应、取消仍走原领域命令及回执。
 
 该视图通过有界 `eventSnapshot` 和现有传输观察更新分发会话、文件与远程状态，前端适配已有订阅接口，不逐个登记远程监听。事件缺口触发只读重新核对；关闭释放观察和资源，隐藏暂停连接关注。会话不可用保留工作台并返回具体分类，非关键输入目录失败单独报告；展开的其他目录失败不会使目标目录失败。目录准备复用 `SessionBrowserPort.readDirectory` 的单次查询作用域，快照修订只在所属文件系统内比较，不跨作用域比较。导航过程中的 UI 文档变化按事务合并保存；这不是跨请求业务缓存。
 

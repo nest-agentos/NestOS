@@ -10,7 +10,8 @@ import {taskAttachment} from './task-attachment';
 export async function openView(services: LocalApplicationServices, backend: ApplicationBackend, request: OpenViewRequest, createWorkbench?: WorkbenchOpener): Promise<OpenedApplicationView> {
     if (request.workbench.initialSessionId && services.sessionManager.getSnapshot().sessionId)
         throw new FSError('EBUSY', 'Cold view opening requires an unbound client');
-    if (request.resourceId) return openResourceView(services, backend, request, createWorkbench);
+    const eventBaseline = await services.events?.eventBaseline();
+    if (request.resourceId) return {...await openResourceView(services, backend, request, createWorkbench), eventBaseline};
     const observation = new ViewObservation(services);
     let workbench: WorkbenchView | undefined;
     try {
@@ -26,7 +27,7 @@ export async function openView(services: LocalApplicationServices, backend: Appl
         const cursor = observation.getViewCursor();
         // This synchronous projection and cursor form the baseline for subsequent Session events.
         if (initial) alignSnapshot(services, initial);
-        return {documents: (results[1] as PromiseFulfilledResult<Record<string, unknown>>).value, workbench: workbench!, initial, observation, cursor,
+        return {eventBaseline, documents: (results[1] as PromiseFulfilledResult<Record<string, unknown>>).value, workbench: workbench!, initial, observation, cursor,
             taskAttachmentKey: request.taskAttachmentKey,
             connectionInterests,
             dispose: () => closeOpenedView(observation, workbench)};

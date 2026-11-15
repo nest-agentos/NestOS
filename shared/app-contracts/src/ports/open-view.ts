@@ -35,6 +35,8 @@ export interface ApplicationViewObservation {
     dispose(): Promise<void>;
 }
 export interface OpenedApplicationView {
+    /** Global event cursor captured before preparing the initial snapshots. */
+    eventBaseline?: import('@nestos/vfs-core').EventCursor;
     conversationWorkbench?: import('./conversation-workbench').ConversationWorkbenchView;
     connectionInterests?: string[];
     documents: Record<string, unknown>;

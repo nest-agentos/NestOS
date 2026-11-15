@@ -105,3 +105,14 @@ it('shares the cold file view observation instead of attaching a second set of d
     expect(opening.observation.getViewCursor()).toBe(opening.conversationWorkbench?.cursor);
     await opening.dispose(); expect(f.stop).toHaveBeenCalledTimes(10); expect(f.browser.dispose).toHaveBeenCalledOnce();
 });
+
+it('captures the global event baseline before preparing any cold file snapshot', async () => {
+    const {openView} = await import('../../src/host/open-view');
+    const f = fixture(), baseline = {streamId: 'events', sequence: 3}, eventBaseline = vi.fn(async () => baseline);
+    Object.assign(f.services, {events: {eventBaseline}});
+    const opening = await openView(f.services, f.backend, {resourceId: '/folder:P/@files/note.md', documents: [], workbench: {}},
+        request => new ConversationWorkbench(f.services).initialize(f.backend, request));
+    expect(opening.eventBaseline).toBe(baseline);
+    expect(eventBaseline.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(f.backend.workbenchView).mock.invocationCallOrder[0]);
+    await opening.dispose();
+});

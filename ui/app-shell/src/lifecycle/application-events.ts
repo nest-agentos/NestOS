@@ -28,7 +28,7 @@ export class ShellApplicationEvents {
     /** Capture before loading snapshots; preloaded snapshots need a fresh invalidation. */
     async prepare(preloaded = false,baseline?:EventCursor): Promise<void> {
         const started = Date.now();
-        this.needsReset = preloaded;
+        this.needsReset = preloaded && !baseline;
         try {this.cursor = baseline??await this.source.eventBaseline();}
         catch (error) {this.needsReset = true; this.report('baseline', error, started);}
     }
