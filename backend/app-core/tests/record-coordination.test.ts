@@ -119,3 +119,38 @@ it('routes management communication to its admitted session without starting ano
  expect(await api.openTaskCoordination('b',{itemId:'group',operationId:'open'})).toMatchObject({id:'analysis',sessionId:'management',resourceId:'/native/management'});
  expect(open).not.toHaveBeenCalled();
 });
+
+it('routes delivery analysis through the current client, repository scope and durable request identity',async()=>{
+ const f=await fixture(),view={pluginId:'software',revision:'outer',operations:[],scopes:[{id:'repo',label:'Repository',contributors:[],view:{revision:'v1',operations:[{id:'analyze',label:'Submit',state:'failed',enabled:true}]}}]};
+ const read=vi.fn(async()=>view),run=vi.fn().mockRejectedValueOnce(Object.assign(Error('lost'),{code:'HTTP_CONNECTION_LOST',outcome:'unknown'})).mockResolvedValue(view);
+ f.options.client=()=>({...f.service,itemOperations:read,runItemOperation:run});
+ expect(await f.request('coordination.read')).toMatchObject({deliveryOperations:{read:'coordination.operations.read'}});
+ expect(await f.request('coordination.operations.read',{itemId:'group'})).toBe(view);
+ const params={itemId:'group',request:{pluginId:'software',scopeId:'repo',action:'analyze',expectedRevision:'v1'}};
+ await expect(f.request('coordination.operations.run',params,'analysis')).rejects.toMatchObject({code:'HTTP_CONNECTION_LOST'});
+ view.scopes[0].view.revision='v2';await f.request('coordination.operations.run',params,'analysis');
+ expect(run.mock.calls[0]).toEqual(run.mock.calls[1]);expect(read).toHaveBeenCalledTimes(2);
+ expect(run.mock.calls[0]).toEqual(['b',expect.objectContaining({itemId:'group',scopeId:'repo',action:'analyze',expectedRevision:'v1',operationId:expect.stringMatching(/^coordinate-operation-/)})]);
+ await expect(f.request('coordination.operations.run',{...params,request:{...params.request,action:'merge'}},'analysis')).rejects.toMatchObject({code:'CHANNEL_REQUEST_CHANGED'});
+ expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'coordination.operations.run',result:'failure',code:'HTTP_CONNECTION_LOST'}));
+ expect(JSON.stringify(f.options.log.mock.calls)).not.toContain('expectedRevision');
+});
+it('keeps delivery requests inside the bound management task and honors actual human confirmation',async()=>{
+ const f=await fixture(),view={revision:'v1',operations:[{id:'merge',label:'Merge',state:'ready',enabled:true,confirmation:'Confirm merge'}]};
+ const run=vi.fn(async()=>view);f.options.client=()=>({...f.service,itemOperations:async()=>view,runItemOperation:run});
+ const params={itemId:'group',request:{action:'merge',expectedRevision:'v1'}};
+ await expect(f.request('coordination.operations.run',params,'merge')).rejects.toMatchObject({code:'OPERATION_CONFIRMATION_REQUIRED'});expect(run).not.toHaveBeenCalled();
+ await expect(f.request('coordination.operations.run',{...params,request:{...params.request,confirmed:true}},'fake')).rejects.toMatchObject({code:'OPERATION_REQUEST_INVALID'});
+ f.read.mockResolvedValue({messages:[{id:'confirmed-merge',role:'user',text:'Confirm merge'}]});await f.request('coordination.operations.run',params,'merge');
+ expect(run).toHaveBeenCalledWith('b',expect.objectContaining({confirmed:true,itemId:'group'}));
+ f.conversation.binding.recordId='other';await expect(f.request('coordination.operations.read',{itemId:'group'})).rejects.toMatchObject({code:'ITEM_NOT_IN_DECISION'});
+});
+it('rejects stale revisions and reconciles an unknown delivery without starting another mutation',async()=>{
+ const f=await fixture(),view={revision:'latest',operations:[{id:'analyze',label:'Analyze',state:'unknown',enabled:false,runId:'original'}]};
+ const run=vi.fn(async()=>view);f.options.client=()=>({...f.service,itemOperations:async()=>view,runItemOperation:run});
+ const params={itemId:'group',request:{action:'analyze',expectedRevision:'old'}};
+ await expect(f.request('coordination.operations.run',params)).rejects.toMatchObject({code:'OPERATION_STALE_REFRESH'});
+ params.request.expectedRevision='latest';await expect(f.request('coordination.operations.run',params)).rejects.toMatchObject({code:'OPERATION_PREREQUISITE_REQUIRED'});
+ await f.request('coordination.operations.run',{...params,request:{...params.request,reconcile:{runId:'original'}}},'reconcile');
+ expect(run).toHaveBeenCalledExactlyOnceWith('b',expect.objectContaining({reconcile:{runId:'original'}}));
+});

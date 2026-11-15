@@ -991,6 +991,8 @@ Cell 的 `isolation = none` 不建立嵌套 namespace；其启动器转换工作
 
 管理会话通过绑定的 `coordination.read` 读取任务及具体诊断，修复并复查后可调用 `coordination.retry-planning` 请求宿主按事项 revision 重试原任务。它也支持 `coordination.propose-fix` 生成受限项目任务组的追加/前置修复提案；提案不创建任务。`coordination.confirm-fix` 核对实际原生用户的确认语、提案摘要、所属决策及依赖后，才通过已有领域命令发布冻结计划；重放不重复创建。完成的原任务及其验收证据不被覆盖。错误报告的 `resolved` 和普通聊天“ok”都不能代替这些正式操作回执。
 
+管理会话的 `coordination.operations.read {itemId}` 读取绑定管理任务的交付插件、仓库范围、操作状态、修订及确认要求；`coordination.operations.run {itemId,request}` 将操作委托给 UI 共用的 `runItemOperation`。request 使用返回的 action、expectedRevision、pluginId、scopeId、selections 和可选 followUp/reconcile；operationId 由宿主根据会话与请求身份生成并持久冻结，模型不能提供 confirmed 标志。需要确认的操作核对真实用户消息；结果未知时原请求重放保留身份与参数，或仅核对已有 run，不新建副作用。Git 更新不会重写失败分析的快照，需在同一管理会话读取最新交付状态后发起新分析；任务拆解的 retry-planning 不能替代 Git 分析。既有管理会话可通过 coordination.read 返回的 deliveryOperations 发现新接口，不改写冻结提示词。桥接日志分别记录读取/提交阶段、稳定 operationId、安全错误码和耗时，不记录参数或正文。
+
 运行时的 30 秒检查是事件之外的兜底：会话通道变化和看板事务提交仍立即唤醒既有监控，扫描在途时合并触发。扫描遍历看板后筛选未结算执行（prepared/running/unknown）、可准入的待启动/依赖事项及控制、恢复、通知补投工作；不会周期性重跑已完成任务，也不会仅因检查就调用模型。无事件触发的定时准入或恢复由下一轮兜底检查发现。该间隔独立于可见页面的十五秒状态补读。
 
 活动执行的未解决 issue 与正式执行失败分开展示。恢复状态读取对仍为 prepared/running 且存在当前 attempt 未解决 issue 的任务返回 `state: blocked` 与 `pendingIssueIds`，不读取无关的运行版本，也不开放重试失败执行。界面提供原会话直达入口；即使调用旧的恢复会话入口，也只返回原会话，不投递“失败任务只读恢复”指令。真正结算失败仍保留既有复验流程。

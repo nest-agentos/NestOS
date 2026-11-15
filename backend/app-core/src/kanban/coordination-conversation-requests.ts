@@ -1,4 +1,5 @@
 import {conversationPolicy} from './conversation-policy';
+import {coordinationOperations} from './coordination-operations';
 import {sha256HexSync} from '@nestos/common';
 import {commitCollaboration,itemsWithinRoots,journalCommand,type Definition} from '@nestos/kanban/integration';
 import type {KanbanBoard,KanbanProjectRecord} from '@nestos/kanban/contracts';
@@ -14,9 +15,11 @@ export async function resolveCoordinationRequest(options:DecisionConversationOpt
     const board=await options.service.read(conversation.boardId),record=await options.service.record(board.id,conversation.binding.recordId!);
     const tasks=itemsWithinRoots(board.items,record.itemIds),reports=conversationIssueView(await options.journal.get<ConversationIssueState>(conversationIssuesKey(conversation.id)));
     if(request.method==='coordination.read')return JSON.parse(JSON.stringify({record,groups:tasks.filter(item=>item.purpose==='planning'||item.planning?.execution==='children').map(item=>({id:item.id,title:item.title,revision:item.revision,projectIds:item.externalRefs?.filter(ref=>ref.system==='nestos-remote-project').map(ref=>ref.id),retryPlanning:item.analysis?.state==='failed'&&!item.owner&&!['completed','cancelled'].includes(item.status)})),
-        tasks:tasks.map(item=>({id:item.id,title:item.title,status:item.status,revision:item.revision,parentId:item.planning?.parentId,analysis:item.analysis,blocked:item.blocked,acceptanceResult:item.acceptanceResult,operationWaivers:item.operationWaivers})),...reports}));
+        deliveryOperations:{read:'coordination.operations.read',run:'coordination.operations.run',readParams:{itemId:'management task id from groups'},runParams:{itemId:'management task id from groups',request:{action:'returned runAction or id',expectedRevision:'selected view revision',pluginId:'returned pluginId',scopeId:'selected scope id when present'}},instructions:'Read delivery operations after Git changes. Use a fresh analysis before integration; planning retry does not reanalyze Git. Preserve request id and params on uncertain outcomes. Honor the selected operation confirmation using the real user message.'},tasks:tasks.map(item=>({id:item.id,title:item.title,status:item.status,revision:item.revision,parentId:item.planning?.parentId,analysis:item.analysis,blocked:item.blocked,acceptanceResult:item.acceptanceResult,operationWaivers:item.operationWaivers})),...reports}));
+    if(request.method==='coordination.operations.read')return readOperations(options,conversation,request,tasks);
     requireValue(!board.lifecycle&&!board.deletedAt&&record.status==='confirmed'&&record.archivedAt===undefined,'DECISION_NOT_ACTIVE');
     requireValue(!reports.pendingReports.length,'DECISION_SESSION_BLOCKED');
+    if(request.method==='coordination.operations.run')return readOperations(options,conversation,request,tasks);
     if(request.method==='coordination.retry-planning'){
         const item=tasks.find(row=>row.id===request.params.itemId);
         requireValue(item&&(item.purpose==='planning'||item.planning?.execution==='children'),'ITEM_NOT_IN_DECISION');
@@ -28,6 +31,10 @@ export async function resolveCoordinationRequest(options:DecisionConversationOpt
     if(request.method==='coordination.propose-fix')return propose(options,conversation,request,board,record);
     if(request.method==='coordination.confirm-fix')return confirm(options,conversation,request,board,record);
     throw Object.assign(new Error('Unsupported coordination request'),{code:'COORDINATION_REQUEST_UNSUPPORTED'});
+}
+async function readOperations(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,tasks:import('@nestos/kanban/contracts').KanbanItem[]) {
+    const item=tasks.find(row=>row.id===request.params.itemId);requireValue(item?.planning?.execution==='children','ITEM_NOT_IN_DECISION');
+    return coordinationOperations(options,conversation,request,item.id);
 }
 async function propose(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,board:KanbanBoard,record:KanbanProjectRecord){
     const item=itemsWithinRoots(board.items,record.itemIds).find(row=>row.id===request.params.itemId);
