@@ -15,8 +15,12 @@ import {decisionProjectScope,requireDecisionProjectContext} from './decision-pro
 
 export function decisionConversationTransport(options:DecisionConversationOptions,advance:RecordConversationPort['advance']):RecordConversationPort {
     return {verifyDraftRemoval:value=>verifyDecisionDraftRemoval(options,value as DecisionConversation),referenceUnavailable:value=>unavailableDecisionReference(options,value as DecisionConversation),prepare:(id,board,resources,primary)=>prepare(options,id,board,resources,primary),start:(binding,first,active)=>start(options,binding as DecisionConversationBinding,first,active),advance,
+        watchKey:value=>{const binding=value.binding as DecisionConversationBinding;return binding.channelId??binding.id;},
         watch:async(value,wake)=>{const binding=value.binding as DecisionConversationBinding,client=await options.remote.projectHarness(binding.projectId);
-            try {requireValue(client.subscribeChannel,'SESSION_CHANNEL_REQUIRED');const stop=client.subscribeChannel(binding.id,wake);return async()=>{stop();await client.close();};}
+            try {requireValue(client.subscribeChannel,'SESSION_CHANNEL_REQUIRED');const stop=client.subscribeChannel(binding.channelId??binding.id,wake);
+                const reader=binding.retainedPlanning?await options.remote.projectConversation(binding.projectId,binding.profileId,value.sessionId,undefined,true):undefined;
+                const off=reader?.subscribe(()=>{const state=reader.snapshot();if(!state.active&&!state.pending)wake();});
+                return async()=>{stop();off?.();await reader?.close();await client.close();};}
             catch(error){await client.close();throw error;}},close:async()=>{}};
 }
 async function prepare(options:DecisionConversationOptions,id:string,boardId:string,resources?:KanbanExternalReference[],primary?:KanbanExternalReference):Promise<DecisionConversationBinding> {

@@ -160,9 +160,32 @@ it('adopts the existing settled planning channel without creating or moving a na
  await f.journal.update('analysis:original',()=>({id:'original',phase:'settled'}));
  await f.journal.update('development-workspace:original',()=>({projectId:'project',directory:'/workspace/original',context:{decision:{sourceBoardId:'b',recordId:'decision'}}}));
  await f.journal.update('kanban-harness-choice:original',()=>({profileId:'codex'}));
- const create=vi.fn(),close=vi.fn(async()=>{});f.options.remote={...f.options.remote,sessionChannel:vi.fn(async(_project:string,operation:string)=>operation==='requests'?{requests:[]}:{execution:{sessionId:'native'}}),projectHarness:async()=>({create,profiles:async()=>({epoch:'current'}),close}),list:()=>[{at:'/',serverProjectId:'workspace'}]};
+ const create=vi.fn(),close=vi.fn(async()=>{});f.options.remote={...f.options.remote,sessionChannel:vi.fn(async(_project:string,operation:string)=>operation==='requests'?{requests:[]}:{scopeId:'coordinate-current',execution:{sessionId:'native'}}),projectHarness:async()=>({create,profiles:async()=>({epoch:'current'}),close}),list:()=>[{at:'/',serverProjectId:'workspace'}]};
  const start=vi.fn(async()=>{}),adopt=adoptPlanningConversation(f.options,start),value={analysisId:'original',resourceId:'/folder:project/@harness/codex/native'} as any;
  await adopt('b','group',value);await adopt('b','group',value);
- expect(await f.journal.get('record-conversation:original')).toMatchObject({sessionId:'native',resourceId:value.resourceId,binding:{id:'original',purpose:'coordination',recordId:'decision',directory:'/workspace/original'}});
- expect(create).not.toHaveBeenCalled();expect(start).toHaveBeenCalledOnce();expect(f.options.remote.sessionChannel).toHaveBeenCalledTimes(2);
+ expect(await f.journal.get('record-conversation:original')).toMatchObject({sessionId:'native',resourceId:value.resourceId,binding:{id:'original',channelId:'coordinate-current',purpose:'coordination',recordId:'decision',directory:'/workspace/original'}});
+ expect(create).not.toHaveBeenCalled();expect(start).toHaveBeenCalledOnce();expect(f.options.remote.sessionChannel).toHaveBeenCalledTimes(3);
+});
+
+it('answers the current phase channel while retaining the logical management and native Session identities',async()=>{
+ const f=await fixture(),{decisionConversations}=await import('../src/kanban/decision-conversations'),{channelDigest}=await import('../src/run/channel-protocol');
+ const request={id:'discover-current',scopeId:'coordinate-new',method:'kanban.discover',params:{}};
+ const enqueue=vi.fn(async()=>{}),stop=vi.fn(),subscribeChannel=vi.fn(()=>stop);
+ const sessionChannel=vi.fn(async(_project:string,method:string,args:any):Promise<any>=>{
+  if(method==='current')return {scopeId:'coordinate-new',execution:{sessionId:'native'}};
+  if(method==='messages')return {messages:[]};
+  if(method==='requests')return {requests:[{request,requestDigest:channelDigest(request),response:null}]};
+  if(method==='respond')return args;
+  throw Error(method);
+ });
+ f.options.remote={...f.options.remote,sessionChannel,projectHarness:async()=>({subscribeChannel,close:async()=>{}}),projectConversation:async()=>({enqueue,read:f.read,subscribe:()=>()=>{},snapshot:()=>({active:false,pending:false}),close:async()=>{}})};
+ await f.journal.update('record-conversation:persistent',()=>({...f.conversation,state:'confirmed',createdAt:1,binding:{...f.conversation.binding,directory:'/original',retainedPlanning:true,channelId:'planning-old'}}));
+ const conversations=decisionConversations(f.options);closes.push(()=>conversations.quiesce());
+ await conversations.startRecordConversation('b',{operationId:'persistent'});
+ expect(sessionChannel.mock.calls.filter(call=>call[1]==='respond')).toEqual([['project','respond',expect.objectContaining({id:request.id,scopeId:'coordinate-new',status:'ok'})]]);
+ expect(enqueue).toHaveBeenCalledOnce();
+ expect(await f.journal.get('decision-response:coordinate-new:discover-current:resumed')).toBe(true);
+ expect(await f.journal.get('record-conversation:persistent')).toMatchObject({id:'persistent',sessionId:'native',binding:{channelId:'coordinate-new'}});
+ await conversations.scan();await vi.waitFor(()=>expect(subscribeChannel).toHaveBeenLastCalledWith('coordinate-new',expect.any(Function)));
+ expect(stop).toHaveBeenCalledOnce();expect(enqueue).toHaveBeenCalledOnce();
 });

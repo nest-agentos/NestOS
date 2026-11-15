@@ -1,4 +1,4 @@
-import {adoptPlanningConversation} from './adopt-planning-conversation';
+import {adoptPlanningConversation,retainAnsweredRequests} from './adopt-planning-conversation';
 import {resolveKanbanPluginRequest} from './session-request-plugins';
 import {recordCoordination} from './record-coordination';
 import {resolveCoordinationRequest} from './coordination-conversation-requests';
@@ -12,7 +12,9 @@ import {resolveDecisionRequest,decisionConversationState} from './decision-conve
 
 export function decisionConversations(options:DecisionConversationOptions) {
     const port=decisionConversationTransport(options,async (value,active)=>{
-        const conversation=value as DecisionConversation,started=Date.now();
+        const retained=value as DecisionConversation,started=Date.now();
+        const channelId=await currentConversationChannel(options,retained);
+        const conversation={...retained,id:channelId};
         let reports:{pendingReports:Array<{id:string;type:'error'|'clarification'}>;code?:string}={pendingReports:[]};
         if(conversation.sessionId){const issues=await readConversationIssues(options.remote,conversation.binding.projectId,conversation.id,conversation.sessionId,options.journal);
             reports=issues;
@@ -44,4 +46,17 @@ export function decisionConversations(options:DecisionConversationOptions) {
     return {adoptPlanning:adoptPlanningConversation(options,conversations.startRecordConversation),removeRecordConversations:conversations.removeRecordConversations,controlRecordConversation:conversations.controlRecordConversation,openRecordCoordination:recordCoordination(options,conversations),startRecordConversation:conversations.startRecordConversation,scan:conversations.scan,quiesce:conversations.quiesce,recordConversations:async(boardId:string)=>{
         return decisionConversationViews(options,await conversations.recordConversations(boardId));
     }};
+}
+
+async function currentConversationChannel(options:DecisionConversationOptions,value:DecisionConversation):Promise<string> {
+    if(!value.binding.retainedPlanning)return value.binding.channelId??value.id;
+    const started=Date.now();
+    const current=await options.remote.sessionChannel(value.binding.projectId,'current',{cwd:value.binding.directory}) as {scopeId?:string;execution?:{sessionId?:string}};
+    if(!current.scopeId||current.execution?.sessionId!==value.sessionId)throw Object.assign(new Error('Retained Session channel changed'),{code:'COORDINATION_CHANNEL_CHANGED'});
+    if(current.scopeId!==value.binding.channelId){
+        await retainAnsweredRequests(options,value.binding.projectId,current.scopeId);
+        await options.journal.update<DecisionConversation>('record-conversation:'+value.id,old=>({...old!,binding:{...old!.binding,channelId:current.scopeId}}));
+        options.log({operationId:value.id,boardId:value.boardId,stage:'coordination.channel.rebind',result:'success',durationMs:Date.now()-started});
+    }
+    return current.scopeId;
 }
