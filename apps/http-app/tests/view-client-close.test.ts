@@ -76,3 +76,15 @@ it('classifies fetch failures at the transport boundary and never replays an unc
     expect(f.requests.filter(request => request.kind === 'call')).toHaveLength(1);
     expect(f.workbenchView).not.toHaveBeenCalled();
 });
+
+it('retries a lost read batch once without replaying a command',async()=>{
+    let first=true;
+    const f=await connection(async request=>{if(request.kind==='queries'&&first){first=false;throw new TypeError('Failed to fetch');}});
+    expect(await f.root.files.getNode('missing')).toBeNull();
+    expect(f.requests.filter(request=>request.kind==='queries')).toHaveLength(2);expect(f.workbenchView).not.toHaveBeenCalled();
+});
+it('bounds read retries and never turns a persistent failure into success',async()=>{
+    const f=await connection(async request=>{if(request.kind==='queries')throw new TypeError('Failed to fetch');});
+    await expect(f.root.files.getNode('missing')).rejects.toMatchObject({code:'HTTP_CONNECTION_LOST'});
+    expect(f.requests.filter(request=>request.kind==='queries')).toHaveLength(2);
+});

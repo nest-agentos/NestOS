@@ -1,3 +1,4 @@
+import {observeConnection,countConnectionRequest} from '../logging/connection-diagnostics';
 import {NATIVE_SESSION_RECOVERY_ENDPOINT} from '@nestos/app-contracts';
 import {traceRequest} from '../logging/request-trace';
 import { createServer, type Server } from 'node:https';
@@ -22,17 +23,18 @@ export interface HttpServerOptions {
 /** Every public resource requires both TLS client validation and explicit certificate enrollment. */
 export function createHttpServer(options: HttpServerOptions): Server {
     const server = createServer(options.certificates.tls, (request, response) => {
+        countConnectionRequest(request);
         void traceRequest(request, response, () => serve(request, response, options).catch(error => sendError(response, error)));
     });
-    server.on('secureConnection', socket => { void validateConnection(socket, options); });
+    server.on('secureConnection', socket => {const connectionId=observeConnection(options.audit,socket);void validateConnection(socket, options,connectionId); });
     server.on('tlsClientError', (error, socket) => options.audit.write({ event: 'auth.rejected', remoteAddress: socket.remoteAddress,
-        code: safeCode(error) }));
+        operation:'http.connection',stage:'tls.handshake',result:'failure',code: safeCode(error) }));
     server.requestTimeout = 120000; server.headersTimeout = 30000;
     return server;
 }
-async function validateConnection(socket: TLSSocket, options: HttpServerOptions): Promise<void> {
+async function validateConnection(socket: TLSSocket, options: HttpServerOptions,connectionId:string): Promise<void> {
     const started = Date.now(), auth = await authenticate(socket, options.certificates);
-    options.audit.write({event: auth.accepted ? 'auth.accepted' : 'auth.rejected', remoteAddress: socket.remoteAddress,
+    options.audit.write({event: auth.accepted ? 'auth.accepted' : 'auth.rejected', connectionId,remoteAddress: socket.remoteAddress,
         userId: auth.userId, certificate: socket.getPeerCertificate()?.fingerprint256, code: auth.code,
         operation: 'certificate.authenticate', stage: 'enrollment', result: auth.accepted ? 'success' : 'failure', durationMs: Date.now() - started});
     if (!auth.accepted) socket.destroy();

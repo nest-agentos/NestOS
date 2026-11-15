@@ -44,12 +44,17 @@ export class HttpViewClient {
     private readonly queries: QueryBatcher;
     private readonly bindings: QueryBatcher;
     constructor(private readonly clientId: string, private readonly url = '/api/application', private readonly fetcher = globalThis.fetch.bind(globalThis), private readonly onDisconnected?: (error: unknown) => void,
-        private readonly onUpdateError?: (error: unknown) => void, private readonly onReconnected?: () => void) {
+        private readonly onUpdateError?: (error: unknown) => void, private readonly onReconnected?: () => void, private readonly onDiagnostic?: (error: unknown) => void) {
         this.queries = this.batcher('queries'); this.bindings = this.batcher('bindings');
         this.peer = new RpcPeer('client', call => this.peer.remoteQuery(call) ? this.queries.query(call)
             : this.peer.remoteBinding(call) ? this.bindings.query(call) : this.post({ kind: 'call', call }),
-            error => console.error('[View]', safeFailure(error)), installViewProjections);
+            error => this.reportPeer(error), installViewProjections);
         installFileTransport(this.peer, this.url, this.clientId, this.abort.signal, (input, init) => this.request(input, init));
+    }
+    private reportPeer(error: unknown): void {
+        if((error as {code?:string})?.code!=='RPC_METHOD_UNSUPPORTED'){console.error('[View]',safeFailure(error));return;}
+        console.warn('[View] Capability diagnostic',safeFailure(error));
+        try {this.onDiagnostic?.(error);} catch { /* Diagnostics cannot interrupt decoding. */ }
     }
     private batcher(kind: 'queries' | 'bindings'): QueryBatcher {
         return new QueryBatcher(calls => this.post({ kind, calls }).then(reply => {
@@ -100,8 +105,9 @@ export class HttpViewClient {
     private async post(body: {kind: string; [key: string]: unknown}): Promise<Reply & { replies?: Reply[] }> {
         const calls = body.kind === 'call' ? [body.call as Call] : (body.calls ?? []) as Call[];
         const method = calls.length === 1 ? calls[0]?.method : undefined;
-        const response = await this.request(this.url, { method: 'POST', headers: { 'Content-Type': 'application/json',
-            'X-NestOS-RPC-Kind':body.kind,...(calls.some(call => call?.method === 'reportClientDiagnostic') ? {'X-NestOS-Diagnostic':'1'} : {}),
+        const response = await this.postRequest(body, { method: 'POST', headers: { 'Content-Type': 'application/json',
+            'X-NestOS-RPC-Kind':body.kind,'X-NestOS-RPC-Batch-Size':String(calls.length),
+            'X-NestOS-RPC-Methods':[...new Set(calls.map(call=>call?.method).filter(name=>typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name)))].slice(0,32).join(','),...(calls.some(call => call?.method === 'reportClientDiagnostic') ? {'X-NestOS-Diagnostic':'1'} : {}),
             ...(method && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(method) ? {'X-NestOS-RPC-Method':method} : {}) },
             body: JSON.stringify({ ...body, clientId: this.clientId, version: RPC_VERSION }), signal: this.abort.signal }).catch(error => {
                 if (body.kind === 'call' && (error as {code?:string})?.code === 'HTTP_CONNECTION_LOST') Object.assign(error, {outcome:'unknown'});
@@ -121,6 +127,19 @@ export class HttpViewClient {
         }
         if (!response.ok) throw Object.assign(new Error(reply.error?.message ?? 'View request failed'), reply.error);
         return reply;
+    }
+    /** Only classified read batches may retry after a lost transport; commands remain uncertain. */
+    private async postRequest(body: {kind: string}, init: RequestInit): Promise<Response> {
+        const headers = new Headers(init.headers);headers.set('X-NestOS-RPC-Attempt','1');
+        try {return await this.request(this.url,{...init,headers});}
+        catch(error){
+            if(body.kind!=='queries'||this.abort.signal.aborted||(error as {code?:string})?.code!=='HTTP_CONNECTION_LOST')throw error;
+            console.warn('[View] Read batch retry',{...safeFailure(error),operation:'http.query',stage:'transport.retry',result:'retrying',attempt:2});
+            // Yield once so a failed keep-alive connection can be replaced without replaying a mutation.
+            await new Promise<void>(resolve=>setTimeout(resolve,100));this.abort.signal.throwIfAborted();
+            headers.set('X-NestOS-RPC-Attempt','2');
+            return this.request(this.url,{...init,headers});
+        }
     }
     private async request(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
         if (this.expired) throw this.expired;
@@ -328,10 +347,11 @@ export class HttpViewClient {
     }
 }
 function safeFailure(error: unknown): Record<string, unknown> {
-    const value = error as {code?:unknown;name?:unknown;stage?:unknown;clientRequestId?:unknown;requestId?:unknown};
+    const value = error as {code?:unknown;name?:unknown;stage?:unknown;clientRequestId?:unknown;requestId?:unknown;capabilityKind?:unknown;rpcMethod?:unknown};
     const result: Record<string,unknown> = {code:typeof value?.code==='string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(value.code)?value.code:'HTTP_VIEW_FAILED'};
     for(const key of ['requestId','clientRequestId'] as const) if(typeof value?.[key]==='string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value[key] as string)) result[key]=value[key];
     if(typeof value?.name==='string' && ['Error','TypeError','SyntaxError','AbortError','NetworkError','TimeoutError'].includes(value.name))result.errorType=value.name;
-    if(typeof value?.stage==='string' && ['transport.fetch','response.headers','response.body','response.decode'].includes(value.stage))result.stage=value.stage;
+    if(typeof value?.stage==='string' && ['transport.fetch','response.headers','response.body','response.decode','rpc.decode'].includes(value.stage))result.stage=value.stage;
+    for(const key of ['capabilityKind','rpcMethod'] as const)if(typeof value?.[key]==='string'&&/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(value[key] as string))result[key]=value[key];
     return result;
 }

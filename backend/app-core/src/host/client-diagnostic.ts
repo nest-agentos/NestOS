@@ -24,13 +24,15 @@ function validHttp(value: ClientDiagnostic['http']): boolean {
         browserSessionId: /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/, traceId: /^[a-f0-9]{32}$/, spanId: /^[a-f0-9]{16}$/,
         method: /^(GET|POST|OTHER)$/, route: /^\/(api\/(application(?:\/events|\/files)?|health|identity)|resource)$/,
         rpcKind: /^(bootstrap|bootstrap-data|queries|bindings|call|callback|close|other)$/,
+        capabilityKind:/^[A-Za-z][A-Za-z0-9_]{0,63}$/,networkCode:/^(?:E[A-Z0-9_]{1,63}|UND_ERR_[A-Z0-9_]{1,63})$/,
         rpcMethod: /^[A-Za-z][A-Za-z0-9_]{0,63}$/, responseType: /^(json|html|text|other)$/, errorKind: /^(abort|network|type|other)$/,
     };
-    const limits: Record<string, [number, number]> = {occurredAt: [0, 8640000000000000], requestBytes: [0, 1024**3], contentLength: [0, 1024**3], status: [100, 599]};
+    const limits: Record<string, [number, number]> = {occurredAt: [0, 8640000000000000], requestBytes: [0, 1024**3], contentLength: [0, 1024**3], status: [100, 599],rpcBatchSize:[0,1024],rpcAttempt:[1,2]};
     if (!['browserSessionId','traceId','spanId','occurredAt','method','route'].every(k => k in value)) return false;
-    return Object.entries(value).every(([key, v]) => v === undefined ? Object.hasOwn(patterns,key) || Object.hasOwn(limits,key) || key === 'online'
+    return Object.entries(value).every(([key, v]) => v === undefined ? Object.hasOwn(patterns,key) || Object.hasOwn(limits,key) || key === 'online'||key==='rpcMethods'
         : Object.hasOwn(patterns,key) ? typeof v === 'string' && patterns[key].test(v)
         : Object.hasOwn(limits,key) ? typeof v === 'number' && Number.isSafeInteger(v) && v >= limits[key][0] && v <= limits[key][1]
+        : key==='rpcMethods'?Array.isArray(v)&&v.length<=32&&v.every(name=>typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name))
         : key === 'online' && typeof v === 'boolean');
 }
 function validTokens(record: Record<string, unknown>): boolean {

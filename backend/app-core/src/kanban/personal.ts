@@ -54,8 +54,9 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
     const {service,journal,workLog,fs,serviceFor}=context;
     const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,...resources}=resourcePorts??{};
     const operations=options?.itemOperations?.({service,journal,workLog,log,automaticTarget:(_board,item)=>workProjectId(item),automatic:async(board,item)=>{
-        const context=await workContext(journal,board,item);if((context.decision?.snapshot as {completion?:string})?.completion!=='automatic')return false;
-        return (await service.record(context.decision!.sourceBoardId,context.decision!.recordId)).status==='confirmed';
+        const context=await workContext(journal,board,item);if(!context.decision)return false;
+        const record=await service.record(context.decision.sourceBoardId,context.decision.recordId);
+        return record.status==='confirmed'&&(record.completion??'automatic')==='automatic';
     },cleanup:async(board,item,id)=>{
         const execution=await service.executionSession(board,item,{includeRelated:true});
         for(const session of new Set([execution.current?.sessionId,...execution.sessions?.map(row=>row.sessionId)??[],...execution.history.map(row=>row.sessionId)].filter((id):id is string=>!!id))){try{await options.archiveSession?.(session,id+'-archive-'+sha256HexSync(session).slice(0,12));}catch(error){if(['SESSION_ARCHIVE_STILL_RUNNING','SESSION_ARCHIVE_OUTCOME_UNKNOWN'].includes((error as {code:string}).code))return false;throw error;}}

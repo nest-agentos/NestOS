@@ -352,3 +352,14 @@ it('inherits the optional decision priority when materializing its management ta
     const run=await f.open().runRecord('source',{operationId:'priority-run',recordId:'decision',expectedRevision:record.revision});
     expect((await f.service.item(run.boardId,run.rootItemId!)).item).toMatchObject({taskType:'coordination',planning:{priority:0}});
 });
+
+it('edits delivery after materialization, resolves it from the management task, and never creates another run on retry',async()=>{
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const original=await f.open().runRecord('source',{operationId:'first',recordId:'decision',expectedRevision:2});
+ const before=await f.service.record('source','decision');await f.command({type:'configure-record-delivery',recordId:'decision',expectedRecordRevision:before.revision,verificationLevel:'none',deliveryMode:'source'});
+ const current=await f.service.record('source','decision'),request={operationId:'after-settings',recordId:'decision',expectedRevision:current.revision};
+ expect((await f.open().runRecord('source',request)).id).toBe(original.id);expect((await f.open().runRecord('source',request)).id).toBe(original.id);
+ expect((await f.service.read('source')).items).toHaveLength(1);
+ expect(await f.open().recordDelivery('source',original.itemIds![0])).toMatchObject({boardId:'source',recordId:'decision',mode:'source',editable:true});
+ const saved=await f.journal.run<{record:{deliveryOptions?:unknown}}>('source',original.id);expect(saved?.record.deliveryOptions).toBeUndefined();
+});

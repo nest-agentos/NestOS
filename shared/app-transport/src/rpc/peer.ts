@@ -50,6 +50,7 @@ export class RpcPeer {
     private refreshTail: Promise<unknown> = Promise.resolve();
     private readonly projectionsLoaded = new Map<string, unknown>();
     private readonly listeners = new Map<string, Set<(...args: any[]) => void>>();
+    private readonly unsupportedMethods = new Set<string>();
     private sequence = 0;
     private readonly identity = randomUUID();
     private closed = false;
@@ -312,8 +313,11 @@ export class RpcPeer {
         this.descriptors.set(descriptor.id, descriptor);
         const schema = descriptor.kind === 'Owned' ? OWNED : this.schemas[descriptor.kind] ?? FUNCTION;
         for (const [key, item] of Object.entries(descriptor.fields)) if (schema.fields.includes(key)) proxy[key] = this.decode(item);
-        for (const name of this.decode(descriptor.fields.$methods ?? []) as string[]) {
-            if (!Object.hasOwn(schema.methods, name)) throw new FSError('ECAPABILITY', 'Unknown remote method');
+        const methods = this.decode(descriptor.fields.$methods ?? []) as unknown;
+        if (!Array.isArray(methods) || methods.length > 256 || methods.some(name => typeof name !== 'string' || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name)))
+            throw new FSError('ECAPABILITY', 'Invalid remote method declarations');
+        for (const name of methods as string[]) {
+            if (!Object.hasOwn(schema.methods, name)) {this.unsupportedMethod(descriptor.kind, name); continue;}
             const mode = schema.methods[name];
             if (mode === 'snapshot') proxy[name] = () => {
                 const value = this.descriptors.get(descriptor.id)!.snapshots[name];
@@ -345,6 +349,14 @@ export class RpcPeer {
         for (const [key, item] of Object.entries(value.$object)) Object.defineProperty(result, key, {
             value: this.decodeSnapshot(item), enumerable: true, configurable: true, writable: true });
         this.decodedSnapshots.set(value, result); return result;
+    }
+    private unsupportedMethod(kind: string, method: string): void {
+        const key = kind + '.' + method;
+        if (this.unsupportedMethods.has(key)||this.unsupportedMethods.size>=128) return;
+        this.unsupportedMethods.add(key);
+        const error = Object.assign(new Error('Unsupported remote method was ignored'), {code:'RPC_METHOD_UNSUPPORTED',stage:'rpc.decode',
+            capabilityKind:/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(kind)?kind:'unknown',rpcMethod:method});
+        try {this.report(error);} catch { /* Diagnostics cannot change capability admission. */ }
     }
     private allocate(descriptor: Descriptor): any {
         if (this.remoteRetirements.has(descriptor.id)) throw new FSError('ECAPABILITY', 'Capability was released');

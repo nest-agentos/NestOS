@@ -31,6 +31,15 @@ export class BrowserRequestTrace {
         this.navigation = operationId && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(operationId)
             && !/^0+$/.test(operationId.replaceAll('-','')) ? operationId.replaceAll('-','') : traceId();
     }
+    compatibility(error: unknown): void {
+        const value=error as {code?:string;capabilityKind?:string;rpcMethod?:string};
+        if(value?.code!=='RPC_METHOD_UNSUPPORTED'||!value.capabilityKind||!value.rpcMethod
+            ||![value.capabilityKind,value.rpcMethod].every(name=>/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name)))return;
+        const operationId=randomUUID();
+        this.diagnostics.add({operation:'http.rpc',operationId,stage:'rpc.decode',code:value.code,result:'failure',durationMs:0,
+            http:{browserSessionId:this.browserSessionId,traceId:this.navigation,spanId:randomUUID().replaceAll('-','').slice(0,16),occurredAt:Date.now(),
+                method:'POST',route:'/api/application',capabilityKind:value.capabilityKind,rpcMethod:value.rpcMethod}});
+    }
     wrap(fetcher: typeof fetch): typeof fetch {
         return async (input, init) => {
             const traceId = this.navigation, spanId = randomUUID().replaceAll('-', '').slice(0,16), started = Date.now(), operationId = randomUUID();
@@ -53,7 +62,9 @@ export class BrowserRequestTrace {
             } catch (error) {
                 const name = (error as {name?:string})?.name, errorKind = name === 'AbortError' ? 'abort' : name === 'NetworkError' ? 'network' : name === 'TypeError' ? 'type' : 'other';
                 const code = errorKind === 'abort' ? 'HTTP_REQUEST_ABORTED' : 'HTTP_CONNECTION_LOST';
-                if (!diagnostic && errorKind !== 'abort') this.record(operationId,'transport.fetch',code,started,{...http,errorKind});
+                const raw=(error as {code?:unknown;cause?:{code?:unknown}})?.cause?.code??(error as {code?:unknown})?.code;
+                const networkCode=typeof raw==='string'&&/^(?:E[A-Z0-9_]{1,63}|UND_ERR_[A-Z0-9_]{1,63})$/.test(raw)?raw:undefined;
+                if (!diagnostic && errorKind !== 'abort') this.record(operationId,'transport.fetch',code,started,{...http,errorKind,...(networkCode?{networkCode}:{})});
                 log.warn('HTTP request failed',{...context,...metadata,stage:'transport.fetch',result:'failure',code,errorKind,durationMs:Date.now()-started});
                 if (error && typeof error === 'object') {try {Object.assign(error,{clientRequestId:operationId});} catch { /* Keep the original failure. */ }}
                 throw error;

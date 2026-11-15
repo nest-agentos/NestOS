@@ -100,7 +100,7 @@ export interface ClientDiagnostic {
     http?: {
         browserSessionId: string; traceId: string; spanId: string; occurredAt: number;
         method: 'GET' | 'POST' | 'OTHER'; route: '/api/application' | '/api/application/events' | '/api/application/files' | '/api/health' | '/api/identity' | '/resource';
-        rpcKind?: string; rpcMethod?: string; requestBytes?: number; status?: number; contentLength?: number;
+        rpcKind?: string; rpcMethod?: string; rpcMethods?: string[];rpcBatchSize?:number;rpcAttempt?:number;capabilityKind?:string;networkCode?:string; requestBytes?: number; status?: number; contentLength?: number;
         responseType?: 'json' | 'html' | 'text' | 'other'; errorKind?: 'abort' | 'network' | 'type' | 'other'; online?: boolean;
     };
 }

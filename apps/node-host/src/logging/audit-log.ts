@@ -1,3 +1,4 @@
+import {connectionId} from './connection-diagnostics';
 import {diagnosticContext} from '@nestos/common';
 import { mkdir, open, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -5,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 export interface AuditEvent {
+    connectionId?:string;remotePort?:number;requestCount?:number;
     traceId?: string; spanId?: string; parentSpanId?: string; browserSessionId?: string;
     userId?: string; operationId?: string; stage?: string; result?: string; count?: number; bytes?: number;
     event: string; requestId?: string; clientRequestId?: string; remoteAddress?: string; method?: string; route?: string;
@@ -70,7 +72,7 @@ export class AuditLog implements AuditPort {
 }
 
 export function auditRequest(audit: AuditPort, request: IncomingMessage, response: ServerResponse, route: string): string {
-    const context = diagnosticContext();
+    const context = {...diagnosticContext(),connectionId:connectionId(request)};
     const requestId = context?.requestId ?? randomUUID(), startedAt = Date.now(), remoteAddress = request.socket.remoteAddress;
     const pathname = new URL(request.url ?? '/', 'https://localhost').pathname;
     const asset = /^\/assets\/[\w.-]+-[\w-]{8,}\.(?:js|css)$/.test(pathname) ? pathname.slice('/assets/'.length) : undefined;

@@ -68,8 +68,9 @@ class HttpStatusBanner {
         this.banner.hidden = true; this.action.disabled = true;
         this.recovering = Promise.resolve().then(() => this.recover!()).catch(error => {
             if (this.abort.signal.aborted) return;
-            this.text.textContent = t('httpApp.autoRecoveryFailed', {reason: error instanceof Error ? error.message : t('httpApp.recoveryUnsupported')});
-            this.manualReload = ['RECOVERY_SETTINGS_FORM', 'RECOVERY_UNSUPPORTED_EDITOR', 'RECOVERY_UNSUPPORTED_WORKSPACE'].includes((error as {code?: string})?.code ?? '');
+            const incompatible=(error as {code?:string})?.code==='ECAPABILITY';
+            this.text.textContent = incompatible?t('httpApp.clientUpdateRequired'):t('httpApp.autoRecoveryFailed', {reason: error instanceof Error ? error.message : t('httpApp.recoveryUnsupported')});
+            this.manualReload = incompatible||['RECOVERY_SETTINGS_FORM', 'RECOVERY_UNSUPPORTED_EDITOR', 'RECOVERY_UNSUPPORTED_WORKSPACE'].includes((error as {code?: string})?.code ?? '');
             this.action.textContent = t(this.manualReload ? 'httpApp.reload' : 'httpApp.retry'); this.banner.hidden = false;
         }).finally(() => {this.recovering = undefined; this.action.disabled = false;});
     }

@@ -1,3 +1,4 @@
+import {currentDeliveryRecord} from './kanban-delivery-options';
 import {reviewCancellation} from './kanban-review-cancellation';
 import {workProjectId} from '../kanban/task-projects';
 import {planningConversationControl} from './kanban-planning-control';
@@ -95,7 +96,7 @@ async function resource(options: Options, item: KanbanItem, boardId: string): Pr
         options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + (primary ? dispatch!.id : ref.id)), options.journal.get('worktree-cleanup:' + ref.id)]);
     requireValue(tree && record && !cleanup && tree.directory === record.directory, 'OPERATION_WORKSPACE_UNAVAILABLE');
     requireValue(item.externalRefs?.some(row => row.system === 'nestos-remote-project' && row.id === record.projectId), 'WORKTREE_PROJECT_CHANGED');
-    return {id: ref.id, tree, record};
+    return {id: ref.id, tree, record:await currentDeliveryRecord(options.service,record)};
 }
 async function snapshot(options: Options, board: KanbanBoard, item: KanbanItem): Promise<ReviewSnapshot> {
     const current = await resource(options, item, board.id), {record, tree} = current;

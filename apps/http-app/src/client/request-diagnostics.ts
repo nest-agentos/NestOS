@@ -2,11 +2,15 @@ import type {ClientDiagnostic} from '@nestos/app-contracts/services';
 type Http = NonNullable<ClientDiagnostic['http']>;
 const routes = new Set(['/api/application','/api/application/events','/api/application/files','/api/health','/api/identity']);
 const kinds = new Set(['bootstrap','bootstrap-data','queries','bindings','call','callback','close']);
-export function requestMetadata(input: RequestInfo | URL, init: RequestInit | undefined, headers: Headers): Pick<Http,'route'|'method'|'rpcKind'|'rpcMethod'|'requestBytes'> {
+export function requestMetadata(input: RequestInfo | URL, init: RequestInit | undefined, headers: Headers): Pick<Http,'route'|'method'|'rpcKind'|'rpcMethod'|'rpcMethods'|'rpcBatchSize'|'rpcAttempt'|'requestBytes'> {
     let path = ''; try {path = new URL(typeof input === 'string' || input instanceof URL ? input : input.url, 'https://localhost').pathname;} catch { /* Never log a caller URL. */ }
     const method = init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : 'GET');
     const kind = headers.get('X-NestOS-RPC-Kind'), rpcMethod = headers.get('X-NestOS-RPC-Method');
+    const methods=(headers.get('X-NestOS-RPC-Methods')??'').split(',').filter(name=>/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name)).slice(0,32);
+    const size=headers.get('X-NestOS-RPC-Batch-Size'),attempt=headers.get('X-NestOS-RPC-Attempt');
     return {route: (routes.has(path) ? path : '/resource') as Http['route'], method: method === 'POST' || method === 'GET' ? method : 'OTHER',
+        ...(methods.length?{rpcMethods:methods}:{}),...(size&&/^\d{1,4}$/.test(size)&&Number(size)<=1024?{rpcBatchSize:Number(size)}:{}),
+        ...(attempt&&/^[12]$/.test(attempt)?{rpcAttempt:Number(attempt)}:{}),
         ...(kind ? {rpcKind: kinds.has(kind) ? kind : 'other'} : {}),
         ...(rpcMethod && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(rpcMethod) ? {rpcMethod} : {}),
         ...(typeof init?.body === 'string' ? {requestBytes: new TextEncoder().encode(init.body).byteLength} : {})};

@@ -385,6 +385,10 @@ C4Component
 
 ## 启动与认证
 
+能力解码允许服务端增加客户端尚未注册的方法：忽略新增方法并记录一次 `RPC_METHOD_UNSUPPORTED`，不会授予调用权限；非法能力声明仍拒绝。必须更新客户端才能恢复的 `ECAPABILITY` 错误显示重新加载入口。仅分类为只读的查询批次在 `HTTP_CONNECTION_LOST` 后重试一次；命令、绑定和初始化不自动重放，命令响应丢失继续按结果未知处理。
+
+客户端诊断携带安全方法名、批次大小及尝试次数，不记录参数；`rpc.decode` 诊断包含能力种类与方法名。TLS 连接分配 `connectionId`，与请求审计关联；握手失败和请求到达前断开分别记录，包含阶段、错误码与耗时。没有对应 `request.received` 时，不能将浏览器 fetch 失败直接归因为 Cells 或业务读取失败。
+
 浏览器启动先加载独立的轻入口，认证身份后立即通过 `@nestos/app-transport/http/startup` 的 `PreparedHttpBootstrap` 发送首屏数据请求；Shell、当前编辑器与完整 RPC 实现并行加载。`HttpViewClient.start({prepared})` 一次性接管相同 clientId、URL 和快照上下文，不重复 bootstrap；接管后建立 SSE 并消费服务端已有的有界事件日志。准备期间取消或模块加载失败会释放尚未接管的视图，写命令不重放。路由通过 `@nestos/app-contracts/routing`、`@nestos/vfs-core/protocol` 和 `/path` 轻入口解析，不引入 VFS 引擎、完整词典或 YAML；认证账号钉住及授权检查保持原链路。`http.bootstrap` 客户端日志区分响应解码成功与具体失败码，`nestos:bootstrap-received` 标记数据到达，不代表界面已可操作。
 
 ```bash

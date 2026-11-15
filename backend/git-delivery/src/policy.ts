@@ -22,7 +22,8 @@ export function deliveryProfile(policy:FrozenDeliveryPolicy,item:DeliveryItem):D
 /** Frozen decision choices override the default release without optional verification. */
 export function decisionDeliveryPolicy(policy:FrozenDeliveryPolicy,context:unknown):Policy|undefined {
     const base=deliveryPolicy(policy);if(!base)return;
-    const snapshot=(context as {decision?:{snapshot?:{verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'}}})?.decision?.snapshot;
+    const saved=(context as {decision?:{snapshot?:{deliveryOptions?:{verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'};verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'}}})?.decision?.snapshot;
+    const snapshot=saved?.deliveryOptions??saved;
     const verificationLevel=snapshot?.verificationLevel??'none',deliveryMode=snapshot?.deliveryMode??'release';
     requireValue(['full','quick','none'].includes(verificationLevel)&&['release','source','build'].includes(deliveryMode),'DELIVERY_PREFERENCES_INVALID');
     requireValue(verificationLevel==='none'?deliveryMode==='source'||deliveryMode==='build'||deliveryMode==='release':deliveryMode==='release','DELIVERY_PREFERENCES_INVALID');
@@ -31,7 +32,8 @@ export function decisionDeliveryPolicy(policy:FrozenDeliveryPolicy,context:unkno
 export function validateDeliveryDecomposition(policy:FrozenDeliveryPolicy,output:unknown,context?:unknown):void {
     const value=output as {ready?:boolean;subtasks?:Array<{key:string;dependsOn:string[];splitJustification?:string;executionProfile?:{system:string;id:string;revision:string}}>};
     const selected=decisionDeliveryPolicy(policy,context);
-    const snapshot=(context as {decision?:{snapshot?:{verificationLevel?:string;deliveryMode?:string}}})?.decision?.snapshot;
+    const saved=(context as {decision?:{snapshot?:{deliveryOptions?:{verificationLevel?:string;deliveryMode?:string};verificationLevel?:string;deliveryMode?:string}}})?.decision?.snapshot;
+    const snapshot=saved?.deliveryOptions??saved;
     if(value?.ready&&(snapshot?.verificationLevel||snapshot?.deliveryMode))requireValue(!!value.subtasks?.length,'DELIVERY_PROFILE_REQUIRED');
     if(!value?.subtasks||!selected)return;
     const tasks=value.subtasks,mode=selected.deliveryMode==='build'?'release':selected.deliveryMode!,full=selected.verificationLevel==='full';
@@ -47,6 +49,7 @@ export function validateDeliveryDecomposition(policy:FrozenDeliveryPolicy,output
 }
 export function selectedDeliveryProfile(policy:FrozenDeliveryPolicy,item:DeliveryItem,context:unknown):DeliveryProfile|undefined {
     const profile=deliveryProfile(policy,item),selected=decisionDeliveryPolicy(policy,context);
+    if(profile?.id==='release'&&selected?.deliveryMode==='source'){const source=selected.profiles.find(value=>value.id==='source');return source?{...source,acceptanceLabel:t('kanban.operationAcceptSource'),acceptanceConfirmation:t('kanban.operationConfirmSource')}:undefined;}
     return profile?.id==='release'&&selected?.deliveryMode==='build'?{...profile,manualAfter:'build'}:profile;
 }
 /** Verification accepts a running release, never uncommitted repairs or another version. */

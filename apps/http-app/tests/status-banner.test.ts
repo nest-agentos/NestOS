@@ -94,3 +94,12 @@ it('retains the page on recovery failure and allows an explicit retry', async ()
     document.querySelector<HTMLButtonElement>('.http-status button')!.click();
     await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(2));
 });
+
+it('offers a reload instead of repeatedly retrying an incompatible capability graph',async()=>{
+    const reload=vi.fn(),recover=vi.fn(async()=>{throw Object.assign(Error('Unknown remote method'),{code:'ECAPABILITY'});});
+    dispose=installHttpStatus({fetcher:vi.fn(async()=>Response.json({ready:true})),reload,recover});
+    window.dispatchEvent(new CustomEvent('nestos:http-disconnected',{detail:{state:'expired'}}));
+    await vi.waitFor(()=>expect(document.querySelector('.http-status')?.textContent).toContain(t('httpApp.clientUpdateRequired')));
+    expect(reload).not.toHaveBeenCalled();document.querySelector<HTMLButtonElement>('.http-status button')!.click();
+    expect(reload).toHaveBeenCalledOnce();expect(recover).toHaveBeenCalledOnce();
+});

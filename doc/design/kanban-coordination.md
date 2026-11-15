@@ -36,6 +36,8 @@ flowchart TD
 
 ## 独立接口与接入
 
+决策的交付方式可在详情或关联管理任务中修改，通过 `configure-record-delivery` 校验人工审核权限及 `expectedRecordRevision`，持久保存 `deliveryOptions` 修订。`recordDelivery(boardId, itemId)` 返回关联决策的当前方式、版本及可编辑状态。原决策快照、run 身份和已提交操作保持不变，新准备的交付操作读取修订；存在任务后不能直接升级为缺少独立验证任务的完整验证，返回 `DELIVERY_VERIFICATION_REPLAN_REQUIRED`。未配置时默认自动合入、构建、发布并核对运行版本；“仅构建”明确停在人工验收边界。未完成、失败和结果未知的决策及管理任务显示取消操作，继续通过原控制与回执链路处理。界面只显示状态和操作，规则说明放在悬停提示中。
+
 根入口的 `createKanban` 按 boards/items/records/planning/references 分组查询，通过单一 execute 写入并返回轻量 Commit；旧 `createKanbanModule` 仍返回 KanbanService，现有 RPC 无需改变。存储、执行、来源发现、活动与 UI 分别使用 `/storage`、`/execution`、`/discovery`、`/activity`、`/ui` 入口。
 
 来源发现的批量变更与水位统一由核心内置 apply-discovery 校验、提交；不再允许宿主以 reducer extension 任意改状态。远程 Store 的布局、编号、正文摘要、回执和条件事务编码也归独立库，NestOS 仅注入授权 HttpSeqClient。库无 mechanisms 入口。版本化内容经 install-content 授权后，由 installKanbanContent 原子安装；应用只提供内容定义，不调用 reducer 或 codec。

@@ -51,6 +51,8 @@ it('rejects a ready plan that bypasses explicit decision delivery profiles',()=>
 
 it('defaults to automatic release without optional checks or an independent verifier',()=>{
  expect(decisionDeliveryPolicy(policy,{})).toMatchObject({verificationLevel:'none',deliveryMode:'release'});
+ const automatic=repositoryDeliveryPlan([selectedDeliveryProfile(policy,{externalRefs:[{system:'nestos-work-delivery',id:'release',revision:'1'}]}, {})!]);
+ expect(automatic.steps).toEqual(expect.arrayContaining(['merge','build','deploy','accept','cleanup']));expect(automatic).not.toHaveProperty('manualAfter');
  expect(kanbanVerificationMode({})).toBe('release');expect(kanbanVerificationMode({verificationLevel:'full',deliveryMode:'release'})).toBe('full');
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation','release')]})).not.toThrow();
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation','release'),task('verify','verification',['implementation'])]})).toThrowError(expect.objectContaining({code:'DELIVERY_CHAIN_INVALID'}));

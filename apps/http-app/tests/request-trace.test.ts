@@ -112,3 +112,21 @@ it('does not recursively queue failures of diagnostic reports or replay the fail
     await vi.waitFor(()=>expect(report).toHaveBeenCalledOnce());await new Promise(resolve=>setTimeout(resolve,10));expect(fetch).toHaveBeenCalledTimes(2);
     await wrapped('/api/health');await vi.waitFor(()=>expect(report).toHaveBeenCalledTimes(2));expect(fetch).toHaveBeenCalledTimes(4);
 });
+
+it('reports bounded method batches, retry attempts and safe network codes without logging arguments',async()=>{
+    const browser=new BrowserRequestTrace(),records:any[]=[];
+    const fetcher=browser.wrap(async()=>{throw Object.assign(new TypeError('PRIVATE_NETWORK_BODY'),{cause:{code:'ECONNRESET'}});});
+    await expect(fetcher('/api/application',{method:'POST',headers:{'X-NestOS-RPC-Kind':'queries','X-NestOS-RPC-Methods':'catalog,decisionSnapshot',
+        'X-NestOS-RPC-Batch-Size':'2','X-NestOS-RPC-Attempt':'2'},body:'PRIVATE_QUERY_ARGUMENTS'})).rejects.toThrow();
+    browser.setReporter(async value=>{reportClientDiagnostic(value);records.push(value);});await vi.waitFor(()=>expect(records).toHaveLength(1));
+    expect(records[0].http).toMatchObject({rpcMethods:['catalog','decisionSnapshot'],rpcBatchSize:2,rpcAttempt:2,networkCode:'ECONNRESET'});
+    expect(JSON.stringify(records)).not.toContain('PRIVATE');
+});
+it('defers exact capability compatibility diagnostics until the new view can report them',async()=>{
+    const browser=new BrowserRequestTrace(),records:any[]=[];
+    browser.compatibility({code:'RPC_METHOD_UNSUPPORTED',capabilityKind:'KanbanService',rpcMethod:'removeRecordConversations'});
+    browser.compatibility({code:'RPC_METHOD_UNSUPPORTED',capabilityKind:'PRIVATE BODY',rpcMethod:'SECRET'});
+    browser.setReporter(async value=>{reportClientDiagnostic(value);records.push(value);});await vi.waitFor(()=>expect(records).toHaveLength(1));
+    expect(records[0]).toMatchObject({stage:'rpc.decode',code:'RPC_METHOD_UNSUPPORTED',http:{capabilityKind:'KanbanService',rpcMethod:'removeRecordConversations'}});
+    expect(JSON.stringify(records)).not.toContain('PRIVATE');
+});
