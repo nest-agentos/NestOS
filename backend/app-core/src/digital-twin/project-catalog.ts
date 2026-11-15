@@ -60,12 +60,12 @@ export class TwinProjectCatalog {
     }
     private async walk(fs: IFileSystem, project: ProjectFolder, active: () => boolean): Promise<TwinDiscoveredSource[]> {
         if (!active()) return [];
-        const root = await fs.driver.getNode('/');
+        const root = await fs.driver.getNode('/',{timeoutMs:5000});
         if (root?.metadata.isProtected || root?.tags.includes('private')) return [];
         const queue = ['/'], resources: TwinDiscoveredSource[] = []; let visited = 0;
         while (queue.length && active()) {
             const path = queue.shift()!;
-            for (const node of await fs.driver.getChildren(path)) {
+            for (const node of await fs.driver.getChildren(path,{timeoutMs:5000})) {
                 if (visited % 128 === 0) await new Promise<void>(resolve => setTimeout(resolve, 0));
                 if (!active()) return resources;
                 if (++visited > 100000 || resources.length >= 10000) throw new Error('TWIN_SOURCE_COUNT_LIMIT');

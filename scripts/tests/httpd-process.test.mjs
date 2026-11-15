@@ -115,13 +115,10 @@ test('discovers a pre-registry host launched through a relative script path, wit
     }
 });
 
-test('safe stop retains a blocked process and its registry until an explicit force request', async () => {
+test('default stop forcefully ends a blocked process at its deadline', async () => {
     const f = await fixture('stuck');
     try {
-        await assert.rejects(stopHttpd(f.root, 'release', f.releases, {timeoutMs: 30}), {code: 'HTTPD_SAFE_STOP_PENDING'});
-        assert.ok(await processIdentity(f.child.pid));
-        assert.equal((await runningHttpd(f.root, 'release', f.releases))[0].pid, f.child.pid);
-        await stopHttpd(f.root, 'release', f.releases, {timeoutMs: 0, force: true});
+        await stopHttpd(f.root, 'release', f.releases, {timeoutMs: 30});
         assert.equal(await processIdentity(f.child.pid), undefined);
     } finally {await f.close();}
 });

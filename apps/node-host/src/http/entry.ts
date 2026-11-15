@@ -1,4 +1,4 @@
-import {traceHostCleanup, shutdownSignal} from '../runtime/host-cleanup';
+import {traceHostCleanup, shutdownSignal, shutdownDeadline} from '../runtime/host-cleanup';
 import { startHost } from './start-host';
 import { mkdir, realpath, access } from 'node:fs/promises';
 import path from 'node:path';
@@ -81,8 +81,8 @@ function validBacklog(value: string): number {
 function installShutdown(starting: ReturnType<typeof startHost>, controller: AbortController): void {
     let stopping = false;
     const stop = (signal: string) => {
-        if (stopping) return; stopping = true; shutdownSignal(signal); controller.abort();
-        void traceHostCleanup('host.close', async () => {const hosted = await starting; await hosted.close();}).then(() => { process.exitCode = 0; }).catch(() => { process.exitCode = 1; });
+        if (stopping) return; stopping = true; const operationId=shutdownSignal(signal);shutdownDeadline(operationId);controller.abort();
+        void traceHostCleanup('host.close', async () => {const hosted = await starting; await hosted.close();},operationId).then(() => { process.exitCode = 0; }).catch(() => { process.exitCode = 1; });
     };
     process.on('SIGINT', stop); process.on('SIGTERM', stop);
     void starting.then(hosted => hosted.server.on('error', () => stop('SERVER_ERROR'))).catch(() => {});

@@ -10,7 +10,7 @@ export async function discoverWorkspaces(fs: IFileSystem, catalog: TwinSourceCat
         const root = `/home/admin/${name}`, projectId = `@workspace/${name}`;
         catalog.projects.push(projectId);
         try {
-            const node = await fs.driver.getNode(root);
+            const node = await fs.driver.getNode(root,{timeoutMs:5000});
             if (node && !node.metadata.isProtected && !node.tags.includes('private')) await walk(fs, root, projectId, catalog, active);
             if (!active()) return;
             catalog.completeScopes.push(`${projectId}/file`);
@@ -20,7 +20,7 @@ export async function discoverWorkspaces(fs: IFileSystem, catalog: TwinSourceCat
 async function walk(fs: IFileSystem, root: string, projectId: string, catalog: TwinSourceCatalog, active: () => boolean): Promise<void> {
     const queue = [root]; let visited = 0;
     while (queue.length && active()) {
-        for (const node of await fs.driver.getChildren(queue.shift()!)) {
+        for (const node of await fs.driver.getChildren(queue.shift()!,{timeoutMs:5000})) {
             if (visited % 128 === 0) await new Promise<void>(resolve => setTimeout(resolve, 0));
             if (!active()) return;
             if (++visited > 100000 || catalog.resources.length >= 10000) throw new Error('TWIN_SOURCE_COUNT_LIMIT');

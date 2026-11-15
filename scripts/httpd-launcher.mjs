@@ -22,8 +22,7 @@ async function finish(root,id,result,code){return changeLaunch(root,'release',st
 async function alive(record){return !!record&&(await processIdentity(record.pid,false))?.birth===record.birth;}
 async function stopChild(root,releases){
     const state=await readLaunch(root,'release');if(!state.child)return;
-    try{await stopHttpd(root,'release',releases,{owned:state.child,timeoutMs:15000});}
-    catch(error){if(error.code!=='HTTPD_SAFE_STOP_PENDING')throw error;while(await alive(state.child))await pause(200);}
+    await stopHttpd(root,'release',releases,{owned:state.child,timeoutMs:15000});
     await unregisterHttpd(root,'release',state.child);
     await changeLaunch(root,'release',current=>current.child?.birth===state.child.birth?{...current,child:undefined}:current);
 }

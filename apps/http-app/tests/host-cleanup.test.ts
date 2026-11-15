@@ -1,6 +1,6 @@
 import {afterEach, expect, it, vi} from 'vitest';
 import {closeHostResources, namedCleanup} from '../../node-host/src/runtime/host-runtime';
-import {traceHostCleanup} from '../../node-host/src/runtime/host-cleanup';
+import {shutdownDeadline,traceHostCleanup} from '../../node-host/src/runtime/host-cleanup';
 afterEach(() => {vi.useRealTimers(); vi.restoreAllMocks();});
 it('identifies nested cleanup stages and continues releasing resources after errors without logging bodies', async () => {
     const output = vi.spyOn(console, 'info').mockImplementation(() => {}), released = vi.fn();
@@ -19,4 +19,12 @@ it('reports the pending stage while awaiting an unfinished cleanup operation', a
     await vi.advanceTimersByTimeAsync(5000);
     expect(output.mock.calls.map(row => JSON.parse(row[1] as string))).toContainEqual(expect.objectContaining({stage: 'views.close', result: 'waiting', durationMs: 5000}));
     finish(); await work; expect(vi.getTimerCount()).toBe(0);
+});
+
+it('forces shutdown after fifteen seconds and permits cancelling an unused watchdog',async()=>{
+ vi.useFakeTimers();const output=vi.spyOn(console,'info').mockImplementation(()=>{}),exit=vi.fn();
+ const cancel=shutdownDeadline('shutdown-request',15000,exit);await vi.advanceTimersByTimeAsync(14999);expect(exit).not.toHaveBeenCalled();
+ await vi.advanceTimersByTimeAsync(1);expect(exit).toHaveBeenCalledExactlyOnceWith(1);
+ expect(output.mock.calls.map(row=>JSON.parse(String(row[1])))).toContainEqual(expect.objectContaining({operationId:'shutdown-request',stage:'deadline',code:'HTTPD_SHUTDOWN_DEADLINE',forced:true,durationMs:15000}));cancel();
+ const unused=shutdownDeadline('unused',15000,exit);unused();await vi.advanceTimersByTimeAsync(15000);expect(exit).toHaveBeenCalledOnce();
 });

@@ -12,8 +12,8 @@ function errorCode(error: unknown): string {
     return typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'HOST_CLEANUP_FAILED';
 }
 /** Observe a stage without skipping cleanup or releasing storage beneath active work. */
-export async function traceHostCleanup<T>(stage: string, run: () => T | Promise<T>): Promise<T> {
-    const parent = context.getStore(), operationId = parent?.operationId ?? randomUUID();
+export async function traceHostCleanup<T>(stage: string, run: () => T | Promise<T>, rootOperationId?:string): Promise<T> {
+    const parent = context.getStore(), operationId = parent?.operationId ?? rootOperationId ?? randomUUID();
     const path = parent ? `${parent.path}/${stage}` : stage, started = Date.now(), cpu = process.cpuUsage();
     const fields = {operationId, stage: path};
     diagnostic({...fields, result: 'started'});
@@ -26,4 +26,10 @@ export async function traceHostCleanup<T>(stage: string, run: () => T | Promise<
         diagnostic({...fields, result: 'failure', code: errorCode(error), durationMs: Date.now() - started}); throw error;
     } finally {clearInterval(pending);}
 }
-export function shutdownSignal(signal: string): void {diagnostic({stage: 'signal', signal, result: 'received'});}
+export function shutdownSignal(signal: string): string {const operationId=randomUUID();diagnostic({operationId,stage:'signal',signal,result:'received'});return operationId;}
+/** Bound direct launches too, without retaining an otherwise idle event loop. */
+export function shutdownDeadline(operationId:string,timeoutMs=15000,exit:(code:number)=>void=code=>process.exit(code)):()=>void {
+    const started=Date.now();
+    const timer=setTimeout(()=>{diagnostic({operationId,stage:'deadline',result:'failure',code:'HTTPD_SHUTDOWN_DEADLINE',forced:true,durationMs:Date.now()-started});exit(1);},timeoutMs);
+    timer.unref();return ()=>clearTimeout(timer);
+}

@@ -392,11 +392,11 @@ C4Component
 浏览器启动先加载独立的轻入口，认证身份后立即通过 `@nestos/app-transport/http/startup` 的 `PreparedHttpBootstrap` 发送首屏数据请求；Shell、当前编辑器与完整 RPC 实现并行加载。`HttpViewClient.start({prepared})` 一次性接管相同 clientId、URL 和快照上下文，不重复 bootstrap；接管后建立 SSE 并消费服务端已有的有界事件日志。准备期间取消或模块加载失败会释放尚未接管的视图，写命令不重放。路由通过 `@nestos/app-contracts/routing`、`@nestos/vfs-core/protocol` 和 `/path` 轻入口解析，不引入 VFS 引擎、完整词典或 YAML；认证账号钉住及授权检查保持原链路。`http.bootstrap` 客户端日志区分响应解码成功与具体失败码，`nestos:bootstrap-received` 标记数据到达，不代表界面已可操作。
 
 ```bash
-pnpm httpd:stop                # 按进程身份停止；默认等待安全点 15 秒；未确认则报告等待，不强杀
+pnpm httpd:stop                # 按进程身份停止；先等待安全点，15 秒后强制退出并核对原进程身份
 pnpm httpd:restart             # 确认旧进程退出后启动已选 release；不自动构建
 pnpm httpd:build && pnpm httpd:restart # 先构建，成功后替换运行版本
-pnpm httpd:stop --force        # 明确允许超时后 SIGKILL，再等待最多 5 秒确认
-pnpm httpd:stop --timeout-ms 60000 # 等待更长的安全步骤
+pnpm httpd:stop --force        # 兼容参数；默认已在 15 秒超时后强制退出
+pnpm httpd:stop --timeout-ms 5000 # 缩短宽限期；宽限期上限为 15 秒
 pnpm httpd:stop --dev          # 停止源码宿主，和 release 独立登记
 pnpm httpd:build --no-activate # 仅构建和验证，不改变下次启动选择
 pnpm httpd:build --no-cache    # 绕过构建缓存，重新安装和编译
@@ -418,7 +418,8 @@ pnpm httpd:activate <版本ID>   # 下次启动使用此版本
 
 停止命令优先读取忽略目录 `release/httpd-processes/<mode>.json`，登记 PID、启动身份、模式和启动参数（0600），不读取用户数据库或 Session。Linux 的启动身份包含本次系统启动 ID 与进程 starttime，避免旧 PID 被复用后误杀其他进程；主线程已退出但仍有工作线程时继续等待，不能提前报告停止。仅旧版未登记宿主会扫描 `/proc`，匹配本检出启动脚本和 release 入口，绝不按端口猜测。生命周期操作由独立 SQLite OS 锁互斥，退出自动释放，不使用永久占用的哨兵锁文件。登记更新使用原子替换，旧宿主退出不能移除新实例的登记。
 
-`stop` 先发 SIGTERM，等待所有工作单元完成当前安全步骤并持久化；15 秒仍未退出则返回 `HTTPD_SAFE_STOP_PENDING`，保留进程、锁与登记，restart 不启动新实例。只有显式 `--force` 才会在超时后发 SIGKILL；强制后 5 秒仍无法确认退出则返回 `HTTPD_STOP_UNCONFIRMED`。日志区分正常退出、超时升级与已经停止；进程仍在不等于 HTTP 已就绪，`start.registered` 仅表示进程登记。Ctrl+C/SIGTERM 也由外层启动器请求安全停止，重复信号不默认终止仍在排空的宿主；强制停止可能中断本次执行，后续依赖既有持久恢复协议，不伪造任务成功或删除数据库。
+`stop` 先发 SIGTERM 并停止新准入，等待当前安全步骤及持久化；宽限期最多 15 秒，随后按已登记的 PID/启动身份发送 SIGKILL，再等待最多 5 秒确认死亡。退出未确认仍返回 `HTTPD_STOP_UNCONFIRMED`，不启动第二实例。启动器不再捕获超时后无限等待，直接启动的宿主也有 15 秒关停看门狗，记录 `HTTPD_SHUTDOWN_DEADLINE`、operationId、PID 和耗时后强制退出；正常结束时不延迟退出。Ctrl+C/SIGTERM 使用同一时限。强制退出不表示业务成功或取消任务，保留冻结请求、检查点和正式回执，重启后核对未知结果。独立提取/分析任务与 httpd 内的扫描协调器是不同边界；后者的来源发现仍可能等待文件读取，因此目录及根节点发现调用显式传递 5 秒读取时限，宿主的硬时限不依赖读取是否配合取消。
+
 
 `[HTTPShutdown]` 记录信号和嵌套关闭阶段（server、views、runtime、storage、lock），包含 PID、operationId、阶段、结果、耗时；等待超过 5 秒持续报告当前阶段及 CPU 用量。应用内部的 `[RuntimeCleanup]` 继续细分 startup、Kanban quiesce、开发任务、会话与 Kernel 清理。失败记录错误分类，不输出正文、参数或令牌。启动器的 `[HTTPProcess]` 用 PID 对应这些日志；不能仅凭最后一条普通业务日志推断阻塞位置。
 

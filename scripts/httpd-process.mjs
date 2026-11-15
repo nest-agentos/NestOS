@@ -6,7 +6,7 @@ import path from 'node:path';
 let bootId, writeLifecycle;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const hints = {
-    HTTPD_SAFE_STOP_PENDING: 'Waiting for a safe checkpoint; process and locks are retained. Retry or increase --timeout-ms. Use --force only to allow interruption.',
+    HTTPD_SAFE_STOP_PENDING: 'The launcher operation is still pending. Inspect lifecycle receipts and current health before retrying.',
     HTTPD_CONTROL_BUSY: 'Another start, stop or restart is in progress; retry after it finishes.',
     HTTPD_STOP_UNCONFIRMED: 'Process exit could not be confirmed; a replacement host will not be started.',
 };
@@ -108,8 +108,9 @@ async function signalHost(record, signal) {
     try {process.kill(record.pid, signal);} catch (error) {if (error.code !== 'ESRCH') throw error;}
 }
 export async function stopHttpd(root, mode, releases, options = {}) {
-    const operationId = randomUUID(), started = Date.now(), timeoutMs = options.timeoutMs ?? 15000;
-    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 300000) throw failure('HTTPD_INVALID_STOP_TIMEOUT');
+    const operationId = randomUUID(), started = Date.now(), requestedTimeoutMs = options.timeoutMs ?? 15000;
+    if (!Number.isSafeInteger(requestedTimeoutMs) || requestedTimeoutMs < 0 || requestedTimeoutMs > 300000) throw failure('HTTPD_INVALID_STOP_TIMEOUT');
+    const timeoutMs=Math.min(requestedTimeoutMs,15000);
     const hosts = options.owned ? [options.owned] : await runningHttpd(root, mode, releases);
     if (!hosts.length) {lifecycleLog({operationId, stage: 'stop', result: 'already-stopped', durationMs: Date.now() - started}); return;}
     const results = await Promise.allSettled(hosts.map(async record => {
@@ -117,10 +118,6 @@ export async function stopHttpd(root, mode, releases, options = {}) {
         await signalHost(record, 'SIGTERM');
         let forced = false;
         if (!await waitForExit(record, timeoutMs)) {
-            if (!options.force) {
-                lifecycleLog({operationId, pid: record.pid, stage: 'stop.safe-point', result: 'waiting', code: 'HTTPD_SAFE_STOP_PENDING', durationMs: Date.now() - started});
-                throw failure('HTTPD_SAFE_STOP_PENDING');
-            }
             forced = true;
             lifecycleLog({operationId, pid: record.pid, stage: 'stop.escalate', result: 'waiting', code: 'HTTPD_GRACEFUL_STOP_TIMEOUT'});
             await signalHost(record, 'SIGKILL');
