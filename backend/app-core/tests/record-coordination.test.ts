@@ -160,9 +160,9 @@ it('adopts the existing settled planning channel without creating or moving a na
  await f.journal.update('analysis:original',()=>({id:'original',phase:'settled'}));
  await f.journal.update('development-workspace:original',()=>({projectId:'project',directory:'/workspace/original',context:{decision:{sourceBoardId:'b',recordId:'decision'}}}));
  await f.journal.update('kanban-harness-choice:original',()=>({profileId:'codex'}));
- const create=vi.fn(),close=vi.fn(async()=>{});f.options.remote={...f.options.remote,sessionChannel:vi.fn(async()=>({execution:{sessionId:'native'}})),projectHarness:async()=>({create,profiles:async()=>({epoch:'current'}),close}),list:()=>[{at:'/',serverProjectId:'workspace'}]};
+ const create=vi.fn(),close=vi.fn(async()=>{});f.options.remote={...f.options.remote,sessionChannel:vi.fn(async(_project:string,operation:string)=>operation==='requests'?{requests:[]}:{execution:{sessionId:'native'}}),projectHarness:async()=>({create,profiles:async()=>({epoch:'current'}),close}),list:()=>[{at:'/',serverProjectId:'workspace'}]};
  const start=vi.fn(async()=>{}),adopt=adoptPlanningConversation(f.options,start),value={analysisId:'original',resourceId:'/folder:project/@harness/codex/native'} as any;
  await adopt('b','group',value);await adopt('b','group',value);
  expect(await f.journal.get('record-conversation:original')).toMatchObject({sessionId:'native',resourceId:value.resourceId,binding:{id:'original',purpose:'coordination',recordId:'decision',directory:'/workspace/original'}});
- expect(create).not.toHaveBeenCalled();expect(start).toHaveBeenCalledOnce();expect(f.options.remote.sessionChannel).toHaveBeenCalledOnce();
+ expect(create).not.toHaveBeenCalled();expect(start).toHaveBeenCalledOnce();expect(f.options.remote.sessionChannel).toHaveBeenCalledTimes(2);
 });

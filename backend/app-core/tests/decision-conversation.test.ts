@@ -204,3 +204,13 @@ it('adds a scoped host plugin without adding a top-level MCP tool or eagerly exp
  const plugin=f.options.requestPlugins()[0];f.options.requestPlugins=()=>[{...plugin,version:'2'}];
  await expect(invoke('kanban.invoke',{pluginId:'example',method:'inspect',input:{selection:'known'}})).rejects.toMatchObject({code:'CHANNEL_PLUGIN_VERSION_CHANGED'});expect(run).toHaveBeenCalledOnce();
 });
+it('keeps real confirmation valid across a proven host continuation but rejects a later real user message',async()=>{
+ const f=await fixture(),proposal=await f.request('decision.propose',{id:'continued',title:'Continued',content:'Scope',rationale:'Check',projectIds:['one'],verificationMode:'release'}) as any;
+ await f.options.journal.update('decision-response:conversation:describe-confirm:resumed',()=>true);
+ f.read.mockResolvedValue({messages:[{id:'real-confirm',turnId:'user-turn',role:'user',text:'确认决策'},{id:'host-message',turnId:'host-turn',role:'user',text:'Read the host response and continue.'}],instructionQueue:{submissions:[{id:'reply-describe-confirm',turnId:'host-turn'}]}} as any);
+ await f.request('decision.confirm',{proposalDigest:proposal.proposalDigest},'confirm-continued');
+ expect((await f.service.record('b','continued')).status).toBe('confirmed');
+ const g=await fixture(),second=await g.request('decision.propose',{id:'blocked',title:'Blocked',content:'Scope',rationale:'Check',projectIds:['one'],verificationMode:'release'}) as any;
+ g.read.mockResolvedValue({messages:[{id:'confirm',turnId:'u1',role:'user',text:'确认决策'},{id:'do-not-confirm',turnId:'u2',role:'user',text:'Wait'}],instructionQueue:{submissions:[{id:'reply-unproven',turnId:'u2'}]}} as any);
+ await expect(g.request('decision.confirm',{proposalDigest:second.proposalDigest})).rejects.toMatchObject({code:'DECISION_USER_CONFIRMATION_REQUIRED'});expect(g.runRecord).not.toHaveBeenCalled();
+});

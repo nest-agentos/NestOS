@@ -1,3 +1,4 @@
+import {channelRequests} from '../run/channel-protocol';
 import type {DecisionConversationOptions,DecisionConversation} from './decision-conversation-ports';
 import type {KanbanPlanningSession} from '@nestos/kanban/contracts';
 import {currentAnalysis,safeCode} from '@nestos/kanban/integration';
@@ -18,8 +19,18 @@ export function adoptPlanningConversation(options:DecisionConversationOptions,st
     const workspaceId=options.remote.list(workspace.projectId).find(row=>row.at==='/')?.serverProjectId;requireValue(workspaceId,'DECISION_PROJECT_BINDING_CHANGED');
     const binding={id:session.analysisId,boardId:context.decision.sourceBoardId,purpose:'coordination' as const,recordId:record.id,projectId:workspace.projectId,
         projectIds:record.externalRefs?.filter(ref=>ref.system==='nestos-remote-project').map(ref=>ref.id),profileId:choice.profileId,workspaceId,directory:workspace.directory,epoch,createId:session.analysisId,inputId:session.analysisId};
+    await retainAnsweredRequests(options,workspace.projectId,session.analysisId);
     await options.journal.update<DecisionConversation>('record-conversation:'+session.analysisId,old=>old??{id:session.analysisId,boardId:binding.boardId,purpose:'coordination',recordId:record.id,state:'confirmed',phase:'submitting',submitted:true,createdAt:record.createdAt,sessionId:native,resourceId:session.resourceId,binding});
     options.log({operationId:session.analysisId,boardId:binding.boardId,stage:'coordination.session.adopt',result:'success',durationMs:Date.now()-started});
     void start(binding.boardId,{operationId:session.analysisId}).catch(error=>options.log({operationId:session.analysisId,boardId:binding.boardId,stage:'coordination.session.watch',result:'failure',code:safeCode(error,'COORDINATION_WATCH_FAILED'),durationMs:Date.now()-started}));
  };
+}
+
+async function retainAnsweredRequests(options:DecisionConversationOptions,project:string,scope:string):Promise<void> {
+    const requests=channelRequests(await options.remote.sessionChannel(project,'requests',{scopeId:scope}),scope);
+    for(const row of requests)if(row.response){
+        const key='decision-response:'+scope+':'+row.request.id;
+        await options.journal.update(key,old=>old??row.response);
+        await options.journal.update(key+':resumed',old=>old??true);
+    }
 }
