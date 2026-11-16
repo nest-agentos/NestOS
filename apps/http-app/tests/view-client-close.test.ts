@@ -10,7 +10,7 @@ afterEach(async () => {
     finally {vi.useRealTimers();}
 });
 
-async function connection(before: (request: Request, signal: AbortSignal) => Promise<void>) {
+async function connection(before: (request: Request, signal: AbortSignal) => Promise<void | Response>) {
     const workbenchView = vi.fn(async () => undefined), stopped = vi.fn(), cancelled = vi.fn();
     const server = new RpcPeer('server', async () => ({}));
     const bootstrap = await server.bootstrap({backend: {workbenchView, toolboxView: async () => {}, taskDetails: async () => {}},
@@ -19,15 +19,16 @@ async function connection(before: (request: Request, signal: AbortSignal) => Pro
     const fetcher: typeof fetch = async (_input, init) => {
         if (!init?.method) return new Response(new ReadableStream({cancel: cancelled}));
         const request = JSON.parse(String(init.body)) as Request; requests.push(request);
-        await before(request, init.signal!);
+        const response = await before(request, init.signal!); if (response) return response;
         const reply = request.kind === 'bootstrap' ? bootstrap : request.kind === 'call' ? await server.handle(request.call!)
             : request.calls ? {replies: await Promise.all(request.calls.map(call => server.handle(call)))} : {};
         return Response.json(reply);
     };
-    const client = new HttpViewClient('test', '/api/application', fetcher);
+    const disconnected = vi.fn(), reconnected = vi.fn();
+    const client = new HttpViewClient('test', '/api/application', fetcher, disconnected, undefined, reconnected);
     releases.push(async () => {await client.close(); await server.close();});
     const root = await client.start() as any;
-    return {client, server, root, requests, workbenchView, stopped, cancelled};
+    return {client, server, root, requests, workbenchView, stopped, cancelled, disconnected, reconnected};
 }
 
 function stalled(signal: AbortSignal): Promise<void> {
@@ -82,9 +83,35 @@ it('retries a lost read batch once without replaying a command',async()=>{
     const f=await connection(async request=>{if(request.kind==='queries'&&first){first=false;throw new TypeError('Failed to fetch');}});
     expect(await f.root.files.getNode('missing')).toBeNull();
     expect(f.requests.filter(request=>request.kind==='queries')).toHaveLength(2);expect(f.workbenchView).not.toHaveBeenCalled();
+    expect(f.cancelled).not.toHaveBeenCalled();expect(f.disconnected).toHaveBeenCalledOnce();expect(f.reconnected).toHaveBeenCalledOnce();
 });
 it('bounds read retries and never turns a persistent failure into success',async()=>{
     const f=await connection(async request=>{if(request.kind==='queries')throw new TypeError('Failed to fetch');});
     await expect(f.root.files.getNode('missing')).rejects.toMatchObject({code:'HTTP_CONNECTION_LOST'});
     expect(f.requests.filter(request=>request.kind==='queries')).toHaveLength(2);
+    expect(f.cancelled).not.toHaveBeenCalled();expect(f.reconnected).not.toHaveBeenCalled();
+});
+
+it('does not repeatedly report expected unsubscribe failures after view expiry', async () => {
+    let expired = false;
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+        const f = await connection(async request => {
+            if (expired && request.kind === 'queries') return Response.json({}, {status: 400, headers: {'X-NestOS-View-Expired': '1'}});
+        });
+        const stop = f.root.files.onAny(() => {});await f.client.peer.whenIdle();
+        expired = true;await expect(f.root.files.getNode('missing')).rejects.toMatchObject({code: 'ECAPABILITY'});
+        const requests = f.requests.length;stop();await f.client.peer.whenIdle();
+        expect(f.requests).toHaveLength(requests);expect(errors).not.toHaveBeenCalled();
+        expect(f.disconnected).toHaveBeenCalledOnce();expect(f.reconnected).not.toHaveBeenCalled();
+    } finally {errors.mockRestore();}
+});
+
+it('preserves directory server errors without retrying them or reporting a connection outage', async () => {
+    const f = await connection(async request => {
+        if (request.kind === 'queries') return Response.json({error: {code: 'EIO', message: 'Source operation failed: getChildren', requestId: 'directory-request'}}, {status: 500});
+    });
+    await expect(f.root.files.getChildren('/')).rejects.toMatchObject({code: 'EIO', requestId: 'directory-request'});
+    expect(f.requests.filter(request => request.kind === 'queries')).toHaveLength(1);
+    expect(f.disconnected).not.toHaveBeenCalled();expect(f.cancelled).not.toHaveBeenCalled();
 });

@@ -1,9 +1,10 @@
-import {observeConnection,countConnectionRequest} from '../logging/connection-diagnostics';
+import {ConnectionDiagnostics,countConnectionRequest} from '../logging/connection-diagnostics';
 import {NATIVE_SESSION_RECOVERY_ENDPOINT} from '@nestos/app-contracts';
 import {traceRequest} from '../logging/request-trace';
 import { createServer, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { TLSSocket } from 'node:tls';
+import {Socket} from 'node:net';
 import { FSError } from '@nestos/vfs-core';
 import type { CertificateAuth } from './certificates';
 import { auditRequest, type AuditPort } from '../logging/audit-log';
@@ -22,13 +23,14 @@ export interface HttpServerOptions {
 }
 /** Every public resource requires both TLS client validation and explicit certificate enrollment. */
 export function createHttpServer(options: HttpServerOptions): Server {
+    const diagnostics=new ConnectionDiagnostics(options.audit);
     const server = createServer(options.certificates.tls, (request, response) => {
         countConnectionRequest(request);
         void traceRequest(request, response, () => serve(request, response, options).catch(error => sendError(response, error)));
     });
-    server.on('secureConnection', socket => {const connectionId=observeConnection(options.audit,socket);void validateConnection(socket, options,connectionId); });
-    server.on('tlsClientError', (error, socket) => options.audit.write({ event: 'auth.rejected', remoteAddress: socket.remoteAddress,
-        operation:'http.connection',stage:'tls.handshake',result:'failure',code: safeCode(error) }));
+    server.on('connection',socket=>{if(socket instanceof Socket)diagnostics.accept(socket);});
+    server.on('secureConnection', socket => {const connectionId=diagnostics.secure(socket);void validateConnection(socket, options,connectionId); });
+    server.on('tlsClientError', (error, socket) => diagnostics.reject(error,socket));
     server.requestTimeout = 120000; server.headersTimeout = 30000;
     return server;
 }
@@ -76,11 +78,6 @@ function validateOrigin(request: IncomingMessage): void {
     if (request.headers.origin && request.headers.origin !== `https://${request.headers.host}`) throw new FSError('EACCES', 'Cross-origin requests are denied');
     if (request.headers['sec-fetch-site'] === 'cross-site') throw new FSError('EACCES', 'Cross-site requests are denied');
 }
-function safeCode(error: Error): string {
-    const code = (error as NodeJS.ErrnoException).code;
-    return code && /^[A-Z0-9_]{1,100}$/.test(code) ? code : 'TLS_CLIENT_AUTHENTICATION_FAILED';
-}
-
 async function authenticate(socket: TLSSocket, certificates: CertificateAuth): Promise<{accepted: boolean; userId?: string; code?: string}> {
     try {
         const userId = await certificates.identity?.(socket);

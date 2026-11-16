@@ -583,7 +583,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         const { elementId } = wsConfig;
         if (pendingLoads.has(elementId)) return pendingLoads.get(elementId)!;
         if (managerCache.has(elementId)) return Promise.resolve(managerCache.get(elementId));
-        const owned = cleanupGroup();
+        const owned = cleanupGroup(() => recoveringView);
         const eventGeneration = applicationEvents?.generation;
         const loading = doLoadWorkspace(wsConfig, owned.own, initialResource).then(manager => {
             if (options.recovery?.workspaces.has(elementId)) {

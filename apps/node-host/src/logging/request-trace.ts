@@ -37,7 +37,7 @@ export function tracedCellsFetch(fetcher: typeof fetch = globalThis.fetch, repor
         if (context.requestId) headers.set('x-parent-request-id', context.requestId);
         if (context.browserSessionId) headers.set('x-nestos-browser-session-id', context.browserSessionId);
         const pathname = new URL(typeof input === 'string' || input instanceof URL ? input : input.url).pathname;
-        const route = /^\/v1\/(?:api\/[a-z_]+\/[a-z_]+|capabilities)$/.test(pathname) ? pathname : '/v1/resource';
+        const route = cellsRoute(pathname);
         const started = Date.now();
         return storage.run(context, async () => {
             try {const response = await fetcher(input, {...init, headers});
@@ -50,6 +50,11 @@ export function tracedCellsFetch(fetcher: typeof fetch = globalThis.fetch, repor
     };
 }
 function safeId(value: string | null): string | undefined {return value && /^[a-zA-Z0-9_-]{1,128}$/.test(value) ? value : undefined;}
+function cellsRoute(pathname:string):string {
+    if(/^\/v1\/(?:api\/[a-z_]+\/[a-z_]+|capabilities)$/.test(pathname))return pathname;
+    const match=/^\/v1\/fs\/[^/]+\/(stat|entries|content|mutate|seq)$/.exec(pathname);
+    return match?`/v1/fs/:alias/${match[1]}`:'/v1/resource';
+}
 function safeCode(error: unknown): string {const value = (error as {code?: unknown})?.code;return typeof value === 'string' && /^[A-Z0-9_]{1,80}$/.test(value) ? value : 'CELLS_TRANSPORT_FAILED';}
 
 function reportSafely(report: ((event: AuditEvent) => void) | undefined, event: AuditEvent): void {try {report?.(event);} catch { /* Logging cannot change request outcomes. */ }}

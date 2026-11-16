@@ -7,6 +7,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 export interface AuditEvent {
     connectionId?:string;remotePort?:number;requestCount?:number;
+    bytesRead?:number;bytesWritten?:number;tlsProtocol?:string;sessionReused?:boolean;tlsReason?:string;tlsLibrary?:string;syscall?:string;
     traceId?: string; spanId?: string; parentSpanId?: string; browserSessionId?: string;
     userId?: string; operationId?: string; stage?: string; result?: string; count?: number; bytes?: number;
     event: string; requestId?: string; clientRequestId?: string; remoteAddress?: string; method?: string; route?: string;

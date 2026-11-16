@@ -11,6 +11,7 @@ import {ensureNativeRuntime} from './httpd-native-runtime.mjs';
 import { buildHttpRelease } from './httpd-build.mjs';
 
 import {withHttpdControl, runningHttpd, registerHttpd, unregisterHttpd, stopHttpd, lifecycleLog, setLifecycleLog} from './httpd-process.mjs';
+import {installProcessDiagnostics,observeChildProcess} from './httpd-diagnostics.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const app = path.join(root, 'apps/http-app'), releases = releasesRoot(root);
@@ -63,9 +64,12 @@ async function serve(mode, args) {
 }
 async function supervise(child, mode, entry, args, output) {
     let stopping = false, registration;
+    const diagnostics=installProcessDiagnostics({role:'supervisor',mode,version:'working-tree'});
+    const observation=observeChildProcess(child,{role:'server',mode,version:'working-tree'});
     const signals = ['SIGINT', 'SIGTERM'];
-    const onSignal = () => {
+    const onSignal = signal => {
         if (stopping) return; stopping = true;
+        diagnostics.signal(signal);observation.expectStop({reason:'shutdown'});
         void Promise.resolve(registration).then(owned => owned && stopHttpd(root, mode, releases, {owned})).catch(error => {
             lifecycleLog({pid: child.pid, stage: 'stop', result: 'failure', code: error.code ?? 'HTTPD_STOP_FAILED'}); process.exitCode = 1;
         });

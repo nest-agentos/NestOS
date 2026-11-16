@@ -1,7 +1,7 @@
 import legacy from './legacy-environment.cjs';
 import path from 'node:path';
 import os from 'node:os';
-import { mkdirSync, openSync, writeSync, closeSync, statSync, renameSync, existsSync, readFileSync, readdirSync, lstatSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, openSync, writeSync, closeSync, statSync, fstatSync, renameSync, existsSync, readFileSync, readdirSync, lstatSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, readlinkSync } from 'node:fs';
@@ -157,19 +157,23 @@ export function verifyRelease(directory) {
 /** Bounded runtime output; audit metadata has its own server-owned JSONL writer. */
 export function runtimeLog(file, limit = 10 * 1024 * 1024) {
     mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-    let fd = openSync(file, 'a', 0o600), size = statSync(file).size;
+    let fd = openSync(file, 'a', 0o600), identity = fstatSync(fd);
+    const reopen = () => {closeSync(fd);fd = openSync(file, 'a', 0o600);identity = fstatSync(fd);};
     return {
         write(chunk) {
+            // Lifecycle writers and server output must follow the same rotated file.
+            let current = statSync(file, {throwIfNoEntry: false});
+            if (!current || current.ino !== identity.ino || current.dev !== identity.dev) {reopen();current = identity;}
+            const size = current.size;
             if (size && size + chunk.length > limit) {
-                closeSync(fd);
                 for (let i = 2; i >= 0; i--) {
                     const from = i ? `${file}.${i}` : file;
-                    if (existsSync(from)) renameSync(from, `${file}.${i + 1}`);
+                    try {renameSync(from, `${file}.${i + 1}`);} catch (error) {if (error.code !== 'ENOENT') throw error;}
                 }
-                fd = openSync(file, 'w', 0o600); size = 0;
+                reopen();
             }
-            writeSync(fd, chunk); size += chunk.length;
+            writeSync(fd, chunk);
         },
-        close() { closeSync(fd); },
+        close() {if (fd !== undefined) {closeSync(fd);fd = undefined;}},
     };
 }

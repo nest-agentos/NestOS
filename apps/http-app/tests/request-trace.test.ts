@@ -5,7 +5,7 @@ import {diagnosticContext} from '@nestos/common';
 import {BrowserRequestTrace} from '../src/client/request-trace';
 import {requestTrace,traceRequest,tracedCellsFetch} from '../../node-host/src/logging/request-trace';
 import {auditRequest} from '../../node-host/src/logging/audit-log';
-import {RequestDiagnostics} from '../src/client/request-diagnostics';
+import {RequestDiagnostics,requestMetadata} from '../src/client/request-diagnostics';
 import {reportClientDiagnostic} from '../../../backend/app-core/src/host/client-diagnostic';
 const response=()=>Object.assign(new EventEmitter(),{headers:new Map<string,string>(),setHeader(name:string,value:string){this.headers.set(name,value);},getHeader(name:string){return this.headers.get(name);},statusCode:200,writableFinished:true});
 it('uses a navigation operation as the backend trace even when pushState emits no hashchange',async()=>{
@@ -129,4 +129,22 @@ it('defers exact capability compatibility diagnostics until the new view can rep
     browser.setReporter(async value=>{reportClientDiagnostic(value);records.push(value);});await vi.waitFor(()=>expect(records).toHaveLength(1));
     expect(records[0]).toMatchObject({stage:'rpc.decode',code:'RPC_METHOD_UNSUPPORTED',http:{capabilityKind:'KanbanService',rpcMethod:'removeRecordConversations'}});
     expect(JSON.stringify(records)).not.toContain('PRIVATE');
+});
+it.each(['updates-read','reply'])('preserves %s failure classification and safe batch metadata across reload',async rpcKind=>{
+    const headers=new Headers({'X-NestOS-RPC-Kind':rpcKind,'X-NestOS-RPC-Batch-Size':'0','X-NestOS-RPC-Attempt':'1'});
+    const http={browserSessionId:'11111111-1111-4111-8111-111111111111',traceId:'1'.repeat(32),spanId:'2'.repeat(16),occurredAt:1,
+        ...requestMetadata('/api/application',{method:'POST'},headers),rpcMethods:['read'],networkCode:'ECONNRESET'};
+    expect(http.rpcKind).toBe(rpcKind);
+    let saved='';const queue=new RequestDiagnostics();queue.restore({read:()=>null,write:value=>{saved=value;}});
+    queue.add({operation:'http.request',operationId:'11111111-1111-4111-8111-111111111111',stage:'transport.fetch',
+        code:'HTTP_CONNECTION_LOST',result:'failure',durationMs:1,http} as never);
+    const next=new RequestDiagnostics();next.restore({read:()=>saved,write:()=>{}});const reporter=vi.fn(async value=>reportClientDiagnostic(value));next.setReporter(reporter);
+    await vi.waitFor(()=>expect(reporter).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({http:expect.objectContaining({rpcKind,rpcAttempt:1,rpcBatchSize:0,networkCode:'ECONNRESET'})})));
+});
+it('identifies a failed downstream file operation and its receipt without exposing the export or path',async()=>{
+    const records:any[]=[];
+    await tracedCellsFetch(async()=>new Response('{"code":"EIO"}',{status:500,headers:{'X-Request-ID':'cells-failed-request'}}),value=>records.push(value))
+        ('http://cells.invalid/v1/fs/PRIVATE_EXPORT/stat?path=PRIVATE_PATH');
+    expect(records).toMatchObject([{event:'cells.request',route:'/v1/fs/:alias/stat',status:500,result:'failure',requestId:'cells-failed-request',durationMs:expect.any(Number)}]);
+    expect(JSON.stringify(records)).not.toMatch(/PRIVATE|cells.invalid/);
 });

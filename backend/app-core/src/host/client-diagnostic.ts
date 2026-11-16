@@ -23,7 +23,7 @@ function validHttp(value: ClientDiagnostic['http']): boolean {
     const patterns: Record<string, RegExp> = {
         browserSessionId: /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/, traceId: /^[a-f0-9]{32}$/, spanId: /^[a-f0-9]{16}$/,
         method: /^(GET|POST|OTHER)$/, route: /^\/(api\/(application(?:\/events|\/files)?|health|identity)|resource)$/,
-        rpcKind: /^(bootstrap|bootstrap-data|queries|bindings|call|callback|close|other)$/,
+        rpcKind: /^(bootstrap|bootstrap-data|updates-read|queries|bindings|call|callback|reply|close|other)$/,
         capabilityKind:/^[A-Za-z][A-Za-z0-9_]{0,63}$/,networkCode:/^(?:E[A-Z0-9_]{1,63}|UND_ERR_[A-Z0-9_]{1,63})$/,
         rpcMethod: /^[A-Za-z][A-Za-z0-9_]{0,63}$/, responseType: /^(json|html|text|other)$/, errorKind: /^(abort|network|type|other)$/,
     };

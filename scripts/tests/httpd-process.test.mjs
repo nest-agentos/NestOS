@@ -74,7 +74,7 @@ test('restart waits for the former host to exit and registers exactly one replac
         await mkdir(path.dirname(entry), {recursive: true}); await mkdir(path.join(root, 'scripts'));
         await mkdir(path.join(root, 'tools/temporary-process/node'), {recursive: true});
         await writeFile(path.join(root, 'package.json'), '{"type":"module"}');
-        for (const name of ['httpd.mjs','httpd-process.mjs','httpd-launcher.mjs','httpd-launch-state.mjs','httpd-child.mjs']) await writeFile(path.join(root, 'scripts', name), await readFile(new URL('../' + name, import.meta.url)));
+        for (const name of ['httpd.mjs','httpd-process.mjs','httpd-launcher.mjs','httpd-launch-state.mjs','httpd-child.mjs','httpd-diagnostics.mjs']) await writeFile(path.join(root, 'scripts', name), await readFile(new URL('../' + name, import.meta.url)));
         await writeFile(path.join(root, 'scripts/httpd-runtime.mjs'), `export const hostArguments=()=>[],hostEnvironment=()=>process.env,runtimePaths=()=>({runtime:'unused'}),runtimeLog=()=>({write(){},close(){}}),releaseDirectory=(r,id)=>r+'/'+id,releasesRoot=root=>root+'/release/httpd',verifyRelease=()=>{};`);
         await writeFile(path.join(root,'scripts/httpd-launch-health.mjs'),'export const launchHealth=()=>async()=>true;');
         await writeFile(path.join(root, 'scripts/httpd-build.mjs'), 'export function buildHttpRelease() {}');

@@ -253,6 +253,10 @@ JSON 应用请求的 `request.complete` 新增可选 `bodyReadMs`（请求体接
 
 多用户宿主的入站 HTTP/RPC 审计位于总审计日志，出站 Cells 元数据位于 `<用户目录>/.nestos/logs/audit.jsonl`；按 traceId 跨日志关联，由入站 userId 选择对应用户目录。Node 调用 Cells 时传递 traceparent、browserSessionId 和父 requestId；`cells.request` 审计记录固定协议路由、响应头接收耗时和远端 requestId，不记录导出路径、查询串、参数或正文。Cells 在 HTTP 层生成自己的 requestId/spanId，以 Tokio task-local 传递到业务日志，文件阻塞 worker 显式继承。业务回执由 `api.operation` 的 result/code 判定，HTTP 200 或收到响应头不是业务成功；SSE 的 response.headers 也不是整条流结束耗时。自主后台任务没有浏览器请求时生成独立 trace，继续使用原 operationId/sessionId，不伪造浏览器父请求。
 
+TLS 从 TCP 接纳时保存来源和开始时间；同一服务内仍存活的完整四元组用于关联 TLS 套接字与 HTTP connectionId。握手错误记录安全错误码、OpenSSL 分类和耗时；连接销毁后无法关联的 TLS 错误不猜测身份，由早期套接字关闭记录保留来源、耗时及字节数。没有握手完成回执时记录 `TLS_HANDSHAKE_INCOMPLETE`，不能将其直接计作用户取消证书或服务崩溃。客户端诊断保留 `updates-read/reply` 分类，刷新后仍恢复有界批次、重试和网络错误元数据。
+
+文件协议路由在 Cells 出站日志中归一化为 `/v1/fs/:alias/<操作>`，以远端 requestId 关联 Cells 的 `files.stat.failed`（路径策略、源准备或源读取）、`files.authorization.failed`（插件策略）及 `storage.io.failed`（errno、错误类别和源码位置）。不记录实际导出名、文件路径、原始异常或参数；真实 500 保留为业务失败，不因前端重连自动重放写入。永久更新失败取消同视图请求时传递 `HTTP_VIEW_UPDATE_FAILED` 和安全的原始分类/请求 ID，避免只出现无原因的 AbortError。
+
 `application.complete` 还记录注册命令目录确认的 `rpcCommands`、业务回复的 `rpcErrorCount/rpcErrorCodes`；HTTP 200 不能代替业务成功。图片上传只额外记录声明的 MIME 与字节数 `uploads`，不写文件名、data URL 或异常正文。上传错误区分 `INPUT_ASSET_FORMAT`、`INPUT_ASSET_TOO_LARGE`、`INPUT_ASSET_PERSISTENCE`，存储错误保留安全错误码；业务错误回复附加 HTTP requestId，前端 flow-images 日志可据此关联。当前宿主输入暂存单文件预算为 20 MiB，与 Flow 自行声明的总字节/数量限制分别校验。
 
 ### RPC 与往返的生命周期边界
@@ -469,6 +473,10 @@ release 沿用原 profile 数据；dev 默认使用 `<configDir>/http-dev/data`�
 
 默认排查 release 日志：运行日志 `/var/log/nestos/httpd.runtime.log`，审计日志 `/var/log/nestos/httpd.audit.jsonl`。dev 使用同目录的 `httpd.debug.runtime.log` 和 `httpd.debug.audit.jsonl`。目录和文件名不包含版本 ID，切换 release 后继续追加；版本 ID 保留在运行日志的启动记录中。每份 10 MiB，保留当前文件及追加 `.1`、`.2`、`.3` 的轮转文件，文件权限 0600。旧版本目录中的日志不自动迁移或删除。
 
+`[HTTPProcess]` 生命周期记录包含 UTC 时间、PID、角色、版本、operationId 和运行时长；release 的服务与启动器另带 serviceId。`process.start / process.signal / process.fatal / process.exit` 记录进程自身观察，`child.exit` 由父启动器独立记录子进程的退出码、退出信号及是否已请求停止，两类证据通过同一个服务进程 operationId 关联。未捕获异常和默认模式下未处理的 Promise 拒绝记录错误类型、错误码、有限 causeCodes 和源码位置，结构化事件不记录异常消息、业务参数、环境变量或完整进程报告，也不阻止 Node 失败退出。服务入口导入失败单独记录 `server.import`；`launcher.restart / launcher.health` 记录自动重启次数、退避和健康检查结果。服务自身的终结记录同步写入运行日志，避免只依赖启动器管道；多个日志写入者在轮转后重新跟随当前文件。
+
+启动器仍存活时可以记录子进程的 `SIGKILL`，但该信号本身不能证明 OOM、操作人员或其他来源。启动器与服务同时被强杀、主机掉电时无法保证写出终结记录；下次启动核对持久进程身份，残留的旧启动器登记记录为 `HTTPD_LAUNCHER_EXIT_UNOBSERVED`，接管的子进程消失记录为 `HTTPD_CHILD_EXIT_UNOBSERVED`，结果为 unknown，不伪造退出码、信号或退出时间。此时需结合系统 journal、内核 OOM 和外部守护进程日志调查。`httpd:status` 的 `lastChildExit / lastLauncherExit` 返回最近保存的退出观察；历史异常仍以轮转运行日志为准，旧版本退出不会凭空产生新回执。
+
 系统部署时先创建由服务运行用户拥有的目录。以下命令用于以当前用户运行的服务；独立服务账号应替换 owner/group：
 
 ```bash
@@ -589,6 +597,12 @@ C4Component
 ```
 
 ## 当前视图恢复
+
+大通知的 `updates-read` 只补读已准备的不可变数据包。该只读请求遇到连接中断或响应正文传输失败时，保持原数据包 ID 和通知顺序，以 1/2/4/8/15 秒封顶退避重试；online/focus/手动重试可提前唤醒，视图关闭立即撤销等待。重试不会重新执行回调或业务写入，也不会因一次临时读失败就把整个视图标为更新损坏并取消无关的在途保存。事件通知队列仍保留原有数量和字节上限；数据包已过期、无权限、真实 EIO、非法 JSON 或补丁错误继续按原分类报告，不跳过丢失更新。`Prepared update read retry` 日志记录数据包操作 ID、请求关联、次数、退避及耗时，不包含数据包正文。
+
+单个 JSON 请求失败不会主动中止仍可用的 SSE 事件流；查询仅在事件连接尚可用时进行一次短暂传输重试，事件连接已经中断时不再逐批重复重试。成功读完响应或收到有效事件帧后才报告连接恢复，单独拿到重连响应头不代表流已恢复。事件流自身失败仍沿用既有序号续传与退避，写命令的未知结果始终保留且不自动重放。回归通过真实 mTLS 连接注入目录查询丢失，确认只读重试成功、SSE 仅建立一次，并核对写入回执丢失后未重复执行。
+
+旧视图过期后，订阅释放遇到同一个已报告的失效原因不再逐条重复输出传输错误；调用方仍收到原失效错误。Shell 恢复清理阶段的不可用能力按工作区聚合为一条 `workspace.cleanup` 告警，保留次数、操作 ID 和安全错误码，不误报为已成功释放远端资源。正常清理中的能力错误、真实 EIO 和目录读取失败继续作为错误处理，不因网络恢复而自动改为成功。
 
 短暂断线复用已有编辑器和 SSE 视图；页面重新可见或 pageshow 时立即检查流活动，超过 30 秒无活动则替换旧流，健康连接不额外请求。服务重启、闲置视图或事件历史过期时，健康检查就绪后自动捕获所有标签的本地快照并重建应用视图，不刷新文档；只按当前 URL 打开一个资源，其他标签延迟恢复，不构造未打开的工作区。文件深链不以导航目录为前提，工作台以 initialNavigation=false 跳过根目录与组织预读；目录可见后再独立读取，隐藏目录和非活动会话停止观察与轮询。正常启动和恢复静默进行，失败局部重试。
 

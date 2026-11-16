@@ -1,7 +1,7 @@
 import type {ClientDiagnostic} from '@nestos/app-contracts/services';
 type Http = NonNullable<ClientDiagnostic['http']>;
 const routes = new Set(['/api/application','/api/application/events','/api/application/files','/api/health','/api/identity']);
-const kinds = new Set(['bootstrap','bootstrap-data','queries','bindings','call','callback','close']);
+const kinds = new Set(['bootstrap','bootstrap-data','updates-read','queries','bindings','call','callback','reply','close']);
 export function requestMetadata(input: RequestInfo | URL, init: RequestInit | undefined, headers: Headers): Pick<Http,'route'|'method'|'rpcKind'|'rpcMethod'|'rpcMethods'|'rpcBatchSize'|'rpcAttempt'|'requestBytes'> {
     let path = ''; try {path = new URL(typeof input === 'string' || input instanceof URL ? input : input.url, 'https://localhost').pathname;} catch { /* Never log a caller URL. */ }
     const method = init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : 'GET');
@@ -65,11 +65,14 @@ function validHttp(value: ClientDiagnostic['http']): boolean {
     if (!value || typeof value !== 'object') return false;
     const patterns: Record<string, RegExp> = {browserSessionId:/^[a-f0-9-]{36}$/,traceId:/^[a-f0-9]{32}$/,spanId:/^[a-f0-9]{16}$/,
         method:/^(GET|POST|OTHER)$/,route:/^\/(api\/(application(?:\/events|\/files)?|health|identity)|resource)$/,
-        rpcKind:/^(bootstrap|bootstrap-data|queries|bindings|call|callback|close|other)$/,rpcMethod:/^[A-Za-z][A-Za-z0-9_]{0,63}$/,
+        rpcKind:/^(bootstrap|bootstrap-data|updates-read|queries|bindings|call|callback|reply|close|other)$/,rpcMethod:/^[A-Za-z][A-Za-z0-9_]{0,63}$/,
+        networkCode:/^(?:E[A-Z0-9_]{1,63}|UND_ERR_[A-Z0-9_]{1,63})$/,
         responseType:/^(json|html|text|other)$/,errorKind:/^(abort|network|type|other)$/};
-    const limits: Record<string,[number,number]>={occurredAt:[0,8640000000000000],requestBytes:[0,1024**3],contentLength:[0,1024**3],status:[100,599]};
+    const limits: Record<string,[number,number]>={occurredAt:[0,8640000000000000],requestBytes:[0,1024**3],contentLength:[0,1024**3],status:[100,599],rpcBatchSize:[0,1024],rpcAttempt:[1,2]};
     if (!['browserSessionId','traceId','spanId','occurredAt','method','route'].every(k => k in value)) return false;
-    return Object.entries(value).every(([k,v])=>v===undefined ? Object.hasOwn(patterns,k) || Object.hasOwn(limits,k) || k==='online'
+    return Object.entries(value).every(([k,v])=>v===undefined ? Object.hasOwn(patterns,k) || Object.hasOwn(limits,k) || k==='online' || k==='rpcMethods'
         : Object.hasOwn(patterns,k) ? typeof v==='string' && patterns[k].test(v)
-        : Object.hasOwn(limits,k) ? typeof v==='number' && Number.isSafeInteger(v) && v>=limits[k][0] && v<=limits[k][1] : k==='online' && typeof v==='boolean');
+        : Object.hasOwn(limits,k) ? typeof v==='number' && Number.isSafeInteger(v) && v>=limits[k][0] && v<=limits[k][1]
+        : k==='rpcMethods'?Array.isArray(v)&&v.length<=32&&v.every(name=>typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name))
+        : k==='online' && typeof v==='boolean');
 }

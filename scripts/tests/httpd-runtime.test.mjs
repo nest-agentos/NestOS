@@ -159,6 +159,20 @@ test('bounds runtime log rotation and protects the log file', () => {
         assert.equal(statSync(file).mode & 0o077, 0);
     } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+test('interleaved lifecycle and server writers follow rotation without losing terminal receipts', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'httpd-multiple-logs-'));
+    const file = path.join(directory, 'runtime.log'), server = runtimeLog(file, 20), lifecycle = runtimeLog(file, 20);
+    try {
+        server.write(Buffer.from('server-output\n'));
+        lifecycle.write(Buffer.from('child-exit\n'));
+        server.write(Buffer.from('launcher-exit\n'));
+        lifecycle.write(Buffer.from('new-start\n'));
+        assert.equal(readFileSync(file, 'utf8'), 'new-start\n');
+        assert.equal(readFileSync(file + '.1', 'utf8'), 'launcher-exit\n');
+        assert.equal(readFileSync(file + '.2', 'utf8'), 'child-exit\n');
+        assert.equal(readFileSync(file + '.3', 'utf8'), 'server-output\n');
+    } finally {server.close();lifecycle.close();rmSync(directory, {recursive: true, force: true});}
+});
 
 test('deployment materializes snapshot edges for every workspace peer without changing unrelated dependencies', t => {
     const root = mkdtempSync(path.join(tmpdir(), 'httpd-peers-')); t.after(() => rmSync(root, {recursive:true,force:true}));

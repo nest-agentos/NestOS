@@ -13,7 +13,7 @@ afterEach(async () => {
 async function connection() {
     vi.spyOn(console, 'error').mockImplementation(() => {}); history.replaceState({}, '', '/#/start');
     const server = new RpcPeer('server', async () => ({})); releases.push(() => server.close());
-    const bootstrap = await server.bootstrap({services: {projects: {}}, commands: {execute: async () => {}, list: () => []}});
+    const bootstrap = await server.bootstrap({backend: {reportClientDiagnostic: async () => {}}, services: {projects: {}}, commands: {execute: async () => {}, list: () => []}});
     let controller!: ReadableStreamDefaultController<Uint8Array>, expired = false;
     vi.stubGlobal('fetch', async (_url: unknown, init?: RequestInit) => {
         if (String(_url) === '/api/identity') return Response.json({userId: 'admin'});

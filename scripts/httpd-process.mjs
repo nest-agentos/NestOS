@@ -14,7 +14,7 @@ const failure = code => Object.assign(new Error(code + (hints[code] ? ': ' + hin
 const stateFile = (root, mode) => path.join(root, 'release/httpd-processes', mode + '.json');
 export function setLifecycleLog(write) {writeLifecycle = write;}
 export function lifecycleLog(event) {
-    const line = '[HTTPProcess] ' + JSON.stringify({operation: 'http.process', ...event});
+    const line = '[HTTPProcess] ' + JSON.stringify({time: new Date().toISOString(), operation: 'http.process', pid: process.pid, ...event});
     console.info(line); writeLifecycle?.(Buffer.from(line + '\n'));
 }
 export async function withHttpdControl(root, run) {

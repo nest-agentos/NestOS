@@ -10,6 +10,7 @@ import { installViewProjections } from '../application/projections';
 import { QueryBatcher } from './query-batcher';
 import { installFileTransport } from './file-transport';
 import { ViewExpiredError } from './view-expired';
+import {PreparedUpdateReader} from './prepared-update-reader';
 import type {PreparedHttpBootstrap} from './startup';
 
 type NotificationPacket = Partial<CallbackRequest> & Pick<Reply, 'updates'> & { calls?: Call[]; viewEvents?: ApplicationViewEvent[]; updatesRead?: string };
@@ -22,6 +23,12 @@ export class HttpViewClient {
     readonly peer: RpcPeer;
     private readonly applicationObservation = new ApplicationObservation();
     private readonly abort = new AbortController();
+    private readonly preparedUpdates = new PreparedUpdateReader<NotificationPacket>(this.abort.signal,
+        id => this.post({kind: 'updates-read', id}), (error, retry) => {
+            this.showDisconnected(error, 'updates-read');
+            console.warn('[View] Prepared update read retry', {...safeFailure(error), ...retry,
+                operation: 'view.update', stage: 'transport.retry', result: 'retrying', clientId: this.clientId});
+        });
     private listening?: Promise<void>;
     private streamAbort = new AbortController();
     private lastEventId = 0;
@@ -52,6 +59,7 @@ export class HttpViewClient {
         installFileTransport(this.peer, this.url, this.clientId, this.abort.signal, (input, init) => this.request(input, init));
     }
     private reportPeer(error: unknown): void {
+        if (this.expired && error === this.expired) return;
         if((error as {code?:string})?.code!=='RPC_METHOD_UNSUPPORTED'){console.error('[View]',safeFailure(error));return;}
         console.warn('[View] Capability diagnostic',safeFailure(error));
         try {this.onDiagnostic?.(error);} catch { /* Diagnostics cannot interrupt decoding. */ }
@@ -126,6 +134,7 @@ export class HttpViewClient {
             throw failure;
         }
         if (!response.ok) throw Object.assign(new Error(reply.error?.message ?? 'View request failed'), reply.error);
+        this.showReconnected();
         return reply;
     }
     /** Only classified read batches may retry after a lost transport; commands remain uncertain. */
@@ -133,7 +142,7 @@ export class HttpViewClient {
         const headers = new Headers(init.headers);headers.set('X-NestOS-RPC-Attempt','1');
         try {return await this.request(this.url,{...init,headers});}
         catch(error){
-            if(body.kind!=='queries'||this.abort.signal.aborted||(error as {code?:string})?.code!=='HTTP_CONNECTION_LOST')throw error;
+            if(body.kind!=='queries'||!this.streamConnected||this.abort.signal.aborted||(error as {code?:string})?.code!=='HTTP_CONNECTION_LOST')throw error;
             console.warn('[View] Read batch retry',{...safeFailure(error),operation:'http.query',stage:'transport.retry',result:'retrying',attempt:2});
             // Yield once so a failed keep-alive connection can be replaced without replaying a mutation.
             await new Promise<void>(resolve=>setTimeout(resolve,100));this.abort.signal.throwIfAborted();
@@ -180,7 +189,7 @@ export class HttpViewClient {
             const connectedAt = Date.now();
             try { await this.consume(body); } catch (error) {
                 if (this.abort.signal.aborted || this.updateFailed || this.closing) return;
-                this.showDisconnected(error);
+                this.streamConnected = false; this.showDisconnected(error, 'events');
             }
             if (!this.resumable || this.abort.signal.aborted || this.updateFailed || this.closing) return;
             this.streamConnected = false;
@@ -188,7 +197,7 @@ export class HttpViewClient {
             if (Date.now() - connectedAt >= 15000) this.reconnectDelay = 0;
             await this.ready;
             const response = await this.reconnect(); if (!response?.body) return;
-            body = response.body; this.disconnected = false; this.onReconnected?.();
+            body = response.body;
         }
     }
     private async reconnect(): Promise<Response | undefined> {
@@ -203,6 +212,7 @@ export class HttpViewClient {
     }
     retryConnection(): void {
         if (this.abort.signal.aborted || this.closing || this.updateFailed) return;
+        this.preparedUpdates.retry();
         if (this.wake) {this.wake(); return;}
         if (this.streamConnected && Date.now() - this.lastStreamActivity >= 30000) this.streamAbort.abort();
     }
@@ -236,6 +246,7 @@ export class HttpViewClient {
         while ((end = buffer.indexOf('\n\n')) >= 0) {
             const frame = buffer.slice(0, end); buffer = buffer.slice(end + 2);
             if (!await this.consumeFrame(frame) || signal.aborted) return;
+            this.showReconnected();
         }
         if (new TextEncoder().encode(buffer).byteLength > maxEventBytes) {
             this.showUpdateError(new FSError('EBUSY', 'View event is too large')); return;
@@ -306,7 +317,7 @@ export class HttpViewClient {
     }
     private async readNotification(id: string): Promise<NotificationPacket> {
         if (!/^[a-f0-9-]{36}$/.test(id)) throw new FSError('EIO', 'Invalid prepared view update identity');
-        const packet = await this.post({kind: 'updates-read', id}) as NotificationPacket;
+        const packet = await this.preparedUpdates.read(id);
         if (!packet || typeof packet !== 'object' || Array.isArray(packet) || packet.updatesRead !== undefined || packet.id !== undefined)
             throw new FSError('EIO', 'Invalid prepared view update');
         return packet;
@@ -314,16 +325,23 @@ export class HttpViewClient {
     private showUpdateError(error: unknown): void {
         if (this.closing || this.expired || this.updateFailed) return;
         this.updateFailed = true;
-        this.abort.abort(); this.wake?.();
+        const failure=safeFailure(error);
+        this.abort.abort(Object.assign(new Error('Application view stopped after an update failure'),
+            {...failure,code:'HTTP_VIEW_UPDATE_FAILED',updateCode:failure.code})); this.wake?.();
         console.error('[View] Update failed', safeFailure(error));
         this.onUpdateError?.(error);
     }
-    private showDisconnected(error: unknown): void {
-        if (this.closing || this.disconnected) return;
+    private showDisconnected(error: unknown, stage = 'request'): void {
+        if (this.closing || this.expired || this.updateFailed || this.disconnected) return;
         this.disconnected = true;
-        this.streamAbort.abort();
-        console.error('[View] Connection lost', safeFailure(error));
+        // A failed request does not prove that the independently owned event stream failed.
+        console.warn('[View] Connection lost', {...safeFailure(error), operation: 'http.connection', stage, result: 'interrupted',
+            clientId: this.clientId, lastEventId: this.lastEventId});
         this.onDisconnected?.(error);
+    }
+    private showReconnected(): void {
+        if (!this.disconnected || !this.streamConnected || this.closing || this.expired || this.updateFailed) return;
+        this.disconnected = false; this.onReconnected?.();
     }
     close(): Promise<void> { return this.closeTask ??= this.closeView(); }
     private async closeView(): Promise<void> {

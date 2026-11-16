@@ -49,6 +49,8 @@ async function requestWithIdentity(route: string, directory?: string, certificat
 it('rejects missing certificates before serving UI, assets, health or VFS', async () => {
     for (const route of ['/', '/assets/chat.js', '/api/health', '/api/vfs']) await expect(requestWithIdentity(route)).rejects.toThrow();
     expect(host.events.some(event => event.event === 'auth.rejected')).toBe(true);
+    expect(host.events).toContainEqual(expect.objectContaining({event:'auth.rejected',stage:'tls.handshake',
+        connectionId:expect.any(String),remoteAddress:expect.any(String),remotePort:expect.any(Number),durationMs:expect.any(Number)}));
     expect(host.events.some(event => event.event === 'request.complete')).toBe(false);
 });
 it('rejects untrusted and expired identities at TLS without falling back to public access', async () => {

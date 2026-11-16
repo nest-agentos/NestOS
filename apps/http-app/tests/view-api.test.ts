@@ -320,10 +320,13 @@ it('updates another browser configuration cache after a backend change without r
     await vi.waitFor(() => expect(second.services.agentService.getProvider('shared')?.name).toBe('Shared'));
 });
 
-it('reads large updates over authenticated HTTP and keeps SSE small without replaying the write', async () => {
-    const requests: string[] = [], frameSizes: number[] = [], readIds: string[] = []; let buffer = '';
+it.each([false,true])('reads large updates over authenticated HTTP without replaying the write (lost read: %s)', async loseFirstRead => {
+    const requests: string[] = [], frameSizes: number[] = [], readIds: string[] = []; let buffer = '', loseRead = loseFirstRead;
     const fetcher: typeof fetch = async (input, init) => {
-        if (init?.body) {const request = JSON.parse(String(init.body)); requests.push(request.kind); if (request.kind === 'updates-read') readIds.push(request.id);}
+        if (init?.body) {
+            const request = JSON.parse(String(init.body));requests.push(request.kind);
+            if (request.kind === 'updates-read') {readIds.push(request.id);if (loseRead) {loseRead = false;throw new TypeError('Prepared read lost');}}
+        }
         const response = await auth.fetcher(input, init);
         if (!String(input).includes('/events?')) return response;
         const decoder = new TextDecoder();
@@ -336,13 +339,15 @@ it('reads large updates over authenticated HTTP and keeps SSE small without repl
             controller.enqueue(chunk);
         }})), {headers: response.headers});
     };
-    const errors = vi.fn(), peer = new HttpViewClient('large-update-reader', server.origin + '/api/application', fetcher, errors, errors); clients.push(peer);
+    const errors = vi.fn(), disconnected = vi.fn(), peer = new HttpViewClient('large-update-reader', server.origin + '/api/application', fetcher, disconnected, errors); clients.push(peer);
     const observer = await peer.start(), writer = await client('large-update-writer'), text = 'large-description '.repeat(10000);
     await writer.services.agentService.saveProvider({id: 'large-update', name: 'Large',
         implementation: 'openai-compatible', baseURL: 'https://example.test', models: [{id: 'model', name: text}]});
-    await vi.waitFor(() => expect(observer.services.agentService.getProvider('large-update')?.models[0].name).toBe(text));
+    await vi.waitFor(() => expect(observer.services.agentService.getProvider('large-update')?.models[0].name).toBe(text), {timeout: 5000});
     expect(requests).toContain('updates-read'); expect(Math.max(...frameSizes)).toBeLessThan(64 * 1024);
     expect(errors).not.toHaveBeenCalled();
+    expect(disconnected).toHaveBeenCalledTimes(loseFirstRead ? 1 : 0);
+    if (loseFirstRead) expect(readIds[1]).toBe(readIds[0]);
     expect(auditEvents.filter(event => event.rpcOperations?.includes('IAgentManagementService.saveProvider'))).toHaveLength(1);
     expect(auditEvents).toContainEqual(expect.objectContaining({event: 'view.update.read', stage: 'read', result: 'success', requestId: expect.any(String)}));
     const denied = await auth.fetcher(server.origin + '/api/application', {method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -425,7 +430,7 @@ it('stops old-handle requests after the view expires, including binary file requ
     expect(response.status).toBe(400); expect(response.headers.get('X-NestOS-View-Expired')).toBe('1');
 });
 
-it('does not replay a command whose response was lost even after reconnecting successfully', async () => {
+it('does not replay a command whose response was lost and confirms recovery through a later read', async () => {
     let loseResponse = false, writes = 0;
     const restored = vi.fn(), fetcher: typeof fetch = async (input, init) => {
         const response = await auth.fetcher(input, init);
@@ -437,10 +442,29 @@ it('does not replay a command whose response was lost even after reconnecting su
     const peer = new HttpViewClient('unknown-outcome', server.origin + '/api/application', fetcher, () => {}, undefined, restored); clients.push(peer);
     const root = await peer.start(); loseResponse = true;
     await expect(root.services.projects.sessions.create('Create only once', null)).rejects.toMatchObject({code: 'HTTP_CONNECTION_LOST'});
-    await vi.waitFor(() => expect(restored).toHaveBeenCalledOnce());
     expect(writes).toBe(1);
     const {sessions} = await root.services.projects.sessions.navigation();
+    await vi.waitFor(() => expect(restored).toHaveBeenCalledOnce());
     expect(sessions.filter(session => session.title === 'Create only once')).toHaveLength(1);
+});
+
+it('keeps the authenticated event stream open when an isolated directory query loses its request', async () => {
+    let loseRead = true, subscriptions = 0, reads = 0;
+    const disconnected = vi.fn(), restored = vi.fn();
+    const fetcher: typeof fetch = async (input, init) => {
+        if (String(input).includes('/events?')) subscriptions++;
+        const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+        if (body?.kind === 'queries' && body.calls.some((call: {method: string}) => call.method === 'forFolder')) {
+            reads++;if (loseRead) {loseRead = false;throw new TypeError('Isolated request failed');}
+        }
+        return auth.fetcher(input, init);
+    };
+    const peer = new HttpViewClient('isolated-query', server.origin + '/api/application', fetcher, disconnected, undefined, restored);clients.push(peer);
+    const root = await peer.start();
+    await root.services.projects.forFolder('/');
+    expect(reads).toBe(2);expect(subscriptions).toBe(1);
+    expect(disconnected).toHaveBeenCalledOnce();expect(restored).toHaveBeenCalledOnce();
+    expect(auditEvents.filter(event => event.rpcOperations?.includes('ProjectService.forFolder'))).toHaveLength(1);
 });
 
 it('reads committed Flow artifacts and byte pages through the authenticated application RPC', async () => {
