@@ -11,7 +11,7 @@ const FUNCTION: CapabilitySchema = { markers: [], fields: [], methods: { call: '
 const OWNED: CapabilitySchema = { markers: [], fields: ['fs', 'context', 'attachments', 'initialData'], methods: {
     dispose: 'async', release: 'async', put: 'async', read: 'async', save: 'async', clear: 'async', prepare: 'async',
     next: 'async', return: 'async' } };
-type Handle = { value: any; kind: string; schema: CapabilitySchema; retired?: boolean };
+type Handle = { value: any; kind: string; schema: CapabilitySchema; retired?: boolean; closing?:number };
 /** Both sides transport only explicit capabilities and data, never executable source. */
 export class RpcPeer {
     private readonly lifetime = new CapabilityLifetime();
@@ -243,11 +243,14 @@ export class RpcPeer {
         const domains = new Set(this.domains); this.domains.clear();
         if (domains.size) await this.prepare?.(domains);
         const updates: WireValue[] = [], seen = new Set<string>();
-        for (const [id, { kind, retired }] of this.handles) {
+        for (const [id, handle] of this.handles) {
+            const {kind}=handle;
             if (domains.has(viewDomain(this.schemas, kind))) this.dirty.add(id);
-            if (kind === 'Function' || retired || !this.dirty.delete(id)) continue;
+            if (kind === 'Function' || handle.retired || handle.closing || !this.dirty.delete(id)) continue;
             seen.add(id);
-            const descriptor = await this.describe(id, seen, true), previous = this.emitted.get(id);
+            const descriptor=await this.refreshDescriptor(id,handle,seen);
+            if(!descriptor)continue;
+            const previous=this.emitted.get(id);
             const changes = previous ? descriptorChanges(previous, descriptor) : undefined;
             if (changes?.length === 0) continue;
             descriptor.version = (previous?.version ?? 0) + 1;
@@ -257,6 +260,11 @@ export class RpcPeer {
             this.emitted.set(id, descriptor);
         }
         return updates;
+    }
+    /** Disposal fences snapshot reads before the resource closes, including refreshes already in flight. */
+    private async refreshDescriptor(id:string,handle:Handle,seen:Set<string>):Promise<Descriptor|undefined> {
+        try {const descriptor=await this.describe(id,seen,true);return handle.retired||handle.closing?undefined:descriptor;}
+        catch(error){if(handle.retired||handle.closing)return;throw error;}
     }
     private async observe(value: any, kind: string, id: string): Promise<void> {
         const method = this.schemas[kind]?.observer;
@@ -268,7 +276,7 @@ export class RpcPeer {
         this.releases.add(release); this.observerReleases.set(id, release);
     }
     private eventInvalidated(id: string): void {
-        const handle = this.handles.get(id); if (!handle || handle.retired) return;
+        const handle = this.handles.get(id); if (!handle || handle.retired || handle.closing) return;
         this.dirty.add(id);
         if (!handle.schema.scopedObserver) this.invalidate(...affectedDomains(this.schemas, handle.kind));
     }
@@ -578,6 +586,7 @@ export class RpcPeer {
     }
     async handle(call: Call, refresh = true, binary?: ArrayBuffer, onRevision?: (revision: string | undefined) => void): Promise<Reply> {
         this.operations++;
+        let closing:Handle|undefined;
         try {
             this.applyReleased(call.released);
             if (call.notification && call.method === 'call' && this.retiredSubscriptions.has(call.target)) return {value: null};
@@ -589,6 +598,7 @@ export class RpcPeer {
             const { args, callbacks } = this.callArguments(call, handle, binary);
             if (onRevision) args[2] = { ...args[2], onRevision };
             if (handle.schema.methods[call.method] === 'lookup') this.remember(handle.value, call.method, args);
+            if (['dispose','release','return','close'].includes(call.method)||this.cleanupFunctions.has(handle.value)) {closing=handle;handle.closing=(handle.closing??0)+1;}
             let result = handle.kind === 'Function' ? await handle.value(...args) : handle.value[call.method](...args);
             if (handle.schema.methods[call.method] === 'iterator') result = iteratorCapability(result);
             else result = await result;
@@ -605,6 +615,7 @@ export class RpcPeer {
                 ...(typeof cause.requestId === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(cause.requestId) ? {requestId: cause.requestId} : {}),
                 ...(typeof cause.remoteCode === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(cause.remoteCode) ? {remoteCode: cause.remoteCode} : {}) } };
         } finally {
+            if(closing){closing.closing=(closing.closing??1)-1;if(!closing.retired&&!closing.closing){this.dirty.add(call.target);this.onInvalidation?.();}}
             this.endOperation();
         }
     }

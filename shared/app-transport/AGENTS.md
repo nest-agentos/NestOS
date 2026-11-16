@@ -46,3 +46,5 @@ FileSystemView 是带独立 dispose 的文件能力，RPC 通过独立类型显�
 - v15 的字符串补丁支持 append/splice，splice 使用经过范围校验的 UTF-16 索引并保留版本前置条件；中间小修改不重传完整正文，数组补丁超过 64 KiB 时整段替换。
 
 ISeqFileOperations 显式公开 setEntry/setEntries/deleteEntry 写操作，供授权文件视图保存插件状态；保留 files/settings 失效域和服务端路径权限检查。真实 RPC 回归见 http-app 的 cloze-storage-rpc。
+
+RPC close/dispose/release/return 在调用资源释放前建立关闭围栏；后台快照跳过关闭中的能力，已开始的快照若与同一能力的关闭竞争则丢弃。只有正式成功才退休句柄；失败撤销围栏并恢复失效通知，普通快照失败继续保留具体错误，正常关闭不得使整条应用连接失效。回归见 app-shell 的 rpc-closing-capability。
