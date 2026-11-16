@@ -4,7 +4,7 @@ import {createModuleLogger} from '@nestos/common';
 import {safeCode} from '@nestos/kanban/integration';
 const log=createModuleLogger('kanban-session-plugins');
 import type {ChannelRequestMethod,ChannelRequestPlugin} from '../run/channel-request-plugins';
-import {resolveChannelPlugin} from '../run/channel-request-plugins';
+import {channelPlugin,resolveChannelPlugin} from '../run/channel-request-plugins';
 import {channelDigest} from '../run/channel-protocol';
 import type {ChannelRequest} from '../run/channel-protocol';
 import type {DecisionConversationOptions,DecisionConversation} from './decision-conversation-ports';
@@ -42,7 +42,7 @@ export async function resolveKanbanPluginRequest(options:DecisionConversationOpt
         method('run','Invoke the enabled operation using its returned revision and real confirmation; retain request identity on uncertainty.',schema({itemId:string,request:schema({action:string,expectedRevision:string,pluginId:string,scopeId:string,selections:{type:'object',additionalProperties:string},followUp:string,reconcile:schema({runId:string},['runId'])},['action','expectedRevision'])},['itemId','request']),input=>resolveCoordinationRequest(options,management,{...input,method:'coordination.operations.run'}),'command'),
     ]});
     const available=[...plugins,...options.requestPlugins?.(conversation)??[]];
-    if(request.method==='kanban.invoke'){const plugin=available.find(row=>row.id===request.params.pluginId);requireValue(plugin,'CHANNEL_PLUGIN_UNAVAILABLE');
+    if(request.method==='kanban.invoke'){const plugin=channelPlugin(request,available);
         const route={pluginId:plugin.id,version:plugin.version,method:request.params.method,digest:channelDigest(request)};
         await options.journal.update('session-plugin-route:'+conversation.id+':'+request.id,old=>{requireValue(!old||channelDigest(old)===channelDigest(route),'CHANNEL_PLUGIN_VERSION_CHANGED');return old??route;});}
     return resolveLogged(request,available,conversation.id);

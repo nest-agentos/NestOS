@@ -17,6 +17,7 @@
     "node-pty": "^1.1.0",
     "@nestos/common": "workspace:*",
     "@nestos/app-core": "workspace:*",
+    "@nestos/kanban": "workspace:*",
     "@nestos/app-shell": "workspace:*",
     "@nestos/llm-ui-adapter": "workspace:*",
     "@nestos/mdxeditor": "workspace:*",

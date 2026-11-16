@@ -1,0 +1,708 @@
+{
+  "schema": "nestos.validation/1",
+  "date": "2026-11-16",
+  "boardId": "development",
+  "parentItemId": "work-aa8aa862a6cd1f6434e375609bb2b34af04536d5ab156fd2de94f7e190812b36-0",
+  "itemId": "sub-010cbc5c9174310862ea1980c50e4358b8011f85",
+  "issueId": "html-network-confinement-blocker-9f988328-v1",
+  "recovery": {
+    "operationId": "html-confinement-repair-20261116-v1",
+    "method": "KanbanClient.replyTask",
+    "sameTask": true,
+    "sameNativeSession": true,
+    "nativeSessionId": "01a1e177-ea50-7bf3-9512-6716022c9a50",
+    "state": "completed"
+  },
+  "diagnostics": {
+    "summaryBound": 2000,
+    "legacyBackfill": true,
+    "additionalBusinessQueries": 0,
+    "tests": {
+      "kanban": 365,
+      "kanbanUi": 221,
+      "hostObserverAndControls": 27,
+      "rpcLifecycle": 10,
+      "authenticatedHttp": 48,
+      "performanceCore": 60,
+      "performanceTransport": 32,
+      "performanceUi": 67
+    },
+    "typecheck": "workspace and changed transport passed",
+    "docs": "passed"
+  },
+  "pageMeasurements": [
+    {
+      "scope": "html-kanban-diagnostic-baseline",
+      "outcome": "succeeded",
+      "measurement": {
+        "operation": "kanban.html.blocker-diagnostic",
+        "version": "20261115T232413-2c7ec2ac",
+        "concrete": false,
+        "elapsedMs": 475,
+        "logicalApiCalls": 14,
+        "apiHttpRequests": 6,
+        "methods": [
+          "currentPrincipal",
+          "recordResources",
+          "catalog",
+          "item",
+          "query",
+          "taskFixes",
+          "events",
+          "itemOperations",
+          "planningSession",
+          "recordConversations",
+          "workResources",
+          "records",
+          "queryActivity",
+          "records"
+        ],
+        "performancePassed": true,
+        "cache": "fresh browser context, authenticated start warmed, first task opening",
+        "dataset": "development/KBC-2-118; original executor active in background; mobile viewport 390x844",
+        "diagnosticCharacters": 10
+      }
+    },
+    {
+      "scope": "html-kanban-diagnostic-deployed",
+      "outcome": "succeeded",
+      "measurement": {
+        "operation": "kanban.html.blocker-diagnostic",
+        "version": "20261116T001821-ec9a5474",
+        "concrete": true,
+        "elapsedMs": 715,
+        "logicalApiCalls": 15,
+        "apiHttpRequests": 7,
+        "methods": [
+          "currentPrincipal",
+          "recordResources",
+          "catalog",
+          "item",
+          "query",
+          "taskFixes",
+          "events",
+          "itemOperations",
+          "planningSession",
+          "recordConversations",
+          "workResources",
+          "records",
+          "queryActivity",
+          "records",
+          "readEvents"
+        ],
+        "performancePassed": true,
+        "cache": "fresh browser context, authenticated start warmed, first task opening",
+        "dataset": "development/KBC-2-118; original executor active in background; mobile viewport 390x844",
+        "diagnosticCharacters": 296
+      }
+    },
+    {
+      "scope": "html-kanban-diagnostic-warm-1",
+      "outcome": "succeeded",
+      "measurement": {
+        "operation": "kanban.html.blocker-diagnostic",
+        "version": "20261116T001821-ec9a5474",
+        "concrete": true,
+        "elapsedMs": 1164,
+        "logicalApiCalls": 29,
+        "apiHttpRequests": 12,
+        "methods": [
+          "currentPrincipal",
+          "recordResources",
+          "catalog",
+          "item",
+          "query",
+          "readEvents",
+          "readEvents",
+          "taskFixes",
+          "events",
+          "itemOperations",
+          "planningSession",
+          "recordConversations",
+          "workResources",
+          "records",
+          "queryActivity",
+          "records",
+          "currentPrincipal",
+          "recordResources",
+          "catalog",
+          "item",
+          "query",
+          "assistantOverview",
+          "taskFixes",
+          "itemOperations",
+          "planningSession",
+          "recordConversations",
+          "records",
+          "queryActivity",
+          "records"
+        ],
+        "performancePassed": true,
+        "cache": "fresh browser context, authenticated start warmed, first task opening",
+        "dataset": "development/KBC-2-118; original executor active in background; mobile viewport 390x844",
+        "diagnosticCharacters": 296
+      }
+    },
+    {
+      "scope": "html-kanban-diagnostic-warm-2",
+      "outcome": "succeeded",
+      "measurement": {
+        "operation": "kanban.html.blocker-diagnostic",
+        "version": "20261116T001821-ec9a5474",
+        "concrete": true,
+        "elapsedMs": 556,
+        "logicalApiCalls": 14,
+        "apiHttpRequests": 6,
+        "methods": [
+          "currentPrincipal",
+          "recordResources",
+          "catalog",
+          "item",
+          "query",
+          "taskFixes",
+          "events",
+          "itemOperations",
+          "planningSession",
+          "recordConversations",
+          "workResources",
+          "records",
+          "queryActivity",
+          "records"
+        ],
+        "performancePassed": true,
+        "cache": "fresh browser context, authenticated start warmed, first task opening",
+        "dataset": "development/KBC-2-118; original executor active in background; mobile viewport 390x844",
+        "diagnosticCharacters": 296
+      }
+    },
+    {
+      "scope": "html-kanban-diagnostic-transport",
+      "outcome": "succeeded",
+      "measurement": {
+        "operation": "kanban.html.blocker-diagnostic",
+        "version": "20261116T002937-7eb0b67c",
+        "concrete": true,
+        "elapsedMs": 617,
+        "logicalApiCalls": 14,
+        "apiHttpRequests": 6,
+        "methods": [
+          "currentPrincipal",
+          "recordResources",
+          "catalog",
+          "item",
+          "query",
+          "taskFixes",
+          "events",
+          "itemOperations",
+          "planningSession",
+          "recordConversations",
+          "workResources",
+          "records",
+          "queryActivity",
+          "records"
+        ],
+        "performancePassed": true,
+        "cache": "fresh browser context, authenticated start warmed, first task opening",
+        "dataset": "development/KBC-2-118; original executor active in background; mobile viewport 390x844",
+        "diagnosticCharacters": 296
+      }
+    }
+  ],
+  "measurementNotes": [
+    "Live production board, fixed target of one management task and one execution child. Other board activity is not frozen.",
+    "The notification-burst run includes readEvents, assistantOverview and a repeated panel refresh; it is retained rather than discarded.",
+    "Steady runs retain the same 14 business/API calls as the original page; all observed runs remain below 5 seconds and 30 logical APIs. These observations do not establish performance under every background load."
+  ],
+  "nativeViewClose": {
+    "operation": "native.view.close",
+    "result": "success",
+    "iterations": [
+      {
+        "iteration": 1,
+        "connectionUsable": true,
+        "durationMs": 321
+      },
+      {
+        "iteration": 2,
+        "connectionUsable": true,
+        "durationMs": 153
+      },
+      {
+        "iteration": 3,
+        "connectionUsable": true,
+        "durationMs": 160
+      },
+      {
+        "iteration": 4,
+        "connectionUsable": true,
+        "durationMs": 146
+      },
+      {
+        "iteration": 5,
+        "connectionUsable": true,
+        "durationMs": 146
+      },
+      {
+        "iteration": 6,
+        "connectionUsable": true,
+        "durationMs": 128
+      }
+    ]
+  },
+  "temporaryProcessCleanup": "scope receipts closed; one feedback driver failed after enqueue acknowledgement due the reproduced close race; that instruction was confirmed consumed in the original Session and was not replayed",
+  "htmlTaskCompletion": "Parent and child formally completed through Kanban; repository automatic delivery completed; execution worktree physically removed; original management Session retained.",
+  "cells": {
+    "commit": "5ad79b9",
+    "rootCommit": "9a2099a",
+    "state": "deployed",
+    "artifactVersion": "cells-9a2099a9-72c3370abd9f49ec",
+    "artifactSha256": "89fdd62ce37865296a8350cb0f16ff61f8336cc47b5933dcc2ba4e26b4b20623",
+    "rustTests": {
+      "passed": 267,
+      "ignored": 5
+    },
+    "rootCause": "runtime_metadata derived current turn identity from the bounded replay ring; long turn evicted its own turn/started event",
+    "recoveredInstruction": {
+      "operationId": "html-repair-delivery-steer-v1",
+      "removedQueueId": "html-repair-review-delivery-v1",
+      "queueRevision": 10,
+      "turnId": "01a1e1b2-ec3f-72f3-8677-b9522e226a92",
+      "state": "steer-accepted",
+      "receipt": {
+        "turnId": "01a1e1b2-ec3f-72f3-8677-b9522e226a92"
+      }
+    },
+    "deployment": {
+      "request": {
+        "operationId": "cells-runtime-heads-switch-20261116-v1",
+        "serviceId": "cells-x1",
+        "expectedVersion": "cells-8bbdee4f-c5c510406737710f",
+        "targetVersion": "cells-9a2099a9-72c3370abd9f49ec"
+      },
+      "result": {
+        "state": "succeeded",
+        "version": "cells-9a2099a9-72c3370abd9f49ec"
+      }
+    }
+  },
+  "buildIsolation": {
+    "operationId": "auto-dfe90e807417a8c4a3cc0213f8626acd583b937ac5c37f41-build",
+    "initialFailure": "BUILD_CAPTURE_SHARED_DEPENDENCY_LINK",
+    "hostRecovery": {
+      "operationId": "html-main-dependencies-recovery-20261116-v1",
+      "rootCommit": "122eb950c6fb47c33942952900bd867d0c59d6af",
+      "lockSha256": "2609ff0d6e20e2493d2e6730210322c744117fd6b07396166bfd9ae62001b265",
+      "cacheLink": "release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/node_modules",
+      "cacheLinkRemoved": true,
+      "desiredMode": "source",
+      "state": "source-layout-restored",
+      "install": {
+        "frozenLockfile": true,
+        "ignoreScripts": true,
+        "exitCode": 0
+      },
+      "remainingValidation": "Pre-existing host app @nestos/kanban peer declaration gap; no external workspace resolution errors remain"
+    },
+    "permanentGuard": {
+      "state": "applied",
+      "regressionTests": 10,
+      "passed": true
+    },
+    "buildReceipt": {
+      "schema": "nestos.kanban.operation-result/1",
+      "operationId": "auto-dfe90e807417a8c4a3cc0213f8626acd583b937ac5c37f41-build",
+      "sourceVersion": "6974c5af1992afc14af98eafd7751edae3792a66351900ea93afc8be590fbe3d",
+      "targetVersion": "122eb950c6fb47c33942952900bd867d0c59d6af",
+      "status": "succeeded",
+      "version": "20261116T023228-122eb950",
+      "targetHead": "122eb950c6fb47c33942952900bd867d0c59d6af",
+      "evidence": {
+        "path": "release/httpd/20261116T023228-122eb950/release.json",
+        "sha256": "2b609d748c624a44a2c6a39fcb1da84a92dc6731a5ff916947ce85bf33dea8ad"
+      },
+      "checksEvidence": {
+        "path": "release/httpd/.kanban-evidence/auto-dfe90e807417a8c4a3cc0213f8626acd583b937ac5c37f41-build/build-success-evidence.json",
+        "sha256": "5e59fdc18868f3ee569d8c05731abbef88ab17c7aec9400aca0d6d150c5c3526"
+      },
+      "artifact": {
+        "format": "nestos.httpd.release/1",
+        "directory": "/home/li/share/prj/x1/release/httpd/20261116T023228-122eb950",
+        "manifest": "release.json"
+      },
+      "summary": "同一build操作已恢复成功，干净HTTP候选20261116T023228-122eb950已写入持久release目录；包含目标122eb950及ab7efa4等既有修复。构建exit0、原生绑定检查与项目release validate通过，335项清单哈希匹配、1031条制品链接均在制品内。主检出依赖树125339项前后签名完全一致，来源HEAD/内容/暂存未变，目标Git干净，current.json未变；所属临时缓存已清理，仅unlink链接，未改源码、重放merge或部署。运行验收与替换留给宿主后续阶段。"
+    },
+    "verifiedRecovery": {
+      "operationId": "auto-dfe90e807417a8c4a3cc0213f8626acd583b937ac5c37f41-build",
+      "version": "20261116T023228-122eb950",
+      "targetHead": "122eb950c6fb47c33942952900bd867d0c59d6af",
+      "candidate": "/home/li/share/prj/x1/release/httpd/20261116T023228-122eb950",
+      "manifestSha256": "2b609d748c624a44a2c6a39fcb1da84a92dc6731a5ff916947ce85bf33dea8ad",
+      "checks": {
+        "manifestFileHashes": 335,
+        "candidateSymlinks": 1031,
+        "externalCandidateLinks": 0,
+        "sourceHeadContentStagingPreserved": true,
+        "mainDependenciesBefore": {
+          "count": 125339,
+          "sha256": "a6107e1375ee52cdcb00d563f5b8e5a3372293b9bdb637473c16ff420216d278",
+          "modulesSha256": "5c8c7b6de2414a3cb7d2ed285830e7474327efb6e09307b7f7aa25bc1978f0ed"
+        },
+        "mainDependenciesAfter": {
+          "count": 125339,
+          "sha256": "a6107e1375ee52cdcb00d563f5b8e5a3372293b9bdb637473c16ff420216d278",
+          "modulesSha256": "5c8c7b6de2414a3cb7d2ed285830e7474327efb6e09307b7f7aa25bc1978f0ed"
+        },
+        "sharedDependencyWrites": false,
+        "targetGitClean": true,
+        "targetAncestorPreserved": "ab7efa4b96f8dccb699400ccfbbfbd104f1797e8",
+        "mdxeditorHead": "0edeec92cdd49a83bdd5f7397feb5d224c4502a8",
+        "isolatedWorkspaceModuleRoots": [
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/ui/mdx-adapter/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/ui/app-shell/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/ui/app-settings/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/ui/llm-ui-adapter/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/ui/ui-common-adapter/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/git-delivery/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/tools/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/sanbox/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/llm-context/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/llm-flow/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/llm-tasks/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/sync-adapters/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/kanban-development/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/app-core/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/llm-session/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/backend/kernel-adapters/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/shared/common/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/shared/app-transport/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/shared/app-contracts/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/apps/demo/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/apps/cli/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/apps/http-app/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/apps/node-host/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/apps/web-app/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/apps/tauri-app/node_modules",
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8/source/tools/image-tools/node_modules"
+        ],
+        "currentSelectionUnchanged": {
+          "id": "20261116T012953-ab7efa4b"
+        },
+        "buildExit": 0,
+        "projectReleaseValidate": "passed",
+        "runtimeAcceptance": "pending host phase"
+      },
+      "cleanup": {
+        "removedOwnedRoots": [
+          "/home/li/share/prj/x1/release/httpd/.build-cache/dependencies/8165039a25222fca5c291a8d8558b26c2a3cdd229bed8e6689d0a1ba646d06f8",
+          "/home/li/share/prj/x1/_nestos/worktrees/9f988328-bac1-44b1-987f-02a71c2f96b9/_nestos/build-cache/html-release"
+        ],
+        "counts": {
+          "files": 68579,
+          "links": 2208,
+          "directories": 6960
+        },
+        "symlinks": "unlink only",
+        "complete": true,
+        "preserved": [
+          "published clean candidate",
+          "prior dirty candidate and failure logs",
+          "source and unrelated caches"
+        ]
+      },
+      "limitations": [
+        "Host recovery evidence path unavailable in this container; restoration confirmed by user and local independent dependency-tree comparison.",
+        "Existing baseline host @nestos/kanban peer declaration issue left to host; no source modification.",
+        "Build contains normal chunk size and native make clock-skew warnings; native bindings and release validation passed."
+      ]
+    }
+  },
+  "htmlRepair": {
+    "status": "development-complete",
+    "ready": true,
+    "operationId": "html-confinement-repair-20261116-v1",
+    "replyTo": "html-network-confinement-blocker-9f988328-v1",
+    "commitPolicy": "changes",
+    "committed": false,
+    "merged": false,
+    "deployed": false,
+    "sourceDigest": "a8faaff0eb1894300118acc6ea2ff69bbf0b7f3d9475ad85743ea39919f812b7",
+    "implementation": "Inert HTML frames plus private QuickJS realm; JSON/local-node-ID DOM bridge, no browser or host API objects; shared initial/dynamic policy and bounded execution/resources.",
+    "checks": {
+      "workspaceTypecheck": "passed",
+      "finalCoreTypecheck": "passed",
+      "coreFullRegression": "206 passed",
+      "finalFocusedRegression": "9 passed",
+      "adapterRegression": "13 passed",
+      "coreBuild": "passed",
+      "webValidationBuild": "passed (serial retry after one exit-137 build)",
+      "docs": "passed",
+      "styles": "passed",
+      "performanceUi": "9 files / 67 tests passed; original thresholds unchanged",
+      "browser": {
+        "securityCases": 21,
+        "realmProbes": 9,
+        "eventRealm": true,
+        "dynamicHtmlCss": true,
+        "typeConstraintShared": true,
+        "promiseTimersAndTeardown": true,
+        "hostTimersAfterDestroy": 0,
+        "budgetCases": 5,
+        "udpPackets": 0
+      },
+      "componentMetrics": [
+        {
+          "temperature": "cold-document",
+          "durationMs": 208.39999999850988,
+          "logicalRpc": 1,
+          "httpRequests": 9
+        },
+        {
+          "temperature": "warm-document",
+          "durationMs": 77.70000000298023,
+          "logicalRpc": 1,
+          "httpRequests": 1
+        }
+      ],
+      "completeWebMetrics": [
+        {
+          "temperature": "cold document/editor/runtime",
+          "preexistingPreviewFrames": 0,
+          "durationMs": 721.0999999977648,
+          "logicalRpc": 0,
+          "httpRequests": 17,
+          "storage": {
+            "openKeyCursor": 21,
+            "returnedRows": 19,
+            "getAll": 2,
+            "get": 14,
+            "put": 2
+          }
+        },
+        {
+          "temperature": "warm browser cache and storage; reloaded page",
+          "preexistingPreviewFrames": 0,
+          "durationMs": 499.5,
+          "logicalRpc": 0,
+          "httpRequests": 17,
+          "storage": {
+            "openKeyCursor": 23,
+            "returnedRows": 23,
+            "getAll": 3,
+            "get": 15,
+            "put": 2
+          }
+        }
+      ],
+      "temporaryCleanup": {
+        "confirmed": true,
+        "registeredRecords": 23
+      }
+    },
+    "scope": "Original single-file inline HTML/CSS/JS preview, source/raw save/rename/refresh; restricted DOM bridge. Relative resources, multi-file sites and module dependencies excluded.",
+    "baselineLimitations": [
+      "Prior two cloze-display-persistence failures reproduced against frozen baseline, retained in baseline-cloze.log; no unrelated cloze edits.",
+      "modules:buildcheck references missing frozen kanban/src/ui/index.ts; retained in frontend-build.log, not claimed passed."
+    ],
+    "releasePending": "Formal candidate integrity/version/health/integration/cleanup receipts belong to host managed source/target lifecycle; local validation builds are not deploy candidates.",
+    "delivery": {
+      "developmentValidationOnly": true,
+      "directDeploymentForbidden": true,
+      "integrationBeforeReleaseBuild": true,
+      "preserveCurrentTarget": true,
+      "minimumKnownTargetCommit": "7eb0b67c4e23f314c47207fe613d6ab88faec2ff",
+      "userReportedRuntimeVersion": "20261116T002937-7eb0b67c",
+      "required": "Host must freeze actual source/target, preserve target changes (including ec9a5474, 88b2618 and RPC-close repair), integrate task deltas into current target, then build/deploy through managed lifecycle. Do not deploy the old-base whole worktree."
+    },
+    "evidence": [
+      "repair-source-manifest.json",
+      "repair-cleanup-records.json",
+      "repair-browser-final.log",
+      "browser-report.json",
+      "full-app-report.json",
+      "repair-performance-ui.log",
+      "repair-core-tests.log",
+      "repair-unit-final.log",
+      "repair-adapter-tests.log",
+      "repair-workspace-typecheck.log",
+      "repair-core-typecheck-final.log",
+      "repair-core-build-final.log",
+      "repair-web-build-serial.log",
+      "repair-docs.log",
+      "repair-styles.log"
+    ],
+    "retained": "Original failure evidence and reproduction, source branches/worktrees, local dependency/tooling caches and review patches retained for host-managed lifecycle."
+  },
+  "productionHtmlAcceptance": {
+    "operation": "html.preview.production",
+    "version": "20261116T023228-122eb950",
+    "scopeId": "d51927dd-7755-4cad-9c8c-1a462ceb8db4",
+    "scopeOutcome": "succeeded",
+    "elapsedMs": 996,
+    "logicalApiCalls": 22,
+    "apiHttpRequests": 13,
+    "httpRequests": 26,
+    "nativeMarker": null,
+    "css": "rgb(1, 2, 3)",
+    "sourceBytes": 224,
+    "project": "cx1",
+    "context": "fresh authenticated LAN browser; application warmed before first HTML open",
+    "passed": true,
+    "cleanup": {
+      "fileRemoved": true,
+      "editorTabClosed": true
+    }
+  },
+  "managementDelivery": {
+    "revision": "1bbeaa0f479c09a5d2952eae15f20a869e2adc8513d7dd717c7486031bc85fd9",
+    "operations": [],
+    "scopes": [
+      {
+        "schema": 1,
+        "id": "repository-2214b27a910fbf73583e1f2378af225d1d36b676",
+        "boardId": "development",
+        "ownerId": "work-aa8aa862a6cd1f6434e375609bb2b34af04536d5ab156fd2de94f7e190812b36-0",
+        "projectId": "cx1",
+        "label": "cx1",
+        "contributors": [
+          {
+            "itemId": "sub-010cbc5c9174310862ea1980c50e4358b8011f85",
+            "title": "接通 HTML 文档模式、隔离交互预览与既有编辑保存链路",
+            "dispatchId": "9f988328-bac1-44b1-987f-02a71c2f96b9",
+            "worktreeId": "9f988328-bac1-44b1-987f-02a71c2f96b9"
+          }
+        ],
+        "ready": true,
+        "completed": true,
+        "createdAt": 1794793365310,
+        "stage": "cleaned",
+        "view": {
+          "revision": "c1a79238fcade78ded0c3ebce44c1af05cb0890d6843c731ce731dc1ba25293e",
+          "operations": [
+            {
+              "id": "analyze",
+              "label": "分析合并方案",
+              "state": "succeeded",
+              "enabled": false,
+              "runId": "auto-dfe90e807417a8c4a3cc0213f8626acd583b937ac5c37f41-analyze",
+              "sessionId": "/folder:cx1/@harness/codex/01a1e177-ea50-7bf3-9512-6716022c9a50",
+              "configurable": false,
+              "openSessionOnRun": true,
+              "summary": "单来源双仓库 changes 增量与目标无路径重叠、无新增文件冲突；mdxeditor 目标指针与冻结基线一致，可由宿主后续授权执行无冲突增量集成。保留当前目标全部独立修复及无关子模块检出。六个目标提交的 Kanban 上下文经正式请求仍不可用，已如实记录；无未决内容取舍。\n源：6974c5af1992afc14af98eafd7751edae3792a66351900ea93afc8be590fbe3d\n目标：ab7efa4b96f8dccb699400ccfbbfbd104f1797e8",
+              "dependsOn": [],
+              "group": {
+                "id": "merge",
+                "label": "提交"
+              }
+            },
+            {
+              "id": "merge",
+              "label": "确认并执行 Git 合并",
+              "state": "succeeded",
+              "enabled": false,
+              "statusText": "已合入并核验结果；后续构建、发布和验收分别处理。",
+              "runId": "auto-dfe90e807417a8c4a3cc0213f8626acd583b937ac5c37f41-merge",
+              "sessionId": "/folder:cx1/@harness/codex/01a1e177-ea50-7bf3-9512-6716022c9a50",
+              "configurable": false,
+              "openSessionOnRun": true,
+              "summary": "单来源双仓库 changes 增量与目标无路径重叠、无新增文件冲突；mdxeditor 目标指针与冻结基线一致，可由宿主后续授权执行无冲突增量集成。保留当前目标全部独立修复及无关子模块检出。六个目标提交的 Kanban 上下文经正式请求仍不可用，已如实记录；无未决内容取舍。\n源：6974c5af1992afc14af98eafd7751edae3792a66351900ea93afc8be590fbe3d\n目标：ab7efa4b96f8dccb699400ccfbbfbd104f1797e8",
+              "fields": [],
+              "confirmation": "确认执行合并；执行前重新核对源与目标，变化时须重新分析。",
+              "dependsOn": [
+                "analyze"
+              ],
+              "group": {
+                "id": "merge",
+                "label": "提交"
+              }
+            },
+            {
+              "runLabel": "重新构建",
+              "followUp": {
+                "action": "deploy",
+                "label": "构建成功后自动替换当前服务",
+                "confirmation": "确认用此验收版本替换当前服务，切换期间允许短暂中断。"
+              },
+              "id": "build",
+              "label": "构建验收版本",
+              "state": "succeeded",
+              "enabled": false,
+              "runId": "auto-dfe90e807417a8c4a3cc0213f8626acd583b937ac5c37f41-build",
+              "sessionId": "/folder:cx1/@harness/codex/01a1e177-ea50-7bf3-9512-6716022c9a50",
+              "configurable": false,
+              "openSessionOnRun": true,
+              "summary": "同一build操作已恢复成功，干净HTTP候选20261116T023228-122eb950已写入持久release目录；包含目标122eb950及ab7efa4等既有修复。构建exit0、原生绑定检查与项目release validate通过，335项清单哈希匹配、1031条制品链接均在制品内。主检出依赖树125339项前后签名完全一致，来源HEAD/内容/暂存未变，目标Git干净，current.json未变；所属临时缓存已清理，仅unlink链接，未改源码、重放merge或部署。运行验收与替换留给宿主后续阶段。\n版本：20261116T023228-122eb950",
+              "dependsOn": [
+                "merge"
+              ],
+              "group": {
+                "id": "build",
+                "label": "构建"
+              }
+            },
+            {
+              "hideRun": false,
+              "id": "deploy",
+              "label": "替换当前服务",
+              "state": "succeeded",
+              "enabled": false,
+              "runId": "auto-dfe90e807417a8c4a3cc0213f8626acd583b937ac5c37f41-deploy",
+              "sessionId": "/folder:cx1/@harness/codex/01a1e177-ea50-7bf3-9512-6716022c9a50",
+              "configurable": false,
+              "openSessionOnRun": true,
+              "summary": "Service controller verified the selected release and health.\n版本：20261116T023228-122eb950",
+              "confirmation": "确认用此验收版本替换当前服务，切换期间允许短暂中断。",
+              "dependsOn": [
+                "build"
+              ],
+              "group": {
+                "id": "deploy",
+                "label": "替换"
+              }
+            },
+            {
+              "id": "accept",
+              "label": "验收通过",
+              "state": "succeeded",
+              "enabled": false,
+              "runId": "auto-dfe90e807417a8c4a3cc0213f8626acd583b937ac5c37f41-accept",
+              "sessionId": "/folder:cx1/@harness/codex/01a1e177-ea50-7bf3-9512-6716022c9a50",
+              "configurable": false,
+              "openSessionOnRun": true,
+              "confirmation": "确认按任务约定接受此版本。",
+              "dependsOn": [
+                "deploy"
+              ],
+              "group": {
+                "id": "accept",
+                "label": "验收"
+              }
+            }
+          ],
+          "automatic": {
+            "state": "completed",
+            "stage": "completed"
+          },
+          "waivers": [],
+          "skippedActions": [],
+          "pluginId": "software-development"
+        }
+      }
+    ],
+    "pluginId": "software-development"
+  },
+  "cleanup": {
+    "state": "completed",
+    "executionWorktreeRemoved": true,
+    "managementSessionPreserved": true,
+    "routeCorrectionOperationId": "html-cleanup-plugin-route-correction-20261116-v1"
+  },
+  "htmlRepairSnapshotNote": "htmlRepair is the immutable source-phase report; current delivery and production verification are recorded separately.",
+  "finalRecoveryChecks": {
+    "buildAndWorkspaceScripts": 26,
+    "pluginRoutingAndCleanup": 29,
+    "performanceCore": 60,
+    "changedPackageTypecheck": "passed",
+    "normalSourceInstall": "passed",
+    "installedLibraryMode": "source; all installed dependency links verified"
+  }
+}

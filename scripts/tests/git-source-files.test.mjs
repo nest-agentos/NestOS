@@ -37,3 +37,16 @@ test('recurses initialized Git repositories and can exclude them before enumerat
     assert.deepEqual(gitSourceFiles(root), ['libraries/widget/source.ts']);
     assert.deepEqual(gitSourceFiles(root, '', name => !name.startsWith('libraries/')), []);
 });
+
+
+test('excludes live dependency directory links despite directory-only Git ignores', t => {
+    const root = fixture(t), shared = path.join(root, 'shared'), nested = path.join(root, 'apps', 'host');
+    mkdirSync(shared); mkdirSync(nested, {recursive: true});
+    writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n');
+    writeFileSync(path.join(shared, 'sentinel'), 'unchanged');
+    symlinkSync(shared, path.join(root, 'node_modules'), 'dir');
+    symlinkSync(shared, path.join(nested, 'node_modules'), 'dir');
+    const files = gitSourceFiles(root);
+    assert.equal(files.some(file => file.split(path.sep).includes('node_modules')), false);
+    assert.ok(files.includes('shared/sentinel'));
+});

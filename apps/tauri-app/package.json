@@ -15,6 +15,7 @@
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.1.0",
     "@nestos/app-core": "workspace:*",
+    "@nestos/kanban": "workspace:*",
     "@nestos/app-settings": "workspace:*",
     "@nestos/app-shell": "workspace:*",
     "@nestos/common": "workspace:*",

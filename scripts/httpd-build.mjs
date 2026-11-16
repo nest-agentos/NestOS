@@ -26,8 +26,23 @@ export const missingOfflinePackages = output => [...new Set([
     ...[...output.matchAll(/Failed to resolve (\S+) in package mirror/g)].map(match => match[1])
 ])];
 const installFailure = status => Object.assign(new Error(`Dependency install failed: pnpm exited with code ${status}.`), {code: 'HTTP_BUILD_INSTALL_FAILED'});
+/** Installation roots must belong to the capture, including cached workspace roots. */
+export function assertDependencyRoots(source) {
+    const capture = path.join(source, '.httpd-captured.json');
+    const inputs = existsSync(capture) ? readJSON(capture) : [];
+    const directories = new Set(['.', ...inputs.filter(file => /(^|\/)package\.json$/.test(file)).map(file => path.dirname(file))]);
+    for (const directory of directories) {
+        const relative = path.join(directory, 'node_modules'), target = path.join(source, relative);
+        let stat;
+        try { stat = lstatSync(target); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+        if (stat.isSymbolicLink()) throw Object.assign(new Error(`Dependency installation root is a symbolic link: ${relative}`),
+            {code: 'HTTP_BUILD_DEPENDENCY_ROOT_LINK', dependencyRoot: relative});
+    }
+}
 /** Reuse the local pnpm store first; fetch only the packages it cannot resolve. */
 export function installDependencies(source, env, {operationId = 'unknown', log = console.log, runCommand = runCaptured} = {}) {
+    assertDependencyRoots(source);
+    env = {...env, CI: 'true'};
     const offline = runCommand('pnpm', ['install', '--offline', '--ignore-scripts', '--no-frozen-lockfile'], source, env);
     if (offline.status === 0) return;
     if (!isOfflineStoreMiss(offline.output)) throw installFailure(offline.status);
@@ -86,7 +101,9 @@ function capture(root, source, inputs) {
 function workspace(context) {
     const {root, cacheDirectory, dependencyKey, inputs, snapshot, cache, stage, env} = context;
     const directory = path.join(cacheDirectory, 'dependencies', cache ? dependencyKey : randomUUID());
-    const source = path.join(directory, 'source'), hit = cache && installationHit(directory, dependencyKey);
+    const source = path.join(directory, 'source');
+    assertDependencyRoots(source);
+    const hit = cache && installationHit(directory, dependencyKey);
     if (!hit) rmSync(directory, {recursive: true, force: true});
     stage('capture', () => { capture(root, source, inputs); if (!hit) copyLibrarySnapshot(root, source, snapshot); });
     pinSnapshotManifests(source, state.readSelection(source), inputs);

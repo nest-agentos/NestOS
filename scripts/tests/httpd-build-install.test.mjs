@@ -1,3 +1,6 @@
+import {mkdtempSync, mkdirSync, writeFileSync, symlinkSync, readFileSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {installDependencies, isOfflineStoreMiss, missingOfflinePackages} from '../httpd-build.mjs';
@@ -53,4 +56,28 @@ test('a failed network retry reports the install failure code', () => {
     assert.throws(() => installDependencies('/tmp/source', {}, {log() {}, runCommand}),
         error => error.code === 'HTTP_BUILD_INSTALL_FAILED' && /exited with code 1/.test(error.message));
     assert.equal(calls, 2);
+});
+
+
+test('rejects shared installation roots before invoking pnpm or modifying dependencies', t => {
+    const root = mkdtempSync(path.join(tmpdir(), 'http-build-install-'));
+    t.after(() => rmSync(root, {recursive: true, force: true}));
+    const source = path.join(root, 'capture'), shared = path.join(root, 'shared');
+    mkdirSync(source); mkdirSync(shared); writeFileSync(path.join(shared, 'sentinel'), 'unchanged');
+    writeFileSync(path.join(source, '.httpd-captured.json'), JSON.stringify(['apps/host/package.json']));
+    for (const relative of ['node_modules', 'apps/host/node_modules']) {
+        const link = path.join(source, relative); mkdirSync(path.dirname(link), {recursive: true}); symlinkSync(shared, link, 'dir');
+        let called = false;
+        assert.throws(() => installDependencies(source, {}, {runCommand() {called = true;}}),
+            error => error.code === 'HTTP_BUILD_DEPENDENCY_ROOT_LINK' && error.dependencyRoot === relative);
+        assert.equal(called, false); assert.equal(readFileSync(path.join(shared, 'sentinel'), 'utf8'), 'unchanged'); rmSync(link);
+    }
+});
+
+test('isolated installs are noninteractive while retaining the supplied environment', () => {
+    const env = {CI: 'false', PATH: '/toolchain'};
+    installDependencies('/tmp/source', env, {runCommand(_command, _args, _cwd, actual) {
+        assert.deepEqual(actual, {CI: 'true', PATH: '/toolchain'}); return {status: 0, output: ''};
+    }});
+    assert.equal(env.CI, 'false');
 });

@@ -214,3 +214,12 @@ it('keeps real confirmation valid across a proven host continuation but rejects 
  g.read.mockResolvedValue({messages:[{id:'confirm',turnId:'u1',role:'user',text:'确认决策'},{id:'do-not-confirm',turnId:'u2',role:'user',text:'Wait'}],instructionQueue:{submissions:[{id:'reply-unproven',turnId:'u2'}]}} as any);
  await expect(g.request('decision.confirm',{proposalDigest:second.proposalDigest})).rejects.toMatchObject({code:'DECISION_USER_CONFIRMATION_REQUIRED'});expect(g.runRecord).not.toHaveBeenCalled();
 });
+
+it('requires a plugin ID and describes cleanup with separate plugin and method routing',async()=>{
+ const f=await fixture(),{resolveKanbanPluginRequest}=await import('../src/kanban/session-request-plugins');
+ Object.assign(f.conversation.binding,{purpose:'coordination',recordId:'record'});
+ const call=(method:string,params:any)=>resolveKanbanPluginRequest(f.options,f.conversation,{id:'cleanup-route',scopeId:'conversation',method,params});
+ for(const method of ['kanban.describe','kanban.invoke'])await expect(call(method,{method:'delivery.cleanup.complete',input:{reviewId:'review'}})).rejects.toMatchObject({code:'CHANNEL_PLUGIN_ID_REQUIRED'});
+ expect(await call('kanban.describe',{pluginId:'delivery',method:'cleanup.complete'})).toMatchObject({pluginId:'delivery',id:'cleanup.complete',inputSchema:{required:['reviewId']}});
+ await expect(call('kanban.describe',{pluginId:'delivery',method:'delivery.cleanup.complete'})).rejects.toMatchObject({code:'CHANNEL_PLUGIN_METHOD_UNAVAILABLE'});
+});

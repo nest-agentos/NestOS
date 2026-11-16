@@ -119,6 +119,9 @@ importers:
       '@nestos/durable-kernel':
         specifier: workspace:*
         version: link:../../libraries/durable-kernel
+      '@nestos/kanban':
+        specifier: workspace:*
+        version: link:../../libraries/kanban
       '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
@@ -268,6 +271,9 @@ importers:
       '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
+      '@nestos/kanban':
+        specifier: workspace:*
+        version: link:../../libraries/kanban
       '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
@@ -411,6 +417,9 @@ importers:
       '@nestos/image-tools':
         specifier: workspace:*
         version: link:../../tools/image-tools
+      '@nestos/kanban':
+        specifier: workspace:*
+        version: link:../../libraries/kanban
       '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
@@ -535,6 +544,9 @@ importers:
       '@nestos/image-tools':
         specifier: workspace:*
         version: link:../../tools/image-tools
+      '@nestos/kanban':
+        specifier: workspace:*
+        version: link:../../libraries/kanban
       '@nestos/kernel-adapters':
         specifier: workspace:*
         version: link:../../backend/kernel-adapters
