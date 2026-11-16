@@ -704,5 +704,76 @@
     "changedPackageTypecheck": "passed",
     "normalSourceInstall": "passed",
     "installedLibraryMode": "source; all installed dependency links verified"
+  },
+  "finalKanbanState": {
+    "rootStatus": "completed",
+    "rootPhase": "completed",
+    "childStatus": "completed",
+    "childPhase": "completed",
+    "resources": [
+      {
+        "id": "9f988328-bac1-44b1-987f-02a71c2f96b9",
+        "state": "cleaned",
+        "reasons": []
+      },
+      {
+        "id": "4bb98371-b962-4859-a3d8-2db981503ced",
+        "state": "retained",
+        "reasons": [
+          "WORKTREE_MANAGEMENT_SESSION_RETAINED"
+        ]
+      }
+    ],
+    "automatic": [
+      {
+        "state": "completed",
+        "stage": "completed"
+      }
+    ]
+  },
+  "maintenanceDeployment": {
+    "commit": "0c432c25",
+    "version": "20261116T025117-0c432c25",
+    "operationId": "ae248d98-56cc-4c10-ae54-f986ec94bba3",
+    "ready": true,
+    "sourceGitCleanAtBuild": true,
+    "smokeScopeOutcome": "succeeded",
+    "smokeScopeId": "2ed23bca-0ece-4956-89a7-d4bf8ffbb86f",
+    "pageMeasurements": [
+      {
+        "operation": "html.preview.production",
+        "version": "20261116T025117-0c432c25",
+        "passed": true,
+        "elapsedMs": 902,
+        "logicalApiCalls": 14,
+        "apiHttpRequests": 10,
+        "httpRequests": 23,
+        "methods": [
+          "bootstrap",
+          "forFolder",
+          "bootstrap",
+          "bootstrap",
+          "onAny",
+          "readNavigation",
+          "readFileDirectory",
+          "forFolder",
+          "forFolder",
+          "forFolder",
+          "forFolder",
+          "forFolder",
+          "forFolder"
+        ],
+        "nativeMarker": null,
+        "css": "rgb(1, 2, 3)",
+        "sourceBytes": 224,
+        "project": "cx1",
+        "context": "fresh authenticated LAN browser; application warmed before first HTML open"
+      },
+      {
+        "operation": "html.preview.production.cleanup",
+        "fileRemoved": true,
+        "editorTabClosed": true
+      }
+    ]
   }
 }
