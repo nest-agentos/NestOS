@@ -139,7 +139,7 @@ it('keeps the task claimed and skips delivery/finalization while a context conti
 });
 it('clears only explicitly linked historical questions/errors and does not let unrelated progress clear them',async()=>{
     const f=await fixture();await f.publish('question','clarification');await f.publish('progress','progress');
-    await f.observe('running');expect((await f.service.item('board','item')).item.issues).toContainEqual({id:'question',attemptId:'attempt',type:'clarification'});
+    await f.observe('running');expect((await f.service.item('board','item')).item.issues).toContainEqual({id:'question',attemptId:'attempt',type:'clarification',summary:'Business message'});
     await f.publish('result','result');expect(await f.observe('succeeded')).toMatchObject({code:'WORKSPACE_INPUT_REQUIRED'});
     // The final resolution is a separate immutable v2 event.
     f.channels.report('attempt','resolved',{type:'resolved',replyTo:'question',content:'Answer has been incorporated'});
@@ -185,4 +185,16 @@ it('exposes later native execution activity without reviving the settled origina
  const value=await f.observer.observe({boardId:'board',dispatch:workflow.dispatches.attempt,service:f.service,worker:f.service,observation:{outcome:'succeeded',executionSessionId:'execution'}});
  expect(value).toMatchObject({outcome:'running'});
  expect(await f.observer.sessionObservation({id:'board'} as never,'execution','/folder:project/@harness/codex/native')).toMatchObject({state:'running',lastActivityAt:123456,stale:false});
+});
+
+it('backfills a delivered legacy issue diagnostic from its immutable channel message',async()=>{
+ const f=await fixture(),summary='WebRTC UDP bypasses the sandbox and CSP';
+ await f.service.execute('board',{operationId:'legacy-network',expectedRevision:(await f.service.read('board')).revision,command:{type:'report-issue',itemId:'item',issue:{id:'network',attemptId:'attempt',type:'error'}}});
+ f.channels.report('attempt','network',{type:'error',content:summary});
+ await f.journal.update('workspace-issue:attempt:network',()=>({done:true}));
+ await f.observe('running');
+ const item=await f.service.item('board','item');
+ expect(item.task).toMatchObject({phase:'error',reason:'network',reasonDetail:summary});
+ const revision=item.item.revision;await f.observe('running');
+ expect((await f.service.item('board','item')).item.revision).toBe(revision);
 });

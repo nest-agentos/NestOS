@@ -252,7 +252,7 @@ createKanbanDiscoveryFlow() 提供本地 analysis 槽；远程使用 createKanba
 
 Web、HTTP 浏览器界面和 Tauri 的桌面侧栏及手机导航都有「看板」入口，对应 `kanban-workspace`，路由为 `#/kanban`；事项资源路径为 `/board/<boardId>/<itemId>`，由 Shell 对完整资源路径编码后生成可分享的 hash 深链。启动时创建「NestOS 示例看板 · 从这里开始」，包含 17 张教学卡片、3 条日志/决策记录和 1 条教学修改建议；旧版示例增量补入新练习，已有内容不覆盖。用户也可点击「新建看板」创建正式看板。
 
-独立界面位于 `libraries/kanban-ui/src/`，`ui/app-shell/src/kanban/` 装配共享导航、窗口与展示端口，通过共享契约消费 `ApplicationServices.kanban`，不直接导入 app-core。左侧选择看板，右侧在「工作看板／工作日志／决策记录」间切换；支持工作/归档视图、搜索、领域/里程碑筛选和每页 50 项。详情显示工作内容、验收条件、负责人、阻塞、关联会话及有界事件记录；可以规划、认领、续租、提交结果、验收、归档和恢复，关联会话复用原工作台导航。
+独立界面位于 `libraries/kanban-ui/src/`，`ui/app-shell/src/kanban/` 装配共享导航、窗口与展示端口，通过共享契约消费 `ApplicationServices.kanban`，不直接导入 app-core。左侧选择看板，右侧在「工作看板／工作日志／决策记录」间切换；支持工作/归档视图、搜索、领域/里程碑筛选和每页 50 项。详情显示工作内容、验收条件、负责人、阻塞、关联会话及有界事件记录；工作通道错误/澄清的正文前 2000 字符随原回执持久为 issue.summary，并由任务投影 reasonDetail 展示，管理任务继承出错子任务的摘要，内部问题 ID 保留为关联依据和悬停提示。旧回执从原不可变消息幂等补齐，不增加读取 RPC、不改变问题解决状态，摘要仅用于授权界面展示，不写诊断日志。可以规划、认领、续租、提交结果、验收、归档和恢复，关联会话复用原工作台导航。
 
 默认创建的是当前用户的个人看板，位于 `/var/lib/kanban/boards.seq`。宿主绑定当前单用户布局的 admin 人员身份，前端通过 currentPrincipal 读取，不从命令中接受操作者身份。个人存储拒绝 project scope 和未绑定的 apply-discovery；项目看板仍须使用项目存储及授权适配，界面不会静默降级存到个人数据。每用户独立 Runtime，sourceId 仅在该用户 journal 内稳定。
 

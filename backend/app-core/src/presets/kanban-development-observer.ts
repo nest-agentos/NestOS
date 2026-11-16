@@ -148,8 +148,7 @@ async function deliver(options: Options, journal: KanbanAutomationJournal, input
         await journalCommand(journal,input.service,input.boardId,'workspace-resolved:'+input.dispatch.id+':'+message.id,{type:'resolve-issue',itemId:message.itemId,attemptId:message.attemptId,issueId:message.replyTo!,resolvedBy:message.id});return;
     }
     if (!['clarification', 'error'].includes(message.type)) return;
-    await journalCommand(journal,input.service,input.boardId,'workspace-issue:'+input.dispatch.id+':'+message.id,
-        {type:'report-issue',itemId:message.itemId,issue:{id:message.id,attemptId:message.attemptId,type:message.type as 'clarification'|'error',...(message.handler?{handler:message.handler}:{})}});
+    await reportIssue(journal,input,message);
     await once(journal, input, message.id + ':block', {type: 'block-item', itemId: message.itemId, token: input.dispatch.fence,
         reason: message.type === 'clarification' ? 'WORKSPACE_INPUT_REQUIRED' : 'WORKSPACE_ERROR_REPORTED'});
     const started=Date.now();
@@ -173,8 +172,7 @@ async function once(journal: KanbanAutomationJournal, input: Input, suffix: stri
 
 async function reconcileIssues(journal: KanbanAutomationJournal, input: Input, messages: WorkMessage[]): Promise<void> {
     for (const message of messages.filter(m => m.type === 'clarification' || m.type === 'error'))
-        await journalCommand(journal,input.service,input.boardId,'workspace-issue:'+input.dispatch.id+':'+message.id,
-            {type:'report-issue',itemId:message.itemId,issue:{id:message.id,attemptId:message.attemptId,type:message.type as 'clarification'|'error',...(message.handler?{handler:message.handler}:{})}});
+        await reportIssue(journal,input,message);
     for (const message of messages.filter(m => m.type === 'resolved'))
         await journalCommand(journal,input.service,input.boardId,'workspace-resolved:'+input.dispatch.id+':'+message.id,
             {type:'resolve-issue',itemId:message.itemId,attemptId:message.attemptId,issueId:message.replyTo!,resolvedBy:message.id});
@@ -183,4 +181,10 @@ async function reconcileIssues(journal: KanbanAutomationJournal, input: Input, m
         && !await journal.get('delivery-blocked:'+input.dispatch.id))
         await journalCommand(journal,input.worker,input.boardId,'workspace-resolution-unblock:'+input.dispatch.id+':'+messages.filter(m=>m.type==='resolved').map(m=>m.id).join(':'),
             {type:'unblock-item',itemId:item.id,token:input.dispatch.fence});
+}
+
+async function reportIssue(journal:KanbanAutomationJournal,input:Input,message:WorkMessage):Promise<void> {
+    await journalCommand(journal,input.service,input.boardId,'workspace-issue-detail:'+input.dispatch.id+':'+message.id,
+        {type:'report-issue',itemId:message.itemId,issue:{id:message.id,attemptId:message.attemptId,
+            type:message.type as 'clarification'|'error',summary:message.content.trim().slice(0,2000),...(message.handler?{handler:message.handler}:{})}});
 }
