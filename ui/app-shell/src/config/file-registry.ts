@@ -11,7 +11,7 @@ export interface AppFileTypeConfig {
     defaultContent: string;
     editorType: EditorTypeKey;
     /** Falls back to extension-based detection when omitted. */
-    contentFormat?: 'markdown' | 'text';
+    contentFormat?: 'markdown' | 'text' | 'html';
     duplicateTransformer?: (content: string) => string | Promise<string>;
 }
 

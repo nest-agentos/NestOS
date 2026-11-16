@@ -159,7 +159,17 @@
 
 ### 文件编辑展示与读取
 
-`EditorOptions.contentFormat` 区分 `markdown` 与 `text`。AppShell 根据统一文件注册表声明文档别名；默认编辑器将其他文件视为源码，保留编辑与保存能力，禁止 Markdown 预览。大 Markdown 默认源码模式，但仍允许用户显式预览。源码策略不改变 `readOnly` 或文件视图授权。
+`EditorOptions.contentFormat` 区分 `markdown`、`text` 与 `html`；可选 `resolveContentFormat(path)` 由宿主保留文件类型别名，在重命名时重新判定格式。AppShell 根据统一文件注册表声明文档别名；默认编辑器将其他文件视为源码，保留编辑与保存能力，禁止 Markdown 预览。大 Markdown 默认源码模式，但仍允许用户显式预览。源码策略不改变 `readOnly` 或文件视图授权。
+
+HTML 的 `.html` / `.htm` 后缀不区分大小写，默认展示页面。源码与预览切换沿用既有保存屏障，保存仍传回原始 HTML；预览中的 DOM 交互不修改源码或 dirty。刷新不读取远端、不保存；重命名按宿主别名重算格式。
+
+HTML 先由 `parse5` 纯解析，删除网络 URL、资源提示、刷新/导航元数据、嵌套浏览上下文及其他危险标记；提取内联脚本和事件属性，绝不把作者代码交给原生浏览器脚本引擎。两层 `srcdoc` iframe 均只使用 `sandbox="allow-same-origin"`，不授予 `allow-scripts`、表单、弹窗、下载或顶层导航。可信外层 CSP 以 `script-src 'none'` 禁止原生脚本，以 `frame-src 'none'` 限制子文档自行导航；内层继承禁止网络、Worker、对象、base 和表单的策略，仅允许内联样式。`allow-same-origin` 只供可信宿主桥读取预览 DOM，不把浏览器 window/document、原型或函数传给作者代码。
+
+作者 JavaScript 在按预览新建的 QuickJS/WASM realm 内执行，未注入网络、宿主窗口、凭据、存储、模块加载器等能力。DOM 桥只收发 JSON 原语与当前预览的节点 ID，宿主核对 ownerDocument，属性与方法使用白名单；构造器和 defaultView 等反射入口不跨桥。初始与动态 HTML/属性共用策略，包括禁止 file/image input、资源提示和导航；CSS 网络请求由继承 CSP 拦截。禁止网络不依赖删除浏览器全局构造器：解释器本来不拥有这些浏览器对象，拒绝函数仅提供明确诊断。
+
+受限 DOM 支持选择器、元素/文本创建、文本与属性、classList、style、dataset、子节点操作、事件、内联事件、DOMContentLoaded/body.onload、Promise、计时器及动画帧回调；不声称兼容所有浏览器 DOM/API。不支持的操作分类报错并可切回源码修正；相对 CSS/JS/图片、多文件运行及模块依赖仍不在范围内。QuickJS 每 realm 限制 32MiB、单次执行 100ms、初始化脚本累计 300ms，Promise 每轮至多 100 个作业；DOM/节点、监听、计时器和待处理回调分别有界。耗尽执行/内存/Promise 预算时停止 realm 并清理计时器；刷新、隐藏、切换源码、格式变化和销毁关闭 realm、iframe、监听与计时器，迟到结果不得回写。没有预览 Blob URL。
+
+先运行 `pnpm --filter nestos-web build`，再运行 `node scripts/verify-html-preview.mjs`，需要 Playwright（可由 `HTML_PREVIEW_PLAYWRIGHT` 指定）及 Chromium。有界作用域内验证真实双层 iframe 的跨 Realm DOM 桥、原文保存、动态 HTML/CSS、9 条宿主反射探测、导航/表单/资源限制、受控 STUN/UDP 为零、内存/执行/Promise/监听/计时器预算和清理；并从完整 Web 宿主实际文件行点击至 HTML 按钮可交互，分别记录冷/热、逻辑 RPC、HTTP 和 IDB 操作计数。组件夹具与完整页面证据分别保存于 `_nestos/kanban/artifacts/html-preview/`，不将组件成本冒充完整页面，也不将本地客户端零 RPC 推断为零存储读取。正式服务版本及 release 回执继续由宿主管理。
 
 桌面 `fs_read_file` 和 `directory_read_file` 使用 Tauri 原始 `ArrayBuffer` 响应；后者缺失文件返回 `null`，越界、符号链接或已关闭 grant 仍拒绝访问。旧的完整文件 JSON 数字数组不再是这两个客户端入口的协议。
 

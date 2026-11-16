@@ -40,3 +40,5 @@ createStudyHost/createStudyEditor 的可选 capabilities.creation 透传宿主�
 创建能力采用 documents/generation/prompts/recovery 分组；适配层只补齐 documents.directories 与 prompts.store，不解释生成错误码或取消策略。
 
 完整 mountTitleBar 端口优先透传到 core:titlebar，复用原标题输入、经过重命名屏障的返回按钮及更多菜单；提供完整布局时不再重复 mountWindowList。mdxeditor 只声明通用节点插槽，公共 UI 与路由实现仍由宿主注入，不引入 ui-common 依赖。
+
+HTML 后缀（.html/.htm，大小写不敏感）通过核心受限 DOM/解释器预览展示；保存仍传回原始 HTML。resolveContentFormat 透传宿主别名，在重命名时重新判定；适配层不为预览提供宿主对象、网络或 AssetProvider 能力。

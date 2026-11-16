@@ -327,11 +327,11 @@ it('keeps host file formats independent from the standard editor', async () => {
     const app = await initTestApp({ services: runtime, workspaces: [active], fileTypes, ui: testUI() });
     try {
         const types = lifecycle.configure.mock.calls[0][0].fileTypes;
-        expect(fileContentFormat('/config.json', types)).toEqual({ contentFormat: 'text' });
-        expect(fileContentFormat('/error.log', types)).toEqual({ contentFormat: 'text' });
-        expect(fileContentFormat('/note.custom', types)).toEqual({ contentFormat: 'markdown' });
-        expect(fileContentFormat('/plain.md', types)).toEqual({ contentFormat: 'text' });
-        expect(fileContentFormat('/note.custom')).toEqual({ contentFormat: 'text' });
+        expect(fileContentFormat('/config.json', types)).toMatchObject({ contentFormat: 'text' });
+        expect(fileContentFormat('/error.log', types)).toMatchObject({ contentFormat: 'text' });
+        expect(fileContentFormat('/note.custom', types)).toMatchObject({ contentFormat: 'markdown' });
+        expect(fileContentFormat('/plain.md', types)).toMatchObject({ contentFormat: 'text' });
+        expect(fileContentFormat('/note.custom')).toMatchObject({ contentFormat: 'text' });
     } finally { await app.destroy(); }
 });
 

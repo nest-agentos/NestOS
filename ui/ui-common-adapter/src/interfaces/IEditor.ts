@@ -158,7 +158,9 @@ export interface EditorOptions<TSubmission = unknown, TInitial = unknown> {
     /** 初始模式 */
     initialMode?: 'edit' | 'render';
     /** Source text never enters Markdown parsing or preview. */
-    contentFormat?: 'markdown' | 'text';
+    contentFormat?: 'markdown' | 'text' | 'html';
+    /** Recompute host document aliases after a path change. */
+    resolveContentFormat?: (path: string) => 'markdown' | 'text' | 'html';
 
     /** 标题（可选） */
     title?: string;

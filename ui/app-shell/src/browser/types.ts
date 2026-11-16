@@ -3,7 +3,7 @@ import type { EditorFactory } from '@nestos/ui-common-adapter';
 
 
 export interface EditorFileType extends FileTypeDefinition {
-  contentFormat?: 'markdown' | 'text';
+  contentFormat?: 'markdown' | 'text' | 'html';
   editorFactory?: EditorFactory;
 }
 export type EditorResolver<Node extends VFSNodeUI = VFSNodeUI> = (node: Node) => EditorFactory | null | undefined;
