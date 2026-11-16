@@ -257,6 +257,8 @@ TLS 从 TCP 接纳时保存来源和开始时间；同一服务内仍存活的�
 
 文件协议路由在 Cells 出站日志中归一化为 `/v1/fs/:alias/<操作>`，以远端 requestId 关联 Cells 的 `files.stat.failed`（路径策略、源准备或源读取）、`files.authorization.failed`（插件策略）及 `storage.io.failed`（errno、错误类别和源码位置）。不记录实际导出名、文件路径、原始异常或参数；真实 500 保留为业务失败，不因前端重连自动重放写入。永久更新失败取消同视图请求时传递 `HTTP_VIEW_UPDATE_FAILED` 和安全的原始分类/请求 ID，避免只出现无原因的 AbortError。
 
+2026-11-16 的新日志定位到远端 `projects/watch/tree.rs` 目录扫描发生 `errno=24 / TooManyOpenFiles`：服务继承的描述符软上限为 1024，小于单个监听的 2048 目录预算，扫描期间可连带影响其他文件请求。Cells 项目服务现按已有 16 个订阅、重建时两代监听和普通读写余量准备软上限 69632，仅在管理员硬上限内提升，并记录 `project.watch.capacity`；不扩大目录扫描预算、不更改硬上限。该原因与浏览器 TLS 协议失败分别诊断，不能用文件句柄耗尽解释全部 TLS 重置。
+
 `application.complete` 还记录注册命令目录确认的 `rpcCommands`、业务回复的 `rpcErrorCount/rpcErrorCodes`；HTTP 200 不能代替业务成功。图片上传只额外记录声明的 MIME 与字节数 `uploads`，不写文件名、data URL 或异常正文。上传错误区分 `INPUT_ASSET_FORMAT`、`INPUT_ASSET_TOO_LARGE`、`INPUT_ASSET_PERSISTENCE`，存储错误保留安全错误码；业务错误回复附加 HTTP requestId，前端 flow-images 日志可据此关联。当前宿主输入暂存单文件预算为 20 MiB，与 Flow 自行声明的总字节/数量限制分别校验。
 
 ### RPC 与往返的生命周期边界
