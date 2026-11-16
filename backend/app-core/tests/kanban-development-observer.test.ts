@@ -198,3 +198,27 @@ it('backfills a delivered legacy issue diagnostic from its immutable channel mes
  const revision=item.item.revision;await f.observe('running');
  expect((await f.service.item('board','item')).item.revision).toBe(revision);
 });
+
+it('closes only verified host delivery failures and gives later failures a fresh identity',async()=>{
+ let code:string|undefined='SOFTWARE_REPORT_TYPE_UNSUPPORTED';
+ const f=await fixture(async()=>{if(code)throw Object.assign(Error(code),{code,diagnostic:'报告含工具符号链接：artifacts/bin/pnpm'});});
+ await f.publish('result','result');await f.observe('succeeded');
+ expect((await f.service.item('board','item')).task.reasonDetail).toContain('artifacts/bin/pnpm');
+ code='SOFTWARE_REPORT_BUDGET_EXCEEDED';await f.observe('succeeded');
+ code=undefined;expect(await f.observe('succeeded')).toMatchObject({outcome:'succeeded'});
+ let item=(await f.service.item('board','item')).item;
+ expect(item.issues).toHaveLength(2);expect(item.issues?.every(issue=>issue.resolvedBy?.startsWith('verified-delivery-'))).toBe(true);expect(item.blocked).toBeUndefined();
+ code='SOFTWARE_REPORT_TYPE_UNSUPPORTED';await f.observe('succeeded');
+ item=(await f.service.item('board','item')).item;
+ expect(item.issues?.filter(issue=>!issue.resolvedBy)).toMatchObject([{id:'delivery-SOFTWARE_REPORT_TYPE_UNSUPPORTED-1'}]);
+ expect(item.issues?.filter(issue=>issue.resolvedBy)).toHaveLength(2);
+ code=undefined;await f.observe('succeeded');expect((await f.service.item('board','item')).item.blocked).toBeUndefined();
+});
+it('repairs a legacy host delivery error only after actual delivery verification succeeds',async()=>{
+ const f=await fixture();await f.publish('result','result');
+ const issue={id:'delivery-EIO',attemptId:'attempt',type:'error' as const};
+ await f.service.execute('board',{operationId:'legacy-delivery-issue',expectedRevision:(await f.service.read('board')).revision,command:{type:'report-issue',itemId:'item',issue}});
+ await f.journal.update('delivery-blocked:attempt',()=>({code:'EIO'}));
+ expect(await f.observe('succeeded')).toMatchObject({outcome:'succeeded'});
+ expect((await f.service.item('board','item')).item.issues?.[0]).toMatchObject({...issue,resolvedBy:'verified-delivery-EIO'});
+});

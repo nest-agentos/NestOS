@@ -25,8 +25,14 @@ export async function deliverSoftwareReports(options:{journal:KanbanAutomationJo
 }
 async function transfer(process:GitProcess,config:Record<string,unknown>):Promise<Receipt> {
     const result=await process.nativeShell.exec('python3',['-c',reportTransferScript,JSON.stringify(config)],{cwd:'/workspace',timeoutMs:120000});
-    let value:Receipt&{code?:string};try{value=JSON.parse(result.stdout);}catch{throw Object.assign(Error('Report receipt unavailable'),{code:'SOFTWARE_REPORT_HANDOFF_UNCONFIRMED'});}
-    requireValue(result.code===0&&!!value.fingerprint,value.code??'SOFTWARE_REPORT_TRANSFER_FAILED');return value;
+    let value:Receipt&{code?:string;kind?:string};try{value=JSON.parse(result.stdout);}catch{throw Object.assign(Error('Report receipt unavailable'),{code:'SOFTWARE_REPORT_HANDOFF_UNCONFIRMED'});}
+    if(result.code!==0||!value.fingerprint) {
+        const code=value.code??'SOFTWARE_REPORT_TRANSFER_FAILED';
+        const detail=code==='SOFTWARE_REPORT_TYPE_UNSUPPORTED'&&['symlink','special-file'].includes(value.kind??'')&&typeof value.path==='string'&&value.path.length<=1024&&!/[\u0000-\u001f\u007f]/u.test(value.path)
+            ? '报告目录包含不支持的'+(value.kind==='symlink'?'符号链接':'特殊文件')+'：'+value.path+'。清理本任务临时条目后重试。':undefined;
+        throw Object.assign(Error(code),{code,...(detail?{diagnostic:detail}:{})});
+    }
+    return value;
 }
 /** The entire owned, merged workspace is disposable after verified report handoff. */
 export const disposableSoftwareFiles=(paths:readonly string[])=>[...paths];

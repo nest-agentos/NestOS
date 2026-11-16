@@ -1,3 +1,4 @@
+import {recordDeliveryFailure,resolveDeliveryFailures} from '@nestos/kanban-development';
 import {registerTaskResultRecovery} from '@nestos/kanban/integration';
 import {completedPublication} from './kanban-completed-result';
 import {currentNativeSessionReader} from '../kanban/native-session-observer';
@@ -6,7 +7,7 @@ import {registerSessionLearnings} from '../kanban/session-learnings';
 import type {ChannelMessage} from '../run/channel-results';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {consumeChannelMessages} from '../run/channel-messages';
-import {createModuleLogger} from '@nestos/common';
+import {createModuleLogger,sha256HexSync} from '@nestos/common';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
 import {readContextCatalog, type ContextInspector} from '../projects/harness-context-catalog';
@@ -102,8 +103,10 @@ export function developmentObserver(options: Options) {
             catch (error) {
                 const raw = (error as {code?: unknown})?.code;
                 const code = typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'DELIVERY_VERIFICATION_FAILED';
-                await journal.update('delivery-blocked:' + input.dispatch.id, () => ({code}));
-                await deliver(options, journal, input, {schema: 'work-message/1', ...scope, id: 'delivery-' + code, type: 'error', content: code});
+                const issueId=await recordDeliveryFailure(journal,input.dispatch.id,code);
+                const detail=(error as {diagnostic?:unknown}).diagnostic;
+                await deliver(options,journal,input,{schema:'work-message/1',...scope,id:issueId,type:'error',
+                    content:typeof detail==='string'&&detail.length<=1800?code+': '+detail:code});
                 if(['VERIFICATION_RUNNING_VERSION_MISMATCH','VERIFICATION_CHANGED_SOURCE'].includes(code)){
                     const failed={...input.observation,outcome:'failed' as const,outputs:undefined,code};
                     if(!stopping)await options.lifecycle?.enqueue(input.boardId,input.dispatch,item,failed);
@@ -111,9 +114,10 @@ export function developmentObserver(options: Options) {
                 }
                 return {...input.observation, outcome: 'unknown', outputs: undefined, code};
             }
+            const resolution=await resolveDeliveryFailures(journal,input.service,{boardId:input.boardId,itemId:item.id,attemptId:input.dispatch.id});
             const {item: current} = await input.worker.item(input.boardId, input.dispatch.itemId);
-            if (current.blocked?.reason === 'WORKSPACE_ERROR_REPORTED' && await journal.get('delivery-blocked:' + input.dispatch.id))
-                await once(journal, input, 'delivery-unblock', {type: 'unblock-item', itemId: current.id, token: input.dispatch.fence});
+            if (current.blocked?.reason === 'WORKSPACE_ERROR_REPORTED' && resolution!==undefined)
+                await once(journal, input, 'delivery-unblock:'+resolution, {type: 'unblock-item', itemId: current.id, token: input.dispatch.fence});
             if (!stopping) await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);
             if (!stopping && options.lifecycle && !await options.lifecycle.settled(input.dispatch.id, input.observation.outcome))
                 return {...input.observation, outcome: 'running', outputs: undefined, code: 'LIFECYCLE_PENDING'};
@@ -184,7 +188,7 @@ async function reconcileIssues(journal: KanbanAutomationJournal, input: Input, m
 }
 
 async function reportIssue(journal:KanbanAutomationJournal,input:Input,message:WorkMessage):Promise<void> {
-    await journalCommand(journal,input.service,input.boardId,'workspace-issue-detail:'+input.dispatch.id+':'+message.id,
+    await journalCommand(journal,input.service,input.boardId,'workspace-issue-detail:'+input.dispatch.id+':'+message.id+':'+sha256HexSync(message.content.trim().slice(0,2000)),
         {type:'report-issue',itemId:message.itemId,issue:{id:message.id,attemptId:message.attemptId,
             type:message.type as 'clarification'|'error',summary:message.content.trim().slice(0,2000),...(message.handler?{handler:message.handler}:{})}});
 }

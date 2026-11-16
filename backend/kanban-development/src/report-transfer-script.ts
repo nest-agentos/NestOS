@@ -3,6 +3,10 @@ export const reportTransferScript = String.raw`import gzip,hashlib,io,json,os,st
 from pathlib import Path
 config=json.loads(sys.argv[1])
 source=Path(config['source']);target=Path(config['target'])
+class ReportTypeError(RuntimeError):
+ def __init__(self,path):
+  super().__init__('SOFTWARE_REPORT_TYPE_UNSUPPORTED')
+  self.path=str(path.relative_to(source));self.kind='symlink' if path.is_symlink() else 'special-file'
 def digest(path):
  h=hashlib.sha256()
  with path.open('rb') as f:
@@ -11,7 +15,7 @@ def digest(path):
 def reports():
  rows=[];total=0;root=source/'_nestos/kanban'
  for part in (source/'_nestos',root,root/'artifacts'):
-  if part.is_symlink():raise RuntimeError('SOFTWARE_REPORT_TYPE_UNSUPPORTED')
+  if part.is_symlink():raise ReportTypeError(part)
  candidates=[]
  artifacts=root/'artifacts'
  if artifacts.exists():
@@ -21,7 +25,7 @@ def reports():
  if root.exists():candidates.extend(p for p in root.iterdir() if p.is_file() and any(word in p.name.lower() for word in ('report','handoff')))
  for path in sorted(set(candidates)):
   info=path.lstat()
-  if not stat.S_ISREG(info.st_mode):raise RuntimeError('SOFTWARE_REPORT_TYPE_UNSUPPORTED')
+  if not stat.S_ISREG(info.st_mode):raise ReportTypeError(path)
   total+=info.st_size
   if len(rows)>=config['maxFiles'] or total>config['maxBytes']:raise RuntimeError('SOFTWARE_REPORT_BUDGET_EXCEEDED')
   rows.append({'path':str(path.relative_to(source)),'bytes':info.st_size,'sha256':digest(path)})
@@ -78,5 +82,5 @@ try:
  value=main();print(json.dumps(value if config['mode']!='inspect' or not value.get('sha256') else {**value,'existing':True}))
 except Exception as error:
  code=str(error) if str(error).startswith('SOFTWARE_REPORT_') else 'SOFTWARE_REPORT_TRANSFER_FAILED'
- print(json.dumps({'code':code,'class':type(error).__name__}));sys.exit(1)
+ print(json.dumps({'code':code,'class':type(error).__name__,**({'path':error.path,'kind':error.kind} if isinstance(error,ReportTypeError) else {})}));sys.exit(1)
 `;
