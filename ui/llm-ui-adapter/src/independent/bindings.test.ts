@@ -8,6 +8,24 @@ import {NativeComposerCapabilities} from './native-composer';
 import {getLogger} from '@nestos/common';
 
 vi.mock('@nestos/llm-ui', async () => ({ ...(await vi.importActual<typeof import('@nestos/llm-ui')>('@nestos/llm-ui')), createChatView: vi.fn() }));
+it('folds native context only by explicit provenance and leaves actual prompts visible', async () => {
+    const host = fixture(), rules = '# AGENTS.md instructions for /project';
+    host.emit({messages: [
+        {id: 'context', role: 'user', text: rules, contentParts: [rules, '<environment_context>'],
+            contentPartKinds: ['agents_md.instructions', 'environments.environment_context']},
+        {id: 'prompt', role: 'user', text: rules, contentParts: [rules], contentPartKinds: ['user.text']},
+        {id: 'legacy', role: 'user', text: rules},
+        {id: 'unknown', role: 'user', text: rules, contentParts: [rules], contentPartKinds: ['unknown']},
+    ]});
+    const binding = await createNativeChatBinding(host.options);
+    const messages = binding.source.getSnapshot().messages;
+    expect(messages[0].parts).toEqual([
+        expect.objectContaining({text: rules, disclosureLabel: expect.any(String)}),
+        expect.objectContaining({text: '<environment_context>', disclosureLabel: expect.any(String)}),
+    ]);
+    for (const message of messages.slice(1)) expect(message.parts[0]).not.toHaveProperty('disclosureLabel');
+    binding.dispose();
+});
 it('explicitly reloads external history instead of waiting for another process to emit local events', async () => {
     const host = fixture();
     host.emit({observation: {scope: 'external', execution: 'unknown', source: 'history', observedAt: Date.now(),

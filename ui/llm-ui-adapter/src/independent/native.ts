@@ -15,6 +15,7 @@ import {NativeComposerCapabilities, type NativeCommandProvider} from './native-c
 import {submitNativeCommand} from './native-command';
 import {awaitNativeAdmission} from './native-admission';
 import {nativeInputPolicy} from './native-input-policy';
+import {contextLabel} from '../shell/transcript-markup';
 import {nativeControlReceipt} from './native-control';
 import {createNativeQueuePort, nativeQueueToolbar} from './native-queue';
 import {nativeQueueMessages, nativeQueueNotice} from './native-queue-messages';
@@ -327,7 +328,11 @@ function nativeMessage(message: NativeSnapshot['messages'][number], operations: 
     const parts: ChatMessage['parts'][number][] = message.role === 'tool' ? [{ id: message.id, kind: 'tool', name: message.name ?? '',
         summary: message.commandPreview ?? message.operation ?? '',
         state: toolState(message.status) }]
-        : (message.contentParts ?? [message.text]).map((text, index) => ({ id: `${message.id}-${index}`, kind: message.contentPartKinds?.[index] === 'assistant.reasoning' ? 'reasoning' : 'markdown', text }));
+        : (message.contentParts ?? [message.text]).map((text, index) => {
+            const kind = message.contentPartKinds?.[index], label = message.role === 'user' && kind ? contextLabel(kind) : undefined;
+            return {id: `${message.id}-${index}`, kind: kind === 'assistant.reasoning' ? 'reasoning' : 'markdown', text,
+                ...(label ? {disclosureLabel: label} : {})};
+        });
     if (message.commandOutput) parts.push({id: `${message.id}-output`, kind: 'extension', type: 'native-command-output',
         data: JSON.parse(JSON.stringify(message.commandOutput)) as JsonValue});
     return { id: message.id, revision: 0, role: message.role, state: messageState(message.status),

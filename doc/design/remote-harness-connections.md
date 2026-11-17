@@ -128,6 +128,8 @@ pnpm --filter @nestos/cli exec vitest run tests/harness-real-model-live.test.ts
 
 RemoteConversationStore 只保存原生身份、草稿及操作回执，不保存另一份原生对话历史。同实例 load/save/submitted 串行，保存时冻结输入，读取返回副本；该边界不等待原生 turn。事务回执丢失时，下一次写先读取原键，只有写前或写后值能继续；出现第三值保持冲突，刷新不能重新授权旧实例覆盖。追加 submittedTurnId 先核对原写，再合并持久事实，不能用旧缓存覆盖已提交草稿修订。
 
+默认原生 ChatView 在台账登记开始时立即显示“提交中”，登记完成前不派发输入；同一 operationId 的 `chat.operation` 浏览器日志区分 register 的 started/完成、dispatch 与 receipt 阶段及耗时。该浏览器日志不等于服务端已持久收集，也不能据服务端请求耗时推断点击后的完整等待。AGENTS.md 等上下文仍由原生 harness 按工作目录读取；展示只依据明确的 contentPartKinds 折叠规则及环境信息，保留原文复制与展开状态，不按正文前缀隐藏用户消息。
+
 ### 原生查询、控制及输出的独立通道
 
 发布 Node 原生协议与宿主 RPC、两种 UI 消费者一同接通：目录及状态查询不等待原发送 tail；查询报告保存到原 journal，以 query receipt 更新同一台账，不生成新 turn 或消费原 pending input。取消携带具体 session/turn 与独立 operationId，接纳与实际停止分别展示和核对。结果读取以不可变输出引用分页核验，仅影响结果卡片可读性；结果 envelope 无效时查询原操作，不重发输入。默认工作台用提交计数保留仍在途的写入，只为声明为 query 的命令放行。Node 源码锁定不等于部署更新，原 Session 验收另行核对运行版本与能力。
