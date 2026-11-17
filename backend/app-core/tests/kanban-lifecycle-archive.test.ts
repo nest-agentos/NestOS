@@ -34,10 +34,12 @@ it('archives only the settled temporary child after saving its notification, inc
 it('retries uncertain archival with the same operation identity without rerunning the hook', async () => {
     const f = await fixture();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const now = Date.now(), clock = vi.spyOn(Date, 'now').mockReturnValue(now);
     f.archiveSession.mockRejectedValueOnce(Object.assign(new Error('private connection detail'), {code: 'SESSION_ARCHIVE_OUTCOME_UNKNOWN'}));
     const lifecycle = f.open(); await lifecycle.scan(); await lifecycle.dispose();
     expect(await f.journal.get(f.key)).toMatchObject({done: true}); expect((await f.journal.get<{archivedSessionId?: string}>(f.key))?.archivedSessionId).toBeUndefined();
-    await f.open().scan();
+    const reopened = f.open(); await reopened.scan(); expect(f.archiveSession).toHaveBeenCalledOnce();
+    clock.mockReturnValue(now + 60_000); await reopened.scan();
     expect(f.archiveSession.mock.calls).toEqual([['temporary-child', 'lifecycle-archive:' + f.id], ['temporary-child', 'lifecycle-archive:' + f.id]]);
     expect((await f.events.listNotifications()).items).toHaveLength(1); expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith('[KanbanDevelopment]', expect.objectContaining({operationId: f.id, stage: 'lifecycle.archive', result: 'failure', code: 'SESSION_ARCHIVE_OUTCOME_UNKNOWN', durationMs: expect.any(Number)}));
@@ -46,12 +48,26 @@ it('retries uncertain archival with the same operation identity without rerunnin
 
 it('keeps unsettled, unknown and changed executions and waits for a confirmed terminal receipt', async () => {
     const f = await fixture(), lifecycle = f.open();
+    let now = Date.now(); vi.spyOn(Date, 'now').mockImplementation(() => now);
     for (const observation of [{outcome: 'running', sessionId: 'temporary-child'}, {outcome: 'unknown', sessionId: 'temporary-child'},
         {outcome: 'failed', sessionId: 'different-child'}, {outcome: 'succeeded', sessionId: f.id}, {outcome: 'unknown'}]) {
         f.inspect.mockResolvedValueOnce(observation as never); await lifecycle.scan(); expect(f.archiveSession).not.toHaveBeenCalled();
+        now += 300_000;
     }
     f.inspect.mockResolvedValueOnce({outcome: 'cancelled', sessionId: 'temporary-child'}); await lifecycle.scan();
     expect(f.archiveSession).toHaveBeenCalledExactlyOnceWith('temporary-child', 'lifecycle-archive:' + f.id);
+});
+
+it('retains unavailable project bindings and throttles their archive checks across restart', async () => {
+    const f = await fixture(), now = Date.now(), clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    f.archiveSession.mockRejectedValue(Object.assign(new Error('unavailable'), {code: 'SESSION_ARCHIVE_PROJECT_UNAVAILABLE'}));
+    const first = f.open(); await first.scan(); await first.dispose();
+    const reopened = f.open();
+    clock.mockReturnValue(now + 60_000); await reopened.scan();
+    expect(f.archiveSession).toHaveBeenCalledOnce();
+    expect(await f.journal.get(f.key)).toMatchObject({done: true, archiveRetryAt: now + 300_000});
+    clock.mockReturnValue(now + 300_000); await reopened.scan();
+    expect(f.archiveSession).toHaveBeenCalledTimes(2); expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
 });
 
 it('keeps the result pending for archival if its notification cannot be saved', async () => {

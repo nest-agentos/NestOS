@@ -1,4 +1,4 @@
-import {indexResourceJob} from '@nestos/kanban/integration';
+import {indexResourceJob, safeCode} from '@nestos/kanban/integration';
 import {lifecyclePromptFiles} from '../run/prompt-lifecycle';
 import {developmentObservation, developmentStage} from './kanban-development-log';
 import {t} from '@nestos/common';
@@ -14,7 +14,7 @@ import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import {failure, hasMarkdownSection} from '../run/prompt-bundle';
 
 interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'execution' | 'prepareSession'> {remote?:Pick<ProjectRemoteMountService,'sessionChannel'>;authorize?(boardId: string, itemId: string): Promise<boolean|'cancelled'>; stop?(executionId: string, operationId: string): Promise<boolean>; archiveSession?(sessionId: string, operationId: string): Promise<void>; journal: KanbanAutomationJournal; events: UserEventService}
-interface Job {id: string; boardId: string; dispatch: KanbanDispatch; stage: string; request: unknown; phase: 'prepared' | 'submitting' | 'settled'; done?: boolean; observation?: KanbanExecutionObservation; archivedSessionId?: string}
+interface Job {id: string; boardId: string; dispatch: KanbanDispatch; stage: string; request: unknown; phase: 'prepared' | 'submitting' | 'settled'; done?: boolean; observation?: KanbanExecutionObservation; archivedSessionId?: string; archiveRetryAt?: number}
 /** Terminal hooks are independent calls; cancellation never sends into the stopped turn. */
 interface State {stopped: boolean; pending?: Promise<void>; executor: ReturnType<typeof createPublishedKanbanWorkExecutor>}
 export function developmentLifecycle(options: Options) {
@@ -92,7 +92,7 @@ async function stopCancelledJob(options: Options, key: string): Promise<void> {
 async function finish(options: Options, state: State, key: string, job: Job): Promise<void> {
     if (!job.observation) return;
     await report(options.events, job, job.observation);
-    if (!options.archiveSession || job.archivedSessionId || !job.request || state.stopped) return;
+    if (!options.archiveSession || job.archivedSessionId || !job.request || state.stopped || (job.archiveRetryAt ?? 0) > Date.now()) return;
     try {
         await developmentStage(job.id, 'lifecycle.archive', async () => {
             const request = job.request as {input?: {request?: {expectedSessionId?: string; submission?: {id?: string}}}};
@@ -103,9 +103,13 @@ async function finish(options: Options, state: State, key: string, job: Job): Pr
             const sessionId = observation.executionSessionId;
             if (sessionId === job.id || job.observation?.executionSessionId && sessionId !== job.observation.executionSessionId) throw failure('LIFECYCLE_ARCHIVE_IDENTITY_CHANGED');
             await options.archiveSession!(sessionId, 'lifecycle-archive:' + job.id);
-            await options.journal.update<Job>(key, old => ({...old!, archivedSessionId: sessionId}));
+            await options.journal.update<Job>(key, old => ({...old!, archivedSessionId: sessionId, archiveRetryAt: undefined}));
         });
-    } catch { /* Keep the settled execution and retry only archival on the next scan. */ }
+    } catch (error) {
+        const code = safeCode(error, 'LIFECYCLE_ARCHIVE_FAILED');
+        const delay = ['SESSION_ARCHIVE_PROJECT_UNAVAILABLE', 'SESSION_ARCHIVE_BINDING_CHANGED', 'SESSION_ARCHIVE_BINDING_AMBIGUOUS', 'LIFECYCLE_ARCHIVE_IDENTITY_CHANGED'].includes(code) ? 300_000 : 60_000;
+        await options.journal.update<Job>(key, old => ({...old!, archiveRetryAt: Date.now() + delay}));
+    }
 }
 async function enqueue(options: Options, state: State, boardId: string, dispatch: KanbanDispatch, item: KanbanItem, observation: KanbanExecutionObservation, kind: 'task' | 'decision', target?: TargetRef) {
         if (state.stopped || !['succeeded', 'failed', 'cancelled'].includes(observation.outcome)) return;
