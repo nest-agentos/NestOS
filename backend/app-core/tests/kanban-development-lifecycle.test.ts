@@ -29,6 +29,9 @@ it('runs cancellation finalization independently and reconciles a lost response 
     Object.assign(options,{execution:createIndependentCallExecutionReader(options as never)});
     const first = developmentLifecycle(options as never);
     const item = {id: 'item', title: 'Task'} as KanbanItem;
+    await first.enqueue('board', dispatch, item, {outcome: 'running'});
+    await first.enqueue('board', dispatch, item, {outcome: 'succeeded'});
+    expect(options.prepareSession).not.toHaveBeenCalled(); expect(channels.channel).not.toHaveBeenCalled();
     await first.enqueue('board', dispatch, item, {outcome: 'cancelled'});
     await first.enqueue('board', dispatch, item, {outcome: 'cancelled'});
     expect(await first.settled('attempt', 'cancelled')).toBe(false);

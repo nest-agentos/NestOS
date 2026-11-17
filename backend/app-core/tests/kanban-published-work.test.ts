@@ -82,6 +82,18 @@ it('passes only the frozen context reference without eagerly reading dependency 
     expect(context).not.toHaveBeenCalled();
 });
 
+it('does not create an empty Session when target or dependency preparation fails', async () => {
+    const f = await fixture(), prepareSession = vi.fn(), onSessionPrepared = vi.fn();
+    const binding = vi.fn().mockRejectedValueOnce(Object.assign(new Error('unavailable'), {code: 'TARGET_NOT_PUBLISHED'}))
+        .mockResolvedValue({target: {kind: 'agent', id: 'worker', version: '1', digest: 'b'.repeat(64)}});
+    const executor = createPublishedKanbanWorkExecutor({calls: f.calls, execution: {inspect: vi.fn()}, prepareSession, onSessionPrepared, binding,
+        context: async () => {throw Object.assign(new Error('unavailable'), {code: 'DEPENDENCY_UNAVAILABLE'});}});
+    await expect(executor.prepare(dispatch, {id: 'item', title: 'Task'} as KanbanItem)).rejects.toMatchObject({code: 'TARGET_NOT_PUBLISHED'});
+    await expect(executor.prepare(dispatch, {id: 'item', title: 'Task'} as KanbanItem)).rejects.toMatchObject({code: 'DEPENDENCY_UNAVAILABLE'});
+    expect(prepareSession).not.toHaveBeenCalled(); expect(onSessionPrepared).not.toHaveBeenCalled();
+    expect(f.calls.prepareTaskCall).not.toHaveBeenCalled(); expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
+});
+
 it('preserves explicitly supplied dependency data for custom context-reference bindings',async()=>{
  const f=await fixture(),executor=createPublishedKanbanWorkExecutor({calls:f.calls,execution:{inspect:input=>inspectIndependentCallExecution({calls:f.calls,kernel:{task:f.task}},input)},prepareSession:f.prepareSession,
   binding:async()=>({target:{kind:'agent',id:'worker',version:'1',digest:'b'.repeat(64)},contextRef:{scopeId:dispatch.id,sections:['task']},dependencies:{checkpoint:'verified custom prerequisite'}})});

@@ -1,6 +1,6 @@
 import {indexResourceJob} from '@nestos/kanban/integration';
 import {lifecyclePromptFiles} from '../run/prompt-lifecycle';
-import {developmentObservation} from './kanban-development-log';
+import {developmentObservation, developmentStage} from './kanban-development-log';
 import {t} from '@nestos/common';
 import type {TargetRef} from '@nestos/llm-flow/contracts';
 import type {KanbanDispatch, KanbanItem, KanbanSessionAssociation} from '@nestos/kanban/contracts';
@@ -13,8 +13,8 @@ import {currentChannelBinding,openDevelopmentChannel,type DevelopmentWorkspaceRe
 import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import {failure, hasMarkdownSection} from '../run/prompt-bundle';
 
-interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'execution' | 'prepareSession'> {remote?:Pick<ProjectRemoteMountService,'sessionChannel'>;authorize?(boardId: string, itemId: string): Promise<boolean|'cancelled'>; stop?(executionId: string, operationId: string): Promise<boolean>; journal: KanbanAutomationJournal; events: UserEventService}
-interface Job {id: string; boardId: string; dispatch: KanbanDispatch; stage: string; request: unknown; phase: 'prepared' | 'submitting' | 'settled'; done?: boolean; observation?: KanbanExecutionObservation}
+interface Options extends Pick<PublishedKanbanWorkOptions, 'calls' | 'execution' | 'prepareSession'> {remote?:Pick<ProjectRemoteMountService,'sessionChannel'>;authorize?(boardId: string, itemId: string): Promise<boolean|'cancelled'>; stop?(executionId: string, operationId: string): Promise<boolean>; archiveSession?(sessionId: string, operationId: string): Promise<void>; journal: KanbanAutomationJournal; events: UserEventService}
+interface Job {id: string; boardId: string; dispatch: KanbanDispatch; stage: string; request: unknown; phase: 'prepared' | 'submitting' | 'settled'; done?: boolean; observation?: KanbanExecutionObservation; archivedSessionId?: string}
 /** Terminal hooks are independent calls; cancellation never sends into the stopped turn. */
 interface State {stopped: boolean; pending?: Promise<void>; executor: ReturnType<typeof createPublishedKanbanWorkExecutor>}
 export function developmentLifecycle(options: Options) {
@@ -61,7 +61,7 @@ async function advance(options: Options, state: State) {
         for (const key of await options.journal.get<string[]>('development-lifecycle-index') ?? []) {
             if (state.stopped) return;
             const job = await options.journal.get<Job>(key); if (!job) continue;
-            if (job.done) {if (job.observation) await report(options.events, job, job.observation); continue;}
+            if (job.done) {await finish(options, state, key, job); continue;}
             const authorization = await options.authorize?.(job.boardId, job.dispatch.itemId) ?? true;
             if (authorization === 'cancelled') {await stopCancelledJob(options, key);continue;}
             if (job.phase === 'prepared' && !authorization) continue;
@@ -76,7 +76,7 @@ async function advance(options: Options, state: State) {
             developmentObservation(job.id, job.stage, observation.outcome, observation.code, Date.now() - started);
             const done = ['succeeded', 'failed', 'cancelled'].includes(observation.outcome);
             await options.journal.update<Job>(key, old => ({...old!, observation, done}));
-            if (done) await report(options.events, job, observation);
+            if (done) await finish(options, state, key, {...job, done, observation});
         }
     }
 async function stopCancelledJob(options: Options, key: string): Promise<void> {
@@ -86,6 +86,26 @@ async function stopCancelledJob(options: Options, key: string): Promise<void> {
     if (!options.stop) throw failure('LIFECYCLE_CANCEL_UNAVAILABLE');
     if (!await options.stop(saved.id, 'cancel-finalizer:' + saved.id)) return;
     await options.journal.update<Job>(key, old => ({...old!,phase:'settled',done:true,observation:{outcome:'cancelled',code:'USER_CANCELLED'}}));
+}
+
+/** Archive only this hook's settled child, after its durable result notification. */
+async function finish(options: Options, state: State, key: string, job: Job): Promise<void> {
+    if (!job.observation) return;
+    await report(options.events, job, job.observation);
+    if (!options.archiveSession || job.archivedSessionId || !job.request || state.stopped) return;
+    try {
+        await developmentStage(job.id, 'lifecycle.archive', async () => {
+            const request = job.request as {input?: {request?: {expectedSessionId?: string; submission?: {id?: string}}}};
+            if (request.input?.request?.expectedSessionId !== job.id || request.input.request.submission?.id !== job.id) throw failure('LIFECYCLE_ARCHIVE_IDENTITY_CHANGED');
+            const observation = await state.executor.inspect(job.request);
+            if (!observation.executionSessionId) return;
+            if (!['succeeded', 'failed', 'cancelled'].includes(observation.outcome)) throw failure('LIFECYCLE_ARCHIVE_EXECUTION_UNSETTLED');
+            const sessionId = observation.executionSessionId;
+            if (sessionId === job.id || job.observation?.executionSessionId && sessionId !== job.observation.executionSessionId) throw failure('LIFECYCLE_ARCHIVE_IDENTITY_CHANGED');
+            await options.archiveSession!(sessionId, 'lifecycle-archive:' + job.id);
+            await options.journal.update<Job>(key, old => ({...old!, archivedSessionId: sessionId}));
+        });
+    } catch { /* Keep the settled execution and retry only archival on the next scan. */ }
 }
 async function enqueue(options: Options, state: State, boardId: string, dispatch: KanbanDispatch, item: KanbanItem, observation: KanbanExecutionObservation, kind: 'task' | 'decision', target?: TargetRef) {
         if (state.stopped || !['succeeded', 'failed', 'cancelled'].includes(observation.outcome)) return;

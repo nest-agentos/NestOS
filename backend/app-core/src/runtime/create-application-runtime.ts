@@ -618,7 +618,9 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const callExecution=independentCalls?createIndependentCallExecutionReader({calls:independentCalls,kernel:kernelCore,log:event=>createModuleLogger('session').info('Execution reconciliation',event)}):undefined;
         const resolveOriginalSession=(input:import('@nestos/llm-session/contracts').IndependentCallInput)=>originalSession({calls:independentCalls!,kernel:kernelCore},input);
         const lifecycleJournal = new KanbanAutomationJournal(systemFS, kanbanJournalOptions);
+        const archiveKanbanSession = remoteConnections ? nativeSessionArchive(kernelCore, projects, remoteConnections, lifecycleJournal) : undefined;
         const lifecycle = independentCalls ? developmentLifecycle({remote:developmentBindings?.remote,journal: lifecycleJournal, events, calls: independentCalls, execution:callExecution!,
+            archiveSession: archiveKanbanSession,
             authorize: async (boardId, itemId): Promise<boolean|'cancelled'> => {
                 const board = await kanban.read(boardId), item = board.items.find(item => item.id === itemId);
                 return item?.status === 'cancelled' || item?.control?.action === 'cancel' ? 'cancelled' : board.automation?.enabled === true;
@@ -661,7 +663,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 sessionResource: remoteConnections ? id => nativeSessionResource(kernelCore, projects, developmentBindings!.remote)(id, 'main') : undefined,
                 report:async job=>{await report(job);await scopes.report(job);},
             });} : undefined,
-            archiveSession:remoteConnections?nativeSessionArchive(kernelCore,projects,remoteConnections,new KanbanAutomationJournal(systemFS,kanbanJournalOptions)):undefined,
+            archiveSession: archiveKanbanSession,
             relatedSessions: lifecycle ? (boardId, itemId) => lifecycle.sessions(boardId, itemId) : undefined,
             sessionExecutionResources: id => developmentSessionResources(new KanbanAutomationJournal(systemFS, kanbanJournalOptions), id),
             collaboration:developmentBindings?{submission:fileSubmission,prepare:input=>developmentOperations.run(()=>developmentSessionOperation({...developmentBindings,journal:lifecycleJournal})(input))}:undefined,
