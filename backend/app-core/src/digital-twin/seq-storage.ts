@@ -19,13 +19,13 @@ export class TwinSeqStorage {
         }
         const root = `/var/lib/digital-twin/${twinId}`;
         for (const file of FILES) { progress(`storage.prepare.${file}`); await prepare(fs, root, file); }
-        const seed: TwinIdentity = { twinId, ownerId, incarnation: randomUUID(), schemaVersion: 1, layoutVersion: 8, forgetEpoch: 0 };
+        const seed: TwinIdentity = { twinId, ownerId, incarnation: randomUUID(), schemaVersion: 1, layoutVersion: 9, forgetEpoch: 0 };
         progress('storage.bind-transaction');
         const bound = await fs.meta.seq.transaction(async tx => {
             const raw = await tx.getEntry(`${root}/authority.seq`, 'twin');
             const previous = raw ? JSON.parse(raw) : null;
             const upgrade = previous?.schemaVersion === 1 && [2, 3, 4, 5, 6, 7].includes(previous?.layoutVersion);
-            const current = raw ? decodeIdentity(upgrade ? JSON.stringify({ ...previous, layoutVersion: 8 }) : raw) : seed;
+            const current = raw ? decodeIdentity(upgrade ? JSON.stringify({ ...previous, layoutVersion: 9 }) : raw) : seed;
             if (current.twinId !== twinId || current.ownerId !== ownerId) throw new Error('Twin owner denied');
             if (!raw) {
                 await assertEmpty(tx, root);
@@ -36,6 +36,13 @@ export class TwinSeqStorage {
             return current;
         });
         return new TwinSeqStorage(fs, root, bound);
+    }
+
+    async requireCompactLayout(tx: ISeqFileTransaction): Promise<void> {
+        if (this.bound.layoutVersion === 9) return;
+        const path = this.file('authority'), current = decodeIdentity(await tx.getEntry(path, 'twin'));
+        this.assertBinding(current);
+        if (current.layoutVersion === 8) await tx.setEntry(path, 'twin', JSON.stringify({...current, layoutVersion: 9}));
     }
 
     file(name: TwinFile): string { return `${this.root}/${name}.seq`; }

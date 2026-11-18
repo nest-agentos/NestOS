@@ -4,12 +4,14 @@ export type TwinRecordFamily = 'memory' | 'evidence' | 'support' | 'derivation' 
     | 'grant' | 'suppression' | 'projection' | 'settings' | 'job' | 'usage'
     | 'scan-plan' | 'scan-run' | 'scan-checkpoint' | 'meter-entry' | 'meter-period';
 
+export interface ScanLease { owner: string; host: string; until: number; fence: number; }
+
 export interface TwinIdentity {
     twinId: string;
     ownerId: string;
     incarnation: string;
     schemaVersion: 1;
-    layoutVersion: 8;
+    layoutVersion: 8 | 9;
     forgetEpoch: number;
 }
 
@@ -55,6 +57,7 @@ export interface TwinStore {
     count(family: TwinRecordFamily): Promise<number>;
     cleanupError(): Promise<string>;
     recentRuns(planIds: string[]): Promise<TwinRecord[]>;
+    replaceScanLease(data: ScanLease, expectedRevision: string | null): Promise<void>;
     commit(command: TwinCommit): Promise<TwinCommitReceipt>;
     startForget(command: TwinForget): Promise<TwinCleanup>;
     pendingCleanup(): Promise<TwinCleanup[]>;

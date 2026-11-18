@@ -32,7 +32,7 @@ export class RecentRunIndex {
             const raw = revision && await tx.getEntry(this.knowledgePath, `version/${recordKey(ref)}/${encodeURIComponent(revision)}`);
             if (!raw) throw new Error('TWIN_RECENT_RUN_INDEX_INCONSISTENT');
             const row = JSON.parse(raw) as TwinRecord, group = String(row.payload.planId), selected = groups.get(group) ?? [];
-            selected.push(summarize(row)); selected.sort((a, b) => Number(b.payload.createdAt) - Number(a.payload.createdAt));
+            selected.push(summarize(row, (row as {sourceCount?: number}).sourceCount)); selected.sort((a, b) => Number(b.payload.createdAt) - Number(a.payload.createdAt));
             groups.set(group, selected.slice(0, 5));
         }
         for await (const name of seqKeys(tx,this.indexPath,'recent-runs/plan/')) await tx.deleteEntry(this.indexPath,name);
@@ -42,9 +42,9 @@ export class RecentRunIndex {
         console.info('[DigitalTwinView]', {operation: 'twin.recentRuns.rebuild', operationId: randomUUID(), stage: 'projection', result: 'success', count: total, durationMs: Date.now() - started});
     }
 }
-function summarize(row: TwinRecord): TwinRecord {
+function summarize(row: TwinRecord, sourceCount?: number): TwinRecord {
     const data = row.payload;
     const collection = data.collection as Record<string, unknown> | undefined;
-    return {...row, payload: {...data, sourceCount: (data.sourceIds as string[]).length, completedSourceCount: (data.completedSourceIds as string[]).length,
+    return {family: row.family, id: row.id, revision: row.revision, payload: {...data, sourceCount: sourceCount ?? (data.sourceIds as string[]).length, completedSourceCount: (data.completedSourceIds as string[]).length,
         sourceIds: [], completedSourceIds: [], ...(collection ? {collection: Object.fromEntries(Object.entries(collection).filter(([name]) => name !== 'values'))} : {})}};
 }

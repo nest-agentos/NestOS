@@ -2,11 +2,12 @@ import { randomUUID } from '@nestos/common';
 import { sha256HexSync } from '@nestos/llm-context';
 import type { IFileSystem, ISeqFileTransaction, ISeqFileReadTransaction } from '@nestos/vfs-core';
 import { decodeCleanup, decodeRecord, epoch, identity, payload, recordKey, recordRef, refs, MAX_FORGET_RECORDS } from './codec';
-import type { TwinCleanup, TwinCommit, TwinCommitReceipt, TwinForget, TwinRecord, TwinRecordFamily, TwinRecordRef,
+import type { ScanLease, TwinCleanup, TwinCommit, TwinCommitReceipt, TwinForget, TwinRecord, TwinRecordFamily, TwinRecordRef,
     TwinRecordWrite, TwinStore } from './contracts';
 import { TwinSeqPages } from './seq-pages';
 import {TwinViewHealth} from './view-health';
 import {RecentRunIndex} from './recent-run-index';
+import { compactRunChain, encodeVersion, expandRunVersions, versionKey, type StoredVersion } from './scan-run-storage';
 import { TwinSeqStorage } from './seq-storage';
 
 /** Storage foundation for trusted host services; does not implement consumer/source policy. */
@@ -38,7 +39,26 @@ export class SeqTwinStore implements TwinStore {
             if (!revision) return null;
             const record = decodeRecord(await tx.getEntry(this.storage.file('knowledge'), versionKey(ref, revision)), ref);
             if (!record || record.revision !== revision) throw new Error('Twin version missing or inconsistent');
-            return record;
+            return (await expandRunVersions(tx, this.storage.file('knowledge'), [record]))[0];
+        });
+    }
+
+    async compactScanRun(id: string): Promise<number> {
+        const ref = {family: 'scan-run' as const, id};
+        recordRef(ref);
+        return this.storage.transaction(async tx => {
+            const path = this.storage.file('knowledge'), head = await tx.getEntry(path, 'head/' + recordKey(ref));
+            if (!head) return 0;
+            const versions = new Map<string, StoredVersion>();
+            await tx.walkEntries(path, entry => {
+                const version = decodeRecord(entry.value, ref) as StoredVersion;
+                if (!version || entry.key !== versionKey(ref, version.revision)) throw new Error('TWIN_SCAN_VERSION_KEY_INVALID');
+                versions.set(version.revision, version); return true;
+            }, {keyPrefix: 'version/' + recordKey(ref) + '/'});
+            const changes = compactRunChain(versions, head);
+            if (changes.length) await this.storage.requireCompactLayout(tx);
+            for (const version of changes) await tx.setEntry(path, versionKey(ref, version.revision), JSON.stringify(version));
+            return changes.length;
         });
     }
 
@@ -69,10 +89,21 @@ export class SeqTwinStore implements TwinStore {
             return [{ref,revision}];
         });
         const bodies = await tx.getEntriesMany(selected.map(({ref,revision}) => ({fileIdOrPath:this.storage.file('knowledge'),key:versionKey(ref,revision)})));
-        return selected.map(({ref,revision},index) => {
+        return expandRunVersions(tx, this.storage.file('knowledge'), selected.map(({ref,revision},index) => {
             const record = decodeRecord(bodies[index],ref);
             if (!record || record.revision !== revision) throw new Error('Twin index version inconsistent');
             return record;
+        }));
+    }
+
+    /** Worker leases use revision fencing and have no replayable caller operation. */
+    async replaceScanLease(data: ScanLease, expectedRevision: string | null): Promise<void> {
+        const record = {family: 'checkpoint' as const, id: 'scan-worker', revision: randomUUID(), payload: {...data}};
+        await this.storage.transaction(async tx => {
+            await this.checkWrite(tx, {...record, expectedRevision});
+            // Keep an existing legacy tail reachable by the forget/cleanup cursor.
+            const previous = expectedRevision === null ? null : await this.cleanVersion(tx, record, expectedRevision);
+            await this.write(tx, record, previous);
         });
     }
 
@@ -164,7 +195,9 @@ export class SeqTwinStore implements TwinStore {
 
     private async write(tx: ISeqFileTransaction, record: TwinRecord, previousRevision: string | null): Promise<void> {
         await this.pages.add(tx, record);
-        await tx.setEntry(this.storage.file('knowledge'), versionKey(record, record.revision), JSON.stringify({ ...record, previousRevision }));
+        const version = await encodeVersion(tx, this.storage.file('knowledge'), {...record, previousRevision});
+        if (version.sourceListRevision) await this.storage.requireCompactLayout(tx);
+        await tx.setEntry(this.storage.file('knowledge'), versionKey(record, record.revision), JSON.stringify(version));
         await tx.setEntry(this.storage.file('knowledge'), `head/${recordKey(record)}`, record.revision);
         await tx.setEntry(this.storage.file('indexes'), `family/${recordKey(record)}`, record.revision);
         await this.recentIndex().put(tx, record);
@@ -243,6 +276,5 @@ function jsonSnapshot<T>(value: T): T {
     return JSON.parse(raw) as T;
 }
 
-const versionKey = (ref: TwinRecordRef, revision: string) => `version/${recordKey(ref)}/${encodeURIComponent(revision)}`;
 const receiptKey = (id: string) => `receipt/${encodeURIComponent(id)}`;
 const cleanupKey = (id: string) => `cleanup/${encodeURIComponent(id)}`;

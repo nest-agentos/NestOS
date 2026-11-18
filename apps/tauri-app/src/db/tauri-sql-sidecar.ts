@@ -81,10 +81,9 @@ const DDL_STATEMENTS = [
         value TEXT NOT NULL,
         PRIMARY KEY (path, field)
     )`,
-    'CREATE INDEX IF NOT EXISTS idx_records_path ON records(path, field)',
 
 ];
-const SCHEMA_OBJECTS = ['_schema_version', 'meta_ext', 'meta_tags', 'records', 'idx_meta_tags_tag', 'idx_records_path'];
+const SCHEMA_OBJECTS = ['_schema_version', 'meta_ext', 'meta_tags', 'records', 'idx_meta_tags_tag'];
 
 export class TauriSqlSidecarDb implements ISidecarDb {
     async getRecordKeys(path: string, options: import('@nestos/vfs-core').RecordKeysOptions): Promise<string[]> {
@@ -120,6 +119,7 @@ export class TauriSqlSidecarDb implements ISidecarDb {
         const versions = tables.some(table => table.name === '_schema_version')
             ? await this.db.select<Array<{ version: number }>>('SELECT version FROM _schema_version') : [];
         if (versions.length !== 1 || versions[0].version !== SCHEMA_VERSION) throw new Error('Filesystem database version incompatible');
+        if (tables.some(table => table.name === 'idx_records_path')) await this.db.execute('DROP INDEX IF EXISTS idx_records_path');
         return SCHEMA_OBJECTS.every(name => tables.some(table => table.name === name));
     }
 

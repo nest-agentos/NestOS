@@ -65,19 +65,20 @@ it('closes an incompatible schema exactly once and scopes the close to its datab
     ]);
 });
 
-it('skips DDL on a complete current schema but retains connection setup', async () => {
-    const names = ['_schema_version', 'meta_ext', 'meta_tags', 'records', 'idx_meta_tags_tag', 'idx_records_path'];
+it.each([false, true])('only drops a redundant legacy index when present (%s)', async legacy => {
+    const names = ['_schema_version', 'meta_ext', 'meta_tags', 'records', 'idx_meta_tags_tag'];
     const invoke = vi.fn(async (command: string, params: any) => {
         if (command === 'sidecar_open_scope') return 1;
         if (command === 'sidecar_open_database') return false;
-        if (params?.query?.includes('sqlite_master')) return names.map(name => ({ name }));
+        if (params?.query?.includes('sqlite_master')) return (legacy ? [...names, 'idx_records_path'] : names).map(name => ({ name }));
         if (params?.query?.includes('SELECT version')) return [{ version: 4 }];
         return [];
     });
     vi.stubGlobal('window', { __TAURI_INTERNALS__: { invoke } });
     const db = await TauriSqlSidecarDb.open('/data/current.sqlite');
     try {
-        expect(invoke.mock.calls.filter(([command]) => command === 'sidecar_database_execute')).toEqual([]);
+        expect(invoke.mock.calls.filter(([command]) => command === 'sidecar_database_execute').map(([, params]) => params.query))
+            .toEqual(legacy ? ['DROP INDEX IF EXISTS idx_records_path'] : []);
         expect(invoke.mock.calls.filter(([command]) => command === 'sidecar_database_select')).toHaveLength(5);
     } finally { await db.close(); }
 });
@@ -149,7 +150,7 @@ it('reads a bounded record page in one select on the transaction connection', as
         expect(page).toEqual({ total: 1000, rows: [{ field: 'prefix/010', value: 'value' }] });
         expect(invoke.mock.calls.map(call => call[0])).toEqual(['sidecar_begin', 'sidecar_select', 'sidecar_finish']);
         expect(invoke.mock.calls[1][1]).toMatchObject({ transactionId: 42,
-            values: ['/records', 'prefix/%', '/records', 'prefix/%', 1, 10] });
+            values: ['/records', 'prefix/', 'prefix0', null, null, '/records', 'prefix/', 'prefix0', null, null, 1, 10] });
         expect(invoke.mock.calls[1][1].query).toContain('LIMIT ? OFFSET ?');
     } finally { await db.close(); }
 });

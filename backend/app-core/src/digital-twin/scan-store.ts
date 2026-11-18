@@ -1,9 +1,8 @@
 import { randomUUID } from '@nestos/common';
-import type { TwinRecordFamily, TwinRecordWrite } from './contracts';
+import type { ScanLease, TwinRecordFamily, TwinRecordWrite } from './contracts';
 import { TwinRecords, write, type TwinDataRecord } from './records';
 import { identifiers, SCAN_TERMINAL, type TwinScanRun } from './scan-domain';
 
-export interface ScanLease { owner: string; host: string; until: number; fence: number; }
 export interface ScanSchedule { planRevision: string; nextAt: number; signature: string; }
 type Condition = { family: TwinRecordFamily; id: string; expectedRevision: string | null };
 
@@ -31,7 +30,7 @@ export class TwinScanStore {
         if (lease && lease.data.owner !== this.owner && lease.data.until > this.now()) return null;
         const fence = lease?.data.owner === this.owner && lease.data.until > this.now() ? lease.data.fence : (lease?.data.fence ?? 0) + 1;
         try {
-            await this.records.save('checkpoint', 'scan-worker', { owner: this.owner, host: this.host, until: this.now() + this.leaseMs, fence }, lease?.revision ?? null);
+            await this.records.store.replaceScanLease({ owner: this.owner, host: this.host, until: this.now() + this.leaseMs, fence }, lease?.revision ?? null);
             return fence;
         } catch (error) { if (conflict(error)) return null; throw error; }
     }
@@ -40,12 +39,12 @@ export class TwinScanStore {
         await retry(async () => {
             const lease = await this.lease();
             if (!lease || lease.data.owner !== this.owner || lease.data.fence !== fence || lease.data.until === 0) throw new Error('TWIN_SCAN_LEASE_LOST');
-            await this.records.save('checkpoint', lease.id, { ...lease.data, until: this.now() + this.leaseMs }, lease.revision);
+            await this.records.store.replaceScanLease({ ...lease.data, until: this.now() + this.leaseMs }, lease.revision);
         });
     }
     async release(): Promise<void> {
         const lease = await this.lease();
-        if (lease?.data.owner === this.owner && lease.data.until !== 0) await this.records.save('checkpoint', lease.id, { ...lease.data, until: 0 }, lease.revision);
+        if (lease?.data.owner === this.owner && lease.data.until !== 0) await this.records.store.replaceScanLease({ ...lease.data, until: 0 }, lease.revision);
     }
     async fence(fence: number): Promise<Condition> {
         let lease = await this.lease();

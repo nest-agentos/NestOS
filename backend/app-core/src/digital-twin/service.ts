@@ -550,7 +550,7 @@ export class DigitalTwinService {
         if (this.workspace?.readOnly) {
             const path = `/var/lib/digital-twin/${this.workspace.twinId}/authority.seq`;
             const raw = await this.deps.fs.meta.seq?.getEntry(path, 'twin');
-            if (!raw || JSON.parse(raw).layoutVersion !== 8) throw new Error('TWIN_WORKSPACE_NOT_INITIALIZED');
+            if (!raw || ![8, 9].includes(JSON.parse(raw).layoutVersion)) throw new Error('TWIN_WORKSPACE_NOT_INITIALIZED');
         }
         const records = new TwinRecords(await SeqTwinStore.open(this.deps.fs, this.workspace?.twinId ?? 'personal', this.workspace?.ownerId ?? 'admin', stage => { this.initializationStage = stage; }));
         this.initializationStage = 'settings.initialize';

@@ -35,6 +35,51 @@ describe.each(['memory', 'indexeddb'] as const)('SeqTwinStore on %s', kind => {
         await expect(SeqTwinStore.open(fs, '../escape', 'owner')).rejects.toThrow('path identity');
     });
 
+    it('keeps a single worker lease and rejects stale fences without accumulating receipts', async () => {
+        const {fs, store} = await setup(kind);
+        const ref = {family: 'checkpoint' as const, id: 'scan-worker'};
+        const lease = {owner: 'worker', host: 'local', until: 100, fence: 1};
+        await store.replaceScanLease(lease, null);
+        const first = (await store.read(ref))!;
+        await store.replaceScanLease({...lease, until: 0}, first.revision);
+        await expect(store.replaceScanLease(lease, first.revision)).rejects.toThrow('revision conflict');
+        expect((await store.read(ref))?.payload.until).toBe(0);
+        const seq = fs.meta.seq!, root = '/var/lib/digital-twin/test';
+        expect(await seq.getEntry(root + '/knowledge.seq', 'version/checkpoint/scan-worker/' + first.revision)).toBeNull();
+        const receipts: string[] = [];
+        await seq.walkEntries(root + '/processing.seq', row => { receipts.push(row.key); return true; });
+        expect(receipts).toEqual([]);
+    });
+
+    it('preserves source order, historical anchors, recent counts and forgetting across compaction', async () => {
+        const {fs, store} = await setup(kind), seq = fs.meta.seq!;
+        const ref = {family: 'scan-run' as const, id: 'r'}, root = '/var/lib/digital-twin/test';
+        const sources = Array.from({length: 50}, (_, i) => 'source-' + i);
+        let revision: string | null = null;
+        const revisions: string[] = [];
+        for (const [i, ids] of [sources, sources, sources, sources.slice().reverse()].entries()) {
+            const receipt = await store.commit({operationId: 'step-' + i, expectedForgetEpoch: 0, writes: [
+                {...ref, expectedRevision: revision, payload: {sourceIds: ids, planId: 'p', completedSourceIds: [], createdAt: 1}}]});
+            revision = receipt.versions[0].revision; revisions.push(revision);
+            const key = 'version/scan-run/r/' + revision;
+            if (i === 1) {
+                const row = JSON.parse((await seq.getEntry(root + '/knowledge.seq', key))!);
+                expect(row.sourceListRevision).toBe(revisions[0]);
+                delete row.sourceListRevision; delete row.sourceCount; row.payload.sourceIds = ids;
+                await seq.setEntry(root + '/knowledge.seq', key, JSON.stringify(row));
+            }
+            expect((await store.read(ref))?.payload.sourceIds).toEqual(ids);
+            expect((await store.list('scan-run'))[0].payload.sourceIds).toEqual(ids);
+        }
+        expect(await store.compactScanRun('r')).toBe(2);
+        expect(await store.compactScanRun('r')).toBe(0);
+        await seq.deleteEntry(root + '/indexes.seq', 'recent-runs/ready-v1');
+        expect((await store.recentRuns(['p']))[0].payload.sourceCount).toBe(50);
+        await store.startForget({operationId: 'forget-run', expectedForgetEpoch: 0, records: [ref]});
+        await store.cleanBatch('forget-run', 4);
+        for (const rev of revisions) expect(await seq.getEntry(root + '/knowledge.seq', 'version/scan-run/r/' + rev)).toBeNull();
+    });
+
     it('commits linked records across files and replays the original receipt', async () => {
         const { fs, store } = await setup(kind);
         const first = await store.commit(commit());
