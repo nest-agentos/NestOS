@@ -14,7 +14,6 @@ import {SeqFileKernelStore} from '@nestos/durable-kernel';
 import {harnessExecutionJournalKey, SeqTwinStore} from '@nestos/app-core';
 import {acquireHostLock, NodeSqliteSidecarDb} from '@nestos/node-host/storage';
 
-const keepVersions = 1;
 const minimumAgeMs = 7 * 24 * 3600 * 1000;
 const operationId = randomUUID();
 let stage = 'arguments';
@@ -42,23 +41,23 @@ async function compactTasks(db: DatabaseSync, fs: IFileSystem) {
     const rows = db.prepare(`WITH candidates AS (
         SELECT path,json_extract(value,'$') AS body FROM records
         WHERE path GLOB '/var/lib/sessions/*/tasks/*/task.seq' AND field='__vfs_seq__:record')
-        SELECT path,json_extract(body,'$.id') AS id FROM candidates
-        WHERE json_extract(body,'$.status') IN ('succeeded','failed','cancelled')
-        AND json_extract(body,'$.updatedAt') <= ? AND json_extract(body,'$.version') >= ?
-        AND json_extract(body,'$.currentAttempt') IS NULL
-        AND NOT EXISTS (SELECT 1 FROM json_each(body,'$.effects') e
-            WHERE json_extract(e.value,'$.cleanupPending') OR json_extract(e.value,'$.currentAttempt') IS NOT NULL)
-        AND EXISTS (SELECT 1 FROM records s WHERE s.path=candidates.path AND
+        , policy AS (SELECT path,body,CASE
+            WHEN json_extract(body,'$.status') NOT IN ('succeeded','failed','cancelled') THEN 4
+            WHEN json_extract(body,'$.updatedAt') <= ? AND json_extract(body,'$.currentAttempt') IS NULL AND
+                NOT EXISTS (SELECT 1 FROM json_each(body,'$.effects') e WHERE json_extract(e.value,'$.cleanupPending')
+                    OR json_extract(e.value,'$.currentAttempt') IS NOT NULL) THEN 1 ELSE 2 END AS keep FROM candidates)
+        SELECT path,json_extract(body,'$.id') AS id,keep FROM policy
+        WHERE EXISTS (SELECT 1 FROM records s WHERE s.path=policy.path AND
             s.field=printf('__vfs_seq__:snapshot/%016d',json_extract(body,'$.version')))
-        AND EXISTS (SELECT 1 FROM records s WHERE s.path=candidates.path AND
-            s.field >= '__vfs_seq__:snapshot/' AND s.field < printf('__vfs_seq__:snapshot/%016d',json_extract(body,'$.version')))`).all(cutoff, keepVersions);
+        AND EXISTS (SELECT 1 FROM records s WHERE s.path=policy.path AND s.field >= '__vfs_seq__:snapshot/'
+            AND s.field < printf('__vfs_seq__:snapshot/%016d',json_extract(body,'$.version') - keep + 1))`).all(cutoff);
     let tasks = 0, snapshots = 0;
     const kernel = new SeqFileKernelStore({fs, rootPath: '/'}, async () => {throw new Error('UNEXPECTED_STORAGE_RESOLUTION');});
     for (const row of rows) {
         const rootPath = path.posix.dirname(path.posix.dirname(path.posix.dirname(String(row.path))));
         const id = String(row.id);
         if (id.includes('/') || String(row.path) !== rootPath + '/tasks/' + id + '/task.seq') throw new Error('TASK_STORAGE_IDENTITY_MISMATCH');
-        const {removed} = await kernel.compactTaskHistory({fs, rootPath}, id, {keepVersions});
+        const {removed} = await kernel.compactTaskHistory({fs, rootPath}, id, {keepVersions: Number(row.keep)});
         if (removed) {tasks++; snapshots += removed;}
     }
     return {tasks, snapshots};

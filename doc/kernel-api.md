@@ -779,7 +779,7 @@ Task 消息发送拒绝取消祖先下的新入队请求，原消息身份可重
 
 Session 布局声明：新记录携带 `layout`（布局版本、各记录族 schema 版本、必需能力与迁移状态）。`openSession` 与 `requireSessionTx` 校验这些字段；不支持的版本/记录族、缺失 schema、未知必需能力及未完成或非法迁移均拒绝。仅完全缺少 `layout` 字段的旧记录保留兼容读取。低层存储方法并非全部经该入口；这不构成在线迁移或跨主机 fencing 协议。
 
-Task 历史裁剪：`Kernel.compactTaskHistory(sessionId, taskId, { keepVersions?, beforeVersion? })` 只删除 Task 文件中的旧 `snapshot/<version>`，与 `task.history.compacted` 事件同事务提交。`keepVersions` 默认为 20，须为正安全整数；`beforeVersion` 可选，须为非负安全整数。只裁剪同时早于两个保留边界的版本，版本 0 也参与计数；当前 Task、attempts、Effect/交互及回执保留。返回 `{ removed, keptFrom }`，其中 `keptFrom` 是本次计算的保留边界，不保证更早已裁剪的数据存在。已删除版本的分页读取返回空。此 API 不管理外部读者的历史固定版本租约，也不代替完整 retention/GC 故障验收。
+Task 历史裁剪：`Kernel.compactTaskHistory(sessionId, taskId, { keepVersions?, beforeVersion? })` 只删除 Task 文件中的旧 `snapshot/<version>`，与 `task.history.compacted` 事件同事务提交。`keepVersions` 默认为 4，须为正安全整数；`beforeVersion` 可选，须为非负安全整数。只裁剪同时早于两个保留边界的版本，版本 0 也参与计数；当前 Task、attempts、Effect/交互及回执保留。返回 `{ removed, keptFrom }`，其中 `keptFrom` 是本次计算的保留边界，不保证更早已裁剪的数据存在。已删除版本的分页读取返回空。此 API 不管理外部读者的历史固定版本租约，也不代替完整 retention/GC 故障验收。
 
 Task 事件裁剪：`Kernel.pruneTaskEvents(sessionId, taskId, { keepEvents? })` 默认保留最近 200 条已索引事件；数量须为正安全整数。删除旧事件及 Task 索引、写入保留水位和裁剪审计事件在同一事务内完成。裁剪会校验索引指向的事件属于当前 Session/Task，损坏索引或非法水位均拒绝。审计事件本身也进入索引，因此本次保留窗口之外会新增一条事件；重复裁剪可能移除一条旧事件。Session 级事件、其他 Task、当前 Task 记录和历史快照不受影响。
 
@@ -939,3 +939,5 @@ Flow 声明 `flow.scheduler`，调用意图声明 `session.flow.admission`，独
 `resolveEffect({requestId,effectId,outcome:{type:"reconcile"}})` 用于只重新核对原未知 Effect，稳定请求幂等且不授予 replayAuthorized。核对适配器缺失时保持未知，不按 idempotent-retry 绕过；适配器必须取得真实结果或正式未启动证据才能继续推进。权限、祖先取消、暂停、原操作身份及执行期限约束沿原链路保留。
 
 本地宿主离线维护会将至少 7 天没有更新、已终态且无进行中 attempt 或 Effect 清理的 Task 收敛到最后一个快照。当前记录、最终版本、事件和回执保留，显式读取被裁掉的历史版本会返回不可用。Harness 执行恢复使用带 CAS 的当前检查点，写入使用 `history: 'latest'`，在同一事务内发布新版、捕获等待证据并移除上一版。普通共享值继续保留版本历史。
+
+Task 快照在每次更新的同一事务裁剪。运行中最多保留 4 版，终态最多 2 版；显式维护可将稳定终态进一步收敛为 1 版。版本号持续递增，过期版本的精确查询为空。
