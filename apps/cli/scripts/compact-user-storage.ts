@@ -47,9 +47,7 @@ async function compactTasks(db: DatabaseSync, fs: IFileSystem) {
                 NOT EXISTS (SELECT 1 FROM json_each(body,'$.effects') e WHERE json_extract(e.value,'$.cleanupPending')
                     OR json_extract(e.value,'$.currentAttempt') IS NOT NULL) THEN 1 ELSE 2 END AS keep FROM candidates)
         SELECT path,json_extract(body,'$.id') AS id,keep FROM policy
-        WHERE EXISTS (SELECT 1 FROM records s WHERE s.path=policy.path AND
-            s.field=printf('__vfs_seq__:snapshot/%016d',json_extract(body,'$.version')))
-        AND EXISTS (SELECT 1 FROM records s WHERE s.path=policy.path AND s.field >= '__vfs_seq__:snapshot/'
+        WHERE EXISTS (SELECT 1 FROM records s WHERE s.path=policy.path AND s.field >= '__vfs_seq__:snapshot/'
             AND s.field < printf('__vfs_seq__:snapshot/%016d',json_extract(body,'$.version') - keep + 1))`).all(cutoff);
     let tasks = 0, snapshots = 0;
     const kernel = new SeqFileKernelStore({fs, rootPath: '/'}, async () => {throw new Error('UNEXPECTED_STORAGE_RESOLUTION');});
@@ -61,6 +59,16 @@ async function compactTasks(db: DatabaseSync, fs: IFileSystem) {
         if (removed) {tasks++; snapshots += removed;}
     }
     return {tasks, snapshots};
+}
+
+function removeDuplicateCurrentSnapshots(db: DatabaseSync): number {
+    db.exec(`DELETE FROM records AS snapshot
+        WHERE snapshot.path GLOB '/var/lib/sessions/*/tasks/*/task.seq' AND snapshot.field GLOB '__vfs_seq__:snapshot/*'
+        AND EXISTS (SELECT 1 FROM records AS current WHERE current.path=snapshot.path
+            AND current.field='__vfs_seq__:record' AND current.value=snapshot.value
+            AND json_type(json_extract(current.value,'$'),'$.version')='integer'
+            AND snapshot.field=printf('__vfs_seq__:snapshot/%016d',json_extract(json_extract(current.value,'$'),'$.version')))`);
+    return Number(db.prepare('SELECT changes() AS removed').get()?.removed);
 }
 
 async function compactHarnessJournals(db: DatabaseSync, fs: IFileSystem) {
@@ -103,12 +111,24 @@ async function pruneJournal(tx: import('@nestos/vfs-core').ISeqFileTransaction, 
 }
 
 async function run() {
-    if (process.argv.length !== 3) throw new Error('Expected the user bundle .nestos directory');
+    const onlyDuplicates = process.argv[3] === '--current-snapshots-only';
+    if (process.argv.length !== (onlyDuplicates ? 4 : 3)) throw new Error('Expected the user bundle .nestos directory');
     const internal = path.resolve(process.argv[2]), dbFile = path.join(internal, 'meta/index.db'), rootDir = path.join(internal, 'state');
     await stat(dbFile); await stat(rootDir);
     stage = 'lock';
     const release = await acquireHostLock(path.join(internal, 'host-lock'));
     try {
+        if (onlyDuplicates) {
+            const db = new DatabaseSync(dbFile);
+            try {
+                stage = 'current-task-snapshots';
+                const duplicates = removeDuplicateCurrentSnapshots(db);
+                if (duplicates || Number(db.prepare('PRAGMA freelist_count').get()?.freelist_count)) db.exec('VACUUM');
+                verifyDatabase(db);
+                console.info({operation: 'storage.compact', operationId, stage, result: 'success', duplicates});
+            } finally {db.close();}
+            return;
+        }
         const backend = await openLocalFSBackend({rootDir, sidecarDir: path.dirname(dbFile), createDb: NodeSqliteSidecarDb.open});
         try {
             const {manager} = await createVFS({rootBackend: backend});
@@ -117,17 +137,22 @@ async function run() {
     } finally {release();}
 }
 
+function verifyDatabase(db: DatabaseSync) {
+    if (db.prepare('PRAGMA integrity_check').get()?.integrity_check !== 'ok') throw new Error('SQLITE_INTEGRITY_CHECK_FAILED');
+}
+
 async function maintain(dbFile: string, fs: IFileSystem) {
     const db = new DatabaseSync(dbFile), started = Date.now();
     try {
         stage = 'scan-history'; const runs = await compactRuns(db, fs);
         stage = 'task-history'; const tasks = await compactTasks(db, fs);
         stage = 'harness-checkpoints'; const harness = await compactHarnessJournals(db, fs);
+        stage = 'current-task-snapshots'; const duplicates = removeDuplicateCurrentSnapshots(db);
         stage = 'vacuum';
-        if (runs.versions || tasks.snapshots || harness.revisions || Number(db.prepare('PRAGMA freelist_count').get()?.freelist_count)) db.exec('VACUUM');
+        if (duplicates || runs.versions || tasks.snapshots || harness.revisions || Number(db.prepare('PRAGMA freelist_count').get()?.freelist_count)) db.exec('VACUUM');
         stage = 'verify';
-        if (db.prepare('PRAGMA integrity_check').get()?.integrity_check !== 'ok') throw new Error('SQLITE_INTEGRITY_CHECK_FAILED');
-        console.info({operation: 'storage.compact', operationId, stage, result: 'success', ...runs, ...tasks, ...harness, durationMs: Date.now() - started});
+        verifyDatabase(db);
+        console.info({operation: 'storage.compact', operationId, stage, result: 'success', ...runs, ...tasks, ...harness, duplicates, durationMs: Date.now() - started});
     } finally {db.close();}
 }
 run().catch(error => {console.error({operation: 'storage.compact', operationId, stage, result: 'failure', error: error.message}); process.exitCode = 1;});
