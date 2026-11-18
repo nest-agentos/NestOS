@@ -937,3 +937,5 @@ Flow 声明 `flow.scheduler`，调用意图声明 `session.flow.admission`，独
 
 
 `resolveEffect({requestId,effectId,outcome:{type:"reconcile"}})` 用于只重新核对原未知 Effect，稳定请求幂等且不授予 replayAuthorized。核对适配器缺失时保持未知，不按 idempotent-retry 绕过；适配器必须取得真实结果或正式未启动证据才能继续推进。权限、祖先取消、暂停、原操作身份及执行期限约束沿原链路保留。
+
+本地宿主离线维护会将至少 7 天没有更新、已终态且无进行中 attempt 或 Effect 清理的 Task 收敛到最后一个快照。当前记录、最终版本、事件和回执保留，显式读取被裁掉的历史版本会返回不可用。Harness 执行恢复使用带 CAS 的当前检查点，写入使用 `history: 'latest'`，在同一事务内发布新版、捕获等待证据并移除上一版。普通共享值继续保留版本历史。

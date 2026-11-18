@@ -18,9 +18,9 @@ export function harnessCleanupRecord(session: Pick<SessionHandle, 'getShared' | 
     const assertKey = (key: string) => {if (key !== allowed) throw new FSError('EACCES', 'Harness cleanup may only access its scoped record');};
     return {
         get: async key => {assertKey(key); await ensureWritable(sessionId); return session.getShared(key);},
-        set: async (key, value, expectedVersion) => {
+        set: async (key, value, expectedVersion, history) => {
             assertKey(key); await ensureWritable(sessionId);
-            return session.setShared(key, value, expectedVersion === undefined ? undefined : {expectedVersion});
+            return session.setShared(key, value, {expectedVersion, history});
         },
     };
 }

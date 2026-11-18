@@ -66,7 +66,7 @@ export class ExecutionJournal {
     }
     async save(update: Partial<ExecutionJournalData>): Promise<void> {
         const next = { ...this.data, ...update };
-        const saved = await this.state.set(this.key, jsonValue(next), this.revision);
+        const saved = await this.state.set(this.key, jsonValue(next), this.revision, 'latest');
         this.data = next; this.revision = saved.version;
     }
     async operation(step: string, value: NativeOperation): Promise<void> {
@@ -76,7 +76,7 @@ export class ExecutionJournal {
     async operationIfRunning(step: string, value: NativeOperation): Promise<boolean> {
         if (!this.state.setIfRunning) throw executionError('NATIVE_CONTINUATION_GUARD_UNAVAILABLE');
         const next = { ...this.data, operations: { ...this.data.operations, [step]: value } };
-        const saved = await this.state.setIfRunning(this.key, jsonValue(next), this.revision);
+        const saved = await this.state.setIfRunning(this.key, jsonValue(next), this.revision, 'latest');
         if (!saved) return false;
         this.data = next; this.revision = saved.version;
         return true;
