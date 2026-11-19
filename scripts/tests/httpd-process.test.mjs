@@ -59,7 +59,8 @@ test('restart waits for the former host to exit and registers exactly one replac
     const entry = path.join(releases, 'fixture/server/main.js'), registry = path.join(root, 'release/httpd-processes/release.json');
     const runners = [];
     async function spawnRunner(command) {
-        const child = spawn(process.execPath, ['scripts/httpd.mjs', command], {cwd:root,stdio:'ignore',env:{...process.env,NESTOS_HTTPD_CONTROL_DIR:path.join(root,'control')}}); runners.push(child); return child;
+        const env = {...process.env, PATH: `${path.join(root, 'scripts')}${path.delimiter}${process.env.PATH}`, NESTOS_HTTPD_CONTROL_DIR:path.join(root,'control')};
+        const child = spawn(process.execPath, ['scripts/httpd.mjs', command], {cwd:root,stdio:'ignore',env}); runners.push(child); return child;
     }
     async function registered(previous = 0) {
         const deadline = Date.now() + 5000;
@@ -74,7 +75,8 @@ test('restart waits for the former host to exit and registers exactly one replac
         await mkdir(path.dirname(entry), {recursive: true}); await mkdir(path.join(root, 'scripts'));
         await mkdir(path.join(root, 'tools/temporary-process/node'), {recursive: true});
         await writeFile(path.join(root, 'package.json'), '{"type":"module"}');
-        for (const name of ['httpd.mjs','httpd-process.mjs','httpd-launcher.mjs','httpd-launch-state.mjs','httpd-child.mjs','httpd-diagnostics.mjs']) await writeFile(path.join(root, 'scripts', name), await readFile(new URL('../' + name, import.meta.url)));
+        for (const name of ['httpd.mjs','httpd-firecracker.mjs','httpd-process.mjs','httpd-launcher.mjs','httpd-launch-state.mjs','httpd-child.mjs','httpd-diagnostics.mjs']) await writeFile(path.join(root, 'scripts', name), await readFile(new URL('../' + name, import.meta.url)));
+        await writeFile(path.join(root, 'scripts/systemctl'), "#!/bin/sh\n[ \"$1\" = show ] || exit 1\nprintf 'LoadState=not-found\\nActiveState=inactive\\n'\n", {mode: 0o755});
         await writeFile(path.join(root, 'scripts/httpd-runtime.mjs'), `export const hostArguments=()=>[],hostEnvironment=()=>process.env,runtimePaths=()=>({runtime:'unused'}),runtimeLog=()=>({write(){},close(){}}),releaseDirectory=(r,id)=>r+'/'+id,releasesRoot=root=>root+'/release/httpd',verifyRelease=()=>{};`);
         await writeFile(path.join(root,'scripts/httpd-launch-health.mjs'),'export const launchHealth=()=>async()=>true;');
         await writeFile(path.join(root, 'scripts/httpd-build.mjs'), 'export function buildHttpRelease() {}');

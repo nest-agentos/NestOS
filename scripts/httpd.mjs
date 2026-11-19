@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import {recover as recoverTemporaryProcesses} from '../tools/temporary-process/node/index.mjs';
 import { spawn, execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, readdirSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, readdirSync, renameSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -97,9 +97,13 @@ function prepareLifecycleLog(command, args) {
         setLifecycleLog(chunk => output.write(chunk)); process.once('exit', () => output.close());
     } catch (error) {console.warn('[HTTPProcess] log unavailable:', error.code ?? 'HTTPD_LOG_UNAVAILABLE');}
 }
-const [command = 'start', ...args] = process.argv.slice(2), commandStarted = Date.now();
+const [command = 'start', ...args] = process.argv.slice(2), commandStarted = Date.now(), operationId = randomUUID();
 try {
     prepareLifecycleLog(command, args);
+    if (command === 'restart' && process.platform === 'linux' && existsSync('/run/systemd/system')) {
+        const {prepareRestartFirecracker} = await import('./httpd-firecracker.mjs');
+        prepareRestartFirecracker(operationId);
+    }
     if (command === 'deploy' && args.includes('--help')) console.log('Usage: ./httpd.sh [--no-cache]\nBuild, switch the running HTTP service, and verify its version and health.');
     else if (command === 'deploy') await (await import('./httpd-deploy.mjs')).deployHttpd(root, releases, args, build);
     else if (command === 'build') build(args);
@@ -118,6 +122,6 @@ try {
     }
     else throw new Error('Usage: httpd.mjs deploy [--no-cache] | build [--share-main] [--no-cache] [--no-activate] | start [httpd options] | dev [httpd options] | stop [--dev] | restart [--dev] [httpd options] | switch <release-id> [--expected-current <id>] [--operation-id <id>] [--service-id <id>] | status | list | activate <release-id>');
 } catch (error) {
-    lifecycleLog({operationId: randomUUID(), stage: command, result: 'failure', code: error.code ?? 'HTTPD_COMMAND_FAILED', durationMs: Date.now() - commandStarted});
+    lifecycleLog({operationId, stage: command, result: 'failure', code: error.code ?? 'HTTPD_COMMAND_FAILED', durationMs: Date.now() - commandStarted});
     console.error(error.code === 'ENOENT' && command === 'start' ? 'No HTTP release found. Run pnpm httpd:build first.' : error.message); process.exitCode = 1;
 }
