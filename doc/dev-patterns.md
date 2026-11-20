@@ -167,3 +167,7 @@ Responses 请求统一发送 `input` item 数组，包括单条纯文本消息�
 Flow 草稿缺省 `layout` 在定义读取边界归一为 `{}`，只补展示值，不重写源文件或发布修订；新模板应声明节点位置。Flow 编辑器区分读取、接管和渲染阶段，加载失败保留可见错误码与 operationId，日志不含 Flow 正文或原始异常内容。
 
 UI 修改在开发交付前执行适用的类型、测试和 `pnpm styles:check`，新增 markup 类必须定义规则、移除无用类或明确声明行为标记。样式检查复用 Git 源文件枚举，纳入已初始化独立库与未忽略的新源码，跳过忽略的构建产物和符号链接；失效构建链接不阻断源码检查。HTTP 源码快照复用同一枚举机制，并保留制品模式排除 libraries 源码的规则。
+
+### PlantUML 预览
+
+Markdown 中的 `plantuml` 和 `puml` 代码块默认生成图表。源码须包含 `@startuml` 与 `@enduml`；C4 Deployment 同样需要完整的 PlantUML 输入及服务端可用的 C4 宏。预览使用外部 PlantUML 服务，图表源码以可还原的编码放入请求 URL 并发送给该服务，请勿在不可信服务上渲染敏感内容。宿主可通过编辑器 `defaultPluginOptions.plantuml.serverUrl` 配置服务地址（默认 `https://www.plantuml.com/plantuml`），也可通过 `-plantuml` 禁用插件。服务或网络失败时保留原代码块；预览不会修改用户文件。

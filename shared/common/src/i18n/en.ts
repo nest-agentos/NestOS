@@ -3252,6 +3252,8 @@ export const en: LocaleStrings = {
     'editor.file.backupTime': 'Backed up: {time}. Closing the editor deletes its swap; httpd removes swaps older than 2 days at startup and hourly.',
     'editor.file.backupTimeUnknown': 'Unknown (legacy backup has no timestamp)',
     'editor.file.noBackup': 'No pre-refresh backup',
+    'editor.plantuml.invalid': 'PlantUML requires @startuml and @enduml. Add them and retry; the source is preserved below.',
+    'editor.plantuml.failed': 'PlantUML service or network failed. Check the network, service address and diagram syntax, then retry; the source is preserved below.',
     'editor.file.info': 'File information',
     'editor.file.created': 'Created',
     'editor.file.modified': 'Modified',

@@ -3252,6 +3252,8 @@ export const zhCN = {
     'editor.file.backupTime': '备份时间：{time}。关闭编辑器时删除；httpd 启动时及每小时清理超过 2 天的 swap。',
     'editor.file.backupTimeUnknown': '未知（旧副本未记录时间）',
     'editor.file.noBackup': '暂无刷新前副本',
+    'editor.plantuml.invalid': 'PlantUML 需要 @startuml 和 @enduml。请补全后重试；原源码保留如下。',
+    'editor.plantuml.failed': 'PlantUML 服务或网络不可用，请检查网络、服务地址和图表语法后重试；原源码保留如下。',
     'editor.file.info': '文件信息',
     'editor.file.created': '创建时间',
     'editor.file.modified': '修改时间',
