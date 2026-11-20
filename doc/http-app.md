@@ -322,6 +322,8 @@ HTTP 页面现在由轻入口同时启动数据连接、Shell 模块和当前编
 
 初始 `POST /api/application` 的 `kind=bootstrap` 可以携带 `initialView: OpenViewRequest` 与 `knownSnapshots: string[]`。后端在本客户端中完成 openView、注册初始观察，再导出服务图和 `initialView`。初始连接兴趣在 openView 内建立，前端按单调 revision 更新：只有已确认相同集合才省略请求；在途或失败时不能按旧集合去重，较早响应不能覆盖较新确认。装配期间只保留最高 revision。普通的无目标 bootstrap 与后续 openView 接口继续可用；已有编辑器切换仍保存后激活。
 
+资源工作台按目标项目登记文件挂载兴趣，文件、目录和远程会话打开失败时也不依赖会话成功来触发首次探测。导航中出现其他项目不会因此探测其文件挂载；隐藏与释放撤销兴趣。挂载状态变化使导航快照失效，恢复时刷新受影响目录；文件不可用时保留具体诊断并提供检查和项目状态入口。远程会话状态与文件挂载状态分别呈现。
+
 初始响应开启缓存时为 `{payload, cache}`：payload 中的 `{$cache: sha256}` 指向本地已验证的数据或本次 cache 字典。未携带 knownSnapshots 的显式协议调用继续返回普通 RPC Reply。初始观察事件使用同一 SSE 帧的 viewEvents 字段发送；HttpViewClient 在安装能力图后按序处理，提供本地 observeView 适配，组件不再远程登记初始订阅。全量快照、版本补丁、回调和应用事件仍使用有界顺序队列。
 
 缓存边界与校准：

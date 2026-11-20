@@ -40,8 +40,8 @@ export class RemoteSessionStatusView {
     private sync() {
         const candidates = this.navigationVisible ? [this.current, ...this.loadedProjects, ...this.tabs.values()]
             : [this.activeTab && this.tabs.get(this.activeTab)];
-        const interested = this.visible ? [...new Set(candidates
-            .filter((id): id is string => !!id))].sort() : [];
+        const current = this.activeTab && this.tabs.get(this.activeTab) || this.current;
+        const interested = this.visible && current ? [current] : [];
         const key = JSON.stringify(interested);
         if (key !== this.observed) {
             this.observed = key;

@@ -26,6 +26,32 @@ function setup() {
     return { rerunSession, kernel, sidebar, workbench, repository, files, factory, release, dispose, destroy, onSelect, manifest, changed: () => listeners.forEach(listener => listener()) };
 }
 afterEach(() => vi.unstubAllGlobals());
+it('shows a directory failure and a retry action without exposing the file contents', async () => {
+    const f = setup(); await f.workbench.start(); const w = f.workbench as any;
+    w.projects = {remoteMounts: {projectStatus: async () => ({mounts: []})}};
+    const retry = vi.spyOn(w, 'openResource').mockResolvedValue(undefined), path = '/folder:P/@files';
+    try {
+        await w.showRemoteFileFailure(path, 'p', {check() {}}, new FSError('EACCES', 'Directory access denied'));
+        expect(w.tabs.content.textContent).toContain('Directory access denied');
+        const button = [...w.tabs.content.querySelectorAll('button')].find((item: any) => item.textContent === t('diagnostics.check')) as HTMLButtonElement;
+        button.click(); expect(retry).toHaveBeenCalledWith(path, {reload: true});
+    } finally {await f.workbench.destroy();}
+});
+it('keeps the failed file recovery action available while checking and reopens once online', async () => {
+    const f = setup(); await f.workbench.start(); const w = f.workbench as any;
+    const path = '/folder:P/@files/note.md'; let state = 'offline';
+    w.projects = {forFolder: async () => ({project: {id: 'p'}}), remoteMounts: {
+        list: () => [{mountId: 'm'}], status: () => state, projectOffline: () => state === 'offline'}};
+    await w.tabs.open(path, 'note', false); w.tabs.current.failed = true; w.active = path;
+    w.tabs.content.innerHTML = '<div class="mm-placeholder" role="alert"></div>';
+    const open = vi.spyOn(w, 'openResource').mockResolvedValue(undefined);
+    try {
+        await w.applyRemoteAvailability(path); expect(w.container.inert).toBe(false);
+        state = 'checking'; await w.applyRemoteAvailability(path); expect(open).not.toHaveBeenCalled();
+        state = 'online'; await w.applyRemoteAvailability(path);
+        expect(open).toHaveBeenCalledExactlyOnceWith(path, {reload: true});
+    } finally {await f.workbench.destroy();}
+});
 it.each(['/folder:P/@files', '/s/files'])('keeps the file directory %s unchanged during background invalidations', async path => {
     const f = setup(); await f.workbench.start();
     const workbench = f.workbench as any, showDirectory = vi.spyOn(workbench, 'showDirectory').mockResolvedValue(undefined);

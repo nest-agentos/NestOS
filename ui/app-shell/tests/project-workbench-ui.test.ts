@@ -223,6 +223,7 @@ it('restores a bookmark inside an unreachable remote project without aborting bo
     projects.remoteMounts = {
         onChange: () => () => {}, async compose(_id: string, owner: unknown) { return owner; }, async checkConnections() {}, projectOffline: () => true, degraded: () => true,
         list: () => [], status: () => 'offline', connectionStatus: () => 'offline', connection: () => { throw new Error('none'); },
+        projectStatus: async () => ({mounts: [{failure: {code: 'ETIMEDOUT', reason: 'timeout'}}]}),
         connections: () => [], assertUnmountable: async () => {}, forgetProject: async () => {}, dispose: async () => {},
     } as never;
     const sidebar = document.createElement('div'), main = document.createElement('div'); document.body.append(sidebar, main);
@@ -237,9 +238,11 @@ it('restores a bookmark inside an unreachable remote project without aborting bo
         expect(create?.disabled).toBe(true);
         await expect(workbench.createResource({ parentPath: folderBrowserPath(remote.path) })).rejects.toThrow();
         await workbench.openResource(folderBrowserPath(remote.path) + '/@files');
-        expect(main.inert).toBe(true);
+        expect(main.inert).toBe(false);
         expect(workbench.getActiveResourceId()).toBe(folderBrowserPath(remote.path) + '/@files');
         expect(main.textContent).toContain('远程文件无法连接');
+        expect(main.textContent).toContain('ETIMEDOUT');
+        expect([...main.querySelectorAll('button')].map(button => button.textContent)).toEqual(expect.arrayContaining([t('diagnostics.check'), t('diagnostics.projectStatus')]));
         await workbench.openResource(`${folderBrowserPath(await projects.sessionFolder(remote))}/${existing}`);
         expect(main.inert).toBe(false);
         expect(workbench.getActiveResourceId()).toContain(existing);

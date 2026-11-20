@@ -3,6 +3,7 @@ import { MemoryBackend } from '@nestos/vfs-core';
 import { conversationResourcePath, folderBrowserPath, projectConversationsPath, resolveBrowserTarget } from '@nestos/app-contracts';
 import { createApplicationRuntime, type ApplicationRuntime } from '../src/runtime/create-application-runtime';
 import { createSessionBrowser } from '../src/session/session-browser';
+import {t} from '@nestos/common';
 
 let app: ApplicationRuntime | undefined, browser: Awaited<ReturnType<typeof createSessionBrowser>> | undefined;
 afterEach(async () => {await browser?.dispose(); await app?.dispose(); browser = undefined; app = undefined;});
@@ -34,6 +35,16 @@ async function setup(extraAgentSessions = 0) {
     return {project, peer, mounts, fs: browser.fs};
 }
 const isSession = (path: string) => {const target = resolveBrowserTarget(path); return target.kind === 'session' || target.kind === 'remote' && !!target.nativeSessionId;};
+
+it('keeps a remote session favorite distinct from offline project files', async () => {
+    const {project, fs} = await setup();
+    await app!.projects.favorites.toggle(project.project.id, {kind: 'remote-session', connectionId: 'server', serverId: 'server', serverProjectId: 'native', profileId: 'codex', sessionId: 's'}, 'Session');
+    await app!.projects.favorites.toggle(project.project.id, {kind: 'file', path: '/workspace/a', nodeType: 'file'}, 'File');
+    vi.spyOn(app!.projects.remoteMounts!, 'projectOffline').mockReturnValue(true);
+    const rows = await fs.driver.getChildren(`${folderBrowserPath(project.path)}/@favorites`);
+    expect(rows.find(row => row.metadata.title === 'Session')?.metadata).toMatchObject({_disabled: false, navigationDescription: t('harness.remoteSessions')});
+    expect(rows.find(row => row.metadata.title === 'File')?.metadata._disabled).toBe(true);
+});
 
 it('projects fifteen mixed recent sessions and pages the complete collection through a contained VFS', async () => {
     const {project, peer, fs} = await setup(), root = folderBrowserPath(project.path), recentPath = projectConversationsPath(project.path, {recent: true});

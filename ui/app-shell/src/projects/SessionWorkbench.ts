@@ -8,6 +8,7 @@ import { PROJECT_ACTION_ICONS } from '@nestos/common';
 import {projectFileSource} from '@nestos/app-contracts';
 import {showProjectSettings} from './project-settings';
 import {showDiagnostics} from '../diagnostics/dialog';
+import {diagnosticReasonText} from '@nestos/app-settings';
 import {withAssistantShortcut} from '../navigation/assistant-actions';
 import {projectAssistantShortcut} from './project-assistant-shortcut';
 import {navigateWorkspaceBack} from '../navigation/page-history';
@@ -604,7 +605,11 @@ export class SessionWorkbench implements WorkspaceController {
         if (this.projects?.remoteMounts) this.subscriptions.add(
             this.projects.remoteMounts.onChange(change => {
                 this.updateRemoteAvailability();
-                if(change?.kind==='status'){this.projectNavigation?.refreshAvailability();return;}
+                if(change?.kind==='status'){
+                    this.projectNavigation?.refreshAvailability();
+                    this.scheduleRefresh('remote-status');
+                    return;
+                }
                 this.scheduleRefresh('remote-configuration');
             }));
         if (!this.active) {
@@ -700,6 +705,7 @@ export class SessionWorkbench implements WorkspaceController {
         const path = this.active;
         void this.applyRemoteAvailability(path).catch(error => this.report(error));
     }
+    private recoveringRemoteFile = false;
     private async applyRemoteAvailability(path: string | null): Promise<void> {
         if (!this.projects?.remoteMounts) return;
         const target = path && !path.startsWith('draft:') && !path.startsWith('@agent/') ? resolveBrowserTarget(parseSessionRoute(path).path) : undefined;
@@ -707,10 +713,21 @@ export class SessionWorkbench implements WorkspaceController {
             ? (await this.repository.getManifest(target.sessionId)).folder : undefined;
         const project = folder ? await this.projects.forFolder(folder) : undefined;
         if (this.closed || path !== this.active) return;
-        const offline = !!project && this.projects.remoteMounts.projectOffline(project.project.id);
-        this.container.inert = offline;
+        const wasOffline = this.container.classList.contains('project-workbench--offline');
+        const mounts = project && this.projects.remoteMounts.list(project.project.id);
+        const offline = !!project && (this.projects.remoteMounts.projectOffline(project.project.id)
+            || wasOffline && !!mounts?.some(mount => this.projects!.remoteMounts!.status(mount.mountId) === 'checking'));
+        const blocked = offline && !(this.tabs.current?.failed && !this.editor && !this.previewCleanup);
+        this.container.inert = blocked;
         this.container.classList.toggle('project-workbench--offline', offline);
-        this.container.setAttribute('aria-disabled', String(offline));
+        this.container.setAttribute('aria-disabled', String(blocked));
+        if (!offline && mounts?.length && mounts.every(mount => this.projects!.remoteMounts!.status(mount.mountId) === 'online')
+            && this.tabs.current?.failed && this.tabs.content.querySelector('.mm-placeholder[role="alert"]') && !this.recoveringRemoteFile && path) {
+            this.recoveringRemoteFile = true;
+            try {await this.openResource(path, {reload: true});} finally {this.recoveringRemoteFile = false;}
+        } else if (wasOffline && !offline && !this.editor && !this.previewCleanup && !this.tabs.current?.failed) {
+            await refreshDirectoryList(this.tabs.content);
+        }
     }
 
     private showProjectStatus(projectId: string, container?: HTMLElement, signal = this.dialogs.signal): Promise<void> {
@@ -972,12 +989,28 @@ export class SessionWorkbench implements WorkspaceController {
             reportRemoteFailure(error, {stage: 'project-open', projectId: project.project.id});
             if (this.tabs.current) this.tabs.current.failed = true;
             this.container.inert = true; this.container.classList.add('project-workbench--offline'); this.container.setAttribute('aria-disabled', 'true');
-            if (this.editor || this.previewCleanup) this.report(error); else this.message(error.message);
+            if (this.editor || this.previewCleanup) this.report(error);
+            else await this.showRemoteFileFailure(path, project.project.id, load);
             return false;
         } catch (error) {
             if (!(error instanceof ViewLoadCancelled)) reportRemoteFailure(error, {stage: 'project-open', projectId: project.project.id});
             throw error;
         }
+    }
+    private async showRemoteFileFailure(path: string, projectId: string, load: ViewLoad, error?: unknown): Promise<void> {
+        const status = await this.projects!.remoteMounts!.projectStatus?.(projectId).catch(() => undefined);
+        load.check();
+        const failure = status?.mounts.find(mount => mount.failure)?.failure ?? status?.issue;
+        const panel = document.createElement('div'); panel.className = 'mm-placeholder'; panel.setAttribute('role', 'alert');
+        const reason = document.createElement('p');
+        reason.textContent = [error ? describeErrorReason(localizeMountError(error)) : t('remote.projectOffline'), failure?.code,
+            failure?.reason && diagnosticReasonText(failure.reason)].filter(Boolean).join(' · ');
+        const diagnostics = document.createElement('button'); diagnostics.type = 'button'; diagnostics.textContent = t('diagnostics.projectStatus');
+        diagnostics.onclick = () => {void this.showProjectStatus(projectId).catch(error => this.report(error));};
+        const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = t('diagnostics.check');
+        retry.onclick = () => {void this.openResource(path, {reload: true}).catch(error => this.report(error));};
+        panel.append(reason, diagnostics, retry); this.tabs.content.replaceChildren(panel);
+        this.container.inert = false; this.container.setAttribute('aria-disabled', 'false');
     }
     async openResource(resourceId: string, options: OpenResourceOptions = {}): Promise<void> {
         const projectAction=parseProjectAction(resourceId);
@@ -1272,7 +1305,12 @@ export class SessionWorkbench implements WorkspaceController {
                 }
                 if (this.tabs.current?.id === id) {
                     this.active = id; this.activeBranch = undefined; this.tabs.current.failed = true;
-                    this.message(describeErrorReason(localizeMountError(error))); this.onSelect(id);
+                    const folder = target.kind === 'project-files' ? target.folder : undefined;
+                    const project = folder && await this.projectForOpen(folder);
+                    if (project && this.projects?.remoteMounts?.list(project.project.id).length)
+                        await this.showRemoteFileFailure(path, project.project.id, load, error);
+                    else this.message(describeErrorReason(localizeMountError(error)));
+                    this.onSelect(id);
                     this.scheduleNavigation(path, {reveal: true, preserveProject: directoryTarget ? options.preserveProject : true});
                 } else if (!this.editor && this.tabs.current?.value) await this.restoreEditor(this.tabs.current.value);
                 throw error;

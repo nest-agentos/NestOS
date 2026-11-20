@@ -1,5 +1,5 @@
 import {FSError} from '@nestos/vfs-core';
-import {folderBrowserPath, resolveBrowserTarget} from '@nestos/app-contracts';
+import {folderBrowserPath, folderPathFromBrowserPath, resolveBrowserTarget} from '@nestos/app-contracts';
 import {createModuleLogger, randomUUID} from '@nestos/common';
 import type {ApplicationBackend, ConversationWorkbenchRequest, ConversationWorkbenchView, LocalApplicationServices, PreparedConversation, WorkbenchNavigationRequest, WorkbenchNavigationView, WorkbenchView} from '@nestos/app-contracts/services';
 import {ViewScope} from './view-scope';
@@ -33,6 +33,14 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             const native = target.kind === 'remote' && !!target.nativeSessionId;
             const chatControls = !['project-files', 'files', 'folder', 'favorites', 'favorite'].includes(target.kind);
             await this.prepareView(backend, request, chatControls);
+            const folder = 'folder' in target ? target.folder : target.kind === 'folder' ? folderPathFromBrowserPath(target.path) : undefined;
+            if (folder) {
+                const project = await this.services.projects.forFolder(folder);
+                if (project) {
+                    this.selectProject(project.project.id);
+                    await this.workbench.connections?.update([...this.interests], ++this.interestRevision);
+                }
+            }
             if (native) {
                 try {this.native = await this.openConversation(request.resourceId);}
                 catch (error) {this.failedOpening(request.resourceId, error);}
@@ -98,8 +106,8 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
         this.native = prepared; this.failure = undefined;
         await this.resources.own({dispose: () => prepared.conversation.close()});
         this.eventSource.addSource('conversation', listener => prepared.conversation.subscribe(() => listener({resourceId})));
-        this.observeStatus(prepared.project.project.id);
-        await this.workbench.connections?.update([...this.interests], ++this.interestRevision);
+        this.selectProject(prepared.project.project.id);
+        await this.workbench.connections?.update(this.visible ? [...this.interests] : [], ++this.interestRevision);
         return prepared;
     }
     async readNavigation(request: WorkbenchNavigationRequest): Promise<WorkbenchNavigationView> {
@@ -115,9 +123,10 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             for (const project of (data.navigation?.projects ?? []).filter(project => !request.projectId || project.project.id === request.projectId).slice(0, 16)) {
                 const id = project.project.id;
                 if (!this.services.projects.remoteMounts?.list(id).some(mount => mount.at === '/' && mount.serverProjectId)) continue;
-                this.observeStatus(id); statuses[id] = this.services.projects.remoteMounts.sessionStatus.records?.(id) ?? [];
+                if (this.interests.has(id)) this.observeStatus(id);
+                statuses[id] = this.services.projects.remoteMounts.sessionStatus.records?.(id) ?? [];
             }
-            await this.workbench.connections?.update([...this.interests], ++this.interestRevision);
+            await this.workbench.connections?.update(this.visible ? [...this.interests] : [], ++this.interestRevision);
             log.info('navigation.read', {operation: 'workbench.navigation', operationId, stage: 'prepare', result: 'success', count: data.directories.length, durationMs: Math.round(performance.now() - started)});
             return {...data, statuses, navigation: data.navigation && {...data.navigation, path: resourceId ?? '/'}};
         } catch (error) {
@@ -132,6 +141,12 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             const target = resolveBrowserTarget(path);
             return target.kind === 'folder' || target.kind === 'project-conversations';
         });
+    }
+    private selectProject(projectId: string): void {
+        for (const id of this.interests) if (id !== projectId) {
+            this.interests.delete(id); this.statusStops.get(id)?.();
+        }
+        this.observeStatus(projectId);
     }
     private observeStatus(projectId: string): void {
         this.interests.add(projectId);

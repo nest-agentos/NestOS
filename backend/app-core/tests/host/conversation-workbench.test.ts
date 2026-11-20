@@ -55,6 +55,16 @@ it('keeps a denied conversation local to its view while navigation and another c
     expect((await view.openConversation('/folder:P/@harness/native/other')).project.project.id).toBe('p');
     expect(view.failure).toBeUndefined(); await view.dispose();
 });
+it('keeps only the target project interested when the conversation fails and navigation includes other projects', async () => {
+    const f = fixture(); f.conversation.read.mockRejectedValueOnce(new FSError('EACCES', 'Denied'));
+    Object.assign(f.projects.remoteMounts, {list: () => [{at: '/', serverProjectId: 'native'}], sessionStatus: {subscribe: () => () => {}, records: () => []}});
+    f.browser.readDirectory.mockResolvedValueOnce({node: {} as never, nodes: [], directories: [], navigation: {projects: [{project: {id: 'other'}}]} as never});
+    const view = await new ConversationWorkbench(f.services).initialize(f.backend, request);
+    await view.readNavigation({projectId: null});
+    expect(view.failure?.code).toBe('EACCES');
+    expect(f.connections.update.mock.calls.every(([ids]) => ids.length === 1 && ids[0] === 'p')).toBe(true);
+    await view.dispose();
+});
 it('releases late resources if closure races preparation', async () => {
     const f = fixture(); let finish!: () => void;
     f.conversation.read.mockImplementationOnce(() => new Promise(resolve => {finish = () => resolve(f.conversation.snapshot());}));
@@ -83,6 +93,23 @@ it('opens files through one owned observation without preparing a conversation o
     const [one, two] = await Promise.all([view.prepareChat(), view.prepareChat()]);
     expect(one).toBe(two); expect(chatFactory).toHaveBeenCalledOnce();
     await view.dispose(); expect(one.configuration!.dispose).toHaveBeenCalledOnce();
+});
+it('registers the file project before navigation and releases its interest', async () => {
+    const f = fixture();
+    const view = await new ConversationWorkbench(f.services).initialize(f.backend, {resourceId: '/folder:P/@files/note.md', documents: []});
+    expect(f.connections.update).toHaveBeenCalledWith(['p'], expect.any(Number));
+    await view.setVisible(false);
+    expect(f.connections.update).toHaveBeenLastCalledWith([], expect.any(Number));
+    await view.setVisible(true);
+    expect(f.connections.update).toHaveBeenLastCalledWith(['p'], expect.any(Number));
+    await view.dispose(); expect(f.connections.dispose).toHaveBeenCalledOnce();
+});
+it('resolves a project folder route before registering its connection interest', async () => {
+    const f = fixture();
+    const view = await new ConversationWorkbench(f.services).initialize(f.backend, {resourceId: '/folder:P', documents: []});
+    expect(f.projects.forFolder).toHaveBeenCalledWith('/P');
+    expect(f.connections.update).toHaveBeenCalledWith(['p'], expect.any(Number));
+    await view.dispose();
 });
 it('closes late lazy chat preparation and never publishes it into a disposed workbench', async () => {
     const f = fixture(), dispose = vi.fn(async () => {}); let finish!: () => void;

@@ -3,6 +3,7 @@ import { harnessObservation as observeHarness } from '@nestos/app-contracts';
 import {expect, it, vi} from 'vitest';
 
 import {t} from '@nestos/common';
+import {formatDateTime} from '@nestos/ui-common';
 import {harnessObservation} from '@nestos/cells-driver';
 import {remoteSessionPath, type ProjectService} from '@nestos/app-core';
 import {RemoteSessionStatusView} from '../src/projects/remote-session-status';
@@ -65,7 +66,7 @@ it('uses the two-minute window only for presentation, with native and offline st
     expect(view.text).toBe(t('harness.activity.recent'));
     expect(view.indicator).toBe('idle'); expect(view.refreshAt).toBe(now + 1);
     expect(view.tooltip).toContain(t('harness.activity.explanation'));
-    expect(conversationStatus(observation, now + 1).text).toBe(t('harness.activity.updated', {time: new Date(observation.updatedAt!).toLocaleString()}));
+    expect(conversationStatus(observation, now + 1).text).toBe(t('harness.activity.updated', {time: formatDateTime(new Date(observation.updatedAt!))}));
     expect(conversationStatus({...observation, stale: true}, now).text).toBe(t('harness.activity.recent'));
     for (const execution of ['idle', 'running', 'waiting-approval', 'waiting-input'] as const)
         expect(conversationStatus({...observation, execution}, now).text).toBe(t(`harness.state.${execution}`));
@@ -95,8 +96,8 @@ it('expires inferred tree and tab hints without a server event and releases refr
         expect(vi.getTimerCount()).toBe(1); changed.mockClear();
         vi.advanceTimersByTime(1000); expect(changed).not.toHaveBeenCalled();
         vi.advanceTimersByTime(1); expect(changed).toHaveBeenCalledOnce();
-        expect(tabStatus.mock.lastCall![2]).toContain(t('harness.activity.updated', {time: new Date(observation.updatedAt!).toLocaleString()}));
-        expect(view.items(items as never)[0].presentation!.badges![0]).toContain(t('harness.activity.updated', {time: new Date(observation.updatedAt!).toLocaleString()}));
+        expect(tabStatus.mock.lastCall![2]).toContain(t('harness.activity.updated', {time: formatDateTime(new Date(observation.updatedAt!))}));
+        expect(view.items(items as never)[0].presentation!.badges![0]).toContain(t('harness.activity.updated', {time: formatDateTime(new Date(observation.updatedAt!))}));
         expect(vi.getTimerCount()).toBe(0);
         observation.updatedAt = Date.now(); view.items(items as never); expect(vi.getTimerCount()).toBe(1);
         view.setVisible(false); expect(vi.getTimerCount()).toBe(0);
@@ -119,4 +120,14 @@ it('observes only the active tab while navigation is hidden', async () => {
     view.setNavigationVisible(false); expect(connections.update.mock.calls.at(-1)?.[0]).toEqual(['project-two']);
     view.activate('one'); expect(connections.update.mock.calls.at(-1)?.[0]).toEqual(['project-one']);
     view.setVisible(false); expect(connections.update.mock.calls.at(-1)?.[0]).toEqual([]); await view.destroy();
+});
+
+it('does not probe unrelated projects rendered in navigation', async () => {
+    const connections = {update: vi.fn(async (_ids: string[], _revision: number) => {}), dispose: vi.fn(async () => {})};
+    const projects = {remoteMounts: {list: () => [{at: '/', serverProjectId: 'native'}], sessionStatus: {subscribe: () => () => {}}}} as unknown as ProjectService;
+    const view = new RemoteSessionStatusView(observeHarness, projects, () => {}, () => {}, undefined, connections);
+    view.project('current');
+    view.items([{id: '/folder:Other', metadata: {custom: {projectId: 'other'}}}] as never);
+    expect(connections.update.mock.calls.at(-1)?.[0]).toEqual(['current']);
+    await view.destroy();
 });
