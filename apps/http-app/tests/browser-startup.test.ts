@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
 import {createStartupStatus, stylesReady} from 'nestos-web/startup';
+import {installStartupNavigation} from '../src/client/startup-navigation';
 
 afterEach(() => {document.head.replaceChildren(); document.body.replaceChildren(); delete document.body.dataset.appStarting; vi.useRealTimers();});
 function stylesheet() {
@@ -51,3 +52,23 @@ it.each(['Importing a module script failed.', 'Failed to fetch dynamically impor
         expect(document.querySelector('.app-startup p')?.textContent).not.toContain('example.test');
         expect(document.querySelectorAll('.app-startup button')).toHaveLength(1);
     });
+
+it('lets the pre-bootstrap navigation select a different startup target and releases control to the shell router', () => {
+    document.body.innerHTML = '<button class="app-nav-btn" data-target="llm-workspace"><span>工作台</span></button>'
+        + '<button class="app-nav-btn" data-target="email-workspace">邮件</button>';
+    history.replaceState(null, '', '#/notes');
+    const reload = vi.fn();
+    const stop = installStartupNavigation(reload);
+    try {
+        document.querySelector('button span')!.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+        expect(location.hash).toBe('#/workbench');
+        expect(reload).toHaveBeenCalledOnce();
+        stop();
+        document.querySelectorAll('button')[1].click();
+        expect(location.hash).toBe('#/workbench');
+        expect(reload).toHaveBeenCalledOnce();
+    } finally {
+        stop();
+        history.replaceState(null, '', '/');
+    }
+});

@@ -13,7 +13,10 @@ export default defineConfig({
         name: 'nestos-web-shell',
         transformIndexHtml: { order: 'pre', handler() {
             const source = createRequire(import.meta.url).resolve('nestos-web/index.html');
+            const navigationCss = readFileSync(new URL('./src/startup-navigation.css', import.meta.url), 'utf8');
             return readFileSync(source, 'utf8')
+                .replace('</head>', `<style>${navigationCss}</style></head>`)
+                .replace('<body data-app-starting>', '<body data-app-starting data-http-shell>')
                 .replace('<head>', '<head>\n<link rel="icon" href="data:,">')
                 .replace('src/styles/index.css', './src/style.css')
                 .replace(/\s*<link rel="(?:manifest|apple-touch-icon)"[^>]+>/g, '');
