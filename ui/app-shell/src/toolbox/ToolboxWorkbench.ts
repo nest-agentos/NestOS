@@ -19,7 +19,7 @@ import { CategoryFilters } from './category-filters';
 import { NavigationFilters } from '../workbench/navigation-filters';
 import { type VFSUIShell, type VFSNodeUI, type VFSToolbarContext, type UIPersistencePort } from '@nestos/vfs-ui';
 import type { IFileSystem } from '@nestos/vfs-core';
-import { createModuleLogger, ENTITY_ICONS, t, type NavigationRequest } from '@nestos/common';
+import { createModuleLogger, ENTITY_ICONS, randomUUID, t, type NavigationRequest } from '@nestos/common';
 import { editorResourceId, type EditorFactory, type MenuItem, type ContextMenuConfig } from '@nestos/ui-common-adapter';
 import type { WorkspaceController } from '@nestos/app-contracts';
 import { showToolboxCreationDialog } from './create-resource-dialog';
@@ -38,7 +38,7 @@ interface Options {
     files: IFileSystem;
     initial?: ToolboxNavigation;
     configuration: ModelConfigurationCommands;
-    projects?: Pick<import('@nestos/app-contracts/services').ProjectService,'list'>;
+    projects?: Pick<import('@nestos/app-contracts/services').ProjectService,'list' | 'remoteMounts'>;
     factories: Record<ToolboxKind, EditorFactory>; flowMenu: ContextMenuConfig<VFSNodeUI>;
     navigate(request: NavigationRequest): Promise<void>; selected(path: string | null): void; onBeforeNavigate?(): void;
     /** Host-owned snapshot storage; omitted means the toolbox restores nothing. */
@@ -121,6 +121,7 @@ export class ToolboxWorkbench implements WorkspaceController {
             appearance: { showTitle: false, showTimestamp: false, menuVisibility: 'always' },
             searchPlaceholder: t('toolbox.search'),
             navigationHeader: {layout: 'inline', filter: this.filterPanel.trigger, summary: this.searchFilters}, listItems: items => this.project(items),
+            directoryAction: this.cellConnectionAction(),
             alwaysLoadedDirectories: this.loadedDirectories,
             hideGitignored: false,
             defaultUiSettings: { showSummary: true, showTags: true, showBadges: false, sortBy: 'title' },
@@ -133,6 +134,31 @@ export class ToolboxWorkbench implements WorkspaceController {
         const stopUsage = this.options.executorUsage?.subscribe?.(() => this.ui.refreshList());
         if (stopUsage) this.cleanups.push(stopUsage);
         await this.ui.start(); this.setFilter(this.prefs.filter, false);
+    }
+    private cellConnectionAction(): import('@nestos/vfs-ui').DirectoryAction | undefined {
+        const remote = this.options.projects?.remoteMounts;
+        if (!remote) return;
+        return {
+            itemType: 'file', label: t('cells.check'),
+            visible: path => toolboxKind(path) === 'cells' && path !== '/cells/manage',
+            run: async path => {
+                const connectionId = decodeURIComponent(path.slice('/cells/'.length));
+                const operationId = randomUUID(), started = performance.now();
+                const context = {operation: 'cells.check', operationId, connectionId, stage: 'check'};
+                const log = createModuleLogger('toolbox-cells');
+                try {
+                    await remote.checkConnection(connectionId, {signal: this.abort.signal, timeoutMs: 10000});
+                    if (!this.abort.signal.aborted) {
+                        log.info('cells.check.completed', {...context, result: 'completed', durationMs: Math.round(performance.now() - started)});
+                        this.scheduleRefresh();
+                    }
+                } catch (error) {
+                    log.warn('cells.check.failed', {...context, result: 'failure', code: (error as {code?: string})?.code ?? 'CELLS_CHECK_FAILED',
+                        durationMs: Math.round(performance.now() - started)});
+                    throw error;
+                }
+            },
+        };
     }
     private connectSources(): void {
         const { resources, editor } = this.options;
@@ -211,6 +237,8 @@ export class ToolboxWorkbench implements WorkspaceController {
             const description = this.descriptions.get(kind + '/' + id);
             const summary = description?.description ?? String(node.metadata.custom.description ?? '');
             const source = String(node.metadata.custom.source ?? '');
+            const status = kind === 'cells' && ['unknown', 'checking', 'online', 'offline'].includes(source)
+                ? t(`cells.status.${source as 'unknown' | 'checking' | 'online' | 'offline'}`) : source;
             const capabilities = (kind === 'providers' ? this.options.inventory.providers : kind === 'connections' ? this.options.inventory.connections : undefined)
                 ?.get(decodeURIComponent(id))?.capabilityTags ?? [];
             this.titles.set(node.id, description?.name ?? node.metadata.title);
@@ -218,7 +246,7 @@ export class ToolboxWorkbench implements WorkspaceController {
                 metadata: { ...node.metadata, title: description?.name ?? node.metadata.title,
                     tags: [...new Set([...node.metadata.tags, ...capabilities])], custom: { ...node.metadata.custom, toolboxKind: kind, navigationMenu: true,
                         ...(kind === 'agents' ? {executorLastUsed: this.options.executorUsage?.lastUsed(decodeURIComponent(id)) ?? 0} : {}) } },
-                content: node.type === 'file' ? { ...node.content!, summary: [['connections', 'tools'].includes(kind) ? '' : source, summary.split('\n')[0].slice(0, 160)].filter(Boolean).join(' · '), searchableText: [source, summary, id, ...capabilities, ...capabilityLabels(capabilities)].join(' ') } : node.content };
+                content: node.type === 'file' ? { ...node.content!, summary: [['connections', 'tools'].includes(kind) ? '' : status, summary.split('\n')[0].slice(0, 160)].filter(Boolean).join(' · '), searchableText: [source, summary, id, ...capabilities, ...capabilityLabels(capabilities)].join(' ') } : node.content };
         });
         const decorated = decorate(roots.flatMap(node => node.children ?? []).flatMap(node =>
             node.id === '/agents/default' ? node.children ?? [] : [node]));

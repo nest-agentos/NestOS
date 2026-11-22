@@ -57,7 +57,7 @@ async function setup(ocr?: import('../src/configuration/ocr-controls').OcrConfig
     cleanup.push(() => files.dispose());
     const flowMenu = createFlowContextMenuConfig({ commands: runtime.commandBus, navigate: vi.fn() });
     const navigate = vi.fn();
-    const workbench = new ToolboxWorkbench({ ocr, sidebar, editor: main, resources, inventory, files, configuration: runtime.configuration, factories, flowMenu, navigate, selected: vi.fn(), uiPreferences, executorUsage, agentsInWorkbench });
+    const workbench = new ToolboxWorkbench({ ocr, sidebar, editor: main, resources, inventory, files, configuration: runtime.configuration, projects: cells ? {remoteMounts: cells, list: () => runtime.projects!.list()} : runtime.projects, factories, flowMenu, navigate, selected: vi.fn(), uiPreferences, executorUsage, agentsInWorkbench });
     cleanup.push(() => workbench.destroy()); await workbench.start();
     return { workbench, sidebar, main, factory, resources, inventory, navigate };
 }
@@ -1176,11 +1176,21 @@ it('offers Cells immediately before Skills and opens its shared configuration re
 
 it('lists actual Cells nodes in the sidebar and opens only the selected node overview',async()=>{
     const summary=vi.fn(async(id:string)=>({connectionId:id,sampledAt:Date.now(),mounts:[],statistics:{state:'unsupported'}}));
+    let status = 'unknown';
+    const checkConnection = vi.fn(async () => { status = 'online'; });
     const cells={connections:()=>[{id:'vm-node',name:'Cell X1',endpoint:'http://127.0.0.1:18787',credentialRef:'never-project-this'}],
-        connectionStatus:()=> 'online',nodeOverview:summary,onChange:()=>()=>{}} as unknown as import('@nestos/app-contracts/services').ProjectRemoteMountPort;
+        connectionStatus:()=>status,checkConnection,nodeOverview:summary,onChange:()=>()=>{}} as unknown as import('@nestos/app-contracts/services').ProjectRemoteMountPort;
     const f=await setup(undefined,undefined,undefined,false,cells);f.workbench.setFilter('cells');
     await vi.waitFor(()=>expect(f.sidebar.querySelector('[data-item-id="/cells/vm-node"]')).not.toBeNull());
     expect(f.sidebar.textContent).toContain('Cell X1');expect(f.sidebar.textContent).not.toContain('never-project-this');
+    expect(f.sidebar.textContent).toContain(t('cells.status.unknown'));
+    expect(checkConnection).not.toHaveBeenCalled();
+    const check = f.sidebar.querySelector<HTMLButtonElement>('[data-directory-action="/cells/vm-node"]')!;
+    expect(check.textContent).toBe(t('cells.check'));
+    check.click();
+    expect(check.disabled).toBe(true);
+    await vi.waitFor(() => expect(f.sidebar.textContent).toContain(t('cells.status.online')));
+    expect(checkConnection).toHaveBeenCalledExactlyOnceWith('vm-node', expect.objectContaining({timeoutMs: 10000}));
     expect(summary).not.toHaveBeenCalled();await f.workbench.openResource('/cells/vm-node');
     await vi.waitFor(()=>expect(f.main.querySelector('[data-cells-title]')?.textContent).toBe('Cell X1'));
     expect(summary).toHaveBeenCalledTimes(1);
