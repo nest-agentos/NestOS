@@ -1,0 +1,36 @@
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
+import {assembleKanbanRuntime} from '../../libraries/kanban/src/runtime/integration';
+import {KanbanWorkbench} from '../../libraries/kanban-ui/src';
+import {kanbanPresentation} from '../../ui/app-shell/src/kanban/host';
+import {zhCN} from '../../shared/common/src/i18n/zh-CN';
+
+const wait=async(test:()=>boolean)=>{for(let n=0;n<1200;n++){if(test())return;await new Promise(resolve=>setTimeout(resolve,5));}throw Error('UI_NOT_READY');};
+async function run(){
+ const {manager}=await createVFS({rootBackend:new MemoryBackend()}),fs=await manager.openFileSystem('/');let clock=Date.now();
+ const actor={kind:'human' as const,id:'owner'},reference={system:'fixture-project',id:'isolated'};
+ const runtime=await assembleKanbanRuntime({fs,actor,authorize:async()=>{},now:()=>clock,resources:{system:reference.system,list:async()=>[{reference,label:'隔离测试项目'}],validate:async()=>{}},log:()=>{}});
+ const service=runtime.service;await service.create({id:'fixture',title:'隔离测试看板',scope:{kind:'system'},members:[{...actor,responsibility:'Review',roles:['coordinator','reviewer','worker']}],policy:{requireEstimate:false}});
+ let serial=0;const command=async(command:any)=>service.execute('fixture',{operationId:'seed-'+ ++serial,expectedRevision:(await service.read('fixture')).revision,command});
+ await command({type:'configure-automation',settings:{enabled:true,autoAccept:false,planner:{system:'agent',id:'planner',revision:'1'},executor:{system:'agent',id:'worker',revision:'1'},coordinator:{kind:'service',id:'planner'},worker:{kind:'service',id:'worker'}}});
+ await command({type:'append-record',record:{id:'fixture-decision',kind:'decision',title:'隔离周期决策',content:'测试目标',rationale:'测试结果',itemIds:[],sources:[],externalRefs:[reference]}});await command({type:'review-record',recordId:'fixture-decision',accept:true});
+ let calls:string[]=[];const client=new Proxy(service,{get(target,key){const value=Reflect.get(target,key);return typeof value==='function'?async(...args:unknown[])=>{calls.push(String(key));return value.apply(target,args);}:value;}});
+ const editor=document.getElementById('editor')!,view=new KanbanWorkbench({service:client,editor,initialResource:'/board/fixture/@decision',selected(){},openSession:async()=>{},presentation:{...kanbanPresentation,text:key=>(zhCN as Record<string,string>)['kanban.'+key]??key}});
+ const metrics:Array<{operation:string;durationMs:number;logicalApiCalls:number;httpRequests:number}>=[];
+ const measure=async(name:string,action:()=>Promise<unknown>|void,ready:()=>boolean)=>{calls=[];const started=performance.now();await action();await wait(ready);const row={operation:name,durationMs:performance.now()-started,logicalApiCalls:calls.length,httpRequests:0};metrics.push(row);if(row.durationMs>=5000||row.logicalApiCalls>=30)throw Error('PERFORMANCE_LIMIT:'+name);};
+ await measure('cold.open-list',()=>view.start(),()=>!!editor.querySelector('[data-record="fixture-decision"]'));
+ await measure('warm.open-detail',()=>editor.querySelector<HTMLElement>('[data-record="fixture-decision"]')!.click(),()=>!!editor.querySelector('[data-action="recurrence-edit"]'));
+ editor.querySelector<HTMLElement>('[data-action="recurrence-edit"]')!.click();await wait(()=>!!editor.querySelector('[data-recurrence-form]'));
+ const form=editor.querySelector<HTMLFormElement>('[data-recurrence-form]')!,first=new Date(Math.ceil((clock+120000)/60000)*60000);
+ const firstInput=form.elements.namedItem('firstAt') as HTMLInputElement;firstInput.value=new Date(first.getTime()-first.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ (form.elements.namedItem('minutes') as HTMLInputElement).value='1';
+ await measure('warm.save-schedule',()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})),()=>!!editor.querySelector('[data-action="recurrence-pause"]'));
+ await service.scan();clock=first.getTime();await service.scan();
+ await measure('warm.open-round',async()=>{await view.openResource('/board/fixture/@decision');editor.querySelector<HTMLElement>('[data-record="fixture-decision"]')!.click();},()=>!!editor.querySelector('[data-recurrence-run] [data-action="open-decision-task"]'));
+ const current=await service.record('fixture','fixture-decision');if(current.recurrenceFence?.pending.length!==1)throw Error('ROUND_NOT_FENCED');
+ await measure('warm.pause',()=>editor.querySelector<HTMLElement>('[data-action="recurrence-pause"]')!.click(),()=>!!editor.querySelector('[data-action="recurrence-resume"]'));
+ clock+=120000;await service.scan();const after=await service.record('fixture','fixture-decision');
+ if(after.recurrence?.state!=='paused'||after.recurrenceFence?.pending.length!==1||(await service.recordExecutions!('fixture','fixture-decision')).length!==1)throw Error('PAUSE_BOUNDARY_FAILED');
+ const result={result:'passed',environment:'Chromium; isolated in-memory VFS; in-process KanbanClient; no HTTP transport',dataset:{boards:1,decisions:1,backgroundLoad:'none'},metrics};
+ document.getElementById('result')!.textContent=JSON.stringify(result);await runtime.service.quiesce();await manager.dispose();
+}
+void run().catch(error=>{document.getElementById('result')!.textContent=JSON.stringify({result:'failed',code:error instanceof Error?error.message:'UNKNOWN'});});

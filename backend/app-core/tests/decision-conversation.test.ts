@@ -32,6 +32,17 @@ it('routes fixes to the original group Session and never creates them in the dec
  await expect(f.request('decision.add-fix',{itemId:'child'})).rejects.toMatchObject({code:'DECISION_REQUEST_UNSUPPORTED'});
 });
 
+it('passes the selected management run to the coordination resolver',async()=>{
+ const f=await fixture();let serial=0;const run=async(command:any)=>f.service.execute('b',{operationId:'round-'+ ++serial,expectedRevision:(await f.service.read('b')).revision,command});
+ const proposal=await f.request('decision.propose',{id:'outline',title:'Outline',content:'Scope',rationale:'Check',projectIds:['one'],verificationMode:'quick'}) as any;
+ f.read.mockResolvedValue({messages:[{id:'confirm',role:'user',text:'确认决策'}]});await f.request('decision.confirm',{proposalDigest:proposal.proposalDigest});
+ for(const id of ['first','second']){await run({type:'create-item',item:{id,title:id,responsibility:'Coordinate',acceptance:'Checked'},planning:{kind:'task',execution:'children',priority:2,dependencies:[],references:[]}});await run({type:'link-record',recordId:'outline',itemId:id});}
+ const openRecordCoordination=vi.fn(async()=>({sessionId:'second-session'}));
+ f.options.client=()=>({...f.service,openRecordCoordination,recordExecutions:async()=>[{id:'run-first',boardId:'b',rootItemId:'first'},{id:'run-second',boardId:'b',rootItemId:'second'}]});
+ expect(await f.request('decision.open-coordination',{itemId:'second'})).toEqual({sessionId:'second-session'});
+ expect(openRecordCoordination).toHaveBeenCalledWith('b',expect.objectContaining({recordId:'outline',runId:'run-second'}));
+});
+
 it('accepts automatic replacement without verification from the conversation API',async()=>{
  const f=await fixture();const proposal=await f.request('decision.propose',{id:'mail-read',title:'Mail read state',content:'Mark opened mail as read',rationale:'Sidebar reflects read state',projectIds:['one'],verificationMode:'release'}) as any;
  expect(proposal.record).toMatchObject({verificationLevel:'none',deliveryMode:'release',completion:'automatic'});

@@ -6,7 +6,7 @@ import {createKanbanModule} from '@nestos/kanban';
 import {SeqKanbanStore} from '@nestos/kanban/storage';
 import type {KanbanCommand, KanbanWorkType} from '@nestos/kanban/contracts';
 import type {ProjectService} from '@nestos/app-contracts/services';
-import {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {KanbanAutomationJournal,recurrenceAdmission} from '@nestos/kanban/integration';
 import {createRecordExecution} from '@nestos/kanban/integration';
 import {validateRemoteReferences, projectResourceCatalog} from '../src/kanban/resource-catalog';
 
@@ -43,6 +43,152 @@ async function completeCoordination(f:Awaited<ReturnType<typeof fixture>>,id:str
  const claimed=await f.command({type:'claim',itemId:child});await f.command({type:'submit',itemId:child,token:claimed.items.find(item=>item.id===child)!.owner!.token,resultRef:'verified'});
  await f.command({type:'review',itemId:child,accept:true});await f.command({type:'close-plan',itemId:id,resultRef:'children-verified'});
 }
+
+it('resumes a persisted recurring intent through the existing execution path with a frozen snapshot',async()=>{
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const before=await f.service.record('source','decision');
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:{state:'active',firstAt:1000,timeZone:'UTC',cadence:{kind:'interval',milliseconds:60000},trigger:'fixed',maxConcurrency:2}});
+ const snapshot=await f.service.record('source','decision'),execution=f.open();
+ const engine=recurrenceAdmission({journal:f.journal,log:f.log,inspect:async intent=>{
+  const run=await f.journal.run<any>(intent.boardId,intent.id);return run?{state:run.state==='completed'?'settled':'admitted',runId:run.id}:{state:'unknown'};
+ },submit:async intent=>{const run=await execution.runRecurring(intent);return {state:'admitted',runId:run.id};}});
+ await f.command({type:'reserve-record-recurrence',recordId:'decision',configRevision:snapshot.recurrenceRevision!,scheduledAt:1000});
+ await f.command({type:'reserve-record-recurrence',recordId:'decision',configRevision:snapshot.recurrenceRevision!,scheduledAt:61000});
+ const reserved=await f.service.record('source','decision'),[firstFence,secondFence]=reserved.recurrenceFence!.pending;
+ const first=await engine.reserve('source',firstFence.record,firstFence.configRevision,firstFence.scheduledAt);
+ const second=await engine.reserve('source',secondFence.record,secondFence.configRevision,secondFence.scheduledAt);
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:reserved.revision,recurrence:{...snapshot.recurrence!,state:'paused'}});
+ expect((await f.service.read('source')).items).toHaveLength(0);
+ const result=await engine.reconcile((await engine.read('source','decision'))[0]);
+ expect(result).toMatchObject({id:first.id,phase:'admitted',runId:first.id});
+ await engine.reconcile(second);
+ expect((await f.service.read('source')).items).toHaveLength(2);
+ expect((await execution.recordExecutions('source','decision')).map(row=>row.id)).toEqual([first.id,second.id]);
+ expect(JSON.stringify(f.log.mock.calls)).not.toContain('PRIVATE_REQUIREMENT');
+});
+
+it('reconciles a lost task creation receipt without creating a second recurring task',async()=>{
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const before=await f.service.record('source','decision');
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:{state:'active',firstAt:1000,timeZone:'UTC',cadence:{kind:'interval',milliseconds:60000},trigger:'fixed',maxConcurrency:1}});
+ const snapshot=await f.service.record('source','decision'),original=f.service.execute.bind(f.service);let lost=false;
+ vi.spyOn(f.service,'execute').mockImplementation(async(board,request)=>{
+  const result=await original(board,request);if(request.command.type==='create-item'&&!lost){lost=true;throw Object.assign(new Error('PRIVATE_REPLY'),{code:'EIO'});}return result;
+ });
+ const open=()=>{const execution=f.open();return {execution,engine:recurrenceAdmission({journal:f.journal,log:f.log,inspect:async intent=>{
+  const run=await f.journal.run<any>(intent.boardId,intent.id);return run?{state:'admitted',runId:run.id}:{state:'unknown'};
+ },submit:async intent=>{const run=await execution.runRecurring(intent);return {state:'admitted',runId:run.id};}})};};
+ await f.command({type:'reserve-record-recurrence',recordId:'decision',configRevision:snapshot.recurrenceRevision!,scheduledAt:1000});
+ const reservation=(await f.service.record('source','decision')).recurrenceFence!.pending[0];
+ const first=open(),intent=await first.engine.reserve('source',reservation.record,reservation.configRevision,reservation.scheduledAt);
+ expect((await first.engine.reconcile(intent)).phase).toBe('unknown');expect((await f.service.read('source')).items).toHaveLength(1);
+ const restored=open();expect((await restored.engine.reconcile(intent)).phase).toBe('admitted');await restored.execution.scan();
+ expect((await f.service.read('source')).items).toHaveLength(1);expect(JSON.stringify(f.log.mock.calls)).not.toContain('PRIVATE_REPLY');
+});
+it('rejects a stale journal intent that has no committed board reservation',async()=>{
+ const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const before=await f.service.record('source','decision');
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:{state:'active',firstAt:1000,timeZone:'UTC',cadence:{kind:'interval',milliseconds:60000},trigger:'fixed',maxConcurrency:1}});
+ const snapshot=await f.service.record('source','decision'),execution=f.open();
+ const engine=recurrenceAdmission({journal:f.journal,log:f.log,inspect:async()=>({state:'unknown'}),submit:async intent=>{const run=await execution.runRecurring(intent);return {state:'admitted',runId:run.id};}});
+ const intent=await engine.reserve('source',snapshot,snapshot.recurrenceRevision!,1000);
+ expect(await engine.reconcile(intent)).toMatchObject({phase:'unknown',code:'RECURRENCE_RESERVATION_MISSING'});
+ expect((await f.service.read('source')).items).toHaveLength(0);
+});
+
+it('automatically schedules due rounds through runtime scans and pauses new admission',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();
+ await f.command({type:'review-record',recordId:'decision',accept:true});let clock=Date.now();
+ const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:clock+60000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:config});
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log,now:()=>clock});cleanup.push(()=>runtime.service.quiesce());
+ await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(0);expect((await runtime.service.record('source','decision')).recurrenceNextAt).toBe(config.firstAt);
+ clock+=60000;await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(1);
+ const started=await f.service.record('source','decision');expect(started.recurrenceFence?.pending).toHaveLength(1);
+ clock+=60000;await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(1);
+ const current=await f.service.record('source','decision');await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:current.revision,recurrence:{...config,state:'paused'}});
+ clock+=60000;await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(1);
+ expect((await f.service.record('source','decision')).recurrenceFence?.pending[0].record.recurrence?.state).toBe('active');
+});
+it('recovers a fenced intent after restart even if scheduling was paused',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:1000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:config});
+ const configured=await f.service.record('source','decision');await f.command({type:'reserve-record-recurrence',recordId:'decision',configRevision:configured.recurrenceRevision!,scheduledAt:1000});
+ const fenced=await f.service.record('source','decision');await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:fenced.revision,recurrence:{...config,state:'paused'}});
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log});cleanup.push(()=>runtime.service.quiesce());
+ await runtime.service.scan();await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(1);
+ expect((await runtime.service.recordExecutions!('source','decision'))[0].id).toBe(fenced.recurrenceFence!.pending[0].id);
+});
+it('does not replay fixed slots missed while runtime was stopped',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
+ const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:1000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:config});let clock=181000;
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log,now:()=>clock});cleanup.push(()=>runtime.service.quiesce());
+ await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(0);
+ clock=241000;await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(1);
+});
+it('does not replay a backlog after a delayed scan',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});let clock=Date.now();
+ const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:clock+60000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:config});
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log,now:()=>clock});cleanup.push(()=>runtime.service.quiesce());
+ await runtime.service.scan();clock+=300000;await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(0);
+ clock+=60000;await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(1);
+});
+it('enforces bounded concurrent rounds in runtime scans',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});let clock=Date.now();
+ const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:clock+60000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:2};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:config});
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log,now:()=>clock});cleanup.push(()=>runtime.service.quiesce());
+ await runtime.service.scan();for(let i=0;i<3;i++){clock+=60000;await runtime.service.scan();}
+ expect(await runtime.service.recordExecutions!('source','decision')).toHaveLength(2);
+ expect((await f.service.record('source','decision')).recurrenceFence?.pending).toHaveLength(2);
+});
+it('waits for the settled round before starting the next after-settlement interval',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});let clock=Date.now();
+ const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:clock+60000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'after-settlement' as const,maxConcurrency:1};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:config});
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log,now:()=>clock});cleanup.push(()=>runtime.service.quiesce());
+ await runtime.service.scan();clock+=60000;await runtime.service.scan();
+ const initial=(await runtime.service.recordExecutions!('source','decision'))[0];expect(initial.rootItemId).toBeDefined();expect((await runtime.service.record('source','decision')).recurrenceNextAt).toBeUndefined();
+ await completeCoordination(f,initial.rootItemId!);clock=Date.now();await runtime.service.scan();await runtime.service.scan();
+ const settled=await f.journal.run<any>('source',initial.id);expect(settled.state).toBe('completed');
+ clock=settled.updatedAt+59999;await runtime.service.scan();expect(await runtime.service.recordExecutions!('source','decision')).toHaveLength(1);
+ clock=settled.updatedAt+60001;await runtime.service.scan();expect((await runtime.service.recordExecutions!('source','decision'))).toHaveLength(2);
+});
+it('keeps more than 100 settled and archived recurring rounds addressable through cursor pages after reopening',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});let clock=Date.now();
+ const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:clock+60000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:config});
+ const open=()=>assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log,now:()=>clock});
+ const runtime=await open();cleanup.push(()=>runtime.service.quiesce());await runtime.service.scan();const ids:string[]=[];
+ for(let i=0;i<101;i++){
+  clock+=60000;await runtime.service.scan();const record=await f.service.record('source','decision'),reservation=record.recurrenceFence?.pending[0];expect(reservation,`round ${i}`).toBeDefined();
+  const run=await f.journal.run<any>('source',reservation!.id);expect(run?.rootItemId).toBeDefined();ids.push(run.id);
+  await completeCoordination(f,run.rootItemId);for(let retry=0;retry<4&&(await f.service.record('source','decision')).recurrenceFence?.pending.length;retry++)await runtime.service.scan();
+  expect((await f.service.record('source','decision')).recurrenceFence?.pending).toHaveLength(0);
+  await f.command({type:'archive-items',itemIds:[run.rootItemId],reason:'Retain completed round'});
+ }
+ expect((await f.service.record('source','decision')).itemIds).toHaveLength(0);
+ await runtime.service.quiesce();const restored=await open();cleanup.push(()=>restored.service.quiesce());await restored.service.scan();
+ const seen:string[]=[];let cursor:string|undefined;
+ do{const page=await restored.service.recordExecutionPage!('source','decision',{limit:20,cursor});seen.push(...page.items.map(row=>row.id));cursor=page.nextCursor;}while(cursor);
+ expect(seen).toHaveLength(101);expect(new Set(seen).size).toBe(101);expect(new Set(seen)).toEqual(new Set(ids));
+ clock+=60000;await restored.service.scan();const pending=(await f.service.record('source','decision')).recurrenceFence!.pending[0];expect(pending).toBeDefined();
+ const live=await f.journal.run<any>('source',pending.id),read=vi.spyOn(f.journal,'get');
+ await restored.service.controlRecord!('source',{recordId:'decision',operationId:'cancel-after-history',action:'cancel'});
+ expect((await f.journal.run<any>('source',live.id)).state).not.toBe('cancelled');
+ await restored.service.quiesce();const recovered=await open();cleanup.push(()=>recovered.service.quiesce());
+ await settleCancellation(f);await recovered.service.scan();
+ expect((await f.journal.run<any>('source',live.id)).state).toBe('cancelled');
+ expect((await f.service.record('source','decision')).status).toBe('cancelled');
+ const restart={recordId:'decision',operationId:'restart-after-history',action:'restart' as const};
+ await recovered.service.controlRecord!('source',restart);await settleCancellation(f);
+ const restarted=await f.journal.get<any>('record-operation:restart-restart-after-history');expect(restarted?.id).toBeDefined();
+ await recovered.service.controlRecord!('source',restart);expect((await f.journal.get<any>('record-operation:restart-restart-after-history'))?.id).toBe(restarted.id);
+ expect(read.mock.calls.some(([key])=>key==='record-runs:source')).toBe(false);read.mockRestore();
+},180000);
 
 it('rejects unconfirmed/stale decisions and local project selection', async () => {
     const f = await fixture(), execution = f.open();

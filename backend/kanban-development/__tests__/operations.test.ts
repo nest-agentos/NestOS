@@ -52,6 +52,18 @@ it('manually reconciles the original operation without starting it again, then a
     expect((await f.journal.get<ReviewJob>(jobKey('original-build')))?.fingerprint).toBe(frozen?.fingerprint);
     expect(f.published.start).toHaveBeenCalledOnce();expect(f.submission.start).not.toHaveBeenCalled();
 });
+it('returns each archived management task’s own persisted operation receipts without enabling actions',async()=>{
+    const f=await fixture();await f.bind('build');await f.run('build','first-round-build');f.complete('first-round-build');await f.api.scan();
+    const first=await f.journal.get<ReviewJob>(jobKey('first-round-build'));expect(first?.state).toBe('succeeded');
+    await f.journal.update(jobKey('second-round-build'),()=>({...first!,id:'second-round-build',itemId:'other',state:'failed',code:'BUILD_FAILED'}));
+    await f.journal.update(reviewKey('board','other'),()=>({revision:1,bindings:{},jobs:['second-round-build'],receipts:{}}));
+    vi.spyOn(f.options.service,'item').mockImplementation(async(_board,id)=>({item:{...f.item,id},archive:{at:1}} as never));
+    const a=await f.api.itemOperations('board','task'),b=await f.api.itemOperations('board','other');
+    expect(a.operations).toEqual([]);expect(b.operations).toEqual([]);
+    expect(a.history).toEqual([expect.objectContaining({runId:'first-round-build',state:'succeeded',enabled:false})]);
+    expect(b.history).toEqual([expect.objectContaining({runId:'second-round-build',state:'failed',code:'BUILD_FAILED',enabled:false})]);
+    expect(JSON.stringify([a,b])).not.toContain('worktreeId');
+});
 it('rejects reconciliation with stale state, another action or a mixed execution request',async()=>{
     const f=await fixture();await f.bind('build');await f.run('build');
     const view=await f.api.itemOperations('board','task');

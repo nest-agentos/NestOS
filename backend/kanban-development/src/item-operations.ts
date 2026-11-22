@@ -100,7 +100,8 @@ async function load(options: ReviewOperationsOptions, board: string, item: strin
 }
 function revision(context: Context): string {return sha256HexSync(JSON.stringify([context.settings.revision, context.item.revision,context.cleanup,context.deliveryPlan,context.cancellations, context.jobs.map(job => [job.id, job.phase, job.state, job.code,job.result,job.followUp?.state,job.followUp?.code])]));}
 async function view(options: ReviewOperationsOptions, context: Context): Promise<KanbanItemOperations> {
-    if (context.archived || options.adapter.supports?.(context.board, context.item) === false) return {revision: revision(context), operations: []};
+    if(context.archived)return {revision:revision(context),operations:[],history:context.jobs.map(job=>({id:job.action,label:t(('kanban.operationAction.'+job.action) as Parameters<typeof t>[0]),state:job.code==='OPERATION_CANCELLED'?'cancelled' as const:job.state,enabled:false,runId:job.id,...(job.sessionId?{sessionId:job.sessionId}:{}),...(job.code?{code:job.code}:{})}))};
+    if (options.adapter.supports?.(context.board, context.item) === false) return {revision: revision(context), operations: []};
     const active = context.cleanup?.reviewState==='pending'||context.jobs.some(job => job.phase !== 'settled')||context.cancellations.some(pendingCancellation), supported = options.adapter.ready?.(context.board,context.item)??['review', 'completed'].includes(context.item.status);
     const activeWaivers=await currentWaivers(options,context);
     const related=await options.adapter.relatedSession?.(context.board,context.item),sessionResources=new Map<string,Promise<string|undefined>>();

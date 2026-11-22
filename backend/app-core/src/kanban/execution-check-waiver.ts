@@ -6,6 +6,7 @@ import type {DecisionConversationOptions,DecisionConversation} from './decision-
 import type {ChannelRequest} from '../run/channel-protocol';
 import {requireUserConfirmation} from './decision-conversation-confirmation';
 import {requireValue} from './validation';
+import {coordinationRoots} from './coordination-roots';
 type Command=Extract<KanbanCommand,{type:'waive-execution-checks'}>;
 interface Preview {id:string;owner:string;sessionId:string;boardId:string;recordId:string;command:Command;projectId:string;profileId:string;nativeSessionId:string}
 const key=(id:string)=>'execution-check-waiver:'+id;
@@ -13,7 +14,7 @@ export async function previewExecutionCheckWaiver(options:DecisionConversationOp
  const {itemId,checks,reason}=request.params;
  requireValue(typeof itemId==='string'&&typeof reason==='string'&&reason.trim().length>0&&reason.length<=2000&&Array.isArray(checks)&&checks.length>0&&checks.length<=16&&checks.every(row=>typeof row==='string'&&row.trim().length>0&&row.length<=1000),'INVALID_CHECK_WAIVER');
  const {board,record}=await boundDecision(options,conversation);
- const item=itemsWithinRoots(board.items,record.itemIds).find(row=>row.id===itemId);requireValue(item&&!item.deletedAt&&item.status==='claimed','ITEM_NOT_IN_DECISION');
+ const roots=await coordinationRoots(options,conversation,record,board.id),item=itemsWithinRoots(board.items,roots).find(row=>row.id===itemId);requireValue(item&&!item.deletedAt&&item.status==='claimed','ITEM_NOT_IN_DECISION');
  const dispatch=Object.values((await options.service.workflow(board.id)).dispatches).filter(row=>row.itemId===item.id).sort((a,b)=>b.attempt-a.attempt)[0];
  requireValue(dispatch?.outcome==='running'&&item.owner?.token===dispatch.fence,'STALE_EXECUTION_RESULT');
  const refs=item.externalRefs?.filter(row=>row.system==='nestos-native-session').map(row=>({id:row.id,binding:JSON.parse(row.revision??'{}') as {projectId?:string;profileId?:string;dispatchId?:string}})).filter(row=>row.binding.dispatchId===dispatch.id)??[];

@@ -18,7 +18,7 @@ export function taskCommunication(service:KanbanClient,journal:KanbanAutomationJ
         if(current)return {id:current.analysisId,boardId,recordId:context.decision.recordId,sessionId:current.sessionId,
             resourceId:current.resourceId??current.sessionId,state:current.state==='waiting-input'?'blocked' as const:current.state==='completed'?'confirmed' as const:'clarifying' as const,
             createdAt:current.createdAt??owner.createdAt,purpose:'coordination' as const};
-        return open(context.decision.sourceBoardId,{recordId:context.decision.recordId,operationId:request.operationId});
+        return open(context.decision.sourceBoardId,{recordId:context.decision.recordId,operationId:request.operationId,runId:context.decision.runId});
     };
     return {openTaskCoordination:coordinate,openTaskCommunication:async(boardId:string,request:Request):Promise<KanbanRecordConversation>=>{
         const started=Date.now();

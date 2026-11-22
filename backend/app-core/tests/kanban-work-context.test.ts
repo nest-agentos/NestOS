@@ -7,13 +7,13 @@ const item={id:'child',title:'Swipe',responsibility:'Implement swipe',acceptance
     externalRefs:[{system:'nestos-decision-run',id:'run'},{system:'nestos-remote-project',id:'x1'},{system:'other',id:'not-a-project'}]} as KanbanItem;
 it('resolves board, decision, task lineage and project identities from host facts',async()=>{
     const decision={sourceBoardId:'development',recordId:'decision',recordRevision:2,runId:'run'};
-    const journal={get:async(key:string)=>key==='record-context:run'?decision:undefined} as KanbanAutomationJournal;
+    const journal={get:async(key:string)=>key==='record-context:run'?decision:undefined,run:async()=>undefined} as unknown as KanbanAutomationJournal;
     expect(await workContext(journal,board,item)).toEqual({board:{id:'development',title:'开发',revision:undefined,reference:'development'},decision,
         task:{id:'child',revision:undefined,reference:'development/child',parentId:'parent',title:'Swipe',responsibility:'Implement swipe',acceptance:'Two clicks',dependencies:['before']},
         projects:[{system:'nestos-remote-project',id:'x1'}]});
 });
 it('recovers same-board historical provenance and never invents a decision for manual work',async()=>{
-    const journal={get:async(key:string)=>key==='record-runs:development'?[{id:'run',sourceBoardId:'development',recordId:'decision',recordRevision:2}]:undefined} as KanbanAutomationJournal;
+    const journal={get:async()=>undefined,run:async(_board:string,id:string)=>id==='run'?{id:'run',sourceBoardId:'development',recordId:'decision',recordRevision:2}:undefined} as unknown as KanbanAutomationJournal;
     expect((await workContext(journal,board,item)).decision?.recordId).toBe('decision');
     expect((await workContext(journal,board,{...item,externalRefs:[]})).decision).toBeNull();
 });
@@ -24,7 +24,7 @@ it('starts decision planning fresh without importing the prior answers or planni
         ['analysis-current:'+JSON.stringify(['old-board','old-task']),'old-analysis'],
         ['old-analysis',{id:'prior-plan',status:{state:'ready'},result:{ready:true,reason:'Confirmed scope',dependencies:[]}}],
     ]);
-    const journal={get:async(key:string)=>data.get(key)} as KanbanAutomationJournal;
+    const journal={get:async(key:string)=>data.get(key),run:async(_board:string,id:string)=>(data.get('record-runs:development') as Array<{id:string}>).find(row=>row.id===id)} as unknown as KanbanAutomationJournal;
     const context=await workContext(journal,board,item);
     expect(context).not.toHaveProperty('priorPlanning');
     expect(context.decision).not.toHaveProperty('previousRunId');
@@ -32,7 +32,7 @@ it('starts decision planning fresh without importing the prior answers or planni
 });
 it('keeps the hosting primary distinct from a secondary implementation project',async()=>{
  const snapshot={externalRefs:[{system:'nestos-remote-project',id:'main'},{system:'nestos-remote-project',id:'x1'},{system:'nestos-primary-project',id:'main'}]};
- const journal={get:async(key:string)=>key==='record-context:run'?{sourceBoardId:'development',recordId:'decision',recordRevision:1,runId:'run'}:key==='record-runs:development'?[{id:'run',record:snapshot}]:undefined} as KanbanAutomationJournal;
+ const journal={get:async(key:string)=>key==='record-context:run'?{sourceBoardId:'development',recordId:'decision',recordRevision:1,runId:'run'}:undefined,run:async()=>({id:'run',record:snapshot})} as unknown as KanbanAutomationJournal;
  const context=await workContext(journal,board,item);
  expect(context).toMatchObject({primaryProjectId:'main',secondaryProjectIds:['x1'],projectIds:['main','x1'],projects:[{system:'nestos-remote-project',id:'x1'}]});
 });

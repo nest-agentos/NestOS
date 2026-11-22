@@ -11,6 +11,7 @@ import type {DecisionConversationOptions,DecisionConversation} from './decision-
 import {validateRemoteReferences,REMOTE_PROJECT_REFERENCE,PRIMARY_PROJECT_REFERENCE} from './resource-catalog';
 import {requireValue} from './validation';
 import {decisionProjectScope} from './decision-project-scope';
+import {kanbanReferences} from './work-log-policy';
 interface Link {recordId:string;state:'draft'|'confirmed';proposalDigest:string}
 interface Proposal {record:KanbanRecordInput;proposalDigest:string;lastActivityAt?:number}
 const proposalKey=(id:string)=>'decision-conversation-proposal:'+id;
@@ -24,7 +25,9 @@ export async function resolveDecisionRequest(options:DecisionConversationOptions
         const record=link?await options.service.record(board.id,link.recordId):null,proposal=await options.journal.get<Proposal>(proposalKey(conversation.id));
         const selected=request.params.itemIds;
         requireValue(selected===undefined||Array.isArray(selected)&&selected.length<=1&&selected.every(id=>typeof id==='string'),'INVALID_DETAIL_SELECTION');
-        const tasks=record?itemsWithinRoots(board.items,record.itemIds,{includeDeleted:true}):[];
+        const page=record?.hadRecurrence?await options.client().recordExecutionPage?.(board.id,record.id,{limit:20}):undefined;
+        const roots=record?[...record.itemIds,...page?.active.flatMap(run=>run.boardId===board.id&&run.rootItemId?[run.rootItemId]:[])??[],...page?.items.flatMap(run=>run.boardId===board.id&&run.rootItemId?[run.rootItemId]:[])??[]]:[];
+        const tasks=record?itemsWithinRoots(board.items,roots,{includeDeleted:true}):[];
         return {capabilities:{discover:'kanban.discover',describe:'kanban.describe',invoke:'kanban.invoke'},conversationId:conversation.id,...await decisionConversationState(options,conversation.id,board.id),actions:{cancel:{method:'decision.cancel',params:{},confirmation:(await conversationPolicy(options.fs)).cancelDecision}},projectIds:conversation.binding.projectIds,conversationProjectId:conversation.binding.projectId,board:{id:board.id,title:board.title},record,...(!link&&proposal?{proposal}:{}),total:tasks.length,
             tasks:(Array.isArray(selected)?tasks.filter(item=>selected.includes(item.id)):tasks.slice(0,50)).map(item=>({id:item.id,title:item.title.slice(0,160),status:item.status,revision:item.revision,projectIds:item.externalRefs?.filter(ref=>ref.system===REMOTE_PROJECT_REFERENCE).map(ref=>ref.id)??[],admittedAt:item.launch?.admittedAt,editing:item.launch?.editing,
                 ...(Array.isArray(selected)&&selected.includes(item.id)?{responsibility:item.responsibility,acceptance:item.acceptance,planning:item.planning}:{})}))};
@@ -98,13 +101,27 @@ async function reviseTasks(options:DecisionConversationOptions,conversation:Deci
 async function openCoordination(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,link:Link) {
     const value=request.params as {itemId:string},board=await options.service.read(conversation.boardId),record=await options.service.record(board.id,link.recordId);
     const coordination=options.client().openRecordCoordination;
-    if(coordination){if(value.itemId)requireValue(itemWithinRoots(board.items,value.itemId,record.itemIds),'ITEM_NOT_IN_DECISION');return coordination(board.id,{recordId:record.id,operationId:'decision-coordinate-'+request.id});}
+    if(coordination){
+        const runId=decisionRunId(board.items,value.itemId);
+        const indexed=runId?await options.journal.run<import('@nestos/kanban/contracts').KanbanRecordExecution>(board.id,runId):undefined;
+        const runs=runId?(indexed&&indexed.recordId===record.id?[indexed]:[]):value.itemId?await options.client().recordExecutions?.(board.id,record.id)??[]:[];
+        const run=runs.find(row=>row.boardId===board.id&&row.rootItemId&&itemWithinRoots(board.items,value.itemId,[row.rootItemId]));
+        if(value.itemId)requireValue(run||itemWithinRoots(board.items,value.itemId,record.itemIds),'ITEM_NOT_IN_DECISION');
+        return coordination(board.id,{recordId:record.id,operationId:'decision-coordinate-'+request.id,...(run?{runId:run.id}:{})});
+    }
     requireValue(itemWithinRoots(board.items,value.itemId,record.itemIds),'ITEM_NOT_IN_DECISION');
     const item=board.items.find(row=>row.id===value.itemId),group=item?.planning?.execution==='children'?item:board.items.find(row=>row.id===item?.planning?.parentId);
     requireValue(group?.planning?.execution==='children','REPAIR_GROUP_REQUIRED');
     const client=options.client();requireValue(client.fixTask,'FIX_UNAVAILABLE');
     const fix=await client.fixTask(board.id,{itemId:group.id,operationId:'decision-coordinate-'+request.id});
     return {groupItemId:group.id,state:'clarifying',sessionId:fix.sessionId,resourceId:await options.executionResource?.(fix.sessionId,'main',board)??fix.sessionId};
+}
+function decisionRunId(items:import('@nestos/kanban/contracts').KanbanItem[],itemId:string):string|undefined {
+    const seen=new Set<string>();let current=items.find(item=>item.id===itemId);
+    while(current&&!seen.has(current.id)){
+        seen.add(current.id);const id=current.externalRefs?.find(ref=>ref.system===kanbanReferences.decision)?.id;if(id)return id;
+        current=items.find(item=>item.id===current?.planning?.parentId);
+    }return;
 }
 
 export async function decisionConversationState(options:DecisionConversationOptions,id:string,boardId?:string) {

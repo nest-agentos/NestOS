@@ -41,6 +41,14 @@ it('reads concrete pre-session preparation failures and requests a fenced retry 
  await expect(f.request('coordination.retry-planning',{itemId:'group',revision:group.revision},'stale')).rejects.toMatchObject({code:'REVISION_CONFLICT'});
  f.conversation.binding.recordId='other';await expect(f.request('coordination.retry-planning',{itemId:'group',revision:group.revision},'foreign')).rejects.toMatchObject({code:'ITEM_NOT_IN_DECISION'});
 });
+it('scopes a retained management conversation to its own recurring run without a record link',async()=>{
+ const f=await fixture(),other=await f.service.record('b','other');f.conversation.binding.recordId='other';
+ const run={id:'round-test',recordId:'other',recordRevision:other.revision,boardId:'b',sourceBoardId:'b',rootItemId:'group',itemIds:['group'],state:'running',createdAt:1,updatedAt:1,record:other} as any;
+ await f.journal.appendRecurringRun('b',run,{sourceBoardId:'b',recordId:'other',recordRevision:other.revision,runId:run.id});
+ await f.journal.update('development-workspace:persistent',()=>({context:{decision:{runId:run.id,recordId:'other',sourceBoardId:'b'}}}));
+ const view=await f.request('coordination.read');expect(view.groups.map((row:any)=>row.id)).toEqual(['group']);
+ await expect(f.request('coordination.retry-planning',{itemId:'foreign',revision:1},'foreign-run')).rejects.toMatchObject({code:'ITEM_NOT_IN_DECISION'});
+});
 it('confirms a scoped follow-up after all original tasks completed without changing their evidence',async()=>{
  const f=await fixture();
  // Configure the same board automation contract consumed by ordinary coordination fixes.
@@ -84,7 +92,7 @@ it('routes a recoverable execution blocker to its executor and a settled failure
  const page=await f.service.records('b',{kind:'decision'});expect(page.items.find(row=>row.id==='decision')?.attentionTasks).toContainEqual(expect.objectContaining({itemId:'child',title:'Execution',purpose:'execution'}));
  await f.command({type:'observe-execution',dispatchId:'attempt',fence:(await f.service.workflow('b')).dispatches.attempt.fence,outcome:'failed'});
  expect(await communication.openTaskCommunication('b',{itemId:'child',operationId:'open-failed'})).toMatchObject({resourceId:'/native/coordinate'});
- expect(open).toHaveBeenCalledWith('b',{recordId:'decision',operationId:'open-failed'});
+ expect(open).toHaveBeenCalledWith('b',{recordId:'decision',operationId:'open-failed',runId:'run'});
 });
 
 
@@ -179,6 +187,35 @@ it('ignores cancelled and archived historical management runs when resolving the
  f.options.client=()=>client;
  expect(await recordCoordination(f.options)('b',{recordId:'decision',operationId:'resolve'})).toMatchObject({sessionId:'native'});
  expect(planningSession).toHaveBeenCalledExactlyOnceWith('b','group');
+});
+
+it('resolves the requested run without selecting another run when its Session is unavailable',async()=>{
+ const f=await fixture();
+ for(const [id,root] of [['first-run','group'],['second-run','second']])await f.journal.appendRecurringRun('b',{id,recordId:'decision',recordRevision:1,boardId:'b',rootItemId:root,state:'running',createdAt:1,updatedAt:1} as any,{sourceBoardId:'b',recordId:'decision',recordRevision:1,runId:id});
+ const planningSession=vi.fn(async(_board:string,id:string)=>id==='second'?{analysisId:'second-analysis',sessionId:'second-session',resourceId:'/native/second',state:'completed'}:undefined);
+ f.options.client=()=>({...f.service,planningSession,recordExecutions:async()=>[
+  {id:'first-run',boardId:'b',rootItemId:'group',state:'running'},
+  {id:'second-run',boardId:'b',rootItemId:'second',state:'running'},
+ ]});
+ const open=recordCoordination(f.options);
+ expect(await open('b',{recordId:'decision',runId:'second-run',operationId:'open-second'})).toMatchObject({sessionId:'second-session'});
+ await expect(open('b',{recordId:'decision',runId:'first-run',operationId:'open-first'})).rejects.toMatchObject({code:'MANAGEMENT_SESSION_NOT_READY'});
+ await expect(open('b',{recordId:'decision',runId:'foreign',operationId:'open-foreign'})).rejects.toMatchObject({code:'MANAGEMENT_SESSION_NOT_READY'});
+ expect(planningSession).toHaveBeenCalledTimes(2);
+});
+
+it('requires an explicit recurring round across more than 100 history rows and opens only that Session',async()=>{
+ const f=await fixture(),record=await f.service.record('b','other');
+ for(let i=0;i<102;i++)await f.journal.appendRecurringRun('b',{id:'round-'+i,recordId:'other',recordRevision:record.revision,boardId:'b',rootItemId:'root-'+i,state:'completed',createdAt:i+1,updatedAt:i+1,archivedAt:i<100?1:undefined} as any,{sourceBoardId:'b',recordId:'other',recordRevision:record.revision,runId:'round-'+i});
+ const planningSession=vi.fn(async(_board:string,id:string)=>({analysisId:id,sessionId:'session-'+id,resourceId:'/native/'+id,state:'completed'}));
+ const recordExecutions=vi.fn(()=>{throw Error('full history read');});
+ f.options.service={...f.service,record:async(board:string,id:string)=>({...await f.service.record(board,id),hadRecurrence:true})};
+ f.options.client=()=>({...f.service,planningSession,recordExecutions,recordExecutionPage:(board:string,id:string,query:any)=>f.journal.runHistoryPage(board,id,query.limit,query.cursor)});
+ const open=recordCoordination(f.options);
+ await expect(open('b',{recordId:'other',operationId:'choose'})).rejects.toMatchObject({code:'MANAGEMENT_SESSION_SELECTION_REQUIRED'});
+ expect(planningSession).not.toHaveBeenCalled();
+ expect(await open('b',{recordId:'other',runId:'round-100',operationId:'selected'})).toMatchObject({sessionId:'session-root-100'});
+ expect(planningSession).toHaveBeenCalledExactlyOnceWith('b','root-100');expect(recordExecutions).not.toHaveBeenCalled();
 });
 
 it('repairs only the original retained Session directory after proven legacy worktree cleanup',async()=>{

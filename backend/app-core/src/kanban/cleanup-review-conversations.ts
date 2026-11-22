@@ -5,6 +5,7 @@ import {reviewCleanupKey,jobKey,safeCode,type ReviewCleanup} from '@nestos/kanba
 import type {KanbanItemOperations} from '@nestos/kanban/contracts';
 import type {DecisionConversationOptions,DecisionConversation} from './decision-conversation-ports';
 import {requireValue} from './validation';
+import {coordinationRoots} from './coordination-roots';
 interface Saved {id:string;input:CleanupReviewInput;projectId:string;profileId:string;sessionId:string;channelId:string;resourceId:string;resources:Array<{id:string;itemId:string;location:string}>;context:unknown}
 const savedKey=(id:string)=>'software-cleanup-review:'+id;
 /** The native durable queue owns submission and recovery; these records only freeze authority and receipts. */
@@ -62,7 +63,8 @@ export async function beginManagementCleanup(options:DecisionConversationOptions
 }
 async function boundItem(options:DecisionConversationOptions,conversation:DecisionConversation,item:string) {
  const record=await options.service.record(conversation.boardId,conversation.binding.recordId!),board=await options.service.read(conversation.boardId);
- requireValue(record.itemIds.includes(item)&&board.items.some(row=>row.id===item&&row.planning?.execution==='children'),'ITEM_NOT_IN_DECISION');
+ const roots=await coordinationRoots(options,conversation,record,board.id);
+ requireValue(roots.includes(item)&&board.items.some(row=>row.id===item&&row.planning?.execution==='children'),'ITEM_NOT_IN_DECISION');
 }
 function scopeView(view:KanbanItemOperations,id:string):KanbanItemOperations {
  const result=view.scopes?.find(row=>row.id===id)?.view??view.plugins?.flatMap(plugin=>plugin.view.scopes??[]).find(row=>row.id===id)?.view;
