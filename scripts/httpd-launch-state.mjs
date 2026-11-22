@@ -22,7 +22,7 @@ export async function changeLaunch(root,mode,change) {
     });
 }
 export async function launcherAlive(state) {return !!state?.launcher&& (await processIdentity(state.launcher.pid,false))?.birth===state.launcher.birth;}
-export async function requestLaunch(root,mode,request) {
+export async function requestLaunch(root,mode,request,validateTarget) {
     return changeLaunch(root,mode,state=>{
         if(!state)throw launchFailure('HTTPD_LAUNCHER_NOT_RUNNING');
         if(request.serviceId&&request.serviceId!==state.serviceId)throw launchFailure('HTTPD_SERVICE_MISMATCH');
@@ -32,6 +32,7 @@ export async function requestLaunch(root,mode,request) {
         if(state.operation&&!state.receipts?.[state.operation.id]&&request.action!=='stop')throw launchFailure('HTTPD_SWITCH_PENDING');
         const receipts={...state.receipts};if(request.action==='stop'&&state.operation&&!receipts[state.operation.id])receipts[state.operation.id]={operationId:state.operation.id,fingerprint:state.operation.fingerprint,result:'failure',code:'HTTPD_SWITCH_CANCELLED'};
         if(request.action==='switch'&&request.expectedCurrent!==state.currentRelease)throw launchFailure('HTTPD_VERSION_CHANGED');
+        validateTarget?.();
         if(Object.keys(state.receipts??{}).length>=512)throw launchFailure('HTTPD_OPERATION_HISTORY_LIMIT');
         return {...state,receipts,desiredState:request.action==='stop'?'stopped':'running',operation:{id:request.operationId,fingerprint,action:request.action,target:request.targetRelease,previous:state.currentRelease,phase:'queued',createdAt:Date.now()}};
     });

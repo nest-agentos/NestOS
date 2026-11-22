@@ -21,8 +21,9 @@ export class ApplicationEventFeed {
     }
     async start(): Promise<void> {
         if (this.closed || this.stop) return;
-        this.stop = this.source.onChange(() => {void this.refresh().catch(error => this.handlers.failure(error));});
-        try {await this.refresh();} catch (error) {this.close(); throw error;}
+        const stop=this.source.onChange(() => {void this.refresh().catch(error => this.handlers.failure(error));}) as (()=>void)&{ready?:Promise<void>};
+        this.stop=stop;
+        try {await stop.ready;await this.refresh();} catch (error) {this.close(); throw error;}
     }
     getCursor(): EventCursor {return {...this.cursor};}
     close(): void {this.closed = true; this.stop?.(); this.stop = undefined;}

@@ -16,3 +16,5 @@ export {cleanupReviewId,cleanupReviewInstruction,finishCleanupReview,type Cleanu
 export {verificationWaiverConfirmation,verificationWaiverInstruction} from './verification-waiver';
 
 export {recordDeliveryFailure,resolveDeliveryFailures} from './delivery-issues';
+export {parseSoftwareExecutionPermissions,softwareExecutionPermission,type SoftwareExecutionPermissions,type ExecutionPermissionVerdict} from './execution-permissions';
+export {workspacePrerequisitesFile,workspacePrerequisites,prerequisiteProbe} from './workspace-prerequisites';

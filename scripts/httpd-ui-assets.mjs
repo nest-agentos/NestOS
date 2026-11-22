@@ -14,10 +14,22 @@ export function retainUiAssets(releases, staging, limit = 2) {
     const candidates = readdirSync(releases, {withFileTypes: true}).filter(entry => entry.isDirectory() && releaseId.test(entry.name))
         .map(entry => entry.name).sort().reverse();
     const sources = [...new Set([selected, ...candidates].filter(id => typeof id === 'string' && releaseId.test(id)))].slice(0, limit);
-    let retained = 0;
+    const groups = [];
+    let previousUiAssets = [];
     for (const id of sources) {
         const directory = path.join(releases, id), manifest = readJSON(path.join(directory, 'release.json'));
-        for (const row of (manifest.uiAssets ?? manifest.files).filter(hashedAsset)) {
+        const assets = (manifest.uiAssets ?? manifest.files).filter(hashedAsset);
+        groups.push({directory, assets});
+        if (groups.length === 1) {
+            previousUiAssets = assets;
+            if (sources.length < limit && manifest.previousUiAssets) {
+                groups.push({directory, assets: manifest.previousUiAssets.filter(hashedAsset)});
+            }
+        }
+    }
+    let retained = 0;
+    for (const {directory, assets} of groups) {
+        for (const row of assets) {
             const source = path.join(directory, row.file), destination = path.join(staging, row.file);
             const relative = path.relative(realpathSync(directory), realpathSync(source));
             if (relative.startsWith('..' + path.sep) || path.isAbsolute(relative)
@@ -31,6 +43,6 @@ export function retainUiAssets(releases, staging, limit = 2) {
             available.set(row.file, row.sha256); retained++;
         }
     }
-    return {uiAssets, retained, generations: sources.length};
+    return {uiAssets, previousUiAssets, retained, generations: groups.length};
 }
 function assetError(code) {return Object.assign(new Error(code), {code});}

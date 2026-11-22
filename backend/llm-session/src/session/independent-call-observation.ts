@@ -1,6 +1,6 @@
 import {taskStat,type Kernel,type TaskCallResult} from '@nestos/durable-kernel';
 import type {IndependentCallService} from './independent-calls';
-import type {IndependentCallInput} from '../contracts/independent-calls';
+import type {IndependentCallInput,IndependentCallView} from '../contracts/independent-calls';
 import type {IndependentTaskCallAdmission} from './independent-call-preparation';
 import {independentCallSettled} from './durable-call-control';
 import {reconcileIndependentCallExecution,type CallReconciliationDiagnostic} from './independent-call-reconciliation';
@@ -14,13 +14,13 @@ export interface IndependentCallExecutionObservation {
     controlCapabilities?:{pause:'boundary'|'none';resume:boolean};
 }
 export interface IndependentCallExecutionReader {
-    inspect(input:IndependentCallInput):Promise<IndependentCallExecutionObservation>;
+    inspect(input:IndependentCallInput,observeApprovals?:(call:IndependentCallView)=>Promise<void>):Promise<IndependentCallExecutionObservation>;
     wait(receipt:IndependentTaskCallAdmission,timeoutMs:number):Promise<IndependentCallExecutionObservation>;
     settled(sessionId:string):Promise<boolean>;
 }
 /** Kernel handles stay inside Session; applications consume execution observations. */
 export function createIndependentCallExecutionReader(ports:IndependentCallExecutionPorts&{kernel:IndependentCallExecutionPorts['kernel']&Pick<Kernel,'attachTask'|'listSessionTasks'>}):IndependentCallExecutionReader {
-    return {inspect:input=>inspectIndependentCallExecution(ports,input),
+    return {inspect:(input,observeApprovals)=>inspectIndependentCallExecution(ports,input,observeApprovals),
         wait:async(receipt,timeoutMs)=>{
             const caller=await ports.kernel.attachTask(receipt.submission.task.sessionId,receipt.submission.task.taskId);
             const exit=await caller.wait({until:'settled',timeoutMs});
@@ -36,7 +36,8 @@ export function createIndependentCallExecutionReader(ports:IndependentCallExecut
         }};
 }
 /** Observe the admitted call and its owned tree; reports and idle conversations are not completion facts. */
-export async function inspectIndependentCallExecution(ports:IndependentCallExecutionPorts,input:IndependentCallInput):Promise<IndependentCallExecutionObservation> {
+export async function inspectIndependentCallExecution(ports:IndependentCallExecutionPorts,input:IndependentCallInput,
+    observeApprovals?:(call:IndependentCallView)=>Promise<void>):Promise<IndependentCallExecutionObservation> {
     const admission=await ports.calls.inspectTaskCallSubmission(input);
     if(!admission)return {outcome:'unknown',code:'WORK_ADMISSION_UNKNOWN'};
     const views=await ports.calls.list({sessionId:input.request.expectedSessionId!,branchId:input.request.expectedBranch});
@@ -45,6 +46,7 @@ export async function inspectIndependentCallExecution(ports:IndependentCallExecu
     if(!view)return {...session,outcome:'unknown',code:'WORK_EXECUTION_VIEW_MISSING'};
     if(view.callerState&&!view.callerState.settled){
         const blocked=await reconcileIndependentCallExecution(ports.kernel,admission.executionSessionId,view.executionState,ports.log);
+        if(!blocked&&view.interactions?.items.some(row=>row.kind==='approval'))await observeApprovals?.(view);
         return {...session,outcome:blocked?'unknown':'running',...(blocked?{code:'WORK_EXECUTION_UNSETTLED'}:{})};
     }
     if(!independentCallSettled(view))return {...session,outcome:'unknown',code:'WORK_EXECUTION_UNSETTLED'};

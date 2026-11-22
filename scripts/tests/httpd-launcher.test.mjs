@@ -1,18 +1,18 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,readFile,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,readFile,writeFile,rm,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';import path from 'node:path';import {spawn} from 'node:child_process';import {once} from 'node:events';
 import {processIdentity} from '../httpd-process.mjs';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function fixture(){
+async function fixture(managed=false){
  const root=await mkdtemp(path.join(tmpdir(),'httpd-launcher-'));await mkdir(path.join(root,'scripts'));await writeFile(path.join(root,'package.json'),'{"type":"module"}');
- for(const file of ['httpd-launcher.mjs','httpd-launch-state.mjs','httpd-child.mjs','httpd-process.mjs','httpd-diagnostics.mjs'])await writeFile(path.join(root,'scripts',file),await readFile(new URL('../'+file,import.meta.url)));
+ for(const file of ['httpd-launcher.mjs','httpd-retention.mjs','httpd-build-cache.mjs','local-library-lock.mjs','httpd-launch-state.mjs','httpd-child.mjs','httpd-process.mjs','httpd-diagnostics.mjs'])await writeFile(path.join(root,'scripts',file),await readFile(new URL('../'+file,import.meta.url)));
  await writeFile(path.join(root,'scripts/httpd-runtime.mjs'),`import{appendFileSync}from'node:fs';export const hostArguments=()=>[],hostEnvironment=()=>process.env,runtimePaths=()=>({runtime:process.env.NESTOS_HTTPD_TEST_ROOT+'/runtime.log'}),runtimeLog=file=>({write(chunk){appendFileSync(file,chunk,{mode:0o600});},close(){}}),releaseDirectory=(r,id)=>r+'/'+id,verifyRelease=()=>{};`);
  await writeFile(path.join(root,'scripts/httpd-launch-health.mjs'),`import{existsSync}from'node:fs';export const launchHealth=root=>Object.assign(async id=>id!=='bad'&&(id!=='delayed'||existsSync(root+'/allow')),{timeoutMs:400});`);
- const releases=path.join(root,'releases');for(const id of ['first','next','bad','delayed']){await mkdir(path.join(releases,id,'server'),{recursive:true});await writeFile(path.join(releases,id,'server/main.js'),`process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);`);}
+ const releases=path.join(root,managed?'release/httpd':'releases');for(const id of ['first','next','bad','delayed']){await mkdir(path.join(releases,id,'server'),{recursive:true});await writeFile(path.join(releases,id,'server/main.js'),`process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);`);}
  await writeFile(path.join(releases,'current.json'),'{"id":"first"}');
- await writeFile(path.join(root,'runner.mjs'),`import{launcherCommand}from'./scripts/httpd-launcher.mjs';import{setLifecycleLog}from'./scripts/httpd-process.mjs';import{runtimeLog,runtimePaths}from'./scripts/httpd-runtime.mjs';const output=runtimeLog(runtimePaths().runtime);setLifecycleLog(chunk=>output.write(chunk));await launcherCommand(process.cwd(),process.cwd()+'/releases',process.argv[2],process.argv.slice(3));`);
- const env={...process.env,NESTOS_HTTPD_CONTROL_DIR:path.join(root,'control'),NESTOS_HTTPD_TEST_ROOT:root},runners=[];
+ await writeFile(path.join(root,'runner.mjs'),`import{launcherCommand}from'./scripts/httpd-launcher.mjs';import{setLifecycleLog}from'./scripts/httpd-process.mjs';import{runtimeLog,runtimePaths}from'./scripts/httpd-runtime.mjs';const output=runtimeLog(runtimePaths().runtime);setLifecycleLog(chunk=>output.write(chunk));await launcherCommand(process.cwd(),process.env.NESTOS_HTTPD_TEST_RELEASES,process.argv[2],process.argv.slice(3));`);
+ const env={...process.env,NESTOS_HTTPD_TEST_RELEASES:releases,NESTOS_HTTPD_CONTROL_DIR:path.join(root,'control'),NESTOS_HTTPD_TEST_ROOT:root},runners=[];
  const run=(command,args=[])=>{const child=spawn(process.execPath,['runner.mjs',command,...args],{cwd:root,env,stdio:'ignore'});runners.push(child);return child;};
  const state=async()=>{const dirs=await import('node:fs/promises').then(fs=>fs.readdir(env.NESTOS_HTTPD_CONTROL_DIR)).catch(()=>[]);return dirs.length?readFile(path.join(env.NESTOS_HTTPD_CONTROL_DIR,dirs[0],'release.json'),'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return;throw error;}):undefined;};
  const saveState=async value=>{const {readdir}=await import('node:fs/promises');const [directory]=await readdir(env.NESTOS_HTTPD_CONTROL_DIR);await writeFile(path.join(env.NESTOS_HTTPD_CONTROL_DIR,directory,'release.json'),JSON.stringify(value));};
@@ -126,3 +126,37 @@ test('server writes fatal receipts after launcher death and recovery marks missi
  const evidence=(await f.state()).lastChildExit;assert.equal(evidence.code,'HTTPD_CHILD_EXIT_UNOBSERVED');
  assert.equal(evidence.result,'unknown');assert.equal(evidence.exitCode,undefined);assert.equal(evidence.signal,undefined);
  }finally{await f.close();}});
+
+test('healthy startup and restart collect superseded releases and unreferenced library snapshots',async()=>{
+ const f=await fixture(true);
+ const version=day=>'2026010'+day+'T000000-12345678';
+ const snapshots=path.join(f.root,'release/local-libraries/snapshots');
+ const snapshot=i=>String(i).repeat(64);
+ try {
+  for(let i=1;i<=6;i++)await mkdir(path.join(snapshots,snapshot(i)),{recursive:true});
+  for(let i=1;i<=4;i++){
+   const dir=path.join(f.releases,version(i));
+   await mkdir(path.join(dir,'server'),{recursive:true});
+   await writeFile(path.join(dir,'release.json'),JSON.stringify({id:version(i),librarySnapshot:snapshot(i)}));
+   await writeFile(path.join(dir,'server/main.js'),await readFile(path.join(f.releases,'first/server/main.js')));
+  }
+  await mkdir(path.join(f.releases,'.pending-acceptance'));
+  await writeFile(path.join(f.releases,'.pending-acceptance',version(2)),'');
+  await writeFile(path.join(snapshots,'../prepared.json'),JSON.stringify({format:1,id:snapshot(5)}));
+  await writeFile(path.join(snapshots,'../active.json'),JSON.stringify({format:1,mode:'snapshot',id:snapshot(6)}));
+  await writeFile(path.join(f.releases,'current.json'),JSON.stringify({id:version(3)}));
+  f.run('start');await f.waitLog(e=>e.stage==='launcher.cleanup'&&e.result==='success');
+  assert.deepEqual((await readdir(snapshots)).sort(),[2,3,4,5,6].map(snapshot));
+  const releases=async()=>(await readdir(f.releases)).filter(id=>id.startsWith('2026')).sort();
+  assert.deepEqual(await releases(),[2,3,4].map(version));
+  const bad=f.run('switch',['bad','--operation-id','failed']);
+  assert.notEqual((await once(bad,'exit'))[0],0);
+  assert.deepEqual(await releases(),[2,3,4].map(version));
+  await writeFile(path.join(f.releases,'current.json'),JSON.stringify({id:version(4)}));
+  const restart=f.run('restart',['--operation-id','healthy-restart']);
+  assert.equal((await once(restart,'exit'))[0],0);
+  await f.waitLog(e=>e.stage==='launcher.cleanup'&&e.operationId==='healthy-restart'&&e.result==='success');
+  assert.deepEqual(await releases(),[2,4].map(version));
+  assert.deepEqual((await readdir(snapshots)).sort(),[2,4,5,6].map(snapshot));
+ }finally{await f.close();}
+});

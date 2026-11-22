@@ -1,3 +1,5 @@
+import {startCellsReconnect} from './cells-reconnect';
+import {kanbanModulePermissions} from './kanban-module-permissions';
 import {serviceControlModules} from './service-control-modules';
 import {tracedCellsFetch} from '../logging/request-trace';
 import {localServiceControl} from './service-control';
@@ -57,11 +59,19 @@ export async function createNodeRuntime(source: IStorageBackend, root?: string, 
         const additionalTools = mergeNodePackageTools(packages.userTools([...createStandardNodeTools(), ...await loadNodeToolModules(undefined, options.toolConnections),
             ...options.kernelPlatform?.additionalTools ?? []]), packages.initialTools(), BUILTIN_TOOLS);
         const runtime = await createApplicationRuntime({remoteSourceProvider: createCellsDriver(undefined, tracedCellsFetch(undefined,event=>traceAudit?.write(event))), ownerKind:'cli',runningVersion:process.env.NESTOS_HTTPD_VERSION,...options,serviceControl:options.configurationReadonly?undefined:options.serviceControl??serviceControlModules(localServiceControl()),backend: borrowed,
+            kanbanModulePermissions: options.kanbanModulePermissions??(options.configurationReadonly?undefined:kanbanModulePermissions(process.env.NESTOS_KANBAN_MODULE_PERMISSIONS)),
             toolDependencies: options.toolDependencies ?? packages,
             kernelPlatform: { ...options.kernelPlatform, additionalTools, configure: async (kernel, services) => {
                 await packages.bind(kernel); await options.kernelPlatform?.configure?.(kernel, services);
             } } });
-        const dispose = runtime.dispose.bind(runtime); runtime.dispose = async () => {try {await dispose();} finally {await packages.close();}};
+        const remote = runtime.projects.remoteMounts;
+        const stopReconnect = options.ownerKind === 'httpd' && remote ? startCellsReconnect(remote) : undefined;
+        const quiesce = runtime.quiesce.bind(runtime), dispose = runtime.dispose.bind(runtime);
+        runtime.quiesce = async () => { await stopReconnect?.(); await quiesce(); };
+        runtime.dispose = async () => {
+            try { await stopReconnect?.(); await dispose(); }
+            finally { await packages.close(); }
+        };
         return runtime;
     } catch (error) {await packages.close(); throw error;}
 }

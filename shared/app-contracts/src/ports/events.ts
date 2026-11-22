@@ -10,6 +10,7 @@ export interface ApplicationEventFact {
 }
 export interface ApplicationEvents {
     eventBaseline(): Promise<EventCursor>;
+    notificationSummary?():Promise<{head:EventCursor;unread:number}>;
     readEvents(after?: EventCursor, limit?: number): Promise<JournalPage<ApplicationEventFact>>;
     listNotifications(limit?: number): Promise<{items: Array<{event: JournalEvent<ApplicationEventFact>; read: boolean}>; head: EventCursor}>;
     setNotificationRead(eventId: string, read: boolean): Promise<void>;

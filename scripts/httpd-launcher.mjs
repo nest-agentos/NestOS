@@ -1,4 +1,5 @@
 import {spawn} from 'node:child_process';
+import {accessSync} from 'node:fs';
 import {readFile,writeFile,rename} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import path from 'node:path';
@@ -6,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {hostArguments,hostEnvironment,runtimePaths,runtimeLog,releaseDirectory,verifyRelease} from './httpd-runtime.mjs';
 import {processIdentity,runningHttpd,registerHttpd,unregisterHttpd,stopHttpd,lifecycleLog} from './httpd-process.mjs';
 import {readLaunch,changeLaunch,launcherAlive,requestLaunch,waitLaunch,pause,launchFailure} from './httpd-launch-state.mjs';
+import {cleanHealthyRelease,pinSharedReleases,sharedReleaseLease} from './httpd-retention.mjs';
 import {launchHealth} from './httpd-launch-health.mjs';
 import {installProcessDiagnostics,observeChildProcess,processErrorMetadata} from './httpd-diagnostics.mjs';
 const childEntry=fileURLToPath(new URL('./httpd-child.mjs',import.meta.url));
@@ -17,7 +19,8 @@ async function updateOperation(root,id,change){return changeLaunch(root,'release
 async function finish(root,id,result,code){return changeLaunch(root,'release',state=>{
     if(state.operation?.id!==id)return state;
     const operation={...state.operation,phase:result==='success'?'succeeded':code==='HTTPD_SWITCH_ROLLED_BACK'?'rolled-back':'failed'};
-    const receipt={operationId:id,fingerprint:operation.fingerprint,result,code,version:state.currentRelease,finishedAt:Date.now()};
+    const receipt={operationId:id,fingerprint:operation.fingerprint,result,code,version:state.currentRelease,finishedAt:Date.now(),
+        ...(result==='success'&&operation.action==='switch'?{cleanupScheduled:true}:{})};
     lifecycleLog({operationId:id,stage:'launcher.operation',result,code,version:state.currentRelease,durationMs:Date.now()-operation.createdAt});
     return {...state,operation,receipts:{...state.receipts,[id]:receipt}};
 });}
@@ -68,7 +71,8 @@ async function releaseLauncher(root,identity,diagnostics,error){
 }
 async function switchRelease(root,releases,operation,probe,timeoutMs){
     let state=await readLaunch(root,'release');const rollback=operation.phase==='rollback';
-    const target=rollback?operation.previous:operation.target;verifyRelease(releaseDirectory(releases,target));
+    const target=rollback?operation.previous:operation.target;
+    pinSharedReleases(root,releases,[target,operation.previous]);verifyRelease(releaseDirectory(releases,target));
     if(['queued','stopping'].includes(operation.phase)||state.childRelease!==target||!await alive(state.child)){
         await updateOperation(root,operation.id,{phase:rollback?'rollback':'stopping'});await stopChild(root,releases);
         state=await readLaunch(root,'release');if(state.desiredState==='stopped'||state.operation.id!==operation.id)return;
@@ -77,13 +81,19 @@ async function switchRelease(root,releases,operation,probe,timeoutMs){
     if(await healthy(root,target,probe,timeoutMs)){
         state=await readLaunch(root,'release');if(state.desiredState==='stopped'||state.operation.id!==operation.id)return;
         await select(releases,target);await changeLaunch(root,'release',old=>({...old,currentRelease:target,restarts:0}));
-        await finish(root,operation.id,rollback?'failure':'success',rollback?'HTTPD_SWITCH_ROLLED_BACK':undefined);return;
+        await finish(root,operation.id,rollback?'failure':'success',rollback?'HTTPD_SWITCH_ROLLED_BACK':undefined);
+        if(!rollback)void cleanHealthyRelease(root,releases,target,operation.id);
+        return;
     }
     if((await readLaunch(root,'release')).desiredState==='stopped')return;
     if(!rollback&&operation.previous&&operation.previous!==target){await updateOperation(root,operation.id,{phase:'rollback'});return;}
     await stopChild(root,releases);await changeLaunch(root,'release',old=>({...old,desiredState:'stopped'}));await finish(root,operation.id,'failure','HTTPD_HEALTH_FAILED');
 }
 export async function runLauncher(root,releases,args){
+    const releaseLease=sharedReleaseLease(root,releases);
+    try{return await superviseReleases(root,releases,args);}finally{releaseLease();}
+}
+async function superviseReleases(root,releases,args){
     const identity=await processIdentity(process.pid,false);
     await changeLaunch(root,'release',async old=>{
         if(await launcherAlive(old))throw launchFailure('HTTPD_ALREADY_RUNNING');
@@ -98,11 +108,17 @@ export async function runLauncher(root,releases,args){
     let failure;
     const stop=signal=>{diagnostics.signal(signal);void changeLaunch(root,'release',old=>({...old,desiredState:'stopped'})).catch(error=>diagnostics.log({stage:'launcher.stop',result:'failure',code:'HTTPD_STOP_INTENT_FAILED',...processErrorMetadata(error)}));};
     process.on('SIGTERM',stop);process.on('SIGINT',stop);
-    try{const probe=launchHealth(root,initial.args,'release');await loop(root,releases,probe,diagnostics);}
+    try{const probe=launchHealth(root,initial.args,'release');
+        if(initial.desiredState==='running'&&(!initial.operation||terminal.has(initial.operation.phase))&&await alive(initial.child)){
+            pinSharedReleases(root,releases,[initial.childRelease]);
+            if(await probe(initial.childRelease))await cleanHealthyRelease(root,releases,initial.childRelease);
+        }
+        await loop(root,releases,probe,diagnostics);}
     catch(error){failure=error;throw error;}
     finally{process.off('SIGTERM',stop);process.off('SIGINT',stop);await releaseLauncher(root,identity,diagnostics,failure);}
 }
 async function restartChild(root,releases,state,probe){
+    pinSharedReleases(root,releases,[state.currentRelease]);
     const observed=state.child&&observedChildren.get(state.child.pid);
     let lastChildExit=observed?.exitReceipt??state.lastChildExit;
     if(state.child){
@@ -122,12 +138,13 @@ async function restartChild(root,releases,state,probe){
         code:good?undefined:'HTTPD_HEALTH_FAILED',attempt:state.restarts+1,durationMs:Date.now()-started});
     if(!good){await stopChild(root,releases);return;}
     await changeLaunch(root,'release',old=>({...old,healthyAt:Date.now()}));
+    void cleanHealthyRelease(root,releases,state.currentRelease,operationId);
 }
 async function loop(root,releases,probe,diagnostics){
     while(true){
         const state=await readLaunch(root,'release');
         diagnostics.update({version:state.currentRelease});
-        if(state.desiredState==='stopped'){await stopChild(root,releases);if(state.operation?.action==='stop')await finish(root,state.operation.id,'success');return;}
+        if(state.desiredState==='stopped'){await stopChild(root,releases);pinSharedReleases(root,releases,[]);if(state.operation?.action==='stop')await finish(root,state.operation.id,'success');return;}
         if(state.operation&&!terminal.has(state.operation.phase)){try{await switchRelease(root,releases,state.operation,probe,probe.timeoutMs??120000);}catch(error){const current=await readLaunch(root,'release');if(state.operation.previous&&state.operation.phase!=='rollback'&&(!await alive(current.child)||current.childRelease!==state.operation.previous))await updateOperation(root,state.operation.id,{phase:'rollback',code:error.code??'HTTPD_SWITCH_FAILED'});else await finish(root,state.operation.id,'failure',error.code??'HTTPD_SWITCH_FAILED');}continue;}
         if(!await alive(state.child)){
             await restartChild(root,releases,state,probe);
@@ -163,7 +180,12 @@ export async function launcherCommand(root,releases,command,args){
     if(command!=='stop')launchHealth(root,state.args,'release');
     const target=command==='stop'?undefined:command==='switch'?args[0]:await selected(releases);if(target)verifyRelease(releaseDirectory(releases,target));
     const operationId=value('--operation-id')??randomUUID();if(!/^[\w-]{1,128}$/.test(operationId))throw launchFailure('HTTPD_OPERATION_INVALID');
-    await requestLaunch(root,'release',{operationId,action:command==='stop'?'stop':'switch',targetRelease:target,expectedCurrent:value('--expected-current')??state.currentRelease,serviceId:value('--service-id')??state.serviceId});
+    await requestLaunch(root,'release',{operationId,action:command==='stop'?'stop':'switch',targetRelease:target,expectedCurrent:value('--expected-current')??state.currentRelease,serviceId:value('--service-id')??state.serviceId},
+        target?()=>accessSync(path.join(releaseDirectory(releases,target),'server/main.js')):undefined);
     if(args.includes('--force'))await stopHttpd(root,'release',releases,{timeoutMs,force:true});
-    await waitLaunch(root,'release',operationId,timeoutMs);
+    const receipt=await waitLaunch(root,'release',operationId,timeoutMs);
+    // Launchers started before retention support return the original receipt format.
+    if(target&&!receipt.cleanupScheduled&&await launchHealth(root,state.args,'release')(target)){
+        await cleanHealthyRelease(root,releases,target,operationId);
+    }
 }

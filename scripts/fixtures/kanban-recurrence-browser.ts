@@ -21,6 +21,7 @@ async function run(){
  await measure('warm.open-detail',()=>editor.querySelector<HTMLElement>('[data-record="fixture-decision"]')!.click(),()=>!!editor.querySelector('[data-action="recurrence-edit"]'));
  editor.querySelector<HTMLElement>('[data-action="recurrence-edit"]')!.click();await wait(()=>!!editor.querySelector('[data-recurrence-form]'));
  const form=editor.querySelector<HTMLFormElement>('[data-recurrence-form]')!,first=new Date(Math.ceil((clock+120000)/60000)*60000);
+ const mode=form.elements.namedItem('decisionRunMode') as HTMLSelectElement;mode.value='recurring';mode.dispatchEvent(new Event('change',{bubbles:true}));
  const firstInput=form.elements.namedItem('firstAt') as HTMLInputElement;firstInput.value=new Date(first.getTime()-first.getTimezoneOffset()*60000).toISOString().slice(0,16);
  (form.elements.namedItem('minutes') as HTMLInputElement).value='1';
  await measure('warm.save-schedule',()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})),()=>!!editor.querySelector('[data-action="recurrence-pause"]'));
@@ -30,6 +31,12 @@ async function run(){
  await measure('warm.pause',()=>editor.querySelector<HTMLElement>('[data-action="recurrence-pause"]')!.click(),()=>!!editor.querySelector('[data-action="recurrence-resume"]'));
  clock+=120000;await service.scan();const after=await service.record('fixture','fixture-decision');
  if(after.recurrence?.state!=='paused'||after.recurrenceFence?.pending.length!==1||(await service.recordExecutions!('fixture','fixture-decision')).length!==1)throw Error('PAUSE_BOUNDARY_FAILED');
+ editor.querySelector<HTMLElement>('[data-action="recurrence-edit"]')!.click();
+ const edit=editor.querySelector<HTMLFormElement>('[data-recurrence-form]')!,switchMode=edit.elements.namedItem('decisionRunMode') as HTMLSelectElement;
+ switchMode.value='once';switchMode.dispatchEvent(new Event('change',{bubbles:true}));
+ await measure('warm.switch-to-once',()=>edit.requestSubmit(),()=>!editor.querySelector('[data-action="recurrence-resume"]'));
+ const once=await service.record('fixture','fixture-decision');
+ if(once.recurrence||once.recurrenceFence?.pending.length!==1||!editor.querySelector('[data-recurrence-run]'))throw Error('SINGLE_MODE_BOUNDARY_FAILED');
  const result={result:'passed',environment:'Chromium; isolated in-memory VFS; in-process KanbanClient; no HTTP transport',dataset:{boards:1,decisions:1,backgroundLoad:'none'},metrics};
  document.getElementById('result')!.textContent=JSON.stringify(result);await runtime.service.quiesce();await manager.dispose();
 }

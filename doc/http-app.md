@@ -72,6 +72,7 @@ pnpm httpd --root /srv/nestos --users-dir /srv/nestos/home
 启动先打开 admin，完成公共配置初始化，再恢复所有已登记用户，全部成功后才监听。请求只能进入证书所属的 Runtime/ViewApi；同一用户的新窗口复用该 Runtime，不同用户的相同 clientId、Session ID 和逻辑路径不会选择到同一份私有存储。新增登记的用户在首次应用请求时初始化，并复用初始化中的 Promise；最多同时保留 100 个用户 Runtime。关闭网页不停止后台任务，宿主退出才依次释放流、视图、Runtime、数据库和锁。当前实现面向少量用户，每用户仍有独立 Kernel、工具装配与后台恢复开销。
 
 远程项目挂载和本地会话记录归各用户所有；不同用户可以挂载同一远程目录。Cells 节点配置与凭据归各用户目录；不同 NestOS 用户若使用同一远端凭据，在 Cells 上仍代表同一 principal，其项目和原生会话按该 principal 授权。需要远端身份隔离时必须配置不同凭据；挂载复用优先核对已验证 principal；未验证的 Bearer 连接按凭据引用区分，不能因为用户名都为空而合并。HTTP 宿主租约使用 `httpd` 标识，历史 `cli` 租约仍按原有效期处理。
+httpd 为每个已加载的用户运行时定时检查其 Cells 连接。首次检查在运行时就绪约 5 秒后进行，随后在每轮完成 60 秒后重试。检查复用节点和挂载探测，运行时停止时取消在途检查。工具箱的 Cells 列表也可按节点立即检查。
 
 多用户工具包安装到 `<rootDir>/tools/<包名>/<版本>`，登记文件为 `<rootDir>/etc/tool-packages.json`；所有用户加载同一份工具代码，运行数据仍归各自用户。工具包源沿用 `NESTOS_TOOL_PACKAGE_DIRS` 或启动目录的 `tools/`。`bin/` 可用于命令行入口，不作为工具注册依据。 可信包 `toolbox.yaml` 的 `preinstall: true` 在启动时预装，默认按用户停用；每用户启用及普通默认参数位于 `.nestos/private/tool-preferences/preferences.json`，认证连接仍单独保存。共享代码、组织空间不共享这些个人设置。
 
@@ -698,7 +699,7 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 
 `pnpm httpd` 常驻启动器管理 release 子进程。`pnpm httpd:status` 返回服务 ID、当前版本和切换回执；`pnpm httpd:switch <release-id> --operation-id <id> --expected-current <version>` 请求版本切换。`httpd:restart` 选取构建后的 release，不重新构建。旧宿主在安全点退出后才启动候选版本，健康检查失败自动回退原版本。
 
-在使用 systemd 的 Linux 宿主上，`pnpm httpd:restart` 会先启动已安装且尚未运行的 `firecracker-server.service`，再从 `list --all --json` 检查 VM ID `cells-x1`。清单中该 VM 处于 `stopped` 时才启动，已绑定服务包的 VM 使用受管服务启动。临时 VM 停止后会从清单消失，下次重启时跳过。Firecracker 检查或启动失败会在替换 HTTP 进程前结束本次重启，运行日志包含失败阶段、错误码和耗时。
+在使用 systemd 的 Linux 宿主上，`pnpm httpd:restart` 先检查已安装的 `nestos-cells-local.service`，在其尚未运行时启动并等待 systemd 的就绪检查。随后启动已安装且尚未运行的 `firecracker-server.service`，再从 `list --all --json` 检查 VM ID `cells-x1`。清单中该 VM 处于 `stopped` 时才启动，已绑定服务包的 VM 使用受管服务启动。临时 VM 停止后会从清单消失，下次重启时跳过。Firecracker 检查或启动失败会在替换 HTTP 进程前结束本次重启，运行日志包含失败阶段、错误码和耗时。
 
 控制状态位于 `$XDG_CONFIG_HOME/nestos/httpd-launchers/<项目路径摘要>/release.json`（默认 `~/.config`），可用 `NESTOS_HTTPD_CONTROL_DIR` 覆盖；文件权限 0600，独立于 worktree 和 release。状态保存服务 ID、目标版本、进程身份和幂等回执；启动器重启接管已登记的候选进程，继续核对。显式 stop 持久化停止意图，不会被守护循环复活；未到安全点时最多等待 15 秒，然后按登记身份强制退出并确认死亡；启动器不再无限等待。
 
@@ -707,3 +708,9 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 健康配置在 `nestos.json` 的 `http.launcher.health`：可选 `url`、`ca`、`cert`、`key`、`timeoutMs`；默认使用本机 `/api/health` 和 http.certDir 下的客户端证书，验证实际 version 与目标一致。`/api/health` 另返回稳定 serviceId 供显式项目目标配置使用，它不是授权凭据。
 
 原生 Harness 的等待输出也通过 Kernel `waitForObservation` 让出本地执行权。安全退出只中止观察等待，保留原 Effect 租约和原生 turn journal；重启核对同一 turn，不取消远程任务、不新建 turn。`WORKER_OBSERVATION_DRAINED` 在宿主与能力适配器之间保留原始身份，不映射成业务失败或 unknown 结果。
+
+### 启动后的制品清理
+
+release 启动器在子进程通过版本健康检查后，以及重启或切换成功后，回收较旧的 HTTP 版本和本检出中无引用的本地库快照。切换失败时先按原流程回滚。清理保留运行版、`current.json` 指定版、更晚的构建和带 `.pending-acceptance/<版本>` 标记的候选。使用 `--no-activate` 构建会写入该标记，候选在主检出成功运行后解除保护。共享目录有其他启动器使用时暂停回收其中的 HTTP 版本。
+
+库快照保留范围包括开发激活指针、HTTP prepared 指针、当前环境显式选择及保留版本清单中的 `librarySnapshot`。清理在构建与库操作锁内将过期目录改名，随后释放锁并删除。启动日志中的 `launcher.cleanup` 记录结果、耗时和错误分类。遇到构建占锁时本轮跳过，下一次成功启动或切换时再清理。Cells 制品与 HTTP 构建缓存单独管理。

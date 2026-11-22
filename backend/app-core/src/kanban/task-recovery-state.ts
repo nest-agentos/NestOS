@@ -26,16 +26,29 @@ export async function taskRecoveryState(options:TaskRecoveryOptions,boardId:stri
     const latest=jobs.filter((job):job is ReviewJob=>typeof actualVersion==='string'&&!!job&&job.boardId===boardId&&candidates.includes(job.itemId)&&board.items.find(row=>row.id===job.itemId)?.externalRefs?.some(ref=>ref.system==='nestos-remote-project'&&ref.id===record?.projectId)===true&&job.action==='deploy'&&job.state==='succeeded'&&job.phase==='settled'&&(job.result as {version?:string})?.version===actualVersion).sort((a,b)=>b.createdAt-a.createdAt)[0];
     const code=dispatch?.code??item.blocked?.reason;
     const retained=!!record&&!await options.journal.get('worktree-cleanup:'+(record.worktreeId??retainedScope!.dispatch.id));
-    return {itemId,related,blockingItems,...optional({sessionId,resourceId,code,expectedVersion,actualVersion,deliveryOperationId:latest?.id,deliveryItemId:latest?.itemId}),
+    const eligibility=taskRecoveryEligibility(item,dispatch,{resourcesRetained:retained,blockingItemIds:blockingItems.map(row=>row.id),targetReady:!delivery?.readOnly||typeof expectedVersion==='string'&&(expectedVersion===actualVersion||!!latest),currentTargetSelectable:!latest&&delivery?.readOnly===true&&!!target&&actualVersion!==expectedVersion});
+    const canRecheck=eligibility.canRetry&&record&&delivery?.readOnly!==true&&options.recheck?.supports(record);
+    return {itemId,related,blockingItems,...(canRecheck?{canRecheck:true}:{}),...optional({sessionId,resourceId,code,expectedVersion,actualVersion,deliveryOperationId:latest?.id,deliveryItemId:latest?.itemId}),
         revision:sha256HexSync(JSON.stringify([item.id,item.revision,dispatch?.id,dispatch?.outcome,code,expectedVersion,target?.id,actualVersion,latest?.id,repairs.map(row=>[row.id,row.revision,row.status])])),
-        ...taskRecoveryEligibility(item,dispatch,{resourcesRetained:retained,blockingItemIds:blockingItems.map(row=>row.id),targetReady:!delivery?.readOnly||typeof expectedVersion==='string'&&(expectedVersion===actualVersion||!!latest),currentTargetSelectable:!latest&&delivery?.readOnly===true&&!!target&&actualVersion!==expectedVersion})};
+        ...eligibility,canRetry:eligibility.canRetry&&!canRecheck};
 }
 
 async function activeBlocker(options:TaskRecoveryOptions,board:KanbanBoard,item:KanbanItem,dispatch:KanbanDispatch|undefined):Promise<KanbanTaskRecovery|undefined>{
     const pendingIssueIds=activeRecoveryIssueIds(item,dispatch);
     if(!dispatch||!pendingIssueIds.length)return;
     const sessionId=dispatch.executionSessionId,resourceId=sessionId?await options.executionResource(sessionId,'main',board):undefined;
-    return {state:'blocked',itemId:item.id,pendingIssueIds,revision:sha256HexSync(JSON.stringify([item.id,item.revision,dispatch.id,dispatch.outcome,pendingIssueIds])),related:[],canRetry:false,canSelectCurrentVersion:false,...optional({sessionId,resourceId,code:dispatch.code??item.blocked?.reason})};
+    const canRecheck=sessionId&&!board.executionControl?.paused&&!board.lifecycle&&board.deletedAt===undefined&&dispatch.outcome==='running'&&pendingIssueIds.length===1&&
+        item.issues?.some(issue=>issue.id===pendingIssueIds[0]&&issue.attemptId===dispatch.id&&issue.type==='error')&&
+        await canRecheckActiveWorkspace(options,dispatch.id);
+    return {state:'blocked',itemId:item.id,pendingIssueIds,revision:sha256HexSync(JSON.stringify([item.id,item.revision,dispatch.id,dispatch.outcome,pendingIssueIds])),
+        related:[],canRetry:false,canSelectCurrentVersion:false,...(canRecheck?{canRecheck:true}:{}),...optional({sessionId,resourceId,code:dispatch.code??item.blocked?.reason})};
+}
+
+async function canRecheckActiveWorkspace(options:TaskRecoveryOptions,dispatchId:string) {
+    if(!options.recheck)return false;
+    const record=await options.journal.get<import('../presets/kanban-development').DevelopmentWorkspaceRecord>('development-workspace:'+dispatchId);
+    const readOnly=(record?.context as {delivery?:{readOnly?:boolean}}|undefined)?.delivery?.readOnly;
+    return !!record&&!readOnly&&!await options.journal.get('worktree-cleanup:'+(record.worktreeId??dispatchId))&&options.recheck.supports(record);
 }
 
 /** Omit absent DTO fields before durable storage and strict channel hashing. */

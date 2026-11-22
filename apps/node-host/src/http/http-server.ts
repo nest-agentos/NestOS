@@ -66,6 +66,7 @@ async function serve(request: IncomingMessage, response: ServerResponse, options
     if (request.method === 'POST' || pathname.startsWith('/api/application')) validateOrigin(request);
     if (['/api/application', '/api/application/events', '/api/application/files', NATIVE_SESSION_RECOVERY_ENDPOINT].includes(pathname)) {
         if (!options.application) throw new FSError('ECAPABILITY', 'Application hosting is disabled');
+        if(!options.multiUser&&pathname==='/api/application'&&request.method==='POST')response.setHeader('X-NestOS-Authenticated-User',userId??'admin');
         await options.application.handle(request, response, () => options.certificates.accepts(request.socket as TLSSocket)); return;
     }
     if (pathname === '/api/vfs') throw new FSError('EACCES', 'Storage is private to the daemon');

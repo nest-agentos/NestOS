@@ -10,7 +10,7 @@ export interface NativeInteractionControls {
     subscribe(listener:()=>void):()=>void;
 }
 const log=createModuleLogger('session-interactions');
-const identity=(request:ConversationRequest)=>`${typeof request.id}:${request.id}`;
+const identity=(request:ConversationRequest)=>nativeInteraction(request).id;
 const fingerprint=(request:ConversationRequest)=>JSON.stringify({...request,responding:undefined});
 /** Both this panel and the chat editor use native cards and the original durable response port. */
 export class NativeInteractionPanel {

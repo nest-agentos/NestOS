@@ -101,7 +101,8 @@ const [command = 'start', ...args] = process.argv.slice(2), commandStarted = Dat
 try {
     prepareLifecycleLog(command, args);
     if (command === 'restart' && process.platform === 'linux' && existsSync('/run/systemd/system')) {
-        const {prepareRestartFirecracker} = await import('./httpd-firecracker.mjs');
+        const {prepareRestartFirecracker, prepareRestartLocalCells} = await import('./httpd-restart-dependencies.mjs');
+        prepareRestartLocalCells(operationId);
         prepareRestartFirecracker(operationId);
     }
     if (command === 'deploy' && args.includes('--help')) console.log('Usage: ./httpd.sh [--no-cache]\nBuild, switch the running HTTP service, and verify its version and health.');
@@ -116,7 +117,11 @@ try {
         const stopped = await stopHttpd(root, mode, releases, {force: args.includes('--force'), timeoutMs});
         if (command === 'restart') await serve(mode, forwarded.length ? forwarded : stopped?.args ?? []);
     });
-    else if (command === 'activate' && args[0]) activate(args[0]);
+    else if (command === 'activate' && args[0]) {
+        const {acquireBuildLock} = await import('./httpd-build-cache.mjs');
+        const unlock = acquireBuildLock(path.join(releases, '.build-cache'));
+        try {activate(args[0]);} finally {unlock();}
+    }
     else if (command === 'list') {
         for (const entry of readdirSync(releases)) if (!entry.startsWith('.') && entry !== 'current.json') console.log(entry);
     }

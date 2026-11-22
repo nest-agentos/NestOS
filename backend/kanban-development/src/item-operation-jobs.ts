@@ -67,18 +67,62 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
             if(record.managed){await options.adapter.managed!.submit(record.managed);return;}if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
         inspect:async record=>{
             if(blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(record.id))))return {state:'unknown' as const,code:'OPERATION_CANCELLING'};
-            if(record.managed)return options.adapter.managed!.inspect(record);
-            const observation=await observeReview(options,record);
-            const recoverReplacement=record.action==='deploy'&&record.request&&observation.state==='unknown';
-            const output=(observation.state==='succeeded'||recoverReplacement)&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
-            const receipt=output as {status?:string;version?:string}|undefined;
-            return {...observation,...(recoverReplacement&&receipt?.status==='succeeded'&&await operationRuntimeVersion(options,record.boardId,record.itemId)===receipt.version?{state:'succeeded' as const}:{}),executionId:observation.sessionId,output};
-        },validate:async(record,output)=>{
-            const expectedVersion=record.action==='deploy'?(record.request||record.managed?(record.operationContext as {version:string}).version
-                :JSON.parse((record.input!.request.source as {values:Record<string,string>}).values.context).input.version):undefined;
-            validateOperationResult({id:record.id,action:record.action,snapshot:record.snapshot,requireStatus:!!record.request,expectedVersion},output);
-            if(record.action==='deploy')requireValue(await operationRuntimeVersion(options,record.boardId,record.itemId)===(output as {version:string}).version,'OPERATION_RESULT_RUNNING_VERSION_MISMATCH');
-        },classify:reviewFailure,report:options.report}});
+            return inspectReview(options,record);
+        },validate:(record,output)=>validateReview(options,record,output),classify:reviewFailure,report:options.report}});
+}
+export const replacementMismatchCode='OPERATION_RESULT_RUNNING_VERSION_MISMATCH';
+export function replacementTarget(job:ReviewJob):string|undefined {
+    if(job.action!=='deploy')return;
+    if(job.managed)return job.managed.targetVersion;
+    if(job.request)return (job.operationContext as {version?:string}|undefined)?.version;
+    const source=job.input?.request.source;
+    if(source?.kind==='composer'&&typeof source.values.context==='string')return JSON.parse(source.values.context).input?.version;
+}
+function replacementMismatch(expected:string|undefined,running:string|undefined) {
+    return Object.assign(new Error(replacementMismatchCode),{code:replacementMismatchCode,result:{replacementVersions:{expected,running}}});
+}
+async function validateReview(options:ReviewOperationsOptions,record:ReviewJob,output:unknown):Promise<void> {
+    const expectedVersion=replacementTarget(record);
+    validateOperationResult({id:record.id,action:record.action,snapshot:record.snapshot,requireStatus:!!record.request,expectedVersion},output);
+    if(record.action!=='deploy')return;
+    const running=await operationRuntimeVersion(options,record.boardId,record.itemId);
+    if(running!==expectedVersion)throw replacementMismatch(expectedVersion,running);
+}
+async function inspectReview(options:ReviewOperationsOptions,record:ReviewJob) {
+    if(record.managed){
+        const managed=options.adapter.managed;requireValue(managed,'OPERATION_RECOVERY_UNAVAILABLE');
+        const observed=await managed.inspect(record);
+        if(observed.code==='SERVICE_VERSION_MISMATCH'){
+            throw replacementMismatch(replacementTarget(record),await operationRuntimeVersion(options,record.boardId,record.itemId));
+        }
+        return observed;
+    }
+    const observation=await observeReview(options,record);
+    const recover=record.action==='deploy'&&record.request&&observation.state==='unknown';
+    const output=(observation.state==='succeeded'||recover)&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
+    const receipt=output as {status?:string;version?:string}|undefined;
+    return {...observation,...(recover&&receipt?.status==='succeeded'&&await operationRuntimeVersion(options,record.boardId,record.itemId)===receipt.version?{state:'succeeded' as const}:{}),executionId:observation.sessionId,output};
+}
+/** Revalidate a settled mismatch against the original receipt without submitting a switch. */
+export async function recheckReplacement(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
+    requireValue(job.action==='deploy'&&job.phase==='settled'&&job.code===replacementMismatchCode,'OPERATION_RECOVERY_UNAVAILABLE');
+    requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))),'OPERATION_CANCELLING');
+    let next:ReviewJob;
+    try {
+        const observation=await inspectReview(options,job);
+        requireValue(observation.state==='succeeded'&&observation.output!==undefined,'OPERATION_RESULT_PENDING');
+        await validateReview(options,job,observation.output);
+        next={...job,state:'succeeded',code:undefined,result:observation.output};
+    }catch(error){
+        if(safeCode(error,'OPERATION_OBSERVATION_FAILED')!==replacementMismatchCode)throw error;
+        next={...job,result:(error as {result:unknown}).result};
+    }
+    const saved=await options.journal.update<ReviewJob>(jobKey(job.id),current=>{
+        requireValue(current?.fingerprint===job.fingerprint,'OPERATION_IDENTITY_CONFLICT');
+        return current.code===replacementMismatchCode?next:current;
+    });
+    await options.report?.(saved);
+    return saved;
 }
 function reviewFailure(error:unknown):import('@nestos/kanban/integration').KanbanOperationFailure {
     const code=safeCode(error,safeCode((error as {cause?:unknown})?.cause,'OPERATION_OBSERVATION_FAILED')),receipt=error as {executionOutcome?:string;retryable?:boolean;result?:unknown};

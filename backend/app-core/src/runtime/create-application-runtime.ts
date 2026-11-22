@@ -41,6 +41,9 @@ import {reportKanbanHealth, kanbanFailureCode} from '../kanban/health-events';
 import {withProjectEnvironment} from '../projects/project-environment';
 import {createPersonalKanban} from '../kanban/personal';
 import {developmentPreparation} from '../presets/kanban-development';
+import {developmentTaskRecheck} from '../presets/kanban-development-recheck';
+import {observeDevelopmentPermissions,softwareApprovalModule} from '../presets/kanban-execution-permissions';
+import type {KanbanApprovalModule} from '../kanban/decision-modules';
 import {developmentObserver} from '../presets/kanban-development-observer';
 import {startKanbanMonitor} from '@nestos/kanban/execution';
 import {UserEventService} from '../events/service';
@@ -180,6 +183,9 @@ export interface ApplicationRuntimeOptions {
     /** Trusted build identity of the running host, independent of a next-start release pointer. */
     runningVersion?: string;
     serviceControl?:import('@nestos/app-contracts/services').RuntimeServiceControl;
+    /** Trusted host configuration keyed by decision module id. */
+    kanbanModulePermissions?: Readonly<Record<string,unknown>>;
+    kanbanApprovalModules?: readonly KanbanApprovalModule[];
     /** Optional host integrations own bindings and execution, never the portable board library. */
     configureKanban?(context: {fs: import('@nestos/vfs-core').IFileSystem; service: import('@nestos/kanban').KanbanModuleHandle;
         kernel: import('@nestos/durable-kernel').Kernel; calls?: import('@nestos/llm-session').IndependentCallService;
@@ -609,6 +615,9 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         cleanupFns.push(cleanupStep('developmentOperations.close', () => developmentOperations.close()));
         const developmentBindings = remoteConnections && options.remoteSourceProvider ? {fs: systemFS, agents: agentService,
             connections: executionConnections, remote: remoteConnections, provider: options.remoteSourceProvider, projects} : undefined;
+        const approvalModules=developmentBindings?[softwareApprovalModule(options.kanbanModulePermissions?.['software-development']),...options.kanbanApprovalModules??[]]:[];
+        const decisionModules=approvalModules.map(({decide,...module})=>module);
+        const observeApprovals=developmentBindings?observeDevelopmentPermissions(developmentBindings.remote,approvalModules,commandBus.execute.bind(commandBus)):undefined;
         const prepareDevelopment = developmentBindings ? developmentPreparation(developmentBindings) : undefined;
         const analyzeDevelopment = developmentBindings ? developmentAnalysis(developmentBindings,()=>wakeKanban()) : undefined;
         if(analyzeDevelopment)cleanupFns.push(()=>analyzeDevelopment.dispose());
@@ -648,8 +657,9 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             boardSettings:remoteConnections?kanbanHarnessSettings(remoteConnections):undefined,
             sessionObservation:developmentBindings?developmentMessages.sessionObservation:undefined,
             taskRecovery:developmentBindings?context=>createTaskRecovery({...developmentBindings,...context,executionResource:executionResource!,
+                recheck:developmentTaskRecheck(developmentBindings.remote,developmentBindings.provider,decisionModules[0]),
                 describe:async item=>{if(!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'))return;const managed=managedServiceDeployment(options.serviceControl,async selected=>projects.openWorkspace((await projects.get(selected.externalRefs!.find(ref=>ref.system==='nestos-remote-project')!.id)).path),async()=>{});return managed?.describe?.(item);}}):undefined,
-            decisionConversations:developmentBindings?context=>decisionConversations({...developmentBindings,...context,executionResource}):undefined,
+            decisionConversations:developmentBindings?context=>decisionConversations({...developmentBindings,...context,executionResource,modules:decisionModules}):undefined,
             itemOperations: developmentBindings ? context => {
                 const review={...developmentBindings,...context,cancelSubmission:submissionControl({contexts:conversationContexts,repository:sessionRepository,kernel:kernelCore,ensureWritable:conversationOptions.ensureWritable}),calls:independentCalls,kernel:kernelCore,runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission,wake:()=>wakeKanban()};
                 const scopes=managementOperationScopes({...review,basePlan:developmentDeliveryPlan(context.journal,context.service)});
@@ -698,6 +708,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             prepareAnalysis: analyzeDevelopment ? input => developmentOperations.run(() => analyzeDevelopment.prepare(input)) : undefined,
             controlConversation: analyzeDevelopment ? input => developmentOperations.run(() => analyzeDevelopment.control(input)) : undefined,
             readAnalysisOutput: analyzeDevelopment ? id => developmentOperations.run(() => analyzeDevelopment.read(id)) : undefined,
+            decisionModules:developmentBindings?decisionModules:undefined,
+            observeApprovals:observeApprovals?input=>developmentOperations.run(()=>observeApprovals(input)):undefined,
             observeWork: input => developmentOperations.run(() => developmentMessages.observe(input)),
             verifyWork: verifyDevelopment ? id => developmentOperations.run(() => verifyDevelopment(id)) : undefined,
             preparations: remoteConnections ? developmentCatalog() : [],

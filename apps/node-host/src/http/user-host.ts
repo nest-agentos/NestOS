@@ -32,6 +32,8 @@ export class UserApplications {
         if (!userId) throw new FSError('EACCES', 'Enrolled user certificate required');
         if (request.headers['x-nestos-user'] !== undefined && request.headers['x-nestos-user'] !== userId)
             throw new FSError('EACCES', 'Certificate user changed; reload this page');
+        if(request.method==='POST'&&new URL(request.url??'/','https://localhost').pathname==='/api/application')
+            response.setHeader('X-NestOS-Authenticated-User',userId);
         const app = await this.get(userId);
         await app.application.handle(request, response, async () => Boolean(await authorize?.()) &&
             await this.options.certificates.identity?.(request.socket as TLSSocket) === userId);

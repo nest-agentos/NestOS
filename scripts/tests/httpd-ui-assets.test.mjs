@@ -44,3 +44,15 @@ test('rejects tampered retained output rather than serving it under an immutable
     writeFileSync(path.join(prior.directory, 'dist/assets/previous-abcdefgh.js'), 'changed after manifest');
     assert.throws(() => retainUiAssets(f.root, f.staging), {code: 'HTTP_ASSET_INTEGRITY'});
 });
+test('serves the preceding asset generation after its release directory is reclaimed', t => {
+    const f = fixture(t), prior = f.release('20260101T000000', 'prior');
+    const current = f.release('20260102T000000', 'current-build');
+    const asset = prior.files.find(row => row.file.endsWith('.js'));
+    writeFileSync(path.join(current.directory, asset.file), readFileSync(path.join(prior.directory, asset.file)));
+    writeFileSync(path.join(current.directory, 'release.json'), JSON.stringify({uiAssets:current.files, previousUiAssets:[asset]}));
+    rmSync(prior.directory, {recursive:true});
+    const result = retainUiAssets(f.root,f.staging);
+    assert.equal(result.generations,2);
+    assert.ok(readFileSync(path.join(f.staging,asset.file)).length);
+    assert.ok(result.previousUiAssets.every(row => row.file !== asset.file));
+});

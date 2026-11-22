@@ -36,6 +36,7 @@ export function developmentObserver(options: Options) {
     const sessionObservation=options.remote?.sessionStatus&&options.projects.forFolder?currentNativeSessionReader({cached:nativeActivity.read,
         status:options.remote.sessionStatus,projects:{forFolder:options.projects.forFolder.bind(options.projects)}}):nativeActivity.read;
     const observe: NonNullable<PersonalKanbanAutomationOptions['observeWork']> = async input => {
+        const observedAt = Date.now();
         if (stopped) return input.observation;
         const worktree = await journal.get<PreparedWorktree>('worktree:' + input.dispatch.id);
         if (!worktree) return input.observation;
@@ -88,7 +89,14 @@ export function developmentObserver(options: Options) {
             if (unresolved.some(message => message.type === 'clarification')) return {...input.observation, outcome: 'running', outputs: undefined, code: 'WORKSPACE_INPUT_REQUIRED'};
             if (input.observation.outcome !== 'succeeded') return input.observation;
             if (!messages.some(message=>message.type==='result')&&messages.some(message=>message.type==='resolved'))return {...input.observation,outcome:'running',outputs:undefined,code:'WORKSPACE_RESULT_PENDING'};
-            if (!messages.some(message => message.type === 'result')) return {...input.observation, outcome: 'unknown', outputs: undefined, code: 'WORKSPACE_RESULT_MISSING'};
+            if (!messages.some(message => message.type === 'result')) {
+                const code = 'WORKSPACE_RESULT_MISSING';
+                if (input.dispatch.code !== code) createModuleLogger('kanban').warn('Workspace result publication missing', {
+                    operation: 'kanban.observe', operationId: input.dispatch.id, stage: 'channel.result', result: 'failure',
+                    code, durationMs: Date.now() - observedAt, messageCount: messages.length,
+                });
+                return {...input.observation, outcome: 'unknown', outputs: undefined, code};
+            }
             const publications = envelope.messages as ChannelMessage[];
             const results = publications.filter(row => row.message.type === 'result');
             if (results.length !== 1) return {...input.observation, outcome: 'unknown', outputs: undefined, code: 'CHANNEL_RESULT_INVALID'};

@@ -16,7 +16,7 @@ import type {PreparedHttpBootstrap} from './startup';
 type NotificationPacket = Partial<CallbackRequest> & Pick<Reply, 'updates'> & { calls?: Call[]; viewEvents?: ApplicationViewEvent[]; updatesRead?: string };
 const maxNotificationCount = 256;
 const maxEventBytes = 2 * 1024 * 1024;
-export interface HttpViewStartOptions {initialRead?:StartupReadRequest; initialView?: OpenViewRequest; snapshots?: SnapshotCache; prepared?: PreparedHttpBootstrap;}
+export interface HttpViewStartOptions {initialRead?:StartupReadRequest; initialView?: OpenViewRequest; snapshots?: SnapshotCache; prepared?: PreparedHttpBootstrap; deferEvents?:boolean;}
 
 /** HTTP commands are never automatically replayed after an unknown outcome. */
 export class HttpViewClient {
@@ -74,18 +74,36 @@ export class HttpViewClient {
         const snapshots = options.prepared?.snapshots ?? options.snapshots ?? new SnapshotCache();
         const prepared = options.prepared?.claim(this.clientId, this.url, this.abort.signal);
         if (!options.prepared) await snapshots.load();
-        const stream = this.startEventStream(); void stream.catch(() => {});
+        const stream = options.deferEvents?undefined:this.startEventStream(); void stream?.catch(() => {});
         const packet = await (prepared ?? this.post({kind: 'bootstrap', initialView: options.initialView, initialRead: options.initialRead, knownSnapshots: snapshots.known()}));
         const reply = await this.expandBootstrap(packet, snapshots);
         if (reply.error) throw new Error(reply.error.message);
         this.peer.applyUpdates(reply.updates);
         const root = this.peer.decode(reply.value!) as HostedApplicationClient;
         this.bindInitialObservation(root);
-        this.initialized(); await stream; await this.callbacks;
+        this.initialized();
+        if(stream){await stream;await this.callbacks;}
         return root;
     }
-    private async startEventStream(): Promise<void> {
-        const response = await this.subscribe(false);
+    private deferredEventStart?:Promise<void>;
+    startDeferredEvents():Promise<void> {
+        return this.deferredEventStart??=this.attachDeferredEvents();
+    }
+    private async attachDeferredEvents():Promise<void> {
+        if(this.closing||this.abort.signal.aborted)return;
+        try{await this.startEventStream(true);}
+        catch(error){
+            if(this.closing||this.abort.signal.aborted)return;
+            this.showDisconnected(error,'events');
+            const response=await this.reconnect();
+            if(!response?.body)return;
+            this.resumable=true;
+            this.listening=this.listen(response.body);
+            void this.listening.catch(failure=>this.showUpdateError(failure));
+        }
+    }
+    private async startEventStream(resume=false): Promise<void> {
+        const response = await this.subscribe(resume);
         this.resumable = (response.headers.get('X-NestOS-View-Resume') ?? response.headers.get('X-MindOS-View-Resume')) === '1';
         this.listening = this.listen(response.body!);
         void this.listening.catch(error => this.showUpdateError(error));

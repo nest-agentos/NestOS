@@ -2,6 +2,7 @@ import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {createKanbanModule,SeqKanbanStore} from '@nestos/kanban';
 import {KanbanWorkbench} from '@nestos/kanban-ui';
 import {zhCN} from '../../shared/common/src/i18n/zh-CN';
+import {taskSnapshot} from '../../libraries/kanban/src/runtime/task-snapshot';
 
 async function wait(ready:()=>boolean){for(let index=0;index<1000;index++){if(ready())return;await new Promise(resolve=>setTimeout(resolve,5));}throw Error('UI_NOT_READY');}
 async function main(){
@@ -15,12 +16,14 @@ async function main(){
  const claimed=await command({type:'claim',itemId:'child'});await command({type:'submit',itemId:'child',token:claimed.items.find(item=>item.id==='child')!.owner!.token,resultRef:'verified'});await command({type:'review',itemId:'child',accept:true});await command({type:'close-plan',itemId:'group',resultRef:'children'});
  const resources=[{id:'unknown',title:'协调工作区',location:'/workspace/_nestos/worktrees/unknown',state:'unknown',version:'',reasons:['WORKTREE_ASSOCIATION_UNKNOWN'],properties:[],canCleanup:false},{id:'missing',title:'执行工作区',location:'/workspace/_nestos/worktrees/missing',state:'retained',version:'v1',reasons:['WORKTREE_MISSING','WORKTREE_NOT_INTEGRATED'],properties:[],canCleanup:false},{id:'child',title:'子任务工作区',location:'/workspace/_nestos/worktrees/child',state:'retained',version:'v2',reasons:['WORKTREE_MISSING'],properties:[],canCleanup:false,ownership:'current',owner:{boardId:'board',itemId:'child'}}];
  let checks=0;Object.assign(service,{workResources:async()=>{checks++;return resources;},itemOperations:async()=>({revision:'v',operations:[],automatic:{state:'blocked',stage:'cleanup',code:'WORKTREE_ASSOCIATION_UNKNOWN'}}),openTaskCommunication:async()=>({resourceId:'/native/coordination'}),planningSession:async()=>({sessionId:'native',title:'历史协调记录',coordination:{state:'succeeded',summary:'历史验收建议',suggestions:[{itemId:'child',action:'accept',reason:'旧的建议'}]}})});
+ Object.assign(service,{taskSnapshot:(board:string,item:string)=>taskSnapshot(service,board,item)});
  let calls:string[]=[];const client=new Proxy(service,{get(target,key){const value=Reflect.get(target,key);return typeof value==='function'?(...args:unknown[])=>{calls.push(String(key));return value.apply(target,args);}:value;}});
  Object.assign(service,{cleanupWorkResource:async(_board:string,request:any)=>{if(request.resolution!=='ignore')throw Error('PHYSICAL_CLEANUP_NOT_EXPECTED');const row=resources.find(row=>row.id===request.resourceId)!;if(request.itemId!==(row.owner?.itemId??'group'))throw Error('WRONG_RESOURCE_ACTION_OWNER');Object.assign(row,{resolution:{kind:'ignored',operationId:request.operationId,reason:request.reason,actor:{kind:'human',id:'owner'},at:Date.now()}});return row;}});
  const editor=document.getElementById('editor')!,opened:string[]=[],navigated:string[]=[];
  const view=new KanbanWorkbench({service:client,editor,initialResource:'/board/board/group',navigate:async path=>{navigated.push(path);},selected(){},openSession:async id=>{opened.push(id);},presentation:{text:(key,values)=>{let text=(zhCN as Record<string,string>)['kanban.'+key]??key;for(const [name,value] of Object.entries(values??{}))text=text.replaceAll('{'+name+'}',String(value));return text;},icons:{more:'…',close:'×',refreshView:'↻'}}});
  const metrics:any[]=[];const measure=async(operation:string,action:()=>Promise<unknown>|void,ready:()=>boolean)=>{calls=[];const started=performance.now();await action();await wait(ready);const row={operation,durationMs:Math.round((performance.now()-started)*100)/100,logicalApiCalls:calls.length,httpRequests:0,methods:[...calls]};metrics.push(row);if(row.durationMs>=5000||row.logicalApiCalls>=30)throw Error('PERFORMANCE_LIMIT:'+operation);};
  await measure('cold.open-completed-group-finalization',()=>view.start(),()=>!!editor.querySelector('[data-finalization-state=blocked]')&&!!editor.querySelector('[data-children-progress] progress')&&editor.querySelectorAll('[data-work-resource]').length===3);
+ if(calls.join(',')!=='taskSnapshot')throw Error('UNEXPECTED_COLD_READ:'+calls.join(','));
  const panel=editor.querySelector<HTMLElement>('[data-panel]')!,section=panel.querySelector<HTMLElement>('[data-group-finalization]')!,box=section.getBoundingClientRect();
  const firstAction=section.querySelector<HTMLButtonElement>('[data-action=cleanup-work-resource]')!.getBoundingClientRect();
  if(box.top<0||firstAction.bottom>innerHeight||firstAction.right>panel.getBoundingClientRect().right||panel.scrollWidth>panel.clientWidth+1)throw Error('FINALIZATION_LAYOUT_NOT_VISIBLE:'+JSON.stringify({top:box.top,actionBottom:firstAction.bottom,actionRight:firstAction.right,height:innerHeight,panelRight:panel.getBoundingClientRect().right,scrollWidth:panel.scrollWidth,clientWidth:panel.clientWidth}));
@@ -32,6 +35,12 @@ async function main(){
  if(navigated[0]!=='/board/board/child')throw Error('WRONG_RESOURCE_OWNER');
  for(const resource of resources)await measure('warm.ignore-resource-'+resource.id,()=>{const button=section.querySelector<HTMLButtonElement>('[data-work-resource="'+resource.id+'"] [data-action=ignore-work-resource]')!;button.scrollIntoView({block:'nearest'});button.click();},()=>!editor.hasAttribute('aria-busy')&&!section.querySelector('[data-work-resource="'+resource.id+'"] [data-action=ignore-work-resource]'));
  if(!section.querySelector('[data-finalization-state=completed-retained]')||resources.some(row=>row.state==='cleaned'))throw Error('RETAINED_RESOURCES_MISREPRESENTED');
+ const comments=panel.querySelector<HTMLDetailsElement>('[data-item-comments]')!;
+ await measure('warm.expand-comments',()=>comments.querySelector('summary')!.click(),()=>!!comments.querySelector('[data-comments-list] p'));
+ const composer=comments.querySelector<HTMLFormElement>('form')!;
+ await measure('warm.post-comment',()=>{composer.querySelector('textarea')!.value='验收评论';composer.requestSubmit();},
+    ()=>!editor.hasAttribute('aria-busy')&&!!comments.querySelector('[data-comments-list]')?.textContent?.includes('验收评论'));
+ if(calls.join(',')!=='execute,events')throw Error('COMMENT_RELOADED_UNRELATED_TASK_DATA:'+calls.join(','));
  document.getElementById('result')!.textContent=JSON.stringify({result:'passed',environment:'Google Chrome headless; actual Kanban task settlement, SeqFile and DOM; resource inspection fixtures; no HTTP transport',dataset:{boards:1,groups:1,children:1,resources:3,backgroundLoad:'none'},metrics});
 }
 void main().catch(error=>{document.getElementById('result')!.textContent=JSON.stringify({result:'failed',error:String(error)});});

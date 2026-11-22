@@ -2,6 +2,12 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { constants, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 
+export function markPendingRelease(releases, id) {
+    const directory = path.join(releases, '.pending-acceptance');
+    mkdirSync(directory, {recursive:true});
+    writeFileSync(path.join(directory, id), '');
+}
+
 export const digest = value => createHash('sha256').update(value).digest('hex');
 export const readJSON = file => JSON.parse(readFileSync(file, 'utf8'));
 export const fileHash = file => digest(readFileSync(file));

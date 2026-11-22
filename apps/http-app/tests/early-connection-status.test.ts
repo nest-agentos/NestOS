@@ -26,6 +26,26 @@ async function connection() {
         corrupt: () => controller.enqueue(new TextEncoder().encode('data: invalid\n\n')), expire: () => {expired = true;}};
 }
 
+it('boots a task from one response, then pins subsequent requests to that response identity',async()=>{
+    history.replaceState({},'', '/#/kanban/'+encodeURIComponent('/board/tasks/manager'));
+    const host=new RpcPeer('server',async()=>({}));releases.push(()=>host.close());
+    const bootstrap=await host.bootstrap({backend:{},services:{projects:{}}});
+    const fetcher=vi.fn(async(input:unknown,_init?:RequestInit)=>{
+        if(String(input).includes('/events?'))return new Response(new ReadableStream<Uint8Array>(),{headers:{'X-NestOS-View-Resume':'1'}});
+        return Response.json(bootstrap,{headers:{'X-NestOS-Authenticated-User':'admin'}});
+    });
+    vi.stubGlobal('fetch',fetcher);
+    const client=connectApplication();releases.push(()=>client.close());
+    await client.ready;
+    expect(fetcher).toHaveBeenCalledOnce();
+    const [route,init]=fetcher.mock.calls[0];
+    expect(route).toBe('/api/application');expect(JSON.parse(String(init?.body)).initialRead.task).toEqual({boardId:'tasks',itemId:'manager'});
+    expect(new Headers(init?.headers).has('X-NestOS-User')).toBe(false);
+    await client.startDeferredEvents!();
+    expect(fetcher.mock.calls[1][0]).toMatch(/\/events\?.*&after=0/);
+    expect(new Headers(fetcher.mock.calls[1][1]?.headers).get('X-NestOS-User')).toBe('admin');
+});
+
 it('replays a fatal update error that occurred before the status UI mounted and preserves an unsent draft', async () => {
     const f = await connection(), states: string[] = [];
     const stop = f.client.subscribeStatus(state => states.push(state)); f.corrupt();

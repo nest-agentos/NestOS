@@ -256,8 +256,9 @@ it('verifies source-checkout artifacts through the frozen service capability rat
  const payload={operationId:'service-proof',status:'succeeded',version:'candidate',evidence:{path:'release/httpd/candidate/release.json',sha256:'a'.repeat(64)}};
  f.channels.report('service-proof','result',{type:'result',content:'Built',payload});
  const job={id:'service-proof',action:'build',boardId:'board',itemId:'task',request,snapshot} as never;
- expect(await f.api.readOperation!(job)).toEqual(payload);
- expect(verifyArtifact).toHaveBeenCalledWith({operationId:'service-proof',serviceId:'service',version:'candidate',sha256:'a'.repeat(64)});
+ expect(await f.api.readOperation!(job)).toEqual({...payload,deployment:{serviceId:deployment.id}});
+ expect(verifyArtifact).toHaveBeenCalledWith({operationId:'service-proof',serviceId:deployment.id,version:'candidate',
+  sha256:'a'.repeat(64),sourceVersion:snapshot.targetVersion});
  verifyArtifact.mockRejectedValueOnce(Object.assign(Error('digest mismatch'),{code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'}));
  await expect(f.api.readOperation!(job)).rejects.toMatchObject({code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
 });

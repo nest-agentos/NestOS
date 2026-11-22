@@ -50,6 +50,9 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     prepareAnalysis?(input: {context?:unknown;reportActivity?(fact: WorkLogFact): Promise<void>; id: string; board: KanbanBoard; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target: import('@nestos/llm-flow/contracts').TargetRef; instruction: string; contextRef?: unknown}>;
     validatePreparation?(reference: import('@nestos/kanban/contracts').KanbanExternalReference, options?: Record<string, string>): void;
     verifyWork?(dispatchId: string): Promise<void>;
+    decisionModules?:readonly import('@nestos/kanban/contracts').KanbanDecisionModule[];
+    observeApprovals?(input:{boardId:string;dispatch:import('@nestos/kanban/contracts').KanbanDispatch;
+        call:import('@nestos/llm-session/contracts').IndependentCallView;service:KanbanService;journal:KanbanAutomationJournal}):Promise<void>;
     preparations?: import('@nestos/kanban/contracts').KanbanAutomationTarget[];
     observeWork?(input: {boardId: string; dispatch: import('@nestos/kanban/contracts').KanbanDispatch;
         observation: import('@nestos/kanban/execution').KanbanExecutionObservation; service: KanbanService; worker: KanbanService}): Promise<import('@nestos/kanban/execution').KanbanExecutionObservation>;
@@ -89,6 +92,7 @@ async function createExecutor(options:Options,context:KanbanExecutorContext,prep
     const observe = options.observeWork ? async (dispatch: import('@nestos/kanban/contracts').KanbanDispatch, observation: import('@nestos/kanban/execution').KanbanExecutionObservation) => options.observeWork!({boardId, dispatch, observation,
         service, worker: options.serviceFor(dispatch.principal)}) : undefined;
     const primary = createPublishedKanbanWorkExecutor({...options, prepareSession,
+        observeApprovals:options.observeApprovals?(dispatch,call)=>options.observeApprovals!({boardId,dispatch,call,service,journal:options.journal}):undefined,
         onSessionPrepared: (dispatch, item, sessionId) => options.workLog?.append(options.service, boardId, item.id, {stage: 'session.prepared', result: 'success', actor: dispatch.principal, dispatchId: dispatch.id,
             references: [{system: 'nestos-execution-session', id: sessionId, revision: dispatch.id}]}) ?? Promise.resolve(),
         observe,

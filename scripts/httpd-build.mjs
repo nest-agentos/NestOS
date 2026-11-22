@@ -5,8 +5,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { pinSnapshotManifests, copyLibrarySnapshot, copyNativeRuntimes, copySource, freezeWorkspaceDependencies, sourceFiles, sourceFingerprint, verifyRelease } from './httpd-runtime.mjs';
-import { acquireBuildLock, artifactContext, buildEnvironment, dependencyInputs, digest, fileHash, graphInputs, readJSON, restoreArtifact, storeArtifact, treeRecords } from './httpd-build-cache.mjs';
+import { acquireBuildLock, markPendingRelease, artifactContext, buildEnvironment, dependencyInputs, digest, fileHash, graphInputs, readJSON, restoreArtifact, storeArtifact, treeRecords } from './httpd-build-cache.mjs';
 import state from './local-library-state.mjs';
+import {acquireLibraryLock} from './local-library-lock.mjs';
 import { preparedSnapshot } from './local-library-plan.mjs';
 import {retainUiAssets} from './httpd-ui-assets.mjs';
 
@@ -185,6 +186,7 @@ function buildRelease(context, activate) {
         stage('validate-reuse', () => run(process.execPath, [path.join(releases, reused, 'server/main.js'), '--help'], path.join(releases, reused)));
         context.sourceGuard.check();
         if (activate) activate(reused);
+        else markPendingRelease(releases, reused);
         console.log(`[HTTPBuild] operationId=${operationId} stage=release cache=hit id=${reused}`); return reused;
     }
     const id = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '') + '-' + commit.slice(0, 8) + (dirty ? '-dirty' : '');
@@ -202,8 +204,9 @@ function buildRelease(context, activate) {
         });
         const files = ['server', 'dist'].flatMap(folder => treeRecords(staging, folder));
         writeFileSync(path.join(staging, 'release.json'), JSON.stringify({id, commit, dirty, builtAt: new Date().toISOString(),
-            buildKey: key, librarySnapshot: snapshot.id, nodeMajor: Number(process.versions.node.split('.')[0]), uiAssets: retained.uiAssets, files}, null, 2) + '\n');
-        renameSync(staging, path.join(releases, id)); if (activate) activate(id);
+            buildKey: key, librarySnapshot: snapshot.id, nodeMajor: Number(process.versions.node.split('.')[0]), uiAssets: retained.uiAssets, previousUiAssets: retained.previousUiAssets, files}, null, 2) + '\n');
+        renameSync(staging, path.join(releases, id));
+        if (activate) activate(id); else markPendingRelease(releases, id);
         writeFileSync(path.join(context.cacheDirectory, 'last-release.json'), JSON.stringify({id}));
         return id;
     } finally { rmSync(staging, {recursive: true, force: true}); if (!cache && captured) rmSync(captured.directory, {recursive: true, force: true}); }
@@ -211,7 +214,11 @@ function buildRelease(context, activate) {
 export function buildHttpRelease(root, {cache = true, activate, releases = path.join(root, 'release/httpd')} = {}) {
     const cacheDirectory = path.join(releases, '.build-cache');
     const unlock = acquireBuildLock(cacheDirectory), operationId = randomUUID(), stage = reporter(operationId);
+    let unlockLibraries;
     try { return stage('total', () => {
+        if (path.resolve(releases) !== path.resolve(root, 'release/httpd')) {
+            unlockLibraries = acquireLibraryLock(state.localRoot(root), operationId);
+        }
         const snapshot = preparedSnapshot(root);
         if (!snapshot) throw new Error('LOCAL_LIBRARIES_SNAPSHOT_REQUIRED: run pnpm lib:build first');
         console.log(`HTTP build libraries: ${snapshot.id}`);
@@ -225,5 +232,5 @@ export function buildHttpRelease(root, {cache = true, activate, releases = path.
         const key = digest(JSON.stringify({fingerprint, dependencyKey, environment, commit, dirty}));
         return buildRelease({root, releases, cacheDirectory, snapshot, inputs, fingerprint, environment, dependencyKey, key,
             cache, stage, sourceGuard, operationId, commit, dirty, env: {...process.env, NESTOS_LIBRARY_DEPLOYMENT: '1'}}, activate);
-    }); } finally { unlock(); }
+    }); } finally { try {unlockLibraries?.();} finally {unlock();} }
 }

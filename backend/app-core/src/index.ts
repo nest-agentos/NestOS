@@ -65,6 +65,7 @@ export { RunCatalog } from './run/run-catalog';
 export type { RunCatalogEntry } from './run/run-catalog';
 
 export { createApplicationRuntime } from './runtime/create-application-runtime';
+export type {KanbanApprovalModule} from './kanban/decision-modules';
 export type { ApplicationRuntime, ApplicationRuntimeOptions, ApplicationKernelPlatform, ApplicationPlatformServices } from './runtime/create-application-runtime';
 
 export { withWorkspaceScopeCleanup } from './runtime/workspace-scope-cleanup';

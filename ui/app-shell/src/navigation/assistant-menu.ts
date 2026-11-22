@@ -25,6 +25,7 @@ interface Options {
     services: ApplicationServices; backend: ApplicationBackend; documents: Pick<VfsJsonStore, 'read' | 'write' | 'flush'>;
     current(): {workspace: string; resource: string; title: string}; navigate(target: {target: string; resourceId?: string}): Promise<void>;
     events?:{subscribe(listener:(events:readonly ApplicationEventFact[])=>void):()=>void};
+    notificationBadge?:{unread?:number;read?:()=>Promise<{unread:number}>};
     home?(): Promise<void>; signal: AbortSignal;
 }
 export function installAssistantMenu(options: Options): () => void {const menu = new AssistantMenu(options); menu.install(); return () => menu.close();}
@@ -45,7 +46,8 @@ class AssistantMenu {
     private stateLoaded?: Promise<void>;
     private readonly selectedEvents = new Map<string, string>();
     private readonly missingIcons = new Set<string>();
-    constructor(private readonly options: Options) {}
+    private unreadNotifications?:number;
+    constructor(private readonly options: Options) {this.unreadNotifications=options.notificationBadge?.unread;}
     install(): void {
         const signal = this.lifetime.signal;
         this.mountLaunchers(); this.dialog.className = 'assistant-menu'; this.dialog.setAttribute('aria-label', label('title'));
@@ -57,16 +59,20 @@ class AssistantMenu {
         this.body.addEventListener('input', event => this.filter(event), {signal});
         this.body.addEventListener('keydown', event => this.searchKey(event), {signal});
         document.addEventListener(ASSISTANT_ADD_EVENT, event => {void this.addFromNavigation((event as CustomEvent<ShortcutRequest>).detail);}, {signal});
-        this.dialog.addEventListener('close', () => {this.buttons.forEach(button => button.setAttribute('aria-expanded', 'false')); this.editing = undefined; this.origin?.focus();}, {signal});
+        this.dialog.addEventListener('close', () => {this.buttons.forEach(button => button.setAttribute('aria-expanded', 'false')); this.editing = undefined; this.origin?.focus();if(this.options.notificationBadge)this.schedule();}, {signal});
         document.addEventListener('visibilitychange', () => {if (!document.hidden) this.schedule();}, {signal});
         this.options.signal.addEventListener('abort', () => this.close(), {once: true});
         const services = this.options.services;
-        if(this.options.events)this.releases.push(this.options.events.subscribe(events=>{if(events.some(assistantConsumesEvent))this.schedule();}));
+        if(this.options.events)this.releases.push(this.options.events.subscribe(events=>{
+            if(events.some(event=>this.options.notificationBadge&&!this.dialog.open?
+                !!event.notification||event.type==='runtime.reset'||event.type==='source.reset':assistantConsumesEvent(event)))this.schedule();
+        }));
         else this.releases.push(services.sessionRepository.subscribe?.(event => {if(event?.kind!=='ui-state')this.schedule();}) ?? (() => {}),
             services.kernel?.kernel?.onChanged?.(event => {if (event.reason === 'structure') this.schedule();}) ?? (() => {}),
             services.digitalTwin?.onChange(() => this.schedule()) ?? (() => {}));
         if (!this.options.backend.assistantOverview) {this.stale = true; this.error = label('eventsUnavailable');}
-        this.stateLoaded = this.loadState(); this.schedule();
+        if (this.options.notificationBadge) this.updateCount();
+        else {void this.ensureState(); this.schedule();}
     }
     private mountLaunchers(): void {
         const brand = document.querySelector<HTMLElement>('.app-sidebar__brand');
@@ -85,9 +91,11 @@ class AssistantMenu {
         button.className = 'assistant-launcher' + (mobile ? ' app-nav-btn' : ''); if (mobile) navigationItem(button); button.setAttribute('aria-haspopup', 'dialog'); button.setAttribute('aria-expanded', 'false');
         button.innerHTML = `<span class="assistant-launcher__icon">${this.icon('assistant', 'nav')}<span class="assistant-launcher__count" data-assistant-count>…</span></span><span class="assistant-launcher__label">${escape(label('nav'))}</span>`;
         button.addEventListener('click', () => {
+            void this.ensureState();
             this.origin = button; this.all = false; this.render(); if (!this.dialog.open) this.dialog.showModal(); button.setAttribute('aria-expanded', 'true'); this.schedule();
         }, {signal: this.lifetime.signal}); this.buttons.push(button); return button;
     }
+    private ensureState(): Promise<void> {return this.stateLoaded ??= this.loadState();}
     private async loadState(): Promise<void> {
         const started = performance.now();
         try {this.state = readAssistantState(await this.options.documents.read(ASSISTANT_MENU_DOCUMENT)); this.storageError = '';}
@@ -104,6 +112,13 @@ class AssistantMenu {
         if (this.closed || this.reading || document.hidden) return;
         this.reading = true; this.dirty = false; const started = performance.now();
         try {
+            if(this.options.notificationBadge&&!this.dialog.open){
+                const summary=await this.options.notificationBadge.read?.();
+                if(summary)this.unreadNotifications=summary.unread;
+                return;
+            }
+            await this.ensureState();
+            if (this.closed) return;
             const result = await this.options.backend.assistantOverview!(); if (this.closed) return;
             const retained = this.overview.events.filter(item => result.unavailable.includes(item.source));
             this.overview = {...result, events: [...result.events.filter(item => !result.unavailable.includes(item.source)), ...retained]
@@ -115,6 +130,17 @@ class AssistantMenu {
     }
     private events(): AssistantEvent[] {return this.overview.events.filter(item => item.requiresAction || this.state.seen[item.id] !== item.revision);}
     private updateCount(): void {
+        if(this.options.notificationBadge){
+            const count=this.unreadNotifications;
+            for(const button of this.buttons){
+                button.querySelector('[data-assistant-count]')!.textContent=count===undefined?'?':count>99?'99+':String(count);
+                button.classList.toggle('assistant-launcher--attention',(count??0)>0);
+                const description=count===undefined?label('eventsUnavailable'):label('unreadNotificationCount',{count});
+                button.title=[button.dataset.brandLabel,description].filter(Boolean).join(' · ');
+                button.setAttribute('aria-label',button.title);
+            }
+            return;
+        }
         const count = this.events().length;
         for (const button of this.buttons) {
             button.querySelector('[data-assistant-count]')!.textContent = !this.hasOverview && !this.stale ? '…' : this.stale ? count ? `${Math.min(count, 99)}+` : '?' : count > 99 ? '99+' : String(count);
@@ -132,7 +158,7 @@ class AssistantMenu {
             <p class="assistant-menu__error" role="alert">${escape(this.storageError || this.error)}</p>
             <section><div class="assistant-menu__heading"><h3>${escape(label('events'))}</h3><span>${escape(label('eventCount', {count: events.length}))}</span></div>
             ${events.some(item => !item.requiresAction) ? `<div class="assistant-menu__actions"><label class="assistant-menu__selection"><input type="checkbox" data-assistant-select-all ${disabled}>${escape(label('selectShownEvents'))}</label><button type="button" data-assistant-action="clearSelected">${escape(label('clearSelected', {count: this.selectedEvents.size}))}</button></div>` : ''}
-            ${shown.length ? shown.map(item => this.eventRow(item)).join('') : `<p class="assistant-menu__empty">${escape(label(this.reading || !this.ready ? 'loading' : 'noEvents'))}</p>`}
+            ${shown.length ? shown.map(item => this.eventRow(item)).join('') : `<p class="assistant-menu__empty">${escape(label(this.reading || !this.ready || !this.hasOverview&&!this.stale ? 'loading' : 'noEvents'))}</p>`}
             ${events.length > 3 ? `<button type="button" data-assistant-action="all">${escape(this.all ? label('collapse') : label('allEvents', {count: events.length - 3}))}</button>` : ''}</section>
             <section><div class="assistant-menu__heading"><h3>${escape(label('shortcuts'))}</h3><div class="assistant-menu__actions"><button type="button" data-assistant-action="add" ${!this.ready || this.storageError || this.busy ? 'disabled' : ''}>${escape(label('add'))}</button>
             <button type="button" data-assistant-action="manage" ${disabled}>${escape(label(this.managing ? 'done' : 'manage'))}</button></div></div>
@@ -170,7 +196,7 @@ class AssistantMenu {
     }
     private async addFromNavigation(request: ShortcutRequest): Promise<void> {
         if (!request || typeof request.title !== 'string' || !validShortcutTarget(request.target)) return;
-        await this.stateLoaded; if (this.closed) return;
+        await this.ensureState(); if (this.closed) return;
         request = {...request, title: request.title.slice(0, 160), context: request.context?.slice(0, 4096)};
         this.origin = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
         this.render(); if (!this.dialog.open) this.dialog.showModal();

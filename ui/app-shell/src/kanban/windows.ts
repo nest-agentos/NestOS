@@ -6,6 +6,7 @@ import {kanbanPresentation, kanbanReviewGuidance} from './host';
 import {KanbanSidebar} from './sidebar';
 import {VFS_DOM_EVENTS} from '@nestos/vfs-ui';
 import {shareKanbanCatalog} from './catalog';
+import {MOBILE_NAVIGATION_QUERY} from '@nestos/ui-common';
 
 const log = createModuleLogger('kanban-windows');
 export type KanbanWorkspaceOptions = Omit<KanbanUIOptions, 'presentation' | 'sidebar'> & {sidebar: HTMLElement; windows?: WorkbenchWindowBinding};
@@ -16,6 +17,8 @@ export class KanbanWindowWorkbench {
     private readonly tabs: WorkbenchTabs<Page>;
     private readonly navigation: KanbanSidebar;
     private visible = true;
+    private navigationVisible=true;
+    private navigationStart?:Promise<void>;
     private disposing = false;
     private readonly observationAbort = new AbortController();
     private availableBoards?: Set<string>;
@@ -39,9 +42,15 @@ export class KanbanWindowWorkbench {
     }
     async start(): Promise<void> {
         const initial=this.options.initialResource;
-        if(initial?.includes('/@decision')&&this.options.service?.decisionSnapshot){await this.openResource(initial);await this.navigation.start(this.boardSnapshots);return;}
-        if(initial&&initial!=='/') {await Promise.all([this.navigation.start(),this.openResource(initial)]);return;}
-        await this.navigation.start();
+        if(initial?.includes('/@decision')&&this.options.service?.decisionSnapshot){await this.openResource(initial);await this.startNavigation();return;}
+        if(initial&&/^\/board\/[^/]+\/[^@/][^/]*$/.test(initial)&&this.options.service?.taskSnapshot){
+            if(mobileTaskDetails()){this.navigationVisible=false;this.navigation.setVisible(false);}
+            await this.openResource(initial);
+            if(this.navigationVisible)await this.startNavigation();
+            return;
+        }
+        if(initial&&initial!=='/') {await Promise.all([this.startNavigation(),this.openResource(initial)]);return;}
+        await this.startNavigation();
         const board=this.boardSnapshots?.length===1?this.boardSnapshots[0]:undefined;
         await this.openResource(board?`/board/${encodeURIComponent(board.id)}/@decision`:'/');
     }
@@ -69,7 +78,14 @@ export class KanbanWindowWorkbench {
         this.boardSnapshots=undefined;this.availableBoards=undefined;this.navigation.invalidate();
         for(const tab of this.tabs.values())if(!board||!tab.id.startsWith('/board/')||decodeURIComponent(tab.id.split('/')[2])===board)tab.value?.view.invalidateFromEvents();
     }
-    setVisible(visible: boolean): void {this.visible = visible; this.navigation.setVisible(visible); this.syncVisibility();}
+    setVisible(visible: boolean): void {this.visible = visible; this.navigation.setVisible(visible&&this.navigationVisible); this.syncVisibility();}
+    async setNavigationVisible(visible:boolean):Promise<void> {
+        this.navigationVisible=visible;this.navigation.setVisible(visible&&this.visible);
+        if(visible&&this.visible&&!this.disposing)await this.startNavigation();
+    }
+    private startNavigation():Promise<void>{
+        return this.navigationStart??=this.navigation.start(this.boardSnapshots).catch(error=>{this.navigationStart=undefined;throw error;});
+    }
     captureRecovery(): unknown {
         for (const tab of this.tabs.values()) tab.value?.view.captureRecovery();
         return this.tabs.captureRecovery();
@@ -83,6 +99,7 @@ export class KanbanWindowWorkbench {
     private createPage(tab: WorkbenchTab<Page>): void {
         const editor = document.createElement('div'); tab.panel.append(editor);
         const view = new KanbanView({...this.options, sidebar: undefined, editor, initialResource: tab.id,
+            includeTaskSidebar:()=>!mobileTaskDetails(),
             openSettings:async id=>{this.tabs.keep(tab.id);this.navigation.openSettings(id);},
             catalogPrepared: boards => {this.boardSnapshots=boards;this.navigation.prepare(boards);},
             getBoardSnapshot: id => this.boardSnapshots?.find(board => board.id === id),
@@ -94,6 +111,7 @@ export class KanbanWindowWorkbench {
             mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts),
         });
         this.options.initialDecision=undefined;
+        this.options.initialTask=undefined;
         tab.value = {view, ready: Promise.resolve()}; this.tabs.setIcon(tab.id, ACTION_ICONS.kanbanView);
         this.tabs.location(tab.id, tab.id); this.syncVisibility();
         tab.value.ready = view.start().then(() => this.updatePage(tab)).catch(error => {tab.failed = true; throw error;});
@@ -163,6 +181,7 @@ export class KanbanWindowWorkbench {
     }
     private report(error: unknown): void {this.options.windows?.registry.report(error);}
 }
+function mobileTaskDetails():boolean{return window.matchMedia?.(MOBILE_NAVIGATION_QUERY).matches??false;}
 function parentPath(path: string): string {
     if(path.startsWith('/@resource/'))return '/';
     const parts = path.split('/'); return parts.length > 3 ? parts.slice(0, 3).join('/') : '/';

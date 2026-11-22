@@ -21,6 +21,22 @@ it('keeps a remote multi-project proposal outside the board until real user conf
  f.read.mockResolvedValue({messages:[{id:'user-2',role:'user',text:'确认决策'}]});await f.request('decision.confirm',{proposalDigest:proposal.proposalDigest});
  expect(await f.service.record('b','outline')).toMatchObject({status:'confirmed'});expect(f.runRecord).toHaveBeenCalledWith('b',expect.objectContaining({recordId:'outline',operationId:'decision-run-conversation'}));
 });
+it('previews the chosen schedule and never launches a one-off run when confirming or retrying a scheduled decision',async()=>{
+ const f=await fixture(),recurrence={state:'active',firstAt:Date.now()+60000,timeZone:'UTC',cadence:{kind:'interval',milliseconds:60000},trigger:'fixed',maxConcurrency:1};
+ f.conversation.recurrence=recurrence;
+ const proposal=await f.request('decision.propose',{id:'scheduled',title:'Maintenance',content:'Check',rationale:'Verified',projectIds:['one'],verificationMode:'quick'}) as any;
+ expect(proposal.record.recurrence).toEqual(recurrence);
+ f.read.mockResolvedValue({messages:[{id:'confirm',role:'user',text:'确认决策'}]});
+ const params={proposalDigest:proposal.proposalDigest};
+ await expect(f.request('decision.confirm',params)).resolves.toMatchObject({state:'confirmed',executionMode:'recurring'});
+ const record=await f.service.record('b','scheduled');
+ expect(record).toMatchObject({status:'confirmed',recurrence});
+ await f.service.execute('b',{operationId:'disable-schedule',expectedRevision:(await f.service.read('b')).revision,
+    command:{type:'configure-record-recurrence',recordId:record.id,expectedRecordRevision:record.revision,recurrence:null}});
+ await f.request('decision.confirm',params);
+ expect((await f.service.record('b','scheduled')).recurrence).toBeUndefined();
+ expect(f.runRecord).not.toHaveBeenCalled();
+});
 it('routes fixes to the original group Session and never creates them in the decision conversation',async()=>{
  const f=await fixture();let serial=0;const run=async(command:any)=>f.service.execute('b',{operationId:'op-'+ ++serial,expectedRevision:(await f.service.read('b')).revision,command});
  const proposal=await f.request('decision.propose',{id:'outline',title:'Outline',content:'Scope',rationale:'Check',projectIds:['one'],verificationMode:'quick'}) as any;
@@ -233,4 +249,16 @@ it('requires a plugin ID and describes cleanup with separate plugin and method r
  for(const method of ['kanban.describe','kanban.invoke'])await expect(call(method,{method:'delivery.cleanup.complete',input:{reviewId:'review'}})).rejects.toMatchObject({code:'CHANNEL_PLUGIN_ID_REQUIRED'});
  expect(await call('kanban.describe',{pluginId:'delivery',method:'cleanup.complete'})).toMatchObject({pluginId:'delivery',id:'cleanup.complete',inputSchema:{required:['reviewId']}});
  await expect(call('kanban.describe',{pluginId:'delivery',method:'delivery.cleanup.complete'})).rejects.toMatchObject({code:'CHANNEL_PLUGIN_METHOD_UNAVAILABLE'});
+});
+
+it('keeps the host-selected module version in the preview and the confirmed record',async()=>{
+ const f=await fixture(),module={id:'software-development',version:'1',label:'Software approvals'};
+ f.conversation.binding.modules=[module];
+ const proposal=await f.request('decision.propose',{id:'module-approval',title:'Approved scope',content:'Check',rationale:'Work',projectIds:['one'],verificationMode:'source',moduleIds:['fake']}) as any;
+ expect(proposal.modules).toEqual([module]);
+ expect(proposal.record.externalRefs).toContainEqual({system:'nestos-decision-module',id:module.id,revision:module.version});
+ expect(proposal.record.externalRefs).not.toContainEqual(expect.objectContaining({id:'fake'}));
+ f.read.mockResolvedValue({messages:[{id:'confirm',role:'user',text:'确认决策'}]});
+ await f.request('decision.confirm',{proposalDigest:proposal.proposalDigest});
+ expect((await f.service.record('b','module-approval')).externalRefs).toEqual(proposal.record.externalRefs);
 });

@@ -4,17 +4,19 @@ import type {InputField, InteractionResponse, InteractionView} from '@nestos/llm
 import {t} from '@nestos/common';
 
 export function nativeInteraction(request: ConversationRequest, revision = 0): InteractionView {
-    const base = {id: `${typeof request.id}:${request.id}`, revision, state: 'pending' as const, responding: request.responding,
+    const id = request.interactionScope ? JSON.stringify([request.interactionScope, typeof request.id, request.id]) : `${typeof request.id}:${request.id}`;
+    const base = {id, revision, state: 'pending' as const, responding: request.responding,
         title: request.title ?? t(request.kind === 'approval' ? 'harness.approval' : 'harness.interaction'), detail: request.detail};
     if(request.kind==='unsupported')return {...base,...(request.approval?approvalPresentation(request):{}),kind:'unsupported'};
     if(request.kind==='approval')return {...base,...approvalPresentation(request),kind:'approval',
-        decisions:(request.decisions??[]).map(id=>({id,label:decisionLabel(id)}))};
+        decisions:(request.decisions??[]).map(id=>({id,label:decisionLabel(id,request.decisions?.includes('allowSiteReadWrite')??false)}))};
     return {...base, kind: 'input', fields: (request.questions ?? []).map(questionField)};
 }
 function approvalPresentation(request:ConversationRequest):Pick<InteractionView,'title'|'detail'|'facts'|'details'> {
     const context=request.approval;
     const title=request.title??t(context?.kind==='command'?'harness.commandApproval':context?.kind==='file-change'?'harness.fileApproval':'harness.approval');
-    const detail=context?.reason?.trim()?context.reason:t('harness.approvalReasonMissing');
+    const detail=request.decisions?.includes('allowSiteReadWrite') ? t('harness.siteApprovalScope')
+        : context?.reason?.trim() ? context.reason : t('harness.approvalReasonMissing');
     const facts=([['harness.approvalPath',context?.path],['harness.approvalCwd',context?.cwd],['harness.approvalTool',context?.toolName]] as const)
         .flatMap(([key,value])=>value?[{label:t(key),value}]:[]);
     const command=context?context.command:request.detail;
@@ -33,7 +35,13 @@ export function nativeResponse(response: InteractionResponse): Record<string, un
     return response.kind === 'approval' ? {decision: response.decisionId}
         : {answers: Object.fromEntries(Object.entries(response.values).map(([id, value]) => [id, {answers: Array.isArray(value) ? value : [value]}]))};
 }
-function decisionLabel(id: string): string {
+function decisionLabel(id: string, site: boolean): string {
+    if (site) {
+        if (id === 'allowSiteRead') return t('harness.siteRead');
+        if (id === 'allowSiteReadWrite') return t('harness.siteReadWrite');
+        if (id === 'accept') return t('harness.siteOnce');
+        if (id === 'decline') return t('harness.siteDeny');
+    }
     if (['accept', 'allow', 'approve'].includes(id)) return t('harness.approve');
     if (id === 'acceptForSession') return t('harness.approveForSession');
     return t(id === 'cancel' ? 'harness.cancelInteraction' : 'harness.decline');

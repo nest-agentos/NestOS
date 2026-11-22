@@ -64,7 +64,7 @@ export class KanbanSidebar {
     invalidate(): void {this.generation++; this.refresh.mark('kanban.committed');}
     setVisible(visible: boolean): void {
         this.visible = visible;
-        if (!visible) this.refresh.pause(); else if (this.refresh.dirty) void this.refresh.flush();
+        if (!visible) this.refresh.pause(); else if (this.started&&this.refresh.dirty) void this.refresh.flush();
     }
     destroy(): void {
         this.closed = true; this.controls?.destroy(); void this.refresh.close(); this.browser.destroy(); this.status.remove(); this.list.remove();

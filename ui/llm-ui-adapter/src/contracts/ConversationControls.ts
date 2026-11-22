@@ -16,6 +16,7 @@ export interface ConversationCommandOutputPage {ref: ConversationCommandOutputRe
 export interface ConversationRequest {
     approval?:{kind:'command'|'file-change';reason?:string;command?:string;path?:string;cwd?:string;toolName?:string};
     id: string | number; kind: 'approval' | 'input' | 'unsupported'; detail: string; title?: string;
+    interactionScope?: string;
     decisions?: string[]; unsupportedDecisionCount?: number; responding?: boolean;
     questions?: Array<{id: string; question: string; header?: string; multiSelect?: boolean; isSecret?: boolean; isOther?: boolean;
         options?: Array<{label: string; description?: string}>}>;

@@ -1,4 +1,5 @@
 import {t} from '@nestos/common';
+import {replacementMismatchCode,replacementTarget} from './item-operation-jobs';
 import type {KanbanItem,KanbanItemOperation} from '@nestos/kanban/contracts';
 import type {ReviewContext as Context,ReviewAction,ReviewJob,MergePlan} from './item-operation-types';
 import {operationDependencies} from './item-operation-skips';
@@ -25,18 +26,27 @@ export function operation(context: Context, action: ReviewAction, active: boolea
     const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && (!context.scoped&&context.item.status === 'completed'||job?.state==='succeeded') || action === 'merge' && job?.state === 'succeeded';
     const enabled = (!context.deliveryPlan||context.deliveryPlan.steps.includes(action)) && supported && !context.archived && !finished && !active && ready && (!configurable || !!binding);
     const built=latest(context,'build'),auto=built?.followUp,autoPending=action==='deploy'&&auto?.state==='queued'&&built?.state==='succeeded'&&(!job||job.createdAt<built.createdAt);
+    const autoFailed=action==='deploy'&&auto?.state==='failed'&&!job;
+    const replacement=job?.action==='deploy'&&job.code===replacementMismatchCode?replacementRecovery(job):undefined;
     return {...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...(!context.deliveryPlan?.manualAfter?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
-        state:action==='merge'&&invalidated&&(!job||job.phase==='settled')?'unavailable':action==='analyze'&&invalidated?(enabled?'ready':'unavailable'):autoPending?'running':action==='deploy'&&auto?.state==='failed'?'failed':action === 'accept' && !context.scoped&&context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
-        ...(job?.state==='unknown'?{attention:{kind:'recovery' as const}}:action==='merge'&&plan?.conflicts.length?{attention:{kind:'choice' as const}}:{}),
-        ...(job?.state==='unknown'&&job.phase==='submitting'?{recovery:{runId:job.id,label:t('kanban.operationReconcile'),
+        state:action==='merge'&&invalidated&&(!job||job.phase==='settled')?'unavailable':action==='analyze'&&invalidated?(enabled?'ready':'unavailable'):autoPending?'running':autoFailed?'failed':action === 'accept' && !context.scoped&&context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
+        ...(replacement||job?.state==='unknown'?{attention:{kind:'recovery' as const}}:action==='merge'&&plan?.conflicts.length?{attention:{kind:'choice' as const}}:{}),
+        ...(replacement?{recovery:replacement}:job?.state==='unknown'&&job.phase==='submitting'?{recovery:{runId:job.id,label:t('kanban.operationReconcile'),
             reason:t(['GIT_IDENTITY_MISSING','GIT_COMMIT_IDENTITY_REQUIRED'].includes(job.code??'')?'kanban.operationRecoveryIdentity':job.code==='OPERATION_RESULT_PENDING'?'kanban.operationRecoveryMissingResult':'kanban.operationRecoveryUnavailable'),
             prompt:t('kanban.operationRecoveryPrompt',{operationId:job.id,source:job.snapshot.sourceVersion,target:job.snapshot.targetVersion})}}:{}),
         statusText:operationStatusText(context,action),progress:operationProgress(job,autoPending),
-        code:action==='deploy'&&auto?.state==='failed'?auto.code:job?.code==='WORKSPACE_CONTEXT_PENDING'?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId??(action==='merge'?latest(context,'analyze')?.sessionId:undefined), configurable, binding, openSessionOnRun: agent || action === 'analyze',
+        code:autoFailed?auto.code:job?.code==='WORKSPACE_CONTEXT_PENDING'?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId??(action==='merge'?latest(context,'analyze')?.sessionId:undefined), configurable, binding, openSessionOnRun: agent || action === 'analyze',
         reason: job?.phase&&job.phase!=='settled'||autoPending ? undefined : enabled || finished ? undefined : t(!supported ? 'kanban.operationNeedsDelivery' : active ? 'kanban.operationBusy' : configurable && !binding ? 'kanban.operationNeedsFlow' : 'kanban.operationNeedsPrevious'),
         summary:action==='analyze'||action==='merge'?plan?plan.summary+'\n'+t('kanban.operationVersions',{source:plan.sourceVersion,target:plan.targetVersion}):undefined:resultSummary(job?.result),
         fields: action === 'merge' && plan ? plan.conflicts.map(conflict => ({id: conflict.id, label: conflict.path + ' · ' + conflict.reason, choices: conflict.options})) : undefined,
         confirmation: action === 'deploy' ? t('kanban.operationConfirmDeploy') : action === 'accept' ? context.deliveryPlan?.acceptanceConfirmation===null?undefined:context.deliveryPlan?.acceptanceConfirmation??t('kanban.operationConfirmAcceptance') : action === 'merge' ? t(plan?.conflicts.length?'kanban.operationConfirmMerge':'kanban.operationConfirmMergeNoConflicts') : undefined};
+}
+function replacementRecovery(job:ReviewJob):NonNullable<KanbanItemOperation['recovery']> {
+    const versions=(job.result as {replacementVersions?:{expected?:string;running?:string}}|undefined)?.replacementVersions;
+    return {runId:job.id,label:t('kanban.operationCheckReplacement'),reason:t('kanban.operationReplacementVersions',{
+        expected:versions?.expected??replacementTarget(job)??t('kanban.operationVersionUnavailable'),
+        running:versions?.running??t('kanban.operationVersionUnavailable'),
+    })};
 }
 function operationStatusText(context:Context,action:ReviewAction):string|undefined {
     const job=latest(context,action),analysis=latest(context,'analyze'),plan=analysis?.result as MergePlan|undefined;

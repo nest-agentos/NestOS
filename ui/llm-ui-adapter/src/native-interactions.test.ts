@@ -1,5 +1,12 @@
 import {expect,it} from 'vitest';
 import {nativeInteraction,nativeResponse} from './native-interactions';
+it('keeps a new native approval separate from an accepted receipt with a reused request ID',()=>{
+ const approval={id:1,kind:'approval' as const,detail:'Tool approval',decisions:['accept','decline']};
+ const previous=nativeInteraction({...approval,interactionScope:'old-runtime-and-turn'});
+ const pending=nativeInteraction({...approval,interactionScope:'new-runtime-and-turn'});
+ expect(pending.id).not.toBe(previous.id);
+ expect(nativeInteraction({...approval,interactionScope:'new-runtime-and-turn'}).id).toBe(pending.id);
+});
 it('keeps legacy commands and unavailable choices in disclosures while preserving usable decisions',()=>{
  const view=nativeInteraction({id:'approval',kind:'approval',detail:'python3 script.py',decisions:['accept','cancel'],unsupportedDecisionCount:1});
  expect(view.title).toBe('等待执行授权');expect(view.kind).toBe('approval');if(view.kind!=='approval')return;

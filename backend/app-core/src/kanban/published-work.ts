@@ -2,7 +2,7 @@ import {type IndependentCallExecutionReader} from '@nestos/llm-session';
 import {contextReferenceInstruction} from '../run/context-reference-instruction';
 import {formatPromptSections} from '@nestos/llm-context/prompt';
 import type {IndependentCallService} from '@nestos/llm-session';
-import type {IndependentCallInput} from '@nestos/llm-session/contracts';
+import type {IndependentCallInput,IndependentCallView} from '@nestos/llm-session/contracts';
 import type {TargetRef} from '@nestos/llm-flow/contracts';
 import type {KanbanDispatch, KanbanItem} from '@nestos/kanban/contracts';
 import type {KanbanExecutionPort, KanbanExecutionObservation} from '@nestos/kanban/execution';
@@ -13,6 +13,7 @@ export interface PublishedKanbanWorkOptions {
     onSessionPrepared?(dispatch: KanbanDispatch, item: KanbanItem, sessionId: string): Promise<void>;
     title?(dispatch: KanbanDispatch, item: KanbanItem): string;
     observe?(dispatch: KanbanDispatch, observation: KanbanExecutionObservation): Promise<KanbanExecutionObservation>;
+    observeApprovals?(dispatch:KanbanDispatch,call:IndependentCallView):Promise<void>;
     calls: Pick<IndependentCallService,'prepareTaskCall'|'submitPreparedTaskCall'|'inspectTaskCallSubmission'|'list'>; execution:Pick<IndependentCallExecutionReader,'inspect'>;
     /** Stable Session preparation is owned by the host's existing session journal. */
     prepareSession(dispatchId: string): Promise<string>;
@@ -51,7 +52,8 @@ export function createPublishedKanbanWorkExecutor(options: PublishedKanbanWorkOp
     };
 }
 async function inspectWork(options: PublishedKanbanWorkOptions, frozen: FrozenWork): Promise<KanbanExecutionObservation> {
-    const {sessionId,output,...observation}=await options.execution.inspect(frozen.input);
+    const {sessionId,output,...observation}=await options.execution.inspect(frozen.input,options.observeApprovals
+        ?call=>options.observeApprovals!(frozen.dispatch,call):undefined);
     return {...observation,...(sessionId?{executionSessionId:sessionId}:{}),...(observation.outcome==='succeeded'?{outputs:[]}:{})};
 }
 function validateFrozen(value: unknown): FrozenWork {

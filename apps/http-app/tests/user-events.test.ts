@@ -1,5 +1,5 @@
 import {afterEach, expect, it, vi} from 'vitest';
-import {MemoryBackend, createVFS} from '@nestos/vfs-core';
+import {MemoryBackend, createVFS,SeqEventJournal} from '@nestos/vfs-core';
 import {UserEventService} from '../../../backend/app-core/src/events/service';
 import {projectKernelEvents} from '../../../backend/app-core/src/events/kernel-source';
 import {ApplicationEventFeed, RpcPeer, installViewProjections} from '@nestos/app-transport/application';
@@ -22,14 +22,36 @@ it('gives two browser feeds independent cursors and a shared persistent notifica
     await service.journal.append('finished', {type: 'task.failed', resourceId: 'task', notification: 'error'});
     await first.refresh(); await second.refresh();
     expect(a).toHaveBeenCalledOnce(); expect(b).toHaveBeenCalledOnce();
+    expect(await service.notificationSummary()).toMatchObject({unread:1});
     first.close();
     await service.setNotificationRead('finished', true);
     const restored = await UserEventService.open(fs);
     expect((await restored.listNotifications()).items[0]).toMatchObject({read: true});
+    expect(await restored.notificationSummary()).toMatchObject({unread:0});
+    await restored.setNotificationRead('finished',false);await restored.setNotificationRead('finished',false);
+    expect(await restored.notificationSummary()).toMatchObject({unread:1});
     expect((await other.service.listNotifications()).items).toEqual([]);
     expect((await other.service.eventBaseline()).streamId).not.toBe(baseline.streamId);
     await expect(other.service.setNotificationRead('finished', true)).rejects.toMatchObject({code: 'ENOENT'});
     expect(failure).not.toHaveBeenCalled();
+});
+it('initializes notification counts from an older journal and updates retention and read flags atomically',async()=>{
+    const {manager}=await createVFS({rootBackend:new MemoryBackend()});cleanup.push(()=>manager.dispose());
+    const fs=await manager.openFileSystem('/'),legacy=await SeqEventJournal.open<import('@nestos/app-contracts/services').ApplicationEventFact>(fs,'/var/lib/events/events.seq','legacy');
+    await legacy.transaction(async tx=>{
+        await tx.append('expired',{type:'task.failed',notification:'error'});
+        await tx.append('old-read',{type:'task.failed',notification:'info'});
+        await tx.setState('notification-read',JSON.stringify(['old-read','missing']));
+        for(let index=0;index<998;index++)await tx.append('hint-'+index,{type:'repository.changed'});
+    });
+    const service=await UserEventService.open(fs);
+    expect(await service.notificationSummary()).toEqual({head:{streamId:'legacy',sequence:1000},unread:1});
+    const saved={type:'task.failed',notification:'error' as const};
+    await service.journal.append('new',saved);await service.journal.append('new',saved);
+    expect(await service.notificationSummary()).toEqual({head:{streamId:'legacy',sequence:1001},unread:1});
+    await service.journal.append('hint-final',{type:'repository.changed'});
+    expect((await service.notificationSummary()).unread).toBe(1);
+    expect((await service.listNotifications()).items.map(row=>row.event.id)).toEqual(['new']);
 });
 it('recovers missed Kernel facts from durable source and atomically advances its own checkpoint', async () => {
     const {fs, service} = await fixture();

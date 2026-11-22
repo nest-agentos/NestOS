@@ -1,3 +1,4 @@
+import {workspacePrerequisitesFile} from '@nestos/kanban-development';
 import {kanbanConfigurationDefaults} from '../resources/catalog';
 import type {IFileSystem} from '@nestos/vfs-core';
 import {LIFECYCLE_PROMPT_SUFFIXES} from '../run/prompt-lifecycle';
@@ -28,7 +29,7 @@ async function resolveFiles(fs:IFileSystem,project:IFileSystem,profile:string):P
     }else{if(profile!=='development'||await fs.driver.exists(KANBAN_CONFIGURATION_DIRECTORY+'/.defaults.json'))throw failure('PROMPT_PROFILE_NOT_FOUND');names=Object.keys(kanbanConfigurationDefaults);}
     const files:PromptFile[]=manifest?[manifest]:[];
     const supplemental=['coordination-conversation.md','session-protocol.md','decision-actions.md','coordination-actions.md','workspace-rules.md','delivery.md','operation-result.md'];
-    const optional=[...supplemental,...['decision','task'].flatMap(entry=>LIFECYCLE_PROMPT_SUFFIXES.map(suffix=>entry+'-'+suffix+'.md'))];
+    const optional=[workspacePrerequisitesFile,...supplemental,...['decision','task'].flatMap(entry=>LIFECYCLE_PROMPT_SUFFIXES.map(suffix=>entry+'-'+suffix+'.md'))];
     for(const name of new Set([...names,...optional])){
         if(supplemental.includes(name)&&name!=='coordination-conversation.md'&&!names.includes(name)&&!files.some(file=>file.content.includes(name)))continue;
         const file=await selected(fs,project,global,local,name);

@@ -6,6 +6,7 @@ for (const event of ['load', 'error']) test(`records stylesheet ${event} before 
     const link = '<link rel="stylesheet" crossorigin href="/assets/app.css">';
     const html = firstPaintStyles().transformIndexHtml.handler(link);
     const handler = html.match(new RegExp(`on${event}="([^"]+)"`))?.[1];
+    assert.ok(html.includes('fetchpriority="high"'));
     assert.ok(handler); const element = {dataset: {appStyles: 'loading'}, media: 'print'};
     new Function(handler).call(element);
     assert.equal(element.dataset.appStyles, event === 'load' ? 'loaded' : 'error');

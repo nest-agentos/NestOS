@@ -2,6 +2,7 @@ import {spawnSync} from 'node:child_process';
 import {lifecycleLog} from './httpd-process.mjs';
 
 const unit = 'firecracker-server.service';
+const localCellsUnit = 'nestos-cells-local.service';
 const server = '/usr/local/bin/firecracker-server';
 const vmId = 'cells-x1';
 
@@ -42,6 +43,18 @@ function serverStatus(output) {
     if (load === 'not-found') return {code: 'UNIT_NOT_FOUND'};
     if (load !== 'loaded' || !active) throw failure(load ? `UNIT_${load.replaceAll('-', '_').toUpperCase()}` : 'INVALID_UNIT_STATUS');
     return {value: active, code: active === 'active' ? 'UNIT_ACTIVE' : 'UNIT_START_REQUIRED'};
+}
+
+export function prepareRestartLocalCells(operationId, run = runCommand) {
+    const hint = `Inspect systemctl status ${localCellsUnit} and journalctl -u ${localCellsUnit}.`;
+    const status = () => serverStatus(run('systemctl', ['show', '--property=LoadState,ActiveState', localCellsUnit]));
+    const active = step(operationId, 'cells.local.status', hint, status);
+    if (!active || active === 'active') return;
+    step(operationId, 'cells.local.start', hint, () => {
+        run('systemctl', ['start', localCellsUnit], true);
+        if (status().value !== 'active') throw failure('CELLS_LOCAL_NOT_ACTIVE');
+        return {code: 'UNIT_STARTED'};
+    });
 }
 
 function vmStatus(output) {

@@ -198,9 +198,11 @@ cells-driver 统一文件、进程、同步和外部 harness 连接。服务端�
 
 接管只允许授权 cwd 且非活跃的原生线程。网关 owned/收据是进程内控制状态，不保证跨 harness 或跨主机排他；外部 CLI 仍可访问自己的状态。旧宿主 workspace 模式与 exclusive rw exports 禁止重叠。新项目模式通过共同 ProjectLauncher 和 FileGate 控制文件、进程及 Codex turn，支持受控 rw 导出；native 运行在外层项目沙箱中。详见 [项目模型](cells-project-model.md)。
 
-操作以 epoch/requestId 保留未知/已提交/未提交收据，HTTP 超时后后台继续等待原生回执，查询可确认晚到结果。事件有界并报告 gap；控制面板安全显示文本，保留审批草稿，不因关闭面板中断原生 turn。服务关闭先封闭所有 driver，再取消监管、回收各 app-server 进程组并等待 leader；已脱离进程组的后代不宣称被回收。
+操作以 epoch/requestId 保留未知/已提交/未提交收据，HTTP 超时后后台继续等待原生回执，查询可确认晚到结果。事件有界并报告 gap。审批卡片使用事件 epoch、轮次和原生请求 ID 关联回执，避免请求 ID 重用时匹配到既有决定。关闭面板保留审批草稿，原生轮次继续运行。服务关闭先封闭所有 driver，再取消监管、回收各 app-server 进程组并等待 leader；已脱离进程组的后代不宣称被回收。
 
-Codex 0.159.2 的 paginated 历史恢复尚有兼容限制；新建显式 legacy，未物化会话展示空历史。旧 paginated 会话保留只读历史；扩展版本能力后再开放恢复。当前支持命令/文件审批与用户问题，其他原生反向请求显示不支持，不自动批准。使用与上限见 [服务 README](../../tools/cells/README.md)。
+Codex 0.159.2 的 paginated 历史恢复尚有兼容限制；新建显式 legacy，未物化会话展示空历史。旧 paginated 会话保留只读历史；扩展版本能力后再开放恢复。工作台支持命令、文件审批和用户问题。Codex 的空表单 MCP 工具审批沿用单次批准或拒绝及原有回执链路，其他原生反向请求保持原有处理方式。使用与上限见 [服务 README](../../tools/cells/README.md)。
+
+固定站点浏览可为同一 Harness 登记一对读写工具，在一个审批入口呈现「不 / 一次 / 只有读 / 读写」。已记住的授权绑定登记所有者、原生会话和站点源。只有读会拒绝当前写请求，读写同时覆盖读取。修改登记或撤销授权后，下一次请求重新核对当前授权。站点读取约束由独立的[受管浏览器工具](../../tools/browser-tools/README.md)执行。
 
 ## MCP 配置与项目目录绑定
 

@@ -2,7 +2,7 @@ import {finishReviewCleanup} from '@nestos/kanban/integration';
 const kanbanJournalOptions={directory:'/var/lib/kanban',artifactScheme:'nestos-kanban-artifact:'};
 import {afterEach, expect, it, vi} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
-import {sha256HexSync} from '@nestos/common';
+import {sha256HexSync,t} from '@nestos/common';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createItemOperations} from '@nestos/kanban-development';
 import { type ReviewOperationsOptions, type ReviewJob} from '@nestos/kanban-development';
@@ -161,6 +161,41 @@ it('checks the real running version before acceptance and journals canonical acc
     f.adapter.runningVersion.mockReturnValue('candidate'); const view = await f.run('accept', 'accept', {confirmed: true});
     expect(f.service.execute).not.toHaveBeenCalled(); expect(f.item.status).toBe('review');
     await f.api.scan(); expect(f.service.execute).not.toHaveBeenCalled(); expect(view.operations.find(op => op.id === 'accept')?.state).toBe('succeeded');
+});
+it('rechecks a replacement with a running-version mismatch without submitting it again',async()=>{
+    const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.scan();
+    f.published.inspect.mockResolvedValue({state:'running'});
+    await f.run('deploy','original-deploy',{confirmed:true});
+    f.adapter.runningVersion.mockReturnValue('old-release');f.complete('original-deploy');await f.api.scan();
+    const deploy=()=>f.api.itemOperations('board','task').then(view=>view.operations.find(row=>row.id==='deploy')!);
+    expect(await deploy()).toMatchObject({state:'failed',recovery:{runId:'original-deploy',reason:expect.stringContaining('old-release')}});
+    const recheck=(id:string)=>f.run('deploy',id,{reconcile:{runId:'original-deploy'}});
+    f.adapter.runningVersion.mockReturnValue('different-release');
+    await recheck('still-mismatched');
+    expect(await deploy()).toMatchObject({state:'failed',recovery:{reason:expect.stringContaining('different-release')}});
+    f.adapter.runningVersion.mockReturnValue('candidate');
+    f.published.inspect.mockResolvedValue({state:'succeeded',output:f.result('another-operation')} as never);
+    await expect(recheck('unrelated-receipt')).rejects.toMatchObject({code:'OPERATION_RESULT_INVALID'});
+    expect((await deploy()).state).toBe('failed');
+    f.complete('original-deploy');
+    await recheck('verify-original');
+    expect(await deploy()).toMatchObject({state:'succeeded',runId:'original-deploy'});
+    expect((await f.api.itemOperations('board','task')).operations.find(row=>row.id==='accept')?.enabled).toBe(true);
+    expect(f.published.start).toHaveBeenCalledTimes(2);
+});
+it('rechecks the original managed switch when its running version changes',async()=>{
+    const f=await fixture();await f.bind('build');await f.bind('deploy');await f.run('build');f.complete('build');await f.api.scan();
+    const submit=vi.fn(async()=>{}),inspect=vi.fn<NonNullable<typeof f.options.adapter.managed>['inspect']>();
+    f.options.adapter.managed={prepare:async()=>({operationId:'switch',serviceId:'host',expectedVersion:'old',targetVersion:'candidate'}),submit,inspect};
+    f.adapter.runningVersion.mockReturnValue('old');
+    inspect.mockResolvedValue({state:'failed',code:'SERVICE_VERSION_MISMATCH'});
+    const view=await f.run('deploy','switch',{confirmed:true});
+    expect(view.operations.find(row=>row.id==='deploy')).toMatchObject({state:'failed',recovery:{runId:'switch'}});
+    f.adapter.runningVersion.mockReturnValue('candidate');
+    inspect.mockResolvedValue({state:'succeeded',output:{...f.result('switch'),status:'succeeded'}});
+    const verified=await f.run('deploy','check-switch',{reconcile:{runId:'switch'}});
+    expect(verified.operations.find(row=>row.id==='deploy')).toMatchObject({state:'succeeded',runId:'switch'});
+    expect(submit).toHaveBeenCalledOnce();
 });
 it('refuses malformed output and does not enable dependent actions', async () => {
     const f = await fixture(); await f.bind('build'); await f.bind('deploy'); await f.run('build');
@@ -428,8 +463,9 @@ it('retries failed post-merge cleanup without resending the merge or deleting Se
  await f.acceptRuntime();f.plan.conflicts=[];await f.bind('merge');await f.run('analyze');await f.api.scan();await f.run('merge','submit',{confirmed:true});
  f.complete('submit');await f.api.scan();
  let view=await f.api.itemOperations('board','task');
- expect(view.operations.find(row=>row.id==='merge')).toMatchObject({state:'failed',runAction:'cleanup',code:'WORKTREE_DIRTY',group:{id:'merge'}});
- expect(view.operations.find(row=>row.id==='merge')?.statusText).toBeUndefined();expect(view.operations.find(row=>row.id==='merge')?.summary).toBeUndefined();
+ expect(view.operations.find(row=>row.id==='merge')).toMatchObject({state:'failed',runAction:'cleanup',code:'WORKTREE_DIRTY',label:t('kanban.operationCleanup'),
+    runLabel:t('kanban.operationRetryCleanup'),summary:t('kanban.operationCleanupRecoveryHint'),inspectWorkResources:true,group:{id:'merge',label:t('kanban.operationCleanup')}});
+ expect(view.operations.find(row=>row.id==='merge')?.statusText).toBeUndefined();
  const submissions=f.published.start.mock.calls.length;
  await f.api.scan();expect(f.options.cleanup).toHaveBeenCalledOnce();
  view=await f.run('cleanup','retry-cleanup');expect(view.operations.find(row=>row.id==='merge')?.state).toBe('succeeded');

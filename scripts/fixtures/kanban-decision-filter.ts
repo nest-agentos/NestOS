@@ -25,14 +25,15 @@ async function run() {
  await command({type:'report-analysis',itemId:'coord',operationId:'failed',status:{itemId:'coord',state:'failed',code:'GIT_RELATIVE_WORKTREES_UNSUPPORTED'}});
  await command({type:'link-record',recordId:'decision-98',itemId:'coord'});
  await command({type:'request-record-cancellation',recordId:'decision-96'});await command({type:'cancel-record',recordId:'decision-96'});await command({type:'archive-record',recordId:'decision-96'});
- let sessionBlocked=true;const openedSessions:string[]=[];const discussionAt=Date.now();
+ let sessionBlocked=true;const openedSessions:string[]=[];let selectedModules:string[]|undefined;const discussionAt=Date.now();
  Object.assign(service,{boardSettings:async()=>({fields:['decision','coordination','execution'].map(role=>({name:'harness-'+role,label:role,choices:[{value:'',label:'默认'},{value:'codex',label:'Codex'},{value:'dsh',label:'缺少必要能力',disabled:true}]}))}),openRecordCoordination:async(_board:string,request:any)=>({id:'retained',boardId:'board',recordId:request.recordId,resourceId:'/native/retained',state:'confirmed',createdAt:1}),openTaskCommunication:async()=>({id:'retained',boardId:'board',recordId:'decision-98',resourceId:'/native/retained',state:'confirmed',createdAt:1}),recordConversations:async()=>[
   {id:'linked-discussion',recordId:'decision-98',boardId:'board',state:sessionBlocked?'blocked':'confirmed',createdAt:1,resourceId:'/native/decision-98',sessionId:'original',code:sessionBlocked?'DECISION_SESSION_ERROR_REPORTED':undefined,pendingReports:sessionBlocked?[{id:'error',type:'error'}]:[]},
   {id:'no-session',boardId:'board',state:'error',createdAt:1,code:'ECONFLICT'},
   {id:'draft',boardId:'board',state:'draft',createdAt:discussionAt+2,resourceId:'/native/draft',sessionId:'draft',title:'待确认草稿',resources:[ref('two')]},
   {id:'cancelled-draft',boardId:'board',state:'cancelled',createdAt:discussionAt+4,resourceId:'/native/cancelled',sessionId:'cancelled',title:'已取消的草稿',resources:[ref('two')]},
   {id:'session-error',boardId:'board',state:'error',createdAt:discussionAt+3,resourceId:'/native/failed',sessionId:'failed',title:'接续失败的草稿',code:'EIO',resources:[ref('two')]}],
- recordExecutions:async(_board:string,id:string)=>id==='decision-98'?[{id:'run-0',recordId:id,recordRevision:1,boardId:'board',itemIds:['coord'],stage:'planning',state:'blocked',code:'GIT_RELATIVE_WORKTREES_UNSUPPORTED',createdAt:1,updatedAt:2}]:[],recordResources:async()=>['one','two'].map(id=>({reference:ref(id),label:id==='one'?'项目 A':'项目 B',group:'same-cell'})),startRecordConversation:async()=>{throw Error('UNEXPECTED_CREATION');}});
+ recordExecutions:async(_board:string,id:string)=>id==='decision-98'?[{id:'run-0',recordId:id,recordRevision:1,boardId:'board',itemIds:['coord'],stage:'planning',state:'blocked',code:'GIT_RELATIVE_WORKTREES_UNSUPPORTED',createdAt:1,updatedAt:2}]:[],recordResources:async()=>['one','two'].map(id=>({reference:ref(id),label:id==='one'?'项目 A':'项目 B',group:'same-cell'})),decisionModules:async()=>[{id:'software-development',version:'1',label:zhCN['kanban.module.softwareDevelopment']}],
+ startRecordConversation:async(_board:string,request:{moduleIds?:string[]})=>{selectedModules=request.moduleIds;return {resourceId:'/native/module-choice'};}});
  let calls:string[]=[];
  const client=new Proxy(service,{get(target,key){const value=Reflect.get(target,key);return typeof value==='function'?async(...args:unknown[])=>{calls.push(String(key));const result=await value.apply(target,args);if(key!=='records')return result;return withRecordAttention({...result,items:result.items.map((record:any)=>record.id==='decision-94'?{...record,progress:{state:'completed',completion:'waived',phase:'completed',lastActivityAt:record.updatedAt,groupIds:['coord'],boardId:'board',itemId:'coord',followUps:[{state:'pending',phase:'cleanup',boardId:'board',itemId:'coord'}]}}:record)},String(args[0]),journal);}:value;}});
  Object.assign(service,{controlRecord:(board:string,request:any):Promise<void>=>dismissRecordAttention(client,journal,board,request)});
@@ -40,6 +41,30 @@ async function run() {
  const metrics:Array<{operation:string;durationMs:number;logicalApiCalls:number;httpRequests:number;methods:string[]}>=[];
  const measure=async(operation:string,action:()=>Promise<unknown>|void,ready:()=>boolean)=>{calls=[];const started=performance.now();try{await action();await wait(ready);}catch(error){throw Error(operation+':'+(error instanceof Error?error.message:'UNKNOWN'));}const row={operation,durationMs:Math.round((performance.now()-started)*100)/100,logicalApiCalls:calls.length,httpRequests:0,methods:[...calls]};metrics.push(row);if(row.durationMs>=5000||row.logicalApiCalls>=30)throw Error('PERFORMANCE_LIMIT:'+operation);};
  await measure('cold.open-decision-list',()=>view.start(),()=>visible(editor,'[data-record-resource]'));
+ if(location.hash==='#planning-retry'){
+    const retry=()=>editor.querySelector<HTMLButtonElement>('[data-action=retry-analysis]');
+    await measure('warm.open-failed-planning',()=>view.openResource('/board/board/coord'),()=>!!retry()&&!retry()!.disabled);
+    await measure('warm.retry-planning',()=>{retry()!.click();retry()!.click();},
+        ()=>!editor.hasAttribute('aria-busy')&&retry()?.textContent===zhCN['kanban.planningRetryRunning']);
+    if(!retry()?.disabled||calls.filter(method=>method==='execute').length!==1)throw Error('PLANNING_RETRY_DUPLICATED');
+    await measure('warm.observe-new-planning-failure',async()=>{
+        await command({type:'report-analysis',itemId:'coord',operationId:'retry-failed',status:{itemId:'coord',state:'failed',code:'GIT_RELATIVE_WORKTREES_UNSUPPORTED'}});
+        view.invalidateFromEvents();
+    },()=>!!retry()&&!retry()!.disabled);
+    publish({result:'passed',environment:'Google Chrome headless; in-process KanbanClient; no HTTP transport',dataset:{boards:1,decisions:100,projects:2,coordinationTasks:1,backgroundLoad:'none'},metrics});
+    return;
+ }
+ if(location.hash==='#decision-modules'){
+    await measure('warm.open-new-decision-dialog',()=>editor.querySelector<HTMLButtonElement>('[data-action=new-decision]')!.click(),
+        ()=>visible(editor,'[name=primaryResource]')&&!!editor.querySelector('[name=decisionModule]'));
+ const module=editor.querySelector<HTMLInputElement>('[name=decisionModule][value=software-development]')!;
+ if(!module||module.checked)throw Error('MODULE_CHOICE_NOT_OPTIONAL');
+ module.click();
+ await measure('warm.create-decision-with-module',()=>editor.querySelector<HTMLButtonElement>('[data-form=decision-conversation] button:not([type])')!.click(),()=>openedSessions.includes('/native/module-choice'));
+ if(JSON.stringify(selectedModules)!==JSON.stringify(['software-development']))throw Error('MODULE_SELECTION_NOT_PRESERVED');
+    publish({result:'passed',environment:'Google Chrome headless; in-process KanbanClient; no HTTP transport',dataset:{boards:1,decisions:100,projects:2,modules:1,backgroundLoad:'none'},metrics});
+    return;
+ }
  if(editor.querySelector('[data-context]')?.getAttribute('data-context')!=='decision')throw Error('DECISION_TAB_NOT_FIRST');
  await measure('warm.filter-secondary-project',()=>{const select=editor.querySelector<HTMLSelectElement>('[data-record-resource]')!;select.value=JSON.stringify(ref('two'));select.dispatchEvent(new Event('change',{bubbles:true}));},()=>!editor.hasAttribute('aria-busy')&&visible(editor,'[data-record-resource]')&&view.getActiveResourceId().endsWith('/nestos-remote-project/'+projectIds.two));
  const rows=[...editor.querySelectorAll<HTMLTableRowElement>('[data-decision-row]')],records=[...editor.querySelectorAll<HTMLElement>('[data-record]')];
@@ -116,7 +141,10 @@ async function run() {
  await measure('warm.observe-new-attention',()=>view.openResource('/board/board/@decision'),()=>!editor.hasAttribute('aria-busy')&&!!editor.querySelector('[data-attention-record=decision-98]'));
  const result={result:'passed',environment:'Google Chrome headless; actual DOM and MemoryBackend/SeqKanbanStore; in-process KanbanClient; no HTTP transport',dataset:{boards:1,decisions:100,archivedDecisions:1,projects:2,relatedDecisions:50,coordinationTasks:1,draftSessions:3,cancelledDrafts:1,hiddenSessionlessFailures:1,backgroundLoad:'none',completionWithWaiverAndPendingCleanup:1},metrics};
 
- document.body.dataset.acceptance='passed';document.getElementById('result')!.textContent=JSON.stringify(result);(globalThis as any).__kanbanAcceptance=result;
+ publish(result);
  // Keep the unified table visible for the screenshot; the browser process owns its lifetime.
+}
+function publish(result:unknown){
+ document.body.dataset.acceptance='passed';document.getElementById('result')!.textContent=JSON.stringify(result);(globalThis as any).__kanbanAcceptance=result;
 }
 void run().catch(error=>{document.body.dataset.acceptance='failed';document.getElementById('result')!.textContent=JSON.stringify({result:'failed',code:error instanceof Error?error.message:'UNKNOWN'});});

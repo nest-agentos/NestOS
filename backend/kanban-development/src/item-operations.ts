@@ -18,7 +18,7 @@ import {sha256HexSync, t} from '@nestos/common';
 import type {KanbanItemOperations, KanbanItemOperation, KanbanItemOperationRequest, KanbanItemOperationBinding, KanbanItem, KanbanSessionAssociation} from '@nestos/kanban/contracts';
 import {automationTarget, automationCatalog} from './automation-targets';
 import {requireValue} from './validation';
-import {prepareReviewJob, advanceReviewJob} from './item-operation-jobs';
+import {prepareReviewJob, advanceReviewJob, recheckReplacement, replacementMismatchCode} from './item-operation-jobs';
 import { type ReviewJob, type ReviewSettings, type ReviewOperationsOptions, type ReviewAction, type MergePlan} from './item-operation-types';
 import {reviewKey, jobKey} from '@nestos/kanban/integration';
 
@@ -118,9 +118,9 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     const projected=projectOperationSkips(cancelDependentOperations(context,selected),context.deliveryPlan,activeWaivers,!!canSkip&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel').map(entry=>canSkip||!entry.cancel?entry:{...entry,cancel:{...entry.cancel,enabled:false,reason:t('kanban.errors.OPERATION_COORDINATOR_REQUIRED')}});
     const operations=projected.map(entry=>{
         const cleanup=context.cleanup,merged=latest(context,'merge');
-        if(entry.id==='merge'&&cleanup&&merged&&cleanup.runId===merged.id&&cleanup.state!=='succeeded')return {...entry,group:operationGroup(entry.id),label:t('kanban.operationCleanup'),state:cleanup.state==='failed'?'failed' as const:'running' as const,
+        if(entry.id==='merge'&&cleanup&&merged&&cleanup.runId===merged.id&&cleanup.state!=='succeeded')return {...entry,group:{...operationGroup(entry.id),label:t('kanban.operationCleanup')},label:t('kanban.operationCleanup'),state:cleanup.state==='failed'?'failed' as const:'running' as const,
             code:cleanup.code,progress:cleanup.state==='running'?{stage:'running' as const,label:t(cleanup.reviewState==='pending'?'kanban.operationProgress.cleanupReview':'kanban.operationProgress.cleanup')}:undefined,runAction:'cleanup',runLabel:t('kanban.operationRetryCleanup'),confirmation:undefined,
-            enabled:cleanup.state==='failed'&&!active,statusText:undefined,summary:undefined,cancel:undefined,fields:undefined,skip:undefined};
+            enabled:cleanup.state==='failed'&&!active,statusText:undefined,summary:cleanup.state==='failed'?t(cleanup.code==='WORKTREE_NOT_INTEGRATED'?'kanban.operationCleanupIntegrationHint':'kanban.operationCleanupRecoveryHint'):undefined,inspectWorkResources:cleanup.state==='failed',cancel:undefined,fields:undefined,skip:undefined};
         return {...entry,group:operationGroup(entry.id)};
     });
     const halted=operationHalt(context,activeWaivers);
@@ -166,7 +166,9 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
         requireValue(request.expectedRevision===revision(context),'OPERATION_STALE_REFRESH');
         requireValue(job.phase==='submitting'||job.phase==='settled','OPERATION_RECOVERY_UNAVAILABLE');
         const started=Date.now();
-        const observed=job.phase==='submitting'?await advanceReviewJob(options,job,true):job;
+        const mismatch=job.code===replacementMismatchCode;
+        if(mismatch)requireValue(latest(context,'deploy')?.id===job.id&&!context.jobs.some(row=>row.phase!=='settled'),'OPERATION_RECOVERY_UNAVAILABLE');
+        const observed=mismatch?await recheckReplacement(options,job):job.phase==='submitting'?await advanceReviewJob(options,job,true):job;
         options.log({operationId:job.id,boardId:board,itemId:request.itemId,stage:'operation.reconcile',result:observed.state==='unknown'||observed.state==='failed'?'failure':'success',code:observed.code,durationMs:Date.now()-started});
         await settleDeliveryAcceptance(options,board,request.itemId);
         return view(options,await load(options,board,request.itemId,false));

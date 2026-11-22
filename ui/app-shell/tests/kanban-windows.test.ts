@@ -204,7 +204,7 @@ it('keeps project decision shortcuts alive through catalog refresh and opens the
  f.workbench.invalidateFromEvents();await vi.waitFor(()=>expect(f.active().querySelector('[data-board=b]')).not.toBeNull());
  f.active().querySelector<HTMLButtonElement>('[data-board=b]')!.click();
  await vi.waitFor(()=>expect(f.workbench.getActiveResourceId()).toBe('/board/b/@decision/nestos-remote-project/secondary'));
- await vi.waitFor(()=>expect(f.active().querySelector<HTMLSelectElement>('[data-record-resource]')?.value).toBe(JSON.stringify(reference)));
+ await vi.waitFor(()=>expect(f.active().querySelector<HTMLInputElement>('.kanban__filter-checklist input:checked')?.value).toBe(JSON.stringify(reference)));
  Object.assign(f.service,{startRecordConversation:vi.fn()});
  f.active().querySelector<HTMLButtonElement>('[data-action=new-decision]')!.click();
  await vi.waitFor(()=>expect(f.active().querySelector('[name=primaryResource]')).not.toBeNull());

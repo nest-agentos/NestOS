@@ -10,8 +10,9 @@ async function fixture(group=false,active=false) {
  const service=createKanbanModule({store,actor:{kind:'human',id:'admin'},authorize:async()=>{},log(){},verifyOutputs:async()=>true}),worker=createKanbanModule({store,actor:{kind:'service',id:'worker'},authorize:async()=>{},log(){}});
  await service.create({id:'b',title:'Work',scope:{kind:'system'},members:[{kind:'human',id:'admin',roles:['coordinator','reviewer'],responsibility:'Manage'},{kind:'service',id:'worker',roles:['worker'],responsibility:'Implement'}],policy:{requireEstimate:false,review:'independent'}});
  let serial=0;const run=async(command:any,client=service)=>client.execute('b',{operationId:'test-'+(++serial),expectedRevision:(await service.read('b')).revision,command});
- if(group){await run({type:'create-item',item:{id:'group',title:'Group',responsibility:'Coordinate',acceptance:'Delivered'},planning:{kind:'task',priority:2,dependencies:[],references:[]}});await run({type:'configure-automation',settings:{enabled:true,autoAccept:false,coordinator:{kind:'human',id:'admin'},worker:{kind:'service',id:'worker'},planner:{system:'external',id:'planner',revision:'1'},executor:{system:'external',id:'executor',revision:'1'}}});}
- await run({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'p',revision:1,sealed:true,...(group?{rootItemId:'group'}:{}),items:[{id:'source',...(group?{workType:'subtask'}:{}),title:'Implementation',responsibility:'Build',acceptance:'Evidence',assignee:{kind:'service',id:'worker'},dependsOn:[],outputs:[]},{id:'verify',...(group?{workType:'subtask'}:{}),title:'Acceptance',responsibility:'Check',acceptance:'Actual version',assignee:{kind:'service',id:'worker'},dependsOn:['source'],outputs:[]}]}});
+ await run({type:'create-item',item:{id:'group',title:'Group',responsibility:'Coordinate',acceptance:'Delivered'},planning:{kind:'task',priority:2,dependencies:[],references:[]}});
+ if(group){await run({type:'configure-automation',settings:{enabled:true,autoAccept:false,coordinator:{kind:'human',id:'admin'},worker:{kind:'service',id:'worker'},planner:{system:'external',id:'planner',revision:'1'},executor:{system:'external',id:'executor',revision:'1'}}});}
+ await run({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'p',revision:1,sealed:true,rootItemId:'group',items:[{id:'source',workType:'subtask',title:'Implementation',responsibility:'Build',acceptance:'Evidence',assignee:{kind:'service',id:'worker'},dependsOn:[],outputs:[]},{id:'verify',workType:'subtask',title:'Acceptance',responsibility:'Check',acceptance:'Actual version',assignee:{kind:'service',id:'worker'},dependsOn:['source'],outputs:[]}]}});
  await run({type:'prepare-dispatch',itemId:'source',dispatchId:'source-dispatch'},worker);let dispatch=(await service.workflow('b')).dispatches['source-dispatch'];
  await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:'succeeded',outputs:[]});await run({type:'accept-execution',dispatchId:dispatch.id,accept:true});
  await run({type:'prepare-dispatch',itemId:'verify',dispatchId:'failed-dispatch'},worker);dispatch=(await service.workflow('b')).dispatches['failed-dispatch'];
@@ -105,4 +106,45 @@ it('keeps an active blocked execution out of failed-task recovery and opens it w
  expect(await f.journal.get('task-recovery-session:failed-dispatch')).toBeUndefined();
  expect((await f.service.workflow('b')).dispatches['failed-dispatch'].outcome).toBe('running');
  await expect(f.recovery.recoverTask('b',{itemId:'verify',operationId:'retry-blocked',expectedRevision:state.revision,action:'retry'})).rejects.toMatchObject({code:'RECOVERY_TARGET_NOT_READY'});
+});
+
+it('reports missing tools, then rechecks after manual installation and continues the original failed dispatch',async()=>{
+ const f=await fixture();
+ await f.run({type:'link-reference',itemId:'verify',reference:{system:'nestos-remote-project',id:'project'}});
+ await f.journal.update('development-workspace:failed-dispatch',()=>({...f.original,context:{}}));
+ f.options.recheck={supports:()=>true,run:vi.fn().mockResolvedValueOnce(['tool:pnpm']).mockResolvedValueOnce([])};
+ const state=await f.recovery.taskRecovery('b','verify');
+ expect(state).toMatchObject({canRecheck:true,canRetry:false,sessionId:'canonical-session'});
+ const request={itemId:'verify',expectedRevision:state.revision,action:'recheck' as const};
+ const first={...request,operationId:'before-install'};
+ const blocked=await f.recovery.recoverTask('b',first);
+ expect(blocked).toMatchObject({state:'blocked',code:'WORKSPACE_PREREQUISITES_MISSING',missing:['tool:pnpm']});
+ expect((await f.service.workflow('b')).dispatches['failed-dispatch'].outcome).toBe('failed');
+ expect(Object.keys((await f.service.workflow('b')).dispatches)).toHaveLength(2);
+ expect(await f.recovery.recoverTask('b',first)).toEqual(blocked);
+ const after=await f.recovery.recoverTask('b',{...request,operationId:'after-install'});
+ expect(after.state).toBe('accepted');
+ expect((await f.service.workflow('b')).dispatches[after.dispatchId!]).toMatchObject({attempt:2,continuation:{previousDispatchId:'failed-dispatch'}});
+ expect(f.options.recheck.run).toHaveBeenCalledTimes(2);
+});
+
+it('rechecks a reported blocker and replies to the original issue without clearing it or creating a dispatch',async()=>{
+ const f=await fixture(false,true);
+ await f.run({type:'link-reference',itemId:'verify',reference:{system:'nestos-remote-project',id:'project'}});
+ await f.journal.update('development-workspace:failed-dispatch',()=>({...f.original,context:{}}));
+ const replyTask=vi.fn(async(_board:string,request:{operationId:string})=>{await f.journal.update('task-reply-delivered:'+request.operationId,()=>true);});
+ f.options.client=()=>({...f.service,replyTask});
+ f.options.recheck={supports:()=>true,run:vi.fn().mockResolvedValueOnce(['tool:npm']).mockResolvedValueOnce([])};
+ const state=await f.recovery.taskRecovery('b','verify');
+ expect(state).toMatchObject({state:'blocked',canRecheck:true});
+ const request={itemId:'verify',expectedRevision:state.revision,action:'recheck' as const};
+ expect(await f.recovery.recoverTask('b',{...request,operationId:'missing'})).toMatchObject({state:'blocked',missing:['tool:npm']});
+ expect(replyTask).not.toHaveBeenCalled();
+ const ready={...request,operationId:'available'};
+ expect(await f.recovery.recoverTask('b',ready)).toMatchObject({state:'accepted'});
+ expect(await f.recovery.recoverTask('b',ready)).toMatchObject({state:'accepted'});
+ expect(replyTask).toHaveBeenCalledExactlyOnceWith('b',expect.objectContaining({itemId:'verify',attemptId:'failed-dispatch',replyTo:'repository-registration-error'}));
+ const item=(await f.service.item('b','verify')).item;
+ expect(item.issues?.find(issue=>issue.id==='repository-registration-error')?.resolvedBy).toBeUndefined();
+ expect(Object.keys((await f.service.workflow('b')).dispatches)).toHaveLength(2);
 });

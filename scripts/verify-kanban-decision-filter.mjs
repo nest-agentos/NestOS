@@ -1,4 +1,4 @@
-const settings=process.argv[2]==='settings',learnings=process.argv[2]==='session-learnings';
+const planningRetry=process.argv[2]==='planning-retry',modules=process.argv[2]==='decision-modules',settings=process.argv[2]==='settings',learnings=process.argv[2]==='session-learnings';
 import {mkdtemp,writeFile,copyFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
@@ -23,7 +23,7 @@ await withTemporaryScope({scopeId:'kanban-filter-browser-'+randomUUID()},async s
   if(styles.outcome!=='succeeded')throw Error((await processOutput(undefined,styles.id)).output);
  }else await copyFile(resolve(root,queue||binding?'libraries/llm-ui/src/style.css':'libraries/kanban-ui/src/kanban.css'),join(directory,'kanban.css'));
  await writeFile(join(directory,'index.html'),'<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="kanban.css"><style>html,body{height:100%;margin:0}#editor{height:100%;min-height:0}#result{display:none}</style><body><main id="editor"></main><pre id="result"></pre><script src="fixture.js"></script></body>');
- const browser=await(await scope.start(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--user-data-dir='+join(directory,'profile'),'--window-size=1280,900','--virtual-time-budget=15000','--screenshot='+join(directory,'screenshot.png'),'--dump-dom','file://'+join(directory,'index.html')+(automatic?'#system-recovery':learnings&&process.argv[3]==='baseline'?'#baseline':'')],{cwd:root,timeoutMs:60000})).result;
+ const browser=await(await scope.start(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--user-data-dir='+join(directory,'profile'),'--window-size=1280,900','--virtual-time-budget=15000','--screenshot='+join(directory,'screenshot.png'),'--dump-dom','file://'+join(directory,'index.html')+(planningRetry?'#planning-retry':modules?'#decision-modules':automatic?'#system-recovery':learnings&&process.argv[3]==='baseline'?'#baseline':'')],{cwd:root,timeoutMs:60000})).result;
  const output=(await processOutput(undefined,browser.id)).output;await writeFile(join(directory,'browser.log'),output);
  const encoded=output.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1];
  if(browser.outcome!=='succeeded'||!encoded)throw Error('BROWSER_ACCEPTANCE_FAILED: '+directory);
@@ -33,4 +33,4 @@ await withTemporaryScope({scopeId:'kanban-filter-browser-'+randomUUID()},async s
  if(report.result!=='passed')throw Error('BROWSER_ASSERTION_FAILED: '+JSON.stringify(report));
  console.log(JSON.stringify({...report,artifacts:directory}));
 });
-console.log(JSON.stringify({operation:binding?'native.session-binding.browser':approval?'native.approval.browser':hierarchy?'kanban.task-hierarchy.browser':learnings?'kanban.session-learnings.browser':settings?'kanban.settings.browser':cancel?'kanban.operation-cancel.browser':progress?'kanban.operation-progress.browser':skips?'kanban.operation-skips.browser':finalization?'kanban.group-finalization.browser':automatic?'native.queue-system-recovery.browser':queue?'native.queue-recovery.browser':native?'kanban.native-activity.browser':'kanban.decision-filter.browser',result:'success',cleanup:'confirmed'}));
+console.log(JSON.stringify({operation:planningRetry?'kanban.planning-retry.browser':modules?'kanban.decision-modules.browser':binding?'native.session-binding.browser':approval?'native.approval.browser':hierarchy?'kanban.task-hierarchy.browser':learnings?'kanban.session-learnings.browser':settings?'kanban.settings.browser':cancel?'kanban.operation-cancel.browser':progress?'kanban.operation-progress.browser':skips?'kanban.operation-skips.browser':finalization?'kanban.group-finalization.browser':automatic?'native.queue-system-recovery.browser':queue?'native.queue-recovery.browser':native?'kanban.native-activity.browser':'kanban.decision-filter.browser',result:'success',cleanup:'confirmed'}));

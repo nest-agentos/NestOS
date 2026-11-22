@@ -4,22 +4,34 @@ import type {GitProcess as RemoteProcessHandle} from './contracts';
 import {gitWorkspace,type WorktreeRepository} from './worktree-modules';
 export interface ModuleProof {path:string;head:string;target:string;reasons:string[];ignoredPaths?:string[];retainedIgnored?:string[]}
 /** Git requires force for populated submodules; prove every retained commit and file first. */
-export async function inspectRemovalModules(process:RemoteProcessHandle,directory:string,authorized:WorktreeRepository[],approveIgnored?:(directory:string,paths:readonly string[])=>Promise<readonly string[]>) {
+export async function inspectRemovalModules(process:RemoteProcessHandle,directory:string,targetCommit:string,authorized:WorktreeRepository[],approveIgnored?:(directory:string,paths:readonly string[])=>Promise<readonly string[]>) {
+    requireValue(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(targetCommit),'WORKTREE_MODULE_TARGET_UNAVAILABLE');
     const listing=(await gitWorkspace(process,directory,['submodule','status','--recursive'])).stdout;
+    const paths=listing.split('\n').filter(line=>line&&!line.startsWith('-')).map(line=>line.slice(1).trim().split(' ')[1]).sort();
     const modules:ModuleProof[]=[];
-    for(const line of listing.split('\n').filter(line=>line&&!line.startsWith('-'))) {
-        const path=line.slice(1).trim().split(' ')[1];
+    for(const path of paths) {
         requireValue(!!path&&path.split('/').every(part=>/^[\w.-]+$/.test(part)&&part!=='.'&&part!=='..'),'WORKTREE_MODULE_SCOPE_INVALID');
         requireValue(authorized.some(row=>row.path===path||row.path!=='.'&&path.startsWith(row.path+'/')),'WORKTREE_MODULE_SCOPE_INVALID');
-        modules.push(await inspectModule(process,directory,path,approveIgnored));
+        const target=await pinnedModuleCommit(process,path,targetCommit,modules);
+        modules.push(await inspectModule(process,directory,path,target,approveIgnored));
     }
     requireValue(modules.length>0,'WORKTREE_MODULE_INSPECTION_UNKNOWN');
     return {modules,reasons:[...new Set(modules.flatMap(row=>row.reasons))],version:sha256HexSync(JSON.stringify(modules))};
 }
-async function inspectModule(process:RemoteProcessHandle,directory:string,path:string,approveIgnored:((directory:string,paths:readonly string[])=>Promise<readonly string[]>)|undefined):Promise<ModuleProof> {
+
+async function pinnedModuleCommit(process:RemoteProcessHandle,path:string,targetCommit:string,modules:ModuleProof[]):Promise<string> {
+    const parent=modules.filter(module=>path.startsWith(module.path+'/')).at(-1);
+    const repo=parent?'/workspace/'+parent.path:'/workspace';
+    const relative=parent?path.slice(parent.path.length+1):path;
+    const entry=await gitWorkspace(process,repo,['ls-tree',parent?.target??targetCommit,'--',relative],true);
+    const match=/^160000 commit ([a-f0-9]{40}|[a-f0-9]{64})\t(.+)$/.exec(entry.stdout.trim());
+    requireValue(entry.code===0&&match?.[2]===relative,'WORKTREE_MODULE_TARGET_UNAVAILABLE');
+    return match[1];
+}
+
+async function inspectModule(process:RemoteProcessHandle,directory:string,path:string,targetHead:string,approveIgnored:((directory:string,paths:readonly string[])=>Promise<readonly string[]>)|undefined):Promise<ModuleProof> {
     const source=directory+'/'+path,target='/workspace/'+path;
     const head=(await gitWorkspace(process,source,['rev-parse','--verify','HEAD^{commit}'])).stdout.trim();
-    const targetHead=(await gitWorkspace(process,target,['rev-parse','--verify','HEAD^{commit}'])).stdout.trim();
     const changed=(await gitWorkspace(process,source,['status','--porcelain=v1','--untracked-files=all','--ignore-submodules=none'])).stdout;
     const ignored=(await gitWorkspace(process,source,['ls-files','--others','--ignored','--exclude-standard','--directory','--no-empty-directory','-z'])).stdout;
     const ignoredPaths=ignored.split('\0').filter(Boolean),removable=await approveIgnored?.(source,ignoredPaths)??[];

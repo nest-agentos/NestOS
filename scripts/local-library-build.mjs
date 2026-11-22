@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, basename, resolve } from 'node:path';
 import { libraries } from './npm-libraries.mjs';
 import { packBuiltLibrary } from './library-artifacts.mjs';
 import { excluded, sourceHash, buildHash, preparedSnapshot, seededSnapshot, planSnapshot } from './local-library-plan.mjs';
 import state from './local-library-state.mjs';
+import {acquireLibraryLock} from './local-library-lock.mjs';
 import { buildSupportFiles } from './local-library-inputs.mjs';
 
 function captureLibrary(root, work, library, plan) {
@@ -66,21 +67,24 @@ function saveSnapshot(root, output, packages) {
 }
 function seedBase(root, operationId) {
     const seedRoot = process.env.NESTOS_LIBRARY_SEED_ROOT?.trim();
-    if (!seedRoot) return null;
+    if (!seedRoot || resolve(seedRoot) === resolve(root) || !existsSync(join(state.localRoot(seedRoot), 'prepared.json'))) return null;
+    let unlock;
     try {
+        unlock = acquireLibraryLock(state.localRoot(seedRoot), operationId);
         const snapshot = seededSnapshot(root, seedRoot);
         if (snapshot) console.log(`[local-libraries] operationId=${operationId} stage=plan-base result=seed id=${snapshot.id}`);
-        return snapshot;
+        return adoptSnapshot(root, snapshot);
     } catch (error) {
         console.log(`[local-libraries] operationId=${operationId} stage=plan-base result=seed-fallback code=${error.code} reason=${error.message}`);
         return null;
-    }
+    } finally {unlock?.();}
 }
 /** A seeded plan reuses another checkout's snapshot; keep a local copy so this checkout's pointer resolves. */
 function adoptSnapshot(root, snapshot) {
     if (!snapshot) return null;
     const destination = join(state.localRoot(root), 'snapshots', snapshot.id);
-    if (existsSync(destination)) return snapshot;
+    if (snapshot.directory === destination) return snapshot;
+    if (existsSync(destination)) return state.readSnapshot(root, snapshot.id);
     mkdirSync(join(state.localRoot(root), 'snapshots'), { recursive: true });
     cpSync(snapshot.directory, destination, { recursive: true });
     return state.readSnapshot(root, snapshot.id);

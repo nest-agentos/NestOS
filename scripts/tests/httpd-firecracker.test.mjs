@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {prepareRestartFirecracker} from '../httpd-firecracker.mjs';
+import {prepareRestartFirecracker, prepareRestartLocalCells} from '../httpd-restart-dependencies.mjs';
 
 const unit = 'firecracker-server.service';
 const server = '/usr/local/bin/firecracker-server';
@@ -58,4 +58,24 @@ test('does not query the VM inventory if the service fails to start', () => {
         throw Object.assign(new Error('private subprocess output'), {code: 'EXIT_1'});
     }), {code: 'EXIT_1', message: /^firecracker\.server\.start: EXIT_1\./});
     assert.deepEqual(calls, [status, start]);
+});
+
+test('starts the installed local Cells service only when inactive and confirms readiness', () => {
+    const local = 'nestos-cells-local.service';
+    const show = ['systemctl', ['show', '--property=LoadState,ActiveState', local]];
+    const startLocal = ['systemctl', ['start', local], true];
+    for (const [initial, expected] of [
+        [unitStatus('not-found', 'inactive'), [show]],
+        [unitStatus('loaded', 'active'), [show]],
+        [unitStatus('loaded', 'failed'), [show, startLocal, show]],
+    ]) {
+        const calls = [];
+        prepareRestartLocalCells('test-restart', (...call) => {
+            calls.push(call);
+            return calls.length === 1 ? initial : unitStatus('loaded', 'active');
+        });
+        assert.deepEqual(calls, expected);
+    }
+    assert.throws(() => prepareRestartLocalCells('test-restart', () => unitStatus('loaded', 'failed')),
+        {code: 'CELLS_LOCAL_NOT_ACTIVE', message: /^cells\.local\.start:/});
 });

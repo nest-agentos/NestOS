@@ -132,8 +132,14 @@ async function inspect(options: Options, boardId: string, resource: ResourceScop
     if (dispatch && ['prepared', 'running', 'unknown', 'succeeded'].includes(dispatch.outcome)) reasons.push('WORKTREE_IN_USE');
     if (!reasons.length) reasons.push(...await workResourceExecution(options, id, record.projectId));
     const version = sha256HexSync(JSON.stringify([state.version,modules?.version,temporary.version,item.revision,item.status,reasons]));
+    const unintegratedModules = (modules?.modules ?? []).filter(module => module.reasons.includes('WORKTREE_NOT_INTEGRATED')).map(module => ({
+        label: t('kanban.workResourceUnintegratedModule'), value: `${module.path} · ${module.head.slice(0, 12)} → ${module.target.slice(0, 12)}`,
+    }));
     return {...base, version, reasons, state: reasons.includes('WORKTREE_IN_USE') ? 'in-use' : reasons.length ? 'retained' : 'cleanup-ready',
-        canCleanup: reasons.length === 0, properties: [...base.properties,...retainedPaths.map(value=>({label:t('kanban.workResourceRetainedPath'),value})),...temporary.branches.map(branch=>({label:t('kanban.workResourceTemporaryBranch'),value:branch.repository+' · '+branch.name})), {label: t('kanban.workResourceTarget'), value: state.targetBranch},
+        canCleanup: reasons.length === 0, properties: [...base.properties, ...unintegratedModules,
+            ...retainedPaths.map(value=>({label:t('kanban.workResourceRetainedPath'),value})),
+            ...temporary.branches.map(branch=>({label:t('kanban.workResourceTemporaryBranch'),value:branch.repository+' · '+branch.name})),
+            {label: t('kanban.workResourceTarget'), value: state.targetBranch},
             ...(state.head ? [{label: 'HEAD', value: state.head.slice(0, 12)}] : [])]};
 }
 async function cleanup(options: Options, boardId: string, request: KanbanWorkResourceCleanup): Promise<KanbanWorkResource> {
@@ -175,7 +181,7 @@ async function remove(options: Options, resource: ResourceScope, boundary:GitRem
 async function removalState(process:import('../projects/remote-mounts').RemoteProcessHandle,resource:ResourceScope,branches:ManagedBranch[]=[]) {
     const state=await inspectWorktree(process,resource.tree,'_nestos/kanban/');
     const removable=disposableSoftwareFiles(state.ignoredPaths??[]);
-    const modules=state.initializedModules?await inspectRemovalModules(process,resource.tree.directory,[...resource.record.repositories??[],...resource.record.availableRepositories??[]],async(_directory,paths)=>disposableSoftwareFiles(paths)):undefined;
+    const modules=state.initializedModules?await inspectRemovalModules(process,resource.tree.directory,state.targetHead,[...resource.record.repositories??[],...resource.record.availableRepositories??[]],async(_directory,paths)=>disposableSoftwareFiles(paths)):undefined;
     const temporary=await inspectManagedBranches(process,branches);
     const reasons=[...temporary.reasons,...worktreeBlockers(state,removable).filter(reason=>reason!=='WORKTREE_INITIALIZED_MODULES'||!modules),...modules?.reasons??[]];
     const retainedPaths=[...(state.ignoredPaths??[]).filter(path=>!removable.includes(path)),...modules?.modules.flatMap(module=>(module.retainedIgnored??[]).map(path=>module.path+'/'+path))??[]];

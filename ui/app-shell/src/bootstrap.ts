@@ -368,7 +368,9 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
 
         if (strategyType === 'kanban') {
-            const module = createKanbanWorkspace({initialDecision:options.initialRead?.request.decision?{...options.initialRead.request.decision,...options.initialRead.decision}:undefined,service: services.kanban, sidebar: sidebarEl, editor: editorEl,
+            const initial=options.initialRead;
+            const module = createKanbanWorkspace({initialDecision:initial?.request.decision?{...initial.request.decision,...initial.decision}:undefined,
+                initialTask:initial?.request.task&&initial.task?{...initial.request.task,...initial.task}:undefined,service: services.kanban, sidebar: sidebarEl, editor: editorEl,
                 windows: windowBinding, initialResource, sessionUrl, referenceLink: kanbanReferenceLink(services.projects),
                 openSessionInteraction:sessionInteractionDialog(services.projects,id=>handleNavigationRequest({target:'chat',resourceId:id,options:{newTab:true}})),
                 selected: path => selectionHistory(elementId, path, 'push'),
@@ -867,7 +869,8 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const initialRevision = navigationRevision;
     options.onShellReady?.();
     await initialLoad;
-    cleanupFns.push(installAssistantMenu({services, backend, events:applicationEvents, documents: uiDocs, signal: navigationSignal,
+    const notificationBadge=options.initialRead?.request.task?{unread:options.initialRead.unreadNotifications?.value,read:backend.events?.notificationSummary?.bind(backend.events)}:undefined;
+    cleanupFns.push(installAssistantMenu({services, backend, events:applicationEvents, notificationBadge, documents: uiDocs, signal: navigationSignal,
         current: () => {
             const workspace = reverseRouteMap[visibleWorkspaceId ?? ''] ?? resolvedDefault;
             const resource = managerCache.get(visibleWorkspaceId ?? '')?.getActiveResourceId() ?? '';
@@ -896,7 +899,15 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         window.addEventListener('online', refresh, {signal: navigationSignal});
         window.addEventListener('focus', refresh, {signal: navigationSignal});
         document.addEventListener('visibilitychange', refresh, {signal: navigationSignal});
-        await applicationEvents.start();
+        if(options.startRemoteEvents) {
+            let timer:ReturnType<typeof setTimeout>|undefined;
+            const frame=requestAnimationFrame(()=>{
+                timer=setTimeout(()=>{void options.startRemoteEvents!().then(()=>applicationEvents.start()).catch(error=>{
+                    console.warn('[Boot] Deferred event connection failed', {code:(error as {code?:string})?.code??'EVENT_FEED_FAILED'});
+                });},0);
+            });
+            cleanupFns.push(()=>{cancelAnimationFrame(frame);clearTimeout(timer);});
+        } else await applicationEvents.start();
     }
     return {
         vfs,

@@ -1,3 +1,4 @@
+import {decisionModuleReference} from './decision-modules';
 import {validateDecisionDependencies} from '@nestos/kanban/integration';
 import {confirmRecordExecution,itemsWithinRoots,itemWithinRoots} from '@nestos/kanban/integration';
 import {conversationIssuesKey,conversationIssueView,type ConversationIssueState} from '../run/conversation-issues';
@@ -60,13 +61,16 @@ async function propose(options:DecisionConversationOptions,conversation:Decision
     requireValue(!scope||scope.length===value.projectIds.length&&value.projectIds.every(id=>scope.includes(id)),'DECISION_PROJECT_SCOPE_MISMATCH');
     const externalRefs=value.projectIds.map(id=>({system:REMOTE_PROJECT_REFERENCE,id}));await validateRemoteReferences(options.projects,{externalRefs});
     if(scope){decisionProjectScope(options.remote,conversation.binding.projectId,scope);externalRefs.push({system:PRIMARY_PROJECT_REFERENCE,id:conversation.binding.projectId});}
+    const modules=conversation.binding.modules??[];
+    externalRefs.push(...modules.map(decisionModuleReference));
     const selected=kanbanVerificationOptions(value.verificationMode),record:KanbanRecordInput={id:value.id,kind:'decision',...(dependsOn.length?{dependsOn}:{}),completion:'automatic',title:value.title,content:value.content,rationale:value.rationale,itemIds:[],externalRefs,discussionSessionId:conversation.resourceId,...selected,
+        ...(conversation.recurrence?{recurrence:conversation.recurrence}:{}),
         sources:[{sessionId:conversation.resourceId!,messageId:request.id,revision:channelDigest(request),role:'assistant'}]};
     const previous=await options.journal.get<Link>(linkKey(conversation.id));requireValue(!previous,'DECISION_ALREADY_CONFIRMED');
     requireValue([value.title,value.content,value.rationale].every(text=>typeof text==='string'&&text.trim().length>0),'DECISION_PROPOSAL_INVALID');
     const proposal={record,proposalDigest:channelDigest(record)};
     await options.journal.update<Proposal>(proposalKey(conversation.id),old=>{requireValue(!old||old.record.id===value.id,'DECISION_ID_IMMUTABLE');return {...proposal,lastActivityAt:old?.proposalDigest===proposal.proposalDigest?old.lastActivityAt:Date.now()};});
-    return {state:'draft',...proposal,confirmation:(await conversationPolicy(options.fs)).confirmDecision};
+    return {state:'draft',...proposal,...(modules.length?{modules}:{}),confirmation:(await conversationPolicy(options.fs)).confirmDecision};
 }
 async function confirm(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,previous?:Link) {
     const proposal=await options.journal.get<Proposal>(proposalKey(conversation.id)),digest=previous?.proposalDigest??proposal?.proposalDigest;
@@ -81,12 +85,12 @@ async function confirm(options:DecisionConversationOptions,conversation:Decision
         await command(options,conversation,request,{type:'append-record',record:proposal.record});
         link=await options.journal.update<Link>(linkKey(conversation.id),()=>({recordId:proposal.record.id,state:'draft',proposalDigest:digest}));
     }
-    const client=options.client();requireValue(client.runRecord,'RECORD_EXECUTION_UNAVAILABLE');
+    const client=options.client();
     const recordId=link.recordId;
     const run=await confirmRecordExecution(options.service,options.journal,{boardId:conversation.boardId,recordId,runKey:'decision-run-request:'+conversation.id,runOperationId:'decision-run-'+conversation.id,
         active:()=>options.active?.()!==false,commit:value=>command(options,conversation,request,value),
-        confirmed:async()=>{await options.journal.update<Link>(linkKey(conversation.id),old=>({...old!,state:'confirmed'}));},run:frozen=>client.runRecord!(conversation.boardId,frozen)});
-    return {recordId,state:'confirmed',execution:run};
+        confirmed:async()=>{await options.journal.update<Link>(linkKey(conversation.id),old=>({...old!,state:'confirmed'}));},run:frozen=>{requireValue(client.runRecord,'RECORD_EXECUTION_UNAVAILABLE');return client.runRecord(conversation.boardId,frozen);}});
+    return {recordId,state:'confirmed',...(run?{execution:run}:{executionMode:'recurring'})};
 }
 async function reviseTasks(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,link:Link) {
     const record=await options.service.record(conversation.boardId,link.recordId),value=request.params as {editId:string;recordRevision:number;items:any[];title:string;content:string;rationale:string};

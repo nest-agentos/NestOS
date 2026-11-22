@@ -112,3 +112,17 @@ it('reconciles an uncertain owned execution instead of presenting it as healthy 
  expect(resolveEffect).toHaveBeenCalledWith('child-session','owned',expect.objectContaining({effectId:'original',outcome:{type:'reconcile'}}));
  expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();expect(f.calls.prepareTaskCall).not.toHaveBeenCalled();
 });
+
+it('forwards a pending native approval during the original call observation without another read or submission',async()=>{
+ const f=await fixture(),observeApprovals=vi.fn(async()=>{});
+ const reader=(input:IndependentCallInput,observe?:(call:IndependentCallView)=>Promise<void>)=>
+    inspectIndependentCallExecution({calls:f.calls,kernel:{task:f.task}},input,observe);
+ const executor=createPublishedKanbanWorkExecutor({calls:f.calls,execution:{inspect:reader},prepareSession:f.prepareSession,observeApprovals,
+    binding:async()=>({target:{kind:'agent',id:'worker',version:'1',digest:'b'.repeat(64)}})});
+ f.view.callerState!.settled=false;
+ f.view.interactions={total:1,items:[{taskId:'worker',interactionId:'approval',kind:'approval',prompt:'Approval',promptTruncated:false,requestedAt:1}]};
+ expect(await executor.inspect(f.frozen)).toEqual({outcome:'running'});
+ expect(observeApprovals).toHaveBeenCalledWith(dispatch,f.view);
+ expect(f.calls.list).toHaveBeenCalledOnce();
+ expect(f.calls.submitPreparedTaskCall).not.toHaveBeenCalled();
+});

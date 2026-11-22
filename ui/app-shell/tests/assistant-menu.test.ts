@@ -11,21 +11,32 @@ const releases: Array<() => void> = [];
 afterEach(() => {for (const close of releases.splice(0)) close(); document.body.replaceChildren(); vi.restoreAllMocks();});
 const event = (id: string, kind: AssistantEvent['kind'] = 'completion', priority = 4): AssistantEvent => ({id, revision: 'v1', kind, source: 'sessions', title: '<img src=x onerror=alert(1)>',
     at: 1000, priority, requiresAction: kind === 'approval', target: {target: 'chat', resourceId: id}});
-function setup(initial = [event('done'), event('approval', 'approval', 0), event('failed', 'failure', 2), event('older')], state: AssistantMenuState = emptyAssistantState(), events?: {subscribe(listener:(events:readonly import('@nestos/app-contracts/services').ApplicationEventFact[])=>void):()=>void}) {
+function setup(initial = [event('done'), event('approval', 'approval', 0), event('failed', 'failure', 2), event('older')], state: AssistantMenuState = emptyAssistantState(), events?: {subscribe(listener:(events:readonly import('@nestos/app-contracts/services').ApplicationEventFact[])=>void):()=>void},notificationBadge?:Parameters<typeof installAssistantMenu>[0]['notificationBadge']) {
     document.body.innerHTML = '<aside class="app-sidebar"><div class="app-sidebar__brand">NestOS</div><ul class="main-nav-list"></ul></aside>';
     HTMLDialogElement.prototype.showModal = function () {this.open = true;};
     HTMLDialogElement.prototype.close = function () {this.open = false; this.dispatchEvent(new Event('close'));};
     const overview: AssistantOverview = {events: initial, scanners: [{id: 'scan', name: 'My scanner', workspaceId: 'team', workspaceName: 'Team'}], unavailable: []};
-    const write = vi.fn(), flush = vi.fn(async () => {}), navigate = vi.fn(async () => {}), assistantOverview = vi.fn(async () => structuredClone(overview));
+    const read = vi.fn(async () => state), write = vi.fn(), flush = vi.fn(async () => {}), navigate = vi.fn(async () => {}), assistantOverview = vi.fn(async () => structuredClone(overview));
     let changed!: (event?: {kind:string}) => void; const unsubscribe = vi.fn();
     const projects = {list: async () => [{project: {id: 'project'}, name: 'Project', path: '/renamed'}], get: vi.fn(async () => ({project: {id: 'project'}, path: '/renamed'}))};
     const abort = new AbortController();
-    releases.push(installAssistantMenu({events,backend: {assistantOverview} as never, services: {projects, kernel: {kernel: {onChanged: () => unsubscribe}},
+    releases.push(installAssistantMenu({events,notificationBadge,backend: {assistantOverview} as never, services: {projects, kernel: {kernel: {onChanged: () => unsubscribe}},
         sessionRepository: {subscribe: (callback: (event?: {kind:string}) => void) => {changed = callback; return unsubscribe;}, listSummaries: async () => [{id: 'existing', title: 'Existing', folder: '/renamed', updatedAt: 1}]}} as never,
-        documents: {read: async () => state, write, flush}, current: () => ({workspace: 'chat', resource: 'current', title: 'Current page'}), navigate, signal: abort.signal}));
+        documents: {read, write, flush}, current: () => ({workspace: 'chat', resource: 'current', title: 'Current page'}), navigate, signal: abort.signal}));
     const open = () => document.querySelector<HTMLButtonElement>('.assistant-launcher')!.click();
-    return {overview, write, flush, navigate, assistantOverview, open, changed: (event?: {kind:string}) => changed(event), abort, projects};
+    return {overview, read, write, flush, navigate, assistantOverview, open, changed: (event?: {kind:string}) => changed(event), abort, projects};
 }
+it('displays the bootstrapped notification count and leaves assistant details until opened',async()=>{
+    const summary=vi.fn(async()=>({unread:3})),subscribe=vi.fn(()=>()=>{});
+    const f=setup(undefined,undefined,{subscribe},{unread:2,read:summary});
+    expect(document.querySelector('[data-assistant-count]')?.textContent).toBe('2');
+    expect(f.assistantOverview).not.toHaveBeenCalled();expect(summary).not.toHaveBeenCalled();
+    expect(f.read).not.toHaveBeenCalled();
+    f.open();expect(f.read).toHaveBeenCalledOnce();await vi.waitFor(()=>expect(f.assistantOverview).toHaveBeenCalledOnce());
+    expect(summary).not.toHaveBeenCalled();
+    document.querySelector('dialog')!.close();
+    await vi.waitFor(()=>expect(document.querySelector('[data-assistant-count]')?.textContent).toBe('3'));
+});
 it('shows the same count on desktop/mobile, only previews the three most important items, and leaves approvals actionable', async () => {
     const f = setup(); await vi.waitFor(() => expect(document.querySelector('[data-assistant-count]')!.textContent).toBe('4'));
     expect(document.querySelectorAll('.assistant-launcher')).toHaveLength(2);

@@ -623,6 +623,32 @@ it('returns declared startup reads in the authenticated bootstrap without follow
  expect(posts).toEqual(['bootstrap','queries']);
 });
 
+it('opens the selected task with its child progress through the authenticated startup response',async()=>{
+ const root=await client('seed-task-snapshot'),service=root.services.kanban!;
+ const board=await service.create({id:'task-view',title:'Task view',scope:{kind:'system'},members:[{kind:'human',id:'admin',responsibility:'Manage',roles:['coordinator']}]});
+ await service.create({id:'other-view',title:'Other view',scope:{kind:'system'},members:[{kind:'human',id:'admin',responsibility:'Manage',roles:['coordinator']}]});
+ await service.execute(board.id,{operationId:'seed-manager',expectedRevision:board.revision,command:{type:'create-item',item:{id:'manager',taskType:'coordination',title:'Manage',responsibility:'Coordinate',acceptance:'Verify'}}});
+ const posts:string[]=[];
+ const streams:string[]=[],identities:(string|null)[]=[];
+ const fetcher:typeof fetch=async(input,init)=>{
+    if(String(input).includes('/api/application/events'))streams.push(String(input));
+    const response=await auth.fetcher(input,init);
+    if(init?.method==='POST'){posts.push(JSON.parse(String(init.body)).kind);identities.push(response.headers.get('X-NestOS-Authenticated-User'));}
+    return response;
+ };
+ const peer=new HttpViewClient('task-snapshot',server.origin+'/api/application',fetcher);clients.push(peer);
+ const task={boardId:board.id,itemId:'manager',includeSidebar:false},opened=await peer.start({initialRead:{task,eventBaseline:true},deferEvents:true});
+ const snapshot=opened.initialRead?.task?.value;
+ expect(snapshot).toMatchObject({detail:{item:{id:'manager'}},actor:{id:'admin'},children:{value:{total:0}}});
+ expect(snapshot?.sidebarIncluded).toBe(false);expect(snapshot?.boards.map(row=>row.id)).toEqual([board.id]);
+ expect(opened.initialRead?.eventBaseline?.value?.sequence).toBeTypeOf('number');
+ expect(opened.initialRead?.unreadNotifications?.value).toBeTypeOf('number');
+ expect(posts).toEqual(['bootstrap']);expect(identities).toEqual(['admin']);expect(streams).toEqual([]);
+ expect(await opened.services.kanban?.taskSnapshot?.(board.id,'manager')).toMatchObject({detail:{item:{id:'manager'}},sidebarIncluded:true,boards:expect.arrayContaining([expect.objectContaining({id:'other-view'})])});
+ expect(posts).toEqual(['bootstrap','queries']);
+ await Promise.all([peer.startDeferredEvents(),peer.startDeferredEvents()]);expect(streams).toHaveLength(1);
+});
+
 it('opens a file workbench with one observation and keeps component subscriptions local', async () => {
     const {WorkbenchSources} = await import('../../../ui/app-shell/src/projects/workbench-sources');
     const {folderBrowserPath} = await import('@nestos/app-contracts');

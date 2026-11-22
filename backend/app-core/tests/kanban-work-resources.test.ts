@@ -218,6 +218,37 @@ it('removes populated modules only after proving clean files and integration int
  expect(f.commands).toContainEqual(['worktree','remove','--force',f.tree.directory]);await expect(stat(f.physical)).rejects.toMatchObject({code:'ENOENT'});
  expect((await f.git(join(f.root,'library'),['status','--porcelain'])).stdout).toBe('');
 });
+it('cleans a worktree whose submodule is pinned by the target commit despite a divergent checkout',async()=>{
+    const f=await fixture(true),target=join(f.root,'library');
+    const pinned=(await f.git(f.root,['rev-parse','HEAD:library'])).stdout.trim();
+    await f.git(target,['switch','--orphan','local-checkout']);
+    await writeFile(join(target,'local.txt'),'Unrelated checkout');
+    await f.git(target,['add','local.txt']);
+    await f.git(target,['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','test: local only']);
+    const checkout=(await f.git(target,['rev-parse','HEAD'])).stdout.trim();
+    const [resource]=await f.api.workResources('board','item');
+    expect(resource.canCleanup).toBe(true);
+    expect(f.commands).toContainEqual(['merge-base','--is-ancestor',pinned,pinned]);
+    await f.api.cleanupWorkResource('board',{operationId:'pinned-module-clean',itemId:'item',resourceId:'ready',version:resource.version});
+    expect((await f.git(target,['rev-parse','HEAD'])).stdout.trim()).toBe(checkout);
+    await expect(stat(f.physical)).rejects.toMatchObject({code:'ENOENT'});
+});
+it('retains a submodule commit present only in the current checkout',async()=>{
+    const f=await fixture(true),source=join(f.physical,'library'),target=join(f.root,'library');
+    await writeFile(join(source,'file.txt'),'Worktree contribution');
+    await f.git(source,['add','file.txt']);
+    await f.git(source,['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','test: module contribution']);
+    const sourceHead=(await f.git(source,['rev-parse','HEAD'])).stdout.trim();
+    await f.git(f.physical,['commit','-am','test: pin contribution']);
+    await f.git(f.root,['merge','--no-ff','-s','ours','work/ready','-m','test: record root integration only']);
+    await f.git(target,['fetch',source,sourceHead]);
+    await f.git(target,['switch','--detach',sourceHead]);
+    const [resource]=await f.api.workResources('board','item');
+    expect(resource).toMatchObject({canCleanup:false,reasons:['WORKTREE_NOT_INTEGRATED']});
+    expect(resource.properties.some(row=>row.value.startsWith('library · '+sourceHead.slice(0,12)))).toBe(true);
+    expect(f.commands.some(args=>args[0]==='worktree'&&args[1]==='remove')).toBe(false);
+});
+
 it('allows ignored module files only within the settled owned software worktree',async()=>{
  const f=await fixture(true);await mkdir(join(f.physical,'library/cache'));await writeFile(join(f.physical,'library/cache/private'),'Retain');
  const resource=(await f.api.workResources('board','item'))[0];expect(resource).toMatchObject({canCleanup:true});
