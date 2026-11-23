@@ -1,11 +1,12 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {createServiceControl} from './index.mjs';
 import {packageArtifact,digest,save} from './artifact.mjs';
-import {redeploy, targetsFor} from './redeploy.mjs';
+import {redeploy, sameDirectory, sameExecutablePath, targetsFor} from './redeploy.mjs';
+import {command, serviceStorage} from './guest.mjs';
 async function fixture(t){
  const root=await mkdtemp(path.join(tmpdir(),'cells-delivery-'));t.after(()=>rm(root,{recursive:true,force:true}));
  await mkdir(root+'/tools/cells/target/release',{recursive:true});await writeFile(root+'/tools/cells/target/release/cells','candidate');
@@ -83,4 +84,55 @@ test('preflight failure prevents build and an unknown first restart prevents a s
  })});
  assert.equal(submissions,1);
  assert.deepEqual(pending.targets.map(row=>row.state),['running','skipped']);
+});
+
+test('does not replace or restart when the installed and running binary both match', async t => {
+ const f=await fixture(t);
+ const binary=await readFile(f.value.binary);
+ await writeFile(f.options.executable,binary);
+ f.setHash(f.value.value.sha256);
+ const request={...f.request,expectedVersion:(await f.control.describe()).version};
+ await f.verify();
+ await f.control.submit(request);
+ assert.equal(f.calls(),0);
+ assert.deepEqual(await f.control.inspect(request),{state:'succeeded',version:request.targetVersion,changed:false});
+ assert.deepEqual(await f.control.inspectOperation(request.operationId),{state:'succeeded',version:request.targetVersion,changed:false});
+});
+test('accepts aliases of the same checkout and rejects a different executable',async t=>{
+ const f=await fixture(t), root=f.options.root, alias=root+'/alias';
+ await symlink(root,alias);
+ await mkdir(root+'/other');
+ assert.equal(await sameDirectory(root,alias),true);
+ assert.equal(await sameDirectory(root,root+'/other'),false);
+ assert.equal(await sameExecutablePath(root+'/running (deleted)',alias+'/running'),true);
+ assert.equal(await sameExecutablePath(root+'/other/running',alias+'/running'),false);
+ assert.equal(await sameExecutablePath(root+'/different',alias+'/running'),false);
+});
+test('continues the second target when the first is unchanged', async t => {
+ const f=await fixture(t);
+ const order=[];
+ const report=await redeploy(f.options.root,targetsFor(),{build:async()=>f.value,controlFor:async (_root,target)=>({
+  describe:async()=>({version:'old'}),verifyArtifact:async()=>{},
+  submit:async()=>{order.push(target);},
+  inspect:async()=>({state:'succeeded',changed:target!=='cells-x1'}),
+ })});
+ assert.deepEqual(order,targetsFor());
+ assert.deepEqual(report.targets.map(row=>row.state),['unchanged','succeeded']);
+});
+
+test('installs a verified binary beside the private config and keeps the prior executable', async t => {
+ const f=await fixture(t);
+ const root=f.options.root;
+ await writeFile(root+'/cells','original');
+ await writeFile(root+'/cells.toml','private config',{mode:0o600});
+ const storage=serviceStorage(([file,...args],input)=>command(file,args,15000,input),root);
+ assert.equal(await storage.installedHash(),digest(Buffer.from('original')));
+ await assert.rejects(storage.install({...f.value,binary:root+'/cells.toml'},f.request),
+  {code:'CELLS_INSTALL_DIGEST_MISMATCH'});
+ assert.equal(await readFile(root+'/cells','utf8'),'original');
+ await assert.rejects(readFile(root+'/previous-'+f.request.operationId),{code:'ENOENT'});
+ await storage.install(f.value,f.request);
+ assert.equal(await storage.installedHash(),f.value.value.sha256);
+ assert.equal(await readFile(root+'/previous-'+f.request.operationId,'utf8'),'original');
+ assert.equal(await readFile(root+'/cells.toml','utf8'),'private config');
 });

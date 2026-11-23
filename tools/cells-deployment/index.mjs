@@ -2,10 +2,11 @@ import path from 'node:path';
 import {copyFile,rename,chmod,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {artifact,json,save,fail,validId,digest} from './artifact.mjs';
-import {command,ready,runningHash} from './guest.mjs';
+import {command,ready,runningHash,guestStorage,installedExecutable} from './guest.mjs';
 /** External business plugin: its private options grant access to exactly one managed VM. */
-export async function createServiceControl(options,ports={command,ready,hash:runningHash}){
+export async function createServiceControl(options,ports){
  if(!validId(options.id)||!validId(options.vm)||['root','executable','identity','stateDirectory','server'].some(key=>typeof options[key]!=='string'||!path.isAbsolute(options[key])))throw fail('CELLS_CONTROLLER_CONFIGURATION_INVALID');
+ ports??={command,ready,hash:runningHash,...(options.executable===installedExecutable?guestStorage(options):{})};
  await mkdir(options.stateDirectory,{recursive:true,mode:0o700});return new CellsDeployment(options,ports);
 }
 class CellsDeployment {
@@ -22,7 +23,11 @@ class CellsDeployment {
   const value=await artifact(this.options.root,id),proof=await this.read('artifact-'+id+'.json');
   if(!proof||proof.digest!==value.digest)throw fail('SERVICE_ARTIFACT_NOT_VERIFIED');return value;
  }
- async describe(){return {id:this.options.id,version:(await this.version()).id,build:{base:'source-checkout',directory:'.',command:['node','tools/cells-deployment/cli.mjs','build']},artifact:{format:'nestos.cells.release/1',manifest:'release.json',store:{base:'source-checkout',path:'release/cells'}}};}
+ async describe(){
+  const version=await this.version();
+  if(this.ports.installedHash)await this.ports.installedHash();
+  return {id:this.options.id,version:version.id,build:{base:'source-checkout',directory:'.',command:['node','tools/cells-deployment/cli.mjs','build']},artifact:{format:'nestos.cells.release/1',manifest:'release.json',store:{base:'source-checkout',path:'release/cells'}}};
+ }
  async verifyArtifact(request){
   const started=Date.now();
   try{if(request.serviceId!==this.options.id)throw fail('SERVICE_TARGET_MISMATCH');
@@ -35,7 +40,7 @@ class CellsDeployment {
   this.check(request);const row=await this.read('operation-'+request.operationId+'.json');
   if(!row)return {state:'running'};
   if(!sameRequest(row.request,request))throw fail('SERVICE_REQUEST_CHANGED');
-  if(row.state==='succeeded')return {state:'succeeded',version:request.targetVersion};
+  if(row.state==='succeeded'||row.state==='unchanged')return {state:'succeeded',version:request.targetVersion,...(row.state==='unchanged'?{changed:false}:{})};
   if(row.state==='failed')return {state:'failed',code:row.code};
   const started=Date.now();
   try{const value=await this.verified(request.targetVersion);
@@ -62,8 +67,14 @@ class CellsDeployment {
   try{
    const existing=await this.read('operation-'+request.operationId+'.json');if(existing){if(!sameRequest(existing.request,request))throw fail('SERVICE_REQUEST_CHANGED');return;}
    if(await this.read('pending.json'))throw fail('SERVICE_OPERATION_PENDING');
-   if((await this.version()).id!==request.expectedVersion)throw fail('SERVICE_VERSION_CHANGED');
+   const current=await this.version();
+   if(current.id!==request.expectedVersion)throw fail('SERVICE_VERSION_CHANGED');
    const value=await this.verified(request.targetVersion);
+   if(current.hash===value.value.sha256&&await this.installedHash()===current.hash){
+    await this.write('current.json',{version:request.targetVersion,sha256:current.hash});
+    await this.write('operation-'+request.operationId+'.json',{request,state:'unchanged'});
+    log(request,'service.switch','unchanged',undefined,started);return;
+   }
    await this.write('operation-'+request.operationId+'.json',{request,state:'running',startedAt:Date.now()});await this.write('pending.json',{operationId:request.operationId});
    await this.install(value,request);log(request,'service.restart','start',undefined,started);
    try{if(this.ports.restart)await this.ports.restart();
@@ -73,12 +84,23 @@ class CellsDeployment {
   }catch(error){log(request,'service.admission','failure',error.code??'SERVICE_OPERATION_BUSY',started);throw error;}finally{db.close();}
  }
  async install(value,request){
+  if(this.ports.install){
+   const started=Date.now();
+   try{await this.ports.install(value,request);log(request,'binary.install','success',undefined,started);}
+   catch(error){log(request,'binary.install','failure',error.code??'CELLS_BINARY_INSTALL_FAILED',started);throw error;}
+   return;
+  }
   const previous=await this.readExecutable();
   if(previous&&digest(previous)===value.value.sha256)return;
   if(previous&&this.options.keepPrevious)await this.backup(previous,request.operationId);
   const temporary=this.options.executable+'.'+request.operationId+'.tmp';
   await copyFile(value.binary,temporary);if(digest(await readFile(temporary))!==value.value.sha256)throw fail('SERVICE_ARTIFACT_CHANGED');
   await chmod(temporary,0o755);await rename(temporary,this.options.executable);
+ }
+ async installedHash(){
+  if(this.ports.installedHash)return this.ports.installedHash();
+  const bytes=await this.readExecutable();
+  return bytes&&digest(bytes);
  }
  async readExecutable(){
   try{return await readFile(this.options.executable);}catch(error){if(error.code!=='ENOENT')throw error;}

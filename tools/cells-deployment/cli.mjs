@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {createServiceControl} from './index.mjs';
 import {fail} from './artifact.mjs';
-import {build, redeploy, redeployStatus, targetsFor} from './redeploy.mjs';
+import {build, finishedTarget, redeploy, redeployStatus, targetsFor} from './redeploy.mjs';
 const root=fileURLToPath(new URL('../..',import.meta.url));
 try{
  const [verb, argument, operation, ...extra] = process.argv.slice(2);
@@ -15,7 +15,7 @@ try{
    ? await redeploy(root, targets)
    : await redeployStatus(root, targets, operation);
   console.log(JSON.stringify(report));
-  if (report.targets.some(row => row.state !== 'succeeded')) process.exitCode = 1;
+  if (!report.targets.every(finishedTarget)) process.exitCode = 1;
  } else if(verb==='describe'){
   const entries=JSON.parse(await readFile(homedir()+'/.config/nestos/service-modules.json','utf8')),selected=entries.find(entry=>entry.id===process.argv[3]);
   if(!selected)throw fail('SERVICE_TARGET_UNAVAILABLE');

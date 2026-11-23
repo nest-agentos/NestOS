@@ -1,4 +1,7 @@
 config.toml
+/tools/cells.toml
+/tools/cells.toml.backup-*.toml
+/tools/.cells.toml.edit.lock
 /tools/config.toml.backup-*.toml
 /tools/.config.toml.edit.lock
 itookit-vfs-server
