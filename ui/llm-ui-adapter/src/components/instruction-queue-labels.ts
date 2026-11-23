@@ -1,6 +1,8 @@
 import {t} from '@nestos/common';
 import type {InstructionQueueViewOptions} from '@nestos/llm-ui';
 
+export const NATIVE_COMMAND_CHANGED = 'HARNESS_COMMAND_CHANGED';
+
 export function instructionQueueLabels(): InstructionQueueViewOptions['labels'] {
     return {
         needsCheck: t('session.instructions.needsCheck'), stalled: t('session.instructions.stalled'),
@@ -24,6 +26,7 @@ export function instructionQueueLabels(): InstructionQueueViewOptions['labels'] 
             'execution-detached': t('session.instructions.reason.detached'), 'recovery-required': t('session.instructions.reason.recoveryRequired'),
             rejected: t('session.instructions.reason.rejected'),
             'branch-changed': t('session.instructions.reason.branch-changed'), recovery: t('session.instructions.reason.recovery'),
+            [NATIVE_COMMAND_CHANGED]: t('session.instructions.reason.commandChanged'),
             HARNESS_SESSION_BUSY: `HARNESS_SESSION_BUSY · ${t('chat.submission.occupied')}`},
     };
 }

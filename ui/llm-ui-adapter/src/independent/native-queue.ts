@@ -1,6 +1,7 @@
 import type {ConversationControls, ConversationQueueEdit, ConversationSnapshot} from '../contracts';
 
 import {NativeInstructionQueuePanel} from '../components/NativeInstructionQueuePanel';
+import {NATIVE_COMMAND_CHANGED} from '../components/instruction-queue-labels';
 import type {ImageChatOptions} from './image-chat-view';
 import {createModuleLogger, randomUUID, t} from '@nestos/common';
 
@@ -59,7 +60,7 @@ function queueMessageActions(queue: NativeQueuePort, borrowed: ImageChatOptions[
     return context => {
         const host = borrowed?.(context) ?? [], state = queue.snapshot();
         const item = state?.instructionQueue?.items.find(item => context.message.id === `operation:${item.id}`);
-        if (!item || item.state !== 'failed') return host;
+        if (!item || item.state !== 'failed' || item.error === NATIVE_COMMAND_CHANGED) return host;
         const expectedRevision = state!.instructionQueue!.revision;
         return [...host, {id: 'resubmit-send', label: t('session.instructions.retry'), disabled: !active() || !state?.canQueue,
             run: async () => {

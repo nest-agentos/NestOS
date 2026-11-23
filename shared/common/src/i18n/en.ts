@@ -3224,6 +3224,7 @@ export const en: LocaleStrings = {
     'session.instructions.editFailed': 'Queue update failed. Please retry.',
     'session.instructions.reason.failed': 'The previous execution failed. Resolve it before resuming the queue.',
     'session.instructions.reason.rejected': 'Some instructions were not submitted. “Resume queue” retries them and continues in order. You can also retry or remove individual items. Unknown outcomes must be reconciled first.',
+    'session.instructions.reason.commandChanged': 'The command definition changed, so the executor rejected this instruction before running it. Remove this entry and select the current command from the menu if you still need it.',
     'session.instructions.reason.aborted': 'The previous execution was stopped. Resume the queue when ready.',
     'session.instructions.reason.branch-changed': 'The session branch changed. Return to the queued branch before resuming.',
     'session.instructions.reason.recovery': 'The previous submission has no confirmed outcome. Check history first.',

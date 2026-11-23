@@ -2,6 +2,7 @@ import {formatDateTime} from '@nestos/ui-common';
 import type {ConversationInstructionQueue, ConversationSnapshot as NativeSnapshot} from '../contracts';
 import {getLocale, t} from '@nestos/common';
 import type {ChatMessage, ConversationSnapshot, OperationLedger} from '@nestos/llm-ui';
+import {NATIVE_COMMAND_CHANGED} from '../components/instruction-queue-labels';
 
 
 /** Queue edits change previews, never the immutable submitted input or its receipt. */
@@ -40,6 +41,7 @@ function queueMessage(item: ConversationInstructionQueue['items'][number], queue
 }
 
 function queueSummary(item: ConversationInstructionQueue['items'][number]): string {
+    if (item.error === NATIVE_COMMAND_CHANGED) return t('session.instructions.reason.commandChanged');
     if (item.error) return item.error === 'HARNESS_SESSION_BUSY' ? t('chat.submission.occupied') : item.error;
     const accepted = new Date(item.acceptedAt ?? NaN);
     if (Number.isFinite(accepted.getTime()) && accepted.getTime() > 0)

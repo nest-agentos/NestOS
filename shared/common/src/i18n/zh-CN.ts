@@ -3224,6 +3224,7 @@ export const zhCN = {
     'session.instructions.editFailed': '更新队列失败，请重试。',
     'session.instructions.reason.failed': '上一轮执行失败。处理后可继续队列。',
     'session.instructions.reason.rejected': '有指令未提交成功。点击“继续队列”会重新提交这些指令并按顺序继续，也可对单条点击“重新提交”或删除；结果未知的指令须先核对。',
+    'session.instructions.reason.commandChanged': '这条指令使用的命令定义已更新，执行器在提交前拒绝了它。请移除这条旧指令。如仍需执行，请从当前命令菜单重新选择。',
     'session.instructions.reason.aborted': '上一轮已停止。确认后可继续队列。',
     'session.instructions.reason.branch-changed': '会话分支已变化，请切回指令所属分支后继续。',
     'session.instructions.reason.recovery': '上次提交的结果尚未确认，请先核对历史记录。',
