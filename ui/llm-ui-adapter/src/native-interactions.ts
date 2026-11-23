@@ -43,6 +43,8 @@ function decisionLabel(id: string, site: boolean): string {
         if (id === 'decline') return t('harness.siteDeny');
     }
     if (['accept', 'allow', 'approve'].includes(id)) return t('harness.approve');
+    if (id === 'allowAllForSession') return t('harness.allowAllForSession');
+    if (id === 'allowRepeatedRead') return t('harness.allowRepeatedRead');
     if (id === 'acceptForSession') return t('harness.approveForSession');
     return t(id === 'cancel' ? 'harness.cancelInteraction' : 'harness.decline');
 }

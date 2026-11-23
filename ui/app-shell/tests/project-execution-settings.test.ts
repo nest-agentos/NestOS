@@ -18,3 +18,23 @@ it('renders profile labels safely and submits the originally read revision', asy
     await form.save();
     expect(setExecution).toHaveBeenCalledWith('p', project, {profile: 'dev', variables: {NAME:'Changed'}}, expect.any(Object));
 });
+
+it('saves approval defaults with their own revision and no environment remount', async () => {
+    const setExecution = vi.fn();
+    const setHarnessApprovals = vi.fn(async () => ({revision: 3, defaults: {claude: 'allowRead'}}));
+    const remote = {executionSettings: async () => ({
+        project: {id: 'p', revision: 7}, execution: {profile: null, variables: {}}, profiles: [],
+        harnessApprovals: {revision: 2, defaults: {codex: 'deny'}},
+    }), setExecution, setHarnessApprovals};
+    const form = await projectExecutionSettings(remote as never, 'p', new AbortController().signal);
+    const [codex, dsh, claude] = [...form.panel.querySelectorAll('fieldset select')];
+    expect(codex.value).toBe('deny');
+    expect([...dsh.options].map(option => option.value)).not.toContain('allowRead');
+    claude.value = 'allowRead';
+    expect(form.requiresRemount()).toBe(false);
+    await form.save();
+    expect(setExecution).not.toHaveBeenCalled();
+    expect(setHarnessApprovals).toHaveBeenCalledWith('p', {revision: 2, defaults: {
+        codex: 'deny', dsh: 'ask', claude: 'allowRead',
+    }}, expect.any(Object));
+});

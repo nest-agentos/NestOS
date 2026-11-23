@@ -330,6 +330,7 @@ export interface ProjectRemoteMountService {
     projectModels(projectId: string, profileId: string, options?: OperationOptions): Promise<HarnessContracts.HarnessModelCatalog>;
     refreshProjectBinding(projectId: string, options?: OperationOptions): Promise<void>;
     executionSettings(projectId: string, options?: OperationOptions): Promise<HarnessContracts.ProjectExecutionSettings & {project: HarnessContracts.RemoteProject}>;
+    setHarnessApprovals(projectId: string, settings: HarnessContracts.HarnessApprovalSettings, options?: OperationOptions): Promise<HarnessContracts.HarnessApprovalSettings>;
     setExecution(projectId: string, expected: HarnessContracts.RemoteProject, execution: HarnessContracts.ProjectEnvironment, options?: OperationOptions): Promise<void>;
     projectRemountOptions(projectId:string,options?:OperationOptions):Promise<{alias:string;path:string;roots:Array<{alias:string;access:'ro'|'rw'}>}>;
     rebindProject(projectId:string,directory:{alias:string;path:string;access:'ro'|'rw'},options?:OperationOptions):Promise<void>;

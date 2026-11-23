@@ -523,6 +523,20 @@ export class ProjectRemoteMountService {
             return {project, ...await client.executionSettings(project, options)};
         } finally { await client.close(); }
     }
+    async setHarnessApprovals(projectId: string, settings: import('@nestos/cells-driver').HarnessApprovalSettings, options?: OperationOptions) {
+        return this.trackProject('project.harness.approvals.configure', projectId, () => this.serial(async () => {
+            const root = this.list(projectId).find(mount => mount.at === '/');
+            if (!root?.connectionId || !root.serverProjectId || !this.provider.projects) throw new FSError('ECAPABILITY', 'Registered project required');
+            if (root.access !== 'rw') throw new FSError('EROFS', 'Project is read-only');
+            const client = this.provider.projects(await this.resolveConnection(root.connectionId, options));
+            try {
+                const project = await client.read(root.serverProjectId, options);
+                this.assertProjectGrant(projectId, root, project);
+                if (!client.setHarnessApprovals) throw new FSError('ECAPABILITY', 'Harness approval defaults unavailable');
+                return await client.setHarnessApprovals(project, settings, options);
+            } finally { await client.close(); }
+        }));
+    }
     async setExecution(projectId: string, expected: RemoteProject, execution: import('@nestos/cells-driver').ProjectEnvironment, options?: OperationOptions): Promise<void> {
         await this.trackProject('project.execution.configure', projectId, () => this.serial(async () => {
             await this.beforeChange(projectId);

@@ -31,7 +31,7 @@ async function openProjectSettings(projects: ProjectService, id: string, signal:
     const status = document.createElement('section'); form.panel.prepend(status); mountStatus?.(status,signal);
     await showNameDialog(`${t('project.settings')} · ${project.displayName ?? project.name}`, t('project.name'), signal, async name => {
         if (!name || /[/\\\0]/.test(name) || ['.','..','@sessions'].includes(name)) throw new Error(t('project.error.name'));
-        await beforeSave?.(project);
+        if (name !== project.name || form.requiresRemount?.() !== false) await beforeSave?.(project);
         await form.save();
         const latest = await projects.get(id);
         if (name !== latest.name) await projects.renameProject(latest.path, `${latest.parentPath ?? ''}/${name}`);
@@ -49,7 +49,7 @@ async function localEnvironment(projects: ProjectService, id: string) {
     }};
 }
 
-async function settingsEnvironment(projects: ProjectService,id: string,signal: AbortSignal,remote: boolean,recovery?: SettingsRecovery): Promise<{panel: HTMLElement; save(): Promise<void>}> {
+async function settingsEnvironment(projects: ProjectService,id: string,signal: AbortSignal,remote: boolean,recovery?: SettingsRecovery): Promise<{panel: HTMLElement; requiresRemount?(): boolean; save(): Promise<void>}> {
     const started = Date.now(), operationId = randomUUID();
     try {return remote ? await projectExecutionSettings(projects.remoteMounts!,id,signal) : await localEnvironment(projects,id);}
     catch (error) {
@@ -70,7 +70,7 @@ function unavailableEnvironment(projects: ProjectService,id: string,signal: Abor
     message.textContent = t(missingConnection ? 'project.connectionMissing' : missingBinding ? 'project.bindingMissing'
         : remote ? 'project.environmentUnavailable' : 'project.localEnvironmentUnavailable',{reason});
     panel.append(message,controls);
-    let current: {save(): Promise<void>} = {save: async () => {}}, busy = false;
+    let current: {requiresRemount?(): boolean; save(): Promise<void>} = {save: async () => {}}, busy = false;
     const button = (label: Parameters<typeof t>[0], action: () => Promise<void>) => {
         const element = document.createElement('button'); element.type = 'button'; element.textContent = t(label); controls.append(element);
         element.onclick = () => {
@@ -89,5 +89,5 @@ function unavailableEnvironment(projects: ProjectService,id: string,signal: Abor
     });
     if (remote && !missingBinding && !missingConnection && recovery?.remount) button('project.remountAndRetry',async () => {await recovery.remount!(); await reload();});
     button('application.retry',reload);
-    return {panel,save:async () => {if (busy) throw new Error(t('remote.state.checking')); await current.save();}};
+    return {panel,requiresRemount: () => current.requiresRemount?.() ?? true,save:async () => {if (busy) throw new Error(t('remote.state.checking')); await current.save();}};
 }
