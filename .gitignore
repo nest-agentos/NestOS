@@ -9,6 +9,8 @@ fs-svr
 priv/
 y.tgz
 yimg/
+cc-proxy
+cc-proxy.toml
 
 node_modules/
 # Library crate: the CLI Session Bash fixture builds it, but its lock file is not committed.

@@ -42,3 +42,21 @@ test('does not report successful deployment if the final runtime version is unhe
 test('rejects activation and unrelated build flags before side effects', async () => {
     const f = fixture(); await assert.rejects(f.run(['--share-main']), {code: 'HTTPD_DEPLOY_INVALID_OPTIONS'}); assert.equal(f.calls.length, 0);
 });
+
+test('skips switching when the build reuses the healthy running release', async () => {
+    const f = fixture();
+    const build = async () => f.state.currentRelease;
+    assert.equal(await deployHttpd('/source', '/releases', [], build, f.ports), 'before');
+    assert.deepEqual(f.calls, [['health', 'before'], ['health', 'before']]);
+    assert.equal(f.logs.at(-1).result, 'unchanged');
+});
+test('does not report unchanged if the launcher switched while building', async () => {
+    const f = fixture();
+    const build = async () => {
+        f.ports.read = async () => ({...f.state, currentRelease: 'changed'});
+        return 'before';
+    };
+    const ports = {...f.ports, read: () => f.ports.read()};
+    await assert.rejects(deployHttpd('/source', '/releases', [], build, ports), {code: 'HTTPD_VERSION_CHANGED'});
+    assert.deepEqual(f.calls, [['health', 'before']]);
+});

@@ -18,6 +18,14 @@ export async function deployHttpd(root, releases, args, build, overrides = {}) {
         report('success', {version: state.currentRelease});
         stage = 'build'; report('started');
         const version = await build([...args, '--no-activate']); report('success', {version});
+        if (version === state.currentRelease) {
+            stage = 'health';
+            const current = await ports.read();
+            if (current?.serviceId !== state.serviceId || current.currentRelease !== version || current.desiredState !== 'running')
+                throw launchFailure('HTTPD_VERSION_CHANGED');
+            if (!await health(version)) throw launchFailure('HTTPD_HEALTH_CHECK_FAILED');
+            report('unchanged', {version}); return version;
+        }
         stage = 'switch'; report('started', {version});
         await ports.switch([version, '--operation-id', operationId, '--expected-current', state.currentRelease, '--service-id', state.serviceId]);
         report('success', {version}); stage = 'health'; report('started', {version});
