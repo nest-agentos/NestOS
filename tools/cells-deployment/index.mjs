@@ -1,5 +1,5 @@
 import path from 'node:path';
-import {copyFile,rename,chmod,mkdir,readFile} from 'node:fs/promises';
+import {copyFile,rename,chmod,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {artifact,json,save,fail,validId,digest} from './artifact.mjs';
 import {command,ready,runningHash} from './guest.mjs';
@@ -51,6 +51,11 @@ class CellsDeployment {
   const db=new DatabaseSync(path.join(this.options.stateDirectory,'service-lock.sqlite'));
   try{db.exec('PRAGMA busy_timeout=0; BEGIN IMMEDIATE');return db;}catch{db.close();throw fail('SERVICE_OPERATION_BUSY');}
  }
+ async inspectOperation(operationId){
+  if(!validId(operationId))throw fail('SERVICE_REQUEST_INVALID');
+  const row=await this.read('operation-'+operationId+'.json');
+  return row ? this.inspect(row.request) : {state:'missing'};
+ }
  async inspect(request){const db=this.lock();try{return await this.observe(request);}finally{db.close();}}
  async submit(request){
   this.check(request);const started=Date.now(),db=this.lock();
@@ -61,15 +66,27 @@ class CellsDeployment {
    const value=await this.verified(request.targetVersion);
    await this.write('operation-'+request.operationId+'.json',{request,state:'running',startedAt:Date.now()});await this.write('pending.json',{operationId:request.operationId});
    await this.install(value,request);log(request,'service.restart','start',undefined,started);
-   try{await this.ports.command('sudo',['-n','systemctl','restart','firecracker-workload@'+this.options.vm+'.service'],120000);await this.observe(request);}
+   try{if(this.ports.restart)await this.ports.restart();
+    else await this.ports.command('sudo',['-n','systemctl','restart','firecracker-workload@'+this.options.vm+'.service'],120000);
+    await this.observe(request);}
    catch(error){log(request,'service.restart','failure',error.code??'SERVICE_SWITCH_UNKNOWN',started);}
   }catch(error){log(request,'service.admission','failure',error.code??'SERVICE_OPERATION_BUSY',started);throw error;}finally{db.close();}
  }
  async install(value,request){
+  const previous=await this.readExecutable();
+  if(previous&&digest(previous)===value.value.sha256)return;
+  if(previous&&this.options.keepPrevious)await this.backup(previous,request.operationId);
   const temporary=this.options.executable+'.'+request.operationId+'.tmp';
   await copyFile(value.binary,temporary);if(digest(await readFile(temporary))!==value.value.sha256)throw fail('SERVICE_ARTIFACT_CHANGED');
   await chmod(temporary,0o755);await rename(temporary,this.options.executable);
  }
+ async readExecutable(){
+  try{return await readFile(this.options.executable);}catch(error){if(error.code!=='ENOENT')throw error;}
+ }
+ async backup(bytes,operationId){
+  await writeFile(path.join(this.options.stateDirectory,'previous-'+operationId),bytes,{flag:'wx',mode:0o700});
+ }
+
 }
 function log(request,stage,result,code,started=Date.now()){console.info(JSON.stringify({operation:'cells.delivery',operationId:request.operationId,stage,result,code,durationMs:Date.now()-started}));}
 

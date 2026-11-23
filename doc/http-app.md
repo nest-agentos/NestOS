@@ -404,6 +404,7 @@ C4Component
 pnpm httpd:stop                # 按进程身份停止；先等待安全点，15 秒后强制退出并核对原进程身份
 pnpm httpd:restart             # 确认旧进程退出后启动已选 release；不自动构建
 pnpm httpd:build && pnpm httpd:restart # 先构建，成功后替换运行版本
+pnpm httpd:redeploy            # 构建、切换 HTTP release 并核验运行版本和健康状态
 pnpm httpd:stop --force        # 兼容参数；默认已在 15 秒超时后强制退出
 pnpm httpd:stop --timeout-ms 5000 # 缩短宽限期；宽限期上限为 15 秒
 pnpm httpd:stop --dev          # 停止源码宿主，和 release 独立登记
