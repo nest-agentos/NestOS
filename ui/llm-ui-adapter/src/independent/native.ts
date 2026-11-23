@@ -54,7 +54,9 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
     let preparedNotice = options.initial?.issues.commands ? {code: options.initial.issues.commands, message: t('harness.commandsPartial', {code: options.initial.issues.commands})}
         : options.initial?.issues.models ? {code: options.initial.issues.models, message: t('chatInput.model') + ' · ' + t('harness.observationFailed', {code: options.initial.issues.models})} : undefined;
     let closed = false, generation = 0, native: NativeSnapshot | undefined;
-    const capabilities = new NativeComposerCapabilities(options.controls, options.onError, options.initial);
+    const deferred = options.initial?.deferredMetadata === true;
+    let metadataReady = !deferred, active = true;
+    const capabilities = new NativeComposerCapabilities(options.controls, options.onError, deferred ? undefined : options.initial);
     const contributions = (state: NativeSnapshot) => options.commandProviders?.map(provider => ({source: provider.source, commands: provider.commands(state)})) ?? [];
     const commands = (state: NativeSnapshot) => capabilities.compose(state, contributions(state)).filter(command =>
         command.source.id !== 'harness' || !options.reservedNativeCommands?.includes(command.name));
@@ -86,9 +88,10 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
     };
     const metrics = new NativeMetricsObserver(options.controls, state => {
         if (!closed && native && native.sessionId === state.sessionId) publish({...native, metrics: state.metrics, metricsError: state.metricsError});
-    }, !!options.initial);
+    }, !!options.initial && !deferred);
+    if (deferred) metrics.setActive(false);
     const loadCapabilities = async (state: NativeSnapshot, force = false) => {
-        if (await capabilities.load(state, force) && !closed && native) publish(options.controls.snapshot?.() ?? native);
+        if (metadataReady && (!deferred || active) && await capabilities.load(state, force) && !closed && native) publish(options.controls.snapshot?.() ?? native);
     };
     const refresh = async (initial = false, forceCapabilities = true) => {
         if (forceCapabilities) preparedNotice = undefined;
@@ -261,7 +264,17 @@ export async function createNativeChatBinding(options: NativeChatBindingOptions)
             publishResponse(state, captured); return state;
         }),
         resolveSubmissionMode: (values?: Readonly<Record<string, string>>) => native ? capabilities.submissionMode(native, values) : 'send' as const,
-        setActive: (value: boolean) => metrics.setActive(value),
+        startMetadata: () => {
+            if (closed || metadataReady) return;
+            metadataReady = true;
+            metrics.setActive(active);
+            if (native) void loadCapabilities(native).catch(error => options.onError?.(error));
+        },
+        setActive: (value: boolean) => {
+            active = value;
+            metrics.setActive(value && metadataReady);
+            if (deferred && metadataReady && active && native) void loadCapabilities(native).catch(error => options.onError?.(error));
+        },
         resultError: () => native?.resultError,
         observationSnapshot: () => native,
         commandOutputs: {readCommandOutput: options.controls.readCommandOutput ? async (id: string, readOptions?: {offset?: number; limit?: number}) => {

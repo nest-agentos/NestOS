@@ -217,12 +217,15 @@ function navigationDOM(other = false) {
 
 it('starts at a lightweight page and loads a workspace only after choosing it', async () => {
     navigationDOM(); lifecycle.start.mockClear();
+    document.querySelector('.app-nav-btn')?.insertAdjacentHTML('afterbegin', '<span aria-hidden="true"></span>');
     const runtime = makeRuntime(), ready = vi.fn();
     const app = await initTestApp({ services: runtime, workspaces: [workspace], startPage: true, onShellReady: ready, ui: testUI() });
     try {
         expect(ready).toHaveBeenCalledOnce(); expect(location.hash).toBe('#/start');
         expect(lifecycle.start).not.toHaveBeenCalled(); expect(lifecycle.open).not.toHaveBeenCalled();
-        document.querySelector<HTMLButtonElement>('.app-start__choice')!.click();
+        const choice = document.querySelector<HTMLButtonElement>('.app-start__choice')!;
+        expect(choice.textContent).toBe('Settings');
+        choice.click();
         await vi.waitFor(() => expect(lifecycle.start).toHaveBeenCalledOnce());
         expect(location.hash).toBe('#/settings');
         HTMLDialogElement.prototype.showModal ??= function () {this.open = true;};

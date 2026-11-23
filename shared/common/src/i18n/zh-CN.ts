@@ -2588,6 +2588,7 @@ export const zhCN = {
     'workbench.reopen': '恢复关闭的标签',
     'workbench.close': '关闭标签',
     'workbench.pin': '固定',
+    'workbench.pinnedWorkspaceUnavailable': '此设备无法打开固定页面所属的工作区。',
     'workbench.unpin': '取消固定',
     'workbench.preview': '预览',
     'workbench.pending': '待保存',

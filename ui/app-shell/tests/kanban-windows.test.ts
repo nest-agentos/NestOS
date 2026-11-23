@@ -12,7 +12,8 @@ import {ShellApplicationEvents} from '../src/lifecycle/application-events';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); document.body.replaceChildren();});
-async function fixture(initialResource = '/board/b/card', shared?: {service: ReturnType<typeof createNestOSKanban>; events: UserEventService}) {
+async function fixture(initialResource = '/board/b/card', shared?: {service: ReturnType<typeof createNestOSKanban>; events: UserEventService},
+    bookmarks?: ConstructorParameters<typeof WorkbenchWindows>[1]) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
     const store = await SeqKanbanStore.open(await manager.openFileSystem('/'));
     const events = shared?.events ?? await UserEventService.open(await manager.openFileSystem('/'));
@@ -25,7 +26,7 @@ async function fixture(initialResource = '/board/b/card', shared?: {service: Ret
     await service.execute(board.id, {operationId: 'create', expectedRevision: board.revision+1, command: {type: 'create-item', item: {id: 'card', title: 'A long item title', responsibility: 'Work', acceptance: 'Done'},planning:{kind:'task',parentId:'management-root',priority:2,dependencies:[],references:[]}}});
     }
     const editor = document.createElement('main'), sidebar = document.createElement('aside'); document.body.append(sidebar, editor);
-    const registry = new WorkbenchWindows(), selected = vi.fn(), queries = vi.spyOn(service, 'queryActivity'); let workbench!: KanbanWindowWorkbench;
+    const registry = new WorkbenchWindows(undefined, bookmarks), selected = vi.fn(), queries = vi.spyOn(service, 'queryActivity'); let workbench!: KanbanWindowWorkbench;
     workbench = new KanbanWindowWorkbench({service, sidebar, editor, initialResource, selected, openSession: vi.fn(),
         windows: {registry, id: 'kanban', isActive: () => true, navigate: path => workbench.openResource(path)}});
     closes.push(() => workbench.destroy()); await workbench.start();
@@ -40,6 +41,31 @@ async function deleteBoard(f: Awaited<ReturnType<typeof fixture>>) {
     await f.service.execute('b',{operationId:'delete-b',expectedRevision:(await f.service.read('b')).revision,command:{type:'delete-board'}});
 }
 async function idle(active: () => HTMLElement) {await vi.waitFor(() => expect(active().hasAttribute('aria-busy')).toBe(false));}
+it('pins a decision page from More and only reads saved pages when another device opens its window list', async () => {
+    HTMLDialogElement.prototype.showModal ??= function () {this.open = true;};
+    HTMLDialogElement.prototype.close ??= function () {this.open = false; this.dispatchEvent(new Event('close'));};
+    const path = '/board/b/@decision';
+    const saved = {workspace: 'kanban', resource: path, title: 'Decisions'};
+    const set = vi.fn(async () => {}), list = vi.fn(async () => [saved]);
+    const first = await fixture(path, undefined, {set, list, navigate: vi.fn()});
+    const pin = first.active().querySelector<HTMLButtonElement>('.kanban__page-header .workbench-menu-pin')!;
+    expect(pin.getAttribute('aria-pressed')).toBe('false'); pin.click();
+    await vi.waitFor(() => expect(pin.getAttribute('aria-pressed')).toBe('true'));
+    expect(set).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({pinned: true, window: expect.objectContaining({resource: path})}));
+    let open: (resource: string) => Promise<void>;
+    const navigate = vi.fn(async (window: typeof saved) => open(window.resource));
+    const second = await fixture('/board/b', first, {set, list, navigate});
+    open = resource => second.workbench.openResource(resource);
+    expect(list).not.toHaveBeenCalled();
+    second.active().querySelector<HTMLButtonElement>('.kanban__page-header .workbench-window-list')!.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-opened-pin]')).not.toBeNull());
+    expect(list).toHaveBeenCalledOnce();
+    expect(navigate).not.toHaveBeenCalled();
+    document.querySelector<HTMLButtonElement>('[data-opened-pin] .workbench-tabs__opened-label')!.click();
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledExactlyOnceWith(saved));
+    await vi.waitFor(() => expect(second.workbench.getActiveResourceId()).toBe(path));
+    await vi.waitFor(() => expect(document.querySelector('.workbench-opened-sheet[open]')).toBeNull());
+});
 it('shares real opened windows with the shell and navigates item, board and catalog through the common header', async () => {
     const f = await fixture();
     await f.workbench.openResource('/board/b/card'); expect(f.queries).not.toHaveBeenCalled();

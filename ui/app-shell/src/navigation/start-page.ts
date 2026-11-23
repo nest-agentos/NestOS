@@ -14,7 +14,8 @@ export function installStartPage(workspaces: WorkspaceConfig[], signal: AbortSig
         const workspace = workspaces.find(ws => ws.elementId === nav.dataset.target);
         if (!workspace) return;
         const choice = document.createElement('button'); choice.type = 'button'; choice.className = 'app-start__choice';
-        choice.textContent = nav.querySelector('span')?.textContent ?? workspace.title ?? workspace.slug;
+        choice.textContent = nav.querySelector(':scope > span:not([aria-hidden="true"])')?.textContent?.trim()
+            || nav.getAttribute('aria-label')?.trim() || workspace.title || workspace.slug;
         choice.addEventListener('click', () => navigate(workspace.elementId), { signal }); choices.append(choice);
     });
     page.append(title, help, choices); (document.querySelector('.main-content-area') ?? document.body).append(page);

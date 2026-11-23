@@ -38,6 +38,8 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
     private announced?: string;
     private suspended = false;
     private timer?: ReturnType<typeof setTimeout>;
+    private metadataFrame?: number;
+    private metadataTimer?: ReturnType<typeof setTimeout>;
     private branches?: RemoteBranches;
     private historyBranches?: RemoteHistoryBranches;
     private readonly events = new Map<EditorEvent, Set<(payload: unknown) => void>>();
@@ -73,6 +75,14 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
         this.offSnapshot = this.binding.source.subscribe(() => this.announce()); this.announce();
         if (!this.handoff && this.options.initialInputState?.text) this.view.setText(this.options.initialInputState.text);
         this.options.signal?.throwIfAborted(); this.schedule(); this.emit('ready', undefined);
+        if (this.prepared?.deferredMetadata) this.scheduleMetadata();
+    }
+    private scheduleMetadata(): void {
+        this.metadataFrame = requestAnimationFrame(() => {
+            this.metadataTimer = setTimeout(() => {
+                if (!this.closed) this.binding?.startMetadata();
+            }, 0);
+        });
     }
     private async retainHandoff(): Promise<void> {
         const retained = new Set<string>();
@@ -199,7 +209,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
     restoreRecovery(value: unknown): void {this.view?.restoreRecovery(value as ReturnType<ChatView['captureRecovery']>);}
     destroy(): Promise<void> {
         return this.closing ??= disposeEditorResources([() => this.flushPendingSave(),
-            () => {this.closed = true; this.lifetime.abort(); clearTimeout(this.timer); this.offSnapshot?.();},
+            () => {this.closed = true; this.lifetime.abort(); clearTimeout(this.timer); clearTimeout(this.metadataTimer); if (this.metadataFrame !== undefined) cancelAnimationFrame(this.metadataFrame); this.offSnapshot?.();},
             () => this.owned ? this.view?.destroy() : undefined,
             () => this.historyBranches?.destroy(), () => this.binding?.dispose(), () => this.service.close(), () => this.events.clear()]);
     }

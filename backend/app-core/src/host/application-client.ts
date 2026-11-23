@@ -42,7 +42,7 @@ import { conversationBranches } from '@nestos/cells-driver';
 import { prepareWorkbenchView } from './workbench-view';
 import { openSessionView } from './session-view';
 import { observeConnections } from './connection-observation';
-import { readUiDocuments, writeUiDocuments } from './ui-documents';
+import { listPinnedWindows, readUiDocuments, setPinnedWindow, writeUiDocuments } from './ui-documents';
 import { ViewScope } from './view-scope';
 import {ResourceWorkbench} from './conversation-workbench';
 import { taskDetails, taskEvents, sessionTasks } from './task-view';
@@ -139,6 +139,8 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
         },
         readUiDocuments: names => readUiDocuments(vfs, names),
         writeUiDocuments: documents => writeUiDocuments(vfs, documents),
+        listPinnedWindows: () => listPinnedWindows(vfs),
+        setPinnedWindow: change => setPinnedWindow(vfs, change),
         settings: sources => settingsService(services, sources, options, scope),
         studyPromptPresets: async () => structuredClone(studyPrompts),
         listTextModels: () => listTextModels(agentService),

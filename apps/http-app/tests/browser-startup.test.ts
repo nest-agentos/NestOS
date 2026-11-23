@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import {URL as FileURL} from 'node:url';
 import {afterEach, expect, it, vi} from 'vitest';
 import {createStartupStatus, stylesReady} from 'nestos-web/startup';
 import {installStartupNavigation} from '../src/client/startup-navigation';
@@ -71,4 +74,19 @@ it('lets the pre-bootstrap navigation select a different startup target and rele
         stop();
         history.replaceState(null, '', '/');
     }
+});
+
+it.each([
+    ['#/kanban/%2Fboard%2Fpersonal%2Ftask-1', null, true],
+    ['#/notes/%2Fweekly.md', null, true],
+    ['#/notes/%2Fweekly.md', {resourceId: '/weekly.md', mobileView: 'list'}, false],
+    ['#/notes/%2Fweekly.md', {resourceId: '/other.md', mobileView: 'list'}, true],
+    ['#/workbench/%2F', null, false],
+    ['#/workbench', null, false],
+    ['', null, false],
+])('selects the startup presentation for %s', (hash, state, detail) => {
+    const dataset: Record<string, string> = {};
+    const script = readFileSync(new FileURL('../src/startup-presentation.js', import.meta.url), 'utf8');
+    runInNewContext(script, {location: {hash}, history: {state}, document: {documentElement: {dataset}}});
+    expect(Object.hasOwn(dataset, 'httpEntryDetail')).toBe(detail);
 });

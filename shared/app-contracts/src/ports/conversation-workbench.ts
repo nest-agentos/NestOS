@@ -10,6 +10,7 @@ export interface PreparedConversation {
     draft?: Awaited<ReturnType<NonNullable<ProjectConversationPort['readComposerDraft']>>>;
     models?: Awaited<ReturnType<NonNullable<ProjectConversationPort['models']>>>;
     commands?: Awaited<ReturnType<NonNullable<ProjectConversationPort['commands']>>>;
+    deferredMetadata?: boolean;
     issues: Partial<Record<'models' | 'commands' | 'metrics', string>>;
 }
 export interface WorkbenchOpenRequest {

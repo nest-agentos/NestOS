@@ -177,6 +177,25 @@ function fixture() {
         emit(update: Partial<ConversationSnapshot>) { state = { ...state, ...update }; listeners.forEach(listener => listener()); },
     };
 }
+it('uses the prepared history and defers native metadata until the editor has mounted', async () => {
+    const host = fixture(), pending = deferred<{models: []}>();
+    host.emit({sessionId: 'native', supportsModels: true, supportsSlashCommands: true, supportsMetrics: true,
+        messages: [{id: 'previous', role: 'assistant', text: 'Prepared history'}]});
+    const models = vi.fn(() => pending.promise), commands = vi.fn(async () => []);
+    const metrics = vi.fn(async () => host.state());
+    Object.assign(host.controls, {models, commands, refreshMetrics: metrics});
+    const binding = await createNativeChatBinding({...host.options, initial: {deferredMetadata: true, issues: {}}});
+    expect(binding.source.getSnapshot().messages).toHaveLength(1);
+    expect(host.read).not.toHaveBeenCalled();
+    host.emit({title: 'Updated before mount'});
+    for (const read of [models, commands, metrics]) expect(read).not.toHaveBeenCalled();
+    binding.startMetadata();
+    binding.startMetadata();
+    for (const read of [models, commands, metrics]) expect(read).toHaveBeenCalledOnce();
+    expect(binding.source.getSnapshot().messages).toHaveLength(1);
+    pending.resolve({models: []});
+    binding.dispose();
+});
 it('discards an older refresh result after a newer native update', async () => {
     const host = fixture(), binding = await createNativeChatBinding(host.options), pending = deferred<ConversationSnapshot>();
     host.refresh.mockReturnValueOnce(pending.promise); const refreshing = binding.source.refresh();

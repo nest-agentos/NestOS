@@ -1,7 +1,7 @@
 import {FSError} from '@nestos/vfs-core';
 import {folderBrowserPath, folderPathFromBrowserPath, resolveBrowserTarget} from '@nestos/app-contracts';
 import {createModuleLogger, randomUUID} from '@nestos/common';
-import type {ApplicationBackend, ConversationWorkbenchRequest, ConversationWorkbenchView, LocalApplicationServices, PreparedConversation, WorkbenchNavigationRequest, WorkbenchNavigationView, WorkbenchView} from '@nestos/app-contracts/services';
+import type {ApplicationBackend, ConversationWorkbenchRequest, ConversationWorkbenchView, LocalApplicationServices, PreparedConversation, ProjectFolder, WorkbenchNavigationRequest, WorkbenchNavigationView, WorkbenchView} from '@nestos/app-contracts/services';
 import {ViewScope} from './view-scope';
 import {ViewObservation} from './view-observation';
 import {prepareConversation} from './prepare-conversation';
@@ -31,20 +31,10 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             this.resourceId = request.resourceId;
             const target = resolveBrowserTarget(request.resourceId);
             const native = target.kind === 'remote' && !!target.nativeSessionId;
-            const chatControls = !['project-files', 'files', 'folder', 'favorites', 'favorite'].includes(target.kind);
+            const chatControls = !native && !['project-files', 'files', 'folder', 'favorites', 'favorite'].includes(target.kind);
             await this.prepareView(backend, request, chatControls);
             const folder = 'folder' in target ? target.folder : target.kind === 'folder' ? folderPathFromBrowserPath(target.path) : undefined;
-            if (folder) {
-                const project = await this.services.projects.forFolder(folder);
-                if (project) {
-                    this.selectProject(project.project.id);
-                    await this.workbench.connections?.update([...this.interests], ++this.interestRevision);
-                }
-            }
-            if (native) {
-                try {this.native = await this.openConversation(request.resourceId);}
-                catch (error) {this.failedOpening(request.resourceId, error);}
-            }
+            await this.prepareTarget(request.resourceId, folder, native);
             await this.eventSource.addChat(this.workbench);
             if (this.closed) throw new FSError('EIO', 'Workbench closed');
             this.cursor = this.eventSource.getViewCursor();
@@ -54,6 +44,14 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             const raw = (error as {code?: unknown})?.code;
             log.warn('resource.open', {operation: 'workbench.open', operationId, stage: 'prepare', result: 'failure', code: typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'WORKBENCH_OPEN_FAILED', durationMs: Math.round(performance.now() - started)});
             await this.dispose(); throw error;
+        }
+    }
+    private async prepareTarget(resourceId: string, folder: string | null | undefined, native: boolean): Promise<void> {
+        const project = folder ? await this.services.projects.forFolder(folder) : null;
+        if (project) await this.updateProjectInterest(project.project.id);
+        if (native) {
+            try { await this.openNativeConversation(resourceId, project ?? null); }
+            catch (error) { this.failedOpening(resourceId, error); }
         }
     }
     private async prepareView(backend: ApplicationBackend, request: ConversationWorkbenchRequest, chatControls: boolean): Promise<void> {
@@ -99,15 +97,17 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
     get observation(): ViewObservation {return this.eventSource;}
     eventSnapshot() {return this.eventSource.eventSnapshot();}
     subscribe(listener: Parameters<ViewObservation['observeView']>[1]) {return this.eventSource.observeView(this.eventSource.getViewCursor(), listener);}
-    async openConversation(resourceId: string): Promise<PreparedConversation> {
+    openConversation(resourceId: string): Promise<PreparedConversation> {
+        return this.openNativeConversation(resourceId);
+    }
+    private async openNativeConversation(resourceId: string, project?: ProjectFolder | null): Promise<PreparedConversation> {
         if (this.closed) throw new FSError('EIO', 'Workbench closed');
-        const prepared = await prepareConversation(this.services.projects, resourceId);
+        const prepared = await prepareConversation(this.services.projects, resourceId, project);
         if (this.closed) {await prepared.conversation.close(); throw new FSError('EIO', 'Workbench closed');}
         this.native = prepared; this.failure = undefined;
         await this.resources.own({dispose: () => prepared.conversation.close()});
         this.eventSource.addSource('conversation', listener => prepared.conversation.subscribe(() => listener({resourceId})));
-        this.selectProject(prepared.project.project.id);
-        await this.workbench.connections?.update(this.visible ? [...this.interests] : [], ++this.interestRevision);
+        if (project === undefined) await this.updateProjectInterest(prepared.project.project.id);
         return prepared;
     }
     async readNavigation(request: WorkbenchNavigationRequest): Promise<WorkbenchNavigationView> {
@@ -141,6 +141,10 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             const target = resolveBrowserTarget(path);
             return target.kind === 'folder' || target.kind === 'project-conversations';
         });
+    }
+    private async updateProjectInterest(projectId: string): Promise<void> {
+        this.selectProject(projectId);
+        await this.workbench.connections?.update(this.visible ? [...this.interests] : [], ++this.interestRevision);
     }
     private selectProject(projectId: string): void {
         for (const id of this.interests) if (id !== projectId) {

@@ -14,8 +14,9 @@ export default defineConfig({
         transformIndexHtml: { order: 'pre', handler() {
             const source = createRequire(import.meta.url).resolve('nestos-web/index.html');
             const navigationCss = readFileSync(new URL('./src/startup-navigation.css', import.meta.url), 'utf8');
+            const presentation = readFileSync(new URL('./src/startup-presentation.js', import.meta.url), 'utf8');
             return readFileSync(source, 'utf8')
-                .replace('</head>', `<style>${navigationCss}</style></head>`)
+                .replace('</head>', `<script>${presentation}</script><style>${navigationCss}</style></head>`)
                 .replace('<body data-app-starting>', '<body data-app-starting data-http-shell>')
                 .replace('<head>', '<head>\n<link rel="icon" href="data:,">')
                 .replace('src/styles/index.css', './src/style.css')

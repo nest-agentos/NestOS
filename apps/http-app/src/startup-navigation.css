@@ -45,6 +45,7 @@ body[data-http-shell]:not([data-http-nav-ready]) .main-nav-list > .app-nav-item-
 body[data-http-shell] > .app-startup { inset-inline-start: 96px; }
 
 @media (max-width: 768px) {
+    html[data-http-entry-detail] body[data-http-shell][data-app-starting] > .app-sidebar { display: none; }
     body[data-http-shell]:not([data-http-nav-ready]) > .app-sidebar {
         inset: auto 0 0;
         width: 100%;

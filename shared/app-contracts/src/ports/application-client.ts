@@ -74,6 +74,8 @@ export interface ApplicationBackend {
     saveAgentProjectScope(id: string, scope: import('./agent-project-scope').AgentProjectScope): Promise<void>;
     readUiDocuments(names: string[]): Promise<Record<string, unknown>>;
     writeUiDocuments(documents: Record<string, unknown>): Promise<void>;
+    listPinnedWindows?(): Promise<import('./pinned-windows').PinnedWindow[]>;
+    setPinnedWindow?(change: import('./pinned-windows').PinnedWindowChange): Promise<void>;
     settings(sources: readonly SettingsWorkspaceSource[]): Promise<SettingsPort>;
     ocr(): Promise<OcrService>;
     initialFiles(): Promise<NestosInitialFiles>;

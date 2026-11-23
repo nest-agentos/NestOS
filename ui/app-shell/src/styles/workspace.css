@@ -375,6 +375,10 @@
 .workbench-tabs__tab .workbench-tabs__pin, .workbench-tabs__tab .workbench-tabs__keep { opacity: 0; width: 27px; padding: 4px; }
 .workbench-tabs__tab:is(:hover, :focus-within) :is(.workbench-tabs__pin, .workbench-tabs__keep), .workbench-tabs__pin[aria-pressed="true"] { opacity: 1; }
 .workbench-tabs__pin[aria-pressed="true"] .workbench-icon { color: var(--primary-color, #6366f1); }
+.workbench-menu-pin:not([hidden]) { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.workbench-menu-pin:hover { background: var(--mm-sidebar-bg, #f1f5f9); }
+.workbench-menu-pin[aria-pressed="true"] .workbench-icon { color: var(--primary-color, #6366f1); }
+@media (max-width: 768px) { .workbench-menu-pin:not([hidden]) { min-height: 44px; } }
 .workbench-tabs__close { width: 27px; padding: 4px !important; }
 .workbench-tabs__state { color: var(--primary-color, #6366f1); font-size: 18px; }
 .workbench-tabs__opened-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--mm-border-color, #e5e7eb); font-size: 12px; }

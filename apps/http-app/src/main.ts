@@ -13,7 +13,9 @@ void import('./client/hosted-application')
     .then(module => module.startApplicationClient(message => startup.progress(message), () => {
         stopStartupNavigation();
         document.body.dataset.httpNavReady = '';
-        delete document.body.dataset.appStarting;
+        const mobileDetail = document.documentElement.hasAttribute('data-http-entry-detail')
+            && matchMedia('(max-width: 768px)').matches;
+        if (!mobileDetail) delete document.body.dataset.appStarting;
         startup.ready();
     }, connection))
     .catch(error => {

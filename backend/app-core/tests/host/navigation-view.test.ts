@@ -15,6 +15,21 @@ async function fixture() {
     const backend = bindApplicationBackend({ vfs: manager } as LocalApplicationServices);
     return { manager, fs, backend };
 }
+it('shares pinned pages across clients without losing concurrent changes or crossing accounts', async () => {
+    const {manager, backend} = await fixture(), other = await fixture();
+    const second = bindApplicationBackend({vfs: manager} as LocalApplicationServices);
+    const decision = {workspace: 'kanban-workspace', resource: '/board/development/@decision', title: 'Decisions'};
+    const notes = {workspace: 'notes-workspace', resource: '/note.md', title: 'Note'};
+    expect(await second.listPinnedWindows!()).toEqual([]);
+    await Promise.all([
+        backend.setPinnedWindow!({operationId: 'pin-decision', window: decision, pinned: true}),
+        second.setPinnedWindow!({operationId: 'pin-notes', window: notes, pinned: true}),
+    ]);
+    expect(await second.listPinnedWindows!()).toEqual([notes, decision]);
+    expect(await other.backend.listPinnedWindows!()).toEqual([]);
+    await second.setPinnedWindow!({operationId: 'unpin-notes', window: notes, pinned: false});
+    expect(await backend.listPinnedWindows!()).toEqual([decision]);
+});
 it('aggregates preferences and root metadata without reading file bodies and shares warm reads across clients', async () => {
     const f = await fixture();
     await f.backend.writeUiDocuments({ 'notes-workspace.ui': { version: 1 }, 'notes-workspace.workbench': { version: 1, tabs: [] } });

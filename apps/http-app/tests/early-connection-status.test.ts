@@ -26,8 +26,11 @@ async function connection() {
         corrupt: () => controller.enqueue(new TextEncoder().encode('data: invalid\n\n')), expire: () => {expired = true;}};
 }
 
-it('boots a task from one response, then pins subsequent requests to that response identity',async()=>{
-    history.replaceState({},'', '/#/kanban/'+encodeURIComponent('/board/tasks/manager'));
+it.each([
+    {slug: 'kanban', resource: '/board/tasks/manager'},
+    {slug: 'workbench', resource: '/folder:x1/@harness/codex/native-session'},
+])('boots $slug before SSE and pins later requests to the authenticated bootstrap identity', async ({slug, resource}) => {
+    history.replaceState({}, '', '/#/' + slug + '/' + encodeURIComponent(resource));
     const host=new RpcPeer('server',async()=>({}));releases.push(()=>host.close());
     const bootstrap=await host.bootstrap({backend:{},services:{projects:{}}});
     const fetcher=vi.fn(async(input:unknown,_init?:RequestInit)=>{
@@ -39,7 +42,11 @@ it('boots a task from one response, then pins subsequent requests to that respon
     await client.ready;
     expect(fetcher).toHaveBeenCalledOnce();
     const [route,init]=fetcher.mock.calls[0];
-    expect(route).toBe('/api/application');expect(JSON.parse(String(init?.body)).initialRead.task).toEqual({boardId:'tasks',itemId:'manager'});
+    expect(route).toBe('/api/application');
+    const packet = JSON.parse(String(init?.body));
+    if (slug === 'kanban') expect(packet.initialRead.task).toEqual({boardId: 'tasks', itemId: 'manager'});
+    else expect(packet.initialView).toMatchObject({resourceId: resource, documents: ['theme', 'session-browser:v1:admin.ui', 'session-browser:v1:admin.workbench'],
+        workbench: {initialNavigation: false}});
     expect(new Headers(init?.headers).has('X-NestOS-User')).toBe(false);
     await client.startDeferredEvents!();
     expect(fetcher.mock.calls[1][0]).toMatch(/\/events\?.*&after=0/);

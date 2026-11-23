@@ -172,7 +172,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         requestDelete: targets => deletionDialog.request(targets),
     });
     cleanupFns.push(() => settings.close());
-    const createChatFactory = (controls: import('@nestos/app-contracts/services').WorkbenchChatControls): EditorFactory => {
+    const createChatFactory = (controls?: import('@nestos/app-contracts/services').WorkbenchChatControls): EditorFactory => {
         const factory = options.ui.createChatEditor(agentService, {
             defaultHarnessToolIds: DEFAULT_HARNESS_TOOL_IDS, sessionManager, sessionRepository, ocr, commandBus,
             kernel: kernel.kernel, readTaskAttachment: backend.taskAttachment?.bind(backend), ...controls,
@@ -291,7 +291,16 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
 
     const navigationObservers = new Map<WorkspaceController, () => void>();
     let visibleWorkspaceId: string | undefined;
-    const windows = new WorkbenchWindows(mountApplicationNavigation); windows.query = options.recovery?.openedQuery ?? '';
+    const windows = new WorkbenchWindows(mountApplicationNavigation, backend.listPinnedWindows && backend.setPinnedWindow ? {
+        list: () => backend.listPinnedWindows!(),
+        set: change => backend.setPinnedWindow!(change),
+        navigate: async window => {
+            const workspace = workspaces.find(candidate => candidate.elementId === window.workspace);
+            if (!workspace) throw new Error(translate('workbench.pinnedWorkspaceUnavailable'));
+            await handleNavigationRequest({target: workspace.slug, resourceId: window.resource}, true);
+        },
+    } : undefined);
+    windows.query = options.recovery?.openedQuery ?? '';
     let navigationRevision = 0, closed = false;
     // Deduplicate concurrent loads: if the same workspace is loading, reuse the promise.
     const pendingLoads = new Map<string, Promise<WorkspaceController | undefined>>();
@@ -436,7 +445,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             const target = resourcePath ? resolveBrowserTarget(resourcePath) : undefined;
             const initialOpening = opened?.conversationWorkbench;
             const preparedLocal = !!target && target.kind === 'session' && opened?.initial?.sessionId === target.sessionId;
-            const opening = initialOpening && (initialOpening.resourceId ?? initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === initialResource ? initialOpening
+            const opening = initialOpening && (initialOpening.resourceId ?? initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === (resourcePath ?? initialResource) ? initialOpening
                 : target && !preparedLocal && backend.openWorkbench
                 ? await backend.openWorkbench({resourceId: resourcePath!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore'})
                 : target && target.kind === 'remote' && target.nativeSessionId && backend.openConversationWorkbench

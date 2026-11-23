@@ -1,5 +1,5 @@
 export {initialViewRequest} from './lifecycle/initial-view';
-export {INITIAL_CHAT_DOCUMENTS} from './persistence/documents';
+export {INITIAL_CHAT_DOCUMENTS, INITIAL_NATIVE_CHAT_DOCUMENTS} from './persistence/documents';
 export {parseWorkspaceHash} from './navigation/workspace-hash';
 
 export {setFileRecoveryOwner} from './persistence/file-recovery-store';

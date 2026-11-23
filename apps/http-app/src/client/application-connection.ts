@@ -11,7 +11,7 @@ export type {ConnectionState} from './connection-status';
 export function connectApplication() {
     const listeners = new AbortController(), status = new ConnectionStatus(), route = initialView(location.hash);
     const tracing = new BrowserRequestTrace(); tracing.bindNavigation(listeners.signal);
-    const deferEvents=!!route.initialRead?.task;
+    const deferEvents=!!route.initialRead?.task || route.nativeConversation;
     const pinUser=(userId:string)=>{setFileRecoveryOwner(userId);tracing.restore(userId);};
     const identity=deferEvents?undefined:resolveUser(listeners.signal);
     const fetcher=tracing.wrap(identity?authenticatedFetch(identity):authenticatedStartupFetch(pinUser));

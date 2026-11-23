@@ -25,6 +25,21 @@ function models() {
         getFullProvider: async (id: string) => providers.find(provider => provider.id === id),
         onChange: (listener: () => void) => { changed = listener; return () => { changed = () => {}; }; } };
 }
+it('exposes pinned pages as one explicit query and sends pin changes as commands', async () => {
+    const window = {workspace: 'kanban-workspace', resource: '/board/development/@decision', title: 'Decisions'};
+    const backend = {workbenchView() {}, toolboxView() {}, taskDetails() {},
+        listPinnedWindows: vi.fn(async () => [window]), setPinnedWindow: vi.fn(async () => {})};
+    const {client, root, calls} = await pair({backend});
+    expect(backend.listPinnedWindows).not.toHaveBeenCalled();
+    const change = {operationId: 'pin-decision', window, pinned: true};
+    await root.backend.setPinnedWindow(change);
+    expect(backend.listPinnedWindows).not.toHaveBeenCalled();
+    expect(await root.backend.listPinnedWindows()).toEqual([window]);
+    expect(backend.setPinnedWindow).toHaveBeenCalledExactlyOnceWith(change);
+    expect(calls.map(call => call.method)).toEqual(['setPinnedWindow', 'listPinnedWindows']);
+    expect(client.remoteQuery(calls[0])).toBe(false);
+    expect(client.remoteQuery(calls[1])).toBe(true);
+});
 it('does not recompute unrelated configuration snapshots for repeated reads or file writes', async () => {
     const model = models();
     const files = { getNode: async () => null, getChildren: async () => [], search: async () => [], writeContent: async () => {} };

@@ -1,4 +1,5 @@
 import { SessionWorkbench } from '../src/projects/SessionWorkbench';
+import {WorkbenchSources} from '../src/projects/workbench-sources';
 import { bindApplicationBackend } from '@nestos/app-core/host';
 // @vitest-environment jsdom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -29,7 +30,10 @@ afterEach(() => {
     }
 });
 
-it('browses mounted native history pages, opens their conversations and routes a project draft remotely', async () => {
+it.each([
+    ['opens a cold native conversation once with no local chat configuration', true],
+    ['browses mounted native history pages, opens their conversations and routes a project draft remotely', false],
+] as const)('%s', async (_name, coldOpen) => {
     const files = new MemoryBackend(); await files.mkdir('/project');
     const fileSource = await createFileSystemSource({backend: files, viewId: 'server-files', access: 'rw'});
     const record = {id:'server-project',name:'Notes',alias:'docs',path:'project',access:'rw' as const,revision:1,mounts:[]};
@@ -72,6 +76,27 @@ it('browses mounted native history pages, opens their conversations and routes a
     try {
         const remote=runtime.projects.remoteMounts!,connection=await remote.saveConnection({name:'Server',endpoint:'https://files.test',username:'u'},'secret');
         const project=await runtime.projects.createRemote('Notes',null,connection,'/docs/project','rw');
+        if (coldOpen) {
+            const resourceId = remoteSessionPath(project.path, 'codex', 'native');
+            const opening = await backend.openWorkbench!({resourceId, documents: []});
+            const sources = new WorkbenchSources(opening), prepareLocalChat = vi.spyOn(opening, 'prepareChat');
+            const coldEditor = document.createElement('div'), coldSidebar = document.createElement('div');
+            document.body.append(coldEditor, coldSidebar);
+            const cold = new SessionWorkbench({backend, sidebar: coldSidebar, container: coldEditor,
+                repository: runtime.sessionRepository, files: runtime.sessionFiles, projects: runtime.projects, kernel: runtime.kernel.kernel,
+                createFactory: () => factory, onSelect() {}, initialResource: resourceId, deferNavigation: true, opening, sources});
+            const nativeReads = vi.mocked(peer.read).mock.calls.length;
+            try {
+                await cold.start();
+                await cold.openResource(resourceId);
+                expect(coldEditor.textContent).toContain('Remote native history');
+                expect(prepareLocalChat).not.toHaveBeenCalled();
+                expect(peer.read).toHaveBeenCalledTimes(nativeReads);
+            } finally {
+                sources.close(); await cold.destroy(); await opening.dispose(); coldEditor.remove(); coldSidebar.remove();
+            }
+            return;
+        }
         const preview = (resource: string) => projectConversationEntryPath(projectConversationsPath(project.path, {recent: true}), resource);
         await workbench.start();
         const selector = sidebar.querySelector<HTMLSelectElement>(`select[aria-label="${t('project.workspace')}"]`)!;

@@ -27,25 +27,18 @@ const request = {resourceId: '/folder:P/@harness/native/native', documents: ['la
 it('prepares fresh read models, observes once and releases all owned resources', async () => {
     const f = fixture(), view = await new ConversationWorkbench(f.services).initialize(f.backend, request);
     expect(view.documents).toEqual({layout: {version: 1}}); expect(view.native?.draft).toEqual({revision: 'r1', data: '{}'});
-    for (const method of ['read', 'readComposerDraft', 'models', 'commands', 'refreshMetrics'] as const) expect(f.conversation[method]).toHaveBeenCalledOnce();
+    for (const method of ['read', 'readComposerDraft'] as const) expect(f.conversation[method]).toHaveBeenCalledOnce();
+    for (const method of ['models', 'commands', 'refreshMetrics'] as const) expect(f.conversation[method]).not.toHaveBeenCalled();
+    expect(view.native?.deferredMetadata).toBe(true);
+    expect(f.backend.workbenchView).toHaveBeenCalledWith(expect.objectContaining({chatControls: false, initialNavigation: false}));
+    expect(f.projects.forFolder).toHaveBeenCalledExactlyOnceWith('/P');
+    expect(f.connections.update).toHaveBeenCalledOnce();
     expect(f.conversation.send).not.toHaveBeenCalled(); expect(f.conversation.respond).not.toHaveBeenCalled(); expect(f.conversation.interrupt).not.toHaveBeenCalled();
     const received = vi.fn(), off = await view.subscribe(received);
     for (const listener of f.nativeListeners) listener();
     expect(received).toHaveBeenCalledWith(expect.objectContaining({topic: 'conversation', value: {resourceId: request.resourceId}}));
     off(); await view.dispose(); await view.dispose();
     expect(f.conversation.close).toHaveBeenCalledOnce(); expect(f.browser.dispose).toHaveBeenCalledOnce(); expect(f.connections.dispose).toHaveBeenCalledOnce(); expect(f.nativeListeners.size).toBe(0);
-});
-it('keeps optional metadata failures separate and bounds a non-settling metadata source', async () => {
-    vi.useFakeTimers(); const f = fixture();
-    f.conversation.models.mockRejectedValueOnce(new FSError('EACCES', 'Private metadata'));
-    f.conversation.commands.mockImplementationOnce(() => new Promise(() => {}));
-    try {
-        const opening = new ConversationWorkbench(f.services).initialize(f.backend, request);
-        await vi.advanceTimersByTimeAsync(1500); const view = await opening;
-        expect(view.native?.issues).toEqual({models: 'EACCES', commands: 'WORKBENCH_METADATA_TIMEOUT'});
-        expect(view.native?.conversation.snapshot().sessionId).toBe('native'); expect(view.failure).toBeUndefined();
-        await view.dispose();
-    } finally {vi.useRealTimers();}
 });
 it('keeps a denied conversation local to its view while navigation and another conversation remain usable', async () => {
     const f = fixture(); f.conversation.read.mockRejectedValueOnce(new FSError('EACCES', 'Denied'));

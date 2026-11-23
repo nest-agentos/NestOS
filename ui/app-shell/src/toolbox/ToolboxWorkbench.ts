@@ -19,7 +19,7 @@ import { CategoryFilters } from './category-filters';
 import { NavigationFilters } from '../workbench/navigation-filters';
 import { type VFSUIShell, type VFSNodeUI, type VFSToolbarContext, type UIPersistencePort } from '@nestos/vfs-ui';
 import type { IFileSystem } from '@nestos/vfs-core';
-import { createModuleLogger, ENTITY_ICONS, randomUUID, t, type NavigationRequest } from '@nestos/common';
+import { ACTION_ICONS, createModuleLogger, ENTITY_ICONS, randomUUID, t, type NavigationRequest } from '@nestos/common';
 import { editorResourceId, type EditorFactory, type MenuItem, type ContextMenuConfig } from '@nestos/ui-common-adapter';
 import type { WorkspaceController } from '@nestos/app-contracts';
 import { showToolboxCreationDialog } from './create-resource-dialog';
@@ -139,7 +139,7 @@ export class ToolboxWorkbench implements WorkspaceController {
         const remote = this.options.projects?.remoteMounts;
         if (!remote) return;
         return {
-            itemType: 'file', label: t('cells.check'),
+            itemType: 'file', label: t('cells.check'), icon: ACTION_ICONS.refreshView, iconOnly: true,
             visible: path => toolboxKind(path) === 'cells' && path !== '/cells/manage',
             run: async path => {
                 const connectionId = decodeURIComponent(path.slice('/cells/'.length));

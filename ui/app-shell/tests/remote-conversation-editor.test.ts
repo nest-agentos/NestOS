@@ -434,7 +434,9 @@ it('keeps passive native diagnostics in More while preserving live updates and i
         expect(indicator.hidden).toBe(true); expect(host.querySelector('.remote-conversation__status')?.textContent).toBe('');
         expect(host.textContent).not.toContain('130,454,629');
         const menu = host.querySelector<HTMLDetailsElement>('.llm-workspace-titlebar__menu')!; menu.open = true;
-        const openInfo = () => host.querySelector<HTMLButtonElement>('[data-action="conversation-information"]')!.click();
+        const infoButton = host.querySelector<HTMLButtonElement>('[data-action="conversation-information"]')!;
+        expect(infoButton.textContent).toBe(t('project.sessionInfo'));
+        const openInfo = () => infoButton.click();
         openInfo(); const dialog = document.querySelector<HTMLDialogElement>('.remote-conversation-info')!;
         expect(dialog.open).toBe(true); expect(menu.open).toBe(false);
         expect([...dialog.querySelectorAll('.remote-conversation-info__body > dl dt')].map(item => item.textContent)).toEqual([t('project.createdAt'), t('project.lastActivity')]);

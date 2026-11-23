@@ -2587,6 +2587,7 @@ export const en: LocaleStrings = {
     'workbench.reopen': 'Reopen closed tab',
     'workbench.close': 'Close tab',
     'workbench.pin': 'Pin',
+    'workbench.pinnedWorkspaceUnavailable': 'The workspace for this pinned page is unavailable on this device.',
     'workbench.unpin': 'Unpin',
     'workbench.preview': 'Preview',
     'workbench.pending': 'Unsaved',

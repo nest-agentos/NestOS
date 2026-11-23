@@ -14,9 +14,10 @@ export class ConversationInformation {
     private status = '';
     private tooltip = '';
     constructor(parent: HTMLElement, private readonly readMetrics?: () => Promise<ConversationSnapshot>) {
-        this.button.type = 'button'; this.button.className = 'llm-workspace-titlebar__btn';
+        this.button.type = 'button'; this.button.className = 'llm-chat__menu-action';
         this.button.innerHTML = ACTION_ICONS.info; this.button.title = t('project.sessionInfo');
-        this.button.setAttribute('aria-label', this.button.title); this.button.setAttribute('aria-haspopup', 'dialog');
+        const label = document.createElement('span'); label.textContent = this.button.title; this.button.append(label);
+        this.button.setAttribute('aria-haspopup', 'dialog');
         this.button.dataset.action = 'conversation-information'; this.button.onclick = () => this.open(); parent.append(this.button);
     }
     setSnapshot(snapshot: ConversationSnapshot): void {this.snapshot = snapshot; this.refresh();}

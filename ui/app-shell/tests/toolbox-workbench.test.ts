@@ -1186,7 +1186,10 @@ it('lists actual Cells nodes in the sidebar and opens only the selected node ove
     expect(f.sidebar.textContent).toContain(t('cells.status.unknown'));
     expect(checkConnection).not.toHaveBeenCalled();
     const check = f.sidebar.querySelector<HTMLButtonElement>('[data-directory-action="/cells/vm-node"]')!;
-    expect(check.textContent).toBe(t('cells.check'));
+    expect(check.textContent).toBe('');
+    expect(check.querySelector('svg')).not.toBeNull();
+    expect(check.title).toBe(t('cells.check'));
+    expect(check.getAttribute('aria-label')).toBe(t('cells.check'));
     check.click();
     expect(check.disabled).toBe(true);
     await vi.waitFor(() => expect(f.sidebar.textContent).toContain(t('cells.status.online')));

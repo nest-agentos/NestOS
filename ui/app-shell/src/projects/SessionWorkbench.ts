@@ -149,7 +149,7 @@ export interface SessionWorkbenchOptions {
     repository: ISessionRepository;
     files: SessionFilesPort;
     factory?: EditorFactory;
-    createFactory?(controls: WorkbenchChatControls): EditorFactory;
+    createFactory?(controls?: WorkbenchChatControls): EditorFactory;
     onSelect: (id: string, mode?: 'push' | 'replace') => void;
     onBeforeNavigate?(): void;
     hostContext: EditorHostContext | undefined;
@@ -389,6 +389,22 @@ export class SessionWorkbench implements WorkspaceController {
         return (target.kind === 'files' && target.path !== '/') || (target.kind === 'project-files' && target.path !== WORKSPACE_PATH);
     }
 
+    private configureChatFactory(chat?: WorkbenchChatControls): void {
+        const createFactory = this.createFactory;
+        if (!createFactory) return;
+        if (chat) { this.factory = createFactory(chat); return; }
+        const nativeFactory = createFactory();
+        let localFactory: Promise<EditorFactory> | undefined;
+        this.factory = async (...args) => {
+            if ('conversation' in args[1] && args[1].conversation) return nativeFactory(...args);
+            const ready = await (localFactory ??= this.opening!.prepareChat().then(controls => {
+                this.sessionSkills ??= controls.sessionSkills;
+                return createFactory(controls);
+            }).catch(error => { localFactory = undefined; throw error; }));
+            return ready(...args);
+        };
+    }
+
     async start(): Promise<void> {
         this.sessions ??= await this.sessionsReady;
         const view = this.opening?.workbench ?? await this.backend.workbenchView({ displayedFilesPolicy: 'gitignore', chatControls: !!this.createFactory,
@@ -396,16 +412,7 @@ export class SessionWorkbench implements WorkspaceController {
         this.initialSession = view.initialSession;
         this.initialData = view.initialData;
         this.chatConfiguration = view.chat?.configuration;
-        if (this.createFactory) {
-            let factory: Promise<EditorFactory> | undefined;
-            this.factory = view.chat ? this.createFactory(view.chat) : async (...args) => {
-                const ready = await (factory ??= this.opening!.prepareChat().then(chat => {
-                    this.sessionSkills ??= chat.sessionSkills;
-                    return this.createFactory!(chat);
-                }).catch(error => {factory = undefined; throw error;}));
-                return ready(...args);
-            };
-        }
+        this.configureChatFactory(view.chat);
         this.sessionSkills ??= view.chat?.sessionSkills;
         this.remoteStatus = new RemoteSessionStatusView(harnessObservation, this.projects, () => this.sidebarUI?.refreshList(),
             (id, icon, tooltip) => this.tabs.setStatus(id, icon, tooltip),
