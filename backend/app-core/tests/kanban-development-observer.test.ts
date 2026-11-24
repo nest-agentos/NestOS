@@ -118,7 +118,11 @@ it('keeps a reported error recoverable after the turn completes and notifies onc
     expect(await f.observe('succeeded')).toMatchObject({outcome:'running',code:'WORKSPACE_ERROR_REPORTED'});
     expect(await f.observe('succeeded')).toMatchObject({outcome:'running'});
     f.channels.report('attempt','fixed',{type:'resolved',replyTo:'failure',content:'Git repaired and checked'});
-    expect(await f.observe('succeeded')).toMatchObject({outcome:'running',code:'WORKSPACE_RESULT_PENDING'});
+    const channel=f.channels.ensure('attempt');
+    channel.execution={sessionId:'original-native',turnId:'resumed-turn',status:'running'};
+    expect(await f.observe('succeeded')).toMatchObject({outcome:'running',code:undefined});
+    channel.execution={...channel.execution,status:'completed'};
+    expect(await f.observe('succeeded')).toMatchObject({outcome:'unknown',code:'WORKSPACE_RESULT_MISSING'});
     expect((await f.service.item('board','item')).item.blocked).toBeUndefined();
     await f.publish('result','result');
     expect(await f.observe('succeeded')).toMatchObject({outcome:'succeeded'});

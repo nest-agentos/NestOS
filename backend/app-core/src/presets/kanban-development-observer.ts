@@ -88,7 +88,6 @@ export function developmentObserver(options: Options) {
             if (unresolved.some(message => message.type === 'error')) return {...input.observation,outcome:'running',outputs:undefined,code:'WORKSPACE_ERROR_REPORTED'};
             if (unresolved.some(message => message.type === 'clarification')) return {...input.observation, outcome: 'running', outputs: undefined, code: 'WORKSPACE_INPUT_REQUIRED'};
             if (input.observation.outcome !== 'succeeded') return input.observation;
-            if (!messages.some(message=>message.type==='result')&&messages.some(message=>message.type==='resolved'))return {...input.observation,outcome:'running',outputs:undefined,code:'WORKSPACE_RESULT_PENDING'};
             if (!messages.some(message => message.type === 'result')) {
                 const code = 'WORKSPACE_RESULT_MISSING';
                 if (input.dispatch.code !== code) createModuleLogger('kanban').warn('Workspace result publication missing', {
