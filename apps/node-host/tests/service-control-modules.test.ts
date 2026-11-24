@@ -21,3 +21,24 @@ it('keeps the primary service available when an unrelated plugin cannot load',as
  expect(await control.describe('web')).toMatchObject({id:'web'});
  await expect(control.describe('node')).rejects.toBeDefined();
 });
+
+it('requires the admin-bound Cells project and rechecks authorization before submitting a self update',async()=>{
+ const id='httpd-bound',project={serverId:'cells-node',serverProjectId:'project-a',principalId:'owner',alias:'prj',root:'/x1'};
+ vi.stubEnv('NESTOS_HTTPD_SERVICE_ID',id);
+ vi.stubEnv('NESTOS_SERVICE_PROJECTS',JSON.stringify([{serviceId:'httpd',...project}]));
+ const primary={describe:async()=>({id,version:'old'}),verifyArtifact:vi.fn(),submit:vi.fn(),inspect:vi.fn(async()=>({state:'succeeded' as const,version:'new'}))};
+ const control=serviceControlModules(primary)!;
+ expect(await control.describeForProject!('httpd',project)).toEqual({id,version:'old',project});
+ await expect(control.describeForProject!('httpd',{...project,serverProjectId:'project-b'})).rejects.toMatchObject({code:'SERVICE_PROJECT_UNAUTHORIZED'});
+ await expect(control.describeForProject!('httpd',{...project,root:'/other'})).rejects.toMatchObject({code:'SERVICE_PROJECT_UNAUTHORIZED'});
+ const verification={operationId:'build',serviceId:id,version:'new',sha256:'a'.repeat(64),sourceVersion:'b'.repeat(40),project};
+ await control.verifyArtifact!(verification);
+ await expect(control.verifyArtifact!({...verification,project:{...project,root:'/other'}})).rejects.toMatchObject({code:'SERVICE_PROJECT_UNAUTHORIZED'});
+ expect(primary.verifyArtifact).toHaveBeenCalledExactlyOnceWith(verification);
+ const request={operationId:'swap',serviceId:id,expectedVersion:'old',targetVersion:'new',project};
+ await control.submit(request);
+ expect(primary.submit).toHaveBeenCalledExactlyOnceWith(request);
+ vi.stubEnv('NESTOS_SERVICE_PROJECTS','[]');
+ await expect(control.submit(request)).rejects.toMatchObject({code:'SERVICE_PROJECT_UNAUTHORIZED'});
+ await expect(control.inspect(request)).resolves.toMatchObject({state:'succeeded',version:'new'});
+});

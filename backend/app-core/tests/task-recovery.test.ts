@@ -5,7 +5,7 @@ import {SeqKanbanStore,createKanbanModule} from '@nestos/kanban';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createTaskRecovery} from '../src/kanban/task-recovery';
 const closes:Array<()=>Promise<void>>=[];afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});
-async function fixture(group=false,active=false,missing=false) {
+async function fixture(group=false,active=false,missing=false,handler:'self'|'parent'='self') {
  const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());const fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs);
  const service=createKanbanModule({store,actor:{kind:'human',id:'admin'},authorize:async()=>{},log(){},verifyOutputs:async()=>true}),worker=createKanbanModule({store,actor:{kind:'service',id:'worker'},authorize:async()=>{},log(){}});
  await service.create({id:'b',title:'Work',scope:{kind:'system'},members:[{kind:'human',id:'admin',roles:['coordinator','reviewer'],responsibility:'Manage'},{kind:'service',id:'worker',roles:['worker'],responsibility:'Implement'}],policy:{requireEstimate:false,review:'independent'}});
@@ -17,7 +17,7 @@ async function fixture(group=false,active=false,missing=false) {
  await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:'succeeded',outputs:[]});await run({type:'accept-execution',dispatchId:dispatch.id,accept:true});
  await run({type:'prepare-dispatch',itemId:'verify',dispatchId:'failed-dispatch'},worker);dispatch=(await service.workflow('b')).dispatches['failed-dispatch'];
  await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:missing?'unknown':active?'running':'failed',code:missing?'WORKSPACE_RESULT_MISSING':active?'WORKSPACE_ERROR_REPORTED':'VERIFICATION_RUNNING_VERSION_MISMATCH',executionSessionId:'canonical-session'});
- if(active)await run({type:'report-issue',itemId:'verify',issue:{id:'repository-registration-error',type:'error',attemptId:dispatch.id,handler:'self'}});
+ if(active)await run({type:'report-issue',itemId:'verify',issue:{id:'repository-registration-error',type:'error',attemptId:dispatch.id,handler}});
  const journal=new KanbanAutomationJournal(fs);await journal.open();const original={channelId:'failed-dispatch',projectId:'project',directory:'/workspace/worktree',context:{delivery:{readOnly:true,evidence:{operationId:'original-deploy',result:{version:'old'}}}}};
  await journal.update('development-workspace:failed-dispatch',()=>original);
  const describe=vi.fn(async()=>({id:'service',version:'current'}));const options={fs,service,journal,client:()=>service,projects:{},remote:{},describe,executionResource:vi.fn(async(id:string)=>'/native/'+id),log:vi.fn()} as any;
@@ -206,4 +206,34 @@ it('requests formal result recovery in the original session without dispatching 
  expect(f.options.remote.projectHarness).not.toHaveBeenCalled();
  const attempts=Object.values((await f.service.workflow('b')).dispatches).filter(row=>row.itemId==='verify');
  expect(attempts).toMatchObject([{id:'failed-dispatch',outcome:'unknown'}]);
+});
+
+
+it('settles only the exact completed parent-reported delivery blocker and retains the original attempt', async()=>{
+ const f=await fixture(false,true,false,'parent'),resourceId='/folder:project/@harness/profile/original-native';
+ f.options.executionResource.mockResolvedValue(resourceId);
+ await f.run({type:'link-reference',itemId:'verify',reference:{system:'nestos-remote-project',id:'project'}});
+ const turn={sessionId:'original-native',turnId:'finished-turn',operationId:'original-operation',status:'completed'};
+ let execution={...turn,status:'running'};
+ const blocker={id:'repository-registration-error',message:{type:'error',payload:{handler:'parent'}},origin:turn};
+ let messages=[blocker] as unknown[];
+ f.options.remote.sessionChannel=vi.fn(async(_project:string,action:string)=>action==='current'
+    ?{scopeId:'failed-dispatch',execution}:{execution,messages});
+ const state=await f.recovery.taskRecovery('b','verify');
+ expect(state).toMatchObject({state:'blocked',canSettleDelivery:true});
+ const request={action:'settle-delivery' as const,operationId:'settle-delivery',itemId:'verify',expectedRevision:state.revision,confirmed:true};
+ await expect(f.recovery.recoverTask('b',{...request,confirmed:false})).rejects.toMatchObject({code:'RECOVERY_USER_CONFIRMATION_REQUIRED'});
+ await expect(f.recovery.recoverTask('b',request)).rejects.toMatchObject({code:'DELIVERY_TURN_UNVERIFIED'});
+ execution=turn;
+ messages=[blocker,{id:'already-delivered',message:{type:'result'}}];
+ await expect(f.recovery.recoverTask('b',request)).rejects.toMatchObject({code:'DELIVERY_RESULT_EXISTS'});
+ messages=[blocker];
+ expect(await f.recovery.recoverTask('b',request)).toMatchObject({state:'accepted'});
+ expect(await f.recovery.recoverTask('b',request)).toMatchObject({state:'accepted'});
+ const attempts=Object.values((await f.service.workflow('b')).dispatches).filter(row=>row.itemId==='verify');
+ expect(attempts).toMatchObject([{id:'failed-dispatch',outcome:'failed',code:'WORKSPACE_DELIVERY_INCOMPLETE',executionSessionId:'canonical-session'}]);
+ const item=(await f.service.item('b','verify')).item;
+ expect(item).toMatchObject({status:'backlog',issues:[{id:blocker.id,handler:'parent'}]});
+ expect(item.owner).toBeUndefined();
+ expect(await f.journal.get('development-workspace:failed-dispatch')).toEqual(f.original);
 });

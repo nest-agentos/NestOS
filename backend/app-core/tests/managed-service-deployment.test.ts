@@ -29,3 +29,26 @@ it('binds each task to its selected controller and rejects changing a successful
  await fs.driver.writeContent('/workspace/_nestos/etc/deployment.json',JSON.stringify({schema:2,defaultServiceId:'web'}));
  await expect(managed.prepare(input)).rejects.toMatchObject({code:'SERVICE_TARGET_CHANGED_REBUILD'});
 });
+
+it('freezes the admitted project into build evidence and rechecks the current binding at dispatch',async()=>{
+ const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());const fs=await manager.openFileSystem('/');
+ await fs.driver.createFile({parentPath:'/workspace/_nestos/etc',name:'deployment.json',recursive:true,content:JSON.stringify({schema:1,serviceId:'httpd'})});
+ const project={serverId:'cells',serverProjectId:'self',principalId:'owner',alias:'prj',root:'/x1'};
+ let current=project;
+ const describeForProject=vi.fn(async(_id:string,project:typeof current)=>({id:'httpd-1',version:'old',project,
+  build:{base:'source-checkout' as const,command:['build'],directory:'.'},
+  artifact:{format:'release',manifest:'release.json',store:{base:'source-checkout' as const,path:'release/httpd'}}}));
+ const control={describe:vi.fn(),describeForProject,submit:vi.fn(async()=>{}),inspect:vi.fn()};
+ const managed=managedServiceDeployment(control,async()=>({fs,dispose:async()=>{},project:async()=>current}),async()=>{})!;
+ const item={id:'self-upgrade'} as never;
+ const {deploymentProjectDigest}=await import('../src/presets/managed-service-deployment');
+ const input={id:'job',item,context:{version:'new',deployment:{serviceId:'httpd-1',projectDigest:deploymentProjectDigest(project)}}} as never;
+ const request=await managed.prepare(input);
+ expect(request).toMatchObject({serviceId:'httpd-1',project});
+ current={...project,root:'/elsewhere'};
+ await expect(managed.prepare(input)).rejects.toMatchObject({code:'SERVICE_PROJECT_CHANGED_REBUILD'});
+ await expect(managed.submit(request!,item)).rejects.toMatchObject({code:'SERVICE_PROJECT_CHANGED_REBUILD'});
+ expect(control.submit).not.toHaveBeenCalled();
+ current=project;await managed.submit(request!,item);
+ expect(control.submit).toHaveBeenCalledExactlyOnceWith(request);
+});

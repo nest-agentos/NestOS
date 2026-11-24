@@ -1,6 +1,7 @@
 import type {RuntimeServiceControl} from '@nestos/app-contracts/services';
-import {readFile} from 'node:fs/promises';
-import {existsSync} from 'node:fs';
+import type {RuntimeServiceProject} from '@nestos/app-contracts/services';
+import {open,readFile} from 'node:fs/promises';
+import {constants,existsSync} from 'node:fs';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -15,11 +16,46 @@ export function serviceControlModules(primary:RuntimeServiceControl|undefined):R
         if(id&&entries.has(id))return entries.get(id)!;
         throw Object.assign(new Error('Service target is not registered'),{code:'SERVICE_TARGET_UNAVAILABLE'});
     };
-    return {describe:async id=>{const descriptor=await(await select(id)).describe();if(id&&descriptor.id!==id)throw failure('SERVICE_TARGET_MISMATCH');return descriptor;},
-        verifyArtifact:async request=>{const entry=await select(request.serviceId);if(!entry.verifyArtifact)throw Object.assign(new Error('Artifact verification unavailable'),{code:'SERVICE_ARTIFACT_VERIFICATION_UNAVAILABLE'});await entry.verifyArtifact(request);},
-        submit:async request=>(await select(request.serviceId)).submit(request),inspect:async request=>(await select(request.serviceId)).inspect(request),
+    const authorize=async(id:string,project:RuntimeServiceProject)=>{
+        const bindings=await projectBindings();
+        const primaryId=process.env.NESTOS_HTTPD_SERVICE_ID;
+        if(!bindings.some(row=>(row.serviceId===id||row.serviceId==='httpd'&&id===primaryId)
+            && projectFields.every(key=>row[key]===project[key])))throw failure('SERVICE_PROJECT_UNAUTHORIZED');
+    };
+    return {describeForProject:async(id,project)=>{
+            const serviceId=id==='httpd'&&primary?process.env.NESTOS_HTTPD_SERVICE_ID??id:id;
+            await authorize(serviceId,project);
+            const descriptor=await(await select(serviceId)).describe();
+            if(descriptor.id!==serviceId)throw failure('SERVICE_TARGET_MISMATCH');
+            return {...descriptor,project};
+        },describe:async id=>{const descriptor=await(await select(id)).describe();if(id&&descriptor.id!==id)throw failure('SERVICE_TARGET_MISMATCH');return descriptor;},
+        verifyArtifact:async request=>{if(request.project)await authorize(request.serviceId,request.project);const entry=await select(request.serviceId);if(!entry.verifyArtifact)throw Object.assign(new Error('Artifact verification unavailable'),{code:'SERVICE_ARTIFACT_VERIFICATION_UNAVAILABLE'});await entry.verifyArtifact(request);},
+        submit:async request=>{if(request.project)await authorize(request.serviceId,request.project);await (await select(request.serviceId)).submit(request);},inspect:async request=>(await select(request.serviceId)).inspect(request),
         provenance:async(version,id)=>(await select(id)).provenance?.(version)};
 }
+const projectFields=['serverId','serverProjectId','principalId','alias','root'] as const;
+type ProjectBinding=RuntimeServiceProject&{serviceId:string};
+async function projectBindings():Promise<ProjectBinding[]>{
+    let raw=process.env.NESTOS_SERVICE_PROJECTS;
+    if(!raw)raw=await readProjectBindings();
+    let value:unknown;
+    try {value=raw?JSON.parse(raw):[];}catch{throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');}
+    if(!Array.isArray(value)||value.length>128||!value.every(row=>typeof row?.serviceId==='string'
+        &&projectFields.every(key=>typeof row[key]==='string'&&row[key].length>0)))throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');
+    return value;
+}
+
+async function readProjectBindings():Promise<string|undefined>{
+    const file=await open(path.join(homedir(),'.config/nestos/service-projects.json'),constants.O_RDONLY|constants.O_NOFOLLOW)
+        .catch(error=>{if(error.code!=='ENOENT')throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');});
+    if(!file)return;
+    try{
+        const info=await file.stat();
+        if(!info.isFile()||(info.mode&0o077)||info.size>128*1024)throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');
+        return await file.readFile('utf8');
+    }finally{await file.close();}
+}
+
 async function load(primary:RuntimeServiceControl|undefined):Promise<Map<string,RuntimeServiceControl>> {
     let raw=process.env.NESTOS_SERVICE_MODULES;
     if(!raw)try{raw=await readFile(path.join(homedir(),'.config/nestos/service-modules.json'),'utf8');}catch(error){if((error as {code?:string}).code!=='ENOENT')throw error;}

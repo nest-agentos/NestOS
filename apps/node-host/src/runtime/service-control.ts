@@ -1,6 +1,7 @@
 import {releaseDependencies} from './release-provenance';
 import type {RuntimeServiceControl} from '@nestos/app-core';
 import path from 'node:path';
+import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {openSync,fstatSync,readFileSync,closeSync,constants} from 'node:fs';
 import {pathToFileURL} from 'node:url';
@@ -15,12 +16,14 @@ export function localServiceControl():RuntimeServiceControl|undefined {
     const check=async()=>{const {state}=await load(),value=await state.readLaunch(root,'release');
         if(value?.serviceId!==serviceId||!await state.launcherAlive(value))throw Object.assign(new Error('Service controller unavailable'),{code:'SERVICE_CONTROLLER_UNAVAILABLE'});return value;};
     return {describe:async()=>{const value=await check();const {runtime}=await load(),relative=path.relative(root,runtime.releasesRoot(root));
-            return {id:serviceId,version:process.env.NESTOS_HTTPD_VERSION??value.currentRelease,artifact:{format:'nestos.httpd.release/1',manifest:'release.json',...(!path.isAbsolute(relative)&&!relative.startsWith('..')?{store:{base:'source-checkout' as const,path:relative.split(path.sep).join('/')}}:{})}};},
+            return {id:serviceId,version:process.env.NESTOS_HTTPD_VERSION??value.currentRelease,
+                ...(relative==='release/httpd'?{build:{base:'source-checkout' as const,directory:'.',command:['node','scripts/httpd.mjs','build','--no-activate','--receipt']}}:{}),artifact:{format:'nestos.httpd.release/1',manifest:'release.json',...(!path.isAbsolute(relative)&&!relative.startsWith('..')?{store:{base:'source-checkout' as const,path:relative.split(path.sep).join('/')}}:{})}};},
         verifyArtifact:async request=>{
             const started=Date.now();
             try{if(request.serviceId!==serviceId)throw Object.assign(new Error('Wrong service'),{code:'HTTPD_SERVICE_MISMATCH'});
                 await check();const {runtime}=await load(),directory=runtime.releaseDirectory(runtime.releasesRoot(root),request.version);
-                const manifest=runtime.verifyRelease(directory);if(request.sourceVersion&&manifest.commit!==request.sourceVersion)throw Object.assign(new Error('Artifact source changed'),{code:'OPERATION_RESULT_SOURCE_CHANGED'});verifyArtifactDigest(path.join(directory,'release.json'),request.sha256);
+                const manifest=runtime.verifyRelease(directory);if(request.sourceVersion&&(manifest.commit!==request.sourceVersion||manifest.dirty!==false))throw Object.assign(new Error('Artifact source changed'),{code:'OPERATION_RESULT_SOURCE_CHANGED'});verifyArtifactDigest(path.join(directory,'release.json'),request.sha256);
+                if(request.project)verifySourceCommit(root,request.sourceVersion);
                 console.info('[HTTPServiceControl]',JSON.stringify({operation:'artifact.verify',operationId:request.operationId,stage:'source-checkout',result:'success',durationMs:Date.now()-started}));
             }catch(error){console.warn('[HTTPServiceControl]',JSON.stringify({operation:'artifact.verify',operationId:request.operationId,stage:'source-checkout',result:'failure',code:(error as {code?:string}).code??'SERVICE_ARTIFACT_INVALID',durationMs:Date.now()-started}));throw error;}
         },
@@ -44,6 +47,14 @@ export function localServiceControl():RuntimeServiceControl|undefined {
             if(receipt.result!=='success')return {state:'failed',code:receipt.code??'SERVICE_REPLACEMENT_FAILED'};
             return value.currentRelease===request.targetVersion?{state:'succeeded',version:request.targetVersion}:{state:'failed',code:'SERVICE_VERSION_MISMATCH'};
         }};
+}
+
+function verifySourceCommit(root:string,commit:string|undefined):void {
+    try {
+        if(commit&&/^[a-f0-9]{40,64}$/.test(commit)&&execFileSync('git',['-C',root,'cat-file','-t',commit],
+            {encoding:'utf8',stdio:['ignore','pipe','ignore'],timeout:5000}).trim()==='commit')return;
+    }catch{/* Return a stable error code without Git diagnostics. */}
+    throw Object.assign(new Error('Source commit unavailable in the trusted repository'),{code:'SERVICE_SOURCE_COMMIT_UNVERIFIED'});
 }
 
 /** Only the configured service store is reachable through this capability. */

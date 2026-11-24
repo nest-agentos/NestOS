@@ -10,7 +10,7 @@ import {developmentWorkspace} from './kanban-development-workspace';
 import {kanbanGitIntegration,usesHostMergeProposal} from './kanban-git-integration';
 import {verifyGitIntegration} from '@nestos/git-delivery/integration';
 import type {GitSource,GitApproval} from '@nestos/git-delivery/contracts';
-import {managedServiceDeployment} from './managed-service-deployment';
+import {managedServiceDeployment,serviceDeploymentView} from './managed-service-deployment';
 import {maintenanceInstruction} from './kanban-maintenance';
 import {managementBatchSnapshot,managementBatch} from './kanban-management-snapshot';
 import {freezeManagementScope,type ManagementScope} from './kanban-management-scope-catalog';
@@ -20,7 +20,7 @@ import {managementPrompts as prompts} from '@nestos/kanban-development';
 export function managementReviewAdapter(options:DevelopmentReviewOptions,scope:ManagementScope):ReviewAdapter {
     const base=developmentReviewAdapter(options);
     const snapshot=async(board:KanbanBoard)=>managementBatchSnapshot(scope,board,options.service,item=>developmentReviewSnapshot(options,board,item));
-    const managed=managedServiceDeployment(options.serviceControl,async()=>options.projects.openWorkspace((await options.projects.get(scope.projectId)).path),
+    const managed=managedServiceDeployment(options.serviceControl,async()=>serviceDeploymentView(await options.projects.openWorkspace((await options.projects.get(scope.projectId)).path),options.remote,scope.projectId),
         async job=>requireValue((await snapshot(await options.service.read(job.boardId))).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD'));
     return {...base,managed,gitIntegration:kanbanGitIntegration(options, job => managementBatch(job.snapshot).sources.map(source => source.snapshot.context as GitSource)),runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??base.runningVersion?.(),relatedSession:async(board)=>(await options.service.workflow(board.id)).dispatches[scope.contributors[0].dispatchId??'']?.executionSessionId,supports:(_board,item)=>item.id===scope.ownerId,
         ready:board=>scope.contributors.every(row=>board.items.some(item=>item.id===row.itemId&&['review','completed'].includes(item.status))),

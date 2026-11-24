@@ -7,7 +7,7 @@ import {compatibleRuntimeDelivery} from './kanban-runtime-acceptance';
 import {retainedExecutionContexts} from '../projects/harness-context-selection';
 import {verifyFileDigest} from '../run/file-digest';
 import {verifyReadOnlyDelivery} from '@nestos/git-delivery/policy';
-import {managedServiceDeployment,verifyManagedBuildArtifact} from './managed-service-deployment';
+import {deploymentProjectDigest,managedServiceDeployment,serviceDeploymentView,verifyManagedBuildArtifact} from './managed-service-deployment';
 import {operationReceipt} from '../run/operation-receipt';
 import {maintenanceInstruction} from './kanban-maintenance';
 import {journalCommand} from '@nestos/kanban/integration';
@@ -66,7 +66,7 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
             return async () => {stop?.(); await client.close();};});
         return record;
     };
-    const managed=managedServiceDeployment(options.serviceControl,async item=>{const projectId=workProjectId(item);requireValue(projectId,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(projectId)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
+    const managed=managedServiceDeployment(options.serviceControl,async item=>{const projectId=workProjectId(item);requireValue(projectId,'SINGLE_PROJECT_TASK_REQUIRED');return serviceDeploymentView(await options.projects.openWorkspace((await options.projects.get(projectId)).path),options.remote,projectId);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
     const cancel=options.cancelSubmission&&options.connections?reviewCancellation({journal:options.journal,submission:options.cancelSubmission,native:planningConversationControl({remote:options.remote,connections:options.connections},options.journal)}):undefined;
     return {managed,cancel,gitIntegration:kanbanGitIntegration(options),runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??options.runningVersion,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
         acceptanceVersion:async(board,item,expectedVersion)=>{
@@ -185,7 +185,7 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
             const frozen=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+job.id);
             const deployment=(frozen?.context as {operation?:{deployment?:import('@nestos/app-contracts/services').RuntimeServiceDescriptor}})?.operation?.deployment;
             if(!await verifyManagedBuildArtifact(options.serviceControl,deployment,result,job.snapshot.targetVersion))await verifyBuildEvidence(view.fs,current.record.directory,result);
-            if(deployment)result={...result as object,deployment:{serviceId:deployment.id}};
+            if(deployment)result={...result as object,deployment:{serviceId:deployment.id,...(deployment.project?{projectDigest:deploymentProjectDigest(deployment.project)}:{})}};
         }}
     finally {await view.dispose();}
     if (result === undefined || ['blocked', 'failed'].includes((result as {status: string})?.status)) return result;

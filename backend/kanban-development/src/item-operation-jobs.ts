@@ -64,7 +64,7 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
             requireValue(!board.lifecycle,'BOARD_STOPPING');
             const {item,archive}=await options.service.item(record.boardId,record.itemId);requireValue(!archive,'ITEM_ARCHIVED');requireValue(!item.deletedAt&&item.status!=='cancelled'&&item.control?.action!=='cancel','TASK_CANCELLING');
             await revalidateMergeAdmission({...options,policy:developmentAnalysisPolicy},record);
-            if(record.managed){await options.adapter.managed!.submit(record.managed);return;}
+            if(record.managed){await options.adapter.managed!.submit(record.managed,item);return;}
             if(record.action==='merge'&&record.request&&await startGitIntegration(options,record))return;
             if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
         inspect:async record=>{

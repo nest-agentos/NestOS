@@ -2,7 +2,7 @@ import path from 'node:path';
 import {copyFile,rename,chmod,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {artifact,json,save,fail,validId,digest} from './artifact.mjs';
-import {command,ready,runningHash,runningProcess,guestStorage,installedExecutable} from './guest.mjs';
+import {command,ready,runningHash,runningProcess,guestStorage,installedExecutable,readConfiguration} from './guest.mjs';
 /** External business plugin: its private options grant access to exactly one managed VM. */
 export async function createServiceControl(options,ports){
  if(!validId(options.id)||!validId(options.vm)||['root','executable','identity','stateDirectory','server'].some(key=>typeof options[key]!=='string'||!path.isAbsolute(options[key])))throw fail('CELLS_CONTROLLER_CONFIGURATION_INVALID');
@@ -32,8 +32,8 @@ class CellsDeployment {
   const saved=await this.read('current.json');
   return {...process,id:saved?.sha256===process.hash?saved.version:'cells-'+process.hash.slice(0,20)};
  }
- async verified(id){
-  const value=await artifact(this.options.root,id),proof=await this.read('artifact-'+id+'.json');
+ async verified(id,project){
+  const value=await artifact(this.options.root,id),proof=await this.read(artifactProofKey(id,project));
   if(!proof||proof.digest!==value.digest)throw fail('SERVICE_ARTIFACT_NOT_VERIFIED');return value;
  }
  async describe(){
@@ -46,17 +46,19 @@ class CellsDeployment {
   try{if(request.serviceId!==this.options.id)throw fail('SERVICE_TARGET_MISMATCH');
    const value=await artifact(this.options.root,request.version);if(value.digest!==request.sha256)throw fail('OPERATION_RESULT_ARTIFACT_UNVERIFIED');
    if(request.sourceVersion&&request.sourceVersion!==value.value.commit)throw fail('OPERATION_RESULT_SOURCE_CHANGED');
-   await this.write('artifact-'+request.version+'.json',{digest:value.digest});log(request,'artifact.verify','success',undefined,started);
+   if(request.project&&(!request.sourceVersion||!await sourceCommit(this.options.root,request.sourceVersion)))throw fail('SERVICE_SOURCE_COMMIT_UNVERIFIED');
+   await this.write(artifactProofKey(request.version,request.project),{digest:value.digest});log(request,'artifact.verify','success',undefined,started);
   }catch(error){log(request,'artifact.verify','failure',error.code??'SERVICE_ARTIFACT_INVALID',started);throw error;}
  }
  async observe(request){
   this.check(request);const row=await this.read('operation-'+request.operationId+'.json');
   if(!row)return {state:'running'};
   if(!sameRequest(row.request,request))throw fail('SERVICE_REQUEST_CHANGED');
+  request=row.request;
   if(row.state==='succeeded'||row.state==='unchanged')return {state:'succeeded',version:request.targetVersion,...(row.state==='unchanged'?{changed:false}:{})};
   if(row.state==='failed')return {state:'failed',code:row.code};
   const started=Date.now();
-  try{const value=await this.verified(request.targetVersion);
+  try{const value=await this.verified(request.targetVersion,request.project);
    const verification=await this.runningRelease(value,request,row);
    if(verification){
     await this.write('current.json',{version:request.targetVersion,sha256:value.value.sha256,...verification});
@@ -102,10 +104,15 @@ class CellsDeployment {
   try{
    const existing=await this.read('operation-'+request.operationId+'.json');if(existing){if(!sameRequest(existing.request,request))throw fail('SERVICE_REQUEST_CHANGED');return;}
    if(await this.read('pending.json'))throw fail('SERVICE_OPERATION_PENDING');
+   if(request.project&&!request.configSha256){
+    config=this.options.configSource===undefined?await this.installedConfiguration():await readConfiguration(this.options.configSource);
+    const configSha256=digest(config),expectedConfigSha256=this.options.configSource===undefined?configSha256:await this.configuration();
+    request={...request,configSha256,expectedConfigSha256};
+   }
    await this.checkConfiguration(request,config);
    const current=await this.version(!!request.configSha256);
    if(current.id!==request.expectedVersion)throw fail('SERVICE_VERSION_CHANGED');
-   const value=await this.verified(request.targetVersion);
+   const value=await this.verified(request.targetVersion,request.project);
    if(await this.unchanged(current,value,request)){
     const prior=await this.read('current.json');
     await this.write('current.json',{...prior,version:request.targetVersion,sha256:current.hash});
@@ -171,4 +178,22 @@ class CellsDeployment {
 }
 function log(request,stage,result,code,started=Date.now()){console.info(JSON.stringify({operation:'cells.delivery',operationId:request.operationId,stage,result,code,durationMs:Date.now()-started}));}
 
-function sameRequest(a,b){return ['operationId','serviceId','expectedVersion','targetVersion','configSha256','expectedConfigSha256'].every(key=>a[key]===b[key]);}
+function projectKey(project){
+ return project?JSON.stringify(['serverId','serverProjectId','principalId','alias','root'].map(key=>project[key])):undefined;
+}
+function artifactProofKey(id,project){
+ const scope=projectKey(project);
+ return 'artifact-'+id+(scope?'-'+digest(scope):'')+'.json';
+}
+async function sourceCommit(root,commit){
+ if(!/^[a-f0-9]{40,64}$/.test(commit))return false;
+ try{return await command('git',['-C',root,'cat-file','-t',commit],5000)==='commit';}
+ catch{return false;}
+}
+
+function sameRequest(a,b){
+ const keys=['operationId','serviceId','expectedVersion','targetVersion'];
+ if(!keys.every(key=>a[key]===b[key])||projectKey(a.project)!==projectKey(b.project))return false;
+ return !!b.project&&b.configSha256===undefined||
+    ['configSha256','expectedConfigSha256'].every(key=>a[key]===b[key]);
+}

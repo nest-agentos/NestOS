@@ -2,7 +2,7 @@
 import {recover as recoverTemporaryProcesses} from '../tools/temporary-process/node/index.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, readdirSync, renameSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -107,7 +107,16 @@ try {
     }
     if (command === 'deploy' && args.includes('--help')) console.log('Usage: ./httpd.sh [--no-cache]\nBuild, switch the running HTTP service, and verify its version and health.');
     else if (command === 'deploy') await (await import('./httpd-deploy.mjs')).deployHttpd(root, releases, args, build);
-    else if (command === 'build') build(args);
+    else if (command === 'build') {
+        if(!args.includes('--receipt'))build(args);
+        else {
+            if(args.some(arg=>!['--no-activate','--receipt','--no-cache'].includes(arg)))throw new Error('HTTPD_BUILD_RECEIPT_ARGUMENTS_INVALID');
+            const version=build([...args,'--no-activate']);
+            const evidence='release/httpd/'+version+'/release.json';
+            const sha256=createHash('sha256').update(readFileSync(path.join(releaseDirectory(releases,version),'release.json'))).digest('hex');
+            console.log(JSON.stringify({operation:'httpd.build',result:'success',version,evidence:{path:evidence,sha256}}));
+        }
+    }
     else if (command === 'dev') await withHttpdControl(root, () => serve('dev', args));
     else if(['start','switch','status'].includes(command)||['stop','restart'].includes(command)&&!args.includes('--dev'))await (await import('./httpd-launcher.mjs')).launcherCommand(root,releases,command,args);
     else if (command === 'stop' || command === 'restart') await withHttpdControl(root, async () => {

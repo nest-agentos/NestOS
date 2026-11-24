@@ -9,10 +9,11 @@ import type {TaskRecoveryOptions,RecoveryIntent} from './task-recovery-ports';
 import {taskRecoveryState} from './task-recovery-state';
 import {taskRecoveryChannels} from './task-recovery-channel';
 import {requireValue} from './validation';
+import {settleTaskDelivery} from './task-delivery-settlement';
 export function createTaskRecovery(options:TaskRecoveryOptions) {
     let stopped=false;const pending=new Map<string,Promise<unknown>>();
     const serial=<T>(id:string,work:()=>Promise<T>)=>{requireValue(!stopped,'SERVICE_STOPPING');const next=(pending.get(id)??Promise.resolve()).catch(()=>{}).then(work);pending.set(id,next);void next.finally(()=>{if(pending.get(id)===next)pending.delete(id);}).catch(()=>{});return next;};
-    const recoveryKey=(board:string,request:KanbanTaskRecoveryRequest)=>['recheck','reconcile-report'].includes(request.action)?JSON.stringify([board,request.itemId]):request.operationId;
+    const recoveryKey=(board:string,request:KanbanTaskRecoveryRequest)=>['recheck','reconcile-report','settle-delivery'].includes(request.action)?JSON.stringify([board,request.itemId]):request.operationId;
     const recoverTask=(boardId:string,request:KanbanTaskRecoveryRequest)=>serial(recoveryKey(boardId,request),()=>recover(options,boardId,request));
     const channels=taskRecoveryChannels(options,{recoverTask,inspect:taskRecoveryState,active:()=>!stopped});
     return {checkTaskConfiguration:(board:string,item:string)=>checkTaskConfiguration(options,board,item),inspectTaskReports:(board:string,item:string)=>inspectTaskReports(options,board,item),reloadTaskConfiguration:(board:string,request:Parameters<ReturnType<typeof reloadTaskConfiguration>>[1])=>serial('configuration:'+request.operationId,()=>reloadTaskConfiguration(options)(board,request)),taskRecovery:(board:string,item:string)=>taskRecoveryState(options,board,item),recoverTask,openTaskRecovery:channels.open,
@@ -51,7 +52,8 @@ async function latestTaskDispatch(options:TaskRecoveryOptions,boardId:string,ite
 }
 
 async function recover(options:TaskRecoveryOptions,boardId:string,request:KanbanTaskRecoveryRequest):Promise<KanbanTaskRecoveryResult> {
-    requireValue(/^[a-zA-Z0-9_-]{1,128}$/.test(request.operationId)&&['retry','retry-current','fix','recheck','reconcile-report'].includes(request.action),'INVALID_RECOVERY_REQUEST');
+    requireValue(/^[a-zA-Z0-9_-]{1,128}$/.test(request.operationId)&&['retry','retry-current','fix','recheck','reconcile-report','settle-delivery'].includes(request.action),'INVALID_RECOVERY_REQUEST');
+    if(request.action==='settle-delivery')return settleTaskDelivery(options,boardId,request);
     if(request.action==='reconcile-report')return reconcileReportHandoff(options,boardId,request);
     const key='task-recovery-operation:'+request.operationId,digest=sha256HexSync(JSON.stringify([boardId,request]));
     const saved=await options.journal.get<RecoveryIntent>(key);if(saved){requireValue(saved.digest===digest,'IDEMPOTENCY_CONFLICT');return settle(options,saved);}
@@ -74,9 +76,15 @@ async function recover(options:TaskRecoveryOptions,boardId:string,request:Kanban
     requireValue(!target||target.version===state.actualVersion,'RECOVERY_TARGET_CHANGED');
     const intent=await options.journal.update<RecoveryIntent>(key,old=>old??{boardId,request,digest,dispatchId,previousDispatchId:previous.id,targetVersion:target?.version??state.expectedVersion,
         ...(target?{evidence:{version:target.version,serviceId:target.id,approval:request.action==='retry-current'?'user':'delivery-receipt',sourceOperationId:state.deliveryOperationId,sourceItemId:state.deliveryItemId,previous:(record?.context as {delivery?:{evidence?:unknown}})?.delivery?.evidence}}:{}),
-        command:{type:'continue-execution',previousDispatchId:previous.id,dispatchId,instruction:request.action==='recheck'?'The host verified the declared prerequisites. Resume the unfinished task in this same Session and worktree. Read the current task context and prerequisites.json, and apply any declared binDirectories to the command PATH. Preserve completed work and all prior evidence.': 'Perform only the failed acceptance checks in this SAME Session. Read the host-frozen recovery receipt in context.recovery; preserve completed siblings and prior failed evidence. Do not redevelop, rebuild or redeploy.'}});
+        command:{type:'continue-execution',previousDispatchId:previous.id,dispatchId,instruction:continuationInstruction(previous.code,request.action)}});
     return settle(options,intent);
 }
+function continuationInstruction(code:string|undefined,action:KanbanTaskRecoveryRequest['action']):string {
+    if(code==='WORKSPACE_DELIVERY_INCOMPLETE')return 'Resume the original execution task in the same Session and retained worktree. Read the current scoped task, frozen acceptance and delivery instructions. Verify existing changes and complete only the remaining implementation and acceptance. Preserve prior evidence and publish the formal result through the new scope.';
+    if(action==='recheck')return 'The host verified the declared prerequisites. Resume the unfinished task in this same Session and worktree. Read the current task context and prerequisites.json, and apply any declared binDirectories to the command PATH. Preserve completed work and all prior evidence.';
+    return 'Perform only the failed acceptance checks in this SAME Session. Read the host-frozen recovery receipt in context.recovery; preserve completed siblings and prior failed evidence. Do not redevelop, rebuild or redeploy.';
+}
+
 async function requestReportHandoff(options:TaskRecoveryOptions,boardId:string,request:KanbanTaskRecoveryRequest,digest:string,allowed:boolean):Promise<KanbanTaskRecoveryResult>{
     requireValue(allowed,'RECOVERY_TARGET_NOT_READY');
     const previous=await latestTaskDispatch(options,boardId,request.itemId);

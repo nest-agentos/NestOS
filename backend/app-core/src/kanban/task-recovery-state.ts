@@ -7,6 +7,7 @@ import {sha256HexSync} from '@nestos/common';
 import type {KanbanTaskRecovery,KanbanBoard,KanbanItem,KanbanDispatch} from '@nestos/kanban/contracts';
 import type {TaskRecoveryOptions} from './task-recovery-ports';
 import {requireValue} from './validation';
+
 export async function taskRecoveryState(options:TaskRecoveryOptions,boardId:string,itemId:string):Promise<KanbanTaskRecovery> {
     const board=await options.service.read(boardId),item=board.items.find(row=>row.id===itemId);requireValue(item,'ITEM_NOT_FOUND');
     const workflow=await options.service.workflow(boardId),dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===itemId).sort((a,b)=>b.attempt-a.attempt)[0];
@@ -56,6 +57,14 @@ async function reportHandoff(options:TaskRecoveryOptions,board:KanbanBoard,item:
         revision:sha256HexSync(JSON.stringify([item.id,item.revision,board.revision,dispatch.id,dispatch.outcome,code,canRecheck]))};
 }
 
+export function canSettleDelivery(board:KanbanBoard,item:KanbanItem,dispatch:KanbanDispatch):boolean {
+    const issues=item.issues?.filter(issue=>issue.attemptId===dispatch.id&&!issue.resolvedBy);
+    return !!issues?.length&&issues.every(issue=>issue.type==='error'&&issue.handler==='parent')
+        &&dispatch.outcome==='running'&&dispatch.code==='WORKSPACE_ERROR_REPORTED'&&!!dispatch.executionSessionId
+        &&item.owner?.token===dispatch.fence&&!item.control&&!item.restartPending&&!item.deletedAt
+        &&!board.executionControl?.paused&&!board.lifecycle&&!board.deletedAt;
+}
+
 async function activeBlocker(options:TaskRecoveryOptions,board:KanbanBoard,item:KanbanItem,dispatch:KanbanDispatch|undefined):Promise<KanbanTaskRecovery|undefined>{
     const pendingIssueIds=activeRecoveryIssueIds(item,dispatch);
     if(!dispatch||!pendingIssueIds.length)return;
@@ -63,7 +72,7 @@ async function activeBlocker(options:TaskRecoveryOptions,board:KanbanBoard,item:
     const canRecheck=sessionId&&!board.executionControl?.paused&&!board.lifecycle&&board.deletedAt===undefined&&dispatch.outcome==='running'&&pendingIssueIds.length===1&&
         item.issues?.some(issue=>issue.id===pendingIssueIds[0]&&issue.attemptId===dispatch.id&&issue.type==='error'&&issue.handler!=='parent')&&
         await canRecheckActiveWorkspace(options,dispatch.id);
-    return {state:'blocked',itemId:item.id,pendingIssueIds,revision:sha256HexSync(JSON.stringify([item.id,item.revision,dispatch.id,dispatch.outcome,pendingIssueIds])),
+    return {state:'blocked',itemId:item.id,pendingIssueIds,...(resourceId&&canSettleDelivery(board,item,dispatch)?{canSettleDelivery:true}:{}),revision:sha256HexSync(JSON.stringify([item.id,item.revision,dispatch.id,dispatch.outcome,pendingIssueIds])),
         related:[],canRetry:false,canSelectCurrentVersion:false,...(canRecheck?{canRecheck:true}:{}),...optional({sessionId,resourceId,code:dispatch.code??item.blocked?.reason})};
 }
 

@@ -1,5 +1,7 @@
 import {execFile} from 'node:child_process';
-import {readFile} from 'node:fs/promises';
+import {open,readFile} from 'node:fs/promises';
+import {constants} from 'node:fs';
+import path from 'node:path';
 import {promisify} from 'node:util';
 import {fail} from './artifact.mjs';
 
@@ -193,4 +195,23 @@ export function serviceStorage(run, directory = '/usr/local/lib/nestos/cells') {
 
 export function guestStorage(options) {
     return serviceStorage((args, input, maxBuffer) => guestCommand(options, args, input, maxBuffer));
+}
+
+export async function readConfiguration(source, {privateFile = true} = {}) {
+    if (typeof source !== 'string' || !path.isAbsolute(source)) throw fail('CELLS_CONFIG_SOURCE_REQUIRED');
+    let file;
+    try {
+        file = await open(source, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+        const metadata = await file.stat();
+        if (!metadata.isFile() || (privateFile && (metadata.mode & 0o077)) || metadata.size === 0 || metadata.size > 1024 * 1024)
+            throw fail('CELLS_CONFIG_SOURCE_INVALID');
+        const bytes = await file.readFile();
+        if (bytes.length !== metadata.size) throw fail('CELLS_CONFIG_SOURCE_CHANGED');
+        return bytes;
+    } catch (error) {
+        if (error.code?.startsWith('CELLS_CONFIG_')) throw error;
+        throw fail('CELLS_CONFIG_SOURCE_UNAVAILABLE');
+    } finally {
+        await file?.close();
+    }
 }

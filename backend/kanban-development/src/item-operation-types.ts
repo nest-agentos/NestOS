@@ -28,7 +28,7 @@ export interface ReviewAdapter {
         inspect(job: ReviewJob, resume?:boolean): Promise<import('@nestos/llm-session').OperationObservation | undefined>;
     };
     managed?:{describe?(item:KanbanItem):Promise<import('@nestos/app-contracts/services').RuntimeServiceDescriptor|undefined>;prepare(input:{id:string;board:KanbanBoard;item:KanbanItem;snapshot:ReviewSnapshot;context:unknown}):Promise<import('@nestos/app-contracts/services').ServiceSwitchRequest|undefined>;
-        submit(request:import('@nestos/app-contracts/services').ServiceSwitchRequest):Promise<void>;
+        submit(request:import('@nestos/app-contracts/services').ServiceSwitchRequest,item?:KanbanItem):Promise<void>;
         inspect(job:ReviewJob):Promise<import('@nestos/llm-session').OperationObservation>};
     supports?(board: KanbanBoard, item: KanbanItem): boolean;
     runningVersion?(): string | undefined;

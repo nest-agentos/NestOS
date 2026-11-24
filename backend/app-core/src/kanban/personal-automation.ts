@@ -34,6 +34,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
         automaticTarget?:import('@nestos/kanban-development').ReviewOperationsOptions['automaticTarget'];automatic?:import('@nestos/kanban-development').ReviewOperationsOptions['automatic'];cleanup?:import('@nestos/kanban-development').ReviewOperationsOptions['cleanup'];reportAutomatic?:import('@nestos/kanban-development').ReviewOperationsOptions['reportAutomatic'];
         log: import('@nestos/kanban-development').ReviewOperationsOptions['log']}): ReturnType<typeof import('@nestos/kanban-development').createItemOperations>;
     relatedSessions?(boardId: string, itemId: string): Promise<import('@nestos/kanban/contracts').KanbanSessionAssociation[]>;
+    verifyNativeRestartIdle?(resourceId:string):Promise<boolean>;
     sessionObservation?:import('./native-session-activity').NativeSessionReader;
     executionReader():ReturnType<typeof import('../session/execution-facts').createSessionExecutionReader>;
     sessionExecutionResources?(id: string): Promise<Array<{label: string; value: string}>>;

@@ -1,3 +1,4 @@
+import {nativeRestartIdle} from '../kanban/restart-barrier';
 import {requestManagementCleanup} from '../kanban/cleanup-review-conversations';
 import {createIndependentCallExecutionReader,createSessionActivityReader} from '@nestos/llm-session';
 import {originalSession} from '../projects/original-execution-session';
@@ -7,7 +8,7 @@ import {kanbanHarnessTarget} from '../presets/kanban-harness-target';
 import {kanbanHarnessSettings} from '../presets/kanban-harness-settings';
 import {NativeSessionRecovery} from '../projects/session-recovery';
 import {createTaskRecovery} from '../kanban/task-recovery';
-import {managedServiceDeployment} from '../presets/managed-service-deployment';
+import {managedServiceDeployment,serviceDeploymentView} from '../presets/managed-service-deployment';
 import {decisionConversations} from '../kanban/decision-conversations';
 import {kanbanSessionResource} from '../kanban/session-resource';
 import {developmentDeliveryPlan} from '../presets/kanban-delivery-plan';
@@ -656,6 +657,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const kanban:import('@nestos/kanban').KanbanModuleHandle = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,createSessionActivityReader(kernelCore), independentCalls ? {
             prepareTarget:developmentBindings?kanbanHarnessTarget(developmentBindings):undefined,
             boardSettings:remoteConnections?kanbanHarnessSettings(remoteConnections):undefined,
+            verifyNativeRestartIdle:remoteConnections?nativeRestartIdle(projects):undefined,
             sessionObservation:developmentBindings?developmentMessages.sessionObservation:undefined,
             taskRecovery:developmentBindings?context=>createTaskRecovery({...developmentBindings,...context,executionResource:executionResource!,
                 reportHandoff:{inspect:record=>developmentOperations.run(()=>inspectDevelopmentReports(developmentBindings,record)),run:async(board,item,id,existingOnly)=>{
@@ -663,7 +665,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                     await handoffDevelopmentReports({...developmentBindings,journal:context.journal},context.service,board,item,id,existingOnly);
                 },wake:()=>wakeKanban()},
                 recheck:developmentTaskRecheck(developmentBindings.remote,developmentBindings.provider,decisionModules[0]),
-                describe:async item=>{if(!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'))return;const managed=managedServiceDeployment(options.serviceControl,async selected=>projects.openWorkspace((await projects.get(selected.externalRefs!.find(ref=>ref.system==='nestos-remote-project')!.id)).path),async()=>{});return managed?.describe?.(item);}}):undefined,
+                describe:async item=>{if(!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'))return;const managed=managedServiceDeployment(options.serviceControl,async selected=>{const id=selected.externalRefs!.find(ref=>ref.system==='nestos-remote-project')!.id;return serviceDeploymentView(await projects.openWorkspace((await projects.get(id)).path),remoteConnections,id);},async()=>{});return managed?.describe?.(item);}}):undefined,
             decisionConversations:developmentBindings?context=>decisionConversations({...developmentBindings,...context,executionResource,modules:decisionModules}):undefined,
             itemOperations: developmentBindings ? context => {
                 const review={...developmentBindings,...context,cancelSubmission:submissionControl({contexts:conversationContexts,repository:sessionRepository,kernel:kernelCore,ensureWritable:conversationOptions.ensureWritable}),calls:independentCalls,kernel:kernelCore,runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission,wake:()=>wakeKanban()};

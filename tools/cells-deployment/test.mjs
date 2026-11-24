@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,rm,symlink,stat,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -290,4 +291,28 @@ test('reads the bounded guest configuration snapshot without changing its bytes'
  assert.deepEqual(await storage.readConfiguration(),config);
  await writeFile(root+'/cells.toml',Buffer.alloc(1024*1024+1));
  await assert.rejects(storage.readConfiguration(),{code:'CELLS_CONFIG_INSTALLED_INVALID'});
+});
+
+test('a project-bound Cells update verifies saved executable and config across restart',async t=>{
+ const f=await fixture(t),config=Buffer.from('private guest configuration'),project={serverId:'node',serverProjectId:'self',principalId:'owner',alias:'prj',root:'/x1'};
+ const git=(...args)=>execFileSync('git',['-C',f.options.root,...args],{encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
+ git('init','-q');git('-c','user.name=Test','-c','user.email=test@example.test','commit','--allow-empty','-qm','Fixture');
+ const sourceVersion=git('rev-parse','HEAD'),artifact=await packageArtifact(f.options.root,sourceVersion);
+ let hash=digest(Buffer.from('original')),generation='old',restarts=0;
+ f.ports.process=async()=>({hash,generation});
+ f.ports.hash=async()=>hash;
+ f.ports.installedHash=async()=>artifact.value.sha256;
+ f.ports.readConfiguration=async()=>config;
+ f.ports.configHash=async()=>digest(config);
+ f.ports.install=async(_value,request,bytes)=>{assert.equal(request.configSha256,digest(config));assert.deepEqual(bytes,config);};
+ f.ports.restart=async()=>{hash=artifact.value.sha256;generation='new';restarts++;};
+ const controller=await createServiceControl(f.options,f.ports),request={...f.request,targetVersion:artifact.value.id,project};
+ await assert.rejects(controller.verifyArtifact({operationId:'build',serviceId:'service',version:artifact.value.id,sha256:artifact.digest,project}),
+  {code:'SERVICE_SOURCE_COMMIT_UNVERIFIED'});
+ await controller.verifyArtifact({operationId:'build',serviceId:'service',version:artifact.value.id,sha256:artifact.digest,sourceVersion,project});
+ await controller.submit(request);
+ const recovered=await createServiceControl(f.options,f.ports);
+ assert.deepEqual(await recovered.inspect(request),{state:'succeeded',version:request.targetVersion});
+ await recovered.submit(request);assert.equal(restarts,1);
+ await assert.rejects(recovered.inspect({...request,project:{...project,root:'/other'}}),{code:'SERVICE_REQUEST_CHANGED'});
 });

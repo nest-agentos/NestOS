@@ -171,3 +171,11 @@ Node 宿主通过部署环境变量 `NESTOS_KANBAN_MODULE_PERMISSIONS` 读取规
 执行失败或原会话留下待处理的错误报告时，如果原工作树可以续用，任务恢复区显示“复查环境并继续”。点击后用已授权项目进程在原工作树内查找命令并检查文件。条件未齐时返回缺项，用户可以安装后再次点击。通过时提交原会话的续办请求。对仍挂在当前派发上的报告，沿用原派发，执行会话核对并给出关联的解决回执。原工作树、已有改动和失败证据继续保留。验收、发布和清理以各自回执为准。
 
 原执行会话用 `session_report` 上报具体缺项。获授权的恢复会话可用 `session_request` 的 `kanban.recovery.inspect` 读取当前状态和可用操作，再按返回的修订调用允许的操作。管理会话可通过 `kanban.discover`、`kanban.describe` 和 `kanban.invoke` 查询或申请软件交付操作。先读 `delivery.read` 确认可用动作，再通过 `delivery.run` 按当前作用域、修订和确认要求提交。项目工具链变更仍需项目或服务相应权限。
+
+## 受管项目自身升级与验收
+
+项目可在 _nestos/etc/deployment.json 选择 httpd（当前受管 HTTP 服务的稳定别名）或管理员注册的服务 ID，例如 cells-x1。管理员在 ~/.config/nestos/service-projects.json（0600）或 NESTOS_SERVICE_PROJECTS 声明允许的项目与服务对应关系。记录由 serviceId、serverId、serverProjectId、principalId、alias 和 root 组成。宿主取已挂载根授权，并向 Cells 核对同一项目 ID 的导出别名与目录。改节点、项目、授权主体、根目录或服务后，旧构建需要重做；已提交的操作继续按原操作 ID 核对回执。
+
+仓库标识、Git 历史和项目声明可帮助发现升级候选。同一 Git 提交可出现在多个克隆中，操作准入还要核对管理员绑定。受管构建使用控制器提供的命令，在冻结的集成提交产生候选和清单摘要；宿主从自身制品库核对清单摘要及 Git commit。HTTP 托管构建要求干净源码。HTTP 使用 build --no-activate --receipt 构建，持久启动器执行版本切换，宿主重启后继续核对同一回执。Cells 项目绑定发布在注册目标上复用二进制与配置的校验、备份与进程核对。Cells 控制器从管理员 options.configSource 读取专用配置，未设置时使用目标现有配置。
+
+宿主管理员可独立使用 pnpm httpd:deploy 和 pnpm cells:redeploy [cells-x1|local]。Kanban 通过同一构建、版本切换和回执能力执行单目标发布。Harness 根据冻结描述构建候选并报告，验收从对应目标读取真实运行版本。

@@ -37,7 +37,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
     const store=await openPersonalKanbanStore(fs);await new KanbanExamples(store).seed();
     const journal=new KanbanAutomationJournal(fs,{...kanbanJournalOptions,diagnostic:event=>diagnostics.record({...event,module:'application',operation:'kanban.operation',level:event.result==='failure'?'warn':'info'})});
     let client:KanbanClient;
-    const assertRestartIdle=restartBarrier(()=>client);
+    const assertRestartIdle=restartBarrier(()=>client,automationOptions?.verifyNativeRestartIdle);
     let operations:ReturnType<typeof import('@nestos/kanban-development').createItemOperations>|undefined;
     const base=personalOptions({store,journal,events,diagnostics,sessions,activity,automationOptions:automationOptions?{...automationOptions,
         relatedSessions:async(board,item)=>[...await automationOptions.relatedSessions?.(board,item)??[],...await operations?.sessions(board,item)??[]]}:undefined});
