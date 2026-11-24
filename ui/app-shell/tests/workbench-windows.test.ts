@@ -28,7 +28,7 @@ it('shares windows, selection and multi-term search while preserving independent
     expect(toolbox.tabs.opened.querySelectorAll('[data-opened-id]')).toHaveLength(2);
     registry.setQuery('toolbox Provider');
     expect([...chat.tabs.opened.querySelectorAll<HTMLElement>('[data-opened-id]')].filter(row => !row.hidden)).toHaveLength(1);
-    chat.tabs.opened.querySelectorAll<HTMLButtonElement>('.workbench-tabs__opened-label')[1].click();
+    chat.tabs.opened.querySelector<HTMLButtonElement>('[data-opened-id]:not([hidden]) .workbench-tabs__opened-label')!.click();
     await vi.waitFor(() => expect(toolbox.navigate).toHaveBeenCalledWith('/same'));
     expect(a.panel.querySelector('textarea')).toBe(input); expect(input.value).toBe('unsaved text'); expect(b.panel.isConnected).toBe(true);
     toolbox.tabs.pin('/same'); registry.selectAll(true); expect(registry.items().some(item => item.selected)).toBe(false);
@@ -143,4 +143,32 @@ it('keeps desktop program navigation in its original position when opening the w
     expect(dialog.querySelector('.app-sidebar')).toBeNull();expect(nav.parentElement).toBe(document.body);
     expect(dialog.querySelector<HTMLElement>('footer')!.hidden).toBe(true);
     await tabs.destroy();expect(nav.parentElement).toBe(document.body);
+});
+
+it('places pinned windows first and sorts each group by the selected timestamp', async () => {
+    const {chat, toolbox} = fixture();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    await chat.tabs.open('first', 'First', false);
+    now.mockReturnValue(2000);
+    await toolbox.tabs.open('second', 'Second', false);
+    now.mockReturnValue(3000);
+    await chat.tabs.open('third', 'Third', false);
+    chat.tabs.pin('first');
+    const order = () => [...chat.tabs.opened.querySelectorAll<HTMLElement>('[data-opened-id]')].map(row => row.dataset.openedId);
+    expect(order()).toEqual(['first', 'third', 'second']);
+    now.mockReturnValue(4000);
+    toolbox.tabs.activate('second');
+    expect(order()).toEqual(['first', 'second', 'third']);
+    const sort = (field: string) => {
+        const select = chat.tabs.opened.querySelector('select')!;
+        select.value = field;
+        select.dispatchEvent(new Event('change'));
+    };
+    sort('createdAt');
+    expect(order()).toEqual(['first', 'third', 'second']);
+    toolbox.tabs.title('second', 'Renamed');
+    sort('modifiedAt');
+    expect(order()).toEqual(['first', 'second', 'third']);
+    expect(chat.tabs.opened.querySelectorAll('[data-opened-id="second"] time[datetime]')).toHaveLength(3);
+    await chat.tabs.destroy(); await toolbox.tabs.destroy();
 });

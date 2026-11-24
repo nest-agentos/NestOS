@@ -10,11 +10,46 @@ afterEach(() => {cleanups.splice(0).forEach(close => close()); document.body.rep
 const board = (id: string): KanbanBoardSummary => ({id, title: id, number: 1, items: []} as unknown as KanbanBoardSummary);
 async function fixture() {
     const catalog = vi.fn(async () => [board('Initial')]), report = vi.fn(), navigate = vi.fn(async () => {}), catalogChanged = vi.fn();
+    const records = vi.fn(async () => ({items: [{id:'formal', title:'Recurring formal', recurrence:{}}, {id:'once', title:'One shot'}]}));
+    const recordConversations = vi.fn(async () => [
+        {id:'draft', title:'Recurring draft', resourceId:'/native/draft', recurrence:{}},
+        {id:'confirmed', title:'Duplicate', recordId:'formal', recurrence:{}},
+    ]);
+    const createDecision = vi.fn(async () => {});
     const container = document.createElement('aside'); document.body.append(container);
-    const sidebar = new KanbanSidebar({container, service: {catalog} as unknown as KanbanClient, navigate, create: vi.fn(), report, catalogChanged});
+    const sidebar = new KanbanSidebar({container, service: {catalog, records, recordConversations, startRecordConversation: vi.fn()} as unknown as KanbanClient, navigate, create: vi.fn(), createDecision, report, catalogChanged});
     cleanups.push(() => sidebar.destroy()); await sidebar.start();
-    return {sidebar, container, catalog, report, navigate, catalogChanged};
+    return {sidebar, container, catalog, report, navigate, catalogChanged, records, createDecision};
 }
+it('opens the default loop board as a single sidebar item', async () => {
+    const f = await fixture();
+    expect(f.container.querySelector('[data-action="toggle-folder"]')).toBeNull();
+    expect(f.records).not.toHaveBeenCalled();
+    const item = f.container.querySelector<HTMLElement>('[data-item-id="/@loops"]')!;
+    expect(item.textContent).toContain(t('kanban.loops'));
+    item.querySelector<HTMLElement>('[title]')!.click();
+    await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledWith('/@loops'));
+    expect(f.records).not.toHaveBeenCalled();
+});
+it('offers new decision in the board item menu', async () => {
+    const f = await fixture();
+    f.container.querySelector<HTMLElement>('[data-item-id="/board/Initial"] [data-action="item-menu"]')!.click();
+    const action = '.vfs-context-menu [data-action="create-decision"]';
+    await vi.waitFor(() => expect(document.querySelector(action)?.textContent).toContain(t('kanban.createDecision')));
+    expect(document.querySelector('.vfs-context-menu [data-action="create-loop"]')).toBeNull();
+    document.querySelector<HTMLElement>(action)!.click();
+    await vi.waitFor(() => expect(f.createDecision).toHaveBeenCalledWith('Initial', false));
+});
+it('starts recurring creation from the loop board menu', async () => {
+    const f = await fixture();
+    f.container.querySelector<HTMLElement>('[data-item-id="/@loops"] [data-action="item-menu"]')!.click();
+    const action = '.vfs-context-menu [data-action="create-loop"]';
+    await vi.waitFor(() => expect(document.querySelector(action)).not.toBeNull());
+    expect(document.querySelector('.vfs-context-menu [data-action="create-decision"]')).toBeNull();
+    document.querySelector<HTMLElement>(action)!.click();
+    await vi.waitFor(() => expect(f.createDecision).toHaveBeenCalledWith('Initial', true));
+    expect(f.records).not.toHaveBeenCalled();
+});
 it('does not reconcile windows against a catalog response invalidated while it was loading',async () => {
     const f = await fixture(); let finish!: (rows: KanbanBoardSummary[]) => void;
     f.catalogChanged.mockClear(); f.catalog.mockImplementationOnce(() => new Promise(resolve => {finish = resolve;}));

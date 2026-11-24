@@ -13,5 +13,5 @@ export function adoptConnection(prepared: PreparedHttpBootstrap, fetcher: typeof
         window.addEventListener(event, () => client.retryConnection(), {signal});
     document.addEventListener('visibilitychange', () => {if (!document.hidden) client.retryConnection();}, {signal});
     const ready = client.start({prepared,deferEvents}).then(root => withSessionRecovery(root, createSessionRecoveryClient(fetcher), sessionRecoveryRequests));
-    return {ready, startEvents:()=>client.startDeferredEvents(), close: () => client.close()};
+    return {ready, startEvents:()=>client.startDeferredEvents(), prepareCatalogs:()=>client.prepareCatalogs(), close: () => client.close()};
 }

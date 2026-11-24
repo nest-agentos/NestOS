@@ -1,4 +1,5 @@
-import {KanbanWorkbench as KanbanView, type KanbanUIOptions} from '@nestos/kanban-ui';
+import type {KanbanDecisionSourceSession} from '@nestos/kanban/contracts';
+import {LOOP_BOARD_PATH, KanbanWorkbench as KanbanView, type KanbanUIOptions} from '@nestos/kanban-ui';
 import {ACTION_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
 import {WorkbenchTabs, type WorkbenchTab} from '../workbench/tabs';
 import type {WorkbenchWindowBinding} from '../workbench/windows';
@@ -36,12 +37,13 @@ export class KanbanWindowWorkbench {
             error: error => this.report(error), changed: () => this.syncVisibility(),
         }, undefined, options.windows);
         this.navigation = new KanbanSidebar({container: options.sidebar, service: options.service, navigate: path => this.navigate(path), windowManagement: this.tabs.windowManagement,
-            create: () => this.openBoardCreation(), report: error => this.report(error),
+            create: () => this.openBoardCreation(), createDecision: (id, recurringOnly, source) => this.openDecisionCreation(id, recurringOnly, source), report: error => this.report(error),
             catalogChanged: boards => {this.boardSnapshots = boards; this.availableBoards = new Set(boards.map(board => board.id)); this.scheduleReconcile();}});
         const host = document.createElement('div'); host.hidden = true; host.append(this.tabs.opened); options.sidebar.append(host);
     }
     async start(): Promise<void> {
         const initial=this.options.initialResource;
+        if (initial === LOOP_BOARD_PATH) {await this.openResource(initial); await this.startNavigation(); return;}
         if(initial?.includes('/@decision')&&this.options.service?.decisionSnapshot){await this.openResource(initial);await this.startNavigation();return;}
         if(initial&&/^\/board\/[^/]+\/[^@/][^/]*$/.test(initial)&&this.options.service?.taskSnapshot){
             if(mobileTaskDetails()){this.navigationVisible=false;this.navigation.setVisible(false);}
@@ -100,6 +102,7 @@ export class KanbanWindowWorkbench {
         const editor = document.createElement('div'); tab.panel.append(editor);
         const view = new KanbanView({...this.options, sidebar: undefined, editor, initialResource: tab.id,
             includeTaskSidebar:()=>!mobileTaskDetails(),
+            openLoopCreation: () => this.navigation.openLoopCreation(),
             openSettings:async id=>{this.tabs.keep(tab.id);this.navigation.openSettings(id);},
             catalogPrepared: boards => {this.boardSnapshots=boards;this.navigation.prepare(boards);},
             getBoardSnapshot: id => this.boardSnapshots?.find(board => board.id === id),
@@ -169,6 +172,15 @@ export class KanbanWindowWorkbench {
         if (!this.disposing) tab.value?.view.captureRecovery();
         await tab.value?.view.destroy();
     }
+    openLoopCreation(source: KanbanDecisionSourceSession): Promise<void> {return this.navigation.openLoopCreation(source);}
+    private async openDecisionCreation(boardId: string, recurringOnly: boolean, source?: KanbanDecisionSourceSession): Promise<void> {
+        const path = recurringOnly ? LOOP_BOARD_PATH : `/board/${encodeURIComponent(boardId)}/@decision`;
+        if (this.tabs.current?.id !== path) await this.navigate(path);
+        const page = this.tabs.get(path)?.value;
+        if (!page || this.disposing) return;
+        await page.ready;
+        if (!this.disposing) await page.view.createDecision(recurringOnly, boardId, source);
+    }
     private async openBoardCreation(): Promise<void> {
         await this.navigate('/');
         const page = this.tabs.current?.value; if (!page || this.disposing) return;
@@ -184,6 +196,7 @@ export class KanbanWindowWorkbench {
 function mobileTaskDetails():boolean{return window.matchMedia?.(MOBILE_NAVIGATION_QUERY).matches??false;}
 function parentPath(path: string): string {
     if(path.startsWith('/@resource/'))return '/';
+    if (/^\/board\/[^/]+\/@loop(?:-draft)?\//.test(path)) return LOOP_BOARD_PATH;
     const parts = path.split('/'); return parts.length > 3 ? parts.slice(0, 3).join('/') : '/';
 }
 

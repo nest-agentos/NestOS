@@ -476,13 +476,20 @@ export class ProjectRemoteMountService {
         }), connectionId);
     }
     async projectHarness(projectId: string, options?: OperationOptions & {requireRegistered?: boolean}): Promise<HarnessClient> {
+        return this.observeHarnessOpen(projectId, options, async () => {
+            const client = await this.openProjectHarness(projectId, options);
+            const connectionId = this.list(projectId).find(mount => mount.at === '/')!.connectionId!;
+            return this.guardHarness(client, projectId, JSON.stringify(this.list(projectId)), connectionId);
+        });
+    }
+    private async observeHarnessOpen<T>(projectId: string, options: OperationOptions | undefined, open: () => Promise<T>): Promise<T> {
         const started = Date.now(), operationId = randomUUID();
         try {
-            const client = await this.openProjectHarness(projectId, options);
+            const result = await open();
             if (this.clearIssue(projectId, 'harness-open')) {
                 this.eventLog.record({module: 'cells', operation: 'project.harness', stage: 'harness-open', result: 'success', level: 'info', projectId, operationId, durationMs: Date.now() - started});
             }
-            return this.guardHarness(client, projectId, JSON.stringify(this.list(projectId)), this.list(projectId).find(mount => mount.at === '/')!.connectionId!);
+            return result;
         }
         catch (error) {
             if (!cancelledByCaller(options)) {
@@ -494,10 +501,19 @@ export class ProjectRemoteMountService {
         }
     }
     private async openProjectHarness(projectId: string, options?: OperationOptions & {requireRegistered?: boolean}): Promise<HarnessClient> {
+        const {client, project, mount} = await this.openProjectBinding(projectId, options);
+        try {
+            const harness=client.harness(project,{readOnly:mount.access==='ro'}), close=harness.close.bind(harness);
+            harness.close=async () => {try {await close();}finally{await client.close();}};
+            return harness;
+        } catch(error) {await client.close();throw error;}
+    }
+    private async openProjectBinding(projectId: string, options?: OperationOptions & {requireRegistered?: boolean}) {
         const mount=this.list(projectId).find(mount => mount.at==='/');
         if (!mount?.connectionId || !this.provider.projects) throw new FSError('ECAPABILITY','Project harness unavailable');
         if (options?.requireRegistered && (!mount.serverProjectId || !Number.isSafeInteger(mount.serverProjectRevision) || mount.serverProjectRevision! < 1 || !mount.authorization))
             throw new FSError('ECAPABILITY','Project harness requires an existing authorized registration');
+        const fingerprint = JSON.stringify(this.list(projectId));
         const client=this.provider.projects(await this.resolveConnection(mount.connectionId, options));
         try {
             const project=options?.requireRegistered || mount.serverProjectId ? await client.read(mount.serverProjectId!,options)
@@ -508,9 +524,9 @@ export class ProjectRemoteMountService {
                 || project.authorization?.anonymous !== mount.authorization?.anonymous
                 || project.authorization?.revision !== mount.authorization?.revision))
                 throw new FSError('ECONFLICT','Remote project revision or authorization changed; refresh its binding');
-            const harness=client.harness(project,{readOnly:mount.access==='ro'}), close=harness.close.bind(harness);
-            harness.close=async () => {try {await close();}finally{await client.close();}};
-            return harness;
+            if (this.closed || fingerprint !== JSON.stringify(this.list(projectId)))
+                throw new FSError('ECONFLICT', 'Project authorization changed');
+            return {client, project, mount, fingerprint, connectionId: mount.connectionId};
         } catch(error) {await client.close();throw error;}
     }
     async executionSettings(projectId: string, options?: OperationOptions) {
@@ -762,15 +778,17 @@ export class ProjectRemoteMountService {
     private async createProjectConversation(projectId: string, profileId: string, sessionId?: string, options?: OperationOptions, readOnly = false, draftId?: string, draftTitle?: string): Promise<ProjectConversationPort> {
         if (draftId !== undefined && !/^[a-zA-Z0-9_-]+$/.test(draftId)) throw new FSError('EINVAL', 'Invalid draft identity');
         if (!this.provider.conversation) throw new FSError('ECAPABILITY', 'Conversation adapter unavailable');
-        const client = await this.projectHarness(projectId, options);
-        const fingerprint = JSON.stringify(this.list(projectId));
-        let stateClient:ProjectClient|undefined;
+        const {client: stateClient, project: stateProject, mount: root, fingerprint, connectionId} =
+            await this.observeHarnessOpen(projectId, options, () => this.openProjectBinding(projectId, options));
+        let client: HarnessClient | undefined;
         try {
+            if(stateProject.revision!==root.serverProjectRevision)throw new FSError('ECONFLICT','Remote harness state binding changed');
+            client = this.guardHarness(stateClient.harness(stateProject, {readOnly:root.access==='ro'}), projectId, fingerprint, connectionId);
             const descriptor = await client.profiles(options);
             const profile = descriptor.profiles.find(p => (p.id === profileId || p.aliases?.includes(profileId)) && p.projectRuntime);
             if (!profile) throw new FSError('ECAPABILITY', 'Project harness profile unavailable');
-            const root = this.list(projectId).find(m => m.at === '/')!;
-            const cellsIdentity = sessionId ? (await this.projectDraft(projectId, {action: 'resolve', profileId: profile.id, sessionId})).conversationId : undefined;
+            const cellsIdentity = sessionId ? (await stateClient.draft?.(stateProject, {action: 'resolve', profileId: profile.id, sessionId}, options))?.conversationId : undefined;
+            this.checkHarnessAccess(projectId, fingerprint, connectionId);
             const conversationId = cellsIdentity ?? (sessionId ? await readConversationIdentity(this.store, projectId, {
                 connectionId: root.connectionId!, serverProjectId: root.serverProjectId!, principalId: root.authorization?.principalId,
                 profileId: profile.id, nativeSessionId: sessionId}) : draftId ?? randomUUID());
@@ -782,14 +800,9 @@ export class ProjectRemoteMountService {
                 if (record.id !== draftId) throw new FSError('ECONFLICT', 'Cells draft identity changed');
                 await drafts.begin(draftTitle ?? '', target);
             } : undefined;
-            const guarded = this.guardHarness(client, projectId, fingerprint, root.connectionId!);
             const checkAccess = () => {
                 if (this.closed || fingerprint !== JSON.stringify(this.list(projectId))) throw new FSError('ECONFLICT', 'Project authorization changed');
             };
-            if(!this.provider.projects)throw new FSError('ECAPABILITY','Remote harness state is unavailable');
-            stateClient=this.provider.projects(await this.resolveConnection(root.connectionId!,options));
-            const stateProject=await stateClient.read(root.serverProjectId!,options);
-            if(stateProject.revision!==root.serverProjectRevision)throw new FSError('ECONFLICT','Remote harness state binding changed');
             const owner=remoteConversationKey(projectId,target,conversationId??sessionId!);
             const writable=(profile.projectCapabilities?.sessionControl??root.access==='rw')&&!readOnly;
             const stateNamespace = !sessionId || cellsIdentity ? JSON.stringify(['conversation', conversationId, profile.id]) : owner;
@@ -798,16 +811,16 @@ export class ProjectRemoteMountService {
                 {...target, nativeSessionId}, conversationId) : undefined;
             const recovery = new RemoteConversationStore(this.store,owner,remoteState,bindIdentity);
             const firstInput = draftId ? remoteFirstInput(draftId, profile.id, input => {
-                if (!stateClient!.draft) throw new FSError('ECAPABILITY', 'Cells first-input submission is unavailable');
-                return stateClient!.draft(stateProject, input);
+                if (!stateClient.draft) throw new FSError('ECAPABILITY', 'Cells first-input submission is unavailable');
+                return stateClient.draft(stateProject, input);
             }, checkAccess) : undefined;
-            const conversation = await this.provider.conversation(sessionId ? guarded : draftHarness(guarded, recovery), profile, profile.workspaces[0].id, sessionId, writable,
+            const conversation = await this.provider.conversation(sessionId ? client : draftHarness(client, recovery), profile, profile.workspaces[0].id, sessionId, writable,
                 remoteConversationJournal(recovery, descriptor.epoch, false, checkAccess, writable ? sessionId : undefined, prepareSubmission, firstInput));
             const composer = new ConversationComposerStore(remoteState,!readOnly,checkAccess,{fs:this.store,projectId,owner});
             const observed = observeConversation(sessionId ? conversation : draftConversation(conversation, recovery, draftTitle), this.estimateUsage, conversationId,
                 () => { void this.sessionStatus.refresh(projectId); });
-            return withConversationComposer(observed,composer,()=>stateClient!.close());
-        } catch (error) { await stateClient?.close();await client.close(); throw error; }
+            return withConversationComposer(observed,composer,()=>stateClient.close());
+        } catch (error) {await Promise.allSettled([client?.close(), stateClient.close()]); throw error;}
     }
     private guardHarness(client: HarnessClient, projectId: string, fingerprint: string, connectionId: string): HarnessClient {
         if (this.guardedClients.has(client)) return client;

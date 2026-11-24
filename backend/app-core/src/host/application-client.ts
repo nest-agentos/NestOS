@@ -41,6 +41,7 @@ import { listRemoteHarnessAgents } from '../projects/remote-agent-catalog';
 import { conversationBranches } from '@nestos/cells-driver';
 import { prepareWorkbenchView } from './workbench-view';
 import { openSessionView } from './session-view';
+import { openProjectDraft } from './project-draft-opening';
 import { observeConnections } from './connection-observation';
 import { listPinnedWindows, readUiDocuments, setPinnedWindow, writeUiDocuments } from './ui-documents';
 import { ViewScope } from './view-scope';
@@ -132,6 +133,7 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
             }
         },
         openSessionView: async id => scope.own(await openSessionView(services, id)),
+        openProjectDraft: path => openProjectDraft(projects, path),
         readAgentProjectScopes: ids => agentProjectScopes(vfs, projects).read(ids),
         saveAgentProjectScope: (id, value) => {
             if (options.configurationReadonly) throw new FSError('EACCES', 'Configuration is read-only');

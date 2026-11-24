@@ -92,6 +92,33 @@ it.each([
                 expect(coldEditor.textContent).toContain('Remote native history');
                 expect(prepareLocalChat).not.toHaveBeenCalled();
                 expect(peer.read).toHaveBeenCalledTimes(nativeReads);
+                const panel = coldEditor.querySelector('.workbench-tabs__panel:not([hidden])')!;
+                const input = panel.querySelector('.llm-chat__input');
+                expect(input).not.toBeNull();
+                await cold.setNavigationVisible(true);
+                await cold.openResource(remoteSessionPath(project.path, 'codex', 'earlier-native'), {newTab: true});
+                const navigation = vi.spyOn(runtime.projects, 'navigation'), open = vi.spyOn(opening, 'openConversation');
+                const tab = coldEditor.querySelector<HTMLButtonElement>(`[data-tab-id="${resourceId}"] .workbench-tabs__label`)!;
+                expect(tab.title).toContain('Native session');
+                tab.click();
+                await vi.waitFor(() => expect(cold.getActiveResourceId()).toBe(resourceId));
+                expect(coldEditor.querySelector('.workbench-tabs__panel:not([hidden])')).toBe(panel);
+                expect(panel.querySelector('.llm-chat__input')).toBe(input);
+                expect(open).not.toHaveBeenCalled();
+                expect(navigation).not.toHaveBeenCalled();
+                let finish!: () => void;
+                const pending = new Promise<void>(resolve => {finish = resolve;}), closeLate = vi.fn(async () => {});
+                open.mockImplementationOnce(async () => {
+                    await pending;
+                    return {...opening.native!, conversation: {...opening.native!.conversation, close: closeLate}};
+                });
+                const loading = cold.openResource(remoteSessionPath(project.path, 'codex', 'pending-native'), {newTab: true});
+                try {
+                    await vi.waitFor(() => expect(open).toHaveBeenCalledOnce());
+                    await cold.openResource(resourceId);
+                    expect(coldEditor.querySelector('.workbench-tabs__panel:not([hidden])')).toBe(panel);
+                } finally {finish(); await loading;}
+                await vi.waitFor(() => expect(closeLate).toHaveBeenCalledOnce());
             } finally {
                 sources.close(); await cold.destroy(); await opening.dispose(); coldEditor.remove(); coldSidebar.remove();
             }

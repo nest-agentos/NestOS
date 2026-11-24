@@ -52,8 +52,21 @@ it('defaults to no optional verification and keeps conflict guidance short and d
  expect(kanbanConfigurationDefaults['decision-actions.md']).toContain('Do not ask about verification unless requested');
  expect(kanbanConfigurationDefaults['task-merge-pre.md']).toContain('kanban.context.resolve');
  expect(kanbanConfigurationDefaults['task-merge-pre.md'].length).toBeLessThan(900);
- expect(kanbanConfigurationDefaults['task-integrate-pre.md']).toContain('restore and verify content and staging');
+ expect(kanbanConfigurationDefaults['task-integrate-pre.md']).toContain('Leave both checkouts, refs and indexes untouched');
  expect(kanbanConfigurationDefaults['task-integrate-pre.md'].length).toBeLessThan(1000);
+});
+
+it('makes report packaging guidance available during delivery and keeps recovery on the existing result', () => {
+    const delivery = promptReferenceSections(files, 'task.md');
+    const recovery = promptReferenceSections(files, 'task-recovery-pre.md');
+    const packaging = delivery['report-packaging.md'];
+    expect(packaging).toContain('_nestos/kanban/artifacts');
+    expect(packaging).toContain('_nestos/kanban/retained-environment');
+    expect(packaging).toContain('hash-matched copy');
+    expect(packaging).toContain('2,000 files and 256 MiB');
+    expect(recovery['report-packaging.md']).toBe(packaging);
+    expect(recovery['task-recovery-pre.md']).toContain('evidence, hashes, and existing result');
+    expect(recovery['task-recovery-pre.md']).toContain('formal handoff receipt');
 });
 
 it('keeps automatic reanalysis instructions short without asking to confirm routine version drift',()=>{

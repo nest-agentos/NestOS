@@ -6,22 +6,65 @@ import {DirectorySubscriptions} from '../run/directory-subscriptions';
 import {channelRequests,channelDigest,type ChannelResponse,type ChannelRequest} from '../run/channel-protocol';
 import type {TaskRecoveryOptions,RecoverySession} from './task-recovery-ports';
 import {requireValue} from './validation';
+import {channelMessages,type ChannelMessage} from '../run/channel-results';
 interface Ports {active():boolean;inspect:typeof import('./task-recovery-state').taskRecoveryState;recoverTask(board:string,request:KanbanTaskRecoveryRequest):Promise<KanbanTaskRecoveryResult>}
 export function taskRecoveryChannels(options:TaskRecoveryOptions,ports:Ports) {
     const watches=new DirectorySubscriptions(),pending=new Map<string,Promise<void>>(),restored=new Set<string>();
     const advance=(scope:RecoverySession)=>{if(!ports.active())return Promise.resolve();const next=(pending.get(scope.scopeId)??Promise.resolve()).catch(()=>{}).then(()=>processRequests(options,ports,scope));pending.set(scope.scopeId,next);void next.finally(()=>{if(pending.get(scope.scopeId)===next)pending.delete(scope.scopeId);}).catch(()=>{});return next;};
     const watch=async(scope:RecoverySession)=>{await watches.ensure(scope.scopeId,async()=>{const client=await options.remote.projectHarness(scope.projectId);try{requireValue(client.subscribeChannel,'SESSION_CHANNEL_REQUIRED');const stop=client.subscribeChannel(scope.scopeId,()=>{void advance(scope).catch(error=>options.log({operationId:scope.dispatchId,boardId:scope.boardId,stage:'task.recovery.channel',result:'failure',code:safeCode(error),durationMs:0}));});return async()=>{stop();await client.close();};}catch(error){await client.close();throw error;}});restored.add(scope.scopeId);};
-    return {open:async(boardId:string,request:{itemId:string;operationId:string})=>{
+    return {open:async(boardId:string,request:{itemId:string;operationId:string;expectedRevision?:string})=>{
         const state=await ports.inspect(options,boardId,request.itemId);requireValue(state.resourceId,'CONTINUATION_SESSION_UNKNOWN');
+        if(request.expectedRevision!==undefined)requireValue(state.revision===request.expectedRevision&&state.code==='WORKSPACE_RESULT_MISSING','RECOVERY_STALE_REFRESH');
         if(state.state==='blocked')return {operationId:request.operationId,state:'accepted' as const,resourceId:state.resourceId};
         const target=resolveBrowserTarget(state.resourceId);requireValue(target.kind==='remote'&&target.profileId&&target.nativeSessionId,'CONTINUATION_NATIVE_SESSION_UNKNOWN');
         const workflow=await options.service.workflow(boardId);const dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===request.itemId).sort((a,b)=>b.attempt-a.attempt)[0];requireValue(dispatch,'EXECUTION_NOT_FOUND');
         const record=(await recoveryWorkspace(options.journal,workflow,dispatch))?.record;requireValue(record?.channelId,'CONTINUATION_WORKSPACE_UNAVAILABLE');
-        const scope=await options.journal.update<RecoverySession>('task-recovery-session:'+dispatch.id,old=>old??{boardId,itemId:request.itemId,dispatchId:dispatch.id,scopeId:record.channelId!,projectId:record.projectId,profileId:target.profileId!,sessionId:target.nativeSessionId!,resourceId:state.resourceId!});
-        await watch(scope);
-        if(!scope.ready){await enqueue(options,scope,'recovery-open-'+dispatch.id,(await conversationPolicy(options.fs)).recoveryBootstrap);await options.journal.update<RecoverySession>('task-recovery-session:'+dispatch.id,old=>({...old!,ready:true}));}
-        await advance(scope);return {operationId:request.operationId,state:'accepted' as const,resourceId:scope.resourceId};
+        const scope:RecoverySession={boardId,itemId:request.itemId,dispatchId:dispatch.id,scopeId:record.channelId,
+            projectId:record.projectId,profileId:target.profileId,sessionId:target.nativeSessionId,resourceId:state.resourceId};
+        if(state.code==='WORKSPACE_RESULT_MISSING'){
+            requireValue(dispatch.executionSessionId===state.sessionId&&dispatch.code===state.code&&dispatch.outcome==='unknown','RECOVERY_STALE_REFRESH');
+            await requestMissingResult(options,scope,record,ports.active);
+            return {operationId:request.operationId,state:'accepted' as const,resourceId:scope.resourceId};
+        }
+        const saved=await options.journal.update<RecoverySession>('task-recovery-session:'+dispatch.id,old=>old??scope);
+        await watch(saved);
+        if(!saved.ready){await enqueue(options,saved,'recovery-open-'+dispatch.id,(await conversationPolicy(options.fs)).recoveryBootstrap);await options.journal.update<RecoverySession>('task-recovery-session:'+dispatch.id,old=>({...old!,ready:true}));}
+        await advance(saved);return {operationId:request.operationId,state:'accepted' as const,resourceId:saved.resourceId};
     },recover:async()=>{for(const row of await options.journal.find<RecoverySession>('task-recovery-session:',()=>true)){if(!ports.active())return;if(!restored.has(row.value.scopeId)){await watch(row.value);void advance(row.value).catch(error=>options.log({operationId:row.value.dispatchId,boardId:row.value.boardId,stage:'task.recovery.restore',result:'failure',code:safeCode(error),durationMs:0}));}}},close:async()=>{await watches.dispose();await Promise.allSettled([...pending.values()]);}};
+}
+async function requestMissingResult(options:TaskRecoveryOptions,scope:RecoverySession,
+    record:NonNullable<Awaited<ReturnType<typeof recoveryWorkspace>>>['record'],active:()=>boolean):Promise<void> {
+    const {boardId,itemId,projectId,scopeId,sessionId,dispatchId}=scope;
+    const started=Date.now(),operationId='recovery-result-'+dispatchId;
+    let stage='task.recovery.admission';
+    try {
+        const board=await options.service.read(boardId),item=board.items.find(row=>row.id===itemId);
+        requireValue(active()&&!!item&&!board.executionControl?.paused&&!board.lifecycle&&board.deletedAt===undefined
+            &&item.deletedAt===undefined&&item.control?.action!=='cancel'&&item.control?.action!=='pause'
+            &&!await options.journal.get('worktree-cleanup:'+(record.worktreeId??dispatchId)),'RECOVERY_TARGET_NOT_READY');
+        stage='task.recovery.scope';
+        const binding=await options.remote.sessionChannel(projectId,'current',{cwd:record.directory}) as
+            {scopeId?:string;execution?:{sessionId?:string}};
+        requireValue(binding.scopeId===scopeId&&binding.execution?.sessionId===sessionId,'RECOVERY_STALE_REFRESH');
+        const existing=publishedRecoveryOutcome(await channelMessages(options.remote,projectId,scopeId));
+        if(existing){
+            options.log({operationId,boardId,stage,result:'success',code:existing,durationMs:Date.now()-started});
+            return;
+        }
+        stage='task.recovery.enqueue';
+        const template=(await conversationPolicy(options.fs)).missingResultBootstrap;
+        const instruction=await options.journal.update<{text:string}>('task-result-assistance:'+dispatchId,old=>old??{text:template});
+        requireValue(active(),'SERVICE_STOPPING');
+        await enqueue(options,scope,operationId,instruction.text);
+        options.log({operationId,boardId,stage,result:'success',durationMs:Date.now()-started});
+    }catch(error){
+        options.log({operationId,boardId,stage,result:'failure',code:safeCode(error),durationMs:Date.now()-started});throw error;
+    }
+}
+function publishedRecoveryOutcome(reports:ChannelMessage[]):string|undefined {
+    if(reports.some(row=>row.message.type==='result'))return 'RESULT_ALREADY_PUBLISHED';
+    const resolved=new Set(reports.filter(row=>row.message.type==='resolved').map(row=>row.message.replyTo));
+    if(reports.some(row=>['error','clarification'].includes(row.message.type)&&!resolved.has(row.id)))return 'WORKSPACE_BLOCKER_ALREADY_REPORTED';
 }
 async function processRequests(options:TaskRecoveryOptions,ports:Ports,scope:RecoverySession):Promise<void> {
     if(!ports.active())return;
@@ -45,7 +88,7 @@ async function processRequests(options:TaskRecoveryOptions,ports:Ports,scope:Rec
 }
 async function resolve(options:TaskRecoveryOptions,ports:Ports,scope:RecoverySession,request:ChannelRequest):Promise<unknown> {
     const state=await ports.inspect(options,scope.boardId,scope.itemId);
-    if(request.method==='kanban.recovery.inspect')return {...state,methods:[{method:'kanban.recovery.retry',params:{expectedRevision:state.revision},available:state.canRetry},...(state.canRecheck?[{method:'kanban.recovery.recheck',params:{expectedRevision:state.revision},available:true}]:[]),{method:'kanban.recovery.retry-current',params:{expectedRevision:state.revision},available:state.canSelectCurrentVersion,confirmationRequired:true},{method:'kanban.recovery.fix',params:{expectedRevision:state.revision,sourceItemId:state.related[0]?.itemId??scope.itemId},available:true}],confirmation:(await conversationPolicy(options.fs)).confirmVersion};
+    if(request.method==='kanban.recovery.inspect')return {...state,methods:[{method:'kanban.recovery.retry',params:{expectedRevision:state.revision},available:state.canRetry},...(state.canRecheck||state.reportHandoff?.canRecheck?[{method:'kanban.recovery.recheck',params:{expectedRevision:state.revision},available:true}]:[]),{method:'kanban.recovery.retry-current',params:{expectedRevision:state.revision},available:state.canSelectCurrentVersion,confirmationRequired:true},{method:'kanban.recovery.fix',params:{expectedRevision:state.revision,sourceItemId:state.related[0]?.itemId??scope.itemId},available:!state.reportHandoff}],confirmation:(await conversationPolicy(options.fs)).confirmVersion};
     const action=request.method==='kanban.recovery.retry'?'retry':request.method==='kanban.recovery.retry-current'?'retry-current':request.method==='kanban.recovery.fix'?'fix':request.method==='kanban.recovery.recheck'?'recheck':undefined;requireValue(action,'RECOVERY_METHOD_UNSUPPORTED');
     requireValue(request.params.itemId===undefined||request.params.itemId===scope.itemId,'RECOVERY_SCOPE_MISMATCH');
     if(action==='retry-current') {

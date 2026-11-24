@@ -17,6 +17,10 @@ describe('terminal command controls', () => {
         widget.insertCommand('echo test',false);expect(paste).toHaveBeenCalledWith('echo test');expect(enqueue).not.toHaveBeenCalled();
         widget.insertCommand('echo test',true);expect(enqueue).toHaveBeenCalledWith('\r');
         widget.insertCommand('bad\x1b[201~\r',false);expect(paste).toHaveBeenCalledTimes(2);
+        expect(root.textContent).not.toContain('bad');
+        widget.terminal.modes.bracketedPasteMode=false;
+        widget.insertCommand('echo blocked',true);
+        expect(paste).toHaveBeenCalledTimes(2);expect(enqueue).toHaveBeenCalledTimes(1);
     });
     it('creates, edits, deletes and invokes saved commands', async () => {
         const root=document.createElement('div'),insert=vi.fn(),error=vi.fn();

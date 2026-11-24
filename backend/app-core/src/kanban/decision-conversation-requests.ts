@@ -59,8 +59,11 @@ async function propose(options:DecisionConversationOptions,conversation:Decision
     const dependsOn=await validateDecisionDependencies(options.service,conversation.boardId,value.id,value.dependsOn);
     const scope=conversation.binding.projectIds;
     requireValue(!scope||scope.length===value.projectIds.length&&value.projectIds.every(id=>scope.includes(id)),'DECISION_PROJECT_SCOPE_MISMATCH');
-    const externalRefs=value.projectIds.map(id=>({system:REMOTE_PROJECT_REFERENCE,id}));await validateRemoteReferences(options.projects,{externalRefs});
+    const externalRefs:import('@nestos/kanban/contracts').KanbanExternalReference[]=value.projectIds.map(id=>({system:REMOTE_PROJECT_REFERENCE,id}));await validateRemoteReferences(options.projects,{externalRefs});
     if(scope){decisionProjectScope(options.remote,conversation.binding.projectId,scope);externalRefs.push({system:PRIMARY_PROJECT_REFERENCE,id:conversation.binding.projectId});}
+    const source=conversation.binding.sourceSession;
+    if(source)externalRefs.push({system:'nestos-decision-source-session',id:source.sessionId,
+        revision:JSON.stringify({projectId:source.projectId,profileId:source.profileId})});
     const modules=conversation.binding.modules??[];
     externalRefs.push(...modules.map(decisionModuleReference));
     const selected=kanbanVerificationOptions(value.verificationMode),record:KanbanRecordInput={id:value.id,kind:'decision',...(dependsOn.length?{dependsOn}:{}),completion:'automatic',title:value.title,content:value.content,rationale:value.rationale,itemIds:[],externalRefs,discussionSessionId:conversation.resourceId,...selected,

@@ -6,6 +6,7 @@ import type { IToolService } from '@nestos/tools/contracts';
 import type { HarnessSession, HarnessConversationSnapshot } from '@nestos/cells-driver/harness';
 import type { SessionFilesPort, DirectoryMountPort, FileSystemsPort } from './files';
 import type { ProjectService, ProjectSessions, NativeSessionCommand, ResolvedProjectFavorite } from './projects';
+import type { ProjectDraftOpening } from './conversation-workbench';
 import type { SessionExport, WorkbenchView, SessionOpenView, WorkbenchArchiveExporter, WorkbenchArchiveImporter, NestosInitialFiles } from './session';
 import type { SettingsPort, SettingsWorkspaceSource } from '../settings';
 import type { ToolboxInventory, ToolboxResources, OcrService, ModelConfigurationCommands } from './configuration';
@@ -70,6 +71,7 @@ export interface ApplicationBackend {
     openConversationWorkbench?(request: import('./conversation-workbench').ConversationWorkbenchRequest): Promise<import('./conversation-workbench').ConversationWorkbenchView>;
     workbenchView(options?: { displayedFilesPolicy?: 'gitignore' | 'all'; chatControls?: boolean; initialNavigation?: boolean; initialSessionId?: string }): Promise<WorkbenchView>;
     openSessionView(sessionId: string): Promise<SessionOpenView>;
+    openProjectDraft?(path: string): Promise<ProjectDraftOpening>;
     readAgentProjectScopes(ids: string[]): Promise<Record<string, import('./agent-project-scope').AgentProjectScope>>;
     saveAgentProjectScope(id: string, scope: import('./agent-project-scope').AgentProjectScope): Promise<void>;
     readUiDocuments(names: string[]): Promise<Record<string, unknown>>;

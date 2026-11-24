@@ -18,6 +18,17 @@ export function createHarnessContextCleanup(kernel: KernelSource, ensureWritable
     return (journal, unstarted, context) => cleanup(kernel, ensureWritable, journal, unstarted, context);
 }
 
+export function createHarnessCleanupContextReader(kernel: KernelSource, ensureWritable: WriteGate):
+    NonNullable<HarnessExecutionOptions['readContextForCleanup']> {
+    return async journal => {
+        const {sessionId} = journal.context;
+        await ensureWritable(sessionId);
+        const session = await kernel().openSession(sessionId);
+        const state = harnessCleanupRecord(session, sessionId, CONTEXT_BINDINGS_KEY, ensureWritable);
+        return new HarnessContextBindings(state, sessionId).get(journal.data.bindingId!);
+    };
+}
+
 async function cleanup(kernel: KernelSource, ensureWritable: WriteGate, journal: ExecutionJournal, unstarted: boolean, context: EffectExecutionContext) {
     const started = Date.now(); let stage = 'journal-verification';
     try {

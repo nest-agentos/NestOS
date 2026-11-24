@@ -20,7 +20,7 @@ export interface ProjectConversationPort extends HarnessConversationPort {
     /** Stable host identity retained when a project draft becomes a native conversation. */
     readonly conversationId?: string;
     snapshot(): ProjectConversationSnapshot;
-    read(): Promise<ProjectConversationSnapshot>;
+    read(options?: {includeUsage?: false}): Promise<ProjectConversationSnapshot>;
     refresh(): Promise<ProjectConversationSnapshot>;
     send(text: string, attachments?: HarnessContracts.HarnessAttachment[], selection?: HarnessContracts.HarnessModelSelection, submissionId?: string): Promise<ProjectConversationSnapshot>;
     command?(...args: Parameters<NonNullable<HarnessConversationPort['command']>>): Promise<ProjectConversationSnapshot>;

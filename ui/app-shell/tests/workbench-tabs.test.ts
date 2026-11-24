@@ -88,7 +88,7 @@ it('keeps project context separate from resource names and rename persistence', 
     const header = f.container.querySelector('.workbench-tabs__tab')!;
     expect(header.querySelector('.workbench-tabs__context')?.textContent).toBe('Personal');
     expect(header.querySelector('.workbench-tabs__label')?.getAttribute('aria-label')).toBe('renamed.md');
-    expect(f.tabs.snapshot()).toEqual([{id: '/renamed.md', title: 'renamed.md', pinned: false, context: 'Personal'}]);
+    expect(f.tabs.snapshot()).toEqual([{id: '/renamed.md', title: 'renamed.md', pinned: false, context: 'Personal', createdAt: expect.any(Number), modifiedAt: expect.any(Number), accessedAt: expect.any(Number) }]);
     expect(f.tabs.get('/renamed.md')?.context).toBe('Personal'); await f.tabs.destroy();
 });
 it('switches opened documents from the compact header without replacing retained editor DOM', async () => {
@@ -271,7 +271,7 @@ it('remaps an inactive renamed file and preserves pinned metadata during shutdow
     const f = tabsFixture(); await f.tabs.open('/old.md', 'old.md'); f.tabs.pin('/old.md');
     await f.tabs.open('/other.md', 'other.md'); f.tabs.rename('/old.md', '/new.md', 'new.md');
     expect(f.tabs.get('/new.md')?.pinned).toBe(true); expect(f.tabs.get('/old.md')).toBeUndefined();
-    expect(f.tabs.snapshot()).toEqual([{ id: '/new.md', title: 'new.md', pinned: true }]); await f.tabs.destroy();
+    expect(f.tabs.snapshot()).toEqual([{ id: '/new.md', title: 'new.md', pinned: true, createdAt: expect.any(Number), modifiedAt: expect.any(Number), accessedAt: expect.any(Number) }]); await f.tabs.destroy();
 });
 it('shares the same search input and query between the sidebar and the window dialog', async () => {
     vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function () {this.open = true;});
@@ -502,7 +502,7 @@ it('uses a display-only path in compact directory navigation and restores docume
         expect(label().textContent).toBe('所有项目 / 个人 / 文件');
         expect(label().querySelector('strong')).toBeNull();
         label().querySelector<HTMLButtonElement>('[data-directory-path="/p"]')!.click(); expect(open).toHaveBeenCalledWith('/p');
-        expect(f.tabs.snapshot()[0]).toEqual({id: 'directory', title: '文件', pinned: false, context: '个人'});
+        expect(f.tabs.snapshot()[0]).toEqual({id: 'directory', title: '文件', pinned: false, context: '个人', createdAt: expect.any(Number), modifiedAt: expect.any(Number), accessedAt: expect.any(Number) });
         await f.tabs.open('doc', 'notes.md', false); expect(label().querySelector('nav')).toBeNull(); expect(label().textContent).toContain('notes.md');
         f.tabs.activate(dir.id); expect(label().textContent).toBe('所有项目 / 个人 / 文件');
     } finally { await f.tabs.destroy(); }

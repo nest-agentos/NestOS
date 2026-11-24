@@ -81,7 +81,7 @@ export function draftConversation(source: HarnessConversationPort, recovery: Rem
             const submitted = !!recovery.submittedTurnId;
             const result = await Reflect.apply(value, target, args);
             if (key === 'rename') initialTitle = undefined;
-            if (!submitted && snapshot().submittedTurnId) initialTitle ??= draftTitle ?? formatDefaultFileTitle();
+            if (!submitted && snapshot().submittedTurnId) initialTitle ??= draftTitle ?? (source.kind === 'codex' ? undefined : formatDefaultFileTitle());
             if (initialTitle && source.snapshot().title === initialTitle) initialTitle = undefined;
             if (initialTitle && ['send', 'command', 'reconcile', 'refresh'].includes(String(key)) && source.snapshot().canRename && source.rename) {
                 try { await source.rename(initialTitle); initialTitle = undefined; }

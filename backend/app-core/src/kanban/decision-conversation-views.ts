@@ -24,7 +24,8 @@ export async function decisionConversationViews(options:DecisionConversationOpti
         try {
             if(!folders.has(binding.projectId))folders.set(binding.projectId,options.projects.get(binding.projectId));
             const folder=await folders.get(binding.projectId)!;
-            return {...view,resources:view.resources??[{system:'nestos-remote-project',id:binding.projectId}],resourceId:remoteSessionPath(folder.path,binding.profileId,sessionId)};
+            const source=binding.sourceSession;
+            return {...view,...(source?{sourceResourceId:remoteSessionPath(folder.path,source.profileId,source.sessionId)}:{}),resources:view.resources??[{system:'nestos-remote-project',id:binding.projectId}],resourceId:remoteSessionPath(folder.path,binding.profileId,sessionId)};
         }catch(error){
             const raw=(error as {code?:string})?.code,code=raw&&/^[A-Z][A-Z0-9_]{0,79}$/.test(raw)?raw:'DECISION_SESSION_LINK_FAILED';
             options.log({operationId:row.id,boardId:row.boardId,stage:'decision.conversation.link',result:'failure',code,durationMs:Date.now()-started});

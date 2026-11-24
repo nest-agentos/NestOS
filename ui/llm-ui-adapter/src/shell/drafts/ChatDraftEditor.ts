@@ -60,10 +60,13 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     };
     private offConfiguration?: () => void;
     private configurationGeneration = 0;
+    private configurationReady = false;
+    private configurationLoading?: ReturnType<typeof draftLoading>;
     private readonly stops: (() => void)[] = [];
     private readonly events = new Map<EditorEvent, Set<(payload: unknown) => void>>();
     private connections: Awaited<ReturnType<typeof buildConnectionOptions>> = [];
     private readonly nativeModels = new Map<string, import('../../contracts').ConversationModelCatalog>();
+    private readonly pendingModels = new Map<string, Promise<void>>();
     private executors: Awaited<ReturnType<typeof buildExecutorOptions>> = [];
     constructor(container: HTMLElement, agents: IAgentConfigService, private config: Options,
         private readonly factory: (container: HTMLElement, options: EditorOptions, handoff: RetainedWorkspaceHandoff) => Promise<IEditor>,
@@ -73,6 +76,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         this.store = new ChatDraftStore(config.sessionDraft);
         this.source = new ChatProjection(config.sessionDraft.id ?? randomUUID(), error => this.emit('error', error));
         if (controls.commands && (config.sessionDraft.executorScope !== 'remote' || config.sessionDraft.promptHarness)) this.targets = new SessionCallTargets(controls.commands, () => {
+            if (!this.view) return;
             if (!this.closed && !this.transferred && this.active) refreshDraftTarget(this.view, this.callTargets());
             this.publish();
         }, false, config.filterExecutors);
@@ -81,16 +85,49 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     async render(): Promise<void> {
         const loading = draftLoading(this.container, this.config.signal);
         await loading.read('attachments', () => this.store.open());
-        await loading.read('configuration', () => this.refreshConfiguration(false));
-        await loading.read('targets', async () => {await this.targets?.refresh();}); this.check(); this.publish();
+        const deferred = this.config.sessionDraft?.executorScope === 'remote';
+        if (!deferred) {
+            await loading.read('configuration', () => this.refreshConfiguration());
+            this.configurationReady = true;
+        }
+        this.check(); this.publish();
         this.view = await createChatView(this.container, this.viewOptions());
         loading.finish();
         this.selectorTarget = JSON.stringify(this.view.getDraft().target);
         this.config.sessionDraft?.presentation?.titleChanged(this.draftTitle());
-        const changed = () => {void this.refreshConfiguration().then(() => this.publish()).catch(error => this.report(error));};
+        const changed = () => {void (deferred ? this.loadConfiguration() : this.refreshConfiguration().then(() => this.publish()).catch(error => this.report(error)));};
         this.offConfiguration = this.controls.configuration?.subscribe(changed) ?? this.service.onChange(changed);
         window.addEventListener('beforeunload', this.beforeUnload);
         if (this.active) this.view.focus(); else this.view.setActive(false); this.emit('ready', undefined);
+        if (deferred) changed();
+        else this.refreshModels();
+    }
+    private async loadConfiguration(): Promise<void> {
+        this.configurationLoading?.finish();
+        const loading = this.configurationLoading = draftLoading(this.container, this.config.signal);
+        try {
+            await loading.read('configuration', () => this.refreshConfiguration());
+            this.check();
+            if (this.configurationLoading === loading && !this.transferred) {
+                const draft = this.view.getDraft();
+                const restored = restoreDraftTarget(draft, this.callTargets(), undefined, this.preferredAgent(draft));
+                if (restored !== draft && !this.view.inputBusy) this.view.configureInput({target: restored.target}, draft.revision);
+                this.configurationReady = true;
+                this.publish();
+                this.refreshModels();
+            }
+            loading.finish();
+        } catch (error) {
+            if (this.configurationLoading !== loading || this.closed || this.transferred || this.config.signal?.aborted) loading.finish();
+            else {
+                this.report(error);
+                loading.retry(() => {loading.finish(); void this.loadConfiguration();});
+            }
+        }
+    }
+    private preferredAgent(draft: ReturnType<ChatView['getDraft']>): string | undefined {
+        return this.config.sessionDraft?.promptHarness && !draft.target
+            ? this.executors.find(item => item.id.startsWith('remote:'))?.id : this.store.preferences(draft).agentId;
     }
     private viewOptions(): ChatOptions {
         const store = this.store;
@@ -103,8 +140,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         const ocr = chatOcrPort(this.controls.ocr, (ref, signal) => images.read(ref, {signal}));
         return prepareImageChatOptions({inputPresentation: 'host', attachmentMenu: chatAttachmentMenu(true), plugins: workspaceInputPlugins(this.controls.commands, {navigation: 'projects', projectId: this.config.sessionDraft?.scope?.id},
             () => this.store.preferences(this.view?.getDraft()).agentId), ocr,
-            source: this.source, operations: this.ledger, locale: getLocale(), initialDraft: restoreDraftTarget(this.store.draft, this.callTargets(), undefined, this.config.sessionDraft?.promptHarness && !store.draft.target
-                ? this.executors.find(item => item.id.startsWith('remote:'))?.id : store.preferences().agentId),
+            source: this.source, operations: this.ledger, locale: getLocale(), initialDraft: restoreDraftTarget(this.store.draft, this.callTargets(), undefined, this.preferredAgent(store.draft)),
             actions: {send: async () => {throw new Error('Draft must materialize before dispatch');}, prepareSend: (input, draft) => this.prepare(input, draft),
                 reconcile: async operationId => ({status: 'unknown', operationId, message: t('chat.submission.unconfirmed')})},
             upload: this.config.sessionDraft?.attachments ? (file, options) => this.store.upload(file, options) : undefined,
@@ -130,7 +166,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     private publish(): void {
         if (this.closed || this.transferred) return;
         this.source.publish({title: this.draftTitle() || t('project.createSession'), messages: [], interactions: [], loading: false, execution: 'idle', connection: 'online', hasEarlier: false,
-            allowed: this.config.readOnly || this.config.sessionDraft?.executorScope === 'remote' && !this.executors.some(item => item.id.startsWith('remote:')) ? [] : ['send'], selectors: this.selectors(), ...(this.targets ? {callTargets: this.callTargets()} : {})});
+            allowed: !this.configurationReady || this.config.readOnly || this.config.sessionDraft?.executorScope === 'remote' && !this.executors.some(item => item.id.startsWith('remote:')) ? [] : ['send'], selectors: this.selectors(), ...(this.targets ? {callTargets: this.callTargets()} : {})});
     }
     private callTargets() {
         const catalog = this.targets?.getSnapshot();
@@ -150,7 +186,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         const native = this.executors.filter(item => item.id.startsWith('remote:'));
         const stale = agentId.startsWith('remote:') && !native.some(item => item.id === agentId);
         const effective = stale || native.some(item => item.id === agentId) ? agentId : native[0]?.id ?? '';
-        this.remoteExecutor ??= effective;
+        if (effective) this.remoteExecutor ??= effective;
         const catalog = this.nativeModels.get(effective);
         const selectors: SelectorView[] = [{id: 'executorId', label: t(this.config.sessionDraft?.promptHarness ? 'harness.executor' : 'harness.remoteAgents'), value: effective,
             choices: [...(stale ? [{id: agentId, label: t('harness.executorInvalid')}] : []), ...native.map(item => ({id: item.id, label: item.name}))]}];
@@ -163,22 +199,35 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
                 choices: [{id: '', label: t('chatSettings.followDefault')}, ...model.reasoningEfforts]}]))}});
         return selectors;
     }
-    private async refreshConfiguration(withTargets = true): Promise<void> {
+    private async refreshConfiguration(): Promise<void> {
         const generation = ++this.configurationGeneration;
         const remote = this.config.sessionDraft?.executorScope === 'remote';
         const configuration = this.controls.configuration?.getConfigurationSnapshot();
         const [executors, connections] = await Promise.all([remote ? this.config.sessionDraft?.promptHarness
             ? buildExecutorOptions(this.service, this.config.remoteAgents, configuration, this.config.filterExecutors) : this.config.remoteAgents?.list() ?? [] : buildExecutorOptions(this.service, undefined, configuration, this.config.filterExecutors),
-            remote ? [] : buildConnectionOptions(this.service, configuration)]);
+            remote ? [] : buildConnectionOptions(this.service, configuration), this.targets?.refresh()]);
         this.check(); if (generation !== this.configurationGeneration) return; if (!this.transferred) {this.executors = executors; this.connections = connections;}
-        if (remote && this.config.remoteAgents?.models) {
-            const selected = this.view?.getDraft().selection?.executorId ?? this.store.preferences().agentId;
-            const executor = executors.find(item => item.id === selected && item.id.startsWith('remote:')) ?? executors.find(item => item.id.startsWith('remote:'));
-            if (executor?.supportsModels !== false && executor && !this.nativeModels.has(executor.id)) {
-                const catalog = await this.loadRemoteModels(executor.id); this.check(); if (generation !== this.configurationGeneration) return; this.nativeModels.set(executor.id, catalog);
-            }
-        }
-        if (withTargets) await this.targets?.refresh();
+        this.refreshModels();
+    }
+    private refreshModels(): void {
+        const id = this.remoteExecutor;
+        if (!this.view || !this.active || this.transferred || !id || this.pendingModels.has(id)) return;
+        void this.ensureRemoteModels(id).catch(error => {
+            if (!this.closed && this.active && !this.transferred && this.remoteExecutor === id && !this.config.signal?.aborted) this.report(error);
+        });
+    }
+    private ensureRemoteModels(id: string): Promise<void> {
+        if (!this.config.remoteAgents?.models || this.nativeModels.has(id)
+            || !this.executors.some(item => item.id === id && item.supportsModels !== false)) return Promise.resolve();
+        const pending = this.pendingModels.get(id);
+        if (pending) return pending;
+        const work = this.loadRemoteModels(id).then(catalog => {
+            if (this.closed || this.transferred || this.config.signal?.aborted) return;
+            this.nativeModels.set(id, catalog);
+            if (this.active && this.remoteExecutor === id) this.publish();
+        }).finally(() => this.pendingModels.delete(id));
+        this.pendingModels.set(id, work);
+        return work;
     }
     private async loadRemoteModels(executorId: string) {
         const started = Date.now(), operationId = randomUUID();
@@ -208,8 +257,6 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
             }
             this.switchRemoteExecutor(selected); return;
         }
-        if (selected?.startsWith('remote:') && !this.nativeModels.has(selected))
-            void this.refreshConfiguration().then(() => this.publish()).catch(error => this.report(error));
     }
     private switchRemoteExecutor(executorId: string): void {
         const started = Date.now(); this.remoteExecutor = executorId;
@@ -221,6 +268,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         if (model) {selection.modelId = model.id;
             selection.reasoningEffort = current?.modelId === model.id ? current.reasoningEffort ?? model.defaultReasoningEffort ?? '' : model.defaultReasoningEffort ?? '';}
         this.view.configureInput({selection}, draft.revision);
+        this.refreshModels();
         log.info('chat.draft.executor', {operationId: randomUUID(), stage: 'selection', result: 'success',
             catalogCached: !!catalog, modelCount: catalog?.models.length ?? 0, durationMs: Date.now() - started});
     }
@@ -230,6 +278,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     }
     private async prepare(input: ChatSubmission, draft: ComposerDraft): Promise<SendPreparation | null> {
         this.check(); if (!this.active) throw new Error('Project draft is hidden');
+        if (!this.configurationReady) throw new Error(t('project.draftLoading.configuration'));
         this.preparing = true; this.submissionStarted = true; this.draftHeader?.update();
         const diagnostic = draftPreparationDiagnostics(this.source.conversationId,input.text.length,input.attachments.length);
         try {
@@ -238,6 +287,10 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         const agentId = input.target?.kind === 'flow' ? undefined : input.target?.kind === 'agent' ? input.target.id : input.selection?.executorId ?? draft.selection?.executorId ?? this.store.preferences(draft).agentId;
         if (this.config.sessionDraft?.executorScope === 'remote' && input.target?.kind !== 'flow' && !this.executors.some(item => item.id === agentId))
             throw new Error(t('toolbox.unavailable'));
+        const executor = this.remoteExecutor;
+        if (executor && this.config.sessionDraft?.promptHarness && !agentId?.startsWith('remote:') && !draft.selection?.modelId) {
+            await this.ensureRemoteModels(executor); this.check();
+        }
         diagnostic.step('editor.materialize'); const target = await this.materialize(agentId, draft); this.check();
         diagnostic.step('input.prepare');
         if (target.resumeOnly || await target.editor.commands.prepareChatInput?.(input, draft)) {diagnostic.step('complete'); return null;}
@@ -381,7 +434,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     captureRecovery(): unknown {return this.delegate?.captureRecovery?.() ?? this.view?.captureRecovery();}
     restoreRecovery(value: unknown): void {if (this.delegate) this.delegate.restoreRecovery?.(value); else this.view?.restoreRecovery(value as ReturnType<ChatView['captureRecovery']>);}
     suspendForRecovery(): void {if (this.delegate) this.delegate.suspendForRecovery?.(); this.rebuilding = true; this.cancelPendingRender();}
-    destroy(): Promise<void> {return this.closing ??= disposeEditorResources([() => this.flushPendingSave(), () => {this.closed = true;},
+    destroy(): Promise<void> {return this.closing ??= disposeEditorResources([() => this.flushPendingSave(), () => {this.closed = true; this.configurationLoading?.finish();},
         () => this.delegate?.destroy(), () => this.owned ? this.view?.destroy() : undefined,
         () => window.removeEventListener('beforeunload', this.beforeUnload),
         () => {this.offConfiguration?.(); this.targets?.dispose(); this.stops.forEach(stop => stop()); this.events.clear();}]);}

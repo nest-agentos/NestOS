@@ -34,7 +34,7 @@ import {createItemOperations} from '@nestos/kanban-development';
 import {createPublishedOperation as publishedOperation} from '@nestos/llm-session';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {developmentCatalog} from '@nestos/kanban-development';
-import {handoffDevelopmentReports} from '../presets/kanban-report-delivery';
+import {handoffDevelopmentReports,inspectDevelopmentReports} from '../presets/kanban-report-delivery';
 import {validateDevelopmentOptions, requiresDevelopmentProject} from '../presets/kanban-development-policy';
 import {prepareHarnessDraftConnection} from '../projects/harness-draft-connection';
 import {reportKanbanHealth, kanbanFailureCode} from '../kanban/health-events';
@@ -85,7 +85,7 @@ import { HarnessConnectionService } from '../projects/harness-connections';
 import { createHarnessExecutionProvider } from '../projects/harness-execution';
 import {createTaskAssetReader} from './task-assets';
 import { createHarnessCleanupState } from '../projects/harness-cleanup-state';
-import {createHarnessContextCleanup} from '../projects/harness-context-cleanup';
+import {createHarnessCleanupContextReader, createHarnessContextCleanup} from '../projects/harness-context-cleanup';
 import { FSError } from '@nestos/vfs-core';
 import { ModelConfigurationCommands } from '../configuration/model-commands';
 import { resumeSessionDeletions } from './resume-session-deletions';
@@ -387,6 +387,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             harnessExecution: createHarnessExecutionProvider(executionConnections, {
                 readTaskAsset: createTaskAssetReader(() => harnessKernel!.kernel, systemFS),
                 stateForCleanup: createHarnessCleanupState(() => harnessKernel!.kernel, id => ensureExecutionWrite(id)),
+                readContextForCleanup: createHarnessCleanupContextReader(() => harnessKernel!.kernel, id => ensureExecutionWrite(id)),
                 settleContextForCleanup: createHarnessContextCleanup(() => harnessKernel!.kernel, id => ensureExecutionWrite(id)),
             }),
             systemFS,
@@ -657,6 +658,10 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             boardSettings:remoteConnections?kanbanHarnessSettings(remoteConnections):undefined,
             sessionObservation:developmentBindings?developmentMessages.sessionObservation:undefined,
             taskRecovery:developmentBindings?context=>createTaskRecovery({...developmentBindings,...context,executionResource:executionResource!,
+                reportHandoff:{inspect:record=>developmentOperations.run(()=>inspectDevelopmentReports(developmentBindings,record)),run:async(board,item,id,existingOnly)=>{
+                    if(verifyDevelopment)await developmentOperations.run(()=>verifyDevelopment(id));
+                    await handoffDevelopmentReports({...developmentBindings,journal:context.journal},context.service,board,item,id,existingOnly);
+                },wake:()=>wakeKanban()},
                 recheck:developmentTaskRecheck(developmentBindings.remote,developmentBindings.provider,decisionModules[0]),
                 describe:async item=>{if(!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'))return;const managed=managedServiceDeployment(options.serviceControl,async selected=>projects.openWorkspace((await projects.get(selected.externalRefs!.find(ref=>ref.system==='nestos-remote-project')!.id)).path),async()=>{});return managed?.describe?.(item);}}):undefined,
             decisionConversations:developmentBindings?context=>decisionConversations({...developmentBindings,...context,executionResource,modules:decisionModules}):undefined,
@@ -683,7 +688,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             workResources: developmentBindings ? context => {
                 const resources = developmentWorkResources({...developmentBindings, ...context, calls: independentCalls, kernel: kernelCore});
                 return {archiveItemResources:resources.archiveItemResources,boardWorkResources:resources.boardWorkResources,workResources: (boardId, itemId, query) => developmentOperations.run(() => resources.workResources(boardId, itemId, query)),
-                    cleanupWorkResource: (boardId, request) => developmentOperations.run(() => resources.cleanupWorkResource(boardId, request))};
+                    cleanupWorkResource: (boardId, request) => developmentOperations.run(() => resources.cleanupWorkResource(boardId, request)),
+                    releaseReportPackages: () => developmentOperations.run(() => resources.releaseReportPackages())};
             } : undefined,
             enqueueTaskReply:async request=>{
                 const lease=await conversationContexts.open(request.expectedSessionId!);

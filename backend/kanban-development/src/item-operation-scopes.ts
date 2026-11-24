@@ -41,7 +41,8 @@ export async function operationRequestOptions(options:ReviewOperationsOptions,bo
 /** Project finalization facts without opening any Session or advancing an operation. */
 export async function scopedFinalizationStatus(options:ReviewOperationsOptions,board:string,item:string):Promise<KanbanItemOperations['automatic']> {
     const route=await options.scopes?.describe(board,item);
-    if(!route?.scopes?.length)return automaticDeliveryStatus(options.journal,board,item,undefined,developmentDeliveryPolicy.steps);
+    if(!route?.scopes?.length)return cleanupReviewStatus(await options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item)))
+        ??automaticDeliveryStatus(options.journal,board,item,undefined,developmentDeliveryPolicy.steps);
     const statuses=await Promise.all(route.scopes.map(async scope=>scope.completed?{state:'completed' as const,stage:'completed'}:
         cleanupReviewStatus(await options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item,scope.id)))??await automaticDeliveryStatus(options.journal,board,item,scope.id,developmentDeliveryPolicy.steps)??{state:'running' as const,stage:scope.ready===false?'waiting-dependency':'analyze'}));
     return statuses.find(row=>row.state==='blocked')??statuses.find(row=>row.state==='waiting-confirmation')

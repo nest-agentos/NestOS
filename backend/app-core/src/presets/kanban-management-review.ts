@@ -7,6 +7,7 @@ import {indexResourceJob} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {developmentReviewAdapter,developmentReviewSnapshot,prepareDevelopmentReviewOperation,type DevelopmentReviewOptions} from './kanban-development-review';
 import {developmentWorkspace} from './kanban-development-workspace';
+import {kanbanGitIntegration,usesHostMergeProposal} from './kanban-git-integration';
 import {verifyGitIntegration} from '@nestos/git-delivery/integration';
 import type {GitSource,GitApproval} from '@nestos/git-delivery/contracts';
 import {managedServiceDeployment} from './managed-service-deployment';
@@ -21,7 +22,7 @@ export function managementReviewAdapter(options:DevelopmentReviewOptions,scope:M
     const snapshot=async(board:KanbanBoard)=>managementBatchSnapshot(scope,board,options.service,item=>developmentReviewSnapshot(options,board,item));
     const managed=managedServiceDeployment(options.serviceControl,async()=>options.projects.openWorkspace((await options.projects.get(scope.projectId)).path),
         async job=>requireValue((await snapshot(await options.service.read(job.boardId))).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD'));
-    return {...base,managed,runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??base.runningVersion?.(),relatedSession:async(board)=>(await options.service.workflow(board.id)).dispatches[scope.contributors[0].dispatchId??'']?.executionSessionId,supports:(_board,item)=>item.id===scope.ownerId,
+    return {...base,managed,gitIntegration:kanbanGitIntegration(options, job => managementBatch(job.snapshot).sources.map(source => source.snapshot.context as GitSource)),runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??base.runningVersion?.(),relatedSession:async(board)=>(await options.service.workflow(board.id)).dispatches[scope.contributors[0].dispatchId??'']?.executionSessionId,supports:(_board,item)=>item.id===scope.ownerId,
         ready:board=>scope.contributors.every(row=>board.items.some(item=>item.id===row.itemId&&['review','completed'].includes(item.status))),
         snapshot,prepareAnalysis:input=>prepareManagementOperation(options,scope,managed,{...input,action:'analyze'}),prepareOperation:input=>prepareManagementOperation(options,scope,managed,input),
         exchange:base.exchange?async(job,observation)=>{
@@ -64,6 +65,10 @@ async function readManagementOperation(options:DevelopmentReviewOptions,scope:Ma
     }
     const result=await base.readOperation!({...job,itemId:frozen.sources[0].itemId,snapshot:frozen.sources[0].snapshot});
     if(job.action==='merge'&&result&&(result as {status?:string}).status==='succeeded'){
+        if(await usesHostMergeProposal(options.journal,job)) {
+            requireValue(actual.version===job.snapshot.version,'MERGE_PLAN_SOURCE_CHANGED');
+            return result;
+        }
         const started=Date.now();
         try{await verifyManagementMerge(options,job,actual,result);log.info('Repository batch verified',{operationId:job.id,scopeId:scope.id,stage:'management.merge.verify',result:'success',count:frozen.sources.length,durationMs:Date.now()-started});}
         catch(error){log.warn('Repository batch verification failed',{operationId:job.id,scopeId:scope.id,stage:'management.merge.verify',result:'failure',code:safeCode(error,'OPERATION_RESULT_BATCH_INCOMPLETE'),count:frozen.sources.length,durationMs:Date.now()-started});throw error;}

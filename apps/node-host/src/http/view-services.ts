@@ -25,8 +25,10 @@ export async function createHostedView(runtime: ApplicationRuntime, configuratio
 async function prepareSnapshots(peer: RpcPeer, services: ApplicationServices, domains?: ReadonlySet<ViewDomain>, projectIds: readonly string[] = []): Promise<void> {
     for (const id of services.vfs.devices.list()) peer.remember(services.vfs.devices, 'get', [id]);
     if (!domains || domains.has('configuration')) {
-        for (const model of peer.localValues<ApplicationServices['agentService']>('IAgentManagementService'))
-            for (const agent of model.listAgents()) peer.remember(model, 'getAgentResourceId', [agent.id]);
+        if (!peer.isSnapshotDeferred('IAgentManagementService', 'listAgents')) {
+            for (const model of peer.localValues<ApplicationServices['agentService']>('IAgentManagementService'))
+                for (const agent of model.listAgents()) peer.remember(model, 'getAgentResourceId', [agent.id]);
+        }
         for (const resource of peer.localValues<ToolboxResources>('ToolboxResources'))
             for (const provider of services.agentService.getProviders()) peer.remember(resource, 'hasProvider', [provider.id]);
     }

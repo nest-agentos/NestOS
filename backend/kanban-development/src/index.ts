@@ -11,10 +11,10 @@ export {default as developmentPrompts} from './prompts/development.json';
 export {default as maintenancePrompts} from './prompts/maintenance.json';
 export {default as managementPrompts} from './prompts/management.json';
 export {developmentCatalog} from './development-catalog';
-export {deliverSoftwareReports,disposableSoftwareFiles} from './report-delivery';
+export {deliverSoftwareReports,inspectSoftwareReports,releaseSoftwareReportPackages,disposableSoftwareFiles} from './report-delivery';
 export {cleanupReviewId,cleanupReviewInstruction,finishCleanupReview,type CleanupReviewInput} from './cleanup-review';
 export {verificationWaiverConfirmation,verificationWaiverInstruction} from './verification-waiver';
 
-export {recordDeliveryFailure,resolveDeliveryFailures} from './delivery-issues';
+export {recordDeliveryFailure,resolveDeliveryFailures,reportHandoffFailure} from './delivery-issues';
 export {parseSoftwareExecutionPermissions,softwareExecutionPermission,type SoftwareExecutionPermissions,type ExecutionPermissionVerdict} from './execution-permissions';
 export {workspacePrerequisitesFile,workspacePrerequisites,prerequisiteProbe} from './workspace-prerequisites';

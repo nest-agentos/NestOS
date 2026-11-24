@@ -1,3 +1,5 @@
+import {reportHandoffFailure} from '@nestos/kanban-development';
+import {reloadTaskConfiguration,taskConfigurationStatus} from './task-configuration-reload';
 import {resumeCompletedResults} from './task-recovery-results';
 import {recoveryWorkspace} from './recovery-workspace';
 import {sha256HexSync} from '@nestos/common';
@@ -10,14 +12,47 @@ import {requireValue} from './validation';
 export function createTaskRecovery(options:TaskRecoveryOptions) {
     let stopped=false;const pending=new Map<string,Promise<unknown>>();
     const serial=<T>(id:string,work:()=>Promise<T>)=>{requireValue(!stopped,'SERVICE_STOPPING');const next=(pending.get(id)??Promise.resolve()).catch(()=>{}).then(work);pending.set(id,next);void next.finally(()=>{if(pending.get(id)===next)pending.delete(id);}).catch(()=>{});return next;};
-    const recoverTask=(boardId:string,request:KanbanTaskRecoveryRequest)=>serial(request.operationId,()=>recover(options,boardId,request));
+    const recoveryKey=(board:string,request:KanbanTaskRecoveryRequest)=>['recheck','reconcile-report'].includes(request.action)?JSON.stringify([board,request.itemId]):request.operationId;
+    const recoverTask=(boardId:string,request:KanbanTaskRecoveryRequest)=>serial(recoveryKey(boardId,request),()=>recover(options,boardId,request));
     const channels=taskRecoveryChannels(options,{recoverTask,inspect:taskRecoveryState,active:()=>!stopped});
-    return {taskRecovery:(board:string,item:string)=>taskRecoveryState(options,board,item),recoverTask,openTaskRecovery:channels.open,
-        scan:async()=>{await channels.recover();await resumeCompletedResults(options,{active:()=>!stopped,inspect:taskRecoveryState,recoverTask});await resumeRepairs(options,()=>!stopped,recoverTask);for(const row of await options.journal.find<RecoveryIntent>('task-recovery-operation:',value=>!value.done)){if(stopped)return;await serial(row.value.request.operationId,()=>settle(options,row.value));}},
+    return {checkTaskConfiguration:(board:string,item:string)=>checkTaskConfiguration(options,board,item),inspectTaskReports:(board:string,item:string)=>inspectTaskReports(options,board,item),reloadTaskConfiguration:(board:string,request:Parameters<ReturnType<typeof reloadTaskConfiguration>>[1])=>serial('configuration:'+request.operationId,()=>reloadTaskConfiguration(options)(board,request)),taskRecovery:(board:string,item:string)=>taskRecoveryState(options,board,item),recoverTask,openTaskRecovery:channels.open,
+        scan:async()=>{await channels.recover();await resumeCompletedResults(options,{active:()=>!stopped,inspect:taskRecoveryState,recoverTask});await resumeRepairs(options,()=>!stopped,recoverTask);for(const row of await options.journal.find<RecoveryIntent>('task-recovery-operation:',value=>!value.done)){if(stopped)return;await serial(recoveryKey(row.value.boardId,row.value.request),()=>settle(options,row.value));}},
         quiesce:async()=>{stopped=true;await channels.close();await Promise.allSettled([...pending.values()]);}};
 }
+async function checkTaskConfiguration(options:TaskRecoveryOptions,boardId:string,itemId:string){
+    const started=Date.now(),operationId='configuration-check-'+sha256HexSync(JSON.stringify([boardId,itemId,started]));
+    const event={operationId,boardId,stage:'task.configuration.inspect'};
+    try{
+        const state=await taskConfigurationStatus(options,boardId,itemId);
+        options.log({...event,result:'success',durationMs:Date.now()-started});return state;
+    }catch(error){
+        options.log({...event,result:'failure',code:safeCode(error,'TASK_CONFIGURATION_CHECK_FAILED'),durationMs:Date.now()-started});throw error;
+    }
+}
+
+async function inspectTaskReports(options:TaskRecoveryOptions,boardId:string,itemId:string){
+    const started=Date.now();
+    const dispatch=await latestTaskDispatch(options,boardId,itemId),operationId=dispatch?.id??itemId;
+    const event={operationId,boardId,stage:'task.recovery.report-usage'};
+    try{
+        requireValue(dispatch&&options.reportHandoff?.inspect&&await reportHandoffFailure(options.journal,dispatch.id),'RECOVERY_TARGET_NOT_READY');
+        const record=await scopedRecoveryWorkspace(options,{boardId,request:{itemId},previousDispatchId:dispatch.id});
+        const usage=await options.reportHandoff.inspect(record);
+        options.log({...event,result:'success',durationMs:Date.now()-started});
+        return usage;
+    }catch(error){
+        options.log({...event,result:'failure',code:safeCode(error,'SOFTWARE_REPORT_INSPECTION_FAILED'),durationMs:Date.now()-started});throw error;
+    }
+}
+
+async function latestTaskDispatch(options:TaskRecoveryOptions,boardId:string,itemId:string){
+    const workflow=await options.service.workflow(boardId);
+    return Object.values(workflow.dispatches).filter(row=>row.itemId===itemId).sort((a,b)=>b.attempt-a.attempt)[0];
+}
+
 async function recover(options:TaskRecoveryOptions,boardId:string,request:KanbanTaskRecoveryRequest):Promise<KanbanTaskRecoveryResult> {
-    requireValue(/^[a-zA-Z0-9_-]{1,128}$/.test(request.operationId)&&['retry','retry-current','fix','recheck'].includes(request.action),'INVALID_RECOVERY_REQUEST');
+    requireValue(/^[a-zA-Z0-9_-]{1,128}$/.test(request.operationId)&&['retry','retry-current','fix','recheck','reconcile-report'].includes(request.action),'INVALID_RECOVERY_REQUEST');
+    if(request.action==='reconcile-report')return reconcileReportHandoff(options,boardId,request);
     const key='task-recovery-operation:'+request.operationId,digest=sha256HexSync(JSON.stringify([boardId,request]));
     const saved=await options.journal.get<RecoveryIntent>(key);if(saved){requireValue(saved.digest===digest,'IDEMPOTENCY_CONFLICT');return settle(options,saved);}
     const state=await taskRecoveryState(options,boardId,request.itemId);requireValue(state.revision===request.expectedRevision,'RECOVERY_STALE_REFRESH');
@@ -27,6 +62,7 @@ async function recover(options:TaskRecoveryOptions,boardId:string,request:Kanban
         const fix=await client.fixTask(boardId,{itemId:target,operationId:request.operationId});
         return {operationId:request.operationId,state:'accepted',resourceId:await options.executionResource(fix.sessionId,'main',await options.service.read(boardId))};
     }
+    if(request.action==='recheck'&&state.reportHandoff)return requestReportHandoff(options,boardId,request,digest,state.reportHandoff.canRecheck);
     requireValue(request.action==='recheck'?state.canRecheck:request.action==='retry'?state.canRetry:state.canSelectCurrentVersion&&request.confirmed===true,'RECOVERY_TARGET_NOT_READY');
     const workflow=await options.service.workflow(boardId),previous=Object.values(workflow.dispatches).filter(row=>row.itemId===request.itemId).sort((a,b)=>b.attempt-a.attempt)[0];requireValue(previous,'EXECUTION_NOT_FOUND');
     if(request.action==='recheck'&&state.state==='blocked'){
@@ -41,6 +77,64 @@ async function recover(options:TaskRecoveryOptions,boardId:string,request:Kanban
         command:{type:'continue-execution',previousDispatchId:previous.id,dispatchId,instruction:request.action==='recheck'?'The host verified the declared prerequisites. Resume the unfinished task in this same Session and worktree. Read the current task context and prerequisites.json, and apply any declared binDirectories to the command PATH. Preserve completed work and all prior evidence.': 'Perform only the failed acceptance checks in this SAME Session. Read the host-frozen recovery receipt in context.recovery; preserve completed siblings and prior failed evidence. Do not redevelop, rebuild or redeploy.'}});
     return settle(options,intent);
 }
+async function requestReportHandoff(options:TaskRecoveryOptions,boardId:string,request:KanbanTaskRecoveryRequest,digest:string,allowed:boolean):Promise<KanbanTaskRecoveryResult>{
+    requireValue(allowed,'RECOVERY_TARGET_NOT_READY');
+    const previous=await latestTaskDispatch(options,boardId,request.itemId);
+    requireValue(previous,'EXECUTION_NOT_FOUND');
+    const current=await options.journal.get<import('@nestos/kanban/contracts').KanbanRecoveryReceipt>('task-report-recovery:'+previous.id);
+    if(current?.state==='pending')return {operationId:current.operationId,state:'pending',...(current.code?{code:current.code}:{})};
+    const intent=await options.journal.update<RecoveryIntent>('task-recovery-operation:'+request.operationId,old=>old??{
+        boardId,request,digest,dispatchId:previous.id,previousDispatchId:previous.id,reportHandoff:true});
+    requireValue(intent.digest===digest,'IDEMPOTENCY_CONFLICT');
+    await trackReportReceipt(options,intent,{operationId:request.operationId,state:'pending'});
+    return settle(options,intent);
+}
+
+async function reconcileReportHandoff(options:TaskRecoveryOptions,boardId:string,request:KanbanTaskRecoveryRequest):Promise<KanbanTaskRecoveryResult>{
+    const {itemId,operationId}=request,started=Date.now(),event={operationId,boardId,stage:'task.recovery.report-reconcile'};
+    const originalKey='task-recovery-operation:'+operationId;
+    const intent=await options.journal.get<RecoveryIntent>(originalKey);
+    const state=await taskRecoveryState(options,boardId,itemId);
+    requireValue(state.revision===request.expectedRevision,'RECOVERY_STALE_REFRESH');
+    requireValue(intent?.reportHandoff&&intent.boardId===boardId&&intent.request.itemId===itemId,'RECOVERY_SCOPE_MISMATCH');
+    if(state.reportReceipt?.operationId===operationId)return {operationId,state:state.reportReceipt.state};
+    requireValue(state.reportHandoff?.canRecheck&&state.reportHandoff.receipt?.operationId===operationId
+        &&state.reportHandoff.receipt.state==='pending'&&options.reportHandoff,'RECOVERY_TARGET_NOT_READY');
+    let result:KanbanTaskRecoveryResult;
+    try{
+        await options.reportHandoff.run(boardId,itemId,intent.dispatchId,true);
+        options.reportHandoff.wake();
+        result={operationId,state:'pending',code:'REPORT_HANDOFF_SETTLEMENT_PENDING'};
+        options.log({...event,result:'success',durationMs:Date.now()-started});
+    }catch(error){
+        const code=safeCode(error,'SOFTWARE_REPORT_HANDOFF_UNCONFIRMED');
+        result={operationId,state:'pending',code};
+        options.log({...event,result:'failure',code,durationMs:Date.now()-started});
+    }
+    await options.journal.update<RecoveryIntent>(originalKey,old=>({...old!,done:true,result}));
+    await trackReportReceipt(options,intent,result);
+    return result;
+}
+
+async function recheckReportHandoff(options:TaskRecoveryOptions,intent:RecoveryIntent):Promise<KanbanTaskRecoveryResult>{
+    const {boardId,request,dispatchId}=intent,{operationId,itemId}=request,started=Date.now();
+    const event={operationId,boardId,stage:'task.recovery.report-handoff'};
+    try{
+        const state=await taskRecoveryState(options,boardId,itemId);
+        requireValue(state.reportHandoff?.canRecheck&&state.revision===request.expectedRevision&&options.reportHandoff,'RECOVERY_STALE_REFRESH');
+        await options.reportHandoff.run(boardId,itemId,dispatchId);
+        options.reportHandoff.wake();
+        options.log({...event,result:'success',durationMs:Date.now()-started});
+        return finishRecovery(options,intent,{operationId,state:'pending',code:'REPORT_HANDOFF_SETTLEMENT_PENDING'});
+    }catch(error){
+        const code=safeCode(error,'SOFTWARE_REPORT_HANDOFF_UNCONFIRMED');
+        options.log({...event,result:'failure',code,durationMs:Date.now()-started});
+        const uncertain=['ECANCELLED','ETIMEDOUT','SOFTWARE_REPORT_HANDOFF_UNCONFIRMED'].includes(code);
+        if(uncertain)options.reportHandoff?.wake();
+        return finishRecovery(options,intent,{operationId,state:uncertain?'pending':'blocked',code});
+    }
+}
+
 async function recheckReportedIssue(options:TaskRecoveryOptions,intent:RecoveryIntent):Promise<KanbanTaskRecoveryResult> {
     const {boardId,request,previousDispatchId:attemptId,issueId}=intent,{operationId,itemId}=request;
     const replyId='recheck-'+sha256HexSync(JSON.stringify([boardId,itemId,attemptId,issueId]));
@@ -77,6 +171,7 @@ async function recheck(options:TaskRecoveryOptions,boardId:string,request:Kanban
 async function settle(options:TaskRecoveryOptions,intent:RecoveryIntent):Promise<KanbanTaskRecoveryResult> {
     if(intent.done)return intent.result!;
     const board=await options.service.read(intent.boardId);if(board.executionControl?.paused)return {operationId:intent.request.operationId,state:'pending',code:'BOARD_EXECUTION_PAUSED'};
+    if(intent.reportHandoff)return recheckReportHandoff(options,intent);
     if(intent.issueId)return recheckReportedIssue(options,intent);
     const ready=await taskRecoveryState(options,intent.boardId,intent.request.itemId);if(ready.blockingItems?.length)return {operationId:intent.request.operationId,state:'pending',code:'RECOVERY_REPAIR_PENDING'};
     if(intent.targetVersion){const current=await options.describe((await options.service.item(intent.boardId,intent.request.itemId)).item);if(current?.version!==intent.targetVersion)return {operationId:intent.request.operationId,state:'pending',code:'RECOVERY_TARGET_CHANGED'};}
@@ -93,18 +188,25 @@ async function settle(options:TaskRecoveryOptions,intent:RecoveryIntent):Promise
     return finishRecovery(options,intent,{operationId:intent.request.operationId,state:'accepted',dispatchId:intent.dispatchId});
 }
 
-async function scopedRecoveryWorkspace(options:TaskRecoveryOptions,intent:RecoveryIntent) {
+async function scopedRecoveryWorkspace(options:TaskRecoveryOptions,intent:{boardId:string;request:{itemId:string};previousDispatchId:string}) {
     const workflow=await options.service.workflow(intent.boardId);
     const previous=workflow.dispatches[intent.previousDispatchId];
     const {item}=await options.service.item(intent.boardId,intent.request.itemId);
     const retained=await recoveryWorkspace(options.journal,workflow,previous),record=retained?.record;
-    requireValue(record&&item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'&&ref.id===record.projectId),'RECOVERY_SCOPE_MISMATCH');
+    requireValue(record&&!await options.journal.get('worktree-cleanup:'+(record.worktreeId??previous.id))&&item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'&&ref.id===record.projectId),'RECOVERY_SCOPE_MISMATCH');
     return record;
 }
 
 async function finishRecovery(options:TaskRecoveryOptions,intent:RecoveryIntent,result:KanbanTaskRecoveryResult) {
     const saved=await options.journal.update<RecoveryIntent>('task-recovery-operation:'+intent.request.operationId,old=>old?.done?old:{...old!,done:true,result});
+    if(intent.reportHandoff)await trackReportReceipt(options,intent,saved.result!);
     return saved.result!;
+}
+
+async function trackReportReceipt(options:TaskRecoveryOptions,intent:RecoveryIntent,result:KanbanTaskRecoveryResult){
+    const key='task-report-recovery:'+intent.dispatchId;
+    await options.journal.update<import('@nestos/kanban/contracts').KanbanRecoveryReceipt>(key,old=>
+        old?.operationId!==result.operationId&&result.code!==undefined?old??{...result,checkedAt:Date.now()}:{...result,checkedAt:Date.now()});
 }
 
 async function resumeRepairs(options:TaskRecoveryOptions,active:()=>boolean,recoverTask:(board:string,request:KanbanTaskRecoveryRequest)=>Promise<KanbanTaskRecoveryResult>):Promise<void> {

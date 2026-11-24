@@ -345,6 +345,22 @@ it('reports configurable transfer budgets without deleting source evidence',asyn
  expect(await readFile(join(f.physical,'_nestos/kanban/artifacts/report.json'),'utf8')).toBe('Retained evidence');
 });
 
+it('releases the verified package only after the owning management task completes',async()=>{
+ const f=await fixture();
+ const [row]=await f.api.workResources('board','item');
+ await f.api.cleanupWorkResource('board',{operationId:'report-release',itemId:'item',resourceId:'ready',version:row.version});
+ const cleanup=await f.journal.get<{delivery:string}>('worktree-cleanup:ready');
+ const archive=cleanup!.delivery.replace('/workspace',f.root),metadata=archive.replace(/\.tar\.gz$/,'.json');
+ Object.assign(f.item,{taskType:'coordination',status:'claimed'});
+ await f.api.releaseReportPackages();
+ expect((await stat(archive)).isFile()).toBe(true);
+ f.item.status='completed';
+ await f.api.releaseReportPackages();await f.api.releaseReportPackages();
+ await expect(stat(archive)).rejects.toMatchObject({code:'ENOENT'});
+ expect((await stat(metadata)).isFile()).toBe(true);
+ expect((await f.journal.find<{phase:string}>('software-report-delivery:ready:',row=>row.phase==='released'))).toHaveLength(1);
+});
+
 it('preserves the retained management Session directory after delivery and rejects ordinary cleanup',async()=>{
  const f=await fixture();await f.journal.update('record-conversation:ready',()=>({id:'ready',sessionId:'native-management',binding:{retainedPlanning:true}}));
  const [resource]=await f.api.workResources('board','item',{inspect:true});

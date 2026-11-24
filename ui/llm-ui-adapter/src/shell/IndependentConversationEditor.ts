@@ -8,7 +8,7 @@ import {chatOcrPort} from './ocr-port';
 import {CHAT_SLOT_CLASSES} from '@nestos/llm-ui';
 import {presentHostControl} from '../independent/button-presentation';
 import {contentSelectionAction, messageMarkdown} from '../independent/message-markdown';
-import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, escapeHTML, getLocale, t} from '@nestos/common';
+import {ACTION_ICONS, CHAT_ICONS, createModuleLogger, escapeHTML, getLocale, randomUUID, t} from '@nestos/common';
 import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventCallback, type EditorEventMap} from '@nestos/ui-common-adapter';
 import type {ChatView, OperationReceipt} from '@nestos/llm-ui';
 import {createNativeChatBinding, createNativeChatView} from '../independent/native';
@@ -40,6 +40,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
     private timer?: ReturnType<typeof setTimeout>;
     private metadataFrame?: number;
     private metadataTimer?: ReturnType<typeof setTimeout>;
+    private activationRefresh?: Promise<void>;
     private branches?: RemoteBranches;
     private historyBranches?: RemoteHistoryBranches;
     private readonly events = new Map<EditorEvent, Set<(payload: unknown) => void>>();
@@ -75,14 +76,22 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
         this.offSnapshot = this.binding.source.subscribe(() => this.announce()); this.announce();
         if (!this.handoff && this.options.initialInputState?.text) this.view.setText(this.options.initialInputState.text);
         this.options.signal?.throwIfAborted(); this.schedule(); this.emit('ready', undefined);
-        if (this.prepared?.deferredMetadata) this.scheduleMetadata();
+        if (this.prepared?.deferredMetadata) this.afterPaint(() => this.binding?.startMetadata());
     }
-    private scheduleMetadata(): void {
+    private afterPaint(task: () => void): void {
+        this.cancelPaint();
         this.metadataFrame = requestAnimationFrame(() => {
+            this.metadataFrame = undefined;
             this.metadataTimer = setTimeout(() => {
-                if (!this.closed) this.binding?.startMetadata();
+                this.metadataTimer = undefined;
+                if (!this.closed && this.active) task();
             }, 0);
         });
+    }
+    private cancelPaint(): void {
+        if (this.metadataFrame !== undefined) cancelAnimationFrame(this.metadataFrame);
+        clearTimeout(this.metadataTimer);
+        this.metadataFrame = this.metadataTimer = undefined;
     }
     private async retainHandoff(): Promise<void> {
         const retained = new Set<string>();
@@ -110,8 +119,11 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
             mountHeader: (root, context) => this.toolbar(root, context)};
     }
     private announce(): void {
-        const state = this.service.snapshot?.(); if (state) this.historyBranches?.update(state, !this.active);
-        const id = this.service.snapshot?.()?.sessionId;
+        const state = this.service.snapshot?.();
+        if (!state || this.closed) return;
+        this.historyBranches?.update(state, !this.active);
+        if (state.title) this.options.onConversationTitle?.(state.title);
+        const id = state.sessionId;
         if (id && id !== this.announced && !this.closed) {this.announced = id; this.options.onConversationSession?.(id);}
     }
     private async runBranch(action: () => Promise<import('../contracts').ConversationSnapshot>): Promise<void> {
@@ -197,11 +209,30 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
     focus(): void {this.view?.focus();}
     isDirty(): boolean {return !!this.view && this.store.dirty(this.view.getDraft());}
     async flushPendingSave(): Promise<void> {if (!this.suspended) {await this.view?.flushDraft(); this.emit('saved', undefined);}}
-    cancelPendingRender(): void {this.active = false; clearTimeout(this.timer); this.view?.setActive(false); this.historyBranches?.setActive(false);}
+    cancelPendingRender(): void {this.active = false; this.cancelPaint(); clearTimeout(this.timer); this.view?.setActive(false); this.historyBranches?.setActive(false);}
     async activate(): Promise<void> {
-        if (this.closed) return;
+        if (this.closed || this.active) return;
         this.active = true; this.historyBranches?.setActive(true); this.view?.setActive(true);
-        try {await this.binding?.source.refresh();} finally {this.schedule();}
+        this.afterPaint(() => {
+            this.binding?.startMetadata();
+            const state = this.service.snapshot?.();
+            if (!this.service.subscribe || !state?.observation || state.gap || state.disconnected || state.observation.stale
+                || Date.now() - state.observation.observedAt > 30_000)
+                this.activationRefresh ??= this.refreshActivated().finally(() => {this.activationRefresh = undefined;});
+            else this.schedule();
+        });
+    }
+    private async refreshActivated(): Promise<void> {
+        const operationId = randomUUID(), started = performance.now();
+        try {
+            await this.binding?.source.refresh();
+            log.debug('chat.native.activate', {operationId, stage: 'refresh', result: 'success', durationMs: Math.round(performance.now() - started)});
+        } catch (error) {
+            const raw = (error as {code?: unknown})?.code;
+            const code = typeof raw === 'string' && /^[A-Z][A-Z_0-9]{0,79}$/.test(raw) ? raw : 'NATIVE_ACTIVATION_REFRESH_FAILED';
+            log.warn('chat.native.activate', {operationId, stage: 'refresh', result: 'failure', code, durationMs: Math.round(performance.now() - started)});
+            if (this.active) this.fail(error);
+        } finally {this.schedule();}
     }
     setReadOnly(value: boolean): void {this.options.readOnly = value; void this.binding?.source.refresh().catch(error => this.fail(error));}
     suspendForRecovery(): void {this.suspended = true; this.store.suspend(); this.cancelPendingRender();}
@@ -209,7 +240,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
     restoreRecovery(value: unknown): void {this.view?.restoreRecovery(value as ReturnType<ChatView['captureRecovery']>);}
     destroy(): Promise<void> {
         return this.closing ??= disposeEditorResources([() => this.flushPendingSave(),
-            () => {this.closed = true; this.lifetime.abort(); clearTimeout(this.timer); clearTimeout(this.metadataTimer); if (this.metadataFrame !== undefined) cancelAnimationFrame(this.metadataFrame); this.offSnapshot?.();},
+            () => {this.closed = true; this.lifetime.abort(); clearTimeout(this.timer); this.cancelPaint(); this.offSnapshot?.();},
             () => this.owned ? this.view?.destroy() : undefined,
             () => this.historyBranches?.destroy(), () => this.binding?.dispose(), () => this.service.close(), () => this.events.clear()]);
     }

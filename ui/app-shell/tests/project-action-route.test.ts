@@ -9,3 +9,9 @@ it('preserves stable project and mount identities without opening a session on c
     expect(()=>parseProjectAction('@project/demo/delete/mount')).toThrow('INVALID_PROJECT_ACTION');
     expect(()=>parseProjectAction('@project/demo/detach/')).toThrow('INVALID_PROJECT_ACTION');
 });
+it('routes a cold project draft through the resource workbench without a session binding', () => {
+    const path = '/folder:Demo/@new', request = initialViewRequest([], path);
+    expect(request.resourceId).toBe(path);
+    expect(request.workbench.initialSessionId).toBeUndefined();
+    expect(request.workbench.initialNavigation).toBe(false);
+});

@@ -86,6 +86,13 @@ export class HttpViewClient {
         return root;
     }
     private deferredEventStart?:Promise<void>;
+    private catalogs?: Promise<void>;
+    prepareCatalogs(): Promise<void> {
+        return this.catalogs ??= this.post({kind: 'bootstrap-catalogs'}).then(async reply => {
+            if (!Array.isArray(reply.updates)) throw new FSError('EIO', 'Invalid catalog response');
+            this.peer.applyUpdates(reply.updates); await this.peer.waitUpdates(reply.updates);
+        }).catch(error => {this.catalogs = undefined; throw error;});
+    }
     startDeferredEvents():Promise<void> {
         return this.deferredEventStart??=this.attachDeferredEvents();
     }

@@ -29,6 +29,17 @@ it('ships only declared data files and conventional lifecycle hooks, honoring pr
     manifest.files.push('../secret.txt');await fs.driver.writeContent(path,JSON.stringify(manifest));
     await expect(resolveKanbanConfiguration(fs,fs,'development')).rejects.toMatchObject({code:'KANBAN_PROFILE_INVALID'});
 });
+it('includes report packaging guidance referenced by delivery in an older profile manifest', async () => {
+    const fs = await fixture();
+    await ensureKanbanConfiguration(fs);
+    const path = '/etc/kanban/development/profile.json';
+    const manifest = JSON.parse(await readPrompt(fs, path)) as {files: string[]};
+    manifest.files = manifest.files.filter(name => name !== 'report-packaging.md');
+    await fs.driver.writeContent(path, JSON.stringify(manifest));
+    const files = await resolveKanbanConfiguration(fs, fs, 'development');
+    expect(files.find(file => file.name === 'report-packaging.md')?.content)
+        .toBe(kanbanConfigurationDefaults['report-packaging.md']);
+});
 it('reports missing or malformed configurations instead of silently replacing their intent with defaults',async()=>{
     const fs=await fixture();await expect(ensureKanbanConfiguration(fs,true)).rejects.toMatchObject({code:'KANBAN_CONFIGURATION_UPGRADE_REQUIRED'});
     await ensureKanbanConfiguration(fs);

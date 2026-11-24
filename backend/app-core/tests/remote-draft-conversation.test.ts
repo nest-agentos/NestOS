@@ -5,12 +5,12 @@ import {RemoteConversationStore} from '../src/projects/remote-conversation-store
 import {draftConversation, draftHarness, remoteConversationJournal} from '../src/projects/remote-draft-conversation';
 import {interceptConversationTransactions} from './remote-conversation-faults';
 
-async function fixture(draftTitle?: string) {
+async function fixture(draftTitle?: string, kind = 'native') {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()});
     const fault = interceptConversationTransactions(await manager.openFileSystem('/'));
     const {fs} = fault, recovery = new RemoteConversationStore(fs, 'draft');
     const session = {id: 'native', title: 'Native preview', cwd: '/', status: 'idle', updatedAt: 1, resumable: true, owned: true};
-    const profile: HarnessProfile = {id: 'p', kind: 'native', workspaces: [{id: 'w'}],
+    const profile: HarnessProfile = {id: 'p', kind, workspaces: [{id: 'w'}],
         capabilities: {create: true, history: true, resume: true, interrupt: true, interactions: true, rename: true, slashCommands: true}};
     const client = {profiles: vi.fn(async()=>({epoch:'epoch',profiles:[profile]})),subscribe: vi.fn(() => () => {}),create: vi.fn(async () => ({session})), read: vi.fn(async () => ({session, turns: []})),
         commands: vi.fn(async () => [{name: 'verify', description: 'Verify', kind: 'prompt'}]),
@@ -171,8 +171,17 @@ it('retries a rejected initial title on a later refresh using the same default n
         expect(vi.mocked(f.client.rename!).mock.calls[1][2]).toBe(title); expect(f.client.turn).toHaveBeenCalledOnce();
     } finally {await view.close(); await f.manager.dispose();}
 });
+it('keeps the Codex preview when an untitled draft is promoted', async () => {
+    const f = await fixture(undefined, 'codex'), view = f.open();
+    try {
+        await view.read();
+        expect(await view.send('First input')).toMatchObject({sessionId: 'native', title: 'Native preview'});
+        expect(f.client.rename).not.toHaveBeenCalled();
+    } finally {await view.close(); await f.manager.dispose();}
+});
+
 it('uses the custom draft title after the first native turn is accepted', async () => {
-    const f = await fixture('手机照片记录'), view = f.open();
+    const f = await fixture('手机照片记录', 'codex'), view = f.open();
     try {
         await view.read(); await view.send('Keep the photo');
         expect(f.client.rename).toHaveBeenCalledWith('p', 'native', '手机照片记录', expect.anything());

@@ -36,6 +36,7 @@ it('does not log provider response bodies, URLs, headers or session content', ()
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     reportRemoteFailure(new Error('private-response-body https://host/?api_key=private-key'),
         {stage: 'session-list', projectId: 'notes', profileId: 'codex'});
+    expect(getLogger().query({modules: ['cells']})[0].data).toMatchObject({code: 'REMOTE_ERROR_WITHOUT_CODE', errorType: 'Error'});
     expect(JSON.stringify(getLogger().query({modules: ['cells']}))).not.toContain('private-');
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('private-');
 });

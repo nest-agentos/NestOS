@@ -6,7 +6,7 @@ NestOS 对独立 `@nestos/mdxeditor` 的适配层。使用 tsup 构建 ESM、CJS
 
 - `src/factory.ts`：接收 `ui-common` 的 `EditorOptions`，先校验 namespace/Session，再构造核心公共接口；文件后缀推断和文件聊天按钮位于这里。
 - 公共 `htmlPolicy` / `scrollMode` 原样转发到 mdxeditor，不在适配层设置对话角色或显示策略。
-- `src/assets.ts`：将授权 `IFileSystem` 转成 `AssetProvider`，拒绝附件路径穿越。
+- `src/assets.ts`：将授权 `IFileSystem` 转成 `AssetProvider`。Markdown 相对图片从当前文档所在目录解析，通过同一挂载读取。`@asset/` 使用附件存储。两套路径都拒绝越过各自边界。
 - `src/document-host.ts`：文档打开、重命名和通知适配。
 - `src/metadata-store.ts`：插件元数据持久化，文档路径随重命名/移动更新；`entries(prefix)` 支持按 key 读取。
 - `src/srs-store.ts`：`cloze:memory` 使用笔记 nav 内统一的 `/.nestos/cloze-srs.seq`，key 为编码后的文档相对路径 + `#` + 插件 key。首次实际渲染 cloze 时登记 `$document` 计数及摘要，不生成评分状态；首次评分才逐卡写入。后端 `app-core/vfs/cloze-lifecycle` 监听笔记 nav 文件视图，事务更新重命名/移动的路径 key，删除文件/目录时清理对应条目；不支持跨 nav 迁移。旧元数据只读兼容，实际评分时由核心迁移被修改的卡片；后端无 seqFiles 时回退节点元数据。

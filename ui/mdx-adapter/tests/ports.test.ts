@@ -43,6 +43,24 @@ it('rejects attachment traversal without accessing the granted view', async () =
     expect(read).not.toHaveBeenCalled(); expect(createFile).not.toHaveBeenCalled();
 });
 
+it('reads relative images in the document mount and follows document moves', async () => {
+    const bytes = new Uint8Array([1, 2]).buffer;
+    const readContent = vi.fn(async () => bytes);
+    const fs = { driver: { readContent }, discoveryRoot: (path: string) => path.startsWith('/workspace/') ? '/workspace' : '/other' } as any;
+    let document = '/workspace/docs/README.md';
+    const provider = createAssetProvider(fs, () => document)!;
+    const signal = new AbortController().signal;
+    await expect(provider.readDocumentImage!('c4/rendered/06-deployment.png', signal)).resolves.toEqual({ data: bytes, mimeType: 'image/png' });
+    expect(readContent).toHaveBeenLastCalledWith('/workspace/docs/c4/rendered/06-deployment.png', {encoding: 'binary', signal});
+    document = '/workspace/new/docs/README.md';
+    await provider.readDocumentImage!('../a%20b.svg?raw=1', signal);
+    expect(readContent).toHaveBeenLastCalledWith('/workspace/new/a b.svg', {encoding: 'binary', signal});
+    for (const reference of ['../../../other/image.png', '..%2Fimage.png', 'https://outside/image.png', 'folder/..%5Cimage.png', '../note.md']) {
+        await expect(provider.readDocumentImage!(reference, signal)).rejects.toThrow();
+    }
+    expect(readContent).toHaveBeenCalledTimes(2);
+});
+
 it('passes public embedding options through without assigning conversation policy', () => {
     const embedded = adaptEditorOptions({ scrollMode: 'host', htmlPolicy: 'literal' });
     expect(embedded.scrollMode).toBe('host'); expect(embedded.htmlPolicy).toBe('literal');

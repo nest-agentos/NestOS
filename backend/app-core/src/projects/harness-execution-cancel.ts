@@ -4,6 +4,7 @@ import type { HarnessConnectionService } from './harness-connections';
 import type { HarnessExecutionOptions } from './harness-execution';
 import { ExecutionJournal, executionError } from './harness-execution-journal';
 import {nativeMutation, settledOperation, recordForkReference, type NativeExecution} from './harness-execution-operations';
+import { verifyNativeTerminal } from './harness-terminal-recovery';
 import { observeNativePage, waitForNativeChange } from './harness-execution-observation';
 
 export async function cancelNativeExecution(connections: Pick<HarnessConnectionService, 'acquire'>,
@@ -21,8 +22,15 @@ export async function cancelNativeExecution(connections: Pick<HarnessConnectionS
         }
         const acquired = await connections.acquire(request.connection);
         try {
-            if (acquired.epoch !== journal.data.epoch) throw executionError('NATIVE_EPOCH_CHANGED');
             const run: NativeExecution = { acquired, journal, request, signal: controller.signal };
+            if (acquired.epoch !== journal.data.epoch) {
+                await verifyNativeTerminal(run, () => {
+                    if (!options.readContextForCleanup) throw executionError('CLEANUP_BINDING_UNAVAILABLE');
+                    return options.readContextForCleanup(journal);
+                });
+                await settleCleanupContext(options, journal, context);
+                return 'terminal';
+            }
             if (!await recoverReferences(run)) {await settleCleanupContext(options, journal, context, true); return 'not-started';}
             await stopNativeTurn(run, options.pollMs ?? 1000);
             await settleCleanupContext(options, journal, context);

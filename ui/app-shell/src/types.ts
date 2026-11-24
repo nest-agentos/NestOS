@@ -166,6 +166,7 @@ export interface AppOptions {
     /** The active workspace's initial resource operation completed (or none was requested). */
     onEditorReady?: () => void;
     startRemoteEvents?: () => Promise<void>;
+    prepareCatalogs?: () => Promise<void>;
     /** UI implementations (editor factories, AI menu, LLM settings editors) injected by the entry app. */
     ui: AppUI;
 }

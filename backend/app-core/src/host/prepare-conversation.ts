@@ -1,7 +1,7 @@
 import {FSError} from '@nestos/vfs-core';
 import {resolveBrowserTarget} from '@nestos/app-contracts';
 import {createModuleLogger, randomUUID} from '@nestos/common';
-import type {PreparedConversation, ProjectFolder, ProjectService} from '@nestos/app-contracts/services';
+import type {PreparedConversation, ProjectConversationPort, ProjectFolder, ProjectService} from '@nestos/app-contracts/services';
 
 const log = createModuleLogger('conversation-workbench');
 /** Opening existing history never adopts, sends, responds or creates a Session. */
@@ -11,14 +11,17 @@ export async function prepareConversation(projects: ProjectService, resourceId: 
     const project = resolvedProject === undefined ? await projects.forFolder(target.folder) : resolvedProject;
     if (!project || project.path !== target.folder) throw Object.assign(new FSError('ENOENT', 'Conversation project missing'), {reason: 'REMOTE_PROJECT_MISSING'});
     if (!projects.remoteMounts) throw new FSError('ECAPABILITY', 'Remote conversations unavailable');
-    const conversation = await projects.remoteMounts.projectConversation(project.project.id, target.profileId, target.nativeSessionId, {timeoutMs: 3000}, target.archived);
+    let conversation: ProjectConversationPort | undefined, stage = 'binding';
     try {
-        const [, draft] = await Promise.all([conversation.read(), conversation.readComposerDraft?.()]);
-        log.info('conversation.open', {operation: 'workbench.conversation', operationId, stage: 'prepare', result: 'success', durationMs: Math.round(performance.now() - started)});
+        conversation = await projects.remoteMounts.projectConversation(project.project.id, target.profileId, target.nativeSessionId, {timeoutMs: 3000}, target.archived);
+        stage = 'snapshot';
+        const [snapshot, draft] = await Promise.all([conversation.read({includeUsage: false}), conversation.readComposerDraft?.()]);
+        log.info('conversation.open', {operation: 'workbench.conversation', operationId, stage: 'prepare', result: 'success',
+            messageCount: snapshot.messages.length, durationMs: Math.round(performance.now() - started)});
         return {resourceId, project, conversation, draft, issues: {}, deferredMetadata: true};
     } catch (error) {
-        await conversation.close();
-        log.warn('conversation.open', {operation: 'workbench.conversation', operationId, stage: 'prepare', result: 'failure', code: safeCode(error), durationMs: Math.round(performance.now() - started)});
+        log.warn('conversation.open', {operation: 'workbench.conversation', operationId, stage, result: 'failure', code: safeCode(error), durationMs: Math.round(performance.now() - started)});
+        if (conversation) await Promise.allSettled([conversation.close()]);
         throw error;
     }
 }

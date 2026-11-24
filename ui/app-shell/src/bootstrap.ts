@@ -1,3 +1,5 @@
+import {LOOP_BOARD_PATH} from '@nestos/kanban-ui';
+import {KanbanWindowWorkbench} from './kanban/windows';
 import {parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts';
 import {mountContentTitleBar} from './workbench/content-titlebar';
 import {lazyScannerPackages} from './digital-twin/lazy-packages';
@@ -53,7 +55,7 @@ import type { EditorFileType as FileTypeDefinition } from './browser/types';
 import { connectEditorLifecycle } from './browser/editor-connector';
 import {NavigationRequest, NAVIGATION_EVENTS, formatDefaultFileTitle, traceBoot, setBootTraceEnabled} from '@nestos/common';
 import { MenuItem } from '@nestos/ui-common-adapter';
-import { EditorFactory } from '@nestos/ui-common-adapter';
+import { EditorFactory, MOBILE_NAVIGATION_QUERY } from '@nestos/ui-common-adapter';
 import { Workbench } from './core/Workbench';
 import { setupMobileWorkspaceView } from './navigation/mobile-workspace-view';
 import { installMobileViewport } from './navigation/mobile-viewport';
@@ -64,6 +66,17 @@ import {createContentSelectionChat, createDocumentChatFactory} from './browser/d
 import { lazyMdxEditorFactory as baseEditorFactory } from './browser/lazy-mdx';
 import { FILE_REGISTRY, EditorTypeKey } from './config/file-registry';
 import { themeService, ThemeMode } from './ThemeService';
+
+function isNativeConversationRoute(resourceId?: string): boolean {
+    const target = resourceId && resourceTarget(resourceId);
+    return !!target && target.kind === 'remote' && !!target.nativeSessionId;
+}
+
+function resourceTarget(path: string): ReturnType<typeof resolveBrowserTarget> | undefined {
+    try {
+        return resolveBrowserTarget(parseSessionRoute(path).path);
+    } catch {return undefined;}
+}
 
 export async function initApp(options: AppOptions): Promise<AppHandle> {
     let diagnostics = false;
@@ -432,17 +445,19 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
 
         if (strategyType === 'chat') {
             const {createProjectModule} = await import('./projects');
+            const contentFirst = !!initialResource && !window.matchMedia?.(MOBILE_NAVIGATION_QUERY)?.matches;
             let sidebarReady = false;
             const revealSidebar = () => {
                 if (sidebarReady || (visibleWorkspaceId && visibleWorkspaceId !== elementId)) return false;
                 sidebarReady = true;
-                requestAnimationFrame(() => { if (!closed) services.startBackground?.(); });
+                if (!contentFirst) requestAnimationFrame(() => { if (!closed) services.startBackground?.(); });
                 options.onWorkspaceReady?.({ editor: editorEl });
+                options.onSidebarInteractive?.();
                 return true;
             };
             const resourcePath = initialResource && !initialResource.startsWith('@') && !initialResource.startsWith('draft:')
                 ? parseSessionRoute(initialResource).path : undefined;
-            const target = resourcePath ? resolveBrowserTarget(resourcePath) : undefined;
+            const target = resourcePath ? resourceTarget(resourcePath) : undefined;
             const initialOpening = opened?.conversationWorkbench;
             const preparedLocal = !!target && target.kind === 'session' && opened?.initial?.sessionId === target.sessionId;
             const opening = initialOpening && (initialOpening.resourceId ?? initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === (resourcePath ?? initialResource) ? initialOpening
@@ -456,6 +471,12 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             ]));
             const module = createProjectModule({ services, backend, opening, createFactory: createChatFactory, initialResource, deferNavigation: !!initialResource, projectSyncSetup: options.projectSyncSetup, projectSyncDirectory: options.projectSyncDirectory, sidebar: sidebarEl, container: editorEl,
                 onUnavailableResource:services.kanban?unavailableConversationCleanup(services.kanban):undefined,
+                createLoopFromSession:services.kanban?.startRecordConversation?async source=>{
+                    await handleNavigationRequest({target:'kanban',resourceId:LOOP_BOARD_PATH},true);
+                    const kanban=managerCache.get('kanban-workspace');
+                    if (!(kanban instanceof KanbanWindowWorkbench)) throw new Error(translate('kanban.errors.DECISION_SESSION_UNAVAILABLE'));
+                    await kanban.openLoopCreation(source);
+                }:undefined,
                 openProjectDecisions:services.kanban?id=>handleNavigationRequest({target:'kanban',resourceId:projectDecisionsPath(id)}):undefined,
                 executorUsage, agentFactory,
                 fileFactory: defaultEditorFactory, createFlowContextMenu: options.ui.createFlowContextMenu,
@@ -469,9 +490,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             if (document.hidden || visibleWorkspaceId && visibleWorkspaceId !== elementId) {
                 await module.workbench.setVisible?.(false); return module.workbench;
             }
-            // Sidebar is populated from the catalog snapshot now; the editor area mounts later.
-            revealSidebar();
-            options.onSidebarInteractive?.();
+            if (!contentFirst) revealSidebar();
             return module.workbench;
         }
 
@@ -676,6 +695,10 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
         const dismissLoading = workspaceId !== START_PAGE_ID ? workspaceStatus(container) : () => {};
         try {
+            if (revision !== 1 && options.prepareCatalogs && !(isProjectWorkspace(workspaceId) && isNativeConversationRoute(resourceId))) {
+                await options.prepareCatalogs();
+                if (closed || revision !== navigationRevision) return;
+            }
             if (sourceSlug === 'projects' && resourceId && workspaces.some(ws => ws.elementId === workspaceId && ws.type === 'chat')) {
                 try { resourceId = await resolveLegacyProjectResource(resourceId, services.projects); }
                 catch (error) {
@@ -731,7 +754,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                         console.error('[Navigation]', error);
                         workspaceStatus(sidebar, error, () => { void Promise.resolve().then(() => manager.setNavigationVisible!(true)).catch(console.error); });
                     });
-                });
+                }, !!resourceId && !navigationFailed && isProjectWorkspace(workspaceId));
                 navigationObservers.set(manager, stop);
                 cleanupFns.push(() => {stop(); navigationObservers.delete(manager);});
             }
@@ -903,6 +926,15 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     // ── AppHandle ──────────────────────────────────────────────────────────────
 
     projection?.finishHydration();
+    if (options.prepareCatalogs) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const frame = requestAnimationFrame(() => {timer = setTimeout(() => {
+            void options.prepareCatalogs!().catch(error => console.warn('[Boot] Deferred catalog load failed', {
+                code: (error as {code?: string})?.code ?? 'VIEW_CATALOG_LOAD_FAILED',
+            }));
+        }, 0);});
+        cleanupFns.push(() => {cancelAnimationFrame(frame); clearTimeout(timer);});
+    }
     if (applicationEvents) {
         const refresh = () => {if (!document.hidden) void applicationEvents.refresh();};
         window.addEventListener('online', refresh, {signal: navigationSignal});

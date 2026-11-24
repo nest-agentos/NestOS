@@ -52,6 +52,9 @@ async function serve(request: IncomingMessage, response: ServerResponse, options
     const route = ['/api/identity', '/api/vfs', '/api/health', '/api/application', '/api/application/events', '/api/application/files', NATIVE_SESSION_RECOVERY_ENDPOINT, '/api/tool-connections/callback', '/api/tool-connections/result'].includes(pathname) ? pathname : pathname.startsWith('/api/') ? '/api/unknown' : '/ui';
     const userId = auth.userId;
     if (userId && userId !== 'admin' && !options.multiUser) throw new FSError('EACCES', 'User mappings require multi-user hosting');
+    if (pathname.startsWith('/api/application') && request.headers['x-nestos-user'] !== undefined
+        && request.headers['x-nestos-user'] !== (userId ?? 'admin'))
+        throw new FSError('EACCES', 'Certificate user changed; reload this page');
     const audit = userId && options.userAudit ? options.userAudit(userId) : options.audit;
     auditRequest(audit, request, response, route);
     if (pathname === '/api/tool-connections/callback' || pathname === '/api/tool-connections/result') {

@@ -54,7 +54,9 @@ function validWindow(value: unknown): value is PinnedWindow {
     const row = value as Partial<PinnedWindow>;
     return typeof row.workspace === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(row.workspace)
         && typeof row.resource === 'string' && !!row.resource && typeof row.title === 'string'
-        && [row.scope, row.context, row.location].every(text => text === undefined || typeof text === 'string');
+        && [row.scope, row.context, row.location].every(text => text === undefined || typeof text === 'string')
+        && [row.createdAt, row.modifiedAt, row.accessedAt].every(time => time === undefined ||
+            (Number.isSafeInteger(time) && time >= 0 && time <= 8.64e15));
 }
 
 async function readPins(fs: FileSystem): Promise<PinnedWindow[]> {
@@ -82,10 +84,10 @@ export async function setPinnedWindow(vfs: IVFSManager, change: PinnedWindowChan
         if (!operationId || !validWindow(change.window) || typeof change.pinned !== 'boolean') {
             throw new FSError('EINVAL', 'Invalid pinned window change');
         }
-        const {workspace, resource, title, scope, context, location} = change.window;
+        const {workspace, resource, title, scope, context, location, createdAt, modifiedAt, accessedAt} = change.window;
         await queueWrite(vfs, async fs => {
             const pins = (await readPins(fs)).filter(pin => pin.workspace !== workspace || pin.resource !== resource);
-            if (change.pinned) pins.unshift({workspace, resource, title, scope, context, location});
+            if (change.pinned) pins.unshift({workspace, resource, title, scope, context, location, createdAt, modifiedAt, accessedAt});
             await writeDocument(fs, pinFile, JSON.stringify(pins));
         });
         log.debug('windows.pin', {operationId, stage: 'persist', result: 'success', durationMs: Math.round(performance.now() - started)});

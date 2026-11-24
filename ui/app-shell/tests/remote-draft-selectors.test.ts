@@ -7,14 +7,14 @@ import {getLogger} from '@nestos/common';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0)) await close(); document.body.replaceChildren(); vi.unstubAllGlobals();});
-async function fixture(promptHarness = false) {
+async function fixture(promptHarness = false, waitForModels?: Promise<void>, waitForExecutors?: Promise<void>) {
     vi.stubGlobal('matchMedia', () => ({matches: false, addEventListener() {}, removeEventListener() {}}));
     const host = document.createElement('div'); document.body.append(host);
     const catalog = (label: string): ConversationModelCatalog => ({models: [
         {id: 'shared', label, reasoningEfforts: [{id: 'low', label: 'Low'}, {id: 'high', label: 'High'}], defaultReasoningEffort: 'low'},
         {id: 'other', label: 'Other', reasoningEfforts: [{id: 'medium', label: 'Medium'}], defaultReasoningEffort: 'medium'}],
         default: {modelId: 'shared', reasoningEffort: 'low'}});
-    const models = vi.fn(async (id: string) => catalog(id)), save = vi.fn(async (_value: string) => {}), materialize = vi.fn();
+    const models = vi.fn(async (id: string) => {await waitForModels; return catalog(id);}), save = vi.fn(async (_value: string) => {}), materialize = vi.fn();
     const nativeB = promptHarness ? 'remote:' + encodeURIComponent(JSON.stringify(['node', 'project', 'claude'])) : 'remote:b';
     const nativeId = promptHarness ? 'remote:' + encodeURIComponent(JSON.stringify(['node', 'project', 'codex'])) : 'remote:a';
     const agent = {kind: 'agent' as const, id: 'writer', version: '1', digest: 'writer-digest'};
@@ -23,12 +23,40 @@ async function fixture(promptHarness = false) {
     const service = {onChange: () => () => {}, listAgents: () => [{id: 'writer', name: 'Writer', type: 'agent', config: {}}], getSystemPrompt: async () => null};
     const editor = new ChatDraftEditor(host, service as never,
         {sessionDraft: {id: 'draft', executorScope: 'remote', promptHarness, materialize, save},
-            remoteAgents: {list: async () => [{id: nativeId, name: 'A'}, {id: nativeB, name: 'B'}], models, send: vi.fn()}}, vi.fn(), promptHarness ? {commands: commands as never} : {});
+            remoteAgents: {list: async () => {await waitForExecutors; return [{id: nativeId, name: 'A'}, {id: nativeB, name: 'B'}];}, models, send: vi.fn()}}, vi.fn(), promptHarness ? {commands: commands as never} : {});
     cleanup.push(() => editor.destroy()); await editor.init(host);
     const select = (id: string) => host.querySelector<HTMLSelectElement>(`[data-selector-id="${id}"]`)!;
+    if (!waitForModels && !waitForExecutors) await vi.waitFor(() => expect(select('modelId')).not.toBeNull());
     const choose = (id: string, value: string) => {const node = select(id); node.value = value; node.dispatchEvent(new Event('change'));};
     return {editor, select, choose, models, save, materialize, agent, flow, nativeId, nativeB, host, commands};
 }
+
+it('renders and keeps draft input while waiting for the remote executor list', async () => {
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => {release = resolve;});
+    const f = await fixture(false, undefined, pending);
+    expect(f.host.querySelector('.llm-chat__input')).not.toBeNull();
+    expect(f.models).not.toHaveBeenCalled();
+    f.editor.setText('Keep this draft');
+    release();
+    await vi.waitFor(() => expect(f.select('modelId')).not.toBeNull());
+    expect(f.editor.getText()).toBe('Keep this draft');
+    expect(f.materialize).not.toHaveBeenCalled();
+});
+
+it('allows typing while the remote model catalog is pending and retains input if it fails', async () => {
+    let reject!: (error: Error) => void;
+    const pending = new Promise<void>((_, fail) => {reject = fail;});
+    const f = await fixture(true, pending), report = vi.fn();
+    f.editor.on('error', report);
+    expect(f.host.querySelector('.llm-chat__input')).not.toBeNull();
+    expect(f.select('modelId')).toBeNull();
+    f.editor.setText('Keep typing');
+    const error = new Error('Catalog timed out'); reject(error);
+    await vi.waitFor(() => expect(report).toHaveBeenCalledWith(error));
+    expect(f.editor.getText()).toBe('Keep typing');
+    expect(f.models).toHaveBeenCalledOnce();
+});
 
 it('opens a remote draft with model and effort choices and preserves the draft when models change', async () => {
     const f = await fixture(); f.editor.setText('Keep this draft');

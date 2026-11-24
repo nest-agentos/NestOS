@@ -6,12 +6,13 @@ import type {RuntimeServiceDescriptor} from '@nestos/app-contracts/services';
 import type {ChannelResponse} from '../run/channel-protocol';
 type Workspace=import('../presets/kanban-development').DevelopmentWorkspaceRecord;
 export interface TaskRecoveryOptions {
+    reportHandoff?:{inspect?(record:Workspace):Promise<import('@nestos/kanban/contracts').KanbanReportUsage>;run(boardId:string,itemId:string,dispatchId:string,existingOnly?:boolean):Promise<void>;wake():void};
     recheck?:{supports(record:Workspace):boolean;run(record:Workspace):Promise<string[]>};
     fs:import('@nestos/vfs-core').IFileSystem;service:KanbanClient;client():KanbanClient;journal:KanbanAutomationJournal;remote:ProjectRemoteMountService;
-    projects:Pick<ProjectService,'get'>;describe(item:import('@nestos/kanban/contracts').KanbanItem):Promise<RuntimeServiceDescriptor|undefined>;
+    projects:Pick<ProjectService,'get'>&Partial<Pick<ProjectService,'openWorkspace'>>;describe(item:import('@nestos/kanban/contracts').KanbanItem):Promise<RuntimeServiceDescriptor|undefined>;
     executionResource(id:string,branch:string,board?:import('@nestos/kanban/contracts').KanbanBoard):Promise<string|undefined>;
     log(event:{operationId:string;boardId?:string;stage:string;result:'success'|'failure';code?:string;durationMs:number}):void;
 }
 export interface RecoverySession {boardId:string;itemId:string;dispatchId:string;scopeId:string;projectId:string;profileId:string;sessionId:string;resourceId:string;ready?:boolean}
-export interface RecoveryIntent {boardId:string;request:KanbanTaskRecoveryRequest;digest:string;dispatchId:string;previousDispatchId:string;issueId?:string;targetVersion?:string;done?:boolean;result?:KanbanTaskRecoveryResult;evidence?:{version:string;serviceId:string;previous:unknown;approval?:string;sourceOperationId?:string;sourceItemId?:string};command?:import('@nestos/kanban/contracts').KanbanCommand}
+export interface RecoveryIntent {boardId:string;request:KanbanTaskRecoveryRequest;digest:string;dispatchId:string;previousDispatchId:string;issueId?:string;reportHandoff?:true;targetVersion?:string;done?:boolean;result?:KanbanTaskRecoveryResult;evidence?:{version:string;serviceId:string;previous:unknown;approval?:string;sourceOperationId?:string;sourceItemId?:string};command?:import('@nestos/kanban/contracts').KanbanCommand}
 export interface RecoveryReply {requestDigest:string;response:ChannelResponse;resumed?:boolean}

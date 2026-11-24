@@ -18,12 +18,13 @@ import {ViewUpdateReads} from './view-update-reads';
 import type { AuditPort } from '../logging/audit-log';
 import { recordRequestPhase } from '../logging/audit-log';
 import {SnapshotCache} from '@nestos/app-transport/http';
-import {bootstrapView, type BootstrapRequest} from './view-bootstrap';
+import {bootstrapCatalogs, bootstrapView, type BootstrapRequest} from './view-bootstrap';
 import { callDiagnostics, replyDiagnostics } from './call-diagnostics';
 import {t} from '@nestos/common';
 
 interface Client { peer: RpcPeer; view: HostedView; stream?: ServerResponse; lastSeen: number; active: number;
     bootstrap?: Promise<Reply>; stopObservation?: () => void;
+    catalogs?: ReturnType<typeof bootstrapCatalogs>;
     initialized: boolean; notifications: ViewNotifications; events: ViewEventStream; updateReads: ViewUpdateReads;
     pending: Map<string, { resolve(reply: Reply): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>; }
 type ApplicationRequest = BootstrapRequest & {clientId?: unknown; version?: unknown; kind?: string;
@@ -57,6 +58,7 @@ export class ViewApi {
         recordRequestPhase(response, 'viewReadyMs', Date.now() - preparing);
         if (body.kind === 'bootstrap') return this.respondBootstrap(client, identity, body, response);
         if (body.kind === 'bootstrap-data') {await compressedJson(response, 200, await client.bootstrap!); return;}
+        if (body.kind === 'bootstrap-catalogs') return this.respondCatalogs(client, response);
         if (body.kind === 'updates-read') return this.readUpdates(client, body.id, response);
         if (body.kind === 'reply') {
             const pending = client.pending.get(body.id!); if (!pending) throw new FSError('ENOENT', 'Unknown callback');
@@ -101,6 +103,24 @@ export class ViewApi {
             this.audit?.write({...diagnosticContext(),event: 'application.complete', requestId: String(response.getHeader('X-Request-ID') ?? ''),
                 rpcKind: 'bootstrap', rpcBatchSize: Number(!!body.initialView)+Number(!!body.initialRead),
                 rpcOperations: [...(body.initialView?['ApplicationBackend.openView']:[]),...(body.initialRead?['ApplicationBackend.readStartup']:[])], durationMs: Date.now() - started});
+        }
+    }
+    private async respondCatalogs(client: Client, response: ServerResponse): Promise<void> {
+        const started = Date.now(), requestId = String(response.getHeader('X-Request-ID') ?? '');
+        let result = 'failure', code: string | undefined;
+        this.acquire(client);
+        try {
+            await compressedJson(response, 200, await bootstrapCatalogs(client));
+            result = 'success';
+        } catch (error) {
+            code = error instanceof FSError ? error.code : 'VIEW_CATALOG_LOAD_FAILED';
+            throw error;
+        } finally {
+            client.active--; client.lastSeen = Date.now();
+            const durationMs = Date.now() - started;
+            recordRequestPhase(response, 'rpcMs', durationMs);
+            this.audit?.write({...diagnosticContext(), event: 'application.complete', operation: 'view.catalogs',
+                stage: 'read', requestId, result, code, rpcKind: 'bootstrap-catalogs', rpcBatchSize: 1, rpcOperations: ['view.catalogs'], durationMs});
         }
     }
     private async invoke(client: Client, body: ApplicationRequest, response: ServerResponse): Promise<void> {

@@ -21,6 +21,12 @@ export interface ReviewAdapter {
     ready?(board:KanbanBoard,item:KanbanItem):boolean;
     acceptanceCommands?(board:KanbanBoard,item:KanbanItem):Promise<import('@nestos/kanban/contracts').KanbanCommand[]>;
     cancel?(job:ReviewJob,operationId:string):Promise<'accepted'|'cancelled'|'unknown'>;
+    gitIntegration?: {
+        start(job: ReviewJob): Promise<'session' | 'applied'>;
+        requiresProposal?(job:ReviewJob):Promise<boolean>;
+        publishProposal?(job:ReviewJob,output:unknown):Promise<unknown|undefined>;
+        inspect(job: ReviewJob, resume?:boolean): Promise<import('@nestos/llm-session').OperationObservation | undefined>;
+    };
     managed?:{describe?(item:KanbanItem):Promise<import('@nestos/app-contracts/services').RuntimeServiceDescriptor|undefined>;prepare(input:{id:string;board:KanbanBoard;item:KanbanItem;snapshot:ReviewSnapshot;context:unknown}):Promise<import('@nestos/app-contracts/services').ServiceSwitchRequest|undefined>;
         submit(request:import('@nestos/app-contracts/services').ServiceSwitchRequest):Promise<void>;
         inspect(job:ReviewJob):Promise<import('@nestos/llm-session').OperationObservation>};
@@ -46,6 +52,7 @@ export interface ReviewOperationsOptions {
     automaticTarget?(board:KanbanBoard,item:KanbanItem):string|undefined;
     automatic?(board:KanbanBoard,item:KanbanItem):Promise<boolean>;
     cleanup?(board:string,item:string,id:string):Promise<boolean>;
+    retryCleanup?:import('@nestos/kanban/integration').ReviewCleanupPorts['retryCleanup'];
     cleanupReview?:import('@nestos/kanban/integration').ReviewCleanupPorts['cleanupReview'];
     reportAutomatic?(state:{id:string;boardId:string;itemId:string;step:number;waitingForUser?:boolean;code?:string;done?:boolean;handoff?:{boardId:string;itemId:string;at:number}}):Promise<void>;
     report?(job: ReviewJob): Promise<void>;

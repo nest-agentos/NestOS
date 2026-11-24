@@ -16,6 +16,7 @@
     "./branches": "./src/managed-branches.ts",
     "./archives": "./src/worktree-archive.ts",
     "./integration": "./src/integration.ts",
+    "./integration-transaction": "./src/integration-transaction.ts",
     "./snapshots": "./src/snapshot.ts",
     "./removal": "./src/removal.ts",
     "./identity": "./src/identity.ts",

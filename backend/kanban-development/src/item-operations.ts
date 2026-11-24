@@ -9,7 +9,7 @@ import {discoverOperationScopes} from './item-operation-discovery';
 import {scanRetiredScope} from './item-operation-retirement';
 import {invalidateReviewAnalysis,prepareAutomaticReanalysis} from '@nestos/kanban/integration';
 import {readOperationScopes,operationRequestOptions,scopedOperationOptions,scopedFinalizationStatus} from './item-operation-scopes';
-import {finishReviewCleanup,reviewCleanupKey,type ReviewCleanup} from '@nestos/kanban/integration';
+import {finishReviewCleanup,registerReviewCleanup,reviewCleanupKey,type ReviewCleanup} from '@nestos/kanban/integration';
 import {cancellationKey,pendingCancellation,cancellationSupported,requestCancellation,scanCancellations,type ReviewCancellation} from '@nestos/kanban/integration';
 import {operationDependencies,operationGroup,affectedOperations,effectiveOperationWaivers,projectOperationSkips,skipItemOperations,applySkipIntent} from './item-operation-skips';
 import {automaticDelivery,automaticDeliveryStatus} from '@nestos/kanban/integration';
@@ -26,7 +26,7 @@ const actions: ReviewAction[] = ['build', 'deploy', 'accept', 'analyze', 'merge'
 const initial = (): ReviewSettings => ({revision: 0, bindings: {}, jobs: [], receipts: {}});
 
 export function createItemOperations(input: ReviewOperationsOptions) {
-    const options=input;options.uncancellableActions??=['accept'];
+    const options=input;options.uncancellableActions??=['accept'];options.retryCleanup??=retrySoftwareCleanup;
     let stopped = false; const tails = new Map<string, Promise<unknown>>();
     const queue = <T>(board: string, item: string, work: () => Promise<T>, lane='run'): Promise<T> => {
         requireValue(!stopped, 'SERVICE_STOPPING'); const key = JSON.stringify([board,item,lane]);
@@ -168,7 +168,10 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
         const started=Date.now();
         const mismatch=job.code===replacementMismatchCode;
         if(mismatch)requireValue(latest(context,'deploy')?.id===job.id&&!context.jobs.some(row=>row.phase!=='settled'),'OPERATION_RECOVERY_UNAVAILABLE');
-        const observed=mismatch?await recheckReplacement(options,job):job.phase==='submitting'?await advanceReviewJob(options,job,true):job;
+        if(job.action==='merge'&&job.phase==='submitting'){
+            requireValue(!context.board.lifecycle&&!context.board.executionControl?.paused&&!context.archived&&context.item.control?.action!=='cancel','OPERATION_RECOVERY_UNAVAILABLE');
+        }
+        const observed=mismatch?await recheckReplacement(options,job):job.phase==='submitting'?await advanceReviewJob(options,job,true,job.action==='merge'):job;
         options.log({operationId:job.id,boardId:board,itemId:request.itemId,stage:'operation.reconcile',result:observed.state==='unknown'||observed.state==='failed'?'failure':'success',code:observed.code,durationMs:Date.now()-started});
         await settleDeliveryAcceptance(options,board,request.itemId);
         return view(options,await load(options,board,request.itemId,false));
@@ -318,6 +321,10 @@ async function settleDeliveryAcceptance(options:ReviewOperationsOptions,board:st
     const required=current.operations.filter(row=>row.runAction!=='cleanup');
     if(!required.every(row=>['succeeded','skipped'].includes(row.state)))return;
     const waivers=await currentWaivers(options,context),waiver=waivers.find(row=>row.acceptanceWaived),accepted=latest(context,'accept');
+    const merged=latest(context,'merge');
+    const cleanup=merged?.state==='succeeded'&&!waivers.some(row=>row.operations.some(op=>op.id==='cleanup'))?merged.id:undefined;
+    if(context.item.status==='review'&&!waiver&&!accepted?.command&&!accepted?.commands)return;
+    if(cleanup&&context.cleanup?.runId!==cleanup)await registerReviewCleanup(options,board,item,cleanup);
     if(options.scopeId&&accepted?.state==='succeeded'&&accepted.commands){
         for(const [index,command] of accepted.commands.entries())await journalCommand(options.journal,options.service,board,'review-accept:'+accepted.id+':'+index,command);
     }else if(context.item.status==='review'){
@@ -325,8 +332,11 @@ async function settleDeliveryAcceptance(options:ReviewOperationsOptions,board:st
         else if(accepted?.state==='succeeded'&&accepted.command)await journalCommand(options.journal,options.service,board,'review-accept:'+accepted.id,accepted.command);
         else return;
     }
-    const merged=latest(context,'merge');
-    if(merged?.state==='succeeded'&&!waivers.some(row=>row.operations.some(op=>op.id==='cleanup')))await finishReviewCleanup(options,board,item,merged.id);
+    if(cleanup)await finishReviewCleanup(options,board,item,cleanup);
+}
+
+function retrySoftwareCleanup(code:string):boolean {
+    return ['WORKTREE_IN_USE','WORKTREE_EXECUTION_UNKNOWN','WORK_RESOURCE_NODE_BUSY','WORKTREE_CLEANUP_UNCONFIRMED','PROCESS_READERS_BUSY','EBUSY','ETIMEDOUT'].includes(code);
 }
 
 function cancellationView(options:ReviewOperationsOptions,context:Context,entry:KanbanItemOperation):KanbanItemOperation {

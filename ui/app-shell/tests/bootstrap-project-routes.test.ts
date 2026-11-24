@@ -98,7 +98,7 @@ describe('saved project routes at bootstrap', () => {
             app = await f.start();
             expect(location.hash).toBe('#/chat');
             expect(document.body.textContent).toContain('此地址无效或内容已不存在');
-            expect(document.querySelector('.vfs-sidebar__navigation select option[value="@new-project"]')).not.toBeNull();
+            await vi.waitFor(() => expect(document.querySelector('.mm-sidebar .vfs-scope-selector option[value="@new-project"]')).not.toBeNull());
         } finally { await app?.destroy(); await f.dispose(); }
     });
     it('reports the workspace shell before the editor so a host can reveal nav, sidebar, then content', async () => {
@@ -118,7 +118,7 @@ describe('saved project routes at bootstrap', () => {
         } finally { await app.destroy(); await f.dispose(); }
     });
 
-    it('reveals the sidebar before opening a deep-linked document', async () => {
+    it('opens a deep-linked document before loading the desktop sidebar', async () => {
         const f = await fixture();
         const project = (await f.projects.current())!;
         await f.root.driver.createFile({ parentPath: project.project.directory, name: documentName, content: 'original study notes' });
@@ -133,15 +133,15 @@ describe('saved project routes at bootstrap', () => {
             onWorkspaceReady: () => {
                 phases.push('sidebar');
                 expect(document.querySelector('.project-workbench__tree')).not.toBeNull();
-                expect(defaultEditorFactory).not.toHaveBeenCalled();
+                expect(defaultEditorFactory).toHaveBeenCalledOnce();
             },
             onSidebarInteractive: () => {
                 phases.push('interactive');
-                expect(defaultEditorFactory).not.toHaveBeenCalled();
+                expect(defaultEditorFactory).toHaveBeenCalledOnce();
             },
             onEditorReady: () => phases.push('editor'),
         });
-        try { expect(phases).toEqual(['shell', 'sidebar', 'interactive', 'editor']); }
+        try { await vi.waitFor(() => expect(phases).toEqual(['shell', 'editor', 'sidebar', 'interactive'])); }
         finally { await app.destroy(); await f.dispose(); }
     });
 
@@ -152,7 +152,7 @@ describe('saved project routes at bootstrap', () => {
         document.body.dataset.appStarting = '';
         const app = await f.start({
             onShellReady: () => expect(document.body.hasAttribute('data-app-starting')).toBe(true),
-            onWorkspaceReady: () => expect(document.querySelector<HTMLElement>('.mm-layout')?.dataset.workspaceOpening).toBe('true'),
+            onEditorReady: () => expect(document.querySelector<HTMLElement>('.mm-layout')?.dataset.workspaceOpening).toBe('true'),
         });
         try {
             expect(document.body.hasAttribute('data-app-starting')).toBe(false);
@@ -172,9 +172,13 @@ describe('saved project routes at bootstrap', () => {
         history.replaceState(null, '', '#/chat/' + encodeURIComponent(folderBrowserPath(project.path)));
         const app = await f.start();
         try {
-            const selector = document.querySelector<HTMLSelectElement>('.workbench-project-navigation select')!;
-            await vi.waitFor(() => expect(selector.value).toBe(folderBrowserPath(project.path)));
+            const selector = await vi.waitFor(() => {
+                const current = document.querySelector<HTMLSelectElement>('.mm-sidebar .vfs-scope-selector');
+                expect(current?.value).toBe(folderBrowserPath(project.path));
+                return current!;
+            });
             await app.navigate('chat'); expect(selector.value).toBe('/');
+            expect(document.querySelector('.mm-sidebar .vfs-scope-selector')).toBe(selector);
             expect(parseWorkspaceHash(location.hash, 'chat').resource).toBe('/');
         } finally { await app.destroy(); await f.dispose(); }
     });

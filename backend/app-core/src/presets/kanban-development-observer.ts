@@ -1,5 +1,5 @@
-import {recordDeliveryFailure,resolveDeliveryFailures} from '@nestos/kanban-development';
-import {registerTaskResultRecovery} from '@nestos/kanban/integration';
+import {recordDeliveryFailure,resolveDeliveryFailures,reportHandoffFailure} from '@nestos/kanban-development';
+import {registeredTaskResult,registerTaskResultRecovery} from '@nestos/kanban/integration';
 import {completedPublication} from './kanban-completed-result';
 import {currentNativeSessionReader} from '../kanban/native-session-observer';
 import {nativeSessionActivity} from '../kanban/native-session-activity';
@@ -78,8 +78,8 @@ export function developmentObserver(options: Options) {
             const unresolved = unresolvedWorkIssues(messages);
             await reconcileIssues(journal, input, messages);
             if(envelope.execution?.sessionId&&['running','submitting'].includes(envelope.execution.status??''))return {...input.observation,outcome:'running',outputs:undefined,code:unresolved.some(message=>message.type==='error')?'WORKSPACE_ERROR_REPORTED':unresolved.some(message=>message.type==='clarification')?'WORKSPACE_INPUT_REQUIRED':undefined};
-            if (options.exchange && !unresolved.length) input = {...input, observation: await options.exchange({id: input.dispatch.id, record: workspace, service: input.service, observation: input.observation,
-                finalPublished: messages.some(message => message.type === 'result')})};
+            if (options.exchange && !unresolved.length) input = {...input, observation: await observeExchange(options.exchange,journal,input,workspace,
+                messages.some(message=>message.type==='result'),envelope.messages as ChannelMessage[])};
             if (['failed', 'cancelled'].includes(input.observation.outcome)) {
                 if (!stopping) await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);
                 await close(input.dispatch.id);
@@ -134,6 +134,22 @@ export function developmentObserver(options: Options) {
     };
     async function close(id:string){await watches.close(id);}
     return {observe,sessionObservation:(...args:Parameters<typeof sessionObservation>)=>stopped?nativeActivity.read(...args):sessionObservation(...args), scan: () => options.lifecycle?.scan(), async quiesce() {stopped = true; await options.lifecycle?.dispose();}, async dispose() {stopped = true; await options.lifecycle?.dispose(); await watches.dispose();nativeActivity.clear();}};
+}
+
+async function observeExchange(exchange:NonNullable<Options['exchange']>,journal:KanbanAutomationJournal,input:Input,
+    record:DevelopmentWorkspaceRecord,finalPublished:boolean,publications:ChannelMessage[]):Promise<Input['observation']> {
+    const {dispatch,observation}=input,started=Date.now();
+    try{return await exchange({id:dispatch.id,record,service:input.service,observation,finalPublished});}
+    catch(error){
+        if((error as {code?:string}).code!=='CHANNEL_RESULT_CONFLICT'||!finalPublished||observation.outcome!=='succeeded'
+            ||!await reportHandoffFailure(journal,dispatch.id,true))throw error;
+        const proof=await registeredTaskResult(journal,dispatch.id);
+        const results=publications.filter(row=>row.message.type==='result');
+        if(proof?.boardId!==input.boardId||proof.itemId!==dispatch.itemId||results.length!==1||proof.resultId!==results[0].id)throw error;
+        createModuleLogger('kanban').info('Retrying handoff of the completed result',{operation:'kanban.observe',operationId:dispatch.id,
+            stage:'channel.result.handoff',result:'success',code:'CHANNEL_RESULT_CONFLICT',durationMs:Date.now()-started});
+        return observation;
+    }
 }
 
 async function linkResult(options: Options, journal: KanbanAutomationJournal, input: Input, projectId: string): Promise<void> {

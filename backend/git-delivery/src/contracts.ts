@@ -2,7 +2,7 @@ import type {INativeShell} from '@nestos/tools';
 export interface GitProcess {nativeShell:Pick<INativeShell,'exec'>}
 export interface GitJournal {get<T>(key:string):Promise<T|undefined>;update<T>(key:string,change:(old:T|undefined)=>T):Promise<T>}
 export interface GitApproval {selections?:Record<string,string>;plan?:{conflicts?:Array<{id:string;path:string;options:Array<{id:string}>}>}}
-export interface GitSource {sourceHead?:string;directory:string;repositories?:Array<{path:string;head:string;dirty?:boolean}>}
+export interface GitSource {sourceHead?:string;sourceTree?:string;directory:string;repositories?:Array<{path:string;head:string;dirty?:boolean}>}
 export interface GitIntegration {operationId?:string;incompleteCode?:'OPERATION_RESULT_BATCH_INCOMPLETE'|'OPERATION_RESULT_MERGE_UNCONFIRMED';previousTarget:string;actualTarget:string;reportedTarget?:string;sources:GitSource[];approval?:GitApproval}
 export interface MergePlan {
     sourceVersion:string;targetVersion:string;summary:string;

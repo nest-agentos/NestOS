@@ -3,6 +3,7 @@ import {fixture,request} from './harness-execution-fixture';
 import {context} from './harness-context-fixture';
 import {ExecutionJournal} from '../src/projects/harness-execution-journal';
 import {HarnessContextBindings} from '../src/projects/harness-context-bindings';
+import {cancelNativeExecution} from '../src/projects/harness-execution-cancel';
 import {recoverNativeTerminal} from '../src/projects/harness-terminal-recovery';
 async function prepared(){
  const f=fixture(),input={...request,connection:{...request.connection,directory:'tree'},context};f.profile.contextId='stable-namespace';
@@ -31,4 +32,28 @@ it.each(['namespace','workspace','session','directory','receipt'] as const)('rej
  const codes={namespace:'CONTEXT_NATIVE_EPOCH_CHANGED',workspace:'CONTEXT_NATIVE_SCOPE_CHANGED',session:'NATIVE_SESSION_MISMATCH',directory:'CONTEXT_NATIVE_SCOPE_CHANGED',receipt:'NATIVE_EPOCH_CHANGED'};
  await expect(recoverNativeTerminal(f.run)).rejects.toMatchObject({code:codes[change]});
  expect(f.run.journal.data.result).toBeUndefined();expect(f.client.create).not.toHaveBeenCalled();expect(f.client.turn).not.toHaveBeenCalled();
+});
+
+it('uses the scoped binding reader and cleanup settlement for a terminal turn after an epoch change', async () => {
+    const f = await prepared();
+    const context = {...f.context, abortSignal: new AbortController().signal};
+    const state = {
+        get: (key: string) => {
+            expect(key).toBe(f.run.journal.key);
+            return f.state.get(key);
+        },
+        set: f.state.set,
+    };
+    const settled: string[] = [];
+    const options = {
+        stateForCleanup: async () => state,
+        readContextForCleanup: async (journal: ExecutionJournal) => f.store.get(journal.data.bindingId!),
+        settleContextForCleanup: async (journal: ExecutionJournal) => {
+            settled.push(journal.data.terminal!);
+            return undefined;
+        },
+    };
+    await expect(cancelNativeExecution(f.connections, f.run.request, context, options)).resolves.toBe('terminal');
+    expect(settled).toEqual(['completed']);
+    expect(f.client.interrupt).not.toHaveBeenCalled();
 });

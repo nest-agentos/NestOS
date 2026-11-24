@@ -33,7 +33,9 @@ async function setup(observed = false) {
         files: services.sessionFiles, projects: services.projects, kernel: services.kernel.kernel, factory, fileFactory: factory, onSelect() {}});
     cleanup.push(() => workbench.destroy()); await configureModel(runtime); await workbench.start();
     projection?.finishHydration();
-    const project = await runtime.projects.personal(); await workbench.startSessionDraft(folderBrowserPath(project.path));
+    const project = await runtime.projects.personal();
+    if (observed) await workbench.openResource(folderBrowserPath(project.path) + '/@new');
+    else await workbench.startSessionDraft(folderBrowserPath(project.path));
     return {runtime, workbench, main, project};
 }
 async function observedApplication(services: Parameters<typeof createApplicationClient>[0]) {

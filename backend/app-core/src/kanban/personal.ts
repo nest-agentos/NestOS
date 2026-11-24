@@ -54,7 +54,7 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
 }
 function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanAutomationOptions|undefined,events:UserEventService,log:ReturnType<typeof personalOptions>['log'],setOperations:(value:ReturnType<typeof import('@nestos/kanban-development').createItemOperations>|undefined)=>void,client:()=>KanbanClient):KanbanRuntimeExtension[] {
     const {service,journal,workLog,fs,serviceFor}=context;
-    const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,...resources}=resourcePorts??{};
+    const resourcePorts=options?.workResources?.({service,journal,workLog}),{archiveItemResources,releaseReportPackages,...resources}=resourcePorts??{};
     const operations=options?.itemOperations?.({service,journal,workLog,log,automaticTarget:(_board,item)=>workProjectId(item),automatic:async(board,item)=>{
         const context=await workContext(journal,board,item);if(!context.decision)return false;
         const record=await service.record(context.decision.sourceBoardId,context.decision.recordId);
@@ -63,7 +63,12 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
         if(!await cleanupExecutionSessions(service,journal,options,board,item,id))return false;
         const rows=await resources.workResources?.(board,item,{inspect:true})??[];
         if(rows.length&&!resources.cleanupWorkResource)return false;
-        for(const row of rows){if(row.state==='cleaned'||row.resolution?.kind==='ignored'||row.reasons.includes(retainedManagementDirectory))continue;assertWorkspaceCleanup(row);await resources.cleanupWorkResource?.(board,{itemId:item,resourceId:row.id,version:row.version,operationId:id+'-cleanup-'+sha256HexSync(row.id).slice(0,12)});}
+        for(const row of rows){
+            if(row.state==='cleaned'||row.resolution?.kind==='ignored'||row.reasons.includes(retainedManagementDirectory))continue;
+            assertWorkspaceCleanup(row);
+            const result=await resources.cleanupWorkResource?.(board,{itemId:item,resourceId:row.id,version:row.version,operationId:id+'-cleanup-'+sha256HexSync(row.id).slice(0,12)});
+            if(result?.state!=='cleaned')return false;
+        }
         return true;
     },reportAutomatic:async state=>{
         await workLog.append(service,state.boardId,state.itemId,{stage:state.handoff?'automatic.handoff':state.done?'automatic.completed':state.waitingForUser?'automatic.waiting-review':'automatic.blocked',result:state.code&&state.code!=='OPERATION_CANCELLED'?'failure':'success',dispatchId:state.id,code:state.code});
@@ -80,13 +85,13 @@ function personalExtensions(context:KanbanRuntimeContext,options:PersonalKanbanA
     const automation=options?createPersonalKanbanAutomation({...options,operationPlugins,fs,service,journal,workLog,log,serviceFor,deliveryReady:operations?.deliveryReady,notifyCoordination:coordinationNotifications(events),beforeCancel:fixes?cancelItemFixes(fixes):undefined}):undefined;
     const replies=options?.enqueueTaskReply?taskReplies(service,journal,options):undefined;
     const release=fixes?options?.registerInstructionGate?.((id,input)=>fixes.intercept(id,input)):undefined;
-    return [{operationPlugins,projectRecords:(board,page)=>recordFollowUps(journal,board,page,operations?.finalizationStatus),archiveItemResources,capabilities:{...(options?.decisionModules?{decisionModules:async()=>[...options.decisionModules!]}:{}),...(options?.boardSettings?{boardSettings:async(board:string)=>options.boardSettings!.catalog(await service.read(board))}:{}),...(recovery?{taskRecovery:recovery.taskRecovery,recoverTask:recovery.recoverTask,openTaskRecovery:recovery.openTaskRecovery}:{}),...(conversations?{removeRecordConversations:conversations.removeRecordConversations,controlRecordConversation:conversations.controlRecordConversation,startRecordConversation:conversations.startRecordConversation,openRecordCoordination:conversations.openRecordCoordination,...communication,recordConversations:conversations.recordConversations}:{}),...(planning?{planningSession:planning}:{}),...resources,
+    return [{operationPlugins,projectRecords:(board,page)=>recordFollowUps(journal,board,page,operations?.finalizationStatus),archiveItemResources,capabilities:{...(options?.decisionModules?{decisionModules:async()=>[...options.decisionModules!]}:{}),...(options?.boardSettings?{boardSettings:async(board:string)=>options.boardSettings!.catalog(await service.read(board))}:{}),...(recovery?{taskRecovery:recovery.taskRecovery,recoverTask:recovery.recoverTask,openTaskRecovery:recovery.openTaskRecovery,inspectTaskReports:recovery.inspectTaskReports,checkTaskConfiguration:recovery.checkTaskConfiguration,...(options?.executionResource?{reloadTaskConfiguration:recovery.reloadTaskConfiguration}:{})}:{}),...(conversations?{removeRecordConversations:conversations.removeRecordConversations,controlRecordConversation:conversations.controlRecordConversation,startRecordConversation:conversations.startRecordConversation,openRecordCoordination:conversations.openRecordCoordination,...communication,recordConversations:conversations.recordConversations}:{}),...(planning?{planningSession:planning}:{}),...resources,
         ...(resources?.cleanupWorkResource&&operations?{cleanupWorkResource:(board,request)=>request.resolution==='ignore'?resources.cleanupWorkResource!(board,request):operations.guardResource(board,request.itemId,()=>resources.cleanupWorkResource!(board,request))}:{}),
         ...(options?.continuation?{executionSession:async(board,item,query)=>{
             const detail=await service.executionSession(board,item,query),current=(await service.item(board,item)).item;
             const previous=Object.values((await service.workflow(board)).dispatches).filter(row=>row.itemId===item).sort((a,b)=>b.attempt-a.attempt)[0];
             return {...detail,...(['backlog','open'].includes(current.status)&&previous&&['failed','cancelled'].includes(previous.outcome)?{continuation:{previousDispatchId:previous.id}}:{})};
-        }}:{}),...(fixes?{fixTask:fixes.fixTask,taskFixes:fixes.taskFixes,cancelFix:fixes.cancelFix}:{}),...(replies?{replyTask:replies}:{})},scan:async()=>{await conversations?.scan();await recovery?.scan();},quiesce:async()=>{await conversations?.quiesce();await recovery?.quiesce();release?.();}},
+        }}:{}),...(fixes?{fixTask:fixes.fixTask,taskFixes:fixes.taskFixes,cancelFix:fixes.cancelFix}:{}),...(replies?{replyTask:replies}:{})},scan:async()=>{await conversations?.scan();await recovery?.scan();await releaseReportPackages?.();},quiesce:async()=>{await conversations?.quiesce();await recovery?.quiesce();release?.();}},
         ...automation?[{...automation,capabilities:{automationCatalog:automation.automationCatalog,analysisStatus:automation.analysisStatus}}]:[],...fixes?[fixes]:[],...replies?[replies]:[]];
 }
 

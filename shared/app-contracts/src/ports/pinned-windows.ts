@@ -1,4 +1,10 @@
-export interface PinnedWindow {
+export interface WindowTimes {
+    createdAt?: number;
+    modifiedAt?: number;
+    accessedAt?: number;
+}
+
+export interface PinnedWindow extends WindowTimes {
     workspace: string;
     resource: string;
     title: string;

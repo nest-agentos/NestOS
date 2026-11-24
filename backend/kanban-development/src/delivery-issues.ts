@@ -2,6 +2,12 @@ import {journalCommand,type KanbanAutomationJournal} from '@nestos/kanban/integr
 import type {KanbanService} from '@nestos/kanban/contracts';
 interface DeliveryFailure {code:string;generation?:number;settled?:boolean;issues?:Array<{id:string;code:string}>}
 interface Scope {boardId:string;itemId:string;attemptId:string}
+export async function reportHandoffFailure(journal:KanbanAutomationJournal,attemptId:string,includeSettled=false):Promise<string|undefined> {
+    const failure=await journal.get<DeliveryFailure>('delivery-blocked:'+attemptId);
+    if(!failure||failure.settled&&!includeSettled)return;
+    if(failure.code.startsWith('SOFTWARE_REPORT_'))return failure.code;
+    return failure.issues?.slice().reverse().find(issue=>issue.code.startsWith('SOFTWARE_REPORT_'))?.code;
+}
 /** A verified host handoff closes only the delivery issues that the host itself registered. */
 export async function recordDeliveryFailure(journal:KanbanAutomationJournal,attemptId:string,code:string):Promise<string> {
     const value=await journal.update<DeliveryFailure>('delivery-blocked:'+attemptId,old=>{

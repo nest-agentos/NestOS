@@ -53,7 +53,7 @@ async function preparationStage<T>(options: ReviewOperationsOptions, operationId
         options.log({operationId, stage: 'prepare.' + stage, result: 'failure', code: safeCode(error, 'OPERATION_PREPARATION_FAILED'), durationMs: Date.now() - started}); throw error;
     }
 }
-export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob,observeOnly=false):Promise<ReviewJob> {
+export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob,observeOnly=false,resumeIntegration=false):Promise<ReviewJob> {
     if(pendingCancellation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))))return (await options.journal.get<ReviewJob>(jobKey(job.id)))??job;
     const rejected=await settleRejectedMerge({...options,policy:developmentAnalysisPolicy},job);if(rejected)return rejected;
     const resource=(job.snapshot.context as {worktreeId?:string})?.worktreeId;if(resource)await indexResourceJob(options.journal,resource,'review',job.id);
@@ -64,11 +64,23 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
             requireValue(!board.lifecycle,'BOARD_STOPPING');
             const {item,archive}=await options.service.item(record.boardId,record.itemId);requireValue(!archive,'ITEM_ARCHIVED');requireValue(!item.deletedAt&&item.status!=='cancelled'&&item.control?.action!=='cancel','TASK_CANCELLING');
             await revalidateMergeAdmission({...options,policy:developmentAnalysisPolicy},record);
-            if(record.managed){await options.adapter.managed!.submit(record.managed);return;}if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
+            if(record.managed){await options.adapter.managed!.submit(record.managed);return;}
+            if(record.action==='merge'&&record.request&&await startGitIntegration(options,record))return;
+            if(record.request)await options.submission.start(record.request);else await options.published.start(record.input!);},
         inspect:async record=>{
             if(blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(record.id))))return {state:'unknown' as const,code:'OPERATION_CANCELLING'};
-            return inspectReview(options,record);
+            return inspectReview(options,record,resumeIntegration);
         },validate:(record,output)=>validateReview(options,record,output),classify:reviewFailure,report:options.report}});
+}
+async function startGitIntegration(options: ReviewOperationsOptions, record: ReviewJob): Promise<boolean> {
+    try {
+        return await options.adapter.gitIntegration?.start(record) === 'applied';
+    } catch (error) {
+        const code = safeCode(error, 'INTEGRATION_OUTCOME_UNKNOWN');
+        if (['INTEGRATION_SOURCE_CHANGED', 'INTEGRATION_TARGET_CHANGED', 'OPERATION_SOURCE_CHANGED_REANALYZE'].includes(code))
+            await revalidateMergeAdmission({...options, policy: developmentAnalysisPolicy}, record);
+        throw error;
+    }
 }
 export const replacementMismatchCode='OPERATION_RESULT_RUNNING_VERSION_MISMATCH';
 export function replacementTarget(job:ReviewJob):string|undefined {
@@ -88,7 +100,7 @@ async function validateReview(options:ReviewOperationsOptions,record:ReviewJob,o
     const running=await operationRuntimeVersion(options,record.boardId,record.itemId);
     if(running!==expectedVersion)throw replacementMismatch(expectedVersion,running);
 }
-async function inspectReview(options:ReviewOperationsOptions,record:ReviewJob) {
+async function inspectReview(options:ReviewOperationsOptions,record:ReviewJob,resumeIntegration=false) {
     if(record.managed){
         const managed=options.adapter.managed;requireValue(managed,'OPERATION_RECOVERY_UNAVAILABLE');
         const observed=await managed.inspect(record);
@@ -97,9 +109,22 @@ async function inspectReview(options:ReviewOperationsOptions,record:ReviewJob) {
         }
         return observed;
     }
+    if (record.action === 'merge') {
+        const integration = await options.adapter.gitIntegration?.inspect(record,resumeIntegration);
+        if (integration) return {...integration, executionId: integration.sessionId};
+    }
     const observation=await observeReview(options,record);
     const recover=record.action==='deploy'&&record.request&&observation.state==='unknown';
-    const output=(observation.state==='succeeded'||recover)&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
+    let output=(observation.state==='succeeded'||recover)&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
+    if(record.action==='merge'&&observation.state==='succeeded'&&(output as {status?:string}|undefined)?.status==='succeeded'
+        &&options.adapter.gitIntegration?.publishProposal&&await options.adapter.gitIntegration.requiresProposal?.(record)){
+        const board=await options.service.read(record.boardId),{item,archive}=await options.service.item(record.boardId,record.itemId);
+        requireValue(!board.lifecycle&&!board.executionControl?.paused&&!archive&&item.deletedAt===undefined&&item.control?.action!=='cancel','OPERATION_RECOVERY_UNAVAILABLE');
+        validateOperationResult({id:record.id,action:'merge',snapshot:record.snapshot,requireStatus:true},output);
+        await revalidateMergeAdmission({...options,policy:developmentAnalysisPolicy},record);
+        output=await options.adapter.gitIntegration.publishProposal(record,output);
+        requireValue(output,'INTEGRATION_PUBLICATION_UNKNOWN');
+    }
     const receipt=output as {status?:string;version?:string}|undefined;
     return {...observation,...(recover&&receipt?.status==='succeeded'&&await operationRuntimeVersion(options,record.boardId,record.itemId)===receipt.version?{state:'succeeded' as const}:{}),executionId:observation.sessionId,output};
 }

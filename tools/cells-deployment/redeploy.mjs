@@ -1,10 +1,11 @@
 import {execFileSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
-import {readFile, readlink, stat} from 'node:fs/promises';
+import {constants} from 'node:fs';
+import {open, readFile, readlink, realpath, stat} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {createServiceControl} from './index.mjs';
-import {command, installedConfig, installedExecutable, serviceStorage} from './guest.mjs';
+import {checkedGeneration, command, installedConfig, installedExecutable, serviceStorage} from './guest.mjs';
 import {digest, fail, packageArtifact, validId} from './artifact.mjs';
 
 const localUnit = 'nestos-cells-local.service';
@@ -64,7 +65,7 @@ async function vmControl(root) {
         throw fail('SERVICE_BINDING_MISMATCH');
     if (!await sameDirectory(options.root, root)) throw fail('SERVICE_SOURCE_ROOT_MISMATCH');
     if (options.executable !== installedExecutable) throw fail('CELLS_INSTALL_GUEST_BINDING_MISMATCH');
-    return createServiceControl(options);
+    return createServiceControl({...options, configSource: process.env.NESTOS_CELLS_X1_CONFIG ?? options.configSource});
 }
 
 async function localPid() {
@@ -73,34 +74,125 @@ async function localPid() {
     return fields.ActiveState === 'active' && /^[1-9][0-9]*$/.test(fields.MainPID) ? fields.MainPID : undefined;
 }
 
+async function localProcess() {
+    const pid = await localPid();
+    if (!pid) throw fail('SERVICE_NOT_READY');
+    const proc = '/proc/' + pid;
+    if (!await sameExecutablePath(await readlink(proc + '/exe'), installedExecutable))
+        throw fail('LOCAL_CELLS_EXECUTABLE_MISMATCH');
+    const [, config] = (await readFile(proc + '/cmdline', 'utf8')).split('\0');
+    if (config !== installedConfig) throw fail('CELLS_CONFIG_BINDING_MISMATCH');
+    const [binary, status, boot] = await Promise.all([readFile(proc + '/exe'), readFile(proc + '/stat', 'utf8'),
+        readFile('/proc/sys/kernel/random/boot_id', 'utf8')]);
+    const start = status.slice(status.lastIndexOf(')') + 1).trim().split(/\s+/)[19];
+    return {hash: digest(binary), generation: checkedGeneration(boot.trim() + ':' + pid + ':' + start)};
+}
+
 async function localControl(root) {
     const stateDirectory = path.join(homedir(), '.local/state/nestos/cells-redeploy-local');
     return createServiceControl({id: 'local', vm: 'local', root, executable: installedExecutable, stateDirectory,
-        identity: '/dev/null', server: '/dev/null'}, {
+        identity: '/dev/null', server: '/dev/null',
+        configSource: process.env.NESTOS_CELLS_LOCAL_CONFIG ?? path.join(root, 'tools/cells.toml')}, {
         ...serviceStorage((args, input) => command('sudo', ['-n', ...args], 120000, input)),
         ready: async () => await localPid() !== undefined,
-        hash: async () => {
-            const pid = await localPid();
-            if (!pid) throw fail('SERVICE_NOT_READY');
-            const proc = '/proc/' + pid + '/exe';
-            if (!await sameExecutablePath(await readlink(proc), installedExecutable))
-                throw fail('LOCAL_CELLS_EXECUTABLE_MISMATCH');
-            const [, config] = (await readFile('/proc/' + pid + '/cmdline', 'utf8')).split('\0');
-            if (config !== installedConfig) throw fail('CELLS_CONFIG_BINDING_MISMATCH');
-            return digest(await readFile(proc));
-        },
+        process: localProcess,
+        hash: async () => (await localProcess()).hash,
         restart: () => command('sudo', ['-n', 'systemctl', 'restart', localUnit], 120000),
     });
+}
+
+export async function readConfiguration(source, {privateFile = true} = {}) {
+    if (typeof source !== 'string' || !path.isAbsolute(source)) throw fail('CELLS_CONFIG_SOURCE_REQUIRED');
+    let file;
+    try {
+        file = await open(source, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+        const metadata = await file.stat();
+        if (!metadata.isFile() || (privateFile && (metadata.mode & 0o077)) || metadata.size === 0 || metadata.size > 1024 * 1024)
+            throw fail('CELLS_CONFIG_SOURCE_INVALID');
+        const bytes = await file.readFile();
+        if (bytes.length !== metadata.size) throw fail('CELLS_CONFIG_SOURCE_CHANGED');
+        return bytes;
+    } catch (error) {
+        if (error.code?.startsWith('CELLS_CONFIG_')) throw error;
+        throw fail('CELLS_CONFIG_SOURCE_UNAVAILABLE');
+    } finally {
+        await file?.close();
+    }
+}
+
+const serviceSources = '/etc/nestos/firecracker/service-sources';
+const parseManifest = `
+import json, sys, tomllib
+try:
+    manifest = tomllib.loads(sys.stdin.read())
+    print(json.dumps({"id": manifest.get("id"), "files": manifest.get("files", [])}))
+except (TypeError, ValueError):
+    sys.exit(1)
+`;
+
+export async function vmConfigurationSource(id, source, directory = serviceSources) {
+    if (source !== undefined) return source;
+    if (id !== 'cells-x1') throw fail('CELLS_CONFIG_SOURCE_REQUIRED');
+    const parent = path.join(directory, id);
+    const manifest = await readConfiguration(path.join(parent, 'service.toml'), {privateFile: false})
+        .catch(error => {
+            throw fail(error.code === 'CELLS_CONFIG_SOURCE_UNAVAILABLE'
+                ? 'CELLS_CONFIG_MANIFEST_UNAVAILABLE' : 'CELLS_CONFIG_MANIFEST_INVALID');
+        });
+    const definition = await command('python3', ['-c', parseManifest], 5000, manifest).then(JSON.parse)
+        .catch(() => {throw fail('CELLS_CONFIG_MANIFEST_INVALID');});
+    if (definition.id !== id || !Array.isArray(definition.files)) throw fail('CELLS_CONFIG_MANIFEST_INVALID');
+    const candidate = configurationAsset(definition.files);
+    const config = path.join(parent, candidate);
+    const root = await realpath(parent);
+    const resolved = await realpath(config).catch(() => {throw fail('CELLS_CONFIG_SOURCE_UNAVAILABLE');});
+    if (resolved !== path.join(root, candidate)) throw fail('CELLS_CONFIG_SOURCE_INVALID');
+    return config;
+}
+
+function configurationAsset(files) {
+    const direct = files.filter(file => file?.target === 'cells.toml');
+    const legacy = files.filter(file => file?.target === 'config.toml');
+    const candidates = direct.length ? direct : legacy;
+    if (!candidates.length) throw fail('CELLS_CONFIG_MANIFEST_SOURCE_NOT_DECLARED');
+    if (candidates.length !== 1) throw fail('CELLS_CONFIG_MANIFEST_SOURCE_AMBIGUOUS');
+    const source = candidates[0].source;
+    if (typeof source !== 'string' || source.split('/').some(part => ['', '.', '..'].includes(part)))
+        throw fail('CELLS_CONFIG_SOURCE_INVALID');
+    return source;
+}
+
+export async function deploymentConfiguration(control, resolveSource = vmConfigurationSource) {
+    const {id, configSource} = control.options;
+    let source = configSource;
+    let kind = id === 'local' ? 'local-file' : 'vm-file';
+    if (id === 'cells-x1' && source === undefined) {
+        try {source = await resolveSource(id);}
+        catch (error) {
+            if (error.code !== 'CELLS_CONFIG_MANIFEST_UNAVAILABLE') throw error;
+            const bytes = await control.installedConfiguration();
+            const sha256 = digest(bytes);
+            return {bytes, sha256, previous: sha256, kind: 'vm-installed'};
+        }
+        kind = 'vm-manifest';
+    }
+    const bytes = await readConfiguration(source);
+    return {bytes, sha256: digest(bytes), previous: await control.configuration(), kind};
+}
+
+async function validateConfig(binary, bytes) {
+    try {await command(binary, ['--check-config', '-'], 15000, bytes);}
+    catch {throw fail('CELLS_CONFIG_INVALID');}
 }
 
 export const finishedTarget = row => row.state === 'succeeded' || row.state === 'unchanged';
 
 const controlFor = (root, target) => target === 'local' ? localControl(root) : vmControl(root);
 
-export async function redeploy(root, targets, operations = {build, controlFor}) {
+export async function redeploy(root, targets, operations = {build, controlFor, deploymentConfiguration, validateConfig}) {
     const operationId = randomUUID();
     const report = {operation: 'cells.redeploy', operationId, targets: []};
-    const plans = await preflight(root, targets, operations.controlFor, operationId);
+    const plans = await preflight(root, targets, operations, operationId);
     if (plans.some(plan => plan.code)) {
         report.targets = plans.map(({target, code}) => code
             ? {target, state: 'failed', code} : {target, state: 'skipped', code: 'PREFLIGHT_INCOMPLETE'});
@@ -108,6 +200,13 @@ export async function redeploy(root, targets, operations = {build, controlFor}) 
     }
     const artifact = await operations.build(root);
     report.version = artifact.value.id;
+    const invalid = await checkConfigurations(plans, artifact.binary, operations.validateConfig, operationId);
+    if (invalid) {
+        report.targets = plans.map(row => row.target === invalid.target
+            ? {target: row.target, state: 'failed', code: invalid.code}
+            : {target: row.target, state: 'skipped', code: 'PREFLIGHT_INCOMPLETE'});
+        return report;
+    }
     for (const plan of plans) {
         const previous = report.targets.at(-1);
         const result = previous && !finishedTarget(previous)
@@ -118,16 +217,31 @@ export async function redeploy(root, targets, operations = {build, controlFor}) 
     return report;
 }
 
-async function preflight(root, targets, resolveControl, operationId) {
+async function checkConfigurations(plans, binary, validate, operationId) {
+    for (const {target, config} of plans) {
+        if (!config) continue;
+        const started = Date.now();
+        const event = (result, code) => console.info(JSON.stringify({operation: 'cells.redeploy', operationId,
+            target, stage: 'config.validate', result, code, durationMs: Date.now() - started}));
+        try {await validate(binary, config.bytes); event('success');}
+        catch (error) {
+            const code = error.code ?? 'CELLS_CONFIG_INVALID';
+            event('failure', code);
+            return {target, code};
+        }
+    }
+}
+async function preflight(root, targets, operations, operationId) {
     return Promise.all(targets.map(async target => {
         const started = Date.now();
-        const log = (result, code) => console.info(JSON.stringify({operation: 'cells.redeploy',
-            operationId, target, stage: 'preflight', result, code, durationMs: Date.now() - started}));
+        const log = (result, code, configurationSource) => console.info(JSON.stringify({operation: 'cells.redeploy',
+            operationId, target, stage: 'preflight', result, code, configurationSource, durationMs: Date.now() - started}));
         try {
-            const control = await resolveControl(root, target);
+            const control = await operations.controlFor(root, target);
             const current = await control.describe();
-            log('success');
-            return {target, control, expectedVersion: current.version};
+            const config = await operations.deploymentConfiguration?.(control);
+            log('success', undefined, config?.kind);
+            return {target, control, expectedVersion: current.version, config};
         } catch (error) {
             const code = error.code ?? 'SERVICE_PREFLIGHT_FAILED';
             log('failure', code);
@@ -136,12 +250,13 @@ async function preflight(root, targets, resolveControl, operationId) {
     }));
 }
 
-async function deploy({control, target, expectedVersion}, artifact, operationId) {
-    const request = {operationId, serviceId: target, expectedVersion, targetVersion: artifact.value.id};
+async function deploy({control, target, expectedVersion, config}, artifact, operationId) {
+    const request = {operationId, serviceId: target, expectedVersion, targetVersion: artifact.value.id,
+        ...(config ? {configSha256: config.sha256, expectedConfigSha256: config.previous} : {})};
     try {
         await control.verifyArtifact({...request, version: request.targetVersion,
             sha256: artifact.digest, sourceVersion: artifact.value.commit});
-        await control.submit(request);
+        await control.submit(request, config?.bytes);
         return present(await control.inspect(request));
     } catch (error) {
         return {state: 'failed', code: error.code ?? 'SERVICE_REDEPLOY_FAILED'};

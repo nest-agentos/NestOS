@@ -10,6 +10,7 @@ import {privateDirectory} from '../runtime/paths';
 
 const queues = new Map<string, Promise<void>>();
 const INIT = `HISTFILE=$NESTOS_TERMINAL_HISTORY_FILE
+bind 'set enable-bracketed-paste on' || echo 'Terminal bracketed paste could not be enabled' >&2
 HISTTIMEFORMAT='%s '
 HISTSIZE=10000
 HISTFILESIZE=

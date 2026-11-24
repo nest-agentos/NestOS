@@ -19,7 +19,7 @@ it('shares pinned pages across clients without losing concurrent changes or cros
     const {manager, backend} = await fixture(), other = await fixture();
     const second = bindApplicationBackend({vfs: manager} as LocalApplicationServices);
     const decision = {workspace: 'kanban-workspace', resource: '/board/development/@decision', title: 'Decisions'};
-    const notes = {workspace: 'notes-workspace', resource: '/note.md', title: 'Note'};
+    const notes = {workspace: 'notes-workspace', resource: '/note.md', title: 'Note', createdAt: 1000, modifiedAt: 2000, accessedAt: 3000};
     expect(await second.listPinnedWindows!()).toEqual([]);
     await Promise.all([
         backend.setPinnedWindow!({operationId: 'pin-decision', window: decision, pinned: true}),

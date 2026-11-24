@@ -1,6 +1,12 @@
-import type {ProjectConversationPort, ProjectFolder} from './projects';
+import type {ProjectConversationPort, ProjectDraftComposer, ProjectFolder} from './projects';
 import type {SessionDirectoryView, WorkbenchView} from './session';
 import type {ApplicationViewEvent} from './open-view';
+
+export interface ProjectDraftOpening {
+    project: ProjectFolder;
+    folder: string;
+    composer: ProjectDraftComposer;
+}
 
 /** Fresh data prepared for one opening, never a reusable execution authorization. */
 export interface PreparedConversation {

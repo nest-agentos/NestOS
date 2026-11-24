@@ -5,7 +5,7 @@ it('keeps accepted task facts while projecting pending decision cleanup in one b
  const state={id:'cleanup',boardId:'execution',itemId:'group',step:5,requests:{}};
  const journal={getMany:vi.fn(async()=>[state]),diagnostic:vi.fn()};
  const result=await recordFollowUps(journal as any,'source',page);
- expect(result.items[0].progress).toMatchObject({state:'running',stage:'finalization',completion:'waived',followUps:[{boardId:'execution',itemId:'group',phase:'cleanup',state:'pending'}]});
+ expect(result.items[0].progress).toMatchObject({state:'completed',completion:'waived',followUps:[{boardId:'execution',itemId:'group',phase:'cleanup',state:'pending'}]});
  expect(journal.getMany).toHaveBeenCalledExactlyOnceWith(['automatic-delivery:["execution","group"]']);
  expect(state.step).toBe(5);expect(page.items[0].progress.followUps).toBeUndefined();
 });
@@ -24,4 +24,11 @@ it('exposes explicit confirmation without executing or modifying its receipt',as
  const result=await recordFollowUps(journal as any,'source',page,read as any);
  expect(result.items[0].progress).toMatchObject({state:'needs-action',stage:'finalization',reason:'confirmation-required',followUps:[{requiresConfirmation:true}]});
  expect(status).toEqual({state:'waiting-confirmation',stage:'accept'});expect(page.items[0].progress.state).toBe('completed');
+});
+
+it('preserves completed delivery with a visible dirty-worktree follow-up',async()=>{
+ const journal={diagnostic:vi.fn()},read=vi.fn(async()=>({state:'blocked' as const,stage:'cleanup',code:'WORKTREE_DIRTY'}));
+ const result=await recordFollowUps(journal as any,'source',page,read);
+ expect(result.items[0].progress).toMatchObject({state:'completed',followUps:[{state:'blocked',phase:'cleanup',code:'WORKTREE_DIRTY'}]});
+ expect(result.items[0].progress?.reason).toBeUndefined();
 });

@@ -28,6 +28,7 @@ it('prepares fresh read models, observes once and releases all owned resources',
     const f = fixture(), view = await new ConversationWorkbench(f.services).initialize(f.backend, request);
     expect(view.documents).toEqual({layout: {version: 1}}); expect(view.native?.draft).toEqual({revision: 'r1', data: '{}'});
     for (const method of ['read', 'readComposerDraft'] as const) expect(f.conversation[method]).toHaveBeenCalledOnce();
+    expect(f.conversation.read).toHaveBeenCalledWith({includeUsage: false});
     for (const method of ['models', 'commands', 'refreshMetrics'] as const) expect(f.conversation[method]).not.toHaveBeenCalled();
     expect(view.native?.deferredMetadata).toBe(true);
     expect(f.backend.workbenchView).toHaveBeenCalledWith(expect.objectContaining({chatControls: false, initialNavigation: false}));
@@ -47,6 +48,16 @@ it('keeps a denied conversation local to its view while navigation and another c
     expect(await view.readNavigation({projectId: null})).toMatchObject({statuses: {}});
     expect((await view.openConversation('/folder:P/@harness/native/other')).project.project.id).toBe('p');
     expect(view.failure).toBeUndefined(); await view.dispose();
+});
+it('releases a closed native tab and its observation before the rest of the workbench', async () => {
+    const f = fixture(), view = await new ConversationWorkbench(f.services).initialize(f.backend, request);
+    const opened = view.native!;
+    expect(f.nativeListeners.size).toBe(1);
+    await opened.conversation.close();
+    expect(f.nativeListeners.size).toBe(0);
+    expect(view.native).toBeUndefined();
+    await view.dispose();
+    expect(f.conversation.close).toHaveBeenCalledOnce();
 });
 it('keeps only the target project interested when the conversation fails and navigation includes other projects', async () => {
     const f = fixture(); f.conversation.read.mockRejectedValueOnce(new FSError('EACCES', 'Denied'));

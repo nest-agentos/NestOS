@@ -20,7 +20,7 @@ function prerequisitesSatisfied(context:Context,action:string,waivers:NonNullabl
 }
 export function operation(context: Context, action: ReviewAction, active: boolean, supported: boolean, agent = false,waivers:NonNullable<KanbanItem['operationWaivers']>=[]): KanbanItemOperation {
     const job=latest(context,action),binding=context.settings.bindings[action],analysis=latest(context,'analyze');
-    const invalidated=!!analysis&&context.settings.invalidatedAnalysis?.id===analysis.id,plan=invalidated?undefined:analysis?.result as MergePlan|undefined;
+    const invalidated=analysisExpired(context,analysis),plan=invalidated?undefined:analysis?.result as MergePlan|undefined;
     const ready=prerequisitesSatisfied(context,action,waivers)&&(action!=='deploy'||latest(context,'build')?.state==='succeeded')
         &&(action!=='merge'||!!plan&&latest(context,'analyze')?.state==='succeeded')&&(action!=='accept'||context.item.status==='review'||!!context.deliveryPlan&&context.item.planning?.execution==='children');
     const configurable = !agent && ['build', 'deploy', 'merge'].includes(action), finished = action === 'accept' && (!context.scoped&&context.item.status === 'completed'||job?.state==='succeeded') || action === 'merge' && job?.state === 'succeeded';
@@ -28,16 +28,16 @@ export function operation(context: Context, action: ReviewAction, active: boolea
     const built=latest(context,'build'),auto=built?.followUp,autoPending=action==='deploy'&&auto?.state==='queued'&&built?.state==='succeeded'&&(!job||job.createdAt<built.createdAt);
     const autoFailed=action==='deploy'&&auto?.state==='failed'&&!job;
     const replacement=job?.action==='deploy'&&job.code===replacementMismatchCode?replacementRecovery(job):undefined;
-    return {...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...(!context.deliveryPlan?.manualAfter?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
+    return {...(action==='analyze'&&invalidated?{runLabel:t('kanban.operationReanalyzeMerge')}:{}),...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...(!context.deliveryPlan?.manualAfter?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
         state:action==='merge'&&invalidated&&(!job||job.phase==='settled')?'unavailable':action==='analyze'&&invalidated?(enabled?'ready':'unavailable'):autoPending?'running':autoFailed?'failed':action === 'accept' && !context.scoped&&context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
         ...(replacement||job?.state==='unknown'?{attention:{kind:'recovery' as const}}:action==='merge'&&plan?.conflicts.length?{attention:{kind:'choice' as const}}:{}),
         ...(replacement?{recovery:replacement}:job?.state==='unknown'&&job.phase==='submitting'?{recovery:{runId:job.id,label:t('kanban.operationReconcile'),
-            reason:t(['GIT_IDENTITY_MISSING','GIT_COMMIT_IDENTITY_REQUIRED'].includes(job.code??'')?'kanban.operationRecoveryIdentity':job.code==='OPERATION_RESULT_PENDING'?'kanban.operationRecoveryMissingResult':'kanban.operationRecoveryUnavailable'),
+            reason:t(['GIT_IDENTITY_MISSING','GIT_COMMIT_IDENTITY_REQUIRED'].includes(job.code??'')?'kanban.operationRecoveryIdentity':job.code==='OPERATION_RESULT_PENDING'?'kanban.operationRecoveryMissingResult':job.code?.startsWith('INTEGRATION_')?'kanban.operationRecoveryGitPublication':'kanban.operationRecoveryUnavailable'),
             prompt:t('kanban.operationRecoveryPrompt',{operationId:job.id,source:job.snapshot.sourceVersion,target:job.snapshot.targetVersion})}}:{}),
         statusText:operationStatusText(context,action),progress:operationProgress(job,autoPending),
         code:autoFailed?auto.code:job?.code==='WORKSPACE_CONTEXT_PENDING'?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId??(action==='merge'?latest(context,'analyze')?.sessionId:undefined), configurable, binding, openSessionOnRun: agent || action === 'analyze',
         reason: job?.phase&&job.phase!=='settled'||autoPending ? undefined : enabled || finished ? undefined : t(!supported ? 'kanban.operationNeedsDelivery' : active ? 'kanban.operationBusy' : configurable && !binding ? 'kanban.operationNeedsFlow' : 'kanban.operationNeedsPrevious'),
-        summary:action==='analyze'||action==='merge'?plan?plan.summary+'\n'+t('kanban.operationVersions',{source:plan.sourceVersion,target:plan.targetVersion}):undefined:resultSummary(job?.result),
+        summary:action==='merge'&&integrationPaths(job?.result)?integrationPaths(job?.result):action==='analyze'||action==='merge'?plan?plan.summary+'\n'+t('kanban.operationVersions',{source:plan.sourceVersion,target:plan.targetVersion}):undefined:resultSummary(job?.result),
         fields: action === 'merge' && plan ? plan.conflicts.map(conflict => ({id: conflict.id, label: conflict.path + ' · ' + conflict.reason, choices: conflict.options})) : undefined,
         confirmation: action === 'deploy' ? t('kanban.operationConfirmDeploy') : action === 'accept' ? context.deliveryPlan?.acceptanceConfirmation===null?undefined:context.deliveryPlan?.acceptanceConfirmation??t('kanban.operationConfirmAcceptance') : action === 'merge' ? t(plan?.conflicts.length?'kanban.operationConfirmMerge':'kanban.operationConfirmMergeNoConflicts') : undefined};
 }
@@ -48,16 +48,27 @@ function replacementRecovery(job:ReviewJob):NonNullable<KanbanItemOperation['rec
         running:versions?.running??t('kanban.operationVersionUnavailable'),
     })};
 }
+function analysisExpired(context:Context,analysis:ReviewJob|undefined):boolean {
+    if(!analysis)return false;
+    const merge=latest(context,'merge');
+    return context.settings.invalidatedAnalysis?.id===analysis.id||!!merge&&merge.createdAt>=analysis.createdAt
+        &&['MERGE_PLAN_SOURCE_CHANGED','OPERATION_SOURCE_CHANGED_REANALYZE','OPERATION_TARGET_CHANGED_REANALYZE'].includes(merge.code??'');
+}
+
 function operationStatusText(context:Context,action:ReviewAction):string|undefined {
     const job=latest(context,action),analysis=latest(context,'analyze'),plan=analysis?.result as MergePlan|undefined;
     if(action==='analyze'&&!job)return t('kanban.operationAnalysisOnly');
     if(action!=='merge')return;
-    if(analysis&&context.settings.invalidatedAnalysis?.id===analysis.id)return t('kanban.operationMergePlanExpired');
+    if(analysisExpired(context,analysis))return t('kanban.operationMergePlanExpired');
     if(job?.state==='succeeded')return t('kanban.operationMergeVerified');
     if(job&&job.phase!=='settled')return t(job.state==='unknown'?'kanban.operationMergeUnverified':'kanban.operationMergeExecuting');
     if(analysis?.state==='succeeded'&&plan)return plan.conflicts.length?t('kanban.operationMergeConflicts',{count:plan.conflicts.length}):t('kanban.operationMergeNoConflicts');
 }
 
+function integrationPaths(result:unknown):string|undefined {
+    const paths=(result as {integrationPaths?:unknown}|undefined)?.integrationPaths;
+    return Array.isArray(paths)&&paths.length?paths.filter((path):path is string=>typeof path==='string').join('\n'):undefined;
+}
 function resultSummary(result: unknown): string | undefined {
     const value = result as {summary?: string; version?: string} | undefined;
     return [typeof value?.summary === 'string' ? value.summary.slice(0, 8000) : undefined, typeof value?.version === 'string' ? t('kanban.operationVersion', {version: value.version}) : undefined].filter(Boolean).join('\n') || undefined;

@@ -28,7 +28,7 @@ async function resolveFiles(fs:IFileSystem,project:IFileSystem,profile:string):P
         if(['decision.md','task.md','planning.md','bootstrap.md'].some(name=>!names.includes(name)))throw failure('KANBAN_PROFILE_REQUIRED_FILE');
     }else{if(profile!=='development'||await fs.driver.exists(KANBAN_CONFIGURATION_DIRECTORY+'/.defaults.json'))throw failure('PROMPT_PROFILE_NOT_FOUND');names=Object.keys(kanbanConfigurationDefaults);}
     const files:PromptFile[]=manifest?[manifest]:[];
-    const supplemental=['coordination-conversation.md','session-protocol.md','decision-actions.md','coordination-actions.md','workspace-rules.md','delivery.md','operation-result.md'];
+    const supplemental=['coordination-conversation.md','session-protocol.md','decision-actions.md','coordination-actions.md','workspace-rules.md','delivery.md','report-packaging.md','operation-result.md'];
     const optional=[workspacePrerequisitesFile,...supplemental,...['decision','task'].flatMap(entry=>LIFECYCLE_PROMPT_SUFFIXES.map(suffix=>entry+'-'+suffix+'.md'))];
     for(const name of new Set([...names,...optional])){
         if(supplemental.includes(name)&&name!=='coordination-conversation.md'&&!names.includes(name)&&!files.some(file=>file.content.includes(name)))continue;

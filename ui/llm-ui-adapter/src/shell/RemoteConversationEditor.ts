@@ -168,6 +168,7 @@ export class RemoteConversationEditor extends BaseSettingsEditor<ConversationCon
             renderConversationRequests(this.view.interactions, snapshot.requests, async (id, response) => {await this.runControl(() => this.service.respond(id, response));}, !this.options.readOnly && !!snapshot.canRespond);
         }
         this.view.setTitle(snapshot.title);
+        if (snapshot.title) this.options.onConversationTitle?.(snapshot.title);
         this.view.setSessionTimes(snapshot.createdAt, snapshot.updatedAt);
         this.view.setInformation(snapshot);
         this.showStatus(snapshot);

@@ -137,6 +137,7 @@ export interface EditorOptions<TSubmission = unknown, TInitial = unknown> {
     /** Editor-specific read model assembled by its application service. */
     initialData?: TInitial;
     onConversationSession?(sessionId: string): void;
+    onConversationTitle?(title: string): void;
     /** Explicit removal of another native branch through the host's management service. */
     removeConversationSession?(sessionId: string): Promise<void>;
     /** Explicit initial input for conversation editors. */

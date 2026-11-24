@@ -93,7 +93,7 @@ it('persists private commands and Bash history without recording interactive inp
         expect(logs).not.toContain('printf edited');expect(logs).not.toContain('private-password-value');
         expect(logs).toContain('EINVAL');
         const session=await first.openTerminal();
-        let page=await outputUntil(session,/[$#] /);
+        let page=await outputUntil(session,/\x1b\[\?2004h.*[$#] /);
         await session.sendInput('false\r'); page=await outputUntil(session,/[$#] /,page.cursor);
         await session.sendInput("printf 'STATUS:%s\\n' \"$?\"\r"); page=await outputUntil(session,/STATUS:1\r?\n/,page.cursor);
         await session.sendInput("for x in marker; do\rprintf 'MULTI_%s\\n' \"$x\"\rdone\r"); page=await outputUntil(session,/MULTI_marker\r?\n/,page.cursor);

@@ -15,6 +15,7 @@ export { harnessExecutionJournalKey } from './harness-execution-journal';
 export interface HarnessExecutionOptions {
     readTaskAsset?: import('@nestos/tools/contracts').TaskAssetReader;
     stateForCleanup?: (context: EffectExecutionContext) => Promise<EffectSessionState>;
+    readContextForCleanup?: (journal: ExecutionJournal) => Promise<import('@nestos/kernel-adapters/contracts').ContextBinding | undefined>;
     settleContextForCleanup?: (journal: ExecutionJournal, unstarted: boolean, context: EffectExecutionContext) => Promise<import('@nestos/kernel-adapters/contracts').ContextBindingRef | undefined>;
     pollMs?: number;
     cancelTimeoutMs?: number;

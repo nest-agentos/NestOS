@@ -140,6 +140,22 @@ describe('native Harness history and interruption recovery', () => {
         expect((f.records.get(harnessExecutionJournalKey(f.context))!.value as any).operations.turn.outcome).toBe('not-committed');
     });
 
+    it.each(['completed', 'failed', 'cancelled'])('confirms cleanup across epochs with %s history', async status => {
+        const f = fixture();
+        const running = f.make().execute(request, f.context).catch(error => error);
+        await vi.waitFor(() => expect(f.client.turn).toHaveBeenCalled());
+        f.controller.abort(); await running;
+        f.data.epoch = 'replacement';
+        f.data.history.turns = [
+            {id: 'other-turn', status: 'completed', items: []},
+            {id: 'native-turn', status, items: []},
+        ];
+        await expect(f.make().cancel(request, f.context)).resolves.toMatchObject({status: 'stopped', cleanup: 'confirmed'});
+        expect(f.client.interrupt).not.toHaveBeenCalled();
+        expect(f.client.turn).toHaveBeenCalledTimes(1);
+        expect(f.records.get(harnessExecutionJournalKey(f.context))?.value).toMatchObject({epoch: 'service-epoch', terminal: status});
+    });
+
     it('does not issue an interrupt against a replacement service epoch', async () => {
         const f = fixture();
         const running = f.make().execute(request, f.context).catch(error => error);

@@ -7,9 +7,11 @@ export function initialView(hash: string) {
     const chat = route.slug === 'chat' || Object.hasOwn(ROUTE_ALIASES, route.slug);
     const editor = chat ? chatEditor(route.resource) : route.slug;
     const request = chat ? initialViewRequest(INITIAL_CHAT_DOCUMENTS, route.resource) : undefined;
-    const nativeConversation = editor === 'chat' && !!request?.resourceId;
-    if (nativeConversation && request) request.documents = INITIAL_NATIVE_CHAT_DOCUMENTS;
-    return {nativeConversation, initialRead:chat?undefined:initialReadRequest(route),request,editor};
+    const resourceId = editor === 'chat' ? request?.resourceId : undefined;
+    const deferEvents = !!resourceId;
+    const deferCatalogs = !!resourceId && resolveBrowserTarget(resourceId).kind === 'remote';
+    if (request && deferCatalogs) request.documents = INITIAL_NATIVE_CHAT_DOCUMENTS;
+    return {deferEvents, deferCatalogs, initialRead:chat?undefined:initialReadRequest(route),request,editor};
 }
 
 function chatEditor(resource?: string): 'chat' | undefined {

@@ -26,6 +26,7 @@ import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {requireValue} from '../kanban/validation';
 import {readContextCatalog} from '../projects/harness-context-catalog';
 import {snapshotGitSource} from '@nestos/git-delivery/snapshots';
+import {kanbanGitIntegration,usesHostMergeProposal} from './kanban-git-integration';
 import {verifyGitIntegration} from '@nestos/git-delivery/integration';
 import {readGitCommitIdentity} from '@nestos/git-delivery/identity';
 import type {PreparedWorktree} from '@nestos/git-delivery/worktrees';
@@ -67,7 +68,7 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
     };
     const managed=managedServiceDeployment(options.serviceControl,async item=>{const projectId=workProjectId(item);requireValue(projectId,'SINGLE_PROJECT_TASK_REQUIRED');return options.projects.openWorkspace((await options.projects.get(projectId)).path);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
     const cancel=options.cancelSubmission&&options.connections?reviewCancellation({journal:options.journal,submission:options.cancelSubmission,native:planningConversationControl({remote:options.remote,connections:options.connections},options.journal)}):undefined;
-    return {managed,cancel,runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??options.runningVersion,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
+    return {managed,cancel,gitIntegration:kanbanGitIntegration(options),runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??options.runningVersion,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
         acceptanceVersion:async(board,item,expectedVersion)=>{
             const current=await resource(options,item,board.id),target=await managed?.describe?.(item),proof=await options.serviceControl?.provenance?.(expectedVersion,target?.id);
             if(!target||!proof||proof.serviceId!==target.id||proof.version!==target.version||proof.version!==options.runningVersion)return;
@@ -190,6 +191,10 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
     if (result === undefined || ['blocked', 'failed'].includes((result as {status: string})?.status)) return result;
     const actual = await snapshot(options, board, item);
     requireValue(actual.sourceVersion === job.snapshot.sourceVersion, 'OPERATION_RESULT_SOURCE_CHANGED');
+    if(await usesHostMergeProposal(options.journal,job)){
+        requireValue(actual.targetVersion===job.snapshot.targetVersion,'MERGE_PLAN_SOURCE_CHANGED');
+        return result;
+    }
     if (job.action !== 'merge') requireValue(actual.version === job.snapshot.version, 'OPERATION_RESULT_SCOPE_MISMATCH');
     else {
         await developmentWorkspace(options.remote,options.provider,current.record.projectId,process=>verifyGitIntegration(process,{

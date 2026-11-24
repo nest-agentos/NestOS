@@ -74,6 +74,15 @@ it('requires a result and native completion before returning a reviewable observ
     expect(await f.observe('succeeded')).toMatchObject({outcome: 'succeeded'});
     expect((await f.service.item('board', 'item')).item.status).toBe('claimed');
 });
+it('projects a management blocker reported after the dispatch was marked result missing',async()=>{
+    const f=await fixture();
+    const observation=await f.observe('succeeded');
+    await f.service.execute('board',{operationId:'observe-missing',expectedRevision:(await f.service.read('board')).revision,
+        command:{type:'observe-execution',dispatchId:f.dispatch.id,fence:f.dispatch.fence,outcome:observation.outcome,code:observation.code}});
+    f.channels.report('attempt','missing-delivery',{type:'error',content:'No implementation or acceptance evidence',payload:{handler:'parent'}});
+    expect(await f.observe('succeeded')).toMatchObject({outcome:'running',code:'WORKSPACE_ERROR_REPORTED'});
+    expect((await f.service.item('board','item')).item.issues).toMatchObject([{id:'missing-delivery',handler:'parent',summary:'No implementation or acceptance evidence'}]);
+});
 it('blocks clarification, emits one global notification, and does not let a result bypass it', async () => {
     const f = await fixture(); await f.publish('question', 'clarification');
     await f.observe('running'); await f.observe('running');
@@ -221,4 +230,27 @@ it('repairs a legacy host delivery error only after actual delivery verification
  await f.journal.update('delivery-blocked:attempt',()=>({code:'EIO'}));
  expect(await f.observe('succeeded')).toMatchObject({outcome:'succeeded'});
  expect((await f.service.item('board','item')).item.issues?.[0]).toMatchObject({...issue,resolvedBy:'verified-delivery-EIO'});
+});
+
+it('rechecks a proven completed result after report packaging failed and the channel has late requests',async()=>{
+    let failureCode:string|undefined='SOFTWARE_REPORT_BUDGET_EXCEEDED',conflict=false;
+    const f=await fixture(async()=>{
+        if(failureCode)throw Object.assign(Error('Report handoff'),{code:failureCode});
+    },undefined,async ({observation})=>{
+        if(conflict)throw Object.assign(Error('Late request'),{code:'CHANNEL_RESULT_CONFLICT'});
+        return observation;
+    });
+    f.channels.ensure('attempt').execution={sessionId:'native',turnId:'turn',operationId:'operation',status:'completed'};
+    await f.publish('result','result');
+    Object.assign(f.channels.ensure('attempt').messages[0],{origin:{sessionId:'native',turnId:'turn',operationId:'operation'}});
+    await expect(f.observe('succeeded')).resolves.toMatchObject({outcome:'unknown',code:'SOFTWARE_REPORT_BUDGET_EXCEEDED'});
+    conflict=true;
+    f.channels.ensure('attempt').execution={sessionId:'native',turnId:'cleanup-turn',operationId:'cleanup',status:'completed'};
+    await expect(f.observe('succeeded')).resolves.toMatchObject({outcome:'unknown',code:'SOFTWARE_REPORT_BUDGET_EXCEEDED'});
+    failureCode='ECANCELLED';
+    await expect(f.observe('succeeded')).resolves.toMatchObject({outcome:'unknown',code:'ECANCELLED'});
+    failureCode=undefined;
+    await expect(f.observe('succeeded')).resolves.toMatchObject({outcome:'succeeded'});
+    await expect(f.observe('succeeded')).resolves.toMatchObject({outcome:'succeeded'});
+    expect((await f.service.item('board','item')).item.issues?.[0].resolvedBy).toBe('verified-delivery-SOFTWARE_REPORT_BUDGET_EXCEEDED');
 });

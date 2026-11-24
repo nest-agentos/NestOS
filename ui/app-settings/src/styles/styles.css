@@ -9,3 +9,17 @@
 @import '@nestos/terminal-ui/style.css';
 
 @import './_cells.css';
+
+.settings-terminal-menu { position: relative; flex: none; }
+.settings-terminal-menu > summary { list-style: none; }
+.settings-terminal-menu > summary::-webkit-details-marker { display: none; }
+.settings-terminal-menu > div {
+    position: absolute;
+    inset-inline-end: 0;
+    z-index: 2;
+    min-width: max-content;
+    padding: 4px;
+    border: 1px solid var(--mm-border-color, #d1d5db);
+    border-radius: 6px;
+    background: var(--mm-bg-color, #fff);
+}

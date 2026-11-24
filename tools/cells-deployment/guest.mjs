@@ -7,9 +7,9 @@ const exec = promisify(execFile);
 export const installedExecutable = '/usr/local/lib/nestos/cells/cells';
 export const installedConfig = '/usr/local/lib/nestos/cells/cells.toml';
 
-export async function command(file, args, timeout = 15000, input) {
+export async function command(file, args, timeout = 15000, input, maxBuffer = 262144) {
     try {
-        const result = exec(file, args, {timeout, maxBuffer: 262144, killSignal: 'SIGKILL'});
+        const result = exec(file, args, {timeout, maxBuffer, killSignal: 'SIGKILL'});
         if (input !== undefined) {
             result.child.stdin.on('error', () => {});
             result.child.stdin.end(input);
@@ -35,14 +35,14 @@ export async function ready(options) {
     return value.state === 'ready';
 }
 
-async function guestCommand(options, args, input) {
+async function guestCommand(options, args, input, maxBuffer) {
     const address = await command('sudo', ['-n', options.server, 'network', 'address', options.vm]);
     const [ip, alias] = address.split(/\s+/);
     if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip) || !/^nestos-[\w-]+$/.test(alias)) throw fail('SERVICE_ADDRESS_INVALID');
     return command('sudo', ['-n', 'ssh', '-F', '/dev/null', '-T', '-i', options.identity,
         '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=3', '-o', 'StrictHostKeyChecking=yes',
         '-o', 'UserKnownHostsFile=/var/lib/nestos-firecracker/services/known_hosts',
-        '-o', 'HostKeyAlias=' + alias, 'agent@' + ip, args.map(quote).join(' ')], 120000, input);
+        '-o', 'HostKeyAlias=' + alias, 'agent@' + ip, args.map(quote).join(' ')], 120000, input, maxBuffer);
 }
 
 const hashProcess = `import pathlib, hashlib, sys
@@ -59,7 +59,9 @@ for p in pathlib.Path('/proc').iterdir():
         if expected_config and (p / 'cmdline').read_bytes().split(b'\\x00')[1:2] != [expected_config.encode()]:
             sys.exit('CELLS_CONFIG_BINDING_MISMATCH')
         with e.open('rb') as binary:
-            rows.append(hashlib.file_digest(binary, 'sha256').hexdigest())
+            start = (p / 'stat').read_text().rsplit(')', 1)[1].split()[19]
+            boot = pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+            rows.append(hashlib.file_digest(binary, 'sha256').hexdigest() + ' ' + boot + ':' + p.name + ':' + start)
     except OSError:
         pass
 if len(rows) != 1:
@@ -67,10 +69,18 @@ if len(rows) != 1:
 print(rows[0])
 `;
 
-export async function runningHash(options) {
+export async function runningProcess(options) {
     const args = ['python3', '-c', hashProcess, options.executable];
     if (options.executable === installedExecutable) args.push(installedConfig);
-    return checkedHash(await guestCommand(options, args));
+    const output = await guestCommand(options, args);
+    return {hash: checkedHash(output), generation: checkedGeneration(output.split(/\s+/)[1])};
+}
+
+export const runningHash = async options => (await runningProcess(options)).hash;
+
+export function checkedGeneration(value) {
+    if (!/^[a-f0-9-]{36}:[1-9]\d*:\d+$/.test(value ?? '')) throw fail('CELLS_INSTALL_PROCESS_UNVERIFIED');
+    return value;
 }
 
 const verifyInstallation = `
@@ -105,17 +115,76 @@ mv -T -- "$staged" cells
 sync -f .
 `;
 
+const installRelease = `${verifyInstallation}
+operation=$2
+binary_hash=$3
+config_hash=$4
+previous_config=$5
+binary_size=$6
+file_hash() { sha256sum < "$1" | cut -d ' ' -f 1; }
+[ "$(file_hash cells.toml)" = "$previous_config" ] ||
+    { echo CELLS_CONFIG_CHANGED >&2; exit 1; }
+staging=$(mktemp -d .release.XXXXXXXX)
+trap 'rm -rf -- "$staging"' EXIT
+head -c "$binary_size" > "$staging/cells"
+cat > "$staging/cells.toml"
+[ "$(file_hash "$staging/cells")" = "$binary_hash" ] ||
+    { echo CELLS_INSTALL_DIGEST_MISMATCH >&2; exit 1; }
+[ "$(file_hash "$staging/cells.toml")" = "$config_hash" ] ||
+    { echo CELLS_CONFIG_DIGEST_MISMATCH >&2; exit 1; }
+chmod 0755 "$staging/cells"
+chmod 0600 "$staging/cells.toml"
+"$staging/cells" --check-config "$staging/cells.toml" >/dev/null 2>&1 ||
+    { echo CELLS_CONFIG_INVALID >&2; exit 1; }
+if [ "$(stat -c %u:%g cells.toml)" != "$(stat -c %u:%g "$staging/cells.toml")" ]; then
+    chown --reference=cells.toml "$staging/cells.toml"
+fi
+sync "$staging/cells" "$staging/cells.toml"
+ln -- cells "previous-$operation"
+ln -- cells.toml "previous-$operation.toml"
+sync -f .
+mv -T -- "$staging/cells" cells
+if ! mv -T -- "$staging/cells.toml" cells.toml; then
+    ln -- "previous-$operation" "$staging/restore"
+    mv -T -- "$staging/restore" cells
+    sync -f .
+    exit 1
+fi
+sync -f .
+`;
+
 function checkedHash(output) {
     const hash = output.split(/\s+/, 1)[0];
     if (!/^[a-f0-9]{64}$/.test(hash)) throw fail('CELLS_INSTALL_DIGEST_INVALID');
     return hash;
 }
 
+const configLimit = 1024 * 1024;
+const readInstalledConfig = `${verifyInstallation}
+head -c ${configLimit + 1} -- cells.toml | base64 -w0
+`;
+
+async function configSnapshot(run, args) {
+    const encoded = await run(args, undefined, 4 * Math.ceil((configLimit + 1) / 3) + 4096);
+    const bytes = Buffer.from(encoded, 'base64');
+    if (!bytes.length || bytes.length > configLimit || bytes.toString('base64') !== encoded)
+        throw fail('CELLS_CONFIG_INSTALLED_INVALID');
+    return bytes;
+}
+
 export function serviceStorage(run, directory = '/usr/local/lib/nestos/cells') {
     const shell = script => ['sh', '-ec', script, 'cells-install', directory];
     return {
         installedHash: async () => checkedHash(await run(shell(verifyInstallation + '\nsha256sum cells'))),
-        install: async (artifact, request) => {
+        readConfiguration: () => configSnapshot(run, shell(readInstalledConfig)),
+        configHash: async () => checkedHash(await run(shell(verifyInstallation + '\nsha256sum cells.toml'))),
+        install: async (artifact, request, config) => {
+            if (config) {
+                const binary = await readFile(artifact.binary);
+                await run([...shell(installRelease), request.operationId, artifact.value.sha256,
+                    request.configSha256, request.expectedConfigSha256, String(binary.length)], Buffer.concat([binary, config]));
+                return;
+            }
             await run([...shell(installBinary), request.operationId, artifact.value.sha256],
                 await readFile(artifact.binary));
         },
@@ -123,5 +192,5 @@ export function serviceStorage(run, directory = '/usr/local/lib/nestos/cells') {
 }
 
 export function guestStorage(options) {
-    return serviceStorage((args, input) => guestCommand(options, args, input));
+    return serviceStorage((args, input, maxBuffer) => guestCommand(options, args, input, maxBuffer));
 }

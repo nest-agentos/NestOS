@@ -8,6 +8,7 @@ export interface CellsConnectionDiagnostic {
 }
 interface RemoteFailureContext {
     stage: string; projectId?: string; profileId?: string; sessionId?: string; connectionId?: string;
+    operationId?: string; durationMs?: number;
 }
 export const remoteLog = createModuleLogger('cells');
 const reported = new WeakSet<object>();
@@ -23,7 +24,10 @@ export class RemoteConnectionUnavailableError extends FSError {
 export function reportRemoteFailure(error: unknown, context: RemoteFailureContext): void {
     if (error instanceof FSError && error.code === 'ECANCELLED') return;
     const [code, ...causeCodes] = failureCodes(error);
-    const data = {source: 'itookit', ...context, code, ...(causeCodes.length ? {causeCodes} : {}),
+    const requestId = failureRequestId(error);
+    const data = {source: 'itookit', ...context, code: code ?? 'REMOTE_ERROR_WITHOUT_CODE',
+        errorType: error instanceof TypeError ? 'TypeError' : error instanceof Error ? 'Error' : 'unknown',
+        ...(causeCodes.length ? {causeCodes} : {}), ...(requestId ? {requestId} : {}),
         ...(error instanceof RemoteConnectionUnavailableError
             ? {...error.diagnostic, projectIds: error.projectIds, stack: error.stack} : {})};
     if (error instanceof Error && reported.has(error)) { remoteLog.debug('remote.operation.failed', data); return; }
@@ -31,6 +35,13 @@ export function reportRemoteFailure(error: unknown, context: RemoteFailureContex
     remoteLog.error('remote.operation.failed', data);
     if (getLogger().getLevel('cells') <= LogLevel.ERROR)
         console.error(`${new Date().toISOString()} [itookit/cells] remote.operation.failed`, data);
+}
+
+function failureRequestId(error: unknown): string | undefined {
+    if (!(error instanceof Error)) return;
+    const details = error as Error & {requestId?: unknown; clientRequestId?: unknown};
+    const id = details.requestId ?? details.clientRequestId;
+    return typeof id === 'string' && /^[a-f\d-]{36}$/i.test(id) ? id : undefined;
 }
 
 function failureCodes(error: unknown): string[] {

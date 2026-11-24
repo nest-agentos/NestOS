@@ -15,8 +15,10 @@ import {MOBILE_NAVIGATION_QUERY} from '@nestos/ui-common-adapter';
 import { Drawer, formatDisplayLabel } from '@nestos/vfs-ui';
 import type {WindowManagementOptions} from '@nestos/vfs-ui';
 import type { WorkbenchWindowBinding, WorkbenchWindow } from './windows';
-import type { PinnedWindow } from '@nestos/app-contracts/services';
+import type { PinnedWindow, WindowTimes } from '@nestos/app-contracts/services';
 import {captureEditor, restoreEditor, type EditorRecoveryState} from './recovery';
+
+import {appendWindowTimes, compareWindows, readWindowTimes, windowTimeFields, type WindowTimeField} from './window-times';
 
 const navigationLog = createModuleLogger('window-navigation');
 
@@ -25,7 +27,7 @@ interface TabsRecovery {
     editors: Map<string, EditorRecoveryState>;
 }
 
-export interface WorkbenchTab<T> {
+export interface WorkbenchTab<T> extends WindowTimes {
     conversationId?: string;
     context?: string;
     navigationLabel?: HTMLElement;
@@ -84,6 +86,7 @@ export class WorkbenchTabs<T> {
     private readonly navigationViews = new Set<ReturnType<typeof windowNavigation>>();
     private readonly titleBars = new Set<ReturnType<typeof mountContentTitleBar>>();
     private openedQuery = '';
+    private openedSort: WindowTimeField = 'accessedAt';
     private describing?: Promise<void>;
     private readonly editors = new Map<WorkbenchTab<T>, IEditor>();
     private readonly recovery = new Map<string, EditorRecoveryState>();
@@ -102,7 +105,7 @@ export class WorkbenchTabs<T> {
         container.append(this.navigation, this.bar, this.body);
         this.observeSidebar();
         for (const tab of restored ?? []) {
-            const entry = this.create(tab.id, tab.title, false); entry.pinned = tab.pinned;
+            const entry = this.create(tab.id, tab.title, false, readWindowTimes(tab)); entry.pinned = tab.pinned;
             entry.context = tab.context; entry.location = tab.location; entry.conversationId = tab.conversationId;
         }
         container.addEventListener('keydown', event => this.keydown(event), { signal: this.abort.signal });
@@ -254,9 +257,9 @@ export class WorkbenchTabs<T> {
     snapshot(): NonNullable<WorkbenchSnapshot['tabs']> {
         return this.values().filter(tab => !tab.preview).map(tab => this.snapshotTab(tab));
     }
-    private snapshotTab({id, title, pinned, conversationId, context, location}: WorkbenchTab<T>): NonNullable<WorkbenchSnapshot['tabs']>[number] {
+    private snapshotTab({id, title, pinned, conversationId, context, location, createdAt, modifiedAt, accessedAt}: WorkbenchTab<T>): NonNullable<WorkbenchSnapshot['tabs']>[number] {
         const synced = this.windows?.registry.pinned(this.windows.id, id);
-        return {id, title, pinned: pinned && synced === undefined,
+        return {id, title, ...readWindowTimes({createdAt, modifiedAt, accessedAt}), pinned: pinned && synced === undefined,
             ...(conversationId ? {conversationId} : {}), ...(context ? {context} : {}), ...(location ? {location} : {})};
     }
     async open(id: string, title: string, preview = true): Promise<WorkbenchTab<T>> {
@@ -269,13 +272,16 @@ export class WorkbenchTabs<T> {
             const tab = this.create(id, title, preview); this.activate(id); return tab;
         } finally { --this.opening; this.syncViewState(); }
     }
-    private create(id: string, title: string, preview: boolean): WorkbenchTab<T> {
+    private create(id: string, title: string, preview: boolean, times?: WindowTimes): WorkbenchTab<T> {
         const panel = document.createElement('div'); panel.className = 'workbench-tabs__panel'; panel.hidden = true;
-        const tab: WorkbenchTab<T> = { id, title, preview, pinned: false, dirty: false, failed: false, panel, subscriptions: [] };
+        const now = Date.now();
+        const tab: WorkbenchTab<T> = { ...(times ?? {createdAt: now, modifiedAt: now}), id, title, preview, pinned: false, dirty: false, failed: false, panel, subscriptions: [] };
         this.entries.set(id, tab); this.body.append(panel); return tab;
     }
     activate(id: string): void {
         this.container.dataset.workbenchActivation = String(++this.activation);
+        const tab = this.get(id);
+        if (tab) tab.accessedAt = Date.now();
         this.currentId = id; this.emptyPanel.hidden = true;
         for (const tab of this.values()) tab.panel.hidden = tab.id !== id;
         this.render(); this.tabViewport.reveal();
@@ -286,7 +292,7 @@ export class WorkbenchTabs<T> {
         const pinned = !tab.pinned;
         const saved = this.windows && !id.startsWith('draft:') && this.windows.registry.setPin({
             workspace: this.windows.id, resource: id, title: tab.title,
-            scope: this.actions.navigation, context: tab.context, location: tab.location,
+            scope: this.actions.navigation, context: tab.context, location: tab.location, ...readWindowTimes(tab),
         }, pinned);
         if (saved) {
             tab.preview = false; this.render();
@@ -306,7 +312,7 @@ export class WorkbenchTabs<T> {
             if (pinned !== undefined) this.applyPin(tab, pinned);
         }
     }
-    title(id: string, title: string): void { const tab = this.get(id); if (tab && tab.title !== title) { tab.title = title; this.render(); } }
+    title(id: string, title: string): void { const tab = this.get(id); if (tab && tab.title !== title) { tab.title = title; tab.modifiedAt = Date.now(); this.render(); } }
     context(id: string, context?: string): void { this.updateMetadata(id, 'context', context); }
     setNavigationLabel(id: string, label: HTMLElement): void {
         const tab = this.get(id); if (tab) { tab.navigationLabel = label; this.render(); }
@@ -330,7 +336,7 @@ export class WorkbenchTabs<T> {
         if (next !== id && this.get(next)) throw new Error(`Tab already open: ${next}`);
         this.metadataRevisions.set(tab, (this.metadataRevisions.get(tab) ?? 0) + 1);
         const entries = [...this.entries].map(([key, value]) => [key === id ? next : key, value] as const);
-        tab.id = next; tab.title = title; this.entries.clear(); for (const [key, value] of entries) this.entries.set(key, value);
+        tab.id = next; tab.title = title; tab.modifiedAt = Date.now(); this.entries.clear(); for (const [key, value] of entries) this.entries.set(key, value);
         if (next !== id && this.recovery.has(id)) {this.recovery.set(next, this.recovery.get(id)!); this.recovery.delete(id);}
         if (next !== id && this.recoveryFailures.has(id)) {this.recoveryFailures.set(next, this.recoveryFailures.get(id)); this.recoveryFailures.delete(id);}
         if (this.selected.delete(id)) this.selected.add(next);
@@ -345,7 +351,7 @@ export class WorkbenchTabs<T> {
         if (!editor?.on) return;
         tab.subscriptions.push(editor.on('interactiveChange', () => {
             tab.preview = false; tab.dirty = true; this.render();
-        }), editor.on('saved', () => { tab.dirty = false; tab.failed = false; this.render(); }),
+        }), editor.on('saved', () => { tab.modifiedAt = Date.now(); tab.dirty = false; tab.failed = false; this.render(); }),
         editor.on('saveError', error => { tab.preview = false; tab.dirty = true; tab.failed = true; this.render(); this.actions.error(error); }));
     }
     private restoreEditorState(tab: WorkbenchTab<T>, editor: IEditor): void {
@@ -364,7 +370,7 @@ export class WorkbenchTabs<T> {
     restoreRecovery(snapshot: unknown): void {
         const state = snapshot as TabsRecovery;
         for (const item of state.tabs) {
-            const tab = this.get(item.id) ?? this.create(item.id, item.title, false);
+            const tab = this.get(item.id) ?? this.create(item.id, item.title, false, readWindowTimes(item));
             Object.assign(tab, item);
         }
         for (const [id, editor] of state.editors) this.recovery.set(id, editor);
@@ -386,6 +392,7 @@ export class WorkbenchTabs<T> {
         const tab = this.get(id); if (!tab) return;
         try { await this.actions.dispose(tab); }
         catch (error) { if (!this.recovering) {tab.preview = false; tab.failed = true; this.render(); throw error;} }
+        this.windows?.registry.rememberPinTimes(this.windows.id, tab.id, readWindowTimes(tab));
         tab.subscriptions.forEach(unsubscribe => unsubscribe()); tab.panel.remove(); this.entries.delete(tab.id);
         this.editors.delete(tab); this.recovery.delete(tab.id);
         this.recoveryFailures.delete(tab.id);
@@ -430,17 +437,38 @@ export class WorkbenchTabs<T> {
             this.openedDrawer.content.append(notice);
         }
         const toolbar = this.openedToolbar();
+        toolbar.append(this.openedSortControl());
         this.appendOpenedActions(toolbar);
         this.openedDrawer.content.append(toolbar);
         if (this.windows) this.renderWindows();
         else {
             const tabs = this.values().sort((a, b) => Number(b.pinned) - Number(a.pinned));
-            for (const tab of tabs) { this.bar.append(this.tabHeader(tab)); this.openedDrawer.content.append(this.openedRow(tab)); }
+            for (const tab of tabs) this.bar.append(this.tabHeader(tab));
+            tabs.sort((a, b) => compareWindows(a, b, this.openedSort));
+            for (const tab of tabs) this.openedDrawer.content.append(this.openedRow(tab));
             this.filterOpened();
         }
         this.barWindows.button.classList.add('workbench-tabs__bar-windows');
         this.barWindows.update(this.windowCount()); this.bar.append(this.barWindows.button);
         this.tabViewport.update();
+    }
+    private openedSortControl(): HTMLSelectElement {
+        const select = document.createElement('select');
+        select.setAttribute('aria-label', t('workbench.sortOpened'));
+        for (const field of windowTimeFields) {
+            const option = document.createElement('option');
+            option.value = field; option.textContent = t(`workbench.${field}`);
+            select.append(option);
+        }
+        select.value = this.windows?.registry.sort ?? this.openedSort;
+        select.onchange = () => {
+            const field = windowTimeFields.find(value => value === select.value);
+            if (!field) return;
+            if (this.windows) this.windows.registry.setSort(field);
+            else {this.openedSort = field; this.renderShared();}
+            if (this.openedDialog?.open) this.openedDrawer.content.querySelector('select')?.focus();
+        };
+        return select;
     }
     private appendOpenedActions(toolbar: HTMLElement): void {
         const actions = document.createElement('div'); actions.className = 'workbench-tabs__opened-actions';
@@ -459,7 +487,7 @@ export class WorkbenchTabs<T> {
     private windowItems(): WorkbenchWindow[] {
         this.syncPins();
         return this.values().map(tab => ({id: tab.id, workspace: this.windows?.id, title: tab.title, scope: this.actions.navigation,
-            context: tab.context, location: tab.location, pinned: tab.pinned, dirty: tab.dirty, failed: tab.failed,
+            ...readWindowTimes(tab), context: tab.context, location: tab.location, pinned: tab.pinned, dirty: tab.dirty, failed: tab.failed,
             selected: this.selected.has(tab.id), active: this.isCurrent(tab.id), activate: () => this.requestActivate(tab.id), header: () => this.tabHeader(tab), row: () => this.openedRow(tab),
             select: selected => { if (selected) this.selected.add(tab.id); else this.selected.delete(tab.id); },
             close: () => this.close(tab.id)}));
@@ -468,11 +496,11 @@ export class WorkbenchTabs<T> {
         const registry = this.windows!.registry;
         this.openedDrawer.setQuery(registry.query);
         const items = registry.items();
-        if (this.openedDialog) {
-            for (const pin of registry.unopenedPins(items)) this.openedDrawer.content.append(this.pinnedRow(pin));
-        }
-        for (const item of items) {
-            this.bar.append(item.header());
+        for (const item of items) this.bar.append(item.header());
+        const pins = this.openedDialog ? registry.unopenedPins(items) : [];
+        const rows = [...items, ...pins.map(pin => ({...pin, pinned: true, row: () => this.pinnedRow(pin)}))];
+        rows.sort((a, b) => compareWindows(a, b, registry.sort));
+        for (const item of rows) {
             const row = item.row(); row.hidden = !registry.matches(item);
             this.openedDrawer.content.append(row);
         }
@@ -508,7 +536,7 @@ export class WorkbenchTabs<T> {
         const label = this.button(tab.title, () => this.run(this.requestActivate(tab.id)), 'workbench-tabs__label');
         label.setAttribute('role', 'tab'); label.setAttribute('aria-selected', String(this.isCurrent(tab.id)));
         decorateResourceButton(label, tab.icon ?? fileTypeIcon(tab.title), tab.title);
-        label.title = tab.statusTooltip ?? tab.id; label.ondblclick = () => this.keep(tab.id);
+        label.title = [tab.title, tab.statusTooltip].filter(Boolean).join('\n'); label.ondblclick = () => this.keep(tab.id);
         const state = document.createElement('span'); state.className = 'workbench-tabs__state';
         state.title = tab.failed ? t('workbench.saveFailed') : tab.dirty ? t('workbench.pending') : tab.preview ? t('workbench.preview') : '';
         state.textContent = tab.failed ? '!' : tab.dirty ? '•' : '';
@@ -541,7 +569,7 @@ export class WorkbenchTabs<T> {
         row.append(checkbox);
         row.append(label, pin, decorateButton(this.button(t('workbench.close'), () => this.run(this.close(tab.id))), FILE_BROWSER_ICONS.close, t('workbench.close'), true)); return row;
     }
-    private openedLabel(label: HTMLButtonElement, tab: Pick<PinnedWindow, 'title' | 'scope' | 'context' | 'location'>): void {
+    private openedLabel(label: HTMLButtonElement, tab: Pick<PinnedWindow, 'title' | 'scope' | 'context' | 'location'> & WindowTimes): void {
         const text = label.lastElementChild!; text.className = 'workbench-tabs__opened-text';
         const title = document.createElement('span'); title.textContent = formatDisplayLabel(tab.title); title.title = tab.title; text.replaceChildren(title);
         label.title = tab.title; label.setAttribute('aria-label', tab.title);
@@ -550,6 +578,7 @@ export class WorkbenchTabs<T> {
             const location = document.createElement('small'); location.textContent = context; text.append(location);
             label.title = `${tab.title} — ${context}`; label.setAttribute('aria-label', `${tab.title} — ${context}`);
         }
+        appendWindowTimes(text, readWindowTimes(tab));
     }
     private filterOpened(): void {
         for (const row of this.opened.querySelectorAll<HTMLElement>('[data-opened-id]')) {

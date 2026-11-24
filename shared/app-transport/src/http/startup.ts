@@ -12,6 +12,7 @@ export interface BootstrapPreparation {
     snapshots?: SnapshotCache;
     initialView?: OpenViewRequest;
     initialRead?: StartupReadRequest;
+    deferCatalogs?: boolean;
 }
 
 /** Transfer data before loading RPC projections; one live client adopts the same operation. */
@@ -38,7 +39,7 @@ export class PreparedHttpBootstrap {
         this.abort.signal.throwIfAborted();
         this.started = true;
         return this.post({kind: 'bootstrap', initialView: this.options.initialView,
-            initialRead: this.options.initialRead, knownSnapshots: this.snapshots.known()}, this.abort.signal);
+            initialRead: this.options.initialRead, deferCatalogs: this.options.deferCatalogs, knownSnapshots: this.snapshots.known()}, this.abort.signal);
     }
     claim(clientId: string, url: string, signal: AbortSignal): Promise<Reply> {
         if (this.claimed || this.closing || clientId !== this.options.clientId || url !== this.url)

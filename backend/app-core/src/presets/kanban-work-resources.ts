@@ -18,7 +18,7 @@ import {workResourceExecution, type ResourceExecutionOptions} from './kanban-wor
 import {inspectWorktree, worktreeBlockers} from '@nestos/git-delivery/inspection';
 import {removeGitWorktree} from '@nestos/git-delivery/removal';
 import type {PreparedWorktree} from '@nestos/git-delivery/worktrees';
-import {handoffDevelopmentReports} from './kanban-report-delivery';
+import {handoffDevelopmentReports,releaseCompletedDevelopmentReports} from './kanban-report-delivery';
 import type {RemoteFileSourceProvider} from '../projects/remote-mounts';
 
 const log = createModuleLogger('kanban-work-resources');
@@ -49,7 +49,8 @@ export function developmentWorkResources(options: Options) {
             log.warn('work-resource.list', {operation: 'work-resource.list', operationId, stage, result: 'failure', code: safeCode(error), durationMs: Date.now() - started}); throw error;
         }
     },
-        cleanupWorkResource: (boardId: string, request: KanbanWorkResourceCleanup) => cleanup(options, boardId, structuredClone(request))};
+        cleanupWorkResource: (boardId: string, request: KanbanWorkResourceCleanup) => cleanup(options, boardId, structuredClone(request)),
+        releaseReportPackages: () => releaseCompletedDevelopmentReports(options)};
 }
 async function associations(options: Options, boardId: string, itemId: string,resourceId?:string): Promise<KanbanWorkResource[]> {
     const refs = (await references(options, boardId, itemId,!!resourceId)).filter(ref=>!resourceId||ref.id===resourceId), rows: KanbanWorkResource[] = [];

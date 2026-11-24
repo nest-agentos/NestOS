@@ -93,7 +93,7 @@ export async function completeManagementCleanup(options:DecisionConversationOpti
  }
  await finishCleanupReview(options.journal,input);
  options.log({operationId:input.operationId,boardId:input.boardId,stage:'cleanup.management.verify',result:residual.length?'failure':'success',code:residual[0]?.code,durationMs:Date.now()-started});
- if(residual.length){await options.journal.update<ReviewCleanup>(reviewCleanupKey(input.boardId,input.itemId,input.scopeId),old=>({...old!,state:'failed',code:residual[0].code}));return {state:'blocked',residual};}
+ if(residual.length){await options.journal.update<ReviewCleanup>(reviewCleanupKey(input.boardId,input.itemId,input.scopeId),old=>old?.state==='succeeded'||old?.operationId!==current.operationId?old!:{...old,state:'failed',code:residual[0].code});return {state:'blocked',residual};}
  const root=await client.itemOperations!(input.boardId,input.itemId),view=scopeView(root,input.scopeId!);
  await client.runItemOperation!(input.boardId,{itemId:input.itemId,scopeId:input.scopeId,pluginId:root.pluginId,operationId:'finish-'+saved.id,action:'cleanup',expectedRevision:view.revision});
  const status=await options.journal.get<ReviewCleanup>(reviewCleanupKey(input.boardId,input.itemId,input.scopeId));

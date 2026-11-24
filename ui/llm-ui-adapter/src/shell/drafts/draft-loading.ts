@@ -23,6 +23,11 @@ export function draftLoading(container: HTMLElement, signal?: AbortSignal) {
                 throw error;
             }
         },
+        retry: (action: () => void) => {
+            const button = document.createElement('button');
+            button.type = 'button'; button.textContent = t('project.draftLoading.retry');
+            button.addEventListener('click', action, {once: true}); notice.append(' ', button);
+        },
         finish: () => notice.remove(),
     };
 }

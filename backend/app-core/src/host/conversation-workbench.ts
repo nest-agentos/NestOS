@@ -20,6 +20,8 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
     private closed = false;
     private visible = true;
     private interestRevision = 0;
+    private conversationRevision = 0;
+    private readonly nativeViews = new Set<PreparedConversation>();
     private readonly interests = new Set<string>();
     private closing?: Promise<void>;
     private readonly resources = new ViewScope();
@@ -102,13 +104,37 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
     }
     private async openNativeConversation(resourceId: string, project?: ProjectFolder | null): Promise<PreparedConversation> {
         if (this.closed) throw new FSError('EIO', 'Workbench closed');
+        const revision = ++this.conversationRevision;
         const prepared = await prepareConversation(this.services.projects, resourceId, project);
         if (this.closed) {await prepared.conversation.close(); throw new FSError('EIO', 'Workbench closed');}
-        this.native = prepared; this.failure = undefined;
-        await this.resources.own({dispose: () => prepared.conversation.close()});
-        this.eventSource.addSource('conversation', listener => prepared.conversation.subscribe(() => listener({resourceId})));
-        if (project === undefined) await this.updateProjectInterest(prepared.project.project.id);
-        return prepared;
+        const owned = await this.ownConversation(prepared);
+        if (this.closed) {await owned.conversation.close(); throw new FSError('EIO', 'Workbench closed');}
+        if (revision !== this.conversationRevision) return owned;
+        this.native = owned; this.failure = undefined;
+        try {
+            if (project === undefined) await this.updateProjectInterest(prepared.project.project.id);
+            return owned;
+        } catch (error) {await Promise.allSettled([owned.conversation.close()]); throw error;}
+    }
+    private async ownConversation(prepared: PreparedConversation): Promise<PreparedConversation> {
+        const source = prepared.conversation;
+        let owned: PreparedConversation | undefined, stop: () => void;
+        try {stop = this.eventSource.addSource('conversation', listener => source.subscribe(() => listener({resourceId: prepared.resourceId})));}
+        catch (error) {await Promise.allSettled([source.close()]); throw error;}
+        const owner = await this.resources.own({dispose: async () => {
+            if (owned) {
+                this.nativeViews.delete(owned);
+                if (this.native === owned) this.native = [...this.nativeViews].at(-1);
+            }
+            try {stop();} finally {await source.close();}
+        }});
+        owned = {...prepared, conversation: new Proxy(source, {get(target, key) {
+            if (key === 'close') return owner.dispose;
+            const value = Reflect.get(target, key, target);
+            return typeof value === 'function' ? value.bind(target) : value;
+        }})};
+        this.nativeViews.add(owned);
+        return owned;
     }
     async readNavigation(request: WorkbenchNavigationRequest): Promise<WorkbenchNavigationView> {
         if (this.closed) throw new FSError('EIO', 'Workbench closed');

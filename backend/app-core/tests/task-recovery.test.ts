@@ -5,7 +5,7 @@ import {SeqKanbanStore,createKanbanModule} from '@nestos/kanban';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createTaskRecovery} from '../src/kanban/task-recovery';
 const closes:Array<()=>Promise<void>>=[];afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});
-async function fixture(group=false,active=false) {
+async function fixture(group=false,active=false,missing=false) {
  const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());const fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs);
  const service=createKanbanModule({store,actor:{kind:'human',id:'admin'},authorize:async()=>{},log(){},verifyOutputs:async()=>true}),worker=createKanbanModule({store,actor:{kind:'service',id:'worker'},authorize:async()=>{},log(){}});
  await service.create({id:'b',title:'Work',scope:{kind:'system'},members:[{kind:'human',id:'admin',roles:['coordinator','reviewer'],responsibility:'Manage'},{kind:'service',id:'worker',roles:['worker'],responsibility:'Implement'}],policy:{requireEstimate:false,review:'independent'}});
@@ -16,7 +16,7 @@ async function fixture(group=false,active=false) {
  await run({type:'prepare-dispatch',itemId:'source',dispatchId:'source-dispatch'},worker);let dispatch=(await service.workflow('b')).dispatches['source-dispatch'];
  await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:'succeeded',outputs:[]});await run({type:'accept-execution',dispatchId:dispatch.id,accept:true});
  await run({type:'prepare-dispatch',itemId:'verify',dispatchId:'failed-dispatch'},worker);dispatch=(await service.workflow('b')).dispatches['failed-dispatch'];
- await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:active?'running':'failed',code:active?'WORKSPACE_ERROR_REPORTED':'VERIFICATION_RUNNING_VERSION_MISMATCH',executionSessionId:'canonical-session'});
+ await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:missing?'unknown':active?'running':'failed',code:missing?'WORKSPACE_RESULT_MISSING':active?'WORKSPACE_ERROR_REPORTED':'VERIFICATION_RUNNING_VERSION_MISMATCH',executionSessionId:'canonical-session'});
  if(active)await run({type:'report-issue',itemId:'verify',issue:{id:'repository-registration-error',type:'error',attemptId:dispatch.id,handler:'self'}});
  const journal=new KanbanAutomationJournal(fs);await journal.open();const original={channelId:'failed-dispatch',projectId:'project',directory:'/workspace/worktree',context:{delivery:{readOnly:true,evidence:{operationId:'original-deploy',result:{version:'old'}}}}};
  await journal.update('development-workspace:failed-dispatch',()=>original);
@@ -147,4 +147,63 @@ it('rechecks a reported blocker and replies to the original issue without cleari
  const item=(await f.service.item('b','verify')).item;
  expect(item.issues?.find(issue=>issue.id==='repository-registration-error')?.resolvedBy).toBeUndefined();
  expect(Object.keys((await f.service.workflow('b')).dispatches)).toHaveLength(2);
+});
+
+it('rechecks report delivery on the same dispatch without admitting another execution',async()=>{
+    const f=await fixture(false,true);
+    const code='SOFTWARE_REPORT_BUDGET_EXCEEDED';
+    await f.run({type:'link-reference',itemId:'verify',reference:{system:'nestos-remote-project',id:'project'}});
+    await f.journal.update('delivery-blocked:failed-dispatch',()=>({code:'ECANCELLED',
+        issues:[{id:'delivery-'+code,code},{id:'delivery-ECANCELLED',code:'ECANCELLED'}]}));
+    const handoff=vi.fn(async()=>{}).mockRejectedValueOnce(Object.assign(Error('Disconnected'),{code:'ECANCELLED'})),wake=vi.fn();
+    f.options.reportHandoff={run:handoff,wake};
+    f.options.executionResource.mockResolvedValue('/folder:cx1/@harness/codex/native');
+    const state=await f.recovery.taskRecovery('b','verify');
+    expect(state).toMatchObject({reportHandoff:{code,canRecheck:true,
+        reportResourceId:'/folder:cx1/@files/worktree/_nestos/kanban'},canRetry:false});
+    const request={operationId:'report-recheck',itemId:'verify',expectedRevision:state.revision,action:'recheck' as const};
+    const result=await f.recovery.recoverTask('b',request);
+    expect(result).toMatchObject({state:'pending',code:'ECANCELLED'});
+    expect(await f.recovery.recoverTask('b',request)).toEqual(result);
+    expect(handoff).toHaveBeenCalledExactlyOnceWith('b','verify','failed-dispatch');
+    await expect(f.recovery.recoverTask('b',{...request,operationId:'unrelated',action:'reconcile-report'})).rejects.toMatchObject({code:'RECOVERY_SCOPE_MISMATCH'});
+    await expect(f.recovery.recoverTask('b',{...request,action:'reconcile-report'})).resolves.toMatchObject({
+        operationId:request.operationId,state:'pending',code:'REPORT_HANDOFF_SETTLEMENT_PENDING'});
+    expect(handoff).toHaveBeenLastCalledWith('b','verify','failed-dispatch',true);
+    expect(wake).toHaveBeenCalledTimes(2);
+    expect(Object.values((await f.service.workflow('b')).dispatches)).toHaveLength(2);
+});
+
+
+it('requests formal result recovery in the original session without dispatching new work', async()=>{
+ const f=await fixture(false,false,true);
+ const resourceId='/folder:project/@harness/profile/canonical-session';
+ f.options.executionResource.mockResolvedValue(resourceId);
+ const enqueue=vi.fn(async()=>{}),close=vi.fn(async()=>{});
+ f.options.remote.projectHarness=vi.fn(async()=>({subscribeChannel:()=>()=>{},close}));
+ f.options.remote.projectConversation=vi.fn(async()=>({enqueue,close}));
+ let scopeId='newer-dispatch',messages:unknown[]=[];
+ f.options.remote.sessionChannel=vi.fn(async(_project:string,method:string)=>{
+    if(method==='current')return {scopeId,execution:{sessionId:'canonical-session'}};
+    if(method==='messages')return {messages};
+    throw new Error('Supplemental recovery channel unavailable');
+ });
+ const state=await f.recovery.taskRecovery('b','verify');
+ const request={itemId:'verify',operationId:'assist',expectedRevision:state.revision};
+ await expect(f.recovery.openTaskRecovery('b',{...request,expectedRevision:'stale'})).rejects.toMatchObject({code:'RECOVERY_STALE_REFRESH'});
+ await expect(f.recovery.openTaskRecovery('b',request)).rejects.toMatchObject({code:'RECOVERY_STALE_REFRESH'});
+ expect(enqueue).not.toHaveBeenCalled();
+ scopeId='failed-dispatch';
+ await expect(f.recovery.openTaskRecovery('b',request)).resolves.toMatchObject({state:'accepted',resourceId});
+ expect(f.options.remote.projectConversation).toHaveBeenCalledWith('project','profile','canonical-session');
+ expect(enqueue).toHaveBeenCalledWith(expect.stringContaining('session_report'),[],undefined,'recovery-result-failed-dispatch','next-turn');
+ expect(enqueue.mock.calls[0]).toEqual(expect.arrayContaining([expect.stringContaining('exact missing evidence')]));
+ messages=[{id:'missing',message:{type:'error',content:'Evidence unavailable',payload:{handler:'parent'}}}];
+ await expect(f.recovery.openTaskRecovery('b',request)).resolves.toMatchObject({state:'accepted',resourceId});
+ messages=[{id:'final',message:{type:'result',content:'Verified'}}];
+ await expect(f.recovery.openTaskRecovery('b',request)).resolves.toMatchObject({state:'accepted',resourceId});
+ expect(enqueue).toHaveBeenCalledOnce();
+ expect(f.options.remote.projectHarness).not.toHaveBeenCalled();
+ const attempts=Object.values((await f.service.workflow('b')).dispatches).filter(row=>row.itemId==='verify');
+ expect(attempts).toMatchObject([{id:'failed-dispatch',outcome:'unknown'}]);
 });

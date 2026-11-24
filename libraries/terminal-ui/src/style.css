@@ -2,7 +2,9 @@
 .terminal-widget { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 360px; box-sizing: border-box; }
 .terminal-widget__title { margin: 0; }
 .terminal-widget__description { margin: 0; }
-.terminal-widget__toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.terminal-widget__toolbar { display: flex; flex: none; align-items: center; gap: 8px; overflow-x: auto; padding: 2px; }
+.terminal-widget__toolbar > *, .terminal-widget__keys > * { flex: none; white-space: nowrap; }
+.terminal-widget__keys { display: flex; gap: 8px; }
 .terminal-widget__status { min-height: 1.5em; overflow-wrap: anywhere; }
 .terminal-widget__screen { flex: 1; min-height: 240px; min-width: 0; padding: 8px; background: #000; overflow: hidden; }
 .terminal-widget__screen .xterm { height: 100%; }
@@ -11,3 +13,8 @@
 .terminal-widget__commands form { display: flex; flex-direction: column; gap: 6px; }
 .terminal-widget__commands textarea { min-height: 4em; }
 .terminal-widget__button { font: inherit; }
+.terminal-widget__keys .terminal-widget__button { min-width: 36px; min-height: 36px; }
+.terminal-widget__keys .terminal-widget__button[aria-pressed="true"] { background: var(--primary-color, #4f46e5); color: #fff; }
+@media (pointer: coarse) {
+    .terminal-widget__keys .terminal-widget__button { min-width: 44px; min-height: 44px; }
+}

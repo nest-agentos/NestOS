@@ -16,8 +16,9 @@ export class ProjectDraftService {
         private readonly initializeExecution?: (sessionId: string) => Promise<void>,
         private readonly assertResettable?: (projectId: string, record: ProjectDraftRecord) => Promise<void>) {}
     async open(projectId: string, folder: string): Promise<ProjectDraftComposer> {
-        await this.reconcile(projectId);
-        const store = this.store(projectId), record = await store.load();
+        const store = this.store(projectId), initial = await store.load();
+        await this.reconcileRecord(projectId, store, initial);
+        const record = store.remote && initial.state === 'draft' && !initial.harnessConnectionId ? initial : await store.load();
         let identity = record.id;
         let resumeOnly = record.state === 'submitting';
         let locked = resumeOnly;
@@ -79,8 +80,14 @@ export class ProjectDraftService {
     }
     async reconcile(projectId: string, sessionId?: string, roundId?: string): Promise<void> {
         const draft = this.store(projectId), record = await draft.load();
+        await this.reconcileRecord(projectId, draft, record, sessionId, roundId);
+    }
+    private async reconcileRecord(projectId: string, draft: DraftStore, record: ProjectDraftRecord, sessionId?: string, roundId?: string): Promise<void> {
         this.publish(await draft.recoverPromotion?.());
-        if (draft.remote && !record.harnessConnectionId) {this.publish(await draft.promote()); return;}
+        if (draft.remote && !record.harnessConnectionId) {
+            if (record.state === 'submitting') this.publish(await draft.promote());
+            return;
+        }
         const remote = draft.remote ? undefined : await this.remoteReceipt?.(projectId, record);
         if (remote) {this.publish(await draft.promote(remote)); return;}
         if (record.remoteTarget || record.state !== 'submitting' || !record.sessionId || !record.submissionId) return;

@@ -1,6 +1,8 @@
+import type {KanbanDecisionSourceSession} from '@nestos/kanban/contracts';
 import {createAgentScopeEditor} from './agent-scope-editor';
 import {projectRemountFields,remountFailure} from './project-remount-fields';
 import {conversationLifetime} from './conversation-lifetime';
+import {beginNavigationTiming} from '../navigation/navigation-timing';
 import {parseProjectAction, type ProjectActionRoute} from './project-action-route';
 import type {ChatEditorFactory as EditorFactory, ChatEditorOptions as EditorOptions} from '@nestos/llm-ui-adapter/contracts';
 import {confirmRemoteRemoval, remoteRemovalItems} from './remote-session-removal';
@@ -14,7 +16,7 @@ import {projectAssistantShortcut} from './project-assistant-shortcut';
 import {navigateWorkspaceBack} from '../navigation/page-history';
 import { SessionTaskView } from './SessionTaskView';
 import { AgentDrawer } from './agent-drawer';
-import type {ProjectDraftPromotion} from '@nestos/app-contracts/services';
+import type {PreparedConversation, ProjectDraftOpening, ProjectDraftPromotion} from '@nestos/app-contracts/services';
 import { AgentProjectPreferences } from './agent-project-preferences';
 import { mountAgentProjectSettings } from './agent-project-settings';
 import { lazyResource } from '../lifecycle/lazy-resource';
@@ -142,6 +144,7 @@ export interface SessionWorkbenchOptions {
     sources?: WorkbenchSources;
     onUnavailableResource?(path:string):Promise<boolean>;
     openProjectDecisions?(projectId:string):Promise<void>;
+    createLoopFromSession?(source:KanbanDecisionSourceSession):Promise<void>;
     initialResource?: string;
     backend: ApplicationBackend;
     sidebar: HTMLElement;
@@ -270,6 +273,7 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly onSelect: SessionWorkbenchOptions['onSelect'];
     private readonly onBeforeNavigate: SessionWorkbenchOptions['onBeforeNavigate'];
     private readonly onUnavailableResource:SessionWorkbenchOptions['onUnavailableResource'];
+    private readonly createLoopFromSession:SessionWorkbenchOptions['createLoopFromSession'];
     private readonly openProjectDecisions:SessionWorkbenchOptions['openProjectDecisions'];
     private readonly digitalTwin?: import('@nestos/app-contracts/services').DigitalTwinService;
     private readonly hostContext: SessionWorkbenchOptions['hostContext'];
@@ -291,7 +295,7 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly presentationState?: WorkbenchStatePort;
     private readonly opening?: import('@nestos/app-contracts/services').ConversationWorkbenchView;
     private readonly sources?: WorkbenchSources;
-    private initialConversation?: import('@nestos/app-contracts/services').PreparedConversation;
+    private initialConversation?: PreparedConversation;
     private initialFailure?: import('@nestos/app-contracts/services').ConversationWorkbenchView['failure'];
     private initialSession?: SessionOpenView;
     private initialData?: import('@nestos/app-contracts/services').SessionEditorInitialData;
@@ -299,6 +303,7 @@ export class SessionWorkbench implements WorkspaceController {
     constructor(options: SessionWorkbenchOptions) {
         this.onUnavailableResource=options.onUnavailableResource;
         this.openProjectDecisions=options.openProjectDecisions;
+        this.createLoopFromSession=options.createLoopFromSession;
         this.backend = options.backend;
         this.agentOptions = options.agents; this.agentProjects = new AgentProjectPreferences(this.backend);
         this.agentCatalog = lazyResource(() => this.backend.toolboxView(), view => view.dispose());
@@ -347,7 +352,7 @@ export class SessionWorkbench implements WorkspaceController {
             describe: tab => this.describeOpenTab(tab.id),
             canGoUp: tab => tab.id !== '/' && !tab.id.startsWith('@agent/'),
             parent: tab => this.openParentDirectory(tab.id),
-            activate: id => this.openResource(id), dispose: tab => this.disposeTab(tab),
+            activate: id => this.activateTab(id), dispose: tab => this.disposeTab(tab),
             empty: () => { this.clearEditorFields(); this.showWelcome(); this.onSelect('', 'replace'); },
             error: error => this.report(error), changed: () => this.sidebarLayout?.save(this.tabs.snapshot()),
         }, options.workbenchState?.load()?.tabs, options.windows);
@@ -416,7 +421,7 @@ export class SessionWorkbench implements WorkspaceController {
         this.sessionSkills ??= view.chat?.sessionSkills;
         this.remoteStatus = new RemoteSessionStatusView(harnessObservation, this.projects, () => this.sidebarUI?.refreshList(),
             (id, icon, tooltip) => this.tabs.setStatus(id, icon, tooltip),
-            (id, title) => this.tabs.title(id, title), this.opening ? undefined : view.connections);
+            (id, title) => {if (!this.tabs.get(id)?.value?.editor) this.tabs.title(id, title);}, this.opening ? undefined : view.connections);
         this.browser = view.browser;
         this.lifecycle = view.lifecycle;
         this.search = view.search;
@@ -1019,7 +1024,16 @@ export class SessionWorkbench implements WorkspaceController {
         panel.append(reason, diagnostics, retry); this.tabs.content.replaceChildren(panel);
         this.container.inert = false; this.container.setAttribute('aria-disabled', 'false');
     }
+    private async activateTab(id: string): Promise<void> {
+        const tab = this.tabs.get(id);
+        const complete = beginNavigationTiming(!!tab?.value && !tab.failed, diagnostic => this.backend.reportClientDiagnostic?.(diagnostic));
+        try {
+            await this.openResource(id);
+            complete(this.tabs.current?.id === id ? this.tabs.current.failed ? 'failure' : 'success' : 'superseded');
+        } catch (error) {complete('failure'); throw error;}
+    }
     async openResource(resourceId: string, options: OpenResourceOptions = {}): Promise<void> {
+        const navigationStarted = performance.now();
         const projectAction=parseProjectAction(resourceId);
         if(projectAction)return this.openProjectAction(projectAction);
         if (resourceId.startsWith('@agent/')) return this.openAgentSettings(decodeURIComponent(resourceId.slice(7)));
@@ -1047,6 +1061,8 @@ export class SessionWorkbench implements WorkspaceController {
         }
         const target = resolveBrowserTarget(path);
         if (target.kind === 'project-draft') {
+            if (this.backend.openProjectDraft && !this.tabs.values().some(tab => tab.id.startsWith('draft:') && tab.value))
+                return this.startSessionDraft(parentBrowserPath(path), undefined, undefined, undefined, current, path);
             const node = await this.navigationFiles?.driver.getNode(path);
             if (!current()) return;
             if (!node) throw new FSError('ENOENT', 'Project draft unavailable');
@@ -1067,7 +1083,8 @@ export class SessionWorkbench implements WorkspaceController {
         const branch = options.branch ?? route.branch;
         const id = target.kind === 'session' ? target.sessionId : path;
         const directoryTarget = target.kind === 'folder' || target.kind === 'favorites' || target.kind === 'project-conversations' || target.kind === 'remote' && !target.nativeSessionId && !target.draft;
-        let opened: SessionOpenView | undefined, finishPresentation: (() => void) | undefined;
+        let opened: SessionOpenView | undefined, unopenedConversation: PreparedConversation | undefined;
+        let finishPresentation: (() => void) | undefined;
         const operation = this.tail.then(async () => {
             finishPresentation = this.presentationState?.begin?.();
             if (this.closed) throw new Error('Session workspace closed');
@@ -1111,11 +1128,14 @@ export class SessionWorkbench implements WorkspaceController {
                     if (!options.preserveProject) this.projectNavigation?.selectScope(path);
                     this.scheduleNavigation(navigationPath, {reveal: true, preserveProject: options.preserveProject});
                 }
-                else this.scheduleNavigation(navigationPath, {reveal: true, preserveProject: true});
+                else this.scheduleNavigation(navigationPath, {reveal: true, preserveProject: true, reuseScope: target.kind === 'remote'});
                 this.onSelect(this.getActiveResourceId()!); return;
             }
             if (existing?.value) await this.tabs.close(tabId, false);
-            await this.tabs.open(tabId, path.split('/').pop() || t('project.workspace'), !options.newTab && target.kind !== 'session'); load.check();
+            const title = target.kind === 'remote' && target.nativeSessionId
+                ? this.sidebarUI?.getNode(path)?.metadata.title || t('harness.remoteSessions')
+                : path.split('/').pop() || t('project.workspace');
+            await this.tabs.open(tabId, title, !options.newTab && target.kind !== 'session'); load.check();
             if (!await load.read(() => this.checkRemoteFiles(path, target, load))) {
                 this.active = path; this.activeBranch = undefined; this.onSelect(path);
                 this.scheduleFileNavigation(path, options.fileNavigation); return;
@@ -1142,16 +1162,18 @@ export class SessionWorkbench implements WorkspaceController {
                 this.active = path; this.activeBranch = undefined; this.onSelect(path); this.scheduleFileNavigation(path, options.fileNavigation); return;
             }
             if (target.kind === 'remote') {
+                this.message(t('status.loading'));
                 const failure = this.initialFailure; this.initialFailure = undefined;
                 if (failure?.resourceId === path) throw Object.assign(new FSError('EIO', failure.code), failure);
                 const prepared = this.initialConversation?.resourceId === path ? this.initialConversation : this.opening
-                    ? this.sources!.conversation(await this.opening.openConversation(path)) : undefined;
+                    ? await load.read(async () => unopenedConversation = this.sources!.conversation(await this.opening!.openConversation(path))) : undefined;
                 if (prepared === this.initialConversation) this.initialConversation = undefined;
                 const project = prepared?.project ?? await this.projectForOpen(target.folder); load.check();
                 if (!project || project.path !== target.folder) throw Object.assign(new FSError('ENOENT',t('kanban.errors.DECISION_CONVERSATION_PROJECT_MISSING')),{reason:'REMOTE_PROJECT_MISSING'});
                 if (!target.profileId) throw new FSError('EINVAL','Remote profile is required');
                 if (prepared) this.openingProjects?.set(project.path, Promise.resolve(project));
                 const controls = conversationLifetime(prepared?.conversation ?? await this.projects!.remoteMounts!.projectConversation(project.project.id, target.profileId, target.nativeSessionId, {signal: load.signal, timeoutMs: 3000}, target.archived));
+                unopenedConversation = undefined;
                 let remoteEditor: IEditor | undefined;
                 try {
                     const mount = await this.editorMount(target.folder); load.check();
@@ -1161,6 +1183,9 @@ export class SessionWorkbench implements WorkspaceController {
                     const root = this.projects!.remoteMounts!.list(project.project.id).find(m => m.at === '/')!;
                     const serverName = this.projects!.remoteMounts!.connectionName(root.connectionId!) ?? project.displayName ?? project.name;
                     remoteEditor = await this.factory(mount, {conversation: controls, conversationInitial: prepared, signal: load.signal,
+                        onConversationTitle: title => {if (this.tabs.get(tabId) === tab && !load.signal.aborted) this.tabs.title(tabId, title);},
+                        mountMoreMenu: this.createLoopFromSession && target.nativeSessionId ? container => this.mountLoopSourceAction(container,
+                            {projectId:project.project.id,profileId:target.profileId!,sessionId:target.nativeSessionId!}) : undefined,
                         conversationSource: {kind: controls.kind, label: harnessPresentation(controls.kind, target.profileId).label},
                         mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts, () => this.toggleSidebar()),
                         mountCompactNavigation: container => this.tabs.mountCompactNavigation(container, project.displayName ?? project.name, () => this.toggleSidebar()),
@@ -1192,7 +1217,7 @@ export class SessionWorkbench implements WorkspaceController {
                 this.remoteStatus.attach(tabId, project.project.id);
                 this.tabs.title(tabId, target.draft ? t('harness.create') : controls.snapshot().title);
                 this.active = path; this.activeBranch = undefined; this.onSelect(path);
-                this.scheduleNavigation(path, {reveal: true, preserveProject: true});
+                this.scheduleNavigation(path, {reveal: true, preserveProject: true, reuseScope: true});
                 return;
             }
             const manifest = openingManifest!;
@@ -1299,7 +1324,7 @@ export class SessionWorkbench implements WorkspaceController {
             }
             if (!(error instanceof ViewLoadCancelled)) {
                 if (load.signal.aborted) return;
-                await this.reportNavigationFailure(error, path);
+                await this.reportNavigationFailure(error, path, {operationId: randomUUID(), durationMs: Math.round(performance.now() - navigationStarted)});
                 if (!this.viewLoads.isCurrent(load)) return;
                 if(target.kind==='remote'&&this.onUnavailableResource&&await this.missingRemoteReference(target,error)){
                     if(await this.onUnavailableResource(path)){
@@ -1325,7 +1350,7 @@ export class SessionWorkbench implements WorkspaceController {
             if (this.closed) throw new Error('Session workspace closed');
         }).finally(async () => {
             this.openingProjects = undefined;
-            const cleanup = load.drain().then(async () => { await opened?.dispose(); });
+            const cleanup = load.drain().then(async () => { await Promise.all([opened?.dispose(), unopenedConversation?.conversation.close()]); });
             if (load.signal.aborted) this.finishReads(cleanup); else await cleanup;
             if (this.viewLoads.isCurrent(load)) this.pendingTarget = undefined;
         });
@@ -1352,17 +1377,17 @@ export class SessionWorkbench implements WorkspaceController {
         if (initial?.sessionId === prepared.manifest.id && (!branch || branch === initial.manifest.currentBranch)) return initial;
         return prepared.activate(branch);
     }
-    private async reportNavigationFailure(error: unknown, path: string): Promise<void> {
+    private async reportNavigationFailure(error: unknown, path: string, timing?: {operationId: string; durationMs: number}): Promise<void> {
         try {
             const target = resolveBrowserTarget(path);
             if (target.kind === 'remote') {
-                reportRemoteFailure(error, {stage: target.nativeSessionId ? 'session-open' : 'directory-open', profileId: target.profileId, sessionId: target.nativeSessionId});
+                reportRemoteFailure(error, {stage: target.nativeSessionId ? 'session-open' : 'directory-open', profileId: target.profileId, sessionId: target.nativeSessionId, ...timing});
                 return;
             }
             const folder = browserTargetFolder(target, path, 'sessionId' in target ? (await this.repository.getManifest(target.sessionId)).folder : undefined);
             const project = await this.projects?.forFolder(folder);
             const remote = project && this.projects?.remoteMounts?.list(project.project.id).some(mount => mount.connectionId);
-            if (remote) reportRemoteFailure(error, {stage: 'project-open', projectId: project!.project.id});
+            if (remote) reportRemoteFailure(error, {stage: 'project-open', projectId: project!.project.id, ...timing});
         } catch { /* Diagnostic lookup must not replace the original navigation failure. */ }
     }
     private showProjectAccessError(error: FSError, resourceId: string): void {
@@ -1632,10 +1657,12 @@ export class SessionWorkbench implements WorkspaceController {
         const revision = ++this.fileNavigationRevision, active = this.active, selection = this.directorySelectionRevision;
         const current = () => !this.closed && this.visible && this.resourceNavigationVisible && revision === this.fileNavigationRevision && this.active === active;
         const navigation = prepared ?? this.preparedDirectoryNavigation(path, options);
-        this.sidebarLayout.navigation.inert = true;
-        this.fileNavigation = this.fileNavigation.then(async () => {
+        const reuseScope = !!options.reuseScope && !navigation && !this.navigationDirty && !this.viewRefresh.dirty;
+        this.sidebarLayout.navigation.inert = !reuseScope;
+        this.fileNavigation = (reuseScope ? Promise.resolve() : this.fileNavigation).then(async () => {
             if (!current()) return;
-            await traceBoot('projectFile.navigation', async () => this.projectNavigation?.sync(path, options, navigation));
+            if (reuseScope) this.projectNavigation?.trackSelection(path);
+            else await traceBoot('projectFile.navigation', async () => this.projectNavigation?.sync(path, options, navigation));
             if (current() && !this.editor && !this.previewCleanup && !this.tabs.current?.failed && !this.container.inert) await this.sidebarUI?.expandPath(path);
             if (current() && select && selection === this.directorySelectionRevision) await this.selectPath(path);
             if (current()) this.pendingNavigation = undefined;
@@ -1883,7 +1910,7 @@ export class SessionWorkbench implements WorkspaceController {
         return { context: project?.displayName ?? project?.name,
             location: target.kind === 'files' || target.kind === 'project-files' ? target.path : folder ?? '/' };
     }
-    private async editorMount(folder?: string | null, sessionId?: string, prepared?: { manifest: ConversationManifest; project?: ProjectFolder | null }): Promise<HTMLElement> {
+    private async editorMount(folder?: string | null, sessionId?: string, prepared?: { manifest?: ConversationManifest; project?: ProjectFolder | null }): Promise<HTMLElement> {
         const mount = document.createElement('div'); mount.className = 'session-editor-mount';
         const project = prepared && 'project' in prepared ? prepared.project : await this.projectForOpen(folder);
         const manifest = prepared?.manifest ?? (sessionId ? await this.sessions.get(sessionId) : undefined);
@@ -2119,6 +2146,16 @@ export class SessionWorkbench implements WorkspaceController {
             },
         }};
     }
+    private mountLoopSourceAction(container: HTMLElement, source: KanbanDecisionSourceSession): () => void {
+        const button = document.createElement('button');
+        button.type = 'button'; button.textContent = t('kanban.createLoopFromSession');
+        button.onclick = () => {
+            button.disabled = true;
+            void this.createLoopFromSession!(source).catch(error => this.report(error)).finally(() => {button.disabled = false;});
+        };
+        container.append(button);
+        return () => button.remove();
+    }
     private async localEditorOptions(prepared: SessionOpenView, context: FileSystemContextOwner, assets: FileSystemView,
         branch?: string, initialInputState?: EditorOptions['initialInputState'], signal?: AbortSignal): Promise<EditorOptions> {
         const manifest = prepared.manifest, id = manifest.id, project = prepared.project;
@@ -2229,15 +2266,17 @@ export class SessionWorkbench implements WorkspaceController {
         }, note, {hideName: true, confirmLabel: t('project.resetDraft')});
     }
     async startSessionDraft(parent?: string, input?: {text: string; files: File[]}, agentId?: string,
-        preferences?: import('@nestos/llm-ui-adapter/contracts').SessionDraftPreferences, navigationCurrent?: () => boolean): Promise<void> {
-        const folder = await this.creationFolder(parent);
+        preferences?: import('@nestos/llm-ui-adapter/contracts').SessionDraftPreferences, navigationCurrent?: () => boolean, draftRoute?: string): Promise<void> {
+        const resolvedFolder = draftRoute ? undefined : await this.creationFolder(parent);
         if (navigationCurrent && !navigationCurrent()) return;
         this.cancelViewLoad(); const load = this.viewLoads.begin();
         let receiver: IEditor | undefined;
         const work = this.tail.then(async () => {
             await this.leaveEditor(); load.check();
             this.container.inert = false; this.container.classList.remove('project-workbench--offline');
-            const project = await this.projects?.forFolder(folder);
+            const opened: ProjectDraftOpening | undefined = draftRoute ? await this.backend.openProjectDraft!(draftRoute) : undefined;
+            const folder = opened?.folder ?? resolvedFolder;
+            const project = opened?.project ?? await this.projects?.forFolder(folder);
             load.check();
             if (!project || !this.projects || !folder) throw new Error('Project required for a draft');
             this.projectNavigation?.showDraft(project);
@@ -2248,8 +2287,8 @@ export class SessionWorkbench implements WorkspaceController {
             this.tabs.setIcon(draftId, FILE_BROWSER_ICONS.newSession);
             if (retained?.value) { await this.restoreEditor(retained.value); receiver = this.editor;
                 await this.selectPath(draftPath); this.onSelect(draftPath, 'replace'); return; }
-            const mount = await this.editorMount(folder);
-            const composer = await this.projects.drafts.open(project.project.id, folder);
+            const mount = await this.editorMount(folder, undefined, {project});
+            const composer = opened?.composer ?? await this.projects.drafts.open(project.project.id, folder);
             const draftOptions = createProjectDraftControls(composer, {
                 check: async () => { load.check(); await this.creationFolder(folderBrowserPath(folder)); },
                 identity: id => {

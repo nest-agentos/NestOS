@@ -6,6 +6,7 @@ import {sha256HexSync,t} from '@nestos/common';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createItemOperations} from '@nestos/kanban-development';
 import { type ReviewOperationsOptions, type ReviewJob} from '@nestos/kanban-development';
+import {advanceReviewJob} from '../src/item-operation-jobs';
 import {jobKey, reviewKey} from '@nestos/kanban/integration';
 
 const closes: Array<() => Promise<void>> = [];
@@ -816,4 +817,60 @@ it('projects reopened cleanup review ahead of historical completion and blocks u
  f.options.scopes={describe:async()=>({scopes}),resolve:async()=>({})};
  await f.journal.update(reviewCleanupKey('board','task','repository'),()=>({runId:'merge',operationId:'review',attempt:1,state:'failed',reviewState:'reviewed',code:'WORKTREE_DIRTY'}));
  expect(await f.api.finalizationStatus('board','task')).toMatchObject({state:'blocked',stage:'cleanup',code:'WORKTREE_DIRTY'});
+});
+
+it('settles an admitted host Git merge through its original operation without submitting a Session round', async () => {
+    const f = await fixture();
+    const output = {...f.result('host-git'), status: 'succeeded', targetHead: 'merged'};
+    const start = vi.fn(async () => 'applied' as const);
+    const inspect = vi.fn(async () => ({state: 'succeeded' as const, sessionId: 'original', output}));
+    f.options.adapter.gitIntegration = {start, inspect};
+    const request = await f.options.adapter.prepareAnalysis({id: 'host-git', board: {} as never,
+        item: f.item as never, snapshot: f.snapshot});
+    const job: ReviewJob = {id: 'host-git', fingerprint: 'frozen', boardId: 'board', itemId: 'task',
+        action: 'merge', phase: 'prepared', state: 'running', snapshot: f.snapshot, request, createdAt: 1};
+    await f.journal.update(jobKey(job.id), () => job);
+    await expect(advanceReviewJob(f.options, job)).resolves.toMatchObject({phase: 'settled', state: 'succeeded', result: output});
+    await advanceReviewJob(f.options, job);
+    expect(start).toHaveBeenCalledOnce();
+    expect(f.submission.start).not.toHaveBeenCalled();
+});
+
+it('passes the original Git operation to recovery only from the explicit reconcile action',async()=>{
+    const f=await fixture(),start=vi.fn(async()=>{throw Object.assign(Error('Interrupted'),{code:'INTEGRATION_PUBLICATION_UNKNOWN'});});
+    const output={...f.result('interrupted-merge'),status:'succeeded',targetHead:'merged'};
+    const inspect=vi.fn(async(_job:ReviewJob,resume?:boolean)=>resume
+        ?{state:'succeeded' as const,sessionId:'original',output}
+        :{state:'unknown' as const,code:'INTEGRATION_PUBLICATION_UNKNOWN',sessionId:'original'});
+    f.options.adapter.gitIntegration={start,inspect};
+    const request=await f.options.adapter.prepareAnalysis({id:'interrupted-merge',board:{} as never,item:f.item as never,snapshot:f.snapshot});
+    const job:ReviewJob={id:'interrupted-merge',fingerprint:'frozen',boardId:'board',itemId:'task',
+        action:'merge',phase:'prepared',state:'running',snapshot:f.snapshot,request,createdAt:1};
+    await f.journal.update(jobKey(job.id),()=>job);
+    await f.journal.update(reviewKey('board','task'),()=>({revision:1,bindings:{},jobs:[job.id],receipts:{}}));
+    const interrupted=await advanceReviewJob(f.options,job);
+    expect(interrupted.state).toBe('unknown');
+    const view=await f.api.itemOperations('board','task');
+    expect(inspect).not.toHaveBeenCalledWith(expect.anything(),true);
+    const recovered=await f.api.runItemOperation('board',{operationId:'check',itemId:'task',action:'merge',expectedRevision:view.revision,reconcile:{runId:job.id}});
+    expect(recovered.operations.find(row=>row.id==='merge')).toMatchObject({state:'succeeded',runId:job.id});
+    expect(inspect).toHaveBeenLastCalledWith(expect.objectContaining({id:job.id}),true);
+    expect(start).toHaveBeenCalledOnce();
+});
+
+it('uses a Session conflict proposal only after host publication supplies a verified receipt',async()=>{
+    const f=await fixture();
+    const proposal={...f.result('proposal-merge'),status:'succeeded',resolutions:[]};
+    const output={...proposal,targetHead:'merged'};
+    const start=vi.fn(async()=> 'session' as const),inspect=vi.fn(async()=>undefined);
+    const publishProposal=vi.fn(async()=>output);
+    f.options.adapter.gitIntegration={start,inspect,requiresProposal:async()=>true,publishProposal};
+    f.options.adapter.readOperation=async()=>proposal;
+    const request=await f.options.adapter.prepareAnalysis({id:'proposal-merge',board:{} as never,item:f.item as never,snapshot:f.snapshot});
+    const job:ReviewJob={id:'proposal-merge',fingerprint:'frozen',boardId:'board',itemId:'task',
+        action:'merge',phase:'prepared',state:'running',snapshot:f.snapshot,request,createdAt:1};
+    await f.journal.update(jobKey(job.id),()=>job);
+    await expect(advanceReviewJob(f.options,job)).resolves.toMatchObject({phase:'settled',state:'succeeded',result:output});
+    expect(publishProposal).toHaveBeenCalledWith(expect.objectContaining({id:job.id}),proposal);
+    expect(f.submission.start).toHaveBeenCalledOnce();
 });

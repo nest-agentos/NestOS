@@ -46,6 +46,7 @@ export class RpcPeer {
     private readonly retiredSubscriptions = new CapabilityRetirements();
     private readonly emitted = new Map<string, Descriptor>();
     private readonly dirty = new Set<string>();
+    private deferredSnapshots?: ReadonlyMap<string, ReadonlySet<string>>;
     private readonly domains = new Set<ViewDomain>();
     private refreshTail: Promise<unknown> = Promise.resolve();
     private readonly projectionsLoaded = new Map<string, unknown>();
@@ -87,6 +88,29 @@ export class RpcPeer {
             this.lifetime.retain(root, () => false);
             return { value: root, updates: await this.refresh() };
         });
+    }
+    deferSnapshots(methods: ReadonlyMap<string, ReadonlySet<string>>): void {
+        this.deferredSnapshots = methods;
+    }
+    isSnapshotDeferred(kind: string, method: string): boolean {
+        return this.deferredSnapshots?.get(kind)?.has(method) ?? false;
+    }
+    async refreshDeferredSnapshots(): Promise<WireValue[]> {
+        const deferred = this.deferredSnapshots;
+        if (!deferred) return [];
+        this.deferredSnapshots = undefined;
+        const affected = new Set([...this.handles].filter(([, handle]) => deferred.has(handle.kind)).map(([id]) => id));
+        for (const id of affected) this.dirty.add(id);
+        this.invalidate('configuration');
+        try {
+            const updates = (await this.refresh()).filter(update => !affected.has(updateDescriptorId(update) ?? ''));
+            for (const id of affected) {
+                const descriptor = this.emitted.get(id);
+                if (descriptor) updates.push({$capability: descriptor as unknown as WireValue});
+            }
+            return updates;
+        }
+        catch (error) {this.deferredSnapshots = deferred; throw error;}
     }
     invalidate(...domains: ViewDomain[]): void {
         domains.forEach(domain => this.domains.add(domain));
@@ -208,6 +232,7 @@ export class RpcPeer {
         for (const [name, mode] of Object.entries(schema.methods)) {
             if (typeof value[name] !== 'function') continue;
             if (mode === 'snapshot') {
+                if (this.isSnapshotDeferred(kind, name)) continue;
                 try {
                     const source = schema.snapshotView ? schema.snapshotView(value, name) : value[name]();
                     snapshots[name] = schema.snapshotView ? this.snapshotCodec.encode(source) ?? await this.encode(source, seen, undefined, flat)
@@ -329,6 +354,7 @@ export class RpcPeer {
             const mode = schema.methods[name];
             if (mode === 'snapshot') proxy[name] = () => {
                 const value = this.descriptors.get(descriptor.id)!.snapshots[name];
+                if (value === undefined) throw Object.assign(new Error('View catalog is still loading'), {code: 'VIEW_CATALOG_PENDING'});
                 return schema.sharedSnapshots ? this.decodeSnapshot(value) : this.decode(value);
             };
             else if (mode === 'lookup') proxy[name] = (...args: unknown[]) => this.lookup(descriptor.id, name, args);
@@ -698,6 +724,12 @@ export class RpcPeer {
         this.remoteCleanups.clear(); this.pendingUnsubscriptions.clear(); this.descriptors.clear(); this.emitted.clear(); this.dirty.clear(); this.pendingPatches.clear(); this.domains.clear();
         this.callbackUses.clear(); this.listeners.clear(); this.eventCallbacks.clear(); this.notificationTails.clear(); this.projectionsLoaded.clear(); this.lookupArgs.clear();
     }
+}
+
+function updateDescriptorId(value: WireValue): string | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+    const body = (value.$patch ?? value.$capability) as {id?: string} | undefined;
+    return body?.id;
 }
 function iteratorCapability(source: AsyncIterable<unknown>) {
     const iterator = source[Symbol.asyncIterator]();

@@ -7,10 +7,10 @@ export function cleanupReviewInstruction(context:unknown):string{return prompt.i
 /** A model attempt permits one new host inspection, never a model-authored success result. */
 export async function finishCleanupReview(journal:KanbanAutomationJournal,input:CleanupReviewInput):Promise<void>{
  const key=reviewCleanupKey(input.boardId,input.itemId,input.scopeId);
- await journal.update<ReviewCleanup>(key,old=>{if(!old||![old.operationId,old.reviewOperationId].includes(input.operationId)||old.runId!==input.runId)throw Object.assign(Error('Cleanup review changed'),{code:'CLEANUP_REVIEW_CHANGED'});return {...old,reviewState:'reviewed',state:'running',code:undefined};});
+ await journal.update<ReviewCleanup>(key,old=>{if(!old||![old.operationId,old.reviewOperationId].includes(input.operationId)||old.runId!==input.runId)throw Object.assign(Error('Cleanup review changed'),{code:'CLEANUP_REVIEW_CHANGED'});return old.state==='succeeded'?old:{...old,reviewState:'reviewed',state:'running',code:undefined,retryAt:undefined};});
 }
 
 export function cleanupReviewStatus(cleanup:ReviewCleanup|undefined):import('@nestos/kanban/contracts').KanbanItemOperations['automatic'] {
- if(!cleanup?.reviewState||cleanup.state==='succeeded')return;
+ if(!cleanup||cleanup.state==='succeeded')return;
  return {state:cleanup.state==='failed'?'blocked':'running',stage:'cleanup',code:cleanup.code};
 }

@@ -21,6 +21,15 @@ async function setup() {
         JSON.stringify([project.project.id, 'connection', 'native-project', 'principal', profileId, draftId]));
     return {project, folder, composer, journal, fs};
 }
+it('loads an idle node-owned draft once without probing a submission', async () => {
+    const f = await setup();
+    const record = {version: 1, id: f.composer.id!, state: 'draft', data: ''} as const;
+    const request = vi.fn(async () => ({record}));
+    app!.projects.remoteMounts!.projectDraft = request;
+    const opened = await app!.projects.drafts.open(f.project.project.id, f.folder);
+    expect(opened.id).toBe(record.id);
+    expect(request).toHaveBeenCalledExactlyOnceWith(f.project.project.id, {action: 'open'});
+});
 it('requires a confirmed native turn, keeps the UI UUID and atomically allocates one successor', async () => {
     const f = await setup(), notify = vi.fn(); app!.projects.drafts.onPromoted(notify);
     const journal = f.journal(); await journal.save({sessionId: 'native-1', pending: {epoch: 'epoch', requestId: 'request', operation: 'turn'}, submittedTurnId: 'turn-1'});

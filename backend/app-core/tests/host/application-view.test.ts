@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { MemoryBackend } from '@nestos/vfs-core';
 import { createApplicationRuntime } from '../../src/runtime/create-application-runtime';
 import { openApplicationView } from '../../src/host/application-view';
+import { folderBrowserPath } from '@nestos/app-contracts';
 
 it('gives clients independent bindings over the same persisted application and closes views independently', async () => {
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'cli', startupMode: 'interactive', digitalTwinAutoStart: false});
@@ -39,4 +40,22 @@ it('reconciles committed draft submissions from browser-owned conversation views
         await vi.waitFor(() => expect(promoted).toHaveBeenCalledOnce());
         const next = await draft.refresh?.(); expect(next?.initialData).toBe(''); release();
     } finally {await view.dispose(); await runtime.dispose();}
+});
+
+it('returns the requested project and draft together without binding a Session', async () => {
+    const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'cli', digitalTwinAutoStart: false});
+    const view = await openApplicationView(runtime);
+    try {
+        const project = await runtime.projects.personal();
+        const route = folderBrowserPath(project.path) + '/@new';
+        const read = vi.spyOn(runtime.projects, 'forFolder');
+        const open = vi.spyOn(runtime.projects.drafts, 'open');
+        const draft = await view.backend.openProjectDraft!(route);
+        expect(draft).toMatchObject({project, folder: project.path + '/@sessions', composer: {id: expect.any(String)}});
+        expect(read).toHaveBeenCalledOnce();
+        expect(open).toHaveBeenCalledOnce();
+        expect(view.services.sessionManager.getSnapshot().sessionId).toBeFalsy();
+        await expect(view.backend.openProjectDraft!(folderBrowserPath(project.path + '/missing') + '/@new')).rejects.toMatchObject({code: 'ENOENT'});
+        expect(open).toHaveBeenCalledOnce();
+    } finally {await view.close(); await runtime.dispose();}
 });

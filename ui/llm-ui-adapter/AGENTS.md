@@ -257,3 +257,5 @@ steer 接纳不生成 steered: 本地历史消息。适配层在接纳后撤下�
 会话与草稿宿主 DTO 从 /contracts 公开（ChatEditorOptions 扩展通用 EditorOptions）；状态展示从轻量 /presentation 消费，不加载聊天运行代码。通用 OCR 由独立 ChatView 的 ocr 选项提供，shell/ocr-port 只注入识别服务、授权图片读取与安全日志；不在适配层重复识别状态机。旧输入框只复用库的 OcrReviewPanel，不重复挂载 OCR 模型配置表单。
 
 原生 ChatView 以真实 turnId 为工具展示分组；旧历史缺失 turnId 时以用户消息边界分组。不同工具在执行过程中持续追加到同一折叠记录，助手进度文字与最终答复保留独立展示；新用户轮次必须另起记录。toolGroupId 仅是 UI 投影，不修改原生消息或执行事实。
+
+远程项目草稿恢复正文和附件后先挂载输入区，再后台读取执行器和模型配置。等待期间可以编辑，发送等配置就绪后开放。读取失败保留输入并提供重试。

@@ -11,6 +11,7 @@ y.tgz
 yimg/
 cc-proxy
 cc-proxy.toml
+tools/data/
 
 node_modules/
 # Library crate: the CLI Session Bash fixture builds it, but its lock file is not committed.

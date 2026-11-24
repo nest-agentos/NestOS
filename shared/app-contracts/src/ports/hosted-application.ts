@@ -2,6 +2,7 @@ import type { ApplicationClient } from './application-client';
 import type { FlowDraft } from '@nestos/llm-flow/contracts';
 
 export interface HostedApplicationClient extends ApplicationClient {
+    deferredCatalogs?: boolean;
     initialRead?: import('./startup-read').StartupReadResult;
     initialView?: import('./open-view').OpenedApplicationView;
     flowLibrary: FlowDraft[];

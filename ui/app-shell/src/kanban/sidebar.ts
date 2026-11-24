@@ -1,15 +1,17 @@
 import {KanbanSidebarControls, controlLabel, controlIcon} from './sidebar-controls';
 import {kanbanSidebarDeletion} from './sidebar-deletion';
 import {ACTION_ICONS, FILE_BROWSER_ICONS, TOOLBOX_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
-import {kanbanReference, type KanbanBoardSummary, type KanbanClient} from '@nestos/kanban/contracts';
+import {kanbanReference, type KanbanBoardSummary, type KanbanClient, type KanbanDecisionSourceSession} from '@nestos/kanban/contracts';
 import {createVFSBrowser, type BrowserNode, type VFSBrowser, type WindowManagementOptions} from '@nestos/vfs-ui';
 import {nestOSVFSPresentation} from '../browser/vfs-presentation';
+import {LOOP_BOARD_PATH} from '@nestos/kanban-ui';
 import {ViewRefresh} from '../lifecycle/view-refresh';
 
 interface Options {
     container: HTMLElement; service?: KanbanClient;
     navigate(path: string): Promise<void>;
     create(): Promise<void>;
+    createDecision(boardId: string, recurringOnly: boolean, source?: KanbanDecisionSourceSession): Promise<void>;
     report(error: unknown): void;
     catalogChanged?(boards: readonly KanbanBoardSummary[]): void;
     windowManagement?: WindowManagementOptions;
@@ -22,6 +24,7 @@ export class KanbanSidebar {
     private readonly refresh: ViewRefresh;
     private readonly status = document.createElement('p');
     private readonly list = document.createElement('div');
+    private loopPicker?: HTMLDialogElement;
     private nodes: BrowserNode[] = [];
     private boards: KanbanBoardSummary[] = [];
     private readonly controls?: KanbanSidebarControls;
@@ -36,12 +39,26 @@ export class KanbanSidebar {
         options.container.classList.add('kanban-sidebar'); options.container.append(this.status, this.list);
         this.browser = createVFSBrowser({container: this.list, title: t('kanban.title'), searchPlaceholder: t('kanban.search'),
             presentation: nestOSVFSPresentation, appearance: {showTimestamp: false}, selection: false, windowManagement: options.windowManagement,
-            deletion: kanbanSidebarDeletion(options.service, async node => {await this.reload(); if (this.selected === node.id) await options.navigate('/');}, () => this.reload()),
-            source: {get: async id => this.nodes.find(node => node.id === id), children: async parent => parent === null ? this.nodes : [], subscribe: () => () => {}},
-            onActivate: node => {void options.navigate(node.id+'/@decision').catch(error => this.failure(error));}, onError: error => this.failure(error),
+            deletion: kanbanSidebarDeletion(options.service, async node => {await this.reload(); if (this.selected.split('/').slice(0, 3).join('/') === node.id) await options.navigate('/');}, () => this.reload()),
+            source: {get: async id => this.nodes.find(node => node.id === id),
+                children: async parent => parent === null ? this.nodes : [], subscribe: () => () => {}},
+            onActivate: node => {void this.activate(node).catch(error => this.failure(error));}, onError: error => this.failure(error),
             actions: [
                 {id: 'execution-settings', label: controlLabel('settings'), iconHTML: TOOLBOX_ICONS.settings, placements: ['toolbar', 'menu'], state: () => ({visible: !!this.controls, enabled: !!this.controls}), run: async context => this.openSettings(this.targetBoard(context.target)?.id)},
                 ...this.executionActions(),
+                {id: 'create-decision', label: t('kanban.createDecision'), iconHTML: FILE_BROWSER_ICONS.addFile, placements: ['menu'],
+                    state: ({target}) => {
+                        const board = target && this.targetBoard(target);
+                        return {visible: !!board && !!options.service?.startRecordConversation, enabled: !!board && !board.lifecycle};
+                    },
+                    run: async ({target}) => {
+                        const board = target && this.targetBoard(target);
+                        if (board && !board.lifecycle) await options.createDecision(board.id, false);
+                    }},
+                {id: 'create-loop', label: t('kanban.newLoopDecision'), iconHTML: FILE_BROWSER_ICONS.addFile, placements: ['menu'],
+                    state: ({target}) => ({visible: target?.id === LOOP_BOARD_PATH && !!options.service?.startRecordConversation,
+                        enabled: this.boards.some(board => !board.lifecycle)}),
+                    run: () => this.openLoopCreation()},
                 {id: 'create', label: t('kanban.newBoard'), iconHTML: FILE_BROWSER_ICONS.addFile, placements: ['toolbar'], run: () => options.create()},
                 {id: 'refresh', label: t('kanban.refresh'), iconHTML: ACTION_ICONS.refreshView, placements: ['toolbar'], run: () => this.reload()},
             ]});
@@ -54,12 +71,13 @@ export class KanbanSidebar {
     prepare(boards:readonly KanbanBoardSummary[]):void {
         if(this.closed)return;
         this.boards=[...boards];this.controls?.update(this.boards);this.options.catalogChanged?.(boards);
-        this.nodes=boards.map(board=>nodeForBoard(board,!!this.options.service?.previewDeletion&&!!this.options.service?.deleteBoard));
+        this.nodes=[...boards.map(board=>nodeForBoard(board,!!this.options.service?.previewDeletion&&!!this.options.service?.deleteBoard)), {id:LOOP_BOARD_PATH, parentId:null, kind:'file', label:t('kanban.loops'), icon:ACTION_ICONS.kanbanView, fileDetails:false, deletable:false}];
     }
     openSettings(boardId?:string):void {this.controls?.open(this.boards,boardId);}
     select(path: string): void {
-        this.selected = path.split('/').slice(0, 3).join('/');
-        this.browser.select(this.nodes.some(node => node.id === this.selected) ? [this.selected] : []);
+        this.selected = path;
+        const id = /^\/board\/[^/]+\/@loop(?:-draft)?\//.test(path) ? LOOP_BOARD_PATH : path.split('/').slice(0, 3).join('/');
+        this.browser.select(this.nodes.some(node => node.id === id) ? [id] : []);
     }
     invalidate(): void {this.generation++; this.refresh.mark('kanban.committed');}
     setVisible(visible: boolean): void {
@@ -67,11 +85,39 @@ export class KanbanSidebar {
         if (!visible) this.refresh.pause(); else if (this.started&&this.refresh.dirty) void this.refresh.flush();
     }
     destroy(): void {
-        this.closed = true; this.controls?.destroy(); void this.refresh.close(); this.browser.destroy(); this.status.remove(); this.list.remove();
+        this.closed = true; this.loopPicker?.remove(); this.controls?.destroy(); void this.refresh.close(); this.browser.destroy(); this.status.remove(); this.list.remove();
         this.options.container.classList.remove('kanban-sidebar');
     }
+    async openLoopCreation(source?: KanbanDecisionSourceSession): Promise<void> {
+        const boards = this.boards.filter(board => !board.lifecycle);
+        if (boards.length === 1) return this.options.createDecision(boards[0].id, true, ...(source ? [source] as const : []));
+        if (!boards.length) throw Object.assign(new Error(t('kanban.emptyBoards')), {code:'BOARD_NOT_FOUND'});
+        if (this.loopPicker) return;
+        const dialog = document.createElement('dialog'), form = document.createElement('form');
+        const label = document.createElement('label'), select = document.createElement('select');
+        const cancel = document.createElement('button'), submit = document.createElement('button');
+        dialog.setAttribute('aria-label', t('kanban.newLoopDecision'));
+        label.append(t('kanban.boardName'), select);
+        for (const board of boards) select.add(new Option(board.title, board.id));
+        cancel.type = 'button'; cancel.textContent = t('kanban.deleteCancel');
+        submit.textContent = t('kanban.newLoopDecision');
+        form.append(label, cancel, submit); dialog.append(form);
+        dialog.addEventListener('close', () => {dialog.remove(); this.loopPicker = undefined;}, {once: true});
+        cancel.addEventListener('click', () => dialog.close());
+        form.addEventListener('submit', event => {
+            event.preventDefault();
+            const board = this.boards.find(value => value.id === select.value && !value.lifecycle);
+            dialog.close();
+            if (board) void this.options.createDecision(board.id, true, ...(source ? [source] as const : [])).catch(error => this.failure(error));
+        });
+        this.options.container.append(dialog); this.loopPicker = dialog; dialog.showModal();
+    }
+    private async activate(node: BrowserNode): Promise<void> {
+        if (node.kind !== 'file') return;
+        return this.options.navigate(node.id === LOOP_BOARD_PATH ? node.id : node.id + '/@decision');
+    }
     private targetBoard(node?: BrowserNode | null): KanbanBoardSummary | undefined {
-        const path = node?.id ?? this.selected;
+        const path = (node?.id ?? this.selected).split('/').slice(0, 3).join('/');
         return this.boards.find(board => `/board/${encodeURIComponent(board.id)}` === path);
     }
     private executionActions(): import('@nestos/vfs-ui').BrowserAction[] {

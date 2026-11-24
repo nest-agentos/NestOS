@@ -3,11 +3,13 @@ import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {SubmissionRequest} from '@nestos/llm-session/contracts';
 import type {ReviewAdapter,ReviewJob} from '@nestos/kanban-development';
 import type {createSubmissionControl as submissionControl,SubmissionControlState} from '@nestos/llm-session';
+import {assertSessionMergeCancellable} from './kanban-git-integration';
 import {requireValue} from '../kanban/validation';
 interface Options {journal:KanbanAutomationJournal;submission:ReturnType<typeof submissionControl>;native(input:{scopeId:string;operationId:string;action:'cancel'}):Promise<SubmissionControlState>}
 /** Freeze every admitted continuation and control only this review's channel. */
 export function reviewCancellation(options:Options):NonNullable<ReviewAdapter['cancel']> {
     return async(job:ReviewJob,operationId:string)=>{
+        if (job.action === 'merge') await assertSessionMergeCancellable(options.journal, job);
         requireValue(job.request?.expectedSessionId&&job.request.submission?.id,'OPERATION_CANCEL_UNSUPPORTED');
         const exchange=await options.journal.get<{request?:SubmissionRequest}>('channel-exchange:'+job.id);
         const requests=await options.journal.update<SubmissionRequest[]>('review-cancel-rounds:'+operationId,old=>old??[job.request!,...(exchange?.request&&exchange.request.submission?.id!==job.request!.submission!.id?[exchange.request]:[])]);

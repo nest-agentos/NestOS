@@ -1,9 +1,10 @@
+import type {WindowTimeField} from './window-times';
 import {createModuleLogger, randomUUID} from '@nestos/common';
-import type {PinnedWindow, PinnedWindowChange} from '@nestos/app-contracts/services';
+import type {PinnedWindow, PinnedWindowChange, WindowTimes} from '@nestos/app-contracts/services';
 
 const log = createModuleLogger('workbench-windows');
 /** Application-owned window metadata; editor instances remain in their workspace. */
-export interface WorkbenchWindow {
+export interface WorkbenchWindow extends WindowTimes {
     id: string; workspace?: string; title: string; scope?: string; context?: string; location?: string;
     active: boolean;
     activate(): Promise<void>;
@@ -39,11 +40,14 @@ export class WorkbenchWindows {
     private readonly sources = new Map<string, {source: WindowSource; render(): void}>();
     private readonly closed: string[] = [];
     private pins = new Map<string, PinnedWindow>();
+    private readonly closedPinTimes = new Map<string, WindowTimes>();
     private readonly knownPins = new Set<string>();
     private readonly pendingPins = new Set<string>();
     private pinQueue = Promise.resolve();
     private pinRead?: Promise<void>;
     query = '';
+    sort: WindowTimeField = 'accessedAt';
+    setSort(sort: WindowTimeField): void {this.sort = sort; this.changed();}
     error?: string;
     report(error: unknown): void {this.error = error instanceof Error ? error.message : String(error); this.changed();}
     clearError(): void {this.error = undefined; this.changed();}
@@ -66,7 +70,12 @@ export class WorkbenchWindows {
     }
     unopenedPins(items: WorkbenchWindow[]): PinnedWindow[] {
         const open = new Set(items.map(item => pinKey(item.workspace ?? '', item.id)));
-        return [...this.pins].filter(([key]) => !open.has(key)).map(([, window]) => window);
+        return [...this.pins].filter(([key]) => !open.has(key))
+            .map(([key, window]) => ({...window, ...this.closedPinTimes.get(key)}));
+    }
+    rememberPinTimes(workspace: string, resource: string, times: WindowTimes): void {
+        const key = pinKey(workspace, resource);
+        if (this.pins.has(key)) this.closedPinTimes.set(key, times);
     }
     openPin(window: PinnedWindow): Promise<void> {return this.bookmarks!.navigate(window);}
     refreshPins(): Promise<void> {
@@ -74,6 +83,7 @@ export class WorkbenchWindows {
         return this.pinRead ??= this.queuePins('read', randomUUID(), async () => {
             const windows = await this.bookmarks!.list();
             this.pins = new Map(windows.map(window => [pinKey(window.workspace, window.resource), window]));
+            for (const key of this.closedPinTimes.keys()) if (!this.pins.has(key)) this.closedPinTimes.delete(key);
             for (const key of this.pins.keys()) this.knownPins.add(key);
             this.changed();
         }).finally(() => {this.pinRead = undefined;});
@@ -87,6 +97,7 @@ export class WorkbenchWindows {
         return this.queuePins('write', operationId, async () => {
             await this.bookmarks!.set({operationId, window, pinned});
             if (pinned) this.pins.set(key, window); else this.pins.delete(key);
+            this.closedPinTimes.delete(key);
             this.knownPins.add(key);
             this.changed();
         }).finally(() => {this.pendingPins.delete(key);});

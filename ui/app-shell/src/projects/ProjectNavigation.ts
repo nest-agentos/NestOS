@@ -32,7 +32,7 @@ interface Actions {
 }
 /** Compatibility hint: favorites may preserve selection while their file opens. */
 export type ProjectFileView = 'preserve' | 'directory';
-export interface ProjectNavigationOptions { reveal?: boolean; project?: ProjectFolder; preserveProject?: boolean; fileView?: ProjectFileView }
+export interface ProjectNavigationOptions { reveal?: boolean; project?: ProjectFolder; preserveProject?: boolean; reuseScope?: boolean; fileView?: ProjectFileView }
 
 /** Project context replaces the contents of one sidebar; file details belong to main tabs. */
 export class ProjectNavigation {
@@ -210,6 +210,9 @@ export class ProjectNavigation {
         this.cancelPending();
         this.draftActive = this.project?.project.id === project.project.id;
         this.create.setAttribute('aria-current', this.draftActive ? 'page' : 'false');
+    }
+    trackSelection(path: string): void {
+        this.path = path; this.draftActive = false; this.updateCreation();
     }
     async sync(path: string, options: ProjectNavigationOptions = {}, prepared?: ProjectNavigationView): Promise<void> {
         ++this.scopeRevision;

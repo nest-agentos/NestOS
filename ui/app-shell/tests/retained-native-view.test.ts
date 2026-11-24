@@ -88,10 +88,34 @@ it('resumes the fallback observer even when activation catch-up fails', async ()
         await editor.init(host); editor.setText('Keep the draft'); editor.cancelPendingRender();
         f.state.messages = [{id: 'later', role: 'assistant', text: 'Output after catch-up retry'}];
         vi.mocked(f.controls.refresh).mockRejectedValueOnce(Object.assign(new Error('Temporarily unavailable'), {code: 'ETIMEDOUT'}));
-        await expect(editor.activate()).rejects.toThrow('Temporarily unavailable');
+        const failure = vi.fn(); editor.on('error', failure);
+        await editor.activate();
+        expect(f.controls.refresh).not.toHaveBeenCalled();
+        await vi.waitFor(() => expect(failure).toHaveBeenCalledWith(expect.objectContaining({code: 'ETIMEDOUT'})));
         await vi.waitFor(() => expect(host.textContent).toContain('Output after catch-up retry'), {timeout: 2500});
         expect(f.controls.refresh).toHaveBeenCalledTimes(2); expect(f.controls.read).toHaveBeenCalledOnce();
         expect(host.querySelector<HTMLTextAreaElement>('.llm-chat__input')!.value).toBe('Keep the draft');
         expect(f.controls.send).not.toHaveBeenCalled(); expect(f.controls.close).not.toHaveBeenCalled();
+    } finally {await editor.destroy(); host.remove(); vi.unstubAllGlobals();}
+});
+
+it('shows a retained native composer without fetching fresh history and follows live titles', async () => {
+    vi.stubGlobal('matchMedia', () => ({matches: false, addEventListener() {}, removeEventListener() {}}));
+    const f = fixture('Existing title'), changed = vi.fn();
+    f.state.observation = {source: 'events', observedAt: Date.now(), execution: 'idle', connection: 'online', stale: false, receiptUnknown: false};
+    f.controls.refresh = vi.fn(async () => f.state);
+    f.controls.readComposerDraft = async () => ({revision: '0', data: '', acceptedOperationIds: []});
+    const host = document.createElement('div'); document.body.append(host);
+    const editor = new IndependentConversationEditor(host, f.controls, {onConversationTitle: changed}, (await NativeChatStore.open(f.controls))!);
+    try {
+        await editor.init(host);
+        const input = host.querySelector('.llm-chat__input');
+        editor.cancelPendingRender();
+        await editor.activate();
+        expect(host.querySelector('.llm-chat__input')).toBe(input);
+        f.state.title = 'New title'; f.listeners.forEach(listener => listener());
+        await vi.waitFor(() => expect(host.querySelector('h2')?.textContent).toBe('New title'));
+        expect(changed).toHaveBeenLastCalledWith('New title');
+        expect(f.controls.refresh).not.toHaveBeenCalled();
     } finally {await editor.destroy(); host.remove(); vi.unstubAllGlobals();}
 });
