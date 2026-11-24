@@ -10,7 +10,7 @@ Artifact verification persists the manifest digest outside the project. Replacem
 
 在宿主机的干净检出中，`pnpm cells:redeploy` 默认同时发布宿主机和 `cells-x1` 的 Cells 二进制与配置。可传 `cells-x1` 或 `local` 单独更新。逻辑目标 `cells-x1` 通过管理员配置绑定到实际 VM ID，例如 `cell-x1`。两个目标共用一次构建，配置分别读取：
 
-- 宿主机默认读取 Git 忽略的 `tools/cells.toml`；可用 `NESTOS_CELLS_LOCAL_CONFIG` 指定绝对路径。
+- 宿主机默认读取 `tools/` 下由宿主提供、Git 忽略的 `cells.toml`；可用 `NESTOS_CELLS_LOCAL_CONFIG` 指定绝对路径。
 - VM 默认读取 `/etc/nestos/firecracker/service-sources/cells-x1/service.toml` 中目标为 `cells.toml` 的声明，兼容目标为 `config.toml` 的旧清单。可用管理员 `service-modules.json` 中的 `options.configSource` 或 `NESTOS_CELLS_X1_CONFIG` 指定该 VM 专用配置的绝对路径，环境变量优先。未指定配置源且默认清单不存在或不可读时，命令从 VM 的安装目录读取现有 `cells.toml`，校验后与二进制一起发布。预检日志以 `configurationSource: "vm-installed"` 标注这一分支；如需应用新的 VM 配置，请提供可读的服务清单或显式配置源。
 
 源配置须为非符号链接的普通文件且仅属主可访问，例如权限 0600。命令会在切换任何目标前检查两个目标的绑定、读取配置并用新二进制校验 TOML。目标端复核实际安装文件的原配置摘要，校验后将二进制和配置分别安装到 `/usr/local/lib/nestos/cells/cells` 和 `/usr/local/lib/nestos/cells/cells.toml`。宿主机通过 `sudo -n` 操作 `nestos-cells-local.service`。VM 的安装目录须允许现有 SSH 管理账号写入，并保存在持久根盘。

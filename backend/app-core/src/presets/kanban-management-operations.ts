@@ -27,7 +27,12 @@ class ManagementOperations implements OperationScopeProvider {
         const owner=await managementOwner(this.options.service,board,item);if(!owner)return;
         if(owner.id!==item.id)return {owner:{boardId,itemId:owner.id},permittedActions:['accept','cancel']};
         const scopes=await managementScopes({...this.options,projectLabel:this.projectLabel,repositoryKey:this.repositoryKey},board,owner);
-        return {finalized:scopes.length>0&&scopes.every(scope=>scope.completed===true),scopes:scopes.map(scope=>({...scope,ready:scope.contributors.every(source=>board.items.some(row=>row.id===source.itemId&&['review','completed'].includes(row.status))),completed:scope.completed===true||scope.stage==='cleaned'}))};
+        const items=new Map(board.items.map(row=>[row.id,row]));
+        return {finalized:scopes.length>0&&scopes.every(scope=>scope.completed===true),scopes:scopes.map(scope=>({
+            ...scope, ready:scope.contributors.every(source=>['review','completed'].includes(items.get(source.itemId)?.status??'')),
+            completed:scope.completed===true||scope.stage==='cleaned',
+            contributors:scope.contributors.map(source=>({...source,...contributorBlocker(items.get(source.itemId),source.dispatchId)})),
+        }))};
     };
     deliveryPlan=async(board:KanbanBoard,item:KanbanItem):Promise<DeliveryPlan>=>{
         const base=await this.options.basePlan(board,item),owner=requiresDevelopmentProject(board)?await managementOwner(this.options.service,board,item):undefined;
@@ -66,6 +71,12 @@ class ManagementOperations implements OperationScopeProvider {
         if(job.action!=='merge')return;
         for(const source of managementBatch(job.snapshot).sources)await this.options.journal.update(integratedContributionKey(job.boardId,job.itemId,source.dispatchId),old=>old??{operationId:job.id,scopeId:scope.id,sourceVersion:source.snapshot.sourceVersion,targetHead:(job.result as {targetHead:string}).targetHead});
     };
+}
+function contributorBlocker(item:KanbanItem|undefined,attemptId:string|undefined) {
+    if(!item||['completed','review'].includes(item.status))return {};
+    const issue=attemptId?item.issues?.filter(row=>row.attemptId===attemptId&&!row.resolvedBy).at(-1):undefined;
+    const code=item.blocked?.reason;
+    return issue||code?{blocker:{...(issue?.summary?{summary:issue.summary}:{}),...(issue?.handler?{handler:issue.handler}:{}),...(code?{code}:{})}}:{};
 }
 async function cleanupManagementScope(options:Options,scope:ManagementScope,operationId:string):Promise<boolean> {
     if(!options.cleanup)return false;

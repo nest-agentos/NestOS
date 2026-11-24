@@ -1,6 +1,6 @@
 import {LOOP_BOARD_PATH} from '@nestos/kanban-ui';
 import {KanbanWindowWorkbench} from './kanban/windows';
-import {parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts';
+import {folderBrowserPath, parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts';
 import {mountContentTitleBar} from './workbench/content-titlebar';
 import {lazyScannerPackages} from './digital-twin/lazy-packages';
 import {ACTION_ICONS, randomUUID} from '@nestos/common';
@@ -394,6 +394,11 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             const module = createKanbanWorkspace({initialDecision:initial?.request.decision?{...initial.request.decision,...initial.decision}:undefined,
                 initialTask:initial?.request.task&&initial.task?{...initial.request.task,...initial.task}:undefined,service: services.kanban, sidebar: sidebarEl, editor: editorEl,
                 windows: windowBinding, initialResource, sessionUrl, referenceLink: kanbanReferenceLink(services.projects),
+                openVerificationSession: async (title,inputText) => {
+                    const local=(await services.projects.list()).find(project=>project.protected);
+                    if(!local)throw Object.assign(new Error('Local project unavailable'),{code:'VERIFICATION_LOCAL_PROJECT_UNAVAILABLE'});
+                    await handleNavigationRequest({target:'chat',action:'create',create:{title,parentPath:folderBrowserPath(local.path)},state:{inputText}},true);
+                },
                 openSessionInteraction:sessionInteractionDialog(services.projects,id=>handleNavigationRequest({target:'chat',resourceId:id,options:{newTab:true}})),
                 selected: path => selectionHistory(elementId, path, 'push'),
                 openSession: id => handleNavigationRequest({target: 'chat', resourceId: id, options: {newTab: true}})});
@@ -799,9 +804,11 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                         console.log(`[Shell] createAndOpenFile ok: newId=${newId}`);
                         selectionHistory(targetWsId, newId, 'replace');
                     } catch (err) {
+                        if(failOnError)throw err;
                         console.error('[Shell] createAndOpenFile failed:', err);
                     }
                 } else {
+                    if(failOnError)throw new Error('Workspace creation unavailable');
                     console.warn(`[Shell] create skipped: no manager for wsId=${targetWsId}`);
                 }
                 break;

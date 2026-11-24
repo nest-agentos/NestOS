@@ -13,7 +13,7 @@
 | 活文档检查 | `pnpm docs:check` | 通过（70 份活文档，10 条告警：5 条历史表述 + 5 条 `[missing-doc]`） |
 | 样式一致性 | `pnpm styles:check` | 通过（63 stylesheets / 813 markup / 3768 类） |
 | 包构建 | `pnpm build:libs` | 通过 |
-| CLI 构建 | `pnpm --filter @nestos/cli build` | 通过（`apps/cli/dist/cli.js`） |
+| CLI 构建 | `pnpm --filter @nestos/cli build` | 通过（生成 CLI 工作区 `dist/` 下的 `cli.js`） |
 | 前端构建 | `pnpm --filter tauri-app build` | 通过（`apps/tauri-app/dist/`） |
 | Tauri 生产二进制 | `cargo build --offline --features tauri/custom-protocol` | 通过（2 条 dead_code 告警） |
 

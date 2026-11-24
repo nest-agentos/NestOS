@@ -62,7 +62,7 @@ export interface ReviewOperationsOptions {
     published: ReturnType<typeof publishedOperation>; submission: ReturnType<typeof sessionSubmission>; adapter: ReviewAdapter;
     log(event: {operationId: string; boardId?:string;itemId?:string;count?:number;reason?:string;stage: string; result: 'success' | 'failure'; code?: string; durationMs: number}): void;
 }
-export interface ReviewOperationScope {ready?:boolean;completed?:boolean;id:string;label:string;contributors:Array<{itemId:string;title:string}>}
+export interface ReviewOperationScope {ready?:boolean;completed?:boolean;id:string;label:string;contributors:import('@nestos/kanban/contracts').KanbanOperationContributor[]}
 export type ResolvedOperationScope=Partial<Pick<ReviewOperationsOptions,'adapter'|'deliveryPlan'|'automaticTarget'|'cleanup'>>;
 export interface OperationScopeProvider {
     describe(board:string,item:string):Promise<{owner?:{boardId:string;itemId:string};finalized?:boolean;permittedActions?:string[];scopes?:ReviewOperationScope[]}|undefined>;
