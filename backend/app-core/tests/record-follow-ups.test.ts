@@ -32,3 +32,9 @@ it('preserves completed delivery with a visible dirty-worktree follow-up',async(
  expect(result.items[0].progress).toMatchObject({state:'completed',followUps:[{state:'blocked',phase:'cleanup',code:'WORKTREE_DIRTY'}]});
  expect(result.items[0].progress?.reason).toBeUndefined();
 });
+
+it('projects a failed merge while a completed set of execution tasks awaits settlement',async()=>{
+ const waiting={...page,items:[{...page.items[0],progress:{...page.items[0].progress,state:'waiting',phase:'waiting-dependency',reason:'GROUP_SETTLEMENT_PENDING'}}]};
+ const result=await recordFollowUps({diagnostic:vi.fn()} as any,'source',waiting,async()=>({state:'blocked',stage:'merge',code:'OPERATION_RESULT_AGENT_BLOCKED'}));
+ expect(result.items[0].progress).toMatchObject({state:'needs-action',stage:'finalization',reason:'OPERATION_RESULT_AGENT_BLOCKED',followUps:[{phase:'merge',state:'blocked'}]});
+});

@@ -1,10 +1,11 @@
+import {latestReviewJob} from './item-operation-projection';
 import {cleanupReviewStatus} from './cleanup-review';
-import {reviewCleanupKey,type ReviewCleanup} from '@nestos/kanban/integration';
+import {jobKey,reviewKey,reviewCleanupKey,type ReviewCleanup} from '@nestos/kanban/integration';
 import {developmentDeliveryPolicy} from './development-operation-policy';
 import {sha256HexSync,t} from '@nestos/common';
 import {safeCode} from '@nestos/kanban/integration';
 import type {KanbanItemOperations,KanbanItemOperationRequest,KanbanItemOperationBinding} from '@nestos/kanban/contracts';
-import type {ReviewOperationsOptions} from './item-operation-types';
+import type {ReviewJob,ReviewSettings,ReviewOperationsOptions} from './item-operation-types';
 import {requireValue} from './validation';
 import {automaticDeliveryStatus} from '@nestos/kanban/integration';
 
@@ -44,9 +45,20 @@ export async function scopedFinalizationStatus(options:ReviewOperationsOptions,b
     if(!route?.scopes?.length)return cleanupReviewStatus(await options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item)))
         ??automaticDeliveryStatus(options.journal,board,item,undefined,developmentDeliveryPolicy.steps);
     const statuses=await Promise.all(route.scopes.map(async scope=>scope.completed?{state:'completed' as const,stage:'completed'}:
-        cleanupReviewStatus(await options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item,scope.id)))??await automaticDeliveryStatus(options.journal,board,item,scope.id,developmentDeliveryPolicy.steps)??{state:'running' as const,stage:scope.ready===false?'waiting-dependency':'analyze'}));
+        cleanupReviewStatus(await options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item,scope.id)))??await automaticDeliveryStatus(options.journal,board,item,scope.id,developmentDeliveryPolicy.steps)??await manualDeliveryBlocker(options,board,item,scope.id)??{state:'running' as const,stage:scope.ready===false?'waiting-dependency':'analyze'}));
     return statuses.find(row=>row.state==='blocked')??statuses.find(row=>row.state==='waiting-confirmation')
         ??statuses.find(row=>row.state==='running')??{state:'completed',stage:'completed'};
+}
+
+
+async function manualDeliveryBlocker(options:ReviewOperationsOptions,board:string,item:string,scopeId:string):Promise<KanbanItemOperations['automatic']> {
+    const settings=await options.journal.get<ReviewSettings>(reviewKey(board,item,scopeId));
+    if(!settings?.jobs.length)return;
+    const jobs=(await options.journal.getMany<ReviewJob>(settings.jobs.map(jobKey)))
+        .filter((job):job is ReviewJob=>!!job&&job.boardId===board&&job.itemId===item&&job.scopeId===scopeId);
+    const steps=['analyze','merge','build','deploy','accept'] as const;
+    const failure=steps.map(step=>latestReviewJob({jobs},step)).find(job=>job?.state==='failed'&&job.phase==='settled');
+    if(failure)return {state:'blocked',stage:failure.action,...(failure.code?{code:failure.code}:{})};
 }
 
 /** Normal source handoff is a host receipt, not a user acceptance step. */

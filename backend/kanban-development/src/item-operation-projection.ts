@@ -4,7 +4,7 @@ import type {KanbanItem,KanbanItemOperation} from '@nestos/kanban/contracts';
 import type {ReviewContext as Context,ReviewAction,ReviewJob,MergePlan} from './item-operation-types';
 import {operationDependencies} from './item-operation-skips';
 import {operationSteps} from './development-operation-policy';
-export function latestReviewJob(context:Context,action:ReviewAction):ReviewJob|undefined {
+export function latestReviewJob(context:Pick<Context,'jobs'|'deliveryPlan'>,action:ReviewAction):ReviewJob|undefined {
     const job=context.jobs.filter(row=>row.action===action).at(-1);if(!job||job.phase!=='settled')return job;
     const steps=operationSteps(context.deliveryPlan?.steps,context.deliveryPlan?.ordering),ancestors=steps.slice(0,steps.indexOf(action));
     const position=context.jobs.indexOf(job);
@@ -28,7 +28,7 @@ export function operation(context: Context, action: ReviewAction, active: boolea
     const built=latest(context,'build'),auto=built?.followUp,autoPending=action==='deploy'&&auto?.state==='queued'&&built?.state==='succeeded'&&(!job||job.createdAt<built.createdAt);
     const autoFailed=action==='deploy'&&auto?.state==='failed'&&!job;
     const replacement=job?.action==='deploy'&&job.code===replacementMismatchCode?replacementRecovery(job):undefined;
-    return {...(action==='analyze'&&invalidated?{runLabel:t('kanban.operationReanalyzeMerge')}:{}),...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...(!context.deliveryPlan?.manualAfter?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
+    return {...(action==='merge'&&job?.state==='failed'&&enabled?{runLabel:t('kanban.operationRetryMerge')}:{}),...(action==='analyze'&&invalidated?{runLabel:t('kanban.operationReanalyzeMerge')}:{}),...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...(!context.deliveryPlan?.manualAfter?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
         state:action==='merge'&&invalidated&&(!job||job.phase==='settled')?'unavailable':action==='analyze'&&invalidated?(enabled?'ready':'unavailable'):autoPending?'running':autoFailed?'failed':action === 'accept' && !context.scoped&&context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
         ...(replacement||job?.state==='unknown'?{attention:{kind:'recovery' as const}}:action==='merge'&&plan?.conflicts.length?{attention:{kind:'choice' as const}}:{}),
         ...(replacement?{recovery:replacement}:job?.state==='unknown'&&job.phase==='submitting'?{recovery:{runId:job.id,label:t('kanban.operationReconcile'),
@@ -61,6 +61,7 @@ function operationStatusText(context:Context,action:ReviewAction):string|undefin
     if(action!=='merge')return;
     if(analysisExpired(context,analysis))return t('kanban.operationMergePlanExpired');
     if(job?.state==='succeeded')return t('kanban.operationMergeVerified');
+    if(job?.state==='failed'&&job.phase==='settled')return undefined;
     if(job&&job.phase!=='settled')return t(job.state==='unknown'?'kanban.operationMergeUnverified':'kanban.operationMergeExecuting');
     if(analysis?.state==='succeeded'&&plan)return plan.conflicts.length?t('kanban.operationMergeConflicts',{count:plan.conflicts.length}):t('kanban.operationMergeNoConflicts');
 }
