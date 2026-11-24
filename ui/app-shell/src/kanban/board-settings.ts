@@ -1,5 +1,5 @@
 import {createModuleLogger, randomUUID, t} from '@nestos/common';
-import {boardSettingsFields} from '@nestos/kanban-ui';
+import {boardSettingsCommand,boardSettingsFields} from '@nestos/kanban-ui';
 import type {KanbanBoardSummary, KanbanBoardSettingsCatalog, KanbanClient} from '@nestos/kanban/contracts';
 const log=createModuleLogger('kanban-settings');
 interface Draft {board:KanbanBoardSummary;catalog:KanbanBoardSettingsCatalog;form:HTMLFormElement;operationId?:string;fingerprint?:string;unknown?:boolean}
@@ -13,14 +13,14 @@ export class KanbanBoardSettings {
     constructor(private readonly service:KanbanClient,private readonly changed:()=>Promise<void>,private readonly saved:()=>void,
         private readonly busy:(value:boolean)=>void) {}
     async select(boardId?:string):Promise<void> {
-        const generation=++this.generation;this.element.replaceChildren();if(!this.service.boardSettings||this.closed)return;
-        const title=document.createElement('h3');title.textContent=label('boardControl.harness');this.element.append(title);
+        const generation=++this.generation;this.element.replaceChildren();if(this.closed)return;
+        const title=document.createElement('h3');title.textContent=label('settingsTitle');this.element.append(title);
         if(!boardId){const help=document.createElement('p');help.textContent=label('boardControl.selectBoard');this.element.append(help);return;}
         const cached=this.drafts.get(boardId);if(cached){this.element.append(cached.form);return;}
         const status=document.createElement('p');status.setAttribute('role','status');status.textContent=label('boardControl.loading');this.element.append(status);
         const operationId=randomUUID(),started=performance.now();
         try {
-            const [board,catalog]=await Promise.all([this.service.read(boardId),this.service.boardSettings(boardId)]);
+            const [board,catalog]=await Promise.all([this.service.read(boardId),this.service.boardSettings?.(boardId)??{fields:[]}]);
             if(this.closed||generation!==this.generation)return;
             const draft=this.create(board,catalog);this.drafts.set(boardId,draft);status.remove();this.element.append(draft.form);
             log.debug('settings.read',{operationId,boardId,stage:'catalog.read',result:'success',count:catalog.fields.length,durationMs:Math.round(performance.now()-started)});
@@ -32,7 +32,7 @@ export class KanbanBoardSettings {
     }
     destroy():void {this.closed=true;this.generation++;this.drafts.clear();this.element.remove();}
     private create(board:KanbanBoardSummary,catalog:KanbanBoardSettingsCatalog):Draft {
-        const form=document.createElement('form');form.dataset.boardSettings=board.id;form.innerHTML=boardSettingsFields(board,catalog);
+        const form=document.createElement('form');form.dataset.boardSettings=board.id;form.innerHTML=boardSettingsFields(board,catalog,label);
         const status=document.createElement('p');status.setAttribute('role','status');form.append(status);
         const save=document.createElement('button');save.type='submit';save.textContent=label('save');
         const refresh=document.createElement('button');refresh.type='button';refresh.textContent=label('refresh');
@@ -41,9 +41,9 @@ export class KanbanBoardSettings {
     }
     private async submit(draft:Draft,status:HTMLElement):Promise<void> {
         if(this.closed||draft.form.getAttribute('aria-busy')==='true')return;
-        const settings={...draft.board.settings},data=new FormData(draft.form);
-        for(const field of draft.catalog.fields)settings[field.name]=String(data.get('setting-'+field.name)??draft.board.settings?.[field.name]??'');
-        const command=draft.unknown&&draft.fingerprint?JSON.parse(draft.fingerprint) as {type:'configure-board-settings';settings:Record<string,string>}:{type:'configure-board-settings' as const,settings},fingerprint=JSON.stringify(command);
+        const command=draft.unknown&&draft.fingerprint?JSON.parse(draft.fingerprint) as ReturnType<typeof boardSettingsCommand>
+            :boardSettingsCommand(new FormData(draft.form),draft.catalog,draft.board.settings??{});
+        const fingerprint=JSON.stringify(command);
         if(draft.fingerprint!==fingerprint){draft.operationId=randomUUID();draft.fingerprint=fingerprint;}
         const operationId=draft.operationId!,started=performance.now();this.busy(true);draft.form.setAttribute('aria-busy','true');
         status.setAttribute('role','status');status.textContent=label('boardControl.processing');
@@ -56,7 +56,7 @@ export class KanbanBoardSettings {
         finally{draft.form.removeAttribute('aria-busy');this.disable(draft,false);this.busy(false);}
     }
     private disable(draft:Draft,saving:boolean):void {
-        draft.form.querySelectorAll<HTMLButtonElement|HTMLSelectElement>('button,select').forEach(input=>{input.disabled=saving||!!draft.unknown&&(input.tagName==='SELECT'||input instanceof HTMLButtonElement&&input.type==='button');});
+        draft.form.querySelectorAll<HTMLButtonElement|HTMLSelectElement|HTMLInputElement>('button,select,input').forEach(input=>{input.disabled=saving||!!draft.unknown&&(input.tagName==='SELECT'||input.tagName==='INPUT'||input instanceof HTMLButtonElement&&input.type==='button');});
     }
     private failure(status:HTMLElement,error:unknown,operationId:string,boardId:string,stage:string,started:number):void {
         const raw=(error as {code?:unknown})?.code,code=typeof raw==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(raw)?raw:'KANBAN_OPERATION_FAILED';

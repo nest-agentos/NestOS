@@ -7,7 +7,7 @@ import {KanbanSidebar} from '../src/kanban/sidebar';
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {cleanups.splice(0).forEach(close => close()); document.body.replaceChildren();});
-const board = (id: string): KanbanBoardSummary => ({id, title: id, number: 1, items: []} as unknown as KanbanBoardSummary);
+const board = (id: string): KanbanBoardSummary => ({id, title: id, number: 1, items: [], policy: {}} as unknown as KanbanBoardSummary);
 async function fixture() {
     const catalog = vi.fn(async () => [board('Initial')]), report = vi.fn(), navigate = vi.fn(async () => {}), catalogChanged = vi.fn();
     const records = vi.fn(async () => ({items: [{id:'formal', title:'Recurring formal', recurrence:{}}, {id:'once', title:'One shot'}]}));
