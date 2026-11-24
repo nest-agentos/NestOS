@@ -27,12 +27,8 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
             if(analysis)await invalidateReviewAnalysis({...options,policy:developmentAnalysisPolicy},board.id,item.id,analysis.id,code,request.operationId);requireValue(false,code);
         }
     }
-    if(action==='deploy'&&options.adapter.managed){const managed=await options.adapter.managed.prepare({id:base.id,board,item,snapshot,context});if(managed)return {...base,operationContext:context,managed};}
-    if (options.adapter.prepareOperation) {
-        requireValue(action !== 'accept', 'OPERATION_REQUEST_INVALID');
-        const request = await preparationStage(options, base.id, 'session', () => options.adapter.prepareOperation!({id: base.id, action, context, board, item, snapshot}));
-        return {...base, operationContext: context, request, sessionId: request.expectedSessionId};
-    }
+    const prepared = await prepareServiceOrSession(options,base,board,item,context);
+    if(prepared)return prepared;
     if (action === 'analyze') {const request = await preparationStage(options, base.id, 'session', () => options.adapter.prepareAnalysis({id: base.id, board, item, snapshot})); return {...base, request, sessionId: request.expectedSessionId};}
     const binding = settings.bindings[action]; requireValue(binding, 'OPERATION_FLOW_REQUIRED');
     const target = automationTarget(binding, await options.catalog()); requireValue(target.kind === 'flow', 'OPERATION_FLOW_REQUIRED');
@@ -41,6 +37,29 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
             action, boardId: board.id, itemId: item.id, sourceVersion: snapshot.sourceVersion, targetVersion: snapshot.targetVersion, resources: snapshot.context, input: context})}},
         submission: {id: base.id, source: {kind: 'conversation', ownerId: base.id, id: base.id}}}}};
 }
+const serviceAdmissionCodes=new Set([
+    'SERVICE_PROJECT_UNAUTHORIZED','SERVICE_PROJECT_BINDING_REQUIRED','SERVICE_PROJECT_CONFIGURATION_INVALID',
+    'SERVICE_TARGET_UNAVAILABLE','SERVICE_TARGET_MISMATCH','SERVICE_SOURCE_BUILD_REQUIRED',
+]);
+
+async function prepareServiceOrSession(options:ReviewOperationsOptions,base:ReviewJob,board:KanbanBoard,item:KanbanItem,context:unknown):Promise<ReviewJob|undefined> {
+    const {adapter}=options,{id,action,snapshot}=base;
+    try {
+        if(action==='deploy'&&adapter.managed){
+            const managed=await preparationStage(options,id,'service',()=>adapter.managed!.prepare({id,board,item,snapshot,context}));
+            if(managed)return {...base,managed};
+        }
+        if(!adapter.prepareOperation)return;
+        requireValue(action!=='accept','OPERATION_REQUEST_INVALID');
+        const request=await preparationStage(options,id,'session',()=>adapter.prepareOperation!({id,action,context,board,item,snapshot}));
+        return {...base,request,sessionId:request.expectedSessionId};
+    }catch(error){
+        const code=safeCode(error,'OPERATION_PREPARATION_FAILED');
+        if(['build','deploy'].includes(action)&&serviceAdmissionCodes.has(code))return {...base,phase:'settled',state:'failed',code};
+        throw error;
+    }
+}
+
 async function preparationStage<T>(options: ReviewOperationsOptions, operationId: string, stage: string, work: () => Promise<T>): Promise<T> {
     const started = Date.now();
     try {

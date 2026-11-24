@@ -242,6 +242,18 @@ it('uses the original Session for project maintenance without a Flow selection o
     await f.run('build'); expect(f.submission.start).toHaveBeenCalledWith(expect.objectContaining({expectedSessionId: 'original'}));
     expect(f.published.start).not.toHaveBeenCalled(); expect(f.options.catalog).not.toHaveBeenCalled();
 });
+it('preserves a managed build admission failure without starting a Session', async () => {
+    const f = await fixture();
+    const code = 'SERVICE_PROJECT_UNAUTHORIZED';
+    f.options.adapter.prepareOperation = vi.fn(async () => {throw Object.assign(new Error(code), {code});});
+    const id = 'managed-build-denied';
+    const result = await f.run('build', id);
+    expect(result.operations.find(op => op.id === 'build')).toMatchObject({state: 'failed', code});
+    expect(await f.journal.get(jobKey(id))).toMatchObject({phase: 'settled', state: 'failed', code});
+    const refreshed = await f.api.itemOperations('board', 'task');
+    expect(refreshed.operations.find(op => op.id === 'build')).toMatchObject({state: 'failed', code});
+    expect(f.submission.start).not.toHaveBeenCalled();
+});
 it('retains the agent prerequisite explanation when an operation reports blocked', async () => {
     const f = await fixture();
     f.options.adapter.prepareOperation = vi.fn(async () => ({expectedSessionId: 'original'}) as never);

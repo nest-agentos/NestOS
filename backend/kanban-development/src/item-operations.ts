@@ -212,7 +212,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
         const saved = old ?? initial(); requireValue(saved.revision === context.settings.revision, 'OPERATION_STALE_REFRESH'); requireValue(saved.jobs.length < 64, 'OPERATION_HISTORY_LIMIT');
         return {...saved, revision: saved.revision + 1,invalidatedAnalysis:request.action==='analyze'?undefined:saved.invalidatedAnalysis,jobs: [...saved.jobs, job.id]};
     });
-    await options.report?.(job); if(!automatic||!(await options.service.read(board)).executionControl?.paused)await advanceReviewJob(options,job);if(request.action==='build')await followUp(options,board,request.itemId);await settleDeliveryAcceptance(options,board,request.itemId);return view(options,await load(options,board,request.itemId,false));
+    await options.report?.(job); if(job.phase!=='settled'&&(!automatic||!(await options.service.read(board)).executionControl?.paused))await advanceReviewJob(options,job);if(request.action==='build')await followUp(options,board,request.itemId);await settleDeliveryAcceptance(options,board,request.itemId);return view(options,await load(options,board,request.itemId,false));
 }
 async function operationInput(options: ReviewOperationsOptions, context: Context, request: KanbanItemOperationRequest): Promise<unknown> {
     if (request.action === 'deploy') {
