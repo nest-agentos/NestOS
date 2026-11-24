@@ -35,7 +35,7 @@ export function taskRecoveryChannels(options:TaskRecoveryOptions,ports:Ports) {
 async function requestMissingResult(options:TaskRecoveryOptions,scope:RecoverySession,
     record:NonNullable<Awaited<ReturnType<typeof recoveryWorkspace>>>['record'],active:()=>boolean):Promise<void> {
     const {boardId,itemId,projectId,scopeId,sessionId,dispatchId}=scope;
-    const started=Date.now(),operationId='recovery-result-'+dispatchId;
+    const started=Date.now(),operationId='recovery-result-v2-'+dispatchId;
     let stage='task.recovery.admission';
     try {
         const board=await options.service.read(boardId),item=board.items.find(row=>row.id===itemId);
@@ -53,7 +53,7 @@ async function requestMissingResult(options:TaskRecoveryOptions,scope:RecoverySe
         }
         stage='task.recovery.enqueue';
         const template=(await conversationPolicy(options.fs)).missingResultBootstrap;
-        const instruction=await options.journal.update<{text:string}>('task-result-assistance:'+dispatchId,old=>old??{text:template});
+        const instruction=await options.journal.update<{text:string}>('task-result-assistance:'+operationId,old=>old??{text:template});
         requireValue(active(),'SERVICE_STOPPING');
         await enqueue(options,scope,operationId,instruction.text);
         options.log({operationId,boardId,stage,result:'success',durationMs:Date.now()-started});

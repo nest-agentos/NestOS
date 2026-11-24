@@ -77,7 +77,7 @@ export const en: LocaleStrings = {
     'kanban.recoveryVersionMismatch': 'The runtime version differs from the acceptance target. Restore the environment or approve a new target before rechecking; the whole decision need not restart.',
     'kanban.recoveryExpectedVersion': 'Expected verification version',
     'kanban.recoveryActualVersion': 'Running version',
-    'kanban.recoveryAssistMissingResult': 'Verify and report in the original session',
+    'kanban.recoveryAssistMissingResult': 'Continue and report in the original session',
     'kanban.recoveryReply': 'Reply to the original session',
     'kanban.recoveryReplyContent': 'Continuation instructions',
     'kanban.recoveryReplySend': 'Send to original session',

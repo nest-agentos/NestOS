@@ -196,8 +196,8 @@ it('requests formal result recovery in the original session without dispatching 
  scopeId='failed-dispatch';
  await expect(f.recovery.openTaskRecovery('b',request)).resolves.toMatchObject({state:'accepted',resourceId});
  expect(f.options.remote.projectConversation).toHaveBeenCalledWith('project','profile','canonical-session');
- expect(enqueue).toHaveBeenCalledWith(expect.stringContaining('session_report'),[],undefined,'recovery-result-failed-dispatch','next-turn');
- expect(enqueue.mock.calls[0]).toEqual(expect.arrayContaining([expect.stringContaining('exact missing evidence')]));
+ expect(enqueue).toHaveBeenCalledWith(expect.stringContaining('Complete remaining authorized work'),[],undefined,'recovery-result-v2-failed-dispatch','next-turn');
+ expect(enqueue.mock.calls[0]).toEqual(expect.arrayContaining([expect.stringContaining('exact blocker and next action')]));
  messages=[{id:'missing',message:{type:'error',content:'Evidence unavailable',payload:{handler:'parent'}}}];
  await expect(f.recovery.openTaskRecovery('b',request)).resolves.toMatchObject({state:'accepted',resourceId});
  messages=[{id:'final',message:{type:'result',content:'Verified'}}];

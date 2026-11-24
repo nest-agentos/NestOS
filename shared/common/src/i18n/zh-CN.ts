@@ -78,7 +78,7 @@ export const zhCN = {
     'kanban.recoveryVersionMismatch': '验收目标与运行版本不同。先处理环境或确认新目标，再复验；不需要重启整个决策。',
     'kanban.recoveryExpectedVersion': '预期验收版本',
     'kanban.recoveryActualVersion': '实际运行版本',
-    'kanban.recoveryAssistMissingResult': '在原会话中核实并补报',
+    'kanban.recoveryAssistMissingResult': '在原会话中继续并补报',
     'kanban.recoveryReply': '在看板回复原执行会话',
     'kanban.recoveryReplyContent': '续办说明',
     'kanban.recoveryReplySend': '发送到原会话',
