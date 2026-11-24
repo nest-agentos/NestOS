@@ -46,6 +46,18 @@ async function view(fetcher: typeof fetch, id = 'same-client') {
     return client.start();
 }
 
+it('keeps saved prompts within the authenticated user and shares them across that user’s clients', async () => {
+    const [first, sameUser, other] = await Promise.all([view(admin.fetcher, 'prompts-a'), view(admin.fetcher, 'prompts-b'), view(alice.fetcher, 'prompts-other')]);
+    await first.services.sessionManager.promptHistory!.savePrompt('PRIVATE_SAVED_PROMPT', '00000000-0000-4000-8000-000000000001');
+    expect(await sameUser.services.sessionManager.promptHistory!.listSaved()).toContain('PRIVATE_SAVED_PROMPT');
+    expect(await other.services.sessionManager.promptHistory!.listSaved()).not.toContain('PRIVATE_SAVED_PROMPT');
+    await other.services.sessionManager.promptHistory!.savePrompt('ALICE_SAVED_PROMPT', '00000000-0000-4000-8000-000000000002');
+    expect(await first.services.sessionManager.promptHistory!.listSaved()).not.toContain('ALICE_SAVED_PROMPT');
+    const audit = await readFile(path.join(temp, 'audit.jsonl'), 'utf8'); expect(audit).not.toContain('PRIVATE_SAVED_PROMPT');
+    const userAudit = await readFile(path.join(temp, 'home', 'admin', '.nestos', 'logs', 'audit.jsonl'), 'utf8');
+    expect(userAudit).not.toContain('PRIVATE_SAVED_PROMPT');
+});
+
 it('returns persisted diagnostic events only from the authenticated user runtime', async () => {
     const [a, b] = await Promise.all([view(admin.fetcher, 'diagnostic-admin'), view(alice.fetcher, 'diagnostic-alice')]);
     await a.backend.reportClientDiagnostic!({operation: 'diagnostic.test', operationId: 'admin-diagnostic', stage: 'query', code: 'ADMIN_TEST_FAILURE', result: 'failure', durationMs: 1});

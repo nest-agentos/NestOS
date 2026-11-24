@@ -61,6 +61,31 @@ async function fixture(backend: IStorageBackend = new MemoryBackend()) {
     return { sessions, repository, agents, id, getUIState, getLoadState, loadView, bind, commandBus, execute, fs, kernel };
 }
 
+it('handles prompt and history commands in the legacy local editor without submitting', async () => {
+    const f = await fixture(), savedPrompts = {listSaved: vi.fn(async () => ['saved prompt']), savePrompt: vi.fn(async () => {})};
+    await f.repository.writeDocument(f.id, 'round-r0.json', JSON.stringify({id: 'r0', sessionId: f.id, kind: 'chat', status: 'completed', createdAt: 1,
+        historyParentIds: [], input: [{role: 'user', content: 'Stored question'}, {role: 'user', content: 'Stored question'}], output: [{role: 'assistant', content: 'answer'}]}));
+    await f.repository.updateManifest(f.id, {rootRoundId: 'r0', currentHead: 'r0', branches: {main: 'r0'}});
+    const container = document.createElement('div'); document.body.append(container);
+    const editor = new LLMWorkspaceEditor(container, {sessionManager: f.sessions, sessionId: f.id, sessionRepository: f.repository,
+        commandBus: f.commandBus, agentService: f.agents as never, savedPrompts}); cleanup.push(() => editor.destroy());
+    await editor.init(container); const input = container.querySelector<HTMLTextAreaElement>('.llm-input__textarea')!;
+    input.value = '/history'; input.dispatchEvent(new Event('input', {bubbles: true}));
+    input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+    await vi.waitFor(() => expect(container.querySelector('.llm-composer-history')?.textContent).toContain('Stored question'));
+    const rows = container.querySelectorAll('.llm-composer-history > div'); expect(rows).toHaveLength(2);
+    rows[0].querySelectorAll<HTMLButtonElement>('button')[1].click();
+    expect(container.querySelector<HTMLElement>('[data-legacy-message-location]')?.dataset.messageId).toBe('round-r0-user:input:1');
+    input.value = '/history'; input.dispatchEvent(new Event('input', {bubbles: true}));
+    input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+    const next = container.querySelectorAll('.llm-composer-history > div'); next[1].querySelectorAll<HTMLButtonElement>('button')[1].click();
+    expect(container.querySelector<HTMLElement>('[data-legacy-message-location]')?.dataset.messageId).toBe('round-r0-user:input:0');
+    input.value = '/history'; input.dispatchEvent(new Event('input', {bubbles: true}));
+    input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+    container.querySelector<HTMLButtonElement>('.llm-composer-history > div button')!.click();
+    expect(input.value).toBe('Stored question'); expect(f.execute).not.toHaveBeenCalledWith(SessionCommand.Send, expect.anything());
+});
+
 it.each(['main', 'review'])('initializes %s once and restores the selected branch draft and settings', async branch => {
     const f = await fixture();
     await f.repository.writeDocument(f.id, 'round-r0.json', JSON.stringify({ id: 'r0', sessionId: f.id, kind: 'chat', status: 'completed', createdAt: 1,

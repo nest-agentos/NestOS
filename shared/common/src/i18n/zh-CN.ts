@@ -4925,6 +4925,8 @@ export const zhCN = {
     'slash.simplify.description':            '用更简单的说法解释上一条回复',
     'slash.summarize.description':           '总结目前的整段对话',
     'slash.history.invalid': '历史长度必须是大于或等于 -1 的整数。',
+    'chat.historyLocatedInput':              '定位的用户输入',
+    'chat.historyLocationUnavailable':       '该消息当前不可用，请刷新历史后重试。',
     'slash.history.description':             '设置上下文历史长度（0 = 不带，-1 = 全部）',
     'slash.fresh.description':               '下一条消息不带任何历史上下文',
     'slash.fold.description':                '折叠当前可见对话',

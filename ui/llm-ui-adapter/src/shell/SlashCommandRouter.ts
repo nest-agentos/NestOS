@@ -271,7 +271,7 @@ function contextSlashCallbacks(deps: SlashCommandRouterDeps): Pick<SlashCommandC
         onHistory: (length: string) => {
             const value = parseInt(length, 10);
             if (isNaN(value)) {
-                Toast.error('Usage: /history <number>  (-1 = unlimited, 0 = none)');
+                Toast.error('Usage: /context-length <number>  (-1 = unlimited, 0 = none)');
                 return;
             }
             deps.chatInput.setConfig({

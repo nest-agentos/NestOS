@@ -20,6 +20,30 @@ function setup(options: EditorOptions = {}) {
     const host=document.createElement('div');document.body.append(host);
     const editor=new RemoteConversationEditor(host,peer,{title:'Server · Project · Codex', ...options});return {editor,peer,host};
 }
+it('intercepts saved prompts and session history in the compatibility editor', async () => {
+    const savedPrompts = {listSaved: vi.fn(async () => ['saved prompt']), savePrompt: vi.fn(async () => {})};
+    const {editor, peer, host} = setup({savedPrompts} as never);
+    const sameTurn = branchState(); sameTurn.messages[2].turnId = 'turn-one'; sameTurn.messages[3].turnId = 'turn-one';
+    vi.mocked(peer.read).mockResolvedValue(sameTurn); await editor.init(host);
+    try {
+        await editor.sendText('/history');
+        const rows = host.querySelectorAll('.llm-composer-history > div'); expect(rows).toHaveLength(2);
+        rows[0].querySelectorAll<HTMLButtonElement>('button')[1].click();
+        expect(host.querySelector<HTMLElement>('[data-legacy-message-location]')?.dataset.messageId).toBe('u2');
+        await editor.sendText('/history');
+        const next = host.querySelectorAll('.llm-composer-history > div'); next[1].querySelectorAll<HTMLButtonElement>('button')[1].click();
+        expect(host.querySelector<HTMLElement>('[data-legacy-message-location]')?.dataset.messageId).toBe('u1');
+        await editor.sendText('/history');
+        const refreshed = host.querySelectorAll('.llm-composer-history > div');
+        refreshed[0].querySelector<HTMLButtonElement>('button')!.click();
+        expect(host.querySelector<HTMLTextAreaElement>('.llm-input__textarea')!.value).toBe('Same prompt');
+        await editor.sendText('/prompt'); await vi.waitFor(() => expect(host.textContent).toContain('saved prompt'));
+        [...host.querySelectorAll('button')].find(button => button.textContent === 'saved prompt')!.click();
+        expect(host.querySelector<HTMLTextAreaElement>('.llm-input__textarea')!.value).toBe('saved prompt');
+        await editor.sendText('/prompt another'); await vi.waitFor(() => expect(savedPrompts.savePrompt).toHaveBeenCalledWith('another', expect.any(String)));
+        expect(peer.send).not.toHaveBeenCalled();
+    } finally {await editor.destroy();}
+});
 it.each([false, true])('passes attachment-only input unchanged to the native port (queued=%s)', async queued => {
     const {editor, peer, host} = setup();
     const capable = {...state, attachments: ['text' as const], ...(queued ? {canQueue: true} : {})};

@@ -197,7 +197,7 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
         }, resize => {const view = this.view; if (!view) return; const current = view.getDraft();
             view.configureInput({selection: {...current.selection, imageResize: JSON.stringify(resize)}}, current.revision);});
         const ocr = chatOcrPort(this.config.ocr, (ref, signal) => images.read(ref, {signal}));
-        return {images, inputPresentation: 'host', attachmentMenu: chatAttachmentMenu(true), plugins: workspaceInputPlugins(this.config.commandBus, {navigation: 'projects', sessionId: this.config.sessionId},
+        return {images, savedPrompts: this.config.savedPrompts ?? this.config.sessionManager.promptHistory, inputPresentation: 'host', attachmentMenu: chatAttachmentMenu(true), plugins: workspaceInputPlugins(this.config.commandBus, {navigation: 'projects', sessionId: this.config.sessionId},
             () => this.view?.getDraft().target?.id ?? 'default', this.config.sessionManager.promptHistory), ocr, setActive: active => {history?.setActive(active); taskPanel?.setActive(active); if (active) void inputCommands?.restore().catch(error => this.fail(error));},
             release: () => disposeEditorResources([releaseUsage, () => history?.destroy(), () => inputCommands?.destroy(), () => taskPanel?.destroy()]),messageActions: context => history?.messageActions(context) ?? [], locale: getLocale(), initialDraft: draft, onContentSelection: contentSelectionAction(this.config), markdown: messageMarkdown(this.config, id => this.messageAnchor(id)),
             assets: createAssetProvider(undefined, undefined, this.config.assets), upload: this.config.assets ? store.upload.bind(store) : undefined,

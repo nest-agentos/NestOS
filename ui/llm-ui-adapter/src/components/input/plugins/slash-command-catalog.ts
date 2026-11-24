@@ -147,9 +147,8 @@ function summarizeCommand(cb: SlashCommandCallbacks): SlashCommandDef {
 }
 function historyCommand(cb: SlashCommandCallbacks): SlashCommandDef {
     return {
-        name: 'history',
-        label: '/history',
-        aliases: ['context-length'],
+        name: 'context-length',
+        label: '/context-length',
         description: t('slash.history.description'),
         icon: SLASH_ICONS.history,
         group: 'context',

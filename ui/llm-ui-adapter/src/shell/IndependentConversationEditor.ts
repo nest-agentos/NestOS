@@ -26,6 +26,7 @@ type Binding = Awaited<ReturnType<typeof createNativeChatBinding>>;
 /** Product shell owns navigation/storage; the shared ChatView owns the conversation DOM. */
 export class IndependentConversationEditor extends BaseSettingsEditor<ConversationControls> {
     private readonly prepared: EditorOptions['conversationInitial'];
+    private readonly savedPrompts: EditorOptions['savedPrompts'];
     private view?: ChatView;
     private binding?: Binding;
     private operations;
@@ -45,7 +46,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
     private historyBranches?: RemoteHistoryBranches;
     private readonly events = new Map<EditorEvent, Set<(payload: unknown) => void>>();
     constructor(container: HTMLElement, controls: ConversationControls, options: EditorOptions, private store: NativeChatStore, private handoff?: RetainedWorkspaceHandoff, private ocrControls?: import('@nestos/app-contracts/services').OcrControls) {
-        super(container, controls, options); this.prepared = options.conversationInitial; this.owned = !handoff; this.operations = store.ledger();
+        super(container, controls, options); this.prepared = options.conversationInitial; this.savedPrompts = options.savedPrompts; this.owned = !handoff; this.operations = store.ledger();
     }
     async init(container: HTMLElement): Promise<void> {this.container = container; await this.render();}
     async render(): Promise<void> {
@@ -109,7 +110,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
         }, resize => {const view = this.view; if (!view) return; const draft = view.getDraft();
             view.configureInput({selection: {...draft.selection, imageResize: JSON.stringify(resize)}}, draft.revision);});
         const ocr = chatOcrPort(this.ocrControls, (ref, signal) => images.read(ref, {signal}));
-        return {promptHistoryPages: 3, images, ocr,
+        return {promptHistoryPages: 3, savedPrompts: this.savedPrompts, images, ocr,
              messageActions: ({message}) => this.historyBranches?.actions(message.id) ?? [], locale: getLocale(), initialDraft: this.store.draft, onContentSelection: contentSelectionAction(this.options), markdown: messageMarkdown(this.options),
             upload: this.options.readOnly ? undefined : this.store.upload.bind(this.store),
             assets: {read: async id => (await this.store.read({id, name: id}, {signal: this.lifetime.signal})).arrayBuffer()},

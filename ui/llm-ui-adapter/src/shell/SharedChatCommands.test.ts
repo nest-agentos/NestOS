@@ -16,8 +16,8 @@ function fixture() {
 }
 it('delegates run to one send operation and rejects malformed history preferences definitively', async () => {
     const f = fixture(); expect(f.commands.getSnapshot().find(item => item.name === 'run')?.dispatch).toBe('send');
-    expect(await f.execute('history', '-2')).toMatchObject({status: 'rejected', code: 'INVALID_HISTORY_LENGTH'});
-    expect(f.configure).not.toHaveBeenCalled(); expect(await f.execute('history', '-1')).toMatchObject({status: 'accepted'});
+    expect(await f.execute('context-length', '-2')).toMatchObject({status: 'rejected', code: 'INVALID_HISTORY_LENGTH'});
+    expect(f.configure).not.toHaveBeenCalled(); expect(await f.execute('context-length', '-1')).toMatchObject({status: 'accepted'});
     expect(f.configure).toHaveBeenCalledWith({historyLength: '-1'}); await f.commands.destroy();
 });
 it('resolves a model id through the current connection and refuses a model absent from its tiers', async () => {

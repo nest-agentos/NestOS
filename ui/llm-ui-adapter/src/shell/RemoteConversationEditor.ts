@@ -5,6 +5,8 @@ import {awaitNativeAdmission} from '../independent/native-admission';
 import {NativeInstructionQueuePanel} from '../components/NativeInstructionQueuePanel';
 import {ConversationComposer} from './drafts/conversation-composer';
 import type {IChatInputConfig} from '../domain/ports/IChatInputPresenter';
+import {LegacyPromptCommands} from './legacy-prompt-commands';
+import {revealLegacyMessage} from './legacy-message-location';
 interface SubmittedInput {text: string; files: File[]; revision: number; config: IChatInputConfig}
 import {BaseSettingsEditor, Toast, type EditorEvent, type EditorEventCallback, type EditorEventMap} from '@nestos/ui-common-adapter';
 import { createModuleLogger, escapeHTML, randomUUID, t } from '@nestos/common';
@@ -26,6 +28,8 @@ const observationLog = createModuleLogger('native-observation');
 
 /** Native histories remain remote; this editor only owns a view and input draft. */
 export class RemoteConversationEditor extends BaseSettingsEditor<ConversationControls> {
+    private promptCommands?: LegacyPromptCommands;
+    private readonly savedPrompts: EditorOptions['savedPrompts'];
     private view!: ConversationWorkspaceView;
     private instructionQueuePanel?: NativeInstructionQueuePanel;
     private executionNotice?: NativeExecutionNotice;
@@ -59,7 +63,7 @@ export class RemoteConversationEditor extends BaseSettingsEditor<ConversationCon
     private updating = false;
     private updateRequested = false;
     private adoptedInput = false;
-    constructor(container: HTMLElement, controls: ConversationControls, options: EditorOptions, private handoff?: WorkspaceHandoff) { super(container, controls, options); }
+    constructor(container: HTMLElement, controls: ConversationControls, options: EditorOptions, private handoff?: WorkspaceHandoff) { super(container, controls, options); this.savedPrompts = options.savedPrompts; }
     async init(container: HTMLElement) {
         this.container = container;
         const abort = () => { void this.service.close().catch(() => {}); };
@@ -119,6 +123,18 @@ export class RemoteConversationEditor extends BaseSettingsEditor<ConversationCon
                     void this.run(() => this.service.rename!(title)).catch(() => {});
             },
         }, this.handoff); this.handoff = undefined;
+        this.promptCommands = new LegacyPromptCommands(() => this.savedPrompts, () => (this.snapshot?.messages ?? [])
+            .filter(message => message.role === 'user' && !message.id.startsWith('submitted:')).map(message => ({id: message.id, revision: 0, role: 'user' as const,
+                state: 'complete' as const, timestamp: message.timestamp ?? message.submittedAt,
+                parts: [{id: 'text', kind: 'markdown' as const, text: remotePrompts([message])[0]?.text ?? ''}]})),
+            (id, expected) => {
+                const messages = this.snapshot?.messages ?? [], index = messages.findIndex(message => message.id === id);
+                if (index < 0) {revealLegacyMessage(null, id, ''); return;}
+                const group = remoteRounds(messages.slice(0, index + 1)).filter(item => item.role === 'user').at(-1), text = remotePrompts([messages[index]])[0]?.text;
+                revealLegacyMessage(group && text === expected ? this.view.history.view.revealSession(group.id) : null, id, text ?? '');
+            }, () => this.loadHistory(),
+            () => !!this.snapshot?.hasEarlier && !!this.service.loadEarlier, () => this.historyError);
+        this.view.input.registerPlugin(this.promptCommands);
         const fork = (action: () => Promise<ConversationSnapshot>) => this.runBranch(action);
         this.branches = new RemoteBranches(this.service, this.options, fork, error => this.showError(error));
         this.container.querySelectorAll('#llm-branch-indicator')[0]!.append(this.branches.element);
@@ -148,6 +164,7 @@ export class RemoteConversationEditor extends BaseSettingsEditor<ConversationCon
         if (!this.composer && this.snapshot?.pending && !snapshot.pending && snapshot.draft === '' && !snapshot.draftAttachments?.length && this.submittedDraft) {
             await this.acceptSubmission(this.submittedDraft.text, this.submittedDraft.files, this.submittedDraft.revision); this.submittedDraft = undefined;
         }
+        if (this.snapshot?.sessionId !== snapshot.sessionId) this.promptCommands?.setActive(false);
         this.snapshot = snapshot;
         this.executionNotice?.update(snapshot);
         this.instructionQueuePanel?.update(snapshot);
@@ -300,6 +317,7 @@ export class RemoteConversationEditor extends BaseSettingsEditor<ConversationCon
     }
     async sendText(text: string, files: File[] = [], nativeSelection?: import('../contracts').ConversationModelSelection): Promise<void | false> {
         if (!text.trim() && !files.length) return;
+        if (!this.closed && this.active && !this.options.readOnly && !files.length && this.promptCommands?.handle(text)) return false;
         const query = this.independentQuery(text);
         if (query) return this.sendReadOnlyQuery(text, files, query);
         const command = nativeBranchCommand(text);

@@ -1,3 +1,15 @@
+.llm-ui-session__message-location {
+    margin: 8px;
+    padding: 8px;
+    border: 1px solid var(--llm-border-color);
+    border-radius: 8px;
+}
+
+.llm-ui-session__message-location pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .llm-ui-flow-window {
     border: 1px solid var(--llm-border-color);
     border-radius: 8px;

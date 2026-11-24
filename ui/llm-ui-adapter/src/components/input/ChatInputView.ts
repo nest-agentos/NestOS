@@ -1044,7 +1044,7 @@ export class ChatInput implements IChatInputPresenter {
         if (!text && this.files.length === 0 && !this.agentFlow() && !this.config.settings.flowId) return;
         if (this.loading && !this.canQueue() && !this.canQuery() && !this.independentQueryAvailable() && !/^\/(flow|cancel|approve|resume)(?:\s|$)/.test(text)) return;
 
-        if (this.config.agentId.startsWith('remote:')) { await this.submitDraft(text, independent); return; }
+        if (this.config.agentId.startsWith('remote:')) { if (this.pluginRegistry.beforeRemoteSend(text)) await this.submitDraft(text, independent); return; }
 
         // ✨ before 钩子
         if (!/^\/run(?:\s|$)/.test(text) && !this.pluginRegistry.beforeSend(text)) return;

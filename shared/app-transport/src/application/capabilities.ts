@@ -65,7 +65,7 @@ export const CAPABILITIES: Readonly<Record<string, CapabilitySchema>> = {
     "ISessionRepository": { observer: 'subscribe', domain: 'session', markers: ["getManifest", "createSession"], fields: [],
         methods: {"subscribe": "subscribe", "createSession": "async", "getManifest": "query", "getLoadState": "query", "loadView": "query", "readHistoryChain": "query", "list": "query", "listSummaries": "query", "listSummariesInFolder": "query", "listFolders": "query", "promoteProjectFolder": "async", "createFolder": "async", "deleteFolder": "async", "renameFolder": "async", "updateManifest": "async", "getUIState": "query", "updateUIState": "async", "compareAndSetUIState": "async", "getSessionSettings": "query", "saveSessionSettings": "async", "readDocument": "query", "listHistory": "query", "writeAttachment": "async", "openAttachments": "async", "readSessionAsset": "query", "pendingSessionDeletions": "query"} },
     "PromptHistoryPort": { markers: ["getRecent"], fields: [],
-        methods: {"getRecent": "async", "add": "async", "remove": "async"} },
+        methods: {"getRecent": "async", "add": "async", "remove": "async", "listSaved": "query", "savePrompt": "async"} },
     "MemorySharingControls": { markers: ["grant", "audit"], fields: [],
         methods: {"state": "async", "create": "async", "use": "async", "grant": "async", "revoke": "async", "remove": "async", "audit": "async"} },
     "SessionMemoryControls": { markers: ["forSession", "sharing"], fields: ["sharing"],

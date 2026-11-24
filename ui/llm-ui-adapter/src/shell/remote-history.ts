@@ -27,6 +27,10 @@ export class RemoteHistory {
     }
     async show(messages: ConversationMessage[], submission?: ChatSubmission): Promise<void> {
         if (this.closed) return;
+        this.container.querySelectorAll('[data-legacy-message-location]').forEach(element => {
+            if (element.parentElement) delete element.parentElement.dataset.legacyMessageLocated;
+            element.remove();
+        });
         this.markup.clear();
         const groups = remoteRounds(messages, this.markup.encode);
         this.groups = groups;

@@ -4,6 +4,8 @@ NestOS 对独立 llm-ui 的适配与原产品编辑器兼容入口。通用 Chat
 
 新的 Session/native ChatView 绑定通过 /independent 导出，宿主保留其 source、台账和连接生命周期。原 /chat、/conversation、/settings、/startup 入口继续保留项目草稿、配置、Flow 业务表单、导航及原编辑器行为。
 
+独立输入框的 `/prompt 内容` 显式保存常用提示词，`/prompt` 列出并回填，均不发送；存储通过当前用户的 `PromptHistoryPort` 注入，独立于自动记录的输入历史。每次列出或保存会读取整个常用提示词文件，不提供分页或索引。`/history` 从当前绑定的已加载用户消息生成目录，按真实消息身份定位，按需加载更早消息；`/context-length 数字` 设置上下文历史长度。
+
 Session 绑定注入 `hasCommittedSubmission`，由宿主调用后端公开函数核对持久提交。仅内存入队时返回 unknown 并保留草稿，后续观察通知重新核对；适配器不直接读取 Round 存储。以下代码位于宿主组合根：
 
 ```ts

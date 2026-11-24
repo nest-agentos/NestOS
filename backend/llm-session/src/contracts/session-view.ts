@@ -6,6 +6,8 @@ export interface PromptHistoryPort {
     getRecent(count?: number): Promise<PromptHistoryEntry[]>;
     add(text: string, options?: { agentId?: string; sessionId?: string }): Promise<void>;
     remove(text: string): Promise<boolean>;
+    listSaved(): Promise<string[]>;
+    savePrompt(text: string, operationId: string): Promise<void>;
 }
 
 /** The editor needs observation and a command channel, not a session implementation. */

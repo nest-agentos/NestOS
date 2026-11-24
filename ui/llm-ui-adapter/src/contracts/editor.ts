@@ -4,6 +4,7 @@ import type {SessionDraftControls} from './SessionDraftControls';
 
 /** NestOS conversation wiring extends the resource-neutral editor host contract. */
 export interface ChatEditorOptions<TSubmission = unknown, TInitial = unknown> extends HostEditorOptions<TSubmission, TInitial> {
+    savedPrompts?: Pick<import('@nestos/llm-session/contracts').PromptHistoryPort, 'listSaved' | 'savePrompt'>;
     /** Host projection of selectable executors for this editor's immutable context. */
     filterExecutors?(ids: string[]): Promise<string[]>;
     conversation?: ConversationControls;

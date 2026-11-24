@@ -4912,6 +4912,8 @@ export const en: LocaleStrings = {
     'slash.simplify.description':            'Explain the last response in simpler terms',
     'slash.summarize.description':           'Summarize the entire conversation so far',
     'slash.history.invalid': 'History length must be an integer greater than or equal to -1.',
+    'chat.historyLocatedInput':              'Located user input',
+    'chat.historyLocationUnavailable':       'This message is unavailable. Refresh history and try again.',
     'slash.history.description':             'Set context history length (0 = none, -1 = all)',
     'slash.fresh.description':               'Next message sends without any history context',
     'slash.fold.description':                'Fold current visible chat',

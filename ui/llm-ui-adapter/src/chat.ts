@@ -70,9 +70,15 @@ export const createLLMFactory = (
     const pendingByContainer = new WeakMap<HTMLElement, Map<string, Promise<IEditor>>>();
 
     const createEditor = async (container: HTMLElement, options: EditorOptions, handoff?: RetainedWorkspaceHandoff): Promise<IEditor> => {
-        const chatOptions = normalizeEditorOptions(options as EditorOptions<import('@nestos/llm-flow/contracts').SessionSubmission, import('./services/SessionService').SessionLoadResult>);
+        const promptPort = () => {
+            const port = (deps.sessionManager ?? deps.resolveSessionView?.())?.promptHistory;
+            if (!port) throw Object.assign(new Error('Saved prompt storage unavailable'), {code: 'PROMPT_STORAGE_UNAVAILABLE'});
+            return port;
+        };
+        const savedPrompts = {listSaved: () => promptPort().listSaved(), savePrompt: (text: string, operationId: string) => promptPort().savePrompt(text, operationId)};
+        const chatOptions = normalizeEditorOptions({...options, savedPrompts} as EditorOptions<import('@nestos/llm-flow/contracts').SessionSubmission, import('./services/SessionService').SessionLoadResult>);
         if (options.conversation) {
-            return createConversationEditor(container, options.conversation, options, handoff, deps.ocr);
+            return createConversationEditor(container, options.conversation, {...options, savedPrompts}, handoff, deps.ocr);
         }
         if (options.sessionDraft) {
             const editor = new ChatDraftEditor(container, agentService, chatOptions, createEditor,

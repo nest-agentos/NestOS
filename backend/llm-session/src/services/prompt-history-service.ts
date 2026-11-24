@@ -33,6 +33,7 @@ const HISTORY_FILE = '/__config/history.yaml';
 const DEFAULT_MAX_ENTRIES = 500;
 const WRITE_DEBOUNCE_MS = 1500;
 const MIN_PROMPT_LENGTH = 2;
+const savedWriteQueues = new WeakMap<IFileSystem, Promise<void>>();
 
 /**
  * Prompt History 服务
@@ -60,6 +61,52 @@ export class PromptHistoryService extends FileBackedService {
 
     constructor(fs: IFileSystem, private readonly host: SessionHost = createSessionHost()) {
         super(fs, host.logger);
+    }
+
+    async listSaved(): Promise<string[]> {
+        await savedWriteQueues.get(this.engine);
+        return (await this.readSaved()).entries;
+    }
+
+    async savePrompt(text: string, operationId: string): Promise<void> {
+        const started = Date.now();
+        if (!text.trim()) throw Object.assign(new Error('Prompt is empty'), {code: 'EMPTY_PROMPT'});
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(operationId))
+            throw Object.assign(new Error('Operation identity is invalid'), {code: 'INVALID_OPERATION'});
+        const write = (savedWriteQueues.get(this.engine) ?? Promise.resolve()).then(async () => {
+            const data = await this.readSaved(), previous = data.operations[operationId];
+            if (previous !== undefined && previous !== text) throw Object.assign(new Error('Operation identity conflict'), {code: 'OPERATION_CONFLICT'});
+            if (previous !== undefined) return;
+            if (!data.entries.includes(text)) data.entries.unshift(text);
+            data.operations[operationId] = text;
+            const path = '/__config/saved-prompts.json', content = JSON.stringify(data);
+            if (await this.engine.driver.exists(path)) await this.engine.driver.writeContent(path, content);
+            else await this.engine.driver.createFile({name: 'saved-prompts.json', parentPath: '/__config', content, recursive: true});
+        });
+        savedWriteQueues.set(this.engine, write.catch(() => {}));
+        try {
+            await write;
+            this.host.logger.info('savedPrompt.persist', {operation: 'savedPrompt', stage: 'persist', operationId, result: 'success', durationMs: Date.now() - started});
+        } catch (error) {
+            const code = (error as {code?: unknown})?.code;
+            this.host.logger.warn('savedPrompt.persist', {operation: 'savedPrompt', stage: 'persist', operationId, result: 'failed', durationMs: Date.now() - started,
+                code: typeof code === 'string' && ['EACCES', 'EPERM', 'EIO', 'OPERATION_CONFLICT', 'INVALID_PROMPT_DATA'].includes(code) ? code : 'PROMPT_STORAGE_FAILED'});
+            throw error;
+        }
+    }
+
+    private async readSaved(): Promise<{version: 1; entries: string[]; operations: Record<string, string>}> {
+        const path = '/__config/saved-prompts.json';
+        if (!await this.engine.driver.exists(path)) return {version: 1, entries: [], operations: {}};
+        const content = await this.engine.driver.readContent(path);
+        const parsed: unknown = JSON.parse(typeof content === 'string' ? content : new TextDecoder().decode(content as ArrayBuffer));
+        if (!parsed || typeof parsed !== 'object' || !('version' in parsed) || parsed.version !== 1 || !('entries' in parsed)
+            || !Array.isArray(parsed.entries) || !parsed.entries.every(entry => typeof entry === 'string'))
+            throw Object.assign(new Error('Saved prompt data is invalid'), {code: 'INVALID_PROMPT_DATA'});
+        const operations = 'operations' in parsed ? parsed.operations : {};
+        if (!operations || typeof operations !== 'object' || Array.isArray(operations) || Object.values(operations).some(value => typeof value !== 'string'))
+            throw Object.assign(new Error('Saved prompt data is invalid'), {code: 'INVALID_PROMPT_DATA'});
+        return {version: 1, entries: [...parsed.entries], operations: {...operations} as Record<string, string>};
     }
 
     protected async onLoad(): Promise<void> {

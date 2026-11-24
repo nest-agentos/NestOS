@@ -1,5 +1,7 @@
 # @nestos/llm-session
 
+`PromptHistoryPort.listSaved()` 与 `savePrompt(text, operationId)` 管理用户显式保存的常用提示词，独立于自动记录的历史；保存返回前写入，重试须复用 UUID v4 操作身份。存储属于注入的用户文件系统，访问范围由宿主授权。
+
 会话机制：Session、Round、分支、上下文提交、运行协调和历史投影。普通 Chat 提交 Direct Run，显式 Flow 才提交 DAG Run。
 
 ```ts

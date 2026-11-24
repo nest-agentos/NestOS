@@ -10,6 +10,8 @@ import {WorkspaceDraftRecovery} from './WorkspaceDraftRecovery';
 import {DraftFilesCodec} from '../services/DraftFilesCodec';
 import {readInputContextDraft} from '../domain/context-draft';
 import { updateCollapseAction } from '../components/history/HistoryToolbar';
+import {LegacyPromptCommands} from './legacy-prompt-commands';
+import {revealLegacyMessage} from './legacy-message-location';
 import { disposeEditorResources } from './editor-disposal';
 import { rememberTaskAttachment, restoreTaskAttachment } from './task-attachment-lifecycle';
 import type { SessionViewPort } from '@nestos/llm-session/contracts';
@@ -120,6 +122,7 @@ import type {LLMEditorOptions} from './session-editor-options';
  * └──────────────────────────────────┘
  */
 export class LLMWorkspaceEditor implements IEditor {
+    private promptCommands?: LegacyPromptCommands;
     private container!: HTMLElement;
 
     // === 面向接口的引用 ===
@@ -998,6 +1001,7 @@ export class LLMWorkspaceEditor implements IEditor {
                     if (this.initComplete) this.submissionRecovery?.observe(event.payload);
                 }
                 if (event.type === 'branch:switched') {
+                    this.promptCommands?.setActive(false);
                     this.invocationAbort.abort();
                     if (this.viewActive) this.invocationAbort = new AbortController();
                     void this.stateManager.switchDraftBranch(event.payload.branchName).then(() => this.independentCallPanel?.reset()).catch(error => console.error('Branch draft switch failed', error));
@@ -1213,6 +1217,23 @@ export class LLMWorkspaceEditor implements IEditor {
 
     private registerInputPlugins(): void {
         const chatInput = this.chatInput as ChatInput;
+
+        this.promptCommands = new LegacyPromptCommands(() => this.options.savedPrompts ?? this.sessionManager.promptHistory,
+            () => this.sessionManager.getSessions().filter(group => group.role === 'user').flatMap(group => {
+                const inputs = group.inputMessages?.length ? group.inputMessages.map(input => typeof input.content === 'string' ? input.content : JSON.stringify(input.content)) : [group.content ?? ''];
+                return inputs.map((text, index) => ({id: `${group.id}:input:${index}`, revision: 0,
+                    role: 'user' as const, state: 'complete' as const, timestamp: group.timestamp, parts: [{id: 'text', kind: 'markdown' as const, text}]}));
+            }),
+            (id, expected) => {
+                const match = /^(.*):input:(\d+)$/.exec(id); if (!match) return;
+                const group = this.sessionManager.getSessions().find(item => item.id === match[1]);
+                const index = Number(match[2]);
+                const content = group?.inputMessages?.length ? group.inputMessages[index]?.content : index === 0 ? group?.content : undefined;
+                const text = content === undefined ? undefined : typeof content === 'string' ? content : JSON.stringify(content);
+                if (text !== expected) {revealLegacyMessage(null, id, ''); return;}
+                revealLegacyMessage(this.historyView.revealSession(match[1]), id, text);
+            }, async () => {}, () => false);
+        chatInput.registerPlugin(this.promptCommands);
 
         const promptHistory = this.sessionManager.promptHistory;
         if (promptHistory) {

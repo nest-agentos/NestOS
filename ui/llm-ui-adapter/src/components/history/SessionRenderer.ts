@@ -237,8 +237,12 @@ export class SessionRenderer {
         const content = group.executionRoot?.data.output ?? group.content ?? '';
         const id = group.executionRoot?.id ?? group.id;
         if (this.snapshotContent.get(group.id) !== content) {
+            const window = this.getSessionElement(group.id);
+            if (window?.dataset.legacyMessageLocated) {
+                window.querySelector(':scope > [data-legacy-message-location]')?.remove(); delete window.dataset.legacyMessageLocated;
+            }
             this.editorMap.get(id)?.setContent(content); this.snapshotContent.set(group.id, content);
-            const preview = this.getSessionElement(group.id)?.querySelector('.llm-ui-header-preview');
+            const preview = window?.querySelector('.llm-ui-header-preview');
             if (preview) preview.textContent = getPreviewText(content);
         }
         const node = group.executionRoot && this.getNode(id);

@@ -484,7 +484,7 @@ export const ChatInputTemplates = {
                     <tr><th colspan="2" class="llm-input__help-group">Settings</th></tr>
                     <tr><td><kbd>/agent</kbd> &lt;id&gt;</td><td>Switch agent</td></tr>
                     <tr><td><kbd>/model</kbd> &lt;id&gt;</td><td>Override model</td></tr>
-                    <tr><td><kbd>/history</kbd> &lt;n&gt;</td><td>Set context length (0 = none, -1 = all)</td></tr>
+                    <tr><td><kbd>/context-length</kbd> &lt;n&gt;</td><td>Set context length (0 = none, -1 = all)</td></tr>
                     <tr><td><kbd>/fresh</kbd></td><td>Clear context (fresh start)</td></tr>
                 </table>
             </section>

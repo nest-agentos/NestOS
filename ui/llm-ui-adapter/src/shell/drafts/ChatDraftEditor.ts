@@ -138,7 +138,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
             view.configureInput({selection: {...draft.selection, imageResize: JSON.stringify(resize)}}, draft.revision);});
         const images = this.imageHost;
         const ocr = chatOcrPort(this.controls.ocr, (ref, signal) => images.read(ref, {signal}));
-        return prepareImageChatOptions({inputPresentation: 'host', attachmentMenu: chatAttachmentMenu(true), plugins: workspaceInputPlugins(this.controls.commands, {navigation: 'projects', projectId: this.config.sessionDraft?.scope?.id},
+        return prepareImageChatOptions({savedPrompts: this.config.savedPrompts, inputPresentation: 'host', attachmentMenu: chatAttachmentMenu(true), plugins: workspaceInputPlugins(this.controls.commands, {navigation: 'projects', projectId: this.config.sessionDraft?.scope?.id},
             () => this.store.preferences(this.view?.getDraft()).agentId), ocr,
             source: this.source, operations: this.ledger, locale: getLocale(), initialDraft: restoreDraftTarget(this.store.draft, this.callTargets(), undefined, this.preferredAgent(store.draft)),
             actions: {send: async () => {throw new Error('Draft must materialize before dispatch');}, prepareSend: (input, draft) => this.prepare(input, draft),
