@@ -57,10 +57,9 @@
   },
   "dependencies": {
     "@nestos/app-contracts": "workspace:*",
-    "@xterm/addon-fit": "^0.10.0",
-    "@xterm/xterm": "^5.5.0",
     "@nestos/ui-common": "workspace:*",
-    "@nestos/llm-ui": "workspace:*"
+    "@nestos/llm-ui": "workspace:*",
+    "@nestos/terminal-ui": "workspace:*"
   },
   "repository": {
     "type": "git",

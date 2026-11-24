@@ -4,15 +4,30 @@ import {createModuleLogger} from '@nestos/common';
 import {FSError} from '@nestos/vfs-core';
 import type {ServerTerminal, ServerTerminals} from '@nestos/app-contracts/services';
 import type {IPty} from 'node-pty';
+import {TerminalStore} from './terminal-store';
+import type {TerminalCommand} from '@nestos/app-contracts/services';
 
 const logger = createModuleLogger('server-terminal');
 const BUFFER_LIMIT = 256 * 1024;
 
 /** No command, output, environment value or native error text enters diagnostics. */
 export class NodeServerTerminals implements ServerTerminals {
+    private readonly store?: TerminalStore;
     private readonly sessions = new Set<LiveTerminal>();
     private opening = 0;
     private closed = false;
+    constructor(directory?: string) { if (directory) this.store = new TerminalStore(directory); }
+    private requireStore(): TerminalStore { if (this.closed) throw new FSError('EIO', 'Terminal view is closed'); if (!this.store) throw new FSError('ECAPABILITY', 'Terminal command storage is unavailable'); return this.store; }
+    listCommands(): Promise<TerminalCommand[]> {return this.storage('listCommands', () => this.requireStore().listCommands());}
+    saveCommand(command: TerminalCommand): Promise<void> {return this.storage('saveCommand', () => this.requireStore().saveCommand(command));}
+    deleteCommand(id: string): Promise<void> {return this.storage('deleteCommand', () => this.requireStore().deleteCommand(id));}
+    listHistory(): Promise<string[]> {return this.storage('listHistory', () => this.requireStore().listHistory());}
+    private async storage<T>(operation: string, action: () => Promise<T>): Promise<T> {
+        const operationId = randomUUID(), started = Date.now();
+        try {const result = await action(); logger.info('Terminal storage operation', {operation, operationId, stage: 'storage', result: 'success', durationMs: Date.now()-started}); return result;}
+        catch (error) {logger.warn('Terminal storage operation failed', {operation, operationId, stage: 'storage', result: 'failure', code: error instanceof FSError ? error.code : 'TERMINAL_STORAGE_FAILED', durationMs: Date.now()-started});
+            if (error instanceof FSError) throw error; throw new FSError('EIO', 'Terminal storage failed; check private storage permissions');}
+    }
     async openTerminal(): Promise<ServerTerminal> {
         if (this.closed) throw new FSError('EIO', 'Terminal view is closed');
         if (this.sessions.size + this.opening >= 2) throw new FSError('EBUSY', 'Close an existing server terminal first');
@@ -21,21 +36,24 @@ export class NodeServerTerminals implements ServerTerminals {
             if (process.platform === 'win32') throw new FSError('ECAPABILITY', 'Server Bash requires a Unix host');
             const {spawn} = await import('node-pty');
             if (this.closed) throw new FSError('EIO', 'Terminal view is closed');
+            stage = 'history';
+            const history = await this.store?.prepareHistory(id);
+            if (this.closed) throw new FSError('EIO', 'Terminal view is closed');
             stage = 'spawn';
-            const pty = spawn('/bin/bash', ['--noprofile', '--norc', '-i'], {
-                name: 'xterm-256color', cols: 80, rows: 24, cwd: homedir(), env: {...process.env, TERM: 'xterm-256color'},
+            const pty = spawn('/bin/bash', history ? ['--noprofile', '--rcfile', history.rc, '-i'] : ['--noprofile', '--norc', '-i'], {
+                name: 'xterm-256color', cols: 80, rows: 24, cwd: homedir(), env: {...process.env, TERM: 'xterm-256color', ...(history ? {HISTFILE: history.history, NESTOS_TERMINAL_HISTORY_FILE: history.history, NESTOS_TERMINAL_HISTORY_LOCK: history.lock} : {})},
             });
             const terminal = new LiveTerminal(id, pty, () => this.sessions.delete(terminal));
             this.sessions.add(terminal);
             logger.info('Server terminal opened', {operation: 'open', operationId: id, stage: 'spawn', result: 'success', durationMs: Date.now() - started});
             return terminal;
         } catch (error) {
-            const code = error instanceof FSError ? error.code : stage === 'driver' ? 'TERMINAL_DRIVER_UNAVAILABLE' : 'TERMINAL_SPAWN_FAILED';
+            const code = error instanceof FSError ? error.code : stage === 'driver' ? 'TERMINAL_DRIVER_UNAVAILABLE' : stage === 'history' ? 'TERMINAL_HISTORY_FAILED' : 'TERMINAL_SPAWN_FAILED';
             logger.error('Server terminal could not open', {operation: 'open', operationId: id, stage, result: 'failure', code, durationMs: Date.now() - started});
             if (error instanceof FSError) throw error;
             throw new FSError('ECAPABILITY', stage === 'driver'
                 ? 'Server terminal driver is unavailable; check the node-pty native module'
-                : 'Server Bash could not start; check /bin/bash and the service account home directory');
+                : stage === 'history' ? 'Terminal history storage is unavailable; check private storage permissions' : 'Server Bash could not start; check /bin/bash and the service account home directory');
         } finally { this.opening--; }
     }
     async dispose(): Promise<void> {

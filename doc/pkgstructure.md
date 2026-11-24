@@ -1,17 +1,17 @@
 
 ## Workspace Structure
 
-pnpm monorepo：前端包位于 `ui/`，后端包位于 `backend/`，共享应用契约与基础工具位于 `shared/`，宿主位于 `apps/`（`apps/web-app` = `nestos-web`）。十六个独立库（包括 llm-ui、mdxeditor、vfs-ui、kanban）均位于 `libraries/`。ui-common 为零运行时依赖的独立 UI 基础库；通用应用编辑器契约位于 ui-common-adapter，会话及草稿契约归 llm-ui-adapter/contracts。
+pnpm monorepo：前端包位于 `ui/`，后端包位于 `backend/`，共享应用契约与基础工具位于 `shared/`，宿主位于 `apps/`（`apps/web-app` = `nestos-web`）。独立库（包括 llm-ui、mdxeditor、vfs-ui、kanban 和 terminal-ui）位于 `libraries/`。ui-common 为零运行时依赖的独立 UI 基础库；通用应用编辑器契约位于 ui-common-adapter，会话及草稿契约归 llm-ui-adapter/contracts。
 
 | 目录 | 模块 |
 |---|---|
 | `ui/` | app-shell、app-settings、llm-ui-adapter、mdx-adapter、ui-common-adapter |
 | `backend/` | app-core、kanban-development、git-delivery、llm-context、llm-session、llm-flow、llm-tasks、kernel-adapters、tools、sanbox、sync-adapters |
 | `shared/` | app-contracts、common、app-transport |
-| `libraries/` | driver-llm、cells-driver、vfs-core、vfs-sync、vfsdriver-indexeddb、vfsdriver-local、vfs-ui、mdxeditor、llm-ui、image-parser、durable-kernel、device-tty、kanban、kanban-ui、mail、ui-common |
+| `libraries/` | driver-llm、cells-driver、vfs-core、vfs-sync、vfsdriver-indexeddb、vfsdriver-local、vfs-ui、mdxeditor、llm-ui、image-parser、durable-kernel、device-tty、kanban、kanban-ui、mail、ui-common、terminal-ui 等 |
 | `apps/` | web-app、tauri-app、cli、http-app、demo、node-host（共享 Node 宿主适配包） |
 
-19 个业务/共享包 + 16 个独立库 + 5 个应用 + 1 个共享 Node 宿主适配包；另有 `tools/cells` Rust 工具子模块（包名与命令为 `cells`），寓意蜂房中的单个巢室，将信息与 Agent 集成为 NestOS 的单个智能节点。原 `packages/` 已清理，不再使用。目录和加载规则见 [前后端模块边界](design/frontend-backend-modules.md)。
+业务/共享包、独立库、应用和共享 Node 宿主适配包按上述目录组织；另有 `tools/cells` Rust 工具子模块（包名与命令为 `cells`），寓意蜂房中的单个巢室，将信息与 Agent 集成为 NestOS 的单个智能节点。原 `packages/` 已清理，不再使用。目录和加载规则见 [前后端模块边界](design/frontend-backend-modules.md)。
 
 ### LLM 子系统分层（单向依赖）
 
@@ -34,6 +34,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 | kernel-adapters `catalogs/` | LLM 设备支持目录：内置 Provider、模型能力、接口资料与价格；只经可选 `/llm/presets` 入口加载并返回独立快照，`/contracts` 提供不加载目录的纯契约。 |
 | `@nestos/driver-llm` | 独立模型通信：OpenAI/Responses/Anthropic/Gemini/Codex、SSE、取消与注入式网络/日志/重试；通信消息契约归本包，源码与发布产物不依赖其他 itookit 包；独立仓库 `mushuanli/driver-llm`。 |
 | `@nestos/device-tty` | 独立 Node TTY 驱动：pipe / node-pty 交互会话，拥有 /contracts；tools/contracts 兼容转发，唯一直接运行依赖 node-pty。 |
+| `@nestos/terminal-ui` | 独立 DOM 终端控件，宿主注入 PTY、命令存储、文案与身份生成；依赖 xterm 及 addon-fit，不依赖 vfs-core、设置页或 HTTP 宿主。 |
 | `@nestos/sanbox` | Seatbelt / Bubblewrap 策略与启动计划；根入口平台无关，`/node` 负责真实路径与启动探测，`native/` Rust crate 已接入 Tauri Session/Flow Bash，见 [系统沙箱](design/system-sandbox.md)。 |
 | `@nestos/tools` | 内置工具实现（`buildTool()` 工厂）：File/Search/Shell/Task/Agent/Bash/Skill 等；拥有 Tool/TTY 公共执行契约，Skill/子代理契约和 MCP 纯协议入口也归本包；外部 Skill/Agent 经最小端口注入。 |
 | `@nestos/vfs-sync` | 多端文件同步核心：规范 manifest、扫描完整性与三方计划、持久操作序列、冲突决策和恢复；零运行时依赖，I/O 由端口注入。 |

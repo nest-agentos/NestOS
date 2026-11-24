@@ -94,5 +94,11 @@
     "name": "@nestos/mail",
     "version": "0.5.1",
     "workspace": true
+  },
+  {
+    "directory": "terminal-ui",
+    "name": "@nestos/terminal-ui",
+    "version": "0.1.0",
+    "workspace": true
   }
 ]

@@ -134,7 +134,7 @@ export const CAPABILITIES: Readonly<Record<string, CapabilitySchema>> = {
     "ApplicationEvents": {invalidates: [], markers: ['eventBaseline', 'readEvents', 'setNotificationRead'], fields: [],
         methods: {eventBaseline: 'query', notificationSummary: 'query', readEvents: 'query', listNotifications: 'query', setNotificationRead: 'async', onChange: 'subscribe'}},
     "ApplicationDiagnostics": {invalidates: [], markers: ['query', 'onChange'], fields: [], methods: {query: 'query', onChange: 'subscribe'}},
-    "ServerTerminals": {invalidates: [], markers: ['openTerminal'], fields: [], methods: {openTerminal: 'async'}},
+    "ServerTerminals": {invalidates: [], markers: ['openTerminal'], fields: [], methods: {openTerminal: 'async', listCommands: 'query', saveCommand: 'async', deleteCommand: 'async', listHistory: 'query'}},
     "ServerTerminal": {invalidates: [], markers: ['readOutput', 'sendInput', 'resizeTerminal'], fields: ['id'],
         methods: {readOutput: 'query', sendInput: 'async', resizeTerminal: 'async', dispose: 'async'}},
     "ApplicationBackend": { markers: ["workbenchView", "toolboxView", "taskDetails"], fields: ['editorSwaps', 'diagnostics', 'flowInstallations', 'events', 'serverTerminals'],

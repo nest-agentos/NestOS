@@ -11,10 +11,10 @@ import type { HostedApplicationClient } from '@nestos/app-contracts/services';
 export interface HostedView { root: HostedApplicationClient; prepare(peer: RpcPeer, domains?: ReadonlySet<ViewDomain>): Promise<void>; close(): Promise<void> }
 const ROOTS = ['/etc', '/home/admin', ...APPLICATION_WORKSPACES.map(name => `/home/admin/${name}`)];
 /** Each browser owns view resources and bindings; execution remains daemon-owned. */
-export async function createHostedView(runtime: ApplicationRuntime, configurationReadonly = false): Promise<HostedView> {
+export async function createHostedView(runtime: ApplicationRuntime, configurationReadonly = false, terminalDirectory?: string): Promise<HostedView> {
     const view = await openApplicationView(runtime, { preload: true, configurationReadonly });
     const client = restrictApplicationFiles(view, ROOTS, configurationReadonly);
-    const terminals = configurationReadonly ? undefined : new NodeServerTerminals();
+    const terminals = configurationReadonly ? undefined : new NodeServerTerminals(terminalDirectory);
     try {
         const root: HostedApplicationClient = { ...client, backend: {...client.backend, serverTerminals: terminals}, services: { ...client.services, startBackground: undefined },
             flowLibrary: createNestosFlowLibrary(), fileTemplates: { agent: JSON.stringify(createNestosLlmPresets().agents, null, 2) } };

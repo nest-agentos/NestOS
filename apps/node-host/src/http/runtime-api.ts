@@ -7,8 +7,8 @@ import {isSessionRecoveryRequest, SessionRecoveryApi} from './session-recovery-a
 export class RuntimeApi {
     private readonly views: ViewApi;
     private readonly recovery: SessionRecoveryApi;
-    constructor(runtime: Promise<ApplicationRuntime>, audit?: AuditPort, ownsRuntime = true, configurationReadonly = false) {
-        this.views = new ViewApi(runtime, audit, ownsRuntime, configurationReadonly);
+    constructor(runtime: Promise<ApplicationRuntime>, audit?: AuditPort, ownsRuntime = true, configurationReadonly = false, terminalDirectory?: string) {
+        this.views = new ViewApi(runtime, audit, ownsRuntime, configurationReadonly, terminalDirectory);
         const service = runtime.then(value => value.sessionRecovery);
         void service.catch(() => {});
         this.recovery = new SessionRecoveryApi(service, audit);

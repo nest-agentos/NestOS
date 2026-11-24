@@ -42,7 +42,7 @@ CellsSettingsEditor 由工具箱 Cells 栏复用，旧 Cells 设置地址只作�
 
 InitialFilesPort.restore 的资源结果可附带独立依赖报告；页面分别显示资源 restored/preserved 和依赖 ready/missingTools/needsConfiguration/failed，具体工具、参数与连接原因均来自宿主。prepareDependencies 只重试依赖准备，不再恢复或覆盖 Flow；未就绪的依赖不能被汇总成恢复全部成功。处理入口通过宿主导航到工具箱，设置 UI 不发现或执行 Node 工具包。
 
-TerminalSettingsEditor 通过宿主注入的 ServerTerminals 打开服务器 PTY，按需加载 xterm 与 FitAddon；输入不持久化、不重放，关闭编辑器释放终端。设置包不直接创建进程；非 HTTP 管理员视图显示不可用原因。输出游标读取有界，隐藏/尺寸变化由公开 ResizeObserver 与 FitAddon 处理。
+TerminalSettingsEditor 装配独立 `@nestos/terminal-ui`，注入 ServerTerminals、命令存储、文案和身份生成；控件按需加载 xterm 与 FitAddon。原始输入不持久化、不重放，Bash 命令历史由宿主集成采集；关闭编辑器释放终端。设置包不直接创建进程；非 HTTP 管理员视图显示不可用原因。输出游标读取有界，隐藏/尺寸变化由公开 ResizeObserver 与 FitAddon 处理。
 
 CellsSettingsEditor 的连接测试和保存分开：参数改变后先 checkDraft，再以 requireTested 保存；状态和概览刷新不重绘未保存表单。项目挂载与指标从 nodeOverview 单次聚合读取，旧节点缺少统计时明确显示不可用；不扫描会话历史。
 

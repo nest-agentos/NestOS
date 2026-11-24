@@ -10,7 +10,7 @@ import type {ChannelRequest} from '../run/channel-protocol';
 import type {DecisionConversationOptions,DecisionConversation} from './decision-conversation-ports';
 import {resolveDecisionRequest} from './decision-conversation-requests';
 import {resolveCoordinationRequest} from './coordination-conversation-requests';
-import {queryDecisions} from './decision-query';
+import {listDecisions,queryDecisions} from './decision-query';
 import {requireValue} from './validation';
 const string={type:'string'};
 function schema(properties:Record<string,unknown>,required:string[]=[]):Record<string,unknown>{return {type:'object',properties,required,additionalProperties:false};}
@@ -21,6 +21,7 @@ export async function resolveKanbanPluginRequest(options:DecisionConversationOpt
     const method=(id:string,description:string,inputSchema:Record<string,unknown>,run:ChannelRequestMethod['run'],kind:'query'|'command'='query'):ChannelRequestMethod=>({id,kind,description,inputSchema,run});
     const decision=(id:string)=>(input:ChannelRequest)=>resolveDecisionRequest(options,conversation,{...input,method:'decision.'+id});
     const plugins:ChannelRequestPlugin[]=[{id:'decisions',version:'1',description:'Query decisions; scoped draft previews and dependency-aware confirmation.',methods:[
+        method('list','List authorized decisions in creation order with a revision-bound cursor.',schema({boardId:string,limit:{type:'integer',minimum:1,maximum:50},cursor:string}),input=>listDecisions(options,conversation,input.params)),
         method('search','Find authorized related decisions and formal completion.',schema({query:string,boardId:string,limit:{type:'integer',minimum:1,maximum:50}}),input=>queryDecisions(options,conversation,input.params)),
         method('read','Read an existing decision without creating or starting it.',schema({boardId:string,recordId:string},['recordId']),async input=>{
             requireValue(typeof input.params.recordId==='string','DECISION_QUERY_INVALID');

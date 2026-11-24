@@ -1,0 +1,13 @@
+@import '@xterm/xterm/css/xterm.css';
+.terminal-widget { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 360px; box-sizing: border-box; }
+.terminal-widget__title { margin: 0; }
+.terminal-widget__description { margin: 0; }
+.terminal-widget__toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.terminal-widget__status { min-height: 1.5em; overflow-wrap: anywhere; }
+.terminal-widget__screen { flex: 1; min-height: 240px; min-width: 0; padding: 8px; background: #000; overflow: hidden; }
+.terminal-widget__screen .xterm { height: 100%; }
+.terminal-widget__commands { display: flex; flex-direction: column; gap: 6px; max-height: 35%; overflow: auto; }
+.terminal-widget__commands[hidden] { display: none; }
+.terminal-widget__commands form { display: flex; flex-direction: column; gap: 6px; }
+.terminal-widget__commands textarea { min-height: 4em; }
+.terminal-widget__button { font: inherit; }

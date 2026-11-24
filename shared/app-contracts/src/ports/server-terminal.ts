@@ -9,4 +9,10 @@ export interface ServerTerminal {
 
 export interface ServerTerminals {
     openTerminal(): Promise<ServerTerminal>;
+    listCommands(): Promise<TerminalCommand[]>;
+    saveCommand(command: TerminalCommand): Promise<void>;
+    deleteCommand(id: string): Promise<void>;
+    listHistory(): Promise<string[]>;
 }
+
+export interface TerminalCommand { id: string; name: string; command: string }

@@ -220,6 +220,20 @@ it('discovers plugin schemas on demand, queries prerequisites and freezes depend
  await call('kanban.invoke',{pluginId:'decisions',method:'confirm',input:{proposalDigest:proposal.proposalDigest}},'confirm-client');
  expect(await f.service.record('b','client')).toMatchObject({status:'confirmed',dependsOn:[{boardId:'b',recordId:'server'}]});
 });
+it('lists only authorized decisions with stable cursors and rejects a stale cursor',async()=>{
+ const f=await fixture(),{resolveKanbanPluginRequest}=await import('../src/kanban/session-request-plugins');
+ f.conversation.binding.projectId='one';
+ const call=(input:any,id:string)=>resolveKanbanPluginRequest(f.options,f.conversation,{id,scopeId:'conversation',method:'kanban.invoke',params:{pluginId:'decisions',method:'list',input}}) as Promise<any>;
+ for(const [id,projects] of [['a',['one']],['b',['two']],['c',['one','two']]] as const){
+  await f.service.execute('b',{operationId:'list-create-'+id,expectedRevision:(await f.service.read('b')).revision,command:{type:'append-record',record:{id,kind:'decision',title:id,content:'Scope',rationale:'Check',itemIds:[],sources:[],externalRefs:projects.map(project=>({system:'nestos-remote-project',id:project}))}}});
+ }
+ const first=await call({limit:1},'list-first');expect(first.total).toBe(2);expect(first.decisions).toHaveLength(1);expect(first.nextCursor).toBeTruthy();
+ const second=await call({limit:1,cursor:first.nextCursor},'list-second');
+ expect([...first.decisions,...second.decisions].map(row=>row.id).sort()).toEqual(['a','c']);
+ expect([...first.decisions,...second.decisions].flatMap(row=>row.projectIds)).toEqual(['one','one']);
+ await f.service.execute('b',{operationId:'list-create-d',expectedRevision:(await f.service.read('b')).revision,command:{type:'append-record',record:{id:'d',kind:'decision',title:'d',content:'Scope',rationale:'Check',itemIds:[],sources:[],externalRefs:[{system:'nestos-remote-project',id:'one'}]}}});
+ await expect(call({limit:1,cursor:first.nextCursor},'list-stale')).rejects.toMatchObject({code:'CURSOR_STALE'});
+});
 it('adds a scoped host plugin without adding a top-level MCP tool or eagerly exposing its schema',async()=>{
  const f=await fixture(),{resolveKanbanPluginRequest}=await import('../src/kanban/session-request-plugins'),run=vi.fn(async()=>({state:'ok'}));
  f.options.requestPlugins=()=>[{id:'example',version:'1',description:'Example capability',methods:[{id:'inspect',kind:'query',description:'Inspect',inputSchema:{type:'object',properties:{selection:{type:'string'}}},run}]}];

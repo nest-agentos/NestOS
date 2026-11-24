@@ -6,7 +6,6 @@
 @import './_log.css';
 @import './_system-fs.css';
 @import './_appearance.css';
-@import '@xterm/xterm/css/xterm.css';
-@import './_terminal.css';
+@import '@nestos/terminal-ui/style.css';
 
 @import './_cells.css';
