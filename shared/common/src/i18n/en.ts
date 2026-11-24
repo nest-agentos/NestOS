@@ -814,6 +814,7 @@ export const en: LocaleStrings = {
     'kanban.errors.DECISION_SESSION_BLOCKED': 'Resolve the open issues in this session before continuing.',
     'kanban.errors.PLANNING_ERROR_REPORTED': 'Resolve and recheck the error in the original management session to continue.',
     'kanban.errors.SERVICE_PROJECT_BINDING_REQUIRED': 'This project lacks the Cells root binding required for managed deployment.',
+    'kanban.errors.SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH': 'The registered source checkout differs from the running service checkout. Check the host deployment binding and launcher directory.',
     'kanban.errors.SERVICE_PROJECT_UNAUTHORIZED': 'This Cells project cannot deploy the selected service. Check the host service project binding.',
     'kanban.errors.SERVICE_PROJECT_BINDING_CHANGED': 'The Cells project root changed. Refresh the mount and rebuild.',
     'kanban.errors.SERVICE_PROJECT_CHANGED_REBUILD': 'The deployment project or service binding changed. Rebuild the candidate.',

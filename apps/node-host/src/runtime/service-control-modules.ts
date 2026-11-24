@@ -1,15 +1,17 @@
 import type {RuntimeServiceControl} from '@nestos/app-contracts/services';
 import type {RuntimeServiceProject} from '@nestos/app-contracts/services';
-import {open,readFile} from 'node:fs/promises';
+import {open,readFile,realpath} from 'node:fs/promises';
 import {constants,existsSync} from 'node:fs';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {randomUUID} from 'node:crypto';
 /** Only administrator-owned host configuration may load service controller code. */
 export function serviceControlModules(primary:RuntimeServiceControl|undefined):RuntimeServiceControl|undefined {
     if(!primary&&!process.env.NESTOS_SERVICE_MODULES&&!existsSync(path.join(homedir(),'.config/nestos/service-modules.json')))return;
     let loaded:Promise<Map<string,RuntimeServiceControl>>|undefined;
     const controllers=()=>loaded??=load(primary);
+    if(primary&&process.env.NESTOS_HTTPD_SERVICE_ID)void reportSelfSource(process.env.NESTOS_HTTPD_SERVICE_ID,process.env.INIT_CWD);
     const select=async(id?:string)=>{
         if(primary&&(!id||(await primary.describe()).id===id))return primary;
         const entries=await controllers();
@@ -19,8 +21,14 @@ export function serviceControlModules(primary:RuntimeServiceControl|undefined):R
     const authorize=async(id:string,project:RuntimeServiceProject)=>{
         const bindings=await projectBindings();
         const primaryId=process.env.NESTOS_HTTPD_SERVICE_ID;
-        if(!bindings.some(row=>(row.serviceId===id||row.serviceId==='httpd'&&id===primaryId)
-            && projectFields.every(key=>row[key]===project[key])))throw failure('SERVICE_PROJECT_UNAUTHORIZED');
+        const matches=bindings.filter(row=>(row.serviceId===id||row.serviceId==='httpd'&&id===primaryId)
+            && projectFields.every(key=>row[key]===project[key]));
+        if(!matches.length)throw failure('SERVICE_PROJECT_UNAUTHORIZED');
+        for(const row of matches){
+            if(!row.sourceCheckout)return;
+            if(primary&&id===primaryId&&await matchesSourceCheckout(row.sourceCheckout,process.env.INIT_CWD))return;
+        }
+        throw failure('SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH');
     };
     return {describeForProject:async(id,project)=>{
             const serviceId=id==='httpd'&&primary?process.env.NESTOS_HTTPD_SERVICE_ID??id:id;
@@ -30,18 +38,35 @@ export function serviceControlModules(primary:RuntimeServiceControl|undefined):R
             return {...descriptor,project};
         },describe:async id=>{const descriptor=await(await select(id)).describe();if(id&&descriptor.id!==id)throw failure('SERVICE_TARGET_MISMATCH');return descriptor;},
         verifyArtifact:async request=>{if(request.project)await authorize(request.serviceId,request.project);const entry=await select(request.serviceId);if(!entry.verifyArtifact)throw Object.assign(new Error('Artifact verification unavailable'),{code:'SERVICE_ARTIFACT_VERIFICATION_UNAVAILABLE'});await entry.verifyArtifact(request);},
+        runningArtifact:async request=>{await authorize(request.serviceId,request.project);return (await select(request.serviceId)).runningArtifact?.(request);},
         submit:async request=>{if(request.project)await authorize(request.serviceId,request.project);await (await select(request.serviceId)).submit(request);},inspect:async request=>(await select(request.serviceId)).inspect(request),
         provenance:async(version,id)=>(await select(id)).provenance?.(version)};
 }
+async function reportSelfSource(serviceId:string,active:string|undefined):Promise<void>{
+    const operationId=randomUUID(),started=Date.now();
+    let code='SERVICE_PROJECT_BINDING_REQUIRED';
+    try{
+        const rows=(await projectBindings()).filter(row=>row.sourceCheckout&&(row.serviceId===serviceId||row.serviceId==='httpd'));
+        if(rows.length)code='SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH';
+        for(const row of rows)if(await matchesSourceCheckout(row.sourceCheckout!,active)){code='SERVICE_PROJECT_SOURCE_CHECKOUT_MATCHED';break;}
+    }catch{code='SERVICE_PROJECT_CONFIGURATION_INVALID';}
+    console.info('[ServiceProject]',JSON.stringify({operation:'service.project',operationId,stage:'startup.source',
+        result:code==='SERVICE_PROJECT_SOURCE_CHECKOUT_MATCHED'?'success':'failure',code,durationMs:Date.now()-started}));
+}
 const projectFields=['serverId','serverProjectId','principalId','alias','root'] as const;
-type ProjectBinding=RuntimeServiceProject&{serviceId:string};
+type ProjectBinding=RuntimeServiceProject&{serviceId:string;sourceCheckout?:string};
+async function matchesSourceCheckout(expected:string,active:string|undefined):Promise<boolean>{
+    if(!active||!path.isAbsolute(active))return false;
+    try{return (await realpath(expected))===(await realpath(active));}catch{return false;}
+}
 async function projectBindings():Promise<ProjectBinding[]>{
     let raw=process.env.NESTOS_SERVICE_PROJECTS;
     if(!raw)raw=await readProjectBindings();
     let value:unknown;
     try {value=raw?JSON.parse(raw):[];}catch{throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');}
     if(!Array.isArray(value)||value.length>128||!value.every(row=>typeof row?.serviceId==='string'
-        &&projectFields.every(key=>typeof row[key]==='string'&&row[key].length>0)))throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');
+        &&projectFields.every(key=>typeof row[key]==='string'&&row[key].length>0)
+        &&(row.sourceCheckout===undefined||typeof row.sourceCheckout==='string'&&path.isAbsolute(row.sourceCheckout))))throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');
     return value;
 }
 

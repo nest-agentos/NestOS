@@ -1,5 +1,5 @@
 import {afterEach,expect,it,vi} from 'vitest';
-import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {serviceControlModules} from '../src/runtime/service-control-modules';
@@ -13,6 +13,22 @@ it('dispatches only to the explicitly registered target and keeps its private op
   expect(await control.describe('node')).toEqual({id:'node',version:'node-version'});
   await control.submit({operationId:'replace',serviceId:'node',expectedVersion:'old',targetVersion:'new'});expect(primary.submit).not.toHaveBeenCalled();
   await expect(control.describe('unknown')).rejects.toMatchObject({code:'SERVICE_TARGET_UNAVAILABLE'});
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+it('recognizes the registered active checkout through an alias and rejects a clone and other project',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'self-service-project-'));
+ try{
+  const source=path.join(root,'source'),clone=path.join(root,'clone'),alias=path.join(root,'alias');
+  await mkdir(source);await mkdir(clone);await symlink(source,alias);
+  const id='httpd-self',project={serverId:'node',serverProjectId:'self',principalId:'owner',alias:'prj',root:'/source'};
+  vi.stubEnv('NESTOS_HTTPD_SERVICE_ID',id);vi.stubEnv('INIT_CWD',alias);
+  vi.stubEnv('NESTOS_SERVICE_PROJECTS',JSON.stringify([{serviceId:'httpd',sourceCheckout:source,...project}]));
+  const control=serviceControlModules({describe:async()=>({id,version:'current'}),submit:vi.fn(),inspect:vi.fn()})!;
+  await expect(control.describeForProject!('httpd',project)).resolves.toMatchObject({id,project});
+  await expect(control.describeForProject!('httpd',{...project,serverProjectId:'clone'})).rejects.toMatchObject({code:'SERVICE_PROJECT_UNAUTHORIZED'});
+  vi.stubEnv('INIT_CWD',clone);
+  await expect(control.describeForProject!('httpd',project)).rejects.toMatchObject({code:'SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH'});
  }finally{await rm(root,{recursive:true,force:true});}
 });
 it('keeps the primary service available when an unrelated plugin cannot load',async()=>{

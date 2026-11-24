@@ -22,11 +22,12 @@ export async function changeLaunch(root,mode,change) {
     });
 }
 export async function launcherAlive(state) {return !!state?.launcher&& (await processIdentity(state.launcher.pid,false))?.birth===state.launcher.birth;}
-export async function requestLaunch(root,mode,request,validateTarget) {
-    return changeLaunch(root,mode,state=>{
+export const requestFingerprint=request=>createHash('sha256').update(JSON.stringify(request)).digest('hex');
+export async function requestLaunch(root,mode,request,validateTarget,verifyRunning) {
+    return changeLaunch(root,mode,async state=>{
         if(!state)throw launchFailure('HTTPD_LAUNCHER_NOT_RUNNING');
         if(request.serviceId&&request.serviceId!==state.serviceId)throw launchFailure('HTTPD_SERVICE_MISMATCH');
-        const fingerprint=createHash('sha256').update(JSON.stringify(request)).digest('hex'),prior=state.receipts?.[request.operationId];
+        const fingerprint=requestFingerprint(request),prior=state.receipts?.[request.operationId];
         if(prior){if(prior.fingerprint!==fingerprint)throw launchFailure('HTTPD_OPERATION_CONFLICT');return state;}
         if(state.operation?.id===request.operationId){if(state.operation.fingerprint!==fingerprint)throw launchFailure('HTTPD_OPERATION_CONFLICT');return state;}
         if(state.operation&&!state.receipts?.[state.operation.id]&&request.action!=='stop')throw launchFailure('HTTPD_SWITCH_PENDING');
@@ -34,6 +35,11 @@ export async function requestLaunch(root,mode,request,validateTarget) {
         if(request.action==='switch'&&request.expectedCurrent!==state.currentRelease)throw launchFailure('HTTPD_VERSION_CHANGED');
         validateTarget?.();
         if(Object.keys(state.receipts??{}).length>=512)throw launchFailure('HTTPD_OPERATION_HISTORY_LIMIT');
+        if(verifyRunning&&request.action==='switch'&&state.desiredState==='running'&&request.targetRelease===state.currentRelease
+            &&await verifyRunning(state)){
+            receipts[request.operationId]={operationId:request.operationId,fingerprint,result:'success',version:state.currentRelease,finishedAt:Date.now(),alreadyRunning:true};
+            return {...state,receipts};
+        }
         return {...state,receipts,desiredState:request.action==='stop'?'stopped':'running',operation:{id:request.operationId,fingerprint,action:request.action,target:request.targetRelease,previous:state.currentRelease,phase:'queued',createdAt:Date.now()}};
     });
 }

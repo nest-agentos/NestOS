@@ -1,5 +1,6 @@
 import {releaseDependencies} from './release-provenance';
 import type {RuntimeServiceControl} from '@nestos/app-core';
+import type {ServiceSwitchRequest} from '@nestos/app-contracts/services';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -27,6 +28,15 @@ export function localServiceControl():RuntimeServiceControl|undefined {
                 console.info('[HTTPServiceControl]',JSON.stringify({operation:'artifact.verify',operationId:request.operationId,stage:'source-checkout',result:'success',durationMs:Date.now()-started}));
             }catch(error){console.warn('[HTTPServiceControl]',JSON.stringify({operation:'artifact.verify',operationId:request.operationId,stage:'source-checkout',result:'failure',code:(error as {code?:string}).code??'SERVICE_ARTIFACT_INVALID',durationMs:Date.now()-started}));throw error;}
         },
+        runningArtifact:async request=>{
+            const version=process.env.NESTOS_HTTPD_VERSION;
+            if(request.serviceId!==serviceId||!version)return;
+            const current=await check();if(current.currentRelease!==version)return;
+            const {runtime}=await load(),directory=runtime.releaseDirectory(runtime.releasesRoot(root),version);
+            const manifest=runtime.verifyRelease(directory);
+            if(manifest.id!==version||manifest.commit!==request.sourceVersion||manifest.dirty!==false)return;
+            return {version,sha256:artifactDigest(path.join(directory,'release.json'))};
+        },
         provenance:async(previousVersion)=>{
             await check();const {runtime}=await load(),version=process.env.NESTOS_HTTPD_VERSION;if(!version)return;
             const manifest=runtime.verifyRelease(runtime.releaseDirectory(runtime.releasesRoot(root),version));
@@ -41,12 +51,22 @@ export function localServiceControl():RuntimeServiceControl|undefined {
             try{runtime.verifyRelease(runtime.releaseDirectory(runtime.releasesRoot(root),request.targetVersion));}
             catch(error){console.warn('[HTTPServiceControl]',JSON.stringify({operation:'service.replace',operationId:request.operationId,stage:'artifact.verify',result:'failure',code:'SERVICE_ARTIFACT_INVALID',causeCode:(error as {code?:string}).code,durationMs:Date.now()-started}));
                 throw Object.assign(new Error('Candidate does not match the declared service artifact'),{code:'SERVICE_ARTIFACT_INVALID',executionOutcome:'not-started',retryable:false});}
-            await state.requestLaunch(root,'release',{operationId:request.operationId,action:'switch',targetRelease:request.targetVersion,expectedCurrent:request.expectedVersion,serviceId});
+            const {launchHealth}=await import(pathToFileURL(path.join(root,'scripts/httpd-launch-health.mjs')).href);
+            const result=await state.requestLaunch(root,'release',switchRequest(request),undefined,async (current:{args:string[]})=>
+                process.env.NESTOS_HTTPD_VERSION===request.targetVersion&&await launchHealth(root,current.args,'release')(request.targetVersion));
+            if(result.receipts?.[request.operationId]?.alreadyRunning)console.info('[HTTPServiceControl]',JSON.stringify({operation:'service.replace',operationId:request.operationId,stage:'reconcile-running',result:'success',version:request.targetVersion,durationMs:Date.now()-started}));
         },inspect:async request=>{
             const value=await check(),receipt=value.receipts?.[request.operationId];if(!receipt)return {state:'running'};
+            const {state}=await load();
+            if(receipt.fingerprint!==state.requestFingerprint(switchRequest(request)))return {state:'failed',code:'HTTPD_OPERATION_CONFLICT'};
             if(receipt.result!=='success')return {state:'failed',code:receipt.code??'SERVICE_REPLACEMENT_FAILED'};
-            return value.currentRelease===request.targetVersion?{state:'succeeded',version:request.targetVersion}:{state:'failed',code:'SERVICE_VERSION_MISMATCH'};
+            if(value.currentRelease!==request.targetVersion||receipt.version!==request.targetVersion)return {state:'failed',code:'SERVICE_VERSION_MISMATCH'};
+            return process.env.NESTOS_HTTPD_VERSION===request.targetVersion?{state:'succeeded',version:request.targetVersion}:{state:'running'};
         }};
+}
+
+function switchRequest(request:ServiceSwitchRequest){
+    return {operationId:request.operationId,action:'switch',targetRelease:request.targetVersion,expectedCurrent:request.expectedVersion,serviceId:request.serviceId};
 }
 
 function verifySourceCommit(root:string,commit:string|undefined):void {
@@ -59,10 +79,13 @@ function verifySourceCommit(root:string,commit:string|undefined):void {
 
 /** Only the configured service store is reachable through this capability. */
 function verifyArtifactDigest(file:string,digest:string):void {
+    if(!/^[a-f0-9]{64}$/.test(digest)||artifactDigest(file)!==digest)throw Object.assign(new Error('Artifact digest mismatch'),{code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
+}
+function artifactDigest(file:string):string {
     const fd=openSync(file,constants.O_RDONLY|constants.O_NOFOLLOW);
     try{const before=fstatSync(fd);if(!before.isFile()||before.size<1||before.size>8*1024*1024)throw Object.assign(new Error('Artifact manifest size invalid'),{code:'OPERATION_RESULT_ARTIFACT_LIMIT'});
         const bytes=readFileSync(fd),after=fstatSync(fd);
         if(bytes.length!==before.size||after.size!==before.size||after.mtimeMs!==before.mtimeMs||after.ctimeMs!==before.ctimeMs)throw Object.assign(new Error('Artifact changed during verification'),{code:'ARTIFACT_READ_CONFLICT'});
-        if(!/^[a-f0-9]{64}$/.test(digest)||createHash('sha256').update(bytes).digest('hex')!==digest)throw Object.assign(new Error('Artifact digest mismatch'),{code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
+        return createHash('sha256').update(bytes).digest('hex');
     }finally{closeSync(fd);}
 }

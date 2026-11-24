@@ -52,3 +52,19 @@ it('freezes the admitted project into build evidence and rechecks the current bi
  current=project;await managed.submit(request!,item);
  expect(control.submit).toHaveBeenCalledExactlyOnceWith(request);
 });
+
+it('adopts only the running artifact for the frozen integrated commit',async()=>{
+ const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());const fs=await manager.openFileSystem('/');
+ await fs.driver.createFile({parentPath:'/workspace/_nestos/etc',name:'deployment.json',recursive:true,content:JSON.stringify({schema:1,serviceId:'httpd'})});
+ const project={serverId:'node',serverProjectId:'self',principalId:'owner',alias:'prj',root:'/self'},commit='c'.repeat(40),sha256='a'.repeat(64);
+ const control={describe:vi.fn(),describeForProject:vi.fn(async()=>({id:'httpd-1',version:'live',project,
+  build:{base:'source-checkout' as const,directory:'.',command:['build']},artifact:{format:'release',manifest:'release.json',store:{base:'source-checkout' as const,path:'release/httpd'}}})),
+  runningArtifact:vi.fn(async(request:{sourceVersion:string})=>request.sourceVersion===commit?{version:'live',sha256}:undefined),
+  verifyArtifact:vi.fn(),submit:vi.fn(),inspect:vi.fn()};
+ const verify=vi.fn();const managed=managedServiceDeployment(control,async()=>({fs,dispose:async()=>{},project:async()=>project}),verify)!;
+ const job=(targetVersion:string)=>({id:'adopt-build',snapshot:{sourceVersion:'work',targetVersion}} as never),item={id:'self'} as never;
+ expect(await managed.reuseBuild!(job('d'.repeat(40)),item)).toBeUndefined();
+ expect(await managed.reuseBuild!(job(commit),item)).toMatchObject({operationId:'adopt-build',version:'live',status:'succeeded'});
+ expect(control.verifyArtifact).toHaveBeenCalledExactlyOnceWith({operationId:'adopt-build',serviceId:'httpd-1',version:'live',sha256,sourceVersion:commit,project});
+ expect(verify).toHaveBeenCalledOnce();
+});

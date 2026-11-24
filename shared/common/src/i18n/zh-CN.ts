@@ -815,6 +815,7 @@ export const zhCN = {
     'kanban.errors.DECISION_SESSION_BLOCKED': '原会话还有未解决的问题，请处理并上报关联的 resolved 后继续。',
     'kanban.errors.PLANNING_ERROR_REPORTED': '管理会话遇到错误。请进入原会话共同处理，复查并解除阻塞后继续规划。',
     'kanban.errors.SERVICE_PROJECT_BINDING_REQUIRED': '项目缺少受管发布所需的 Cells 根绑定。',
+    'kanban.errors.SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH': '此项目登记的源码目录与当前服务的启动目录不一致。请核对宿主发布绑定和启动目录。',
     'kanban.errors.SERVICE_PROJECT_UNAUTHORIZED': '此 Cells 项目未获准发布所选服务。请核对宿主的服务项目绑定。',
     'kanban.errors.SERVICE_PROJECT_BINDING_CHANGED': 'Cells 项目的实际根目录已变化。请刷新挂载后重新构建。',
     'kanban.errors.SERVICE_PROJECT_CHANGED_REBUILD': '发布项目或目标绑定已变化。请重新构建候选制品。',

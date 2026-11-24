@@ -39,12 +39,16 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
 }
 const serviceAdmissionCodes=new Set([
     'SERVICE_PROJECT_UNAUTHORIZED','SERVICE_PROJECT_BINDING_REQUIRED','SERVICE_PROJECT_CONFIGURATION_INVALID',
-    'SERVICE_TARGET_UNAVAILABLE','SERVICE_TARGET_MISMATCH','SERVICE_SOURCE_BUILD_REQUIRED',
+    'SERVICE_TARGET_UNAVAILABLE','SERVICE_TARGET_MISMATCH','SERVICE_SOURCE_BUILD_REQUIRED','SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH',
 ]);
 
 async function prepareServiceOrSession(options:ReviewOperationsOptions,base:ReviewJob,board:KanbanBoard,item:KanbanItem,context:unknown):Promise<ReviewJob|undefined> {
     const {adapter}=options,{id,action,snapshot}=base;
     try {
+        if(action==='build'&&adapter.managed?.reuseBuild){
+            const result=await preparationStage(options,id,'service.artifact',()=>adapter.managed!.reuseBuild!(base,item));
+            if(result){await validateReview(options,base,result);return {...base,phase:'settled',state:'succeeded',result};}
+        }
         if(action==='deploy'&&adapter.managed){
             const managed=await preparationStage(options,id,'service',()=>adapter.managed!.prepare({id,board,item,snapshot,context}));
             if(managed)return {...base,managed};
