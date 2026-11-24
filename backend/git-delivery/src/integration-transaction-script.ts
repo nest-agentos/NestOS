@@ -1,5 +1,6 @@
 import {integrationPublication} from './integration-publication-script';
 import {preserveIntegrationGitlinks} from './integration-gitlinks-script';
+import {captureIntegrationModules} from './integration-modules-source';
 import {captureIntegrationSource} from './integration-source-script';
 import {approvedMerge} from './integration-merge-script';
 
@@ -15,6 +16,7 @@ ${integrationPublication}
 ${approvedMerge}
 ${preserveIntegrationGitlinks}
 ${captureIntegrationSource}
+${captureIntegrationModules}
 integration_lock
 git check-ref-format "$branch"
 [ "$(git symbolic-ref HEAD)" = "$branch" ] && [ "$(git rev-parse HEAD)" = "$target" ] ||
@@ -65,19 +67,30 @@ for offset in range(0, len(blockers), 128):
 PYTHON
 }
 merge_source() {
-    source=$1 head=$2 dirty=$3 trailers=$4 frozen_tree=$5
+    source=$1 head=$2 dirty=$3 trailers=$4 frozen_tree=$5 source_modules=$6
     [ "$(git -C "$source" rev-parse HEAD)" = "$head" ] || stop 4 INTEGRATION_SOURCE_CHANGED
     next=$head
     if [ "$dirty" = dirty ]; then
         [ "$(git -C "$source" config --bool core.sparseCheckout || true)" != true ] || stop 3 INTEGRATION_SPARSE_WORKTREE
-        source_tree=$(capture_source_tree "$source" "$head" "$tmp/index")
+        if [ "$source_modules" = '[]' ]; then
+            source_tree=$(capture_source_tree "$source" "$head" "$tmp/index")
+        else
+            rc=0
+            source_tree=$(capture_module_tree "$source" "$head" "$source_modules" "$tmp" "$PWD" "$frozen_tree") || rc=$?
+            [ "$rc" -ne 4 ] || stop 4 INTEGRATION_SOURCE_CHANGED
+            [ "$rc" -eq 0 ] || stop 3 INTEGRATION_MODULE_CAPTURE_FAILED
+        fi
         [ -z "$frozen_tree" ] || [ "$source_tree" = "$frozen_tree" ] || stop 4 INTEGRATION_SOURCE_CHANGED
         next=$(commit "$source_tree" -p "$head" -m "chore(delivery): snapshot approved worktree")
     fi
-    if git merge-base --is-ancestor "$next" "$candidate"; then return; fi
+    if git merge-base --is-ancestor "$next" "$candidate"; then
+        verify_module_links "$next" "$candidate" "$candidate" "$source_modules" || stop 3 INTEGRATION_MODULE_REVIEW_REQUIRED
+        return
+    fi
     rc=0
     tree=$(approved_merge "$candidate" "$next") || rc=$?
     [ "$rc" -eq 0 ] || stop "$rc" INTEGRATION_SOURCE_MERGE
+    verify_module_links "$next" "$tree" "$candidate" "$source_modules" || stop 3 INTEGRATION_MODULE_REVIEW_REQUIRED
     if [ "$dirty" = dirty ] && git merge-base --is-ancestor "$head" "$candidate"; then
         [ "$tree" != "$(git rev-parse "$candidate^{tree}")" ] || return 0
         candidate=$(commit "$tree" -p "$candidate" -m "chore(delivery): integrate approved changes" -m "$trailers")
@@ -89,10 +102,10 @@ candidate=$target
 step=0
 while [ "$#" -gt 0 ]
 do
-    merge_source "$1" "$2" "$3" "$4" "$5"
+    merge_source "$1" "$2" "$3" "$4" "$5" "$6"
     printf 'create %s/steps/%s %s\\ncreate %s/sources/%s %s\\n' "$ref" "$step" "$candidate" "$ref" "$step" "$next" >> "$tmp/steps"
     step=$((step + 1))
-    shift 5
+    shift 6
 done
 
 stage=INTEGRATION_TARGET_CAPTURE_FAILED

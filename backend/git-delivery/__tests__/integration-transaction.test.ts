@@ -232,3 +232,41 @@ it('reports an external index change without resetting its staged blob',async()=
     expect(await f.git('show',':outside')).toBe('user staged');
     expect(await f.git('rev-parse','HEAD')).toBe(f.input.previousTarget);
 });
+
+it('publishes a frozen module snapshot without moving either module checkout',async()=>{
+    const f=await fixture(),repo=await mkdtemp(join(tmpdir(),'nestos-module-capture-'));
+    roots.push(repo);
+    await f.git('init','-qb','main',repo);
+    await f.git('-C',repo,'config','user.name','Fixture');
+    await f.git('-C',repo,'config','user.email','fixture@example.test');
+    await writeFile(join(repo,'history'),'base\n');await f.git('-C',repo,'add','history');await f.git('-C',repo,'commit','-qm','base');
+    const base=await f.git('-C',repo,'rev-parse','HEAD');
+    await f.git('-c','protocol.file.allow=always','submodule','add','--',repo,'module');
+    await f.git('commit','-qam','register module');
+    const previousTarget=await f.git('rev-parse','HEAD');
+    await f.git('-C',f.source,'merge','--ff-only',previousTarget);
+    await f.git('-C',f.source,'-c','protocol.file.allow=always','submodule','update','--init','--','module');
+    const sourceModule=join(f.source,'module'),targetModule=join(f.root,'module');
+    const file=join(sourceModule,'history');
+    await writeFile(file,'approved\n');
+    const objects=JSON.stringify([['module',base]]);
+    const frozen=await f.process.nativeShell.exec('sh',['-c',integrationSourceSnapshotScript,'test',previousTarget,objects],{cwd:'/workspace/source'});
+    expect(frozen).toMatchObject({code:0});
+    const input={...f.input,previousTarget,sources:[{...f.input.sources[0],sourceHead:previousTarget,sourceTree:frozen.stdout.trim(),
+        repositories:[{path:'.',head:previousTarget,dirty:true},{path:'module',head:base,dirty:true}]}]};
+    await writeFile(file,'changed after review\n');
+    await expect(tryGitIntegration(f.process,input)).rejects.toMatchObject({code:'INTEGRATION_SOURCE_CHANGED'});
+    expect(await f.git('rev-parse','HEAD')).toBe(previousTarget);
+    await writeFile(file,'approved\n');
+    expect(await tryGitIntegration(f.process,input)).toBe('applied');
+    const link=/^160000 commit ([a-f0-9]+)\s/.exec(await f.git('ls-tree','HEAD','module'))?.[1];
+    expect(link).toBeDefined();
+    expect(await f.git('-C',targetModule,'show',link+':history')).toBe('approved');
+    expect(await f.git('-C',targetModule,'rev-parse','refs/nestos/module-delivery/'+link)).toBe(link);
+    expect(await f.git('-C',targetModule,'rev-parse','HEAD')).toBe(base);
+    expect(await f.git('-C',sourceModule,'rev-parse','HEAD')).toBe(base);
+    expect(await f.git('-C',sourceModule,'diff','--cached','--name-only')).toBe('');
+    expect(await readFile(file,'utf8')).toBe('approved\n');
+    await writeFile(file,'later task work\n');
+    expect(await inspectGitIntegration(f.process,input)).toBe(await f.git('rev-parse','HEAD'));
+});

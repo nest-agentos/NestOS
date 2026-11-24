@@ -1178,6 +1178,7 @@ export const zhCN = {
     'kanban.errors.SERVICE_TARGET_CHANGED_REBUILD': '交付目标已变更，请为新目标重新构建，原制品不能直接替换。',
     'kanban.errors.SERVICE_PRIVILEGE_UNAVAILABLE': '服务控制器缺少管理权限，请检查宿主的控制插件授权。',
     'kanban.errors.SERVICE_TARGET_UNAVAILABLE': '交付目标尚未注册，请检查该任务的服务目标及控制插件。',
+    'kanban.errors.INTEGRATION_MODULE_CAPTURE_FAILED': '捕获授权子仓库的交付快照失败。请核对工作树、已登记模块和冻结版本后重新分析。',
     'kanban.errors.OPERATION_RESULT_AGENT_BLOCKED': 'Agent 发现缺少必要能力，详情见操作说明和原会话。',
     'kanban.errors.OPERATION_RESULT_AGENT_FAILED': 'Agent 执行未通过，详情见操作说明和原会话。',
     'kanban.reviewHelpTitle': '等待验收',

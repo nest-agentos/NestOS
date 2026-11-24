@@ -1177,6 +1177,7 @@ export const en: LocaleStrings = {
     'kanban.errors.SERVICE_TARGET_CHANGED_REBUILD': 'The delivery target changed. Rebuild for the new target before replacement.',
     'kanban.errors.SERVICE_PRIVILEGE_UNAVAILABLE': 'The service controller lacks administrator privileges. Check its host authorization.',
     'kanban.errors.SERVICE_TARGET_UNAVAILABLE': 'The delivery target is not registered. Check its service controller.',
+    'kanban.errors.INTEGRATION_MODULE_CAPTURE_FAILED': 'Failed to capture the authorized submodule snapshot. Check the worktree, registered submodule and frozen version before reanalysis.',
     'kanban.errors.OPERATION_RESULT_AGENT_BLOCKED': 'The agent found a missing prerequisite. See the operation summary and original session.',
     'kanban.errors.OPERATION_RESULT_AGENT_FAILED': 'The agent operation failed. See the summary and original session.',
     'kanban.reviewHelpTitle': 'Awaiting acceptance',

@@ -6,6 +6,7 @@ import {processWorkspacePath} from './worktree-paths';
 import {gitWorkspace} from './worktree-modules';
 import {inspectApprovedMergeScript} from './integration-merge-script';
 import {integrationRecoveryScript} from './integration-publication-script';
+import {dirtyIntegrationModules} from './integration-source-script';
 import {integrationScript} from './integration-transaction-script';
 
 export interface GitConflictResolution {path:string;choice:string;mode:'100644'|'100755'|'delete';oid?:string}
@@ -26,11 +27,11 @@ function operationRef(input: GitIntegrationTransaction): string {
 
 export async function tryGitIntegration(process: GitProcess, input: GitIntegrationTransaction): Promise<'session' | 'applied'> {
     const choices=integrationChoices(input.approval,input.resolutions);
-    if (!choices || !input.sources.length ||
-        input.sources.some(source => !source.sourceHead || source.repositories?.some(repo => repo.path !== '.' && repo.dirty))) return 'session';
+    if (!choices || !input.sources.length || input.sources.some(source => !source.sourceHead)) return 'session';
+    if(input.sources.some(source=>dirtyIntegrationModules(source.repositories).length>0&&!source.sourceTree))return 'session';
     requireValue(objectId.test(input.previousTarget) && input.sources.every(source => objectId.test(source.sourceHead!)&&(!source.sourceTree||objectId.test(source.sourceTree))), 'OPERATION_GIT_IDENTITY_INVALID');
     const sources = await Promise.all(input.sources.map(async source => [
-        await processWorkspacePath(process, source.directory), source.sourceHead!, source.repositories?.find(repo => repo.path === '.')?.dirty ? 'dirty' : 'clean', source.commitContext?.trailers ?? '',source.sourceTree??'',
+        await processWorkspacePath(process, source.directory), source.sourceHead!, source.repositories?.find(repo => repo.path === '.')?.dirty ? 'dirty' : 'clean', source.commitContext?.trailers ?? '',source.sourceTree??'', JSON.stringify(dirtyIntegrationModules(source.repositories)),
     ]));
     const args = ['-c', integrationScript, 'nestos-integration', operationRef(input),
         input.previousTarget, 'refs/heads/' + input.targetBranch, JSON.stringify(choices), ...sources.flat()];
@@ -40,6 +41,7 @@ export async function tryGitIntegration(process: GitProcess, input: GitIntegrati
     const code = stage && /^[A-Z_]{1,70}$/.test(stage) ? stage : 'INTEGRATION_OUTCOME_UNKNOWN';
     log.info('Git integration transaction', {operationId: input.operationId, stage: 'integration.apply',
         result: result.code === 0 ? 'success' : 'failure', code, durationMs: Date.now() - started});
+    if (code === 'INTEGRATION_MODULE_CAPTURE_FAILED') throw Object.assign(failure(code), {executionOutcome:'not-started'});
     if (result.code === 3 && code !== 'INTEGRATION_PUBLICATION_UNKNOWN') return 'session';
     if (code === 'INTEGRATION_SOURCE_CHANGED' || code === 'INTEGRATION_TARGET_CHANGED') {
         throw Object.assign(failure(code), {executionOutcome: 'not-started'});
@@ -95,12 +97,26 @@ async function verifyIntegrationSteps(process: GitProcess, input: GitIntegration
     for (const [index, source] of input.sources.entries()) {
         const actualTarget = refs.get(ref + '/steps/' + index), captured = refs.get(ref + '/sources/' + index);
         requireValue(actualTarget && captured && objectId.test(actualTarget) && objectId.test(captured), 'INTEGRATION_RECEIPT_INVALID');
-        const repositories = source.repositories?.map(repo => repo.path === '.' ? {...repo, dirty: false} : repo);
+        const repositories = await capturedRepositories(process,source,captured);
         await verifyCapturedTree(process, source, captured, previousTarget, actualTarget,input.approval,input.resolutions);
         await verifyGitIntegration(process, {...input, previousTarget, actualTarget, reportedTarget: actualTarget, sources: [{...source, repositories}]});
         previousTarget = actualTarget;
     }
     requireValue(previousTarget === target, 'INTEGRATION_RECEIPT_INVALID');
+}
+
+async function capturedRepositories(process:GitProcess,source:GitSource,captured:string):Promise<GitSource['repositories']> {
+    return source.repositories&&Promise.all(source.repositories.map(async repo=>{
+        if(repo.path==='.')return {...repo,dirty:false};
+        if(!repo.dirty)return repo;
+        requireValue(source.sourceTree,'INTEGRATION_RECEIPT_INVALID');
+        const entry=await gitWorkspace(process,'/workspace',['ls-tree',captured,'--',repo.path]);
+        const head=/^160000 commit ([a-f0-9]{40,64})\t/.exec(entry.stdout)?.[1];
+        requireValue(head,'INTEGRATION_RECEIPT_INVALID');
+        const parent=await gitWorkspace(process,'/workspace/'+repo.path,['show','-s','--format=%P',head]);
+        requireValue(parent.stdout.trim()===repo.head,'INTEGRATION_RECEIPT_INVALID');
+        return {...repo,head,dirty:false};
+    }));
 }
 
 async function verifyCapturedTree(process: GitProcess, source: GitSource, captured: string, previous: string, target: string,approval?:GitApproval,resolutions?:GitConflictResolution[]): Promise<void> {
