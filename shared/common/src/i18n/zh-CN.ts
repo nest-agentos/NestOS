@@ -184,6 +184,8 @@ export const zhCN = {
     'kanban.manualTask.cancel': '取消任务',
     'kanban.manualTask.cancelConfirm': '取消这张任务卡后，本轮会保留该卡的取消记录和备注。',
     'kanban.manualTask.discuss': '与 AI 讨论',
+    'kanban.manualTask.continueDiscussion': '查看或继续 AI 讨论',
+    'kanban.errors.TASK_DISCUSSION_ALREADY_LINKED': '此任务已有讨论会话，请打开原会话。',
     'kanban.manualTask.discussionPrompt': '请和我一起完成这项任务：{reference} {title}。\n完成标准：{acceptance}\n任务链接：{link}',
     'kanban.errors.RESERVED_TASK_ID': '此任务编号由系统保留，请使用其他编号。',
     'kanban.errors.HUMAN_CHECKLIST_REQUIRED': '此任务未配置为人工清单任务。',

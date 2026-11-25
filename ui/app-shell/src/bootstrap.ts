@@ -1,4 +1,5 @@
 import {LOOP_BOARD_PATH} from '@nestos/kanban-ui';
+import {openTaskDiscussion} from './kanban/task-discussion';
 import {KanbanWindowWorkbench} from './kanban/windows';
 import {folderBrowserPath, parseSessionRoute, resolveBrowserTarget} from '@nestos/app-contracts';
 import {mountContentTitleBar} from './workbench/content-titlebar';
@@ -400,11 +401,9 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                     if(!local)throw Object.assign(new Error('Local project unavailable'),{code:'VERIFICATION_LOCAL_PROJECT_UNAVAILABLE'});
                     await handleNavigationRequest({target:'chat',action:'create',create:{title,parentPath:folderBrowserPath(local.path)},state:{inputText}},true);
                 },
-                openTaskDiscussion: async (item,inputText) => {
-                    const projectId=item.externalRefs?.find(ref=>ref.system==='nestos-remote-project')?.id;
-                    const project=projectId?await services.projects.get(projectId):(await services.projects.list()).find(row=>row.protected);
-                    if(!project)throw Object.assign(new Error('Project unavailable'),{code:'TASK_DISCUSSION_PROJECT_UNAVAILABLE'});
-                    await handleNavigationRequest({target:'chat',action:'create',create:{title:item.title,parentPath:folderBrowserPath(project.path)},state:{inputText}},true);
+                openTaskDiscussion: async (boardId,item,inputText) => {
+                    const id=await openTaskDiscussion(services,backend,boardId,item,inputText);
+                    await handleNavigationRequest({target:'chat',resourceId:id,options:{newTab:true}});
                 },
                 openSessionInteraction:sessionInteractionDialog(services.projects,id=>handleNavigationRequest({target:'chat',resourceId:id,options:{newTab:true}})),
                 selected: path => selectionHistory(elementId, path, 'push'),

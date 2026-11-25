@@ -183,6 +183,8 @@ export const en: LocaleStrings = {
     'kanban.manualTask.cancel': 'Cancel task',
     'kanban.manualTask.cancelConfirm': 'The round will retain the cancellation and any notes for this task.',
     'kanban.manualTask.discuss': 'Discuss with AI',
+    'kanban.manualTask.continueDiscussion': 'View or continue AI discussion',
+    'kanban.errors.TASK_DISCUSSION_ALREADY_LINKED': 'This task already has a discussion. Open the existing session.',
     'kanban.manualTask.discussionPrompt': 'Help me with this task: {reference} {title}.\nCompletion criteria: {acceptance}\nTask link: {link}',
     'kanban.errors.RESERVED_TASK_ID': 'This task ID is reserved. Choose a different ID.',
     'kanban.errors.HUMAN_CHECKLIST_REQUIRED': 'This task is not configured as a human checklist item.',
