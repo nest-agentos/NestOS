@@ -254,6 +254,20 @@ it('preserves a managed build admission failure without starting a Session', asy
     expect(refreshed.operations.find(op => op.id === 'build')).toMatchObject({state: 'failed', code});
     expect(f.submission.start).not.toHaveBeenCalled();
 });
+it('reconciles a prepared build for the original operation when the Session result is unavailable',async()=>{
+    const f=await fixture(),id='original-build';
+    f.options.adapter.prepareOperation=vi.fn(async()=>({expectedSessionId:'original'}) as never);
+    f.options.adapter.readOperation=vi.fn(async()=>undefined);
+    f.submission.inspect.mockResolvedValue({sessionId:'original',outcome:'unknown'});
+    const reuseBuild=vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+    f.options.adapter.managed={reuseBuild,prepare:vi.fn(),submit:vi.fn(),inspect:vi.fn()};
+    await f.run('build',id);
+    reuseBuild.mockResolvedValue({...f.result(id),status:'succeeded'});
+    const view=await f.run('build','reconcile-build',{reconcile:{runId:id}});
+    expect(view.operations.find(operation=>operation.id==='build')).toMatchObject({state:'succeeded',runId:id});
+    expect(f.submission.start).toHaveBeenCalledOnce();
+    expect(f.options.adapter.managed.submit).not.toHaveBeenCalled();
+});
 it('retains the agent prerequisite explanation when an operation reports blocked', async () => {
     const f = await fixture();
     f.options.adapter.prepareOperation = vi.fn(async () => ({expectedSessionId: 'original'}) as never);

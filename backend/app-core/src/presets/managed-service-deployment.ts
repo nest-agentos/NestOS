@@ -37,13 +37,15 @@ export function managedServiceDeployment(control:RuntimeServiceControl|undefined
         }finally{await view.dispose();}
     };
     return {describe,reuseBuild:async(job,item)=>{
-        if(!control.runningArtifact)return;
+        if(!control.runningArtifact&&!control.preparedArtifact)return;
         const target=await describe(item),store=target?.artifact?.store;
         if(!target?.project||!target.artifact||!store)return;
-        const candidate=await control.runningArtifact({serviceId:target.id,sourceVersion:job.snapshot.targetVersion,project:target.project});
-        if(!candidate||candidate.version!==target.version)return;
+        const request={serviceId:target.id,sourceVersion:job.snapshot.targetVersion,project:target.project};
+        const running=await control.runningArtifact?.(request);
+        const candidate=running?.version===target.version?running:await control.preparedArtifact?.(request);
+        if(!candidate)return;
         const result={schema:'nestos.kanban.operation-result/1',operationId:job.id,sourceVersion:job.snapshot.sourceVersion,
-            targetVersion:job.snapshot.targetVersion,status:'succeeded',version:candidate.version,summary:'Host verified the deployed artifact for the integrated commit.',
+            targetVersion:job.snapshot.targetVersion,status:'succeeded',version:candidate.version,summary:'Host verified the release artifact for the integrated commit.',
             evidence:{path:`${store.path}/${candidate.version}/${target.artifact.manifest}`,sha256:candidate.sha256},
             deployment:{serviceId:target.id,projectDigest:deploymentProjectDigest(target.project)}};
         await verifyManagedBuildArtifact(control,target,result,job.snapshot.targetVersion);

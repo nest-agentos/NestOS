@@ -7,6 +7,7 @@ export interface RuntimeServiceControl {
     describe(serviceId?:string):Promise<RuntimeServiceDescriptor>;
     verifyArtifact?(request:{operationId:string;serviceId:string;version:string;sha256:string;sourceVersion?:string;project?:RuntimeServiceProject}):Promise<void>;
     runningArtifact?(request:{serviceId:string;sourceVersion:string;project:RuntimeServiceProject}):Promise<{version:string;sha256:string}|undefined>;
+    preparedArtifact?(request:{serviceId:string;sourceVersion:string;project:RuntimeServiceProject}):Promise<{version:string;sha256:string}|undefined>;
     provenance?(previousVersion:string,serviceId?:string):Promise<{serviceId:string;version:string;sourceCommit:string;dependencies?:Record<string,{current:string;previous:string}>}|undefined>;
     submit(request:ServiceSwitchRequest):Promise<void>;
     inspect(request:ServiceSwitchRequest):Promise<{state:'running'|'succeeded'|'failed';version?:string;code?:string}>;

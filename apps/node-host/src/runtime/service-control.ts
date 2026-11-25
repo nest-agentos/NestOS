@@ -4,7 +4,7 @@ import type {ServiceSwitchRequest} from '@nestos/app-contracts/services';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {openSync,fstatSync,readFileSync,closeSync,constants} from 'node:fs';
+import {openSync,fstatSync,readFileSync,closeSync,constants,readdirSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 /** Only the administrator runtime receives this local capability; no credential enters model context. */
 export function localServiceControl():RuntimeServiceControl|undefined {
@@ -36,6 +36,18 @@ export function localServiceControl():RuntimeServiceControl|undefined {
             const manifest=runtime.verifyRelease(directory);
             if(manifest.id!==version||manifest.commit!==request.sourceVersion||manifest.dirty!==false)return;
             return {version,sha256:artifactDigest(path.join(directory,'release.json'))};
+        },
+        preparedArtifact:async request=>{
+            if(request.serviceId!==serviceId||!/^[a-f0-9]{40,64}$/.test(request.sourceVersion))return;
+            await check();const {runtime}=await load(),store=runtime.releasesRoot(root);
+            const suffix='-'+request.sourceVersion.slice(0,8);
+            const candidates=readdirSync(store,{withFileTypes:true}).filter(entry=>entry.isDirectory()&&
+                /^\d{8}T\d{6}-[a-f0-9]{8}$/.test(entry.name)&&entry.name.endsWith(suffix)).map(entry=>entry.name).sort().reverse();
+            for(const version of candidates){
+                const directory=runtime.releaseDirectory(store,version),file=path.join(directory,'release.json');
+                const bytes=artifactManifest(file),manifest=JSON.parse(bytes.toString('utf8')) as {id?:string;commit?:string;dirty?:boolean};
+                if(manifest.id===version&&manifest.commit===request.sourceVersion&&manifest.dirty===false)return {version,sha256:createHash('sha256').update(bytes).digest('hex')};
+            }
         },
         provenance:async(previousVersion)=>{
             await check();const {runtime}=await load(),version=process.env.NESTOS_HTTPD_VERSION;if(!version)return;
@@ -82,10 +94,13 @@ function verifyArtifactDigest(file:string,digest:string):void {
     if(!/^[a-f0-9]{64}$/.test(digest)||artifactDigest(file)!==digest)throw Object.assign(new Error('Artifact digest mismatch'),{code:'OPERATION_RESULT_ARTIFACT_UNVERIFIED'});
 }
 function artifactDigest(file:string):string {
+    return createHash('sha256').update(artifactManifest(file)).digest('hex');
+}
+function artifactManifest(file:string):Buffer {
     const fd=openSync(file,constants.O_RDONLY|constants.O_NOFOLLOW);
     try{const before=fstatSync(fd);if(!before.isFile()||before.size<1||before.size>8*1024*1024)throw Object.assign(new Error('Artifact manifest size invalid'),{code:'OPERATION_RESULT_ARTIFACT_LIMIT'});
         const bytes=readFileSync(fd),after=fstatSync(fd);
         if(bytes.length!==before.size||after.size!==before.size||after.mtimeMs!==before.mtimeMs||after.ctimeMs!==before.ctimeMs)throw Object.assign(new Error('Artifact changed during verification'),{code:'ARTIFACT_READ_CONFLICT'});
-        return createHash('sha256').update(bytes).digest('hex');
+        return bytes;
     }finally{closeSync(fd);}
 }

@@ -39,6 +39,7 @@ export function serviceControlModules(primary:RuntimeServiceControl|undefined):R
         },describe:async id=>{const descriptor=await(await select(id)).describe();if(id&&descriptor.id!==id)throw failure('SERVICE_TARGET_MISMATCH');return descriptor;},
         verifyArtifact:async request=>{if(request.project)await authorize(request.serviceId,request.project);const entry=await select(request.serviceId);if(!entry.verifyArtifact)throw Object.assign(new Error('Artifact verification unavailable'),{code:'SERVICE_ARTIFACT_VERIFICATION_UNAVAILABLE'});await entry.verifyArtifact(request);},
         runningArtifact:async request=>{await authorize(request.serviceId,request.project);return (await select(request.serviceId)).runningArtifact?.(request);},
+        preparedArtifact:async request=>{await authorize(request.serviceId,request.project);return (await select(request.serviceId)).preparedArtifact?.(request);},
         submit:async request=>{if(request.project)await authorize(request.serviceId,request.project);await (await select(request.serviceId)).submit(request);},inspect:async request=>(await select(request.serviceId)).inspect(request),
         provenance:async(version,id)=>(await select(id)).provenance?.(version)};
 }
