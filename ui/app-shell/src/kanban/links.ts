@@ -1,4 +1,4 @@
-import {remoteSessionPath} from '@nestos/app-contracts';
+import {folderBrowserPath,remoteSessionPath} from '@nestos/app-contracts';
 import type {ProjectService} from '@nestos/app-contracts/services';
 import type {KanbanExternalReference} from '@nestos/kanban/contracts';
 import {KANBAN_EXECUTION_SESSION} from '@nestos/app-contracts';
@@ -10,6 +10,14 @@ export const projectDecisionsPath=(projectId:string):string=>decisionListPath(''
 export const sessionUrl = (id: string): string => workbenchUrl(id);
 export function kanbanReferenceLink(projects: Pick<ProjectService, 'get'>) {
     return async (reference: KanbanExternalReference) => {
+        if(reference.system==='nestos-primary-project'||reference.system==='nestos-work-directory'||reference.system==='nestos-worktree'){
+            const scope=reference.system==='nestos-primary-project'?{projectId:reference.id,directory:''}:directoryScope(reference.revision);
+            if(!scope)return;
+            const project=await projects.get(scope.projectId);
+            const directory=scope.directory.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+            const path=folderBrowserPath(project.path)+'/@files'+(directory?'/'+directory:'');
+            return {href:workbenchUrl(path),label:(project.displayName??project.name)+' · /workspace'+(scope.directory?'/'+scope.directory:'')};
+        }
         if (reference.system === KANBAN_EXECUTION_SESSION) return {href: sessionUrl(reference.id), label: t('kanban.enterSession'), sessionId: reference.id};
         if (reference.system !== 'nestos-native-session' && reference.system !== 'nestos-decision-source-session') return;
         let scope: {projectId?: string; profileId?: string};
@@ -21,3 +29,13 @@ export function kanbanReferenceLink(projects: Pick<ProjectService, 'get'>) {
     };
 }
 function workbenchUrl(resource: string): string {return `${location.href.split('#')[0]}#/workbench/${encodeURIComponent(resource)}`;}
+
+function directoryScope(revision:string|undefined):{projectId:string;directory:string}|undefined {
+    try {
+        const scope=JSON.parse(revision??'null');
+        if(typeof scope?.projectId!=='string'||typeof scope.directory!=='string')return;
+        const directory=scope.directory.replace(/^\/workspace\//,'');
+        if(directory.startsWith('/')||directory.split('/').some((segment:string)=>!segment||segment==='.'||segment==='..'))return;
+        return {projectId:scope.projectId,directory};
+    }catch{return;}
+}

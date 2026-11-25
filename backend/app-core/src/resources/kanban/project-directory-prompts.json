@@ -1,0 +1,4 @@
+{
+  "decision.md": "Read the frozen `planning-input` through session_context. Plan only, preserving the confirmed project scope. Follow planning.md for the result schema. Publish one scoped result through session_report, with ready=true and at least one independently verifiable execution subtask. Ask for clarification only when the confirmed scope is insufficient.",
+  "task.md": "Read `task` and `context` through session_context. Work within the confirmed project and task scope. The current directory is private to this attempt. Use it for generated artifacts and report their project-relative paths. Apply any explicitly authorized edits to the intended project files. Verify the acceptance criteria and publish exactly one result through session_report with concrete evidence and artifact locations. If blocked, publish the concrete issue and await clarification. Do not mark the task complete yourself."
+}

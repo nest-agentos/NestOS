@@ -16,7 +16,7 @@ export function developmentDelivery(fs: IFileSystem, remote: ProjectRemoteMountS
     const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions);
     return async (dispatchId: string) => {
         const record = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + dispatchId);
-        if (!record) return;
+        if (!record || record.directoryOnly) return;
         const repositories = await developmentStage(dispatchId, 'delivery.verify', () => developmentWorkspace(remote, provider, record.projectId,
             async process => {
                 const evidence = await verifyWorktreeDelivery(process, record.directory, record.repositories, record.policy.commit, record.availableRepositories);

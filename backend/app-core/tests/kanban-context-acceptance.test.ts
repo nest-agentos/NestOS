@@ -78,3 +78,18 @@ it.each([['decision','coordination'],['task','execution']] as const)('binds %s w
     const prepare=developmentPreparation(f.options as never);await prepare(input as never);input.board.settings['harness-'+role]='missing';await prepare(input as never);
     expect(save).toHaveBeenCalledTimes(2);for(const [connection]of save.mock.calls as unknown as Array<[{profileId:string}]>)expect(connection.profileId).toBe('chosen');
 });
+
+it('prepares a recurring decision without the software module in a project directory', async()=>{
+    const f=await fixture(1);
+    const board={id:'round-board',scope:{kind:'collection',namespace:'recurring-run',id:'round'}};
+    const input={board,target:f.target,context:f.context,item:f.item,stage:'decision',
+        preparation:{system:'nestos-work-preparation',id:'project-directory',revision:'1'},dispatch:{id:'directory-round',itemId:f.item.id}};
+    await developmentPreparation(f.options as never)(input as never);
+    expect(await f.journal.get('development-workspace:directory-round')).toMatchObject({
+        directoryOnly:true,directory:'_nestos/kanban/runs/directory-round',repositories:[],
+    });
+    expect(await f.journal.get('development-commit-context:directory-round')).toBeUndefined();
+    const manifest=JSON.parse(await readPrompt(f.fs,'/workspace/_nestos/kanban/runs/directory-round/manifest.json'));
+    expect(manifest.context.itemId).toBe(f.item.id);
+    expect(f.sessionChannel).toHaveBeenCalledWith('project','open',expect.objectContaining({cwd:'_nestos/kanban/runs/directory-round'}));
+});

@@ -134,7 +134,7 @@ function personalOptions({store, journal, events, diagnostics, sessions, activit
             }
             if(command&&automationOptions?.projects)await validateWorkProjects(automationOptions.projects,board,command,automationOptions.requiresItemResource?.(board)===true);
             if (command?.type === 'configure-automation' && command.settings.preparation)
-                automationOptions?.validatePreparation?.(command.settings.preparation, command.settings.preparationOptions);
+                automationOptions?.validatePreparation?.(command.settings.preparation, command.settings.preparationOptions, board);
             if (command?.type === 'append-record' && command.record.id.startsWith('activity-')) throw new KanbanError('RESERVED_RECORD_ID');
             if (command?.type === 'append-record' && command.record.externalRefs?.length) {
                 if (!automationOptions?.projects) throw new KanbanError('PROJECT_SELECTION_UNAVAILABLE');

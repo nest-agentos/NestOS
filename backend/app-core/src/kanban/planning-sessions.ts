@@ -12,11 +12,14 @@ export function planningSessionReader(service: KanbanService, journal: KanbanAut
         const admission = await options.calls.inspectTaskCallSubmission(job.input);
         if (!admission?.executionSessionId) return;
         const sessionId = admission.executionSessionId;
-        const resourceId = await options.executionResource?.(sessionId,'main');
+        const [resourceId,workspace] = await Promise.all([options.executionResource?.(sessionId,'main'),
+            item.recurring?journal.get<import('../presets/kanban-development').DevelopmentWorkspaceRecord>('development-workspace:'+job.id):undefined]);
+        const workDirectory=workspace?.directoryOnly?{system:'nestos-work-directory',id:workspace.channelId,
+            revision:JSON.stringify({projectId:workspace.projectId,directory:workspace.directory})}:undefined;
         const state = ['clarification','blocked'].includes(job.status.state) ? 'waiting-input' : job.status.state === 'ready' ? 'completed'
             : job.status.state === 'failed' ? 'failed' : job.status.state === 'analyzing' ? 'running' : 'unknown';
         const operation=item.planning?.coordination?await currentCoordination(journal,board,itemId):undefined;
         const result=operation?.result as {summary?:string;suggestions?:Array<{itemId:string;action:string;reason:string}>}|undefined;
-        return {...(operation?{coordination:{id:operation.id,state:operation.state,code:operation.code,...result}}:{}),itemId,analysisId:job.id,sessionId,resourceId,title:item.title,state,stale:false,recent:false};
+        return {...(workDirectory?{workDirectory}:{}),...(operation?{coordination:{id:operation.id,state:operation.state,code:operation.code,...result}}:{}),itemId,analysisId:job.id,sessionId,resourceId,title:item.title,state,stale:false,recent:false};
     };
 }

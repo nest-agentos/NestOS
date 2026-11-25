@@ -49,7 +49,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     readAnalysisOutput?(id:string):Promise<import('@nestos/kanban/integration').KanbanAnalysisObservation|undefined>;
     onAnalysis?(input: {boardId: string; id: string; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef; outcome: 'succeeded' | 'failed' | 'cancelled'; code?: string}): Promise<void>;
     prepareAnalysis?(input: {context?:unknown;reportActivity?(fact: WorkLogFact): Promise<void>; id: string; board: KanbanBoard; item: KanbanItem; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target: import('@nestos/llm-flow/contracts').TargetRef; instruction: string; contextRef?: unknown}>;
-    validatePreparation?(reference: import('@nestos/kanban/contracts').KanbanExternalReference, options?: Record<string, string>): void;
+    validatePreparation?(reference: import('@nestos/kanban/contracts').KanbanExternalReference, options: Record<string, string>|undefined, board:KanbanBoard): void;
     verifyWork?(dispatchId: string): Promise<void>;
     decisionModules?:readonly import('@nestos/kanban/contracts').KanbanDecisionModule[];
     observeApprovals?(input:{boardId:string;dispatch:import('@nestos/kanban/contracts').KanbanDispatch;
@@ -57,7 +57,7 @@ export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     preparations?: import('@nestos/kanban/contracts').KanbanAutomationTarget[];
     observeWork?(input: {boardId: string; dispatch: import('@nestos/kanban/contracts').KanbanDispatch;
         observation: import('@nestos/kanban/execution').KanbanExecutionObservation; service: KanbanService; worker: KanbanService}): Promise<import('@nestos/kanban/execution').KanbanExecutionObservation>;
-    prepareWork?(input: {board?:Pick<KanbanBoard,'id'|'settings'>;context?:unknown;dispatch: import('@nestos/kanban/contracts').KanbanDispatch; item: KanbanItem;
+    prepareWork?(input: {board?:Pick<KanbanBoard,'id'|'settings'|'scope'>;context?:unknown;dispatch: import('@nestos/kanban/contracts').KanbanDispatch; item: KanbanItem;
         reportActivity?(fact: WorkLogFact): Promise<void>; stage?: 'decision' | 'task' | 'fix'; options?: Record<string, string>; preparation: import('@nestos/kanban/contracts').KanbanExternalReference; target: import('@nestos/llm-flow/contracts').TargetRef}): Promise<{target:import('@nestos/llm-flow/contracts').TargetRef;contextRef?:unknown}>;
     projects?: Pick<import('@nestos/app-contracts/services').ProjectService, 'list' | 'get'> & Partial<Pick<import('@nestos/app-contracts/services').ProjectService,'openWorkspace'>>;
     calls: IndependentCallService; execution:IndependentCallExecutionReader; originalSession:OriginalSessionResolver; sessions: SessionRepository;

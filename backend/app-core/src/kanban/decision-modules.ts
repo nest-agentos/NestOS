@@ -20,3 +20,7 @@ export interface KanbanApprovalModule extends KanbanDecisionModule {
     decide(context:{projectId:string;profileId:string;cwd:string|null;request:Record<string,unknown>}):
         {decision:'allow'}|{decision:'manual';code:string};
 }
+
+export function usesSoftwareModule(record:Pick<import('@nestos/kanban/contracts').KanbanProjectRecord,'externalRefs'>|undefined):boolean {
+    return record?.externalRefs?.some(ref=>ref.system===system&&ref.id==='software-development')===true;
+}

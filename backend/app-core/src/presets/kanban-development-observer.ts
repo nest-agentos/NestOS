@@ -39,7 +39,8 @@ export function developmentObserver(options: Options) {
         const observedAt = Date.now();
         if (stopped) return input.observation;
         const worktree = await journal.get<PreparedWorktree>('worktree:' + input.dispatch.id);
-        if (!worktree) return input.observation;
+        const workspace = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id);
+        if (!worktree && !workspace?.directoryOnly) return input.observation;
         const {item} = await input.service.item(input.boardId, input.dispatch.itemId);
         const stopping = (await input.service.read(input.boardId)).lifecycle !== undefined;
         if (['failed', 'cancelled'].includes(input.observation.outcome)) {
@@ -54,7 +55,6 @@ export function developmentObserver(options: Options) {
         }
         const projectId = item.externalRefs?.find(ref => ref.system === REMOTE_PROJECT_REFERENCE)?.id;
         if (!projectId) throw Object.assign(new Error('Missing workspace project binding'), {code: 'WORKSPACE_PROJECT_MISSING'});
-        const workspace = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id);
         if (!workspace?.channelId || !options.remote) throw Object.assign(new Error('Session channel required'), {code: 'SESSION_CHANNEL_REQUIRED'});
         if(options.remote)await watches.ensure(input.dispatch.id,async()=>{
             const client=await options.remote!.projectHarness(projectId);
@@ -64,8 +64,9 @@ export function developmentObserver(options: Options) {
                 return async()=>{stop?.();await client.close();};
             }catch(error){await client.close();throw error;}
         });
-        await linkReference(journal, input, {system: 'nestos-worktree', id: workspace?.worktreeId ?? worktree.id ?? input.dispatch.id,
+        if(worktree)await linkReference(journal, input, {system: 'nestos-worktree', id: workspace?.worktreeId ?? worktree.id ?? input.dispatch.id,
             revision: JSON.stringify({projectId, directory: worktree.directory, branch: worktree.branch, baseCommit: worktree.baseCommit})});
+        if(workspace.directoryOnly)await linkReference(journal,input,{system:'nestos-work-directory',id:workspace.channelId,revision:JSON.stringify({projectId,directory:workspace.directory})});
         await linkResult(options, journal, input, projectId);
         const scope = {runId: item.externalRefs?.find(ref => ref.system === 'nestos-decision-run')?.id ?? input.dispatch.planId,
             itemId: item.id, attemptId: input.dispatch.id};
@@ -81,7 +82,7 @@ export function developmentObserver(options: Options) {
             const unresolved = unresolvedWorkIssues(messages);
             await reconcileIssues(journal, input, messages);
             if(envelope.execution?.sessionId&&['running','submitting'].includes(envelope.execution.status??''))return {...input.observation,outcome:'running',outputs:undefined,code:unresolved.some(message=>message.type==='error')?'WORKSPACE_ERROR_REPORTED':unresolved.some(message=>message.type==='clarification')?'WORKSPACE_INPUT_REQUIRED':undefined};
-            if (options.exchange && !unresolved.length) input = {...input, observation: await observeExchange(options.exchange,journal,input,workspace,
+            if (options.exchange && !workspace.directoryOnly && !unresolved.length) input = {...input, observation: await observeExchange(options.exchange,journal,input,workspace,
                 messages.some(message=>message.type==='result'),envelope.messages as ChannelMessage[])};
             if (['failed', 'cancelled'].includes(input.observation.outcome)) {
                 if (!stopping) await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);
@@ -109,7 +110,7 @@ export function developmentObserver(options: Options) {
             } catch (error) {
                 return {...input.observation, outcome: 'unknown', outputs: undefined, code: (error as {code: string}).code};
             }
-            try {await options.verifyDelivery?.(input.dispatch.id);await options.handoffReports?.(input.boardId,item.id,input.dispatch.id,input.service);}
+            try {await options.verifyDelivery?.(input.dispatch.id);if(!workspace.directoryOnly)await options.handoffReports?.(input.boardId,item.id,input.dispatch.id,input.service);}
             catch (error) {
                 const raw = (error as {code?: unknown})?.code;
                 const code = typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'DELIVERY_VERIFICATION_FAILED';

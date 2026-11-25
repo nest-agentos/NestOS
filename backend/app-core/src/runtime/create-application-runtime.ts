@@ -1,3 +1,4 @@
+import {isDirectoryPreparation} from '../kanban/recurring-automation';
 import {nativeRestartIdle} from '../kanban/restart-barrier';
 import {requestManagementCleanup} from '../kanban/cleanup-review-conversations';
 import {createIndependentCallExecutionReader,createSessionActivityReader} from '@nestos/llm-session';
@@ -734,7 +735,12 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             executionResource,
             sessionChannel: remoteConnections?.sessionChannel.bind(remoteConnections),
             projects, requiresItemResource:requiresDevelopmentProject,
-            validatePreparation: (reference, settings) => {
+            validatePreparation: (reference, settings, board) => {
+                if(isDirectoryPreparation(reference)){
+                    if(board.scope.kind!=='collection'||board.scope.namespace!=='recurring-run'||Object.keys(settings??{}).length)
+                        throw Object.assign(new Error('Invalid project directory preparation'), {code:'WORK_PREPARATION_UNSUPPORTED'});
+                    return;
+                }
                 if (reference.system !== 'nestos-work-preparation' || reference.id !== 'git-worktree' || reference.revision !== '1')
                     throw Object.assign(new Error('Unsupported preparation'), {code: 'WORK_PREPARATION_UNSUPPORTED'});
                 validateDevelopmentOptions(settings);
