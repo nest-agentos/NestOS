@@ -1,5 +1,6 @@
 import {afterEach, expect, it} from 'vitest';
 import {execFile} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -153,6 +154,27 @@ it('preserves a concurrent edit and identifies the changed path during recovery'
         code:'INTEGRATION_RECOVERY_WORKTREE_CHANGED',result:{integrationPaths:expect.arrayContaining(['shared'])}});
     expect(await readFile(join(f.root,'shared'),'utf8')).toBe('concurrent user edit\n');
     expect(await f.git('rev-parse','HEAD')).toBe(f.input.previousTarget);
+});
+
+it.each(['exact payload', 'other payload'])('checks hydrated Git LFS content after interruption (%s)',async payload=>{
+    const f=await fixture(),asset=join(f.root,'asset.dat'),content='exact payload\n';
+    const digest=createHash('sha256').update(content).digest('hex');
+    await writeFile(join(f.root,'.gitattributes'),'asset.dat filter=lfs -text\n');
+    await f.git('config','filter.lfs.clean','cat');
+    await writeFile(asset,`version https://git-lfs.github.com/spec/v1\noid sha256:${digest}\nsize ${content.length}\n`);
+    await f.git('add','.gitattributes','asset.dat');
+    await f.git('commit','-qm','LFS pointer');
+    const previousTarget=await f.git('rev-parse','HEAD');
+    await f.git('-C',f.source,'merge','--ff-only',previousTarget);
+    await writeFile(join(f.source,'shared'),contents.replace('line 1\n','source\n'));
+    const input={...f.input,previousTarget,sources:[{...f.input.sources[0],sourceHead:previousTarget,
+        repositories:[{path:'.',head:previousTarget,dirty:true}]}]};
+    await interruptPublication({...f,input},publicationBoundaries[0]);
+    await writeFile(asset,payload+'\n');
+    if(payload==='exact payload')expect(await resumeGitIntegration(f.process,input)).toBe(await f.git('rev-parse','HEAD'));
+    else await expect(resumeGitIntegration(f.process,input)).rejects.toMatchObject({
+        code:'INTEGRATION_RECOVERY_WORKTREE_CHANGED',result:{integrationPaths:expect.arrayContaining(['asset.dat'])}});
+    expect(await readFile(asset,'utf8')).toBe(payload+'\n');
 });
 
 it.each(['source','target'] as const)('publishes the selected %s Git stage from the frozen conflict plan',async choice=>{
