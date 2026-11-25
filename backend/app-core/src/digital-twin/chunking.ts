@@ -1,5 +1,6 @@
 /** Limits use UTF-16 offsets, matching persisted source checkpoints. */
 export const TWIN_CHUNK_CHARACTERS = 32 * 1024;
+export const TWIN_MANAGED_SOURCE_MAX_BYTES = 256 * 1024;
 
 /** Prefer complete turns, then messages, then document blocks; always make progress. */
 export function extractionEnd(text: string, offset: number): number {

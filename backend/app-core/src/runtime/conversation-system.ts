@@ -33,7 +33,7 @@ export interface ConversationSystemOptions {
     scheduleAgentInitialization?: (initialize: () => Promise<void>) => void | Promise<void>;
     scheduleInvocationRecovery?: (recover: () => Promise<void>) => void | Promise<void>;
     digitalTwin?: import('../digital-twin/service').DigitalTwinService;
-    retrieveDreamMemory?(sessionId: string, limit: number): Promise<Array<{entryId: string; namespaceId: string; content: string; contentHash: string}>>;
+    retrieveDreamMemory?(sessionId: string, limit: number, tokenBudget?: number): Promise<Array<{entryId: string; namespaceId: string; content: string; contentHash: string}>>;
     directAgentPolicy?: import('@nestos/llm-session/contracts').DirectAgentPolicy;
     agentResolution?: import('@nestos/llm-session').AgentResolutionPolicy;
     vfs: IVFSManager;
@@ -97,7 +97,7 @@ export async function createConversationSystem(
         retrieveMemory: async (plan, agent, context) => {
             const ordinary = await kernel.memory.retrieve(plan, agent, context);
             const twin = await options.digitalTwin?.retrieve(plan, agent.id, context.sessionId) ?? [];
-            return includeDreamMemory(ordinary, twin, context.policy, context.sessionId, options.retrieveDreamMemory);
+            return includeDreamMemory(ordinary, twin, context.policy, context.sessionId, options.retrieveDreamMemory, plan.tokenBudget);
         },
         memoryProvider: kernel.memory,
         workspaceManager: options.flowWorkspaceManager ? withWorkspaceScopeCleanup(options.flowWorkspaceManager, kernel, options.ensureWritable) : undefined,

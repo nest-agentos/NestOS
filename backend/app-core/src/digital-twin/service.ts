@@ -148,6 +148,9 @@ export class DigitalTwinService {
             mode: 'analyze', trigger: 'event', intervalMinutes: 30, tokenLimit: settings.tokenLimit, enabled: true, autoConfirm: false});
         this.notify(); return {sourceId, planId: plan.id, planRevision: plan.revision};
     }
+    async saveDreamScannerSnapshot(text: string): Promise<string> {
+        return saveScannerText((await this.services()).records, text);
+    }
     async scannerExchangeCount(job: TwinAnalysisJob): Promise<number> {
         const records = (await this.services()).records;
         return (await records.get<{attempts: string[]}>('checkpoint', 'scanner-envelope:' + job.sessionId))?.data.attempts.length ?? 0;

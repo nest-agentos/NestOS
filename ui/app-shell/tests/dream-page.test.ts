@@ -44,6 +44,123 @@ it('configures a source and retries a failed scan with the same operation identi
 function find(label: string) {return [...document.querySelectorAll('button')].find(item => item.textContent === label);}
 function click(label: string) {const node = find(label); if (!node) throw new Error(`Missing button ${label}`); node.click();}
 
+it('explains a missing source file at the configuration form', async () => {
+    const target = {kind: 'flow', id: 'flow', version: '1', digest: 'digest'};
+    const config = {revision: 1, config: {name: 'Dream', enabled: true, files: []}};
+    const service = {list: async () => ({items: [{id: 'dream', name: 'Dream'}]}),
+        openView: async () => ({config, history: {items: []}, targets: [{name: 'Scanner', target}], models: [{id: 'model', name: 'Model'}]}),
+        setModelConnection: async () => {}, addFile: async () => {throw new Error('DREAM_SOURCE_NOT_FOUND');}} as unknown as DreamService;
+    const projects = {list: async () => [{project: {id: 'owner'}, name: 'Owner'}]} as unknown as ProjectService;
+    const page = new DreamPage(service, projects, vi.fn(), vi.fn(), vi.fn());
+    try {
+        await page.mount(document.body); click('Dream');
+        await vi.waitFor(() => expect(find(t('dream.addSource'))).toBeTruthy());
+        document.querySelector<HTMLInputElement>(`input[placeholder="${t('dream.path')}"]`)!.value = '/missing.md';
+        click(t('dream.addSource'));
+        await vi.waitFor(() => expect(document.querySelector('[role="alert"]')?.textContent).toContain(t('dream.errors.DREAM_SOURCE_NOT_FOUND')));
+    } finally {page.destroy();}
+});
+
+it('saves consolidation settings and submits a ready subset', async () => {
+    const target = {kind: 'flow', id: 'flow', version: '1', digest: 'digest'};
+    const config = {revision: 1, config: {name: 'Dream', enabled: true, files: [], consolidation: {target, hotLoadTokens: 1500}}};
+    const configureConsolidation = vi.fn(async () => config), commitConsolidation = vi.fn()
+        .mockRejectedValueOnce(Object.assign(new Error('DREAM_SELECTION_CONFLICT'), {field: 'proposal'})).mockResolvedValue({});
+    const service = {list: async () => ({items: [{id: 'dream', name: 'Dream'}]}),
+        openView: async () => ({config, history: {items: []}, targets: [{name: 'Flow', target}], models: []}),
+        configureConsolidation, commitConsolidation, reviewConsolidation: async () => ({version: 'v1', page:
+            {items: [{id: 'proposal', revision: 1, status: 'ready', changes: [{id: 'm', content: 'New rule'}], evidenceIds: ['ev1']}]}}),
+        readProposalEvidence: async () => ({locator: '/note', granularity: 'excerpt', fingerprint: 'hash', snapshot: 'captured original'})} as unknown as DreamService;
+    const projects = {list: async () => [{project: {id: 'owner'}, name: 'Owner'}]} as unknown as ProjectService;
+    const page = new DreamPage(service, projects, vi.fn(), vi.fn(), vi.fn());
+    const label = (key: string) => t(key as Parameters<typeof t>[0]);
+    try {
+        await page.mount(document.body); click('Dream');
+        await vi.waitFor(() => expect(find(label('dream.saveConsolidation'))).toBeTruthy());
+        document.querySelector<HTMLInputElement>(`[aria-label="${label('dream.hotLoadBudget')}"]`)!.value = '2400';
+        const joint = [...document.querySelectorAll('label')].find(item => item.textContent === label('dream.crossProject'))!;
+        joint.querySelector<HTMLInputElement>('input')!.checked = true;
+        click(label('dream.saveConsolidation'));
+        await vi.waitFor(() => expect(configureConsolidation).toHaveBeenCalledWith('owner', 'dream', expect.any(String), 1, {target, hotLoadTokens: 2400, crossProject: true}));
+        await vi.waitFor(() => expect(find(label('dream.reviewProposals'))).toBeTruthy());
+        click(label('dream.reviewProposals'));
+        await vi.waitFor(() => expect(document.body.textContent).toContain('New rule'));
+        click(label('dream.viewEvidence'));
+        await vi.waitFor(() => expect(document.body.textContent).toContain('captured original'));
+        const row = find(label('dream.viewEvidence'))!.parentElement!;
+        row.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked = true;
+        click(label('dream.commitSelected'));
+        await vi.waitFor(() => expect(commitConsolidation).toHaveBeenCalledWith('owner', 'dream', expect.any(String), 'v1', [{id: 'proposal', revision: 1}]));
+        await vi.waitFor(() => expect(row.getAttribute('aria-invalid')).toBe('true'));
+        expect(document.querySelector('[role="alert"]')?.textContent).toContain('New rule');
+        await vi.waitFor(() => expect(find(label('dream.commitSelected'))?.disabled).toBe(false));
+        click(label('dream.commitSelected'));
+        await vi.waitFor(() => expect(commitConsolidation).toHaveBeenCalledTimes(2));
+        expect(commitConsolidation.mock.calls[1][2]).toBe(commitConsolidation.mock.calls[0][2]);
+    } finally {page.destroy();}
+});
+
+it('shows authorized downstream candidates and adopts one only after an explicit action', async () => {
+    const target = {kind: 'flow', id: 'flow', version: '1', digest: 'digest'};
+    const config = {revision: 1, config: {name: 'Dream', enabled: true, files: [], consolidation: {target}}};
+    const adopt = vi.fn(async () => ({recordId: 'decision'}));
+    const service = {list: async () => ({items: [{id: 'dream', name: 'Dream'}]}),
+        openView: async () => ({config, history: {items: []}, targets: [{name: 'Flow', target}], models: []}),
+        listDownstream: async () => ({items: [{commitId: 'commit', version: 'v1', requiredScopes: ['source'], referenceCommits: ['prior'],
+            changes: [{id: 'memory', action: 'add', content: 'Review the deployment rule', evidenceIds: ['evidence']}] }], scanned: 1}),
+        readCommittedVersion: async (_owner: string, _dream: string, commitId: string) => ({candidate: {topics: [{id: 'memory', content: `Version ${commitId}`}]}}),
+        adoptionBoards: async () => [{id: 'board', title: 'Board', projectId: 'remote'}], adoptDownstreamDecision: adopt} as unknown as DreamService;
+    const projects = {list: async () => [{project: {id: 'owner'}, name: 'Owner'}, {project: {id: 'remote', source: {kind: 'remote'}}, name: 'Remote'}]} as unknown as ProjectService;
+    const page = new DreamPage(service, projects, vi.fn(), vi.fn(), vi.fn());
+    const label = (key: string) => t(key as Parameters<typeof t>[0]);
+    try {
+        await page.mount(document.body); click('Dream');
+        await vi.waitFor(() => expect(find(label('dream.downstreamCandidates'))).toBeTruthy());
+        click(label('dream.downstreamCandidates'));
+        await vi.waitFor(() => expect(document.body.textContent).toContain('Review the deployment rule'));
+        expect(document.body.textContent).toContain('evidence'); expect(adopt).not.toHaveBeenCalled();
+        click(label('dream.viewRollbackOrigin'));
+        await vi.waitFor(() => expect(document.body.textContent).toContain('Version prior'));
+        click(label('dream.adoptDecision'));
+        await vi.waitFor(() => expect(document.querySelector('[data-dream-decision]')).toBeTruthy());
+        const form = document.querySelector<HTMLElement>('[data-dream-decision]')!;
+        const board = form.querySelector<HTMLSelectElement>(`[aria-label="${label('dream.board')}"]`)!;
+        board.value = 'board'; board.dispatchEvent(new Event('change'));
+        const project = form.querySelector<HTMLSelectElement>(`[aria-label="${label('kanban.primaryProject')}"]`)!; project.value = 'remote';
+        click(label('dream.createDecisionDraft'));
+        await vi.waitFor(() => expect(adopt).toHaveBeenCalledWith(expect.objectContaining({runId: 'commit', suggestionId: 'memory', boardId: 'board', targetProjectId: 'remote'})));
+    } finally {page.destroy();}
+});
+
+it('lets the reviewer set kind, priority and title while preserving inherited metadata', async () => {
+    const target = {kind: 'flow', id: 'flow', version: '1', digest: 'digest'};
+    const config = {revision: 1, config: {name: 'Dream', enabled: true, files: [], consolidation: {target}}};
+    const resolveConsolidation = vi.fn(async () => ({}));
+    const service = {list: async () => ({items: [{id: 'dream', name: 'Dream'}]}),
+        openView: async () => ({config, history: {items: []}, targets: [{name: 'Flow', target}], models: []}),
+        reviewConsolidation: async () => ({version: 'v1', topics: [{id: 'm', kind: 'topic', priority: 8, title: 'Old'}],
+            page: {items: [{id: 'proposal', targetId: 'm', revision: 1, status: 'ready', changes: [{id: 'm', content: 'Rule'}], evidenceIds: []}]}}),
+        resolveConsolidation} as unknown as DreamService;
+    const projects = {list: async () => [{project: {id: 'owner'}, name: 'Owner'}]} as unknown as ProjectService;
+    const page = new DreamPage(service, projects, vi.fn(), vi.fn(), vi.fn());
+    const label = (key: string) => t(key as Parameters<typeof t>[0]);
+    try {
+        await page.mount(document.body); click('Dream');
+        await vi.waitFor(() => expect(find(label('dream.reviewProposals'))).toBeTruthy()); click(label('dream.reviewProposals'));
+        await vi.waitFor(() => expect(find(label('dream.editHotload'))).toBeTruthy()); click(label('dream.editHotload'));
+        await vi.waitFor(() => expect(document.querySelector('[data-dream-hotload]')).toBeTruthy());
+        const form = document.querySelector<HTMLElement>('[data-dream-hotload]')!;
+        const kind = form.querySelector<HTMLSelectElement>(`[aria-label="${label('dream.hotloadKind')}"]`)!;
+        const priority = form.querySelector<HTMLInputElement>(`[aria-label="${label('dream.hotloadPriority')}"]`)!;
+        const title = form.querySelector<HTMLInputElement>(`[aria-label="${label('dream.hotloadTitle')}"]`)!;
+        expect([kind.value, priority.value, title.value]).toEqual(['topic', '8', 'Old']);
+        kind.value = 'constraint'; priority.value = '12'; title.value = '';
+        click(label('dream.saveHotload'));
+        await vi.waitFor(() => expect(resolveConsolidation).toHaveBeenCalledWith('owner', 'dream', expect.any(String), 'proposal', 1,
+            {action: 'rewrite', changes: [{id: 'm', content: 'Rule', kind: 'constraint', priority: 12, title: null}]}));
+    } finally {page.destroy();}
+});
+
 it('manually scans selected directories across projects and applies the source type filter', async () => {
     const changes = [
         {id: 'local-docs', projectId: 'owner', directory: '/docs'},

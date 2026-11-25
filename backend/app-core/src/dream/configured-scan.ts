@@ -44,11 +44,25 @@ async function executeConfigured(input: ConfiguredDreamRequest, dependencies: De
     const outcome = previous?.outcomes[0];
     if (previous && (previous.outcomes.length !== 1 || outcome?.status !== 'ok' || outcome.evidence.sourceId !== file.id))
         throw new Error('DREAM_OPERATION_CONFLICT');
-    const cursor = outcome?.status === 'ok' ? outcome.evidence.startCursor : watermark?.cursor ?? null;
+    const captured = previous ? null : await dependencies.evidence.readCapturedOperation(input.ownerProjectId, input.dreamId, input.operationId,
+        async evidence => {
+            if (evidence.projectId !== base.projectId || evidence.sourceId !== base.id || evidence.connectionId !== base.connectionId
+                || evidence.locator !== port.target(base)) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+            return port.authorize(base);
+        });
+    const latestId = !previous && !captured ? await dependencies.evidence.latestCapturedOperation(input.ownerProjectId, input.dreamId, file.id) : null;
+    const latest = latestId ? await dependencies.evidence.readCapturedOperation(input.ownerProjectId, input.dreamId, latestId, async evidence => {
+        if (evidence.projectId !== base.projectId || evidence.sourceId !== base.id || evidence.connectionId !== base.connectionId
+            || evidence.locator !== port.target(base)) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+        return port.authorize(base);
+    }) : null;
+    const cursor = outcome?.status === 'ok' ? outcome.evidence.startCursor
+        : captured?.startCursor !== undefined ? captured.startCursor : latest?.endCursor !== undefined ? latest.endCursor : watermark?.cursor ?? null;
     const source = {...base, cursor};
     await runDreamTwinFileScan({ownerProjectId: input.ownerProjectId, dreamId: input.dreamId, operationId: input.operationId,
         planId: file.planId, planRevision: file.planRevision, twinSourceId: file.twinSourceId, target: port.target(source),
         source, configRevision: record.revision}, dependencies.twin, port, dependencies.evidence, dependencies.kernel,
-        () => dependencies.authorizeOwner(input.ownerProjectId), (runId, authority) => dependencies.registry.bindRun(runId, {
-            ownerProjectId: input.ownerProjectId, dreamId: input.dreamId, sourceId: file.id, configRevision: record.revision, authority}));
+        () => dependencies.authorizeOwner(input.ownerProjectId), (runId, authority, retryPlan) => dependencies.registry.bindRun(runId, {
+            ownerProjectId: input.ownerProjectId, dreamId: input.dreamId, sourceId: file.id, configRevision: record.revision, authority,
+            ...(retryPlan ? {retryPlan} : {})}));
 }

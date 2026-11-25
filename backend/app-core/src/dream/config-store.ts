@@ -4,6 +4,8 @@ import type {DreamProjectFile} from './project-file-source';
 import {validateChangeScope, type DreamChangeSource} from './change-source';
 import type {KanbanRecurrence} from '@nestos/kanban/contracts';
 import {nextRecurrence, validateRecurrence} from '@nestos/kanban/integration';
+import {isTargetRef, type TargetRef} from '@nestos/llm-flow/contracts';
+import {DREAM_OUTBOX_INDEX, dreamOutboxKey} from './outbox-index';
 
 export interface DreamFileConfig extends DreamProjectFile {planId: string; planRevision: string; twinSourceId: string}
 export interface DreamAdoptionSourceConfig {id: string; boardId: string; itemId: string}
@@ -11,7 +13,7 @@ export interface DreamDecisionSourceConfig {id: string; projectId: string; conne
 export interface DreamTaskSourceConfig {id: string; projectId: string; connectionId: string; boardId: string; itemId: string; scannerSourceId: string}
 export interface DreamSessionSourceConfig {id: string; projectId: string; connectionId: string; sessionId: string; profileId?: string; maxRounds: number; scannerSourceId: string}
 export type DreamChangeSourceConfig = DreamChangeSource;
-export interface DreamConfig {name: string; enabled: boolean; files: DreamFileConfig[]; adoptions?: DreamAdoptionSourceConfig[]; decisions?: DreamDecisionSourceConfig[]; tasks?: DreamTaskSourceConfig[]; sessions?: DreamSessionSourceConfig[]; changes?: DreamChangeSourceConfig[]; schedule?: KanbanRecurrence}
+export interface DreamConfig {name: string; enabled: boolean; files: DreamFileConfig[]; adoptions?: DreamAdoptionSourceConfig[]; decisions?: DreamDecisionSourceConfig[]; tasks?: DreamTaskSourceConfig[]; sessions?: DreamSessionSourceConfig[]; changes?: DreamChangeSourceConfig[]; schedule?: KanbanRecurrence; consolidation?: {target: TargetRef; focus?: string; hotLoadTokens?: number; crossProject?: boolean}}
 export interface DreamConfigRecord {revision: number; config: DreamConfig}
 const validId = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value);
 const log = createModuleLogger('dream-config');
@@ -120,6 +122,10 @@ export class DreamConfigStore {
         catch (error) {if (!(error instanceof FSError) || error.code !== 'EEXIST') throw error;}
         try {await this.fs.driver.createFile({parentPath: '/var/lib/dream', name: 'schedules.seq', type: 'seqfile', recursive: true});}
         catch (error) {if (!(error instanceof FSError) || error.code !== 'EEXIST') throw error;}
+        if (frozen.consolidation) {
+            try {await this.fs.driver.createFile({parentPath: '/var/lib/dream', name: 'outbox-index.seq', type: 'seqfile', recursive: true});}
+            catch (error) {if (!(error instanceof FSError) || error.code !== 'EEXIST') throw error;}
+        }
         return this.fs.meta.seq!.transaction!(async tx => {
             const receiptKey = `save:${JSON.stringify(operationId)}`;
             const fingerprint = sha256HexSync(JSON.stringify([expectedRevision, frozen]));
@@ -181,6 +187,7 @@ export class DreamConfigStore {
             const next = {revision: (current?.revision ?? 0) + 1, config: frozen};
             await tx.setEntry(path, 'config', JSON.stringify(next));
             await tx.setEntry(path, `revision:${next.revision}`, JSON.stringify(next));
+            if (frozen.consolidation) await tx.setEntry(DREAM_OUTBOX_INDEX, dreamOutboxKey(owner, dream), JSON.stringify({owner, dream}));
             await updateSchedule(tx, owner, dream, current?.config, next);
             await tx.setEntry(path, receiptKey, JSON.stringify({fingerprint, result: next})); return next;
         });
@@ -289,7 +296,16 @@ function normalize(config: DreamConfig): DreamConfig {
         if (config.schedule.trigger !== 'fixed' || config.schedule.maxConcurrency !== 1) throw new Error('DREAM_SCHEDULE_INVALID');
         schedule = structuredClone(config.schedule);
     }
-    return {name: config.name.trim(), enabled: config.enabled, files, ...(adoptions ? {adoptions} : {}), ...(decisions ? {decisions} : {}), ...(tasks ? {tasks} : {}), ...(sessions ? {sessions} : {}), ...(changes ? {changes} : {}), ...(schedule ? {schedule} : {})};
+    let consolidation: DreamConfig['consolidation'];
+    if (config.consolidation !== undefined) {
+        if (!config.consolidation || !isTargetRef(config.consolidation.target) || config.consolidation.target.kind !== 'flow'
+            || config.consolidation.focus !== undefined && (typeof config.consolidation.focus !== 'string' || config.consolidation.focus.length > 2000)
+            || config.consolidation.crossProject !== undefined && typeof config.consolidation.crossProject !== 'boolean'
+            || config.consolidation.hotLoadTokens !== undefined && (!Number.isSafeInteger(config.consolidation.hotLoadTokens) || config.consolidation.hotLoadTokens < 0 || config.consolidation.hotLoadTokens > 100000))
+            throw new Error('DREAM_CONFIG_INVALID');
+        consolidation = structuredClone(config.consolidation);
+    }
+    return {name: config.name.trim(), enabled: config.enabled, files, ...(adoptions ? {adoptions} : {}), ...(decisions ? {decisions} : {}), ...(tasks ? {tasks} : {}), ...(sessions ? {sessions} : {}), ...(changes ? {changes} : {}), ...(schedule ? {schedule} : {}), ...(consolidation ? {consolidation} : {})};
 }
 export function validateDreamConfig(config: DreamConfig): DreamConfig {return normalize(config);}
 function decode(raw: string | null): DreamConfigRecord | null {

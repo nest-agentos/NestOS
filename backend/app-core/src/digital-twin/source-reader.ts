@@ -6,6 +6,7 @@ import type { ProjectService } from '@nestos/app-contracts/services';
 import { TwinProjectCatalog, documentPath, nodeVersion } from './project-catalog';
 import { readHarness, readHarnessWindow, harnessTarget } from './harness-reader';
 import type { TwinSourceContent, TwinSourceReader, TwinSourceSpec } from './domain';
+import {TWIN_MANAGED_SOURCE_MAX_BYTES} from './chunking';
 
 const MAX_BYTES = 1024 * 1024;
 /** Read ordinary project documents and visible conversations through existing application services. */
@@ -26,7 +27,7 @@ export class NestosTwinSourceReader implements TwinSourceReader {
         if (spec.kind === 'managed-artifact') {
             if (!this.readManagedArtifact) throw new Error('TWIN_MANAGED_SOURCE_UNAVAILABLE');
             const content = await this.readManagedArtifact(spec.target);
-            if (!content || typeof content.text !== 'string' || new TextEncoder().encode(content.text).length > 32768
+            if (!content || typeof content.text !== 'string' || new TextEncoder().encode(content.text).length > TWIN_MANAGED_SOURCE_MAX_BYTES
                 || !content.nativeIdentity || content.hash !== sha256HexSync(content.text)) throw new Error('TWIN_MANAGED_SOURCE_INVALID');
             return content;
         }

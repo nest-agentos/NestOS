@@ -13,9 +13,13 @@ import {NestosTwinSourceReader} from '../digital-twin/source-reader';
 import type {DigitalTwinService} from '../digital-twin/service';
 import {DreamConfigStore, validateDreamConfig, type DreamConfig} from './config-store';
 import {DreamEvidenceStore, type DreamReview} from './evidence-store';
+import {PublishedConsolidationModel} from './consolidation-model';
 import {DreamExecutionRegistry} from './execution-registry';
 import {bindDreamExecutionFromRun, prepareDreamExecution} from './execution-bind';
 import {resolveDreamExecution} from './execution-route';
+import {authorizeDreamExecution} from './execution-authority';
+import {DreamDownstream} from './downstream';
+import {assembleDreamHotload, type DreamHotloadItem} from './hotload';
 import {openDreamSystemWorkspace} from './workspace';
 import {runConfiguredDreamFile, type ConfiguredDreamRequest} from './configured-scan';
 import {dreamProjectFilePort} from './project-file-source';
@@ -40,10 +44,13 @@ interface Options {
     fs: IFileSystem; repository: SessionRepository; kernel: Kernel; models: Parameters<typeof createNativeDigitalTwin>[3] & {
         getConnections(): Promise<Array<{id: string; name: string; enabled: boolean}>>};
     projects: ProjectService; remote: ProjectRemoteMountService; commands: ICommandBus; calls: IndependentCallService;
-    authorizeOwner(owner: string): Promise<void>; hostKind: string;
+    authorizeOwner(owner: string): Promise<void>; hostKind: string; hotLoadTokenLimit?: number;
     readCommits?(source: DreamChangeSource): Promise<ChangeSnapshot>;
 }
 interface Entry {twin: DigitalTwinService; fs: IFileSystem; disposeView(): Promise<void>}
+type DreamBatchResult = {sourceId: string; operationId: string; status: 'settled' | 'failed'; code?: string};
+export interface DreamRecomputePlan {owner: string; dream: string; project: string; configRevision: number; activeVersion: string | null;
+    sources: Array<{sourceId: string; operationId: string}>; id: string}
 export interface DreamFileSelection {
     projectId: string; connectionId: string; path: string; executor: TwinScannerExecutor;
     maxOutputTokens: number; runTokenLimit: number;
@@ -162,6 +169,32 @@ export class DreamHost {
         return adoptDreamDecision(request, {kanban: kanban.service, journal: kanban.journal, store: this.evidence,
             inspect: input => this.decisionEvidence(kanban.service, input)});
     }
+    async adoptDownstreamDecision(request: DreamDecisionAdoptionRequest) {
+        const kanban = this.kanban;
+        if (!kanban) throw new Error('DREAM_KANBAN_UNAVAILABLE');
+        return adoptDreamDecision(request, {kanban: kanban.service, journal: kanban.journal, store: this.evidence,
+            inspect: input => this.downstreamDecisionEvidence(kanban.service, input),
+            prepare: (input, revision) => this.evidence.prepareDownstreamDecisionAdoption(input, revision)});
+    }
+    private async downstreamDecisionEvidence(kanban: Pick<KanbanService, 'read'>, request: DreamDecisionAdoptionRequest): Promise<DreamDecisionEvidence> {
+        const config = await this.configs.read(request.ownerProjectId, request.dreamId);
+        if (!config?.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        const board = await kanban.read(request.boardId);
+        if (board.lifecycle || isKanbanRecurringRunBoard(board) || board.scope.kind === 'project' && board.scope.projectId !== request.targetProjectId
+            || (await this.options.projects.get(request.targetProjectId)).project.source?.kind !== 'remote') throw new Error('DREAM_TARGET_SCOPE_CHANGED');
+        await this.authorizeTarget(request.targetProjectId);
+        const contribution = await this.readDownstream(request.ownerProjectId, request.dreamId, 'kanban', request.runId);
+        const change = contribution?.changes.find(item => item.id === request.suggestionId);
+        const sourceId = contribution?.requiredScopes[0];
+        const watermark = sourceId ? await this.evidence.watermark(request.ownerProjectId, request.dreamId, sourceId) : null;
+        if (!contribution || !change || !sourceId || !watermark) throw new Error('DREAM_SUGGESTION_UNAVAILABLE');
+        await this.evidence.checkConfig(request.ownerProjectId, request.dreamId, config.revision);
+        const content = change.content ?? `Retire memory: ${change.id}`;
+        return {configRevision: config.revision, suggestion: {id: change.id, sourceId, kind: 'suggestion', content,
+            revision: 1, state: 'active', origin: 'source'}, evidence: {sourceId, projectId: watermark.projectId,
+            connectionId: watermark.connectionId, authority: watermark.authority, startCursor: watermark.cursor, endCursor: watermark.cursor,
+            version: contribution.version, scanned: 1}};
+    }
     private async decisionEvidence(kanban: Pick<KanbanService, 'read'>, request: DreamDecisionAdoptionRequest): Promise<DreamDecisionEvidence> {
         const {ownerProjectId: owner, dreamId: dream, runId, suggestionId, targetProjectId} = request;
         await this.options.authorizeOwner(owner);
@@ -275,6 +308,27 @@ export class DreamHost {
         return this.configs.save(owner, dream, operationId, expectedRevision, {...base.config, changes}, {
             owner: () => this.options.authorizeOwner(owner), source: async () => {}, change: source => this.validateChangeSource(source),
         });
+    }
+
+    async configureConsolidation(owner: string, dream: string, operationId: string, expectedRevision: number,
+        consolidation: DreamConfig['consolidation'] | null) {
+        const started = Date.now(); let stage = 'authorize';
+        try {
+            if (consolidation === undefined) throw new Error('DREAM_CONFIG_INVALID');
+            await this.options.authorizeOwner(owner);
+            const base = await this.configs.readRevision(owner, dream, expectedRevision);
+            if (!base) throw new Error('DREAM_CONFIG_CONFLICT');
+            const {consolidation: _previous, ...config} = base.config;
+            stage = 'save';
+            const result = await this.configure(owner, dream, operationId, expectedRevision, {...config, ...(consolidation ? {consolidation} : {})});
+            log.info('dream.consolidation.configure', {operationId, stage, result: 'success', durationMs: Date.now() - started});
+            return result;
+        } catch (error) {
+            const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_CONSOLIDATION_CONFIG_FAILED';
+            log.warn('dream.consolidation.configure', {operationId: /^[a-zA-Z0-9_-]{1,128}$/.test(operationId) ? operationId : 'invalid',
+                stage, result: 'failure', code, durationMs: Date.now() - started});
+            throw new Error(code);
+        }
     }
     private async validateChangeSource(source: DreamChangeSource): Promise<void> {
         const input = {id: source.id, projectId: source.projectId, connectionId: source.connectionId, cursor: null};
@@ -634,12 +688,16 @@ export class DreamHost {
             throw new Error(code);
         }
     }
-    async retrieveSessionMemory(session: string, limit: number) {
+    async retrieveSessionMemory(session: string, limit: number, tokenBudget?: number) {
         const started = Date.now(), operationId = 'dream-retrieve-' + sha256HexSync(session);
         try {
             if (!Number.isSafeInteger(limit) || limit < 0) throw new Error('DREAM_SESSION_INVALID');
             if (!limit) return [];
-            const binding = await this.sessionMemory.read(session); if (!binding || 'disabled' in binding) return [];
+            const binding = await this.sessionMemory.read(session);
+            if (binding && 'disabled' in binding) return [];
+            const active = await this.retrieveActiveSessionMemory(session, limit, tokenBudget);
+            if (active !== null) return JSON.stringify(await this.sessionMemory.read(session)) === JSON.stringify(binding) ? active : [];
+            if (!binding) return [];
             await this.assertSessionOwner(binding.owner, session);
             const config = await this.configs.read(binding.owner, binding.dream);
             if (!config?.config.enabled || config.revision !== binding.configRevision) return [];
@@ -678,6 +736,89 @@ export class DreamHost {
             log.warn('dream.session.retrieve', {operationId, stage: 'authorize', result: 'failure', code, durationMs: Date.now() - started}); return [];
         }
     }
+    async searchSessionMemory(session: string, query: string, entryId?: string, namespaceId?: string) {
+        if (typeof query !== 'string' || query.length > 500 || entryId !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(entryId))
+            throw new Error('DREAM_SEARCH_INVALID');
+        const binding = await this.sessionMemory.read(session);
+        if (binding && 'disabled' in binding) return [];
+        const items = await this.retrieveActiveSessionMemory(session, 50, 262144, query, entryId, namespaceId);
+        if (JSON.stringify(await this.sessionMemory.read(session)) !== JSON.stringify(binding)) return [];
+        return items ?? [];
+    }
+    private async retrieveActiveSessionMemory(session: string, limit: number, tokenBudget?: number, query?: string, entryId?: string, namespaceId?: string) {
+        const manifest = await this.options.repository.getManifest(session);
+        const project = manifest.folder ? await this.options.projects.forFolder(manifest.folder) : undefined;
+        if (!project) return null;
+        const owner = project.project.id, dreams = await this.list(owner);
+        const configurations = await Promise.all(dreams.items.map(async item => ({item, config: await this.configs.read(owner, item.id)})));
+        const entries: Array<{entryId: string; namespaceId: string; content: string; contentHash: string}> = [];
+        const hotload: DreamHotloadItem[] = [];
+        const checks: Array<{dream: string; revision: number; version: string}> = [];
+        const requested = query === undefined ? Math.max(0, ...configurations.map(({config}) => config?.config.enabled && config.config.consolidation
+            ? config.config.consolidation.hotLoadTokens ?? 1500 : 0)) : 262144;
+        const hostLimit = query === undefined ? this.options.hotLoadTokenLimit ?? 100000 : 262144;
+        let configured = false, remaining = Number.isSafeInteger(hostLimit) && hostLimit >= 0 ? Math.min(requested, hostLimit) : 0;
+        if (tokenBudget !== undefined) remaining = Number.isSafeInteger(tokenBudget) && tokenBudget >= 0 ? Math.min(remaining, tokenBudget) : 0;
+        for (const {item, config} of configurations) {
+            if (!config?.config.enabled || !config.config.consolidation) continue;
+            if (namespaceId !== undefined && namespaceId !== `dream:${owner}:${item.id}`) continue;
+            configured = true;
+            try {
+                const candidate = await this.evidence.activeMemory(owner, item.id,
+                    scopes => this.authorizeSessionScopes(owner, item.id, config.revision, scopes, session));
+                if (candidate) checks.push({dream: item.id, revision: config.revision, version: candidate.version});
+                for (const topic of [...candidate?.topics ?? []].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) {
+                    if (entryId !== undefined && topic.id !== entryId || query !== undefined
+                        && !topic.content.toLowerCase().includes(query.toLowerCase()) && !(topic.title ?? '').toLowerCase().includes(query.toLowerCase())) continue;
+                    const namespaceId = `dream:${owner}:${item.id}`, content = topic.content;
+                    if (query === undefined) hotload.push({namespaceId, topic, budget: config.config.consolidation.hotLoadTokens ?? 1500});
+                    else {
+                        const cost = new TextEncoder().encode(`Memory (${namespaceId}/${topic.id}):\n${content}`).byteLength;
+                        if (entries.length < limit && cost <= remaining) {
+                            entries.push({entryId: topic.id, namespaceId, content, contentHash: sha256HexSync(content)}); remaining -= cost;
+                        }
+                    }
+                }
+            } catch (error) {
+                log.warn('dream.session.active', {operationId: 'dream-retrieve-' + sha256HexSync(session), stage: 'authorize', result: 'failure',
+                    code: error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SESSION_RETRIEVAL_FAILED', durationMs: 0});
+            }
+        }
+        for (const check of checks) {
+            const current = await this.evidence.activeMemory(owner, check.dream,
+                scopes => this.authorizeSessionScopes(owner, check.dream, check.revision, scopes, session));
+            if (current?.version !== check.version) throw new Error('DREAM_VERSION_CONFLICT');
+        }
+        await this.assertSessionOwner(owner, session);
+        return configured ? query === undefined ? assembleDreamHotload(owner, hotload, limit, remaining) : entries : null;
+    }
+    private async authorizeSessionScopes(owner: string, dream: string, revision: number, scopes: readonly string[], session: string) {
+        let foreign = false;
+        for (const scope of scopes) {
+            const watermark = await this.evidence.watermark(owner, dream, scope);
+            if (!watermark) throw new Error('DREAM_SESSION_SCOPE_CHANGED');
+            if (watermark.projectId !== owner) foreign = true;
+        }
+        if (foreign) await this.authorizeJointSession(owner, dream, revision, scopes, session);
+        await this.authorizeConsolidationScopes(owner, dream, revision, scopes);
+    }
+    private async authorizeJointSession(owner: string, dream: string, revision: number, scopes: readonly string[], session: string): Promise<void> {
+        const binding = await this.sessionMemory.read(session);
+        if (!binding || 'disabled' in binding || binding.owner !== owner || binding.dream !== dream || binding.configRevision !== revision)
+            throw new Error('DREAM_SESSION_SCOPE_CHANGED');
+        await this.assertSessionOwner(owner, session);
+        const selections = [{runId: binding.runId, sourceIds: binding.sourceIds}, ...binding.additional ?? []];
+        const covered = new Set<string>();
+        for (const selection of selections) {
+            const needed = selection.sourceIds.filter(source => scopes.includes(source));
+            if (!needed.length) continue;
+            const run = await this.readRun(owner, dream, selection.runId);
+            for (const source of needed) if (run?.sources.some(item => item.status === 'available' && item.evidence.sourceId === source)) covered.add(source);
+        }
+        if (scopes.some(scope => !covered.has(scope)) || JSON.stringify(await this.sessionMemory.read(session)) !== JSON.stringify(binding))
+            throw new Error('DREAM_SESSION_SCOPE_CHANGED');
+        await this.assertSessionOwner(owner, session);
+    }
     private async assertSessionOwner(owner: string, session: string): Promise<void> {
         await this.options.authorizeOwner(owner);
         const manifest = await this.options.repository.getManifest(session);
@@ -710,6 +851,9 @@ export class DreamHost {
     }
     async configure(owner: string, dream: string, operationId: string, expectedRevision: number, config: DreamConfig) {
         const frozen = validateDreamConfig(config), entry = await this.open(owner, dream);
+        if (frozen.consolidation && !(await entry.twin.scannerTargets()).some(item => item.target.kind === frozen.consolidation!.target.kind
+            && item.target.id === frozen.consolidation!.target.id && item.target.version === frozen.consolidation!.target.version
+            && item.target.digest === frozen.consolidation!.target.digest)) throw new Error('DREAM_CONSOLIDATION_TARGET_INVALID');
         const reader = new NestosTwinSourceReader(entry.fs, this.options.repository, this.options.projects);
         for (const file of frozen.files) {
             const port = dreamProjectFilePort(this.sourceAuthorization, file, reader);
@@ -782,20 +926,196 @@ export class DreamHost {
             log.info('dream.file.add', {operationId, stage, result: 'success', durationMs: Date.now() - started});
             return {sourceId: intent.id, config: result};
         } catch (error) {
-            const code = error instanceof Error && /^(DREAM|TWIN)_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_FILE_ADD_FAILED';
+            const code = stage === 'scanner' && (error as {code?: unknown} | null)?.code === 'ENOENT'
+                && error instanceof Error && error.message.endsWith('Twin source missing') ? 'DREAM_SOURCE_NOT_FOUND'
+                : error instanceof Error && /^(DREAM|TWIN)_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_FILE_ADD_FAILED';
             log.warn('dream.file.add', {operationId: /^[a-zA-Z0-9_-]{1,128}$/.test(operationId) ? operationId : 'invalid', stage, result: 'failure', code, durationMs: Date.now() - started});
             throw new Error(code);
         }
     }
     async run(input: ConfiguredDreamRequest): Promise<void> {
+        await this.scanConfigured(input);
+        const config = await this.configs.read(input.ownerProjectId, input.dreamId);
+        if (config?.config.consolidation) await this.consolidateRun(input, config);
+    }
+    private async scanConfigured(input: ConfiguredDreamRequest): Promise<void> {
         const entry = await this.open(input.ownerProjectId, input.dreamId);
         const config = await this.configs.read(input.ownerProjectId, input.dreamId);
         const selected = config?.config.decisions?.find(source => source.id === input.sourceId) ?? config?.config.tasks?.find(source => source.id === input.sourceId) ?? config?.config.sessions?.find(source => source.id === input.sourceId) ?? config?.config.changes?.find(source => source.id === input.sourceId);
-        if (selected && config) return this.runSummary(input, entry, config, selected);
-        if (config?.config.adoptions?.some(source => source.id === input.sourceId)) return this.runAdoption(input, entry, config);
-        return runConfiguredDreamFile(input, {configs: this.configs, evidence: this.evidence, registry: this.registry,
+        if (selected && config) await this.runSummary(input, entry, config, selected);
+        else if (config?.config.adoptions?.some(source => source.id === input.sourceId)) await this.runAdoption(input, entry, config);
+        else await runConfiguredDreamFile(input, {configs: this.configs, evidence: this.evidence, registry: this.registry,
             twin: entry.twin, kernel: this.options.kernel, remote: this.sourceAuthorization,
             reader: new NestosTwinSourceReader(entry.fs, this.options.repository, this.options.projects), authorizeOwner: this.options.authorizeOwner});
+    }
+
+    private async consolidateRun(input: ConfiguredDreamRequest, config: import('./config-store').DreamConfigRecord): Promise<void> {
+        const {ownerProjectId: owner, dreamId: dream, sourceId} = input;
+        const evidence = await this.evidence.readCapturedOperation(owner, dream, input.operationId, async captured => {
+            if (captured.sourceId !== sourceId) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+            return this.authorizeConsolidationSource(owner, dream, config.revision, sourceId);
+        });
+        if (!evidence) return;
+        if (sha256HexSync(evidence.snapshot) !== evidence.fingerprint) throw new Error('DREAM_CAPTURE_INVALID');
+        const watermark = await this.evidence.watermark(owner, dream, sourceId);
+        if (!watermark) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        const authorize = (scopes: readonly string[]) => this.authorizeConsolidationScopes(owner, dream, config.revision, scopes);
+        const model = new PublishedConsolidationModel({fs: this.options.fs, path: this.evidence.consolidationPath(owner, dream),
+            target: config.config.consolidation!.target, repository: this.options.repository, calls: this.options.calls, kernel: this.options.kernel,
+            authorize, bindSession: (sessionId, scopes) => this.registry.bind(sessionId, {ownerProjectId: owner, dreamId: dream,
+                sourceId, configRevision: config.revision, authority: watermark.authority, consolidationScopes: [...scopes]})});
+        const service = this.evidence.consolidation(owner, dream, model, {evidence: captured => {
+            if (captured.sourceId !== sourceId) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+            return this.authorizeConsolidationSource(owner, dream, config.revision, sourceId);
+        }, evidenceScope: captured => captured.sourceId, scopes: authorize}, config.revision);
+        const sources = [...config.config.files, ...config.config.decisions ?? [], ...config.config.tasks ?? [],
+            ...config.config.sessions ?? [], ...config.config.changes ?? []];
+        const permittedScopes = [...new Set([sourceId, ...sources.filter(source => source.projectId === evidence.projectId).map(source => source.id)])].sort();
+        await service.run({operationId: 'consolidate-' + sha256HexSync(JSON.stringify([owner, dream, input.operationId, config.revision])),
+            captureOperationId: input.operationId, scope: evidence.projectId, scopes: [sourceId], permittedScopes,
+            ...(config.config.consolidation!.focus !== undefined ? {focus: config.config.consolidation!.focus} : {})});
+    }
+
+    private async authorizeConsolidationScopes(owner: string, dream: string, revision: number, scopes: readonly string[]): Promise<void> {
+        await this.options.authorizeOwner(owner);
+        for (const sourceId of scopes) await this.authorizeConsolidationSource(owner, dream, revision, sourceId);
+        await this.evidence.checkConfig(owner, dream, revision);
+        await this.options.authorizeOwner(owner);
+    }
+
+    private async authorizeConsolidationSource(owner: string, dream: string, revision: number, sourceId: string) {
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream), watermark = await this.evidence.watermark(owner, dream, sourceId);
+        if (!config?.config.enabled || config.revision !== revision || !watermark) throw new Error('DREAM_CONFIG_CONFLICT');
+        const file = config.config.files.find(item => item.id === sourceId);
+        const current = file ? await this.sourceAuthorization.authorizeDreamSource(file.projectId, file.connectionId, file.capability)
+            : await this.adoptionBinding({ownerProjectId: owner, dreamId: dream, sourceId, configRevision: revision,
+                authority: watermark.authority, adoptionPlanRevision: 'consolidation'});
+        if (file && (file.projectId !== watermark.projectId || file.connectionId !== watermark.connectionId)
+            || !sameSourceIdentity(current, watermark.authority)) throw new Error('DREAM_AUTHORIZATION_CHANGED');
+        await this.evidence.checkConfig(owner, dream, revision);
+        await this.options.authorizeOwner(owner);
+        return watermark.authority;
+    }
+
+    async pendingConsolidation(owner: string, dream: string, scope: string, after?: string) {
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream);
+        if (!config?.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        const result = await this.evidence.pendingProposals(owner, dream, scope, after, async scopes => {
+            try {await this.authorizeConsolidationScopes(owner, dream, config.revision, scopes); return true;}
+            catch (error) {
+                if (error instanceof Error && ['DREAM_AUTHORIZATION_DENIED', 'DREAM_AUTHORIZATION_CHANGED', 'DREAM_CONFIG_CONFLICT',
+                    'DREAM_OWNER_AUTHORIZATION_FAILED', 'DREAM_SOURCE_NOT_CONFIGURED'].includes(error.message)) return false;
+                throw error;
+            }
+        });
+        await this.evidence.checkConfig(owner, dream, config.revision);
+        await this.options.authorizeOwner(owner);
+        return result;
+    }
+
+    async readProposalEvidence(owner: string, dream: string, proposalId: string, evidenceId: string) {
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream);
+        if (!config?.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        const authorize = (scopes: readonly string[]) => this.authorizeConsolidationScopes(owner, dream, config.revision, scopes);
+        const proposal = await this.evidence.proposal(owner, dream, proposalId, authorize);
+        if (!proposal || !proposal.evidenceIds.includes(evidenceId)) throw new Error('DREAM_EVIDENCE_MISSING');
+        const known = [...config.config.files.map(item => ({id: item.id, projectId: item.projectId, type: 'file'})),
+            ...(config.config.changes ?? []).map(item => ({id: item.id, projectId: item.projectId, type: item.commits ? 'git' : 'change'})),
+            ...(config.config.sessions ?? []).map(item => ({id: item.id, projectId: item.projectId, type: 'session'})),
+            ...(config.config.tasks ?? []).map(item => ({id: item.id, projectId: item.projectId, type: 'other'})),
+            ...(config.config.decisions ?? []).map(item => ({id: item.id, projectId: item.projectId, type: 'other'}))];
+        for (const adoption of config.config.adoptions ?? []) {
+            const watermark = await this.evidence.watermark(owner, dream, adoption.id);
+            if (watermark) known.push({id: adoption.id, projectId: watermark.projectId, type: 'other'});
+        }
+        for (const source of known.filter(item => proposal.requiredScopes.includes(item.id))) {
+            const captured = await this.evidence.readCapturedEvidenceById(owner, dream, [source.projectId, source.type, source.id], evidenceId,
+                async item => {
+                    const authority = await this.authorizeConsolidationSource(owner, dream, config.revision, item.sourceId);
+                    if (!sameSourceIdentity(authority, item.authority)) throw new Error('DREAM_AUTHORIZATION_CHANGED');
+                    return item.authority;
+                });
+            if (captured) {
+                if (sha256HexSync(captured.snapshot) !== captured.fingerprint) throw new Error('DREAM_CAPTURE_INVALID');
+                await authorize(proposal.requiredScopes);
+                if (JSON.stringify(await this.evidence.proposal(owner, dream, proposalId, authorize)) !== JSON.stringify(proposal))
+                    throw new Error('DREAM_PROPOSAL_CONFLICT');
+                return {id: captured.id, sourceId: captured.sourceId, locator: captured.locator, fingerprint: captured.fingerprint,
+                    granularity: captured.granularity, snapshot: captured.snapshot};
+            }
+        }
+        throw new Error('DREAM_EVIDENCE_MISSING');
+    }
+
+    async activeConsolidation(owner: string, dream: string) {
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream);
+        if (!config?.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        const result = await this.evidence.activeMemory(owner, dream, scopes => this.authorizeConsolidationScopes(owner, dream, config.revision, scopes));
+        await this.evidence.checkConfig(owner, dream, config.revision);
+        await this.options.authorizeOwner(owner);
+        return result;
+    }
+
+    async authorizeDownstream(owner: string, dream: string, scopes: readonly string[]): Promise<void> {
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream);
+        if (!config?.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        await this.authorizeConsolidationScopes(owner, dream, config.revision, scopes);
+    }
+    async readDownstream(owner: string, dream: string, kind: 'daily' | 'kanban', commitId: string) {
+        if (kind !== 'daily' && kind !== 'kanban') throw new Error('DREAM_OUTBOX_INVALID');
+        await this.options.authorizeOwner(owner);
+        return new DreamDownstream(this.options.fs, (project, id, scopes) => this.authorizeDownstream(project, id, scopes)).read(owner, dream, kind, commitId);
+    }
+    async readCommittedVersion(owner: string, dream: string, commitId: string) {
+        await this.options.authorizeOwner(owner);
+        const authorize = (scopes: readonly string[]) => this.authorizeDownstream(owner, dream, scopes);
+        return this.evidence.committedMemory(owner, dream, commitId, authorize);
+    }
+    async listDownstream(owner: string, dream: string, kind: 'daily' | 'kanban', after?: string) {
+        if (kind !== 'daily' && kind !== 'kanban') throw new Error('DREAM_OUTBOX_INVALID');
+        await this.options.authorizeOwner(owner);
+        return new DreamDownstream(this.options.fs, (project, id, scopes) => this.authorizeDownstream(project, id, scopes)).list(owner, dream, kind, after);
+    }
+
+    async reviewConsolidation(owner: string, dream: string, scope: string, after?: string) {
+        const active = await this.activeConsolidation(owner, dream);
+        const page = await this.pendingConsolidation(owner, dream, scope, after);
+        const current = await this.activeConsolidation(owner, dream);
+        if ((active?.version ?? null) !== (current?.version ?? null)) throw new Error('DREAM_VERSION_CONFLICT');
+        return {page, version: current?.version ?? null, topics: (current?.topics ?? []).map(({id, kind, priority, updatedAt, title}) =>
+            ({id, ...(kind !== undefined ? {kind} : {}), ...(priority !== undefined ? {priority} : {}),
+                ...(updatedAt !== undefined ? {updatedAt} : {}), ...(title !== undefined ? {title} : {})}))};
+    }
+
+    async commitConsolidation(owner: string, dream: string, operationId: string, expectedVersion: string | null,
+        selected: Array<{id: string; revision: number}>) {
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream);
+        if (!config?.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        return this.evidence.commitProposals(owner, dream, operationId, expectedVersion, selected, config.revision,
+            scopes => this.authorizeConsolidationScopes(owner, dream, config.revision, scopes));
+    }
+
+    async rollbackConsolidation(owner: string, dream: string, operationId: string, targetCommitId: string, expectedVersion: string) {
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream);
+        if (!config?.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        return this.evidence.rollbackMemory(owner, dream, operationId, targetCommitId, expectedVersion, config.revision,
+            scopes => this.authorizeConsolidationScopes(owner, dream, config.revision, scopes));
+    }
+
+    async resolveConsolidation(owner: string, dream: string, operationId: string, id: string, revision: number,
+        resolution: import('@nestos/dream/vfs').ProposalResolution) {
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream);
+        if (!config?.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        return this.evidence.resolveProposal(owner, dream, operationId, id, revision, resolution, config.revision,
+            scopes => this.authorizeConsolidationScopes(owner, dream, config.revision, scopes));
     }
     private async runSummary(input: ConfiguredDreamRequest, entry: Entry, config: import('./config-store').DreamConfigRecord,
         selected: import('./config-store').DreamDecisionSourceConfig | import('./config-store').DreamTaskSourceConfig | import('./config-store').DreamSessionSourceConfig | import('./config-store').DreamChangeSourceConfig) {
@@ -820,12 +1140,20 @@ export class DreamHost {
         if (watermark && (watermark.projectId !== base.projectId || watermark.connectionId !== base.connectionId || !sameAuthority(watermark.authority, authority))) throw new Error('DREAM_AUTHORIZATION_CHANGED');
         const previous = await this.evidence.run(input.ownerProjectId, input.dreamId, input.operationId), outcome = previous?.outcomes[0];
         if (previous && (previous.outcomes.length !== 1 || outcome?.status !== 'ok' || outcome.evidence.sourceId !== input.sourceId)) throw new Error('DREAM_OPERATION_CONFLICT');
-        const source = {...base, cursor: outcome?.status === 'ok' ? outcome.evidence.startCursor : watermark?.cursor ?? null};
+        const captured = previous ? null : await this.evidence.readCapturedOperation(input.ownerProjectId, input.dreamId, input.operationId, async evidence => {
+            if (evidence.projectId !== base.projectId || evidence.sourceId !== base.id || evidence.connectionId !== base.connectionId
+                || evidence.locator !== port.target(base)) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+            return port.authorize(base);
+        });
+        const latest = !previous && !captured ? await this.latestCapturedForSource(input, base, port) : null;
+        const source = {...base, cursor: outcome?.status === 'ok' ? outcome.evidence.startCursor
+            : captured?.startCursor !== undefined ? captured.startCursor : latest?.endCursor !== undefined ? latest.endCursor : watermark?.cursor ?? null};
         return runDreamTwinFileScan({...input, planId: plan.planId, planRevision: plan.planRevision, twinSourceId: plan.sourceId,
-            target: selected.id, sourceKind: 'managed-artifact', source, configRevision: config.revision}, entry.twin, port,
+            target: selected.id, sourceKind: 'managed-artifact', evidenceSourceType: 'directory' in selected ? (selected.commits ? 'git' : 'change') : 'sessionId' in selected ? 'session' : 'other',
+            source, configRevision: config.revision}, entry.twin, port,
             this.evidence, this.options.kernel, () => this.options.authorizeOwner(input.ownerProjectId),
-            (runId, proof) => this.registry.bindRun(runId, {ownerProjectId: input.ownerProjectId, dreamId: input.dreamId,
-                sourceId: input.sourceId, configRevision: config.revision, authority: proof, adoptionPlanRevision: plan.planRevision}));
+            (runId, proof, retryPlan) => this.registry.bindRun(runId, {ownerProjectId: input.ownerProjectId, dreamId: input.dreamId,
+                sourceId: input.sourceId, configRevision: config.revision, authority: proof, adoptionPlanRevision: plan.planRevision, ...(retryPlan ? {retryPlan} : {})}));
     }
     private async runAdoption(input: ConfiguredDreamRequest, entry: Entry, config: import('./config-store').DreamConfigRecord) {
         if (!config.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
@@ -850,12 +1178,29 @@ export class DreamHost {
             throw new Error('DREAM_AUTHORIZATION_CHANGED');
         const previous = await this.evidence.run(input.ownerProjectId, input.dreamId, input.operationId), outcome = previous?.outcomes[0];
         if (previous && (previous.outcomes.length !== 1 || outcome?.status !== 'ok' || outcome.evidence.sourceId !== input.sourceId)) throw new Error('DREAM_OPERATION_CONFLICT');
-        const source = {...base, cursor: outcome?.status === 'ok' ? outcome.evidence.startCursor : watermark?.cursor ?? null};
+        const captured = previous ? null : await this.evidence.readCapturedOperation(input.ownerProjectId, input.dreamId, input.operationId, async evidence => {
+            if (evidence.projectId !== base.projectId || evidence.sourceId !== base.id || evidence.connectionId !== base.connectionId
+                || evidence.locator !== port.target(base)) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+            return port.authorize(base);
+        });
+        const latest = !previous && !captured ? await this.latestCapturedForSource(input, base, port) : null;
+        const source = {...base, cursor: outcome?.status === 'ok' ? outcome.evidence.startCursor
+            : captured?.startCursor !== undefined ? captured.startCursor : latest?.endCursor !== undefined ? latest.endCursor : watermark?.cursor ?? null};
         return runDreamTwinFileScan({...input, planId: plan.planId, planRevision: plan.planRevision, twinSourceId: plan.sourceId,
             target: input.sourceId, sourceKind: 'managed-artifact', source, configRevision: config.revision}, entry.twin, port,
             this.evidence, this.options.kernel, () => this.options.authorizeOwner(input.ownerProjectId),
-            (runId, proof) => this.registry.bindRun(runId, {ownerProjectId: input.ownerProjectId, dreamId: input.dreamId,
-                sourceId: input.sourceId, configRevision: config.revision, authority: proof, adoptionPlanRevision: plan.planRevision}));
+            (runId, proof, retryPlan) => this.registry.bindRun(runId, {ownerProjectId: input.ownerProjectId, dreamId: input.dreamId,
+                sourceId: input.sourceId, configRevision: config.revision, authority: proof, adoptionPlanRevision: plan.planRevision, ...(retryPlan ? {retryPlan} : {})}));
+    }
+    private async latestCapturedForSource(input: ConfiguredDreamRequest, source: import('@nestos/dream').DreamSource,
+        port: import('./project-file-source').DreamProjectFilePort) {
+        const operation = await this.evidence.latestCapturedOperation(input.ownerProjectId, input.dreamId, input.sourceId);
+        if (!operation) return null;
+        return this.evidence.readCapturedOperation(input.ownerProjectId, input.dreamId, operation, async evidence => {
+            if (evidence.projectId !== source.projectId || evidence.sourceId !== source.id || evidence.connectionId !== source.connectionId
+                || evidence.locator !== port.target(source)) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+            return port.authorize(source);
+        });
     }
     async runAll(owner: string, dream: string, operationId: string, configRevision: number, sourceIds?: string[]) {
         const started = Date.now();
@@ -867,12 +1212,59 @@ export class DreamHost {
         const available = [...files, ...adoptions ?? [], ...decisions ?? [], ...tasks ?? [], ...sessions ?? [], ...changes ?? []].map(source => source.id);
         const selected = this.batchSources(available, operationId, started, sourceIds);
         await this.configs.reserveBatch(owner, dream, operationId, configRevision, sourceIds === undefined ? undefined : selected);
-        const results: Awaited<ReturnType<DreamHost['runBatchSource']>>[] = [];
-        for (const sourceId of selected) results.push(await this.runBatchSource(owner, dream, operationId, configRevision, sourceId));
+        const gaps = current.config.consolidation ? await this.retryBatchGaps(owner, dream, operationId, current, selected) : [];
+        const results: DreamBatchResult[] = [];
+        for (const sourceId of selected) results.push(await this.runBatchSource(owner, dream, operationId, configRevision, sourceId, !!current.config.consolidation));
+        if (current.config.consolidation) await this.consolidateBatch(owner, dream, operationId, current, [...gaps, ...results]);
         await this.options.authorizeOwner(owner); await this.evidence.checkConfig(owner, dream, configRevision);
         log.info('dream.scan.batch', {operationId, stage: 'complete', result: 'success', count: results.length,
             failed: results.filter(item => item.status === 'failed').length, durationMs: Date.now() - started});
         return {configRevision, results};
+    }
+    private async retryBatchGaps(owner: string, dream: string, batch: string, config: import('./config-store').DreamConfigRecord, selected: string[]): Promise<DreamBatchResult[]> {
+        const started = Date.now();
+        const entries = await Promise.all(selected.map(async sourceId => {
+            try {
+            const id = await this.evidence.latestCapturedOperation(owner, dream, sourceId);
+            if (!id) return null;
+            const authorize = async (evidence: import('@nestos/dream/vfs').CapturedEvidence) => {
+                if (evidence.sourceId !== sourceId) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+                await authorizeDreamExecution('dream-gap', {ownerProjectId: owner, dreamId: dream, sourceId, configRevision: config.revision,
+                    authority: evidence.authority, adoptionPlanRevision: 'gap'}, this.configs, this.sourceAuthorization,
+                    this.options.authorizeOwner, binding => this.adoptionBinding(binding));
+                return evidence.authority;
+            };
+            const evidence = await this.evidence.readCapturedOperation(owner, dream, id, authorize);
+            return evidence ? {sourceId, evidence, authorize} : null;
+            } catch (error) {
+                const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SCAN_FAILED';
+                log.warn('dream.scan.gap', {operationId: batch, stage: 'authorize', result: 'failure', code, sourceId, durationMs: Date.now() - started});
+                return null;
+            }
+        }));
+        const available = entries.filter((entry): entry is NonNullable<typeof entry> => !!entry);
+        if (config.config.consolidation!.crossProject && (config.config.adoptions ?? []).some(item => selected.includes(item.id)
+            && !available.some(entry => entry.sourceId === item.id))) return [];
+        const configured = [...config.config.files, ...config.config.decisions ?? [], ...config.config.tasks ?? [],
+            ...config.config.sessions ?? [], ...config.config.changes ?? []].filter(item => selected.includes(item.id));
+        const projects = [...new Set([...available.map(entry => entry.evidence.projectId), ...configured.map(item => item.projectId)])].sort();
+        const rows: DreamBatchResult[] = [];
+        for (const entry of available) {
+            const scope = config.config.consolidation!.crossProject ? 'joint-' + sha256HexSync(JSON.stringify(projects)) : entry.evidence.projectId;
+            const source: [string, string, string] = [entry.evidence.projectId, entry.evidence.sourceType, entry.sourceId];
+            const watermark = await this.evidence.consolidationWatermark(owner, dream, scope, source);
+            const pending = await this.evidence.pendingCapturedOperations(owner, dream, scope, source, watermark, 1, entry.authorize);
+            for (const item of pending.items) {
+                try {
+                    await this.scanConfigured({ownerProjectId: owner, dreamId: dream, sourceId: entry.sourceId, operationId: item.operationId});
+                    rows.push({sourceId: entry.sourceId, operationId: item.operationId, status: 'settled'});
+                } catch (error) {
+                    const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SCAN_FAILED';
+                    log.warn('dream.scan.gap', {operationId: batch, stage: 'retry', result: 'failure', code, sourceId: entry.sourceId, durationMs: Date.now() - started});
+                }
+            }
+        }
+        return rows;
     }
     private batchSources(available: string[], operationId: string, started: number, requested?: string[]): string[] {
         if (requested === undefined) return available;
@@ -884,10 +1276,164 @@ export class DreamHost {
         }
         return available.filter(id => requested.includes(id));
     }
-    private async runBatchSource(owner: string, dream: string, batch: string, revision: number, sourceId: string) {
+    private async consolidateBatch(owner: string, dream: string, batch: string, config: import('./config-store').DreamConfigRecord,
+        results: DreamBatchResult[]): Promise<void> {
+        const known: Array<{id: string; projectId: string}> = [...config.config.files, ...config.config.decisions ?? [], ...config.config.tasks ?? [],
+            ...config.config.sessions ?? [], ...config.config.changes ?? []];
+        for (const adoption of config.config.adoptions ?? []) if (results.some(row => row.sourceId === adoption.id)) {
+            const watermark = await this.evidence.watermark(owner, dream, adoption.id);
+            if (watermark) known.push({id: adoption.id, projectId: watermark.projectId});
+        }
+        const projectFor = (sourceId: string) => known.find(source => source.id === sourceId)?.projectId;
+        const joint = config.config.consolidation!.crossProject === true;
+        const projects = [...new Set(results.map(result => projectFor(result.sourceId)).filter((id): id is string => !!id))].sort();
+        if (joint && (results.some(result => result.status === 'failed' || !projectFor(result.sourceId)) || !projects.length)) {
+            for (const result of results) if (result.status === 'settled') Object.assign(result, {status: 'failed', code: 'DREAM_BATCH_INCOMPLETE'});
+            return;
+        }
+        const groups = new Map<string, DreamBatchResult[]>();
+        for (const result of results.filter(item => item.status === 'settled')) {
+            const project = projectFor(result.sourceId);
+            if (!project) {Object.assign(result, {status: 'failed', code: 'DREAM_SOURCE_NOT_CONFIGURED'}); continue;}
+            const group = joint ? 'joint-' + sha256HexSync(JSON.stringify(projects)) : project;
+            groups.set(group, [...groups.get(group) ?? [], result]);
+        }
+        for (const [scope, rows] of groups) {
+            const started = Date.now();
+            try {
+                await this.consolidateBatchGroup(owner, dream, batch, config, scope, rows, joint ? projects : [scope], known);
+                log.info('dream.consolidation.batch', {operationId: batch, stage: 'settle', result: 'success', count: rows.length, durationMs: Date.now() - started});
+            }
+            catch (error) {
+                const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_CONSOLIDATION_FAILED';
+                log.warn('dream.consolidation.batch', {operationId: batch, stage: 'settle', result: 'failure', code, count: rows.length, durationMs: Date.now() - started});
+                for (const row of rows) Object.assign(row, {status: 'failed', code});
+            }
+        }
+    }
+    private async consolidateBatchGroup(owner: string, dream: string, batch: string, config: import('./config-store').DreamConfigRecord,
+        scope: string, rows: DreamBatchResult[], projects: string[], known: Array<{id: string; projectId: string}>,
+        recompute?: {receiptScope: string; expectedVersion: string | null}): Promise<void> {
+        const selected = new Set(rows.map(row => row.sourceId));
+        const permittedScopes = known.filter(source => projects.includes(source.projectId)).map(source => source.id).sort();
+        const participants = config.config.consolidation!.crossProject ? projects.map(project => {
+            const source = known.find(item => item.projectId === project && selected.has(item.id));
+            if (!source) throw new Error('DREAM_SOURCE_NOT_CONFIGURED'); return source.id;
+        }) : [];
+        const captured: DreamBatchResult[] = [];
+        for (const row of rows) {
+            const evidence = await this.evidence.readCapturedOperation(owner, dream, row.operationId, async item => {
+                if (item.sourceId !== row.sourceId || !projects.includes(item.projectId)) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+                return this.authorizeConsolidationSource(owner, dream, config.revision, item.sourceId);
+            });
+            if (!evidence && recompute) throw new Error('DREAM_EVIDENCE_MISSING');
+            if (evidence && sha256HexSync(evidence.snapshot) !== evidence.fingerprint) throw new Error('DREAM_CAPTURE_INVALID');
+            if (evidence) captured.push(row);
+        }
+        if (!captured.length) return;
+        const sourceId = captured[0].sourceId, watermark = await this.evidence.watermark(owner, dream, sourceId);
+        if (!watermark) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        const authorize = async (scopes: readonly string[]) => {
+            for (const participant of participants) await this.authorizeConsolidationSource(owner, dream, config.revision, participant);
+            await this.authorizeConsolidationScopes(owner, dream, config.revision, scopes);
+        };
+        const model = new PublishedConsolidationModel({fs: this.options.fs, path: this.evidence.consolidationPath(owner, dream),
+            target: config.config.consolidation!.target, repository: this.options.repository, calls: this.options.calls, kernel: this.options.kernel,
+            authorize, bindSession: (sessionId, scopes) => this.registry.bind(sessionId, {ownerProjectId: owner, dreamId: dream,
+                sourceId, configRevision: config.revision, authority: watermark.authority, consolidationScopes: [...new Set([...scopes, ...participants])].sort()})});
+        const service = this.evidence.consolidation(owner, dream, model, {evidence: item => {
+            if (!selected.has(item.sourceId) || !projects.includes(item.projectId)) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+            return this.authorizeConsolidationSource(owner, dream, config.revision, item.sourceId);
+        }, evidenceScope: item => item.sourceId, scopes: authorize}, config.revision);
+        await service.runBatch({operationId: 'consolidate-' + sha256HexSync(JSON.stringify([owner, dream, batch, config.revision, scope])),
+            captureOperationIds: captured.map(row => row.operationId), scope, permittedScopes,
+            ...(recompute ? recompute : {}),
+            ...(config.config.consolidation!.focus !== undefined ? {focus: config.config.consolidation!.focus} : {})});
+    }
+
+    async planRecomputation(owner: string, dream: string): Promise<DreamRecomputePlan[]> {
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream), active = await this.evidence.activeMemoryScopes(owner, dream);
+        if (!config?.config.enabled || !config.config.consolidation) return [];
+        const restricted = [...active?.requiredScopes ?? [], ...(await this.evidence.pendingMemoryScopes(owner, dream)).flat()];
+        if (!restricted.length) return [];
+        const known = await this.recomputeSources(owner, dream, config.config);
+        const available = new Map<string, boolean>();
+        for (const id of new Set([...restricted, ...known.map(source => source.id)])) {
+            if (!known.some(source => source.id === id)) {available.set(id, false); continue;}
+            if (!await this.evidence.watermark(owner, dream, id)) {available.set(id, false); continue;}
+            try {await this.authorizeConsolidationSource(owner, dream, config.revision, id); available.set(id, true);}
+            catch (error) {if (!recomputeAccessDenied(error)) throw error; available.set(id, false);}
+        }
+        if (!restricted.some(id => !available.get(id))) return [];
+        const groups = new Map<string, Array<{sourceId: string; operationId: string}>>();
+        for (const source of known.filter(item => available.get(item.id))) {
+            const operationId = await this.evidence.latestCapturedOperation(owner, dream, source.id);
+            if (!operationId) continue;
+            const evidence = await this.evidence.readCapturedOperation(owner, dream, operationId, item => {
+                if (item.sourceId !== source.id || item.projectId !== source.projectId) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+                return this.authorizeConsolidationSource(owner, dream, config.revision, source.id);
+            });
+            if (evidence && sha256HexSync(evidence.snapshot) !== evidence.fingerprint) throw new Error('DREAM_CAPTURE_INVALID');
+            if (evidence) groups.set(source.projectId, [...groups.get(source.projectId) ?? [], {sourceId: source.id, operationId}]);
+        }
+        await this.evidence.checkConfig(owner, dream, config.revision); await this.options.authorizeOwner(owner);
+        return [...groups].map(([project, sources]) => {
+            sources.sort((a, b) => a.sourceId < b.sourceId ? -1 : a.sourceId > b.sourceId ? 1 : 0);
+            const activeVersion = active?.version ?? null;
+            const id = 'recompute-' + sha256HexSync(JSON.stringify([owner, dream, project, config.revision, activeVersion, sources]));
+            return {owner, dream, project, configRevision: config.revision, activeVersion, sources, id};
+        });
+    }
+
+    async recomputeCatalog(after?: string): Promise<{items: Array<{owner: string; dream: string}>; next?: string}> {
+        const projects = (await this.options.projects.list()).map(item => item.project.id).sort();
+        const page = projects.filter(id => after === undefined || id > after).slice(0, 10);
+        const items: Array<{owner: string; dream: string}> = [];
+        for (const owner of page) {
+            try {
+                const dreams = await this.list(owner);
+                for (const dream of dreams.items.filter(item => item.enabled)) {
+                    const config = await this.configs.read(owner, dream.id);
+                    if (config?.config.consolidation) items.push({owner, dream: dream.id});
+                }
+                if (dreams.truncated) log.warn('dream.recompute.catalog', {operationId: 'recompute-catalog', stage: 'list', result: 'failure',
+                    code: 'DREAM_CATALOG_TRUNCATED', durationMs: 0});
+            } catch (error) {
+                log.warn('dream.recompute.catalog', {operationId: 'recompute-catalog', stage: 'authorize', result: 'failure',
+                    code: error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_CATALOG_READ_FAILED', durationMs: 0});
+            }
+        }
+        return {items, ...(page.length === 10 ? {next: page[page.length - 1]} : {})};
+    }
+
+    async executeRecomputation(plan: DreamRecomputePlan, attempt = 0): Promise<void> {
+        if (!Number.isSafeInteger(attempt) || attempt < 0 || attempt > 1000) throw new Error('DREAM_RECOMPUTE_INVALID');
+        await this.options.authorizeOwner(plan.owner);
+        const config = await this.configs.read(plan.owner, plan.dream);
+        if (!config?.config.enabled || !config.config.consolidation || config.revision !== plan.configRevision) throw new Error('DREAM_CONFIG_CONFLICT');
+        const known = await this.recomputeSources(plan.owner, plan.dream, config.config);
+        if (!plan.sources.length || plan.sources.some(source => !known.some(item => item.id === source.sourceId && item.projectId === plan.project)))
+            throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+        const rows: DreamBatchResult[] = plan.sources.map(source => ({...source, status: 'settled'}));
+        await this.consolidateBatchGroup(plan.owner, plan.dream, `${plan.id}-${attempt}`, config, plan.project, rows, [plan.project], known,
+            {receiptScope: plan.id, expectedVersion: plan.activeVersion});
+    }
+
+    private async recomputeSources(owner: string, dream: string, config: DreamConfig): Promise<Array<{id: string; projectId: string}>> {
+        const result: Array<{id: string; projectId: string}> = [...config.files, ...config.decisions ?? [], ...config.tasks ?? [],
+            ...config.sessions ?? [], ...config.changes ?? []].map(source => ({id: source.id, projectId: source.projectId}));
+        for (const source of config.adoptions ?? []) {
+            const watermark = await this.evidence.watermark(owner, dream, source.id);
+            if (watermark) result.push({id: source.id, projectId: watermark.projectId});
+        }
+        return result;
+    }
+    private async runBatchSource(owner: string, dream: string, batch: string, revision: number, sourceId: string, scanOnly = false) {
         const operationId = 'batch-' + sha256HexSync(JSON.stringify([owner, dream, batch, revision, sourceId]));
         try {
-            await this.run({ownerProjectId: owner, dreamId: dream, sourceId, operationId});
+            const input = {ownerProjectId: owner, dreamId: dream, sourceId, operationId};
+            if (scanOnly) await this.scanConfigured(input); else await this.run(input);
             return {sourceId, operationId, status: 'settled' as const};
         } catch (error) {
             await this.options.authorizeOwner(owner);
@@ -898,6 +1444,10 @@ export class DreamHost {
     async forSession(sessionId: string): Promise<DigitalTwinService | null> {
         if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(sessionId)) return null;
         const saved = await this.registry.find(sessionId);
+        if (saved?.consolidationScopes) {
+            await this.authorizeConsolidationScopes(saved.ownerProjectId, saved.dreamId, saved.configRevision, saved.consolidationScopes);
+            return null;
+        }
         if (saved) return resolveDreamExecution(sessionId, {registry: this.registry, configs: this.configs,
             remote: this.sourceAuthorization, authorizeOwner: this.options.authorizeOwner, authorizeAdoption: binding => this.adoptionBinding(binding),
             open: async (owner, dream) => (await this.open(owner, dream)).twin}, saved);
@@ -960,4 +1510,14 @@ export class DreamHost {
 }
 async function disposeEntry(entry: Entry): Promise<void> {
     try {await entry.twin.dispose();} finally {await entry.disposeView();}
+}
+function recomputeAccessDenied(error: unknown): boolean {
+    const code = (error as {code?: unknown} | null)?.code;
+    const message = error instanceof Error ? error.message : '';
+    return code === 'EACCES' || ['DREAM_AUTHORIZATION_CHANGED', 'DREAM_AUTHORIZATION_DENIED', 'DREAM_OWNER_AUTHORIZATION_FAILED',
+        'DREAM_SOURCE_NOT_CONFIGURED', 'DREAM_SERVER_IDENTITY_CHANGED'].includes(message);
+}
+function sameSourceIdentity(current: import('@nestos/dream').SourceAuthority, captured: import('@nestos/dream').SourceAuthority): boolean {
+    return sameAuthority(current, current) && sameAuthority(captured, captured) && current.principalId === captured.principalId
+        && current.serverId === captured.serverId && current.serverProjectId === captured.serverProjectId;
 }

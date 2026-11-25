@@ -18,6 +18,7 @@ interface Dependencies {
     journal: KanbanAutomationJournal;
     store: DreamEvidenceStore;
     inspect(request: Request): Promise<DreamDecisionEvidence>;
+    prepare?(request: Request, configRevision: number): Promise<void>;
 }
 const log = createModuleLogger('dream-adoption');
 const operationPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
@@ -34,7 +35,7 @@ export async function adoptDreamDecision(request: Request, deps: Dependencies): 
         stage = 'reconcile';
         if (!await reconcileDecision(deps, request, record.id)) {
             stage = 'prepare';
-            await deps.store.prepareDecisionAdoption(request, initial.configRevision);
+            await (deps.prepare ? deps.prepare(request, initial.configRevision) : deps.store.prepareDecisionAdoption(request, initial.configRevision));
             verifyEvidence(initial, await deps.inspect(request));
             stage = 'append-record';
             await journalCommand(deps.journal, deps.kanban, request.boardId, 'dream-decision-command:' + record.id, {type: 'append-record', record});
@@ -81,7 +82,8 @@ function validateRequest(request: Request): void {
 
 function verifyEvidence(initial: DreamDecisionEvidence, current: DreamDecisionEvidence): void {
     if (initial.configRevision !== current.configRevision) throw new Error('DREAM_CONFIG_CONFLICT');
-    if (initial.suggestion.revision !== current.suggestion.revision || initial.evidence.version !== current.evidence.version
+    if (initial.suggestion.revision !== current.suggestion.revision || initial.suggestion.content !== current.suggestion.content
+        || initial.suggestion.sourceId !== current.suggestion.sourceId || initial.evidence.version !== current.evidence.version
         || !sameAuthority(initial.evidence.authority, current.evidence.authority))
         throw new Error('DREAM_AUTHORIZATION_CHANGED');
 }

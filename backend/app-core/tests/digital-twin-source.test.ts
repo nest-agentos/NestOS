@@ -82,3 +82,20 @@ it('reads a provenance-filtered bounded native page and fences its history revis
     expect(await reader.readHarnessWindow('project', 'profile', 'session', 2, result.cursor)).toMatchObject({text: '', historyBytes: 0, contextBytes: 0});
     expect(digest).toHaveBeenCalledOnce(); expect(digest.mock.calls[0][2]).toMatchObject({metadataOnly: true});
 });
+
+it('accepts a Harness digest up to 256 KiB and rejects an oversized one', async () => {
+    const {fs, repository} = await setup();
+    const session = {id: 'session', title: 'Remote', cwd: null, status: 'idle', createdAt: 1, updatedAt: 2, resumable: true, historyRevision: 'a'.repeat(64)};
+    const value = {version: 1, session, revision: 'b'.repeat(64), omittedUnclassified: 0, nextCursor: null,
+        scan: {historyBytes: 300000, contextBytes: 0}, messages: [{id: 'm', turnId: 'turn', role: 'user', text: 'x'.repeat(200 * 1024)}]};
+    const digest = vi.fn(async () => structuredClone(value));
+    const projects = {remoteMounts: {list: () => [{at: '/', connectionId: 'connection', serverId: 'node', serverProjectId: 'remote'}],
+        projectHarness: async () => ({digest, close: async () => {}})}} as unknown as ProjectService;
+    const reader = new NestosTwinSourceReader(fs, repository, projects);
+    expect((await reader.readHarnessWindow('project', 'profile', 'session', 1)).text.length).toBeGreaterThan(32 * 1024);
+    const overhead = new TextEncoder().encode(JSON.stringify([{...value.messages[0], text: ''}])).length;
+    value.messages[0].text = 'x'.repeat(256 * 1024 - overhead);
+    expect(new TextEncoder().encode((await reader.readHarnessWindow('project', 'profile', 'session', 1)).text).length).toBe(256 * 1024);
+    value.messages[0].text += 'x';
+    await expect(reader.readHarnessWindow('project', 'profile', 'session', 1)).rejects.toThrow('TWIN_SOURCE_LIMIT');
+});

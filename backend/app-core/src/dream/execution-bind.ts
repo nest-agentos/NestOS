@@ -69,6 +69,14 @@ async function bind(job: TwinAnalysisJob, executionSessionId: string, binding: D
 async function validateJob(job: TwinAnalysisJob, binding: DreamExecutionBinding, configs: DreamConfigStore): Promise<void> {
     const config = await configs.read(binding.ownerProjectId, binding.dreamId);
     const file = config?.config.files.find(item => item.id === binding.sourceId);
+    if (binding.retryPlan) {
+        const plan = binding.retryPlan;
+        if (!config?.config.enabled || config.revision !== binding.configRevision || job.sourceId !== plan.sourceId
+            || job.scanScope?.sourceId !== plan.sourceId || job.scanScope.planId !== plan.planId
+            || job.scanScope.planRevision !== plan.revision || !['queued', 'running'].includes(job.state))
+            throw new Error('DREAM_EXECUTION_BINDING_INVALID');
+        return;
+    }
     if (!file && (config?.config.adoptions?.some(item => item.id === binding.sourceId) || config?.config.decisions?.some(item => item.id === binding.sourceId) || config?.config.tasks?.some(item => item.id === binding.sourceId) || config?.config.sessions?.some(item => item.id === binding.sourceId) || config?.config.changes?.some(item => item.id === binding.sourceId)) && binding.adoptionPlanRevision) {
         const ids = adoptionScannerIds(binding.ownerProjectId, binding.dreamId, binding.sourceId);
         if (config.revision !== binding.configRevision || job.sourceId !== ids.twinSourceId || job.scanScope?.sourceId !== ids.twinSourceId

@@ -1,5 +1,5 @@
 import {createModuleLogger, randomUUID, t} from '@nestos/common';
-import type {DreamService, DreamAdoptionRecord, DreamAdoptionRequest, DreamConfigurationRecord, DreamRunView, ProjectService} from '@nestos/app-contracts/services';
+import type {DreamService, DreamAdoptionRecord, DreamAdoptionRequest, DreamConfigurationRecord, DreamProposalView, DreamRunView, ProjectService} from '@nestos/app-contracts/services';
 
 type Project = Awaited<ReturnType<ProjectService['list']>>[number];
 type Target = Awaited<ReturnType<DreamService['scannerTargets']>>[number];
@@ -130,8 +130,177 @@ export class DreamPage {
         this.kanbanSourceForm(owner, dream, config);
         this.sourceForm(owner, dream, config, targets, models);
         this.scheduleForm(owner, dream, config, scheduleStatus);
+        this.consolidationForm(owner, dream, config, targets);
         this.body.append(text(t('dream.history')));
         this.appendHistory(owner, dream, history);
+    }
+    private consolidationForm(owner: string, dream: string, config: DreamConfigurationRecord, targets: Target[]): void {
+        const panel = document.createElement('details'), summary = document.createElement('summary');
+        summary.textContent = t('dream.consolidation' as Parameters<typeof t>[0]); panel.append(summary);
+        const flow = document.createElement('select'), focus = document.createElement('input'), budget = document.createElement('input');
+        flow.setAttribute('aria-label', t('dream.consolidationFlow' as Parameters<typeof t>[0]));
+        const flows = targets.filter(item => item.target.kind === 'flow');
+        flows.forEach((item, index) => flow.add(option(String(index), item.name)));
+        const current = flows.findIndex(item => JSON.stringify(item.target) === JSON.stringify(config.config.consolidation?.target));
+        if (current >= 0) flow.value = String(current);
+        focus.setAttribute('aria-label', t('dream.focus' as Parameters<typeof t>[0])); focus.value = config.config.consolidation?.focus ?? '';
+        budget.type = 'number'; budget.min = '0'; budget.max = '100000'; budget.value = String(config.config.consolidation?.hotLoadTokens ?? 1500);
+        budget.setAttribute('aria-label', t('dream.hotLoadBudget' as Parameters<typeof t>[0]));
+        const joint = document.createElement('input'), jointLabel = document.createElement('label'); joint.type = 'checkbox';
+        joint.checked = config.config.consolidation?.crossProject === true; jointLabel.append(joint, t('dream.crossProject' as Parameters<typeof t>[0]));
+        panel.append(flow, focus, budget, jointLabel, button(t('dream.saveConsolidation' as Parameters<typeof t>[0]), async () => {
+            const selected = flows[Number(flow.value)], hotLoadTokens = Number(budget.value);
+            if (!selected || !Number.isSafeInteger(hotLoadTokens) || hotLoadTokens < 0 || hotLoadTokens > 100000) throw new Error('DREAM_CONFIG_INVALID');
+            const value = {target: selected.target, ...(focus.value.trim() ? {focus: focus.value.trim()} : {}), hotLoadTokens,
+                ...(joint.checked ? {crossProject: true} : config.config.consolidation?.crossProject !== undefined ? {crossProject: false} : {})};
+            await this.command(JSON.stringify([owner, dream, 'consolidation', config.revision, value]),
+                id => this.service.configureConsolidation(owner, dream, id, config.revision, value));
+            await this.refreshAfterWrite(() => this.loadDream());
+        }));
+        if (config.config.consolidation) this.proposalReview(panel, owner, dream);
+        if (config.config.consolidation) this.downstreamReview(panel, owner, dream);
+        this.body.append(panel);
+    }
+    private downstreamReview(panel: HTMLElement, owner: string, dream: string): void {
+        const results = document.createElement('div');
+        const show = async (kind: 'daily' | 'kanban', after?: string) => {
+            const page = await this.service.listDownstream(owner, dream, kind, after);
+            results.replaceChildren();
+            for (const item of page.items) {
+                const group = document.createElement('div');
+                if (item.committedAt !== undefined) group.append(text(new Date(item.committedAt).toLocaleDateString()));
+                group.append(button(t('dream.viewVersion' as Parameters<typeof t>[0]), () => this.showCommittedVersion(group, owner, dream, item.commitId)));
+                for (const reference of item.referenceCommits ?? []) group.append(button(t('dream.viewRollbackOrigin' as Parameters<typeof t>[0]),
+                    () => this.showCommittedVersion(group, owner, dream, reference)));
+                for (const change of item.changes) {
+                    const row = document.createElement('div'), content = change.content ?? t('dream.proposalRetire' as Parameters<typeof t>[0]);
+                    row.append(text(t(`dream.downstream.${change.action}` as Parameters<typeof t>[0])), text(content), text(change.evidenceIds.join(' · ')));
+                    if (change.kind !== undefined || change.priority !== undefined || change.title !== undefined) {
+                        const kind = change.kind === 'topic' ? t('dream.hotloadTopic' as Parameters<typeof t>[0]) : t('dream.hotloadConstraint' as Parameters<typeof t>[0]);
+                        row.append(text(`${kind} · ${t('dream.hotloadPriority' as Parameters<typeof t>[0])}: ${change.priority ?? 0}${change.title ? ` · ${change.title}` : ''}`));
+                    }
+                    for (const ref of change.evidenceRefs ?? []) row.append(button(t('dream.viewEvidence' as Parameters<typeof t>[0]),
+                        () => this.showCapturedEvidence(row, owner, dream, ref.proposalId, ref.evidenceId)));
+                    const finding: DreamRunView['findings'][number] = {id: change.id, sourceId: item.requiredScopes[0], kind: 'suggestion',
+                        content, revision: 1, state: 'active', origin: 'source'};
+                    if (kind === 'kanban') row.append(button(t('dream.adoptDecision'), () => this.decisionForm(row, {operationId: item.commitId, sources: [], findings: []}, finding, true)));
+                    group.append(row);
+                }
+                results.append(group);
+            }
+            if (page.nextCursor) results.append(button(t('dream.moreProposals' as Parameters<typeof t>[0]), () => show(kind, page.nextCursor)));
+        };
+        panel.append(button(t('dream.downstreamDaily' as Parameters<typeof t>[0]), () => show('daily')),
+            button(t('dream.downstreamCandidates' as Parameters<typeof t>[0]), () => show('kanban')), results);
+    }
+    private async showCommittedVersion(row: HTMLElement, owner: string, dream: string, commitId: string): Promise<void> {
+        const version = await this.service.readCommittedVersion(owner, dream, commitId);
+        if (!version) throw new Error('DREAM_COMMIT_MISSING');
+        const details = document.createElement('pre');
+        details.textContent = version.candidate.topics.map(topic => {
+            const kind = topic.kind === 'topic' ? t('dream.hotloadTopic' as Parameters<typeof t>[0]) : t('dream.hotloadConstraint' as Parameters<typeof t>[0]);
+            const updated = topic.updatedAt === undefined ? '' : ` · ${new Date(topic.updatedAt).toLocaleString()}`;
+            return `${kind} · ${t('dream.hotloadPriority' as Parameters<typeof t>[0])}: ${topic.priority ?? 0}${updated}\n${topic.title ? `${topic.title}\n` : ''}${topic.content}`;
+        }).join('\n\n'); row.append(details);
+    }
+    private async showCapturedEvidence(row: HTMLElement, owner: string, dream: string, proposalId: string, evidenceId: string): Promise<void> {
+        const evidence = await this.service.readProposalEvidence(owner, dream, proposalId, evidenceId);
+        const details = document.createElement('pre');
+        details.textContent = `${evidence.locator}\n${evidence.granularity} · ${evidence.fingerprint}\n${evidence.snapshot}`; row.append(details);
+    }
+    private proposalReview(panel: HTMLElement, owner: string, dream: string): void {
+        const scope = document.createElement('select'), results = document.createElement('div');
+        scope.setAttribute('aria-label', t('dream.source'));
+        for (const project of this.projects) scope.add(option(project.project.id, project.displayName ?? project.name));
+        scope.value = owner;
+        const show = async (after?: string) => {
+            const {page, version, topics} = await this.service.reviewConsolidation(owner, dream, scope.value, after);
+            results.replaceChildren();
+            const choices: Array<{id: string; revision: number; box: HTMLInputElement; row: HTMLElement}> = [];
+            for (const proposal of page.items) {
+                const row = document.createElement('div'), box = document.createElement('input'); box.type = 'checkbox';
+                box.disabled = proposal.status !== 'ready'; choices.push({id: proposal.id, revision: proposal.revision, box, row});
+                row.append(box, text(proposal.changes.map(change => change.content ?? t('dream.proposalRetire' as Parameters<typeof t>[0])).join(' · ')));
+                for (const change of proposal.changes) if (change.content !== null && (change.kind !== undefined || change.priority !== undefined || change.title !== undefined)) {
+                    const label = change.kind === 'topic' ? t('dream.hotloadTopic' as Parameters<typeof t>[0]) : t('dream.hotloadConstraint' as Parameters<typeof t>[0]);
+                    row.append(text(`${label} · ${t('dream.hotloadPriority' as Parameters<typeof t>[0])}: ${change.priority ?? 0}${change.title ? ` · ${change.title}` : ''}`));
+                }
+                for (const evidenceId of proposal.evidenceIds ?? []) row.append(button(t('dream.viewEvidence' as Parameters<typeof t>[0]),
+                    () => this.showCapturedEvidence(row, owner, dream, proposal.id, evidenceId)));
+                if (proposal.status === 'ready') row.append(button(t('dream.editHotload' as Parameters<typeof t>[0]),
+                    () => this.editHotload(row, owner, dream, proposal, topics ?? [])));
+                if (proposal.status === 'conflict') {
+                    row.append(text(t('dream.proposalConflict' as Parameters<typeof t>[0])));
+                    const edits = proposal.changes.map(change => {
+                        if (change.content === null) return null;
+                        const input = document.createElement('textarea'); input.value = change.content;
+                        input.setAttribute('aria-label', t('dream.proposalRewrite' as Parameters<typeof t>[0])); row.append(input); return input;
+                    });
+                    if (edits.some(Boolean)) row.append(button(t('dream.proposalRewrite' as Parameters<typeof t>[0]), async () => {
+                        const changes = proposal.changes.map((change, index) => ({...change, content: edits[index]?.value ?? null}));
+                        await this.command(JSON.stringify([owner, dream, 'rewrite', proposal.id, proposal.revision, changes]),
+                            id => this.service.resolveConsolidation(owner, dream, id, proposal.id, proposal.revision, {action: 'rewrite', changes}));
+                        await this.refreshAfterWrite(() => this.loadDream());
+                    }));
+                    for (const evidenceId of proposal.evidenceIds) row.append(button(`${t('dream.proposalChoose' as Parameters<typeof t>[0])}: ${evidenceId}`, async () => {
+                        await this.command(JSON.stringify([owner, dream, 'resolve', proposal.id, proposal.revision, evidenceId]),
+                            id => this.service.resolveConsolidation(owner, dream, id, proposal.id, proposal.revision, {action: 'choose', evidenceId}));
+                        await this.refreshAfterWrite(() => this.loadDream());
+                    }));
+                    row.append(button(t('dream.proposalReject' as Parameters<typeof t>[0]), async () => {
+                        await this.command(JSON.stringify([owner, dream, 'reject', proposal.id, proposal.revision]),
+                            id => this.service.resolveConsolidation(owner, dream, id, proposal.id, proposal.revision, {action: 'reject'}));
+                        await this.refreshAfterWrite(() => this.loadDream());
+                    }));
+                }
+                results.append(row);
+            }
+            results.append(button(t('dream.commitSelected' as Parameters<typeof t>[0]), async () => {
+                const selected = choices.filter(choice => choice.box.checked).map(({id, revision}) => ({id, revision}));
+                try {await this.command(JSON.stringify([owner, dream, 'commit', version, selected]),
+                    id => this.service.commitConsolidation(owner, dream, id, version, selected));}
+                catch (error) {
+                    const field = (error as {field?: unknown})?.field;
+                    const failed = choices.find(choice => choice.id === field);
+                    if (failed) {failed.row.setAttribute('aria-invalid', 'true'); this.status.textContent = `${errorText(error)}: ${failed.row.textContent ?? ''}`; return;}
+                    throw error;
+                }
+                await this.refreshAfterWrite(() => this.loadDream());
+            }));
+            if (page.nextCursor) results.append(button(t('dream.moreProposals' as Parameters<typeof t>[0]), () => show(page.nextCursor)));
+        };
+        panel.append(scope, button(t('dream.reviewProposals' as Parameters<typeof t>[0]), () => show()), results);
+    }
+    private editHotload(row: HTMLElement, owner: string, dream: string, proposal: DreamProposalView,
+        topics: Array<{id: string; kind?: 'constraint' | 'topic'; priority?: number; title?: string}>): void {
+        if (row.querySelector('[data-dream-hotload]')) return;
+        const form = document.createElement('div'); form.dataset.dreamHotload = '';
+        const fields = proposal.changes.map(change => {
+            if (change.content === null) return null;
+            const kind = document.createElement('select'), priority = document.createElement('input'), title = document.createElement('input');
+            const previous = topics.find(item => item.id === change.id);
+            kind.setAttribute('aria-label', t('dream.hotloadKind' as Parameters<typeof t>[0]));
+            kind.add(option('constraint', t('dream.hotloadConstraint' as Parameters<typeof t>[0])));
+            kind.add(option('topic', t('dream.hotloadTopic' as Parameters<typeof t>[0])));
+            kind.value = change.kind ?? previous?.kind ?? 'constraint';
+            if (proposal.constraint && change.id === proposal.targetId) {kind.value = 'constraint'; kind.disabled = true;}
+            priority.type = 'number'; priority.min = '-1000'; priority.max = '1000'; priority.value = String(change.priority ?? previous?.priority ?? 0);
+            priority.setAttribute('aria-label', t('dream.hotloadPriority' as Parameters<typeof t>[0]));
+            title.value = change.title === null ? '' : change.title ?? previous?.title ?? ''; title.maxLength = 500; title.setAttribute('aria-label', t('dream.hotloadTitle' as Parameters<typeof t>[0]));
+            form.append(text(change.id), kind, priority, title); return {kind, priority, title};
+        });
+        form.append(button(t('dream.saveHotload' as Parameters<typeof t>[0]), async () => {
+            const changes = proposal.changes.map((change, index) => {
+                const field = fields[index]; if (!field) return change;
+                const priority = Number(field.priority.value);
+                if (!Number.isSafeInteger(priority) || Math.abs(priority) > 1000) throw new Error('DREAM_PROPOSAL_INVALID');
+                const title = field.title.value.trim();
+                return {...change, kind: field.kind.value as 'constraint' | 'topic', priority, title: title || null};
+            });
+            await this.command(JSON.stringify([owner, dream, 'hotload', proposal.id, proposal.revision, changes]),
+                id => this.service.resolveConsolidation(owner, dream, id, proposal.id, proposal.revision, {action: 'rewrite', changes}));
+            await this.refreshAfterWrite(() => this.loadDream());
+        })); row.append(form);
     }
     private async scanBatch(owner: string, dream: string, config: DreamConfigurationRecord, sourceIds?: string[]): Promise<void> {
         const key = JSON.stringify([owner, dream, 'batch', config.revision, sourceIds]), operationId = this.commandOperations.get(key) ?? randomUUID();
@@ -647,7 +816,7 @@ export class DreamPage {
             }); form.append(more);
         }
     }
-    private async decisionForm(row: HTMLElement, run: DreamRunView, finding: DreamRunView['findings'][number]): Promise<void> {
+    private async decisionForm(row: HTMLElement, run: DreamRunView, finding: DreamRunView['findings'][number], downstream = false): Promise<void> {
         const owner = this.owner, dream = this.dream, boards = await this.service.adoptionBoards(owner);
         if (!row.isConnected || owner !== this.owner || dream !== this.dream || row.querySelector('[data-dream-decision]')) return;
         const form = document.createElement('div'), board = document.createElement('select'), project = document.createElement('select');
@@ -662,8 +831,9 @@ export class DreamPage {
             if (!board.value || !project.value) throw new Error('DREAM_TARGET_SCOPE_CHANGED');
             const input = {ownerProjectId: owner, dreamId: dream, runId: run.operationId, suggestionId: finding.id,
                 boardId: board.value, targetProjectId: project.value, title: title.value};
-            await this.command(JSON.stringify(['adopt-decision', input]), async operationId => {
-                const {recordId} = await this.service.adoptDecision({...input, operationId});
+            await this.command(JSON.stringify([downstream ? 'adopt-downstream-decision' : 'adopt-decision', input]), async operationId => {
+                const {recordId} = downstream ? await this.service.adoptDownstreamDecision({...input, operationId})
+                    : await this.service.adoptDecision({...input, operationId});
                 form.replaceChildren(text(t('dream.decisionDraftCreated')), button(t('dream.openDecision'), () => this.openDecision(input.boardId, recordId)));
             });
         });

@@ -45,6 +45,7 @@ export interface CreateKernelRuntimeOptions {
     skillSourceForSession?: KernelAdaptersRuntimeOptions['skillSourceForSession'];
     skillToolHandlerFactory?: KernelAdaptersRuntimeOptions['skillToolHandlerFactory'];
     additionalTools?: KernelAdaptersRuntimeOptions['additionalTools'];
+    additionalEffectTools?: KernelAdaptersRuntimeOptions['effectTools'];
     dagPlugins?: DagPluginRegistry;
     /** Register the shared Durable programs before initialize. Defaults to true. */
     registerPrograms?: boolean;
@@ -101,7 +102,7 @@ export async function createKernelRuntime(
         additionalTools: options.additionalTools,
         readTaskAsset: createTaskAssetReader(() => kernel, options.systemFS),
         taskAssetStore: createTaskAssetStore(() => kernel),
-        effectTools: createMemoryTools(() => kernel, () => memory),
+        effectTools: [...createMemoryTools(() => kernel, () => memory), ...options.additionalEffectTools ?? []],
     });
 
     const kernelLog = createModuleLogger('durable-kernel');

@@ -1,8 +1,18 @@
 import {expect, it} from 'vitest';
 import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {DREAM_SCHEDULE_INDEX, dreamScheduleKey, DreamConfigStore} from '../src/dream/config-store';
-import {DreamEvidenceStore} from '../src/dream/evidence-store';
+import {DREAM_OUTBOX_INDEX, dreamOutboxKey, DreamEvidenceStore} from '../src/dream/evidence-store';
 const allow = {owner: async () => {}, source: async () => {}};
+
+it('indexes consolidation configuration before the first committed memory exists', async () => {
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    try {
+        const fs = await manager.openFileSystem('/'), store = new DreamConfigStore(fs);
+        const target = {kind: 'flow', id: 'flow', version: '1', digest: 'digest'} as const;
+        await store.save('owner', 'dream', 'create', null, {name: 'Dream', enabled: true, files: [], consolidation: {target}}, allow);
+        expect(JSON.parse((await fs.meta.seq!.getEntry(DREAM_OUTBOX_INDEX, dreamOutboxKey('owner', 'dream')))!)).toEqual({owner: 'owner', dream: 'dream'});
+    } finally {await manager.dispose();}
+});
 
 it('persists owner-scoped configuration and rejects stale or unauthorized writes', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()});

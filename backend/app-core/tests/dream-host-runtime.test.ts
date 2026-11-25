@@ -47,6 +47,10 @@ it('routes a Dream scanner through the host and restores its bound session after
         await localFiles.dispose();
         await dream.create(ownerId, 'local-dream', 'create-local', 'Local Dream');
         await dream.setModelConnection(ownerId, 'local-dream', 'default');
+        await expect(dream.addFile(ownerId, 'local-dream', 'missing-local', 1, {projectId: personal.project.id,
+            connectionId: 'dream-local', path: '/notes/missing.md', executor: {target}, maxOutputTokens: 256, runTokenLimit: 1000}))
+            .rejects.toThrow('DREAM_SOURCE_NOT_FOUND');
+        expect((await dream.configs.read(ownerId, 'local-dream'))?.revision).toBe(1);
         const local = await dream.addFile(ownerId, 'local-dream', 'add-local', 1, {projectId: personal.project.id,
             connectionId: 'dream-local', path: '/notes/local.md', executor: {target}, maxOutputTokens: 256, runTokenLimit: 1000});
         await dream.run({ownerProjectId: ownerId, dreamId: 'local-dream', sourceId: local.sourceId, operationId: 'local-run'});
@@ -131,6 +135,19 @@ it('routes a Dream scanner through the host and restores its bound session after
         await kanban.execute(board.id, {operationId: 'confirm-dream-decision', expectedRevision: (await kanban.read(board.id)).revision,
             command: {type: 'review-record', recordId: decision.recordId, accept: true}});
         expect((await kanban.record(board.id, decision.recordId)).status).toBe('confirmed');
+        expect((await kanban.read(board.id)).items).toEqual(taskState);
+        const downstreamPath = dream.evidence.consolidationPath(ownerId, 'dream');
+        const downstreamFs = await runtime.vfs.openFileSystem('/');
+        await downstreamFs.meta.seq!.setEntry(downstreamPath, `consumer-result:kanban:${JSON.stringify('downstream-commit')}`, JSON.stringify({
+            commitId: 'downstream-commit', version: 'version1', requiredScopes: [added.sourceId],
+            changes: [{id: 'memory1', action: 'update', content: 'Review deployment checks', evidenceIds: ['ev1']}]}));
+        const downstreamRequest = {...decisionRequest, runId: 'downstream-commit', suggestionId: 'memory1', operationId: 'downstream-adopt', title: 'Review deployment checks'};
+        grant.mockRejectedValueOnce(new Error('revoked'));
+        await expect(dream.adoptDownstreamDecision(downstreamRequest)).rejects.toThrow();
+        expect((await kanban.read(board.id)).items).toEqual(taskState);
+        const downstreamDecision = await dream.adoptDownstreamDecision(downstreamRequest);
+        expect(await dream.adoptDownstreamDecision(downstreamRequest)).toEqual(downstreamDecision);
+        expect(await kanban.record(board.id, downstreamDecision.recordId)).toMatchObject({kind: 'decision', status: 'draft', content: 'Review deployment checks'});
         expect((await kanban.read(board.id)).items).toEqual(taskState);
         getProject.mockRestore(); listMounts.mockRestore();
         expect(await dream.reviewFinding(ownerId, 'dream', findings[0].id, 'correct', 0,

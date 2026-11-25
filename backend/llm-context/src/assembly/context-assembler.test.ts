@@ -47,6 +47,18 @@ async function fixture(options: { profile?: BranchContextProfile; artifact?: Art
 }
 
 describe('ContextAssembler', () => {
+    it('passes a conservative remaining budget after policy, history, inputs and pending text', async () => {
+        let remaining: number | undefined;
+        const assembler = new ContextAssembler({profileStore: {getProfile: async () => null}, readRound: async () => null,
+            retrieveMemory: async plan => {remaining = plan.tokenBudget; return [];}});
+        const plan: ContextPlan = {branchRef: 'main', branchHead: null, profile: {id: '', revision: 1}, tokenBudget: 100,
+            explicitInputs: [{kind: 'text', label: 'File', content: 'data', order: 0}], pendingUserMessage: {role: 'user', content: '你好'}};
+        const result = await assembler.assemble(plan, 'run', {id: 'agent', version: '1'}, 'policy', undefined, {persist: false});
+        const used = new TextEncoder().encode('policy').byteLength + new TextEncoder().encode('File:\ndata').byteLength
+            + new TextEncoder().encode('你好').byteLength;
+        expect(remaining).toBe(100 - used);
+        expect(result.messages.map(item => item.content)).toEqual(['policy', 'File:\ndata', '你好']);
+    });
     it('drops Skill discovery metadata before history while retaining loaded rules', async () => {
         const { assembler, plan } = await fixture({ tokenBudget: 100 });
         const result = await assembler.assemble(plan, 'run', { id: 'agent', version: '1' }, ['identity'], undefined,

@@ -79,10 +79,13 @@ export class ContextAssembler implements IContextAssembler {
     ): Promise<AssemblyResult> {
         const blocks = this.policyBlocks(systemPrompt, skillsPrompt, options);
         blocks.push(...await this.historyBlocks(plan));
-        for (const memory of await this.deps.retrieveMemory?.(plan, agent) ?? []) blocks.push({ kind: 'memory', ...memory });
-        blocks.push(...await this.inputBlocks(plan));
+        const inputs = await this.inputBlocks(plan);
         const prompts = plan.pendingUserMessages ?? (plan.pendingUserMessage ? [plan.pendingUserMessage] : []);
         const pending: ContextBlock | null = prompts.length ? {kind: 'round', roundId: '', messages: prompts} : null;
+        const remaining = this.deps.retrieveMemory ? await this.remainingMemoryBudget(plan.tokenBudget, [...blocks, ...inputs, ...(pending ? [pending] : [])], pending) : undefined;
+        const memoryPlan = remaining === undefined ? plan : {...plan, tokenBudget: remaining};
+        for (const memory of await this.deps.retrieveMemory?.(memoryPlan, agent) ?? []) blocks.push({ kind: 'memory', ...memory });
+        blocks.push(...inputs);
         if (pending) blocks.push(pending);
         let selected = await this.fitTokenBudget(blocks, plan.tokenBudget, pending);
         if (pending) selected = this.dropDuplicatedPending(selected, plan, pending);
@@ -92,6 +95,15 @@ export class ContextAssembler implements IContextAssembler {
         const persisted = await this.persist(snapshot, options.persist !== false);
         if (persisted.explanation) persisted.explanation.digest = persisted.digest;
         return { snapshot: persisted, messages: persisted.canonicalMessages };
+    }
+
+    private async remainingMemoryBudget(budget: number | undefined, blocks: ContextBlock[], pending: ContextBlock | null): Promise<number | undefined> {
+        if (budget === undefined) return undefined;
+        if (!Number.isSafeInteger(budget) || budget < 0) return 0;
+        const fitting = await this.fitTokenBudget(blocks, budget, pending);
+        const messages = await this.flattenBlocks(fitting), encoder = new TextEncoder();
+        const used = messages.reduce((total, message) => total + encoder.encode(messageText(message)).byteLength, 0);
+        return Math.max(0, budget - used);
     }
 
     private async historyBlocks(plan: ContextPlan): Promise<ContextBlock[]> {

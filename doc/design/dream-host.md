@@ -148,9 +148,18 @@ or older page is requested. The Codex adapter reads at most 8 MiB of the selecte
 log plus at most 8 MiB of preceding context per page, and reports both actual
 byte counts. It fails if the context limit cannot establish the turn boundary.
 Those counts exclude native Session metadata RPCs and repeated checks during
-execution. Other providers without this accounting are rejected rather than
+execution. The Claude adapter reports up to 8 MiB of history and up to 1 MiB
+of preceding turn context, and rejects a trailing incomplete record when
+producing a digest. Its history revision includes file identity, size and
+nanosecond modification/change times. Other providers without this accounting are rejected rather than
 assumed bounded. This requires the updated Cells server and cells-driver; the
 older protocol does not provide the needed revision and read-cost evidence.
+The selected Harness digest and its captured snapshot are limited to 256 KiB of
+UTF-8 text, including the serialized message metadata. Dream verifies each
+32K-character scanner chunk and retains every task receipt before settlement;
+the configured run and model context budgets still apply. A larger digest is
+rejected without advancing its source cursor. The byte limit does not bound the
+underlying history and context scan sizes described above.
 The explicit source picker loads profiles and one page of up to 50 Session
 summaries on demand. `returned` describes that page, not the native catalog's
 physical scan, which depends on the provider and is not measured here.
@@ -178,6 +187,61 @@ checks the registered parent, child and configuration revision before advancing 
 schedule or scanning. The UI distinguishes saved configuration from pending
 activation and displays the last round when available. Real remote, crash-matrix
 and page-performance acceptance have not yet been completed.
+
+An explicitly configured consolidation Flow runs after a source scan in the same
+manual or scheduled batch. Its Session and submission identity are persisted;
+source permissions are checked before and after execution and on Session use.
+Pending proposal reads filter by current source permissions. The host can commit a
+selected ready subset with an expected active version, recording a review receipt
+and an Outbox entry in the same transaction. Batch runs group newly captured
+evidence by project; an explicit joint setting fixes the selected participating
+projects and checks their grants during model execution. Evidence receipts and
+the proposal are settled in one transaction. Existing memory and proposals are
+included only when their source scopes belong to the frozen participants; the
+result retains the union of scopes actually used. The Dream page can configure
+the Flow, optional focus, hot-load budget and joint mode, and review a selected
+page of proposals. The rollback command targets a committed receipt, rechecks
+current and target authorization, and writes a new version and Outbox event;
+it leaves source watermarks unchanged. New rollback receipts record the target
+commit in the same transaction; downstream contributions expose that reference
+and the evidence from the target's proposal history. The UI can inspect both
+committed versions and authorized captured evidence. Earlier rollback receipts
+that recorded only a request fingerprint cannot reconstruct the target. The
+Outbox independently persists daily contributions and reviewable decision
+candidates; explicit adoption still creates a draft through the existing Kanban
+receipt path. A cross-project session must explicitly bind every required source
+through currently authorized scan receipts before loading the joint version;
+unbound or partially bound sessions remain excluded. Committed and pending material whose
+source authorization becomes unavailable is filtered on reads; a separate
+background reconciler records a durable, idempotent recomputation request. It
+rechecks the remaining sources, uses their captured snapshots, and keeps the
+independent project's context and receipts separate from joint consolidation.
+Authorization-change notifications wake it, and bounded catalog scans recover
+missed notifications and older configurations. Recompute currently uses the
+latest captured snapshot per source. It verifies a live grant and permits a
+changed authorization revision only when principal, server and server-project
+identity still match the captured binding; a revoked grant or changed identity
+is rejected. Real remote authorization changes and large legacy capture
+indexes need further acceptance.
+Pending proposal pagination uses a scope generation and an offset; a changed
+scope rejects the cursor rather than silently skipping entries. `scanned` counts
+the index rows returned for that page, not the backend's physical work to reach
+the offset. The cursor contains no proposal identity.
+
+Authorized same-project Sessions can read the active version through the existing
+Dream memory policy. Hot loading uses a project budget (default 1,500), a host
+limit and the context plan limit; absent a trusted tokenizer, it conservatively
+counts UTF-8 bytes of each final memory message and subtracts the assembled
+session context and other selected memories. Authorized critical constraints
+are loaded first, followed by topic pointers; each group is ordered by explicit
+priority, update time and stable ID. Older entries default to constraints with
+priority and update time zero. A truncation hint is included when it fits.
+`dream_search` and `dream_read` recheck the persisted
+agent Task's allowed tools and Dream read scope, then reauthorize the Session's
+project and current active version. Cross-project reads require all referenced
+scopes to be bound and authorized. Search returns at most 50 matches and does
+not yet provide pagination. Real remote authorization and end-to-end injection
+acceptance remain open.
 
 
 The portable scan and evidence validation package lives in

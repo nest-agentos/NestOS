@@ -10,7 +10,7 @@ export interface DreamDecisionSourceConfiguration {id: string; projectId: string
 export interface DreamTaskSourceConfiguration {id: string; projectId: string; connectionId: string; boardId: string; itemId: string; scannerSourceId: string}
 export interface DreamSessionSourceConfiguration {id: string; projectId: string; connectionId: string; sessionId: string; profileId?: string; maxRounds: number; scannerSourceId: string}
 export interface DreamChangeSourceConfiguration {id: string; projectId: string; connectionId: string; directory: string; exclude: string[]; maxEntries: number; scannerSourceId: string; commits?: true; extensions?: string[]}
-export interface DreamConfiguration {name: string; enabled: boolean; files: DreamFileConfiguration[]; adoptions?: DreamAdoptionSourceConfiguration[]; decisions?: DreamDecisionSourceConfiguration[]; tasks?: DreamTaskSourceConfiguration[]; sessions?: DreamSessionSourceConfiguration[]; changes?: DreamChangeSourceConfiguration[]; schedule?: import('@nestos/kanban/contracts').KanbanRecurrence}
+export interface DreamConfiguration {name: string; enabled: boolean; files: DreamFileConfiguration[]; adoptions?: DreamAdoptionSourceConfiguration[]; decisions?: DreamDecisionSourceConfiguration[]; tasks?: DreamTaskSourceConfiguration[]; sessions?: DreamSessionSourceConfiguration[]; changes?: DreamChangeSourceConfiguration[]; schedule?: import('@nestos/kanban/contracts').KanbanRecurrence; consolidation?: {target: import('@nestos/llm-flow/contracts').TargetRef; focus?: string; hotLoadTokens?: number; crossProject?: boolean}}
 export interface DreamConfigurationRecord {revision: number; config: DreamConfiguration}
 export interface DreamFileSelection {
     projectId: string; connectionId: string; path: string; executor: TwinScannerExecutor;
@@ -26,6 +26,13 @@ export interface DreamFindingView {
     quote?: string; subject?: string; project?: string; eventTime?: string; recordedAt?: number;
     revision: number; state: 'active' | 'disputed' | 'disabled'; origin: 'source' | 'user-correction'; updatedAt?: number;
 }
+export interface DreamProposalView {
+    id: string; scope: string; targetId: string; revision: number; status: 'ready' | 'conflict' | 'committed' | 'rejected';
+    requiredScopes: string[]; affectedMemoryIds: string[]; constraint?: {scope: string; key: string};
+    changes: Array<{id: string; content: string | null; kind?: 'constraint' | 'topic'; priority?: number; title?: string | null}>; evidenceIds: string[];
+    resolution?: {action: 'choose'; evidenceId: string} | {action: 'rewrite'} | {action: 'reject'};
+}
+export interface DreamMemoryTopic {id: string; content: string; kind?: 'constraint' | 'topic'; priority?: number; updatedAt?: number; title?: string}
 export type DreamReview = {action: 'correct'; content: string; kind: 'fact' | 'inference'} | {action: 'dispute' | 'disable' | 'restore'};
 export interface DreamAdoptionRequest {
     ownerProjectId: string; dreamId: string; runId: string; suggestionId: string; operationId: string;
@@ -42,7 +49,7 @@ export interface DreamRunView {
         | {status: 'failed'; sourceId: string; code: 'AUTHORIZATION_FAILED' | 'READ_FAILED' | 'AUTHORIZATION_CHANGED' | 'INVALID_BATCH'}
         | {status: 'skipped'; sourceId: string; code: 'BUDGET_EXHAUSTED'}>;
     findings: DreamFindingView[];
-    execution?: {scanRunId: string; sessionId: string; taskId: string};
+    execution?: {scanRunId: string; sessionId: string; taskId: string; additionalTasks?: Array<{sessionId: string; taskId: string}>};
 }
 export interface DreamService {
     list(owner: string): Promise<{items: Array<{id: string; name: string; enabled: boolean; revision: number}>; scanned: number; truncated: boolean}>;
@@ -61,6 +68,22 @@ export interface DreamService {
     configureTaskSources(owner: string, dream: string, operationId: string, expectedRevision: number, tasks: DreamTaskSourceConfiguration[]): Promise<DreamConfigurationRecord>;
     configureSessionSources(owner: string, dream: string, operationId: string, expectedRevision: number, sessions: DreamSessionSourceConfiguration[]): Promise<DreamConfigurationRecord>;
     configureChangeSources(owner: string, dream: string, operationId: string, expectedRevision: number, changes: DreamChangeSourceConfiguration[]): Promise<DreamConfigurationRecord>;
+    configureConsolidation(owner: string, dream: string, operationId: string, expectedRevision: number, consolidation: DreamConfiguration['consolidation'] | null): Promise<DreamConfigurationRecord>;
+    pendingConsolidation(owner: string, dream: string, scope: string, after?: string): Promise<{items: DreamProposalView[]; scanned: number; nextCursor?: string}>;
+    readProposalEvidence(owner: string, dream: string, proposalId: string, evidenceId: string): Promise<{id: string; sourceId: string; locator: string; fingerprint: string; granularity: string; snapshot: string}>;
+    activeConsolidation(owner: string, dream: string): Promise<{version: string; parentVersion: string | null; requiredScopes: string[]; topics: DreamMemoryTopic[]} | null>;
+    readDownstream(owner: string, dream: string, kind: 'daily' | 'kanban', commitId: string): Promise<{commitId: string; version: string; requiredScopes: string[]; committedAt?: number; referenceCommits?: string[];
+        changes: Array<{id: string; action: 'add' | 'update' | 'retire'; content: string | null; evidenceIds: string[];
+            kind?: 'constraint' | 'topic'; priority?: number; title?: string; evidenceRefs?: Array<{proposalId: string; evidenceId: string}>}>} | null>;
+    listDownstream(owner: string, dream: string, kind: 'daily' | 'kanban', after?: string): Promise<{items: Array<NonNullable<Awaited<ReturnType<DreamService['readDownstream']>>>>; scanned: number; nextCursor?: string}>;
+    readCommittedVersion(owner: string, dream: string, commitId: string): Promise<{event: {commitId: string; version: string; requiredScopes: string[]};
+        candidate: {version: string; parentVersion: string | null; requiredScopes: string[]; topics: DreamMemoryTopic[]}} | null>;
+    reviewConsolidation(owner: string, dream: string, scope: string, after?: string): Promise<{page: {items: DreamProposalView[]; scanned: number; nextCursor?: string};
+        version: string | null; topics: Array<Omit<DreamMemoryTopic, 'content'>>}>;
+    commitConsolidation(owner: string, dream: string, operationId: string, expectedVersion: string | null, selected: Array<{id: string; revision: number}>): Promise<{commitId: string; version: string; requiredScopes: string[]}>;
+    rollbackConsolidation(owner: string, dream: string, operationId: string, targetCommitId: string, expectedVersion: string): Promise<{commitId: string; version: string; requiredScopes: string[]}>;
+    resolveConsolidation(owner: string, dream: string, operationId: string, id: string, revision: number,
+        resolution: {action: 'choose'; evidenceId: string} | {action: 'rewrite'; changes: DreamProposalView['changes']} | {action: 'reject'}): Promise<DreamProposalView>;
     addFile(owner: string, dream: string, operationId: string, expectedRevision: number, selection: DreamFileSelection): Promise<{sourceId: string; config: DreamConfigurationRecord}>;
     setEnabled(owner: string, dream: string, operationId: string, expectedRevision: number, enabled: boolean): Promise<DreamConfigurationRecord>;
     configureSchedule(owner: string, dream: string, operationId: string, expectedRevision: number,
@@ -71,6 +94,7 @@ export interface DreamService {
     findingHistory(owner: string, dream: string, id: string, revision: number): Promise<{operationId: string; previous: DreamFindingView; result: DreamFindingView} | null>;
     adoptSuggestion(request: DreamAdoptionRequest): Promise<{itemId: string}>;
     adoptDecision(request: DreamDecisionAdoptionRequest): Promise<{recordId: string}>;
+    adoptDownstreamDecision(request: DreamDecisionAdoptionRequest): Promise<{recordId: string}>;
     suggestionAdoptions(owner: string, dream: string, runId: string, suggestionId: string): Promise<DreamAdoptionRecord[]>;
     adoptionStatus(request: DreamAdoptionRequest): Promise<{state: 'pending'} | {state: 'committed'; itemId: string; execution?: {dispatchId: string; sessionId: string; outputs: Array<{name: string; ref: string; sha256: string; bytes: number}>};
         phase?: import('@nestos/kanban/contracts').KanbanTaskProjection['phase']; completion?: import('@nestos/kanban/contracts').KanbanTaskProjection['completion']}>;

@@ -3,6 +3,7 @@ import type { HarnessClient, HarnessHistory } from '@nestos/cells-driver';
 import type { ProjectService, ProjectFolder } from '@nestos/app-contracts/services';
 import type { TwinSourceCatalog, TwinSourceContent } from './domain';
 import { sha256HexSync } from '@nestos/llm-context';
+import {TWIN_MANAGED_SOURCE_MAX_BYTES} from './chunking';
 
 export const harnessTarget = (project: string, profile: string, session: string) => JSON.stringify([project, profile, session]);
 export async function discoverHarness(projects: ProjectService, project: ProjectFolder, catalog: TwinSourceCatalog, active: () => boolean = () => true): Promise<void> {
@@ -79,7 +80,7 @@ export async function readHarnessWindow(projects: ProjectService, target: string
         const selected = new Set(turns.slice(-maxRounds));
         const messages = digest.messages.filter(item => selected.has(item.turnId));
         const text = messages.length ? JSON.stringify(messages) : '';
-        if (new TextEncoder().encode(text).length > 32768) throw new Error('TWIN_SOURCE_LIMIT');
+        if (new TextEncoder().encode(text).length > TWIN_MANAGED_SOURCE_MAX_BYTES) throw new Error('TWIN_SOURCE_LIMIT');
         const after = await client.digest(profileId, sessionId, {timeoutMs: 5000, metadataOnly: true, expectedRevision: digest.revision});
         const current = mounts?.list(projectId).find(mount => mount.at === '/');
         if (after.revision !== digest.revision || after.session.historyRevision !== session.historyRevision || after.session.createdAt !== session.createdAt

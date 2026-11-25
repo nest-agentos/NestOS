@@ -5,7 +5,7 @@ const prefix = 'scanner-input://';
 const key = (id: string) => 'scanner-input:' + id;
 
 export async function saveScannerText(records: TwinRecords, text: string): Promise<string> {
-    if (typeof text !== 'string' || !text.trim() || new TextEncoder().encode(text).byteLength > 128 * 1024 || text.includes('\0')) throw new Error('TWIN_SCANNER_TEXT_INVALID');
+    if (typeof text !== 'string' || !text.trim() || new TextEncoder().encode(text).byteLength > 256 * 1024 || text.includes('\0')) throw new Error('TWIN_SCANNER_TEXT_INVALID');
     const id = sha256HexSync(text), previous = await records.get<{text: string}>('checkpoint', key(id));
     if (previous && previous.data.text !== text) throw new Error('TWIN_SCANNER_INPUT_CONFLICT');
     if (!previous) await records.save('checkpoint', key(id), {text}, null);

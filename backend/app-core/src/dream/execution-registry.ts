@@ -5,6 +5,8 @@ import type {SourceAuthority} from '@nestos/dream';
 export interface DreamExecutionBinding {
     ownerProjectId: string; dreamId: string; sourceId: string; configRevision: number; authority: SourceAuthority;
     adoptionPlanRevision?: string;
+    consolidationScopes?: string[];
+    retryPlan?: {sourceId: string; planId: string; revision: string};
 }
 const FILE = '/var/lib/dream/executions.seq';
 const validId = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value);
@@ -60,11 +62,18 @@ function validate(binding: DreamExecutionBinding): DreamExecutionBinding {
     if (!binding || !validId(binding.ownerProjectId) || !validId(binding.dreamId) || !validId(binding.sourceId)
         || !Number.isSafeInteger(binding.configRevision) || binding.configRevision < 1 || !binding.authority
         || binding.adoptionPlanRevision !== undefined && (typeof binding.adoptionPlanRevision !== 'string' || !binding.adoptionPlanRevision || binding.adoptionPlanRevision.length > 256)
+        || binding.retryPlan !== undefined && (!validId(binding.retryPlan.sourceId) || !validId(binding.retryPlan.planId)
+            || typeof binding.retryPlan.revision !== 'string' || !binding.retryPlan.revision || binding.retryPlan.revision.length > 256)
+        || binding.consolidationScopes !== undefined && (!Array.isArray(binding.consolidationScopes) || !binding.consolidationScopes.length
+            || binding.consolidationScopes.length > 32 || binding.consolidationScopes.some(scope => !validId(scope))
+            || new Set(binding.consolidationScopes).size !== binding.consolidationScopes.length)
         || !['principalId', 'revision', 'projectRevision', 'serverId', 'serverProjectId'].every(key => {
             const value = binding.authority[key as keyof SourceAuthority]; return typeof value === 'string' && value.length > 0 && value.length <= 4096;
         })) throw new Error('DREAM_EXECUTION_BINDING_INVALID');
     const a = binding.authority;
     return {ownerProjectId: binding.ownerProjectId, dreamId: binding.dreamId, sourceId: binding.sourceId, configRevision: binding.configRevision,
         authority: {principalId: a.principalId, revision: a.revision, projectRevision: a.projectRevision, serverId: a.serverId, serverProjectId: a.serverProjectId},
-        ...(binding.adoptionPlanRevision ? {adoptionPlanRevision: binding.adoptionPlanRevision} : {})};
+        ...(binding.adoptionPlanRevision ? {adoptionPlanRevision: binding.adoptionPlanRevision} : {}),
+        ...(binding.retryPlan ? {retryPlan: {sourceId: binding.retryPlan.sourceId, planId: binding.retryPlan.planId, revision: binding.retryPlan.revision}} : {}),
+        ...(binding.consolidationScopes ? {consolidationScopes: [...binding.consolidationScopes]} : {})};
 }

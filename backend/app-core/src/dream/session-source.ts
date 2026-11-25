@@ -1,6 +1,7 @@
 import {createModuleLogger, sha256HexSync} from '@nestos/common';
 import type {DreamSource, SourceAuthority, SourcePort} from '@nestos/dream';
 import type {NestosTwinSourceReader} from '../digital-twin/source-reader';
+import {TWIN_MANAGED_SOURCE_MAX_BYTES} from '../digital-twin/chunking';
 
 export interface DreamSessionSource {id: string; projectId: string; connectionId: string; sessionId: string; profileId?: string; maxRounds: number}
 const log = createModuleLogger('dream-session-source');
@@ -21,13 +22,16 @@ export function sessionSourcePort(selected: DreamSessionSource, reader: Pick<Nes
                 : await reader.readSessionWindow(frozen.sessionId, frozen.maxRounds);
             const version = JSON.stringify([result.nativeIdentity, result.hash]), cursor = 'cursor' in result && typeof result.cursor === 'string' ? result.cursor : sha256HexSync(version);
             log.info('dream.session.source', {operationId: frozen.id, stage: 'window', result: 'success', maxRounds: frozen.maxRounds,
+                outputBytes: new TextEncoder().encode(result.text).length,
                 hasOlder: result.hasOlder, ...('historyBytes' in result && 'contextBytes' in result
                     ? {returnedVisibleTurns: result.scannedRounds, historyBytes: result.historyBytes, contextBytes: result.contextBytes}
                     : {scannedRounds: result.scannedRounds}), durationMs: Date.now() - started});
             return {items: cursor === source.cursor || !result.text ? [] : [result.text], cursor, version, scanned: 1};
         } catch (error) {
             const code = error instanceof Error && /^(DREAM|TWIN)_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SOURCE_READ_FAILED';
-            log.warn('dream.session.source', {operationId: frozen.id, stage: 'window', result: 'failure', code, durationMs: Date.now() - started});
+            log.warn('dream.session.source', {operationId: frozen.id, stage: 'window', result: 'failure', code,
+                ...(code === 'TWIN_SOURCE_LIMIT' ? {configuredOutputMaxBytes: frozen.profileId ? TWIN_MANAGED_SOURCE_MAX_BYTES : 32768} : {}),
+                durationMs: Date.now() - started});
             throw new Error(code);
         }
     }};

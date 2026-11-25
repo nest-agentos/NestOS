@@ -30,8 +30,10 @@ it('uses the durable scanner receipt and resumes a failed settlement without rep
     const workspace = await openDreamSystemWorkspace(system, 'dream-source', 'dream', async () => {});
     const journal = new KanbanAutomationJournal(system); await journal.open();
     const outputs = await journal.artifact('dispatch', {content: 'TypeScript is used.'});
+    const largeSession = 'TypeScript is used. '.repeat(11000);
     let allowed = true;
     const readManagedArtifact = async (target: string) => {
+        if (target === 'large-session') return {text: largeSession, hash: sha256HexSync(largeSession), nativeIdentity: 'large-session-v1'};
         if (target !== 'configured-source') throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
         const result = await readAdoptionSource('adoption', null, 1, async () => {
             if (!allowed) throw new Error('revoked');
@@ -72,8 +74,13 @@ it('uses the durable scanner receipt and resumes a failed settlement without rep
             planRevision: managed.planRevision, twinSourceId: managed.sourceId, target: 'configured-source', sourceKind: 'managed-artifact' as const, source: managedSource};
         await expect(runDreamTwinFileScan(managedInput, twin, managedPort, managedStore, runtime.kernel.kernel, async () => {})).rejects.toThrow('DREAM_SETTLEMENT_FAILED');
         expect(await managedStore.watermark(id, 'dream', managedSource.id)).toBeNull();
+        const capturedSource: [string, string, string] = [id, 'other', managedSource.id];
+        const captured = await managedStore.readCapturedEvidence(id, 'dream', capturedSource, 1, () => managedPort.authorize(managedSource));
+        expect(captured?.snapshot).toContain('TypeScript is used.');
+        expect(await managedStore.readCapturedOperation(id, 'dream', managedInput.operationId, () => managedPort.authorize(managedSource))).toEqual(captured);
         const managedRun = (await twin.snapshot()).scans.runs.find(run => run.data.planId === managed.planId)!.id;
         allowed = false;
+        await expect(managedStore.readCapturedEvidence(id, 'dream', capturedSource, 1, () => managedPort.authorize(managedSource))).rejects.toThrow();
         await expect(runDreamTwinFileScan(managedInput, twin, managedPort, managedStore, runtime.kernel.kernel, async () => {})).rejects.toThrow('DREAM_SOURCE_AUTHORIZATION_FAILED');
         expect(await managedStore.run(id, 'dream', managedInput.operationId)).toBeNull();
         allowed = true;
@@ -131,10 +138,32 @@ it('uses the durable scanner receipt and resumes a failed settlement without rep
         await expect(runDreamTwinFileScan(input, twin, port, store, runtime.kernel.kernel, async () => {})).rejects.toThrow('DREAM_AUTHORIZATION_UNAVAILABLE');
         expect(await store.run(id, 'dream', 'operation')).toBeNull();
         revoke = false; checks = 0;
+        const changed = await runtime.projects.openFiles(project.path);
+        await changed.fs.driver.writeContent('/notes/source.md', 'The original source has changed.');
+        await changed.dispose();
         await runDreamTwinFileScan(input, twin, port, store, runtime.kernel.kernel, async () => {});
         const record = await store.run(id, 'dream', 'operation');
         expect(record?.execution?.taskId).toBeTruthy(); expect(record?.findings).toHaveLength(1);
         expect(record?.execution?.taskId).toBe(priorJob.data.taskId);
+        expect((await store.finding(id, 'dream', record!.findings![0]))?.quote).toBe('TypeScript is used.');
+        const restore = await runtime.projects.openFiles(project.path);
+        await restore.fs.driver.writeContent('/notes/source.md', 'TypeScript is used.');
+        await restore.dispose();
+        let triggered = 0;
+        const failingTwin = {dreamScanEvidence: twin.dreamScanEvidence.bind(twin), waitScanRun: twin.waitScanRun.bind(twin),
+            triggerScanPlan: async () => {triggered++; throw new Error('injected queue failure');}};
+        const interrupted = {...input, operationId: 'interrupted-before-queue'};
+        await expect(runDreamTwinFileScan(interrupted, failingTwin, port, store, runtime.kernel.kernel, async () => {}))
+            .rejects.toThrow('DREAM_EXECUTION_FAILED');
+        const editedAgain = await runtime.projects.openFiles(project.path);
+        await editedAgain.fs.driver.writeContent('/notes/source.md', 'Changed before a run was created.');
+        await editedAgain.dispose();
+        await expect(runDreamTwinFileScan(interrupted, failingTwin, port, store, runtime.kernel.kernel, async () => {}))
+            .rejects.toThrow('DREAM_CAPTURED_EXECUTION_UNAVAILABLE');
+        expect(triggered).toBe(1);
+        const restoreAgain = await runtime.projects.openFiles(project.path);
+        await restoreAgain.fs.driver.writeContent('/notes/source.md', 'TypeScript is used.');
+        await restoreAgain.dispose();
         const runCount = (await twin.snapshot()).scans.runs.filter(run => run.data.planId === planId).length;
         await runDreamTwinFileScan(input, twin, port, store, runtime.kernel.kernel, async () => {});
         expect((await twin.snapshot()).scans.runs.filter(run => run.data.planId === planId)).toHaveLength(runCount);
@@ -188,5 +217,20 @@ it('uses the durable scanner receipt and resumes a failed settlement without rep
         await expect(runDreamTwinFileScan({...badInput, operationId: 'failed-retry'}, twin, badPort, store, runtime.kernel.kernel, async () => {}))
             .rejects.toThrow('DREAM_EXECUTION_FAILED');
         expect((await twin.snapshot()).scans.runs.filter(run => run.data.planId === badPlanId)).toHaveLength(2);
+        await twin.configure({budgetUnlimited: true}, (await twin.getSettings()).revision);
+        const largePlan = await twin.ensureBoundScanner({sourceId: 'large-source', planId: 'large-plan',
+            spec: {kind: 'managed-artifact', target: 'large-session', label: ''}, executor: {target}, name: 'Large session',
+            kinds: ['fact'], maxOutputTokens: 256, runTokenLimit: 1000000});
+        const largeVersion = JSON.stringify(['large-session-v1', sha256HexSync(largeSession)]);
+        const largeSource = {id: 'large-session', projectId: id, connectionId: 'connection', cursor: null};
+        const largePort = {target: () => 'large-session', authorize: async () => authority,
+            read: async () => ({items: [largeSession], cursor: largeVersion, version: largeVersion, scanned: 1})};
+        await runDreamTwinFileScan({ownerProjectId: id, dreamId: 'dream', operationId: 'large-session-run',
+            planId: largePlan.planId, planRevision: largePlan.planRevision, twinSourceId: largePlan.sourceId,
+            target: 'large-session', sourceKind: 'managed-artifact', evidenceSourceType: 'session', source: largeSource},
+        twin, largePort, store, runtime.kernel.kernel, async () => {});
+        const largeRun = await store.run(id, 'dream', 'large-session-run');
+        expect(largeRun?.execution?.additionalTasks?.length).toBeGreaterThan(0);
+        expect(largeRun?.findings).toHaveLength(1);
     } finally {await runtime.dispose(); await journal.drain(); await workspace.dispose(); await manager.dispose(); await closeBackend();}
 }, 60000);

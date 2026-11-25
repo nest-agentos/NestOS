@@ -41,7 +41,15 @@ it('exposes only authorized Dream configuration commands through RPC', async () 
             [{id: 'source', projectId: project.project.id, connectionId: 'dream-local', directory: '/docs', exclude: [], maxEntries: 10, scannerSourceId: 'missing'}])).rejects.toThrow('DREAM_CONFIG_INVALID');
         await expect(dream.remoteSessionProfiles(project.project.id, project.project.id, 'dream-local')).rejects.toThrow();
         await expect(dream.kanbanSourceCandidates(project.project.id, project.project.id, 'dream-local', 'missing', 'task')).rejects.toThrow();
-        expect((await dream.readConfig(project.project.id, 'dream')).revision).toBe(3);
+        expect(await dream.pendingConsolidation(project.project.id, 'dream', project.project.id)).toEqual({items: [], scanned: 0});
+        await expect(dream.resolveConsolidation(project.project.id, 'dream', 'resolve', '?', 1, {action: 'reject'}))
+            .rejects.toThrow('DREAM_PROPOSAL_INVALID');
+        expect(await dream.activeConsolidation(project.project.id, 'dream')).toBeNull();
+        expect(await dream.reviewConsolidation(project.project.id, 'dream', project.project.id)).toEqual({page: {items: [], scanned: 0}, version: null, topics: []});
+        await expect(dream.commitConsolidation(project.project.id, 'dream', 'empty-review', null, [])).rejects.toThrow('DREAM_SELECTION_INVALID');
+        await expect(dream.rollbackConsolidation(project.project.id, 'dream', 'rollback', 'missing', '?')).rejects.toThrow('DREAM_COMMIT_INVALID');
+        expect(await dream.configureConsolidation(project.project.id, 'dream', 'clear-consolidation', 3, null)).toMatchObject({revision: 4});
+        expect((await dream.readConfig(project.project.id, 'dream')).revision).toBe(4);
         expect(dream.evidence).toBeUndefined();
         await expect(dream.readConfig('missing', 'dream')).rejects.toThrow();
         expect(report).not.toHaveBeenCalled();
