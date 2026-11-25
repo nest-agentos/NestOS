@@ -16,6 +16,7 @@ export async function validateWorkProjects(projects:Projects,board:KanbanBoard,c
         const previous=board.items.find(item=>item.id===command.itemId);
         if(previous)await validate(projects,board,inheritWorkReferences(previous.externalRefs??[]),previous.planning?.kind,previous.planning?.parentId,required);
     }
+    if(command.type==='create-manual-children')return validate(projects,board,command.externalRefs,command.workType,command.itemId,required);
     if(command.type==='create-item')return validate(projects,board,command.item.externalRefs,command.planning?.kind,command.planning?.parentId,required);
     if(command.type==='save-edit'||command.type==='plan-item') {
         const previous=board.items.find(item=>item.id===command.itemId);

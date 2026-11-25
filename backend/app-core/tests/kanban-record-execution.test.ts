@@ -170,6 +170,37 @@ it('automatically isolates recurring work from a source board without AI collabo
  expect(run.managementTasks?.[0].reference).toMatch(/^KBLC-/);
  expect(recurringAutomation).toHaveBeenCalledTimes(1);
 });
+it('rebuilds today once and creates one manager with 18 manual cards on each following day',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture(null);
+ await f.command({type:'review-record',recordId:'decision',accept:true});
+ let clock=Date.UTC(2026,10,25,10);
+ const record=await f.service.record('source','decision');
+ const manualChecklist=Array.from({length:18},(_,i)=>({title:'Exercise '+(i+1),acceptance:'Check '+(i+1)}));
+ const recurrence={state:'active' as const,firstAt:clock-3600000,timeZone:'UTC',cadence:{kind:'calendar' as const,hour:9,minute:0,weekdays:[0,1,2,3,4,5,6]},trigger:'fixed' as const,maxConcurrency:1,manualChecklist};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:record.revision,recurrence});
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log,now:()=>clock});
+ cleanup.push(()=>runtime.service.quiesce());
+ const configRevision=(await f.service.record('source','decision')).recurrenceRevision!;
+ const rebuild=async (operationId:string)=>runtime.service.execute('source',{operationId,expectedRevision:(await f.service.read('source')).revision,command:{type:'rebuild-record-recurrence',recordId:'decision',configRevision}});
+ await rebuild('manual-rebuild');await rebuild('manual-rebuild-again');
+ await runtime.service.scan();await runtime.service.scan();
+ for(const day of [26,27]){
+    clock=Date.UTC(2026,10,day,9);
+    await runtime.service.scan();await runtime.service.scan();
+ }
+ const {items,active}=await runtime.service.recordExecutionPage!('source','decision',{includeManagementTasks:'page'});
+ expect(active).toEqual([]);
+ expect(items).toHaveLength(3);
+ for(const run of items){
+    const target=await f.service.read(run.boardId);
+    expect(run.manualCardCount).toBe(18);
+    expect(run.managementTasks?.[0].reference).toMatch(/^KBLC-/);
+    expect(target.automation).toBeUndefined();
+    const children=target.items.filter(item=>item.planning?.parentId===run.rootItemId);
+    expect(children.map(({title,acceptance})=>({title,acceptance}))).toEqual(manualChecklist);
+    expect(children.every(item=>item.launch?.mode==='manual'&&item.status==='backlog')).toBe(true);
+ }
+});
 it('recovers a fenced intent after restart even if scheduling was paused',async()=>{
  const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
  const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:1000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
