@@ -21,6 +21,7 @@ it('exposes only authorized Dream configuration commands through RPC', async () 
         expect(await dream.readConfig(project.project.id, 'dream')).toMatchObject({config: {name: 'Dream', files: []}});
         expect(await dream.openView(project.project.id, 'dream')).toMatchObject({config: {revision: 1}, history: {items: []}});
         expect(await dream.readRun(project.project.id, 'dream', 'unknown')).toBeNull();
+        await expect(dream.adoptDecision({operationId: 'invalid'})).rejects.toThrow('DREAM_ADOPTION_INVALID');
         expect(await dream.history(project.project.id, 'dream')).toEqual({items: [], scanned: 0});
         const schedule = {state: 'active', firstAt: Date.now() + 60000, timeZone: 'UTC',
             cadence: {kind: 'interval', milliseconds: 60000}, trigger: 'fixed', maxConcurrency: 1};

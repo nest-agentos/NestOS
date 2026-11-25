@@ -94,6 +94,12 @@ it('routes a Dream scanner through the host and restores its bound session after
         await kanban.execute(board.id, {operationId: 'parent', expectedRevision: board.revision, command: {type: 'create-item',
             item: {id: 'parent', taskType: 'coordination', title: 'Parent', responsibility: 'Coordinate', acceptance: 'Done',
                 externalRefs: [{system: 'nestos-remote-project', id: source.project.id}]}}});
+        await kanban.execute(board.id, {operationId: 'closed-group', expectedRevision: (await kanban.read(board.id)).revision, command: {type: 'create-item',
+            item: {id: 'closed-group', taskType: 'coordination', title: 'Closed group', responsibility: 'Coordinate', acceptance: 'Done',
+                externalRefs: [{system: 'nestos-remote-project', id: source.project.id}]}}});
+        await kanban.execute(board.id, {operationId: 'cancel-closed-group', expectedRevision: (await kanban.read(board.id)).revision,
+            command: {type: 'cancel-item', itemId: 'closed-group', reason: 'No longer needed'}});
+        expect((await dream.adoptionTargets(ownerId, board.id)).items.map(item => item.itemId)).toEqual(['parent']);
         const adoption = {ownerProjectId: ownerId, dreamId: 'dream', runId: 'operation', suggestionId: findings[2].id, operationId: 'adopt',
             boardId: board.id, targetProjectId: source.project.id, parentItemId: 'parent', title: 'Review types', responsibility: 'Review checks', acceptance: 'Checks reviewed'};
         vi.spyOn(dream.evidence, 'completeAdoption').mockRejectedValueOnce(new Error('injected write failure'));
@@ -104,6 +110,28 @@ it('routes a Dream scanner through the host and restores its bound session after
         expect((await kanban.item(board.id, adopted.itemId)).item).toMatchObject({status: 'backlog', launch: {mode: 'manual'}, control: {action: 'pause'}});
         expect(await dream.suggestionAdoptions(ownerId, 'dream', 'operation', findings[2].id)).toMatchObject([{state: 'committed', itemId: adopted.itemId}]);
         expect(await dream.adoptionStatus(adoption)).toMatchObject({state: 'committed', itemId: adopted.itemId});
+        const taskState = (await kanban.read(board.id)).items;
+        const decisionRequest = {ownerProjectId: ownerId, dreamId: 'dream', runId: 'operation', suggestionId: findings[2].id,
+            operationId: 'adopt-decision', boardId: board.id, targetProjectId: source.project.id, title: 'Review type checks'};
+        const prepareDecision = vi.spyOn(dream.evidence, 'prepareDecisionAdoption');
+        vi.spyOn(dream.evidence, 'completeDecisionAdoption').mockRejectedValueOnce(new Error('injected write failure'));
+        await expect(dream.adoptDecision(decisionRequest)).rejects.toThrow('DREAM_ADOPTION_RECEIPT_UNAVAILABLE');
+        const decision = await dream.adoptDecision(decisionRequest);
+        expect(await dream.adoptDecision(decisionRequest)).toEqual(decision);
+        expect(prepareDecision).toHaveBeenCalledOnce();
+        expect((await kanban.record(board.id, decision.recordId))).toMatchObject({kind: 'decision', status: 'draft',
+            content: 'Review type checks', rationale: 'TypeScript is used.', itemIds: [], externalRefs: expect.arrayContaining([
+                {system: 'nestos-remote-project', id: source.project.id}, {system: 'nestos-primary-project', id: source.project.id},
+            ])});
+        expect(await dream.suggestionAdoptions(ownerId, 'dream', 'operation', findings[2].id)).toEqual(expect.arrayContaining([
+            expect.objectContaining({kind: 'decision', state: 'committed', recordId: decision.recordId}),
+        ]));
+        await expect(kanban.runRecord!(board.id, {recordId: decision.recordId, operationId: 'run-dream-draft', expectedRevision: 1}))
+            .rejects.toMatchObject({code: 'DECISION_NOT_CONFIRMED'});
+        await kanban.execute(board.id, {operationId: 'confirm-dream-decision', expectedRevision: (await kanban.read(board.id)).revision,
+            command: {type: 'review-record', recordId: decision.recordId, accept: true}});
+        expect((await kanban.record(board.id, decision.recordId)).status).toBe('confirmed');
+        expect((await kanban.read(board.id)).items).toEqual(taskState);
         getProject.mockRestore(); listMounts.mockRestore();
         expect(await dream.reviewFinding(ownerId, 'dream', findings[0].id, 'correct', 0,
             {action: 'correct', kind: 'inference', content: 'Likely uses TypeScript'})).toEqual({revision: 1});

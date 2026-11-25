@@ -31,7 +31,10 @@ export interface DreamAdoptionRequest {
     ownerProjectId: string; dreamId: string; runId: string; suggestionId: string; operationId: string;
     boardId: string; targetProjectId: string; parentItemId: string; title: string; responsibility: string; acceptance: string;
 }
-export interface DreamAdoptionRecord {request: DreamAdoptionRequest; configRevision: number; state: 'prepared' | 'committed'; itemId?: string}
+export type DreamDecisionAdoptionRequest = Omit<DreamAdoptionRequest, 'parentItemId' | 'responsibility' | 'acceptance'>;
+export type DreamAdoptionRecord = {configRevision: number; state: 'prepared' | 'committed'} & (
+    {kind?: 'task'; request: DreamAdoptionRequest; itemId?: string}
+    | {kind: 'decision'; request: DreamDecisionAdoptionRequest; recordId?: string});
 export interface DreamRunView {
     operationId: string;
     sources: Array<{status: 'available'; evidence: DreamSourceEvidence}
@@ -67,11 +70,12 @@ export interface DreamService {
     mergeFindings(owner: string, dream: string, ids: [string, string], revisions: [number, number], operationId: string): Promise<{mergeId: string}>;
     findingHistory(owner: string, dream: string, id: string, revision: number): Promise<{operationId: string; previous: DreamFindingView; result: DreamFindingView} | null>;
     adoptSuggestion(request: DreamAdoptionRequest): Promise<{itemId: string}>;
+    adoptDecision(request: DreamDecisionAdoptionRequest): Promise<{recordId: string}>;
     suggestionAdoptions(owner: string, dream: string, runId: string, suggestionId: string): Promise<DreamAdoptionRecord[]>;
     adoptionStatus(request: DreamAdoptionRequest): Promise<{state: 'pending'} | {state: 'committed'; itemId: string; execution?: {dispatchId: string; sessionId: string; outputs: Array<{name: string; ref: string; sha256: string; bytes: number}>};
         phase?: import('@nestos/kanban/contracts').KanbanTaskProjection['phase']; completion?: import('@nestos/kanban/contracts').KanbanTaskProjection['completion']}>;
     readAdoptionResults(request: DreamAdoptionRequest, cursor: string | null, limit: number): Promise<{items: string[]; cursor: string; version: string; scanned: number}>;
-    adoptionBoards(owner: string): Promise<Array<{id: string; title: string}>>;
+    adoptionBoards(owner: string): Promise<Array<{id: string; title: string; projectId?: string}>>;
     kanbanSourceCandidates(owner: string, project: string, connection: string, board: string, kind: 'task' | 'decision', cursor?: string): Promise<{items: Array<{id: string; title: string}>; returned: number; nextCursor?: string}>;
     adoptionTargets(owner: string, board: string, cursor?: string): Promise<{items: Array<{itemId: string; title: string; projectId: string}>; scanned: number; nextCursor?: string}>;
     memorySessions(owner: string, cursor?: string): Promise<{items: Array<{id: string; title: string}>; scanned: number; nextCursor?: string}>;

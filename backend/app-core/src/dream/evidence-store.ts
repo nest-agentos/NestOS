@@ -1,6 +1,7 @@
 import {FSError, type IFileSystem} from '@nestos/vfs-core';
 import {createModuleLogger, sha256HexSync} from '@nestos/common';
 import type {SourceEvidence, SourceScanResult} from '@nestos/dream';
+import type {DreamAdoptionRecord, DreamAdoptionRequest, DreamDecisionAdoptionRequest} from '@nestos/app-contracts/services';
 
 type Outcome = Omit<Extract<SourceScanResult<never>, {status: 'ok'}>, 'items'> | Exclude<SourceScanResult<never>, {status: 'ok'}>;
 interface Run {operationId: string; outcomes: Outcome[]; findings?: string[]; execution?: DreamExecutionReceipt; requestHash?: string; configRevision?: number}
@@ -8,7 +9,6 @@ export interface DreamExecutionReceipt {scanRunId: string; sessionId: string; ta
 export interface DreamFinding {id: string; sourceId: string; kind: 'fact' | 'inference' | 'suggestion'; content: string; quote?: string; subject?: string; project?: string; eventTime?: string; recordedAt?: number}
 export interface DreamFindingView extends DreamFinding {revision: number; state: 'active' | 'disputed' | 'disabled'; origin: 'source' | 'user-correction'; updatedAt?: number}
 export type DreamReview = {action: 'correct'; content: string; kind: 'fact' | 'inference'} | {action: 'dispute' | 'disable' | 'restore'};
-export interface DreamAdoptionRecord {request: import('./adopt-suggestion').DreamAdoptionRequest; configRevision: number; state: 'prepared' | 'committed'; itemId?: string}
 interface DreamMerge {id: string; members: Array<{id: string; sourceId: string; revision: number}>; operationId: string}
 export interface Watermark {projectId: string; connectionId: string; authority: SourceEvidence['authority']; cursor: string | null}
 const key = (name: string, id: string) => `${name}:${JSON.stringify(id)}`;
@@ -122,16 +122,24 @@ export class DreamEvidenceStore {
         const detailed = items.map(item => ({...item, ...historyState(states[key('run-state', item.operationId)])}));
         return {items: detailed, scanned: keys.length, ...(end > 1 && keys.length ? {nextCursor: end} : {})};
     }
-    async prepareAdoption(request: DreamAdoptionRecord['request'], configRevision: number): Promise<void> {
+    async prepareAdoption(request: DreamAdoptionRequest, configRevision: number): Promise<void> {
+        await this.prepareAdoptionRecord({request, configRevision, state: 'prepared'});
+    }
+    async prepareDecisionAdoption(request: DreamDecisionAdoptionRequest, configRevision: number): Promise<void> {
+        await this.prepareAdoptionRecord({kind: 'decision', request, configRevision, state: 'prepared'});
+    }
+    private async prepareAdoptionRecord(record: DreamAdoptionRecord): Promise<void> {
+        const {request, configRevision} = record;
         const path = this.path(request.ownerProjectId, request.dreamId);
         if (!identity(request.operationId) || !identity(request.runId) || !identity(request.suggestionId)
             || JSON.stringify(request).length > 60_000 || !Number.isSafeInteger(configRevision) || configRevision < 1) throw new Error('DREAM_ADOPTION_INVALID');
-        const record: DreamAdoptionRecord = {request: structuredClone(request), configRevision, state: 'prepared'};
+        record = structuredClone(record);
         await this.fs.meta.seq!.transaction!(async tx => {
             const receiptKey = key('adoption', request.operationId), old = await tx.getEntry(path, receiptKey);
             if (old) {
                 const saved = parseStored<DreamAdoptionRecord>(old, 'DREAM_ADOPTION_INVALID');
-                if (JSON.stringify(saved.request) !== JSON.stringify(record.request) || saved.configRevision !== configRevision) throw new Error('DREAM_OPERATION_CONFLICT');
+                if (saved.kind !== record.kind || JSON.stringify(saved.request) !== JSON.stringify(record.request) || saved.configRevision !== configRevision)
+                    throw new Error('DREAM_OPERATION_CONFLICT');
                 return;
             }
             if (configVersion(await tx.getEntry(this.configPath(request.ownerProjectId, request.dreamId), 'config')) !== configRevision)
@@ -146,14 +154,28 @@ export class DreamEvidenceStore {
         });
     }
     async completeAdoption(owner: string, dream: string, operationId: string, itemId: string): Promise<void> {
-        if (!identity(operationId) || !identity(itemId)) throw new Error('DREAM_ADOPTION_INVALID');
+        await this.completeAdoptionRecord(owner, dream, operationId, itemId, false);
+    }
+    async completeDecisionAdoption(owner: string, dream: string, operationId: string, recordId: string): Promise<void> {
+        await this.completeAdoptionRecord(owner, dream, operationId, recordId, true);
+    }
+    async adoptionReceipt(owner: string, dream: string, operationId: string): Promise<DreamAdoptionRecord | null> {
+        if (!identity(operationId)) throw new Error('DREAM_ADOPTION_INVALID');
+        const raw = await this.fs.meta.seq!.getEntry(this.path(owner, dream), key('adoption', operationId));
+        return raw ? parseStored<DreamAdoptionRecord>(raw, 'DREAM_ADOPTION_INVALID') : null;
+    }
+    private async completeAdoptionRecord(owner: string, dream: string, operationId: string, id: string, decision: boolean): Promise<void> {
+        if (!identity(operationId) || !identity(id)) throw new Error('DREAM_ADOPTION_INVALID');
         const path = this.path(owner, dream);
         await this.fs.meta.seq!.transaction!(async tx => {
             const receiptKey = key('adoption', operationId), raw = await tx.getEntry(path, receiptKey);
             if (!raw) throw new Error('DREAM_ADOPTION_INVALID');
             const record = parseStored<DreamAdoptionRecord>(raw, 'DREAM_ADOPTION_INVALID');
-            if (record.state === 'committed' && record.itemId !== itemId) throw new Error('DREAM_ADOPTION_RECEIPT_MISMATCH');
-            if (record.state !== 'committed') await tx.setEntry(path, receiptKey, JSON.stringify({...record, state: 'committed', itemId}));
+            const isDecision = record.kind === 'decision';
+            if (isDecision !== decision || record.state === 'committed' && (isDecision ? record.recordId : record.itemId) !== id)
+                throw new Error('DREAM_ADOPTION_RECEIPT_MISMATCH');
+            if (record.state !== 'committed') await tx.setEntry(path, receiptKey,
+                JSON.stringify({...record, state: 'committed', ...(isDecision ? {recordId: id} : {itemId: id})}));
         });
     }
     async adoptions(owner: string, dream: string, suggestionId: string): Promise<DreamAdoptionRecord[]> {
@@ -166,7 +188,8 @@ export class DreamEvidenceStore {
             const record = parseStored<DreamAdoptionRecord>(entries[key('adoption', id)], 'DREAM_ADOPTION_INVALID');
             if (!record || record.request?.operationId !== id || record.request.suggestionId !== suggestionId
                 || record.request.ownerProjectId !== owner || record.request.dreamId !== dream || !['prepared', 'committed'].includes(record.state)
-                || record.state === 'committed' && (!record.itemId || !identity(record.itemId))) throw new Error('DREAM_ADOPTION_INVALID');
+                || record.state === 'committed' && !identity((record.kind === 'decision' ? record.recordId : record.itemId) ?? ''))
+                throw new Error('DREAM_ADOPTION_INVALID');
             return record;
         });
     }

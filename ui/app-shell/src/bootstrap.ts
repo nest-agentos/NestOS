@@ -39,7 +39,7 @@ import { createOcrControls } from './configuration/ocr-controls';
 import { ConfigurationDeletionDialog } from './configuration/delete-dialog';
 import {createPageWindows} from './workspaces/page-windows';
 import {unavailableConversationCleanup} from './kanban/unavailable-conversation';
-import {sessionUrl, kanbanReferenceLink,projectDecisionsPath} from './kanban/links';
+import {sessionUrl, kanbanEntityPath, kanbanReferenceLink,projectDecisionsPath} from './kanban/links';
 import {sessionInteractionDialog} from './kanban/session-interactions';
 import {createKanbanWorkspace} from './kanban';
 import { TOOLBOX_SCOPE, TOOLBOX_PREFERENCES_DOC } from './toolbox/documents';
@@ -393,8 +393,8 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         if (strategyType === 'kanban') {
             const initial=options.initialRead;
             const module = createKanbanWorkspace({initialDecision:initial?.request.decision?{...initial.request.decision,...initial.decision}:undefined,
-                initialTask:initial?.request.task&&initial.task?{...initial.request.task,...initial.task}:undefined,service: services.kanban, dream: services.dream,
-                projects: services.projects, sidebar: sidebarEl, editor: editorEl,
+                initialTask:initial?.request.task&&initial.task?{...initial.request.task,...initial.task}:undefined,service: services.kanban,
+                sidebar: sidebarEl, editor: editorEl,
                 windows: windowBinding, initialResource, sessionUrl, referenceLink: kanbanReferenceLink(services.projects),
                 openVerificationSession: async (title,inputText) => {
                     const local=(await services.projects.list()).find(project=>project.protected);
@@ -415,14 +415,19 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
 
         if (strategyType === 'twin') {
-            const {TwinWorkbench} = await import('./digital-twin');
+            const {DREAM_PATH, TwinWorkbench} = await import('./digital-twin');
             if (!services.digitalTwin) throw new Error('Digital twin is unavailable in this services');
             const service = services.digitalTwin;
             let pendingToolbox: ReturnType<typeof backend.toolboxView> | undefined;
             const toolbox = () => pendingToolbox ??= backend.toolboxView().then(value => {own(() => value.dispose()); return value;})
                 .catch(error => {pendingToolbox = undefined; throw error;});
             const module = createPageWindows({sidebar: sidebarEl, editor: editorEl, title: translate('twin.title'), windows: windowBinding, initialResource, initializeAtResource: true,
+                titleFor: path => translate(path === DREAM_PATH && services.dream ? 'dream.title' : 'twin.title'),
                 selected: path => selectionHistory(elementId, path, 'push'), create: host => new TwinWorkbench({...host, service, showNavigationTitle: false,
+                dream: services.dream && {service: services.dream, projects: services.projects,
+                    openSession: id => handleNavigationRequest({target: 'chat', resourceId: id, options: {newTab: true}}, true),
+                    openTask: (board, item) => handleNavigationRequest({target: 'kanban', resourceId: kanbanEntityPath(board, item, 'task')}, true),
+                    openDecision: (board, record) => handleNavigationRequest({target: 'kanban', resourceId: kanbanEntityPath(board, record, 'decision')}, true)},
                 packages: lazyScannerPackages(async () => (await toolbox()).resources.toolPackages, own),
                 projects: async () => (await services.projects.list()).map(project => ({id: project.project.id, name: project.name})),
                 connections: async () => (await agentService.getConnections()).filter(connection => connection.enabled)

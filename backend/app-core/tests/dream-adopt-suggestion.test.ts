@@ -7,8 +7,9 @@ import {UserEventService} from '../src/events/service';
 import {DreamConfigStore} from '../src/dream/config-store';
 import {DreamEvidenceStore} from '../src/dream/evidence-store';
 import {adoptDreamSuggestion} from '../src/dream/adopt-suggestion';
+import {adoptDreamDecision} from '../src/dream/adopt-decision';
 
-it('creates one manually controlled task after explicit adoption, even when the first reply is lost', async () => {
+it('reconciles task and decision adoption after a lost reply and keeps source tasks outside the new decision group', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()});
     let journal: KanbanAutomationJournal | undefined, events: UserEventService | undefined;
     try {
@@ -17,8 +18,9 @@ it('creates one manually controlled task after explicit adoption, even when the 
             path: '/note.md', planId: 'plan', planRevision: 'revision', twinSourceId: 'twin-source'};
         await configs.save('owner', 'dream', 'config', null, {name: 'Dream', enabled: true, files: [file]}, {owner: async () => {}, source: async () => {}});
         const authority = {principalId: 'alice', revision: '1', projectRevision: '1', serverId: 'node', serverProjectId: 'remote'};
-        await evidence.settle('owner', 'dream', 'run', [{status: 'ok', items: [], evidence: {sourceId: file.id, projectId: file.projectId,
-            connectionId: file.connectionId, authority, startCursor: null, endCursor: 'next', version: 'v1', scanned: 0}}],
+        const proof = {sourceId: file.id, projectId: file.projectId,
+            connectionId: file.connectionId, authority, startCursor: null, endCursor: 'next', version: 'v1', scanned: 0};
+        await evidence.settle('owner', 'dream', 'run', [{status: 'ok', items: [], evidence: proof}],
         [{id: 'suggestion', sourceId: file.id, kind: 'suggestion', content: 'Suggested action'}], {scanRunId: 'scan', sessionId: 'session', taskId: 'task'});
         const kanbanStore = await SeqKanbanStore.open(fs); events = await UserEventService.open(fs);
         const service = createNestOSKanban({store: kanbanStore, authorize: async () => {}, log: vi.fn(), actor: {kind: 'human', id: 'admin'},
@@ -47,5 +49,22 @@ it('creates one manually controlled task after explicit adoption, even when the 
         await expect(adoptDreamSuggestion({...request, operationId: 'revoked'}, {...deps, source: {authorize: async () => {throw new Error('private');}}}))
             .rejects.toThrow('DREAM_SUGGESTION_UNAVAILABLE');
         expect((await service.read('board')).items).toHaveLength(2);
+        const decisionRequest = {ownerProjectId: 'owner', dreamId: 'dream', runId: 'run', suggestionId: 'suggestion',
+            operationId: 'make-decision', boardId: 'board', targetProjectId: 'target', title: 'Follow up'};
+        const executeDecision = vi.fn(async (...args: Parameters<typeof service.execute>) => {
+            await service.execute(...args);
+            throw new Error('lost decision reply');
+        });
+        const decisionDeps = {store: evidence, journal, kanban: {...kanban, record: service.record.bind(service), execute: executeDecision},
+            inspect: async () => ({configRevision: 1, evidence: proof, origin: {kind: 'task' as const, boardId: 'board', id: accepted.itemId},
+                suggestion: {id: 'suggestion', sourceId: file.id, kind: 'suggestion' as const, state: 'active' as const,
+                    origin: 'source' as const, revision: 0, content: 'Suggested action', quote: 'Verified evidence'}})};
+        await expect(adoptDreamDecision(decisionRequest, decisionDeps)).rejects.toThrow('DREAM_ADOPTION_RECEIPT_UNAVAILABLE');
+        const {recordId} = await adoptDreamDecision(decisionRequest, decisionDeps);
+        expect(executeDecision).toHaveBeenCalledOnce();
+        expect(await service.record('board', recordId)).toMatchObject({status: 'draft', itemIds: [], externalRefs: expect.arrayContaining([
+            {system: 'nestos-dream-source-task', id: JSON.stringify(['board', accepted.itemId])},
+        ])});
+        expect((await service.read('board')).items).toEqual(items);
     } finally {await journal?.drain(); events?.journal.close(); await manager.dispose();}
 });

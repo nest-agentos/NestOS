@@ -1,12 +1,15 @@
-import {randomUUID, t} from '@nestos/common';
-import type {DreamService, DreamConfigurationRecord, DreamRunView, ProjectService} from '@nestos/app-contracts/services';
+import {createModuleLogger, randomUUID, t} from '@nestos/common';
+import type {DreamService, DreamAdoptionRecord, DreamAdoptionRequest, DreamConfigurationRecord, DreamRunView, ProjectService} from '@nestos/app-contracts/services';
 
 type Project = Awaited<ReturnType<ProjectService['list']>>[number];
 type Target = Awaited<ReturnType<DreamService['scannerTargets']>>[number];
 
+const log = createModuleLogger('dream-page');
+
 /** A Dream is opened only after the user chooses its owning project. */
-export class DreamDialog {
-    private readonly dialog = document.createElement('dialog');
+export class DreamPage {
+    private readonly section = document.createElement('section');
+    private initialization?: Promise<void>;
     private readonly body = document.createElement('div');
     private readonly status = document.createElement('p');
     private readonly owners = document.createElement('select');
@@ -23,47 +26,65 @@ export class DreamDialog {
     private createSignature = '';
     private closed = false;
     constructor(private readonly service: DreamService, private readonly projectsPort: ProjectService,
-        private readonly openSession: (id: string) => Promise<void>, private readonly openTask: (board: string, item: string) => Promise<void>) {
-        this.dialog.setAttribute('aria-label', t('dream.title'));
+        private readonly openSession: (id: string) => Promise<void>, private readonly openTask: (board: string, item: string) => Promise<void>,
+        private readonly openDecision: (board: string, record: string) => Promise<void>) {
+        this.section.className = 'twin__body';
+        this.section.dataset.dreamPage = '';
+        this.section.setAttribute('aria-label', t('dream.title'));
         const title = document.createElement('h2'); title.textContent = t('dream.title');
-        const close = button(t('dream.close'), () => this.dialog.close());
+        this.status.className = 'twin__error';
         this.status.setAttribute('role', 'alert'); this.owners.setAttribute('aria-label', t('dream.owner'));
-        this.owners.onchange = () => {this.owner = this.owners.value; this.dream = ''; this.mergeSelection = undefined; this.status.textContent = ''; void this.loadList();};
-        this.dialog.append(title, close, this.owners, this.status, this.body); document.body.append(this.dialog);
+        this.owners.onchange = () => {
+            this.owner = this.owners.value; this.dream = ''; this.mergeSelection = undefined;
+            void this.perform(() => this.loadList());
+        };
+        this.section.append(title, this.owners, this.status, this.body);
     }
-    async open(): Promise<void> {
-        if (this.closed) return;
-        if (!this.dialog.open) this.dialog.showModal();
-        await this.perform(async () => {
+    mount(container: HTMLElement): Promise<void> {
+        if (this.closed) return Promise.resolve();
+        if (this.section.parentElement !== container) container.replaceChildren(this.section);
+        return this.initialization ??= this.loadProjects();
+    }
+    private async loadProjects(): Promise<void> {
+        const operationId = randomUUID(), started = performance.now();
+        let stage = 'projects';
+        this.status.textContent = '';
+        this.owners.disabled = true;
+        this.body.replaceChildren(text(t('status.loading')));
+        try {
             this.projects = await this.projectsPort.list();
             if (this.closed) return;
             this.owners.replaceChildren();
             for (const project of this.projects.filter(item => item.project.source?.kind !== 'remote'))
                 this.owners.add(option(project.project.id, project.displayName ?? project.name));
-            this.owner = this.projects.some(item => item.project.id === this.owner) ? this.owner : this.owners.value;
-            this.owners.value = this.owner;
+            this.owner = this.owners.value;
+            stage = 'dreams';
             await this.loadList();
-        });
+            log.debug('dream.open', {operationId, stage, result: 'success', durationMs: Math.round(performance.now() - started)});
+        } catch (error) {
+            log.warn('dream.open', {operationId, stage, result: 'failure', code: safeCode(error), durationMs: Math.round(performance.now() - started)});
+            if (this.closed) return;
+            this.status.textContent = errorText(error);
+            this.body.replaceChildren(button(t('dream.retry'), () => this.loadProjects()));
+        } finally {if (!this.closed) this.owners.disabled = false;}
     }
-    destroy(): void {this.closed = true; this.dialog.remove();}
+    destroy(): void {this.closed = true; this.section.remove();}
     private async loadList(): Promise<void> {
         if (!this.owner) {this.body.replaceChildren(text(t('dream.noProjects'))); return;}
-        await this.perform(async () => {
-            const owner = this.owner, result = await this.service.list(owner);
-            if (this.closed || owner !== this.owner) return;
-            const name = document.createElement('input'); name.placeholder = t('dream.name');
-            const create = button(t('dream.create'), async () => {
-                const signature = JSON.stringify([owner, name.value]);
-                if (this.createSignature && signature !== this.createSignature) {this.createId = randomUUID(); this.createOperation = randomUUID();}
-                this.createSignature = signature;
-                await this.service.create(owner, this.createId, this.createOperation, name.value);
-                const id = this.createId; this.createId = randomUUID(); this.createOperation = randomUUID();
-                if (owner === this.owner) {this.dream = id; await this.refreshAfterWrite(() => this.loadDream());}
-            });
-            this.body.replaceChildren(name, create);
-            for (const item of result.items) this.body.append(button(item.name, async () => {this.dream = item.id; await this.loadDream();}));
-            if (result.truncated) this.body.append(text(t('dream.listTruncated')));
+        const owner = this.owner, result = await this.service.list(owner);
+        if (this.closed || owner !== this.owner) return;
+        const name = document.createElement('input'); name.placeholder = t('dream.name');
+        const create = button(t('dream.create'), async () => {
+            const signature = JSON.stringify([owner, name.value]);
+            if (this.createSignature && signature !== this.createSignature) {this.createId = randomUUID(); this.createOperation = randomUUID();}
+            this.createSignature = signature;
+            await this.service.create(owner, this.createId, this.createOperation, name.value);
+            const id = this.createId; this.createId = randomUUID(); this.createOperation = randomUUID();
+            if (owner === this.owner) {this.dream = id; await this.refreshAfterWrite(() => this.loadDream());}
         });
+        this.body.replaceChildren(name, create);
+        for (const item of result.items) this.body.append(button(item.name, async () => {this.dream = item.id; await this.loadDream();}));
+        if (result.truncated) this.body.append(text(t('dream.listTruncated')));
     }
     private async loadDream(): Promise<void> {
         const owner = this.owner, dream = this.dream;
@@ -413,9 +434,12 @@ export class DreamDialog {
                             await this.refreshAfterWrite(async () => {const updated = await this.service.readRun(owner, dream, operationId); if (owner === this.owner && dream === this.dream) this.showRun(updated, operationId);});
                         }));
                 }
-                if (finding.kind === 'suggestion' && finding.state === 'active')
-                    row.append(button(t('dream.adopt'), async () => this.adoptionForm(row, operationId, finding)),
-                        button(t('dream.adoptionHistory'), async () => this.showAdoptions(row, operationId, finding.id)));
+                if (finding.kind === 'suggestion' && finding.state === 'active') {
+                    row.append(button(t('dream.adoptDecision'), () => this.decisionForm(row, run, finding)));
+                    if (this.config?.config.files.some(source => source.id === finding.sourceId))
+                        row.append(button(t('dream.adopt'), () => this.adoptionForm(row, operationId, finding)));
+                    row.append(button(t('dream.adoptionHistory'), () => this.showAdoptions(row, operationId, finding.id)));
+                }
                 if (finding.revision > 0) row.append(button(t('dream.changes'), async () => {
                     const history = await this.service.findingHistory(this.owner, this.dream, finding.id, finding.revision);
                     if (history && row.isConnected) row.append(text(`${history.previous.content} → ${history.result.content}`));
@@ -447,18 +471,32 @@ export class DreamDialog {
         const list = document.createElement('section');
         if (!records.length) list.append(text(t('dream.noAdoptions')));
         for (const record of records) {
-            const item = document.createElement('div'), request = record.request;
+            const item = document.createElement('div');
+            if (record.kind === 'decision') {
+                this.showDecisionAdoption(item, record); list.append(item); continue;
+            }
+            const {request} = record;
             item.append(text(request.title), text(request.responsibility), text(request.acceptance));
             if (record.state === 'prepared') item.append(button(t('dream.reconcileAdoption'), async () => {
                 const receipt = await this.service.adoptSuggestion(request); item.append(text(t('dream.taskCreated')),
-                    button(t('dream.openTask'), async () => {this.dialog.close(); await this.openTask(request.boardId, receipt.itemId);}));
+                    button(t('dream.openTask'), () => this.openTask(request.boardId, receipt.itemId)));
             }));
-            else item.append(button(t('dream.checkTask'), async () => this.showAdoptionStatus(item, request)));
+            else item.append(button(t('dream.checkTask'), () => this.showAdoptionStatus(item, request)));
             list.append(item);
         }
         row.append(list);
     }
-    private async showAdoptionStatus(container: HTMLElement, request: import('@nestos/app-contracts/services').DreamAdoptionRequest): Promise<void> {
+    private showDecisionAdoption(container: HTMLElement, record: Extract<DreamAdoptionRecord, {kind: 'decision'}>): void {
+        const {request, recordId} = record;
+        container.replaceChildren(text(request.title));
+        if (record.state === 'committed' && recordId)
+            container.append(button(t('dream.openDecision'), () => this.openDecision(request.boardId, recordId)));
+        else container.append(button(t('dream.reconcileAdoption'), async () => {
+            const receipt = await this.service.adoptDecision(request);
+            this.showDecisionAdoption(container, {...record, state: 'committed', recordId: receipt.recordId});
+        }));
+    }
+    private async showAdoptionStatus(container: HTMLElement, request: DreamAdoptionRequest): Promise<void> {
         const result = await this.service.adoptionStatus(request);
         if (!container.isConnected) return;
         if (result.state === 'pending') {container.append(text(t('dream.adoptionPending'))); return;}
@@ -466,7 +504,7 @@ export class DreamDialog {
         const completion = result.completion === 'accepted' ? t('dream.accepted') : result.completion === 'waived' ? t('kanban.completionOutcome.waived')
             : result.completion === 'mixed' ? t('kanban.completionOutcome.mixed')
             : result.phase === 'completed' ? t('dream.resultUnverified') : t(phaseKey);
-        container.append(text(completion), button(t('dream.openTask'), async () => {this.dialog.close(); await this.openTask(request.boardId, result.itemId);}));
+        container.append(text(completion), button(t('dream.openTask'), () => this.openTask(request.boardId, result.itemId)));
         const config = this.config;
         if (config && result.completion === 'accepted' && result.execution?.outputs.length
             && !config.config.adoptions?.some(source => source.boardId === request.boardId && source.itemId === result.itemId)) {
@@ -523,7 +561,7 @@ export class DreamDialog {
             const signature = JSON.stringify([owner, dream, 'bind-memory', session, run.operationId, sourceIds, expected, useAppend]);
             await this.command(signature, id => this.service.bindSessionMemory(owner, dream, session, run.operationId, sourceIds, id, expected, useAppend));
             form.replaceChildren(text(t('dream.memoryBound')), text(t('dream.memoryPolicyHint')),
-                button(t('dream.openSession'), async () => {this.dialog.close(); await this.openSession(session);}));
+                button(t('dream.openSession'), () => this.openSession(session)));
         });
         form.prepend(sessions, bindingInfo, appendLabel); form.append(text(t('dream.memoryPolicyHint')), submit, remove); parent.append(form);
         if (!page.items.length) form.append(text(t('dream.noSessions'))); else await loadBinding();
@@ -536,6 +574,41 @@ export class DreamDialog {
             }); form.append(more);
         }
     }
+    private async decisionForm(row: HTMLElement, run: DreamRunView, finding: DreamRunView['findings'][number]): Promise<void> {
+        const owner = this.owner, dream = this.dream, boards = await this.service.adoptionBoards(owner);
+        if (!row.isConnected || owner !== this.owner || dream !== this.dream || row.querySelector('[data-dream-decision]')) return;
+        const form = document.createElement('div'), board = document.createElement('select'), project = document.createElement('select');
+        form.dataset.dreamDecision = '';
+        board.setAttribute('aria-label', t('dream.board')); project.setAttribute('aria-label', t('kanban.primaryProject'));
+        board.add(option('', t('dream.selectBoard')));
+        for (const item of boards) board.add(option(item.id, item.title));
+        const title = document.createElement('input');
+        title.value = finding.content; title.setAttribute('aria-label', t('dream.decisionTitle'));
+        const source = run.sources.find(item => item.status === 'available' && item.evidence.sourceId === finding.sourceId);
+        const submit = button(t('dream.createDecisionDraft'), async () => {
+            if (!board.value || !project.value) throw new Error('DREAM_TARGET_SCOPE_CHANGED');
+            const input = {ownerProjectId: owner, dreamId: dream, runId: run.operationId, suggestionId: finding.id,
+                boardId: board.value, targetProjectId: project.value, title: title.value};
+            await this.command(JSON.stringify(['adopt-decision', input]), async operationId => {
+                const {recordId} = await this.service.adoptDecision({...input, operationId});
+                form.replaceChildren(text(t('dream.decisionDraftCreated')), button(t('dream.openDecision'), () => this.openDecision(input.boardId, recordId)));
+            });
+        });
+        const refreshProjects = () => this.decisionProjects(project,
+            boards.find(item => item.id === board.value)?.projectId, source?.status === 'available' ? source.evidence.projectId : undefined);
+        board.onchange = refreshProjects; refreshProjects();
+        form.append(board, project, title, submit);
+        if (!boards.length) {submit.disabled = true; form.append(text(t('dream.noBoards')));}
+        if (!this.projects.some(item => item.project.source?.kind === 'remote')) {submit.disabled = true; form.append(text(t('dream.noDecisionProjects')));}
+        row.append(form);
+    }
+    private decisionProjects(select: HTMLSelectElement, scope?: string, source?: string): void {
+        const previous = select.value;
+        select.replaceChildren(option('', t('dream.selectDecisionProject')));
+        for (const item of this.projects.filter(item => item.project.source?.kind === 'remote' && (!scope || item.project.id === scope)))
+            select.add(option(item.project.id, item.displayName ?? item.name));
+        select.value = [scope, previous, source].find(id => [...select.options].some(item => id && item.value === id)) ?? '';
+    }
     private async adoptionForm(row: HTMLElement, runId: string, finding: DreamRunView['findings'][number]): Promise<void> {
         const owner = this.owner, dream = this.dream, boards = await this.service.adoptionBoards(owner);
         if (!row.isConnected || owner !== this.owner || dream !== this.dream) return;
@@ -546,10 +619,27 @@ export class DreamDialog {
         title.value = finding.content; title.setAttribute('aria-label', t('dream.taskTitle'));
         responsibility.setAttribute('aria-label', t('dream.responsibility')); acceptance.setAttribute('aria-label', t('dream.acceptance'));
         responsibility.placeholder = t('dream.responsibility'); acceptance.placeholder = t('dream.acceptance');
+        const submit = button(t('dream.createTask'), async () => {
+            if (!board.value || !target.value) throw new Error('DREAM_TARGET_SCOPE_CHANGED');
+            const [parentItemId, targetProjectId] = JSON.parse(target.value) as [string, string];
+            const input = {ownerProjectId: owner, dreamId: dream, runId, suggestionId: finding.id, boardId: board.value,
+                targetProjectId, parentItemId, title: title.value, responsibility: responsibility.value, acceptance: acceptance.value};
+            await this.command(JSON.stringify([owner, dream, 'adopt', input]), async operationId => {
+                const {itemId} = await this.service.adoptSuggestion({...input, operationId});
+                form.replaceChildren(text(t('dream.taskCreated')), button(t('dream.openTask'), () => this.openTask(input.boardId, itemId)));
+            });
+        });
+        form.append(board, target, title, responsibility, acceptance, submit); row.append(form);
+        if (!boards.length) form.append(text(t('dream.noBoards')));
+        else await this.loadTaskTargets(owner, form, board, target);
+    }
+    private async loadTaskTargets(owner: string, form: HTMLElement, board: HTMLSelectElement, target: HTMLSelectElement): Promise<void> {
         let moreButton: HTMLButtonElement | undefined;
+        const noParents = text(t('dream.noParents')); noParents.hidden = true;
+        target.after(noParents);
         const addTargets = async (cursor?: string) => {
             const selectedBoard = board.value, page = await this.service.adoptionTargets(owner, selectedBoard, cursor);
-            if (!form.isConnected || selectedBoard !== board.value) return;
+            if (!target.isConnected || selectedBoard !== board.value) return;
             for (const item of page.items) {
                 const project = this.projects.find(candidate => candidate.project.id === item.projectId);
                 if (project) target.add(option(JSON.stringify([item.itemId, item.projectId]), `${item.title} · ${project.displayName ?? project.name}`));
@@ -557,21 +647,13 @@ export class DreamDialog {
             if (page.nextCursor) {
                 const more = button(t('dream.moreTargets'), async () => {await addTargets(page.nextCursor); more.remove();});
                 moreButton = more; form.append(more);
-            } else if (!target.options.length) form.append(text(t('dream.noParents')));
+            } else noParents.hidden = !!target.options.length;
         };
-        board.onchange = () => {target.replaceChildren(); moreButton?.remove(); moreButton = undefined; void this.perform(() => addTargets());};
-        const submit = button(t('dream.createTask'), async () => {
-            if (!board.value || !target.value) throw new Error('DREAM_TARGET_SCOPE_CHANGED');
-            const [parentItemId, targetProjectId] = JSON.parse(target.value) as [string, string];
-            const input = {ownerProjectId: owner, dreamId: dream, runId, suggestionId: finding.id, boardId: board.value,
-                targetProjectId, parentItemId, title: title.value, responsibility: responsibility.value, acceptance: acceptance.value};
-            const signature = JSON.stringify([owner, dream, 'adopt', input]), id = this.commandOperations.get(signature) ?? randomUUID();
-            this.commandOperations.set(signature, id);
-            const receipt = await this.service.adoptSuggestion({...input, operationId: id}); this.commandOperations.delete(signature);
-            form.replaceChildren(text(t('dream.taskCreated')), button(t('dream.openTask'), async () => {this.dialog.close(); await this.openTask(input.boardId, receipt.itemId);}));
-        });
-        form.append(board, target, title, responsibility, acceptance, submit); row.append(form);
-        if (!boards.length) form.append(text(t('dream.noBoards'))); else await addTargets();
+        board.onchange = () => {
+            target.replaceChildren(); noParents.hidden = true;
+            moreButton?.remove(); moreButton = undefined; void this.perform(() => addTargets());
+        };
+        await addTargets();
     }
     private async review(operationId: string, finding: DreamRunView['findings'][number], change: import('@nestos/app-contracts/services').DreamReview): Promise<void> {
         const owner = this.owner, dream = this.dream;
@@ -596,7 +678,7 @@ function option(value: string, label: string): HTMLOptionElement {const node = d
 function text(value: string): HTMLElement {const node = document.createElement('p'); node.textContent = value; return node;}
 function button(label: string, action: () => void | Promise<void>): HTMLButtonElement {
     const node = document.createElement('button'); node.type = 'button'; node.textContent = label;
-    node.onclick = () => {node.disabled = true; const status = node.closest('dialog')?.querySelector('[role="alert"]');
+    node.onclick = () => {node.disabled = true; const status = node.closest('[data-dream-page]')?.querySelector('[role="alert"]');
         if (status) status.textContent = '';
         void Promise.resolve().then(action).catch(error => {
         if (status) status.textContent = errorText(error);

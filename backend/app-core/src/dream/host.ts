@@ -3,7 +3,7 @@ import {createModuleLogger, sha256HexSync} from '@nestos/common';
 import type {Kernel} from '@nestos/durable-kernel';
 import type {SessionRepository, IndependentCallService} from '@nestos/llm-session';
 import {SessionCommand, type ICommandBus, type RootTargetCatalog} from '@nestos/llm-session/contracts';
-import type {ProjectService} from '@nestos/app-contracts/services';
+import type {DreamDecisionAdoptionRequest, ProjectService} from '@nestos/app-contracts/services';
 import type {TwinScannerExecutor} from '@nestos/app-contracts';
 import {sameAuthority, scanSources} from '@nestos/dream';
 import type {ProjectRemoteMountService} from '../projects/remote-mounts';
@@ -23,6 +23,7 @@ import {validateDreamTwinFilePlan} from './twin-scan';
 import {readAuthorizedDreamRun} from './evidence-access';
 import {DreamSessionMemoryStore} from './session-memory-store';
 import {adoptDreamSuggestion, validateDreamAdoptionRequest, type DreamAdoptionRequest} from './adopt-suggestion';
+import {adoptDreamDecision, type DreamDecisionEvidence} from './adopt-decision';
 import {adoptionExecution} from './adoption-execution';
 import {adoptionScannerIds, adoptionTwinScanPort, configuredAdoptionSource, readAdoptionSource} from './adoption-source';
 import {runDreamTwinFileScan} from './twin-scan';
@@ -32,6 +33,7 @@ import {sessionSourcePort} from './session-source';
 import {changeSourcePort} from './change-source';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {KanbanService} from '@nestos/kanban/contracts';
+import {isKanbanRecurringRunBoard} from '@nestos/kanban/contracts';
 import type {DreamScheduleManager} from './schedule-manager';
 
 interface Options {
@@ -82,7 +84,9 @@ export class DreamHost {
         if (!this.kanban) throw new Error('DREAM_KANBAN_UNAVAILABLE');
         const boards = await this.kanban.service.catalog();
         await this.options.authorizeOwner(owner);
-        return boards.filter(board => !board.lifecycle).map(board => ({id: board.id, title: board.title}));
+        return boards.filter(board => !board.lifecycle && !isKanbanRecurringRunBoard(board)).map(board => ({
+            id: board.id, title: board.title, ...(board.scope.kind === 'project' ? {projectId: board.scope.projectId} : {}),
+        }));
     }
     async kanbanSourceCandidates(owner: string, project: string, connection: string, board: string, kind: 'task' | 'decision', cursor?: string) {
         const started = Date.now(), operationId = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(board) ? board : 'invalid';
@@ -110,7 +114,8 @@ export class DreamHost {
         await this.options.authorizeOwner(owner);
         if (!this.kanban) throw new Error('DREAM_KANBAN_UNAVAILABLE');
         const page = await this.kanban.service.query(board, {view: 'all', excludeArchived: true, limit: 100, cursor});
-        const items = page.items.filter(item => item.taskType === 'coordination' && !item.deletedAt && !item.archivedAt)
+        const items = page.items.filter(item => item.taskType === 'coordination' && !item.deletedAt && !item.archivedAt
+            && !item.planning.parentId && item.control?.action !== 'cancel' && !['completed', 'cancelled', 'claimed', 'review'].includes(item.status))
             .flatMap(item => (item.externalRefs ?? []).filter(ref => ref.system === 'nestos-remote-project')
                 .map(ref => ({itemId: item.id, title: item.title, projectId: ref.id})));
         await this.options.authorizeOwner(owner);
@@ -151,11 +156,40 @@ export class DreamHost {
         if (!final?.findings.some(item => item.id === suggestionId && item.kind === 'suggestion')) throw new Error('DREAM_SUGGESTION_UNAVAILABLE');
         return rows.filter(row => row.request.runId === runId);
     }
+    async adoptDecision(request: DreamDecisionAdoptionRequest) {
+        const kanban = this.kanban;
+        if (!kanban) throw new Error('DREAM_KANBAN_UNAVAILABLE');
+        return adoptDreamDecision(request, {kanban: kanban.service, journal: kanban.journal, store: this.evidence,
+            inspect: input => this.decisionEvidence(kanban.service, input)});
+    }
+    private async decisionEvidence(kanban: Pick<KanbanService, 'read'>, request: DreamDecisionAdoptionRequest): Promise<DreamDecisionEvidence> {
+        const {ownerProjectId: owner, dreamId: dream, runId, suggestionId, targetProjectId} = request;
+        await this.options.authorizeOwner(owner);
+        const config = await this.configs.read(owner, dream);
+        if (!config?.config.enabled) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+        const board = await kanban.read(request.boardId);
+        if (board.lifecycle || isKanbanRecurringRunBoard(board) || board.scope.kind === 'project' && board.scope.projectId !== targetProjectId)
+            throw new Error('DREAM_TARGET_SCOPE_CHANGED');
+        if ((await this.options.projects.get(targetProjectId)).project.source?.kind !== 'remote')
+            throw new Error('DREAM_TARGET_SCOPE_CHANGED');
+        await this.authorizeTarget(targetProjectId);
+        const view = await this.readRun(owner, dream, runId);
+        const suggestion = view?.findings.find(finding => finding.id === suggestionId && finding.kind === 'suggestion' && finding.state === 'active');
+        const source = view?.sources.find(source => source.status === 'available' && source.evidence.sourceId === suggestion?.sourceId);
+        if (!suggestion || source?.status !== 'available') throw new Error('DREAM_SUGGESTION_UNAVAILABLE');
+        await this.evidence.checkConfig(owner, dream, config.revision);
+        const priorTask = config.config.tasks?.find(item => item.id === suggestion.sourceId)
+            ?? config.config.adoptions?.find(item => item.id === suggestion.sourceId);
+        const priorDecision = config.config.decisions?.find(item => item.id === suggestion.sourceId);
+        const origin = priorTask ? {kind: 'task' as const, boardId: priorTask.boardId, id: priorTask.itemId}
+            : priorDecision ? {kind: 'decision' as const, boardId: priorDecision.boardId, id: priorDecision.recordId} : undefined;
+        return {configRevision: config.revision, suggestion, evidence: source.evidence, origin};
+    }
     async adoptionStatus(request: DreamAdoptionRequest) {
         const kanban = this.kanban; if (!kanban) throw new Error('DREAM_KANBAN_UNAVAILABLE');
         const rows = await this.suggestionAdoptions(request.ownerProjectId, request.dreamId, request.runId, request.suggestionId);
         const record = rows.find(row => row.request.operationId === request.operationId);
-        if (!record || JSON.stringify(record.request) !== JSON.stringify(request)) throw new Error('DREAM_ADOPTION_INVALID');
+        if (!record || record.kind === 'decision' || JSON.stringify(record.request) !== JSON.stringify(request)) throw new Error('DREAM_ADOPTION_INVALID');
         if (record.state !== 'committed' || !record.itemId) return {state: 'pending' as const};
         await this.authorizeTarget(request.targetProjectId);
         const actual = await kanban.service.item(request.boardId, record.itemId);
@@ -308,8 +342,8 @@ export class DreamHost {
         if (!Array.isArray(binding) || binding.length !== 4 || binding[0] !== owner || binding[1] !== dream
             || typeof binding[2] !== 'string' || typeof binding[3] !== 'string') throw new Error('DREAM_SOURCE_BINDING_CHANGED');
         const rows = await this.suggestionAdoptions(owner, dream, binding[2], binding[3]);
-        const record = rows.find(row => row.state === 'committed' && row.itemId === source.itemId && row.request.boardId === source.boardId);
-        if (!record) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
+        const record = rows.find(row => row.kind !== 'decision' && row.state === 'committed' && row.itemId === source.itemId && row.request.boardId === source.boardId);
+        if (!record || record.kind === 'decision') throw new Error('DREAM_SOURCE_BINDING_CHANGED');
         const status = await this.adoptionStatus(record.request);
         if (status.state !== 'committed' || status.itemId !== source.itemId) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
         return record.request;

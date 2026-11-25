@@ -8,8 +8,23 @@ import {decisionListPath} from '@nestos/kanban-ui';
 export const projectDecisionsPath=(projectId:string):string=>decisionListPath('',{system:'nestos-remote-project',id:projectId});
 
 export const sessionUrl = (id: string): string => workbenchUrl(id);
+export const kanbanEntityPath = (board: string, id: string, kind: 'task' | 'decision'): string =>
+    `/board/${encodeURIComponent(board)}/${kind === 'decision' ? '@record/' : ''}${encodeURIComponent(id)}`;
+
+function dreamSourceLink(reference: KanbanExternalReference) {
+    try {
+        const value: unknown = JSON.parse(reference.id);
+        if (!Array.isArray(value) || value.length !== 2 || !value.every(id => typeof id === 'string' && id.length)) return;
+        const decision = reference.system === 'nestos-dream-source-decision';
+        const path = kanbanEntityPath(value[0], value[1], decision ? 'decision' : 'task');
+        return {href: `${location.href.split('#')[0]}#/kanban/${encodeURIComponent(path)}`,
+            label: t(decision ? 'dream.sourceDecision' : 'dream.sourceTask')};
+    } catch {return;}
+}
 export function kanbanReferenceLink(projects: Pick<ProjectService, 'get'>) {
     return async (reference: KanbanExternalReference) => {
+        if (reference.system === 'nestos-dream-source-task' || reference.system === 'nestos-dream-source-decision')
+            return dreamSourceLink(reference);
         if(reference.system==='nestos-primary-project'||reference.system==='nestos-work-directory'||reference.system==='nestos-worktree'){
             const scope=reference.system==='nestos-primary-project'?{projectId:reference.id,directory:''}:directoryScope(reference.revision);
             if(!scope)return;
