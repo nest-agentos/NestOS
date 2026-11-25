@@ -834,6 +834,7 @@ export const en: LocaleStrings = {
     'kanban.errors.AUTOMATION_UNAVAILABLE': 'AI execution is unavailable on this host.',
     'kanban.errors.AUTOMATION_PRINCIPAL_MISMATCH': 'AI collaboration identities do not match. Reopen the configuration.',
     'kanban.errors.AUTOMATION_PAUSED': 'AI collaboration is paused; no new tasks will start.',
+    'kanban.errors.RECURRENCE_AUTOMATION_TARGET_UNAVAILABLE': 'The recurring round needs published planning and execution targets and Git worktree preparation.',
     'kanban.errors.AUTOMATION_ANALYSIS_PREPARE_FAILED': 'Unable to prepare planning. Check the published target and its connection.',
     'kanban.errors.AUTOMATION_ANALYSIS_FAILED': 'Planning execution failed. Inspect its execution history before retrying.',
     'kanban.errors.PLANNING_RESULT_MISSING': 'The management session ended without publishing a result. Publish the result in the original session to continue.',

@@ -12,7 +12,7 @@ import {validateRemoteReferences, projectResourceCatalog} from '../src/kanban/re
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0).reverse()) await close();});
-async function fixture(enabled = true, workTypes?: KanbanWorkType[]) {
+async function fixture(enabled:boolean|null = true, workTypes?: KanbanWorkType[]) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); cleanup.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions);
     await journal.open();
@@ -26,7 +26,7 @@ async function fixture(enabled = true, workTypes?: KanbanWorkType[]) {
     const reviewer = createKanbanModule({store, actor: {kind: 'human', id: 'reviewer'}, authorize: async () => {}, log});
     let sequence = 0;
     const command = async (command: KanbanCommand) => (command.type === 'review' ? reviewer : service).execute('source', {operationId: 'request-' + ++sequence, expectedRevision: (await service.read('source')).revision, command});
-    await command({type: 'configure-automation', settings: {enabled, autoAccept: false,
+    if(enabled!==null)await command({type: 'configure-automation', settings: {enabled, autoAccept: false,
         planner: {system: 'agent', id: 'planner', revision: '1'}, executor: {system: 'agent', id: 'worker', revision: '1'},
         coordinator: {kind: 'service', id: 'planner'}, worker: {kind: 'service', id: 'worker'}}});
     await command({type: 'append-record', record: {id: 'decision', kind: 'decision', title: 'Goal', content: 'PRIVATE_REQUIREMENT', rationale: 'Acceptance criteria', itemIds: [], sources: [],
@@ -143,6 +143,32 @@ it('retries the same reserved round after board automation is enabled',async()=>
  expect(await f.service.resolve(executionRef)).toMatchObject({itemId:child.id,reference:executionRef});
  expect(await f.service.resolve(`KBT-${board.number}-${child.number}`)).toMatchObject({itemId:child.id,reference:executionRef});
  expect((await f.service.query('source',{search:executionRef,view:'all'})).items.map(item=>item.id)).toEqual([child.id]);
+});
+it('automatically isolates recurring work from a source board without AI collaboration',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture(null);
+ await f.command({type:'review-record',recordId:'decision',accept:true});
+ let clock=Date.now();
+ const record=await f.service.record('source','decision');
+ const config={state:'active' as const,firstAt:clock+60000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:record.revision,recurrence:config});
+ const automation={enabled:true,autoAccept:false,planner:{system:'agent',id:'planner',revision:'1'},executor:{system:'agent',id:'worker',revision:'1'},
+    coordinator:{kind:'service' as const,id:'planner'},worker:{kind:'service' as const,id:'worker'}};
+ const recurringAutomation=vi.fn(async()=>automation);
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),recurringAutomation,log:f.log,now:()=>clock});
+ cleanup.push(()=>runtime.service.quiesce());
+ await runtime.service.scan();
+ clock=config.firstAt;
+ await runtime.service.scan();
+ await runtime.service.scan();
+ const [run]=await runtime.service.recordExecutions!('source','decision',{includeManagementTasks:true});
+ const target=await f.service.read(run.boardId),source=await f.service.read('source');
+ expect(source.automation).toBeUndefined();
+ expect(source.items).toHaveLength(0);
+ expect(target.scope).toEqual({kind:'collection',namespace:'recurring-run',id:run.id});
+ expect(target.automation).toMatchObject(automation);
+ expect(target.items.map(item=>item.id)).toEqual([run.rootItemId]);
+ expect(run.managementTasks?.[0].reference).toMatch(/^KBLC-/);
+ expect(recurringAutomation).toHaveBeenCalledTimes(1);
 });
 it('recovers a fenced intent after restart even if scheduling was paused',async()=>{
  const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});

@@ -835,6 +835,7 @@ export const zhCN = {
     'kanban.errors.AUTOMATION_UNAVAILABLE': '当前宿主尚未提供 AI 执行能力。',
     'kanban.errors.AUTOMATION_PRINCIPAL_MISMATCH': 'AI 协作身份不匹配，请重新打开配置。',
     'kanban.errors.AUTOMATION_PAUSED': 'AI 协作已暂停，不再启动新任务。',
+    'kanban.errors.RECURRENCE_AUTOMATION_TARGET_UNAVAILABLE': '循环轮次缺少可用的已发布规划或执行目标，或缺少 Git 工作树准备能力。',
     'kanban.errors.AUTOMATION_ANALYSIS_PREPARE_FAILED': '无法准备规划执行，请检查已发布目标及其连接配置。',
     'kanban.errors.AUTOMATION_ANALYSIS_FAILED': '规划执行未成功，请打开执行记录排查后重试。',
     'kanban.errors.PLANNING_RESULT_MISSING': '分析会话已结束，但未提交分析结果。请进入原会话补交分析结果后继续。',

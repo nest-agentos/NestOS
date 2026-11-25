@@ -1,3 +1,4 @@
+import {isKanbanRecurringRunBoard} from '@nestos/kanban/contracts';
 import {KanbanSidebarControls, controlLabel, controlIcon} from './sidebar-controls';
 import {kanbanSidebarDeletion} from './sidebar-deletion';
 import {ACTION_ICONS, FILE_BROWSER_ICONS, TOOLBOX_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
@@ -73,8 +74,8 @@ export class KanbanSidebar {
     }
     prepare(boards:readonly KanbanBoardSummary[]):void {
         if(this.closed)return;
-        this.boards=[...boards];this.controls?.update(this.boards);this.options.catalogChanged?.(boards);
-        this.nodes=[...boards.map(board=>nodeForBoard(board,!!this.options.service?.previewDeletion&&!!this.options.service?.deleteBoard)), {id:LOOP_BOARD_PATH, parentId:null, kind:'file', label:t('kanban.loops'), icon:ACTION_ICONS.kanbanView, fileDetails:false, deletable:false}];
+        this.boards=boards.filter(board=>!isKanbanRecurringRunBoard(board));this.controls?.update(this.boards);this.options.catalogChanged?.(this.boards);
+        this.nodes=[...this.boards.map(board=>nodeForBoard(board,!!this.options.service?.previewDeletion&&!!this.options.service?.deleteBoard)), {id:LOOP_BOARD_PATH, parentId:null, kind:'file', label:t('kanban.loops'), icon:ACTION_ICONS.kanbanView, fileDetails:false, deletable:false}];
     }
     openSettings(boardId?:string):void {this.controls?.open(this.boards,boardId);}
     select(path: string): void {
