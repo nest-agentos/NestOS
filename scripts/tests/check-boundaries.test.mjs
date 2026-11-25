@@ -56,6 +56,14 @@ test('dependency direction keeps domain capabilities independent of applications
     assert.match(dependencyError(core.name, 'some-sdk'), /platform-neutral/);
 });
 
+test('only Dream’s storage entry loads VFS', () => {
+    const dream = {...pkg('dream'), dir: '/repo/libraries/dream'};
+    const source = "import type {IFileSystem} from '@nestos/vfs-core'";
+    assert.match(inspect(dream, source)[0], /VFS dependencies belong/);
+    assert.match(inspect(dream, "export {DreamEvidenceStore} from './vfs'")[0], /VFS dependencies belong/);
+    assert.deepEqual(inspect(dream, source, dream.dir + '/src/vfs.ts'), []);
+});
+
 test('checks static, dynamic, type-only, re-export and CommonJS dependencies', () => {
     for (const expression of ["import type { X } from '@nestos/app-shell'", "export { X } from '@nestos/app-shell'",
         "import('@nestos/app-shell')", "type X = import('@nestos/app-shell').X", "require('@nestos/app-shell')",

@@ -14,10 +14,12 @@ export async function prepareConversation(projects: ProjectService, resourceId: 
     let conversation: ProjectConversationPort | undefined, stage = 'binding';
     try {
         conversation = await projects.remoteMounts.projectConversation(project.project.id, target.profileId, target.nativeSessionId, {timeoutMs: 3000}, target.archived);
+        const boundAt = performance.now();
         stage = 'snapshot';
         const [snapshot, draft] = await Promise.all([conversation.read({includeUsage: false}), conversation.readComposerDraft?.()]);
         log.info('conversation.open', {operation: 'workbench.conversation', operationId, stage: 'prepare', result: 'success',
-            messageCount: snapshot.messages.length, durationMs: Math.round(performance.now() - started)});
+            messageCount: snapshot.messages.length, bindingMs: Math.round(boundAt - started), snapshotMs: Math.round(performance.now() - boundAt),
+            durationMs: Math.round(performance.now() - started)});
         return {resourceId, project, conversation, draft, issues: {}, deferredMetadata: true};
     } catch (error) {
         log.warn('conversation.open', {operation: 'workbench.conversation', operationId, stage, result: 'failure', code: safeCode(error), durationMs: Math.round(performance.now() - started)});

@@ -35,8 +35,7 @@ export async function runDreamTwinFileScan(input: Input, twin: Twin, port: Dream
         prepared = true;
         const before = await twin.dreamScanEvidence(input.operationId, input.planId, input.twinSourceId); verifyPlan(before, input);
         if (input.configRevision !== undefined) await store.checkConfig(input.ownerProjectId, input.dreamId, input.configRevision);
-        const [result] = await scanSources([input.source], 1, port);
-        if (result.status !== 'ok') throw new Error('DREAM_SOURCE_' + result.code);
+        const result = await readScanSource(input.source, port);
         if (!result.items.length) {await checkOwner(authorizeOwner); await store.settle(input.ownerProjectId, input.dreamId, input.operationId, [result], [], undefined, requestHash, input.configRevision); return;}
         if (result.items.length !== 1 || result.items[0].length > TWIN_CHUNK_CHARACTERS) throw new Error('DREAM_SOURCE_LIMIT');
         stage = 'execute';
@@ -86,6 +85,17 @@ export async function runDreamTwinFileScan(input: Input, twin: Twin, port: Dream
             stage, result: 'failure', code, durationMs: Date.now() - started});
         throw new Error(code);
     }
+}
+
+async function readScanSource(source: Input['source'], port: DreamProjectFilePort) {
+    let readError: unknown;
+    const [result] = await scanSources([source], 1, {...port, read: async (input, limit) => {
+        try {return await port.read(input, limit);}
+        catch (error) {readError = error; throw error;}
+    }});
+    if (result.status === 'ok') return result;
+    if (readError instanceof Error && /^DREAM_(GIT|CHANGE)_[A-Z_]+$/.test(readError.message)) throw readError;
+    throw new Error('DREAM_SOURCE_' + result.code);
 }
 
 async function checkOwner(authorizeOwner: () => Promise<void>): Promise<void> {

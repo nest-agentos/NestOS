@@ -23,7 +23,7 @@ it('creates files and conversations with styled icon buttons on fixed directory 
     Object.defineProperty(HTMLDialogElement.prototype, 'close', {configurable: true, value() {this.open = false;}});
     const factory = vi.fn(async () => ({destroy() {}, commands: {}}) as never);
     const workbench = createTestWorkbench({sidebar, container: main, repository, files, projects, directoryMounts: mounts,
-        kernel: {onChanged: () => () => {}, async *listSessions() {}} as never, factory, onSelect() {}});
+        kernel: {onChanged: () => () => {}, async *listSessions() {}} as never, factory, fileFactory: factory, onSelect() {}});
     const panel = () => main.querySelector<HTMLElement>('.workbench-tabs__panel:not([hidden])')!;
     try {
         await workbench.start(); await workbench.setNavigationVisible(false); await workbench.openResource(path + '/@files');
@@ -66,6 +66,21 @@ it('creates files and conversations with styled icon buttons on fixed directory 
         expect(getComputedStyle(more).opacity).toBe('1');
         more.click(); await vi.waitFor(() => expect(document.querySelector('.vfs-context-menu')).not.toBeNull());
         document.body.click();
+        const browse = {directory: true, fromSidebar: true};
+        const filesPath = path + '/@files';
+        const filePath = filesPath + '/created.md';
+        await workbench.openResource(filesPath + '/child', browse);
+        expect(main.querySelector(`[data-tab-id="${filesPath}"]`)).toBeNull();
+        await workbench.openResource(filesPath, browse);
+        main.querySelector<HTMLButtonElement>(`[data-tab-id="${filesPath}"] .workbench-tabs__pin`)!.click();
+        await workbench.openResource(filesPath + '/child', browse);
+        expect(main.querySelector(`[data-tab-id="${filesPath}"] [aria-pressed=true]`)).not.toBeNull();
+        await workbench.openResource(filesPath, browse);
+        await workbench.openResource(filePath, {fromSidebar: true});
+        expect(main.querySelector(`[data-tab-id="${filesPath}"]`)).not.toBeNull();
+        expect(workbench.getActiveResourceId()).toBe(filePath);
+        await workbench.openResource(filesPath + '/child', browse);
+        expect(main.querySelector(`[data-tab-id="${filePath}"]`)).not.toBeNull();
         await workbench.openResource(projectConversationsPath(project.path));
         const create = panel().querySelector<HTMLButtonElement>('[data-action="create-session"]')!;
         expect(create.disabled).toBe(false); expect(create.children).toHaveLength(1); create.click();

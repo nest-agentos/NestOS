@@ -4,13 +4,14 @@ import type {ProjectService} from '@nestos/app-contracts/services';
 import type {DreamSource, SourceAuthority, SourcePort} from '@nestos/dream';
 import {documentPath, nodeVersion} from '../digital-twin/project-catalog';
 
-export interface ChangeScope {directory: string; exclude: string[]; maxEntries: number}
+export interface ChangeScope {directory: string; exclude: string[]; maxEntries: number; commits?: true; extensions?: string[]}
 export interface ChangeSnapshot {text: string; hash: string; scanned: number; directories: number}
 export interface DreamChangeSource extends ChangeScope {id: string; projectId: string; connectionId: string; scannerSourceId: string}
 const log = createModuleLogger('dream-change-source');
 
 export function changeSourcePort(source: DreamChangeSource, projects: ProjectService,
-    authorize: (source: DreamChangeSource) => Promise<SourceAuthority>): SourcePort<string> {
+    authorize: (source: DreamChangeSource) => Promise<SourceAuthority>,
+    readCommits?: (source: DreamChangeSource) => Promise<ChangeSnapshot>): SourcePort<string> {
     const frozen = structuredClone(source);
     const check = (input: DreamSource) => {
         if (input.id !== frozen.id || input.projectId !== frozen.projectId || input.connectionId !== frozen.connectionId)
@@ -20,18 +21,14 @@ export function changeSourcePort(source: DreamChangeSource, projects: ProjectSer
         const started = Date.now();
         try {
             check(input); if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('DREAM_SOURCE_LIMIT');
-            const project = (await projects.list()).find(item => item.project.id === frozen.projectId);
-            if (!project) throw new Error('DREAM_CHANGE_SCOPE_UNAVAILABLE');
-            const view = await projects.openFiles(project.path);
-            try {
-                const snapshot = await readChangeSnapshot(view.fs, frozen);
-                const identity = JSON.stringify([project.project.id, project.project.directory, project.project.source,
-                    frozen.directory, frozen.exclude, frozen.maxEntries]);
-                const version = JSON.stringify([identity, snapshot.hash]), cursor = sha256HexSync(version);
-                log.info('dream.change.source', {operationId: frozen.id, stage: 'snapshot', result: 'success',
-                    scanned: snapshot.scanned, directories: snapshot.directories, durationMs: Date.now() - started});
-                return {items: cursor === input.cursor ? [] : [snapshot.text], cursor, version, scanned: 1};
-            } finally {await view.dispose();}
+            const project = await projects.get(frozen.projectId);
+            const snapshot = frozen.commits ? await readCommitSnapshot(frozen, readCommits) : await readProjectChanges(projects, project.path, frozen);
+            const identity = JSON.stringify([project.project.id, project.project.directory, project.project.source,
+                frozen.directory, frozen.exclude, frozen.maxEntries, ...(frozen.commits || frozen.extensions?.length ? [frozen.commits ?? false, frozen.extensions ?? []] : [])]);
+            const version = JSON.stringify([identity, snapshot.hash]), cursor = sha256HexSync(version);
+            log.info('dream.change.source', {operationId: frozen.id, stage: 'snapshot', result: 'success',
+                scanned: snapshot.scanned, directories: snapshot.directories, durationMs: Date.now() - started});
+            return {items: cursor === input.cursor || frozen.commits && !snapshot.scanned ? [] : [snapshot.text], cursor, version, scanned: 1};
         } catch (error) {
             const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_CHANGE_READ_FAILED';
             log.warn('dream.change.source', {operationId: frozen.id, stage: 'snapshot', result: 'failure', code, durationMs: Date.now() - started});
@@ -40,12 +37,26 @@ export function changeSourcePort(source: DreamChangeSource, projects: ProjectSer
     }};
 }
 
+async function readProjectChanges(projects: ProjectService, path: string, scope: ChangeScope): Promise<ChangeSnapshot> {
+    const view = await projects.openFiles(path);
+    try {return await readChangeSnapshot(view.fs, scope);}
+    finally {await view.dispose();}
+}
+
+async function readCommitSnapshot(source: DreamChangeSource, read?: (source: DreamChangeSource) => Promise<ChangeSnapshot>) {
+    if (!read) throw new Error('DREAM_GIT_UNAVAILABLE');
+    return read(source);
+}
+
 /** Paths are absolute within the already authorized project view. */
 export function validateChangeScope(scope: ChangeScope): void {
     const valid = (path: string) => typeof path === 'string' && path.startsWith('/') && path.length <= 1000
         && !/[\\\0]/.test(path) && (path === '/' || path.split('/').slice(1).every(part => !!part && !part.startsWith('.')));
     if (!scope || !valid(scope.directory) || !Array.isArray(scope.exclude) || scope.exclude.length > 32
         || !Number.isSafeInteger(scope.maxEntries) || scope.maxEntries < 1 || scope.maxEntries > 128
+        || (scope.commits !== undefined && scope.commits !== true)
+        || (scope.extensions !== undefined && (scope.commits || !Array.isArray(scope.extensions) || scope.extensions.length > 24
+            || scope.extensions.some(value => typeof value !== 'string' || !/^[a-z0-9]{1,12}$/.test(value))))
         || scope.exclude.some(path => !valid(path) || path === scope.directory
             || !(scope.directory === '/' ? path.startsWith('/') : path.startsWith(scope.directory + '/'))))
         throw new Error('DREAM_CHANGE_SCOPE_INVALID');
@@ -79,7 +90,8 @@ async function collect(fs: IFileSystem, scope: ChangeScope): Promise<Omit<Change
                 || node.path.slice(prefix.length) === '..' || node.path.includes('\\')) throw new Error('DREAM_CHANGE_SCOPE_INVALID');
             if (privateNode(node) || excluded(node.path, scope.exclude)) continue;
             if (node.type === 'directory') queue.push(node.path);
-            else if (node.type === 'file' && documentPath(node.path)) {
+            else if (node.type === 'file' && documentPath(node.path)
+                && (!scope.extensions?.length || scope.extensions.includes(node.path.split('.').at(-1)!.toLowerCase()))) {
                 if (node.size > 32768) throw new Error('DREAM_CHANGE_LIMIT');
                 const text = await fs.driver.readContent(node.path, {encoding: 'utf-8'});
                 const after = await fs.driver.getNode(node.path);

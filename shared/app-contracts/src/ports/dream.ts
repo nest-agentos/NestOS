@@ -9,7 +9,7 @@ export interface DreamAdoptionSourceConfiguration {id: string; boardId: string; 
 export interface DreamDecisionSourceConfiguration {id: string; projectId: string; connectionId: string; boardId: string; recordId: string; scannerSourceId: string}
 export interface DreamTaskSourceConfiguration {id: string; projectId: string; connectionId: string; boardId: string; itemId: string; scannerSourceId: string}
 export interface DreamSessionSourceConfiguration {id: string; projectId: string; connectionId: string; sessionId: string; profileId?: string; maxRounds: number; scannerSourceId: string}
-export interface DreamChangeSourceConfiguration {id: string; projectId: string; connectionId: string; directory: string; exclude: string[]; maxEntries: number; scannerSourceId: string}
+export interface DreamChangeSourceConfiguration {id: string; projectId: string; connectionId: string; directory: string; exclude: string[]; maxEntries: number; scannerSourceId: string; commits?: true; extensions?: string[]}
 export interface DreamConfiguration {name: string; enabled: boolean; files: DreamFileConfiguration[]; adoptions?: DreamAdoptionSourceConfiguration[]; decisions?: DreamDecisionSourceConfiguration[]; tasks?: DreamTaskSourceConfiguration[]; sessions?: DreamSessionSourceConfiguration[]; changes?: DreamChangeSourceConfiguration[]; schedule?: import('@nestos/kanban/contracts').KanbanRecurrence}
 export interface DreamConfigurationRecord {revision: number; config: DreamConfiguration}
 export interface DreamFileSelection {
@@ -85,6 +85,6 @@ export interface DreamService {
     bindSessionMemory(owner: string, dream: string, session: string, runId: string, sourceIds: string[], operationId: string, expectedRevision: number | null, append?: boolean): Promise<{revision: number}>;
     unbindSessionMemory(owner: string, session: string, operationId: string, expectedRevision: number): Promise<{revision: number}>;
     run(input: {ownerProjectId: string; dreamId: string; sourceId: string; operationId: string}): Promise<void>;
-    runAll(owner: string, dream: string, operationId: string, configRevision: number): Promise<{configRevision: number;
+    runAll(owner: string, dream: string, operationId: string, configRevision: number, sourceIds?: string[]): Promise<{configRevision: number;
         results: Array<{sourceId: string; operationId: string; status: 'settled' | 'failed'; code?: string}>}>;
 }

@@ -1,10 +1,10 @@
-# Dream source boundary (in progress)
+# Dream host integration
 
 `scanSources` isolates source failures and returns a cursor only after the same
 principal, server and project identity, authorization revision, and project revision are confirmed before and
 after a read. The caller supplies the authorized source adapter and must recheck
 authority when stored evidence or derived content is consumed. The application
-runtime and Kanban entry use this boundary.
+runtime and the Digital Twin workbench use this boundary.
 
 The total scan limit is divided into fixed per-source quotas. A failed read keeps
 its quota reserved because its actual work may be unknown. The adapter must
@@ -62,7 +62,7 @@ The application host owns and disposes the view. Scanner tool calls are denied
 by default; supporting authorized read-only tools requires a separate capability
 boundary.
 
-The preliminary configuration store keeps selected project files and frozen scanner
+The host configuration store keeps selected project files and frozen scanner
 plan revisions under the owner project. Changes use revision comparison and stable
 operation receipts. Configured scans check the revision before dispatch and in the
 same transaction that commits their results. Source and owner grants are checked
@@ -76,9 +76,10 @@ The internal adoption adapter accepts an explicit user-authored task under an
 existing Kanban coordination item. It checks the current source and target grants,
 uses the Kanban command journal for lost replies, and verifies the created item's
 Dream reference. The task starts in backlog with manual launch paused; creation is
-not execution or acceptance. The Kanban entry accepts a published scanner's
-explicit suggestion and lets the user choose a board, parent task and authorized
-target project. It supports selected files, directory changes, Sessions, Kanban
+not execution or acceptance. From the Digital Twin workbench, Dream can also
+adopt a suggestion as a draft decision on an authorized board. A draft waits for
+Kanban confirmation and an explicit start. Source task or decision links are
+evidence, so the new decision can execute in its own task group. It supports selected files, directory changes, Sessions, Kanban
 tasks and decisions, and verified adoption artifacts, with manual scans,
 configuration pause, history, and memory review. Two active findings of the same
 kind may be explicitly merged with their source revisions fenced in the commit;
@@ -177,3 +178,12 @@ checks the registered parent, child and configuration revision before advancing 
 schedule or scanning. The UI distinguishes saved configuration from pending
 activation and displays the last round when available. Real remote, crash-matrix
 and page-performance acceptance have not yet been completed.
+
+
+The portable scan and evidence validation package lives in
+[libraries/dream](../../libraries/dream/README.md). Its VFS entry receives the
+authorized filesystem, evidence path and transactional configuration revision
+reader from the host. NestOS continues using its existing project-scoped
+`config.seq` and `evidence.seq` paths and record keys. The host retains the
+Kanban adoption policy and receipts, project readers, scanner bindings,
+session integration and scheduling.

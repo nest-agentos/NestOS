@@ -363,7 +363,7 @@ it('routes a Dream scanner through the host and restores its bound session after
         revokeSession.mockRestore();
         const originalMounts = runtime.projects.remoteMounts!.list.bind(runtime.projects.remoteMounts);
         const remoteMount = vi.spyOn(runtime.projects.remoteMounts!, 'list').mockImplementation(id => id === source.project.id
-            ? [{at: '/', root: '/', alias: 'source', connectionId: 'connection', serverId: 'node', serverProjectId: 'remote'} as never] : originalMounts(id));
+            ? [{at: '/', root: '/', alias: 'source', access: 'ro', connectionId: 'connection', serverId: 'node', serverProjectId: 'remote'} as never] : originalMounts(id));
         const history = {version: 1, session: {id: 'remote-session', title: 'Remote', cwd: null, status: 'idle', createdAt: 1, updatedAt: 2,
             resumable: true, historyRevision: 'a'.repeat(64)}, revision: 'b'.repeat(64), omittedUnclassified: 0,
             messages: [{id: 'message', turnId: 'turn', role: 'user', text: 'TypeScript is used.'}], nextCursor: 'older', scan: {historyBytes: 100, contextBytes: 10}};
@@ -399,11 +399,46 @@ it('routes a Dream scanner through the host and restores its bound session after
         expect(nativeRead).not.toHaveBeenCalled();
         expect(nativeDigest.mock.calls.every(call => !(call[2] as {cursor?: string} | undefined)?.cursor)).toBe(true);
         expect(nativeDigest.mock.calls.some(call => (call[2] as {expectedRevision?: string} | undefined)?.expectedRevision === history.revision)).toBe(true);
+        const remoteOwner = source.project.id, remoteDream = runtime.dream!;
+        expect(runtime.projects.workspaceAccess(source)).toBe('ro');
+        await remoteDream.create(remoteOwner, 'daily', 'create-daily', 'Daily work');
+        expect((await remoteDream.list(remoteOwner)).items).toContainEqual(expect.objectContaining({id: 'daily', name: 'Daily work'}));
+        expect((await remoteDream.list(ownerId)).items.some(item => item.id === 'daily')).toBe(false);
+        await remoteDream.setModelConnection(remoteOwner, 'daily', 'default');
+        const dailyScanner = await remoteDream.addFile(remoteOwner, 'daily', 'daily-scanner', 1, {
+            ...selection, projectId: localProject.project.id, connectionId: 'dream-local', path: '/notes/local.md',
+        });
+        const dailySource = {...remoteSession, scannerSourceId: dailyScanner.sourceId};
+        const dailyConfig = await remoteDream.configureSessionSources(remoteOwner, 'daily', 'daily-session', dailyScanner.config.revision, [dailySource]);
+        const dailyRun = await remoteDream.runAll(remoteOwner, 'daily', 'daily-run', dailyConfig.revision);
+        const dailySessionRun = dailyRun.results.find(result => result.sourceId === dailySource.id)!;
+        expect(dailySessionRun.status).toBe('settled');
+        expect((await remoteDream.readRun(remoteOwner, 'daily', dailySessionRun.operationId))?.findings).toHaveLength(3);
+        const manual = await remoteDream.runAll(remoteOwner, 'daily', 'manual-selected', dailyConfig.revision, [dailySource.id]);
+        expect(manual.results).toMatchObject([{sourceId: dailySource.id, status: 'settled'}]);
+        expect(await remoteDream.runAll(remoteOwner, 'daily', 'manual-selected', dailyConfig.revision, [dailySource.id])).toEqual(manual);
+        await expect(remoteDream.runAll(remoteOwner, 'daily', 'manual-selected', dailyConfig.revision, [dailyScanner.sourceId]))
+            .rejects.toThrow('DREAM_OPERATION_CONFLICT');
+        await expect(remoteDream.runAll(remoteOwner, 'daily', 'manual-unknown', dailyConfig.revision, ['unknown']))
+            .rejects.toThrow('DREAM_BATCH_SELECTION_INVALID');
+        expect(await remoteDream.configureSchedule(remoteOwner, 'daily', 'daily-schedule', dailyConfig.revision, {
+            state: 'active', trigger: 'fixed', maxConcurrency: 1, firstAt: 0, timeZone: 'Asia/Shanghai',
+            cadence: {kind: 'calendar', weekdays: [0, 1, 2, 3, 4, 5, 6], hour: 18, minute: 0},
+        })).toMatchObject({activation: 'ready'});
         taskGrant.mockRejectedValue(new Error('revoked'));
+        expect((await remoteDream.readRun(remoteOwner, 'daily', dailySessionRun.operationId))?.findings).toEqual([]);
+        expect((await remoteDream.list(remoteOwner)).items).toContainEqual(expect.objectContaining({id: 'daily'}));
         expect((await runtime.dream!.readRun(ownerId, 'dream', remoteInput.operationId))?.findings).toEqual([]);
         await expect(runtime.dream!.remoteSessionCandidates(ownerId, source.project.id, 'connection', 'profile')).rejects.toThrow();
         await expect(runtime.dream!.run({...remoteInput, operationId: 'remote-session-revoked'})).rejects.toThrow();
         openHarness.mockRestore(); remoteMount.mockRestore();
+        const projectLookup = runtime.projects.get.bind(runtime.projects);
+        const unboundProject = vi.spyOn(runtime.projects, 'get').mockImplementation(async id => {
+            const project = await projectLookup(id);
+            return id === remoteOwner ? {...project, project: {...project.project, source: {kind: 'remote'}}} : project;
+        });
+        await expect(remoteDream.list(remoteOwner)).rejects.toThrow('DREAM_OWNER_REMOTE_UNBOUND');
+        unboundProject.mockRestore();
         taskGrant.mockResolvedValue(authority);
         const currentDream = runtime.dream!;
         const changes = [{id: 'changes', projectId: localProject.project.id, connectionId: 'dream-local',

@@ -2,7 +2,7 @@ import path from 'node:path';
 import {stat} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 interface DatabaseSync {
-    prepare(sql: string): {all(...args: unknown[]): Record<string, unknown>[]; get(): Record<string, unknown> | undefined};
+    prepare(sql: string): {all(...args: unknown[]): Record<string, unknown>[]; get(...args: unknown[]): Record<string, unknown> | undefined};
     exec(sql: string): void;
     close(): void;
 }
@@ -15,6 +15,9 @@ import {harnessExecutionJournalKey, SeqTwinStore} from '@nestos/app-core';
 import {acquireHostLock, NodeSqliteSidecarDb} from '@nestos/node-host/storage';
 
 const minimumAgeMs = 7 * 24 * 3600 * 1000;
+const retainedTaskEvents = 200;
+const prunableTaskEvents = new Set(['task.created', 'task.started', 'task.leased', 'task.ready',
+    'task.running', 'task.waiting', 'effect.leased', 'task.events.pruned', 'task.history.compacted']);
 const operationId = randomUUID();
 let stage = 'arguments';
 
@@ -69,6 +72,41 @@ function removeDuplicateCurrentSnapshots(db: DatabaseSync): number {
             AND json_type(json_extract(current.value,'$'),'$.version')='integer'
             AND snapshot.field=printf('__vfs_seq__:snapshot/%016d',json_extract(json_extract(current.value,'$'),'$.version')))`);
     return Number(db.prepare('SELECT changes() AS removed').get()?.removed);
+}
+
+async function compactTaskEvents(db: DatabaseSync, fs: IFileSystem) {
+    const cutoff = Date.now() - minimumAgeMs;
+    const rows = db.prepare(`WITH candidates AS (
+        SELECT path,json_extract(value,'$') AS body FROM records
+        WHERE path GLOB '/var/lib/sessions/*/tasks/*/task.seq' AND field='__vfs_seq__:record')
+        SELECT path,json_extract(body,'$.id') AS id FROM candidates
+        WHERE json_extract(body,'$.status') IN ('succeeded','failed','cancelled')
+            AND json_extract(body,'$.updatedAt') <= ? AND json_extract(body,'$.currentAttempt') IS NULL
+            AND (json_extract(body,'$.recovery.until') IS NOT 'acknowledged' OR json_extract(body,'$.recoveryAcknowledged'))
+            AND NOT EXISTS (SELECT 1 FROM json_each(body,'$.effects') e WHERE json_extract(e.value,'$.cleanupPending')
+                OR json_extract(e.value,'$.currentAttempt') IS NOT NULL
+                OR json_extract(e.value,'$.status') IN ('pending','leased','indeterminate'))`).all(cutoff);
+    const kernel = new SeqFileKernelStore({fs, rootPath: '/'}, async () => {throw new Error('UNEXPECTED_STORAGE_RESOLUTION');});
+    let eventTasks = 0, eventsRemoved = 0;
+    const eventWindow = db.prepare(`SELECT
+        coalesce((SELECT CAST(value AS INTEGER) FROM records WHERE path=?1 AND field=?2),0)
+        - coalesce((SELECT CAST(value AS INTEGER) FROM records WHERE path=?1 AND field=?3),1) + 1 AS count`);
+    for (const row of rows) {
+        const id = String(row.id), taskPath = String(row.path);
+        const rootPath = path.posix.dirname(path.posix.dirname(path.posix.dirname(taskPath)));
+        if (id.includes('/') || taskPath !== rootPath + '/tasks/' + id + '/task.seq') throw new Error('TASK_STORAGE_IDENTITY_MISMATCH');
+        const key = encodeURIComponent(id);
+        const count = Number(eventWindow.get(rootPath + '/events.seq',
+            '__vfs_seq__:task-event-count/' + key, '__vfs_seq__:task-event-first/' + key)?.count);
+        // Allow room for the audit event written by the preceding maintenance run.
+        if (count <= retainedTaskEvents + 2) continue;
+        const {removed} = await kernel.pruneTaskEvents({fs, rootPath}, id, {
+            keepEvents: retainedTaskEvents + 1, maxRemoved: 1_000,
+            canPrune: event => event.occurredAt <= cutoff && prunableTaskEvents.has(event.type),
+        });
+        if (removed) {eventTasks++; eventsRemoved += removed;}
+    }
+    return {eventCandidates: rows.length, eventTasks, eventsRemoved};
 }
 
 async function compactHarnessJournals(db: DatabaseSync, fs: IFileSystem) {
@@ -144,15 +182,18 @@ function verifyDatabase(db: DatabaseSync) {
 async function maintain(dbFile: string, fs: IFileSystem) {
     const db = new DatabaseSync(dbFile), started = Date.now();
     try {
+        const bytesBefore = (await stat(dbFile)).size;
         stage = 'scan-history'; const runs = await compactRuns(db, fs);
         stage = 'task-history'; const tasks = await compactTasks(db, fs);
+        stage = 'task-events'; const events = await compactTaskEvents(db, fs);
         stage = 'harness-checkpoints'; const harness = await compactHarnessJournals(db, fs);
         stage = 'current-task-snapshots'; const duplicates = removeDuplicateCurrentSnapshots(db);
         stage = 'vacuum';
-        if (duplicates || runs.versions || tasks.snapshots || harness.revisions || Number(db.prepare('PRAGMA freelist_count').get()?.freelist_count)) db.exec('VACUUM');
+        if (duplicates || runs.versions || tasks.snapshots || events.eventsRemoved || harness.revisions || Number(db.prepare('PRAGMA freelist_count').get()?.freelist_count)) db.exec('VACUUM');
         stage = 'verify';
         verifyDatabase(db);
-        console.info({operation: 'storage.compact', operationId, stage, result: 'success', ...runs, ...tasks, ...harness, duplicates, durationMs: Date.now() - started});
+        console.info({operation: 'storage.compact', operationId, stage, result: 'success', ...runs, ...tasks, ...events,
+            ...harness, duplicates, bytesBefore, bytesAfter: (await stat(dbFile)).size, durationMs: Date.now() - started});
     } finally {db.close();}
 }
 run().catch(error => {console.error({operation: 'storage.compact', operationId, stage, result: 'failure', error: error.message}); process.exitCode = 1;});

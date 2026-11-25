@@ -7,7 +7,7 @@ import { t } from '@nestos/common';
 import { createVFSUI } from '@nestos/vfs-ui';
 vi.mock('@nestos/vfs-ui', async (importOriginal) => ({ ...(await importOriginal<typeof import('@nestos/vfs-ui')>()),
     filterGitignoredFiles: async (_fs: unknown, _path: string, nodes: unknown[]) => nodes,
-    createVFSUI: vi.fn(() => ({ on: () => () => {}, start: async () => {}, getActiveSession: () => undefined, refresh: async () => {}, selectPath: async () => {}, destroy: () => {} })) }));
+    createVFSUI: vi.fn(() => ({ on: () => () => {}, start: async () => {}, getActiveSession: () => undefined, getNode: () => undefined, refresh: async () => {}, selectPath: async () => {}, destroy: () => {} })) }));
 const element = () => document.createElement('div');
 function setup() {
     const release = vi.fn(async () => {}), dispose = vi.fn(async () => {});
@@ -46,7 +46,9 @@ it('keeps the failed file recovery action available while checking and reopens o
     w.tabs.content.innerHTML = '<div class="mm-placeholder" role="alert"></div>';
     const open = vi.spyOn(w, 'openResource').mockResolvedValue(undefined);
     try {
-        await w.applyRemoteAvailability(path); expect(w.container.inert).toBe(false);
+        await w.applyRemoteAvailability(path);
+        expect(w.container.inert).not.toBe(true);
+        expect(w.tabs.content.inert).toBe(false);
         state = 'checking'; await w.applyRemoteAvailability(path); expect(open).not.toHaveBeenCalled();
         state = 'online'; await w.applyRemoteAvailability(path);
         expect(open).toHaveBeenCalledExactlyOnceWith(path, {reload: true});

@@ -44,6 +44,34 @@ it('configures a source and retries a failed scan with the same operation identi
 function find(label: string) {return [...document.querySelectorAll('button')].find(item => item.textContent === label);}
 function click(label: string) {const node = find(label); if (!node) throw new Error(`Missing button ${label}`); node.click();}
 
+it('manually scans selected directories across projects and applies the source type filter', async () => {
+    const changes = [
+        {id: 'local-docs', projectId: 'owner', directory: '/docs'},
+        {id: 'remote-code', projectId: 'remote', directory: '/src'},
+        {id: 'remote-commits', projectId: 'remote', directory: '/src', commits: true},
+    ];
+    const config = {revision: 3, config: {name: 'Work', enabled: true,
+        files: [{id: 'scanner', projectId: 'owner', path: '/scanner.md'}], changes}};
+    const runAll = vi.fn(async () => ({results: []}));
+    const service = {list: async () => ({items: [{id: 'work', name: 'Work'}]}), runAll,
+        openView: async () => ({config, history: {items: []}, targets: [], models: [], scheduleStatus: null})} as unknown as DreamService;
+    const projects = {list: async () => [{project: {id: 'owner'}, name: 'Local'},
+        {project: {id: 'remote', source: {kind: 'remote'}}, name: 'Remote'}]} as unknown as ProjectService;
+    const page = new DreamPage(service, projects, vi.fn(), vi.fn(), vi.fn());
+    try {
+        await page.mount(document.body); click('Work');
+        await vi.waitFor(() => expect(find(t('dream.scanSelected'))).toBeTruthy());
+        const section = find(t('dream.scanSelected'))!.closest('details')!;
+        const kind = section.querySelectorAll('select')[1]; kind.value = 'files'; kind.dispatchEvent(new Event('change'));
+        const labels = [...section.querySelectorAll('label')];
+        expect(labels.find(label => label.textContent?.includes(t('dream.scanKind.commits')))?.hidden).toBe(true);
+        for (const label of labels.filter(label => label.textContent === 'Local: /docs' || label.textContent === 'Remote: /src'))
+            label.querySelector('input')!.checked = true;
+        click(t('dream.scanSelected'));
+        await vi.waitFor(() => expect(runAll).toHaveBeenCalledWith('owner', 'work', expect.any(String), 3, ['local-docs', 'remote-code']));
+    } finally {page.destroy();}
+});
+
 it('opens Dream directly, retries its list and skips ordinary Twin reads', async () => {
     const list = vi.fn().mockRejectedValueOnce(new Error('DREAM_AUTHORIZATION_UNAVAILABLE'))
         .mockResolvedValue({items: [{id: 'dream', name: 'Project Dream'}]});
@@ -288,20 +316,31 @@ it('opens Dream from the Twin sidebar, adopts a suggestion and opens the created
     } finally {await page.destroy(); await twin.dispose(); await manager.dispose();}
 });
 
-it('keeps the schedule and operation identity when saving needs a retry', async () => {
+it('selects a remote Dream owner, defaults to daily scanning and keeps the schedule identity on retry', async () => {
     const config = {revision: 1, config: {name: 'Dream', enabled: true, files: []}};
     const configureSchedule = vi.fn().mockRejectedValueOnce(new Error('DREAM_SCHEDULE_RECONCILE_FAILED'))
         .mockResolvedValue({config, activation: 'ready'});
-    const service = {list: async () => ({items: [{id: 'dream', name: 'Dream'}], scanned: 1, truncated: false}),
-        openView: async () => ({config, history: {items: [], scanned: 0}, targets: [], models: [], scheduleStatus: null}), configureSchedule} as unknown as DreamService;
-    const projects = {list: async () => [{project: {id: 'owner'}, name: 'Owner'}], remoteMounts: {list: () => []}} as unknown as ProjectService;
+    const list = vi.fn(async () => ({items: [{id: 'dream', name: 'Daily work'}], scanned: 1, truncated: false}));
+    const service = {list, openView: async () => ({config, history: {items: [], scanned: 0}, targets: [], models: [], scheduleStatus: null}),
+        configureSchedule} as unknown as DreamService;
+    const projects = {list: async () => [{project: {id: 'owner'}, name: 'Owner'}, {project: {id: 'remote', source: {kind: 'remote'}}, name: 'Remote'}],
+        remoteMounts: {list: (id: string) => id === 'remote' ? [{at: '/', protocol: 'cells', connectionId: 'connection'}] : []}} as unknown as ProjectService;
     const page = new DreamPage(service, projects, vi.fn(), vi.fn(), vi.fn());
     try {
-        await page.mount(document.body); click('Dream'); await vi.waitFor(() => expect(find(t('dream.saveSchedule'))).toBeTruthy());
+        await page.mount(document.body);
+        const owner = document.querySelector<HTMLSelectElement>(`select[aria-label="${t('dream.owner')}"]`)!;
+        owner.value = 'remote'; owner.dispatchEvent(new Event('change'));
+        await vi.waitFor(() => expect(list).toHaveBeenCalledWith('remote'));
+        await vi.waitFor(() => expect(find('Daily work')).toBeTruthy()); click('Daily work');
+        await vi.waitFor(() => expect(find(t('dream.saveSchedule'))).toBeTruthy());
+        expect(document.querySelector<HTMLSelectElement>(`select[aria-label="${t('dream.source')}"]`)?.value).toBe('remote');
+        expect(document.querySelector<HTMLSelectElement>(`select[aria-label="${t('dream.cadence')}"]`)?.value).toBe('daily');
         click(t('dream.saveSchedule')); await vi.waitFor(() => expect(configureSchedule).toHaveBeenCalledTimes(1));
         await vi.waitFor(() => expect(document.querySelector('[role="alert"]')?.textContent).toContain('DREAM_SCHEDULE_RECONCILE_FAILED'));
         click(t('dream.saveSchedule')); await vi.waitFor(() => expect(configureSchedule).toHaveBeenCalledTimes(2));
         expect(configureSchedule.mock.calls[0][2]).toBe(configureSchedule.mock.calls[1][2]);
         expect(configureSchedule.mock.calls[0][4]).toEqual(configureSchedule.mock.calls[1][4]);
+        expect(configureSchedule.mock.calls[0][0]).toBe('remote');
+        expect(configureSchedule.mock.calls[0][4]).toMatchObject({cadence: {kind: 'calendar', hour: 18, minute: 0, weekdays: [0, 1, 2, 3, 4, 5, 6]}});
     } finally {page.destroy();}
 });

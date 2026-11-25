@@ -3,6 +3,7 @@
 .twin__body > h2 { margin: 0 0 8px; font-size: 24px; font-weight: 650; letter-spacing: -.025em; }
 .twin__form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; margin-block: 16px; }
 .twin__form label { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 13px; font-weight: 500; }
+.twin__form label[hidden] { display: none; }
 .twin__form label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }
 .twin__form > :is(details, fieldset, p, pre), .twin__form > label:has(textarea) { grid-column: 1 / -1; }
 .twin__form input, .twin__form select, .twin__form textarea, .twin__search { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid var(--llm-border-color, #dce1e8); border-radius: 8px; background: var(--llm-bg-primary, white); color: inherit; font: inherit; font-size: 14px; }

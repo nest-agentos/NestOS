@@ -3,7 +3,7 @@ import {WorkbenchSources} from '../src/projects/workbench-sources';
 import { bindApplicationBackend } from '@nestos/app-core/host';
 // @vitest-environment jsdom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { t } from '@nestos/common';
+import { randomUUID, t } from '@nestos/common';
 import { MemoryBackend, createFileSystemSource, FSError } from '@nestos/vfs-core';
 import { createApplicationRuntime, remoteSessionPath, folderBrowserPath } from '@nestos/app-core';
 import { HarnessConversation, type HarnessClient, type ProjectClient } from '@nestos/cells-driver';
@@ -11,6 +11,33 @@ import {createLLMFactory} from '../../llm-ui-adapter/src/chat';
 import type {EditorOptions} from '@nestos/ui-common-adapter';
 import type { VFSUIShell } from '@nestos/vfs-ui';
 import { projectConversationEntryPath, projectConversationsPath } from '@nestos/app-contracts';
+import type {CellsDraftPromotion, CellsDraftRecord} from '@nestos/cells-driver';
+
+function nodeDrafts(peer: HarnessClient, workspaceId: string) {
+    const blank = (): CellsDraftRecord => ({version: 1, id: randomUUID(), state: 'draft', data: ''});
+    let draft = blank(), promotion: CellsDraftPromotion | undefined;
+    const identities = new Map<string, string>();
+    return vi.fn<NonNullable<ProjectClient['draft']>>(async (_project, input) => {
+        if (input.action === 'resolve') return {conversationId: identities.get(input.sessionId!) ?? null};
+        if (input.action === 'open') return {record: {...draft}, promotion};
+        if (input.action === 'save') {draft = {...draft, data: input.data!}; return {record: {...draft}};}
+        if (input.action === 'begin') {
+            draft = {...draft, state: 'submitting', remoteTarget: input.target, submissionId: draft.id};
+            return {record: {...draft}};
+        }
+        if (input.action === 'submit') {
+            const options = {requestId: input.operationId!};
+            const {session} = await peer.create(input.profileId!, workspaceId, options);
+            const {turnId} = await peer.turn(input.profileId!, session.id, input.prompt!, options);
+            const next = blank();
+            identities.set(session.id, draft.id);
+            promotion = {draftId: draft.id, nextDraftId: next.id, submissionId: draft.id, remoteTarget: draft.remoteTarget, nativeSessionId: session.id, turnId};
+            draft = next;
+            return {receipt: {requestId: input.operationId!, outcome: 'committed', result: {session, turnId}}};
+        }
+        return {promotion};
+    });
+}
 
 const dialogMethods = new Map<string, PropertyDescriptor | undefined>();
 beforeEach(() => {
@@ -57,7 +84,8 @@ it.each([
         expect(input.action).toBe('read');
         return {owner: 'cells', revision: 0, paused: false, items: [], receipts: []};
     };
-    const client = {register:async () => record,read:async () => record,roots:async () => ({roots: [{alias: 'docs', access: 'rw'}]}),harness:() => peer,clientState,queueSession,close:async () => {}} as unknown as ProjectClient;
+    const draft = nodeDrafts(peer, record.id);
+    const client = {register:async () => record,read:async () => record,roots:async () => ({roots: [{alias: 'docs', access: 'rw'}]}),harness:() => peer,clientState,queueSession,draft,close:async () => {}} as unknown as ProjectClient;
     const runtime = await createApplicationRuntime({backend:new MemoryBackend(),ownerKind:'web',remoteSourceProvider:{setCredential() {},resolveCredential:()=>'secret',dispose:async () => {},projects:() => client,
         conversation:(...args) => new HarnessConversation(...args),discover:async connection => ({version:1,fileProtocol:'fs-agent-http-v1',httpEndpoint:connection.endpoint.replace(/\/mcp$/,''),serverId:'node',harness:true,projects:true,projectProtocol:'fs-agent-project-v1'}),
         open:async () => ({fs: fileSource.fs, dispose: async () => {}})}});
@@ -106,6 +134,17 @@ it.each([
                 expect(panel.querySelector('.llm-chat__input')).toBe(input);
                 expect(open).not.toHaveBeenCalled();
                 expect(navigation).not.toHaveBeenCalled();
+                const filesPath = folderBrowserPath(project.path) + '/@files';
+                await cold.openResource(filesPath, {newTab: true, directory: true});
+                const offline = vi.spyOn(remote, 'projectOffline').mockReturnValue(true);
+                try {
+                    await (cold as unknown as {applyRemoteAvailability(path: string): Promise<void>}).applyRemoteAvailability(filesPath);
+                    expect(coldEditor.querySelector<HTMLElement>('.workbench-tabs__panel:not([hidden])')?.inert).toBe(true);
+                    expect(coldEditor.inert).not.toBe(true);
+                    coldEditor.querySelector<HTMLButtonElement>(`[data-tab-id="${resourceId}"] .workbench-tabs__label`)!.click();
+                    await vi.waitFor(() => expect(cold.getActiveResourceId()).toBe(resourceId));
+                    expect(coldEditor.querySelector('.workbench-tabs__panel:not([hidden])')).toBe(panel);
+                } finally {offline.mockRestore();}
                 let finish!: () => void;
                 const pending = new Promise<void>(resolve => {finish = resolve;}), closeLate = vi.fn(async () => {});
                 open.mockImplementationOnce(async () => {
@@ -166,8 +205,8 @@ it.each([
             expect(workbench.getActiveResourceId()).toBe(remotePath);
             expect(selector.value).toBe(remotePath);
             expect(main.querySelector('.workbench-tabs__panel:not([hidden])')!.textContent).toContain('Remote directory unavailable');
-            expect(diagnostic.mock.calls.some(([message, details]) => String(message).includes('[itookit/cells]')
-                && details?.stage === 'project-open' && details?.projectId === project.project.id && details?.code === 'EIO')).toBe(true);
+            await vi.waitFor(() => expect(diagnostic.mock.calls.some(([message, details]) => String(message).includes('[itookit/cells]')
+                && details?.stage === 'project-open' && details?.projectId === project.project.id && details?.code === 'EIO')).toBe(true));
         } finally {listFailure.mockRestore(); diagnostic.mockRestore();}
         await workbench.openResource(remotePath);
         expect(workbench.getActiveResourceId()).toBe(remotePath);
@@ -179,8 +218,12 @@ it.each([
         const create = () => activePanel().querySelector<HTMLButtonElement>('[data-directory-action="enabled"]');
         expect(create()?.title).toBe(t('project.createSession'));
         expect(create()?.getAttribute('aria-label')).toBe(t('project.createSession'));
+        const openDraft = vi.spyOn(backend, 'openProjectDraft').mockRejectedValueOnce(new TypeError('Failed to fetch'));
         create()!.click();
-        await vi.waitFor(() => expect(workbench.getActiveResourceId()).toBe('draft:' + project.project.id));
+        await vi.waitFor(() => expect(main.querySelector('[data-draft-connection-error]')?.textContent).toContain(t('project.draftLoading.connection')));
+        main.querySelector<HTMLButtonElement>('[data-draft-connection-error] button')!.click();
+        await vi.waitFor(() => expect(workbench.getActiveResourceId(), main.textContent ?? '').toBe('draft:' + project.project.id));
+        expect(openDraft).toHaveBeenCalledTimes(2);
         expect(activePanel().querySelector('[data-selector-id=executorId]')?.textContent).toContain('codex');
         expect(activePanel().querySelector('[data-execution-target]')).toBeNull();
         expect(peer.create).not.toHaveBeenCalled(); expect(peer.turn).not.toHaveBeenCalled();

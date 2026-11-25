@@ -26,12 +26,12 @@ async function fixture(initialResource = '/board/b/card', shared?: {service: Ret
     await service.execute(board.id, {operationId: 'create', expectedRevision: board.revision+1, command: {type: 'create-item', item: {id: 'card', title: 'A long item title', responsibility: 'Work', acceptance: 'Done'},planning:{kind:'task',parentId:'management-root',priority:2,dependencies:[],references:[]}}});
     }
     const editor = document.createElement('main'), sidebar = document.createElement('aside'); document.body.append(sidebar, editor);
-    const registry = new WorkbenchWindows(undefined, bookmarks), selected = vi.fn(), queries = vi.spyOn(service, 'queryActivity'); let workbench!: KanbanWindowWorkbench;
-    workbench = new KanbanWindowWorkbench({service, sidebar, editor, initialResource, selected, openSession: vi.fn(),
+    const registry = new WorkbenchWindows(undefined, bookmarks), selected = vi.fn(), openSession = vi.fn(async () => {}), queries = vi.spyOn(service, 'queryActivity'); let workbench!: KanbanWindowWorkbench;
+    workbench = new KanbanWindowWorkbench({service, sidebar, editor, initialResource, selected, openSession,
         windows: {registry, id: 'kanban', isActive: () => true, navigate: path => workbench.openResource(path)}});
     closes.push(() => workbench.destroy()); await workbench.start();
     const active = () => editor.querySelector<HTMLElement>('.workbench-tabs__panel:not([hidden]) > .kanban')!;
-    return {editor, sidebar, registry, workbench, active, service, events, selected, queries};
+    return {editor, sidebar, registry, workbench, active, service, events, selected, queries, openSession};
 }
 async function subscribe(f: Awaited<ReturnType<typeof fixture>>) {
     const feed = new ShellApplicationEvents(f.events,() => f.workbench.invalidateFromEvents(),() => true);
@@ -66,8 +66,9 @@ it('pins a decision page from More and only reads saved pages when another devic
     await vi.waitFor(() => expect(second.workbench.getActiveResourceId()).toBe(path));
     await vi.waitFor(() => expect(document.querySelector('.workbench-opened-sheet[open]')).toBeNull());
 });
-it('shares real opened windows with the shell and navigates item, board and catalog through the common header', async () => {
+it('reuses the current window when navigating item, board and catalog through the common header', async () => {
     const f = await fixture();
+    const view = f.active();
     await f.workbench.openResource('/board/b/card'); expect(f.queries).not.toHaveBeenCalled();
     expect(f.registry.items().map(item => item.id)).toEqual(['/board/b/card']);
     expect(f.sidebar.querySelector('.vfs-window-management')).not.toBeNull();
@@ -75,21 +76,22 @@ it('shares real opened windows with the shell and navigates item, board and cata
     f.active().querySelector<HTMLButtonElement>('[data-panel] [data-window-navigation=parent]')!.click();
     await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('/board/b')); await idle(f.active);
     expect(f.active().querySelector('.kanban__page-header .workbench-window-list')).not.toBeNull();
-    expect(f.registry.items()).toHaveLength(2);
+    expect(f.registry.items().map(item => item.id)).toEqual(['/board/b']);
     f.active().querySelector<HTMLButtonElement>('.kanban__page-header [data-window-navigation=parent]')!.click();
     await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('/')); await idle(f.active);
     expect(f.active().querySelector<HTMLButtonElement>('[data-window-navigation=parent]')!.hidden).toBe(true);
-    expect(f.registry.items()).toHaveLength(3);
-    await f.registry.items().find(item => item.id === '/board/b/card')!.activate();
+    expect(f.registry.items().map(item => item.id)).toEqual(['/']);
+    await f.workbench.openResource('/board/b/card');
+    expect(f.active()).toBe(view);
     const board = await f.service.read('b'), {item} = await f.service.item('b', 'card');
     expect(f.active().querySelector('[data-panel] h3')?.textContent).toBe(kanbanReference(board, item) + item.title);
     expect(f.active().querySelector('[data-panel] h3 [data-entity-type=execution] svg')).not.toBeNull();
 });
 
-it('opens sibling context tabs from the shared catalog without redundant principal or catalog reads', async () => {
+it('loads explicitly opened sibling tabs from the shared catalog without redundant reads', async () => {
     const f = await fixture('/board/b');
     const catalog = vi.spyOn(f.service,'catalog'), principal = vi.spyOn(f.service,'currentPrincipal'), records = vi.spyOn(f.service,'records');
-    await f.workbench.openResource('/board/b/@log'); await f.workbench.openResource('/board/b/@decision');
+    await f.workbench.openResource('/board/b/@log', {newTab: true}); await f.workbench.openResource('/board/b/@decision', {newTab: true});
     expect(catalog).not.toHaveBeenCalled(); expect(principal).not.toHaveBeenCalled(); expect(records).toHaveBeenCalledTimes(2);
     await f.workbench.openResource('/board/b/@log');
     expect(records).toHaveBeenCalledTimes(2);
@@ -100,11 +102,12 @@ it('keeps filter, scroll and unsaved forms when switching windows and refuses to
     form.querySelector<HTMLInputElement>('[name=search]')!.value = 'A long';
     form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true})); await idle(f.active);
     const column = boardElement.querySelector<HTMLElement>('[data-column=backlog]')!; column.scrollTop = 123;
-    await f.workbench.openResource('/board/b/card'); await f.workbench.openResource('/board/b');
+    await f.workbench.openResource('/board/b/card', {newTab: true}); await f.workbench.openResource('/board/b');
     expect(f.active()).toBe(boardElement); expect(column.scrollTop).toBe(123);
     expect(boardElement.querySelector<HTMLInputElement>('[name=search]')!.value).toBe('A long');
     boardElement.querySelector<HTMLButtonElement>('[data-action=new-item]')!.click(); await idle(f.active);
     const title = boardElement.querySelector<HTMLInputElement>('[name=title]')!; title.value = 'Unsaved'; title.dispatchEvent(new Event('input', {bubbles: true}));
+    await expect(f.workbench.openResource('/board/b/@decision')).rejects.toThrow(t('kanban.unsaved'));
     await f.workbench.openResource('/board/b/card'); await f.workbench.openResource('/board/b');
     expect(boardElement.querySelector<HTMLInputElement>('[name=title]')!.value).toBe('Unsaved');
     expect(f.registry.items().find(item => item.id === '/board/b')!.dirty).toBe(true);
@@ -114,7 +117,7 @@ it('keeps filter, scroll and unsaved forms when switching windows and refuses to
     expect(f.registry.items().map(item => item.id)).toEqual(['/board/b/card']);
 });
 it('marks hidden windows dirty without querying them until activated, and unregisters all window metadata', async () => {
-    const f = await fixture('/board/b'); await f.workbench.openResource('/board/b/card');
+    const f = await fixture('/board/b'); await f.workbench.openResource('/board/b/card', {newTab: true});
     f.workbench.setVisible(false); const query = vi.spyOn(f.service, 'query');
     f.workbench.invalidateFromEvents(); expect(query).not.toHaveBeenCalled();
     f.workbench.setVisible(true); await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(1)); await idle(f.active);
@@ -128,7 +131,7 @@ it('keeps one VFS sidebar while switching and closing editors, including a dirty
     f.active().querySelector<HTMLButtonElement>('[data-action=new-item]')!.click(); await idle(f.active);
     const field = f.active().querySelector<HTMLInputElement>('[name=title]')!; field.value = 'Draft'; field.dispatchEvent(new Event('input', {bubbles: true}));
     expect(f.sidebar.inert).not.toBe(true);
-    await f.workbench.openResource('/board/b/card'); await f.workbench.openResource('/');
+    await f.workbench.openResource('/board/b/card', {newTab: true}); await f.workbench.openResource('/');
     expect(f.sidebar.querySelectorAll('.vfs-node-list')).toHaveLength(1); expect(f.sidebar.querySelector('.vfs-node-list')).toBe(list);
     await f.workbench.openResource('/board/b'); expect(f.active().querySelector<HTMLInputElement>('[name=title]')!.value).toBe('Draft');
     f.active().querySelector<HTMLButtonElement>('[data-action=close-panel]')!.click(); await idle(f.active);
@@ -177,7 +180,7 @@ it('keeps a recurring management deep link open while hiding its run board from 
 
 it('refreshes both sidebars and retires clean board and item tabs through the shared event feed',async () => {
     const first = await fixture('/board/b'), second = await fixture('/board/b/card',first);
-    await first.workbench.openResource('/board/b/card'); await subscribe(first); await subscribe(second);
+    await first.workbench.openResource('/board/b/card', {newTab: true}); await subscribe(first); await subscribe(second);
     await deleteBoard(first);
     await vi.waitFor(() => {
         for (const f of [first,second]) {
@@ -298,10 +301,53 @@ it('keeps the catalog for multiple boards and opens its selection on decisions',
     const seed = await fixture('/board/b');
     await seed.service.create({id: 'second', title: 'Second', scope: {kind: 'system'}, members: [{kind: 'human', id: 'admin', responsibility: 'Work', roles: ['coordinator', 'worker']}]});
     const f = await fixture('/', seed);
+    const view = f.active();
     expect(f.workbench.getActiveResourceId()).toBe('/');
     f.active().querySelector<HTMLButtonElement>('[data-board=b]')!.click();
     await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('/board/b/@decision'));
     await idle(f.active); expect(f.active().querySelector('.kanban__decision-table')).not.toBeNull();
+    expect(f.active()).toBe(view);
+    expect(f.registry.items().map(item => item.id)).toEqual(['/board/b/@decision']);
+});
+
+it('opens a decision in the same page and delegates its session link separately', async () => {
+    const f = await fixture('/board/b/@decision');
+    const board = await f.service.read('b');
+    await f.service.execute('b', {operationId: 'new-decision', expectedRevision: board.revision, command: {
+        type: 'append-record', record: {id: 'd', kind: 'decision', title: 'Decision', content: 'Scope', rationale: 'Evidence', itemIds: [], sources: []},
+    }});
+    f.workbench.invalidateFromEvents();
+    const view = f.active();
+    await vi.waitFor(() => expect(view.querySelector('button[data-record=d]')).not.toBeNull()); await idle(f.active);
+    view.querySelector<HTMLButtonElement>('button[data-record=d]')!.click();
+    await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('/board/b/@record/d')); await idle(f.active);
+    expect(f.active()).toBe(view);
+    expect(f.registry.items().map(item => item.id)).toEqual(['/board/b/@record/d']);
+    const link = document.createElement('a'); link.href = '#'; link.dataset.session = 'linked-session'; view.append(link); link.click();
+    await vi.waitFor(() => expect(f.openSession).toHaveBeenCalledExactlyOnceWith('linked-session'));
+    expect(f.workbench.getActiveResourceId()).toBe('/board/b/@record/d');
+});
+
+it('keeps one tab for task card clicks and subsequent workspace route changes', async () => {
+    const f = await fixture('/board/b'), view = f.active();
+    view.querySelector<HTMLButtonElement>('button[data-item=card]')!.click();
+    await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('/board/b/card'));
+    await idle(f.active);
+    expect(f.active()).toBe(view);
+    expect(f.registry.items().map(item => item.id)).toEqual(['/board/b/card']);
+    await f.workbench.openResource('/board/b');
+    await f.workbench.openResource('/board/b/@decision');
+    expect(f.active()).toBe(view);
+    expect(f.registry.items().map(item => item.id)).toEqual(['/board/b/@decision']);
+    expect(f.openSession).not.toHaveBeenCalled();
+});
+
+it.each(['/board/b/card', '/board/b/@decision'])('uses the initial page when the workspace router opens %s', async path => {
+    const f = await fixture('/board/b'), view = f.active();
+    await f.workbench.openResource(path);
+    await idle(f.active);
+    expect(f.active()).toBe(view);
+    expect(f.registry.items().map(item => item.id)).toEqual([path]);
 });
 
 it('rereads failed Session observations after HTTP reconnect and removes its recovery listener on close',async()=>{

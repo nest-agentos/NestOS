@@ -17,7 +17,7 @@ const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionSt
 
 export function dependencyError(source, target) {
     if (source === target) return;
-    if (source === '@nestos/dream' && target.startsWith('@nestos/')) return 'dream must receive host capabilities through its own ports';
+    if (source === '@nestos/dream' && target.startsWith('@nestos/') && target !== '@nestos/vfs-core') return 'dream must receive host capabilities through its own ports';
     if (['@nestos/durable-kernel','@nestos/kernel-adapters','@nestos/llm-tasks','@nestos/llm-flow','@nestos/llm-session'].includes(source)
         && ['@nestos/kanban','@nestos/kanban-ui','@nestos/git-delivery'].includes(target)) return 'execution mechanisms must not depend on Kanban or delivery policy';
     if (source === '@nestos/git-delivery' && !['@nestos/common','@nestos/vfs-core','@nestos/tools'].includes(target)) return 'git-delivery owns Git rules and receives execution through ports; it must not depend on application or execution runtimes';
@@ -69,6 +69,10 @@ export function importError(source, file, specifier, packages) {
     if (source.name === '@nestos/app-core' && file.startsWith(resolve(source.dir,'src/kanban')+sep)
         && (specifier === '@nestos/durable-kernel' || specifier.startsWith('@nestos/durable-kernel/')))
         return 'Kanban adapters must consume Session execution observations, not Kernel tasks or effects';
+    if (source.name === '@nestos/dream' && file !== resolve(source.dir, 'src/vfs.ts')) {
+        const storage = specifier.startsWith('.') && resolve(file, '..', specifier).replace(/\.ts$/, '') === resolve(source.dir, 'src/vfs');
+        if (specifier === '@nestos/vfs-core' || storage) return 'Dream VFS dependencies belong in its vfs entry';
+    }
     if (source.name === '@nestos/image-parser' && specifier === '@nestos/vfs-core' && file !== resolve(source.dir, 'src/vfs.ts'))
         return 'image-parser VFS types and runtime stay in the optional vfs entry';
     if (source.name === '@nestos/llm-ui' && !specifier.startsWith('.') && !['@nestos/mdxeditor', '@nestos/ui-common', '@nestos/ui-common/navigation.css'].includes(specifier))

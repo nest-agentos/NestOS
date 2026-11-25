@@ -787,7 +787,7 @@ export class ProjectRemoteMountService {
             client = this.guardHarness(stateClient.harness(stateProject, {readOnly:root.access==='ro'}), projectId, fingerprint, connectionId);
             const descriptor = await client.profiles(options);
             const profile = descriptor.profiles.find(p => (p.id === profileId || p.aliases?.includes(profileId)) && p.projectRuntime);
-            if (!profile) throw new FSError('ECAPABILITY', 'Project harness profile unavailable');
+            if (!profile || !sessionId && draftId && !profile.capabilities.create) throw new FSError('ECAPABILITY', 'Project harness profile unavailable');
             const cellsIdentity = sessionId ? (await stateClient.draft?.(stateProject, {action: 'resolve', profileId: profile.id, sessionId}, options))?.conversationId : undefined;
             this.checkHarnessAccess(projectId, fingerprint, connectionId);
             const conversationId = cellsIdentity ?? (sessionId ? await readConversationIdentity(this.store, projectId, {

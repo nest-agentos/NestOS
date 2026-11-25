@@ -56,7 +56,7 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 | `@nestos/app-transport` | 平台中立的 HTTP/SSE 与能力 RPC，应用描述/selector 注入机制，不加载 Node 或 UI。 |
 | `@nestos/kanban-development` | 软件开发操作插件：构建、部署、验收、合并分析、合并及清理；向 Kanban 注册插件，接收已授权的 Session/Git/部署端口，不依赖 app-core 或 Kernel。 |
 | `@nestos/git-delivery` | Git 交付领域：工作树、源与批次快照、提交来源、合并与 gitlink 核验、归档及清理回执；仅消费进程/日志/VFS 端口，不依赖 app-core 或执行运行时。 |
-| `@nestos/dream` | 开发中的独立 Dream 来源扫描和授权复验机制；宿主注入来源、存储与执行端口，尚未完成工作台接入。 |
+| `@nestos/dream` | 位于 `libraries/dream` 的独立库。主入口提供零运行时依赖的有界扫描、授权复验和证据校验；`/vfs` 依赖 vfs-core 的 SeqFile 事务，原子保存证据、游标和回执。项目来源、配置、调度和看板接入由 app-core 装配，工作台入口位于 app-shell 的数字分身。 |
 | `@nestos/app-core` | 无 UI 应用核心：NestOS profile、RunDefinition、共享 Session 文件/目录服务，以及统一装配 `createApplicationRuntime`（VFS/LLM/Session/Flow）与 headless `createKernelRuntime`（durable-kernel + kernel-adapters + Flow programs）。Web/Tauri/CLI 共用。 |
 | `@nestos/app-shell` | Web/Tauri UI shell：`initApp()`（宿主注入 services/localBackend，不创建 Runtime）、workspace 策略、路由、Workbench/编辑器装配；通过 shared/app-contracts 的独立服务接口与宿主注入端口调用后端。 |
 

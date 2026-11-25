@@ -89,3 +89,7 @@
 [submodule "libraries/scanner-ui"]
 	path = libraries/scanner-ui
 	url = git@github.com:nest-agentos/scanner-ui.git
+[submodule "libraries/dream"]
+	path = libraries/dream
+	url = git@github.com:nest-agentos/dream.git
+	branch = main

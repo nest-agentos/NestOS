@@ -9,6 +9,7 @@ import {KanbanSidebar} from './sidebar';
 import {VFS_DOM_EVENTS} from '@nestos/vfs-ui';
 import {shareKanbanCatalog} from './catalog';
 import {MOBILE_NAVIGATION_QUERY} from '@nestos/ui-common';
+import type {WorkspaceOpenOptions} from '@nestos/app-contracts';
 
 const log = createModuleLogger('kanban-windows');
 export type KanbanWorkspaceOptions = Omit<KanbanUIOptions, 'presentation' | 'sidebar'> & {sidebar: HTMLElement; windows?: WorkbenchWindowBinding};
@@ -33,11 +34,11 @@ export class KanbanWindowWorkbench {
         this.options = options = {...options, service: shareKanbanCatalog(options.service)};
         this.tabs = new WorkbenchTabs(options.editor, {
             navigation: t('kanban.title'), activate: id => this.navigate(id),
-            parent: tab => this.navigate(parentPath(tab.id)), canGoUp: tab => tab.id !== '/',
+            parent: tab => this.navigatePage(parentPath(tab.id), tab), canGoUp: tab => tab.id !== '/',
             dispose: tab => this.disposePage(tab), empty: () => this.showList(),
             error: error => this.report(error), changed: () => this.syncVisibility(),
         }, undefined, options.windows);
-        this.navigation = new KanbanSidebar({container: options.sidebar, service: options.service, navigate: path => this.navigate(path), windowManagement: this.tabs.windowManagement,
+        this.navigation = new KanbanSidebar({container: options.sidebar, service: options.service, navigate: path => this.navigatePage(path), windowManagement: this.tabs.windowManagement,
             create: () => this.openBoardCreation(), createDecision: (id, recurringOnly, source) => this.openDecisionCreation(id, recurringOnly, source), report: error => this.report(error),
             catalogChanged: boards => {this.boardSnapshots = boards; this.availableBoards = new Set(boards.map(board => board.id)); this.scheduleReconcile();}});
         const host = document.createElement('div'); host.hidden = true; host.append(this.tabs.opened); options.sidebar.append(host);
@@ -58,15 +59,18 @@ export class KanbanWindowWorkbench {
         const board=visible?.length===1?visible[0]:undefined;
         await this.openResource(board?`/board/${encodeURIComponent(board.id)}/@decision`:'/');
     }
-    async openResource(path: string): Promise<void> {
+    async openResource(path: string, options?: WorkspaceOpenOptions): Promise<void> {
         if (this.disposing) return;
+        const active = this.tabs.current, state = active?.value?.view.getViewState();
+        if (!options?.newTab && active && state && !state.unavailable && !this.tabs.get(path))
+            return this.navigatePage(path, active);
         const operationId = randomUUID(), started = performance.now();
         try {
             const tab = await this.tabs.open(path, t('kanban.title'), false);
             if (!tab.value) this.createPage(tab);
             await tab.value!.ready;
-            const state = tab.value!.view.getViewState();
-            if (!state.dirty && !state.busy && tab.value!.view.getActiveResourceId() !== tab.id) await tab.value!.view.openResource(tab.id);
+            const pageState = tab.value!.view.getViewState();
+            if (!pageState.dirty && !pageState.busy && tab.value!.view.getActiveResourceId() !== tab.id) await tab.value!.view.openResource(tab.id);
             if (this.tabs.current === tab) {this.syncVisibility(); this.options.selected(tab.id);}
             log.debug('window.open', {operationId, stage: 'navigation', result: 'success', count: this.tabs.values().length, durationMs: Math.round(performance.now() - started)});
         } catch (error) {
@@ -111,7 +115,7 @@ export class KanbanWindowWorkbench {
             itemOperationsAvailable: (_board, item) => !!item.externalRefs?.some(ref => ref.system === "nestos-worktree"),
             presentation: kanbanPresentation, reviewGuidance: this.options.reviewGuidance ?? kanbanReviewGuidance,
             openSession: async id => {this.tabs.keep(tab.id); await this.options.openSession(id);},
-            navigate: path => this.navigate(path), changed: () => this.updatePage(tab),
+            navigate: path => this.navigatePage(path, tab, 'within-action'), changed: () => this.updatePage(tab),
             selected: () => this.updatePage(tab), committed: () => {this.boardSnapshots = undefined; this.availableBoards = undefined; this.navigation.invalidate();},
             mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts),
         });
@@ -126,11 +130,34 @@ export class KanbanWindowWorkbench {
         const {view} = tab.value, state = view.getViewState(), path = view.getActiveResourceId();
         const dirtyChanged = tab.dirty !== state.dirty, renamed = path !== tab.id && !this.tabs.get(path);
         tab.dirty = state.dirty;
-        if (renamed) this.tabs.rename(tab.id, path, state.title ?? t('kanban.title'));
+        if (renamed) {
+            const {windows} = this.options;
+            if (windows?.registry.pinned(windows.id, tab.id)) tab.pinned = false;
+            this.tabs.rename(tab.id, path, state.title ?? t('kanban.title'));
+        }
         this.tabs.title(tab.id, state.title ?? t('kanban.title')); this.tabs.context(tab.id, state.context); this.tabs.location(tab.id, path);
         if (dirtyChanged) this.tabs.keep(tab.id);
         if (this.tabs.current === tab) {this.navigation.select(tab.id); if (renamed) this.options.selected(tab.id);}
         this.scheduleReconcile();
+    }
+    private async navigatePage(path: string, tab = this.tabs.current, navigation?: 'within-action'): Promise<void> {
+        if (!tab?.value || this.tabs.get(path)) return this.navigate(path);
+        const page = tab.value, state = page.view.getViewState();
+        if (state.dirty || state.busy && navigation !== 'within-action') {
+            if (state.unavailable) return this.navigate(path);
+            throw new Error(t('kanban.unsaved'));
+        }
+        const started = performance.now(), operationId = randomUUID();
+        try {
+            await page.view.openResource(path, navigation);
+            this.updatePage(tab);
+            log.debug('window.navigate', {operationId, stage: 'navigation', result: 'success', durationMs: Math.round(performance.now() - started)});
+        } catch (error) {
+            const code = (error as {code?: unknown})?.code;
+            log.warn('window.navigate', {operationId, stage: 'navigation', result: 'failure',
+                code: typeof code === 'string' && /^[A-Z_]{1,80}$/.test(code) ? code : 'KANBAN_WINDOW_FAILED', durationMs: Math.round(performance.now() - started)});
+            throw error;
+        }
     }
     private scheduleReconcile(): void {
         if (this.disposing || !this.availableBoards) return;

@@ -57,6 +57,7 @@ import {FlowLibraryCommand} from '@nestos/app-contracts';
 import {recoverFlowSchedulers} from './flow-scheduler-recovery';
 import {bindTwinWorkspaces} from '../digital-twin/workspaces';
 import {PublishedScannerExecutor} from '../digital-twin/scanner-executor';
+import {readDreamGitHistory} from '../dream/git-history';
 import {DreamHost} from '../dream/host';
 import {DreamScheduleManager} from '../dream/schedule-manager';
 import {dreamScheduleProgram, dreamRoundProgram} from '../dream/schedule-program';
@@ -588,13 +589,33 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             ready: () => ({commands: commandBus, calls: independentCalls}), exchanges: job => twin.scannerExchangeCount(job), bind: (job, sessionId) => twin.bindScanner(job, sessionId)}));
         }
         if (independentCalls && remoteConnections) {
+            const dreamRemote = remoteConnections;
+            const dreamProvider = options.remoteSourceProvider;
+            const ownerLog = createModuleLogger('dream-owner');
             const authorizeDreamOwner = async (id: string) => {
-                await initializeProjects(); const project = await projects.get(id);
-                if (projects.fileSource(project).kind !== 'local' || projects.workspaceAccess(project) !== 'rw') throw new Error('DREAM_OWNER_AUTHORIZATION_FAILED');
+                const started = Date.now();
+                try {
+                    await initializeProjects(); const project = await projects.get(id);
+                    if (projects.fileSource(project).kind === 'local') {
+                        if (projects.workspaceAccess(project) === 'rw') return;
+                        throw new Error('DREAM_OWNER_AUTHORIZATION_FAILED');
+                    }
+                    // Ownership grants access to the host's private Dream data. Remote source reads still verify their live grants.
+                    const root = dreamRemote.list(id).find(mount => mount.at === '/');
+                    if (root?.connectionId && root.serverId && root.serverProjectId) return;
+                    throw new Error('DREAM_OWNER_REMOTE_UNBOUND');
+                } catch (error) {
+                    const code = error instanceof Error && error.message === 'DREAM_OWNER_REMOTE_UNBOUND'
+                        ? error.message : 'DREAM_OWNER_AUTHORIZATION_FAILED';
+                    ownerLog.warn('dream.owner.authorize', {operationId: randomUUID(), stage: 'project-binding', result: 'failure',
+                        code, durationMs: Date.now() - started});
+                    throw new Error(code);
+                }
             };
             dreamHost = new DreamHost({fs: systemFS, repository: sessionRepository, kernel: kernelCore, models: agentService, projects,
-                remote: remoteConnections, commands: commandBus, calls: independentCalls, hostKind: options.ownerKind ?? 'tauri',
-                authorizeOwner: authorizeDreamOwner});
+                remote: dreamRemote, commands: commandBus, calls: independentCalls, hostKind: options.ownerKind ?? 'tauri',
+                authorizeOwner: authorizeDreamOwner,
+                ...(dreamProvider ? {readCommits: source => readDreamGitHistory(dreamRemote, dreamProvider, source)} : {})});
             kernelCore.registerProgram(dreamScheduleProgram); kernelCore.registerProgram(dreamRoundProgram);
             kernelCore.registerEffect(dreamScheduleEffect(dreamHost, dreamHost.configs.markSchedule.bind(dreamHost.configs),
                 (request, context) => authorizeScheduledRound(request, context, {fs: systemFS, kernel: kernelCore, authorizeOwner: authorizeDreamOwner})));

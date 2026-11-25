@@ -3,6 +3,7 @@ import type {DreamService, DreamAdoptionRecord, DreamAdoptionRequest, DreamConfi
 
 type Project = Awaited<ReturnType<ProjectService['list']>>[number];
 type Target = Awaited<ReturnType<DreamService['scannerTargets']>>[number];
+const everyDay = [0, 1, 2, 3, 4, 5, 6];
 
 const log = createModuleLogger('dream-page');
 
@@ -36,7 +37,7 @@ export class DreamPage {
         this.status.setAttribute('role', 'alert'); this.owners.setAttribute('aria-label', t('dream.owner'));
         this.owners.onchange = () => {
             this.owner = this.owners.value; this.dream = ''; this.mergeSelection = undefined;
-            void this.perform(() => this.loadList());
+            void this.switchOwner();
         };
         this.section.append(title, this.owners, this.status, this.body);
     }
@@ -55,7 +56,7 @@ export class DreamPage {
             this.projects = await this.projectsPort.list();
             if (this.closed) return;
             this.owners.replaceChildren();
-            for (const project of this.projects.filter(item => item.project.source?.kind !== 'remote'))
+            for (const project of this.projects)
                 this.owners.add(option(project.project.id, project.displayName ?? project.name));
             this.owner = this.owners.value;
             stage = 'dreams';
@@ -69,6 +70,17 @@ export class DreamPage {
         } finally {if (!this.closed) this.owners.disabled = false;}
     }
     destroy(): void {this.closed = true; this.section.remove();}
+    private async switchOwner(): Promise<void> {
+        const owner = this.owner;
+        this.status.textContent = '';
+        this.body.replaceChildren(text(t('status.loading')));
+        try {await this.loadList();}
+        catch (error) {
+            if (this.closed || owner !== this.owner) return;
+            this.status.textContent = errorText(error);
+            this.body.replaceChildren(button(t('dream.retry'), () => this.switchOwner()));
+        }
+    }
     private async loadList(): Promise<void> {
         if (!this.owner) {this.body.replaceChildren(text(t('dream.noProjects'))); return;}
         const owner = this.owner, result = await this.service.list(owner);
@@ -97,17 +109,10 @@ export class DreamPage {
             await this.command(JSON.stringify([owner, dream, 'enabled', config.revision, !config.config.enabled]),
                 id => this.service.setEnabled(owner, dream, id, config.revision, !config.config.enabled)); await this.refreshAfterWrite(() => this.loadDream());
         }));
-        if (config.config.enabled && config.config.files.length) this.body.append(button(t('dream.scanAll'), async () => {
-            const key = JSON.stringify([owner, dream, 'batch', config.revision]), operationId = this.commandOperations.get(key) ?? randomUUID();
-            this.commandOperations.set(key, operationId);
-            const result = await this.service.runAll(owner, dream, operationId, config.revision);
-            const failed = result.results.filter(item => item.status === 'failed');
-            if (!failed.length) this.commandOperations.delete(key);
-            await this.refreshAfterWrite(() => this.loadDream());
-            if (failed.length) this.status.textContent = `${t('dream.partialFailure')} ${failed.map(item => {
-                return `${this.sourceLabel(config, item.sourceId)}: ${item.code ?? 'DREAM_SCAN_FAILED'}`;
-            }).join('; ')}`;
-        }));
+        if (config.config.enabled && config.config.files.length) {
+            this.body.append(button(t('dream.scanAll'), () => this.scanBatch(owner, dream, config)));
+            this.manualScan(owner, dream, config);
+        }
         for (const file of config.config.files) {
             const project = this.projects.find(item => item.project.id === file.projectId);
             const row = document.createElement('div'); row.append(text(`${project?.displayName ?? project?.name ?? t('dream.unavailableProject')}: ${file.path}`));
@@ -128,6 +133,49 @@ export class DreamPage {
         this.body.append(text(t('dream.history')));
         this.appendHistory(owner, dream, history);
     }
+    private async scanBatch(owner: string, dream: string, config: DreamConfigurationRecord, sourceIds?: string[]): Promise<void> {
+        const key = JSON.stringify([owner, dream, 'batch', config.revision, sourceIds]), operationId = this.commandOperations.get(key) ?? randomUUID();
+        this.commandOperations.set(key, operationId);
+        const result = sourceIds === undefined ? await this.service.runAll(owner, dream, operationId, config.revision)
+            : await this.service.runAll(owner, dream, operationId, config.revision, sourceIds);
+        const failed = result.results.filter(item => item.status === 'failed');
+        if (!failed.length) this.commandOperations.delete(key);
+        if (owner !== this.owner || dream !== this.dream) return;
+        await this.refreshAfterWrite(() => this.loadDream());
+        if (failed.length && owner === this.owner && dream === this.dream) this.status.textContent = `${t('dream.partialFailure')} ${failed.map(item =>
+            `${this.sourceLabel(config, item.sourceId)}: ${errorText(new Error(item.code ?? 'DREAM_SCAN_FAILED'))}`).join('；')}`;
+    }
+    private manualScan(owner: string, dream: string, record: DreamConfigurationRecord): void {
+        const {files, changes, sessions} = record.config;
+        const scope = document.createElement('details'), summary = document.createElement('summary');
+        scope.className = 'twin__panel';
+        summary.textContent = t('dream.manualScan'); scope.append(summary);
+        const project = document.createElement('select'), kind = document.createElement('select');
+        project.setAttribute('aria-label', t('dream.source')); kind.setAttribute('aria-label', t('dream.scanKind'));
+        project.add(option('', t('dream.scanAllProjects'))); kind.add(option('', t('dream.scanAllKinds')));
+        const sources = [...files.map(source => ({...source, kind: 'files'})),
+            ...(changes ?? []).map(source => ({...source, kind: source.commits ? 'commits' : 'files'})),
+            ...(sessions ?? []).map(source => ({...source, kind: 'sessions'}))];
+        for (const item of this.projects.filter(item => sources.some(source => source.projectId === item.project.id)))
+            project.add(option(item.project.id, item.displayName ?? item.name));
+        for (const value of ['files', 'sessions', 'commits'] as const) kind.add(option(value, t(`dream.scanKind.${value}`)));
+        const choices = sources.map(source => {
+            const label = document.createElement('label'), checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            label.append(checkbox, this.sourceLabel(record, source.id)); return {source, label, checkbox};
+        });
+        const filter = () => {for (const {source, label} of choices)
+            label.hidden = !!project.value && project.value !== source.projectId || !!kind.value && kind.value !== source.kind;};
+        project.onchange = filter; kind.onchange = filter;
+        const run = button(t('dream.scanSelected'), async () => {
+            const selected = choices.filter(item => !item.label.hidden && item.checkbox.checked).map(item => item.source.id);
+            if (!selected.length) throw new Error('DREAM_BATCH_SELECTION_INVALID');
+            await this.scanBatch(owner, dream, record, selected);
+        });
+        const controls = document.createElement('div'); controls.className = 'twin__form';
+        controls.append(project, kind, ...choices.map(item => item.label), run);
+        scope.append(controls); this.body.append(scope);
+    }
     private scheduleForm(owner: string, dream: string, config: DreamConfigurationRecord,
         status: NonNullable<Awaited<ReturnType<DreamService['openView']>>>['scheduleStatus']): void {
         const section = document.createElement('section'), existing = config.config.schedule;
@@ -138,26 +186,30 @@ export class DreamPage {
             section.append(text(`${this.sourceLabel(config, failure.sourceId)}: ${failure.code}`));
         }
         const cadence = document.createElement('select'), zone = document.createElement('input'), interval = document.createElement('input'), time = document.createElement('input');
-        cadence.setAttribute('aria-label', t('dream.cadence')); cadence.add(option('interval', t('dream.interval'))); cadence.add(option('calendar', t('dream.weekly')));
-        cadence.value = existing?.cadence.kind ?? 'interval';
+        cadence.setAttribute('aria-label', t('dream.cadence'));
+        cadence.add(option('daily', t('dream.daily'))); cadence.add(option('calendar', t('dream.weekly'))); cadence.add(option('interval', t('dream.interval')));
+        const remote = this.projects.find(item => item.project.id === owner)?.project.source?.kind === 'remote';
+        cadence.value = existing?.cadence.kind === 'calendar' && existing.cadence.weekdays.length === everyDay.length
+            ? 'daily' : existing?.cadence.kind ?? (remote ? 'daily' : 'interval');
         zone.setAttribute('aria-label', t('dream.timeZone')); zone.placeholder = t('dream.timeZone');
         zone.value = existing?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
         interval.type = 'number'; interval.min = '1'; interval.setAttribute('aria-label', t('dream.intervalMinutes'));
         interval.value = String(existing?.cadence.kind === 'interval' ? existing.cadence.milliseconds / 60000 : 60);
         time.type = 'time'; time.setAttribute('aria-label', t('dream.timeOfDay'));
-        time.value = existing?.cadence.kind === 'calendar' ? `${String(existing.cadence.hour).padStart(2, '0')}:${String(existing.cadence.minute).padStart(2, '0')}` : '09:00';
+        time.value = existing?.cadence.kind === 'calendar' ? `${String(existing.cadence.hour).padStart(2, '0')}:${String(existing.cadence.minute).padStart(2, '0')}` : remote ? '18:00' : '09:00';
         section.append(cadence, zone, interval, time);
         const weekdays = Array.from({length: 7}, (_, day) => {
             const label = document.createElement('label'), box = document.createElement('input'); box.type = 'checkbox';
             box.checked = existing?.cadence.kind === 'calendar' ? existing.cadence.weekdays.includes(day) : true;
             label.append(box, t(`dream.weekday.${day}` as Parameters<typeof t>[0])); section.append(label); return box;
         });
-        const updateCadence = () => {const calendar = cadence.value === 'calendar'; interval.hidden = calendar; time.hidden = !calendar;
-            for (const box of weekdays) if (box.parentElement) box.parentElement.hidden = !calendar;};
+        const updateCadence = () => {interval.hidden = cadence.value !== 'interval'; time.hidden = !interval.hidden;
+            for (const box of weekdays) if (box.parentElement) box.parentElement.hidden = cadence.value !== 'calendar';};
         cadence.onchange = updateCadence; updateCadence();
         let draft: {signature: string; value: NonNullable<DreamConfigurationRecord['config']['schedule']>} | undefined;
         const save = button(t('dream.saveSchedule'), async () => {
-            const [hour, minute] = time.value.split(':').map(Number), days = weekdays.flatMap((box, index) => box.checked ? [index] : []);
+            const [hour, minute] = time.value.split(':').map(Number);
+            const days = cadence.value === 'daily' ? everyDay : weekdays.flatMap((box, index) => box.checked ? [index] : []);
             const minutes = Number(interval.value), signature = JSON.stringify([cadence.value, zone.value, minutes, hour, minute, days]);
             if (!draft || draft.signature !== signature) draft = {signature, value: {state: 'active', timeZone: zone.value, trigger: 'fixed', maxConcurrency: 1,
                 firstAt: cadence.value === 'interval' ? Date.now() + minutes * 60000 : 0,
@@ -212,7 +264,7 @@ export class DreamPage {
         const project = this.projects.find(item => item.project.id === source?.projectId);
         const name = project?.displayName ?? project?.name ?? t('dream.unavailableProject');
         if (file) return `${name}: ${file.path}`;
-        if (change) return `${name}: ${change.directory}`;
+        if (change) return `${name}: ${change.directory}${change.commits ? ' · ' + t('dream.scanKind.commits') : ''}`;
         if (session) return `${name}: ${t('dream.sourceSession')}`;
         if (task) return `${name}: ${t('dream.sourceTask')}`;
         if (decision) return `${name}: ${t('dream.sourceDecision')}`;
@@ -246,7 +298,7 @@ export class DreamPage {
         const changes = config.config.changes ?? [];
         for (const source of changes) {
             const project = this.projects.find(item => item.project.id === source.projectId), row = document.createElement('div');
-            row.append(text(`${project?.displayName ?? project?.name ?? t('dream.unavailableProject')}: ${source.directory}`));
+            row.append(text(`${project?.displayName ?? project?.name ?? t('dream.unavailableProject')}: ${source.directory}${source.commits ? ' · ' + t('dream.scanKind.commits') : ''}`));
             row.append(button(t('dream.scan'), async () => {
                 const id = this.runOperations.get(source.id) ?? randomUUID(); this.runOperations.set(source.id, id);
                 await this.service.run({ownerProjectId: owner, dreamId: dream, sourceId: source.id, operationId: id});
@@ -262,11 +314,23 @@ export class DreamPage {
         if (!config.config.files.length) return;
         const project = document.createElement('select'), scanner = document.createElement('select');
         const directory = document.createElement('input'), exclude = document.createElement('input'), limit = document.createElement('input');
+        const kind = document.createElement('select'), extensions = document.createElement('input');
+        kind.setAttribute('aria-label', t('dream.scanKind'));
+        kind.add(option('files', t('dream.scanKind.files')));
+        const gitOption = option('commits', t('dream.scanKind.commits')); kind.add(gitOption);
+        extensions.placeholder = t('dream.changeExtensions'); extensions.setAttribute('aria-label', t('dream.changeExtensions'));
+        kind.onchange = () => {extensions.hidden = kind.value === 'commits';};
         project.setAttribute('aria-label', t('dream.source')); scanner.setAttribute('aria-label', t('dream.changeScanner'));
         directory.setAttribute('aria-label', t('dream.changeDirectory')); directory.placeholder = t('dream.changeDirectory');
         exclude.setAttribute('aria-label', t('dream.changeExclude')); exclude.placeholder = t('dream.changeExclude');
         limit.type = 'number'; limit.min = '1'; limit.max = '128'; limit.value = '64'; limit.setAttribute('aria-label', t('dream.changeLimit'));
-        for (const item of this.projects) if (this.connection(item.project.id)) project.add(option(item.project.id, item.displayName ?? item.name));
+        this.sourceProjects(project, owner);
+        const updateKinds = () => {
+            gitOption.disabled = !this.connection(project.value) || this.connection(project.value) === 'dream-local';
+            if (gitOption.disabled && kind.value === 'commits') kind.value = 'files';
+            extensions.hidden = kind.value === 'commits';
+        };
+        project.onchange = updateKinds; updateKinds();
         for (const file of config.config.files) {
             const item = this.projects.find(value => value.project.id === file.projectId);
             scanner.add(option(file.id, `${item?.displayName ?? item?.name ?? t('dream.unavailableProject')}: ${file.path}`));
@@ -275,14 +339,18 @@ export class DreamPage {
         const add = button(t('dream.addChangeSource'), async () => {
             const connectionId = this.connection(project.value);
             if (!connectionId || !scanner.value) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+            const git = kind.value === 'commits';
+            if (git && connectionId === 'dream-local') throw new Error('DREAM_GIT_UNAVAILABLE');
+            const suffixes = extensions.value.split(',').map(item => item.trim().replace(/^\./, '').toLowerCase()).filter(Boolean);
             const next = [...changes, {id: sourceId, projectId: project.value, connectionId, directory: directory.value,
-                exclude: exclude.value.split(',').map(item => item.trim()).filter(Boolean), maxEntries: Number(limit.value), scannerSourceId: scanner.value}];
+                exclude: exclude.value.split(',').map(item => item.trim()).filter(Boolean), maxEntries: Number(limit.value), scannerSourceId: scanner.value,
+                ...(git ? {commits: true as const} : suffixes.length ? {extensions: suffixes} : {})}];
             await this.command(JSON.stringify([owner, dream, 'changes', config.revision, next]),
                 id => this.service.configureChangeSources(owner, dream, id, config.revision, next));
             await this.refreshAfterWrite(() => this.loadDream());
         });
         add.disabled = !project.options.length || !scanner.options.length;
-        this.body.append(project, directory, exclude, limit, scanner, add);
+        this.body.append(project, kind, directory, exclude, extensions, limit, scanner, add);
     }
     private sessionSourceForm(owner: string, dream: string, config: DreamConfigurationRecord): void {
         if (!config.config.files.length) return;
@@ -291,7 +359,7 @@ export class DreamPage {
         project.setAttribute('aria-label', t('dream.sessionProject')); session.setAttribute('aria-label', t('dream.sourceSession'));
         profile.setAttribute('aria-label', t('dream.sessionProfile'));
         scanner.setAttribute('aria-label', t('dream.sessionScanner')); rounds.setAttribute('aria-label', t('dream.sessionRounds'));
-        for (const item of this.projects) if (this.connection(item.project.id)) project.add(option(item.project.id, item.displayName ?? item.name));
+        this.sourceProjects(project, owner);
         for (const file of config.config.files) {
             const item = this.projects.find(value => value.project.id === file.projectId);
             scanner.add(option(file.id, `${item?.displayName ?? item?.name ?? t('dream.unavailableProject')}: ${file.path}`));
@@ -338,7 +406,7 @@ export class DreamPage {
         kind.setAttribute('aria-label', t('dream.kanbanKind')); item.setAttribute('aria-label', t('dream.kanbanItem'));
         scanner.setAttribute('aria-label', t('dream.kanbanScanner'));
         kind.add(option('task', t('dream.sourceTask'))); kind.add(option('decision', t('dream.sourceDecision')));
-        for (const value of this.projects) if (this.connection(value.project.id)) project.add(option(value.project.id, value.displayName ?? value.name));
+        this.sourceProjects(project, owner);
         for (const file of config.files) {const value = this.projects.find(project => project.project.id === file.projectId);
             scanner.add(option(file.id, `${value?.displayName ?? value?.name ?? t('dream.unavailableProject')}: ${file.path}`));}
         const loadBoards = button(t('dream.loadBoards'), async () => {
@@ -376,7 +444,7 @@ export class DreamPage {
         const source = document.createElement('select'), model = document.createElement('select'), target = document.createElement('select');
         const path = document.createElement('input'); path.placeholder = t('dream.path');
         source.setAttribute('aria-label', t('dream.source')); model.setAttribute('aria-label', t('dream.model')); target.setAttribute('aria-label', t('dream.scanner'));
-        for (const project of this.projects) if (this.connection(project.project.id)) source.add(option(project.project.id, project.displayName ?? project.name));
+        this.sourceProjects(source, owner);
         for (const item of models) model.add(option(item.id, item.name));
         targets.forEach((item, index) => target.add(option(String(index), item.name)));
         const add = button(t('dream.addSource'), async () => {
@@ -392,6 +460,11 @@ export class DreamPage {
         if (!model.options.length) this.body.append(text(t('dream.noModel')));
         if (!target.options.length) this.body.append(text(t('dream.noScanner')));
         add.disabled = !source.options.length || !model.options.length || !target.options.length;
+    }
+    private sourceProjects(select: HTMLSelectElement, owner: string): void {
+        for (const project of this.projects) if (this.connection(project.project.id))
+            select.add(option(project.project.id, project.displayName ?? project.name));
+        if ([...select.options].some(item => item.value === owner)) select.value = owner;
     }
     private connection(projectId: string): string | undefined {
         const mounts = this.projectsPort.remoteMounts?.list(projectId) ?? [];

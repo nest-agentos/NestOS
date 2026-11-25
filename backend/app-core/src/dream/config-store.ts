@@ -41,14 +41,15 @@ export class DreamConfigStore {
             await tx.setEntry(path, key, JSON.stringify(intent)); return intent;
         });
     }
-    async reserveBatch(owner: string, dream: string, operationId: string, revision: number): Promise<void> {
+    async reserveBatch(owner: string, dream: string, operationId: string, revision: number, sourceIds?: string[]): Promise<void> {
         if (!validId(operationId) || !Number.isSafeInteger(revision) || revision < 1) throw new Error('DREAM_INVALID_OPERATION');
         const path = configPath(owner, dream);
         await this.fs.meta.seq!.transaction!(async tx => {
             const receiptKey = `batch-intent:${JSON.stringify(operationId)}`, prior = await tx.getEntry(path, receiptKey);
-            if (prior && prior !== String(revision)) throw new Error('DREAM_OPERATION_CONFLICT');
+            const intent = sourceIds === undefined ? String(revision) : JSON.stringify([revision, sourceIds]);
+            if (prior && prior !== intent) throw new Error('DREAM_OPERATION_CONFLICT');
             if (decode(await tx.getEntry(path, 'config'))?.revision !== revision) throw new Error('DREAM_CONFIG_CONFLICT');
-            if (!prior) await tx.setEntry(path, receiptKey, String(revision));
+            if (!prior) await tx.setEntry(path, receiptKey, intent);
         });
     }
     async markSchedule(owner: string, dream: string, revision: number, nextAt: number): Promise<void> {
@@ -171,7 +172,8 @@ export class DreamConfigStore {
                 if (current?.config.files.some(file => file.id === source.id) || await tx.getEntry(path, `adoption-binding:${JSON.stringify(source.id)}`)
                     || await tx.getEntry(path, `decision-binding:${JSON.stringify(source.id)}`) || await tx.getEntry(path, `task-binding:${JSON.stringify(source.id)}`)
                     || await tx.getEntry(path, `session-binding:${JSON.stringify(source.id)}`)) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
-                const key = `change-binding:${JSON.stringify(source.id)}`, binding = JSON.stringify([source.projectId, source.connectionId, source.directory, source.exclude, source.maxEntries]);
+                const key = `change-binding:${JSON.stringify(source.id)}`, binding = JSON.stringify([source.projectId, source.connectionId, source.directory, source.exclude, source.maxEntries,
+                    ...(source.commits || source.extensions?.length ? [source.commits ?? false, source.extensions ?? []] : [])]);
                 const prior = await tx.getEntry(path, key);
                 if (prior && prior !== binding) throw new Error('DREAM_SOURCE_BINDING_CHANGED');
                 if (!prior) await tx.setEntry(path, key, binding);
@@ -273,11 +275,12 @@ function normalize(config: DreamConfig): DreamConfig {
             if (!source || ![source.id, source.projectId, source.connectionId, source.scannerSourceId].every(validId)
                 || ids.has(source.id) || !files.some(file => file.id === source.scannerSourceId)) throw new Error('DREAM_CONFIG_INVALID');
             validateChangeScope(source);
-            const target = JSON.stringify([source.projectId, source.directory]);
+            const target = JSON.stringify([source.projectId, source.directory, !!source.commits]);
             if (targets.has(target)) throw new Error('DREAM_CONFIG_INVALID');
             targets.add(target); ids.add(source.id);
             return {id: source.id, projectId: source.projectId, connectionId: source.connectionId, scannerSourceId: source.scannerSourceId,
-                directory: source.directory, exclude: [...source.exclude], maxEntries: source.maxEntries};
+                directory: source.directory, exclude: [...source.exclude], maxEntries: source.maxEntries,
+                ...(source.commits ? {commits: true as const} : {}), ...(source.extensions?.length ? {extensions: [...source.extensions]} : {})};
         });
     }
     let schedule: KanbanRecurrence | undefined;

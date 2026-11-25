@@ -53,3 +53,4 @@ overrides:
   "@nestos/ui-common": "workspace:*"
   "@nestos/kanban": "workspace:*"
   "@nestos/kanban-ui": "workspace:*"
+  "@nestos/dream": "workspace:*"

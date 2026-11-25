@@ -12,6 +12,12 @@
     "workspace": true
   },
   {
+    "directory": "dream",
+    "name": "@nestos/dream",
+    "version": "0.1.0",
+    "workspace": true
+  },
+  {
     "directory": "vfs-ui",
     "name": "@nestos/vfs-ui",
     "version": "0.5.1",

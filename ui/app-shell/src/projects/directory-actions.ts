@@ -1,4 +1,4 @@
-import { folderBrowserPath, folderPathFromBrowserPath, resolveBrowserTarget } from '@nestos/app-contracts';
+import { folderBrowserPath, folderPathFromBrowserPath, remoteSessionPath, resolveBrowserTarget } from '@nestos/app-contracts';
 import type { ProjectFolder, ProjectService } from '@nestos/app-contracts/services';
 import { ACTION_ICONS, FILE_BROWSER_ICONS, t } from '@nestos/common';
 import type { FSNode } from '@nestos/vfs-core';
@@ -22,7 +22,8 @@ export async function projectDirectoryActions(path: string, node: FSNode | null,
             const reason = sessionCreationReason(projects, project.project.id);
             actions.push({id: 'create-session', label: t('project.createSession'), icon: FILE_BROWSER_ICONS.newSession, primary: true,
                 disabled: !!reason, disabledReason: reason,
-                run: run(() => commands.session(folderBrowserPath(project.path)))});
+                run: run(() => commands.session(target.kind === 'remote' && target.profileId
+                    ? remoteSessionPath(project.path, target.profileId) : folderBrowserPath(project.path)))});
         }
     }
     if ((target.kind === 'project-files' || target.kind === 'files') && node?.type === 'directory') {

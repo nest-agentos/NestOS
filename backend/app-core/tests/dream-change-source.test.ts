@@ -18,6 +18,9 @@ it('reads only the selected tree, excludes subtrees, and changes its digest on m
         expect((await readChangeSnapshot(fs, scope)).hash).toBe(first.hash);
         await fs.driver.writeContent('/chosen/one.md', 'two');
         expect((await readChangeSnapshot(fs, scope)).hash).not.toBe(first.hash);
+        const markdownOnly = await readChangeSnapshot(fs, {...scope, extensions: ['md']});
+        await fs.driver.createFile({parentPath: '/chosen', name: 'ignored.ts', content: 'excluded by extension'});
+        expect((await readChangeSnapshot(fs, {...scope, extensions: ['md']})).hash).toBe(markdownOnly.hash);
         await expect(readChangeSnapshot(fs, {...scope, maxEntries: 1})).rejects.toThrow('DREAM_CHANGE_LIMIT');
         await expect(readChangeSnapshot(fs, {...scope, exclude: ['/other']})).rejects.toThrow('DREAM_CHANGE_SCOPE_INVALID');
     } finally {await manager.dispose();}

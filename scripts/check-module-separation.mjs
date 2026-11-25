@@ -6,7 +6,7 @@ import { workspacePackages, sourceExports } from './workspace-packages.mjs';
 
 const repository = fileURLToPath(new URL('..', import.meta.url));
 const frontend = ['app-shell', 'app-settings', 'llm-ui', 'llm-ui-adapter', 'mdx-adapter', 'ui-common', 'kanban-ui', 'ui-common-adapter', 'vfs-ui', 'image-parser', 'mdxeditor'];
-const backend = ['app-core', 'kanban-development', 'llm-context', 'llm-session', 'llm-flow', 'llm-tasks', 'durable-kernel', 'kernel-adapters', 'tools', 'device-tty', 'sanbox', 'sync-adapters'];
+const backend = ['app-core', 'dream', 'kanban-development', 'llm-context', 'llm-session', 'llm-flow', 'llm-tasks', 'durable-kernel', 'kernel-adapters', 'tools', 'device-tty', 'sanbox', 'sync-adapters'];
 const shared = ['app-contracts', 'common', 'app-transport'];
 
 /** Inspect emitted imports, including lazy imports, without relying on tree shaking. */
@@ -55,7 +55,7 @@ function contractErrors(roots, role, root) {
 }
 
 export function directoryErrors(root = repository) {
-    const groups = new Map([...frontend.map(name => [name, ['vfs-ui', 'image-parser', 'mdxeditor', 'llm-ui', 'ui-common', 'kanban-ui'].includes(name) ? 'libraries' : 'ui']), ...backend.map(name => [name, ['durable-kernel', 'device-tty'].includes(name) ? 'libraries' : 'backend']), ...shared.map(name => [name, 'shared'])]);
+    const groups = new Map([...frontend.map(name => [name, ['vfs-ui', 'image-parser', 'mdxeditor', 'llm-ui', 'ui-common', 'kanban-ui'].includes(name) ? 'libraries' : 'ui']), ...backend.map(name => [name, ['durable-kernel', 'device-tty', 'dream'].includes(name) ? 'libraries' : 'backend']), ...shared.map(name => [name, 'shared'])]);
     const legacy = resolve(root, 'packages');
     const misplaced = existsSync(legacy) ? readdirSync(legacy).filter(name => existsSync(resolve(legacy, name, 'package.json'))) : [];
     return [...misplaced.map(name => `packages/${name} must move to ui/, backend/, shared/ or apps/`), ...workspacePackages(root).flatMap(pkg => {

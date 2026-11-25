@@ -30,7 +30,7 @@ import {runDreamTwinFileScan} from './twin-scan';
 import {decisionSourcePort} from './decision-source';
 import {taskSourcePort} from './task-source';
 import {sessionSourcePort} from './session-source';
-import {changeSourcePort} from './change-source';
+import {changeSourcePort, type ChangeSnapshot, type DreamChangeSource} from './change-source';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import type {KanbanService} from '@nestos/kanban/contracts';
 import {isKanbanRecurringRunBoard} from '@nestos/kanban/contracts';
@@ -41,6 +41,7 @@ interface Options {
         getConnections(): Promise<Array<{id: string; name: string; enabled: boolean}>>};
     projects: ProjectService; remote: ProjectRemoteMountService; commands: ICommandBus; calls: IndependentCallService;
     authorizeOwner(owner: string): Promise<void>; hostKind: string;
+    readCommits?(source: DreamChangeSource): Promise<ChangeSnapshot>;
 }
 interface Entry {twin: DigitalTwinService; fs: IFileSystem; disposeView(): Promise<void>}
 export interface DreamFileSelection {
@@ -66,9 +67,8 @@ export class DreamHost {
             const project = await this.options.projects.get(projectId);
             if (this.options.projects.fileSource(project).kind !== 'local' || this.options.remote.list(projectId).length)
                 return this.options.remote.authorizeDreamSource(projectId, connectionId, capability);
-            await this.options.authorizeOwner(projectId);
+            if (this.options.projects.workspaceAccess(project) !== 'rw') throw new Error('DREAM_OWNER_AUTHORIZATION_FAILED');
             const revision = sha256HexSync(JSON.stringify([project.project.id, project.project.directory, project.project.source, project.path]));
-            await this.options.authorizeOwner(projectId);
             return {principalId: 'local-profile', revision, projectRevision: revision, serverId: 'local-profile', serverProjectId: projectId};
         },
     };
@@ -273,18 +273,27 @@ export class DreamHost {
         const base = await this.configs.readRevision(owner, dream, expectedRevision);
         if (!base) throw new Error('DREAM_CONFIG_CONFLICT');
         return this.configs.save(owner, dream, operationId, expectedRevision, {...base.config, changes}, {
-            owner: () => this.options.authorizeOwner(owner), source: async () => {}, change: async source => {
-                const [result] = await scanSources([{id: source.id, projectId: source.projectId, connectionId: source.connectionId, cursor: null}], 1, this.changePort(source));
-                if (result.status !== 'ok') throw new Error('DREAM_CHANGE_SCOPE_UNAVAILABLE');
-            },
+            owner: () => this.options.authorizeOwner(owner), source: async () => {}, change: source => this.validateChangeSource(source),
         });
+    }
+    private async validateChangeSource(source: DreamChangeSource): Promise<void> {
+        const input = {id: source.id, projectId: source.projectId, connectionId: source.connectionId, cursor: null};
+        const port = this.changePort(source);
+        if (source.commits) {
+            const before = await port.authorize(input);
+            await port.read(input, 1);
+            if (!sameAuthority(before, await port.authorize(input))) throw new Error('DREAM_AUTHORIZATION_CHANGED');
+            return;
+        }
+        const [result] = await scanSources([input], 1, port);
+        if (result.status !== 'ok') throw new Error('DREAM_CHANGE_SCOPE_UNAVAILABLE');
     }
     private async authorizeChange(source: import('./config-store').DreamChangeSourceConfig) {
         if (this.options.remote.list(source.projectId).some(mount => mount.at !== '/')) throw new Error('DREAM_CHANGE_MOUNT_UNSUPPORTED');
         return this.sourceAuthorization.authorizeDreamSource(source.projectId, source.connectionId, 'fileRead');
     }
     private changePort(source: import('./config-store').DreamChangeSourceConfig) {
-        return changeSourcePort(source, this.options.projects, value => this.authorizeChange(value));
+        return changeSourcePort(source, this.options.projects, value => this.authorizeChange(value), this.options.readCommits);
     }
     private sessionPort(source: import('./config-store').DreamSessionSourceConfig) {
         const reader = new NestosTwinSourceReader(this.options.fs, this.options.repository, this.options.projects);
@@ -406,7 +415,10 @@ export class DreamHost {
     }
     private async authorizeTarget(id: string): Promise<void> {
         const project = await this.options.projects.get(id);
-        if (this.options.projects.fileSource(project).kind === 'local') return this.options.authorizeOwner(id);
+        if (this.options.projects.fileSource(project).kind === 'local') {
+            if (this.options.projects.workspaceAccess(project) !== 'rw') throw new Error('DREAM_OWNER_AUTHORIZATION_FAILED');
+            return;
+        }
         const root = this.options.remote.list(id).find(item => item.at === '/');
         if (!root?.connectionId) throw new Error('DREAM_TARGET_SCOPE_CHANGED');
         await this.sourceAuthorization.authorizeDreamSource(id, root.connectionId, 'fileRead');
@@ -845,64 +857,43 @@ export class DreamHost {
             (runId, proof) => this.registry.bindRun(runId, {ownerProjectId: input.ownerProjectId, dreamId: input.dreamId,
                 sourceId: input.sourceId, configRevision: config.revision, authority: proof, adoptionPlanRevision: plan.planRevision}));
     }
-    async runAll(owner: string, dream: string, operationId: string, configRevision: number) {
+    async runAll(owner: string, dream: string, operationId: string, configRevision: number, sourceIds?: string[]) {
         const started = Date.now();
         if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(operationId)) throw new Error('DREAM_INVALID_OPERATION');
         await this.options.authorizeOwner(owner);
         const current = await this.configs.read(owner, dream);
         if (!current || current.revision !== configRevision || !current.config.enabled) throw new Error('DREAM_CONFIG_CONFLICT');
-        await this.configs.reserveBatch(owner, dream, operationId, configRevision);
-        const results: Array<{sourceId: string; operationId: string; status: 'settled' | 'failed'; code?: string}> = [];
-        for (const file of current.config.files) {
-            const child = 'batch-' + sha256HexSync(JSON.stringify([owner, dream, operationId, configRevision, file.id]));
-            try {
-                await this.run({ownerProjectId: owner, dreamId: dream, sourceId: file.id, operationId: child});
-                results.push({sourceId: file.id, operationId: child, status: 'settled'});
-            } catch (error) {
-                await this.options.authorizeOwner(owner);
-                const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SCAN_FAILED';
-                results.push({sourceId: file.id, operationId: child, status: 'failed', code});
-            }
-        }
-        for (const source of current.config.adoptions ?? []) {
-            const child = 'batch-' + sha256HexSync(JSON.stringify([owner, dream, operationId, configRevision, source.id]));
-            try {await this.run({ownerProjectId: owner, dreamId: dream, sourceId: source.id, operationId: child});
-                results.push({sourceId: source.id, operationId: child, status: 'settled'});
-            } catch (error) {await this.options.authorizeOwner(owner); const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SCAN_FAILED';
-                results.push({sourceId: source.id, operationId: child, status: 'failed', code});}
-        }
-        for (const source of current.config.decisions ?? []) {
-            const child = 'batch-' + sha256HexSync(JSON.stringify([owner, dream, operationId, configRevision, source.id]));
-            try {await this.run({ownerProjectId: owner, dreamId: dream, sourceId: source.id, operationId: child});
-                results.push({sourceId: source.id, operationId: child, status: 'settled'});
-            } catch (error) {await this.options.authorizeOwner(owner); const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SCAN_FAILED';
-                results.push({sourceId: source.id, operationId: child, status: 'failed', code});}
-        }
-        for (const source of current.config.tasks ?? []) {
-            const child = 'batch-' + sha256HexSync(JSON.stringify([owner, dream, operationId, configRevision, source.id]));
-            try {await this.run({ownerProjectId: owner, dreamId: dream, sourceId: source.id, operationId: child});
-                results.push({sourceId: source.id, operationId: child, status: 'settled'});
-            } catch (error) {await this.options.authorizeOwner(owner); const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SCAN_FAILED';
-                results.push({sourceId: source.id, operationId: child, status: 'failed', code});}
-        }
-        for (const source of current.config.sessions ?? []) {
-            const child = 'batch-' + sha256HexSync(JSON.stringify([owner, dream, operationId, configRevision, source.id]));
-            try {await this.run({ownerProjectId: owner, dreamId: dream, sourceId: source.id, operationId: child});
-                results.push({sourceId: source.id, operationId: child, status: 'settled'});
-            } catch (error) {await this.options.authorizeOwner(owner); const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SCAN_FAILED';
-                results.push({sourceId: source.id, operationId: child, status: 'failed', code});}
-        }
-        for (const source of current.config.changes ?? []) {
-            const child = 'batch-' + sha256HexSync(JSON.stringify([owner, dream, operationId, configRevision, source.id]));
-            try {await this.run({ownerProjectId: owner, dreamId: dream, sourceId: source.id, operationId: child});
-                results.push({sourceId: source.id, operationId: child, status: 'settled'});
-            } catch (error) {await this.options.authorizeOwner(owner); const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SCAN_FAILED';
-                results.push({sourceId: source.id, operationId: child, status: 'failed', code});}
-        }
+        const {files, adoptions, decisions, tasks, sessions, changes} = current.config;
+        const available = [...files, ...adoptions ?? [], ...decisions ?? [], ...tasks ?? [], ...sessions ?? [], ...changes ?? []].map(source => source.id);
+        const selected = this.batchSources(available, operationId, started, sourceIds);
+        await this.configs.reserveBatch(owner, dream, operationId, configRevision, sourceIds === undefined ? undefined : selected);
+        const results: Awaited<ReturnType<DreamHost['runBatchSource']>>[] = [];
+        for (const sourceId of selected) results.push(await this.runBatchSource(owner, dream, operationId, configRevision, sourceId));
         await this.options.authorizeOwner(owner); await this.evidence.checkConfig(owner, dream, configRevision);
         log.info('dream.scan.batch', {operationId, stage: 'complete', result: 'success', count: results.length,
             failed: results.filter(item => item.status === 'failed').length, durationMs: Date.now() - started});
         return {configRevision, results};
+    }
+    private batchSources(available: string[], operationId: string, started: number, requested?: string[]): string[] {
+        if (requested === undefined) return available;
+        if (!Array.isArray(requested) || !requested.length || requested.length > 32
+            || new Set(requested).size !== requested.length || requested.some(id => !available.includes(id))) {
+            log.warn('dream.scan.batch', {operationId, stage: 'select-sources', result: 'failure',
+                code: 'DREAM_BATCH_SELECTION_INVALID', durationMs: Date.now() - started});
+            throw new Error('DREAM_BATCH_SELECTION_INVALID');
+        }
+        return available.filter(id => requested.includes(id));
+    }
+    private async runBatchSource(owner: string, dream: string, batch: string, revision: number, sourceId: string) {
+        const operationId = 'batch-' + sha256HexSync(JSON.stringify([owner, dream, batch, revision, sourceId]));
+        try {
+            await this.run({ownerProjectId: owner, dreamId: dream, sourceId, operationId});
+            return {sourceId, operationId, status: 'settled' as const};
+        } catch (error) {
+            await this.options.authorizeOwner(owner);
+            const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_SCAN_FAILED';
+            return {sourceId, operationId, status: 'failed' as const, code};
+        }
     }
     async forSession(sessionId: string): Promise<DigitalTwinService | null> {
         if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(sessionId)) return null;

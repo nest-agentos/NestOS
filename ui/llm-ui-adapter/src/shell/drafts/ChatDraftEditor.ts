@@ -61,6 +61,8 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     private offConfiguration?: () => void;
     private configurationGeneration = 0;
     private configurationReady = false;
+    private configurationWork?: Promise<void>;
+    private configurationError?: unknown;
     private configurationLoading?: ReturnType<typeof draftLoading>;
     private readonly stops: (() => void)[] = [];
     private readonly events = new Map<EditorEvent, Set<(payload: unknown) => void>>();
@@ -95,16 +97,21 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         loading.finish();
         this.selectorTarget = JSON.stringify(this.view.getDraft().target);
         this.config.sessionDraft?.presentation?.titleChanged(this.draftTitle());
-        const changed = () => {void (deferred ? this.loadConfiguration() : this.refreshConfiguration().then(() => this.publish()).catch(error => this.report(error)));};
+        const changed = () => {void (deferred ? this.scheduleConfiguration() : this.refreshConfiguration().then(() => this.publish()).catch(error => this.report(error)));};
         this.offConfiguration = this.controls.configuration?.subscribe(changed) ?? this.service.onChange(changed);
         window.addEventListener('beforeunload', this.beforeUnload);
         if (this.active) this.view.focus(); else this.view.setActive(false); this.emit('ready', undefined);
         if (deferred) changed();
         else this.refreshModels();
     }
+    private scheduleConfiguration(): Promise<void> {
+        const work = this.loadConfiguration().finally(() => {if (this.configurationWork === work) this.configurationWork = undefined;});
+        return this.configurationWork = work;
+    }
     private async loadConfiguration(): Promise<void> {
         this.configurationLoading?.finish();
         const loading = this.configurationLoading = draftLoading(this.container, this.config.signal);
+        this.configurationError = undefined;
         try {
             await loading.read('configuration', () => this.refreshConfiguration());
             this.check();
@@ -120,8 +127,9 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         } catch (error) {
             if (this.configurationLoading !== loading || this.closed || this.transferred || this.config.signal?.aborted) loading.finish();
             else {
+                this.configurationError = error;
                 this.report(error);
-                loading.retry(() => {loading.finish(); void this.loadConfiguration();});
+                loading.retry(() => {loading.finish(); void this.scheduleConfiguration();});
             }
         }
     }
@@ -387,8 +395,14 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         } finally {this.rebuilding = false;}
     }
     private async selectAgent(id: string): Promise<void> {
-        const revision = this.view.getDraft().revision; await this.refreshConfiguration(); this.check();
+        if (this.config.sessionDraft?.executorScope === 'remote' && !this.configurationReady) {
+            await (this.configurationWork ?? this.scheduleConfiguration());
+            if (this.configurationError) throw this.configurationError;
+        }
+        else if (!this.executors.some(item => item.id === id)) await this.refreshConfiguration();
+        this.check();
         if (this.transferred || this.view.inputBusy) throw new Error(t('chatInput.switchUnavailable'));
+        const revision = this.view.getDraft().revision;
         if (!this.executors.some(item => item.id === id)) throw new Error(t('toolbox.unavailable'));
         const target = this.callTargets()?.entries.find(item => item.target.kind === 'agent' && item.target.id === id)?.target;
         this.view.configureInput({selection: {...this.view.getDraft().selection, ...(!this.config.sessionDraft?.promptHarness || id.startsWith('remote:') ? {executorId: id} : {})}, ...(this.targets ? {target} : {})}, revision);
