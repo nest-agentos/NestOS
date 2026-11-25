@@ -1,3 +1,4 @@
+import {isKanbanRecurringRunBoard} from '@nestos/kanban/contracts';
 import type {KanbanDecisionSourceSession} from '@nestos/kanban/contracts';
 import {LOOP_BOARD_PATH, KanbanWorkbench as KanbanView, type KanbanUIOptions} from '@nestos/kanban-ui';
 import {ACTION_ICONS, createModuleLogger, randomUUID, t} from '@nestos/common';
@@ -62,7 +63,8 @@ export class KanbanWindowWorkbench {
         }
         if(initial&&initial!=='/') {await Promise.all([this.startNavigation(),this.openResource(initial)]);return;}
         await this.startNavigation();
-        const board=this.boardSnapshots?.length===1?this.boardSnapshots[0]:undefined;
+        const visible=this.boardSnapshots?.filter(board=>!isKanbanRecurringRunBoard(board));
+        const board=visible?.length===1?visible[0]:undefined;
         await this.openResource(board?`/board/${encodeURIComponent(board.id)}/@decision`:'/');
     }
     async openResource(path: string): Promise<void> {

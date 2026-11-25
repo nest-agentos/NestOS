@@ -156,6 +156,25 @@ it('keeps search, create and refresh in the shared browser header without a refe
     expect(f.sidebar.querySelector('button[aria-label="' + t('kanban.openReference') + '"]')).toBeNull();
 });
 
+it('keeps a recurring management deep link open while hiding its run board from the sidebar',async()=>{
+    const first=await fixture('/@loops'),id='run-recurring';
+    const board=await first.service.create({id,title:'Private round',scope:{kind:'collection',namespace:'recurring-run',id:'round'},
+        members:[{kind:'human',id:'admin',responsibility:'Coordinate',roles:['coordinator']}]});
+    await first.service.execute(id,{operationId:'make-manager',expectedRevision:board.revision,command:{type:'create-item',
+        item:{id:'manager',title:'Recurring manager',responsibility:'Coordinate',acceptance:'Done'}}});
+    const path='/board/'+id+'/manager';
+    const direct=await fixture(path,first);
+    first.workbench.invalidateFromEvents();
+    await first.workbench.openResource(path);
+    for(const f of [first,direct]){
+        await vi.waitFor(()=>{
+            expect(f.sidebar.querySelector('.vfs-node-list [data-item-id="/board/'+id+'"]')).toBeNull();
+            expect(f.active().querySelector('[data-panel]')?.textContent).toContain('Recurring manager');
+        });
+        expect(f.workbench.getActiveResourceId()).toBe(path);
+    }
+});
+
 it('refreshes both sidebars and retires clean board and item tabs through the shared event feed',async () => {
     const first = await fixture('/board/b'), second = await fixture('/board/b/card',first);
     await first.workbench.openResource('/board/b/card'); await subscribe(first); await subscribe(second);
