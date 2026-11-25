@@ -9,7 +9,7 @@ import { WORKSPACE_GROUPS } from './workspace-packages.mjs';
 
 const application = new Set(['@nestos/app-core', '@nestos/app-shell', '@nestos/app-settings']);
 const coreDependencies = new Set(['app-contracts', 'common', 'llm-context', 'vfs-core', 'durable-kernel', 'kernel-adapters',
-    'llm-flow', 'llm-session', 'llm-tasks', 'tools', 'driver-llm', 'vfs-sync', 'cells-driver', 'kanban', 'kanban-development', 'mail', 'git-delivery'].map(name => '@nestos/' + name));
+    'llm-flow', 'llm-session', 'llm-tasks', 'tools', 'driver-llm', 'vfs-sync', 'cells-driver', 'kanban', 'kanban-development', 'mail', 'git-delivery', 'dream'].map(name => '@nestos/' + name));
 // Portable codecs are allowed explicitly; native I/O still requires host ports.
 coreDependencies.add('js-yaml');
 const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionStorage', 'navigator',
@@ -17,6 +17,7 @@ const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionSt
 
 export function dependencyError(source, target) {
     if (source === target) return;
+    if (source === '@nestos/dream' && target.startsWith('@nestos/')) return 'dream must receive host capabilities through its own ports';
     if (['@nestos/durable-kernel','@nestos/kernel-adapters','@nestos/llm-tasks','@nestos/llm-flow','@nestos/llm-session'].includes(source)
         && ['@nestos/kanban','@nestos/kanban-ui','@nestos/git-delivery'].includes(target)) return 'execution mechanisms must not depend on Kanban or delivery policy';
     if (source === '@nestos/git-delivery' && !['@nestos/common','@nestos/vfs-core','@nestos/tools'].includes(target)) return 'git-delivery owns Git rules and receives execution through ports; it must not depend on application or execution runtimes';

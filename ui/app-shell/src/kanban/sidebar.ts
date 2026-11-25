@@ -11,6 +11,7 @@ interface Options {
     container: HTMLElement; service?: KanbanClient;
     navigate(path: string): Promise<void>;
     create(): Promise<void>;
+    openDream?(): Promise<void>;
     createDecision(boardId: string, recurringOnly: boolean, source?: KanbanDecisionSourceSession): Promise<void>;
     report(error: unknown): void;
     catalogChanged?(boards: readonly KanbanBoardSummary[]): void;
@@ -44,6 +45,8 @@ export class KanbanSidebar {
                 children: async parent => parent === null ? this.nodes : [], subscribe: () => () => {}},
             onActivate: node => {void this.activate(node).catch(error => this.failure(error));}, onError: error => this.failure(error),
             actions: [
+                {id: 'dream', label: t('dream.title'), iconHTML: ACTION_ICONS.kanbanView, placements: ['toolbar', 'menu'],
+                    state: () => ({visible: !!options.openDream, enabled: !!options.openDream}), run: async () => {await options.openDream?.();}},
                 {id: 'execution-settings', label: controlLabel('settings'), iconHTML: TOOLBOX_ICONS.settings, placements: ['toolbar', 'menu'], state: () => ({visible: !!this.controls, enabled: !!this.controls}), run: async context => this.openSettings(this.targetBoard(context.target)?.id)},
                 ...this.executionActions(),
                 {id: 'create-decision', label: t('kanban.createDecision'), iconHTML: FILE_BROWSER_ICONS.addFile, placements: ['menu'],

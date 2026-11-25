@@ -392,7 +392,8 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         if (strategyType === 'kanban') {
             const initial=options.initialRead;
             const module = createKanbanWorkspace({initialDecision:initial?.request.decision?{...initial.request.decision,...initial.decision}:undefined,
-                initialTask:initial?.request.task&&initial.task?{...initial.request.task,...initial.task}:undefined,service: services.kanban, sidebar: sidebarEl, editor: editorEl,
+                initialTask:initial?.request.task&&initial.task?{...initial.request.task,...initial.task}:undefined,service: services.kanban, dream: services.dream,
+                projects: services.projects, sidebar: sidebarEl, editor: editorEl,
                 windows: windowBinding, initialResource, sessionUrl, referenceLink: kanbanReferenceLink(services.projects),
                 openVerificationSession: async (title,inputText) => {
                     const local=(await services.projects.list()).find(project=>project.protected);

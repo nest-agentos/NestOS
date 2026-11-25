@@ -16,7 +16,7 @@ export async function inspectAuthorization(provider: RemoteFileSourceProvider, c
         if (!root) return {...result, projectAccess: 'denied', reason: 'export-not-granted', code: 'REMOTE_EXPORT_NOT_GRANTED'};
         if (!mount.serverProjectId) return result;
         const project = await client.read(mount.serverProjectId, options);
-        return {...result, projectAccess: project.access, projectRevision: project.revision, principalId: project.authorization?.principalId,
+        return {...result, projectAccess: project.access, projectId: project.id, projectRevision: project.revision, principalId: project.authorization?.principalId,
             authorizationRevision: project.authorization?.revision, capabilities: project.capabilities,
             reason: project.revision !== mount.serverProjectRevision || project.authorization?.revision !== mount.authorization?.revision ? 'binding-outdated' : 'available'};
     } catch (error) {

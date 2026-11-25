@@ -141,7 +141,7 @@ function assertScannerGraph(graph: import('@nestos/llm-flow/contracts').DagRunSp
     }
     for (const template of Object.values(graph.functionCalls ?? {})) assertScannerGraph(template.child, depth + 1);
 }
-function scannerOutput(value: unknown, path?: string[]): unknown {
+export function scannerOutput(value: unknown, path?: string[]): unknown {
     if (path?.length) {
         for (const key of path) {
             if (!value || typeof value !== 'object' || !Object.hasOwn(value, key)) throw new Error('TWIN_SCANNER_OUTPUT_INVALID');

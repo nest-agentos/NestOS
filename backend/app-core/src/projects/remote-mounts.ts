@@ -3,6 +3,7 @@ import {CellsAuthorizationRefreshes} from './cells-authorization-refresh';
 import {remoteClientState} from './remote-client-state';
 import {CellsDraftChecks} from './cells-draft-checks';
 import {inspectAuthorization} from './authorization-inspection';
+import {verifyDreamAuthorization, type DreamReadCapability} from './dream-authorization';
 import {DiagnosticJournal} from '../diagnostics/journal';
 import {diagnosticFailure} from '../diagnostics/failure';
 import type {DiagnosticEvent, RemoteProjectStatus,ProjectRemoteMountChange} from '@nestos/app-contracts/services';
@@ -917,6 +918,25 @@ export class ProjectRemoteMountService {
             this.observations.set(mount.mountId, {...this.observations.get(mount.mountId), checkedAt: Date.now(), failure});
             // The remote file gate can reject reads during execution while the connection stays usable.
             this.setStatus(mount.mountId, failure.reason === 'busy' ? 'online' : 'offline');
+        }
+    }
+    async authorizeDreamSource(projectId: string, connectionId: string, capability: DreamReadCapability, options?: OperationOptions) {
+        const started = Date.now(), operationId = randomUUID(), fingerprint = JSON.stringify(this.list(projectId));
+        const root = this.list(projectId).find(mount => mount.at === '/');
+        try {
+            if (!root || root.connectionId !== connectionId) throw new Error('DREAM_BINDING_UNVERIFIED');
+            const connection = await this.resolveConnection(connectionId, options);
+            const proof = await verifyDreamAuthorization(this.provider, connection, root, capability, options);
+            checkOperation(options);
+            if (this.closed || fingerprint !== JSON.stringify(this.list(projectId))) throw new Error('DREAM_BINDING_CHANGED');
+            this.eventLog.record({module: 'cells', operation: 'dream.authorize', projectId, connectionId, operationId,
+                stage: 'authorization', result: 'success', level: 'info', durationMs: Date.now() - started});
+            return proof;
+        } catch (error) {
+            const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_AUTHORIZATION_UNAVAILABLE';
+            this.eventLog.record({module: 'cells', operation: 'dream.authorize', projectId, connectionId, operationId,
+                stage: 'authorization', result: 'failure', level: 'error', code, durationMs: Date.now() - started});
+            throw new Error(code);
         }
     }
     async inspectProjectAccess(projectId: string, options?: OperationOptions): Promise<void> {

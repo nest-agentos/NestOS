@@ -106,6 +106,7 @@ export interface RemoteAuthorizationInspection {
     exportAccess: 'unknown' | 'none' | 'ro' | 'rw';
     projectAccess: 'unknown' | 'denied' | 'ro' | 'rw';
     reason: 'available' | 'export-not-granted' | 'project-denied' | 'binding-outdated' | 'unverified';
+    projectId?: string;
     projectRevision?: number;
     principalId?: string;
     authorizationRevision?: string;

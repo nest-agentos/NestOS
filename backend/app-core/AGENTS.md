@@ -16,7 +16,7 @@ projects/remote-conversation-retry 对暂时性观察接线失败按 15 至 60 �
 
 - **协调层边界**：app-core 的目标职责为组合接线、授权上下文传递和跨领域协调。执行机制归 Kernel/Session/Flow，领域规则归各领域模块，具体 Git 交付等业务归独立 Tool/领域包。优先复用已有公开接口；禁止新增执行队列或重复的重试、取消、恢复状态机。现有业务实现属于待迁移职责，不能据此继续扩大本层；迁移须保留稳定身份、批准、真实回执和故障恢复，不把业务规则下沉到 Kernel。现状与迁移边界见 [策略与机制边界](../../doc/design/application-policy-boundaries.md)。
 - **平台无关**：`src/` 内不出现 `node:*`、DOM、`window`、`localStorage`；宿主差异一律通过注入传入（`ApplicationKernelPlatform`：`createSessionProcesses` / `skillSourceForSession` / `configureSession` / `configure`）。
-- **依赖只朝下**：只依赖共享 `app-contracts`、`llm-context`、`common`、`vfs-core`、`durable-kernel`、`kernel-adapters`、`llm-flow`、`llm-session`、`llm-tasks`、`tools`、`driver-llm`、`vfs-sync`、`cells-driver`（harness 类型端口及纯 authorization 校验入口）；不得依赖 `app-shell`、UI 包或任何 app。
+- **依赖只朝下**：只依赖共享 `app-contracts`、`llm-context`、`common`、`vfs-core`、`durable-kernel`、`kernel-adapters`、`llm-flow`、`llm-session`、`llm-tasks`、`tools`、`driver-llm`、`vfs-sync`、`cells-driver`、`dream` 和既有领域包（harness 类型端口及纯 authorization 校验入口）；不得依赖 `app-shell`、UI 包或任何 app。
 - **用例与装配分开**：应用策略放入 configuration/projects/session 等可单测服务；`runtime/` 负责接线与生命周期，不内联业务用例。宿主差异通过端口注入，DOM、导航与确认交互归 app-shell。
 - Composite 作者配置由 `configuration/agent-composition.ts` 校验并生成受管 Flow：普通主持动态选择一批白名单成员，再由同一主持汇总；不新增执行器。`VFSAgentService.configureAgentPreparation` 是唯一保存预处理入口，受管 Flow 身份以先于发布持久化的所有权收据为准，不能信任调用方的旧绑定或节点形状。工具箱导出包含主持/成员闭包，导入先重映射普通 Agent 再重编译 Composite；回归见 `tests/agent-composition.test.ts`。
 - 受管发布以已发布正文核验幂等，同 Agent 的准备与保存串行；草稿相同不能证明发布成功。归档通过 llm-flow/contracts 的语义引用遍历重映射 Agent，禁止递归改写 Tool 参数中的同名字段。删除 Agent 或导入回滚保留已登记发布资源供历史和重试核对，见 `../../doc/design/flow-invocation-composition.md`。

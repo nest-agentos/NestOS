@@ -32,6 +32,7 @@ export interface ApplicationServices {
     commandBus: ICommandBus;
     projectSync?: ProjectSyncService;
     digitalTwin?: DigitalTwinService;
+    dream?: import('./dream').DreamService;
     kanban?: import('@nestos/kanban/contracts').KanbanClient;
     startBackground?(): void;
     prepareSession?(sessionId: string): Promise<boolean>;

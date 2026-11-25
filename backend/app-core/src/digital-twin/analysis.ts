@@ -18,7 +18,8 @@ import { readProgress } from './read-progress';
 export class TwinAnalysis {
     private running = new Map<string, Promise<void>>();
     constructor(private readonly records: TwinRecords, private readonly sources: TwinSources, private readonly extractor: TwinExtractionPort,
-        private readonly changed: () => void = () => {}, private readonly scanGuard?: TwinScanGuardPort) {}
+        private readonly changed: () => void = () => {}, private readonly scanGuard?: TwinScanGuardPort,
+        private readonly prepareJob?: (job: TwinAnalysisJob) => Promise<void>) {}
 
     async run(sourceId: string, scope?: TwinScanScope, active: () => boolean = () => true): Promise<void> {
         const existing = this.running.get(sourceId);
@@ -111,6 +112,7 @@ export class TwinAnalysis {
         try {
             requireActive(active);
             if (pending) job = await this.resumeJob(pending, source, scope);
+            await this.prepareJob?.(job.data);
             const result = await this.extractor.run(job.data, text, id => this.attach(job.id, id), progress => this.requestProgress(job.id, progress), this.lifecycle(job.id, active));
             traceAnalysis(job.data, 'committing', { jobId: job.id, candidates: result.candidates.length });
             await this.settleResult(job, source, result);

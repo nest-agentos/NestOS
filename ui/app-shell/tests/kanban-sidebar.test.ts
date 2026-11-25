@@ -15,12 +15,18 @@ async function fixture() {
         {id:'draft', title:'Recurring draft', resourceId:'/native/draft', recurrence:{}},
         {id:'confirmed', title:'Duplicate', recordId:'formal', recurrence:{}},
     ]);
-    const createDecision = vi.fn(async () => {});
+    const createDecision = vi.fn(async () => {}), openDream = vi.fn(async () => {});
     const container = document.createElement('aside'); document.body.append(container);
-    const sidebar = new KanbanSidebar({container, service: {catalog, records, recordConversations, startRecordConversation: vi.fn()} as unknown as KanbanClient, navigate, create: vi.fn(), createDecision, report, catalogChanged});
+    const sidebar = new KanbanSidebar({container, service: {catalog, records, recordConversations, startRecordConversation: vi.fn()} as unknown as KanbanClient, navigate, create: vi.fn(), createDecision, openDream, report, catalogChanged});
     cleanups.push(() => sidebar.destroy()); await sidebar.start();
-    return {sidebar, container, catalog, report, navigate, catalogChanged, records, createDecision};
+    return {sidebar, container, catalog, report, navigate, catalogChanged, records, createDecision, openDream};
 }
+it('opens Dream from the fixed sidebar action', async () => {
+    const f = await fixture();
+    const action = f.container.querySelector<HTMLElement>('[data-action="dream"]');
+    expect(action).not.toBeNull(); action!.click();
+    await vi.waitFor(() => expect(f.openDream).toHaveBeenCalledOnce());
+});
 it('opens the default loop board as a single sidebar item', async () => {
     const f = await fixture();
     expect(f.container.querySelector('[data-action="toggle-folder"]')).toBeNull();

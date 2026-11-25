@@ -20,6 +20,7 @@ import type { HeadlessKernelRuntime } from './create-kernel-runtime';
 import { withWorkspaceScopeCleanup } from './workspace-scope-cleanup';
 import { t, createModuleLogger, traceBoot } from '@nestos/common';
 import { registerFlowLibraryRecovery } from '../presets/restore-flows';
+import {includeDreamMemory} from '../dream/conversation-memory';
 
 export interface OwnedConversationView { sessionManager: SessionManager; commandBus: CommandBus; dispose(): Promise<void> }
 
@@ -32,6 +33,7 @@ export interface ConversationSystemOptions {
     scheduleAgentInitialization?: (initialize: () => Promise<void>) => void | Promise<void>;
     scheduleInvocationRecovery?: (recover: () => Promise<void>) => void | Promise<void>;
     digitalTwin?: import('../digital-twin/service').DigitalTwinService;
+    retrieveDreamMemory?(sessionId: string, limit: number): Promise<Array<{entryId: string; namespaceId: string; content: string; contentHash: string}>>;
     directAgentPolicy?: import('@nestos/llm-session/contracts').DirectAgentPolicy;
     agentResolution?: import('@nestos/llm-session').AgentResolutionPolicy;
     vfs: IVFSManager;
@@ -92,10 +94,11 @@ export async function createConversationSystem(
         kernel: kernel.kernel,
         flowStore: flowEngine,
         dagPlugins: kernel.dagPlugins,
-        retrieveMemory: async (plan, agent, context) => [
-            ...await kernel.memory.retrieve(plan, agent, context),
-            ...await options.digitalTwin?.retrieve(plan, agent.id, context.sessionId) ?? [],
-        ],
+        retrieveMemory: async (plan, agent, context) => {
+            const ordinary = await kernel.memory.retrieve(plan, agent, context);
+            const twin = await options.digitalTwin?.retrieve(plan, agent.id, context.sessionId) ?? [];
+            return includeDreamMemory(ordinary, twin, context.policy, context.sessionId, options.retrieveDreamMemory);
+        },
         memoryProvider: kernel.memory,
         workspaceManager: options.flowWorkspaceManager ? withWorkspaceScopeCleanup(options.flowWorkspaceManager, kernel, options.ensureWritable) : undefined,
         canWriteSession: options.ensureWritable,

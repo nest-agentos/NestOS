@@ -4,13 +4,14 @@ import { FSError, type IFileSystem } from '@nestos/vfs-core';
 import { RoundLog, type SessionRepository } from '@nestos/llm-session';
 import type { ProjectService } from '@nestos/app-contracts/services';
 import { TwinProjectCatalog, documentPath, nodeVersion } from './project-catalog';
-import { readHarness } from './harness-reader';
+import { readHarness, readHarnessWindow, harnessTarget } from './harness-reader';
 import type { TwinSourceContent, TwinSourceReader, TwinSourceSpec } from './domain';
 
 const MAX_BYTES = 1024 * 1024;
 /** Read ordinary project documents and visible conversations through existing application services. */
 export class NestosTwinSourceReader implements TwinSourceReader {
-    constructor(private readonly fs: IFileSystem, private readonly sessionsRepository: SessionRepository, private readonly projects?: ProjectService) {}
+    constructor(private readonly fs: IFileSystem, private readonly sessionsRepository: SessionRepository, private readonly projects?: ProjectService,
+        private readonly readManagedArtifact?: (target: string) => Promise<TwinSourceContent>) {}
     async discover(active: () => boolean = () => true) {
         if (!this.projects) throw new Error('TWIN_PROJECT_CATALOG_UNAVAILABLE');
         const catalog = await new TwinProjectCatalog(this.projects, this.sessionsRepository).discover(active);
@@ -20,14 +21,56 @@ export class NestosTwinSourceReader implements TwinSourceReader {
         .map(session => ({ id: session.id, title: session.title })); }
 
     async read(spec: TwinSourceSpec): Promise<TwinSourceContent> {
-        if (!spec || !['file', 'session', 'harness-session'].includes(spec.kind) || typeof spec.target !== 'string' || !spec.target.trim()
+        if (!spec || !['file', 'session', 'harness-session', 'managed-artifact'].includes(spec.kind) || typeof spec.target !== 'string' || !spec.target.trim()
             || spec.target.length > 1000 || typeof spec.label !== 'string' || spec.label.length > 200) throw new Error('TWIN_INVALID_SOURCE');
+        if (spec.kind === 'managed-artifact') {
+            if (!this.readManagedArtifact) throw new Error('TWIN_MANAGED_SOURCE_UNAVAILABLE');
+            const content = await this.readManagedArtifact(spec.target);
+            if (!content || typeof content.text !== 'string' || new TextEncoder().encode(content.text).length > 32768
+                || !content.nativeIdentity || content.hash !== sha256HexSync(content.text)) throw new Error('TWIN_MANAGED_SOURCE_INVALID');
+            return content;
+        }
         if (spec.kind === 'harness-session') {
             if (!this.projects) throw new Error('TWIN_PROJECT_CATALOG_UNAVAILABLE');
             return readHarness(this.projects, spec.target);
         }
         if (spec.kind === 'file' && spec.target.startsWith('project://')) return this.projectFile(spec.target);
         return spec.kind === 'file' ? this.file(spec.target) : this.session(spec.target);
+    }
+
+    /** Read a bounded head window without enumerating session lists or walking older rounds. */
+    async readSessionWindow(id: string, maxRounds: number): Promise<TwinSourceContent & {scannedRounds: number; hasOlder: boolean}> {
+        if (!Number.isSafeInteger(maxRounds) || maxRounds < 1 || maxRounds > 20 || /^twin-(analysis|collection)-/.test(id)) throw new Error('TWIN_SOURCE_LIMIT');
+        const manifest = await this.sessionsRepository.getManifest(id), head = manifest.currentHead;
+        const log = new RoundLog(this.sessionsRepository, id), texts: string[] = [], seen = new Set<string>();
+        let cursor = head, bytes = 0;
+        while (cursor && seen.size < maxRounds) {
+            if (seen.has(cursor)) throw new Error('TWIN_HISTORY_INCOMPLETE');
+            seen.add(cursor);
+            const round = await log.readRound(cursor);
+            if (!round || round._deleted) throw new Error('TWIN_HISTORY_INCOMPLETE');
+            if (['pending', 'running', 'waiting'].includes(round.status)) throw new Error('TWIN_SOURCE_BUSY');
+            if (round.exposure && round.exposure !== 'public') throw new Error('TWIN_HISTORY_SCOPE');
+            if (round.historyParentIds.length > 1) throw new Error('TWIN_HISTORY_MERGE_UNSUPPORTED');
+            const input = publicMessages(round.input).filter(item => typeof item.content === 'string' && item.content.trim());
+            const output = publicMessages(round.output).filter(item => typeof item.content === 'string' && item.content.trim());
+            if (input.length || output.length) {
+                const text = JSON.stringify({id: round.id, time: round.createdAt, input, output});
+                bytes += new TextEncoder().encode(text).length + 1;
+                if (bytes > 32768) throw new Error('TWIN_SOURCE_LIMIT');
+                texts.unshift(text);
+            }
+            cursor = round.historyParentIds[0] ?? null;
+        }
+        if (cursor && seen.has(cursor)) throw new Error('TWIN_HISTORY_INCOMPLETE');
+        const after = await this.sessionsRepository.getManifest(id);
+        if (head !== after.currentHead || manifest.revision !== after.revision || manifest.folder !== after.folder) throw new Error('TWIN_SOURCE_CHANGED');
+        const text = texts.join('\n');
+        return {text, hash: sha256HexSync(text), nativeIdentity: JSON.stringify([id, manifest.createdAt, maxRounds]), scannedRounds: seen.size, hasOlder: !!cursor};
+    }
+    async readHarnessWindow(projectId: string, profileId: string, sessionId: string, maxRounds: number, cursor?: string | null): Promise<TwinSourceContent & {scannedRounds: number; hasOlder?: boolean; historyBytes: number; contextBytes: number; cursor: string}> {
+        if (!this.projects) throw new Error('TWIN_PROJECT_CATALOG_UNAVAILABLE');
+        return readHarnessWindow(this.projects, harnessTarget(projectId, profileId, sessionId), maxRounds, cursor);
     }
 
     async probe(spec: TwinSourceSpec): Promise<string> {

@@ -25,6 +25,28 @@ export class TwinSources {
         return id;
     }
 
+    /** Stable identity lets a host reconcile a lost creation reply without rereading another source. */
+    async ensure(id: string, spec: TwinSourceSpec, connectionId: string): Promise<string> {
+        if (!id || id.length > 256 || !connectionId.trim()) throw new Error('TWIN_SOURCE_ID_INVALID');
+        const fingerprint = await this.fingerprint(connectionId);
+        const verify = async () => {
+            const current = await this.records.get<TwinSourceData>('source', id);
+            if (!current) return false;
+            if (!current.data.enabled || current.data.connectionId !== connectionId || current.data.connectionFingerprint !== fingerprint
+                || current.data.kind !== spec.kind || current.data.target !== spec.target || current.data.label !== spec.label)
+                throw new Error('TWIN_SOURCE_ID_CONFLICT');
+            return true;
+        };
+        if (await verify()) return id;
+        if ((await this.records.list('source')).length >= 10000) throw new Error('TWIN_SOURCE_COUNT_LIMIT');
+        const content = await this.preview(spec);
+        const data: TwinSourceData = {...spec, connectionId, connectionFingerprint: fingerprint, enabled: true, incarnation: randomUUID(),
+            nativeIdentity: content.nativeIdentity, hash: content.hash, checkedAt: Date.now(), analyzedHash: '', offset: 0, status: 'available', characters: content.text.length};
+        try {await this.records.save('source', id, data, null);}
+        catch (error) {if (!await verify()) throw error;}
+        return id;
+    }
+
     async setEnabled(id: string, revision: string, enabled: boolean): Promise<void> {
         const source = await this.records.get<TwinSourceData>('source', id);
         if (!source || source.revision !== revision) throw new Error('TWIN_REVIEW_CONFLICT');

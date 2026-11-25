@@ -1,0 +1,8 @@
+{
+  "name": "@nestos/dream",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {".": "./src/index.ts"},
+  "scripts": {"test": "node --test tests/*.test.mjs"}
+}

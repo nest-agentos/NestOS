@@ -52,9 +52,9 @@ export class TwinScans {
     async refreshModels(): Promise<void> {
         for (const plan of await this.plans.refreshBindings()) await this.cancelPlan(plan.id, plan.revision);
     }
-    async trigger(id: string, eventId: string): Promise<string> {
+    async trigger(id: string, eventId: string, beforeQueue?: (runId: string) => Promise<void>): Promise<string> {
         if (typeof eventId !== 'string' || !eventId.trim() || eventId.length > 256) throw new Error('TWIN_EVENT_INVALID');
-        const runId = await this.plans.enqueue(id, 'event', '', true, eventId); this.changed(); return runId;
+        const runId = await this.plans.enqueue(id, 'event', '', true, eventId, beforeQueue); this.changed(); return runId;
     }
     async enqueue(id: string): Promise<string> { const runId = await this.plans.enqueue(id); this.changed(); return runId; }
     async analyzeSource(id: string): Promise<void> {

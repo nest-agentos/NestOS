@@ -19,6 +19,7 @@ export interface LocalApplicationServices {
     flowInstallations?: import('./flow-installation').FlowInstallations;
     toolPackages?: import('./flow-installation').ToolPackages;
     digitalTwin?: DigitalTwinService;
+    dream?: import('./dream').DreamService;
     kanban?: import('@nestos/kanban/contracts').KanbanClient;
     vfs: IVFSManager;
     llmDriver: IConnectionService & { init(): Promise<void> };

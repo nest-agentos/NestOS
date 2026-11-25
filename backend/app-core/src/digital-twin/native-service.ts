@@ -12,7 +12,7 @@ import { KernelTwinExtractor } from './extraction';
 interface Models { getConnection(id: string): Promise<ConnectionMeta | undefined>; getProvider(id: string): LLMProvider | undefined; getDefaultConnection?(): Promise<ConnectionMeta | null>; }
 /** The model destination binding excludes mutable accounting and all credentials. */
 export function createNativeDigitalTwin(fs: IFileSystem, repository: SessionRepository, kernel: Kernel, models: Models, hostKind = 'local', projects?: ProjectService, workspace?: TwinWorkspaceBinding): DigitalTwinService {
-    return new DigitalTwinService({ fs, workspace, scanHost: { kind: hostKind }, defaultConnection: async () => (await models.getDefaultConnection?.())?.id ?? '', reader: new NestosTwinSourceReader(fs, repository, projects), extractor: new KernelTwinExtractor(kernel),
+    return new DigitalTwinService({ fs, workspace, scanHost: { kind: hostKind }, defaultConnection: async () => (await models.getDefaultConnection?.())?.id ?? '', reader: new NestosTwinSourceReader(fs, repository, projects, workspace?.readManagedArtifact), extractor: new KernelTwinExtractor(kernel),
         openCollectionProject: projects ? async id => {
             const project = await projects.get(id), source = await projects.openFiles(project.path);
             return {...source, authorize: async () => {

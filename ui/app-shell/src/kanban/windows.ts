@@ -8,9 +8,12 @@ import {KanbanSidebar} from './sidebar';
 import {VFS_DOM_EVENTS} from '@nestos/vfs-ui';
 import {shareKanbanCatalog} from './catalog';
 import {MOBILE_NAVIGATION_QUERY} from '@nestos/ui-common';
+import type {ApplicationServices} from '@nestos/app-contracts/services';
+import {DreamDialog} from '../dream/dialog';
 
 const log = createModuleLogger('kanban-windows');
-export type KanbanWorkspaceOptions = Omit<KanbanUIOptions, 'presentation' | 'sidebar'> & {sidebar: HTMLElement; windows?: WorkbenchWindowBinding};
+export type KanbanWorkspaceOptions = Omit<KanbanUIOptions, 'presentation' | 'sidebar'> & {sidebar: HTMLElement; windows?: WorkbenchWindowBinding;
+    dream?: ApplicationServices['dream']; projects?: ApplicationServices['projects']};
 interface Page {view: KanbanView; ready: Promise<void>; visible?: boolean}
 
 /** Each opened resource keeps its view, inspector, drafts and scroll in its own tab. */
@@ -27,6 +30,7 @@ export class KanbanWindowWorkbench {
     private reconcile?: Promise<void>;
     private reconcileAgain = false;
     private readonly options: KanbanWorkspaceOptions;
+    private dreamDialog?: DreamDialog;
     constructor(options: KanbanWorkspaceOptions) {
         window.addEventListener('nestos:http-reconnected', () => this.invalidateFromEvents(), {signal: this.observationAbort.signal});
         this.options = options = {...options, service: shareKanbanCatalog(options.service)};
@@ -37,6 +41,11 @@ export class KanbanWindowWorkbench {
             error: error => this.report(error), changed: () => this.syncVisibility(),
         }, undefined, options.windows);
         this.navigation = new KanbanSidebar({container: options.sidebar, service: options.service, navigate: path => this.navigate(path), windowManagement: this.tabs.windowManagement,
+            openDream: options.dream && options.projects ? async () => {
+                this.dreamDialog ??= new DreamDialog(options.dream!, options.projects!, options.openSession,
+                    (board, item) => this.navigate(`/board/${encodeURIComponent(board)}/${encodeURIComponent(item)}`));
+                await this.dreamDialog.open();
+            } : undefined,
             create: () => this.openBoardCreation(), createDecision: (id, recurringOnly, source) => this.openDecisionCreation(id, recurringOnly, source), report: error => this.report(error),
             catalogChanged: boards => {this.boardSnapshots = boards; this.availableBoards = new Set(boards.map(board => board.id)); this.scheduleReconcile();}});
         const host = document.createElement('div'); host.hidden = true; host.append(this.tabs.opened); options.sidebar.append(host);
@@ -97,7 +106,7 @@ export class KanbanWindowWorkbench {
         this.navigation.setVisible(false); this.tabs.suspendForRecovery();
         for (const tab of this.tabs.values()) tab.value?.view.suspendForRecovery();
     }
-    async destroy(): Promise<void> {this.disposing = true; this.observationAbort.abort(); this.navigation.destroy(); await this.reconcile; await this.tabs.destroy(); this.options.sidebar.replaceChildren();}
+    async destroy(): Promise<void> {this.disposing = true; this.observationAbort.abort(); this.dreamDialog?.destroy(); this.navigation.destroy(); await this.reconcile; await this.tabs.destroy(); this.options.sidebar.replaceChildren();}
     private createPage(tab: WorkbenchTab<Page>): void {
         const editor = document.createElement('div'); tab.panel.append(editor);
         const view = new KanbanView({...this.options, sidebar: undefined, editor, initialResource: tab.id,

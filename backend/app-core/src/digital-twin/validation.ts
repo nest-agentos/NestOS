@@ -36,7 +36,7 @@ function validateMemory(data: Data): void {
 }
 function validateSource(data: Data): void {
     strings(data, ['target', 'label', 'connectionId', 'connectionFingerprint', 'incarnation', 'nativeIdentity', 'hash', 'analyzedHash']);
-    oneOf(data.kind, ['file', 'session', 'harness-session']); oneOf(data.status, ['available', 'changed', 'deleted', 'inaccessible']);
+    oneOf(data.kind, ['file', 'session', 'harness-session', 'managed-artifact']); oneOf(data.status, ['available', 'changed', 'deleted', 'inaccessible']);
     booleans(data, ['enabled']); integers(data, ['offset', 'characters', 'checkedAt']);
     if (data.managed !== undefined) validateManagedSource(data);
 }

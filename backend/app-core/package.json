@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@nestos/common": "workspace:*",
+    "@nestos/dream": "workspace:*",
     "@nestos/durable-kernel": "workspace:*",
     "@nestos/kernel-adapters": "workspace:*",
     "@nestos/llm-flow": "workspace:*",

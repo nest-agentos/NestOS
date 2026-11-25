@@ -623,6 +623,9 @@ importers:
       '@nestos/common':
         specifier: workspace:*
         version: link:../../shared/common
+      '@nestos/dream':
+        specifier: workspace:*
+        version: link:../dream
       '@nestos/driver-llm':
         specifier: workspace:*
         version: link:../../libraries/driver-llm
@@ -690,6 +693,8 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@20.19.43)(jiti@1.21.7)(jsdom@27.4.0)(tsx@4.20.6)(yaml@2.8.2)
+
+  backend/dream: {}
 
   backend/git-delivery:
     dependencies:

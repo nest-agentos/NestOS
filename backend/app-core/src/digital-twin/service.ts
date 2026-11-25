@@ -37,6 +37,10 @@ export interface TwinWorkspaceBinding {
     readOnly?: boolean;
     fs?: IFileSystem;
     ownerId: string;
+    /** Host-owned reads must validate the resource and current authorization on every call. */
+    readManagedArtifact?(target: string): Promise<import('./domain').TwinSourceContent>;
+    /** Trusted host may bind a durable job before any scanner call is submitted. */
+    prepareJob?(job: TwinAnalysisJob): Promise<void>;
     /** Trusted host checks membership and authority; never supplied by model output or RPC payloads. */
     authorize(access?: 'read' | 'write'): Promise<void>;
 }
@@ -112,10 +116,10 @@ export class DigitalTwinService {
         await this.sourceConnections.remove(id); this.notify();
     }
     async collectionTools() {await this.authorizeWorkspace('read'); return this.collector?.tools?.() ?? [];}
-    async triggerScanPlan(id: string, eventId: string): Promise<string> {
+    async triggerScanPlan(id: string, eventId: string, beforeQueue?: (runId: string) => Promise<void>): Promise<string> {
         const started = Date.now(), operationId = randomUUID(), log = createModuleLogger('twin-scanner');
         try {
-            const services = await this.services(), runId = await services.scans.trigger(id, eventId);
+            const services = await this.services(), runId = await services.scans.trigger(id, eventId, beforeQueue);
             log.info('twin.event.queue', {operationId, stage: 'queue', result: 'success', runId, durationMs: Date.now() - started});
             this.notify(); return runId;
         } catch (error) {
@@ -130,6 +134,19 @@ export class DigitalTwinService {
     async scannerTargets() {
         await this.authorizeWorkspace('read');
         return this.scannerExecution ? (await this.scannerExecution.catalog()).entries : [];
+    }
+    /** Host-only idempotent construction of a single-source published scanner. */
+    async ensureBoundScanner(input: {sourceId: string; planId: string; spec: TwinSourceSpec; executor: import('@nestos/app-contracts').TwinScannerExecutor;
+        name: string; kinds: import('./domain').TwinMemoryKind[]; maxOutputTokens: number; runTokenLimit: number}) {
+        const services = await this.services(), settings = (await services.records.get<TwinSettings>('settings', 'pot'))!.data;
+        if (!settings.connectionId) throw new Error('TWIN_CONNECTION_REQUIRED');
+        if (!this.scannerExecution) throw new Error('TWIN_SCANNER_EXECUTOR_UNAVAILABLE');
+        await this.scannerExecution.validate(input.executor);
+        const sourceId = await services.sources.ensure(input.sourceId, input.spec, settings.connectionId);
+        const plan = await services.scans.plans.ensure(input.planId, {name: input.name, sourceIds: [sourceId], connectionId: settings.connectionId,
+            executor: input.executor, maxOutputTokens: input.maxOutputTokens, runTokenLimit: input.runTokenLimit, kinds: input.kinds,
+            mode: 'analyze', trigger: 'event', intervalMinutes: 30, tokenLimit: settings.tokenLimit, enabled: true, autoConfirm: false});
+        this.notify(); return {sourceId, planId: plan.id, planRevision: plan.revision};
     }
     async scannerExchangeCount(job: TwinAnalysisJob): Promise<number> {
         const records = (await this.services()).records;
@@ -229,6 +246,27 @@ export class DigitalTwinService {
     async readView(request: import('@nestos/app-contracts/services').TwinViewRequest) {
         const services = await this.services('read');
         return readTwinView(services.records, services.scans, await this.workspaceView(), request);
+    }
+
+    /** Internal Dream verification reads the selected plan and source, without activating sessions. */
+    async dreamScanEvidence(operationId: string, planId: string, sourceId: string, runId?: string) {
+        const started = Date.now(), safeId = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(operationId) ? operationId : 'invalid';
+        try {
+            if (safeId === 'invalid') throw new Error('TWIN_INVALID_OPERATION');
+            const services = await this.services('read'), records = services.records;
+            const [workspace, plan, source, run] = await Promise.all([this.workspaceView(), records.get<TwinScanPlan>('scan-plan', planId),
+                records.get<TwinSourceData>('source', sourceId), runId ? records.get<import('./scan-domain').TwinScanRun>('scan-run', runId) : null]);
+            const [jobs, memories] = runId ? await Promise.all([records.list<TwinAnalysisJob>('job'), records.list<TwinMemoryData>('memory')]) : [[], []];
+            const result = {workspace, plan, source, run, jobs: jobs.filter(job => job.data.scanScope?.runId === runId),
+                memories: memories.filter(memory => memory.data.scanRunId === runId).map(memory => ({...memory, supported: supported(memory.data, source)}))};
+            console.info('[DigitalTwin]', {operation: 'twin.dream.evidence', operationId: safeId, stage: 'read', result: 'success',
+                jobsScanned: jobs.length, memoriesScanned: memories.length, durationMs: Date.now() - started});
+            return result;
+        } catch (error) {
+            const code = error instanceof Error && /^TWIN_[A-Z_]+$/.test(error.message) ? error.message : 'TWIN_DREAM_EVIDENCE_FAILED';
+            console.warn('[DigitalTwin]', {operation: 'twin.dream.evidence', operationId: safeId, stage: 'read', result: 'failure', code, durationMs: Date.now() - started});
+            throw error;
+        }
     }
 
     async snapshot(progress: (stage: string) => void = () => {}) {
@@ -577,7 +615,7 @@ export class DigitalTwinService {
         const analysis = new TwinAnalysis(records, sources, extraction, () => this.notify(), async (scope, charge) => {
             await this.authorizeWorkspace();
             return guard(scope, charge);
-        });
+        }, this.workspace?.prepareJob);
         const knowledge = new TwinKnowledge(records);
         const scans = new TwinScans(scanStore, sources, analysis, () => this.notify(), index, async () => {
             await knowledge.recoverCleanup(() => !this.disposed); await analysis.recoverCleanup(() => !this.disposed);

@@ -56,6 +56,12 @@ import {FlowLibraryCommand} from '@nestos/app-contracts';
 import {recoverFlowSchedulers} from './flow-scheduler-recovery';
 import {bindTwinWorkspaces} from '../digital-twin/workspaces';
 import {PublishedScannerExecutor} from '../digital-twin/scanner-executor';
+import {DreamHost} from '../dream/host';
+import {DreamScheduleManager} from '../dream/schedule-manager';
+import {dreamScheduleProgram, dreamRoundProgram} from '../dream/schedule-program';
+import {dreamScheduleEffect} from '../dream/schedule-effect';
+import {authorizeScheduledRound} from '../dream/schedule-authority';
+import {DREAM_SCHEDULE_INDEX} from '../dream/config-store';
 import {migrateNotes} from './migrate-notes';
 import {trackNotesCloze} from '../vfs/cloze-lifecycle';
 import {createSessionTaskCallAuthority} from '../session/task-call-authority';
@@ -155,6 +161,8 @@ export interface ApplicationRuntime {
     flowInstallations: import('@nestos/app-contracts/services').FlowInstallations;
     toolPackages: import('@nestos/app-contracts/services').ToolPackages;
     digitalTwin?: DigitalTwinService;
+    /** Host-only Dream lifecycle; application transport does not expose this capability yet. */
+    dream?: DreamHost;
     kanban?: import('@nestos/kanban/contracts').KanbanClient;
     vfs: import('@nestos/vfs-core').IVFSManager;
     llmDriver: LLMDeviceDriver;
@@ -379,8 +387,12 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         let ensureExecutionWrite = async (_id: string): Promise<void> => { throw new FSError('ECONFLICT', 'Session ownership is not ready'); };
         let mayCollectContext = (_id: string): boolean => false;
         let digitalTwin: DigitalTwinService | undefined;
+        let dreamHost: DreamHost | undefined;
+        let dreamSchedules: DreamScheduleManager | undefined;
         const twinServices: DigitalTwinService[] = [];
         const executionTwin = async (sessionId: string) => {
+            const dream = await dreamHost?.forSession(sessionId);
+            if (dream) return dream;
             for (const twin of twinServices) if (await twin.ownsExecution(sessionId)) return twin;
             return digitalTwin;
         };
@@ -403,7 +415,10 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             contextEngineOptions: options.contextEngineOptions,
             contextGc: { canCollectSession: id => mayCollectContext(id) },
             llmDriver,
-            authorizeTool: async (request, context) => (await executionTwin(context.sessionId))?.authorizeTool(request, context),
+            authorizeTool: async (request, context) => {
+                await dreamHost?.authorizeScannerTool(context.sessionId);
+                return (await executionTwin(context.sessionId))?.authorizeTool(request, context);
+            },
             authorizeLlm: async (request, context) => (await executionTwin(context.sessionId))?.authorizeLlm(request, context),
             authorizeMedia: async (request, context) => (await executionTwin(context.sessionId))?.authorizeMedia(request, context),
             storageResolver: new SessionDirectoryStorageResolver(systemFS),
@@ -487,8 +502,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             { id: ownerId, kind: options.ownerKind ?? 'tauri' }, 10_000, async (id, ensureLeases) => {
                 await initializeProjects();
                 await skillsReady;
-                if (!id.startsWith('twin-analysis-')) await measureCallbacks(observed, 'adoptSession', () => projects.adoptSession(id, folder => sessionRepository.reconcileFolder(id, folder, ensureLeases)));
-                if (!id.startsWith('twin-analysis-')) await measureCallbacks(observed, 'platformBeforeRecovery', async () => options.kernelPlatform?.beforeSessionRecovery?.(id));
+                if (!id.startsWith('twin-analysis-') && !id.startsWith('dream-schedule-')) await measureCallbacks(observed, 'adoptSession', () => projects.adoptSession(id, folder => sessionRepository.reconcileFolder(id, folder, ensureLeases)));
+                if (!id.startsWith('twin-analysis-') && !id.startsWith('dream-schedule-')) await measureCallbacks(observed, 'platformBeforeRecovery', async () => options.kernelPlatform?.beforeSessionRecovery?.(id));
                 await measureCallbacks(observed, 'contextGcObserve', async () => { await kernel.contextGc?.observeSession(id); });
             }, excluded, 'deferred')).catch(async error => {
                 kernelCore.dispose();
@@ -553,6 +568,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 prepareSessionExecution: prepareChildExecution,
                 ensureFlowDependencies: async (id: string) => {await flowInstallations?.ensure(id);}, executionActivity, instructionQueueSessions, vfs, systemFS, promptHistoryFiles, directAgentPolicy: options.directAgentPolicy, agentResolution: options.agentResolution, agentService, sessionRepository, flowEngine, kernel,
                 digitalTwin,
+                retrieveDreamMemory: (sessionId, limit) => dreamHost?.retrieveSessionMemory(sessionId, limit) ?? Promise.resolve([]),
                 scheduleAgentInitialization: run => startup.schedule(policy.agents, 'agents.initialize', run),
                 scheduleInvocationRecovery: run => startup.schedule(policy.invocations, 'invocations.recover', async () => { await initializeProjects(); await run(); }),
                 ensureWritable: async sessionId => {
@@ -569,6 +585,23 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 tools: {kernel: kernelCore, repository: sessionRepository, tools: kernel.toolCatalog, prepareSession: prepareChildExecution}}));
             twin.setScannerExecution(new PublishedScannerExecutor({kernel: kernelCore, repository: sessionRepository,
             ready: () => ({commands: commandBus, calls: independentCalls}), exchanges: job => twin.scannerExchangeCount(job), bind: (job, sessionId) => twin.bindScanner(job, sessionId)}));
+        }
+        if (independentCalls && remoteConnections) {
+            const authorizeDreamOwner = async (id: string) => {
+                await initializeProjects(); const project = await projects.get(id);
+                if (projects.fileSource(project).kind !== 'local' || projects.workspaceAccess(project) !== 'rw') throw new Error('DREAM_OWNER_AUTHORIZATION_FAILED');
+            };
+            dreamHost = new DreamHost({fs: systemFS, repository: sessionRepository, kernel: kernelCore, models: agentService, projects,
+                remote: remoteConnections, commands: commandBus, calls: independentCalls, hostKind: options.ownerKind ?? 'tauri',
+                authorizeOwner: authorizeDreamOwner});
+            kernelCore.registerProgram(dreamScheduleProgram); kernelCore.registerProgram(dreamRoundProgram);
+            kernelCore.registerEffect(dreamScheduleEffect(dreamHost, dreamHost.configs.markSchedule.bind(dreamHost.configs),
+                (request, context) => authorizeScheduledRound(request, context, {fs: systemFS, kernel: kernelCore, authorizeOwner: authorizeDreamOwner})));
+            dreamSchedules = new DreamScheduleManager({fs: systemFS, kernel: kernelCore, repository: sessionRepository,
+                authorizeOwner: authorizeDreamOwner, prepare: prepareChildExecution, recover: id => recovery.acquireLater(id)});
+            dreamHost.bindSchedules(dreamSchedules);
+            cleanupFns.push(cleanupStep('dream.dispose', () => dreamHost!.dispose()));
+            cleanupFns.push(cleanupStep('dream-schedules.quiesce', () => dreamSchedules!.quiesce()));
         }
         flowInstallations = new FlowInstallationService(commandBus, new FlowToolPackages(kernel.toolCatalog, options.toolDependencies, options.toolConnections,
             templates => commandBus.execute<number>(FlowLibraryCommand.Restore, {templates})));
@@ -734,6 +767,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             throw error;
         });
         recoveryClient=kanban;
+        dreamHost?.bindKanban(kanban, new KanbanAutomationJournal(systemFS, kanbanJournalOptions));
         cleanupFns.push(cleanupStep('kanban.dispose', () => kanban.dispose()));
         const kanbanIntegrations = await options.configureKanban?.({fs:systemFS,service:kanban,kernel:kernelCore,calls:independentCalls,
             sessions:sessionRepository,prepareSession:id=>recovery.acquireLater(id)}) ?? [];
@@ -761,6 +795,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 stop('developmentMessages.quiesce', () => developmentMessages.quiesce()),
                 stop('developmentOperations.close', () => developmentOperations.close()),
                 stop('kanbanMonitor.dispose', async () => {await kanbanMonitor?.dispose();}),
+                ...(dreamHost ? [stop('dream.quiesce', async () => {await dreamSchedules?.quiesce(); await dreamHost!.quiesce();})] : []),
                 ...twinServices.map((twin, index) => stop(`scanner-${index + 1}.quiesce`, () => twin.quiesce())),
                 ...stopKanbanIntegrations.map((close, index) => stop(`integration-${index + 1}.quiesce`, close)),
             ];
@@ -789,12 +824,13 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         await startup.schedule(policy.workers, 'runtime.workers', async () => {
             await initializeProjects();
             if (!startup.active) return;
-            kanbanMonitor = startKanbanMonitor({service: {scan:async()=>{const results = await Promise.allSettled([kanban.scan(), developmentMessages.scan(), ...kanbanIntegrations.map(integration => integration.scan())]);
+            const hasDreamSchedules = await dreamSchedules?.hasSchedules() ?? false;
+            kanbanMonitor = startKanbanMonitor({service: {scan:async()=>{const results = await Promise.allSettled([kanban.scan(), developmentMessages.scan(), ...(dreamSchedules ? [dreamSchedules.scan()] : []), ...kanbanIntegrations.map(integration => integration.scan())]);
                 const failures = results.filter(result => result.status === 'rejected');
-                if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'KANBAN_SCAN_FAILED');}}, initialScan: kanbanIntegrations.length > 0 || !!developmentBindings, subscribeTick: tick => {
+                if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'KANBAN_SCAN_FAILED');}}, initialScan: kanbanIntegrations.length > 0 || !!developmentBindings || hasDreamSchedules, subscribeTick: tick => {
                 wakeKanban = tick;
                 const timer = setInterval(tick, 30_000); return () => {wakeKanban = () => {}; clearInterval(timer);};
-            }, subscribeChanges: tick => systemFS.on('seq:committed', event => {if(event.payload.paths.includes('/var/lib/kanban/boards.seq')) tick();}),
+            }, subscribeChanges: tick => systemFS.on('seq:committed', event => {if(event.payload.paths.some(path => path === '/var/lib/kanban/boards.seq' || path === DREAM_SCHEDULE_INDEX)) tick();}),
             onSuccess: () => reportKanbanHealth(events), onError: async error => {diagnostics.record({module: 'application', operation: 'kanban.monitor', stage: 'scan', result: 'failure', level: 'warn', code: kanbanFailureCode(error)}); await reportKanbanHealth(events,error);}});
             recovery.startBackground();
             if (options.digitalTwinAutoStart !== false) for (const twin of twinServices) {
@@ -806,7 +842,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         diagnostics.record({module: 'application', operation: 'application.runtime', stage: 'ready', result: 'success', level: 'info'});
         return { sessionRecovery, events, diagnostics, vfs, llmDriver, agentService, configuration, sessionRepository, flowEngine, sessionFiles, directoryMounts, projects, executionConnections, toolConnections: options.toolConnections,
             flowInstallations: installations, toolPackages: installations.toolPackages, kernel, sessionManager, commandBus, independentCalls, runCatalog, quiesce, dispose, startBackground, prepareSession: async id => { await initializeProjects(); return recovery.acquireLater(id); },
-            projectSync, digitalTwin, kanban, createView: createConversationView, openConversation: id => conversationContexts.open(id), conversationObservation: conversationContexts };
+            projectSync, digitalTwin, dream: dreamHost, kanban, createView: createConversationView, openConversation: id => conversationContexts.open(id), conversationObservation: conversationContexts };
     } catch (error) {
         await startup.close();
         for (const close of [...cleanupFns].reverse().concat([...sourceCleanupFns].reverse())) {

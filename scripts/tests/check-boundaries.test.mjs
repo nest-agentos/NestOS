@@ -48,6 +48,8 @@ test('public execution and conversation capabilities cannot depend on legacy sha
 test('dependency direction keeps domain capabilities independent of applications', () => {
     assert.equal(dependencyError(shell.name, core.name), undefined);
     assert.equal(dependencyError(core.name, '@nestos/llm-session'), undefined);
+    assert.equal(dependencyError(core.name, '@nestos/dream'), undefined);
+    assert.match(dependencyError('@nestos/dream', core.name), /own ports/);
     assert.match(dependencyError(vfs.name, shell.name), /must not depend/);
     assert.match(dependencyError(core.name, vfs.name), /platform-neutral/);
     assert.equal(dependencyError(core.name, 'js-yaml'), undefined);

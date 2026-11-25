@@ -54,6 +54,42 @@ export async function readHarness(projects: ProjectService, target: string): Pro
         const text = texts.join('\n'); return { text, hash: sha256HexSync(text), nativeIdentity };
     } finally { await client.close(); }
 }
+/** Read a provenance-filtered page with a revision fence and measured server-side I/O. */
+export async function readHarnessWindow(projects: ProjectService, target: string, maxRounds: number, previousCursor?: string | null): Promise<TwinSourceContent & {scannedRounds: number; hasOlder?: boolean; historyBytes: number; contextBytes: number; cursor: string}> {
+    if (!Number.isSafeInteger(maxRounds) || maxRounds < 1 || maxRounds > 20) throw new Error('TWIN_SOURCE_LIMIT');
+    const [projectId, profileId, sessionId] = parseTarget(target);
+    const mounts = projects.remoteMounts, root = mounts?.list(projectId).find(mount => mount.at === '/');
+    const client = await mounts?.projectHarness(projectId, {timeoutMs: 5000});
+    if (!client) throw new Error('TWIN_SOURCE_SCOPE');
+    try {
+        if (!root?.connectionId || !root.serverId || !root.serverProjectId || !client.digest) throw new Error('TWIN_DIGEST_UNAVAILABLE');
+        const metadata = await client.digest(profileId, sessionId, {timeoutMs: 5000, metadataOnly: true});
+        const session = metadata.session;
+        if (session.id !== sessionId || typeof session.createdAt !== 'number' || !session.historyRevision || session.activeTurnId
+            || !['idle', 'notLoaded', null].includes(session.status))
+            throw new Error('TWIN_DIGEST_UNAVAILABLE');
+        const nativeIdentity = JSON.stringify([projectId, profileId, sessionId, root.serverId, root.serverProjectId, session.createdAt, maxRounds]);
+        const cursor = sha256HexSync(JSON.stringify([nativeIdentity, metadata.revision]));
+        if (cursor === previousCursor) return {text: '', hash: '', nativeIdentity, cursor, scannedRounds: 0, historyBytes: 0, contextBytes: 0};
+        const digest = await client.digest(profileId, sessionId, {timeoutMs: 5000, expectedRevision: metadata.revision});
+        if (digest.revision !== metadata.revision || digest.session.historyRevision !== session.historyRevision) throw new Error('TWIN_SOURCE_CHANGED');
+        if (!digest.scan || digest.omittedUnclassified) throw new Error('TWIN_DIGEST_UNAVAILABLE');
+        const turns = [...new Set(digest.messages.map(item => item.turnId))];
+        if (turns.some(turn => !turn)) throw new Error('TWIN_HISTORY_INCOMPLETE');
+        const selected = new Set(turns.slice(-maxRounds));
+        const messages = digest.messages.filter(item => selected.has(item.turnId));
+        const text = messages.length ? JSON.stringify(messages) : '';
+        if (new TextEncoder().encode(text).length > 32768) throw new Error('TWIN_SOURCE_LIMIT');
+        const after = await client.digest(profileId, sessionId, {timeoutMs: 5000, metadataOnly: true, expectedRevision: digest.revision});
+        const current = mounts?.list(projectId).find(mount => mount.at === '/');
+        if (after.revision !== digest.revision || after.session.historyRevision !== session.historyRevision || after.session.createdAt !== session.createdAt
+            || after.session.activeTurnId || !['idle', 'notLoaded', null].includes(after.session.status) || current?.connectionId !== root.connectionId
+            || current?.serverId !== root.serverId || current?.serverProjectId !== root.serverProjectId) throw new Error('TWIN_SOURCE_CHANGED');
+        return {text, hash: sha256HexSync(text), nativeIdentity, cursor,
+            scannedRounds: turns.length, hasOlder: turns.length > maxRounds || !!digest.nextCursor,
+            historyBytes: digest.scan.historyBytes, contextBytes: digest.scan.contextBytes};
+    } finally {await client.close();}
+}
 function parseTarget(target: string): [string, string, string] {
     const value: unknown = JSON.parse(target);
     if (!Array.isArray(value) || value.length !== 3 || value.some(item => typeof item !== 'string' || !item)) throw new Error('TWIN_INVALID_SOURCE');

@@ -15,7 +15,7 @@ export interface TwinMemoryData {
     goalStatus: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
     successCondition: string; deadline: string; executionRefs: Array<{ sessionId: string; taskId: string }>;
 }
-export interface TwinSourceSpec { kind: 'file' | 'session' | 'harness-session'; target: string; label: string; }
+export interface TwinSourceSpec { kind: 'file' | 'session' | 'harness-session' | 'managed-artifact'; target: string; label: string; }
 export interface TwinDiscoveredSource extends TwinSourceSpec {
     location?: 'local' | 'remote'; directoryPath?: string;
     projectId: string; projectName?: string; path?: string; sessionId?: string; profileId?: string; version?: string;
