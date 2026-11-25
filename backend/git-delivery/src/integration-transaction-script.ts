@@ -88,7 +88,8 @@ merge_source() {
         return
     fi
     rc=0
-    tree=$(approved_merge "$candidate" "$next") || rc=$?
+    tree=$(approved_merge "$candidate" "$next" "$source_modules") || rc=$?
+    [ "$rc" -ne 5 ] || stop 5 MERGE_PLAN_CONFLICTS_MISSING
     [ "$rc" -eq 0 ] || stop "$rc" INTEGRATION_SOURCE_MERGE
     verify_module_links "$next" "$tree" "$candidate" "$source_modules" || stop 3 INTEGRATION_MODULE_REVIEW_REQUIRED
     if [ "$dirty" = dirty ] && git merge-base --is-ancestor "$head" "$candidate"; then

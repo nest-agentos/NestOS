@@ -73,6 +73,17 @@ it.each(['staged', 'untracked', 'ignored'])('hands back a %s collision without c
     expect(await readFile(join(f.root, path), 'utf8')).toBe(target);
 });
 
+it('requires a fresh approval when the frozen plan omitted a real Git conflict',async()=>{
+    const f=await fixture();
+    await writeFile(join(f.root,'shared'),contents.replace('line 1\n','target edit\n'));
+    await f.git('add','shared');await f.git('commit','-qm','target edit');
+    await writeFile(join(f.source,'shared'),contents.replace('line 1\n','source edit\n'));
+    const previousTarget=await f.git('rev-parse','HEAD'),input={...f.input,previousTarget};
+    await expect(tryGitIntegration(f.process,input)).rejects.toMatchObject({code:'MERGE_PLAN_CONFLICTS_MISSING',executionOutcome:'not-started'});
+    expect(await f.git('rev-parse','HEAD')).toBe(previousTarget);
+    expect(await inspectGitIntegration(f.process,input)).toBeUndefined();
+});
+
 it('verifies two changes-only sources against their respective integration steps', async () => {
     const f = await fixture();
     const second = join(f.root, 'second');
@@ -233,7 +244,7 @@ it('reports an external index change without resetting its staged blob',async()=
     expect(await f.git('rev-parse','HEAD')).toBe(f.input.previousTarget);
 });
 
-it('publishes a frozen module snapshot without moving either module checkout',async()=>{
+it.each([false,true])('publishes a frozen module snapshot without moving either module checkout (diverged=%s)',async diverged=>{
     const f=await fixture(),repo=await mkdtemp(join(tmpdir(),'nestos-module-capture-'));
     roots.push(repo);
     await f.git('init','-qb','main',repo);
@@ -243,17 +254,24 @@ it('publishes a frozen module snapshot without moving either module checkout',as
     const base=await f.git('-C',repo,'rev-parse','HEAD');
     await f.git('-c','protocol.file.allow=always','submodule','add','--',repo,'module');
     await f.git('commit','-qam','register module');
-    const previousTarget=await f.git('rev-parse','HEAD');
-    await f.git('-C',f.source,'merge','--ff-only',previousTarget);
+    const sourceHead=await f.git('rev-parse','HEAD');
+    await f.git('-C',f.source,'merge','--ff-only',sourceHead);
     await f.git('-C',f.source,'-c','protocol.file.allow=always','submodule','update','--init','--','module');
     const sourceModule=join(f.source,'module'),targetModule=join(f.root,'module');
+    if(diverged){
+        await writeFile(join(targetModule,'target-only'),'retained\n');
+        await f.git('-C',targetModule,'add','target-only');
+        await f.git('-C',targetModule,'-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','-qm','target module change');
+        await f.git('add','module');await f.git('commit','-qm','advance target module');
+    }
+    const previousTarget=await f.git('rev-parse','HEAD'),targetModuleHead=await f.git('-C',targetModule,'rev-parse','HEAD');
     const file=join(sourceModule,'history');
     await writeFile(file,'approved\n');
     const objects=JSON.stringify([['module',base]]);
-    const frozen=await f.process.nativeShell.exec('sh',['-c',integrationSourceSnapshotScript,'test',previousTarget,objects],{cwd:'/workspace/source'});
+    const frozen=await f.process.nativeShell.exec('sh',['-c',integrationSourceSnapshotScript,'test',sourceHead,objects],{cwd:'/workspace/source'});
     expect(frozen).toMatchObject({code:0});
-    const input={...f.input,previousTarget,sources:[{...f.input.sources[0],sourceHead:previousTarget,sourceTree:frozen.stdout.trim(),
-        repositories:[{path:'.',head:previousTarget,dirty:true},{path:'module',head:base,dirty:true}]}]};
+    const input={...f.input,previousTarget,sources:[{...f.input.sources[0],sourceHead,sourceTree:frozen.stdout.trim(),
+        repositories:[{path:'.',head:sourceHead,dirty:true},{path:'module',head:base,dirty:true}]}]};
     await writeFile(file,'changed after review\n');
     await expect(tryGitIntegration(f.process,input)).rejects.toMatchObject({code:'INTEGRATION_SOURCE_CHANGED'});
     expect(await f.git('rev-parse','HEAD')).toBe(previousTarget);
@@ -263,7 +281,8 @@ it('publishes a frozen module snapshot without moving either module checkout',as
     expect(link).toBeDefined();
     expect(await f.git('-C',targetModule,'show',link+':history')).toBe('approved');
     expect(await f.git('-C',targetModule,'rev-parse','refs/nestos/module-delivery/'+link)).toBe(link);
-    expect(await f.git('-C',targetModule,'rev-parse','HEAD')).toBe(base);
+    expect(await f.git('-C',targetModule,'rev-parse','HEAD')).toBe(targetModuleHead);
+    if(diverged)expect(await f.git('-C',targetModule,'show',link+':target-only')).toBe('retained');
     expect(await f.git('-C',sourceModule,'rev-parse','HEAD')).toBe(base);
     expect(await f.git('-C',sourceModule,'diff','--cached','--name-only')).toBe('');
     expect(await readFile(file,'utf8')).toBe('approved\n');

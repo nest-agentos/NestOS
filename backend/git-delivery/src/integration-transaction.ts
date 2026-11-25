@@ -42,6 +42,7 @@ export async function tryGitIntegration(process: GitProcess, input: GitIntegrati
     log.info('Git integration transaction', {operationId: input.operationId, stage: 'integration.apply',
         result: result.code === 0 ? 'success' : 'failure', code, durationMs: Date.now() - started});
     if (code === 'INTEGRATION_MODULE_CAPTURE_FAILED') throw Object.assign(failure(code), {executionOutcome:'not-started'});
+    if (code === 'MERGE_PLAN_CONFLICTS_MISSING') throw Object.assign(failure(code), {executionOutcome:'not-started'});
     if (result.code === 3 && code !== 'INTEGRATION_PUBLICATION_UNKNOWN') return 'session';
     if (code === 'INTEGRATION_SOURCE_CHANGED' || code === 'INTEGRATION_TARGET_CHANGED') {
         throw Object.assign(failure(code), {executionOutcome: 'not-started'});
@@ -130,7 +131,7 @@ async function verifyCapturedTree(process: GitProcess, source: GitSource, captur
     const actual = await git(['rev-parse', target + '^{tree}']);
     if(captured===previous){requireValue(actual===await git(['rev-parse',previous+'^{tree}']),'INTEGRATION_RECEIPT_INVALID');return;}
     const choices=integrationChoices(approval,resolutions);requireValue(choices,'INTEGRATION_RECEIPT_INVALID');
-    const replay=await process.nativeShell.exec('sh',['-c',inspectApprovedMergeScript,'nestos-merge-proof',previous,captured,JSON.stringify(choices)],
+    const replay=await process.nativeShell.exec('sh',['-c',inspectApprovedMergeScript,'nestos-merge-proof',previous,captured,JSON.stringify(choices),JSON.stringify(dirtyIntegrationModules(source.repositories))],
         {cwd:'/workspace',timeoutMs:120000});
     requireValue(replay.code===0&&actual===replay.stdout.trim(),'INTEGRATION_RECEIPT_INVALID');
 }

@@ -1130,6 +1130,7 @@ export const en: LocaleStrings = {
     "kanban.errors.OPERATION_RESULT_TARGET_REWRITTEN": "The target history changed. Check the operation Session and analyze again.",
     "kanban.errors.OPERATION_OWNER_INVALID": "Management ownership is invalid. Check the parent task links.",
     "kanban.errors.OPERATION_TARGET_CHANGED_REANALYZE": "The target branch or worktree changed; the previous analysis is stale.",
+    'kanban.errors.MERGE_PLAN_CONFLICTS_MISSING': 'Git found conflicts missing from the approval. Reanalyze and confirm how to resolve each conflict.',
     "kanban.errors.OPERATION_SOURCE_CHANGED_REANALYZE": "The source changed; the previous analysis is stale.",
     "kanban.errors.OPERATION_RUNNING_VERSION_MISMATCH": "The running service is not the selected acceptance version.",
     "kanban.errors.OPERATION_RESULT_RUNNING_VERSION_MISMATCH": "The running version does not match the replacement result.",

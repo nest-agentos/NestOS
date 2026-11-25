@@ -93,11 +93,13 @@ def entry(tree, path):
 for path, _ in json.loads(modules):
     incoming = entry(source, path)
     baseline = entry(previous, path)
-    if incoming != entry(target, path) or not baseline.startswith(b'160000 commit '):
+    merged = entry(target, path)
+    if not all(row.startswith(b'160000 commit ') for row in (incoming, baseline, merged)):
         sys.exit(3)
     old = baseline.split()[2]
     new = incoming.split()[2]
-    if subprocess.run(['git', '-C', path, 'merge-base', '--is-ancestor', old, new]).returncode:
+    result = merged.split()[2]
+    if any(subprocess.run(['git', '-C', path, 'merge-base', '--is-ancestor', parent, result]).returncode for parent in (old, new)):
         sys.exit(3)
 PYTHON
 }

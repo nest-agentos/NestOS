@@ -52,7 +52,7 @@ function analysisExpired(context:Context,analysis:ReviewJob|undefined):boolean {
     if(!analysis)return false;
     const merge=latest(context,'merge');
     return context.settings.invalidatedAnalysis?.id===analysis.id||!!merge&&merge.createdAt>=analysis.createdAt
-        &&['MERGE_PLAN_SOURCE_CHANGED','OPERATION_SOURCE_CHANGED_REANALYZE','OPERATION_TARGET_CHANGED_REANALYZE'].includes(merge.code??'');
+        &&['MERGE_PLAN_SOURCE_CHANGED','MERGE_PLAN_CONFLICTS_MISSING','OPERATION_SOURCE_CHANGED_REANALYZE','OPERATION_TARGET_CHANGED_REANALYZE'].includes(merge.code??'');
 }
 
 function operationStatusText(context:Context,action:ReviewAction):string|undefined {

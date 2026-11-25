@@ -1131,6 +1131,7 @@ export const zhCN = {
     "kanban.errors.OPERATION_RESULT_TARGET_REWRITTEN": "目标分支历史已改变，请检查操作会话并重新分析。",
     "kanban.errors.OPERATION_OWNER_INVALID": "管理任务归属关系无效，请检查父任务关联。",
     "kanban.errors.OPERATION_TARGET_CHANGED_REANALYZE": "目标分支或工作区已变化，旧分析已失效。",
+    'kanban.errors.MERGE_PLAN_CONFLICTS_MISSING': 'Git 检测到审批中遗漏的冲突。请重新分析并逐项确认合入处理方式。',
     "kanban.errors.OPERATION_SOURCE_CHANGED_REANALYZE": "源提交或文件已变化，旧分析已失效。",
     "kanban.errors.OPERATION_RUNNING_VERSION_MISMATCH": "当前服务不是所选验收版本，请先完成替换。",
     "kanban.errors.OPERATION_RESULT_RUNNING_VERSION_MISMATCH": "替换流程已结束，但当前服务版本与验收版本不符。",
