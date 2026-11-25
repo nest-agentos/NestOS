@@ -74,7 +74,10 @@ export function developmentObserver(options: Options) {
         const completed=completedPublication(envelope as Parameters<typeof completedPublication>[0]);
         if(completed)await registerTaskResultRecovery(journal,{boardId:input.boardId,itemId:item.id,dispatchId:input.dispatch.id,resultId:completed.id});
         const messages = await consumeChannelMessages(envelope,scope,journal,
-            message => deliver(options, journal, input, message), async message => {await options.remote!.sessionChannel(projectId, 'acknowledge', {scopeId: workspace.channelId, id: message.id, ack: {status: 'delivered'}});});
+            message => deliver(options, journal, input, message), async (message,rejection) => {
+                await options.remote!.sessionChannel(projectId,'acknowledge',{scopeId:workspace.channelId,id:message.id,
+                    ack:rejection?{status:'rejected',code:rejection}:{status:'delivered'}});
+            });
             const unresolved = unresolvedWorkIssues(messages);
             await reconcileIssues(journal, input, messages);
             if(envelope.execution?.sessionId&&['running','submitting'].includes(envelope.execution.status??''))return {...input.observation,outcome:'running',outputs:undefined,code:unresolved.some(message=>message.type==='error')?'WORKSPACE_ERROR_REPORTED':unresolved.some(message=>message.type==='clarification')?'WORKSPACE_INPUT_REQUIRED':undefined};

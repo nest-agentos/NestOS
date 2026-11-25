@@ -23,11 +23,19 @@ it('repairs a lost node acknowledgement without repeating a committed delivery',
     await consumeChannelMessages(value,scope,store,deliver,ack);
     expect(deliver).toHaveBeenCalledOnce();expect(ack).toHaveBeenCalledTimes(2);
 });
-it('rejects invalid linked resolutions and duplicate IDs before any delivery',async()=>{
+it('rejects duplicate IDs before delivery and isolates invalid resolutions from a valid result',async()=>{
     const deliver=vi.fn(),row={id:'m',message:{type:'progress',content:'Saved'}};
     await expect(consumeChannelMessages({messages:[row,row]},scope,journal(),deliver)).rejects.toMatchObject({code:'CHANNEL_MESSAGE_INVALID'});
-    await expect(consumeChannelMessages({messages:[row,{id:'resolved',message:{type:'resolved',replyTo:'missing',content:'Done'}}]},scope,journal(),deliver)).rejects.toMatchObject({code:'WORKSPACE_RESOLUTION_INVALID'});
     expect(deliver).not.toHaveBeenCalled();
+    const store=journal(),ack=vi.fn(),invalid={id:'invalid',message:{type:'resolved',replyTo:'m',content:'Done'}},
+        issue={id:'issue',message:{type:'error',content:'Blocked'}},resolved={id:'resolved',message:{type:'resolved',replyTo:'issue',content:'Fixed'}},
+        result={id:'result',message:{type:'result',content:'Evidence'}};
+    const envelope={messages:[row,invalid,issue,resolved,result]};
+    for(let i=0;i<2;i++)expect((await consumeChannelMessages(envelope,scope,store,deliver,ack)).map(message=>message.id))
+        .toEqual(['m','issue','result','resolved']);
+    expect(ack).toHaveBeenCalledWith(expect.objectContaining({id:'invalid'}),'WORKSPACE_RESOLUTION_INVALID');
+    expect(ack).toHaveBeenCalledTimes(5);
+    expect(deliver).toHaveBeenCalledTimes(4);
 });
 it('delivers linked questions before their resolutions and detects removed publications after restart',async()=>{
     const store=journal(),deliver=vi.fn(async()=>{}),question={id:'question',message:{type:'clarification',content:'Choose'}};

@@ -13,5 +13,6 @@ export async function observeFixMessages(options:Options,fix:SavedFix):Promise<v
                     ...(['clarification','error'].includes(message.type)?{notification:message.type==='error'?'error' as const:'info' as const}:{})},Date.now());
                 await tx.setState(key,'delivered');
             });
-        },async message=>{await options.automation.sessionChannel!(fix.resourceId,'acknowledge',{scopeId:fix.id,id:message.id,ack:{status:'delivered'}});});
+        },async (message,rejection)=>{await options.automation.sessionChannel!(fix.resourceId,'acknowledge',{
+            scopeId:fix.id,id:message.id,ack:rejection?{status:'rejected',code:rejection}:{status:'delivered'}});});
 }
