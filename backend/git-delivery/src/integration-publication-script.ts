@@ -28,7 +28,10 @@ match_work() {
     observed=$(GIT_INDEX_FILE="$tmp/probe" git write-tree) || return 1
     GIT_INDEX_FILE="$tmp/probe" python3 - "$expected" "$alternate" "$observed" "$tmp" <<'PYTHON'
 import filecmp
+import hashlib
 import os
+import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -36,9 +39,35 @@ import tempfile
 expected, alternate, observed, temp = sys.argv[1:]
 missing = subprocess.check_output(['git', 'diff-tree', '-r', '--no-commit-id',
     '--name-only', '--no-renames', '--diff-filter=A', '-z', expected, alternate]).split(b"\\0")
+def lfs_matches(path, oid):
+    if not stat.S_ISREG(os.lstat(path).st_mode):
+        return False
+    attr = subprocess.check_output(['git', 'check-attr', '--cached', '-z', 'filter', '--', path])
+    if not attr.endswith(b'\\0filter\\0lfs\\0'):
+        return False
+    if int(subprocess.check_output(['git', 'cat-file', '-s', oid])) > 1024:
+        return False
+    pointer = subprocess.check_output(['git', 'cat-file', 'blob', oid])
+    match = re.fullmatch(rb'version https://git-lfs.github.com/spec/v1\\noid sha256:([0-9a-f]{64})\\nsize ([0-9]+)\\n', pointer)
+    if not match or os.stat(path).st_size != int(match[2]):
+        return False
+    with open(path, 'rb') as content:
+        digest = hashlib.sha256()
+        for chunk in iter(lambda: content.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest().encode() == match[1]
+
+def equivalent(spec, path):
+    old_mode, new_mode, oid, _, _ = spec[1:].split()
+    if old_mode == new_mode == b'160000':
+        # The separately checked module checkpoint owns the checkout state.
+        return not os.path.islink(path) and os.path.exists(os.path.join(path, b'.git'))
+    return old_mode == new_mode and old_mode in (b'100644', b'100755') and lfs_matches(path, oid)
+
 changed = subprocess.check_output(['git', 'diff-tree', '-r', '--no-commit-id',
-    '--name-only', '--no-renames', '-z', expected, observed]).split(b"\\0")
-collisions = set(path for path in missing if path and os.path.lexists(path)) | set(filter(None, changed))
+    '--raw', '--no-renames', '-z', expected, observed]).split(b"\\0")
+collisions = {path for path in missing if path and os.path.lexists(path)}
+collisions.update(path for spec, path in zip(changed[::2], changed[1::2]) if not equivalent(spec, path))
 if not collisions:
     selected = subprocess.check_output(['git', 'diff-tree', '-r', '--no-commit-id',
         '--name-only', '--no-renames', '--diff-filter=AMT', '-z', alternate, expected])

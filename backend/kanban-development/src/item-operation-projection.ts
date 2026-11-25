@@ -32,7 +32,7 @@ export function operation(context: Context, action: ReviewAction, active: boolea
         state:action==='merge'&&invalidated&&(!job||job.phase==='settled')?'unavailable':action==='analyze'&&invalidated?(enabled?'ready':'unavailable'):autoPending?'running':autoFailed?'failed':action === 'accept' && !context.scoped&&context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
         ...(replacement||job?.state==='unknown'?{attention:{kind:'recovery' as const}}:action==='merge'&&plan?.conflicts.length?{attention:{kind:'choice' as const}}:{}),
         ...(replacement?{recovery:replacement}:job?.state==='unknown'&&job.phase==='submitting'?{recovery:{runId:job.id,label:t('kanban.operationReconcile'),
-            reason:t(['GIT_IDENTITY_MISSING','GIT_COMMIT_IDENTITY_REQUIRED'].includes(job.code??'')?'kanban.operationRecoveryIdentity':job.code==='OPERATION_RESULT_PENDING'?'kanban.operationRecoveryMissingResult':job.code?.startsWith('INTEGRATION_')?'kanban.operationRecoveryGitPublication':'kanban.operationRecoveryUnavailable'),
+            reason:recoveryReason(job),
             prompt:t('kanban.operationRecoveryPrompt',{operationId:job.id,source:job.snapshot.sourceVersion,target:job.snapshot.targetVersion})}}:{}),
         statusText:operationStatusText(context,action),progress:operationProgress(job,autoPending),
         code:autoFailed?auto.code:job?.code==='WORKSPACE_CONTEXT_PENDING'?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId??(action==='merge'?latest(context,'analyze')?.sessionId:undefined), configurable, binding, openSessionOnRun: agent || action === 'analyze',
@@ -40,6 +40,12 @@ export function operation(context: Context, action: ReviewAction, active: boolea
         summary:action==='merge'&&integrationPaths(job?.result)?integrationPaths(job?.result):action==='analyze'||action==='merge'?plan?plan.summary+'\n'+t('kanban.operationVersions',{source:plan.sourceVersion,target:plan.targetVersion}):undefined:resultSummary(job?.result),
         fields: action === 'merge' && plan ? plan.conflicts.map(conflict => ({id: conflict.id, label: conflict.path + ' · ' + conflict.reason, choices: conflict.options})) : undefined,
         confirmation: action === 'deploy' ? t('kanban.operationConfirmDeploy') : action === 'accept' ? context.deliveryPlan?.acceptanceConfirmation===null?undefined:context.deliveryPlan?.acceptanceConfirmation??t('kanban.operationConfirmAcceptance') : action === 'merge' ? t(plan?.conflicts.length?'kanban.operationConfirmMerge':'kanban.operationConfirmMergeNoConflicts') : undefined};
+}
+function recoveryReason(job:ReviewJob):string {
+    const code=job.code??'';
+    const message=t(['GIT_IDENTITY_MISSING','GIT_COMMIT_IDENTITY_REQUIRED'].includes(code)?'kanban.operationRecoveryIdentity':code==='OPERATION_RESULT_PENDING'?'kanban.operationRecoveryMissingResult':code.startsWith('INTEGRATION_')?'kanban.operationRecoveryGitPublication':'kanban.operationRecoveryUnavailable');
+    const paths=code.startsWith('INTEGRATION_')?integrationPaths(job.result):undefined;
+    return paths?message+'\n'+paths:message;
 }
 function replacementRecovery(job:ReviewJob):NonNullable<KanbanItemOperation['recovery']> {
     const versions=(job.result as {replacementVersions?:{expected?:string;running?:string}}|undefined)?.replacementVersions;
