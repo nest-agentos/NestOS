@@ -82,7 +82,7 @@ export function createPersonalKanbanAutomation(options:Options) {
         analyze:async(board,item,service,active)=>{
             await recoverAnalysis(options,board,item,service,active,async()=>{
             const target=board.automation!.enabled?automationTarget(board.automation!.planner,await options.catalog()):undefined;
-            await analyzeItem({...options,prepareSession,active,readPlanningPrompt:board=>readGlobalPlanningPrompt(options.fs,board.automation?.preparationOptions?.profile??'development'),prepareAnalysis:options.prepareAnalysis?async input=>options.prepareAnalysis!({...input,
+            await analyzeItem({...options,decisionSource:options.service,prepareSession,active,readPlanningPrompt:board=>readGlobalPlanningPrompt(options.fs,board.automation?.preparationOptions?.profile??'development'),prepareAnalysis:options.prepareAnalysis?async input=>options.prepareAnalysis!({...input,
                 context:await workContext(options.journal,board,item,options.service),
                 reportActivity:fact=>options.workLog?.append(options.service,board.id,item.id,{...fact,actor:fact.actor??board.automation?.coordinator,dispatchId:input.id})??Promise.resolve()}) : undefined},board,item,target,service);
             });

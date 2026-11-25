@@ -83,6 +83,12 @@ C4Component
     Rel(execution, remote, "执行会话与工作区操作")
 ```
 
+### 软件模块的边界
+
+Kanban 核心通过宿主端口请求准备、规划和执行，轮次持久化所选的准备描述符。NestOS 在装配层把普通循环的 `project-directory` 绑定到独立目录适配器，把选择了软件模块的循环的 `git-worktree` 绑定到软件适配器。两者共用原生会话通道、固定发布目标和结果回执。
+
+项目目录适配器只准备专用目录及任务输入。软件适配器额外提供 Git 基线与工作树、交付拆解校验、合并、构建和发布。普通循环的结果通过正式会话回执核对，无需软件交付检查。
+
 ### 实现入口
 
 | 层 | 源码 |
@@ -92,7 +98,7 @@ C4Component
 | 生命周期及扩展装配 | [runtime.ts](../../libraries/kanban/src/runtime/runtime.ts)、[runtime-ports.ts](../../libraries/kanban/src/runtime/runtime-ports.ts) |
 | 循环与管理任务 | [recurrence-scheduler.ts](../../libraries/kanban/src/runtime/recurrence-scheduler.ts)、[record-execution.ts](../../libraries/kanban/src/runtime/record-execution.ts) |
 | 自动协调与任务操作插件 | [automation.ts](../../libraries/kanban/src/runtime/automation.ts)、[operation-plugins.ts](../../libraries/kanban/src/runtime/operation-plugins.ts) |
-| NestOS 接线、循环执行绑定和决策模块 | [personal.ts](../../backend/app-core/src/kanban/personal.ts)、[recurring-automation.ts](../../backend/app-core/src/kanban/recurring-automation.ts)、[decision-modules.ts](../../backend/app-core/src/kanban/decision-modules.ts) |
+| NestOS 接线、循环执行绑定和决策模块 | [personal.ts](../../backend/app-core/src/kanban/personal.ts)、[recurring-automation.ts](../../backend/app-core/src/kanban/recurring-automation.ts)、[kanban-project-directory.ts](../../backend/app-core/src/presets/kanban-project-directory.ts)、[decision-modules.ts](../../backend/app-core/src/kanban/decision-modules.ts) |
 | 侧栏和循环界面 | [sidebar.ts](../../ui/app-shell/src/kanban/sidebar.ts)、[loop-catalog.ts](../../libraries/kanban-ui/src/loop-catalog.ts)、[loop-board.ts](../../libraries/kanban-ui/src/loop-board.ts) |
 
 ## 循环如何复用普通看板能力

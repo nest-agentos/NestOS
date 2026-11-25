@@ -90,6 +90,23 @@ it('analyzes newly added work, waits for independent acceptance and passes prere
     expect((await f.executionItem('second')).item.status).toBe('review');
 });
 
+it('verifies the frozen source decision when the coordinator can only access its execution board',async()=>{
+    const f=await fixture();
+    const source='decision-source',recordId='decision',runId='round-source-verification';
+    await f.service.create({id:source,title:'Source',scope:{kind:'system'},members:[
+        {kind:'human',id:'admin',responsibility:'Verify decision',roles:['coordinator','reviewer']}]});
+    const command=async (command:KanbanCommand)=>f.service.execute(source,{operationId:randomUUID(),expectedRevision:(await f.service.read(source)).revision,command});
+    await command({type:'append-record',record:{id:recordId,kind:'decision',title:'Approved',content:'Plan',rationale:'Checked',itemIds:[],sources:[]}});
+    await command({type:'review-record',recordId,accept:true});
+    const record=await f.service.record(source,recordId);
+    await f.journal.appendRecurringRun(source,{id:runId,boardId:'board',recordId,recordRevision:record.revision,record,
+        state:'running',createdAt:Date.now(),updatedAt:Date.now()}, {sourceBoardId:source,recordId,recordRevision:record.revision,runId});
+    await f.item('first');
+    await f.command({type:'link-reference',itemId:'first',reference:{system:'nestos-decision-run',id:runId}});
+    await f.scan();
+    expect(await f.service.analysisStatus!('board','first')).toMatchObject({state:'ready'});
+    expect((await f.executionItem('first')).item.planning?.parentId).toBe('first');
+});
 it('persists an uncertain analysis and only inspects its original admission after reopening', async () => {
     const f = await fixture(); await f.item('first'); f.lose(); await f.scan();
     expect(await f.service.analysisStatus!('board', 'first')).toMatchObject({state: 'unknown', code: 'AUTOMATION_ADMISSION_UNKNOWN'});

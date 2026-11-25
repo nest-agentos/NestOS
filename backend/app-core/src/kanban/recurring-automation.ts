@@ -1,6 +1,7 @@
 import type {KanbanBoard,KanbanProjectRecord} from '@nestos/kanban/contracts';
 import {automationCatalog,automationTarget,developmentCatalog} from '@nestos/kanban-development';
 import type {PersonalKanbanAutomationOptions} from './personal-automation';
+import {projectDirectoryPreparation} from '../presets/kanban-project-directory';
 import {usesSoftwareModule} from './decision-modules';
 import {requireValue} from './validation';
 
@@ -16,13 +17,8 @@ export function recurringAutomation(options:PersonalKanbanAutomationOptions) {
         const {targets,coordinator,worker}=automationCatalog(published);
         const planner=targets.find(({reference})=>reference.system==='nestos-published-agent'&&reference.id==='kanban-file-planner')?.reference;
         const executor=targets.find(({reference})=>reference.system==='nestos-published-agent'&&reference.id==='kanban-development-worker')?.reference;
-        const preparation=software?options.preparations?.find(({reference})=>reference.id===developmentCatalog()[0].reference.id)?.reference:directoryPreparation;
+        const preparation=software?options.preparations?.find(({reference})=>reference.id===developmentCatalog()[0].reference.id)?.reference:projectDirectoryPreparation;
         requireValue(planner&&executor&&preparation&&options.prepareWork&&options.prepareAnalysis,'RECURRENCE_AUTOMATION_TARGET_UNAVAILABLE');
         return {enabled:true,autoAccept:false,planner,executor,coordinator,worker,preparation,...(software?{preparationOptions:{commit:'changes'}}:{})};
     };
-}
-
-export const directoryPreparation={system:'nestos-work-preparation',id:'project-directory',revision:'1'} as const;
-export function isDirectoryPreparation(reference:{system:string;id:string;revision?:string}):boolean {
-    return reference.system===directoryPreparation.system&&reference.id===directoryPreparation.id&&reference.revision===directoryPreparation.revision;
 }

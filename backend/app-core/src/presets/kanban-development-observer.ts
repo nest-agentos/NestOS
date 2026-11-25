@@ -103,6 +103,7 @@ export function developmentObserver(options: Options) {
             const publications = envelope.messages as ChannelMessage[];
             const results = publications.filter(row => row.message.type === 'result');
             if (results.length !== 1) return {...input.observation, outcome: 'unknown', outputs: undefined, code: 'CHANNEL_RESULT_INVALID'};
+            if(workspace.directoryOnly&&!completed)return {...input.observation,outcome:'unknown',outputs:undefined,code:'WORKSPACE_RESULT_UNVERIFIED'};
             const result = results[0];
             if (result) try {
                 await registerSessionLearnings({boardId: input.boardId, sessionId: input.observation.executionSessionId ?? input.dispatch.executionSessionId,

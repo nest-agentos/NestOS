@@ -13,6 +13,7 @@ import type {TargetRef} from '@nestos/llm-flow/contracts';
 import {requireValue} from './validation';
 import {developmentPrompts as defaults} from '../resources/catalog';
 export interface AnalysisOptions {
+    decisionSource?:Pick<KanbanService,'record'>;
     readPlanningPrompt?(board:KanbanBoard):Promise<string>;
     readAnalysisOutput?(id:string):Promise<KanbanAnalysisObservation|undefined>;
     onAnalysis?: import('./personal-automation').PersonalKanbanAutomationOptions['onAnalysis'];
@@ -47,7 +48,7 @@ function analysisInput(board:KanbanBoard,item:KanbanItem,target:TargetRef,id:str
 async function inspectAnalysis(options:AnalysisOptions,id:string,input:IndependentCallInput,board:KanbanBoard,item:KanbanItem,service:KanbanService):Promise<KanbanAnalysisObservation> {
     const observed=await options.readAnalysisOutput?.(id);
     if(observed&&observed.state!=='running'&&observed.state!=='succeeded')return observed;
-    if(observed?.state==='succeeded')await validateDecisionSource(service,(await workContext(options.journal,board,item)).decision);
+    if(observed?.state==='succeeded')await validateDecisionSource(options.decisionSource??service,(await workContext(options.journal,board,item)).decision);
     const pending={state:'running' as const};if(!options.active())return pending;
     const result=await options.execution.inspect(input);
     if(!options.active()||result.outcome==='running')return pending;

@@ -1,4 +1,4 @@
-import {isDirectoryPreparation} from '../kanban/recurring-automation';
+import {isProjectDirectoryPreparation,prepareKanbanProjectDirectory} from '../presets/kanban-project-directory';
 import {nativeRestartIdle} from '../kanban/restart-barrier';
 import {requestManagementCleanup} from '../kanban/cleanup-review-conversations';
 import {createIndependentCallExecutionReader,createSessionActivityReader} from '@nestos/llm-session';
@@ -22,7 +22,7 @@ import {developmentWorkExchange} from '../presets/kanban-channel-exchange';
 import {cleanupStep, cleanupStage, type CleanupStep} from './cleanup-stage';
 import {nativeSessionResource} from '../projects/session-resource';
 import {OperationLifetime} from '../run/operation-lifetime';
-import {developmentAnalysis} from '../presets/kanban-development-analysis';
+import {nativeWorkPlanning} from '../presets/kanban-native-planning';
 import {developmentDelivery} from '../presets/kanban-development-delivery';
 import {developmentContinuation} from '../presets/kanban-development-continuation';
 import {createSubmissionControl as submissionControl} from '@nestos/llm-session';
@@ -42,7 +42,7 @@ import {prepareHarnessDraftConnection} from '../projects/harness-draft-connectio
 import {reportKanbanHealth, kanbanFailureCode} from '../kanban/health-events';
 import {withProjectEnvironment} from '../projects/project-environment';
 import {createPersonalKanban} from '../kanban/personal';
-import {developmentPreparation} from '../presets/kanban-development';
+import {developmentPreparation,validateSoftwarePlanning} from '../presets/kanban-development';
 import {developmentTaskRecheck} from '../presets/kanban-development-recheck';
 import {observeDevelopmentPermissions,softwareApprovalModule} from '../presets/kanban-execution-permissions';
 import type {KanbanApprovalModule} from '../kanban/decision-modules';
@@ -655,7 +655,10 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const decisionModules=approvalModules.map(({decide,...module})=>module);
         const observeApprovals=developmentBindings?observeDevelopmentPermissions(developmentBindings.remote,approvalModules,commandBus.execute.bind(commandBus)):undefined;
         const prepareDevelopment = developmentBindings ? developmentPreparation(developmentBindings) : undefined;
-        const analyzeDevelopment = developmentBindings ? developmentAnalysis(developmentBindings,()=>wakeKanban()) : undefined;
+        const prepareDirectory=developmentBindings?prepareKanbanProjectDirectory(developmentBindings):undefined;
+        const prepareKanbanWork:typeof prepareDevelopment=prepareDevelopment&&prepareDirectory?input=>(
+            isProjectDirectoryPreparation(input.preparation)?prepareDirectory:prepareDevelopment)(input):undefined;
+        const analyzeDevelopment = developmentBindings && prepareKanbanWork ? nativeWorkPlanning(developmentBindings,prepareKanbanWork,()=>wakeKanban(),validateSoftwarePlanning) : undefined;
         if(analyzeDevelopment)cleanupFns.push(()=>analyzeDevelopment.dispose());
         const verifyDevelopment = developmentBindings ? developmentDelivery(systemFS, developmentBindings.remote, developmentBindings.provider,options.runningVersion) : undefined;
         const continueDevelopment = developmentBindings && independentCalls ? developmentContinuation({...developmentBindings,
@@ -736,7 +739,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             sessionChannel: remoteConnections?.sessionChannel.bind(remoteConnections),
             projects, requiresItemResource:requiresDevelopmentProject,
             validatePreparation: (reference, settings, board) => {
-                if(isDirectoryPreparation(reference)){
+                if(isProjectDirectoryPreparation(reference)){
                     if(board.scope.kind!=='collection'||board.scope.namespace!=='recurring-run'||Object.keys(settings??{}).length)
                         throw Object.assign(new Error('Invalid project directory preparation'), {code:'WORK_PREPARATION_UNSUPPORTED'});
                     return;
@@ -760,7 +763,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             observeWork: input => developmentOperations.run(() => developmentMessages.observe(input)),
             verifyWork: verifyDevelopment ? id => developmentOperations.run(() => verifyDevelopment(id)) : undefined,
             preparations: remoteConnections ? developmentCatalog() : [],
-            prepareWork: prepareDevelopment ? input => developmentOperations.run(() => prepareDevelopment(input)) : undefined,
+            prepareWork: prepareKanbanWork ? input => developmentOperations.run(() => prepareKanbanWork(input)) : undefined,
             callControl: (command, request) => commandBus.execute(command, request),
             callCancel: (command, request) => commandBus.execute(command, request),
             submissionControl: submissionControl({contexts:conversationContexts, repository:sessionRepository, kernel:kernelCore, ensureWritable:conversationOptions.ensureWritable}),

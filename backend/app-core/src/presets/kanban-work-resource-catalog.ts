@@ -23,7 +23,7 @@ export async function registerWorkResource(journal:KanbanAutomationJournal,id:st
 async function ensureCatalog(journal:KanbanAutomationJournal):Promise<void>{
     if(await journal.get('work-resource-catalog-version')===1)return;
     let scanned=0;const started=Date.now(),operationId=randomUUID(),rows=await journal.find<DevelopmentWorkspaceRecord>('development-workspace:',()=>{requireValue(++scanned<=2000,'WORK_RESOURCE_INDEX_LIMIT');return true;});
-    for(const row of rows)await registerWorkResource(journal,row.key.slice('development-workspace:'.length),row.value);
+    for(const row of rows)if(!row.value.directoryOnly)await registerWorkResource(journal,row.key.slice('development-workspace:'.length),row.value);
     await journal.update('work-resource-catalog-version',()=>1);
     log.info('work-resource.catalog',{operationId,stage:'association-migration',result:'success',count:rows.length,durationMs:Date.now()-started});
 }

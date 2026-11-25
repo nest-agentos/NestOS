@@ -2,6 +2,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
+import {prepareKanbanProjectDirectory} from '../src/presets/kanban-project-directory';
 import {developmentPreparation} from '../src/presets/kanban-development';
 import {readPrompt} from '../src/run/prompt-bundle';
 vi.mock('../src/presets/kanban-development-policy',()=>({developmentPolicy:async()=>({version:1,profile:'development',commit:'changes',modules:[],prompts:{version:1,files:[]}})}));
@@ -84,9 +85,9 @@ it('prepares a recurring decision without the software module in a project direc
     const board={id:'round-board',scope:{kind:'collection',namespace:'recurring-run',id:'round'}};
     const input={board,target:f.target,context:f.context,item:f.item,stage:'decision',
         preparation:{system:'nestos-work-preparation',id:'project-directory',revision:'1'},dispatch:{id:'directory-round',itemId:f.item.id}};
-    await developmentPreparation(f.options as never)(input as never);
+    await prepareKanbanProjectDirectory(f.options as never)(input as never);
     expect(await f.journal.get('development-workspace:directory-round')).toMatchObject({
-        directoryOnly:true,directory:'_nestos/kanban/runs/directory-round',repositories:[],
+        directoryOnly:true,directory:'_nestos/kanban/runs/directory-round',
     });
     expect(await f.journal.get('development-commit-context:directory-round')).toBeUndefined();
     const manifest=JSON.parse(await readPrompt(f.fs,'/workspace/_nestos/kanban/runs/directory-round/manifest.json'));
