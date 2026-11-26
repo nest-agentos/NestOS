@@ -82,6 +82,20 @@ it('consumes navigation preferences locally without replacing a more recent loca
     expect(readUiDocuments).not.toHaveBeenCalled(); await store.flush();
 });
 
+it('skips transient presentation changes and restores a saved value after an unknown write', async () => {
+    const writeUiDocuments = vi.fn(async (_documents: Record<string, unknown>) => {});
+    const store = new VfsJsonStore({readUiDocuments: async () => ({layout: 'saved'}), writeUiDocuments});
+    await store.read('layout');
+    const finish = store.begin();
+    store.write('layout', 'draft'); store.write('layout', 'saved'); finish();
+    await store.flush(); expect(writeUiDocuments).not.toHaveBeenCalled();
+    writeUiDocuments.mockRejectedValueOnce(new Error('Reply lost'));
+    store.write('layout', 'draft');
+    await expect(store.flush()).rejects.toThrow('Reply lost');
+    store.write('layout', 'saved'); await store.flush();
+    expect(writeUiDocuments).toHaveBeenLastCalledWith({layout: 'saved'});
+});
+
 it('batches staged startup reads once and does not reuse a preload after a newer write', async () => {
     const readUiDocuments = vi.fn(async () => ({theme: {mode: 'dark'}, layout: {width: 300}}));
     const store = new VfsJsonStore({readUiDocuments, writeUiDocuments: async () => {}});

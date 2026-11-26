@@ -11,8 +11,9 @@ export class SessionCallTargets {
     private pending?: Promise<void>;
     private closed = false;
     constructor(private readonly commands: ICommandBus, private readonly changed: () => void, private readonly autoSelectFirst = true,
-        private readonly filterAgents?: (ids: string[]) => Promise<string[]>) {
+        private readonly filterAgents?: (ids: string[]) => Promise<string[]>, initial?: RootTargetCatalog) {
         this.snapshot = {...this.snapshot, autoSelectFirst};
+        if (initial) this.apply(initial);
     }
     getSnapshot(): CallTargetCatalog {return this.snapshot;}
     refresh(): Promise<void> {
@@ -31,9 +32,7 @@ export class SessionCallTargets {
             const catalog = await this.commands.execute<RootTargetCatalog>(SessionCommand.ListTargets);
             if (!catalog || !Array.isArray(catalog.entries) || !Array.isArray(catalog.issues)) throw new Error(t('callable.catalog.invalid'));
             const allowed = this.filterAgents ? new Set(await this.filterAgents(catalog.entries.filter(entry => entry.target.kind === 'agent').map(entry => entry.target.id))) : undefined;
-            const entries = catalog.entries.filter(entry => entry.target.kind !== 'agent' || !allowed || allowed.has(entry.target.id)).map(entry => choice(entry));
-            if (!this.closed) this.snapshot = {entries, loading: false, autoSelectFirst: this.autoSelectFirst, label: t('chatInput.target.label'),
-                ...(catalog.issues.length ? entries.length ? {message: t('callable.catalog.partial', {count: catalog.issues.length})} : {error: t('callable.catalog.unavailable')} : {})};
+            const entries = this.apply(catalog, allowed);
             log.info('chat.targets.read', {operationId, stage: 'catalog', result: entries.length ? 'success' : 'unavailable',
                 code: entries.length ? 'CATALOG_READY' : catalog.issues.length ? 'CATALOG_ENTRIES_UNAVAILABLE' : 'CATALOG_EMPTY',
                 durationMs: Date.now() - started, entryCount: entries.length, issueCodes: catalog.issues.map(issue => issue.code)});
@@ -43,6 +42,12 @@ export class SessionCallTargets {
                 error: error instanceof Error ? error.message : t('callable.catalog.unavailable')};
         }
         if (!this.closed) this.changed();
+    }
+    private apply(catalog: RootTargetCatalog, allowed?: Set<string>): CallTargetChoice[] {
+        const entries = catalog.entries.filter(entry => entry.target.kind !== 'agent' || !allowed || allowed.has(entry.target.id)).map(choice);
+        if (!this.closed) this.snapshot = {entries, loading: false, autoSelectFirst: this.autoSelectFirst, label: t('chatInput.target.label'),
+            ...(catalog.issues.length ? entries.length ? {message: t('callable.catalog.partial', {count: catalog.issues.length})} : {error: t('callable.catalog.unavailable')} : {})};
+        return entries;
     }
 }
 

@@ -250,6 +250,15 @@ it('returns a usable project composer in the authenticated startup response', as
         composer: {id: expect.any(String), initialData: '', save: expect.any(Function)}});
     expect(posts).toEqual(['bootstrap']);
     expect(root.services.sessionManager.getSnapshot().sessionId).toBeFalsy();
+    const draftId = opening.draft!.composer.id!;
+    await expect(opening.prepareDraftSession!('wrong-draft')).rejects.toMatchObject({code: 'ECONFLICT'});
+    const prepared = await opening.prepareDraftSession!(draftId, {data: '{}'});
+    expect(prepared).toMatchObject({sessionId: draftId, view: {manifest: {id: draftId}}});
+    expect(root.services.sessionManager.getSnapshot().sessionId).toBeFalsy();
+    const initial = await prepared.view.activate('main', {taskAttachmentKey: 'ui.privileged.active-task'});
+    expect(initial).toMatchObject({sessionId: draftId, targets: {entries: expect.any(Array)}, independentCalls: [],
+        skills: [], taskAttachment: {pendingTaskIds: []}, instructionQueue: {sessionId: draftId}});
+    await prepared.view.dispose();
     await root.initialView!.dispose();
 });
 
@@ -339,6 +348,41 @@ it('updates another browser configuration cache after a backend change without r
     const first = await client('writer'), second = await client('observer');
     await first.services.agentService.saveProvider({ id: 'shared', name: 'Shared', implementation: 'openai-compatible', baseURL: 'https://example.test', models: [] });
     await vi.waitFor(() => expect(second.services.agentService.getProvider('shared')?.name).toBe('Shared'));
+});
+
+it('repairs an SSE patch after a lost write response without replaying the write or affecting another tab', async () => {
+    const requests: string[] = [], faults = vi.fn(), url = server.origin + '/api/application';
+    let targets: string[] = [];
+    const fetcher: typeof fetch = async (input, init) => {
+        const response = await auth.fetcher(input, init);
+        if (!init?.body) return response;
+        const request = JSON.parse(String(init.body));
+        requests.push(request.kind);
+        if (request.kind === 'updates-sync') targets = request.targets;
+        if (request.call?.method === 'saveProvider') {
+            const reply = await response.json();
+            expect(JSON.stringify(reply.updates)).toContain('$patch');
+            throw new TypeError('Write reply lost after commit');
+        }
+        return response;
+    };
+    const peer = new HttpViewClient('lost-write-reply', url, fetcher, undefined, faults); clients.push(peer);
+    const root = await peer.start(), other = await client('other-tab');
+    const provider = {id: 'shared', name: 'Initial', implementation: 'openai-compatible' as const, baseURL: 'https://example.test', models: []};
+    await other.services.agentService.saveProvider(provider);
+    await vi.waitFor(() => expect(root.services.agentService.getProvider('shared')?.name).toBe('Initial'));
+    await expect(root.services.agentService.saveProvider({...provider, name: 'Lost reply'})).rejects.toMatchObject({outcome:'unknown'});
+    await other.services.agentService.saveProvider({...provider, name: 'Latest'});
+    await vi.waitFor(() => expect(root.services.agentService.getProvider('shared')?.name).toBe('Latest'), {timeout:3000});
+    expect(requests.filter(kind => kind === 'updates-sync')).toHaveLength(1);
+    expect(faults).not.toHaveBeenCalled();
+    expect(auditEvents.filter(event => event.rpcOperations?.includes('IAgentManagementService.saveProvider'))).toHaveLength(3);
+    expect(auditEvents).toContainEqual(expect.objectContaining({event:'view.update.sync', result:'success', count:targets.length}));
+    const denied = await auth.fetcher(url, {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({kind:'updates-sync', clientId:'other-tab', version:RPC_VERSION, targets})});
+    expect(denied.headers.get('X-NestOS-View-Expiry-Code')).toBe('VIEW_SNAPSHOT_UNAVAILABLE');
+    expect(await denied.json()).not.toHaveProperty('updates');
+    expect(other.services.agentService.getProvider('shared')?.name).toBe('Latest');
 });
 
 it.each([false,true])('reads large updates over authenticated HTTP without replaying the write (lost read: %s)', async loseFirstRead => {
@@ -586,13 +630,16 @@ it('atomically rejects an old Session UI revision across authenticated views wit
     const a = await client('ui-cas-a'), b = await client('ui-cas-b');
     const id = await a.services.projects.sessions.create('UI CAS', null), before = await a.services.sessionRepository.getManifest(id);
     const writes = await Promise.allSettled([
-        a.services.sessionRepository.compareAndSetUIState!(id, before.revision!, {operationRecords: [{id: 'a', input: 'PRIVATE_UI_RECORD'}]}),
-        b.services.sessionRepository.compareAndSetUIState!(id, before.revision!, {operationRecords: [{id: 'b', input: 'PRIVATE_UI_RECORD'}]}),
+        a.services.sessionRepository.compareAndSetUIState!(id, before.revision!, {operationRecords: [{id: 'a', input: 'PRIVATE_UI_RECORD'}]}, true),
+        b.services.sessionRepository.compareAndSetUIState!(id, before.revision!, {operationRecords: [{id: 'b', input: 'PRIVATE_UI_RECORD'}]}, true),
     ]);
     expect(writes.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(writes.find(result => result.status === 'rejected')).toMatchObject({reason: {code: 'SESSION_UI_STATE_CONFLICT'}});
     const current = await b.services.sessionRepository.getManifest(id);
     expect(current.revision).toBe(before.revision! + 1); expect(current.uiState?.operationRecords).toHaveLength(1);
+    const committed = {revision: current.revision, uiState: current.uiState};
+    expect(writes.find(result => result.status === 'fulfilled')).toEqual({status: 'fulfilled', value: committed});
+    await expect(b.services.sessionRepository.compareAndSetUIState!(id, current.revision!, {}, true)).resolves.toEqual(committed);
     await expect(b.services.sessionRepository.compareAndSetUIState!(id, -1, {})).rejects.toMatchObject({code: 'SESSION_UI_STATE_VERSION_INVALID'});
     expect(JSON.stringify(auditEvents)).not.toContain('PRIVATE_UI_RECORD');
 });
@@ -688,10 +735,18 @@ it('opens a file workbench with one observation and keeps component subscription
         bound.kernel.kernel.onChanged(() => {}), bound.projects.favorites.subscribe(() => {}),
         bound.projects.drafts.onPromoted(() => {}), sources.files(opening.workbench.browser.fs).onAny!(() => {}));
     await new Promise(resolve => setTimeout(resolve, 20)); expect(requests.length).toBe(before);
-    await root.services.projects.sessions.create('Observation fixture', project.path);
+    const sessionId = await root.services.projects.sessions.create('Observation fixture', project.path);
     await vi.waitFor(() => expect(received).toHaveBeenCalled());
-    const navigation = await opening.readNavigation({projectId: project.project.id});
-    expect(navigation.navigation?.path).toBe(opening.resourceId);
+    const directory = folderBrowserPath(project.path), navigationStart = requests.length;
+    const {navigation, activity, session} = await opening.readRefresh!({navigation: {
+        resourceId: directory, projectId: project.project.id, expandedPaths: [directory], refresh: true
+    }, activity: [sessionId], sessionId});
+    expect(navigation?.navigation?.path).toBe(directory);
+    expect(navigation?.navigation?.project?.project.id).toBe(project.project.id);
+    expect(navigation?.directories).toEqual(expect.arrayContaining([expect.objectContaining({path:directory})]));
+    expect(activity).toHaveProperty(sessionId);
+    expect(session).toMatchObject({id: sessionId, manifest: {id: sessionId}});
+    expect(requests.slice(navigationStart)).toEqual(['queries']);
     expect(await opening.prepareChat()).toHaveProperty('sessionSkills');
     stops.forEach(stop => stop()); sources.close(); await opening.dispose();
     await expect(opening.readNavigation({projectId: null})).rejects.toMatchObject({code: 'ECAPABILITY'});

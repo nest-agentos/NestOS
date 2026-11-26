@@ -19,7 +19,7 @@ function fixture(input?: OperationRecord['input']) {
         source: {kind: 'composer', text: 'hello', attachments: [], values: {}},
         submission: {id: 'op', source: {kind: 'conversation', ownerId: 'session', id: 'op'}}}} as unknown as OperationRecord['input']};
     const operations: OperationLedger = { getSnapshot: () => [record], subscribe: () => () => {}, register: async () => {}, settle: async () => {} };
-    const execute = vi.fn(async () => 'in-memory-request');
+    const execute = vi.fn(async (_name: string, _args?: unknown) => 'in-memory-request');
     const hasCommittedSubmission = vi.fn(async () => committed);
     const session = { id: 'session', getSnapshot: () => ({instructionQueue: queue}), getSessions: () => groups, isGenerating: () => false,
         onEvent(callback: () => void) { listeners.add(callback); return () => { listeners.delete(callback); }; } } as unknown as SessionViewPort;
@@ -42,6 +42,20 @@ it('does not acknowledge a Session request that has only entered the in-memory q
     const receipt = await binding.actions.send!({ text: 'hello', attachments: [] }, { operationId: 'op', viewId: binding.source.getSnapshot().viewId });
     expect(host.execute).toHaveBeenCalledOnce(); expect(receipt.status).toBe('unknown');
     expect(host.hasCommittedSubmission).toHaveBeenCalledWith({ id: 'op', source: { kind: 'conversation', ownerId: 'session', id: 'op' } });
+    binding.dispose();
+});
+
+it.each([false, true])('reuses the first admission receipt and only inspects when the submit response is lost (%s)', async lost => {
+    const target = {kind: 'flow' as const, id: 'worker', version: '1', digest: 'a'.repeat(64)}, input = {text: 'hello', attachments: [], target};
+    const host = fixture({...input});
+    if (lost) host.execute.mockRejectedValueOnce(new Error('Response lost'));
+    host.execute.mockResolvedValue({operationId: 'op', status: 'accepted', evidence: 'queue'} as never);
+    const binding = createSessionChatBinding({...host.options, targetSelection: true, initialTargets: {entries: [{target, name: 'Worker'}], issues: []}});
+    const send = binding.actions.send!(input, {operationId: 'op', viewId: binding.source.getSnapshot().viewId});
+    if (lost) await expect(send).rejects.toThrow('Response lost');
+    else await expect(send).resolves.toMatchObject({operationId: 'op', status: 'accepted'});
+    expect(await binding.actions.reconcile!('op')).toMatchObject({status: 'accepted'});
+    expect(host.execute.mock.calls.map(([name]) => name)).toEqual(lost ? [SessionCommand.Submit, SessionCommand.InspectSubmissionReceipt] : [SessionCommand.Submit]);
     binding.dispose();
 });
 

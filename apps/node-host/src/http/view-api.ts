@@ -28,7 +28,7 @@ interface Client { peer: RpcPeer; view: HostedView; stream?: ServerResponse; las
     initialized: boolean; notifications: ViewNotifications; events: ViewEventStream; updateReads: ViewUpdateReads;
     pending: Map<string, { resolve(reply: Reply): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>; }
 type ApplicationRequest = BootstrapRequest & {clientId?: unknown; version?: unknown; kind?: string;
-    call?: Call; calls?: Call[]; id?: string; reply?: Reply};
+    call?: Call; calls?: Call[]; id?: string; targets?: unknown; reply?: Reply};
 /** A certificate-scoped browser view owns subscriptions; the daemon owns execution. */
 export class ViewApi {
     private readonly snapshots = new SnapshotCache();
@@ -60,6 +60,7 @@ export class ViewApi {
         if (body.kind === 'bootstrap-data') {await compressedJson(response, 200, await client.bootstrap!); return;}
         if (body.kind === 'bootstrap-catalogs') return this.respondCatalogs(client, response);
         if (body.kind === 'updates-read') return this.readUpdates(client, body.id, response);
+        if (body.kind === 'updates-sync') return this.syncUpdates(client, body.targets, response);
         if (body.kind === 'reply') {
             const pending = client.pending.get(body.id!); if (!pending) throw new FSError('ENOENT', 'Unknown callback');
             clearTimeout(pending.timer); client.pending.delete(body.id!); pending.resolve(body.reply!); json(response, 200, {}); return;
@@ -92,6 +93,28 @@ export class ViewApi {
         catch (error) {
             if (error instanceof FSError && error.code === 'ENOENT') this.expire(response, 'VIEW_UPDATE_EXPIRED', 'Prepared view update expired; reconnect the page');
             throw error;
+        }
+    }
+    private async syncUpdates(client: Client, targets: unknown, response: ServerResponse): Promise<void> {
+        const started = Date.now(), requestId = String(response.getHeader('X-Request-ID') ?? '');
+        let code: string | undefined, updateCount = 0;
+        this.acquire(client);
+        try {
+            if (!Array.isArray(targets) || !targets.length || targets.length > 64
+                || targets.some(id => typeof id !== 'string' || !/^server:[a-f0-9-]{36}:[1-9][0-9]{0,9}$/.test(id))) {
+                throw new FSError('EINVAL', 'Expected a bounded list of view snapshot identities');
+            }
+            const updates = client.peer.publishedUpdates([...new Set<string>(targets)]);
+            updateCount = updates.length;
+            await compressedJson(response, 200, {updates});
+        } catch (error) {
+            code = error instanceof FSError ? error.code : 'VIEW_SNAPSHOT_SYNC_FAILED';
+            if (code === 'ENOENT') this.expire(response, 'VIEW_SNAPSHOT_UNAVAILABLE', 'Published view snapshot is unavailable');
+            throw error;
+        } finally {
+            client.active--; client.lastSeen = Date.now();
+            this.audit?.write({...diagnosticContext(), event:'view.update.sync', operation:'view.update', stage:'snapshot.read', requestId,
+                result: code ? 'failure' : 'success', code, count:updateCount, durationMs: Date.now() - started});
         }
     }
     private async respondBootstrap(client: Client, identity: string, body: BootstrapRequest, response: ServerResponse): Promise<void> {

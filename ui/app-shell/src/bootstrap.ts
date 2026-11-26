@@ -22,6 +22,7 @@ import {rememberPagePresentation, writePageHistory, type PagePresentation} from 
 import { FlowCommand } from '@nestos/llm-flow/contracts';
 import {withInitialDirectory} from './browser/initial-directory';
 import {OpenedViewProjection} from './lifecycle/opened-view';
+import {overlay} from './lifecycle/view-sources';
 import {openInitialView} from './lifecycle/initial-view';
 import { ExecutorUsage } from './persistence/executor-usage';
 import { INITIAL_CHAT_DOCUMENTS } from './persistence/documents';
@@ -130,7 +131,10 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
 
     if (!options.services || !options.backend) throw new Error('AppOptions.services and AppOptions.backend are required');
     let services = options.services, backend = options.backend;
-    const applicationEvents = backend.events ? new ShellApplicationEvents(backend.events, event => {
+    const eventSource = backend.events;
+    const applicationEvents = eventSource ? new ShellApplicationEvents(overlay(eventSource, {
+        onChange: listener => (backend.events ?? eventSource).onChange(listener),
+    }), event => {
         for (const [id, manager] of managerCache) {
             const kind = workspaces.find(workspace => workspace.elementId === id)?.type;
             if (workspaceConsumesEvent(kind, event)) manager.invalidateFromEvents?.(event);
@@ -474,7 +478,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             const resourcePath = initialResource && !initialResource.startsWith('@') && !initialResource.startsWith('draft:')
                 ? parseSessionRoute(initialResource).path : undefined;
             const target = resourcePath ? resourceTarget(resourcePath) : undefined;
-            const initialOpening = opened?.conversationWorkbench;
+            const initialOpening = projection?.opening ?? opened?.conversationWorkbench;
             const preparedLocal = !!target && target.kind === 'session' && opened?.initial?.sessionId === target.sessionId;
             const opening = initialOpening && (initialOpening.resourceId ?? initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === (resourcePath ?? initialResource) ? initialOpening
                 : target && !preparedLocal && backend.openWorkbench
@@ -919,7 +923,10 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const initialRevision = navigationRevision;
     options.onShellReady?.();
     await initialLoad;
-    const notificationBadge=options.initialRead?.request.task?{unread:options.initialRead.unreadNotifications?.value,read:backend.events?.notificationSummary?.bind(backend.events)}:undefined;
+    const notificationBadge = backend.events?.notificationSummary
+        ? {unread: options.initialRead?.unreadNotifications?.value, read: backend.events.notificationSummary.bind(backend.events),
+            subscribe: opened?.sharedEventHints && applicationEvents
+                ? applicationEvents.subscribeNotificationCount.bind(applicationEvents) : undefined} : undefined;
     cleanupFns.push(installAssistantMenu({services, backend, events:applicationEvents, notificationBadge, documents: uiDocs, signal: navigationSignal,
         current: () => {
             const workspace = reverseRouteMap[visibleWorkspaceId ?? ''] ?? resolvedDefault;

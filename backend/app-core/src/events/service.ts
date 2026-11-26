@@ -13,7 +13,11 @@ export class UserEventService implements ApplicationEvents {
     }
     eventBaseline() {return this.journal.baseline();}
     notificationSummary() {return this.journal.transaction(notificationSummary);}
-    readEvents(after?: EventCursor, limit?: number) {return this.journal.read(after, limit);}
+    readEvents(after?: EventCursor, limit?: number, includeNotifications?: true) {
+        if (includeNotifications !== true) return this.journal.read(after, limit);
+        return this.journal.transaction(async tx => ({...await tx.read(after, limit),
+            unreadNotifications: (await notificationSummary(tx)).unread}));
+    }
     onChange(listener: () => void) {return this.journal.onChange(listener);}
     async listNotifications(limit = 100) {
         if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) throw new FSError('EINVAL', 'Invalid notification limit');

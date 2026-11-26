@@ -28,7 +28,11 @@ export function connectApplication() {
         tracing.bootstrap(prepared.packet); return prepared;
     });
     const ready = Promise.all([preparing, import('./live-connection')]).then(([prepared, module]) => {
-        listeners.signal.throwIfAborted(); live = module.adoptConnection(prepared, fetcher, status, listeners.signal,error=>tracing.compatibility(error),deferEvents);
+        listeners.signal.throwIfAborted();
+        live = module.adoptConnection(prepared, fetcher, status, listeners.signal, {
+            compatibility: error => tracing.compatibility(error),
+            updateFailure: error => tracing.viewUpdateFailure(clientId, error),
+        }, deferEvents);
         return live.ready;
     }).then(root => {
         const report = root.backend.reportClientDiagnostic?.bind(root.backend);

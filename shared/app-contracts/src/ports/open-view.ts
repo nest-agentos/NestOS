@@ -20,6 +20,7 @@ export interface ApplicationViewSources {
     remoteStatus: {projectId: string; rows: readonly import('@nestos/cells-driver/harness').HarnessStatusRow[]};
     session: Parameters<Parameters<ApplicationServices['sessionManager']['onEvent']>[0]>[0];
     global: Parameters<Parameters<ApplicationServices['sessionManager']['onGlobalEvent']>[0]>[0];
+    applicationEvents: undefined;
     agents: undefined;
     configuration: undefined;
     skills: {sessionId: string};
@@ -37,6 +38,7 @@ export interface ApplicationViewObservation {
 export interface OpenedApplicationView {
     /** Global event cursor captured before preparing the initial snapshots. */
     eventBaseline?: import('@nestos/vfs-core').EventCursor;
+    sharedEventHints?: true;
     conversationWorkbench?: import('./conversation-workbench').ConversationWorkbenchView;
     connectionInterests?: string[];
     documents: Record<string, unknown>;

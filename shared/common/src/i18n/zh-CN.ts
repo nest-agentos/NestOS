@@ -3216,6 +3216,7 @@ export const zhCN = {
     'project.draftLoading.attachments': '正在恢复草稿和附件…',
     'project.draftLoading.configuration': '正在读取执行器和模型配置…',
     'project.draftLoading.targets': '正在读取智能体和流程…',
+    'project.draftLoading.submission': '正在准备发送第一条消息…',
     'project.draftLoading.retry': '重试',
     'project.draftLoading.connection': '新建会话时连接中断。检查网络连接后重试。',
     'project.draftLoading.failed': '草稿打开失败：',

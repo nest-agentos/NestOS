@@ -18,12 +18,18 @@ export class OpenedViewProjection {
     private skills?: SessionPresentationState['skills'];
     readonly services: ApplicationServices;
     readonly backend: ApplicationBackend;
+    readonly opening?: OpenedApplicationView['conversationWorkbench'];
     constructor(private readonly view: OpenedApplicationView, services: ApplicationServices, backend: ApplicationBackend) {
         this.cursor = view.cursor;
         this.recovery = view.initial?.taskAttachment; this.flows = view.initial?.flowInvocations; this.skills = view.initial?.skills;
         this.services = this.bindServices(services);
         this.prepared = view.conversationWorkbench ? undefined : this.bindWorkbench(view.workbench);
+        const opening = view.conversationWorkbench;
+        this.opening = opening && overlay(opening, {
+            subscribe: async listener => this.subscribeEvents(listener),
+        });
         this.backend = overlay(backend, {
+            ...(backend.events && view.sharedEventHints && {events: overlay(backend.events, {onChange: listener => this.subscribe('applicationEvents', listener)})}),
             workbenchView: settings => {const ready = this.prepared; this.prepared = undefined; return ready ? Promise.resolve(ready) : backend.workbenchView(settings);},
             taskAttachment: async (id, key) => {
                 const matches = id === view.initial?.sessionId && key === view.taskAttachmentKey;
@@ -37,13 +43,19 @@ export class OpenedViewProjection {
         const stop = await this.view.observation.observeView(this.cursor, event => this.receive(event));
         if (this.stopped) stop(); else this.stop = stop;
     }
+    private readonly eventListeners = new Set<(event: ApplicationViewEvent) => void>();
+    private subscribeEvents(listener: (event: ApplicationViewEvent) => void): () => void {
+        if (this.stopped) return () => {};
+        this.eventListeners.add(listener);
+        return () => {this.eventListeners.delete(listener);};
+    }
     finishHydration(): void {
         this.hydrating = false;
         for (const event of this.buffered.splice(0)) this.dispatch(event);
         this.flushConnections?.();
     }
     async dispose(): Promise<void> {
-        this.stopped = true; this.stop?.(); this.listeners.clear(); this.buffered.length = 0;
+        this.stopped = true; this.stop?.(); this.listeners.clear(); this.eventListeners.clear(); this.buffered.length = 0;
         await this.view.dispose();
     }
     private subscribe<K extends keyof ApplicationViewSources>(topic: K, listener: (value: ApplicationViewSources[K]) => void): () => void {
@@ -67,6 +79,9 @@ export class OpenedViewProjection {
         } else this.dispatch(event);
     }
     private dispatch(event: ApplicationViewEvent): void {
+        for (const listener of this.eventListeners) {
+            try {listener(event);} catch (error) {console.error('[Workbench observation] Observer failed', error);}
+        }
         if (event.topic === 'session' && event.sequence <= this.snapshotCursor) return;
         for (const listener of this.listeners.get(event.topic) ?? []) {
             try {listener(event.value);} catch (error) {console.error('[Application view] Observer failed', error);}

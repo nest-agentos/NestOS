@@ -52,6 +52,9 @@ export interface SessionChatBindingOptions {
     /** Enable the published Agent/Flow selector through the existing Session command port. */
     readonly filterAgents?: (ids: string[]) => Promise<string[]>;
     readonly targetSelection?: boolean;
+    readonly initialTargets?: import('@nestos/llm-session/contracts').RootTargetCatalog;
+    readonly initialCalls?: import('@nestos/llm-session/contracts').IndependentCallView[];
+    readonly initialQueue?: import('@nestos/llm-session/contracts').SessionInstructionQueue;
     readonly autoSelectFirstTarget?: boolean;
     readonly onTargetsChanged?: (catalog: import('@nestos/llm-ui').CallTargetCatalog) => void;
     /** Offer independent calls for published targets; the host keeps all execution state. */
@@ -84,6 +87,7 @@ class SessionChatBinding {
     private readonly queued = new Set<string>();
     private readonly checking = new Map<string, Promise<boolean>>();
     private readonly admissionChecks = new Map<string, Promise<boolean>>();
+    private readonly requestingReceipt = new Set<string>();
     private closed = false;
     private active = true;
     private presentation?: SessionCallPresentation;
@@ -95,7 +99,7 @@ class SessionChatBinding {
         this.sessionId = options.session.id;
         this.branch = this.currentBranch();
         this.operations = this.createLedger(options.operations);
-        if (options.targetSelection) this.targets = new SessionCallTargets(options.commands, () => {options.onTargetsChanged?.(this.targets!.getSnapshot()); this.publish();}, options.autoSelectFirstTarget !== false, options.filterAgents);
+        if (options.targetSelection) this.targets = new SessionCallTargets(options.commands, () => {options.onTargetsChanged?.(this.targets!.getSnapshot()); this.publish();}, options.autoSelectFirstTarget !== false, options.filterAgents, options.initialTargets);
         this.source = new ChatProjection(this.sessionId, options.onError, this.targets ? () => this.refreshTargets() : undefined);
         this.actions = {...options.history, send: (input, context) => this.send(input, context), reconcile: id => this.reconcile(id) };
         if (options.prepareSend) this.actions.prepareSend = options.prepareSend;
@@ -114,7 +118,7 @@ class SessionChatBinding {
         if (options.composerCommands?.subscribe) this.releases.push(options.composerCommands.subscribe(() => this.publish()));
         if (options.subscribeInput) this.releases.push(options.subscribeInput(() => this.publish()));
         this.publish();
-        if (this.targets) void this.targets.refresh();
+        if (this.targets && !options.initialTargets) void this.targets.refresh();
         void this.execution?.refresh();
         this.scheduleIndependentAdmission();
     }
@@ -179,7 +183,7 @@ class SessionChatBinding {
             allowed: this.options.readOnly ? [] : ['send', ...(this.execution?.executionRef ? ['cancel' as const] : []),
                 ...(this.execution?.interactions.some(item => item.kind !== 'unsupported') ? ['respond' as const] : []), ...(this.options.composerCommands ? ['command' as const] : []),
                 ...(this.options.history?.edit ? ['edit' as const] : []), ...(this.options.history?.retry ? ['retry' as const] : [])] });
-        for (const message of messages) if (message.submissionId && !this.confirmed.has(message.submissionId)) {
+        for (const message of messages) if (message.submissionId && !this.confirmed.has(message.submissionId) && !this.requestingReceipt.has(message.submissionId)) {
             void this.check(message.submissionId).then(accepted => { if (accepted) this.publish(); }).catch(error => this.options.onError?.(error));
         }
     }
@@ -188,7 +192,7 @@ class SessionChatBinding {
         for (const item of queue.items) {
             const submission = item.sendIntent?.submission, expected = this.submission(item.id);
             if (this.independentTitle(item.id)) continue;
-            if (this.queued.has(item.id) || submission?.id !== item.id || submission.source.kind !== expected.source.kind
+            if (this.queued.has(item.id) || this.requestingReceipt.has(item.id) || submission?.id !== item.id || submission.source.kind !== expected.source.kind
                 || submission.source.ownerId !== expected.source.ownerId || submission.source.id !== expected.source.id) continue;
             void this.checkAdmission(item.id).then(accepted => {if (accepted) this.publish();})
                 .catch(error => this.options.onError?.(error));
@@ -237,7 +241,8 @@ class SessionChatBinding {
         if (this.options.readOnly) return rejected(context, 'READ_ONLY', 'Conversation is read-only');
         if (!this.current() || context.viewId !== this.source.getSnapshot().viewId)
             return rejected(context, 'STALE_VIEW', 'Observation binding expired');
-        if (input.target?.kind === 'agent' && this.options.filterAgents &&
+        const checkScope = !this.options.initialTargets || input.selection?.callMode === 'independent';
+        if (checkScope && input.target?.kind === 'agent' && this.options.filterAgents &&
             !(await this.options.filterAgents([input.target.id])).includes(input.target.id))
             return rejected(context, 'AGENT_PROJECT_SCOPE_DENIED', t('agentWorkspace.scopeDenied'));
         const choice = input.target && this.targets?.find(input.target);
@@ -262,8 +267,32 @@ class SessionChatBinding {
             assertIndependentReceipt(receipt, this.sessionId);
             if (receipt.operationId !== context.operationId) throw new Error('Independent call operation identity mismatch');
             if (receipt.status === 'accepted') {this.queued.add(context.operationId); this.publish(); return {status: 'accepted', operationId: context.operationId};}
-        } else await this.options.commands.execute(SessionCommand.Submit, request);
+        } else if (this.options.initialTargets) return this.submitWithReceipt(request, context);
+        else await this.options.commands.execute(SessionCommand.Submit, request);
         return this.reconcile(context.operationId);
+    }
+    private async submitWithReceipt(request: SubmissionRequest, context: OperationContext): Promise<OperationReceipt> {
+        const {operationId} = context;
+        this.requestingReceipt.add(operationId);
+        try {
+            const receipt = await this.options.commands.execute<import('@nestos/llm-session/contracts').SubmissionReceipt | string>(
+                SessionCommand.Submit, {...request, returnReceipt: true});
+            if (receipt && typeof receipt === 'object') {
+                if (receipt.operationId !== operationId) throw new Error('Submission receipt differs from the frozen request');
+                if (receipt.status === 'accepted') {
+                    this.queued.add(operationId);
+                    if (receipt.evidence === 'history') this.confirmed.add(operationId);
+                    this.requestingReceipt.delete(operationId);
+                    this.publish();
+                    return {status: 'accepted', operationId};
+                }
+            }
+            return this.reconcile(operationId);
+        } catch (error) {
+            if ((error as {code?: string})?.code === 'AGENT_PROJECT_SCOPE_DENIED')
+                return rejected(context, 'AGENT_PROJECT_SCOPE_DENIED', t('agentWorkspace.scopeDenied'));
+            throw error;
+        } finally {this.requestingReceipt.delete(operationId);}
     }
     private selectors(): readonly SelectorView[] | undefined {
         const selectors = this.options.selectors?.() ?? [];
@@ -353,13 +382,16 @@ class SessionChatBinding {
         this.closed = true; this.execution?.dispose(); this.presentation?.destroy(); clearTimeout(this.admissionTimer); this.releases.forEach(release => release());
         this.targets?.dispose();
     }
-    async refreshTargets(force = true): Promise<void> {if (force) {await this.targets?.refreshCurrent(); await this.presentation?.refresh();} else await this.targets?.refresh();}
+    async refreshTargets(force = true, refreshCalls = force): Promise<void> {
+        if (force) await this.targets?.refreshCurrent(); else await this.targets?.refresh();
+        if (refreshCalls) await this.presentation?.refresh();
+    }
     get outputsRenderer() {return this.options.openOutputs ? outputRenderer(async taskId => {if (this.current() && this.active) await this.options.openOutputs!(taskId);}) : undefined;}
     get instructionQueue() {
         if (!this.options.instructionQueue) return undefined;
         return {commands: this.options.commands, sessionId: this.sessionId,
             current: () => !this.options.readOnly && this.active && this.current(),
-            snapshot: () => this.current() ? this.options.session.getSnapshot?.().instructionQueue : undefined};
+            snapshot: () => this.current() ? this.options.session.getSnapshot?.().instructionQueue ?? this.options.initialQueue : undefined};
     }
     get contextSelection(): boolean {return !!this.options.contextSelection;}
     contextScope() {return this.current() && this.branch ? {sessionId: this.sessionId, branchId: this.branch} : undefined;}
@@ -368,7 +400,7 @@ class SessionChatBinding {
         if (this.presentation || !this.options.independentCalls || !this.branch || this.closed || this.options.readOnly) return;
         clearTimeout(this.admissionTimer);
         this.presentation = new SessionCallPresentation(this.options.commands, this.sessionId, () => this.branch!, this.operations,
-            () => this.publish(), this.options.openChild, this.options.interactionDrafts);
+            () => this.publish(), this.options.openChild, this.options.interactionDrafts, this.options.initialCalls);
         if (!this.active || !this.current()) this.presentation.setActive(false);
     }
     mountCalls(): SessionCallPresentation | undefined {

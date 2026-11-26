@@ -7,8 +7,14 @@ const terminal = new Set(['succeeded', 'failed', 'cancelled']);
 
 /** Aggregate recovery reads for one explicit Session without changing the browser binding. */
 export async function taskAttachment(services: LocalApplicationServices, sessionId: string, sharedKey: string): Promise<TaskAttachmentRecovery> {
-    if (typeof sharedKey !== 'string' || !sharedKey || sharedKey.length > 200) throw new FSError('EINVAL', 'Invalid shared key');
+    validateKey(sharedKey);
     await services.sessionRepository.getManifest(sessionId);
+    return readTaskAttachment(services, sessionId, sharedKey);
+}
+
+/** The editor has already activated and checked access to this Session. */
+export async function readTaskAttachment(services: LocalApplicationServices, sessionId: string, sharedKey: string): Promise<TaskAttachmentRecovery> {
+    validateKey(sharedKey);
     const kernel = services.kernel.kernel, session = await inspectExistingSession(kernel, sessionId);
     if (!session) return {pendingTaskIds: []};
     const [entry, pending] = await Promise.all([
@@ -18,6 +24,9 @@ export async function taskAttachment(services: LocalApplicationServices, session
     const active = id ? await kernel.task(sessionId, id) : undefined;
     return { activeTaskId: active && !terminal.has(active.status) ? active.id : undefined,
         pendingTaskIds: pending.filter(hasPendingInteraction).sort((a, b) => b.updatedAt - a.updatedAt).map(task => task.id) };
+}
+function validateKey(sharedKey: string): void {
+    if (typeof sharedKey !== 'string' || !sharedKey || sharedKey.length > 200) throw new FSError('EINVAL', 'Invalid shared key');
 }
 
 async function inspectExistingSession(kernel: LocalApplicationServices['kernel']['kernel'], sessionId: string) {

@@ -267,6 +267,7 @@ export interface ProjectDraftPromotion {
 }
 
 export interface ProjectDraftComposer {
+    readonly acceptsDraftOnPrepare?: boolean;
     readonly locked?: boolean;
     readonly id?: string;
     /** Reconcile durable submission evidence and replace this cursor only after its promotion. */
@@ -280,7 +281,7 @@ export interface ProjectDraftComposer {
     /** Return the replacement UUID so clients can update immutable RPC field snapshots. */
     clear(): Promise<string | void>;
     move?(projectId: string): Promise<void>;
-    prepare(request?: {title?: string; harness?: {profileId: string; expectedProject?: {nodeConnectionId: string; serverProjectId: string}; selection?: {modelId: string; reasoningEffort?: string}}}): Promise<{
+    prepare(request?: {title?: string; data?: string; harness?: {profileId: string; expectedProject?: {nodeConnectionId: string; serverProjectId: string}; selection?: {modelId: string; reasoningEffort?: string}}}): Promise<{
         sessionId: string;
         resumeOnly: boolean;
         submission?: FlowContracts.SessionSubmission;

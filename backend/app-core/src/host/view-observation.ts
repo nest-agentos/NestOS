@@ -25,6 +25,7 @@ export class ViewObservation implements ApplicationViewObservation {
         this.releases.push(services.sessionManager.onEvent(event => this.publish('session', event)));
         this.releases.push(services.sessionManager.onGlobalEvent(event => this.publish('global', event)));
         this.releases.push(services.agentService.onChange(() => this.publish('agents', undefined)));
+        if (services.events) this.releases.push(services.events.onChange(() => this.publish('applicationEvents', undefined)));
         if (services.projects) {
             this.releases.push(services.projects.favorites.subscribe(() => this.publish('favorites', undefined)));
             this.releases.push(services.projects.drafts.onPromoted(event => this.publish('draft', event)));
@@ -43,10 +44,20 @@ export class ViewObservation implements ApplicationViewObservation {
     }
     async addChat(view: WorkbenchView, sessionId?: string): Promise<void> {
         if (view.chat?.configuration) this.releases.push(view.chat.configuration.subscribe(() => this.publish('configuration', undefined)));
-        if (sessionId && view.chat?.sessionSkills) {
-            const stop = await view.chat.sessionSkills.onChange(sessionId, () => this.publish('skills', {sessionId}));
-            if (this.closed) stop(); else this.releases.push(stop);
-        }
+        if (sessionId && view.chat) await this.observeSkills(view.chat.sessionSkills, sessionId);
+    }
+    async observeSkills(source: NonNullable<WorkbenchView['chat']>['sessionSkills'], sessionId: string): Promise<() => void> {
+        const release = await source.onChange(sessionId, () => this.publish('skills', {sessionId}));
+        if (this.closed) {release(); return () => {};}
+        let closed = false;
+        const stop = () => {
+            if (closed) return; closed = true;
+            const index = this.releases.indexOf(stop);
+            if (index >= 0) this.releases.splice(index, 1);
+            release();
+        };
+        this.releases.push(stop);
+        return stop;
     }
     eventSnapshot() {return {cursor: this.sequence, firstSequence: this.history[0]?.event.sequence ?? this.sequence + 1, events: this.history.map(row => row.event)};}
     getViewCursor(): number { return this.sequence; }

@@ -51,6 +51,7 @@ export type {
 } from './core/types';
 export type {
     ConversationUIState,
+    SessionUIStateRevision,
     SessionCreation,
     ConversationManifest,
     SessionSummary,

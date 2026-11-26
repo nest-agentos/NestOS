@@ -12,7 +12,7 @@ export class InstructionQueuePanel {
     private readonly view: InstructionQueueView;
     private queue?: Projection;
     constructor(element: HTMLElement, commands: ICommandBus, private readonly sessionId: string,
-        private readonly isCurrent: () => boolean = () => true) {
+        private readonly isCurrent: () => boolean = () => true, initial?: Projection) {
         const project = (queue: Projection): InstructionQueueSnapshot => this.project(queue);
         this.view = new InstructionQueueView(element, {
             ownerId: sessionId, locale: getLocale(), initiallyCollapsed: true, toggleIcon: CHAT_ICONS.enqueue, removeIcon: CHAT_ICONS.delete,
@@ -21,7 +21,8 @@ export class InstructionQueuePanel {
             labels: instructionQueueLabels(), attentionAfterMs: 30 * 60 * 1000, executionControl: true,
             sessionHref: `#/workbench/${encodeURIComponent(sessionId)}`,
         });
-        void this.execute('read', () => commands.execute<Projection>(SessionCommand.GetInstructionQueue), project)
+        if (initial?.sessionId === sessionId) this.update(initial);
+        else void this.execute('read', () => commands.execute<Projection>(SessionCommand.GetInstructionQueue), project)
             .then(queue => {if (this.isCurrent()) this.view.update(queue);}).catch(() => {});
     }
     private async execute(stage: string, action: () => Promise<Projection>, project: (queue: Projection) => InstructionQueueSnapshot): Promise<InstructionQueueSnapshot> {

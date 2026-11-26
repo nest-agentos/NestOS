@@ -44,6 +44,35 @@ it('repairs lost hints on the visible polling interval and leaves hidden windows
     expect(vi.getTimerCount()).toBe(0);
 });
 
+it('reads one cursor page for a burst of live hints and catches up after being hidden', async () => {
+    vi.useFakeTimers(); const f = await fixture();
+    await f.bridge.prepare(); await f.bridge.start();
+    vi.mocked(f.source.readEvents).mockClear();
+    for (const id of ['first', 'second', 'third']) await f.journal.append(id, {type:'task.succeeded', resourceId:id});
+    expect(f.source.readEvents).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(350);
+    expect(f.source.readEvents).toHaveBeenCalledOnce();
+    expect(f.invalidate.mock.calls.map(([event]) => event.resourceId)).toEqual(['first','second','third']);
+    f.visible.value = false; await f.journal.append('hidden', {type:'task.succeeded', resourceId:'hidden'});
+    await vi.advanceTimersByTimeAsync(350);
+    expect(f.source.readEvents).toHaveBeenCalledOnce();
+    f.visible.value = true; await f.bridge.refresh();
+    expect(f.invalidate.mock.calls.map(([event]) => event.resourceId)).toEqual(['first','second','third','hidden']);
+});
+
+it('uses the same event read for the notification count, including pages with no new events', async () => {
+    const f = await fixture(), badge = vi.fn();
+    let unread = 2;
+    vi.mocked(f.source.readEvents).mockImplementation(async (after, limit, include) =>
+        ({...await f.journal.read(after, limit), ...(include && {unreadNotifications: unread})}));
+    const stop = f.bridge.subscribeNotificationCount(badge);
+    await f.bridge.prepare(); await f.bridge.start();
+    expect(f.source.readEvents).toHaveBeenCalledExactlyOnceWith(expect.anything(), undefined, true);
+    expect(badge).toHaveBeenLastCalledWith(2);
+    unread = 1; await f.bridge.refresh(); expect(badge).toHaveBeenLastCalledWith(1);
+    stop(); unread = 0; await f.bridge.refresh(); expect(badge).toHaveBeenCalledTimes(2);
+});
+
 it('retries a failed initial subscription without losing its baseline or leaking error bodies', async () => {
     const f = await fixture(), warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await f.bridge.prepare(); await f.journal.append('before-failure', {type: 'task.succeeded'});

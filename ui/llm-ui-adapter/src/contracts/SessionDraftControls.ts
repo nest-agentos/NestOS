@@ -5,6 +5,8 @@ export interface SessionDraftMaterialization {
     container: HTMLElement;
     agentId?: string;
     title?: string;
+    data?: string;
+    draftSaved?(): void;
     harness?: {profileId: string; expectedProject?: {nodeConnectionId: string; serverProjectId: string}; selection?: {modelId: string; reasoningEffort?: string}};
     /** The stable view creates its controller from host-prepared resource options. */
     createEditor?: EditorFactory;
@@ -22,6 +24,7 @@ export interface SessionDraftControls<TSubmission = unknown> {
     readonly id?: string;
     /** Materialize a controller inside the existing mount while retaining its composer. */
     readonly inPlace?: boolean;
+    readonly prepareWithDraft?: boolean;
     readonly executorScope?: 'local' | 'remote';
     /** Supports NestOS prompt targets on a separately selected native harness. */
     readonly promptHarness?: boolean;

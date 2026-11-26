@@ -455,15 +455,35 @@ export class RpcPeer {
             if (!patches.length) this.pendingPatches.delete(id);
         }
     }
-    waitUpdates(updates: WireValue[] = []): Promise<void> {
-        const versions = updates.flatMap(update => {
+    /** Read the last published state without invoking or refreshing any capability. */
+    publishedUpdates(ids: readonly string[]): WireValue[] {
+        return ids.map((id): WireValue => {
+            const handle = this.handles.get(id), descriptor = this.emitted.get(id);
+            if (handle?.retired || this.localRetirements.has(id)) return {$retired: id};
+            if (!descriptor) throw new FSError('ENOENT', 'Published view snapshot is unavailable');
+            return {$capability: descriptor as unknown as WireValue};
+        });
+    }
+    missingUpdateIds(updates: WireValue[] = []): string[] {
+        return [...new Set(this.pendingUpdateVersions(updates).map(item => item.id))];
+    }
+    private pendingUpdateVersions(updates: WireValue[]) {
+        return updates.flatMap(update => {
             if (!update || typeof update !== 'object' || Array.isArray(update)) return [];
             const value = update.$patch ?? update.$capability;
-            return value && typeof value === 'object' && !Array.isArray(value) ? [{ id: String(value.id), version: Number(value.version ?? 0) }] : [];
+            if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+            const id = String(value.id), version = Number(value.version ?? 0);
+            return !(this.remoteRetirements.has(id) || (this.descriptors.get(id)?.version ?? 0) >= version) ? [{id, version}] : [];
         });
-        if (versions.every(item => this.remoteRetirements.has(item.id) || (this.descriptors.get(item.id)?.version ?? 0) >= item.version)) return Promise.resolve();
+    }
+    waitUpdates(updates: WireValue[] = [], timeoutMs = 5000): Promise<void> {
+        const versions = this.pendingUpdateVersions(updates);
+        if (!versions.length) return Promise.resolve();
         return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => { this.updateWaiters.delete(ready); reject(new FSError('EIO', 'Missing view update')); }, 5000);
+            const timer = setTimeout(() => {
+                this.updateWaiters.delete(ready);
+                reject(Object.assign(new FSError('EIO', 'Missing view update'), {remoteCode: 'RPC_VIEW_UPDATE_MISSING'}));
+            }, timeoutMs);
             const ready = () => {
                 if (!this.closed && !versions.every(item => this.remoteRetirements.has(item.id) || (this.descriptors.get(item.id)?.version ?? 0) >= item.version)) return;
                 clearTimeout(timer); this.updateWaiters.delete(ready); this.closed ? reject(new FSError('EIO', 'View closed')) : resolve();

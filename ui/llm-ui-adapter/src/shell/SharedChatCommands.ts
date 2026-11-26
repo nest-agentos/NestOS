@@ -30,6 +30,7 @@ interface Options {
     changed(): Promise<void>; selectAgent(id: string): Promise<void>; configure(values: Record<string, string>): Promise<void>;
     openSettings(): void;
     report(error: unknown): void;
+    presentation?: import('@nestos/app-contracts/services').SessionPresentationState;
 }
 /** Product commands keep their policy here; the shared composer supplies discovery and durable dispatch. */
 export class SharedChatCommands {
@@ -41,10 +42,13 @@ export class SharedChatCommands {
     private skillBinding?: ReturnType<typeof bindSkillRefresh>;
     private readonly listeners = new Set<() => void>();
     private readonly attachment?: RunAttachmentController;
+    private recovery?: import('@nestos/durable-kernel/contracts').TaskAttachmentRecovery;
     constructor(private readonly options: Options) {
+        const prepared = options.presentation?.presentationCursor === undefined ? undefined : options.presentation;
+        this.recovery = prepared?.taskAttachment;
         if (options.config.sessionSkills) this.skillBinding = bindSkillRefresh(options.config.sessionSkills, options.config.sessionId, skills => {
             this.skills = skills; this.skillsPanel?.refresh(skills); for (const listener of this.listeners) listener();
-        });
+        }, prepared?.skills);
         this.definitions = createSlashCommandCatalog(this.callbacks(), name => {throw new Error(`${name}: ${t('toolbox.unavailable')}`);});
         if (options.config.kernel) {
             this.attachment = new RunAttachmentController(options.config.kernel, options.taskCallbacks);
@@ -207,8 +211,12 @@ export class SharedChatCommands {
         this.check(); await rememberTaskAttachment(this.options.config.kernel!, this.options.config.sessionId, this.attachment!, taskId);
         createModuleLogger('shared-chat-commands').info('chat.task.attach', {operationId: randomUUID(), stage: 'commit', result: 'success', taskId});
     }
-    async restore(): Promise<void> {if (this.attachment) await restoreTaskAttachment(this.options.config.kernel!, this.options.config.sessionId, this.attachment,
-        () => this.options.current(), async () => new Set(), this.options.config.readTaskAttachment);}
+    async restore(): Promise<void> {
+        if (!this.attachment || !this.options.current()) return;
+        const recovery = this.recovery; this.recovery = undefined;
+        await restoreTaskAttachment(this.options.config.kernel!, this.options.config.sessionId, this.attachment,
+            () => this.options.current(), async () => new Set(), recovery ? async () => recovery : this.options.config.readTaskAttachment);
+    }
     private check(): void {this.options.signal.throwIfAborted(); if (!this.options.current()) throw Object.assign(new Error('Chat command binding expired'), {code: 'STALE_VIEW'});}
     private view(): ChatView {this.check(); const view = this.options.view(); if (!view) throw new Error('ChatView is not ready'); return view;}
     destroy(): Promise<void> {return this.closing ??= this.dispose();}

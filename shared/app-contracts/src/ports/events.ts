@@ -8,10 +8,13 @@ export interface ApplicationEventFact {
     sourceSequence?: number;
     notification?: 'info' | 'error';
 }
+export interface ApplicationEventPage extends JournalPage<ApplicationEventFact> {
+    unreadNotifications?: number;
+}
 export interface ApplicationEvents {
     eventBaseline(): Promise<EventCursor>;
     notificationSummary?():Promise<{head:EventCursor;unread:number}>;
-    readEvents(after?: EventCursor, limit?: number): Promise<JournalPage<ApplicationEventFact>>;
+    readEvents(after?: EventCursor, limit?: number, includeNotifications?: true): Promise<ApplicationEventPage>;
     listNotifications(limit?: number): Promise<{items: Array<{event: JournalEvent<ApplicationEventFact>; read: boolean}>; head: EventCursor}>;
     setNotificationRead(eventId: string, read: boolean): Promise<void>;
     /** A hint only. Each browser keeps its own replay cursor; this never acknowledges delivery. */

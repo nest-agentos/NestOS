@@ -3215,6 +3215,7 @@ export const en: LocaleStrings = {
     'project.draftLoading.attachments': 'Restoring draft and attachments…',
     'project.draftLoading.configuration': 'Loading executor and model settings…',
     'project.draftLoading.targets': 'Loading agents and flows…',
+    'project.draftLoading.submission': 'Preparing the first message…',
     'project.draftLoading.retry': 'Retry',
     'project.draftLoading.connection': 'The connection was interrupted while opening the session draft. Check your network and retry.',
     'project.draftLoading.failed': 'Could not open draft:',

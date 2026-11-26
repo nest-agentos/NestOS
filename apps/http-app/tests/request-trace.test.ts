@@ -76,6 +76,26 @@ it('distinguishes an upstream HTML 503 from a response decoding failure without 
     expect(records.every(r=>r.http.status===503 && r.http.responseType==='html' && !r.requestId)).toBe(true);
     expect(JSON.stringify(records)).not.toContain('PRIVATE');
 });
+it('retains the original view failure across reload and omits the resulting request cancellations', async () => {
+    let saved = '';
+    const previous = new BrowserRequestTrace();
+    const persistence = {read: () => saved, write: (value: string) => {saved = value;}};
+    vi.stubGlobal('sessionStorage', {getItem: persistence.read, setItem: (_key: string, value: string) => persistence.write(value)});
+    try {
+        previous.restore('admin');
+        const clientId = '11111111-1111-4111-8111-111111111111';
+        previous.viewUpdateFailure(clientId, Object.assign(Error('PRIVATE_BODY'), {remoteCode:'VIEW_EVENT_SEQUENCE_GAP'}));
+        const controller = new AbortController();
+        controller.abort(Object.assign(Error('PRIVATE_ABORT_REASON'), {code:'HTTP_VIEW_UPDATE_FAILED'}));
+        const fetcher = previous.wrap(async (_input, init) => {init?.signal?.throwIfAborted(); return Response.json({});});
+        await expect(fetcher('/api/application', {signal:controller.signal})).rejects.toMatchObject({code:'HTTP_VIEW_UPDATE_FAILED'});
+        const next = new BrowserRequestTrace(), reporter = vi.fn(async value => reportClientDiagnostic(value));
+        next.restore('admin'); next.setReporter(reporter);
+        await vi.waitFor(() => expect(reporter).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({operation:'http.view',
+            operationId:clientId, stage:'view.update', code:'VIEW_EVENT_SEQUENCE_GAP', http:expect.objectContaining({browserSessionId:previous.browserSessionId})})));
+        expect(JSON.stringify(reporter.mock.calls)).not.toContain('PRIVATE');
+    } finally {vi.unstubAllGlobals();}
+});
 it('bounds deferred reports across reload and retains a failed report without a retry loop or replaying input',async()=>{
     const queue=new RequestDiagnostics();let saved='';queue.restore({read:()=>null,write:value=>{saved=value;}});
     const record={operation:'http.request',operationId:'11111111-1111-4111-8111-111111111111',stage:'transport.fetch',code:'HTTP_CONNECTION_LOST',result:'failure' as const,durationMs:1,

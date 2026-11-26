@@ -99,7 +99,10 @@ export function createSessionPlugin(sessionManager: SessionManager): ILLMPlugin 
                 return sm.sendMessage(text, files as any, agentId ?? '', overrides as any, origin as any, historyPolicy as any, sendIntent as any);
             });
             ctx.commands.register(SessionCommand.PrepareBranch, args => sm.prepareBranchSubmission(args as import('../contracts/submission').SubmissionRequest));
-            ctx.commands.register(SessionCommand.Submit, args => sm.submit(args as import('../contracts/submission').SubmissionRequest));
+            ctx.commands.register(SessionCommand.Submit, args => {
+                const request = args as import('../contracts/submission').SubmissionRequest & {returnReceipt?: true};
+                return request?.returnReceipt === true ? sm.submitWithReceipt(request) : sm.submit(request);
+            });
             ctx.commands.register(SessionCommand.ListTargets, () => sm.listCallTargets());
             ctx.commands.register(SessionCommand.GetSubmissionReceipt, args => sm.getSubmissionReceipt(args as import('../contracts/submission').SubmissionRequest));
             ctx.commands.register(SessionCommand.InspectSubmissionReceipt, args => sm.inspectSubmissionReceipt(args as import('../contracts/submission').SubmissionRequest));

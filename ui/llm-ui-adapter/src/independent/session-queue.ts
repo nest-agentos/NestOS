@@ -16,7 +16,7 @@ export function sessionQueueToolbar(queue: SessionQueuePort | undefined, options
     const mount: ImageChatOptions['mountToolbar'] = queue ? (root, context) => {
         const borrowed = options.mountToolbar?.(root, context);
         const element = document.createElement('section'); root.append(element);
-        const panel = new InstructionQueuePanel(element, queue.commands, queue.sessionId, () => active && queue.current());
+        const panel = new InstructionQueuePanel(element, queue.commands, queue.sessionId, () => active && queue.current(), queue.snapshot());
         const update = () => {panel.update(queue.snapshot()); panel.setReadOnly(!active || !queue.current());};
         updates.add(update); update();
         return {update: state => {borrowed?.update?.(state); update();},

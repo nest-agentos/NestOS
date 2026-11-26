@@ -1,7 +1,7 @@
 import type {ClientDiagnostic} from '@nestos/app-contracts/services';
 type Http = NonNullable<ClientDiagnostic['http']>;
 const routes = new Set(['/api/application','/api/application/events','/api/application/files','/api/health','/api/identity']);
-const kinds = new Set(['bootstrap','bootstrap-data','updates-read','queries','bindings','call','callback','reply','close']);
+const kinds = new Set(['bootstrap','bootstrap-data','updates-read','updates-sync','queries','bindings','call','callback','reply','close']);
 export function requestMetadata(input: RequestInfo | URL, init: RequestInit | undefined, headers: Headers): Pick<Http,'route'|'method'|'rpcKind'|'rpcMethod'|'rpcMethods'|'rpcBatchSize'|'rpcAttempt'|'requestBytes'> {
     let path = ''; try {path = new URL(typeof input === 'string' || input instanceof URL ? input : input.url, 'https://localhost').pathname;} catch { /* Never log a caller URL. */ }
     const method = init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : 'GET');
@@ -55,17 +55,18 @@ function restorable(value: unknown): value is ClientDiagnostic {
     const v = value as ClientDiagnostic;
     // Only this writer's fixed schema is restored; the host independently validates every field.
     const allowed = ['operation','operationId','stage','code','result','durationMs','requestId','http'];
-    return Object.keys(v).every(k => allowed.includes(k)) && v.operation === 'http.request' && typeof v.operationId === 'string'
+    const stage = v.operation === 'http.request' && ['transport.fetch','response.headers','response.body','response.decode'].includes(v.stage)
+        || v.operation === 'http.view' && v.stage === 'view.update';
+    return Object.keys(v).every(k => allowed.includes(k)) && stage && typeof v.operationId === 'string'
         && /^[a-f0-9-]{36}$/.test(v.operationId) && v.result === 'failure' && typeof v.durationMs === 'number' && Number.isFinite(v.durationMs)
         && v.durationMs>=0 && v.durationMs<=86400000 && validHttp(v.http) && typeof v.code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(v.code)
-        && (v.requestId===undefined || typeof v.requestId==='string' && /^[a-zA-Z0-9_-]{1,128}$/.test(v.requestId))
-        && typeof v.stage === 'string' && ['transport.fetch','response.headers','response.body','response.decode'].includes(v.stage);
+        && (v.requestId===undefined || typeof v.requestId==='string' && /^[a-zA-Z0-9_-]{1,128}$/.test(v.requestId));
 }
 function validHttp(value: ClientDiagnostic['http']): boolean {
     if (!value || typeof value !== 'object') return false;
     const patterns: Record<string, RegExp> = {browserSessionId:/^[a-f0-9-]{36}$/,traceId:/^[a-f0-9]{32}$/,spanId:/^[a-f0-9]{16}$/,
         method:/^(GET|POST|OTHER)$/,route:/^\/(api\/(application(?:\/events|\/files)?|health|identity)|resource)$/,
-        rpcKind:/^(bootstrap|bootstrap-data|updates-read|queries|bindings|call|callback|reply|close|other)$/,rpcMethod:/^[A-Za-z][A-Za-z0-9_]{0,63}$/,
+        rpcKind:/^(bootstrap|bootstrap-data|updates-read|updates-sync|queries|bindings|call|callback|reply|close|other)$/,rpcMethod:/^[A-Za-z][A-Za-z0-9_]{0,63}$/,
         networkCode:/^(?:E[A-Z0-9_]{1,63}|UND_ERR_[A-Z0-9_]{1,63})$/,
         responseType:/^(json|html|text|other)$/,errorKind:/^(abort|network|type|other)$/};
     const limits: Record<string,[number,number]>={occurredAt:[0,8640000000000000],requestBytes:[0,1024**3],contentLength:[0,1024**3],status:[100,599],rpcBatchSize:[0,1024],rpcAttempt:[1,2]};

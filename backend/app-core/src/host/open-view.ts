@@ -11,7 +11,8 @@ export async function openView(services: LocalApplicationServices, backend: Appl
     if (request.workbench.initialSessionId && services.sessionManager.getSnapshot().sessionId)
         throw new FSError('EBUSY', 'Cold view opening requires an unbound client');
     const eventBaseline = await services.events?.eventBaseline();
-    if (request.resourceId) return {...await openResourceView(services, backend, request, createWorkbench), eventBaseline};
+    const sharedEventHints = services.events ? true : undefined;
+    if (request.resourceId) return {...await openResourceView(services, backend, request, createWorkbench), eventBaseline, sharedEventHints};
     const observation = new ViewObservation(services);
     let workbench: WorkbenchView | undefined;
     try {
@@ -27,7 +28,7 @@ export async function openView(services: LocalApplicationServices, backend: Appl
         const cursor = observation.getViewCursor();
         // This synchronous projection and cursor form the baseline for subsequent Session events.
         if (initial) alignSnapshot(services, initial);
-        return {eventBaseline, documents: (results[1] as PromiseFulfilledResult<Record<string, unknown>>).value, workbench: workbench!, initial, observation, cursor,
+        return {eventBaseline, sharedEventHints, documents: (results[1] as PromiseFulfilledResult<Record<string, unknown>>).value, workbench: workbench!, initial, observation, cursor,
             taskAttachmentKey: request.taskAttachmentKey,
             connectionInterests,
             dispose: () => closeOpenedView(observation, workbench)};

@@ -40,6 +40,16 @@ export class BrowserRequestTrace {
             http:{browserSessionId:this.browserSessionId,traceId:this.navigation,spanId:randomUUID().replaceAll('-','').slice(0,16),occurredAt:Date.now(),
                 method:'POST',route:'/api/application',capabilityKind:value.capabilityKind,rpcMethod:value.rpcMethod}});
     }
+    viewUpdateFailure(clientId: string, error: unknown): void {
+        const failure = error as {code?: unknown; remoteCode?: unknown; reason?: unknown; requestId?: unknown; name?: string};
+        const code = [failure?.remoteCode, failure?.reason, failure?.code]
+            .find(value => typeof value === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(value)) as string | undefined;
+        const requestId = typeof failure?.requestId === 'string' ? safeId(failure.requestId) : undefined;
+        this.diagnostics.add({operation:'http.view', operationId:clientId, stage:'view.update',
+            code:code ?? (failure?.name === 'SyntaxError' ? 'VIEW_EVENT_JSON_INVALID' : 'HTTP_VIEW_UPDATE_FAILED'), result:'failure', durationMs:0, requestId,
+            http:{browserSessionId:this.browserSessionId, traceId:this.navigation, spanId:randomUUID().replaceAll('-','').slice(0,16),
+                occurredAt:Date.now(), method:'GET', route:'/api/application/events'}});
+    }
     wrap(fetcher: typeof fetch): typeof fetch {
         return async (input, init) => {
             const traceId = this.navigation, spanId = randomUUID().replaceAll('-', '').slice(0,16), started = Date.now(), operationId = randomUUID();
@@ -52,31 +62,35 @@ export class BrowserRequestTrace {
             const http = {...metadata,traceId,spanId,browserSessionId:this.browserSessionId,occurredAt:started,
                 ...(typeof navigator === 'undefined' ? {} : {online:navigator.onLine})};
             log.debug('HTTP request started',{...context,...metadata,stage:'transport.fetch',result:'started'});
+            const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
             try {
                 const response = await fetcher(input, {...init,headers}), reply = responseMetadata(response), requestId = safeId(response.headers.get('X-Request-ID'));
                 const report = response.ok ? log.debug : log.warn;
                 report('HTTP response headers', {...context,...metadata,...reply,stage:'response.headers',result:response.ok?'received':'failure',requestId,durationMs:Date.now()-started});
                 if (!response.ok && !diagnostic) this.record(operationId,'response.headers',`HTTP_STATUS_${response.status}`,started,{...http,...reply},requestId);
                 if (!diagnostic && response.ok) this.diagnostics.flush();
-                return this.observeJson(response,operationId,started,{...http,...reply},diagnostic);
+                return this.observeJson(response,operationId,started,{...http,...reply},diagnostic,signal);
             } catch (error) {
-                const name = (error as {name?:string})?.name, errorKind = name === 'AbortError' ? 'abort' : name === 'NetworkError' ? 'network' : name === 'TypeError' ? 'type' : 'other';
+                const name = (error as {name?:string})?.name, errorKind = signal?.aborted || name === 'AbortError' ? 'abort' : name === 'NetworkError' ? 'network' : name === 'TypeError' ? 'type' : 'other';
                 const code = errorKind === 'abort' ? 'HTTP_REQUEST_ABORTED' : 'HTTP_CONNECTION_LOST';
                 const raw=(error as {code?:unknown;cause?:{code?:unknown}})?.cause?.code??(error as {code?:unknown})?.code;
                 const networkCode=typeof raw==='string'&&/^(?:E[A-Z0-9_]{1,63}|UND_ERR_[A-Z0-9_]{1,63})$/.test(raw)?raw:undefined;
                 if (!diagnostic && errorKind !== 'abort') this.record(operationId,'transport.fetch',code,started,{...http,errorKind,...(networkCode?{networkCode}:{})});
-                log.warn('HTTP request failed',{...context,...metadata,stage:'transport.fetch',result:'failure',code,errorKind,durationMs:Date.now()-started});
-                if (error && typeof error === 'object') {try {Object.assign(error,{clientRequestId:operationId});} catch { /* Keep the original failure. */ }}
+                const report = errorKind === 'abort' ? log.debug : log.warn;
+                report('HTTP request ended',{...context,...metadata,stage:'transport.fetch',result:errorKind === 'abort'?'aborted':'failure',code,errorKind,durationMs:Date.now()-started});
+                if (errorKind !== 'abort' && error && typeof error === 'object') {
+                    try {Object.assign(error,{clientRequestId:operationId});} catch { /* Keep the original failure. */ }
+                }
                 throw error;
             }
         };
     }
-    private observeJson(response: Response, operationId: string, started: number, http: NonNullable<ClientDiagnostic['http']>, diagnostic: boolean): Response {
+    private observeJson(response: Response, operationId: string, started: number, http: NonNullable<ClientDiagnostic['http']>, diagnostic: boolean, signal?: AbortSignal | null): Response {
         const json = response.json.bind(response);
         try {response.json = async () => {
             try {return await json();}
             catch (error) {
-                const name = (error as {name?:string})?.name, invalid = name === 'SyntaxError', aborted = name === 'AbortError';
+                const name = (error as {name?:string})?.name, invalid = name === 'SyntaxError', aborted = signal?.aborted || name === 'AbortError';
                 const code = aborted ? 'HTTP_REQUEST_ABORTED' : invalid ? 'HTTP_RESPONSE_INVALID' : 'HTTP_RESPONSE_READ_FAILED', stage = invalid ? 'response.decode' : 'response.body';
                 if (!diagnostic && !aborted) this.record(operationId,stage,code,started,http,safeId(response.headers.get('X-Request-ID')));
                 throw Object.assign(new Error(`Application response could not be ${invalid?'decoded':'read'} (HTTP ${response.status})`),

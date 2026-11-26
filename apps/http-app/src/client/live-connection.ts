@@ -4,11 +4,13 @@ import {withSessionRecovery} from './session-recovery';
 import type {ConnectionStatus} from './connection-status';
 
 const sessionRecoveryRequests = new Map<string, string>();
+interface ViewDiagnostics {compatibility(error: unknown): void; updateFailure(error: unknown): void}
 /** Adopt the original bootstrap identity and install live behavior after code arrives. */
-export function adoptConnection(prepared: PreparedHttpBootstrap, fetcher: typeof fetch, status: ConnectionStatus, signal: AbortSignal, diagnostic?: (error: unknown) => void,deferEvents=false) {
+export function adoptConnection(prepared: PreparedHttpBootstrap, fetcher: typeof fetch, status: ConnectionStatus, signal: AbortSignal, diagnostics: ViewDiagnostics, deferEvents = false) {
     const client = new HttpViewClient(prepared.options.clientId, prepared.url, fetcher,
         error => status.publish(error instanceof ViewExpiredError ? 'expired' : 'reconnecting'),
-        () => status.publish('view-error'), () => status.publish('connected'),diagnostic);
+        error => {diagnostics.updateFailure(error); status.publish('view-error');},
+        () => status.publish('connected'), error => diagnostics.compatibility(error));
     for (const event of ['online', 'focus', 'nestos:http-retry', 'pageshow'])
         window.addEventListener(event, () => client.retryConnection(), {signal});
     document.addEventListener('visibilitychange', () => {if (!document.hidden) client.retryConnection();}, {signal});

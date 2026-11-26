@@ -4,8 +4,9 @@
 import { SessionCommand, ISessionRepository, SessionSnapshot, type ConversationManifest, type SessionRepositoryChange } from '@nestos/llm-session/contracts';
 import type { ICommandBus } from '@nestos/llm-session/contracts';
 import type { ChatInputSettings } from '../domain/ports/IChatInputPresenter';
+import type { SessionPresentationState } from '@nestos/app-contracts/services';
 
-export interface SessionLoadResult {
+export interface SessionLoadResult extends SessionPresentationState {
     sessionId: string;
     snapshot: SessionSnapshot;
     title: string;

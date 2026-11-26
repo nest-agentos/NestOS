@@ -1,10 +1,12 @@
 import {FSError} from '@nestos/vfs-core';
 import {folderBrowserPath, folderPathFromBrowserPath, resolveBrowserTarget} from '@nestos/app-contracts';
 import {createModuleLogger, randomUUID} from '@nestos/common';
-import type {ApplicationBackend, ConversationWorkbenchRequest, ConversationWorkbenchView, LocalApplicationServices, PreparedConversation, ProjectFolder, WorkbenchNavigationRequest, WorkbenchNavigationView, WorkbenchView} from '@nestos/app-contracts/services';
+import type {ApplicationBackend, ConversationWorkbenchRequest, ConversationWorkbenchView, LocalApplicationServices, PreparedConversation, ProjectFolder, WorkbenchNavigationRequest, WorkbenchNavigationView, WorkbenchRefreshRequest, WorkbenchRefreshView, WorkbenchView} from '@nestos/app-contracts/services';
 import {ViewScope} from './view-scope';
 import {ViewObservation} from './view-observation';
 import {prepareConversation} from './prepare-conversation';
+import {openSessionView} from './session-view';
+import {prepareEditorPresentation} from './editor-presentation';
 
 const log = createModuleLogger('resource-workbench');
 /** Composition of independent domain ports with one explicit observation lifetime. */
@@ -109,6 +111,27 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
     get observation(): ViewObservation {return this.eventSource;}
     eventSnapshot() {return this.eventSource.eventSnapshot();}
     subscribe(listener: Parameters<ViewObservation['observeView']>[1]) {return this.eventSource.observeView(this.eventSource.getViewCursor(), listener);}
+    async prepareDraftSession(draftId: string, request?: Parameters<NonNullable<ConversationWorkbenchView['prepareDraftSession']>>[1]) {
+        const composer = this.draft?.composer;
+        if (this.closed || !composer || typeof draftId !== 'string' || composer.id !== draftId)
+            throw new FSError('ECONFLICT', 'Project draft identity changed');
+        const prepared = await composer.prepare(request);
+        return {...prepared, view: await this.openSession(prepared.sessionId)};
+    }
+    async openSession(sessionId: string) {
+        const session = await openSessionView(this.services, sessionId);
+        let stop: () => void, chat: NonNullable<WorkbenchView['chat']>;
+        try {
+            chat = this.workbench.chat ?? await this.prepareChat();
+            stop = await this.eventSource.observeSkills(chat.sessionSkills, sessionId);
+        } catch (error) {await session.dispose(); throw error;}
+        const activate: typeof session.activate = async (branch, presentation) => {
+            const initial = await session.activate(branch);
+            return presentation ? {...initial, ...await prepareEditorPresentation(this.services, this.eventSource, chat, initial,
+                session.project?.project.id, presentation.taskAttachmentKey)} : initial;
+        };
+        return this.resources.own({...session, activate, dispose: async () => {try {stop();} finally {await session.dispose();}}});
+    }
     openConversation(resourceId: string): Promise<PreparedConversation> {
         return this.openNativeConversation(resourceId);
     }
@@ -151,18 +174,18 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
         const paths = this.navigationPaths(request.expandedPaths ?? []), resourceId = request.resourceId ?? this.native?.resourceId ?? this.resourceId;
         if (resourceId !== undefined && (typeof resourceId !== 'string' || resourceId.length > 4096)) throw new FSError('EINVAL', 'Invalid navigation target');
         const target = resourceId && resolveBrowserTarget(resourceId);
-        const path = target && (target.kind === 'remote' || target.kind === 'project-files' || target.kind === 'favorites' || target.kind === 'favorite') ? folderBrowserPath(target.folder) : '/';
+        const path = target && (target.kind === 'folder' || target.kind === 'project-conversations' || target.kind === 'favorites')
+            ? resourceId ?? '/' : target && 'folder' in target ? folderBrowserPath(target.folder) : '/';
         const started = performance.now(), operationId = randomUUID();
         try {
-            const data = await this.workbench.browser.readDirectory!(path, {projectId: request.projectId, includeAncestors: true, includePaths: paths});
+            const data = await this.workbench.browser.readDirectory!(path, {projectId: request.projectId, refresh: request.refresh === true,
+                includeAncestors: true, includePaths: paths});
             const statuses: WorkbenchNavigationView['statuses'] = {};
             for (const project of (data.navigation?.projects ?? []).filter(project => !request.projectId || project.project.id === request.projectId).slice(0, 16)) {
                 const id = project.project.id;
                 if (!this.services.projects.remoteMounts?.list(id).some(mount => mount.at === '/' && mount.serverProjectId)) continue;
-                if (this.interests.has(id)) this.observeStatus(id);
                 statuses[id] = this.services.projects.remoteMounts.sessionStatus.records?.(id) ?? [];
             }
-            await this.workbench.connections?.update(this.visible ? [...this.interests] : [], ++this.interestRevision);
             log.info('navigation.read', {operation: 'workbench.navigation', operationId, stage: 'prepare', result: 'success', count: data.directories.length, durationMs: Math.round(performance.now() - started)});
             return {...data, statuses, navigation: data.navigation && {...data.navigation, path: resourceId ?? '/'}};
         } catch (error) {
@@ -171,11 +194,47 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             throw error;
         }
     }
+    async readRefresh(request: WorkbenchRefreshRequest): Promise<WorkbenchRefreshView> {
+        if (this.closed) throw new FSError('EIO', 'Workbench closed');
+        const ids = request.activity ?? [];
+        const sessionId = request.sessionId;
+        if (!Array.isArray(ids) || ids.length > 32 || ids.some(id => !validSessionId(id)) || sessionId !== undefined && !validSessionId(sessionId))
+            throw new FSError('EINVAL', 'Invalid Session refresh interests');
+        const started = performance.now(), operationId = randomUUID();
+        const fields = {operationId, stage: 'refresh', count: ids.length, navigation: !!request.navigation};
+        try {
+            const [navigation, activity, session] = await Promise.all([
+                request.navigation && this.readNavigation(request.navigation),
+                ids.length ? Promise.all([...new Set(ids)].map(async id => [id, await this.readActivity(id)] as const)) : undefined,
+                sessionId === undefined ? undefined : this.readSession(sessionId),
+            ]);
+            log.debug('workbench.refresh', {...fields, result: 'success', durationMs: Math.round(performance.now() - started)});
+            return {navigation, activity: activity && Object.fromEntries(activity), session};
+        } catch (error) {
+            const code = error instanceof FSError ? error.code : 'WORKBENCH_REFRESH_FAILED';
+            log.warn('workbench.refresh', {...fields, result: 'failure', code, durationMs: Math.round(performance.now() - started)});
+            throw error;
+        }
+    }
+    private async readSession(id: string): Promise<NonNullable<WorkbenchRefreshView['session']>> {
+        try {
+            const {currentBranch, createdAt, updatedAt} = await this.services.sessionRepository.getManifest(id);
+            return {id, manifest: {id, currentBranch, createdAt, updatedAt}};
+        }
+        catch (error) {if ((error as {code?: string})?.code === 'ENOENT') return {id, manifest: null}; throw error;}
+    }
+    private async readActivity(id: string) {
+        try {return await this.services.kernel.kernel.sessionActivity?.(id) ?? null;}
+        catch (error) {
+            if (['ENOENT', 'SESSION_NOT_FOUND'].includes(String((error as {code?: unknown})?.code))) return null;
+            throw error;
+        }
+    }
     private navigationPaths(paths: string[]): string[] {
         if (!Array.isArray(paths) || paths.length > 64 || paths.some(path => typeof path !== 'string' || path.length > 4096)) throw new FSError('EINVAL', 'Invalid navigation interests');
         return [...new Set(paths)].filter(path => {
             const target = resolveBrowserTarget(path);
-            return target.kind === 'folder' || target.kind === 'project-conversations';
+            return target.kind === 'folder' || target.kind === 'project-conversations' || target.kind === 'favorites';
         });
     }
     private async updateProjectInterest(projectId: string): Promise<void> {
@@ -218,5 +277,6 @@ async function closeWorkbench(view: WorkbenchView): Promise<void> {
     const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
     if (errors.length) throw new AggregateError(errors, 'Workbench resource cleanup failed');
 }
+function validSessionId(id: unknown): id is string {return typeof id === 'string' && !!id && id.length <= 128;}
 
 export {ResourceWorkbench as ConversationWorkbench};

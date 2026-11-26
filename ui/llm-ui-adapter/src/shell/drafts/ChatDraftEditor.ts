@@ -32,6 +32,7 @@ import type {SendMessageParams} from '../../commands/SendMessageCommand';
 const log = createModuleLogger('chat-draft-editor');
 type Options = EditorOptions<SessionSubmission>;
 type Materialized = Awaited<ReturnType<NonNullable<Options['sessionDraft']>['materialize']>>;
+type PreparedDraftSave = Awaited<ReturnType<ChatDraftStore['prepareSave']>>;
 /** The first submit transfers one ChatView to its formal controller before registering the operation. */
 export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     private view!: ChatView;
@@ -52,6 +53,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     private rebuilding = false;
     private suspended = false;
     private preparing = false;
+    private captureSave?: (draft: ComposerDraft) => Promise<void>;
     private submissionStarted = false;
     private owned = true;
     private closing?: Promise<void>;
@@ -288,15 +290,34 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     }
     private async save(draft: ComposerDraft): Promise<void> {
         if (this.transferred || this.closed || this.rebuilding || this.suspended) return;
+        if (this.captureSave) return this.captureSave(draft);
         await this.store.save(draft); this.emit('saved', undefined);
+    }
+    private async flushForPreparation(draft: ComposerDraft, agentId?: string): Promise<PreparedDraftSave | undefined> {
+        let prepared: PreparedDraftSave | undefined;
+        if (this.config.sessionDraft?.prepareWithDraft && !this.config.sessionDraft.locked && !this.resume
+            && !agentId?.startsWith('remote:')) this.captureSave = async current => {
+                if (current.revision !== draft.revision) {await this.store.save(current); return;}
+                prepared = await this.store.prepareSave(current);
+            };
+        try {await this.view.flushDraft(); return prepared;}
+        finally {this.captureSave = undefined;}
     }
     private async prepare(input: ChatSubmission, draft: ComposerDraft): Promise<SendPreparation | null> {
         this.check(); if (!this.active) throw new Error('Project draft is hidden');
         if (!this.configurationReady) throw new Error(t('project.draftLoading.configuration'));
         this.preparing = true; this.submissionStarted = true; this.draftHeader?.update();
+        const status = document.createElement('p');
+        status.className = 'llm-draft-submitting';
+        status.setAttribute('role', 'status'); status.textContent = t('project.draftLoading.submission');
+        this.container.append(status);
         const diagnostic = draftPreparationDiagnostics(this.source.conversationId,input.text.length,input.attachments.length);
         try {
-        await this.view.flushDraft();
+            return await this.prepareSubmission(input, draft, diagnostic);
+        } catch (error) {diagnostic.fail(error); throw error;}
+        finally {status.remove(); this.preparing = false; this.draftHeader?.update();}
+    }
+    private async prepareSubmission(input: ChatSubmission, draft: ComposerDraft, diagnostic: ReturnType<typeof draftPreparationDiagnostics>): Promise<SendPreparation | null> {
         diagnostic.step('executor.validate');
         const agentId = input.target?.kind === 'flow' ? undefined : input.target?.kind === 'agent' ? input.target.id : input.selection?.executorId ?? draft.selection?.executorId ?? this.store.preferences(draft).agentId;
         if (this.config.sessionDraft?.executorScope === 'remote' && input.target?.kind !== 'flow' && !this.executors.some(item => item.id === agentId))
@@ -305,36 +326,35 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         if (executor && this.config.sessionDraft?.promptHarness && !agentId?.startsWith('remote:') && !draft.selection?.modelId) {
             await this.ensureRemoteModels(executor); this.check();
         }
-        diagnostic.step('editor.materialize'); const target = await this.materialize(agentId, draft); this.check();
+        const preparedDraft = await this.flushForPreparation(draft, agentId);
+        diagnostic.step('editor.materialize'); const target = await this.materialize(agentId, draft, preparedDraft); this.check();
         diagnostic.step('input.prepare');
         if (target.resumeOnly || await target.editor.commands.prepareChatInput?.(input, draft)) {diagnostic.step('complete'); return null;}
         diagnostic.step('submission.prepare');
-        const prepared = await target.editor.commands.preparedSubmission?.();
-        const submission = target.submission ?? prepared as SessionSubmission | undefined;
+        const submission = target.submission ?? await target.editor.commands.preparedSubmission?.() as SessionSubmission | undefined;
         const result = {operationId: submission?.id ?? randomUUID(), viewId: this.bindingViewId()}; diagnostic.step('complete'); return result;
-        } catch (error) {diagnostic.fail(error); throw error;}
-        finally {this.preparing = false; this.draftHeader?.update();}
     }
     private bindingViewId(): string {
         const binding = this.delegate?.commands.chatBindingIdentity?.() as {viewId: string} | undefined;
         if (!binding) throw Object.assign(new Error('Formal editor did not adopt the prepared ChatView'), {code: 'HANDOFF_NOT_COMMITTED'});
         return binding.viewId;
     }
-    private materialize(agentId?: string, draft?: ComposerDraft): Promise<Materialized> {
-        return this.prepared ??= this.bind(agentId, draft).catch(async error => {
+    private materialize(agentId?: string, draft?: ComposerDraft, preparedDraft?: PreparedDraftSave): Promise<Materialized> {
+        return this.prepared ??= this.bind(agentId, draft, preparedDraft).catch(async error => {
             this.prepared = undefined;
             if (!this.closed && !this.transferred) {try {await this.view.replaceBinding(this.viewOptions());}
                 catch (cleanup) {throw new AggregateError([error, cleanup], 'Draft handoff and restoration failed');}}
             throw error;
         });
     }
-    private async bind(agentId?: string, draft?: ComposerDraft): Promise<Materialized> {
+    private async bind(agentId?: string, draft?: ComposerDraft, preparedDraft?: PreparedDraftSave): Promise<Materialized> {
         const handoff: RetainedWorkspaceHandoff = {kind: 'chat-view', view: this.view, read: this.store.read, conversationId: this.source.conversationId, images: this.imageHost};
         const createEditor: EditorFactory = (container, options) => this.factory(container, options, handoff);
         const harness = this.resume ? undefined : this.harnessForDraft(agentId, draft);
         const target = this.resume ? {editor: await this.resume(createEditor), resumeOnly: false}
             : await this.config.sessionDraft!.materialize({container: this.container, agentId, title: this.draftTitle() || undefined, createEditor,
-                ...(harness ? {harness} : {})});
+                ...(harness ? {harness} : {}), ...(preparedDraft ? {data: preparedDraft.data,
+                    draftSaved: () => {preparedDraft.confirm(); this.emit('saved', undefined);}} : {})});
         if (this.closed) {await target.editor.destroy(); throw new Error('Project draft closed during materialization');}
         this.delegate = target.editor; this.transferred = true;
         target.editor.commands.takeViewOwnership?.(); this.owned = false;
@@ -427,17 +447,22 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         await this.view.flushDraft();
     }
     private async refreshDraft(): Promise<void> {
-        if (this.transferred || !this.active || this.view?.inputBusy || this.isDirty()) return;
+        if (!this.canRefreshDraft() || this.isDirty()) return;
         const current = this.config.sessionDraft, revision = this.view.getDraft().revision, next = await current?.refresh?.();
-        if (!next || this.closed || !this.active || this.transferred || this.view.inputBusy || this.view.getDraft().revision !== revision) return;
+        if (!next || !this.canRefreshDraft(revision)) return;
         const store = new ChatDraftStore(next); await store.open(); this.check();
-        if (this.transferred || this.view.inputBusy || this.view.getDraft().revision !== revision) return;
+        if (!this.canRefreshDraft(revision)) return;
         this.rebuilding = true;
         try {
             this.config.sessionDraft = next; this.store = store; this.remoteExecutor = undefined;
             this.source = new ChatProjection(next.id ?? this.source.conversationId, error => this.report(error)); this.publish();
             await this.view.replaceBinding(this.viewOptions(), {draft: store.draft});
         } finally {this.rebuilding = false;}
+    }
+    private canRefreshDraft(revision?: number): boolean {
+        return !!this.view && this.active && !this.closed && !this.suspended && !this.transferred
+            && !this.rebuilding && !this.preparing && !this.view.inputBusy
+            && (revision === undefined || this.view.getDraft().revision === revision);
     }
     private check(): void {this.config.signal?.throwIfAborted(); if (this.closed) throw Object.assign(new Error('Project draft is closed'), {code: 'VIEW_CLOSED'});}
     private report(error: unknown): void {

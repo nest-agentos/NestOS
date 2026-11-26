@@ -12,8 +12,8 @@ function setup() {
     const queue: SessionInstructionQueue = { sessionId: 's', revision: 7, paused: false,
         items: ['a', 'b', 'c'].map(id => ({ id, branch: 'main', state: 'pending', text: id, files: [], agentId: 'default', createdAt: 1 })) };
     const execute = vi.fn(async () => ({ ...queue, revision: 8 }));
-    const panel = new InstructionQueuePanel(element, { execute } as never, 's');
-    panels.push(panel); panel.update(queue);
+    const panel = new InstructionQueuePanel(element, { execute } as never, 's', undefined, queue);
+    panels.push(panel);
     expect(element.querySelector<HTMLElement>('.llm-instruction-queue__body')!.hidden).toBe(true);
     element.querySelector<HTMLButtonElement>('[data-action="toggle"]')!.click();
     const click = (selector: string) => element.querySelector<HTMLButtonElement>(selector)!.click();

@@ -9,7 +9,8 @@ export class ApplicationObservation {
     initialize(cursor: number): void {this.cursor = cursor;}
     receive(event: ApplicationViewEvent): void {
         if (event.sequence <= this.cursor) return;
-        if (event.sequence !== this.cursor + 1) throw new FSError('EIO', 'Application view event gap');
+        if (event.sequence !== this.cursor + 1)
+            throw Object.assign(new FSError('EIO', 'Application view event gap'), {remoteCode:'VIEW_OBSERVATION_SEQUENCE_GAP'});
         this.cursor = event.sequence; this.events.push(event);
         if (this.events.length > 256) this.events.shift();
         for (const listener of this.listeners) listener(event);

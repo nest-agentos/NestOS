@@ -97,17 +97,19 @@ export class ProjectDraftStore {
             if (patch === null) await this.removeAttachments(oldScope);
         });
     }
-    begin(title: string, remoteTarget?: RemoteDraftTarget, harnessConnectionId?: string): Promise<ProjectDraftRecord> {
+    begin(title: string, remoteTarget?: RemoteDraftTarget, harnessConnectionId?: string, data?: string): Promise<ProjectDraftRecord> {
         return this.enqueue(async () => {
             const record = await this.fs.meta.seq!.transaction!(async tx => {
                 const raw = await tx.getEntry(this.path, 'draft'), current = decodeDraftRecord(raw).record;
                 if (current.id !== this.record.id || current.attachmentScopeId !== this.record.attachmentScopeId || current.data !== this.record.data) throw conflict();
                 if (current.state === 'submitting') {
-                    if (current.harnessConnectionId !== harnessConnectionId || !sameTarget(current.remoteTarget, remoteTarget)) throw conflict();
+                    if (current.harnessConnectionId !== harnessConnectionId || !sameTarget(current.remoteTarget, remoteTarget)
+                        || data !== undefined && data !== current.data) throw conflict();
                     return current;
                 }
-                const next: ProjectDraftRecord = {...current, state: 'submitting', sessionId: current.id,
-                    submissionId: randomUUID(), submissionDraftHash: sha256HexSync(current.data), title,
+                const draftData = data ?? current.data;
+                const next: ProjectDraftRecord = {...current, data: draftData, state: 'submitting', sessionId: current.id,
+                    submissionId: randomUUID(), submissionDraftHash: sha256HexSync(draftData), title,
                     ...(harnessConnectionId ? {harnessConnectionId} : {}), ...(remoteTarget ? {remoteTarget} : {})};
                 if (!await tx.compareAndSet(this.path, 'draft', {expected: raw, value: JSON.stringify(next)})) throw conflict();
                 return next;

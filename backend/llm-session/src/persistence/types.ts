@@ -18,6 +18,11 @@ export interface ConversationUIState {
 
 export type SessionOrigin = 'cli' | 'tauri' | 'web';
 
+export interface SessionUIStateRevision {
+    revision: number;
+    uiState?: ConversationUIState;
+}
+
 export interface ConversationManifest extends RoundManifest {
     /** Existing storage revision; used for conditional UI writes, never an execution version. */
     readonly revision?: number;
@@ -133,7 +138,7 @@ export interface ISessionRepository extends SessionDeletionStore {
     getUIState(sessionId: string): Promise<ConversationUIState | null>;
     updateUIState(sessionId: string, patch: Partial<ConversationUIState>): Promise<void>;
     /** Atomic condition on the existing Session revision; absence is not permission to overwrite. */
-    compareAndSetUIState?(sessionId: string, expectedRevision: number, patch: Partial<ConversationUIState>): Promise<void>;
+    compareAndSetUIState?(sessionId: string, expectedRevision: number, patch: Partial<ConversationUIState>, returnState?: true): Promise<SessionUIStateRevision | void>;
     getSessionSettings(sessionId: string): Promise<import('../contracts').ChatSessionSettings>;
     saveSessionSettings(sessionId: string, patch: Partial<import('../contracts').ChatSessionSettings>): Promise<void>;
     readDocument(sessionId: string, name: string): Promise<string | null>;

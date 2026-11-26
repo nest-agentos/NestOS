@@ -23,6 +23,7 @@ export class ProjectDraftService {
         let resumeOnly = record.state === 'submitting';
         let locked = resumeOnly;
         return {
+            acceptsDraftOnPrepare: true,
             get id() {return identity;},
             get locked() {return locked;},
             initialData: record.data,
@@ -47,7 +48,9 @@ export class ProjectDraftService {
             },
             prepare: async request => {
                 const harnessConnectionId = await this.assertLocal?.(projectId, request) || undefined;
-                const intent = await store.begin(preparedTitle(request?.title), undefined, harnessConnectionId);
+                if (request?.data !== undefined && typeof request.data !== 'string') throw new FSError('EINVAL', 'Invalid draft data');
+                if (store.remote && request?.data !== undefined) await store.saveData(request.data);
+                const intent = await store.begin(preparedTitle(request?.title), undefined, harnessConnectionId, request?.data);
                 locked = true;
                 await this.sessions.ensureSession(intent.sessionId!, intent.title!, 'tauri', folder, null, {agentId: draftAgent(intent.data)});
                 if (harnessConnectionId) await this.sessions.saveSessionSettings(intent.sessionId!, {harnessConnectionId});

@@ -1,7 +1,7 @@
 import type {ConversationUIState} from '@nestos/llm-session/contracts';
 import {createModuleLogger, randomUUID, t} from '@nestos/common';
 import {canonicalJson} from '../utils/canonical-json';
-import {writeUIStateConditionally, type ConditionalUIRepository} from './conditional-ui-state';
+import {writeUIStateConditionally, type ConditionalUIRepository, type SessionUIStateWriter} from './conditional-ui-state';
 export type BranchDraft = NonNullable<ConversationUIState['branchDrafts']>[string];
 export interface DraftConflict {readonly id: string; readonly branch: string; readonly saved?: BranchDraft}
 const log = createModuleLogger('workspace-draft-store');
@@ -11,7 +11,7 @@ export class DraftPersistence {
     private readonly baselines = new Map<string, BranchDraft | undefined>();
     private readonly conflicts = new Map<string, DraftConflict>();
     private readonly listeners = new Set<() => void>();
-    constructor(private readonly repository: ConditionalUIRepository) {}
+    constructor(private readonly repository: ConditionalUIRepository, private readonly writer?: SessionUIStateWriter) {}
     subscribe(listener: () => void): () => void {this.listeners.add(listener); return () => this.listeners.delete(listener);}
     observe(sessionId: string, branch: string, state?: ConversationUIState): void {
         const key = this.key(sessionId, branch);
@@ -24,13 +24,18 @@ export class DraftPersistence {
         if (!this.baselines.has(key)) throw draftFailure('DRAFT_BASELINE_UNAVAILABLE');
         if (replaceId && conflict?.id !== replaceId) throw draftFailure('DRAFT_RESOLUTION_CHANGED');
         const expected = structuredClone(replaceId ? conflict?.saved : this.baselines.get(key));
-        const saved = await writeUIStateConditionally(this.repository, sessionId, state => {
+        const prepare = (state: ConversationUIState | undefined, authoritative: boolean) => {
             const current = readBranchDraft(state, branch), next = proposed.branchDrafts?.[branch];
             if (sameDraft(current, next)) return {value: structuredClone(current)};
-            if (!sameDraft(current, expected)) {this.recordConflict(key, branch, current); throw draftFailure('SESSION_DRAFT_CONFLICT');}
+            if (!sameDraft(current, expected)) {
+                if (authoritative) this.recordConflict(key, branch, current);
+                throw draftFailure('SESSION_DRAFT_CONFLICT');
+            }
             return {value: structuredClone(next), patch: proposed};
-        }, {unavailable: () => draftFailure('DRAFT_STORE_UNAVAILABLE'), conflict: () => draftFailure('DRAFT_SAVE_CONFLICT'),
-            report: (stage, attempt, error) => report(operationId, started, stage, attempt, error)});
+        };
+        const options = {unavailable: () => draftFailure('DRAFT_STORE_UNAVAILABLE'), conflict: () => draftFailure('DRAFT_SAVE_CONFLICT'),
+            report: (stage: string, attempt: number, error?: unknown) => report(operationId, started, stage, attempt, error)};
+        const saved = await (this.writer ? this.writer.write(prepare, options) : writeUIStateConditionally(this.repository, sessionId, prepare, options));
         this.baselines.set(key, saved); this.conflicts.delete(key); this.notify();
     }
     private recordConflict(key: string, branch: string, saved?: BranchDraft): void {

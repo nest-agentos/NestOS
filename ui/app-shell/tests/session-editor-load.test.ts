@@ -70,18 +70,20 @@ it('handles prompt and history commands in the legacy local editor without submi
     const editor = new LLMWorkspaceEditor(container, {sessionManager: f.sessions, sessionId: f.id, sessionRepository: f.repository,
         commandBus: f.commandBus, agentService: f.agents as never, savedPrompts}); cleanup.push(() => editor.destroy());
     await editor.init(container); const input = container.querySelector<HTMLTextAreaElement>('.llm-input__textarea')!;
-    input.value = '/history'; input.dispatchEvent(new Event('input', {bubbles: true}));
-    input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+    const type = (text: string) => {input.value = text; input.dispatchEvent(new Event('input', {bubbles: true}));};
+    const enter = () => input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+    const labels = () => Array.from(document.querySelectorAll('.llm-popup--slash.llm-popup--visible .llm-popup__item-label'), row => row.textContent);
+    type('/'); expect(labels().slice(0, 2)).toEqual(['/history', '/prompt']);
+    type('/his'); expect(labels()[0]).toBe('/history'); expect(labels()).not.toContain('/prompt');
+    enter(); expect(input.value).toBe('/history '); enter();
     await vi.waitFor(() => expect(container.querySelector('.llm-composer-history')?.textContent).toContain('Stored question'));
     const rows = container.querySelectorAll('.llm-composer-history > div'); expect(rows).toHaveLength(2);
     rows[0].querySelectorAll<HTMLButtonElement>('button')[1].click();
     expect(container.querySelector<HTMLElement>('[data-legacy-message-location]')?.dataset.messageId).toBe('round-r0-user:input:1');
-    input.value = '/history'; input.dispatchEvent(new Event('input', {bubbles: true}));
-    input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+    type('/history '); enter();
     const next = container.querySelectorAll('.llm-composer-history > div'); next[1].querySelectorAll<HTMLButtonElement>('button')[1].click();
     expect(container.querySelector<HTMLElement>('[data-legacy-message-location]')?.dataset.messageId).toBe('round-r0-user:input:0');
-    input.value = '/history'; input.dispatchEvent(new Event('input', {bubbles: true}));
-    input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+    type('/history '); enter();
     container.querySelector<HTMLButtonElement>('.llm-composer-history > div button')!.click();
     expect(input.value).toBe('Stored question'); expect(f.execute).not.toHaveBeenCalledWith(SessionCommand.Send, expect.anything());
 });

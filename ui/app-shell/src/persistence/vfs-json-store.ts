@@ -80,14 +80,28 @@ export class VfsJsonStore {
     private async drain(): Promise<void> {
         try {
             while (this.pending.size && !this.transactionDepth) {
-                const batch = [...this.pending].slice(0, 32);
-                await this.backend.writeUiDocuments(Object.fromEntries(batch.map(([name, content]) => [name, JSON.parse(content)])));
+                const batch = this.nextBatch();
+                if (!batch.length) continue;
+                try {await this.backend.writeUiDocuments(Object.fromEntries(batch.map(([name, content]) => [name, JSON.parse(content)])));}
+                catch (error) {
+                    for (const [name] of batch) this.saved.delete(name);
+                    throw error;
+                }
                 for (const [name, content] of batch) {
                     this.saved.set(name, content);
                     if (this.pending.get(name) === content) this.pending.delete(name);
                 }
             }
         } finally { this.writing = undefined; }
+    }
+    private nextBatch(): Array<[string, string]> {
+        const batch: Array<[string, string]> = [];
+        for (const [name, content] of this.pending) {
+            if (content === this.saved.get(name)) this.pending.delete(name);
+            else batch.push([name, content]);
+            if (batch.length === 32) break;
+        }
+        return batch;
     }
     /** Retry failed writes, and report failures to the caller retaining the draft. */
     async flush(): Promise<void> {

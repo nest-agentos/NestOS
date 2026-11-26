@@ -1,7 +1,7 @@
 import {ASSISTANT_ADD_EVENT, type ShortcutRequest} from './assistant-actions';
 import {setTimePresentation, navigationItem} from '@nestos/ui-common-adapter';
 import {ACTION_ICONS, createModuleLogger, escapeHTML, randomUUID, t} from '@nestos/common';
-import type {ApplicationBackend, ApplicationServices, AssistantEvent, AssistantOverview, ApplicationEventFact} from '@nestos/app-contracts/services';
+import type {ApplicationBackend, ApplicationServices, AssistantEvent, AssistantOverview, ApplicationEventFact, ApplicationEvents} from '@nestos/app-contracts/services';
 import type {VfsJsonStore} from '../persistence/vfs-json-store';
 import {assistantLabel as label, shortcutEditor, readShortcutForm, updateShortcutFields, filterTargetChoices, filterSessionChoices, type AssistantChoices} from './assistant-editor';
 import {matchesShortcutQuery, shortcutSearchValues, validShortcutTarget, ASSISTANT_MENU_DOCUMENT, emptyAssistantState, readAssistantState, shortcutNavigation, type AssistantShortcut, type AssistantMenuState} from './assistant-shortcuts';
@@ -25,7 +25,7 @@ interface Options {
     services: ApplicationServices; backend: ApplicationBackend; documents: Pick<VfsJsonStore, 'read' | 'write' | 'flush'>;
     current(): {workspace: string; resource: string; title: string}; navigate(target: {target: string; resourceId?: string}): Promise<void>;
     events?:{subscribe(listener:(events:readonly ApplicationEventFact[])=>void):()=>void};
-    notificationBadge?:{unread?:number;read?:()=>Promise<{unread:number}>};
+    notificationBadge?: {unread?: number; read?: () => Promise<{unread: number}>; subscribe?: (listener: (count: number) => void) => () => void};
     home?(): Promise<void>; signal: AbortSignal;
 }
 export function installAssistantMenu(options: Options): () => void {const menu = new AssistantMenu(options); menu.install(); return () => menu.close();}
@@ -47,6 +47,7 @@ class AssistantMenu {
     private readonly selectedEvents = new Map<string, string>();
     private readonly missingIcons = new Set<string>();
     private unreadNotifications?:number;
+    private notifications: Awaited<ReturnType<ApplicationEvents['listNotifications']>>['items'] = [];
     constructor(private readonly options: Options) {this.unreadNotifications=options.notificationBadge?.unread;}
     install(): void {
         const signal = this.lifetime.signal;
@@ -64,14 +65,23 @@ class AssistantMenu {
         this.options.signal.addEventListener('abort', () => this.close(), {once: true});
         const services = this.options.services;
         if(this.options.events)this.releases.push(this.options.events.subscribe(events=>{
-            if(events.some(event=>this.options.notificationBadge&&!this.dialog.open?
-                !!event.notification||event.type==='runtime.reset'||event.type==='source.reset':assistantConsumesEvent(event)))this.schedule();
+            if(events.some(event=>!!event.notification || (this.options.notificationBadge&&!this.dialog.open
+                ? event.type==='runtime.reset'||event.type==='source.reset':assistantConsumesEvent(event))))this.schedule();
         }));
         else this.releases.push(services.sessionRepository.subscribe?.(event => {if(event?.kind!=='ui-state')this.schedule();}) ?? (() => {}),
             services.kernel?.kernel?.onChanged?.(event => {if (event.reason === 'structure') this.schedule();}) ?? (() => {}),
             services.digitalTwin?.onChange(() => this.schedule()) ?? (() => {}));
         if (!this.options.backend.assistantOverview) {this.stale = true; this.error = label('eventsUnavailable');}
-        if (this.options.notificationBadge) this.updateCount();
+        if (this.options.notificationBadge) {
+            this.updateCount();
+            const subscribe = this.options.notificationBadge.subscribe;
+            if (subscribe) this.releases.push(subscribe(count => {
+                const changed = this.unreadNotifications !== count;
+                this.unreadNotifications = count; this.updateCount();
+                if (changed && this.dialog.open) this.schedule();
+            }));
+            else if (this.unreadNotifications === undefined) this.schedule();
+        }
         else {void this.ensureState(); this.schedule();}
     }
     private mountLaunchers(): void {
@@ -104,6 +114,7 @@ class AssistantMenu {
     }
     private schedule(): void {
         if (this.closed || document.hidden || !this.options.backend.assistantOverview) return;
+        if (this.options.notificationBadge?.subscribe && !this.dialog.open) return;
         this.dirty = true;
         if (this.timer || this.reading) return;
         this.timer = setTimeout(() => {this.timer = undefined; void this.refresh();}, 400);
@@ -119,7 +130,13 @@ class AssistantMenu {
             }
             await this.ensureState();
             if (this.closed) return;
-            const result = await this.options.backend.assistantOverview!(); if (this.closed) return;
+            const [result, notifications] = await Promise.all([this.options.backend.assistantOverview!(),
+                this.options.notificationBadge?.subscribe ? this.options.backend.events?.listNotifications().catch(() => {
+                    this.report('notification-list', 'NOTIFICATION_LIST_FAILED', undefined, performance.now() - started);
+                    return undefined;
+                }) : undefined]);
+            if (this.closed) return;
+            if (notifications) this.notifications = notifications.items.filter(item => !item.read);
             const retained = this.overview.events.filter(item => result.unavailable.includes(item.source));
             this.overview = {...result, events: [...result.events.filter(item => !result.unavailable.includes(item.source)), ...retained]
                 .sort((a, b) => a.priority - b.priority || b.at - a.at || a.id.localeCompare(b.id))};
@@ -156,6 +173,7 @@ class AssistantMenu {
         const caret = searching ? (document.activeElement as HTMLInputElement).selectionStart : null;
         this.body.innerHTML = `<header class="assistant-menu__header"><h2>${escape(label('title'))}</h2><button type="button" data-assistant-action="close" ${disabled}>${escape(t('action.close'))}</button></header>
             <p class="assistant-menu__error" role="alert">${escape(this.storageError || this.error)}</p>
+            ${this.notificationRows()}
             <section><div class="assistant-menu__heading"><h3>${escape(label('events'))}</h3><span>${escape(label('eventCount', {count: events.length}))}</span></div>
             ${events.some(item => !item.requiresAction) ? `<div class="assistant-menu__actions"><label class="assistant-menu__selection"><input type="checkbox" data-assistant-select-all ${disabled}>${escape(label('selectShownEvents'))}</label><button type="button" data-assistant-action="clearSelected">${escape(label('clearSelected', {count: this.selectedEvents.size}))}</button></div>` : ''}
             ${shown.length ? shown.map(item => this.eventRow(item)).join('') : `<p class="assistant-menu__empty">${escape(label(this.reading || !this.ready || !this.hasOverview&&!this.stale ? 'loading' : 'noEvents'))}</p>`}
@@ -177,6 +195,13 @@ class AssistantMenu {
         const items = this.state.shortcuts.filter(item => matchesShortcutQuery(this.query, shortcutSearchValues(item)));
         list.innerHTML = items.length ? items.map(item => this.shortcutRow(item)).join('') : `<p class="assistant-menu__empty">${escape(label(this.state.shortcuts.length ? 'noMatches' : 'noShortcuts'))}</p>`;
         this.body.querySelector('[data-assistant-filter-count]')!.textContent = this.query.trim() ? label('filterCount', {count: items.length, total: this.state.shortcuts.length}) : '';
+    }
+    private notificationRows(): string {
+        if (!this.notifications.length) return '';
+        return `<section><h3>${escape(label('unreadNotificationCount', {count: this.unreadNotifications ?? this.notifications.length}))}</h3>${
+            this.notifications.map(({event}) => `<article class="assistant-menu__event"><span>${escape(label(event.value.type === 'task.failed' ? 'event.failure' : 'events'))}</span>
+                <time data-assistant-time="${event.occurredAt}"></time><button type="button" data-assistant-notification="${escape(event.id)}"
+                aria-label="${escape(label('markRead'))}">${this.icon('markRead', 'markRead')}</button></article>`).join('')}</section>`;
     }
     private filter(event: Event): void {
         const input = event.target as HTMLInputElement;
@@ -248,6 +273,7 @@ class AssistantMenu {
     }
     private click(event: MouseEvent): void {
         const button = (event.target as Element).closest<HTMLButtonElement>('button'); if (!button || this.busy || this.closed) return;
+        if (button.dataset.assistantNotification) {void this.markNotificationRead(button.dataset.assistantNotification); return;}
         if (button.dataset.assistantEvent) {const item = this.overview.events.find(item => item.id === button.dataset.assistantEvent); if (item) void this.openEvent(item); return;}
         if (button.dataset.assistantRead) {const item = this.overview.events.find(item => item.id === button.dataset.assistantRead); if (item) void this.markRead(item); return;}
         if (button.dataset.assistantShortcut) {const item = this.state.shortcuts.find(item => item.id === button.dataset.assistantShortcut); if (item) void this.openShortcut(item); return;}
@@ -301,6 +327,20 @@ class AssistantMenu {
         finally {this.busy = false;}
     }
     private async markRead(item: AssistantEvent): Promise<boolean> {return this.markEventsRead([item]);}
+    private async markNotificationRead(id: string): Promise<void> {
+        const events = this.options.backend.events;
+        if (!events || !this.notifications.some(item => item.event.id === id)) return;
+        const started = performance.now();
+        this.busy = true;
+        try {
+            await events.setNotificationRead(id, true);
+            this.notifications = this.notifications.filter(item => item.event.id !== id);
+            this.error = '';
+        } catch {
+            this.error = label('saveFailed');
+            this.report('notification-read', 'NOTIFICATION_MARK_READ_FAILED', undefined, performance.now() - started);
+        } finally {this.busy = false; this.render();}
+    }
     private async markEventsRead(items: AssistantEvent[]): Promise<boolean> {
         const clearable = items.filter(item => !item.requiresAction);
         if (!clearable.length) return true;

@@ -70,12 +70,19 @@ export class ChatDraftStore {
             context: draft.context?.value == null ? undefined : draft.context.value as unknown as IChatInputConfig['context']};
     }
     async save(draft: ComposerDraft): Promise<void> {
+        const prepared = await this.prepareSave(draft);
+        await this.controls.save?.(prepared.data);
+        prepared.confirm();
+    }
+    async prepareSave(draft: ComposerDraft): Promise<{data: string; confirm(): void}> {
         const config = this.preferences(draft), files = await this.readFiles(draft.attachments.map(item => item.file));
         const encoded = JSON.parse(await this.codec.encode(config, files));
         encoded.files = encoded.files.map((file: object, index: number) => ({...file, fileId: draft.attachments[index].id}));
         encoded.files = this.images.records(encoded.files);
-        await this.controls.save?.(JSON.stringify({...encoded, chatDraft: draft, chatImages: this.images.snapshot()}));
-        this.config = config; this.draft = structuredClone(draft); this.saved = JSON.stringify(draft);
+        return {data: JSON.stringify({...encoded, chatDraft: draft, chatImages: this.images.snapshot()}), confirm: () => {
+            if (draft.revision < this.draft.revision) return;
+            this.config = config; this.draft = structuredClone(draft); this.saved = JSON.stringify(draft);
+        }};
     }
     dirty(draft: ComposerDraft): boolean {return JSON.stringify(draft) !== this.saved;}
 }

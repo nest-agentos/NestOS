@@ -28,8 +28,8 @@ export class SessionCallPresentation {
         }};
     };
     constructor(commands: ICommandBus, sessionId: string, branch: () => string, operations: OperationLedger,
-        changed: () => void, openChild?: (id: string) => void | Promise<void>, interactionDrafts?: InteractionDraftStorage) {
-        this.panel = new IndependentCallPanel(commands, sessionId, this.notices, {operations, branch, openChild, interactionDrafts,
+        changed: () => void, openChild?: (id: string) => void | Promise<void>, interactionDrafts?: InteractionDraftStorage, initial?: IndependentCallView[]) {
+        this.panel = new IndependentCallPanel(commands, sessionId, this.notices, {operations, branch, openChild, interactionDrafts, initial,
             mountCard: (element, call) => {
                 const id = call.receipt.operationId;
                 this.calls.set(id, {element, call}); changed();

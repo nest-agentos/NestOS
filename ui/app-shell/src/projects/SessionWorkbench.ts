@@ -1,4 +1,5 @@
 import type {KanbanDecisionSourceSession} from '@nestos/kanban/contracts';
+import type {SessionSubmission} from '@nestos/llm-flow/contracts';
 import {createAgentScopeEditor} from './agent-scope-editor';
 import {projectRemountFields,remountFailure} from './project-remount-fields';
 import {conversationLifetime} from './conversation-lifetime';
@@ -16,7 +17,7 @@ import {projectAssistantShortcut} from './project-assistant-shortcut';
 import {navigateWorkspaceBack} from '../navigation/page-history';
 import { SessionTaskView } from './SessionTaskView';
 import { AgentDrawer } from './agent-drawer';
-import type {PreparedConversation, ProjectDraftOpening, ProjectDraftPromotion} from '@nestos/app-contracts/services';
+import type {ApplicationEventFact, PreparedConversation, ProjectDraftOpening, ProjectDraftPromotion} from '@nestos/app-contracts/services';
 import { AgentProjectPreferences } from './agent-project-preferences';
 import { mountAgentProjectSettings } from './agent-project-settings';
 import { lazyResource } from '../lifecycle/lazy-resource';
@@ -61,7 +62,7 @@ import { conversationResourcePath, projectConversationsPath } from '@nestos/app-
 import { WORKSPACE_PATH, projectRelativePath, reportRemoteFailure } from '@nestos/app-contracts';
 import { createProjectDraftControls } from './project-draft-editor';
 import {remoteDraftCatalog} from './remote-draft-catalog';
-import type { SessionOpenView, WorkbenchChatControls, ProjectFolder, ProjectNavigationView, SessionDirectoryView } from '@nestos/app-contracts/services';
+import type { SessionOpenView, WorkbenchChatControls, ProjectFolder, ProjectNavigationView, SessionDirectoryView, WorkbenchRefreshView } from '@nestos/app-contracts/services';
 import type { ConversationManifest } from '@nestos/llm-session/contracts';
 import { EditorLease } from '../browser/editor-lease';
 import { openProjectFileEditor, localizeRemoteWriteError } from './project-file-editor';
@@ -198,7 +199,13 @@ function initialSessionId(resource?: string): string | undefined {
         return target.kind === 'session' ? target.sessionId : undefined;
     } catch { return undefined; }
 }
+function workbenchSessionId(resource: string | null): string | undefined {
+    if (!resource || resource.startsWith('draft:') || resource.startsWith('@agent/')) return;
+    const target = resolveBrowserTarget(resource.startsWith('/') ? resource : '/' + resource);
+    if ('sessionId' in target) return target.sessionId;
+}
 
+interface RefreshReads {activity: string[]; sessionId?: string; result?: WorkbenchRefreshView}
 interface RetainedEditor {
     editor?: IEditor; context?: FileSystemContextOwner; assets?: FileSystemView;
     previewCleanup?: () => void; renameCleanup?: () => void;
@@ -256,11 +263,12 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly localActivity: LocalSessionActivityView;
     private navigationReadAt = 0;
     private kernelChanges: Record<string, number> = {};
+    private draftHandoffs = 0;
     private refreshCount = 0;
     private lastRefreshAt = 0;
     private readonly viewRefresh = new ViewRefresh({
-        visible: () => !this.closed && this.visible,
-        run: sources => this.refreshView(sources), report: error => this.report(error),
+        visible: () => !this.closed && this.visible && !this.draftHandoffs,
+        run: sources => this.refreshView(sources), report: error => this.report(error), delay: 250,
     });
     private readonly waiting = new Set<string>();
     private readonly resettingTasks = new Set<string>();
@@ -336,7 +344,8 @@ export class SessionWorkbench implements WorkspaceController {
         this.hostContext = options.hostContext; this.digitalTwin = options.digitalTwin;
         this.kernel = options.kernel;
         this.localActivity = new LocalSessionActivityView(this.kernel, () => this.sidebarUI,
-            () => !this.closed && this.visible && this.resourceNavigationVisible, id => this.sessionPath(id), () => this.scheduleRefresh('kernel:activity-retry', false));
+            () => !this.closed && this.visible && this.resourceNavigationVisible, id => this.sessionPath(id),
+            () => this.scheduleRefresh('kernel:activity-retry', false), options.projects ? () => this.activityNavigationRoots() : undefined);
         this.fileFactory = options.fileFactory;
         this.directoryMounts = options.directoryMounts;
         this.sessionSkills = options.sessionSkills;
@@ -401,14 +410,14 @@ export class SessionWorkbench implements WorkspaceController {
     private configureChatFactory(chat?: WorkbenchChatControls): void {
         const createFactory = this.createFactory;
         if (!createFactory) return;
-        if (chat) { this.factory = createFactory(chat); return; }
+        if (chat) { this.factory = createFactory(this.sources?.chat(chat) ?? chat); return; }
         const nativeFactory = createFactory();
         let localFactory: Promise<EditorFactory> | undefined;
         this.factory = async (...args) => {
             if ('conversation' in args[1] && args[1].conversation) return nativeFactory(...args);
             const ready = await (localFactory ??= this.opening!.prepareChat().then(controls => {
                 this.sessionSkills ??= controls.sessionSkills;
-                return createFactory(controls);
+                return createFactory(this.sources?.chat(controls) ?? controls);
             }).catch(error => { localFactory = undefined; throw error; }));
             return ready(...args);
         };
@@ -623,7 +632,6 @@ export class SessionWorkbench implements WorkspaceController {
                 this.updateRemoteAvailability();
                 if(change?.kind==='status'){
                     this.projectNavigation?.refreshAvailability();
-                    this.scheduleRefresh('remote-status');
                     return;
                 }
                 this.scheduleRefresh('remote-configuration');
@@ -872,8 +880,27 @@ export class SessionWorkbench implements WorkspaceController {
         if (navigation) this.navigationDirty = true;
         this.viewRefresh.mark(source, this.resourceNavigationVisible || !!this.active);
     }
-    invalidateFromEvents(): void {
+    private beginDraftHandoff(): () => void {
+        if (!this.draftHandoffs++) this.viewRefresh.pause();
+        return () => {
+            if (--this.draftHandoffs === 0 && this.viewRefresh.dirty)
+                this.viewRefresh.mark('draft-handoff', this.resourceNavigationVisible || !!this.active);
+        };
+    }
+    invalidateFromEvents(event?: ApplicationEventFact): void {
         if (this.closed) return;
+        if (event && event.type !== 'runtime.reset' && event.type !== 'source.reset') {
+            if (this.sources) return;
+            if (event.type === 'session.activity.changed' && event.resourceId) {
+                this.localActivity.invalidate(event.resourceId);
+                this.scheduleRefresh('events:activity', false);
+                return;
+            }
+            if (event.type.startsWith('task.')) {
+                if (this.active?.match(/\/tasks(?:\/|$)/)) this.scheduleRefresh('events:task', false);
+                return;
+            }
+        }
         this.scheduleRefresh('events');
     }
     private async refresh(): Promise<void> { await this.remoteStatus?.refresh(); await this.viewRefresh.flush(); }
@@ -885,31 +912,69 @@ export class SessionWorkbench implements WorkspaceController {
             this.lastRefreshAt = now;
         }
         this.kernelChanges = {};
-        const prepared = this.navigationDirty || sources.length === 0 || sources.includes('visibility-interrupted')
-            ? await this.refreshResourceNavigation(sources) : undefined;
+        const refreshNavigation = this.navigationDirty || sources.length === 0 || sources.includes('visibility-interrupted');
+        const refreshSession = sources.length === 0
+            || sources.some(source => ['repository', 'events', 'visibility-interrupted', 'refresh-failed'].includes(source));
+        const active = this.active;
+        const {prepared, session} = await this.refreshWorkbench(sources, refreshNavigation, refreshSession);
         if (!this.visible || this.closed) { this.viewRefresh.mark('visibility-interrupted', false); return; }
-        await this.localActivity.refresh();
-        await this.syncBranchRoute();
+        if (refreshSession && active === this.active) await this.syncBranchRoute(active, session);
         if (this.resourceNavigationVisible) for (const id of this.waiting) this.sidebarUI?.setNodeAttention(await this.sessionPath(id), t('project.waitingInput'));
         if (this.active?.startsWith('/')) {
             const target = resolveBrowserTarget(this.active);
             if (target.kind === 'task') await this.showTask(this.active);
-            else if (target.kind === 'folder' || target.kind === 'favorites' || target.kind === 'project-conversations' || target.kind === 'remote' && !target.nativeSessionId && !target.draft
-                || target.kind === 'tasks') await this.showDirectory(this.active, undefined, prepared?.path === this.active ? prepared.view : undefined);
+            else if (target.kind === 'tasks' || target.kind === 'remote' && !target.nativeSessionId && !target.draft
+                || refreshNavigation && ['folder', 'favorites', 'project-conversations'].includes(target.kind))
+                await this.showDirectory(this.active, undefined, prepared?.path === this.active ? prepared.view : undefined);
         }
     }
-    private async refreshResourceNavigation(sources: readonly string[]) {
+    private async refreshWorkbench(sources: readonly string[], refreshNavigation: boolean, refreshSession: boolean) {
+        if (!this.opening?.readRefresh) {
+            const prepared = refreshNavigation ? await this.refreshResourceNavigation(sources) : undefined;
+            await this.localActivity.refresh();
+            return {prepared, session: undefined};
+        }
+        let prepared: Awaited<ReturnType<SessionWorkbench['refreshResourceNavigation']>>;
+        const reads: RefreshReads = {activity: [], sessionId: refreshSession ? workbenchSessionId(this.active) : undefined};
+        await this.localActivity.refresh(async ids => {
+            reads.activity = ids.slice(0, 32);
+            if (refreshNavigation) prepared = await this.refreshResourceNavigation(sources, reads);
+            if (!reads.result && (reads.activity.length || reads.sessionId))
+                reads.result = await this.opening!.readRefresh!({activity: reads.activity, sessionId: reads.sessionId});
+            return reads.result?.activity;
+        });
+        return {prepared, session: reads.result?.session};
+    }
+    private async refreshResourceNavigation(sources: readonly string[], reads?: RefreshReads) {
         if (!this.resourceNavigationVisible || !this.navigationReady) return;
+        this.navigationDirty = false;
+        try {return await this.reloadResourceNavigation(sources, reads);}
+        catch (error) {this.navigationDirty = true; throw error;}
+    }
+    private async reloadResourceNavigation(sources: readonly string[], reads?: RefreshReads) {
+        const active = this.active, path = active?.startsWith('/') ? active : undefined;
+        const target = path && resolveBrowserTarget(path);
+        const directory = target && ['folder', 'favorites', 'project-conversations'].includes(target.kind) ? path : undefined;
+        if (this.opening && this.sources) {
+            const project = this.projectNavigation?.currentProject();
+            const route = path ?? (project && active?.startsWith('draft:') ? folderBrowserPath(project.path) : this.initialResource) ?? '/';
+            const data = await this.readNavigationSnapshot(route, true, reads);
+            if (active !== this.active || !this.resourceNavigationVisible || !this.visible || this.closed) {this.navigationDirty = true; return;}
+            if (!data) {this.scheduleRefresh('navigation:stale'); return;}
+            await this.sidebarUI?.refresh();
+            if (active !== this.active || !this.resourceNavigationVisible || !this.visible || this.closed) {this.navigationDirty = true; return;}
+            await this.projectNavigation?.refresh(data.navigation);
+            this.navigationReadAt = performance.now(); this.updateRemoteAvailability();
+            return {path: directory, view: directory ? data : undefined};
+        }
         await this.browser?.invalidateNavigation({activity: sources.length === 0 || sources.includes('events')});
         if (!this.resourceNavigationVisible || !this.visible || this.closed) { this.navigationDirty = true; return; }
-        const path = this.active?.startsWith('/') ? this.active : undefined, target = path ? resolveBrowserTarget(path) : undefined;
-        const prepared = path && this.browser?.readDirectory && target && ['folder', 'favorites', 'project-conversations'].includes(target.kind)
-            ? {path, view: await this.readDirectoryData(path)} : undefined;
-        if (prepared && path !== this.active) {this.navigationDirty = true; return;}
+        const prepared = directory && this.browser?.readDirectory ? {path: directory, view: await this.readDirectoryData(directory)} : undefined;
+        if (active !== this.active) {this.navigationDirty = true; return;}
         await this.sidebarUI?.refresh();
         if (!this.resourceNavigationVisible || !this.visible || this.closed) { this.navigationDirty = true; return; }
         await this.projectNavigation?.refresh(prepared && 'navigation' in prepared.view ? prepared.view.navigation : undefined);
-        this.navigationDirty = false; this.navigationReadAt = performance.now(); this.updateRemoteAvailability();
+        this.navigationReadAt = performance.now(); this.updateRemoteAvailability();
         return prepared;
     }
     private message(text: string): void {
@@ -1148,7 +1213,7 @@ export class SessionWorkbench implements WorkspaceController {
                 this.scheduleFileNavigation(path, options.fileNavigation); return;
             }
             if (target.kind === 'session') {
-                if (!opened) await load.read(async () => { opened = await this.backend.openSessionView(target.sessionId); });
+                if (!opened) await load.read(async () => { opened = await this.openLocalView(target.sessionId); });
                 this.tabs.setIcon(tabId, ENTITY_ICONS.chat);
             }
             if (directoryTarget) {
@@ -1381,12 +1446,15 @@ export class SessionWorkbench implements WorkspaceController {
         const prepared = this.initialSession; this.initialSession = undefined;
         if (prepared?.manifest.id === id) return prepared;
         await prepared?.dispose();
-        return this.backend.openSessionView(id);
+        return this.openLocalView(id);
+    }
+    private openLocalView(id: string): Promise<SessionOpenView> {
+        return this.sources?.session(id, this.backend) ?? this.backend.openSessionView(id);
     }
     private async activatePrepared(prepared: SessionOpenView, branch?: string) {
         const initial = this.initialData; this.initialData = undefined;
         if (initial?.sessionId === prepared.manifest.id && (!branch || branch === initial.manifest.currentBranch)) return initial;
-        return prepared.activate(branch);
+        return this.opening?.openSession ? prepared.activate(branch, {taskAttachmentKey: 'ui.privileged.active-task'}) : prepared.activate(branch);
     }
     private async reportNavigationFailure(error: unknown, path: string, timing?: {operationId: string; durationMs: number}): Promise<void> {
         try {
@@ -1412,23 +1480,25 @@ export class SessionWorkbench implements WorkspaceController {
         this.active = resourceId; this.activeBranch = undefined;
         this.onSelect(resourceId);
     }
-    private async syncBranchRoute(): Promise<void> {
+    private async syncBranchRoute(expected: string | null, session?: WorkbenchRefreshView['session']): Promise<void> {
         // Serialize reconciliation with navigation so a stale read cannot close a newer editor.
         const operation = this.tail.then(async () => {
-            if (this.closed || !this.visible || !this.active) return;
-            const id = this.active; if (id.startsWith('draft:') || id.startsWith('@agent/')) return;
-            const target = resolveBrowserTarget(id.startsWith('/') ? id : '/' + id);
-            if (!('sessionId' in target)) return;
-            const manifest = await this.sessions.get(target.sessionId).catch(async error => {
-                if (!this.visible || this.closed) return undefined;
+            if (this.closed || !this.visible || !expected || this.active !== expected) return;
+            const id = this.active, sessionId = workbenchSessionId(id);
+            if (!sessionId) return;
+            const manifest = session?.id === sessionId ? session.manifest : await this.sessions.get(sessionId).catch(error => {
                 if (error?.code !== 'ENOENT') throw error;
+                return null;
+            });
+            if (this.closed || !this.visible) return;
+            if (!manifest) {
                 if (this.tabs.current) await this.tabs.close(this.tabs.current.id, false);
                 else await this.closeEditor();
                 this.message('选择一个会话，或新建会话');
                 this.onSelect('', 'replace');
-                return undefined;
-            });
-            if (this.closed || !this.visible || !manifest || this.activeBranch === undefined || !this.editor) return;
+                return;
+            }
+            if (this.activeBranch === undefined || !this.editor) return;
             this.familyActions?.updateMetadata(manifest);
             const current = manifest.currentBranch ?? 'main';
             if (current !== this.activeBranch) {
@@ -1650,6 +1720,11 @@ export class SessionWorkbench implements WorkspaceController {
         const manifest = await this.sessions.get(id);
         return `${folderBrowserPath(manifest.folder)}/${id}`;
     }
+    private activityNavigationRoots(): string[] {
+        const navigation = this.projectNavigation, selected = navigation?.currentProject();
+        if (selected) return [folderBrowserPath(selected.path)];
+        return ['/', ...(navigation?.registeredProjects() ?? []).map(project => folderBrowserPath(project.path))];
+    }
     private fileNavigation: Promise<void> = Promise.resolve();
     private fileNavigationRevision = 0;
     private directorySelectionRevision = 0;
@@ -1674,7 +1749,11 @@ export class SessionWorkbench implements WorkspaceController {
             if (!current()) return;
             if (reuseScope) this.projectNavigation?.trackSelection(path);
             else await traceBoot('projectFile.navigation', async () => this.projectNavigation?.sync(path, options, navigation));
-            if (current() && !this.editor && !this.previewCleanup && !this.tabs.current?.failed && !this.tabs.content.inert) await this.sidebarUI?.expandPath(path);
+            if (current() && !this.editor && !this.previewCleanup && !this.tabs.current?.failed && !this.tabs.content.inert) {
+                const target = resolveBrowserTarget(path);
+                const directory = target.kind === 'remote' && target.nativeSessionId ? path.slice(0, path.lastIndexOf('/')) : path;
+                await this.sidebarUI?.expandPath(directory);
+            }
             if (current() && select && selection === this.directorySelectionRevision) await this.selectPath(path);
             if (current()) this.pendingNavigation = undefined;
         }).catch(error => { if (current()) this.report(error); }).finally(() => { if (revision === this.fileNavigationRevision) this.sidebarLayout.navigation.inert = false; });
@@ -1691,12 +1770,12 @@ export class SessionWorkbench implements WorkspaceController {
         const path=this.pendingNavigation?.path??this.active??this.initialResource;
         if(!path||!path.startsWith('/')||!this.browser?.readDirectory||!this.projects)return;
         const target=resolveBrowserTarget(path);
-        if(target.kind!=='project-files'&&(target.kind!=='remote'||!target.nativeSessionId))return;
+        if(target.kind!=='project-files'&&target.kind!=='project-draft'&&(target.kind!=='remote'||!target.nativeSessionId))return;
+        if (this.opening && this.sources) return (await this.readNavigationSnapshot(path))?.navigation;
         const started=performance.now(),operationId=randomUUID(),revision=this.navigationFiles!.revision;
         try{
             const projectId=this.projectNavigation?.currentProject()?.project.id??null;
-            const data=this.opening&&this.sources ? this.sources.navigation(await this.opening.readNavigation({resourceId:path,projectId,expandedPaths:this.uiPersistence?.load?.()?.expandedFolderIds}))
-                : await this.browser.readDirectory(folderBrowserPath(target.folder),{projectId,includeAncestors:true});
+            const data=await this.browser.readDirectory(folderBrowserPath(target.folder),{projectId,includeAncestors:true});
             if(this.closed||(this.pendingNavigation?.path??this.active??this.initialResource)!==path)return;
             const stale=revision!==this.navigationFiles!.revision||data.directories.some(directory=>directory.stale);
             this.directorySeeds?.seed(data.directories.map(directory=>({...directory,nodes:directory.nodes??(directory.entryIndices??[]).map(index=>data.nodes[index]),revision:this.navigationFiles!.revision,stale:stale||directory.stale})));
@@ -1704,6 +1783,37 @@ export class SessionWorkbench implements WorkspaceController {
             sidebarLog.debug('project.navigation.prepare',{operationId,stage:'navigation.prepare',result:'success',count:data.directories.length,stale,revision,currentRevision:this.navigationFiles!.revision,sourceRevision:this.browser.fs.revision,preparedRevision:data.directories[0]?.revision,durationMs:Math.round(performance.now()-started)});
             return stale ? undefined : navigation;
         }catch(error){const code=(error as {code?:unknown})?.code;sidebarLog.warn('project.navigation.prepare',{operationId,stage:'navigation.prepare',result:'failure',code:typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'NAVIGATION_PREPARE_FAILED',durationMs:Math.round(performance.now()-started)});}
+    }
+    private async readNavigationSnapshot(path: string, refresh = false, reads?: RefreshReads): Promise<SessionDirectoryView | undefined> {
+        const started = performance.now(), operationId = randomUUID(), revision = this.navigationFiles!.revision, active = this.active;
+        const generation = this.directorySeeds?.generation, selected = this.projectNavigation?.currentProject()?.project.id;
+        const project = this.projectNavigation?.currentProject() ?? (!this.navigationReady ? this.opening?.draft?.project : undefined);
+        const scope = project ? [folderBrowserPath(project.path)] : [];
+        const expanded = this.sidebarUI?.getSnapshot().expandedIds ?? this.uiPersistence?.load?.()?.expandedFolderIds ?? [];
+        const expandedPaths = [...new Set([...scope, ...expanded.filter(isExpandableDirectory)])].slice(0, 64);
+        try {
+            const request = {resourceId: path, projectId: project?.project.id ?? null, expandedPaths, refresh};
+            const response = reads && (reads.activity.length || reads.sessionId) && this.opening!.readRefresh
+                ? await this.opening!.readRefresh({navigation: request, activity: reads.activity, sessionId: reads.sessionId}) : undefined;
+            if (reads) reads.result = response;
+            const data = response?.navigation ?? await this.opening!.readNavigation(request);
+            const stale = this.closed || active !== this.active || revision !== this.navigationFiles!.revision
+                || generation !== this.directorySeeds?.generation || selected !== this.projectNavigation?.currentProject()?.project.id
+                || data.directories.some(directory => directory.stale);
+            if (!stale) {
+                this.sources!.navigation(data);
+                this.directorySeeds?.seed(data.directories.map(directory => ({...directory, revision,
+                    nodes:directory.nodes ?? (directory.entryIndices ?? []).map(index => data.nodes[index])})));
+            }
+            sidebarLog.debug('project.navigation.prepare', {operationId, stage:'navigation.prepare', result:stale?'superseded':'success',
+                count:data.directories.length, durationMs:Math.round(performance.now() - started)});
+            return stale ? undefined : data;
+        } catch (error) {
+            const code = (error as {code?:string})?.code;
+            sidebarLog.warn('project.navigation.prepare', {operationId, stage:'navigation.prepare', result:'failure',
+                code:code && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'NAVIGATION_PREPARE_FAILED', durationMs:Math.round(performance.now() - started)});
+            if (refresh) throw error;
+        }
     }
     /**
      * Follow a favorite row to its live resource. Returns false when the route is not a
@@ -2168,7 +2278,8 @@ export class SessionWorkbench implements WorkspaceController {
         return () => button.remove();
     }
     private async localEditorOptions(prepared: SessionOpenView, context: FileSystemContextOwner, assets: FileSystemView,
-        branch?: string, initialInputState?: EditorOptions['initialInputState'], signal?: AbortSignal): Promise<EditorOptions> {
+        branch?: string, initialInputState?: EditorOptions['initialInputState'], signal?: AbortSignal,
+        initialSubmission?: SessionSubmission): Promise<EditorOptions> {
         const manifest = prepared.manifest, id = manifest.id, project = prepared.project;
         return {signal, filterExecutors: ids => this.filterProjectAgents(project?.project.id, ids),
             mountMoreMenu: this.familyActions ? container => this.familyActions!.mount(container, manifest) : undefined,
@@ -2176,7 +2287,10 @@ export class SessionWorkbench implements WorkspaceController {
             mountCompactNavigation: container => this.tabs.mountCompactNavigation(container, project?.displayName ?? project?.name ?? '', () => this.toggleSidebar()),
             onStartConversationDraft: manifest.folder ? input => this.startSessionDraft(folderBrowserPath(manifest.folder), input) : undefined,
             initialData: await this.activatePrepared(prepared, branch), remoteAgents: this.remoteAgentControls(manifest.folder, project), initialInputState,
-            resolveSubmission: project ? () => this.projects!.drafts.submissionForSession(project.project.id, id) : undefined,
+            resolveSubmission: project ? async () => {
+                if (!initialSubmission) return this.projects!.drafts.submissionForSession(project.project.id, id);
+                const submission = initialSubmission; initialSubmission = undefined; return submission;
+            } : undefined,
             target: {kind: 'session', sessionId: id, branch: branch ?? manifest.currentBranch ?? 'main'}, files: context.context, assets, title: manifest.title,
             hostContext: {...this.hostContext!, directoryCommands: this.sessionDirectoryCommands(prepared), toggleSidebar: () => this.toggleSidebar()}};
     }
@@ -2197,13 +2311,14 @@ export class SessionWorkbench implements WorkspaceController {
                 } catch (error) {throw localizeMountError(error);}
             }};
     }
-    private async prepareLocalDraft(tab: WorkbenchTab<RetainedEditor>, id: string, mount: HTMLElement, signal: AbortSignal, createEditor = this.factory): Promise<IEditor> {
-        const prepared = await this.backend.openSessionView(id), context = {context: prepared.context, release: () => prepared.dispose()};
+    private async prepareLocalDraft(tab: WorkbenchTab<RetainedEditor>, id: string, mount: HTMLElement, signal: AbortSignal,
+        createEditor = this.factory, submission?: SessionSubmission, opened?: SessionOpenView): Promise<IEditor> {
+        const prepared = opened ?? await this.openLocalView(id), context = {context: prepared.context, release: () => prepared.dispose()};
         const assets = createFileSystemView({viewId: `editor-attachments:${id}`, mounts: [{mountId: 'attachments', at: '/', root: '/attachments', fs: prepared.context.fs, access: 'rw'}]});
         let editor: IEditor | undefined;
         try {
             signal.throwIfAborted();
-            editor = await createEditor(mount, await this.localEditorOptions(prepared, context, assets, undefined, undefined, signal));
+            editor = await createEditor(mount, await this.localEditorOptions(prepared, context, assets, undefined, undefined, signal, submission));
             signal.throwIfAborted();
             if (tab.value) {tab.value.context = context; tab.value.assets = assets;}
             if (this.tabs.current === tab) {this.context = context; this.assets = assets;}
@@ -2241,24 +2356,30 @@ export class SessionWorkbench implements WorkspaceController {
     private async promoteDraftTab(event: ProjectDraftPromotion): Promise<void> {
         const tab = this.tabs.get(`draft:${event.projectId}`), value = tab?.value;
         if (!tab || value?.draft?.id !== event.draftId || this.closed) return;
-        const project = await this.projects!.get(event.projectId);
-        const path = event.remote ? remoteSessionPath(project.path, event.remote.profileId, event.remote.nativeSessionId) : event.sessionId;
+        const project = event.remote ? await this.projects!.get(event.projectId) : undefined;
+        const path = event.remote ? remoteSessionPath(project!.path, event.remote.profileId, event.remote.nativeSessionId) : event.sessionId;
         const title = event.remote ? value.draft.remote?.snapshot?.().title ?? formatDefaultFileTitle() : (await this.sessions.get(event.sessionId)).title;
         const duplicate = this.tabs.get(path), replaceActive = duplicate && duplicate !== tab && this.tabs.current === duplicate;
         if (duplicate && duplicate !== tab) await this.tabs.close(path, false);
         if (this.closed || this.tabs.get(tab.id) !== tab || value.draft?.id !== event.draftId) return;
-        this.tabs.rename(tab.id, path, title); this.tabs.setIcon(path, event.remote ? ENTITY_ICONS.remoteSession : ENTITY_ICONS.chat);
-        value.active = path; value.branch = event.remote ? undefined : 'main'; value.draft = undefined;
-        const mount = tab.panel.querySelector<HTMLElement>('.session-editor-mount')!;
-        const confirming = value.editor?.commands.confirmDraft?.((createEditor?: EditorFactory) => event.remote
-            ? this.prepareRemoteDraft(tab, project, event.draftId, {container: mount, createEditor,
-                agentId: 'remote:' + encodeURIComponent(JSON.stringify([event.remote.connectionId, event.remote.serverProjectId, event.remote.profileId]))}, this.dialogs.signal, event.remote.nativeSessionId)
-            : this.prepareLocalDraft(tab, event.sessionId, mount, this.dialogs.signal, createEditor));
-        if (event.remote) this.remoteStatus.attach(path, project.project.id);
-        if (this.tabs.current === tab) {this.active = path; this.activeBranch = value.branch; this.onSelect(this.getActiveResourceId()!, 'replace');}
-        this.scheduleRefresh('project.draftPromoted');
-        await confirming;
+        await this.applyDraftPromotion(tab, project, event, path, title);
         if (replaceActive) {this.tabs.activate(path); await this.restoreEditor(value); this.onSelect(this.getActiveResourceId()!, 'replace');}
+    }
+    private applyDraftPromotion(tab: WorkbenchTab<RetainedEditor>, project: ProjectFolder | undefined, event: ProjectDraftPromotion, path: string, title: string) {
+        const value = tab.value!, finish = this.presentationState?.begin?.() ?? this.uiPersistence?.begin?.();
+        try {
+            this.tabs.rename(tab.id, path, title); this.tabs.setIcon(path, event.remote ? ENTITY_ICONS.remoteSession : ENTITY_ICONS.chat);
+            value.active = path; value.branch = event.remote ? undefined : 'main'; value.draft = undefined;
+            const mount = tab.panel.querySelector<HTMLElement>('.session-editor-mount')!;
+            const confirming = value.editor?.commands.confirmDraft?.((createEditor?: EditorFactory) => event.remote
+                ? this.prepareRemoteDraft(tab, project!, event.draftId, {container: mount, createEditor,
+                    agentId: 'remote:' + encodeURIComponent(JSON.stringify([event.remote.connectionId, event.remote.serverProjectId, event.remote.profileId]))}, this.dialogs.signal, event.remote.nativeSessionId)
+                : this.prepareLocalDraft(tab, event.sessionId, mount, this.dialogs.signal, createEditor));
+            if (event.remote) this.remoteStatus.attach(path, event.projectId);
+            if (this.tabs.current === tab) {this.active = path; this.activeBranch = value.branch; this.onSelect(this.getActiveResourceId()!, 'replace');}
+            this.scheduleRefresh('project.draftPromoted');
+            return confirming;
+        } finally {finish?.();}
     }
     private async resetProjectDraft(folder: string): Promise<void> {
         const project = await this.projects!.forFolder(folder);
@@ -2339,14 +2460,24 @@ export class SessionWorkbench implements WorkspaceController {
             const mount = await this.editorMount(folder, undefined, {project});
             const composer = opened?.composer ?? await this.projects.drafts.open(project.project.id, folder);
             const draftOptions = createProjectDraftControls(composer, {
-                check: async () => { load.check(); await this.creationFolder(folderBrowserPath(folder)); },
+                begin: () => this.beginDraftHandoff(),
+                prepare: this.sources && composer === this.opening?.draft?.composer && this.opening?.prepareDraftSession
+                    ? async (id, request) => {
+                        const prepared = await this.opening!.prepareDraftSession!(id, request);
+                        return {...prepared, view: this.sources!.trackSession(prepared.sessionId, prepared.view)};
+                    } : undefined,
+                check: async () => {
+                    load.check();
+                    const reason = sessionCreationReason(this.projects!, project.project.id);
+                    if (reason) throw new Error(reason);
+                },
                 identity: id => {
                     tab.conversationId = id; tab.panel.dataset.conversationId = id; mount.dataset.conversationId = id;
                     if (tab.value?.draft) tab.value.draft.id = id;
                 },
                 remote: request => this.prepareRemoteDraft(tab, project, tab.conversationId ?? composer.id!, request, load.signal),
-                open: async (id, request) => {
-                    if (request) return this.prepareLocalDraft(tab, id, request.container, load.signal, request.createEditor);
+                open: async (id, request, submission, view) => {
+                    if (request) return this.prepareLocalDraft(tab, id, request.container, load.signal, request.createEditor, submission, view);
                     await Promise.all([this.openResource(id), this.sidebarUI?.refresh()]);
                     await this.tabs.close(draftId, false);
                     await this.selectPath(await this.sessionPath(id));

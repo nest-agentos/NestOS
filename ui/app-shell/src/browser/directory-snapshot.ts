@@ -9,18 +9,20 @@ const reads = ['getNode', 'getNodeType', 'getChildren', 'readContent'];
 /** Consume prepared metadata once; events, explicit revisions and later reads use the live port. */
 export function directorySnapshot(files: IFileSystem) {
     const available = new Map<string, Seed>();
+    let generation = 0;
+    const invalidate = () => {available.clear(); generation++;};
     const driver = new Proxy(files.driver, { get(target, key) {
-        const observer = observeSnapshot(target, key, available); if (observer) return observer;
+        const observer = observeSnapshot(target, key, invalidate); if (observer) return observer;
         if (reads.includes(String(key))) return seededRead(files, key, available);
         const method = Reflect.get(target, key, target); return typeof method === 'function' ? method.bind(target) : method;
     } });
     const view: IFileSystem = new Proxy(files, { get(target, key) {
-        const observer = observeSnapshot(target, key, available); if (observer) return observer;
+        const observer = observeSnapshot(target, key, invalidate); if (observer) return observer;
         if (key === 'driver') return driver;
         if (key === 'openFile') return (path: string) => createFile(view, path);
         const method = Reflect.get(target, key, target); return typeof method === 'function' ? method.bind(target) : method;
     } });
-    return { files: view, seed(directories: Directory[]) {
+    return { files: view, get generation() {return generation;}, seed(directories: Directory[]) {
         available.clear();
         for (const directory of directories) seedDirectory(available, directory);
     } };
@@ -38,12 +40,12 @@ function seedDirectory(available: Map<string, Seed>, directory: Directory): void
     if (ignore.content !== undefined) add('readContent', at, ignore.content);
 }
 
-function observeSnapshot(target: object, key: PropertyKey, available: Map<string, Seed>) {
+function observeSnapshot(target: object, key: PropertyKey, invalidate: () => void) {
     const method = Reflect.get(target, key, target);
     if (!['on', 'onAny'].includes(String(key)) || typeof method !== 'function') return undefined;
     return (...args: unknown[]) => {
         const listener = args.pop() as (...values: unknown[]) => void;
-        return method.call(target, ...args, (...values: unknown[]) => { available.clear(); return listener(...values); });
+        return method.call(target, ...args, (...values: unknown[]) => { invalidate(); return listener(...values); });
     };
 }
 function seededRead(files: IFileSystem, key: PropertyKey, available: Map<string, Seed>) {

@@ -6,7 +6,7 @@ import type {VFSNodeUI, VFSUIShell} from '@nestos/vfs-ui';
 
 afterEach(() => vi.useRealTimers());
 
-function fixture() {
+function fixture(scoped = false) {
     let visible = true;
     const node = (id: string): VFSNodeUI => ({id, type: 'directory', version: '1', metadata: {title: id,
         tags: [], path: id, parentPath: '/', createdAt: new Date(0).toISOString(), lastModified: new Date(0).toISOString(), custom: {keep: true}}});
@@ -18,7 +18,8 @@ function fixture() {
         counts: {running: 1}, pending: {approval: 0, input: 0, cleanup: 0}})), task: vi.fn(async () => ({
         id: 'existing', program: {kind: 'test'}, status: 'succeeded', updatedAt: 42}))};
     const path = vi.fn(async () => '/s');
-    const view = new LocalSessionActivityView(kernel as unknown as KernelViewPort, () => ui as unknown as VFSUIShell, () => visible, path);
+    const view = new LocalSessionActivityView(kernel as unknown as KernelViewPort, () => ui as unknown as VFSUIShell,
+        () => visible, path, undefined, scoped ? () => ['/s'] : undefined);
     return {view, kernel, ui, path, session, hide: () => {visible = false;}, show: () => {visible = true;}};
 }
 
@@ -27,6 +28,14 @@ it('updates loaded Session and Task rows through metadata without reloading thei
     expect(f.ui.updateNodeMetadata).toHaveBeenCalledWith('/s', expect.objectContaining({custom: expect.objectContaining({keep: true})}));
     expect(f.ui.updateNodeMetadata).toHaveBeenCalledWith('/s/tasks/existing', expect.objectContaining({title: 'test · succeeded · existing'}));
     expect(f.ui.loadDirectory).not.toHaveBeenCalled();
+});
+
+it('reuses a visible Session row and skips background Sessions without looking up their location', async () => {
+    const f = fixture(true);
+    f.view.invalidate('outside'); f.view.invalidate('s', 'existing'); await f.view.refresh();
+    expect(f.path).not.toHaveBeenCalled();
+    expect(f.kernel.sessionActivity).toHaveBeenCalledExactlyOnceWith('s');
+    expect(f.kernel.task).toHaveBeenCalledExactlyOnceWith('s', 'existing');
 });
 
 it('loads only an explicitly expanded Task directory when new or unidentified Tasks change', async () => {

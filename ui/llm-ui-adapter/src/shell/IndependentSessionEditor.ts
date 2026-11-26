@@ -80,19 +80,21 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
         await this.resolveSubmission();
         this.checkAlive();
         this.initialManifest = loaded.manifest;
-        try {await this.mount(loaded.manifest.currentBranch, {uiState: loaded.manifest.uiState});}
+        try {await this.mount(loaded.manifest.currentBranch, loaded.manifest, loaded);}
         finally {this.initialManifest = undefined;}
         if (this.config.initialInputState?.text) this.view!.setText(this.config.initialInputState.text);
         measurement.mark('restoreAndRender'); measurement.finish(); this.emit('ready', undefined);
     }
-    private async mount(branch: string, initial?: {uiState?: import('@nestos/llm-session/contracts').ConversationUIState}): Promise<void> {
+    private async mount(branch: string, initial?: Pick<import('@nestos/llm-session/contracts').ConversationManifest, 'revision' | 'uiState'>,
+        presentation?: import('@nestos/app-contracts/services').SessionPresentationState): Promise<void> {
         this.checkAlive();
         const previous = this.mountSnapshot();
         const store = await SessionChatStore.open(this.service, this.config.sessionId, branch, new AssetService(this.config.assets), initial);
         this.checkAlive();
-        const lifetime = new AbortController(), binding = this.createBinding(store, lifetime.signal);
+        const lifetime = new AbortController(), binding = this.createBinding(store, lifetime.signal, presentation);
         try {
-            await binding.refreshTargets(false); const draft = await this.initialDraft(store, binding); this.checkAlive();
+            if (!presentation?.targets) await binding.refreshTargets(false);
+            const draft = await this.initialDraft(store, binding); this.checkAlive();
             this.branch = branch; this.store = store; this.binding = binding; this.lifetime = lifetime;
             if (this.config.target?.kind === 'session') this.config.target = {...this.config.target, branch};
             const options = this.viewOptions(store, draft);
@@ -139,19 +141,22 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
         this.config.signal?.throwIfAborted();
         if (this.closed) throw Object.assign(new Error('Session editor is closed'), {code: 'VIEW_CLOSED'});
     }
-    private createBinding(store: SessionChatStore, signal: AbortSignal): Binding {
+    private createBinding(store: SessionChatStore, signal: AbortSignal, presentation?: import('@nestos/app-contracts/services').SessionPresentationState): Binding {
         const owner = this, operations = store.ledger();
         const taskPanel = new SharedChatTaskPanel(error => this.fail(error), this.config.commandBus!, task =>
             this.config.sessionManager.getSessions().some(group => group.execution?.taskId === task.id || group.execution?.taskId === task.rootTaskId));
-        const inputCommands = new SharedChatCommands({config: this.config, session: this.config.sessionManager, operations, signal,
+        const inputCommands = new SharedChatCommands({config: this.config, session: this.config.sessionManager, operations, signal, presentation,
             view: () => this.view, snapshot: () => binding.source.getSnapshot(), current: () => this.binding === binding && this.current() && this.active && !this.config.readOnly,
             taskCallbacks: taskPanel.callbacks, attach: controller => taskPanel.bind(controller), changed: () => this.observeBranch(),
             selectAgent: id => this.selectAgent(id), configure: values => this.configure(values),
             openSettings: () => {const menu = this.container.querySelector<HTMLDetailsElement>('[data-chat-settings]'); if (menu) {const parent = menu.closest<HTMLDetailsElement>('.llm-chat__input-menu'); if (parent) parent.open = true; menu.open = true;}}, report: error => this.fail(error)});
         this.inputCommands = inputCommands; this.taskPanel = taskPanel;
         const history = this.historyActions = this.createHistory(store, () => binding);
+        const configurationGeneration = this.configurationGeneration;
         const binding = createSessionChatBinding({session: this.config.sessionManager, commands: this.config.commandBus!, kernel: this.config.kernel,
-            history: history.actions, title: this.config.title, operations, composerCommands: {subscribe: listener => inputCommands.subscribe(listener), getSnapshot: () => inputCommands.getSnapshot(), execute: (input, context) => inputCommands.execute(input, context),
+            history: history.actions, title: this.config.title, operations, initialTargets: presentation?.targets,
+            initialCalls: presentation?.independentCalls, initialQueue: presentation?.instructionQueue,
+            composerCommands: {subscribe: listener => inputCommands.subscribe(listener), getSnapshot: () => inputCommands.getSnapshot(), execute: (input, context) => inputCommands.execute(input, context),
                 reconcile: async operationId => {const record = operations.getSnapshot().find(item => item.context.operationId === operationId); return record?.status === 'accepted' ? {status: 'accepted', operationId} : {status: 'unknown', operationId, message: t('chat.submission.unconfirmed')};}}, filterAgents: this.config.filterExecutors, targetSelection: true, autoSelectFirstTarget: false, structuredInputDialog: true,
             onTargetsChanged: catalog => {if (this.binding === binding && !this.closed && this.active) refreshDraftTarget(this.view, catalog);}, independentCalls: !this.config.readOnly, instructionQueue: true, contextSelection: true,
             get readOnly() {return !!owner.config.readOnly;}, branch: () => this.config.sessionManager.getSnapshot?.().view?.manifest.currentBranch ?? store.branch,
@@ -164,7 +169,8 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
                 if (submission && binding.operations.getSnapshot().some(record => record.context.operationId === submission.id)) return null;
                 return {operationId: submission?.id ?? randomUUID(), viewId: binding.source.getSnapshot().viewId};
             },
-            prepareRequest: (request, input) => this.prepare(request, input, store, signal),
+            prepareRequest: (request, input) => this.prepare(request, input, store, signal,
+                this.configurationGeneration === configurationGeneration ? presentation?.targets : undefined),
             hasCommittedSubmission: submission => this.config.commandBus!.execute(SessionCommand.HasCommittedSubmission, {sessionId: this.config.sessionId, submission}),
             openOutputs: taskId => openSessionFlowOutputs(this.config.commandBus!, this.config.sessionId, signal, taskId),
             openChild: id => this.config.hostContext?.navigate({target: 'chat', resourceId: id}),
@@ -241,11 +247,12 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
                 if (`${group.id}:input:${index}` === messageId) return {branch: this.branch, roundId, userIndex: index};
         }
     }
-    private async prepare(request: SubmissionRequest, input: ChatSubmission, store: SessionChatStore, signal: AbortSignal): Promise<SubmissionRequest> {
+    private async prepare(request: SubmissionRequest, input: ChatSubmission, store: SessionChatStore, signal: AbortSignal, initial?: RootTargetCatalog): Promise<SubmissionRequest> {
         if (!this.current() || this.config.readOnly) throw new Error('Session input binding expired');
-        const catalog = await this.config.commandBus!.execute<RootTargetCatalog>(SessionCommand.ListTargets);
-        const choice = catalog.entries.find(choice => choice.target.kind === request.expectedTarget?.kind && choice.target.id === request.expectedTarget.id
-            && choice.target.version === request.expectedTarget.version && choice.target.digest === request.expectedTarget.digest);
+        const matches = ({target}: RootTargetCatalog['entries'][number]) => target.kind === request.expectedTarget?.kind
+            && target.id === request.expectedTarget.id && target.version === request.expectedTarget.version && target.digest === request.expectedTarget.digest;
+        const choice = initial?.entries.find(matches)
+            ?? (await this.config.commandBus!.execute<RootTargetCatalog>(SessionCommand.ListTargets)).entries.find(matches);
         if (!choice) throw new Error(t('callable.catalog.changed'));
         return prepareSessionChatRequest({commands: this.config.commandBus!, agents: this.config.agentService, choice, request, input,
             files: await store.files(input.attachments, signal), assets: this.config.assets, harnessConnectionId: this.settings.harnessConnectionId, signal});
@@ -269,7 +276,7 @@ export class IndependentSessionEditor extends BaseSettingsEditor<LLMEditorOption
         const generation = ++this.configurationGeneration;
         const connections = await buildConnectionOptions(this.config.agentService, this.config.configuration?.getConfigurationSnapshot());
         if (this.closed || !this.active || generation !== this.configurationGeneration) return;
-        this.connections = connections; await this.binding?.refreshTargets();
+        this.connections = connections; await this.binding?.refreshTargets(true, false);
     }
     private selectors() {
         if (this.settings.harnessConnectionId) return [];

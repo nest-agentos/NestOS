@@ -17,6 +17,7 @@ interface Options {
     interactionDrafts?: InteractionDraftStorage;
     operations: OperationLedger;
     branch(): string;
+    initial?: IndependentCallView[];
     mountCard?(element: HTMLElement, call: IndependentCallView): () => void;
     openChild?(id: string): void | Promise<void>;
 }
@@ -34,11 +35,18 @@ export class IndependentCallPanel {
     private active = false;
     private releaseLedger: () => void;
     private readonly controls: CallControlOperations;
+    private initial?: IndependentCallView[];
     constructor(private commands: ICommandBus, private sessionId: string, parent: HTMLElement, private options: Options) {
         this.controls = new CallControlOperations(options.operations, commands, sessionId);
+        this.initial = options.initial;
         this.element.className = 'flow-invocations'; this.element.hidden = true;
         this.error.setAttribute('role', 'alert'); this.element.append(this.error); parent.append(this.element);
-        this.releaseLedger = options.operations.subscribe(() => {void this.refresh();});
+        let pending = this.pending();
+        this.releaseLedger = options.operations.subscribe(() => {
+            const next = this.pending();
+            if (next !== pending || next) void this.refresh();
+            pending = next;
+        });
         const refresh = () => {if (!document.hidden) void this.refresh();};
         window.addEventListener('focus', refresh, {signal: this.abort.signal});
         document.addEventListener('visibilitychange', refresh, {signal: this.abort.signal});
@@ -67,6 +75,7 @@ export class IndependentCallPanel {
     }
     reset(): void {++this.generation; this.refreshing = undefined; this.clearCards(); void this.refresh();}
     setVisible(value: boolean): void {
+        if (value === this.visible) return;
         this.visible = value; ++this.generation; this.refreshing = undefined; clearTimeout(this.timer);
         for (const card of this.cards.values()) {card.flowDocument?.setVisible(value); card.artifacts.setVisible(value); card.control.setActive(value); card.descendants.setActive(value); card.answers.setActive(value);}
         if (value) void this.refresh();
@@ -81,7 +90,8 @@ export class IndependentCallPanel {
     }
     private async load(branch: string, current: () => boolean): Promise<void> {
         const started = Date.now();
-        const calls = await this.commands.execute<IndependentCallView[]>(IndependentCallCommand.List, {sessionId: this.sessionId, branchId: branch});
+        const initial = this.initial; this.initial = undefined;
+        const calls = await (initial ?? this.commands.execute<IndependentCallView[]>(IndependentCallCommand.List, {sessionId: this.sessionId, branchId: branch}));
         if (!current()) return;
         for (const call of calls) this.assertScope(call, branch);
         const wasActive = this.active;

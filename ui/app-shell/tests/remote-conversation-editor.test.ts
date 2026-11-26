@@ -370,6 +370,24 @@ it.each(['closed', 'hidden'])('does not restore native command suggestions after
     await editor.destroy();
 });
 
+it('offers local prompt commands while native suggestions are loading and after a failure', async () => {
+    const {editor, peer, host} = setup();
+    let fail!: (error: Error) => void;
+    peer.commands = vi.fn(() => new Promise((_resolve, reject) => {fail = reject;}));
+    await editor.init(host);
+    try {
+        const input = host.querySelector<HTMLTextAreaElement>('.llm-input__textarea')!;
+        const type = (text: string) => {input.value = text; input.dispatchEvent(new Event('input', {bubbles: true}));};
+        const popup = () => document.querySelector('.llm-popup--visible.llm-popup--slash');
+        type('/'); expect(popup()?.textContent).toContain('/history'); expect(popup()?.textContent).toContain('/prompt');
+        type('/pro'); expect(popup()?.textContent).not.toContain('/history');
+        fail(new Error('CATALOG_UNAVAILABLE')); await new Promise(resolve => setTimeout(resolve, 0));
+        expect(popup()?.querySelector('[aria-selected=true]')?.textContent).toContain('/prompt');
+        input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Tab', bubbles: true, cancelable: true}));
+        expect(input.value).toBe('/prompt '); expect(peer.send).not.toHaveBeenCalled(); expect(peer.commands).toHaveBeenCalledOnce();
+    } finally {await editor.destroy();}
+});
+
 it('coalesces candidate discovery across keystrokes and revalidates the raw command on send', async () => {
     const {editor, peer, host} = setup();
     let finish!: (rows: import('@nestos/llm-ui-adapter/contracts').ConversationSlashCommand[]) => void;

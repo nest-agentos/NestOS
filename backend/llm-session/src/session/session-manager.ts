@@ -509,6 +509,13 @@ export class SessionManager implements ISession, SessionQuery {
         }
     }
 
+    async submitWithReceipt(request: import('../contracts/submission').SubmissionRequest): Promise<import('../contracts/submission').SubmissionReceipt> {
+        if (!request.expectedSessionId || !request.submission?.id)
+            throw Object.assign(new Error('Submission receipt requires an explicit Session and operation identity'), {code: 'SUBMISSION_INVALID'});
+        await this.submit(request);
+        return this.inspectSubmissionReceipt(request);
+    }
+
     listCallTargets(): Promise<import('../contracts/submission').RootTargetCatalog> {return this.callTargets.list();}
 
     /** Trusted host preparation only; explicit child identity never rebinds this manager's view. */

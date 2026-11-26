@@ -1,20 +1,23 @@
 import {mergeOperationRecords, type OperationRecord} from '@nestos/llm-ui';
-import type {ISessionRepository} from '@nestos/llm-session/contracts';
+import type {ConversationUIState, ISessionRepository} from '@nestos/llm-session/contracts';
 import {createModuleLogger, randomUUID, t} from '@nestos/common';
-import {writeUIStateConditionally} from './conditional-ui-state';
+import {writeUIStateConditionally, type SessionUIStateWriter} from './conditional-ui-state';
 import {canonicalJson} from '../utils/canonical-json';
 const log = createModuleLogger('workspace-operation-store');
 type Repository = Pick<ISessionRepository, 'getManifest' | 'compareAndSetUIState'>;
 
 /** UI owns merge policy; Session supplies only an atomic revision condition on opaque data. */
-export async function persistOperations(repository: Repository, sessionId: string, incoming: readonly OperationRecord[]): Promise<readonly OperationRecord[]> {
+export async function persistOperations(repository: Repository, sessionId: string, incoming: readonly OperationRecord[],
+    writer?: SessionUIStateWriter): Promise<readonly OperationRecord[]> {
     const proposed = structuredClone(incoming), operationId = randomUUID(), started = Date.now();
-    return writeUIStateConditionally(repository, sessionId, state => {
+    const prepare = (state: ConversationUIState | undefined) => {
         readRecords(proposed, sessionId);
         const stored = readRecords(state?.operationRecords, sessionId), merged = mergeOperationRecords(stored, proposed);
         return {value: merged, ...(sameRecords(stored, merged) ? {} : {patch: {operationRecords: JSON.parse(JSON.stringify(merged))}})};
-    }, {unavailable: () => failure('OPERATION_STORE_UNAVAILABLE'), conflict: () => failure('OPERATION_SAVE_CONFLICT'),
-        report: (stage, attempt, error) => report(operationId, started, stage, attempt, error)});
+    };
+    const options = {unavailable: () => failure('OPERATION_STORE_UNAVAILABLE'), conflict: () => failure('OPERATION_SAVE_CONFLICT'),
+        report: (stage: string, attempt: number, error?: unknown) => report(operationId, started, stage, attempt, error)};
+    return writer ? writer.write(prepare, options) : writeUIStateConditionally(repository, sessionId, prepare, options);
 }
 function readRecords(value: unknown, sessionId: string): readonly OperationRecord[] {
     if (value === undefined) return [];

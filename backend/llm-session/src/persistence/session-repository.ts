@@ -562,11 +562,13 @@ export class SessionRepository implements ISessionRepository {
         }
         await this.commitManifest(id, patch);
     }
-    private async commitManifest(id: string, patch: Partial<ConversationManifest>, expectedRevision?: number): Promise<void> {
-        const changed = await this.fs.meta.seq!.transaction!(async tx => this.writeManifestTx(tx, await this.paths(id, tx), patch, expectedRevision));
-        if (changed) this.notify({ sessionId: id, kind: Object.keys(patch).every(key => key === 'uiState') ? 'ui-state' : 'session' });
+    private async commitManifest(id: string, patch: Partial<ConversationManifest>, expectedRevision?: number) {
+        const result = await this.fs.meta.seq!.transaction!(async tx => this.writeManifestTx(tx, await this.paths(id, tx), patch, expectedRevision));
+        if (result.changed) this.notify({ sessionId: id, kind: Object.keys(patch).every(key => key === 'uiState') ? 'ui-state' : 'session' });
+        return result;
     }
-    private async writeManifestTx(tx: ISeqFileTransaction, p: SessionPaths, patch: Partial<ConversationManifest>, expectedRevision?: number): Promise<boolean> {
+    private async writeManifestTx(tx: ISeqFileTransaction, p: SessionPaths, patch: Partial<ConversationManifest>, expectedRevision?: number):
+        Promise<import('./types').SessionUIStateRevision & {changed: boolean}> {
         const raw = await tx.getEntry(p.session, 'session');
         if (!raw) throw new FSError('ENOENT', 'Session not found');
         const current = JSON.parse(raw);
@@ -587,12 +589,14 @@ export class SessionRepository implements ISessionRepository {
             ...(normalizedFolder !== undefined ? { folder: normalizedFolder } : {}),
             ...(uiState ? { uiState: { ...current.uiState, ...uiState, ...(uiState.branchDrafts ? { branchDrafts: { ...current.uiState?.branchDrafts, ...uiState.branchDrafts } } : {}) } } : {}), ...(flow ? { flow } : {}) };
         const historyChanged = await this.writeHistoryPatchTx(tx, p, historyPatch);
-        if (!historyChanged && JSON.stringify(current) === JSON.stringify(next)) return false;
+        if (!historyChanged && JSON.stringify(current) === JSON.stringify(next))
+            return {changed: false, revision: current.revision, uiState: current.uiState};
         const updatedAt = activityChanged(current, next, historyChanged) ? Date.now() : current.updatedAt;
-        await tx.setEntry(p.session, 'session', JSON.stringify({ ...next, updatedAt, revision: current.revision + 1 }));
+        const revision = current.revision + 1;
+        await tx.setEntry(p.session, 'session', JSON.stringify({ ...next, updatedAt, revision }));
         if (updatedAt !== current.updatedAt || ['title', 'summary', 'origin', 'folder'].some(key => next[key] !== current[key]))
             await indexSessionSummary(tx, { ...next, updatedAt }, current);
-        return true;
+        return {changed: true, revision, uiState: next.uiState};
     }
     private async writeHistoryPatchTx(tx: ISeqFileTransaction, p: SessionPaths, patch: object): Promise<boolean> {
         if (!Object.keys(patch).length) return false;
@@ -605,14 +609,16 @@ export class SessionRepository implements ISessionRepository {
     }
     async getUIState(id: string): Promise<ConversationUIState | null> { return (await this.getManifest(id)).uiState ?? null; }
     async updateUIState(id: string, updates: Partial<ConversationUIState>): Promise<void> {await this.commitManifest(id, {uiState: structuredClone(updates)});}
-    async compareAndSetUIState(id: string, expectedRevision: number, updates: Partial<ConversationUIState>): Promise<void> {
+    async compareAndSetUIState(id: string, expectedRevision: number, updates: Partial<ConversationUIState>,
+        returnState?: true): Promise<import('./types').SessionUIStateRevision | void> {
         const patch = structuredClone(updates);
         const started = performance.now(), operationId = ulid();
         try {
             if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)
                 throw Object.assign(new Error('Invalid Session UI state revision'), {code: 'SESSION_UI_STATE_VERSION_INVALID'});
-            await this.commitManifest(id, {uiState: patch}, expectedRevision);
+            const {revision, uiState} = await this.commitManifest(id, {uiState: patch}, expectedRevision);
             this.traceUIStateWrite(id, operationId, started);
+            if (returnState === true) return {revision, uiState};
         } catch (error) {this.traceUIStateWrite(id, operationId, started, error); throw error;}
     }
     private traceUIStateWrite(sessionId: string, operationId: string, started: number, error?: unknown): void {

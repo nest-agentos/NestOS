@@ -325,15 +325,28 @@ it.each([
         let accept!: () => void;
         const delayed = new Promise<void>(resolve => {accept = resolve;});
         vi.mocked(peer.turn).mockImplementationOnce(async () => {await delayed; return {turnId: 't'};});
+        let open!: () => void;
+        const opening = new Promise<void>(resolve => {open = resolve;}), projectConversation = remote.projectConversation.bind(remote);
+        const handoff = vi.spyOn(remote, 'projectConversation').mockImplementationOnce(async (...args) => {
+            await opening; return projectConversation(...args);
+        });
+        const refreshDraft = vi.spyOn(draftEditor.config.sessionDraft, 'refresh');
         textarea.value = 'remote task'; textarea.dispatchEvent(new Event('input', {bubbles: true}));
         const send = mount.querySelector<HTMLButtonElement>('.llm-chat__composer button[type=submit]')!;
         await vi.waitFor(() => expect(send.disabled).toBe(false)); send.click();
         try {
+            await vi.waitFor(() => expect(handoff).toHaveBeenCalledOnce());
+            expect(mount.querySelector('.llm-draft-submitting')?.textContent).toBe(t('project.draftLoading.submission'));
+            await draftEditor.commands.refreshDraft();
+            expect(refreshDraft).not.toHaveBeenCalled();
+            expect(send.disabled).toBe(true);
+            open();
             await vi.waitFor(() => expect(peer.turn).toHaveBeenCalledOnce());
+            expect(mount.querySelector('.llm-draft-submitting')).toBeNull();
             expect(workbench.getActiveResourceId()).toBe('draft:' + project.project.id);
             textarea.value = 'Next remote message'; textarea.dispatchEvent(new Event('input', {bubbles: true}));
             textarea.focus(); textarea.setSelectionRange(4, 4);
-        } finally {accept();}
+        } finally {open(); accept();}
         const promoted = remoteSessionPath(project.path, 'codex', 'new-native');
         await vi.waitFor(() => expect(workbench.getActiveResourceId()).toBe(promoted));
         expect(shell.tabs.current).toBe(draftTab); expect(shell.editor).toBe(draftEditor);

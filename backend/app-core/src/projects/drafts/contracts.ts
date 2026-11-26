@@ -21,7 +21,7 @@ export interface DraftStore {
     saveData(data: string): Promise<void>;
     reset(): Promise<void>;
     moveTo?(projectId: string): Promise<void>;
-    begin(title: string, remoteTarget?: RemoteDraftTarget, harnessConnectionId?: string): Promise<ProjectDraftRecord>;
+    begin(title: string, remoteTarget?: RemoteDraftTarget, harnessConnectionId?: string, data?: string): Promise<ProjectDraftRecord>;
     promote(remote?: ProjectDraftPromotion['remote']): Promise<ProjectDraftPromotion | undefined>;
     wasPromoted(): Promise<boolean>;
 }

@@ -1,7 +1,8 @@
 import {randomUUID} from '@nestos/common';
 import {bindViewSources, overlay as delegate} from '../lifecycle/view-sources';
-import type {ApplicationServices, ApplicationViewEvent, ApplicationViewSources, ConversationWorkbenchView, PreparedConversation, WorkbenchNavigationView} from '@nestos/app-contracts/services';
+import type {ApplicationBackend, ApplicationServices, ApplicationViewEvent, ApplicationViewSources, ConversationWorkbenchView, PreparedConversation, SessionEditorInitialData, WorkbenchNavigationView, WorkbenchView} from '@nestos/app-contracts/services';
 import type {IFileSystem} from '@nestos/vfs-core';
+import type {SessionOpenView} from '@nestos/app-contracts/services';
 
 /** Adapt one owned view observation to existing UI ports without extra remote listeners. */
 export class WorkbenchSources {
@@ -11,6 +12,8 @@ export class WorkbenchSources {
     private closed = false;
     private cursor: number;
     private recovering?: Promise<void>;
+    private readonly skills = new Map<string, number>();
+    private readonly changes = new Map<keyof ApplicationViewSources, number>();
     constructor(readonly opening: ConversationWorkbenchView) {this.cursor = opening.cursor;}
     async start(): Promise<void> {
         const stop = await this.opening.subscribe(event => this.deliver(event), failure => this.recover(failure.code));
@@ -29,6 +32,7 @@ export class WorkbenchSources {
     private deliver(event: ApplicationViewEvent): void {
         if (this.closed) return;
         if (event.sequence > 0) {if (event.sequence <= this.cursor) return; this.cursor = event.sequence;}
+        if (event.topic !== 'repository' || event.value?.kind !== 'ui-state') this.changes.set(event.topic, this.cursor);
         if (event.topic === 'remoteStatus') this.statuses.set(event.value.projectId, event.value.rows);
         for (const listener of [...(this.listeners.get(event.topic) ?? [])]) listener(event.value);
     }
@@ -41,6 +45,7 @@ export class WorkbenchSources {
             if (this.closed) return;
             this.navigation(view);
             for (const [projectId, rows] of Object.entries(view.statuses)) this.deliver({sequence: 0, topic: 'remoteStatus', value: {projectId, rows}});
+            this.deliver({sequence: 0, topic: 'repository', value: undefined});
             this.deliver({sequence: 0, topic: 'mounts', value: undefined});
             if (this.opening.native) this.deliver({sequence: 0, topic: 'conversation', value: {resourceId: this.opening.native.resourceId}});
         }).catch(error => {
@@ -68,6 +73,39 @@ export class WorkbenchSources {
     files(source: IFileSystem): IFileSystem {
         return delegate(source, {onAny: listener => this.on('navigation', listener),
             on: (type, listener) => this.on('navigation', event => {if (event.type === type) listener(event as Parameters<typeof listener>[0]);})});
+    }
+    chat(source: NonNullable<WorkbenchView['chat']>): NonNullable<WorkbenchView['chat']> {
+        const configuration = source.configuration, skills = source.sessionSkills;
+        return {...source, configuration: configuration && delegate(configuration, {subscribe: listener => this.on('configuration', listener)}),
+            sessionSkills: delegate(skills, {onChange: (id, listener) => this.skills.has(id)
+                ? Promise.resolve(this.on('skills', event => {if (event.sessionId === id) listener();}))
+                : skills.onChange(id, listener)})};
+    }
+    async session(id: string, backend: ApplicationBackend) {
+        if (!this.opening.openSession) return backend.openSessionView(id);
+        return this.trackSession(id, await this.opening.openSession(id));
+    }
+    trackSession(id: string, session: SessionOpenView): SessionOpenView {
+        this.skills.set(id, (this.skills.get(id) ?? 0) + 1);
+        let disposed = false;
+        return delegate(session, {activate: async (branch, presentation) => this.currentPresentation(await session.activate(branch, presentation)),
+            dispose: async () => {
+            if (disposed) return; disposed = true;
+            const remaining = (this.skills.get(id) ?? 1) - 1;
+            if (remaining) this.skills.set(id, remaining); else this.skills.delete(id);
+            await session.dispose();
+        }});
+    }
+    private currentPresentation(initial: SessionEditorInitialData): SessionEditorInitialData {
+        const cursor = initial.presentationCursor;
+        if (cursor === undefined) return initial;
+        const changed = (...topics: (keyof ApplicationViewSources)[]) => topics.some(topic => (this.changes.get(topic) ?? 0) > cursor);
+        return {...initial,
+            targets: changed('configuration', 'agents') ? undefined : initial.targets,
+            independentCalls: changed('kernel', 'repository') ? undefined : initial.independentCalls,
+            skills: changed('skills', 'agents') ? undefined : initial.skills,
+            instructionQueue: changed('session') ? undefined : initial.instructionQueue,
+            taskAttachment: changed('kernel') ? undefined : initial.taskAttachment};
     }
     conversation(prepared: PreparedConversation): PreparedConversation {
         return {...prepared, conversation: delegate(prepared.conversation, {

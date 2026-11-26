@@ -15,11 +15,19 @@ export class ShellApplicationEvents {
     private closed = false;
     private started = false;
     private needsReset = false;
+    private unread?: number;
+    private readonly badgeListeners = new Set<(count: number) => void>();
     generation = 0;
     private readonly listeners=new Set<(events:readonly ApplicationEventFact[])=>void|Promise<void>>();
     subscribe(listener:(events:readonly ApplicationEventFact[])=>void|Promise<void>):()=>void {
         if(this.closed)return ()=>{};
         this.listeners.add(listener);return ()=>{this.listeners.delete(listener);};
+    }
+    subscribeNotificationCount(listener: (count: number) => void): () => void {
+        if (this.closed) return () => {};
+        this.badgeListeners.add(listener);
+        if (this.unread !== undefined) listener(this.unread);
+        return () => {this.badgeListeners.delete(listener);};
     }
     constructor(private readonly source: ApplicationEvents,
         private readonly invalidate: (event: ApplicationEventFact) => void | Promise<void>,
@@ -45,7 +53,7 @@ export class ShellApplicationEvents {
             .finally(() => {this.pending = undefined;});
     }
     close(): void {
-        this.closed = true; clearInterval(this.timer); this.feed?.close();this.listeners.clear();
+        this.closed = true; clearInterval(this.timer); this.feed?.close();this.listeners.clear();this.badgeListeners.clear();
     }
     private async connect(): Promise<void> {
         const started = Date.now(), operationId = randomUUID();
@@ -55,10 +63,14 @@ export class ShellApplicationEvents {
         if (this.closed) return;
         if (this.feed) {await this.feed.refresh(); return;}
         const feed = new ApplicationEventFeed(this.source, this.cursor, {
+            ...(this.badgeListeners.size > 0 && {notificationCount: (unread: number) => {
+                this.unread = unread;
+                for (const listener of this.badgeListeners) listener(unread);
+            }}),
             receiveBatch: events => this.deliverBatch(events.map(event=>event.value)),
             receive: event => ['runtime.reset', 'source.reset'].includes(event.value.type) ? undefined : this.deliver(event.value),
             reset: () => this.deliver(reset), failure: error => this.report('consume', error),
-        });
+        }, {delayMs: 350, visible: this.visible});
         this.feed = feed;
         try {await feed.start();}
         catch (error) {this.cursor = feed.getCursor(); feed.close(); this.feed = undefined; throw error;}

@@ -187,7 +187,7 @@ class SessionRepository implements ISessionRepository {
     updateManifest(sessionId: string, patch: Partial<ConversationManifest>): Promise<void>;
     getUIState(sessionId: string): Promise<ConversationUIState | null>;
     updateUIState(sessionId: string, patch: Partial<ConversationUIState>): Promise<void>;
-    compareAndSetUIState?(sessionId: string, expectedRevision: number, patch: Partial<ConversationUIState>): Promise<void>;
+    compareAndSetUIState?(sessionId: string, expectedRevision: number, patch: Partial<ConversationUIState>, returnState?: true): Promise<SessionUIStateRevision | void>;
     getSessionSettings(sessionId: string): Promise<ChatSessionSettings>;
     saveSessionSettings(sessionId: string, patch: Partial<ChatSessionSettings>): Promise<void>;
 
@@ -694,7 +694,7 @@ C4Dynamic
 
 该方法通过 SessionRepository 的应用 RPC 能力表以独立 async 方法开放。旧 `updateUIState` 继续用于普通 UI patch；缺少条件方法的宿主不能安全保存多视图台账，客户端须报不支持，不能忽略条件后覆盖。后端不合并 OperationRecord，也不将 UI 接纳状态转为 Kernel 执行事实。
 
-宿主 UI 的 OperationPersistence 读取当前记录，调用独立 llm-ui 的纯合并函数，再携带已读修订条件保存；修订冲突最多重读合并八次。写入回复丢失只读核对原提议是否已持久保存。save 返回实际保存快照，OperationLedger 核对后才发布；原操作已接纳、拒绝或未知时不再次派发。回归分别覆盖 SessionRepository 原子并发、真实两个工作台、认证 HTTP 条件冲突及安全诊断。
+宿主 UI 的 OperationPersistence 调用独立 llm-ui 的纯合并函数，再携带观察到的修订条件保存。独立会话编辑器的草稿与台账串行共用同一编辑器绑定内的版本。条件写显式传入 `returnState: true` 时可取得同一事务提交的 UI 状态和修订，下一次修改可直接尝试带此修订写入。缓存计算为无变化或存在冲突时，重新读取后再判断；旧宿主未返回状态时逐次读取。写入回复丢失只读核对原提议是否已持久保存。save 返回实际保存快照，OperationLedger 核对后才发布；原操作已接纳、拒绝或未知时不再次派发。回归分别覆盖 SessionRepository 原子并发、真实两个工作台、认证 HTTP 条件冲突及安全诊断。
 
 同一分支正文草稿的并发冲突通过 F09d 的持久基线检查和显式恢复处理：不同分支独立保存；同分支有新编辑时，旧视图不得覆盖或清空该草稿，失败保留本地输入。台账记录的并集不能用来合并用户正文。
 

@@ -49,6 +49,21 @@ it('rejects stale writers instead of overwriting or clearing another window draf
     } finally { await manager.dispose(); }
 });
 
+it('commits the first draft contents with its submission identity and rejects stale or changed retries', async () => {
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    const fs = await manager.openFileSystem('/');
+    try {
+        const writer = new ProjectDraftStore(fs, 'a'), other = new ProjectDraftStore(fs, 'a');
+        const draft = await writer.load(); await other.load();
+        const prepared = await writer.begin('Title', undefined, undefined, 'first message');
+        expect(prepared).toMatchObject({id: draft.id, sessionId: draft.id, data: 'first message', state: 'submitting'});
+        expect(await writer.begin('Title', undefined, undefined, 'first message')).toEqual(prepared);
+        await expect(writer.begin('Title', undefined, undefined, 'different')).rejects.toMatchObject({code: 'ECONFLICT'});
+        await expect(other.begin('Title', undefined, undefined, 'stale')).rejects.toMatchObject({code: 'ECONFLICT'});
+        expect(await new ProjectDraftStore(fs, 'a').load()).toEqual(prepared);
+    } finally {await manager.dispose();}
+});
+
 it('migrates legacy data once and rejects corrupt state instead of inventing a new draft', async () => {
     const { manager } = await createVFS({ rootBackend: new MemoryBackend() });
     const fs = await manager.openFileSystem('/');

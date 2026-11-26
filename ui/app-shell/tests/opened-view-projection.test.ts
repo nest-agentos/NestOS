@@ -16,6 +16,25 @@ function fixture(interests?: string[]) {
         frame(events: ApplicationViewEvent[]) {cursor = events.at(-1)?.sequence ?? cursor; for (const event of events) listener(event);}};
 }
 
+it('uses one initial observer for workbench and application event hints', async () => {
+    const f = fixture();
+    const remoteSubscribe = vi.fn(), remoteHints = vi.fn(), workbench = vi.fn(), hint = vi.fn();
+    const observe = vi.spyOn(f.view.observation, 'observeView');
+    f.view.sharedEventHints = true;
+    f.view.conversationWorkbench = {subscribe: remoteSubscribe} as OpenedApplicationView['conversationWorkbench'];
+    Object.assign(f.backend, {events: {onChange: remoteHints}});
+    const projection = new OpenedViewProjection(f.view, f.source, f.backend);
+    await projection.start();
+    const stop = await projection.opening!.subscribe(workbench);
+    projection.backend.events!.onChange(hint);
+    f.frame([{sequence: 11, topic: 'applicationEvents', value: undefined}]);
+    projection.finishHydration();
+    expect(observe).toHaveBeenCalledOnce();
+    expect(remoteSubscribe).not.toHaveBeenCalled(); expect(remoteHints).not.toHaveBeenCalled();
+    expect(workbench).toHaveBeenCalledOnce(); expect(hint).toHaveBeenCalledOnce();
+    stop(); await projection.dispose();
+});
+
 it('does not replay stream deltas already included in the hydrated snapshot, then delivers subsequent deltas once', async () => {
     const f = fixture(), received = vi.fn(); await f.projection.start();
     f.projection.services.sessionManager.onEvent(received);

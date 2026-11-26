@@ -78,11 +78,11 @@ export class SessionFamilyActions {
         this.controllers.get(header)?.abort(); this.controllers.delete(header);
         if (this.currentHeader === header) this.currentHeader = undefined;
     }
-    updateMetadata(manifest: ConversationManifest): void {
+    updateMetadata(manifest: Pick<ConversationManifest, 'id' | 'createdAt' | 'updatedAt'>): void {
         if (this.currentHeader?.dataset.sessionId !== manifest.id) return;
         this.renderMetadata(this.currentHeader, manifest);
     }
-    private renderMetadata(section: HTMLElement, manifest: ConversationManifest): void {
+    private renderMetadata(section: HTMLElement, manifest: Pick<ConversationManifest, 'createdAt' | 'updatedAt'>): void {
         for (const time of section.querySelectorAll<HTMLTimeElement>('time[data-session-time]')) {
             const value = manifest[time.dataset.sessionTime as 'createdAt' | 'updatedAt'];
             setTimePresentation(time, value, t('project.timeUnknown'));

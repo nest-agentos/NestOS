@@ -4,7 +4,7 @@ import {ApplicationObservation} from './application-observation';
 import type { HostedApplicationClient } from '@nestos/app-contracts/services';
 import { FSError } from '@nestos/vfs-core';
 import { RpcPeer } from '../application/peer';
-import type { Reply, CallbackRequest, Call } from '../rpc/protocol';
+import type { Reply, CallbackRequest, Call, WireValue } from '../rpc/protocol';
 import { RPC_VERSION } from '../rpc/protocol';
 import { installViewProjections } from '../application/projections';
 import { QueryBatcher } from './query-batcher';
@@ -16,6 +16,7 @@ import type {PreparedHttpBootstrap} from './startup';
 type NotificationPacket = Partial<CallbackRequest> & Pick<Reply, 'updates'> & { calls?: Call[]; viewEvents?: ApplicationViewEvent[]; updatesRead?: string };
 const maxNotificationCount = 256;
 const maxEventBytes = 2 * 1024 * 1024;
+const snapshotOrderingGraceMs = 1000;
 export interface HttpViewStartOptions {initialRead?:StartupReadRequest; initialView?: OpenViewRequest; snapshots?: SnapshotCache; prepared?: PreparedHttpBootstrap; deferEvents?:boolean;}
 
 /** HTTP commands are never automatically replayed after an unknown outcome. */
@@ -282,26 +283,26 @@ export class HttpViewClient {
             this.showReconnected();
         }
         if (new TextEncoder().encode(buffer).byteLength > maxEventBytes) {
-            this.showUpdateError(new FSError('EBUSY', 'View event is too large')); return;
+            this.showUpdateError(viewUpdateFailure('VIEW_EVENT_TOO_LARGE', 'View event is too large', 'EBUSY')); return;
         }
         return buffer;
     }
     private async consumeFrame(frame: string): Promise<boolean> {
         const bytes = new TextEncoder().encode(frame).byteLength;
-        if (bytes > maxEventBytes) {this.showUpdateError(new FSError('EBUSY', 'View event is too large')); return false;}
+        if (bytes > maxEventBytes) {this.showUpdateError(viewUpdateFailure('VIEW_EVENT_TOO_LARGE', 'View event is too large', 'EBUSY')); return false;}
         const lines = frame.split('\n'), data = lines.find(line => line.startsWith('data: '));
         if (!data) return true;
         try {
             const sequence = lines.find(line => line.startsWith('id: '));
-            if (this.resumable && !sequence) throw new FSError('EIO', 'View event sequence is missing');
+            if (this.resumable && !sequence) throw viewUpdateFailure('VIEW_EVENT_SEQUENCE_MISSING', 'View event sequence is missing');
             if (sequence) {
                 const id = Number(sequence.slice(4));
-                if (!Number.isSafeInteger(id) || id < 1 || id > this.lastEventId + 1) throw new FSError('EIO', 'View event sequence gap');
+                if (!Number.isSafeInteger(id) || id < 1 || id > this.lastEventId + 1) throw viewUpdateFailure('VIEW_EVENT_SEQUENCE_GAP', 'View event sequence gap');
                 if (id <= this.lastEventId) return true;
                 this.lastEventId = id;
             }
             const packet = JSON.parse(data.slice(6));
-            if (!packet || typeof packet !== 'object' || Array.isArray(packet)) throw new FSError('EIO', 'Invalid view event');
+            if (!packet || typeof packet !== 'object' || Array.isArray(packet)) throw viewUpdateFailure('VIEW_EVENT_INVALID', 'Invalid view event');
             // Blocking replies remain independent of notification delivery.
             if (packet.id) void this.callback(packet).catch(error => this.showUpdateError(error));
             else return await this.enqueueNotification(packet, bytes);
@@ -340,12 +341,35 @@ export class HttpViewClient {
         if (packet.updatesRead !== undefined) packet = await this.readNotification(packet.updatesRead);
         if (this.abort.signal.aborted) return;
         this.peer.applyUpdates(packet.updates);
-        await this.peer.waitUpdates(packet.updates);
+        await this.waitNotificationUpdates(packet.updates);
         for (const event of packet.viewEvents ?? []) this.applicationObservation.receive(event);
         for (const call of packet.calls ?? (packet.call ? [packet.call] : [])) {
             const reply = await this.peer.handle(call);
             if (packet.id) await this.post({ kind: 'reply', id: packet.id, reply });
             else if (reply.error) throw Object.assign(new Error(reply.error.message), reply.error);
+        }
+    }
+    private async waitNotificationUpdates(updates: WireValue[] | undefined): Promise<void> {
+        try {await this.peer.waitUpdates(updates, snapshotOrderingGraceMs);}
+        catch (error) {
+            if ((error as {remoteCode?: string})?.remoteCode !== 'RPC_VIEW_UPDATE_MISSING') throw error;
+            this.abort.signal.throwIfAborted();
+            const targets = this.peer.missingUpdateIds(updates);
+            if (targets.length) await this.syncSnapshots(targets, updates);
+        }
+    }
+    private async syncSnapshots(targets: string[], updates: WireValue[] | undefined): Promise<void> {
+        const started = Date.now();
+        const context = {operation:'view.update', stage:'snapshot.sync', clientId:this.clientId, lastEventId:this.lastEventId, targetCount:targets.length};
+        try {
+            const reply = await this.post({kind:'updates-sync', targets});
+            if (!Array.isArray(reply.updates)) throw viewUpdateFailure('VIEW_SNAPSHOT_SYNC_INVALID', 'Invalid view snapshot recovery response');
+            this.peer.applyUpdates(reply.updates);
+            if (this.peer.missingUpdateIds(updates).length) throw viewUpdateFailure('VIEW_SNAPSHOT_SYNC_INCOMPLETE', 'View snapshot recovery did not fill the gap');
+            console.info('[View] Snapshot gap repaired', {...context, result:'success', durationMs:Date.now() - started});
+        } catch (error) {
+            console.warn('[View] Snapshot gap repair failed', {...context, ...safeFailure(error), result:'failure', durationMs:Date.now() - started});
+            throw error;
         }
     }
     private async readNotification(id: string): Promise<NotificationPacket> {
@@ -361,7 +385,8 @@ export class HttpViewClient {
         const failure=safeFailure(error);
         this.abort.abort(Object.assign(new Error('Application view stopped after an update failure'),
             {...failure,code:'HTTP_VIEW_UPDATE_FAILED',updateCode:failure.code})); this.wake?.();
-        console.error('[View] Update failed', safeFailure(error));
+        console.error('[View] Update failed', {operation:'view.update', result:'failure', clientId:this.clientId,
+            lastEventId:this.lastEventId, ...failure});
         this.onUpdateError?.(error);
     }
     private showDisconnected(error: unknown, stage = 'request'): void {
@@ -400,9 +425,13 @@ export class HttpViewClient {
 function viewExpired(response: Response): boolean {
     return (response.headers.get('X-NestOS-View-Expired') ?? response.headers.get('X-MindOS-View-Expired')) === '1';
 }
+function viewUpdateFailure(remoteCode: string, message: string, code: 'EIO' | 'EBUSY' = 'EIO'): Error {
+    return Object.assign(new FSError(code, message), {remoteCode});
+}
 function safeFailure(error: unknown): Record<string, unknown> {
-    const value = error as {code?:unknown;name?:unknown;stage?:unknown;clientRequestId?:unknown;requestId?:unknown;capabilityKind?:unknown;rpcMethod?:unknown};
+    const value = error as {code?:unknown;name?:unknown;stage?:unknown;clientRequestId?:unknown;requestId?:unknown;capabilityKind?:unknown;rpcMethod?:unknown;remoteCode?:unknown;reason?:unknown};
     const result: Record<string,unknown> = {code:typeof value?.code==='string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(value.code)?value.code:'HTTP_VIEW_FAILED'};
+    for (const key of ['remoteCode','reason'] as const) if (typeof value?.[key] === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(value[key])) result[key] = value[key];
     for(const key of ['requestId','clientRequestId'] as const) if(typeof value?.[key]==='string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value[key] as string)) result[key]=value[key];
     if(typeof value?.name==='string' && ['Error','TypeError','SyntaxError','AbortError','NetworkError','TimeoutError'].includes(value.name))result.errorType=value.name;
     if(typeof value?.stage==='string' && ['transport.fetch','response.headers','response.body','response.decode','rpc.decode'].includes(value.stage))result.stage=value.stage;

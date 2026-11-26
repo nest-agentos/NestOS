@@ -1,11 +1,12 @@
 import {StoredChatImages} from './stored-chat-images';
 import type {ImageAssetMetadata} from './image-editing';
 import {createOperationLedger, type AttachmentRef, type ComposerDraft, type OperationLedger} from '@nestos/llm-ui';
-import type {ConversationUIState, ISessionRepository} from '@nestos/llm-session/contracts';
+import type {ConversationManifest, ConversationUIState, ISessionRepository} from '@nestos/llm-session/contracts';
 import {createModuleLogger, randomUUID} from '@nestos/common';
 import {AssetService} from '../services/AssetService';
 import {DraftPersistence, readBranchDraft, type BranchDraft} from '../services/DraftPersistence';
 import {persistOperations} from '../services/OperationPersistence';
+import {SessionUIStateWriter} from '../services/conditional-ui-state';
 import {readDraftFiles} from '../services/DraftFilesCodec';
 import {readInputDraft} from '../domain/input-draft';
 import {isTargetRef} from '@nestos/llm-flow/contracts';
@@ -18,21 +19,25 @@ type StoredBranch = BranchDraft & {inputImageMetadata?: Record<string, ImageAsse
 export class SessionChatStore {
     readonly images: StoredChatImages;
     private readonly persistence: DraftPersistence;
+    private readonly writer: SessionUIStateWriter;
     private tail: Promise<void> = Promise.resolve();
     private raw?: ConversationUIState;
     private saved!: ComposerDraft;
     private suspended = false;
     private constructor(private repository: ISessionRepository, readonly sessionId: string, readonly branch: string, readonly assets: AssetService) {
-        this.persistence = new DraftPersistence(repository);
+        this.writer = new SessionUIStateWriter(repository, sessionId);
+        this.persistence = new DraftPersistence(repository, this.writer);
         this.images = new StoredChatImages({upload: (file, options) => this.upload(file, options), read: async (ref, {signal}) => {
             signal.throwIfAborted(); const bytes = await assets.draftFiles().read(ref.id); signal.throwIfAborted(); return new Blob([bytes], {type: ref.mimeType});
         }});
     }
-    static async open(repository: ISessionRepository, sessionId: string, branch: string, assets: AssetService, initial?: {uiState?: ConversationUIState}): Promise<SessionChatStore> {
+    static async open(repository: ISessionRepository, sessionId: string, branch: string, assets: AssetService,
+        initial?: Pick<ConversationManifest, 'revision' | 'uiState'>): Promise<SessionChatStore> {
         const store = new SessionChatStore(repository, sessionId, branch, assets);
         const operationId = randomUUID(), started = Date.now(); let stage = 'read';
         try {
             store.raw = initial ? structuredClone(initial.uiState) : await repository.getUIState(sessionId) ?? undefined; stage = 'restore';
+            if (initial) store.writer.seed(initial);
             store.persistence.observe(sessionId, branch, store.raw);
             const stored = readBranchDraft(store.raw, branch) as StoredBranch | undefined;
             store.saved = restore(stored); store.images.restore(stored?.inputImageMetadata, readDraftFiles(stored?.inputFiles ?? []));
@@ -49,7 +54,7 @@ export class SessionChatStore {
     get draft(): ComposerDraft {return structuredClone(this.saved);}
     ledger(): OperationLedger {
         return createOperationLedger({initial: this.raw?.operationRecords as unknown as import('@nestos/llm-ui').OperationRecord[] | undefined,
-            save: records => persistOperations(this.repository, this.sessionId, records)});
+            save: records => persistOperations(this.repository, this.sessionId, records, this.writer)});
     }
     save(draft: ComposerDraft): Promise<void> {
         const captured = structuredClone(draft);

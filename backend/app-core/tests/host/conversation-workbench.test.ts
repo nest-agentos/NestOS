@@ -24,6 +24,20 @@ function fixture() {
     return {services, backend, projects, conversation, nativeListeners, browser, connections, stop};
 }
 const request = {resourceId: '/folder:P/@harness/native/native', documents: ['layout']};
+it('combines workbench navigation with only the requested session activities', async () => {
+    const f = fixture(), sessionActivity = vi.fn(async (id: string) => {
+        if (id === 'removed') throw new FSError('ENOENT', 'Session missing');
+        return {id};
+    });
+    Object.assign(f.services.kernel.kernel, {sessionActivity});
+    const view = await new ConversationWorkbench(f.services).initialize(f.backend, request);
+    try {
+        const result = await view.readRefresh({navigation: {projectId: null}, activity: ['a', 'a', 'removed']});
+        expect(result).toMatchObject({navigation: {statuses: {}}, activity: {a: {id: 'a'}, removed: null}});
+        expect(f.browser.readDirectory).toHaveBeenCalledOnce();
+        expect(sessionActivity.mock.calls).toEqual([['a'], ['removed']]);
+    } finally {await view.dispose();}
+});
 it('prepares fresh read models, observes once and releases all owned resources', async () => {
     const f = fixture(), view = await new ConversationWorkbench(f.services).initialize(f.backend, request);
     expect(view.documents).toEqual({layout: {version: 1}}); expect(view.native?.draft).toEqual({revision: 'r1', data: '{}'});
@@ -140,10 +154,13 @@ it('shares the cold file view observation instead of attaching a second set of d
 it('captures the global event baseline before preparing any cold file snapshot', async () => {
     const {openView} = await import('../../src/host/open-view');
     const f = fixture(), baseline = {streamId: 'events', sequence: 3}, eventBaseline = vi.fn(async () => baseline);
-    Object.assign(f.services, {events: {eventBaseline}});
+    const stop = vi.fn(), onChange = vi.fn(() => stop);
+    Object.assign(f.services, {events: {eventBaseline, onChange}});
     const opening = await openView(f.services, f.backend, {resourceId: '/folder:P/@files/note.md', documents: [], workbench: {}},
         request => new ConversationWorkbench(f.services).initialize(f.backend, request));
     expect(opening.eventBaseline).toBe(baseline);
+    expect(opening.sharedEventHints).toBe(true);
+    expect(onChange).toHaveBeenCalledOnce();
     expect(eventBaseline.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(f.backend.workbenchView).mock.invocationCallOrder[0]);
-    await opening.dispose();
+    await opening.dispose(); expect(stop).toHaveBeenCalledOnce();
 });

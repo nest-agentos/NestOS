@@ -223,6 +223,10 @@ export interface SessionPresentationState {
     taskAttachment?: import('@nestos/durable-kernel/contracts').TaskAttachmentRecovery;
     flowInvocations?: import('@nestos/llm-session/contracts').FlowInvocationRecord[];
     skills?: Awaited<ReturnType<import('@nestos/tools/contracts').SessionSkillControls['list']>>;
+    targets?: import('@nestos/llm-session/contracts').RootTargetCatalog;
+    independentCalls?: import('@nestos/llm-session/contracts').IndependentCallView[];
+    instructionQueue?: import('@nestos/llm-session/contracts').SessionInstructionQueue;
+    presentationCursor?: number;
 }
 
 /** Prepared once by the backend; the editor owns the returned file lease. */
@@ -235,7 +239,7 @@ export interface SessionEditorInitialData extends SessionPresentationState {
 }
 
 export interface SessionOpenView {
-    activate(branch?: string): Promise<SessionEditorInitialData>;
+    activate(branch?: string, presentation?: {taskAttachmentKey?: string}): Promise<SessionEditorInitialData>;
     manifest: ConversationManifest;
     project: import('./projects').ProjectFolder | null | undefined;
     workspaceReadOnly: boolean;
