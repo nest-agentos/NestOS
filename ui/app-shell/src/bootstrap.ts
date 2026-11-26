@@ -866,9 +866,17 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const entryResource = (id: string) => isProjectWorkspace(id)
         ? '/' : managerCache.get(id)?.getActiveResourceId() ?? null;
 
-    const navigateWorkspace=async(targetId:string)=>{
-        rememberCurrentPage();const lastId=entryResource(targetId);updateHistory(targetId,lastId,'push');
-        await performNavigation(targetId,lastId??undefined);
+    const retainedNavTypes = new Set<WorkspaceConfig['type']>(['kanban', 'calendar', 'mail', 'twin', 'toolbox', 'settings']);
+    const navigateWorkspace = async (targetId: string): Promise<void> => {
+        rememberCurrentPage();
+        const lastId = entryResource(targetId);
+        const type = workspaces.find(workspace => workspace.elementId === targetId)?.type;
+        const retained = retainedNavTypes.has(type) && managerCache.has(targetId);
+        const mobileView = retained
+            ? document.getElementById(targetId)?.querySelector<HTMLElement>('.mm-layout')?.dataset.mobileView
+            : undefined;
+        updateHistory(targetId, lastId, 'push', mobileView);
+        await performNavigation(targetId, retained ? undefined : lastId ?? undefined);
     };
     const showWorkspaceNavigation = async (workspaceId: string): Promise<void> => {
         rememberCurrentPage();
@@ -912,11 +920,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
 
     // ── 9. Initial navigation ──────────────────────────────────────────────────
 
-    if (options.startPage) cleanupFns.push(installStartPage(workspaces, navigationSignal, id => {
-        rememberCurrentPage();
-        const lastId = entryResource(id);
-        updateHistory(id, lastId, 'push'); void performNavigation(id, lastId ?? undefined);
-    }));
+    if (options.startPage) cleanupFns.push(installStartPage(workspaces, navigationSignal, id => {void navigateWorkspace(id);}));
     const initialRoute = parseWorkspaceHash(location.hash, resolvedDefault);
     const initWs = resolveTarget(initialRoute.slug, initialRoute.resource);
     const initialLoad = performNavigation(initWs, initialRoute.resource, initialRoute.slug);

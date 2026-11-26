@@ -14,7 +14,7 @@ const kanbanSession = vi.hoisted(() => ({open: undefined as ((id: string) => Pro
 const visibility = vi.hoisted(() => vi.fn());
 const invalidateEvents = vi.hoisted(() => vi.fn());
 const lifecycle = vi.hoisted(() => ({ start: vi.fn(async () => {}), open: vi.fn(async (_id: string) => {}),
-    destroy: vi.fn(async () => {}), expand: vi.fn(), scope: '/', restoreScope: vi.fn(async (_scope: string) => {}), before: undefined as (() => void) | undefined, configure: vi.fn(), selection: undefined as ((id: string) => void) | undefined }));
+    destroy: vi.fn(async () => {}), expand: vi.fn(), active: null as string | null, scope: '/', restoreScope: vi.fn(async (_scope: string) => {}), before: undefined as (() => void) | undefined, configure: vi.fn(), selection: undefined as ((id: string) => void) | undefined }));
 
 vi.mock('../src/ThemeService', () => ({
     themeService: { init: vi.fn(async () => {}), destroy: vi.fn(), setMode: vi.fn(async () => {}) },
@@ -46,7 +46,7 @@ vi.mock('../src/core/Workbench', () => ({
         destroy = lifecycle.destroy;
         openFile = lifecycle.open;
         createAndOpenFile = vi.fn(async () => 'new-id');
-        getActiveFilePath = vi.fn(() => null);
+        getActiveFilePath = () => lifecycle.active;
         setNodeWaitingInput = vi.fn();
     },
 }));
@@ -106,7 +106,7 @@ function makeRuntime(): ApplicationRuntime {
 afterEach(() => {
     document.body.innerHTML = '';
     history.replaceState(null, '', '/');
-    lifecycle.scope = '/'; lifecycle.restoreScope.mockReset().mockImplementation(async scope => {lifecycle.scope = scope;});
+    lifecycle.active = null; lifecycle.scope = '/'; lifecycle.restoreScope.mockReset().mockImplementation(async scope => {lifecycle.scope = scope;});
     lifecycle.expand.mockClear();
     vi.restoreAllMocks(); lifecycle.start.mockReset().mockResolvedValue(); lifecycle.open.mockReset().mockResolvedValue(); lifecycle.destroy.mockReset().mockResolvedValue();
 });
@@ -236,6 +236,31 @@ it('starts at a lightweight page and loads a workspace only after choosing it', 
         await vi.waitFor(() => expect(location.hash).toBe('#/start'));
         expect(document.querySelector('.app-start')?.classList.contains('active')).toBe(true);
     } finally { await app.destroy(); }
+});
+
+it('switches to the retained settings view from nav and the start page', async () => {
+    navigationDOM();
+    const ready = vi.fn();
+    const app = await initTestApp({services: makeRuntime(), workspaces: [workspace], startPage: true, ui: testUI(), onEditorReady: ready});
+    try {
+        await app.navigate('settings', '/appearance');
+        lifecycle.active = '/appearance';
+        const layout = document.querySelector<HTMLElement>('#settings-workspace .mm-layout')!;
+        layout.dataset.mobileView = 'list';
+        await app.navigate('start');
+        ready.mockClear();
+        document.querySelector<HTMLButtonElement>('.app-nav-btn')!.click();
+        await vi.waitFor(() => expect(ready).toHaveBeenCalledOnce());
+        expect(history.state).toMatchObject({resourceId: '/appearance', mobileView: 'list'});
+        expect(document.querySelector('#settings-workspace .mm-layout')).toBe(layout);
+        await app.navigate('start');
+        ready.mockClear();
+        document.querySelector<HTMLButtonElement>('.app-start__choice')!.click();
+        await vi.waitFor(() => expect(ready).toHaveBeenCalledOnce());
+        expect(lifecycle.open.mock.calls).toEqual([['/appearance']]);
+        await app.navigate('settings', '/language');
+        expect(lifecycle.open).toHaveBeenLastCalledWith('/language');
+    } finally {await app.destroy();}
 });
 
 it('releases the global banner before slow workspace startup and ignores obsolete resource navigation', async () => {
