@@ -88,6 +88,7 @@ it('makes report packaging guidance available during delivery and keeps recovery
 
 it('keeps automatic reanalysis instructions short without asking to confirm routine version drift',()=>{
  expect(kanbanConfigurationDefaults['task-merge-pre.md']).toContain('refreshes stale analysis automatically');
+ expect(kanbanConfigurationDefaults['task-merge-pre.md']).toContain('List every actual conflict even if the resolution is clear');
  expect(kanbanConfigurationDefaults['task-integrate-pre.md']).toContain('Report version drift for host reanalysis');
  expect(kanbanConfigurationDefaults['task-merge-pre.md']).not.toContain('separate merge confirmation');
 });
