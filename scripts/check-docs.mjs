@@ -13,7 +13,8 @@
  * 用法：node scripts/check-docs.mjs   （或 pnpm docs:check）
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { WORKSPACE_GROUPS } from './workspace-packages.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -70,6 +71,43 @@ function workspaceDirs() {
 
 const WORKSPACE_DIRS = workspaceDirs();
 const WORKSPACE_NAMES = WORKSPACE_DIRS.map(dir => dir.split('/')[1]);
+const verifiedGitlinks = new Set();
+let frozenGitlinks;
+
+function git(...args) {
+    const result = spawnSync('git', args, {cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024});
+    return result.status === 0 ? result.stdout : undefined;
+}
+
+function readFrozenGitlinks() {
+    const index = git('ls-files', '--stage', '-z');
+    const common = git('rev-parse', '--path-format=absolute', '--git-common-dir')?.trim();
+    if (!index || !common) return [];
+    return index.split('\0').flatMap(row => {
+        const match = /^160000 ([a-f0-9]{40,64}) 0\t(.+)$/.exec(row);
+        if (!match || existsSync(join(ROOT, match[2], '.git'))) return [];
+        return [{path: match[2], revision: match[1], gitDir: join(common, 'modules', match[2])}];
+    });
+}
+
+/** Verify a missing link against the indexed commit of an uninitialized submodule. */
+function verifiedFrozenTarget(path) {
+    const local = relative(ROOT, path);
+    const target = local.split(sep).join('/');
+    if (!target || isAbsolute(local) || target === '..' || target.startsWith('../')) return false;
+    frozenGitlinks ??= readFrozenGitlinks();
+    const link = frozenGitlinks.find(row => target.startsWith(row.path + '/'));
+    if (!link || !existsSync(link.gitDir)) return false;
+    if (verifiedGitlinks.has(target)) return true;
+    const object = link.revision + ':' + target.slice(link.path.length + 1);
+    if (git('--git-dir=' + link.gitDir, 'cat-file', '-e', object) === undefined) return false;
+    verifiedGitlinks.add(target);
+    return true;
+}
+
+function hasReference(paths) {
+    return paths.some(path => existsSync(path)) || paths.some(verifiedFrozenTarget);
+}
 
 /** 只校验"看起来是仓库路径"的引用；概念路径（如 `_agent/AGENT.md`）不校验。 */
 function isRepoReference(ref) {
@@ -84,14 +122,14 @@ function resolveReference(doc, ref) {
     const owner = WORKSPACE_DIRS.find(dir => doc.startsWith(`${dir}/`));
     if (owner) candidates.push(join(owner, ref));
     const head = ref.split('/')[0];
-    if (TOP_DIRS.includes(head)) return candidates.some(candidate => existsSync(resolve(ROOT, candidate)));
+    if (TOP_DIRS.includes(head)) return hasReference(candidates.map(candidate => resolve(ROOT, candidate)));
     if (WORKSPACE_NAMES.includes(head)) {
         const rest = ref.slice(head.length + 1);
         for (const group of WORKSPACE_GROUPS) candidates.push(`${group}/${head}/${rest}`, `${group}/${head}/src/${rest}`);
     }
     for (const group of WORKSPACE_GROUPS) candidates.push(`${group}/${ref}`);
     for (const dir of WORKSPACE_DIRS) candidates.push(`${dir}/${ref}`, `${dir}/src/${ref}`);
-    return candidates.some(candidate => existsSync(resolve(ROOT, candidate)));
+    return hasReference(candidates.map(candidate => resolve(ROOT, candidate)));
 }
 
 const PATH_REF = /`([A-Za-z0-9_@./-]+\/[A-Za-z0-9_@./-]+\.(?:ts|tsx|js|mjs|md|json|css|rs|yml|yaml|toml))`/g;
@@ -105,7 +143,7 @@ function checkLinks(doc) {
         for (const match of line.matchAll(MD_LINK)) {
             const target = match[1];
             if (/^(?:https?:|mailto:|#)/.test(target)) continue;
-            if (!existsSync(resolve(ROOT, dirname(doc), target))) errors.push(`[broken-link] ${doc}:${index + 1} → ${target}`);
+            if (!hasReference([resolve(ROOT, dirname(doc), target)])) errors.push(`[broken-link] ${doc}:${index + 1} → ${target}`);
         }
     });
 }
@@ -142,3 +180,4 @@ if (errors.length) {
     process.exit(1);
 }
 console.log(`文档同步检查通过（${activeDocs.length} 份活文档、${historicalDocs.length} 份历史文档链接，${warnings.length} 条历史表述告警）`);
+if (verifiedGitlinks.size) console.log(`按冻结子模块提交核对了 ${verifiedGitlinks.size} 个链接目标`);
