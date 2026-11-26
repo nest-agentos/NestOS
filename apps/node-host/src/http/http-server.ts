@@ -1,6 +1,6 @@
 import {ConnectionDiagnostics,countConnectionRequest} from '../logging/connection-diagnostics';
 import {NATIVE_SESSION_RECOVERY_ENDPOINT} from '@nestos/app-contracts';
-import {traceRequest} from '../logging/request-trace';
+import {traceAuthenticatedUser,traceRequest} from '../logging/request-trace';
 import { createServer, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { TLSSocket } from 'node:tls';
@@ -70,7 +70,8 @@ async function serve(request: IncomingMessage, response: ServerResponse, options
     if (['/api/application', '/api/application/events', '/api/application/files', NATIVE_SESSION_RECOVERY_ENDPOINT].includes(pathname)) {
         if (!options.application) throw new FSError('ECAPABILITY', 'Application hosting is disabled');
         if(!options.multiUser&&pathname==='/api/application'&&request.method==='POST')response.setHeader('X-NestOS-Authenticated-User',userId??'admin');
-        await options.application.handle(request, response, () => options.certificates.accepts(request.socket as TLSSocket)); return;
+        await traceAuthenticatedUser(userId??'admin',()=>options.application!.handle(request,response,
+            ()=>options.certificates.accepts(request.socket as TLSSocket))); return;
     }
     if (pathname === '/api/vfs') throw new FSError('EACCES', 'Storage is private to the daemon');
     if (pathname === '/api/health') { json(response, 200, { ready: true, ...options.build }); return; }

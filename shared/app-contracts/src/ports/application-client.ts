@@ -50,6 +50,7 @@ export interface ApplicationBackend {
     serverTerminals?: import('./server-terminal').ServerTerminals;
     events?: import('./events').ApplicationEvents;
     diagnostics?: import('./diagnostics').ApplicationDiagnostics;
+    projectDiagnosticAccess?: import('./service-control').ProjectDiagnosticAccess;
     flowInstallations?: import('./flow-installation').FlowInstallations;
     reportClientDiagnostic?(diagnostic: ClientDiagnostic): Promise<void>;
     sessionResponse(sessionId: string, query?: SessionResponseQuery): Promise<SessionResponse | undefined>;

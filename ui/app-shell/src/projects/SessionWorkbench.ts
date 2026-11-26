@@ -77,6 +77,7 @@ import { type SessionSkillControls } from '@nestos/tools/contracts';
 import { ProjectNavigation, type ProjectFileView, type ProjectNavigationOptions } from './ProjectNavigation';
 import { remapProjectPath } from './project-paths';
 import { showNameDialog, showProjectDialog } from '../files/project-dialog';
+import {showProjectDiagnosticSettings} from './project-diagnostic-settings';
 import { showMountDialog } from '../files/mount-dialog';
 import { localizeMountError } from '../files/localize-mount-error';
 
@@ -768,9 +769,12 @@ export class SessionWorkbench implements WorkspaceController {
     }
     private projectEntryMenu(item: VFSNodeUI, defaults: MenuItem<VFSNodeUI>[]): MenuItem<VFSNodeUI>[] {
         const id = String(item.metadata.custom.projectId), remote = !!item.metadata.custom.remoteProject;
+        const diagnosticAccess=remote?this.backend.projectDiagnosticAccess:undefined;
         const hidden = ['create-in-folder-session', 'create-in-folder-folder', ...(item.metadata.custom.protectedProject ? ['delete', 'moveTo'] : []), ...(remote ? ['delete', 'moveTo', 'copyTo', 'duplicate'] : [])];
         const entries: MenuItem<VFSNodeUI>[] = [{id: 'create-session', label: t('project.createSession'), disabled: !!this.projects && !!sessionCreationReason(this.projects, id), onClick: () => this.startSessionDraft(item.id)},
             {id:'project-settings',label:t('project.settings'),onClick:() => this.projectSettingsDialog(id)},
+            ...(diagnosticAccess?[{id:'project-diagnostic-access',label:t('project.diagnosticAccess.title'),onClick:() =>
+                showProjectDiagnosticSettings(diagnosticAccess,id,this.dialogs.signal).catch(error=>this.report(error))}]:[]),
             { id: 'enter-project', label: t('project.enter'), onClick: () => this.openResource(item.id) },
             ...defaults.filter(entry => !('id' in entry) || !hidden.includes(entry.id))
                 .map(entry => 'id' in entry && entry.id === 'rename' ? {...entry, onClick: () => this.renameProjectDialog(id)} : entry),
@@ -785,7 +789,7 @@ export class SessionWorkbench implements WorkspaceController {
             if (entry.type === 'separator') continue;
             const key = entry.id;
             const group = ['create-session','enter-project'].includes(key) ? 0
-                : key === 'project-settings' ? 1 : key.startsWith('project-sync-') ? 3
+                : ['project-settings','project-diagnostic-access'].includes(key) ? 1 : key.startsWith('project-sync-') ? 3
                 : ['refresh-project-binding','remount-project','unmount-project','project-harness'].includes(key) ? 4 : 2;
             groups[group]!.push(entry);
         }

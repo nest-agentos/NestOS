@@ -5,6 +5,7 @@ export interface DiagnosticContext {
     parentSpanId?: string;
     requestId?: string;
     browserSessionId?: string;
+    userId?: string;
 }
 let provider: (() => DiagnosticContext | undefined) | undefined;
 export function setDiagnosticContextProvider(value: () => DiagnosticContext | undefined): void {provider = value;}

@@ -21,6 +21,22 @@ it('keeps a remote multi-project proposal outside the board until real user conf
  f.read.mockResolvedValue({messages:[{id:'user-2',role:'user',text:'确认决策'}]});await f.request('decision.confirm',{proposalDigest:proposal.proposalDigest});
  expect(await f.service.record('b','outline')).toMatchObject({status:'confirmed'});expect(f.runRecord).toHaveBeenCalledWith('b',expect.objectContaining({recordId:'outline',operationId:'decision-run-conversation'}));
 });
+it('discovers and invokes diagnostics through the native request route using the bound project',async()=>{
+ const f=await fixture(),{serviceDiagnosticsPlugins}=await import('../src/kanban/service-diagnostics-plugin');
+ const {resolveKanbanPluginRequest}=await import('../src/kanban/session-request-plugins');
+ const read=vi.fn(async()=>({records:[],sources:{httpd:'read',cells:'read'}}));
+ const remote={list:vi.fn(()=>[{at:'/',serverId:'node',serverProjectId:'p',authorization:{principalId:'owner'},alias:'prj',root:'/src',mountId:'root'}]),
+  projectRemountOptions:vi.fn(async()=>({path:'src',alias:'prj'}))};
+ f.options.requestPlugins=()=>serviceDiagnosticsPlugins({readDiagnosticsForProject:read} as never,remote as never,'carrier');
+ const call=(method:string,params:Record<string,unknown>,id=method)=>resolveKanbanPluginRequest(f.options,f.conversation,{id,scopeId:'conversation',method,params});
+ await expect(call('kanban.discover',{})).resolves.toMatchObject({plugins:expect.arrayContaining([{id:'service-diagnostics',version:'1',description:expect.any(String)}])});
+ const params={pluginId:'service-diagnostics',method:'read',input:{requestId:'req'}};
+ await expect(call('kanban.invoke',params)).resolves.toMatchObject({records:[]});
+ expect(read).toHaveBeenCalledExactlyOnceWith({serverId:'node',serverProjectId:'p',principalId:'owner',alias:'prj',root:'/src'},'carrier',{requestId:'req'});
+ await expect(call('kanban.invoke',{...params,input:{requestId:'req',projectId:'other'}},'retry'))
+  .rejects.toMatchObject({code:'SERVICE_DIAGNOSTICS_QUERY_INVALID'});
+ expect(read).toHaveBeenCalledOnce();
+});
 it('previews the chosen schedule and never launches a one-off run when confirming or retrying a scheduled decision',async()=>{
  const f=await fixture(),recurrence={state:'active',firstAt:Date.now()+60000,timeZone:'UTC',cadence:{kind:'interval',milliseconds:60000},trigger:'fixed',maxConcurrency:1};
  f.conversation.recurrence=recurrence;

@@ -11,6 +11,7 @@ import {NativeSessionRecovery} from '../projects/session-recovery';
 import {createTaskRecovery} from '../kanban/task-recovery';
 import {managedServiceDeployment,serviceDeploymentView} from '../presets/managed-service-deployment';
 import {decisionConversations} from '../kanban/decision-conversations';
+import {serviceDiagnosticsPlugins} from '../kanban/service-diagnostics-plugin';
 import {kanbanSessionResource} from '../kanban/session-resource';
 import {developmentDeliveryPlan} from '../presets/kanban-delivery-plan';
 import {developmentSessionOperation} from '../presets/kanban-session-operation';
@@ -158,6 +159,7 @@ export interface ApplicationKernelPlatform {
 
 export interface ApplicationRuntime {
     sessionRecovery: NativeSessionRecovery;
+    serviceControl?:import('@nestos/app-contracts/services').RuntimeServiceControl;
     events: UserEventService;
     diagnostics: DiagnosticJournal;
     /** Host-only callback/token capability; it is never part of the frontend services graph. */
@@ -718,6 +720,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const fileSubmission = sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore, ensureWritable: conversationOptions.ensureWritable});
         let recoveryClient:import('@nestos/kanban/contracts').KanbanClient|undefined;
         const developmentMessages = developmentObserver({learningService: (): import('@nestos/kanban/contracts').KanbanService => kanban, exchange: developmentBindings && independentCalls ? developmentWorkExchange({...developmentBindings,
+            serviceControl:options.serviceControl,
             journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), kernel: kernelCore, calls: independentCalls, submission: fileSubmission,
             recovery:async(board,item)=>{if(!recoveryClient?.taskRecovery)throw Object.assign(new Error('Recovery service is starting'),{code:'RECOVERY_SERVICE_STARTING'});return recoveryClient.taskRecovery(board,item);}}) : undefined, kernel: kernelCore, fs: systemFS, events, projects, remote: remoteConnections, lifecycle,
             replyTask:async(board,request)=>{if(!recoveryClient?.replyTask)throw Object.assign(new Error('Task reply unavailable'),{code:'WORKSPACE_REPLY_UNAVAILABLE'});await recoveryClient.replyTask(board,request);},
@@ -738,7 +741,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 },wake:()=>wakeKanban()},
                 recheck:developmentTaskRecheck(developmentBindings.remote,developmentBindings.provider,decisionModules[0]),
                 describe:async item=>{if(!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'))return;const managed=managedServiceDeployment(options.serviceControl,async selected=>{const id=selected.externalRefs!.find(ref=>ref.system==='nestos-remote-project')!.id;return serviceDeploymentView(await projects.openWorkspace((await projects.get(id)).path),remoteConnections,id);},async()=>{});return managed?.describe?.(item);}}):undefined,
-            decisionConversations:developmentBindings?context=>decisionConversations({...developmentBindings,...context,executionResource,modules:decisionModules}):undefined,
+            decisionConversations:developmentBindings?context=>decisionConversations({...developmentBindings,...context,executionResource,modules:decisionModules,
+                requestPlugins:conversation=>serviceDiagnosticsPlugins(options.serviceControl,developmentBindings.remote,conversation.binding.projectId)}):undefined,
             itemOperations: developmentBindings ? context => {
                 const review={...developmentBindings,...context,cancelSubmission:submissionControl({contexts:conversationContexts,repository:sessionRepository,kernel:kernelCore,ensureWritable:conversationOptions.ensureWritable}),calls:independentCalls,kernel:kernelCore,runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission,wake:()=>wakeKanban()};
                 const scopes=managementOperationScopes({...review,basePlan:developmentDeliveryPlan(context.journal,context.service)});
@@ -893,7 +897,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const startBackground = () => startup.activate();
         if (policy.projects === 'before-ready') startBackground();
         diagnostics.record({module: 'application', operation: 'application.runtime', stage: 'ready', result: 'success', level: 'info'});
-        return { sessionRecovery, events, diagnostics, vfs, llmDriver, agentService, configuration, sessionRepository, flowEngine, sessionFiles, directoryMounts, projects, executionConnections, toolConnections: options.toolConnections,
+        return { sessionRecovery, events, diagnostics, serviceControl:options.serviceControl,vfs, llmDriver, agentService, configuration, sessionRepository, flowEngine, sessionFiles, directoryMounts, projects, executionConnections, toolConnections: options.toolConnections,
             flowInstallations: installations, toolPackages: installations.toolPackages, kernel, sessionManager, commandBus, independentCalls, runCatalog, quiesce, dispose, startBackground, prepareSession: async id => { await initializeProjects(); return recovery.acquireLater(id); },
             projectSync, digitalTwin, dream: dreamHost, kanban, createView: createConversationView, openConversation: id => conversationContexts.open(id), conversationObservation: conversationContexts };
     } catch (error) {

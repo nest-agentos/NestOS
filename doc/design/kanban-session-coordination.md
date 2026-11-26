@@ -176,6 +176,14 @@ Node 宿主通过部署环境变量 `NESTOS_KANBAN_MODULE_PERMISSIONS` 读取规
 
 ## 受管项目自身升级与验收
 
+开发任务、交付复核和决策协调 Harness 可通过已有 `session_request` 查询受管项目的服务诊断。先调用 `kanban.discover`，再用 `kanban.invoke` 请求 `{pluginId:"service-diagnostics",method:"read",input:{operationId:"…"}}`。也可使用 `requestId`，时间范围默认 30 分钟且最多 120 分钟，结果最多 50 条。收到 pending 时沿用原会话的续办协议。
+
+诊断默认关闭。管理员在工作台打开已登记项目的菜单，选择「Harness 日志访问」，勾选 httpd 运行日志、Cells 服务日志或两者，再保存。全部取消即关闭。设置存放在 httpd 运行用户的私有目录 `~/.config/nestos/service-diagnostics/`，服务重启后保留。已登记项目的绑定授权与勾选来源在每次查询时核对，保存后随下一次查询生效。两个页面并发保存时，旧版本会收到冲突提示。
+
+未在工作台保存过的项目沿用管理员在 `~/.config/nestos/service-projects.json` 或 `NESTOS_SERVICE_PROJECTS` 中登记的默认值。`"diagnostics": true` 默认开放两个来源，缺省或 `false` 默认关闭。工作台已保存的来源列表覆盖该默认值。撤销项目与服务的绑定会阻止后续查询。httpd 路径由宿主的 `NESTOS_HTTPD_LOG_DIR` 选择，缺省为 `/var/log/nestos`。Cells 来源由宿主固定为本机的 Cells 服务日志。Cells TOML 与项目目录里的配置不授予访问权限。
+
+诊断只在具有 httpd 控制器的管理员运行时提供。实际调用重新核对该会话绑定的项目及管理员登记的 httpd 项目授权。httpd 只返回可确认属于管理员且匹配项目的结构化记录；本机 Cells 只读取固定 systemd 单元里、与绑定节点身份吻合的进程日志。每条只返回时间、操作、阶段、结果、错误码和耗时，缺少可验证归属的记录不进入结果。Harness 文件系统无需挂载宿主日志目录，查询不改变版本、任务或会话状态。验证和发布仍走受管交付流程。
+
 项目可在 _nestos/etc/deployment.json 选择 httpd（当前受管 HTTP 服务的稳定别名）或管理员注册的服务 ID，例如 cells-x1。管理员在 ~/.config/nestos/service-projects.json（0600）或 NESTOS_SERVICE_PROJECTS 声明允许的项目与服务对应关系。记录由 serviceId、serverId、serverProjectId、principalId、alias 和 root 组成。宿主取已挂载根授权，并向 Cells 核对同一项目 ID 的导出别名与目录。改节点、项目、授权主体、根目录或服务后，旧构建需要重做；已提交的操作继续按原操作 ID 核对回执。
 
 仓库标识、Git 历史和项目声明可帮助发现升级候选。同一 Git 提交可出现在多个克隆中，操作准入还要核对管理员绑定。受管构建使用控制器提供的命令，在冻结的集成提交产生候选和清单摘要；宿主从自身制品库核对清单摘要及 Git commit。HTTP 托管构建要求干净源码。HTTP 使用 build --no-activate --receipt 构建，持久启动器执行版本切换，宿主重启后继续核对同一回执。Cells 项目绑定发布在注册目标上复用二进制与配置的校验、备份与进程核对。Cells 控制器从管理员 options.configSource 读取专用配置，未设置时使用目标现有配置。

@@ -5,9 +5,12 @@ import {constants,existsSync} from 'node:fs';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
+import {projectServiceDiagnostics} from '../logging/project-service-diagnostics';
+import {diagnosticSources,ServiceDiagnosticGrants} from './service-diagnostic-grants';
 /** Only administrator-owned host configuration may load service controller code. */
-export function serviceControlModules(primary:RuntimeServiceControl|undefined):RuntimeServiceControl|undefined {
+export function serviceControlModules(primary:RuntimeServiceControl|undefined,
+    grants=new ServiceDiagnosticGrants(path.join(homedir(),'.config/nestos/service-diagnostics'))):RuntimeServiceControl|undefined {
     if(!primary&&!process.env.NESTOS_SERVICE_MODULES&&!existsSync(path.join(homedir(),'.config/nestos/service-modules.json')))return;
     let loaded:Promise<Map<string,RuntimeServiceControl>>|undefined;
     const controllers=()=>loaded??=load(primary);
@@ -25,12 +28,27 @@ export function serviceControlModules(primary:RuntimeServiceControl|undefined):R
             && projectFields.every(key=>row[key]===project[key]));
         if(!matches.length)throw failure('SERVICE_PROJECT_UNAUTHORIZED');
         for(const row of matches){
-            if(!row.sourceCheckout)return;
-            if(primary&&id===primaryId&&await matchesSourceCheckout(row.sourceCheckout,process.env.INIT_CWD))return;
+            if(!row.sourceCheckout||primary&&id===primaryId&&await matchesSourceCheckout(row.sourceCheckout,process.env.INIT_CWD))return row;
         }
         throw failure('SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH');
     };
-    return {describeForProject:async(id,project)=>{
+    const diagnosticBinding=async(project:RuntimeServiceProject)=>{
+        if(!primary)throw failure('SERVICE_TARGET_UNAVAILABLE');
+        const serviceId=(await primary.describe()).id,row=await authorize(serviceId,project);
+        return {key:createHash('sha256').update(JSON.stringify([serviceId,...projectFields.map(key=>row[key]),row.sourceCheckout])).digest('hex'),
+            defaults:row.diagnostics===true?[...diagnosticSources]:[]};
+    };
+    const diagnostics:Pick<RuntimeServiceControl,'readDiagnosticsForProject'|'diagnosticAccess'|'saveDiagnosticAccess'>=
+        primary&&process.env.NESTOS_HTTPD_SERVICE_ID?{
+            diagnosticAccess:async project=>{const {key,defaults}=await diagnosticBinding(project);return grants.read(key,defaults);},
+            saveDiagnosticAccess:async(project,change)=>{const {key,defaults}=await diagnosticBinding(project);return grants.save(key,defaults,change);},
+            readDiagnosticsForProject:async(project,projectId,query)=>{
+                const {key,defaults}=await diagnosticBinding(project),access=await grants.read(key,defaults);
+                if(!access.sources.length)throw failure('SERVICE_DIAGNOSTICS_DISABLED');
+                return projectServiceDiagnostics({id:projectId,nodeId:project.serverProjectId,serverId:project.serverId},query,undefined,undefined,access.sources);
+            },
+        }:{};
+    return {...diagnostics,describeForProject:async(id,project)=>{
             const serviceId=id==='httpd'&&primary?process.env.NESTOS_HTTPD_SERVICE_ID??id:id;
             await authorize(serviceId,project);
             const descriptor=await(await select(serviceId)).describe();
@@ -55,7 +73,7 @@ async function reportSelfSource(serviceId:string,active:string|undefined):Promis
         result:code==='SERVICE_PROJECT_SOURCE_CHECKOUT_MATCHED'?'success':'failure',code,durationMs:Date.now()-started}));
 }
 const projectFields=['serverId','serverProjectId','principalId','alias','root'] as const;
-type ProjectBinding=RuntimeServiceProject&{serviceId:string;sourceCheckout?:string};
+type ProjectBinding=RuntimeServiceProject&{serviceId:string;sourceCheckout?:string;diagnostics?:boolean};
 async function matchesSourceCheckout(expected:string,active:string|undefined):Promise<boolean>{
     if(!active||!path.isAbsolute(active))return false;
     try{return (await realpath(expected))===(await realpath(active));}catch{return false;}
@@ -67,6 +85,7 @@ async function projectBindings():Promise<ProjectBinding[]>{
     try {value=raw?JSON.parse(raw):[];}catch{throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');}
     if(!Array.isArray(value)||value.length>128||!value.every(row=>typeof row?.serviceId==='string'
         &&projectFields.every(key=>typeof row[key]==='string'&&row[key].length>0)
+        &&(row.diagnostics===undefined||typeof row.diagnostics==='boolean')
         &&(row.sourceCheckout===undefined||typeof row.sourceCheckout==='string'&&path.isAbsolute(row.sourceCheckout))))throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');
     return value;
 }

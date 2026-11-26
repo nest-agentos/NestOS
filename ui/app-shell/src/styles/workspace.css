@@ -250,6 +250,7 @@
 .remote-directory__list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; }
 .remote-directory__list button { text-align: left; }
 .project-dialog input[type="checkbox"] { width: 18px; min-height: 18px; align-self: flex-start; }
+.project-dialog .project-diagnostic-settings__source { flex-direction: row; align-items: center; }
 .project-dialog button:disabled { opacity: .5; cursor: default; }
 .remote-connection__controls { display: flex; gap: 8px; align-items: center; }
 .remote-connection__controls select { flex: 1; min-width: 0; }

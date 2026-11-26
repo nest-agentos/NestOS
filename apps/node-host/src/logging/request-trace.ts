@@ -26,6 +26,10 @@ export function traceSpan<T>(run: () => T): T {
     const parent = diagnosticContext();
     return parent ? storage.run({...parent, parentSpanId:parent.spanId, spanId:randomBytes(8).toString('hex')}, run) : run();
 }
+export function traceAuthenticatedUser<T>(userId:string,run:()=>T):T {
+    const parent=diagnosticContext();
+    return parent?storage.run({...parent,userId},run):run();
+}
 /** Record only fixed protocol routes; exported paths and URL queries are private. */
 export function tracedCellsFetch(fetcher: typeof fetch = globalThis.fetch, report?: (event: AuditEvent) => void): typeof fetch {
     return async (input, init) => {

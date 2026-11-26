@@ -7,6 +7,9 @@ import type {createSessionSubmission as sessionSubmission, SessionSubmissionObse
 import {failure} from '../run/prompt-bundle';
 import {advanceChannelExchange} from '../run/channel-exchange';
 import {channelRequests, type ChannelResponse} from '../run/channel-protocol';
+import {resolveChannelPlugin} from '../run/channel-request-plugins';
+import {serviceDiagnosticsPlugins} from '../kanban/service-diagnostics-plugin';
+import {safeCode} from '@nestos/kanban/integration';
 import {channelMessages} from '../run/channel-results';
 import {prepareChannelContinuation} from '../run/channel-session-continuation';
 import {resolveCommitRequest} from './kanban-commit-query';
@@ -17,6 +20,7 @@ export interface DevelopmentExchangeOptions {
     kernel: Pick<Kernel, 'inspectSession' | 'sessionActivity'>; journal: KanbanAutomationJournal;
     submission: ReturnType<typeof sessionSubmission>;
     recovery?(boardId:string,itemId:string):Promise<unknown>;
+    serviceControl?:import('@nestos/app-contracts/services').RuntimeServiceControl;
 }
 /** Product context resolution plugs into a generic, channel-based request/response mechanism. */
 export async function developmentChannelExchange(options: DevelopmentExchangeOptions, input: {id: string; record: DevelopmentWorkspaceRecord;
@@ -31,6 +35,9 @@ export async function developmentChannelExchange(options: DevelopmentExchangeOpt
         submission: options.submission, report: input.report,
         finalPublished: input.finalPublished ?? (async () => (await channelMessages(options.remote, input.record.projectId, input.id)).some(row => row.message.type === 'result')),
         resolve: request => {
+            if(['kanban.discover','kanban.describe','kanban.invoke'].includes(request.method))
+                return resolveChannelPlugin(request,serviceDiagnosticsPlugins(options.serviceControl,options.remote,input.record.projectId))
+                    .catch(error=>{throw Object.assign(failure(safeCode(error,'SERVICE_DIAGNOSTICS_QUERY_FAILED')),{channelResponse:true});});
             if(request.method.startsWith('kanban.recovery.')) {
                 const scope=input.record.context as {board?:{id:string};task?:{id:string}};
                 if(request.method!=='kanban.recovery.inspect'||!options.recovery||!scope.board?.id||!scope.task?.id)throw Object.assign(failure('RECOVERY_FINISH_ATTEMPT_FIRST'),{channelResponse:true});

@@ -1,4 +1,5 @@
 import {readStartup} from './startup-read';
+import {projectDiagnosticAccess} from './project-diagnostic-access';
 import {agentProjectScopes} from '../configuration/agent-project-scope';
 import {mailView} from './mail-view';
 import {kanbanConfigurationResources} from '../presets/kanban-configuration-resources';
@@ -58,7 +59,7 @@ export interface ApplicationViewOptions extends LocalBackendOptions { preload?: 
 export function createApplicationClient(services: LocalApplicationServices, options: ApplicationViewOptions = {}): ApplicationClient & { close(): Promise<void> } {
     if (options.configurationReadonly) services = {...services, agentService: publicConfiguration(services.agentService), llmDriver: publicConfiguration(services.llmDriver)};
     const scope = new ViewScope(), backend = bindApplicationBackend(services, options, scope);
-    const { acquireConversation: _acquireConversation, editorSwapStore: _editorSwapStore, diagnostics: _diagnostics, events: _events, ...publicServices } = services;
+    const { acquireConversation: _acquireConversation, editorSwapStore: _editorSwapStore, diagnostics: _diagnostics, events: _events, serviceControl: _serviceControl,...publicServices } = services;
     return { services: { ...publicServices, agentService: withConfigurationImport(services.agentService),
         llmDriver: withConfigurationImport(services.llmDriver), flowEngine: { engine: services.flowEngine.engine }, kernel: { kernel: services.kernel.kernel,
             toolCatalog: {...services.kernel.toolCatalog, describeTools: async () => configuredToolCatalog(services.kernel.toolCatalog, await services.agentService.getMCPServers())} } },
@@ -86,6 +87,7 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
         events: services.events,
         readStartup: request => readStartup(backend,services,request),
         diagnostics: services.diagnostics,
+        projectDiagnosticAccess: options.configurationReadonly?undefined:projectDiagnosticAccess(services),
         flowInstallations: services.flowInstallations,
         assistantOverview: () => assistantOverview(services),
         sessionResponse: (id, query) => sessionResponse(repository, id, query),

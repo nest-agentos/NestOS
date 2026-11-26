@@ -7,14 +7,15 @@ import {createModuleLogger,randomUUID,sha256HexSync} from '@nestos/common';
 import {safeCode} from '@nestos/kanban/integration';
 const log=createModuleLogger('kanban.deployment');
 export function serviceDeploymentView(view:{fs:IFileSystem;dispose():Promise<void>},remote:Pick<ProjectRemoteMountPort,'list'|'projectRemountOptions'>|undefined,projectId:string){
-    return {fs:view.fs,dispose:()=>view.dispose(),project:async()=>{
-        const root=remote?.list(projectId).find(mount=>mount.at==='/');
-        if(!remote||!root?.serverId||!root.serverProjectId||!root.authorization?.principalId)return;
-        const binding=await remote.projectRemountOptions(projectId,{timeoutMs:3000});
-        requireValue(binding.alias===root.alias&&('/'+binding.path).replace(/\/$/,'')===(root.root.replace(/\/$/,''))&&
-            remote.list(projectId).find(mount=>mount.at==='/')?.mountId===root.mountId,'SERVICE_PROJECT_BINDING_CHANGED');
-        return {serverId:root.serverId,serverProjectId:root.serverProjectId,principalId:root.authorization.principalId,alias:root.alias,root:root.root};
-    }};
+    return {fs:view.fs,dispose:()=>view.dispose(),project:()=>resolveServiceProject(remote,projectId)};
+}
+export async function resolveServiceProject(remote:Pick<ProjectRemoteMountPort,'list'|'projectRemountOptions'>|undefined,projectId:string):Promise<RuntimeServiceProject|undefined>{
+    const root=remote?.list(projectId).find(mount=>mount.at==='/');
+    if(!remote||!root?.serverId||!root.serverProjectId||!root.authorization?.principalId)return;
+    const binding=await remote.projectRemountOptions(projectId,{timeoutMs:3000});
+    requireValue(binding.alias===root.alias&&('/'+binding.path).replace(/\/$/,'')===(root.root.replace(/\/$/,''))&&
+        remote.list(projectId).find(mount=>mount.at==='/')?.mountId===root.mountId,'SERVICE_PROJECT_BINDING_CHANGED');
+    return {serverId:root.serverId,serverProjectId:root.serverProjectId,principalId:root.authorization.principalId,alias:root.alias,root:root.root};
 }
 /** Project declarations select a controller; only a trusted host port grants execution authority. */
 export function managedServiceDeployment(control:RuntimeServiceControl|undefined,open:(item:import('@nestos/kanban/contracts').KanbanItem)=>Promise<{fs:IFileSystem;dispose():Promise<void>;project?():Promise<RuntimeServiceProject|undefined>}>,verify:(job:import('@nestos/kanban-development').ReviewJob)=>Promise<void>):ReviewAdapter['managed'] {
