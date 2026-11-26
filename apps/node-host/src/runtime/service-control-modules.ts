@@ -21,25 +21,33 @@ export function serviceControlModules(primary:RuntimeServiceControl|undefined,
         if(id&&entries.has(id))return entries.get(id)!;
         throw Object.assign(new Error('Service target is not registered'),{code:'SERVICE_TARGET_UNAVAILABLE'});
     };
-    const authorize=async(id:string,project:RuntimeServiceProject)=>{
-        const bindings=await projectBindings();
+    const available=async(id:string,diagnostic:boolean)=>{
+        const bindings=(diagnostic?await diagnosticProjectBindings():undefined)??await projectBindings();
         const primaryId=process.env.NESTOS_HTTPD_SERVICE_ID;
-        const matches=bindings.filter(row=>(row.serviceId===id||row.serviceId==='httpd'&&id===primaryId)
-            && projectFields.every(key=>row[key]===project[key]));
+        return bindings.filter(row=>row.serviceId===id||row.serviceId==='httpd'&&id===primaryId);
+    };
+    const checkoutMatches=(row:ProjectBinding,id:string)=>!row.sourceCheckout
+        ||!!primary&&id===process.env.NESTOS_HTTPD_SERVICE_ID&&matchesSourceCheckout(row.sourceCheckout,process.env.INIT_CWD);
+    const authorize=async(id:string,project:RuntimeServiceProject,diagnostic=false)=>{
+        const matches=(await available(id,diagnostic)).filter(row=>projectFields.every(key=>row[key]===project[key]));
         if(!matches.length)throw failure('SERVICE_PROJECT_UNAUTHORIZED');
-        for(const row of matches){
-            if(!row.sourceCheckout||primary&&id===primaryId&&await matchesSourceCheckout(row.sourceCheckout,process.env.INIT_CWD))return row;
-        }
+        for(const row of matches)if(await checkoutMatches(row,id))return row;
         throw failure('SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH');
     };
     const diagnosticBinding=async(project:RuntimeServiceProject)=>{
         if(!primary)throw failure('SERVICE_TARGET_UNAVAILABLE');
-        const serviceId=(await primary.describe()).id,row=await authorize(serviceId,project);
+        const serviceId=(await primary.describe()).id,row=await authorize(serviceId,project,true);
         return {key:createHash('sha256').update(JSON.stringify([serviceId,...projectFields.map(key=>row[key]),row.sourceCheckout])).digest('hex'),
             defaults:row.diagnostics===true?[...diagnosticSources]:[]};
     };
-    const diagnostics:Pick<RuntimeServiceControl,'readDiagnosticsForProject'|'diagnosticAccess'|'saveDiagnosticAccess'>=
+    const diagnostics:Pick<RuntimeServiceControl,'readDiagnosticsForProject'|'diagnosticAccess'|'saveDiagnosticAccess'|'diagnosticProjects'>=
         primary&&process.env.NESTOS_HTTPD_SERVICE_ID?{
+            diagnosticProjects:async()=>{
+                const id=process.env.NESTOS_HTTPD_SERVICE_ID!;
+                const rows=await available(id,true);
+                const verified=await Promise.all(rows.map(async row=>await checkoutMatches(row,id)?publicProject(row):undefined));
+                return verified.filter(row=>row!==undefined);
+            },
             diagnosticAccess:async project=>{const {key,defaults}=await diagnosticBinding(project);return grants.read(key,defaults);},
             saveDiagnosticAccess:async(project,change)=>{const {key,defaults}=await diagnosticBinding(project);return grants.save(key,defaults,change);},
             readDiagnosticsForProject:async(project,projectId,query)=>{
@@ -79,8 +87,16 @@ async function matchesSourceCheckout(expected:string,active:string|undefined):Pr
     try{return (await realpath(expected))===(await realpath(active));}catch{return false;}
 }
 async function projectBindings():Promise<ProjectBinding[]>{
-    let raw=process.env.NESTOS_SERVICE_PROJECTS;
-    if(!raw)raw=await readProjectBindings();
+    return parseProjectBindings(process.env.NESTOS_SERVICE_PROJECTS||await readProjectBindings('service-projects.json'));
+}
+async function diagnosticProjectBindings():Promise<ProjectBinding[]|undefined>{
+    const raw=process.env.NESTOS_SERVICE_DIAGNOSTIC_PROJECTS??await readProjectBindings('service-diagnostic-projects.json');
+    return raw===undefined?undefined:parseProjectBindings(raw);
+}
+function publicProject({serverId,serverProjectId,principalId,alias,root}:RuntimeServiceProject):RuntimeServiceProject{
+    return {serverId,serverProjectId,principalId,alias,root};
+}
+function parseProjectBindings(raw:string|undefined):ProjectBinding[]{
     let value:unknown;
     try {value=raw?JSON.parse(raw):[];}catch{throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');}
     if(!Array.isArray(value)||value.length>128||!value.every(row=>typeof row?.serviceId==='string'
@@ -90,13 +106,14 @@ async function projectBindings():Promise<ProjectBinding[]>{
     return value;
 }
 
-async function readProjectBindings():Promise<string|undefined>{
-    const file=await open(path.join(homedir(),'.config/nestos/service-projects.json'),constants.O_RDONLY|constants.O_NOFOLLOW)
+async function readProjectBindings(name:string):Promise<string|undefined>{
+    const file=await open(path.join(homedir(),'.config/nestos',name),constants.O_RDONLY|constants.O_NOFOLLOW)
         .catch(error=>{if(error.code!=='ENOENT')throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');});
     if(!file)return;
     try{
         const info=await file.stat();
-        if(!info.isFile()||(info.mode&0o077)||info.size>128*1024)throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');
+        if(!info.isFile()||(info.mode&0o077)||info.size>128*1024||process.getuid&&info.uid!==process.getuid())
+            throw failure('SERVICE_PROJECT_CONFIGURATION_INVALID');
         return await file.readFile('utf8');
     }finally{await file.close();}
 }

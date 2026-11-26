@@ -43,6 +43,7 @@ it('requires the admin-bound Cells project and rechecks authorization before sub
  const id='httpd-bound',project={serverId:'cells-node',serverProjectId:'project-a',principalId:'owner',alias:'prj',root:'/x1'};
  vi.stubEnv('NESTOS_HTTPD_SERVICE_ID',id);
  vi.stubEnv('NESTOS_SERVICE_PROJECTS',JSON.stringify([{serviceId:'httpd',...project}]));
+ vi.stubEnv('NESTOS_SERVICE_DIAGNOSTIC_PROJECTS',process.env.NESTOS_SERVICE_PROJECTS);
  const primary={describe:async()=>({id,version:'old'}),verifyArtifact:vi.fn(),submit:vi.fn(),inspect:vi.fn(async()=>({state:'succeeded' as const,version:'new'}))};
  const directory=await mkdtemp(path.join(tmpdir(),'diagnostic-grants-'));
  onTestFinished(()=>rm(directory,{recursive:true,force:true}));
@@ -54,6 +55,7 @@ it('requires the admin-bound Cells project and rechecks authorization before sub
  await expect(control.readDiagnosticsForProject!(project,'project-a',{operationId:'check'}))
     .rejects.toMatchObject({code:'SERVICE_DIAGNOSTICS_DISABLED'});
  vi.stubEnv('NESTOS_SERVICE_PROJECTS',JSON.stringify([{serviceId:'httpd',...project,diagnostics:true}]));
+ vi.stubEnv('NESTOS_SERVICE_DIAGNOSTIC_PROJECTS',process.env.NESTOS_SERVICE_PROJECTS);
  await expect(control.readDiagnosticsForProject!(project,'project-a',{}))
     .rejects.toMatchObject({code:'SERVICE_DIAGNOSTICS_QUERY_INVALID'});
  await expect(control.describeForProject!('httpd',{...project,root:'/other'})).rejects.toMatchObject({code:'SERVICE_PROJECT_UNAUTHORIZED'});
@@ -74,9 +76,15 @@ it('reads and saves diagnostic access only for the registered project binding',a
  try{
   const id='httpd-bound',project={serverId:'cells-node',serverProjectId:'project-a',principalId:'owner',alias:'prj',root:'/x1'};
   vi.stubEnv('NESTOS_HTTPD_SERVICE_ID',id);
-  vi.stubEnv('NESTOS_SERVICE_PROJECTS',JSON.stringify([{serviceId:'httpd',...project}]));
+  const deployment={...project,serverProjectId:'vm-project'};
+  vi.stubEnv('NESTOS_SERVICE_PROJECTS',JSON.stringify([{serviceId:'httpd',...deployment}]));
+  vi.stubEnv('NESTOS_SERVICE_DIAGNOSTIC_PROJECTS',JSON.stringify([{serviceId:'httpd',...project}]));
   const primary={describe:async()=>({id,version:'current'}),submit:vi.fn(),inspect:vi.fn()};
   const control=serviceControlModules(primary,new ServiceDiagnosticGrants(path.join(root,'grants')))!;
+  await expect(control.diagnosticProjects!()).resolves.toEqual([project]);
+  await expect(control.describeForProject!('httpd',project)).rejects.toMatchObject({code:'SERVICE_PROJECT_UNAUTHORIZED'});
+  await expect(control.describeForProject!('httpd',deployment)).resolves.toMatchObject({project:deployment});
+  await expect(control.diagnosticAccess!(deployment)).rejects.toMatchObject({code:'SERVICE_PROJECT_UNAUTHORIZED'});
   const current=await control.diagnosticAccess!(project);
   expect(current.sources).toEqual([]);
   const update={expectedRevision:current.revision,operationId:'save-a',sources:['httpd' as const]};
@@ -88,7 +96,7 @@ it('reads and saves diagnostic access only for the registered project binding',a
       .resolves.toMatchObject({sources:[]});
   await expect(control.readDiagnosticsForProject!(project,'project-a',{operationId:'check'}))
       .rejects.toMatchObject({code:'SERVICE_DIAGNOSTICS_DISABLED'});
-  vi.stubEnv('NESTOS_SERVICE_PROJECTS','[]');
+  vi.stubEnv('NESTOS_SERVICE_DIAGNOSTIC_PROJECTS','[]');
   await expect(control.diagnosticAccess!(project)).rejects.toMatchObject({code:'SERVICE_PROJECT_UNAUTHORIZED'});
  }finally{await rm(root,{recursive:true,force:true});}
 });

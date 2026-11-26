@@ -5,7 +5,7 @@ import { remoteProjectFields } from './remote-project-fields';
 
 /** Keep validation errors and the user's draft inside the dialog. */
 export function showNameDialog(title: string, label: string, signal: AbortSignal,
-    save: (name: string) => Promise<void>, extra?: HTMLElement, options?: { initialName?: string; confirmLabel?: string; hideName?: boolean; nameInput?: HTMLInputElement }): Promise<void> {
+    save: ((name: string) => Promise<void>) | undefined, extra?: HTMLElement, options?: { initialName?: string; confirmLabel?: string; hideName?: boolean; nameInput?: HTMLInputElement }): Promise<void> {
     if (signal.aborted) return Promise.resolve();
     return new Promise(resolve => {
         const dialog = document.createElement('dialog'); dialog.className = 'project-dialog';
@@ -16,18 +16,19 @@ export function showNameDialog(title: string, label: string, signal: AbortSignal
         const input = options?.nameInput ?? document.createElement('input'); input.required = !options?.hideName; field.hidden = !!options?.hideName; input.autofocus = !options?.hideName; input.value = options?.initialName ?? ''; field.append(input);
         const status = document.createElement('p'); status.setAttribute('role', 'alert');
         const actions = document.createElement('div'); actions.className = 'project-dialog__actions';
-        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = t('project.cancel');
+        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = t(save?'project.cancel':'action.close');
         const submit = document.createElement('button'); submit.type = 'submit'; submit.textContent = options?.confirmLabel ?? t('project.createConfirm');
         const close = () => { dialog.close(); dialog.remove(); signal.removeEventListener('abort', close); resolve(); };
         cancel.onclick = close; dialog.oncancel = event => { event.preventDefault(); close(); };
         form.onsubmit = event => {
-            event.preventDefault(); if (submit.disabled) return; submit.disabled = true;
+            event.preventDefault(); if (!save || submit.disabled) return; submit.disabled = true;
             const inputs = Array.from(form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement>('input, textarea, select, button')).filter(item => item !== cancel && item !== submit && !item.disabled);
             inputs.forEach(item => { item.disabled = true; });
             void save(input.value.trim()).then(close).catch(error => { status.textContent = error.message; })
                 .finally(() => { submit.disabled = false; inputs.forEach(item => { item.disabled = false; }); });
         };
-        actions.append(cancel, submit); form.append(field); if (extra) form.append(extra); form.append(status, actions);
+        actions.append(cancel); if (save) actions.append(submit);
+        form.append(field); if (extra) form.append(extra); form.append(status, actions);
         dialog.append(heading, form); signal.addEventListener('abort', close, { once: true });
         document.body.append(dialog); dialog.showModal();
     });

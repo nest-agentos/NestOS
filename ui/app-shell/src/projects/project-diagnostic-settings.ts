@@ -1,14 +1,21 @@
 import {randomUUID, t} from '@nestos/common';
-import type {ProjectDiagnosticAccess, ServiceDiagnosticSource} from '@nestos/app-contracts/services';
+import type {ProjectDiagnosticAccess, ProjectRemoteMount, ServiceDiagnosticSource} from '@nestos/app-contracts/services';
 import {showNameDialog} from '../files/project-dialog';
+
+export function diagnosticAccessForProject(access:ProjectDiagnosticAccess|undefined,mounts:ProjectRemoteMount[]):ProjectDiagnosticAccess|undefined{
+    const mount=mounts.find(item=>item.at==='/');
+    if(mount&&access?.projects?.some(project=>project.serverId===mount.serverId&&project.serverProjectId===mount.serverProjectId
+        &&project.principalId===mount.authorization?.principalId&&project.alias===mount.alias&&project.root===mount.root))return access;
+}
 
 export async function showProjectDiagnosticSettings(access:ProjectDiagnosticAccess, id:string, signal:AbortSignal):Promise<void>{
     if(signal.aborted)return;
-    const current=await access.readDiagnosticAccess(id).catch(error=>{
-        if(['SERVICE_PROJECT_BINDING_REQUIRED','SERVICE_PROJECT_UNAUTHORIZED','SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH'].includes(diagnosticErrorCode(error)))
-            throw new Error(t('project.diagnosticAccess.bindingRequired'),{cause:error});
-        throw error;
+    const current=await access.readDiagnosticAccess(id).catch(async error=>{
+        const note=document.createElement('p');
+        note.setAttribute('role','alert'); note.textContent=diagnosticErrorMessage(error);
+        await showNameDialog(t('project.diagnosticAccess.title'),'',signal,undefined,note,{hideName:true});
     });
+    if(!current)return;
     if(signal.aborted)return;
     const fields=document.createElement('div');
     const note=document.createElement('p');
@@ -25,16 +32,18 @@ export async function showProjectDiagnosticSettings(access:ProjectDiagnosticAcce
         try{
             await access.saveDiagnosticAccess(id,{sources:selected,expectedRevision:current.revision,operationId:intent.operationId});
         }catch(error){
-            if(diagnosticErrorCode(error)==='SERVICE_DIAGNOSTICS_ACCESS_CONFLICT')
-                throw new Error(t('project.diagnosticAccess.conflict'),{cause:error});
-            throw error;
+            throw new Error(diagnosticErrorMessage(error),{cause:error});
         }
     },fields,{hideName:true,confirmLabel:t('action.save')});
 }
 
-function diagnosticErrorCode(error:unknown):string{
+function diagnosticErrorMessage(error:unknown):string{
     const failure=error as {code?:string;remoteCode?:string}|undefined;
-    return failure?.remoteCode??failure?.code??'';
+    const code=failure?.remoteCode??failure?.code??'';
+    if(code==='SERVICE_DIAGNOSTICS_ACCESS_CONFLICT')return t('project.diagnosticAccess.conflict');
+    if(['SERVICE_PROJECT_BINDING_REQUIRED','SERVICE_PROJECT_BINDING_CHANGED','SERVICE_PROJECT_UNAUTHORIZED','SERVICE_PROJECT_SOURCE_CHECKOUT_MISMATCH'].includes(code))
+        return t('project.diagnosticAccess.bindingRequired');
+    return error instanceof Error ? error.message : String(error);
 }
 
 function diagnosticSourceField(fields:HTMLElement,source:ServiceDiagnosticSource,checked:boolean):HTMLInputElement{

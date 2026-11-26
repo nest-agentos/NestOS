@@ -52,9 +52,9 @@ import { createSessionDraft } from '../session/create-session-draft';
 import { createChatConfigurationView } from '../configuration/chat-configuration';
 import { taskAttachment } from './task-attachment';
 import {openView} from './open-view';
-import type { ApplicationClient, ApplicationBackend, LocalApplicationServices, LocalBackendOptions, ToolboxView } from '@nestos/app-contracts/services';
+import type { ApplicationClient, ApplicationBackend, LocalApplicationServices, LocalBackendOptions, RuntimeServiceProject, ToolboxView } from '@nestos/app-contracts/services';
 
-export interface ApplicationViewOptions extends LocalBackendOptions { preload?: boolean; configurationReadonly?: boolean }
+export interface ApplicationViewOptions extends LocalBackendOptions { preload?: boolean; configurationReadonly?: boolean; diagnosticProjects?:readonly RuntimeServiceProject[] }
 /** Bind construction dependencies once, inside the host rather than across the UI port. */
 export function createApplicationClient(services: LocalApplicationServices, options: ApplicationViewOptions = {}): ApplicationClient & { close(): Promise<void> } {
     if (options.configurationReadonly) services = {...services, agentService: publicConfiguration(services.agentService), llmDriver: publicConfiguration(services.llmDriver)};
@@ -87,7 +87,7 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
         events: services.events,
         readStartup: request => readStartup(backend,services,request),
         diagnostics: services.diagnostics,
-        projectDiagnosticAccess: options.configurationReadonly?undefined:projectDiagnosticAccess(services),
+        projectDiagnosticAccess: options.configurationReadonly?undefined:projectDiagnosticAccess(services,options.diagnosticProjects),
         flowInstallations: services.flowInstallations,
         assistantOverview: () => assistantOverview(services),
         sessionResponse: (id, query) => sessionResponse(repository, id, query),

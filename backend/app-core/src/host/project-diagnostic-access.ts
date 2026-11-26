@@ -1,12 +1,22 @@
 import {createModuleLogger,randomUUID} from '@nestos/common';
-import type {LocalApplicationServices,ProjectDiagnosticAccess,ServiceDiagnosticAccess} from '@nestos/app-contracts/services';
+import type {LocalApplicationServices,ProjectDiagnosticAccess,RuntimeServiceProject,ServiceDiagnosticAccess,RuntimeServiceControl} from '@nestos/app-contracts/services';
 import {resolveServiceProject} from '../presets/managed-service-deployment';
 import {requireValue} from '../kanban/validation';
 import {safeCode} from '@nestos/kanban/integration';
 
 const log=createModuleLogger('service-diagnostics-settings');
 
-export function projectDiagnosticAccess(services:LocalApplicationServices):ProjectDiagnosticAccess|undefined{
+export async function diagnosticProjectCatalog(control?:RuntimeServiceControl):Promise<RuntimeServiceProject[]|undefined>{
+    const started=Date.now();
+    try{return await control?.diagnosticProjects?.();}
+    catch(error){
+        log.warn('Diagnostic project catalog unavailable',{operation:'service.diagnostics.access',operationId:randomUUID(),stage:'catalog',
+            result:'failure',code:safeCode(error,'SERVICE_DIAGNOSTICS_ACCESS_FAILED'),durationMs:Date.now()-started});
+        return [];
+    }
+}
+
+export function projectDiagnosticAccess(services:LocalApplicationServices,projects?:readonly RuntimeServiceProject[]):ProjectDiagnosticAccess|undefined{
     const control=services.serviceControl;
     if(!control?.diagnosticAccess||!control.saveDiagnosticAccess)return;
     const binding=async(id:string)=>{
@@ -16,6 +26,7 @@ export function projectDiagnosticAccess(services:LocalApplicationServices):Proje
         return project;
     };
     return {
+        projects,
         readDiagnosticAccess:id=>trackAccess('read',undefined,async()=>control.diagnosticAccess!(await binding(id))),
         saveDiagnosticAccess:(id,change)=>trackAccess('save',change?.operationId,async()=>control.saveDiagnosticAccess!(await binding(id),change)),
     };

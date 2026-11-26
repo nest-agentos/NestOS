@@ -14,6 +14,7 @@ export interface UpdateServiceDiagnosticAccess {
     operationId: string;
 }
 export interface ProjectDiagnosticAccess {
+    readonly projects?: readonly RuntimeServiceProject[];
     readDiagnosticAccess(projectId:string):Promise<ServiceDiagnosticAccess>;
     saveDiagnosticAccess(projectId:string,change:UpdateServiceDiagnosticAccess):Promise<ServiceDiagnosticAccess>;
 }
@@ -31,6 +32,7 @@ export interface ServiceDiagnosticResult {
     sources:Record<ServiceDiagnosticSource,'read'|'unavailable'|'disabled'>;
 }
 export interface RuntimeServiceControl {
+    diagnosticProjects?():Promise<RuntimeServiceProject[]>;
     describeForProject?(serviceId:string,project:RuntimeServiceProject):Promise<RuntimeServiceDescriptor>;
     readDiagnosticsForProject?(project:RuntimeServiceProject,projectId:string,query:ServiceDiagnosticQuery):Promise<ServiceDiagnosticResult>;
     diagnosticAccess?(project:RuntimeServiceProject):Promise<ServiceDiagnosticAccess>;

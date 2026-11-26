@@ -131,10 +131,13 @@ it('opens current-project actions from the sidebar title button and selector con
     await navigation.sync('/project', { project: project as never });
     expect(navigation.header.querySelector(`button[aria-label="${t('project.sync.status')}"]`)).toBeNull();
     expect(navigation.header.textContent).not.toContain(t('project.sync.unboundShort'));
-    const menu = [...navigation.header.querySelectorAll<HTMLButtonElement>('details button')]
-        .find(button => button.textContent === t('project.sync.projectActions'))!;
-    expect(menu.hidden).toBe(false); menu.click(); expect(projectMenu.mock.calls[0]?.[1]).toBe(project);
-    navigation.header.querySelector('select')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    navigation.header.querySelector('details > summary')!.click();
+    expect(navigation.overflow.root.open).toBe(false);
+    expect(projectMenu.mock.calls[0]?.[1]).toBe(project);
+    navigation.context.firstElementChild!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    expect(projectMenu).toHaveBeenCalledTimes(2);
+    await navigation.sync('/',{}, {path:'/',projects:[project as never],pendingDeletions:0,offlineProjectIds:[],loadPaths:[]});
+    navigation.header.querySelector('details > summary')!.click();
     expect(projectMenu).toHaveBeenCalledTimes(2);
     navigation.destroy();
 });

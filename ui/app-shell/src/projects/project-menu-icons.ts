@@ -9,6 +9,7 @@ const icons: Record<string, string> = {
     'edit-tags': PROJECT_ACTION_ICONS.tags, 'favorite-toggle': PROJECT_ACTION_ICONS.favorite,
     rename: CHAT_ICONS.edit, delete: CHAT_ICONS.delete, copyTo: CHAT_ICONS.copy, duplicate: CHAT_ICONS.copy,
     'refresh-project-binding': ACTION_ICONS.refreshView,
+    'refresh-project': ACTION_ICONS.refreshView,
     'project-sync-settings': PROJECT_ACTION_ICONS.settings, 'project-sync-status': ACTION_ICONS.info,
     'project-sync-setup': TOOLBOX_ICONS.connections, 'project-sync-now': ACTION_ICONS.refreshView,
     'project-sync-recover': ACTION_ICONS.refreshView, 'project-sync-reconcile': TOOLBOX_ICONS.tasks,

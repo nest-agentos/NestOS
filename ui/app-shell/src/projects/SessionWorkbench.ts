@@ -77,7 +77,7 @@ import { type SessionSkillControls } from '@nestos/tools/contracts';
 import { ProjectNavigation, type ProjectFileView, type ProjectNavigationOptions } from './ProjectNavigation';
 import { remapProjectPath } from './project-paths';
 import { showNameDialog, showProjectDialog } from '../files/project-dialog';
-import {showProjectDiagnosticSettings} from './project-diagnostic-settings';
+import {diagnosticAccessForProject,showProjectDiagnosticSettings} from './project-diagnostic-settings';
 import { showMountDialog } from '../files/mount-dialog';
 import { localizeMountError } from '../files/localize-mount-error';
 
@@ -769,13 +769,15 @@ export class SessionWorkbench implements WorkspaceController {
     }
     private projectEntryMenu(item: VFSNodeUI, defaults: MenuItem<VFSNodeUI>[]): MenuItem<VFSNodeUI>[] {
         const id = String(item.metadata.custom.projectId), remote = !!item.metadata.custom.remoteProject;
-        const diagnosticAccess=remote?this.backend.projectDiagnosticAccess:undefined;
+        const diagnosticAccess=remote&&this.backend.projectDiagnosticAccess
+            ?diagnosticAccessForProject(this.backend.projectDiagnosticAccess,this.projects?.remoteMounts?.list(id)??[]):undefined;
         const hidden = ['create-in-folder-session', 'create-in-folder-folder', ...(item.metadata.custom.protectedProject ? ['delete', 'moveTo'] : []), ...(remote ? ['delete', 'moveTo', 'copyTo', 'duplicate'] : [])];
         const entries: MenuItem<VFSNodeUI>[] = [{id: 'create-session', label: t('project.createSession'), disabled: !!this.projects && !!sessionCreationReason(this.projects, id), onClick: () => this.startSessionDraft(item.id)},
             {id:'project-settings',label:t('project.settings'),onClick:() => this.projectSettingsDialog(id)},
             ...(diagnosticAccess?[{id:'project-diagnostic-access',label:t('project.diagnosticAccess.title'),onClick:() =>
-                showProjectDiagnosticSettings(diagnosticAccess,id,this.dialogs.signal).catch(error=>this.report(error))}]:[]),
+                showProjectDiagnosticSettings(diagnosticAccess,id,this.dialogs.signal)}]:[]),
             { id: 'enter-project', label: t('project.enter'), onClick: () => this.openResource(item.id) },
+            {id:'refresh-project',label:t('action.refresh'),onClick:()=>this.refresh()},
             ...defaults.filter(entry => !('id' in entry) || !hidden.includes(entry.id))
                 .map(entry => 'id' in entry && entry.id === 'rename' ? {...entry, onClick: () => this.renameProjectDialog(id)} : entry),
             ...(remote ? [

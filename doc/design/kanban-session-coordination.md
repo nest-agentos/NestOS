@@ -180,9 +180,9 @@ Node 宿主通过部署环境变量 `NESTOS_KANBAN_MODULE_PERMISSIONS` 读取规
 
 开发任务、交付复核和决策协调 Harness 可通过已有 `session_request` 查询受管项目的服务诊断。先调用 `kanban.discover`，再用 `kanban.invoke` 请求 `{pluginId:"service-diagnostics",method:"read",input:{operationId:"…"}}`。也可使用 `requestId`，时间范围默认 30 分钟且最多 120 分钟，结果最多 50 条。收到 pending 时沿用原会话的续办协议。
 
-诊断默认关闭。管理员在工作台打开已登记项目的菜单，选择「Harness 日志访问」，勾选 httpd 运行日志、Cells 服务日志或两者，再保存。全部取消即关闭。设置存放在 httpd 运行用户的私有目录 `~/.config/nestos/service-diagnostics/`，服务重启后保留。已登记项目的绑定授权与勾选来源在每次查询时核对，保存后随下一次查询生效。两个页面并发保存时，旧版本会收到冲突提示。
+诊断默认关闭。管理员在工作台打开已登记项目的菜单，选择「Harness 日志访问」，勾选 httpd 运行日志、Cells 服务日志或两者，再保存。全部取消即关闭。设置存放在 httpd 运行用户的私有目录 `~/.config/nestos/service-diagnostics/`，服务重启后保留。已登记项目的绑定授权与勾选来源在每次查询时核对，保存后随下一次查询生效。两个页面并发保存时，旧版本会收到冲突提示。侧栏进入项目后，「…」直接打开该项目菜单。
 
-未在工作台保存过的项目沿用管理员在 `~/.config/nestos/service-projects.json` 或 `NESTOS_SERVICE_PROJECTS` 中登记的默认值。`"diagnostics": true` 默认开放两个来源，缺省或 `false` 默认关闭。工作台已保存的来源列表覆盖该默认值。撤销项目与服务的绑定会阻止后续查询。httpd 路径由宿主的 `NESTOS_HTTPD_LOG_DIR` 选择，缺省为 `/var/log/nestos`。Cells 来源由宿主固定为本机的 Cells 服务日志。Cells TOML 与项目目录里的配置不授予访问权限。
+管理员可通过 `~/.config/nestos/service-diagnostic-projects.json`（0600）或 `NESTOS_SERVICE_DIAGNOSTIC_PROJECTS` 单独登记可配置日志的项目，记录字段沿用服务绑定结构。工作台菜单只显示在与诊断登记匹配的项目上。这份登记仅授予日志配置资格，服务部署继续使用 `service-projects.json` 或 `NESTOS_SERVICE_PROJECTS`。未设置诊断登记时，沿用原服务登记兼容旧配置。登记内的 `"diagnostics": true` 默认开放两个来源，缺省或 `false` 默认关闭。工作台已保存的来源列表覆盖该默认值。撤销诊断登记会阻止后续查询。httpd 路径由宿主的 `NESTOS_HTTPD_LOG_DIR` 选择，缺省为 `/var/log/nestos`。Cells 来源由宿主固定为本机的 Cells 服务日志。Cells TOML 与项目目录里的配置不授予访问权限。
 
 诊断只在具有 httpd 控制器的管理员运行时提供。实际调用重新核对该会话绑定的项目及管理员登记的 httpd 项目授权。httpd 只返回可确认属于管理员且匹配项目的结构化记录；本机 Cells 只读取固定 systemd 单元里、与绑定节点身份吻合的进程日志。每条只返回时间、操作、阶段、结果、错误码和耗时，缺少可验证归属的记录不进入结果。Harness 文件系统无需挂载宿主日志目录，查询不改变版本、任务或会话状态。验证和发布仍走受管交付流程。
 

@@ -47,7 +47,6 @@ export class ProjectNavigation {
     private readonly menu = document.createElement('details');
     private readonly menuContent = document.createElement('div');
     readonly overflow = {root: this.menu, content: this.menuContent};
-    private readonly projectActions = document.createElement('button');
     private readonly settings = document.createElement('button');
     private readonly overflowSettings = document.createElement('button');
     private settingsPending = false;
@@ -151,11 +150,13 @@ export class ProjectNavigation {
             this.button(button, t(`vfs.toolbar.${id}`), () => this.runTransfer(id));
             decorateButton(button, VFS_TOOLBAR_ICONS[id], t(`vfs.toolbar.${id}`)); panel.append(button);
         }
-        this.button(this.projectActions, t('project.sync.projectActions'), async () => {
+        summary.addEventListener('click',event=>{
+            if(!this.project||!this.actions.projectMenu)return;
+            event.preventDefault();
             const rect = summary.getBoundingClientRect(); this.menu.open = false;
             this.showMenu(new MouseEvent('contextmenu', { clientX: rect.left, clientY: rect.bottom }));
         });
-        panel.append(this.syncStatus.element, this.projectActions); this.menu.append(summary, panel);
+        panel.append(this.syncStatus.element); this.menu.append(summary, panel);
         this.menu.addEventListener('keydown', event => {
             if (event.key === 'Escape') { this.menu.open = false; summary.focus(); }
         });
@@ -251,7 +252,6 @@ export class ProjectNavigation {
         delete this.settings.dataset.status;
         void this.updateRemoteStatus();
         this.updateCreation();
-        this.projectActions.hidden = !project || !this.actions.projectMenu;
         for (const button of this.menu.querySelectorAll<HTMLButtonElement>('[data-project-action="import"], [data-project-action="export"]')) button.hidden = !project;
         this.retry.hidden = !pending; this.retry.textContent = t('project.retryDeletion', { count: pending });
         this.updateSelector();

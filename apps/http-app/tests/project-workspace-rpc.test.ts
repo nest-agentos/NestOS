@@ -26,10 +26,11 @@ it('exports the scoped log settings RPC only to administrator views',async()=>{
     const current:ServiceDiagnosticAccess={revision:'initial',sources:[]};
     const diagnosticAccess=vi.fn(async()=>current);
     const saveDiagnosticAccess=vi.fn(async()=>({revision:'next',sources:['cells' as const]}));
-    const serviceControl={describe:vi.fn(),submit:vi.fn(),inspect:vi.fn(),diagnosticAccess,saveDiagnosticAccess};
+    const project={serverId:'node',serverProjectId:'remote-a',principalId:'owner',alias:'prj',root:'/x1'};
+    const diagnosticProjects=vi.fn(async()=>[project]);
+    const serviceControl={describe:vi.fn(),submit:vi.fn(),inspect:vi.fn(),diagnosticProjects,diagnosticAccess,saveDiagnosticAccess};
     const remoteSourceProvider={resolveCredential:()=>'',setCredential:vi.fn(),dispose:vi.fn(),open:vi.fn()};
     const runtime=await createApplicationRuntime({backend:new MemoryBackend(),ownerKind:'httpd',digitalTwinAutoStart:false,serviceControl,remoteSourceProvider});
-    const project={serverId:'node',serverProjectId:'remote-a',principalId:'owner',alias:'prj',root:'/x1'};
     const grant:ProjectRemoteMount={...project,at:'/',mountId:'mount-x1',access:'rw',endpoint:'https://cells.test',credentialRef:'fixture',
         authorization:{principalId:'owner',anonymous:false,revision:'1'}};
     const server=new RpcPeer('server',async()=>({value:null}),console.error);
@@ -43,6 +44,8 @@ it('exports the scoped log settings RPC only to administrator views',async()=>{
             const backend=(await expose(admin.root)).backend,other=(await expose(readonly.root)).backend;
             expect(other.projectDiagnosticAccess).toBeUndefined();
             const access=backend.projectDiagnosticAccess;
+            expect(access.projects).toEqual([project]);
+            expect(diagnosticProjects).toHaveBeenCalledOnce();
             expect(await access.readDiagnosticAccess('x1')).toEqual(current);
             const update={operationId:'grant',expectedRevision:'initial',sources:['cells']};
             expect(await access.saveDiagnosticAccess('x1',update)).toEqual({revision:'next',sources:['cells']});
