@@ -8,6 +8,7 @@ import { fileContentFormat } from '../browser/file-format';
 import { ViewLoad, ViewLoadCancelled } from '../lifecycle/view-load';
 
 interface ProjectFileOptions {
+    prepared?: Awaited<ReturnType<ProjectService['openWorkspace']>>;
     factory: EditorFactory;
     mount(): Promise<HTMLElement>;
     showBinary(mount: HTMLElement, path: string, bytes: ArrayBuffer): () => void;
@@ -22,12 +23,13 @@ interface OpenedProjectFile { node: FSNode; editor?: IEditor; context: FileSyste
 
 export async function openProjectFileEditor(projects: ProjectService, target: { folder: string; path: string },
     load: ViewLoad, options: ProjectFileOptions): Promise<OpenedProjectFile> {
-    let owner: Awaited<ReturnType<ProjectService['openWorkspace']>> | undefined;
+    let owner: Awaited<ReturnType<ProjectService['openWorkspace']>> | undefined = options.prepared;
     let editor: IEditor | undefined;
     let mount: HTMLElement | undefined;
     let previewCleanup: (() => void) | undefined;
     try {
-        const source = await load.read(async () => owner = await traceBoot('projectFile.source', () => projects.openWorkspace(target.folder, {initialPath: target.path})));
+        const source = owner ?? await load.read(async () => owner = await traceBoot('projectFile.source', () => projects.openWorkspace(target.folder, {initialPath: target.path})));
+        load.check();
         const context: FileSystemContextOwner = { context: { fs: source.fs, cwd: target.path.slice(0, target.path.lastIndexOf('/')) || '/' }, release: () => source.dispose() };
         const driver = source.fs.driver;
         const node = source.initialFile ? source.initialFile.node

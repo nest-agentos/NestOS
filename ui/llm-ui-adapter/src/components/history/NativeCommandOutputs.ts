@@ -1,3 +1,4 @@
+import type {OpenSystemPath} from '@nestos/llm-ui';
 import type {ConversationCommandOutput} from '../../contracts';
 
 import {NativeCommandOutput, type CommandOutputReader} from './NativeCommandOutput';
@@ -9,14 +10,14 @@ export class NativeCommandOutputs {
     private readonly views = new Map<string, NativeCommandOutput>();
     private disposed = false;
     private active = true;
-    constructor(private readonly reader: CommandOutputReader) {}
+    constructor(private readonly reader: CommandOutputReader, private readonly openSystemPath?: OpenSystemPath) {}
     show(placements: NativeOutputPlacement[]): void {
         if (this.disposed) return;
         const ids = new Set(placements.map(item => item.id));
         for (const [id, view] of this.views) {if (!ids.has(id)) {view.destroy(); this.views.delete(id);}}
         for (const placement of placements) {
             let view = this.views.get(placement.id);
-            if (!view) {view = new NativeCommandOutput(this.reader); view.setActive(this.active); this.views.set(placement.id, view);}
+            if (!view) {view = new NativeCommandOutput(this.reader, this.openSystemPath); view.setActive(this.active); this.views.set(placement.id, view);}
             view.update(placement.output); placement.parent.append(view.element);
         }
     }

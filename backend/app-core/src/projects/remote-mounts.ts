@@ -665,6 +665,20 @@ export class ProjectRemoteMountService {
             const granted=this.list(projectId);
             if (expected.length!==granted.length || expected.some(m=>!granted.some(g=>g.alias===m.alias && g.root===m.root && g.at===m.at)) || mount.access==='rw' && project.mounts.some(m=>granted.find(g=>g.at===m.at.slice('/workspace'.length))?.access!==m.access)) throw new FSError('ECONFLICT','Server project mounts changed; refresh the project binding');
     }
+    async resolvePath(projectId: string, path: string, options?: OperationOptions, operationId?: string): Promise<{path: string; specificity: number; kind: 'physical' | 'workspace' | 'project'}> {
+        const mount = this.list(projectId).find(m => m.at === '/');
+        if (!mount?.connectionId || !mount.serverProjectId || !this.provider.projects) throw new FSError('ECAPABILITY', 'Project path resolution unavailable');
+        const fingerprint = JSON.stringify(this.list(projectId));
+        const connection = await this.resolveConnection(mount.connectionId, options);
+        const client = this.provider.projects(connection);
+        try {
+            if (!client.resolvePath || !mount.serverProjectRevision) throw new FSError('ECAPABILITY', 'Server path resolution unavailable');
+            const result = await client.resolvePath({id:mount.serverProjectId,revision:mount.serverProjectRevision}, path, options, operationId);
+            this.assertProjectGrant(projectId, mount, result.project);
+            if (this.closed || fingerprint !== JSON.stringify(this.list(projectId))) throw new FSError('ECONFLICT', 'Project authorization changed');
+            return result;
+        } finally { await client.close(); }
+    }
     async searchFiles(projectId: string, query: import('@nestos/cells-driver').FileSearchQuery, options?: OperationOptions) {
         const mount = this.list(projectId).find(m => m.at === '/');
         if (!mount?.connectionId || !mount.serverProjectId || !this.provider.projects) throw new FSError('ECAPABILITY', 'Project search unavailable');

@@ -1,3 +1,4 @@
+import {resolveSystemPath, systemLineOffset} from './system-path';
 import type {KanbanDecisionSourceSession} from '@nestos/kanban/contracts';
 import type {SessionSubmission} from '@nestos/llm-flow/contracts';
 import {createAgentScopeEditor} from './agent-scope-editor';
@@ -119,6 +120,8 @@ export interface OpenResourceOptions {
     fileNavigation?: ProjectFileView;
     /** A listing hint; the source still validates that the target is a directory. */
     directory?: boolean;
+    /** Owned only by the current path-opening attempt. */
+    systemPathOpening?: {value: Awaited<ReturnType<ProjectService['openSystemPath']>>; claimed: boolean};
 }
 
 /** File column behavior for a resolved favorite target. */
@@ -246,6 +249,7 @@ export class SessionWorkbench implements WorkspaceController {
     private navigationVisible: boolean;
     private navigationReady = false;
     private navigationDirty = false;
+    private remoteAvailabilityDirty = false;
     private navigationTask?: Promise<ProjectNavigationView | undefined>;
     private startNavigation?: () => Promise<ProjectNavigationView | undefined>;
     private pendingNavigation?: {path: string; options: ProjectNavigationOptions; select: boolean};
@@ -632,6 +636,7 @@ export class SessionWorkbench implements WorkspaceController {
             this.projects.remoteMounts.onChange(change => {
                 this.updateRemoteAvailability();
                 if(change?.kind==='status'){
+                    if (!this.visible) this.remoteAvailabilityDirty = true;
                     this.projectNavigation?.refreshAvailability();
                     return;
                 }
@@ -736,7 +741,7 @@ export class SessionWorkbench implements WorkspaceController {
         const target = path && !path.startsWith('draft:') && !path.startsWith('@agent/') ? resolveBrowserTarget(parseSessionRoute(path).path) : undefined;
         const folder = target?.kind === 'project-files' ? target.folder : target?.kind === 'files'
             ? (await this.repository.getManifest(target.sessionId)).folder : undefined;
-        const project = folder ? await this.projects.forFolder(folder) : undefined;
+        const project = folder ? await this.projectForOpen(folder) : undefined;
         if (this.closed || path !== this.active) return;
         const wasOffline = this.tabs.content.classList.contains('project-workbench--offline');
         const mounts = project && this.projects.remoteMounts.list(project.project.id);
@@ -1040,6 +1045,7 @@ export class SessionWorkbench implements WorkspaceController {
         } else {
             await this.opening?.setVisible(true);
             if (!this.visible || this.closed) return;
+            if (this.remoteAvailabilityDirty) {this.remoteAvailabilityDirty = false; this.updateRemoteAvailability();}
             void this.syncNavigationVisibility().catch(error => this.report(error));
             const pending = this.pendingTarget;
             if (pending) await this.openResource(pending.id, pending.options);
@@ -1163,6 +1169,7 @@ export class SessionWorkbench implements WorkspaceController {
                 this.tabs.keep(id);
             }
             this.openingProjects = new Map(this.initialConversation?.resourceId === path ? [[this.initialConversation.project.path, Promise.resolve(this.initialConversation.project)]] : []);
+            if (options.systemPathOpening) this.openingProjects.set(options.systemPathOpening.value.project.path, Promise.resolve(options.systemPathOpening.value.project));
             if (id === this.active && !options.reload && !this.tabs.current?.failed && (branch === undefined || branch === this.activeBranch)) {
                 if (target.kind === 'project-files' || target.kind === 'files') this.scheduleFileNavigation(path, options.fileNavigation);
                 else if (directoryTarget) {
@@ -1234,7 +1241,7 @@ export class SessionWorkbench implements WorkspaceController {
             if (target.kind === 'project-files') {
                 if (options.directory || target.path === WORKSPACE_PATH || this.sidebarUI?.getNode(path)?.type === 'directory')
                     await load.read(() => this.showDirectory(path, {signal: load.signal}));
-                else await this.openProjectFile(path, target, load);
+                else await this.openProjectFile(path, target, load, options.systemPathOpening);
                 load.check();
                 if (this.closed) throw new Error('Session workspace closed');
                 this.active = path; this.activeBranch = undefined; this.onSelect(path); this.scheduleFileNavigation(path, options.fileNavigation); return;
@@ -1269,6 +1276,7 @@ export class SessionWorkbench implements WorkspaceController {
                         mountCompactNavigation: container => this.tabs.mountCompactNavigation(container, project.displayName ?? project.name, () => this.toggleSidebar()),
                         onStartConversationDraft: input => this.startSessionDraft(folderBrowserPath(target.folder), input),
                         hostContext: {...this.hostContext, toggleSidebar: () => this.toggleSidebar(),
+                            openSystemPath: value => this.openSystemPath(project.project.id, value),
                             navigate: request => this.hostContext?.navigate(request) ?? Promise.resolve()},
                         title: `${serverName} · ${project.name} · ${controls.kind} · ${target.profileId}`,
                         removeConversationSession: async nativeId => {
@@ -1798,7 +1806,10 @@ export class SessionWorkbench implements WorkspaceController {
     }
     /** File content is ready before optional navigation I/O; stale work cannot select a newer route. */
     private scheduleFileNavigation(path: string, mode?: ProjectFileView): void {
-        this.scheduleNavigation(path, {reveal: true, fileView: mode, preserveProject: true}, mode !== 'preserve');
+        const target = resolveBrowserTarget(path);
+        const project = this.projectNavigation?.currentProject();
+        const reuseScope = mode === 'preserve' && target.kind === 'project-files' && (!project || project.path === target.folder);
+        this.scheduleNavigation(path, {reveal: true, fileView: mode, preserveProject: true, reuseScope}, mode !== 'preserve');
     }
     private scheduleNavigation(path: string, options: ProjectNavigationOptions, select = true, prepared?: ProjectNavigationView): void {
         this.pendingNavigation = {path, options, select};
@@ -1806,10 +1817,13 @@ export class SessionWorkbench implements WorkspaceController {
         const revision = ++this.fileNavigationRevision, active = this.active, selection = this.directorySelectionRevision;
         const current = () => !this.closed && this.visible && this.resourceNavigationVisible && revision === this.fileNavigationRevision && this.active === active;
         const navigation = prepared ?? this.preparedDirectoryNavigation(path, options);
-        const reuseScope = !!options.reuseScope && !navigation && !this.navigationDirty && !this.viewRefresh.dirty;
-        this.sidebarLayout.navigation.inert = !reuseScope;
-        this.fileNavigation = (reuseScope ? Promise.resolve() : this.fileNavigation).then(async () => {
+        const mayReuseScope = !!options.reuseScope && !navigation;
+        this.sidebarLayout.navigation.inert = !mayReuseScope;
+        this.fileNavigation = (mayReuseScope ? Promise.resolve() : this.fileNavigation).then(async () => {
             if (!current()) return;
+            if (mayReuseScope && (this.navigationDirty || this.viewRefresh.dirty || this.viewRefresh.busy)) await this.viewRefresh.settle();
+            if (!current()) return;
+            const reuseScope = mayReuseScope && !this.navigationDirty && !this.viewRefresh.dirty && !this.viewRefresh.busy;
             if (reuseScope) this.projectNavigation?.trackSelection(path);
             else await traceBoot('projectFile.navigation', async () => this.projectNavigation?.sync(path, options, navigation));
             if (current() && !this.editor && !this.previewCleanup && !this.tabs.current?.failed && !this.tabs.content.inert) {
@@ -2108,10 +2122,15 @@ export class SessionWorkbench implements WorkspaceController {
         if (sessionId && manifest) this.tabs.title(this.tabs.current!.id, manifest.title);
         this.tabs.content.append(mount); return mount;
     }
-    private async openProjectFile(_path: string, target: { folder: string; path: string }, load: ViewLoad): Promise<void> {
+    private async openProjectFile(_path: string, target: { folder: string; path: string }, load: ViewLoad, opening?: OpenResourceOptions['systemPathOpening']): Promise<void> {
         if (!this.projects) throw new Error('Projects unavailable');
         const project = await this.projectForOpen(target.folder); load.check();
+        if (opening) {
+            opening.claimed = true;
+            if (this.pendingTarget?.options.systemPathOpening === opening) this.pendingTarget.options.systemPathOpening = undefined;
+        }
         const opened = await openProjectFileEditor(this.projects, target, load, {
+            prepared: opening?.value.workspace,
             mountTitleBar: (container, parts) => this.tabs.mountTitleBar(container, parts, () => this.toggleSidebar()),
             mountWindowList: container => this.tabs.mountWindowList(container),
             factory: (mount, options) => this.fileFactory(mount, {...options, defaultPluginOptions: {...options.defaultPluginOptions,
@@ -2136,6 +2155,39 @@ export class SessionWorkbench implements WorkspaceController {
         if (opened.editor) this.trackProjectFileRenames(opened.context.context.fs, target.folder, target.path);
     }
 
+    private async openSystemPath(projectId: string, value: string): Promise<void> {
+        const operationId = randomUUID(), started = performance.now(), source = this.active;
+        let opening: OpenResourceOptions['systemPathOpening'];
+        try {
+            if (!this.projects) throw new Error(t('systemPath.unavailable'));
+            const target = await resolveSystemPath(this.backend, projectId, value);
+            opening = {value:target, claimed:false};
+            if (this.closed || !this.visible || this.active !== source) throw new Error(t('systemPath.changed'));
+            const route = folderBrowserPath(target.project.path) + '/@files/' + target.path;
+            await this.openResource(route, {fileNavigation:'preserve', systemPathOpening:opening});
+            if (target.line) await this.navigateSystemLine(route, target.line);
+            sidebarLog.info('system.path.open', {operation:'system.path.open',operationId,stage:'open',result:'success',durationMs:performance.now()-started});
+        } catch (error) {
+            const code = (error as {code?: string}).code;
+            sidebarLog.warn('system.path.open', {operation:'system.path.open',operationId,stage:'open',result:'failure',code:typeof code === 'string' && /^[A-Z_]{1,80}$/.test(code) ? code : 'PATH_OPEN_FAILED',durationMs:performance.now()-started});
+            if (this.active !== source) this.report(error);
+            throw error;
+        } finally {
+            if (opening && !opening.claimed) {
+                if (this.pendingTarget?.options.systemPathOpening === opening) this.pendingTarget.options.systemPathOpening = undefined;
+                await opening.value.workspace.dispose();
+            }
+        }
+    }
+    private async navigateSystemLine(route: string, line: number): Promise<void> {
+        const editor = this.editor;
+        if (!editor || this.active !== route) throw new Error(t('systemPath.unavailable'));
+        if (editor.getMode() !== 'edit' && editor.isDirty()) throw new Error(t('systemPath.dirty'));
+        await editor.switchToMode('edit');
+        if (this.closed || this.editor !== editor || this.active !== route) throw new Error(t('systemPath.changed'));
+        const offset = systemLineOffset(editor.getText(), line);
+        editor.gotoMatch({source:'editor', text:'', context:'', details:{from:offset, to:offset}});
+    }
     private async openLinkedFile(path: string, anchor?: string): Promise<void> {
         await this.openResource(path);
         if (anchor) await this.editor?.navigateTo({ elementId: anchor });
@@ -2355,7 +2407,7 @@ export class SessionWorkbench implements WorkspaceController {
                 const submission = initialSubmission; initialSubmission = undefined; return submission;
             } : undefined,
             target: {kind: 'session', sessionId: id, branch: branch ?? manifest.currentBranch ?? 'main'}, files: context.context, assets, title: manifest.title,
-            hostContext: {...this.hostContext!, directoryCommands: this.sessionDirectoryCommands(prepared), toggleSidebar: () => this.toggleSidebar()}};
+            hostContext: {...this.hostContext!, openSystemPath: project ? value => this.openSystemPath(project.project.id, value) : undefined, directoryCommands: this.sessionDirectoryCommands(prepared), toggleSidebar: () => this.toggleSidebar()}};
     }
     private sessionDirectoryCommands(prepared: SessionOpenView): EditorHostContext['directoryCommands'] {
         if (!this.directoryMounts) return;

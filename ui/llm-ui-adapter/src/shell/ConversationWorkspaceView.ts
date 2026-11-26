@@ -70,7 +70,7 @@ export class ConversationWorkspaceView {
         this.progress.setAttribute('aria-live', 'polite');
         this.history = new RemoteHistory(history, container, this.progress, {
             refresh: actions.openPrompts, earlier: actions.earlier,
-        }, actions.commandOutputs);
+        }, actions.commandOutputs, options.hostContext?.openSystemPath);
         this.reconcile = this.button(t('harness.reconcile'), actions.reconcile, toolbar); this.reconcile.disabled = true;
         this.input = this.createInput(options, actions, handoff);
         if (actions.commands) this.input.registerPlugin(new NativeSlashCommandPlugin(actions.commands));

@@ -1,3 +1,4 @@
+import {chooseSystemPath} from './system-path-opening';
 import {CellsProjectDraftStore} from './drafts/cells-store';
 import {navigationFolders} from './navigation-folders';
 import {LEGACY_LOCAL_PROJECT_NAMES} from '@nestos/app-contracts';
@@ -501,9 +502,31 @@ export class ProjectService {
         try { return (await source.fs.capabilitiesAt('/')).readonly; } finally { await source.dispose(); }
     }
     /** The editor and tools share canonical project paths; openFiles remains a source view. */
+    async openSystemPath(projectId: string, path: string, operationId: string) {
+        const started = performance.now(), log = createModuleLogger('project-system-path');
+        if (!/^[a-zA-Z0-9_-]{1,128}$/.test(operationId)) throw new FSError('EINVAL', 'INVALID_OPERATION_ID');
+        try {
+            const catalog = await this.list(), before = this.systemPathBindings(catalog);
+            const selected = await chooseSystemPath(catalog, this.remote, projectId, path, operationId);
+            const workspace = await this.openWorkspaceFor(selected.project, catalog, {initialPath: WORKSPACE_PATH + '/' + selected.path});
+            if (before !== this.systemPathBindings(catalog)) {await workspace.dispose(); throw new FSError('ECONFLICT', 'PROJECT_AUTHORIZATION_CHANGED');}
+            log.info('project.system-path.open', {operation:'project.system-path.open',operationId,stage:'resolve.prepare',result:'success',durationMs:performance.now()-started});
+            return {...selected, workspace};
+        } catch (error) {
+            const code = (error as {remoteCode?: string; code?: string}).remoteCode ?? (error as {code?: string}).code;
+            log.warn('project.system-path.open', {operation:'project.system-path.open',operationId,stage:'resolve.prepare',result:'failure',code:typeof code === 'string' && /^[A-Z_]{1,80}$/.test(code) ? code : 'SYSTEM_PATH_OPEN_FAILED',durationMs:performance.now()-started});
+            throw error;
+        }
+    }
+    private systemPathBindings(catalog: readonly ProjectFolder[]): string {
+        return JSON.stringify(catalog.map(project => [project.project.id, this.remote?.list(project.project.id) ?? []]));
+    }
     async openWorkspace(folder: string, options?: {initialPath?: string}) {
         const catalog = await this.list(), project = catalog.find(item => item.path === folder);
         if (!project) throw new FSError('ENOENT', 'Project not found');
+        return this.openWorkspaceFor(project, catalog, options);
+    }
+    private async openWorkspaceFor(project: ProjectFolder, catalog: readonly ProjectFolder[], options?: {initialPath?: string}) {
         const source = await this.openProjectFiles(project, catalog);
         try {
             const fs = createFileSystemView({ viewId: `project-workspace:${source.fs.viewId}`, mounts: [

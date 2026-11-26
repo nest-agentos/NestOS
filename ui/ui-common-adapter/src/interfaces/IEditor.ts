@@ -71,6 +71,8 @@ export interface EditorFileReference {
 export interface EditorHostContext {
     /** Open a resolved path in the editor's file namespace, optionally at a document anchor. */
     openFile?: (path: string, anchor?: string) => Promise<void>;
+    /** Resolve and open a displayed system path through the host authorization boundary. */
+    openSystemPath?: (value: string) => Promise<void>;
     /** Read the latest file; advance the save revision only after accept returns successfully. */
     reloadRecovery?: {canPreserve?(content: string): boolean; preserve(content: string): Promise<void>; read(): Promise<string | {content: string; savedAt?: number} | undefined>};
     reloadContent?: (path: string, accept: (content: string) => Promise<boolean>) => Promise<void>;

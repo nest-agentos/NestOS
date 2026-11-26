@@ -143,6 +143,8 @@ export interface ProjectService {
     workspaceAccess(project: ProjectFolder, requested?: 'ro' | 'rw'): 'ro' | 'rw';
     assertIndependent(project: ProjectFolder, mounts?: ProjectRemoteMount[], knownCatalog?: readonly ProjectFolder[]): Promise<void>;
     workspaceReadOnly(folder: string): Promise<boolean>;
+    /** Resolve and prepare one authorized file under a single project read scope. */
+    openSystemPath(projectId: string, path: string, operationId: string): Promise<{project: ProjectFolder; path: string; workspace: Awaited<ReturnType<ProjectService['openWorkspace']>>}>;
     /** Optionally prepare file metadata beside storage, without reading its content. */
     openWorkspace(folder: string, options?: {initialPath?: string}): Promise<{
         fs: VfsContracts.FileSystemView;
@@ -336,6 +338,7 @@ export interface ProjectRemoteMountService {
     projectRemountOptions(projectId:string,options?:OperationOptions):Promise<{alias:string;path:string;roots:Array<{alias:string;access:'ro'|'rw'}>}>;
     rebindProject(projectId:string,directory:{alias:string;path:string;access:'ro'|'rw'},options?:OperationOptions):Promise<void>;
     remountProject(projectId: string, access: 'ro' | 'rw', options?: OperationOptions): Promise<void>;
+    resolvePath(projectId: string, path: string, options?: OperationOptions, operationId?: string): Promise<{path: string; specificity: number; kind: 'physical' | 'workspace' | 'project'}>;
     searchFiles(projectId: string, query: HarnessContracts.FileSearchQuery, options?: OperationOptions): Promise<HarnessContracts.FileSearchResult>;
     projectConversation(projectId: string, profileId: string, sessionId?: string, options?: OperationOptions, readOnly?: boolean, draftId?: string, draftTitle?: string): Promise<ProjectConversationPort>;
     projectOffline(projectId: string): boolean;

@@ -37,6 +37,17 @@ function fixture(input?: OperationRecord['input']) {
     };
 }
 
+it('projects restored assistant history into the markdown view', () => {
+    const host = fixture(), path = '/work/tools/cells/src/http/agent_mcp.rs:26';
+    const group: SessionGroup = {id: 'round-fixture-round-assistant', role: 'assistant', timestamp: 1,
+        executionRoot: {id: 'fixture-round', executorId: '', executorType: 'agent', name: 'Assistant', status: 'success', startTime: 1,
+            data: {output: `Command output: ${path}`}, children: []}};
+    const session = {...host.options.session, getSessions: () => [group]} as SessionViewPort;
+    const binding = createSessionChatBinding({...host.options, session, branch: () => 'main'});
+    expect(binding.source.getSnapshot().messages).toMatchObject([{role: 'assistant', parts: [{kind: 'markdown', text: `Command output: ${path}`}]}]);
+    binding.dispose();
+});
+
 it('does not acknowledge a Session request that has only entered the in-memory queue', async () => {
     const host = fixture(), binding = createSessionChatBinding(host.options);
     const receipt = await binding.actions.send!({ text: 'hello', attachments: [] }, { operationId: 'op', viewId: binding.source.getSnapshot().viewId });

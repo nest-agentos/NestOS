@@ -406,6 +406,13 @@ it('updates connection health without reloading directories and still reloads on
         for(const listener of listeners)listener({kind:'status'});
         await new Promise(resolve=>setTimeout(resolve,150));
         expect(refresh).not.toHaveBeenCalled();expect(invalidate).not.toHaveBeenCalled();
+        const availability=vi.spyOn(workbench as never,'applyRemoteAvailability' as never);
+        await workbench.setVisible(false); availability.mockClear();
+        for(const listener of listeners)listener({kind:'status'});
+        expect(availability).not.toHaveBeenCalled();
+        await workbench.setVisible(true);
+        await vi.waitFor(()=>expect(availability).toHaveBeenCalled());
+        expect(refresh).not.toHaveBeenCalled();expect(invalidate).not.toHaveBeenCalled();
         for(const listener of listeners)listener();
         await vi.waitFor(()=>expect(refresh).toHaveBeenCalled());expect(invalidate).toHaveBeenCalledOnce();
     }finally{await workbench.destroy();await mounts.dispose();await files.dispose();await repository.dispose();await manager.dispose();sidebar.remove();main.remove();}

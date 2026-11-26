@@ -7,6 +7,7 @@ import { remoteRounds, remotePrompts, remoteCommandOutputs } from './remote-roun
 import { ConversationHistoryNavigation } from './ConversationHistoryNavigation';
 import type { ChatSubmission } from '../domain/submission';
 import {NativeCommandOutputs} from '../components/history/NativeCommandOutputs';
+import {linkSystemPaths, type OpenSystemPath} from '@nestos/llm-ui';
 import type {CommandOutputReader} from '../components/history/NativeCommandOutput';
 
 
@@ -19,11 +20,11 @@ export class RemoteHistory {
     readonly view: HistoryView;
     readonly navigation: ConversationHistoryNavigation;
     constructor(private readonly container: HTMLElement, workspace: HTMLElement, header?: HTMLElement,
-        navigation: {refresh?(): void; earlier?(): void} = {}, outputReader: CommandOutputReader = {}) {
-        this.view = new HistoryView(container, {header, readOnly: true, htmlPolicy: 'literal', markdownPlugins: [this.markup.plugin],
+        navigation: {refresh?(): void; earlier?(): void} = {}, outputReader: CommandOutputReader = {}, private readonly openSystemPath?: OpenSystemPath) {
+        this.view = new HistoryView(container, {header, openSystemPath, readOnly: true, htmlPolicy: 'literal', markdownPlugins: [this.markup.plugin],
             codeBlockControls: {defaultCollapsed: true, minLinesThreshold: 0, collapsedHeight: 0}});
         this.navigation = new ConversationHistoryNavigation(workspace, container, this.view, navigation);
-        this.outputs = new NativeCommandOutputs(outputReader);
+        this.outputs = new NativeCommandOutputs(outputReader, openSystemPath);
     }
     async show(messages: ConversationMessage[], submission?: ChatSubmission): Promise<void> {
         if (this.closed) return;
@@ -40,6 +41,7 @@ export class RemoteHistory {
         await this.view.renderSnapshot(groups); this.navigation.update(groups, remotePrompts(messages));
         if (this.closed) return;
         this.mountOutputs(messages);
+        linkSystemPaths(this.container, this.openSystemPath);
         if (anchor?.isConnected && top !== undefined) this.container.scrollTop += anchor.getBoundingClientRect().top - top;
     }
     private mountOutputs(messages: ConversationMessage[]): void {

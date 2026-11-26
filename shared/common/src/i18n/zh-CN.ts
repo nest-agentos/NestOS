@@ -5509,6 +5509,16 @@ export const zhCN = {
     'chatInput.draft.notLoaded': '尚未成功读取此分支草稿，请重新加载后再保存。',
     'chatInput.draft.invalid': '已保存的分支草稿格式无效，请检查存储后重试。',
     'chatInput.draft.busy': '其他视图仍在修改会话，请稍后重试；当前输入已保留。',
+    'systemPath.unavailable': '当前项目没有可用的远程路径解析',
+    'systemPath.unmapped': '路径未映射到已授权项目',
+    'systemPath.ambiguous': '路径映射到多个项目，请使用更具体的路径',
+    'systemPath.invalid': '路径或行号格式无效',
+    'systemPath.line': '文件中不存在指定行',
+    'systemPath.dirty': '文件有未保存的更改，请先保存后再定位行号',
+    'systemPath.denied': '当前授权不允许访问该文件',
+    'systemPath.missing': '目标文件不存在或不可读取',
+    'systemPath.changed': '项目目录或授权已变化，请刷新项目后重试',
+    'systemPath.failed': '路径解析失败，请检查连接后重试',
 } as const;
 
 // LocaleStrings maps every key to string (not literal), so other locales can provide different values.

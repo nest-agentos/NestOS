@@ -160,6 +160,10 @@ export function bindApplicationBackend(services: LocalApplicationServices, optio
         archiveImporter: async () => new WorkbenchArchiveImporter(projects, await lifecycle(), repository),
         exportSession: (...args) => exportSessionBundle(repository, ...args),
         exportRemoteSession: (...args) => exportRemoteSession(projects, ...args),
+        openSystemPath: async (projectId, path, operationId) => {
+            const opening = await projects.openSystemPath(projectId, path, operationId);
+            return {...opening, workspace:await scope.own(opening.workspace)};
+        },
         resolveFavorite: (folder, id) => resolveProjectFavorite(projects, repository, folder, id),
         manageRemoteSession: (...args) => manageRemoteSession(projects, ...args),
         unmountProject: id => unmountRemoteProject(projects, lifecycle(), id),

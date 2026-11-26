@@ -299,7 +299,7 @@ function prepareNativeView(binding: NativeBinding, options: ImageChatOptions): C
     const outputs = new Set<NativeCommandOutput>(), repairs = new Set<NativeResultRepair>(), notices = new Set<NativeExecutionNotice>();
     const queue = nativeQueueToolbar(binding.instructionQueue, options);
     const renderer: ExtensionRenderer = (root, part) => {
-        const output = new NativeCommandOutput(binding.commandOutputs); root.append(output.element); outputs.add(output);
+        const output = new NativeCommandOutput(binding.commandOutputs, options.onOpenSystemPath); root.append(output.element); outputs.add(output);
         output.update(part.data as unknown as ConversationCommandOutput);
         return {update: part => output.update(part.data as unknown as ConversationCommandOutput), destroy: () => {outputs.delete(output); output.destroy();}};
     };

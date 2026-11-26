@@ -6,6 +6,7 @@ import type { IFileSystem } from '@nestos/vfs-core';
 import type { IHistoryPresenter } from '../domain/ports/IHistoryPresenter';
 import type { CollapseStateMap, NodeActionCallback } from '../domain/types';
 import type { IEditorEventBus } from '../domain/events';
+import {linkSystemPaths, type OpenSystemPath} from '@nestos/llm-ui';
 import {ScrollController, ContentResizeTracker, TimerManager} from '@nestos/llm-ui';
 import {EventBatchProcessor, BatchedEvents} from './common';
 import { ErrorTemplates } from './templates/ErrorTemplates';
@@ -25,6 +26,7 @@ import type { ContentSearchView } from '@nestos/llm-ui';
 import { mountHistorySearch } from './history/content-search';
 
 export interface HistoryViewOptions {
+    openSystemPath?: OpenSystemPath;
     artifacts?: RendererContext['artifacts'];
     messagePlugins?: RendererContext['messagePlugins'];
     /** Optional host-owned controls inside the history scroll pane. */
@@ -77,6 +79,7 @@ export class HistoryView implements IHistoryPresenter {
     private suppressScrollHighlight = false;
     private onHistoryActivity?: HistoryViewOptions['onHistoryActivity'];
     private readonly contentSearch?: ContentSearchView;
+    private pathObserver?: MutationObserver;
 
     constructor(container: HTMLElement, options: HistoryViewOptions) {
         this.container = container;
@@ -102,6 +105,17 @@ export class HistoryView implements IHistoryPresenter {
         const messages = document.createElement('div'), pending = document.createElement('div');
         container.replaceChildren(...(options.header ? [options.header] : []), messages, pending);
         this.renderer = new SessionRenderer(messages, ctx, options.onContentChange);
+        if (options.openSystemPath) {
+            this.pathObserver = new MutationObserver(records => {
+                const parents = new Set<HTMLElement>();
+                for (const record of records) {
+                    const parent = record.target instanceof HTMLElement ? record.target : record.target.parentElement;
+                    if (parent && messages.contains(parent)) parents.add(parent);
+                }
+                for (const parent of parents) linkSystemPaths(parent, options.openSystemPath);
+            });
+            this.pathObserver.observe(messages, {childList:true, subtree:true, characterData:true});
+        }
         this.submission = new SubmissionFeedback(pending, ctx);
 
         this.scrollController = new ScrollController(container, {
@@ -619,6 +633,7 @@ export class HistoryView implements IHistoryPresenter {
     setActive(active: boolean): void { this.contentSearch?.setActive(active); this.renderer.setActive(active); }
 
     async destroy(): Promise<void> {
+        this.pathObserver?.disconnect();
         this.contentSearch?.destroy();
         this.timers.destroy();
         this.eventProcessor.destroy();

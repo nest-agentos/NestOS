@@ -356,6 +356,7 @@ export class LLMWorkspaceEditor implements IEditor {
         const historyEl = this.domCache.byId('llm-ui-history')!;
         const inputEl = this.domCache.byId('llm-ui-input')!;
         const historyView = new HistoryView(historyEl, {
+            openSystemPath: this.hostContext?.openSystemPath,
             messagePlugins: workspaceMessagePlugins(this.options, () => this.stateManager.getDraftBranch()),
             artifacts: {commands: this.commandBus, scope: group => group.role === 'assistant' && group.execution
                 && ['success', 'failed', 'aborted', 'cancelled'].includes(group.executionRoot?.status ?? '')

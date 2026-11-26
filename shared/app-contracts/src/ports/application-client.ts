@@ -90,6 +90,7 @@ export interface ApplicationBackend {
     archiveImporter(): Promise<WorkbenchArchiveImporter>;
     exportSession(sessionId: string): Promise<SessionExport>;
     exportRemoteSession(folder: string, profileId: string, sessionId: string, options?: OperationOptions): Promise<SessionExport>;
+    openSystemPath(projectId: string, path: string, operationId: string): ReturnType<ProjectService['openSystemPath']>;
     resolveFavorite(folder: string, favoriteId: string): Promise<ResolvedProjectFavorite>;
     manageRemoteSession(folder: string, profileId: string, sessionId: string, command: NativeSessionCommand, options?: OperationOptions): Promise<HarnessConversationSnapshot>;
     unmountProject(projectId: string): Promise<void>;

@@ -170,6 +170,10 @@ TTY：TtyEffectAdapter → device-tty（node-pty）
 
 命名连接入口：工具箱 → MCP → `MCPSettingsEditor` → MCPManager 标准发现及已注册扩展验证 → 保存统一配置及运行期凭据引用。宿主注入 `MCPConfigurationControlsRegistry`，只为已识别 cells 显示 `CellsMCPControls` 控制中心。工作台新建项目 → `ProjectService.createRemote` → `bindProject`，以服务地址和别名内路径去重，将远程根组合到项目 `/` 及 Session `/workspace`。连接名称可改，引用使用稳定 ID；Basic 密码仅存宿主凭据 provider。
 
+## 会话与命令输出中的文件位置
+
+会话正文和命令输出识别绝对路径及可选行号；同源 HTTPS 位置也可请求解析。点击时工作台调用聚合打开用例，在同一读取作用域内复用项目目录和当前连接的绑定，查询 Cells 并按目录边界选择最具体的唯一映射；`/workspace` 只在当前项目上下文解释。Cells 校验当前项目修订、挂载遮蔽与文件授权，再使用受限文件句柄检查目标，返回项目相对路径，不把系统路径作为读取凭据。用例返回受管文件视图及文件元数据，宿主复用该视图读取并打开文件、定位行号，同项目打开保留已有侧栏范围；无映射、歧义、授权变化或读取失败保留原文并显示原因。普通外部链接沿用原行为。解析请求与日志不记录路径、消息或文件正文。
+
 ## cells 与外部 harness 控制链
 
 Web/Tauri/CLI → `createCellsDriver` → 同一命名连接和凭据解析器。节点 0.4 起，Harness、项目目录与进程观察复用按节点/身份共享的 fetch SSE；修改命令与回执查询继续使用 HTTP/MCP。文件/远程进程交给 cells-driver HTTP；同步交给 cells-driver 的 HttpSyncClient；外部会话交给 MCPHarnessClient → cells `/mcp` → 通用 Harnesses/收据表 → Codex HarnessDriver → `codex app-server --stdio`。

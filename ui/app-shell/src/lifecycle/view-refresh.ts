@@ -16,6 +16,9 @@ export class ViewRefresh {
     private retryDelay = 1000;
     constructor(private readonly options: ViewRefreshOptions) {}
     get dirty(): boolean { return this.sources.size > 0; }
+    get busy(): boolean { return this.running || this.queued; }
+    /** Join the current refresh, or start the pending invalidation once. */
+    settle(): Promise<void> { return this.dirty ? this.flush() : this.tail; }
     mark(source: string, schedule = true): void {
         if (this.closed) return;
         this.sources.add(source);

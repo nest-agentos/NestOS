@@ -1,3 +1,4 @@
+import {linkSystemPaths, type OpenSystemPath} from '@nestos/llm-ui';
 import type {ConversationCommandOutput} from '../../contracts';
 import {createModuleLogger, escapeHTML, t} from '@nestos/common';
 
@@ -21,7 +22,7 @@ export class NativeCommandOutput {
     private page = 0;
     private readonly urls = new Map<string, ReturnType<typeof setTimeout>>();
     private readonly clicked = (event: Event) => this.click(event);
-    constructor(private readonly reader: CommandOutputReader) {
+    constructor(private readonly reader: CommandOutputReader, private readonly openSystemPath?: OpenSystemPath) {
         this.element.className = 'native-command-output';
         this.element.addEventListener('click', this.clicked);
     }
@@ -51,6 +52,7 @@ export class NativeCommandOutput {
             ${this.pending ? `<p role="status">${escapeHTML(t('harness.commandOutput.loading'))}</p>` : ''}
             ${this.error ? `<p role="alert">${escapeHTML(this.error)}</p>` : ''}
             ${this.text === undefined ? '' : this.preview()}`;
+        linkSystemPaths(this.element, this.openSystemPath);
     }
     private notices(output: ConversationCommandOutput): string {
         const notice = output.truncated && output.ref ? `<p>${escapeHTML(t('harness.commandOutput.preview', {bytes: output.ref.bytes}))}</p>` : '';
