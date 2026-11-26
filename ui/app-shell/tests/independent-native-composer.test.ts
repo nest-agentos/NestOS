@@ -7,6 +7,33 @@ import {createOperationLedger} from '@nestos/llm-ui';
 import {createNativeChatBinding, createNativeChatView} from '../../llm-ui-adapter/src/independent/native';
 
 afterEach(() => {document.body.replaceChildren(); vi.unstubAllGlobals();});
+it('recalls only authored text from native history, preserving user-pasted rules and unmarked older entries', async () => {
+    const rules = '# AGENTS.md instructions for /project', environment = '<environment_context>';
+    const state: ConversationSnapshot = {sessionId: 'session', title: 'Native', requests: [], canSend: true, canInterrupt: false,
+        canRespond: false, pending: false, disconnected: false, gap: false, messages: [
+            {id: 'rules', role: 'user', text: rules, contentParts: [rules], contentPartKinds: ['agents_md.instructions']},
+            {id: 'mixed', role: 'user', text: environment + '\nActual request', contentParts: [environment, 'Actual request'],
+                contentPartKinds: ['environments.environment_context', 'user.text']},
+            {id: 'pasted', role: 'user', text: rules, contentParts: [rules], contentPartKinds: ['user.text']},
+            {id: 'legacy', role: 'user', text: 'Older user input'},
+        ]};
+    const controls: ConversationControls = {read: vi.fn(async () => state), refresh: vi.fn(async () => state),
+        send: vi.fn(), interrupt: vi.fn(), respond: vi.fn(), reconcile: vi.fn(), close: vi.fn()};
+    const binding = await createNativeChatBinding({conversationId: 'conversation', controls, operations: createOperationLedger(), reconcile: vi.fn()});
+    const host = document.createElement('div'); document.body.append(host);
+    const view = await createNativeChatView(host, binding);
+    try {
+        view.setText('/history'); await view.submit();
+        const rows = [...host.querySelectorAll<HTMLButtonElement>('.llm-composer-history > div > button:first-child')];
+        expect(rows.map(row => row.textContent)).toEqual(['Older user input', rules, 'Actual request']);
+        rows[2].click();
+        expect(view.getDraft().text).toBe('Actual request'); expect(controls.send).not.toHaveBeenCalled();
+        const folded = () => host.querySelector<HTMLDetailsElement>('[data-message-id="rules"] .llm-chat__part details');
+        await vi.waitFor(() => expect(folded()?.textContent).toContain('AGENTS.md instructions for /project'));
+        expect(folded()?.open).toBe(false);
+    } finally {await view.destroy(); binding.dispose();}
+});
+
 it('routes an actual independent composer selection through the binding and replaces its prompt bubble', async () => {
     vi.stubGlobal('matchMedia', () => ({matches: false, addEventListener() {}, removeEventListener() {}}));
     const listeners = new Set<() => void>();

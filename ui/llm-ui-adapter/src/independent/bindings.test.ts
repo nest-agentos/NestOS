@@ -16,14 +16,18 @@ it('folds native context only by explicit provenance and leaves actual prompts v
         {id: 'prompt', role: 'user', text: rules, contentParts: [rules], contentPartKinds: ['user.text']},
         {id: 'legacy', role: 'user', text: rules},
         {id: 'unknown', role: 'user', text: rules, contentParts: [rules], contentPartKinds: ['unknown']},
+        {id: 'misaligned', role: 'user', text: rules, contentParts: [rules], contentPartKinds: ['agents_md.instructions', 'user.text']},
     ]});
     const binding = await createNativeChatBinding(host.options);
     const messages = binding.source.getSnapshot().messages;
     expect(messages[0].parts).toEqual([
-        expect.objectContaining({text: rules, disclosureLabel: expect.any(String)}),
-        expect.objectContaining({text: '<environment_context>', disclosureLabel: expect.any(String)}),
+        expect.objectContaining({text: rules, disclosureLabel: expect.any(String), source: 'context'}),
+        expect.objectContaining({text: '<environment_context>', disclosureLabel: expect.any(String), source: 'context'}),
     ]);
-    for (const message of messages.slice(1)) expect(message.parts[0]).not.toHaveProperty('disclosureLabel');
+    for (const message of messages.slice(1)) {
+        expect(message.parts[0]).not.toHaveProperty('disclosureLabel');
+        expect(message.parts[0]).not.toHaveProperty('source');
+    }
     binding.dispose();
 });
 it('explicitly reloads external history instead of waiting for another process to emit local events', async () => {

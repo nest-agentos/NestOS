@@ -334,13 +334,15 @@ function nativeMessage(message: NativeSnapshot['messages'][number], operations: 
             || firstUser?.id === message.id && !!item.submissionRef && item.submissionRef === message.turnId
             || item.observedUserMessageId === message.id;
     });
+    const content = message.contentParts ?? [message.text];
+    const kinds = message.contentPartKinds?.length === content.length ? message.contentPartKinds : undefined;
     const parts: ChatMessage['parts'][number][] = message.role === 'tool' ? [{ id: message.id, kind: 'tool', name: message.name ?? '',
         summary: message.commandPreview ?? message.operation ?? '',
         state: toolState(message.status) }]
-        : (message.contentParts ?? [message.text]).map((text, index) => {
-            const kind = message.contentPartKinds?.[index], label = message.role === 'user' && kind ? contextLabel(kind) : undefined;
+        : content.map((text, index) => {
+            const kind = kinds?.[index], label = message.role === 'user' && kind ? contextLabel(kind) : undefined;
             return {id: `${message.id}-${index}`, kind: kind === 'assistant.reasoning' ? 'reasoning' : 'markdown', text,
-                ...(label ? {disclosureLabel: label} : {})};
+                ...(label ? {disclosureLabel: label, source: 'context' as const} : {})};
         });
     if (message.commandOutput) parts.push({id: `${message.id}-output`, kind: 'extension', type: 'native-command-output',
         data: JSON.parse(JSON.stringify(message.commandOutput)) as JsonValue});
