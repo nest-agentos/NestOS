@@ -60,6 +60,7 @@ export { createSessionSkillControls } from './skill/session-skill-controls';
 export { runSessionSkillOperation } from './skill/operation-queue';
 
 export { SessionFileSkillSource } from './skill/session-file-source';
+export { McpSkillSource } from './skill/mcp-skill-source';
 export { resolveSessionSkillContext, resolveSessionSelectedSkills } from './skill/session-prompt-context';
 
 export { MCPToolAdapter, mcpToolId, mcpResourceToolId, mcpPromptToolId } from './tool/mcp-tools';

@@ -218,7 +218,7 @@ export const ChatInputTemplates = {
      * 渲染单个 Skill 条目 — toggle switch 样式
      */
     renderSkillItem(skill: { id: string; name: string; description: string; loaded: boolean; enabled?: boolean; toolCount: number; authorizedToolCount?: number; capabilitiesManagedByFlow?: boolean; icon?: string;
-        drift?: import('@nestos/tools/contracts').SkillVersionDrift; unversioned?: boolean }): string {
+        drift?: import('@nestos/tools/contracts').SkillVersionDrift; unversioned?: boolean; mcpApprovalAvailable?:boolean; mcpUpdateRequired?:boolean }): string {
         const icon = skill.icon ? escapeHTML(skill.icon) : '⚡';
         const checked = skill.loaded ? 'checked' : '';
         const btnClass = skill.loaded ? 'llm-input__skill-btn--unload' : 'llm-input__skill-btn--load';
@@ -235,6 +235,8 @@ export const ChatInputTemplates = {
                 <span class="llm-input__skill-icon">${icon}</span>
                 <span class="llm-input__skill-name">${escapeHTML(skill.name)}</span>${desc}
                 <span role="status">${t(skill.loaded ? 'skill.instructionsLoaded' : 'skill.instructionsUnloaded')}${skill.toolCount ? ` · ${skill.capabilitiesManagedByFlow ? t('skill.flowGrants') : t('skill.toolGrants', { granted: skill.authorizedToolCount ?? 0, total: skill.toolCount })}` : ''}</span>
+                ${skill.mcpApprovalAvailable ? `<button type="button" data-skill-approval="${escapeHTML(skill.id)}">${escapeHTML(t('skill.requestApproval'))}</button>` : ''}
+                ${skill.mcpUpdateRequired ? `<span role="status">${escapeHTML(t('skill.updateRequiresNewSession'))}</span>` : ''}
                 ${skill.drift || skill.unversioned ? `<span role="status">${escapeHTML(t(skill.drift?.policy === 'keep-old' ? 'skill.version.kept' : 'skill.version.changed'))}</span>
                     <button type="button" data-skill-reload="${escapeHTML(skill.id)}">${escapeHTML(t('skill.version.reload'))}</button>` : ''}
             </div>

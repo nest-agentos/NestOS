@@ -37,10 +37,11 @@ import type {
     SkillSource,
     SkillToolHandlerFactory,
 } from '../ports/capabilities';
-import { ApprovedEffectProgram } from '../programs/approved-effect-program';
+import { ApprovedEffectProgram, McpSkillApprovalProgram } from '../programs/approved-effect-program';
 import { ExecProgram } from '../programs/exec-program';
 import { ContextPrepareEffect, ContextLlmEffect, ContextToolEffect, type ContextServiceResolver } from '../context/effects';
 import {LiveTools} from './live-tools';
+import {assertMcpSkillExecution} from '../skill/mcp-execution-window';
 
 export interface KernelAdaptersRuntimeOptions extends KernelAdapterDiagnostics {
     authorizeTool?(request: import('../effects/tool-call-effect').ToolCallEffectRequest, context: import('@nestos/durable-kernel').EffectExecutionContext): Promise<void>;
@@ -66,7 +67,7 @@ export interface KernelAdaptersRuntimeOptions extends KernelAdapterDiagnostics {
     runMode?: 'kernel';
     skillSource?: SkillSource;
     /** Create a source using only the acquired Session file view. */
-    skillSourceForSession?: (files: { vfs: ToolVFSContext; cwd: string }) => SkillSource;
+    skillSourceForSession?: (files: { vfs: ToolVFSContext; cwd: string; sessionId:string; scopeId?:string }) => SkillSource;
     skillToolHandlerFactory?: SkillToolHandlerFactory;
     /** Additional application tools registered in every isolated session scope. */
     additionalTools?: Tool[];
@@ -129,7 +130,7 @@ export async function createKernelAdaptersRuntime(options: KernelAdaptersRuntime
         sessions: registry,
         plugin: new KernelAdaptersPlugin({
             effects: effects.map(effect => coordinateSkillEffect(effect, registry)),
-            programs: [new ApprovedEffectProgram(), new ExecProgram(), new MediaProgram(), new ToolProgram(), new HarnessProgram()],
+            programs: [new ApprovedEffectProgram(), new McpSkillApprovalProgram(), new ExecProgram(), new MediaProgram(), new ToolProgram(), new HarnessProgram()],
             onSessionClosed: sessionId => registry.disposeSession(sessionId),
         }),
         disposeSession: sessionId => registry.disposeSession(sessionId),
@@ -215,6 +216,7 @@ class KernelAdaptersSessionRegistry implements SessionCapabilityRegistry {
         if (!scope) {
             scope = new KernelAdaptersSessionRegistry({ ...this.options, scopeForEffect: undefined,
                 fileContextForScope: undefined,
+                skillSourceForSession:this.options.skillSourceForSession?files=>this.options.skillSourceForSession!({...files,scopeId}):undefined,
                 fileContextForSession: id => this.options.fileContextForScope!(id, scopeId) }, this.skillDefinitions, this.liveTools);
             scopes.set(scopeId, scope);
         }
@@ -328,7 +330,7 @@ class KernelAdaptersSessionRegistry implements SessionCapabilityRegistry {
         if (nativeShell) toolDriver.setNativeShell(nativeShell);
         let source: SkillSource | undefined;
         try { source = files && this.options.skillSourceForSession
-            ? this.options.skillSourceForSession(files) : this.options.skillSource; }
+            ? this.options.skillSourceForSession({...files,sessionId}) : this.options.skillSource; }
         catch (error) { return cleanupAfterFailure(error, [() => files?.release(), () => toolDriver.dispose()]); }
         const mcp = new MCPToolAdapter(this.options.llmDriver);
         const defaults = createSkillToolHandlers(mcp, nativeShell);
@@ -349,10 +351,16 @@ class KernelAdaptersSessionRegistry implements SessionCapabilityRegistry {
         }
         catch (error) { detachTools(); return cleanupAfterFailure(error, [() => files?.release(), () => toolDriver.dispose(), () => skillDriver.dispose()]); }
         const scope = createScope(toolDriver, skillDriver, { cwd: files?.cwd, shellAttached: !!nativeShell }, ttySessions);
+        scope.stageMcpSkill=(id,content)=>skillDriver.stageMcpSkill(id,content);
+        scope.commitMcpSkill=snapshot=>skillDriver.commitMcpSkill(snapshot);
+        if(source?.readApproved) scope.readMcpSkillApproved=(id,skillId,taskId,windowId,controls)=>{
+            if(id!==sessionId)throw new Error('MCP_SKILL_SESSION_CHANGED');
+            return source.readApproved!(id,skillId,taskId,windowId,controls);
+        };
         scope.resolveMCPToolIds = profiles => mcp.resolveProfiles(profiles);
         scope.prepareTools = ids => mcp.prepare(scope.toolService, ids);
         const dispose = scope.dispose.bind(scope);
-        scope.dispose = retryCleanup([async () => {detachTools(); await dispose();}, () => files?.release()]);
+        scope.dispose = retryCleanup([async () => {await source?.dispose?.();}, async () => {detachTools(); await dispose();}, () => files?.release()]);
         try { await this.options.configureSession?.(sessionId, scope); }
         catch (error) { return cleanupAfterFailure(error, [() => scope.dispose()]); }
         return scope;
@@ -411,17 +419,23 @@ function createEffects(
     const skills = async (context: import('@nestos/durable-kernel').EffectExecutionContext) =>
         (await registry.getForContext(context)).skillService;
     const effects: import('@nestos/durable-kernel').EffectAdapter[] = [
-        new LlmChatEffectAdapter(llm, diagnostics.logger, diagnostics.authorizeLlm, diagnostics.readTaskAsset),
+        new LlmChatEffectAdapter(llm, diagnostics.logger, async(request,context)=>{
+            await diagnostics.authorizeLlm?.(request,context);
+            await assertMcpSkillExecution(await registry.getForContext(context),context,diagnostics.logger);
+        }, diagnostics.readTaskAsset),
         new ToolCallEffectAdapter(async (context, request) => {
             await diagnostics.authorizeTool?.(request, context);
             const scope = await registry.getForEffect(context);
-            await diagnostics.authorizeTool?.(request, context);
             const meta = scope.toolService.getToolMeta(request.toolId);
+            const effectKind=meta?.sideEffect==='none'?undefined:'tool.call';
+            await assertMcpSkillExecution(scope,context,diagnostics.logger,effectKind);
+            await diagnostics.authorizeTool?.(request, context);
             if (meta?.skillUnloaderArgKey) return scope.toolService;
             if (meta?.skillLoaderArgKey) return tools(context);
             return runSessionSkillOperation(registry, context.sessionId, async () => {
                 const ready = await registry.getForContext(context);
                 await ready.prepareTools?.([request.toolId]);
+                await assertMcpSkillExecution(ready,context,diagnostics.logger,effectKind);
                 await diagnostics.authorizeTool?.(request, context);
                 return ready.toolService;
             });
@@ -445,6 +459,7 @@ function createEffects(
         }, context => skills(context), effectTools, diagnostics.logger),
         new BashEffectAdapter(context => runSessionSkillOperation(registry, context.sessionId, async () => {
             const scope = await registry.getForContext(context);
+            await assertMcpSkillExecution(scope,context,diagnostics.logger,'process.exec');
             if (!scope.processContext.shellAttached) {
                 (diagnostics.logger ?? silentAdapterLog).error('[process.context] No execution backend', { sessionId: context.sessionId,
                     taskId: context.taskId, ...scope.processContext });
@@ -455,7 +470,9 @@ function createEffects(
         new SkillLoadEffectAdapter(skills, persistLoadedSkill),
         new SkillUnloadEffectAdapter(async context => (await registry.getForEffect(context)).skillService),
     ];
-    if (ttyEnabled) effects.push(new TtyEffectAdapter(context => runSessionSkillOperation(registry, context.sessionId, () => tools(context))));
+    if (ttyEnabled) effects.push(new TtyEffectAdapter(context => runSessionSkillOperation(registry, context.sessionId, async () => {
+        const scope=await registry.getForContext(context);await assertMcpSkillExecution(scope,context,diagnostics.logger,'tty.command');return scope.toolService;
+    })));
     return effects;
 }
 

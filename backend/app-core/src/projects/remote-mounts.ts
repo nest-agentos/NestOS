@@ -176,7 +176,7 @@ export class ProjectRemoteMountService {
             this.checkHarnessAccess(projectId,fingerprint,root.connectionId);
             if (!client.channel || project.revision !== root.serverProjectRevision) throw new FSError('ECAPABILITY', 'Session channel binding unavailable');
             return await client.channel(project, operation, {...input,
-                ...(['open', 'current'].includes(operation) ? {cwd: String(input.cwd).replace(/^\/workspace\//, ''),
+                ...(['open', 'current'].includes(operation) || operation==='messages'&&(input.skillsMetadata===true||typeof input.skillResourceUri==='string') ? {cwd: String(input.cwd).replace(/^\/workspace\//, ''),
                     endpoint: connection.endpoint.replace(/\/$/, '') + '/v1/channel/mcp'} : {})});
         } finally {await client.close();}
     }

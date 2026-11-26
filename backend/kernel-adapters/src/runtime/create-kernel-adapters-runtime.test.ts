@@ -16,9 +16,108 @@ import type { ITTYDriver } from '@nestos/tools/contracts';
 import { ToolDeviceDriver } from '@nestos/tools';
 import { createKernelAdaptersRuntime } from './create-kernel-adapters-runtime';
 import { buildSkillPromptContext } from '../skill/prompt-context';
+import {resolveSessionSkillContext} from '../skill/session-prompt-context';
 import { ApprovedEffectProgram } from '../programs/approved-effect-program';
+import {McpSkillApprovalProgram} from '../programs/approved-effect-program';
+import {McpSkillSource} from '../skill/mcp-skill-source';
+import {Kernel} from '@nestos/durable-kernel';
+import {createVFS,MemoryBackend} from '@nestos/vfs-core';
+import {sha256HexSync} from '@nestos/llm-context';
 
 describe('createKernelAdaptersRuntime', () => {
+    it('uses the durable user approval window at the actual tool adapter',async()=>{
+        const {manager}=await createVFS({rootBackend:new MemoryBackend()});const fs=await manager.openFileSystem('/gate');
+        const kernel=new Kernel({catalog:{fs},pollMs:0});kernel.registerStorageResolver({kind:'gate',async resolve(){return {fs,rootPath:'/session'};}});
+        kernel.registerProgram(new McpSkillApprovalProgram());await kernel.initialize();
+        const session=await kernel.createSession({id:'session-a',storage:{kind:'gate',locator:null}});
+        const uri='skill://example/SKILL.md',text='---\nname: example\ndescription: Example\n---\nBody\n';
+        const entry={uri,frontmatter:{name:'example',description:'Example'},resources:[{uri,digest:'sha256:'+sha256HexSync(text),size:new TextEncoder().encode(text).length}]};
+        const origin={projectId:'project',projectRevision:1,mountId:'root',principalId:'alice',authorizationRevision:'auth-rev'};
+        const source=new McpSkillSource('node',{listMcpSkills:async()=>[entry],getMcpSkill:async()=>entry,readMcpSkillBytes:async()=>new TextEncoder().encode(text)},'scope',origin);
+        const runtime=await createKernelAdaptersRuntime({llmDriver:{} as IDeviceDriver,skillSourceForSession:()=>source,
+            fileContextForSession:async()=>({cwd:'/workspace',vfs:{readFile:async()=> 'file',writeFile:async()=>{},listFiles:async()=>[]},release:async()=>{}})});
+        try {
+            let scope=await runtime.sessions.get('session-a');const skill=scope.skillService.getScopedSkills()[0];
+            const controls=createSessionSkillControls(kernel,runtime.sessions),window=await controls.mcpApprovalWindow!('session-a');
+            const id=await controls.requestMcpApproval!('session-a',skill.id,'approved-gate',window),task=await session.attachTask(id);
+            await vi.waitFor(async()=>expect((await task.status()).task.interactions['approve:mcp-skill']?.status).toBe('pending'));
+            expect((await task.status()).task.input).toMatchObject({...origin,serverId:'node',scopeId:'scope'});
+            await task.respond({interactionId:'approve:mcp-skill',value:true});expect((await task.wait({timeoutMs:5000})).status).toBe('succeeded');
+            await expect(controls.activateMcpApproved!('session-a',skill.id,id,'old-window')).rejects.toThrow('MCP_SKILL_WINDOW_CHANGED');
+            const failingControls=createSessionSkillControls({openSession:async(sessionId:string)=>{
+                const opened=await kernel.openSession(sessionId);
+                return new Proxy(opened,{get(target,key){if(key==='setShared')return async()=>{throw new Error('WRITE_FAILED');};
+                    const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}});
+            }} as never,runtime.sessions);
+            await expect(failingControls.activateMcpApproved!('session-a',skill.id,id,window)).rejects.toThrow('WRITE_FAILED');
+            expect(scope.skillService.getLoadedSkills()).toEqual([]);
+            expect(await controls.activateMcpApproved!('session-a',skill.id,id,window)).toEqual([]);
+            const frozen=scope.skillService.getSkillSnapshot!(skill.id)!;
+            const restored=new (await import('../skill/skill-device-driver')).SkillDeviceDriver({source});
+            try {await restored.setCwd('/workspace');expect(await restored.restoreSkillSnapshot(frozen)).toMatchObject({success:false,error:'MCP_SKILL_REAPPROVAL_REQUIRED'});}
+            finally {await restored.dispose();}
+            expect((await resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).skillInstructions).toContain('Body');
+            const effects:EffectAdapter[]=[];runtime.plugin.install(registration(effects));const tool=effects.find(effect=>effect.kind==='tool.call')!;
+            const request={resourceHandleId:'tool-handle',toolId:'Read',args:{file_path:'/workspace/file'}};
+            const state:NonNullable<EffectExecutionContext['sessionState']>={get:key=>session.getShared(key),set:(key,value,version)=>session.setShared(key,value,{expectedVersion:version})};
+            expect(await tool.execute(request,context(state))).toMatchObject({success:true});
+            await controls.unload('session-a',skill.id);
+            await expect(resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).rejects.toThrow('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
+            await expect(tool.execute(request,context(state))).rejects.toThrow('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
+            expect(await controls.activateMcpApproved!('session-a',skill.id,id,window)).toEqual([]);
+            await runtime.disposeSession('session-a');scope=await runtime.sessions.get('session-a');
+            const recoveryWindow=await controls.mcpApprovalWindow!('session-a');expect(recoveryWindow).not.toBe(window);
+            await expect(controls.activateMcpApproved!('session-a',skill.id,id,window)).rejects.toThrow('MCP_SKILL_WINDOW_CHANGED');
+            await expect(resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).rejects.toThrow();
+            const recoveryId=await controls.requestMcpApproval!('session-a',skill.id,'reapprove-gate',recoveryWindow),recovery=await session.attachTask(recoveryId);
+            await vi.waitFor(async()=>expect((await recovery.status()).task.interactions['approve:mcp-skill']?.status).toBe('pending'));
+            await recovery.respond({interactionId:'approve:mcp-skill',value:true});expect((await recovery.wait({timeoutMs:5000})).status).toBe('succeeded');
+            expect(await controls.activateMcpApproved!('session-a',skill.id,recoveryId,recoveryWindow)).toEqual([]);
+            expect((await resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).skillInstructions).toContain('Body');
+            entry.resources[0].digest='sha256:'+'f'.repeat(64);await scope.skillService.refreshScopedSkills();
+            await expect(tool.execute(request,context(state))).rejects.toThrow();
+            const update=(await session.getShared('kernel-adapters.skills.mcp-updates'))?.value as {items:Record<string,{status:string;previousManifest:string;observedManifest:string}>};
+            expect(update.items[skill.id]).toMatchObject({status:'restart-required',previousManifest:expect.stringMatching(/^sha256:/),observedManifest:expect.stringMatching(/^sha256:/)});
+            expect(update.items[skill.id].observedManifest).not.toBe(update.items[skill.id].previousManifest);
+            expect(await controls.list('session-a')).toContainEqual(expect.objectContaining({id:skill.id,loaded:false,mcpUpdateRequired:true}));
+            await runtime.disposeSession('session-a');await expect(resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).rejects.toThrow();
+            expect((await session.getShared('kernel-adapters.skills.mcp-updates'))?.value).toEqual(update);
+        } finally {await runtime.dispose();await kernel.dispose();await manager.dispose();}
+    },20_000);
+    it('checks active remote Skill windows before tool, process and TTY effects',async()=>{
+        let allowed=false;
+        const verify=vi.fn(async(skill:SkillDefinition)=>allowed&&(skill.metadata?.mcpOrigin as {serverId?:string}|undefined)?.serverId==='node');
+        const remote={...skillDefinition(),metadata:{mcpOrigin:{serverId:'node',uri:'skill://example/SKILL.md',scopeId:'scope'}}};
+        const exec=vi.fn(async()=>({stdout:'ok',stderr:'',code:0}));
+        const runtime=await createKernelAdaptersRuntime({llmDriver:{} as IDeviceDriver,
+            fileContextForSession:async()=>({cwd:'/workspace',vfs:{readFile:async()=> 'file',writeFile:async()=>{},listFiles:async()=>[]},
+                nativeShell:{capabilities:{ripgrep:false,fd:false},exec},ttyDriver:{supportsPty:false,spawn(){throw new Error('TTY_REACHED');}} as ITTYDriver,release:async()=>{}}),
+            configureSession:(id,scope)=>{if(id==='session-a'){vi.spyOn(scope.skillService,'getLoadedSkills').mockReturnValue([remote]);scope.validateMcpSkillWindow=verify;}},
+        });
+        const effects:EffectAdapter[]=[];runtime.plugin.install(registration(effects));
+        const ctx=context(sessionState());ctx.grants.push(...['process','tty','llm'].map(kind=>({handleId:`${kind}-handle`,right:'execute' as const,
+            resource:{id:`${kind}-resource`,sessionId:'session-a',kind,uri:`${kind}://runtime`,generation:1,createdAt:Date.now()}})));
+        const requests=[['tool.call',{resourceHandleId:'tool-handle',toolId:'Read',args:{file_path:'/workspace/file'}}],
+            ['process.exec',{resourceHandleId:'process-handle',command:'pwd'}],['tty.command',{resourceHandleId:'tty-handle',operation:'spawn',command:'sh'}]] as const;
+        try {
+            for(const [kind,request] of requests)await expect(effects.find(effect=>effect.kind===kind)!.execute(request,ctx)).rejects.toThrow('MCP_SKILL_EXECUTION_WINDOW_DENIED');
+            await expect(effects.find(effect=>effect.kind==='llm.chat')!.execute({resourceHandleId:'llm-handle',connectionId:'model',request:{messages:[]}},ctx)).rejects.toThrow('MCP_SKILL_EXECUTION_WINDOW_DENIED');
+            expect(exec).not.toHaveBeenCalled();expect(verify).toHaveBeenCalled();
+            allowed=true;
+            expect(await effects.find(effect=>effect.kind==='tool.call')!.execute(requests[0][1],ctx)).toMatchObject({success:true});
+            await expect(effects.find(effect=>effect.kind==='process.exec')!.execute(requests[1][1],ctx)).rejects.toThrow('MCP_SKILL_EFFECT_APPROVAL_REQUIRED');
+            await expect(effects.find(effect=>effect.kind==='tty.command')!.execute(requests[2][1],ctx)).rejects.toThrow('MCP_SKILL_EFFECT_APPROVAL_REQUIRED');
+            const scoped=await runtime.sessions.get('session-a');scoped.validateMcpSkillEffect=async()=>true;
+            expect(await effects.find(effect=>effect.kind==='process.exec')!.execute(requests[1][1],ctx)).toMatchObject({success:true});
+            expect(exec).toHaveBeenCalledOnce();
+            await expect(effects.find(effect=>effect.kind==='tty.command')!.execute(requests[2][1],ctx)).rejects.not.toThrow('MCP_SKILL_EXECUTION_WINDOW_DENIED');
+            allowed=false;await expect(effects.find(effect=>effect.kind==='process.exec')!.execute(requests[1][1],ctx)).rejects.toThrow('MCP_SKILL_EXECUTION_WINDOW_DENIED');
+            const scope=await runtime.sessions.get('session-a');delete scope.validateMcpSkillWindow;
+            await expect(effects.find(effect=>effect.kind==='tool.call')!.execute(requests[0][1],ctx)).rejects.toThrow('MCP_SKILL_EXECUTION_WINDOW_DENIED');
+            const other=context(sessionState());other.sessionId='session-b';other.grants=other.grants.map(grant=>({...grant,resource:{...grant.resource,sessionId:'session-b'}}));
+            expect(await effects.find(effect=>effect.kind==='tool.call')!.execute(requests[0][1],other)).toMatchObject({success:true});
+        } finally {await runtime.dispose();}
+    });
     it.each([false, true])('distinguishes file-only sessions from attached process backends (%s)', async attached => {
         const exec = vi.fn(async () => ({ stdout: 'ok', stderr: '', code: 0 }));
         const log = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -43,7 +142,7 @@ describe('createKernelAdaptersRuntime', () => {
         } finally { await runtime.dispose(); log.mockRestore(); }
     });
     it('routes real tool Effects to independent Run files and shells and tombstones closed scopes', async () => {
-        const opened: string[] = [], released: string[] = [];
+        const opened: string[] = [], released: string[] = [], skillScopes:Array<{sessionId:string;scopeId?:string}>=[];
         const files = async (id: string) => {
             opened.push(id);
             return { cwd: '/workspace', vfs: {
@@ -57,6 +156,7 @@ describe('createKernelAdaptersRuntime', () => {
             fileContextForSession: () => files('normal'),
             scopeForEffect: select,
             fileContextForScope: (session, run) => files(`${session}:${run}`),
+            skillSourceForSession:({sessionId,scopeId})=>{skillScopes.push({sessionId,scopeId});return {loadScope:async cwd=>({cwd,skills:[],agentInstructions:''})};},
         });
         const effects: EffectAdapter[] = []; runtime.plugin.install(registration(effects));
         const tool = effects.find(effect => effect.kind === 'tool.call')!;
@@ -71,6 +171,7 @@ describe('createKernelAdaptersRuntime', () => {
             expect(JSON.stringify(results[2])).toContain('normal');
             expect(JSON.stringify(await invoke('one', 'Bash'))).toContain('session-a:one');
             expect(opened.sort()).toEqual(['normal', 'session-a:one', 'session-a:two']);
+            expect(skillScopes).toEqual(expect.arrayContaining([{sessionId:'session-a',scopeId:'one'},{sessionId:'session-a',scopeId:'two'},{sessionId:'session-a',scopeId:undefined}]));
             expect(select).toHaveBeenCalledTimes(4);
             await runtime.disposeScope('session-a', 'one');
             await expect(invoke('one')).rejects.toThrow('closed');
@@ -188,7 +289,7 @@ describe('createKernelAdaptersRuntime', () => {
             'llm.chat', 'tool.call', 'process.exec', 'skill.load', 'skill.unload', 'harness.execute',
         ]);
         expect(programs.map(program => program.manifest.kind)).toEqual([
-            'kernel-adapters.approved-effect', 'kernel-adapters.exec', 'kernel-adapters.media', 'kernel-adapters.tool', 'kernel-adapters.harness',
+            'kernel-adapters.approved-effect', 'kernel-adapters.mcp-skill-approval', 'kernel-adapters.exec', 'kernel-adapters.media', 'kernel-adapters.tool', 'kernel-adapters.harness',
         ]);
 
         await runtime.dispose();

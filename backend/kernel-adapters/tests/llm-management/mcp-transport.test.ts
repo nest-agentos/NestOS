@@ -2,6 +2,8 @@ import { createServer, type Server } from 'node:http';
 import { afterEach, expect, it } from 'vitest';
 import { MCPServerConnection } from '../../src/llm-management/skills/mcp-client';
 import { parseMcpArgs } from '../../src/llm-management/device/mcp-manager';
+import {McpSkillVerification} from '../../src/skill/mcp-skill-verification';
+import {sha256HexSync} from '@nestos/llm-context';
 
 let server: Server | undefined, client: MCPServerConnection | undefined;
 afterEach(async () => { await client?.disconnect(); server?.closeAllConnections(); await new Promise<void>(resolve => server ? server.close(() => resolve()) : resolve()); });
@@ -60,6 +62,26 @@ async function listen(): Promise<string> {
     return `http://127.0.0.1:${address.port}/mcp`;
 }
 
+it('discovers and verifies a skill lazily over the originating MCP connection',async()=>{
+    const methods:string[]=[],uri='skill://example/SKILL.md',body='---\nname: example\ndescription: Example\n---\nBody\n';
+    const entry={uri,frontmatter:{name:'example',description:'Example'},resources:[{uri,digest:'sha256:'+sha256HexSync(body),size:new TextEncoder().encode(body).length}]};
+    server=createServer((request,response)=>{
+        if(request.method!=='POST'){response.writeHead(405);response.end();return;}
+        let raw='';request.on('data',data=>raw+=data);request.on('end',()=>{
+            const msg=JSON.parse(raw);methods.push(msg.method);
+            const payload=msg.method==='server/discover'?{supportedVersions:['2026-07-28'],capabilities:{resources:{},extensions:{'io.modelcontextprotocol/skills':{}}},_meta:{'io.modelcontextprotocol/serverInfo':{name:'fixture',version:'1'}}}
+                :msg.method==='skills/list'?{skills:[entry]}:msg.method==='skills/get'?{skill:entry}: {contents:[{uri,text:body}]};
+            response.writeHead(200,{'content-type':'application/json'});response.end(JSON.stringify({jsonrpc:'2.0',id:msg.id,result:{resultType:'complete',ttlMs:0,cacheScope:'private',...payload}}));
+        });
+    });
+    client=new MCPServerConnection({name:'origin',transport:'http',url:await listen(),timeout:3000});await client.connect();
+    expect(await client.listMcpSkills()).toEqual([entry]);expect(await client.getMcpSkill(uri)).toEqual(entry);
+    expect(methods).not.toContain('resources/read');
+    const verification=new McpSkillVerification('origin',entry,{read:path=>client!.readMcpSkillBytes(path)});
+    await expect(verification.load(async()=>false)).rejects.toThrow('MCP_SKILL_APPROVAL_DENIED');expect(methods).not.toContain('resources/read');
+    expect(await verification.load(async()=>true)).toBe(body);expect(methods.filter(method=>method==='resources/read')).toHaveLength(1);
+});
+
 it.each(['401', '403', '503'])('rejects %s without initializing or falling back', async failure => {
     const methods: string[] = [];
     server = createServer((request, response) => {
@@ -100,6 +122,7 @@ it.each(['method-not-found','2025-11-25'])('negotiates a legacy server after %s 
     client = new MCPServerConnection({name:'legacy',transport:'http',url:await listen(),timeout:1000});
     await client.connect();
     expect(await client.discover()).toMatchObject({protocolVersion:'2025-11-25',tools:[{name:'legacy_tool'}]});
+    expect(await client.listMcpSkills()).toEqual([]);
     expect(methods).toEqual(['server/discover','initialize','notifications/initialized','tools/list']);
 });
 

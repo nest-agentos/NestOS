@@ -16,6 +16,9 @@ export interface SkillScopeSnapshot {
 
 export interface SkillSource {
     loadScope(cwd: string): Promise<SkillScopeSnapshot>;
+    dispose?():void|Promise<void>;
+    readApproved?(sessionId:string,skillId:string,taskId:string,windowId:string,
+        controls:Pick<import('@nestos/tools/contracts').SessionSkillControls,'verifyMcpApproval'>):Promise<string>;
     loadDirectory?(
         dirPath: string,
         scopeLevel: SkillScopeLevel,
@@ -30,6 +33,14 @@ export interface SkillToolHandlerFactory {
 export interface SessionCapabilityScope {
     resolveMCPToolIds?(profiles: string[]): Promise<string[]>;
     prepareTools?(ids: string[]): Promise<void>;
+    /** Host-owned validation of an active remote Skill's current approval window. */
+    validateMcpSkillWindow?(skill:SkillDefinition):Promise<boolean>;
+    /** A separate host authorization is required for effects with side effects. */
+    validateMcpSkillEffect?(skill:SkillDefinition,kind:string):Promise<boolean>;
+    stageMcpSkill?(id:string,content:string):import('@nestos/tools/contracts').SkillVersionSnapshot;
+    commitMcpSkill?(snapshot:import('@nestos/tools/contracts').SkillVersionSnapshot):SkillLoadResult;
+    readMcpSkillApproved?(sessionId:string,skillId:string,taskId:string,windowId:string,
+        controls:Pick<import('@nestos/tools/contracts').SessionSkillControls,'verifyMcpApproval'>):Promise<string>;
     readonly toolService: import('@nestos/tools/contracts').IToolService;
     readonly skillService: ISkillService;
     dispose(): Promise<void>;

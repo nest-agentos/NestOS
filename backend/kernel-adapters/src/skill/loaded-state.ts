@@ -119,15 +119,30 @@ export async function persistSkillDrifts(service: ISkillService, state: EffectEx
     }
 }
 
+export async function persistMcpSkillUpdates(service:ISkillService,state:EffectExecutionContext['sessionState']):Promise<void> {
+    if(!state||!service.getMcpSkillUpdates)return;
+    const updates=service.getMcpSkillUpdates();if(!Object.keys(updates).length)return;
+    const key='kernel-adapters.skills.mcp-updates';
+    for(let attempt=0;attempt<3;attempt++) {
+        const saved=await state.get(key),value=saved?.value as {format?:unknown;items?:Record<string,unknown>}|undefined;
+        if(value&&(value.format!==1||!value.items||typeof value.items!=='object'||Array.isArray(value.items)))throw new Error('MCP_SKILL_UPDATE_STATE_INVALID');
+        const next={format:1,items:{...value?.items,...updates}};
+        if(JSON.stringify(saved?.value)===JSON.stringify(next))return;
+        try {await state.set(key,next as never,saved?.version??null);return;}
+        catch(error){if(!(error instanceof KernelError)||error.code!==KernelErrorCode.CONFLICT||attempt===2)throw error;}
+    }
+}
+
 export async function withSkillDriftPersistence<T>(service: ISkillService, state: EffectExecutionContext['sessionState'],
     action: () => Promise<T>): Promise<T> {
     let result: T;
     try { result = await action(); }
     catch (error) {
-        try { await persistSkillDrifts(service, state); }
+        try { await persistSkillDrifts(service, state);await persistMcpSkillUpdates(service,state); }
         catch (persistence) { throw new AggregateError([error, persistence], 'Skill operation and drift persistence failed'); }
         throw error;
     }
     await persistSkillDrifts(service, state);
+    await persistMcpSkillUpdates(service,state);
     return result;
 }

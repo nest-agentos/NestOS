@@ -20,6 +20,7 @@ import {ToolCommandOperations} from '../flows/tool-operations';
 import type {RunAttachmentCallbacks} from './RunAttachmentController';
 import {RunAttachmentController} from './RunAttachmentController';
 import {rememberTaskAttachment, restoreTaskAttachment} from './task-attachment-lifecycle';
+import {McpSkillApprovalAction} from './mcp-skill-approval';
 import {parseDirectCommand} from '../commands/direct-command';
 
 interface Options {
@@ -37,6 +38,7 @@ export class SharedChatCommands {
     private readonly definitions: SlashCommandDef[];
     private skills: SkillInfo[] = [];
     private skillsPanel?: SkillPanel;
+    private mcpApproval?:McpSkillApprovalAction;
     private skillRoot?: HTMLDetailsElement;
     private skillBinding?: ReturnType<typeof bindSkillRefresh>;
     private readonly listeners = new Set<() => void>();
@@ -47,7 +49,9 @@ export class SharedChatCommands {
         });
         this.definitions = createSlashCommandCatalog(this.callbacks(), name => {throw new Error(`${name}: ${t('toolbox.unavailable')}`);});
         if (options.config.kernel) {
-            this.attachment = new RunAttachmentController(options.config.kernel, options.taskCallbacks);
+            this.attachment = new RunAttachmentController(options.config.kernel, {...options.taskCallbacks,onEvent:event=>{
+                options.taskCallbacks.onEvent(event);void this.mcpApproval?.observe(event).catch(error=>options.report(error));
+            }});
             options.attach(this.attachment);
         }
     }
@@ -162,6 +166,11 @@ export class SharedChatCommands {
         section.append(list); details.append(summary, section); container.append(details);
         this.skillsPanel = new SkillPanel(details, {onRequestSkills: () => controls.list(this.options.config.sessionId),
             onLoadSkill: async id => {this.check(); return controls.load(this.options.config.sessionId, id);},
+            onRequestMcpApproval: id => {
+                this.mcpApproval??=new McpSkillApprovalAction(controls,this.options.config.sessionId,()=>this.attachment,
+                    taskId=>this.remember(taskId),()=>this.check());
+                return this.mcpApproval.request(id);
+            },
             onUnloadSkill: async id => {this.check(); await controls.unload(this.options.config.sessionId, id);}});
         this.skillsPanel.refresh(this.skills);
     }
@@ -204,7 +213,7 @@ export class SharedChatCommands {
         await this.remember(taskId); return true;
     }
     private async remember(taskId: string): Promise<void> {
-        this.check(); await rememberTaskAttachment(this.options.config.kernel!, this.options.config.sessionId, this.attachment!, taskId);
+        this.check(); await rememberTaskAttachment(this.options.config.kernel!, this.options.config.sessionId, this.attachment!, taskId,()=>this.check());
         createModuleLogger('shared-chat-commands').info('chat.task.attach', {operationId: randomUUID(), stage: 'commit', result: 'success', taskId});
     }
     async restore(): Promise<void> {if (this.attachment) await restoreTaskAttachment(this.options.config.kernel!, this.options.config.sessionId, this.attachment,

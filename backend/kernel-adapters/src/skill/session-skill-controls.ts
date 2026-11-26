@@ -3,6 +3,16 @@ import type { SessionSkillControls, ISkillService } from '@nestos/tools/contract
 import type { Kernel } from '@nestos/durable-kernel';
 import type { SessionCapabilityRegistry } from '../ports/capabilities';
 import { forgetLoadedSkill, parseLoadedSkillIds, parseLoadedSkillVersions, rememberLoadedSkill, rollbackFailedLoad } from './loaded-state';
+import {interactionApproved} from '@nestos/durable-kernel';
+import {mcpSkillManifestDigest,type McpSkillEntry} from './mcp-skill-verification';
+import {validateMcpSkillApproval,type McpSkillApprovalBinding} from '../programs/approved-effect-program';
+import {randomUUID} from '../utils/random';
+import {MCP_CONTEXT_WINDOW_KEY} from './mcp-execution-window';
+
+const mcpWindows=new WeakMap<object,string>();
+function scopeWindow(scope:object):string {
+    let id=mcpWindows.get(scope);if(!id){id=randomUUID();mcpWindows.set(scope,id);}return id;
+}
 
 /** UI control uses Session shared state directly; it does not impersonate an Agent Effect. */
 export function createSessionSkillControls(kernel: Pick<Kernel, 'openSession'>, registry: SessionCapabilityRegistry): SessionSkillControls {
@@ -12,22 +22,85 @@ export function createSessionSkillControls(kernel: Pick<Kernel, 'openSession'>, 
             const saved = (await session.getShared('kernel-adapters.skills.loaded'))?.value;
             const ids = parseLoadedSkillIds(saved);
             const versions = parseLoadedSkillVersions(saved);
+            const hasRemote=Object.values(versions?.snapshots??{}).some(snapshot=>!!snapshot.definition.metadata?.mcpOrigin);
+            const updateState=hasRemote?(await session.getShared('kernel-adapters.skills.mcp-updates'))?.value as {items?:Record<string,{status?:string}>}|undefined:undefined;
             const scope = await registry.get(sessionId);
-            const loaded = new Set([...ids, ...scope.skillService.getLoadedSkills().map(skill => skill.id)]);
+            const live=scope.skillService.getLoadedSkills(),loaded = new Set([...ids, ...live.map(skill => skill.id)]);
             const all = new Set([...loaded, ...(onlyLoaded ? [] : scope.skillService.listSkills().map(skill => skill.id))]);
             return [...all].sort().map(id => {
-                const skill = scope.skillService.getSkill(id);
-                return { id, name: skill?.name ?? id, description: skill?.description ?? '', loaded: loaded.has(id),
+                const skill = live.find(item=>item.id===id)??scope.skillService.getSkill(id);
+                const remoteSaved=!!versions?.snapshots[id]?.definition.metadata?.mcpOrigin;
+                const raw=scope.skillService.getSkill(id),previous=versions?.snapshots[id]?.definition.metadata;
+                const changed=remoteSaved&&(!raw?.metadata?.mcpEntry||JSON.stringify(raw.metadata.mcpEntry)!==JSON.stringify(previous?.mcpEntry)
+                    ||JSON.stringify(raw.metadata.mcpOrigin)!==JSON.stringify(previous?.mcpOrigin));
+                return { id, name: skill?.name ?? id, description: skill?.description ?? '', loaded: loaded.has(id)&&(!remoteSaved||live.some(item=>item.id===id)),
                     enabled: !!skill?.enabled && !skill.disableModelInvocation && skill.triggerStrategy !== 'action',
                     // Definition-level enablement, independent of whether the input-side checkbox may
                     // load it: `/sk-<id>` exists exactly for the manual (action/silent) invocations.
-                    definitionEnabled: !!skill?.enabled,
+                    definitionEnabled: !!skill?.enabled && skill.metadata?.mcpActivationPending!==true,
+                    ...(skill?.metadata?.mcpActivationPending===true?{mcpApprovalAvailable:Array.isArray((skill.metadata.mcpEntry as {resources?:unknown}|undefined)?.resources)}:{}),
+                    ...(changed||updateState?.items?.[id]?.status==='restart-required'||scope.skillService.getMcpSkillUpdates?.()[id]?.status==='restart-required'?{mcpUpdateRequired:true}:{}),
                     toolCount: skill?.tools.length ?? 0, toolIds: skill?.tools.map(tool => tool.toolId) ?? [], versionDigest: versions?.snapshots[id]?.digest,
                     versionPolicy: versions?.snapshots[id]?.policy, drift: versions?.drifts[id],
                     unversioned: ids.includes(id) && (!versions || !Object.hasOwn(versions.snapshots, id)) };
             });
     };
-    return {
+    const verify=async(sessionId:string,taskId:string,skillId:string,windowId:string)=>{
+        const expected=await approvalBinding(registry,sessionId,skillId,windowId);
+        const session=await kernel.openSession(sessionId),task=await session.attachTask(taskId),record=(await task.status()).task;
+        const interaction=record.interactions['approve:mcp-skill'];
+        return record.sessionId===sessionId&&record.program.kind==='kernel-adapters.mcp-skill-approval'&&record.program.version==='1'
+            &&record.status==='succeeded'&&interaction?.status==='resolved'&&interactionApproved(interaction.response!)
+            &&sameApprovalBinding(record.input,expected)&&sameApprovalBinding(record.output,expected);
+    };
+    const controls:SessionSkillControls = {
+        mcpApprovalWindow:sessionId=>serial(sessionId,async()=>scopeWindow(await registry.get(sessionId))),
+        requestMcpApproval:(sessionId,skillId,requestId,windowId)=>serial(sessionId,async()=>{
+            if(typeof requestId!=='string'||!requestId.trim()||requestId.length>128)throw new Error('MCP_SKILL_REQUEST_INVALID');
+            const binding=await approvalBinding(registry,sessionId,skillId,windowId);
+            const session=await kernel.openSession(sessionId);
+            const task=await session.submit({requestId,program:{kind:'kernel-adapters.mcp-skill-approval',version:'1'},input:binding});
+            return task.id;
+        }),
+        verifyMcpApproval:(sessionId,taskId,skillId,windowId)=>serial(sessionId,()=>verify(sessionId,taskId,skillId,windowId)),
+        readMcpApproved:async(sessionId,skillId,taskId,windowId)=>{
+            const scope=await registry.get(sessionId);
+            if(!scope.readMcpSkillApproved)throw new Error('MCP_SKILL_UNAVAILABLE');
+            const content=await scope.readMcpSkillApproved(sessionId,skillId,taskId,windowId,{verifyMcpApproval:controls.verifyMcpApproval});
+            if(await registry.get(sessionId)!==scope||!await controls.verifyMcpApproval!(sessionId,taskId,skillId,windowId))throw new Error('MCP_SKILL_APPROVAL_REVOKED');
+            attachMcpWindow(scope,registry,verify,sessionId,skillId,taskId,windowId);
+            return content;
+        },
+        activateMcpApproved:async(sessionId,skillId,taskId,windowId)=>{
+            const content=await controls.readMcpApproved!(sessionId,skillId,taskId,windowId);
+            return serial(sessionId,async()=>{
+                const scope=await registry.get(sessionId),skill=scope.skillService.getSkill(skillId);
+                if(!skill||!scope.stageMcpSkill||!scope.commitMcpSkill||!scope.validateMcpSkillWindow
+                    ||!await scope.validateMcpSkillWindow(skill)||scope.skillService.getLoadedSkills().some(item=>item.id===skillId))throw new Error('MCP_SKILL_ACTIVATION_DENIED');
+                const snapshot=scope.stageMcpSkill(skillId,content),session=await kernel.openSession(sessionId);
+                const state:NonNullable<import('@nestos/durable-kernel').EffectExecutionContext['sessionState']>={
+                    get:key=>session.getShared(key),set:(key,value,expectedVersion)=>session.setShared(key,value,{expectedVersion})};
+                let persisted=false,markerVersion:number|undefined,previousMarker:import('@nestos/durable-kernel').JsonValue|null=null;
+                try {
+                    const marker=await state.get(MCP_CONTEXT_WINDOW_KEY);previousMarker=marker?.value??null;
+                    const old=previousMarker as {format?:unknown;skills?:Record<string,string>}|null;
+                    if(old&&(old.format!==1||!old.skills||typeof old.skills!=='object'||Array.isArray(old.skills)))throw new Error('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
+                    if(old?.skills?.[skillId]&&old.skills[skillId]!==snapshot.digest)throw new Error('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
+                    for(const [other,digest] of Object.entries(old?.skills??{}))if(other!==skillId
+                        &&(!scope.skillService.getLoadedSkills().some(item=>item.id===other)||scope.skillService.getSkillSnapshot?.(other)?.digest!==digest))
+                        throw new Error('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
+                    if(!old?.skills?.[skillId])markerVersion=(await state.set(MCP_CONTEXT_WINDOW_KEY,{format:1,skills:{...old?.skills,[skillId]:snapshot.digest}} as never,marker?.version??null)).version;
+                    await rememberLoadedSkill(skillId,state,snapshot);persisted=true;
+                    if(await registry.get(sessionId)!==scope||!await scope.validateMcpSkillWindow(skill))throw new Error('MCP_SKILL_APPROVAL_REVOKED');
+                    const result=scope.commitMcpSkill(snapshot);if(!result.success)throw new Error(result.error??'MCP_SKILL_ACTIVATION_FAILED');
+                    return result.toolIds;
+                } catch(error) {
+                    try {if(persisted)await forgetLoadedSkill(skillId,state);if(markerVersion!==undefined)await state.set(MCP_CONTEXT_WINDOW_KEY,previousMarker,markerVersion);await scope.skillService.unloadSkill(skillId);}
+                    catch(cleanup){throw new AggregateError([error,cleanup],'MCP Skill activation rollback failed');}
+                    throw error;
+                }
+            });
+        },
         list: id => serial(id, () => list(id, false)),
         listLoaded: id => serial(id, () => list(id, true)),
         load: (id, skillId) => serial(id, async () => {
@@ -67,6 +140,41 @@ export function createSessionSkillControls(kernel: Pick<Kernel, 'openSession'>, 
             await (await registry.get(sessionId)).skillService.unloadSkill(skillId);
         }),
     };
+    return controls;
+}
+
+const mcpWindowBindings=new WeakMap<object,Map<string,{taskId:string;windowId:string;origin:string;manifest:string}>>();
+function attachMcpWindow(scope:import('../ports/capabilities').SessionCapabilityScope,registry:SessionCapabilityRegistry,verify:NonNullable<SessionSkillControls['verifyMcpApproval']>,
+    sessionId:string,skillId:string,taskId:string,windowId:string):void {
+    const skill=scope.skillService.getSkill(skillId),entry=skill?.metadata?.mcpEntry as McpSkillEntry|undefined;
+    if(!skill?.metadata?.mcpOrigin||!entry)throw new Error('MCP_SKILL_UNAVAILABLE');
+    const bindings=mcpWindowBindings.get(scope)??new Map();mcpWindowBindings.set(scope,bindings);
+    bindings.set(skillId,{taskId,windowId,origin:JSON.stringify(skill.metadata.mcpOrigin),manifest:mcpSkillManifestDigest(entry)});
+    scope.validateMcpSkillWindow=async active=>{
+        const held=bindings.get(active.id),current=active.metadata?.mcpEntry as McpSkillEntry|undefined;
+        if(!held||!current||JSON.stringify(active.metadata?.mcpOrigin)!==held.origin||mcpSkillManifestDigest(current)!==held.manifest)return false;
+        try {return await registry.get(sessionId)===scope&&await verify(sessionId,held.taskId,active.id,held.windowId)
+            &&await registry.get(sessionId)===scope;}catch{return false;}
+    };
+}
+
+function sameApprovalBinding(value:unknown,expected:McpSkillApprovalBinding):boolean {
+    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    const row=value as Record<string,unknown>,keys=Object.keys(expected);
+    return Object.keys(row).length===keys.length&&keys.every(key=>row[key]===expected[key as keyof McpSkillApprovalBinding]);
+}
+
+async function approvalBinding(registry:SessionCapabilityRegistry,sessionId:string,skillId:string,windowId:string):Promise<McpSkillApprovalBinding> {
+    const scope=await registry.get(sessionId);
+    if(scopeWindow(scope)!==windowId)throw new Error('MCP_SKILL_WINDOW_CHANGED');
+    const skill=scope.skillService.getSkill(skillId),origin=skill?.metadata?.mcpOrigin as {serverId?:unknown;uri?:unknown;scopeId?:unknown;projectId?:unknown;projectRevision?:unknown;mountId?:unknown;principalId?:unknown;authorizationRevision?:unknown}|undefined;
+    const entry=skill?.metadata?.mcpEntry as McpSkillEntry|undefined;
+    if(!skill?.enabled||skill.metadata?.mcpActivationPending!==true||typeof origin?.serverId!=='string'||typeof origin.uri!=='string'||!entry||entry.uri!==origin.uri)throw new Error('MCP_SKILL_UNAVAILABLE');
+    if(origin.scopeId!==undefined&&typeof origin.scopeId!=='string')throw new Error('MCP_SKILL_UNAVAILABLE');
+    if(origin.projectId!==undefined&&(typeof origin.projectId!=='string'||typeof origin.projectRevision!=='number'||typeof origin.mountId!=='string'||typeof origin.principalId!=='string'||typeof origin.authorizationRevision!=='string'))throw new Error('MCP_SKILL_UNAVAILABLE');
+    const binding={sessionId,serverId:origin.serverId,uri:origin.uri,manifestDigest:mcpSkillManifestDigest(entry),windowId,...(origin.scopeId?{scopeId:origin.scopeId}:{}),
+        ...(typeof origin.projectId==='string'?{projectId:origin.projectId,projectRevision:origin.projectRevision as number,mountId:origin.mountId as string,principalId:origin.principalId as string,authorizationRevision:origin.authorizationRevision as string}:{})};
+    validateMcpSkillApproval(binding);return binding;
 }
 
 /** Editor paths are virtual Session paths; reject anything that is not a non-empty string. */

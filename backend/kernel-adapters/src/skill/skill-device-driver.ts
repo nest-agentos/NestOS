@@ -12,6 +12,7 @@ import { matchGlob } from './glob-matcher';
 import { skillSupportPrompt } from './support-files';
 import type { SkillSource, SkillToolHandlerFactory } from '../ports/capabilities';
 import { createSkillVersionSnapshot, snapshotLoadResult, validateSkillVersionSnapshot } from './version-snapshot';
+import {mcpSkillManifestDigest,type McpSkillEntry} from './mcp-skill-verification';
 
 export interface SkillDeviceDriverOptions {
     registry?: Map<string, SkillDefinition>;
@@ -34,6 +35,8 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
     private readonly snapshots = new Map<string, SkillVersionSnapshot>();
     private readonly pins = new Map<string, SkillVersionSnapshot>();
     private readonly drifts = new Map<string, SkillVersionDrift>();
+    private readonly mcpUpdates=new Map<string,{previousManifest:string;observedManifest:string|null;detectedAt:number;status:'restart-required'}>();
+    private readonly stagedMcp = new WeakMap<SkillVersionSnapshot,{revision:number;definition:SkillDefinition}>();
     private changeListeners: Array<() => void> = [];
     private toolService: IToolService | null = null;
 
@@ -66,6 +69,7 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
         this.fileSystemSkills.clear();
         this.pins.clear();
         this.drifts.clear();
+        this.mcpUpdates.clear();
         this.agentMdContent = '';
         this.changeListeners = [];
     }
@@ -103,6 +107,10 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
         if (this.closed) return fail('Skill service is closed');
         const skill = this.getSkill(id);
         if (!skill) return fail(`Skill not found: ${id}`);
+        if (skill.metadata?.mcpActivationPending === true) {
+            const held=this.loaded.has(id)?this.snapshots.get(id):undefined;
+            return held?snapshotLoadResult(held):fail('MCP_SKILL_ACTIVATION_GATE_REQUIRED');
+        }
         if (!skill.enabled) return fail(`Skill is disabled: ${id}`);
         if (!this.isSkillInScope(skill)) return fail(`Skill is outside the current scope: ${id}`);
         const revision = this.scopeRevision;
@@ -152,15 +160,36 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
         return snapshotLoadResult(selected);
     }
 
+    /** Prepare verified content without making it visible to any prompt or tool. */
+    stageMcpSkill(id:string,content:string):SkillVersionSnapshot {
+        const definition=this.getSkill(id);
+        if(this.closed||!definition?.enabled||definition.metadata?.mcpActivationPending!==true||this.loaded.has(id))throw new Error('MCP_SKILL_UNAVAILABLE');
+        const approved={...definition,instructions:content,disableModelInvocation:false,
+            metadata:{...definition.metadata,mcpActivationPending:false}};
+        const snapshot=createSkillVersionSnapshot(approved,content,'');
+        this.stagedMcp.set(snapshot,{revision:this.scopeRevision,definition});return snapshot;
+    }
+
+    commitMcpSkill(snapshot:SkillVersionSnapshot):SkillLoadResult {
+        const staged=this.stagedMcp.get(snapshot);this.stagedMcp.delete(snapshot);
+        if(!staged||this.closed||staged.revision!==this.scopeRevision||this.getSkill(snapshot.definition.id)!==staged.definition
+            ||this.loaded.has(snapshot.definition.id))throw new Error('MCP_SKILL_SCOPE_CHANGED');
+        const current=validateSkillVersionSnapshot(snapshot),selected=this.selectVersion(current);
+        if(selected.digest!==current.digest)throw new Error('MCP_SKILL_VERSION_CHANGED');
+        const result=this.activateVersion(selected);this.notifyChange();return result;
+    }
+
     getSkillSnapshot(id: string): SkillVersionSnapshot | undefined {
         const snapshot = this.snapshots.get(id);
         return snapshot ? structuredClone(snapshot) : undefined;
     }
 
     getSkillDrifts(): Record<string, SkillVersionDrift> { return structuredClone(Object.fromEntries(this.drifts)); }
+    getMcpSkillUpdates() {return structuredClone(Object.fromEntries(this.mcpUpdates));}
 
     async restoreSkillSnapshot(value: SkillVersionSnapshot): Promise<SkillLoadResult> {
         const snapshot = validateSkillVersionSnapshot(value);
+        if(snapshot.definition.metadata?.mcpOrigin)return {skillId:snapshot.definition.id,success:false,toolIds:[],error:'MCP_SKILL_REAPPROVAL_REQUIRED'};
         this.pins.set(snapshot.definition.id, snapshot);
         if (this.fileSystemSkills.has(snapshot.definition.id)) this.fileSystemLoadIntent.add(snapshot.definition.id);
         return this.loadSkill(snapshot.definition.id);
@@ -248,7 +277,8 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
             spatial: [],
         };
 
-        for (const skill of this.getScopedSkills()) {
+        for (const candidate of this.getScopedSkills()) {
+            const skill=this.loaded.has(candidate.id)?this.snapshots.get(candidate.id)?.definition??candidate:candidate;
             if (!skill.enabled) continue;
 
             // L1: action skill with disableModelInvocation → silent
@@ -387,6 +417,7 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
     async refreshScopedSkills(): Promise<SkillLoadResult[]> {
         if (this.closed) throw new Error('Skill service is closed');
         if (!this.options.source) return [];
+        const retained=[...this.snapshots.values()].filter(snapshot=>snapshot.definition.metadata?.mcpOrigin);
         const revision = ++this.scopeRevision;
         this.agentMdContent = '';
         this.replaceFileSystemSkills([], true);
@@ -394,9 +425,16 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
         if (revision !== this.scopeRevision) return [];
         this.agentMdContent = snapshot.agentInstructions;
         const results = this.replaceFileSystemSkills(snapshot.skills, true);
+        for(const previous of retained) {
+            const current=this.fileSystemSkills.get(previous.definition.id);
+            if(current?.metadata?.mcpActivationPending===true&&JSON.stringify(current.metadata.mcpOrigin)===JSON.stringify(previous.definition.metadata?.mcpOrigin)
+                &&JSON.stringify(current.metadata.mcpEntry)===JSON.stringify(previous.definition.metadata?.mcpEntry))this.activateVersion(previous);
+            else this.recordMcpUpdate(previous,current);
+        }
         for (const id of [...this.fileSystemLoadIntent]) {
             if (revision !== this.scopeRevision) return [];
             const skill = this.fileSystemSkills.get(id);
+            if(this.loaded.has(id)&&skill?.metadata?.mcpActivationPending===true)continue;
             if (!skill?.enabled || skill.disableModelInvocation || !this.isSkillInScope(skill)) {
                 results.push({ skillId: id, success: false, toolIds: [], error: `Loaded Skill is unavailable or unauthorized: ${id}` });
                 continue;
@@ -407,6 +445,16 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
             if (index >= 0) results[index] = result;
         }
         return results;
+    }
+
+    private recordMcpUpdate(previous:SkillVersionSnapshot,current?:SkillDefinition):void {
+        const old=previous.definition.metadata?.mcpEntry as McpSkillEntry;
+        let observedManifest:string|null=null;
+        try {if(current?.metadata?.mcpEntry)observedManifest=mcpSkillManifestDigest(current.metadata.mcpEntry as McpSkillEntry);}catch {}
+        const previousManifest=mcpSkillManifestDigest(old),prior=this.mcpUpdates.get(previous.definition.id);
+        this.mcpUpdates.set(previous.definition.id,{previousManifest,observedManifest,
+            detectedAt:prior?.observedManifest===observedManifest?prior.detectedAt:Date.now(),status:'restart-required'});
+        this.notifyChange();
     }
 
     // ── 私有工具 ──
@@ -453,6 +501,9 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
     }
 
     private replaceFileSystemSkills(skills: SkillDefinition[], replace: boolean): SkillLoadResult[] {
+        if (skills.some(skill => skill.metadata?.mcpActivationPending === true && this.registry.has(skill.id))) {
+            throw new Error('MCP_SKILL_IDENTITY_CONFLICT');
+        }
         if (replace) {
             for (const id of this.fileSystemSkills.keys()) this.deactivateSkill(id);
             this.fileSystemSkills.clear();

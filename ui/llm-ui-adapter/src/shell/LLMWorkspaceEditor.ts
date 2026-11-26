@@ -14,6 +14,7 @@ import {LegacyPromptCommands} from './legacy-prompt-commands';
 import {revealLegacyMessage} from './legacy-message-location';
 import { disposeEditorResources } from './editor-disposal';
 import { rememberTaskAttachment, restoreTaskAttachment } from './task-attachment-lifecycle';
+import {McpSkillApprovalAction} from './mcp-skill-approval';
 import type { SessionViewPort } from '@nestos/llm-session/contracts';
 import { acquireConnectionOptions } from './connection-options-cache';
 import { rerunSession } from './rerun-session';
@@ -149,6 +150,7 @@ export class LLMWorkspaceEditor implements IEditor {
     private assetManager?: AssetManagerUI;
     private fileSearchService!: FileSearchService;
     private runAttachment?: RunAttachmentController;
+    private mcpApproval?:{sessionId:string;action:McpSkillApprovalAction};
     private viewActive = true;
     private activationRevision = 0;
     private rerunAbort?: AbortController;
@@ -447,6 +449,7 @@ export class LLMWorkspaceEditor implements IEditor {
                     void this.hostContext?.navigate?.({ target: 'agents', resourceId: this.agentService.getAgentResourceId?.(id) });
                 },
                 onLoadSkill: (id: string) => this.options.sessionSkills!.load(this.options.sessionId, id),
+                onRequestMcpApproval: (id:string)=>this.requestMcpSkillApproval(id),
                 onUnloadSkill: (id: string) => this.options.sessionSkills!.unload(this.options.sessionId, id),
             } : {}),
             onIndependentSend: (text, files, agentId, overrides, target) => this.routeMessage({text, files, agentId, overrides, target, independentTitle: target?.id}),
@@ -590,6 +593,7 @@ export class LLMWorkspaceEditor implements IEditor {
     }
 
     private handleRunEvent(event: EventEnvelope): void {
+        void this.mcpApproval?.action.observe(event).catch(error=>Toast.error(String(error)));
         if (event.type === 'task.interaction.resolved') {
             const payload = event.payload as { interactionId?: string };
             if (payload.interactionId) this.chatInput.clearInteraction(payload.interactionId);
@@ -1344,6 +1348,19 @@ export class LLMWorkspaceEditor implements IEditor {
         if (!this.runAttachment) throw new Error('Kernel task attachment is unavailable');
         await rememberTaskAttachment(this.options.kernel!, this.requireSessionId(), this.runAttachment, taskId);
         if (message) Toast.info(message);
+    }
+
+    private requestMcpSkillApproval(skillId:string):Promise<void> {
+        const sessionId=this.requireSessionId(),controls=this.options.sessionSkills;
+        if(!controls)throw new Error(t('skill.approvalUnavailable'));
+        if(this.mcpApproval?.sessionId!==sessionId){
+            const attachment=this.runAttachment,check=()=>{
+                if(this.attachmentClosed||!this.viewActive||this.currentSessionId!==sessionId||this.runAttachment!==attachment)throw new Error(t('skill.approvalUnavailable'));
+            };
+            this.mcpApproval={sessionId,action:new McpSkillApprovalAction(controls,sessionId,()=>attachment,
+                taskId=>rememberTaskAttachment(this.options.kernel!,sessionId,attachment!,taskId,check),check)};
+        }
+        return this.mcpApproval.action.request(skillId);
     }
 
     private async restorePrivilegedTaskAttachment(): Promise<void> {

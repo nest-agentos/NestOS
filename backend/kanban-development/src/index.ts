@@ -18,3 +18,4 @@ export {verificationWaiverConfirmation,verificationWaiverInstruction} from './ve
 export {recordDeliveryFailure,resolveDeliveryFailures,reportHandoffFailure} from './delivery-issues';
 export {parseSoftwareExecutionPermissions,softwareExecutionPermission,type SoftwareExecutionPermissions,type ExecutionPermissionVerdict} from './execution-permissions';
 export {workspacePrerequisitesFile,workspacePrerequisites,prerequisiteProbe} from './workspace-prerequisites';
+export {kanbanWorkSkillContribution,kanbanWorkSkillProvider,type KanbanWorkSkillSource} from './skill-contribution';

@@ -88,6 +88,7 @@ export interface ChatInputOptions {
      */
     onConfigureCapabilities?: () => void;
     onRequestSkills?: () => Promise<SkillInfo[]>;
+    onRequestMcpApproval?: (skillId:string)=>Promise<void>;
 
     /**
      * 加载 Skill 到当前 kernel 会话。
@@ -1515,6 +1516,7 @@ export class ChatInput implements IChatInputPresenter {
         this.skillPanel = new SkillPanel(document.getElementById(id)!, {
             onConfigureCapabilities: this.options.onConfigureCapabilities ? () => { modal.hide(); this.options.onConfigureCapabilities?.(); } : undefined,
             onRequestSkills: this.options.onRequestSkills,
+            onRequestMcpApproval: this.options.onRequestMcpApproval,
             onLoadSkill: this.options.onLoadSkill, onUnloadSkill: this.options.onUnloadSkill,
         });
         void this.skillPanel.reload();
