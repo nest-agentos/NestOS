@@ -84,7 +84,7 @@ export function developmentObserver(options: Options) {
             const unresolved = unresolvedWorkIssues(messages);
             await reconcileIssues(journal, input, messages);
             if (!stopped && !stopping && !board.deletedAt && !board.executionControl?.paused && envelope.execution?.status === 'completed' && worktree)
-                await continueSelfHandledIssue(options, journal, input, item, unresolved, workspace, worktree.id??input.dispatch.id);
+                await continueSelfHandledIssue(options, journal, input, item, unresolved, messages, workspace, worktree.id??input.dispatch.id,envelope.execution.turnId);
             if(envelope.execution?.sessionId&&['running','submitting'].includes(envelope.execution.status??''))return {...input.observation,outcome:'running',outputs:undefined,code:unresolved.some(message=>message.type==='error')?'WORKSPACE_ERROR_REPORTED':unresolved.some(message=>message.type==='clarification')?'WORKSPACE_INPUT_REQUIRED':undefined};
             if (options.exchange && !workspace.directoryOnly && !unresolved.length) input = {...input, observation: await observeExchange(options.exchange,journal,input,workspace,
                 messages.some(message=>message.type==='result'),envelope.messages as ChannelMessage[])};
@@ -163,27 +163,57 @@ async function continueMissingResult(options:Options,journal:KanbanAutomationJou
     }
 }
 
-async function continueSelfHandledIssue(options:Options,journal:KanbanAutomationJournal,input:Input,item:import('@nestos/kanban/contracts').KanbanItem,issues:WorkMessage[],workspace:DevelopmentWorkspaceRecord,worktreeId:string) {
-    const [issue]=issues,{boardId,dispatch}=input;
-    if (!options.replyTask || issues.length!==1 || issue.type!=='error' || issue.handler!=='self'
-        || item.control || item.restartPending || item.deletedAt || item.owner?.token!==dispatch.fence) return;
-    const operationId='self-retry-'+sha256HexSync(dispatch.id),started=Date.now(),key='task-auto-self-retry:'+dispatch.id;
+async function continueSelfHandledIssue(options:Options,journal:KanbanAutomationJournal,input:Input,item:import('@nestos/kanban/contracts').KanbanItem,issues:WorkMessage[],messages:WorkMessage[],workspace:DevelopmentWorkspaceRecord,worktreeId:string,turnId?:string) {
+    const issue=issues.at(-1),{boardId,dispatch}=input;
+    if (!options.replyTask || !issue || issues.some(row=>row.type!=='error'||row.handler!=='self')
+        || messages.some(row=>row.type==='result') || item.control || item.restartPending || item.deletedAt || item.owner?.token!==dispatch.fence) return;
+    let operationId='self-retry-'+sha256HexSync(dispatch.id);
+    const started=Date.now();
     try {
-        if (await journal.get('task-reply-delivered:'+operationId)) return;
         if (await journal.get('worktree-cleanup:'+(workspace.worktreeId??worktreeId))) return;
         const decision=(workspace.context as {decision?:{sourceBoardId:string;recordId:string;snapshot?:{completion?:string}}}|undefined)?.decision;
         if (decision?.snapshot?.completion!=='automatic') return;
         if ((await input.service.record(decision.sourceBoardId,decision.recordId)).status!=='confirmed') return;
-        const selected=await journal.update<string>(key,old=>old??issue.id);
-        if(selected!==issue.id)return;
+        const selected=await selectSelfContinuation(journal,dispatch.id,operationId,issue,issues.length,messages,turnId);
+        if(!selected)return;
+        operationId=selected;
         await options.replyTask(boardId,{itemId:item.id,attemptId:dispatch.id,replyTo:issue.id,operationId,
-            content:'Continue the reported self-handled issue in this same workspace and Session. Preserve the original scope and checks. If repaired, publish a linked resolved report and complete the normal handoff. Otherwise report the concrete remaining blocker once.'});
+            content:operationId.startsWith('self-progress-')
+                ? 'Continue in this same workspace and Session. Read the latest progress and remaining self-handled issues. Preserve the original scope and checks, link a resolution to each issue actually fixed, and complete the normal handoff after verification. Report concrete external blockers if any.'
+                : 'Continue the reported self-handled issue in this same workspace and Session. Preserve the original scope and checks. If repaired, publish a linked resolved report and complete the normal handoff. Otherwise report the concrete remaining blocker once.'});
         createModuleLogger('kanban').info('Self-handled issue continuation queued',{operationId,boardId,stage:'task.recovery.self',result:'success',durationMs:Date.now()-started});
     }catch(error){
         const code=(error as {code?:string}).code;
         createModuleLogger('kanban').warn('Self-handled issue continuation unavailable',{operationId,boardId,stage:'task.recovery.self',result:'failure',
             code:code&&/^[A-Z0-9_]{1,80}$/.test(code)?code:'WORKSPACE_REPLY_FAILED',durationMs:Date.now()-started});
     }
+}
+
+async function selectSelfContinuation(journal:KanbanAutomationJournal,dispatchId:string,initialId:string,issue:WorkMessage,issueCount:number,messages:WorkMessage[],turnId?:string) {
+    const initialKey='task-auto-self-retry:'+dispatchId;
+    const firstTurnKey='task-auto-self-first-turn:'+dispatchId;
+    const progress=messages.filter(message=>message.type==='progress').at(-1);
+    if(!await journal.get('task-reply-delivered:'+initialId)&&issueCount===1){
+        const selected=await journal.update<string>(initialKey,old=>old??issue.id);
+        if(selected===issue.id){
+            if(turnId)await journal.update<{turnId:string;progressId?:string}>(firstTurnKey,old=>old??{turnId,progressId:progress?.id});
+            return initialId;
+        }
+    }
+    if(!turnId||!progress||messages.indexOf(progress)<=messages.indexOf(issue))return;
+    const first=await journal.get<{turnId:string;progressId?:string}>(firstTurnKey);
+    if(first?.turnId===turnId||first?.progressId===progress.id)return;
+    const key='task-auto-self-progress:'+dispatchId;
+    type Checkpoint = {progressId:string;issueId:string;turnId:string};
+    const checkpoints=await journal.update<Checkpoint[]>(key,old=>{
+        const rows=old??[];
+        if(rows.length>=3||rows.some(row=>row.progressId===progress.id||row.turnId===turnId))return rows;
+        return [...rows,{progressId:progress.id,issueId:issue.id,turnId}];
+    });
+    const selected=checkpoints.at(-1);
+    if(selected?.progressId!==progress.id||selected.issueId!==issue.id||selected.turnId!==turnId)return;
+    const id='self-progress-'+sha256HexSync(JSON.stringify([dispatchId,progress.id]));
+    return await journal.get('task-reply-delivered:'+id)?undefined:id;
 }
 
 async function observeExchange(exchange:NonNullable<Options['exchange']>,journal:KanbanAutomationJournal,input:Input,

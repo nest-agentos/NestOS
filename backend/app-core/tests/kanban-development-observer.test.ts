@@ -125,6 +125,35 @@ it('blocks clarification, emits one global notification, and does not let a resu
     expect(await f.observe('succeeded')).toMatchObject({outcome: 'running', code: 'WORKSPACE_INPUT_REQUIRED'});
 });
 
+it('continues distinct completed turns with new progress despite historical self-handled issues',async()=>{
+    const reply=vi.fn<NonNullable<Parameters<typeof developmentObserver>[0]['replyTask']>>();
+    const f=await fixture(undefined,undefined,undefined,false,reply);
+    vi.spyOn(f.coordinator,'record').mockResolvedValue({status:'confirmed'} as never);
+    await f.journal.update<Record<string,unknown>>('development-workspace:attempt',old=>({...old,context:{
+        decision:{sourceBoardId:'board',recordId:'decision',snapshot:{completion:'automatic'}},
+    }}));
+    reply.mockImplementation(async (_board,request)=>{await f.journal.update('task-reply-delivered:'+request.operationId,()=>true);});
+    const channel=f.channels.ensure('attempt');
+    channel.execution={sessionId:'native',turnId:'first',status:'completed'};
+    for(const id of ['older','latest'])f.channels.report('attempt',id,{type:'error',content:'Remaining work',payload:{handler:'self'}});
+    await f.observe('succeeded');
+    expect(reply).not.toHaveBeenCalled();
+    f.channels.report('attempt','parent-issue',{type:'clarification',content:'External dependency',payload:{handler:'parent'}});
+    await f.publish('progress-with-question','progress');
+    await f.observe('succeeded');
+    expect(reply).not.toHaveBeenCalled();
+    f.channels.report('attempt','parent-resolved',{type:'resolved',replyTo:'parent-issue',content:'External dependency supplied'});
+    for(let i=0;i<4;i++){
+        channel.execution.turnId='turn-'+i;
+        await f.publish('progress-'+i,'progress');
+        await f.observe('succeeded');
+        await f.observe('succeeded');
+    }
+    expect(reply).toHaveBeenCalledTimes(3);
+    for(const [,request] of reply.mock.calls)expect(request).toMatchObject({replyTo:'latest',operationId:expect.stringMatching(/^self-progress-/)});
+    expect((await f.service.item('board','item')).item.issues?.filter(issue=>!issue.resolvedBy)).toHaveLength(2);
+});
+
 it('blocks policy violations and allows review only after successful verification', async () => {
     let allowed = false;
     const f = await fixture(async () => {if (!allowed) throw Object.assign(new Error('Unauthorized commit'), {code: 'UNAUTHORIZED_COMMIT'});});
