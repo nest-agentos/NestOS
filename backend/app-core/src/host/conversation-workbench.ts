@@ -13,6 +13,7 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
     private chatPreparation?: Promise<NonNullable<WorkbenchView['chat']>>;
     documents: Record<string, unknown> = {};
     native?: PreparedConversation;
+    draft?: ConversationWorkbenchView['draft'];
     failure?: ConversationWorkbenchView['failure'];
     workbench!: WorkbenchView;
     private readonly eventSource: ViewObservation;
@@ -36,7 +37,8 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             const chatControls = !native && !['project-files', 'files', 'folder', 'favorites', 'favorite'].includes(target.kind);
             await this.prepareView(backend, request, chatControls);
             const folder = 'folder' in target ? target.folder : target.kind === 'folder' ? folderPathFromBrowserPath(target.path) : undefined;
-            await this.prepareTarget(request.resourceId, folder, native);
+            if (target.kind === 'project-draft') await this.prepareDraft(backend, request.resourceId);
+            else await this.prepareTarget(request.resourceId, folder, native);
             await this.eventSource.addChat(this.workbench);
             if (this.closed) throw new FSError('EIO', 'Workbench closed');
             this.cursor = this.eventSource.getViewCursor();
@@ -47,6 +49,14 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             log.warn('resource.open', {operation: 'workbench.open', operationId, stage: 'prepare', result: 'failure', code: typeof raw === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(raw) ? raw : 'WORKBENCH_OPEN_FAILED', durationMs: Math.round(performance.now() - started)});
             await this.dispose(); throw error;
         }
+    }
+    private async prepareDraft(backend: ApplicationBackend, resourceId: string): Promise<void> {
+        try {
+            this.draft = await backend.openProjectDraft?.(resourceId);
+        } catch (error) {
+            this.failedOpening(resourceId, error);
+        }
+        if (this.draft) await this.updateProjectInterest(this.draft.project.project.id);
     }
     private async prepareTarget(resourceId: string, folder: string | null | undefined, native: boolean): Promise<void> {
         const project = folder ? await this.services.projects.forFolder(folder) : null;

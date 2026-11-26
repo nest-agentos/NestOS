@@ -50,12 +50,15 @@ it('returns the requested project and draft together without binding a Session',
         const route = folderBrowserPath(project.path) + '/@new';
         const read = vi.spyOn(runtime.projects, 'forFolder');
         const open = vi.spyOn(runtime.projects.drafts, 'open');
-        const draft = await view.backend.openProjectDraft!(route);
+        const opened = await view.backend.openView({resourceId: route, documents: [], workbench: {initialNavigation: false}});
+        expect(opened.conversationWorkbench?.resourceId).toBe(route);
+        const draft = opened.conversationWorkbench?.draft;
         expect(draft).toMatchObject({project, folder: project.path + '/@sessions', composer: {id: expect.any(String)}});
         expect(read).toHaveBeenCalledOnce();
         expect(open).toHaveBeenCalledOnce();
         expect(view.services.sessionManager.getSnapshot().sessionId).toBeFalsy();
         await expect(view.backend.openProjectDraft!(folderBrowserPath(project.path + '/missing') + '/@new')).rejects.toMatchObject({code: 'ENOENT'});
         expect(open).toHaveBeenCalledOnce();
+        await opened.dispose();
     } finally {await view.close(); await runtime.dispose();}
 });

@@ -97,10 +97,13 @@ it('does not repeatedly report expected unsubscribe failures after view expiry',
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
         const f = await connection(async request => {
-            if (expired && request.kind === 'queries') return Response.json({}, {status: 400, headers: {'X-NestOS-View-Expired': '1'}});
+            if (expired && request.kind === 'queries') return Response.json({}, {status: 400, headers: {
+                'X-NestOS-View-Expired': '1', 'X-NestOS-View-Expiry-Code': 'VIEW_HISTORY_EXPIRED', 'X-Request-ID': 'expired-request',
+            }});
         });
         const stop = f.root.files.onAny(() => {});await f.client.peer.whenIdle();
-        expired = true;await expect(f.root.files.getNode('missing')).rejects.toMatchObject({code: 'ECAPABILITY'});
+        expired = true;await expect(f.root.files.getNode('missing')).rejects.toMatchObject({code: 'ECAPABILITY',
+            viewReason: 'VIEW_HISTORY_EXPIRED', requestId: 'expired-request'});
         const requests = f.requests.length;stop();await f.client.peer.whenIdle();
         expect(f.requests).toHaveLength(requests);expect(errors).not.toHaveBeenCalled();
         expect(f.disconnected).toHaveBeenCalledOnce();expect(f.reconnected).not.toHaveBeenCalled();

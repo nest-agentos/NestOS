@@ -68,15 +68,17 @@ class HttpStatusBanner {
         this.banner.hidden = true; this.action.disabled = true;
         this.recovering = Promise.resolve().then(() => this.recover!()).catch(error => {
             if (this.abort.signal.aborted) return;
-            const incompatible=(error as {code?:string})?.code==='ECAPABILITY';
+            const failure = error as {code?: string; viewReason?: string};
+            const incompatible = failure?.code === 'RPC_METHOD_UNSUPPORTED' || failure?.viewReason === 'VIEW_PROTOCOL_MISMATCH'
+                || failure?.code === 'ECAPABILITY' && !failure.viewReason;
             this.text.textContent = incompatible?t('httpApp.clientUpdateRequired'):t('httpApp.autoRecoveryFailed', {reason: error instanceof Error ? error.message : t('httpApp.recoveryUnsupported')});
             this.manualReload = incompatible||['RECOVERY_SETTINGS_FORM', 'RECOVERY_UNSUPPORTED_EDITOR', 'RECOVERY_UNSUPPORTED_WORKSPACE'].includes((error as {code?: string})?.code ?? '');
             this.action.textContent = t(this.manualReload ? 'httpApp.reload' : 'httpApp.retry'); this.banner.hidden = false;
         }).finally(() => {this.recovering = undefined; this.action.disabled = false;});
     }
     private show(state: Status, message: string, recover = true): void {
-        this.state = state; this.banner.hidden = state === 'reconnecting' || state === 'expired'; this.text.textContent = message;
-        this.action.textContent = t(state === 'reconnecting' ? 'httpApp.retry' : 'httpApp.reload');
+        this.state = state; this.banner.hidden = state === 'reconnecting'; this.text.textContent = message;
+        this.action.textContent = t(state === 'reconnecting' || state === 'expired' && this.recover ? 'httpApp.retry' : 'httpApp.reload');
         if (recover) this.recovery.start();
     }
     dispose(): void { this.abort.abort(); this.recovery.stop(); this.banner.remove(); }

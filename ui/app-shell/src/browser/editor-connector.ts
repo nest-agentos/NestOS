@@ -65,11 +65,12 @@ export function connectEditorLifecycle(vfs: VFSUIShell, engine: IFileSystem, con
         if (editor?.flushPendingSave) await editor.flushPendingSave();
         else if (editor?.isDirty?.()) throw new Error('Dirty editor does not support flushing');
     }
+    let recovering = false;
     async function disposeTab(tab: WorkbenchTab<OpenView>): Promise<void> {
         const view = tab.value; if (!view) return;
-        await flush(view.editor);
+        if (!recovering) await flush(view.editor);
         view.lease ??= new EditorLease(view.editor, async () => { view.cancel?.(); });
-        await view.lease.dispose();
+        await view.lease.dispose(recovering);
     }
     function placeholder(): void { tabs.content.textContent = emptyMessage ?? t('workbench.selectFile'); }
     let selectionWork: Promise<void> = Promise.resolve();
@@ -244,7 +245,7 @@ export function connectEditorLifecycle(vfs: VFSUIShell, engine: IFileSystem, con
         if (mode && tabs.current?.id === path) {await tabs.current.value?.editor?.switchToMode(mode); tabs.current.value?.editor?.focus();}
     }
     const refreshDirectory = async () => {if (!closed && visible && tabs.current) await refreshDirectoryList(tabs.current.panel);};
-    return Object.assign(dispose, {refreshDirectory, assertRecovery: () => tabs.assertRecovery(), captureRecovery: () => tabs.captureRecovery(), restoreRecovery: (state: unknown) => tabs.restoreRecovery(state), suspendForRecovery: () => tabs.suspendForRecovery(), openDirectory, openResource, getActiveResourceId: () => tabs.current?.value?.node.id ?? null, async whenReady(): Promise<void> { await selectionWork; }, async setVisible(next: boolean): Promise<void> {
+    return Object.assign(dispose, {refreshDirectory, assertRecovery: () => tabs.assertRecovery(), captureRecovery: () => tabs.captureRecovery(), restoreRecovery: (state: unknown) => tabs.restoreRecovery(state), suspendForRecovery: () => {recovering = true; tabs.suspendForRecovery();}, openDirectory, openResource, getActiveResourceId: () => tabs.current?.value?.node.id ?? null, async whenReady(): Promise<void> { await selectionWork; }, async setVisible(next: boolean): Promise<void> {
         if (visible === next) return; visible = next;
         if (!next) { loads.cancel(); await Promise.all(tabs.values().map(tab => flush(tab.value?.editor))); }
         else if (pendingItem && (tabs.current?.id !== pendingItem.id || !tabs.current?.value)) await select({ item: pendingItem });

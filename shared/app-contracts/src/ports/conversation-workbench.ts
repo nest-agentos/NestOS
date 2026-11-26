@@ -38,6 +38,7 @@ export interface ResourceWorkbenchView {
     documents: Record<string, unknown>;
     workbench: WorkbenchView;
     native?: PreparedConversation;
+    draft?: ProjectDraftOpening;
     failure?: {resourceId: string; code: string; reason?: string};
     eventSnapshot(): {cursor: number; firstSequence: number; events: ApplicationViewEvent[]};
     subscribe(listener: (event: ApplicationViewEvent) => void, failed?: (failure: {code: string}) => void): Promise<() => void>;

@@ -50,6 +50,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     private active = true;
     private transferred = false;
     private rebuilding = false;
+    private suspended = false;
     private preparing = false;
     private submissionStarted = false;
     private owned = true;
@@ -86,18 +87,23 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     async init(container: HTMLElement): Promise<void> {this.container = container; await this.render();}
     async render(): Promise<void> {
         const loading = draftLoading(this.container, this.config.signal);
-        await loading.read('attachments', () => this.store.open());
         const deferred = this.config.sessionDraft?.executorScope === 'remote';
-        if (!deferred) {
-            await loading.read('configuration', () => this.refreshConfiguration());
-            this.configurationReady = true;
-        }
+        const preparation = await Promise.allSettled([
+            loading.read('attachments', () => this.store.open()),
+            deferred ? undefined : loading.read('configuration', () => this.refreshConfiguration()),
+        ]);
+        const failure = preparation.find(result => result.status === 'rejected');
+        if (failure?.status === 'rejected') throw failure.reason;
+        this.configurationReady = !deferred;
         this.check(); this.publish();
         this.view = await createChatView(this.container, this.viewOptions());
         loading.finish();
         this.selectorTarget = JSON.stringify(this.view.getDraft().target);
         this.config.sessionDraft?.presentation?.titleChanged(this.draftTitle());
-        const changed = () => {void (deferred ? this.scheduleConfiguration() : this.refreshConfiguration().then(() => this.publish()).catch(error => this.report(error)));};
+        const changed = () => {
+            if (!this.active || this.closed || this.suspended || this.transferred) return;
+            void (deferred ? this.scheduleConfiguration() : this.refreshConfiguration().then(() => this.publish()).catch(error => this.report(error)));
+        };
         this.offConfiguration = this.controls.configuration?.subscribe(changed) ?? this.service.onChange(changed);
         window.addEventListener('beforeunload', this.beforeUnload);
         if (this.active) this.view.focus(); else this.view.setActive(false); this.emit('ready', undefined);
@@ -115,7 +121,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
         try {
             await loading.read('configuration', () => this.refreshConfiguration());
             this.check();
-            if (this.configurationLoading === loading && !this.transferred) {
+            if (this.configurationLoading === loading && !this.transferred && !this.suspended) {
                 const draft = this.view.getDraft();
                 const restored = restoreDraftTarget(draft, this.callTargets(), undefined, this.preferredAgent(draft));
                 if (restored !== draft && !this.view.inputBusy) this.view.configureInput({target: restored.target}, draft.revision);
@@ -125,7 +131,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
             }
             loading.finish();
         } catch (error) {
-            if (this.configurationLoading !== loading || this.closed || this.transferred || this.config.signal?.aborted) loading.finish();
+            if (this.configurationLoading !== loading || this.closed || this.transferred || this.suspended || this.config.signal?.aborted) loading.finish();
             else {
                 this.configurationError = error;
                 this.report(error);
@@ -281,7 +287,7 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
             catalogCached: !!catalog, modelCount: catalog?.models.length ?? 0, durationMs: Date.now() - started});
     }
     private async save(draft: ComposerDraft): Promise<void> {
-        if (this.transferred || this.closed || this.rebuilding) return;
+        if (this.transferred || this.closed || this.rebuilding || this.suspended) return;
         await this.store.save(draft); this.emit('saved', undefined);
     }
     private async prepare(input: ChatSubmission, draft: ComposerDraft): Promise<SendPreparation | null> {
@@ -442,13 +448,20 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     setText(text: string): void {this.view?.setText(text);}
     focus(): void {this.view?.focus();}
     isDirty(): boolean {return this.delegate?.isDirty() ?? (!!this.view && this.store.dirty(this.view.getDraft()));}
-    async flushPendingSave(): Promise<void> {if (this.delegate) await this.delegate.flushPendingSave?.(); else await this.view?.flushDraft();}
+    async flushPendingSave(): Promise<void> {if (this.suspended) return; if (this.delegate) await this.delegate.flushPendingSave?.(); else await this.view?.flushDraft();}
     cancelPendingRender(): void {this.active = false; this.view?.setActive(false); this.delegate?.cancelPendingRender?.();}
-    async activate(): Promise<void> {this.check(); this.active = true; if (this.delegate) await this.delegate.activate?.(); else {await this.refreshDraft(); await this.refreshConfiguration(); this.publish(); this.view?.setActive(true);}}
+    async activate(): Promise<void> {
+        this.check(); this.active = true;
+        if (this.delegate) {await this.delegate.activate?.(); return;}
+        await this.refreshDraft();
+        if (this.configurationReady) {await this.refreshConfiguration(); this.publish();}
+        else await (this.configurationWork ?? this.scheduleConfiguration());
+        if (this.active && !this.suspended) this.view?.setActive(true);
+    }
     captureRecovery(): unknown {return this.delegate?.captureRecovery?.() ?? this.view?.captureRecovery();}
     restoreRecovery(value: unknown): void {if (this.delegate) this.delegate.restoreRecovery?.(value); else this.view?.restoreRecovery(value as ReturnType<ChatView['captureRecovery']>);}
-    suspendForRecovery(): void {if (this.delegate) this.delegate.suspendForRecovery?.(); this.rebuilding = true; this.cancelPendingRender();}
-    destroy(): Promise<void> {return this.closing ??= disposeEditorResources([() => this.flushPendingSave(), () => {this.closed = true; this.configurationLoading?.finish();},
+    suspendForRecovery(): void {this.suspended = true; if (this.delegate) this.delegate.suspendForRecovery?.(); this.cancelPendingRender();}
+    destroy(): Promise<void> {return this.closing ??= disposeEditorResources([{stage: 'draft.flush', release: () => this.flushPendingSave()}, () => {this.closed = true; this.configurationLoading?.finish();},
         () => this.delegate?.destroy(), () => this.owned ? this.view?.destroy() : undefined,
         () => window.removeEventListener('beforeunload', this.beforeUnload),
         () => {this.offConfiguration?.(); this.targets?.dispose(); this.stops.forEach(stop => stop()); this.events.clear();}]);}

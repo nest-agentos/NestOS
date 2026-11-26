@@ -232,6 +232,27 @@ it('opens, activates and observes in one handshake, reuses cached DTOs across cl
     expect(second.services.sessionManager.getSnapshot().sessionId).toBe(b);
     console.log('[Handshake cache bytes]', {cold: sizes[0], warm: sizes[1], openingPosts: posts.slice(0, 2)});
 });
+it('returns a usable project composer in the authenticated startup response', async () => {
+    const {folderBrowserPath} = await import('@nestos/app-contracts');
+    const seed = await client('composer-seed');
+    const project = await seed.services.projects.create('Composer startup');
+    const resourceId = folderBrowserPath(project.path) + '/@new';
+    const posts: string[] = [];
+    const fetcher: typeof fetch = (url, init) => {
+        if (init?.method === 'POST') posts.push(JSON.parse(String(init.body)).kind);
+        return auth.fetcher(url, init);
+    };
+    const http = new HttpViewClient('composer-startup', server.origin + '/api/application', fetcher); clients.push(http);
+    const root = await http.start({initialView: {resourceId, documents: [], workbench: {initialNavigation: false}}});
+    const opening = root.initialView!.conversationWorkbench!;
+    expect(opening.resourceId).toBe(resourceId);
+    expect(opening.draft).toMatchObject({project: {project: {id: project.project.id}},
+        composer: {id: expect.any(String), initialData: '', save: expect.any(Function)}});
+    expect(posts).toEqual(['bootstrap']);
+    expect(root.services.sessionManager.getSnapshot().sessionId).toBeFalsy();
+    await root.initialView!.dispose();
+});
+
 it('uses backend draft creation and navigation projections across browsers with an awaited refresh barrier', async () => {
     const first = await client('draft-writer'), second = await client('navigation-reader');
     const project = await first.services.projects.create('Shared project');

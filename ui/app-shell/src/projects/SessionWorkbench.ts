@@ -297,6 +297,7 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly presentationState?: WorkbenchStatePort;
     private readonly opening?: import('@nestos/app-contracts/services').ConversationWorkbenchView;
     private readonly sources?: WorkbenchSources;
+    private initialDraft?: ProjectDraftOpening;
     private initialConversation?: PreparedConversation;
     private initialFailure?: import('@nestos/app-contracts/services').ConversationWorkbenchView['failure'];
     private initialSession?: SessionOpenView;
@@ -312,6 +313,7 @@ export class SessionWorkbench implements WorkspaceController {
         this.presentationState = options.workbenchState;
         this.initialResource = options.initialResource; this.opening = options.opening; this.sources = options.sources;
         this.initialFailure = options.opening?.failure;
+        this.initialDraft = options.opening?.draft;
         this.initialConversation = options.opening?.native && options.sources?.conversation(options.opening.native);
         this.taskView = new SessionTaskView(this.backend, {
             begin: () => { const version = ++this.contentVersion; return () => !this.closed && version === this.contentVersion; },
@@ -951,7 +953,6 @@ export class SessionWorkbench implements WorkspaceController {
     async setVisible(visible: boolean): Promise<void> {
         if (this.visible === visible || this.closed) return;
         this.visible = visible;
-        await this.opening?.setVisible(visible);
         this.agentDrawer?.setVisible(visible && this.navigationVisible);
         this.remoteStatus?.setVisible(visible);
         if (!visible) this.searchPanel?.cancel();
@@ -961,9 +962,13 @@ export class SessionWorkbench implements WorkspaceController {
             this.cancelViewLoad();
             this.viewRefresh.pause();
             this.editor?.cancelPendingRender?.();
-            try { await Promise.all(this.tabs.values().map(tab => tab.value?.editor?.flushPendingSave?.())); }
+            try {
+                await Promise.all([this.opening?.setVisible(false), ...this.tabs.values().map(tab => tab.value?.editor?.flushPendingSave?.())]);
+            }
             catch (error) { this.report(error); throw error; }
         } else {
+            await this.opening?.setVisible(true);
+            if (!this.visible || this.closed) return;
             void this.syncNavigationVisibility().catch(error => this.report(error));
             const pending = this.pendingTarget;
             if (pending) await this.openResource(pending.id, pending.options);
@@ -1058,6 +1063,7 @@ export class SessionWorkbench implements WorkspaceController {
             return this.startSessionDraft(folderBrowserPath(folder));
         }
         const parsed = parseSessionRoute(resourceId), route = {...parsed, path: conversationResourcePath(parsed.path)};
+        if (this.initialDraft && route.path !== this.opening?.resourceId) this.initialDraft = undefined;
         if (!isFlowPath(route.path) && await this.openFavorite(resourceId, route.path, options, current)) return;
         if (!current()) return;
         let path = route.path;
@@ -2276,9 +2282,11 @@ export class SessionWorkbench implements WorkspaceController {
             const parent = folderBrowserPath(target.folder), remoteProfile = target.kind === 'remote' ? target.profileId : undefined;
             const retained = this.tabs.values().some(tab => tab.id.startsWith('draft:') && tab.value);
             const route = this.backend.openProjectDraft && !retained ? `${parent}/@new` : undefined;
+            const prepared = route && path === this.opening?.resourceId ? this.initialDraft : undefined;
+            this.initialDraft = undefined;
             if (!route && target.kind === 'project-draft' && !await this.navigationFiles?.driver.getNode(path)) throw new FSError('ENOENT', 'Project draft unavailable');
             const text = options.initialInputState?.text;
-            await this.startSessionDraft(parent, text ? {text, files: []} : undefined, undefined, undefined, current, {route, remoteProfile});
+            await this.startSessionDraft(parent, text ? {text, files: []} : undefined, undefined, undefined, current, {route, remoteProfile, prepared});
             draftLog.info('draft.open', {operationId, stage: 'resource.open', result: 'success', durationMs: Math.round(performance.now() - started)});
         } catch (error) {
             const raw = (error as {code?: unknown})?.code;
@@ -2306,7 +2314,7 @@ export class SessionWorkbench implements WorkspaceController {
     }
     async startSessionDraft(parent?: string, input?: {text: string; files: File[]}, agentId?: string,
         preferences?: import('@nestos/llm-ui-adapter/contracts').SessionDraftPreferences, navigationCurrent?: () => boolean,
-        opening?: {route?: string; remoteProfile?: string}): Promise<void> {
+        opening?: {route?: string; remoteProfile?: string; prepared?: ProjectDraftOpening}): Promise<void> {
         const resolvedFolder = opening?.route ? undefined : await this.creationFolder(parent);
         if (navigationCurrent && !navigationCurrent()) return;
         this.cancelViewLoad(); const load = this.viewLoads.begin();
@@ -2314,7 +2322,7 @@ export class SessionWorkbench implements WorkspaceController {
         const work = this.tail.then(async () => {
             await this.leaveEditor(); load.check();
             this.setRemoteFileAvailability(false);
-            const opened: ProjectDraftOpening | undefined = opening?.route ? await this.backend.openProjectDraft!(opening.route) : undefined;
+            const opened = opening?.prepared ?? (opening?.route ? await this.backend.openProjectDraft!(opening.route) : undefined);
             const folder = opened?.folder ?? resolvedFolder;
             const project = opened?.project ?? await this.projects?.forFolder(folder);
             load.check();
@@ -2442,15 +2450,17 @@ export class SessionWorkbench implements WorkspaceController {
     }
     private async disposeTab(tab: WorkbenchTab<RetainedEditor>): Promise<void> {
         const value = tab.value; if (!value) return;
-        await value.editor?.flushPendingSave?.();
-        if (value.editor?.isDirty?.() && !value.editor.flushPendingSave) throw new Error(t('workbench.pending'));
+        if (!this.recoveringView) {
+            await value.editor?.flushPendingSave?.();
+            if (value.editor?.isDirty?.() && !value.editor.flushPendingSave) throw new Error(t('workbench.pending'));
+        }
         value.lease ??= new EditorLease(value.editor, async () => {
             value.previewCleanup?.(); value.renameCleanup?.(); value.cancel?.();
             this.familyActions?.release(tab.panel.querySelector('.session-family__section'));
             if (this.openEditorTarget && value.skills?.sessionId === this.openEditorTarget.sessionId && value.skills.path === this.openEditorTarget.path) await this.unmountEditorSkills();
             await Promise.all([value.assets?.dispose(), value.context?.release()]);
         });
-        try {await value.lease.dispose();} catch (error) {if (!this.recoveringView) throw error;}
+        try {await value.lease.dispose(this.recoveringView);} catch (error) {if (!this.recoveringView) throw error;}
         this.remoteStatus?.detach(tab.id);
         if (this.tabs.current === tab) this.clearEditorFields();
     }

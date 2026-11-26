@@ -15,7 +15,7 @@ export const CAPABILITIES: Readonly<Record<string, CapabilitySchema>> = {
     "MailClient": {markers: ['queryMail', 'readThread', 'refreshMail', 'dispose'], fields: [],
         methods: {queryMail: 'query', readThread: 'query', confirmThreadRead: 'async', refreshMail: 'query', dispose: 'async'}},
     "ProjectWorkspaceSource": {markers: ['fs', 'initialFile', 'dispose'], fields: ['fs', 'initialFile'], methods: {dispose: 'async'}},
-    "ConversationWorkbenchView": {domain: 'opened-view', invalidates: [], observer: 'subscribe', scopedObserver: true, sharedSnapshots: true, markers: ['readNavigation', 'openConversation', 'eventSnapshot', 'subscribe', 'dispose'], fields: ['resourceId', 'documents', 'workbench', 'native', 'failure', 'cursor'],
+    "ConversationWorkbenchView": {domain: 'opened-view', invalidates: [], observer: 'subscribe', scopedObserver: true, sharedSnapshots: true, markers: ['readNavigation', 'openConversation', 'eventSnapshot', 'subscribe', 'dispose'], fields: ['resourceId', 'documents', 'workbench', 'native', 'draft', 'failure', 'cursor'],
         methods: {eventSnapshot: 'snapshot', subscribe: 'async-subscribe', readNavigation: 'query', prepareChat: 'async', openConversation: 'async', setVisible: 'async', dispose: 'async'}},
     "OpenedApplicationView": {markers: ['workbench', 'observation', 'cursor', 'dispose'],
         domain: 'opened-view', invalidates: [],

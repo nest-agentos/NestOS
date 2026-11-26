@@ -186,15 +186,22 @@ export class HttpViewClient {
             this.showDisconnected(failure);
             throw failure;
         });
-        if ((response.headers.get('X-NestOS-View-Expired') ?? response.headers.get('X-MindOS-View-Expired')) === '1') {
-            await response.body?.cancel(); this.expire(); throw this.expired;
-        }
+        if (viewExpired(response)) this.rejectExpired(response, 'request');
         return response;
     }
-    private expire(): void {
-        if (this.expired) return;
-        this.expired = new ViewExpiredError(); this.abort.abort(); this.wake?.();
-        if (!this.closing) this.onDisconnected?.(this.expired);
+    private rejectExpired(response: Response, stage: 'request' | 'events', hint?: string): never {
+        void response.body?.cancel().catch(() => {});
+        if (!this.expired) {
+            const reason = hint ?? response.headers.get('X-NestOS-View-Expiry-Code');
+            const id = response.headers.get('X-Request-ID');
+            this.expired = new ViewExpiredError(reason && /^VIEW_[A-Z_]{1,64}$/.test(reason) ? reason : undefined,
+                id && /^[a-zA-Z0-9_-]{1,128}$/.test(id) ? id : undefined);
+            this.abort.abort(); this.wake?.();
+            console.warn('[View] Expired', {operation: 'http.view', stage, result: 'failure', code: this.expired.viewReason,
+                requestId: this.expired.requestId, clientId: this.clientId, lastEventId: this.lastEventId});
+            if (!this.closing) this.onDisconnected?.(this.expired);
+        }
+        throw this.expired;
     }
     private async subscribe(resume: boolean): Promise<Response> {
         this.streamAbort = new AbortController();
@@ -202,9 +209,10 @@ export class HttpViewClient {
         try {
             const response = await this.fetcher(`${this.url}/events?clientId=${encodeURIComponent(this.clientId)}&resume=1${resume ? `&after=${this.lastEventId}&version=${RPC_VERSION}` : ''}`, {
                 signal: AbortSignal.any([this.abort.signal, this.streamAbort.signal]), cache: 'no-store', redirect: 'error' });
-            if ((response.headers.get('X-NestOS-View-Expired') ?? response.headers.get('X-MindOS-View-Expired')) === '1') { await response.body?.cancel(); this.expire(); throw this.expired; }
+            if (viewExpired(response)) this.rejectExpired(response, 'events');
             if (!response.ok || !response.body) { await response.body?.cancel(); throw new FSError('EIO', `View subscription failed (${response.status})`); }
-            if (resume && (response.headers.get('X-NestOS-View-Resume') ?? response.headers.get('X-MindOS-View-Resume')) !== '1') { await response.body.cancel(); this.expire(); throw this.expired; }
+            if (resume && (response.headers.get('X-NestOS-View-Resume') ?? response.headers.get('X-MindOS-View-Resume')) !== '1')
+                this.rejectExpired(response, 'events', 'VIEW_RESUME_UNSUPPORTED');
             this.streamConnected = true; this.lastStreamActivity = Date.now();
             return response;
         } finally { clearTimeout(timer); }
@@ -388,6 +396,9 @@ export class HttpViewClient {
             finally { clearTimeout(timer!); }
         }
     }
+}
+function viewExpired(response: Response): boolean {
+    return (response.headers.get('X-NestOS-View-Expired') ?? response.headers.get('X-MindOS-View-Expired')) === '1';
 }
 function safeFailure(error: unknown): Record<string, unknown> {
     const value = error as {code?:unknown;name?:unknown;stage?:unknown;clientRequestId?:unknown;requestId?:unknown;capabilityKind?:unknown;rpcMethod?:unknown};

@@ -26,19 +26,26 @@ async function setup(observed = false) {
     const runtime = await createApplicationRuntime({backend: new MemoryBackend(), ownerKind: 'cli', digitalTwinAutoStart: false});
     cleanup.push(() => runtime.dispose());
     const sidebar = document.createElement('div'), main = document.createElement('div'); document.body.append(sidebar, main);
-    const projection = observed ? await observedApplication(bindLocalApplicationServices(runtime)) : undefined;
+    const project = await runtime.projects.personal();
+    const resourceId = folderBrowserPath(project.path) + '/@new';
+    await configureModel(runtime);
+    const startup = observed ? await observedApplication(bindLocalApplicationServices(runtime), resourceId) : undefined;
+    const projection = startup?.projection;
     const services = projection?.services ?? bindLocalApplicationServices(runtime), backend = projection?.backend ?? bindApplicationBackend(runtime);
     const factory = createLLMFactory(services.agentService, {sessionRepository: services.sessionRepository, sessionManager: services.sessionManager, commandBus: services.commandBus});
-    const workbench = new SessionWorkbench({sidebar, container: main, backend, repository: services.sessionRepository,
+    const openDraft = observed ? vi.spyOn(backend, 'openProjectDraft') : undefined;
+    const workbench = new SessionWorkbench({sidebar, container: main, backend, opening: startup?.opening, repository: services.sessionRepository,
         files: services.sessionFiles, projects: services.projects, kernel: services.kernel.kernel, factory, fileFactory: factory, onSelect() {}});
-    cleanup.push(() => workbench.destroy()); await configureModel(runtime); await workbench.start();
+    cleanup.push(() => workbench.destroy()); await workbench.start();
     projection?.finishHydration();
-    const project = await runtime.projects.personal();
-    if (observed) await workbench.openResource(folderBrowserPath(project.path) + '/@new');
+    if (observed) {
+        await workbench.openResource(resourceId);
+        expect(openDraft).not.toHaveBeenCalled();
+    }
     else await workbench.startSessionDraft(folderBrowserPath(project.path));
     return {runtime, workbench, main, project};
 }
-async function observedApplication(services: Parameters<typeof createApplicationClient>[0]) {
+async function observedApplication(services: Parameters<typeof createApplicationClient>[0], resourceId: string) {
     const application = createApplicationClient(services); cleanup.push(() => application.close());
     let server!: RpcPeer;
     const client = new RpcPeer('client', call => server.handle(call), console.error, installViewProjections);
@@ -46,9 +53,9 @@ async function observedApplication(services: Parameters<typeof createApplication
     cleanup.push(() => server.close(), () => client.close());
     const boot = await server.bootstrap(application); client.applyUpdates(boot.updates);
     const remote = client.decode(boot.value!);
-    const view = await remote.backend.openView({documents: [], workbench: {chatControls: true, initialNavigation: false}});
+    const view = await remote.backend.openView({resourceId, documents: [], workbench: {chatControls: true, initialNavigation: false}});
     const projection = new OpenedViewProjection(view, remote.services, remote.backend); await projection.start();
-    cleanup.push(() => projection.dispose()); return projection;
+    cleanup.push(() => projection.dispose()); return {projection, opening: view.conversationWorkbench};
 }
 async function configureModel(runtime: Awaited<ReturnType<typeof createApplicationRuntime>>) {
     await runtime.agentService.saveProvider({id: 'test', name: 'Test', implementation: 'openai-compatible', apiKey: 'test',
@@ -329,4 +336,17 @@ it('adopts the authoritative execution mode on external promotion while preservi
     await vi.waitFor(() => expect(editor.delegate).toBeDefined());
     expect((await f.runtime.sessionRepository.getSessionSettings(prepared.sessionId)).executionMode).toBe('agent');
     expect(editor.commands.getInputConfig().settings.executionMode).toBe('agent');
+});
+
+it('preserves unsaved draft input in the recovery checkpoint without retrying a write on the retired view', async () => {
+    const f = await setup(), editor = (f.workbench as any).editor;
+    const save = vi.spyOn(editor.store, 'save').mockRejectedValue(Object.assign(new Error('Expired view'), {
+        code: 'ECAPABILITY', viewReason: 'VIEW_NOT_FOUND',
+    }));
+    editor.setText('Keep this unsent input');
+    await expect(editor.flushPendingSave()).rejects.toMatchObject({viewReason: 'VIEW_NOT_FOUND'});
+    expect(editor.captureRecovery()).toMatchObject({draft: {text: 'Keep this unsent input'}});
+    f.workbench.suspendForRecovery();
+    await expect(f.workbench.destroy()).resolves.toBeUndefined();
+    expect(save).toHaveBeenCalledOnce();
 });

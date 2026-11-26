@@ -20,3 +20,14 @@ it('does not release capabilities until slow editor destruction completes', asyn
     expect(release).not.toHaveBeenCalled(); finish(); await closing;
     expect(release).toHaveBeenCalledOnce();
 });
+
+it('releases the retired editor resources after recovery has captured its input', async () => {
+    const destroy = vi.fn().mockRejectedValue(Object.assign(new Error('Expired view'), {code: 'ECAPABILITY'}));
+    const release = vi.fn(async () => {});
+    const lease = new EditorLease({destroy} as any, release);
+    await expect(lease.dispose()).rejects.toMatchObject({code: 'ECAPABILITY'});
+    expect(release).not.toHaveBeenCalled();
+    await lease.dispose(true);
+    await lease.dispose(true);
+    expect(release).toHaveBeenCalledOnce();
+});

@@ -6,10 +6,10 @@ it('releases all resources in order when saving and a subscription cleanup fail'
     const cleanup = vi.fn(() => { order.push('cleanup'); });
     const failures = [new Error('save failed'), new Error('unsubscribe failed')];
     await expect(disposeEditorResources([
-        async () => { order.push('save'); throw failures[0]; },
+        {stage: 'draft.flush', release: async () => { order.push('save'); throw failures[0]; }},
         async () => { order.push('detach'); },
         () => { order.push('unsubscribe'); throw failures[1]; }, cleanup,
-    ])).rejects.toMatchObject({ errors: failures });
+    ])).rejects.toMatchObject({ errors: failures, cause: failures[0] });
     expect(order).toEqual(['save', 'detach', 'unsubscribe', 'cleanup']);
     expect(cleanup).toHaveBeenCalledOnce();
 });

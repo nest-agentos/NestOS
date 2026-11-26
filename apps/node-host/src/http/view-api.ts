@@ -205,8 +205,9 @@ export class ViewApi {
     }
     private expire(response: ServerResponse, code: string, message: string): never {
         response.setHeader('X-NestOS-View-Expired', '1'); response.setHeader('X-MindOS-View-Expired', '1');
+        response.setHeader('X-NestOS-View-Expiry-Code', code);
         this.audit?.write({...diagnosticContext(),event: 'view.expired', requestId: String(response.getHeader('X-Request-ID') ?? ''),
-            operation: 'view.resume', code, durationMs: 0});
+            operation: 'view.resume', stage: 'validate', result: 'failure', code, durationMs: 0});
         throw new FSError('ECAPABILITY', message);
     }
     private async createClient(): Promise<Client> {
@@ -256,7 +257,7 @@ export class ViewApi {
     private async releaseIdle(): Promise<void> {
         for (const [id, ready] of this.clients) {
             const client = await ready.catch(() => undefined);
-            if (client && !client.stream && !client.pending.size && !client.active && Date.now() - client.lastSeen > 60000) await this.release(id);
+            if (client && this.clients.get(id) === ready && !client.stream && !client.pending.size && !client.active && Date.now() - client.lastSeen > 60000) await this.release(id);
         }
     }
     private async release(identity: string): Promise<void> {

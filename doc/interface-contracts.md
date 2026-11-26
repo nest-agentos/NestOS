@@ -286,7 +286,9 @@ HarnessExecutionProvider.reconcile 返回 ConnectionReconcileResult；Effect 桥
 
 HTTP v15 的 bootstrap 可携带 OpenViewRequest 并返回 HostedApplicationClient.initialView，先登记观察再导出能力；HttpViewClient 将 SSE viewEvents 适配为本地 ApplicationViewObservation。纯数据按 SHA-256 校准，句柄每个连接独立，见 [一次打开同步握手](./http-app.md#一次打开同步握手与首帧v14)。
 
-文件、目录、项目草稿和原生会话共用 `ApplicationBackend.openWorkbench`，返回有生命周期的 `ResourceWorkbenchView`；原 `openConversationWorkbench` 为兼容入口并委托同一实现。一次准备必要工作台能力和 UI 文档，只有原生会话准备目标会话及其输入能力；文件视图后续转入会话时通过 `prepareChat` 惰性准备聊天控制。组件在本地按主题分发一个观察源，不逐个登记远程订阅；`readNavigation` 单独准备侧栏及其关注项目状态。冷路由可由 `openView({resourceId})` 一并返回同一视图。 `OpenedApplicationView.eventBaseline` 在准备任何首屏快照前读取，供全局事件流补读；它与工作台局部观察游标独立，不跨流比较。基线可用时不再为首屏强制清空导航，基线缺失或事件缺口仍执行保守重读。应用层组合独立领域端口，不把看板、harness、布局存储合并成业务服务；发送、授权响应、取消仍走原领域命令及回执。 HTTP 宿主按当前连接目录置换连接 lookup 的参数集合；删除连接后撤销旧查询登记，不在写入回执刷新时再次读取已删除实体。通用机制为 `RpcPeer.replaceLookups`，不扩展线协议或公开新的远程权限。
+文件、目录、项目草稿和原生会话共用 `ApplicationBackend.openWorkbench`，返回有生命周期的 `ResourceWorkbenchView`；原 `openConversationWorkbench` 为兼容入口并委托同一实现。一次准备必要工作台能力和 UI 文档。项目草稿视图通过 `draft` 返回已核对访问权限的项目、会话目录和受管 composer，工作台仅在首次匹配路由时消费该结果。原生会话准备目标会话及其输入能力，文件视图后续转入会话时通过 `prepareChat` 惰性准备聊天控制。组件在本地按主题分发一个观察源，不逐个登记远程订阅；`readNavigation` 单独准备侧栏及其关注项目状态。冷路由可由 `openView({resourceId})` 一并返回同一视图。 `OpenedApplicationView.eventBaseline` 在准备任何首屏快照前读取，供全局事件流补读；它与工作台局部观察游标独立，不跨流比较。基线可用时不再为首屏强制清空导航，基线缺失或事件缺口仍执行保守重读。应用层组合独立领域端口，不把看板、harness、布局存储合并成业务服务；发送、授权响应、取消仍走原领域命令及回执。 HTTP 宿主按当前连接目录置换连接 lookup 的参数集合；删除连接后撤销旧查询登记，不在写入回执刷新时再次读取已删除实体。通用机制为 `RpcPeer.replaceLookups`，不扩展线协议或公开新的远程权限。
+
+HTTP 视图失效时，`X-NestOS-View-Expiry-Code` 和 `X-Request-ID` 将浏览器诊断关联到服务端 `view.expired` 审计记录。客户端停止使用旧句柄。恢复先捕获编辑器输入，再释放旧视图并重新打开目标；回收期间跳过旧视图的草稿写入。正常切换和关闭仍等待保存结果。
 
 直接打开项目 `@new` 时，`ApplicationBackend.openProjectDraft` 一次核对项目和草稿访问，返回项目、会话目录及草稿编辑端口。输入框就绪后再加载当前远程执行器的模型选项。模型读取失败时可继续编辑草稿，界面显示具体原因。
 
