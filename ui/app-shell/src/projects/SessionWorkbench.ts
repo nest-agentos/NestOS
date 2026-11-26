@@ -1640,13 +1640,14 @@ export class SessionWorkbench implements WorkspaceController {
         if (this.navigationFiles?.on && target.kind !== 'files' && target.kind !== 'project-files')
             owner!.subscriptions.push(watchDirectoryList(this.navigationFiles, panel, error => this.report(error), () => this.visible && !this.closed && this.tabs.current === owner));
     }
+    private readonly backgroundDirectoryRefreshes = new Map<string, {generation: number; operationId: string}>();
     private async directoryEntries(path: string, update?: (nodes: FSNode[]) => void) {
         const {nodes, node} = await this.readDirectoryData(path, undefined, true);
         update?.(nodes);
         const target = resolveBrowserTarget(path), files = target.kind === 'project-files' || target.kind === 'files';
         if (files && node && this.navigationFiles) {
             this.directorySeeds?.seed([{path, node, nodes, revision: this.navigationFiles.revision}]);
-            if (this.active === path && this.resourceNavigationVisible && this.navigationReady)
+            if (this.active === path && this.resourceNavigationVisible && this.navigationReady && !this.backgroundDirectoryRefreshes.has(path))
                 await this.sidebarUI?.refresh();
         } else if (this.active === path) {
             await this.sidebarUI?.refresh();
@@ -1688,13 +1689,69 @@ export class SessionWorkbench implements WorkspaceController {
         link.click(); setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
     private async createDirectoryEntry(path: string, type: 'file' | 'directory'): Promise<void> {
+        const operationId = randomUUID();
+        let createdPath: string | undefined;
+        const nameInput = document.createElement('input');
         await showNameDialog(t(type === 'file' ? 'project.createFile' : 'project.createFolder'), t('project.newFileName'), this.dialogs.signal, async name => {
-            const driver = this.navigationFiles!.driver;
-            if (type === 'file') await driver.createFile({ parentPath: path, name, content: '' });
-            else await driver.createDirectory({ parentPath: path, name });
-            await this.sidebarUI?.refresh();
-            await this.openResource(path, { reload: true });
-        });
+            const run = (stage: string, action: () => Promise<unknown>) => this.runEntryStage(operationId, stage, !!createdPath, action);
+            if (!createdPath) await run('create', async () => {
+                const driver = this.navigationFiles!.driver;
+                if (type === 'file') await driver.createFile({ parentPath: path, name, content: '' });
+                else await driver.createDirectory({ parentPath: path, name });
+                createdPath = `${path.replace(/\/$/, '')}/${name}`;
+                nameInput.readOnly = true;
+            });
+            if (type === 'directory') {
+                await run('refresh', async () => { await this.sidebarUI?.refresh(); });
+                await run('open', () => this.openResource(path, {reload: true}));
+            } else {
+                await run('open', () => this.openResource(createdPath!, {newTab: true}));
+                this.refreshCreatedFileDirectory(path, operationId);
+            }
+        }, undefined, {nameInput});
+    }
+    private refreshCreatedFileDirectory(path: string, operationId: string): void {
+        const pending = this.backgroundDirectoryRefreshes.get(path);
+        if (pending) { pending.generation++; pending.operationId = operationId; return; }
+        const state = {generation: 1, operationId};
+        this.backgroundDirectoryRefreshes.set(path, state);
+        void this.drainCreatedFileRefresh(path, state);
+    }
+    private async drainCreatedFileRefresh(path: string, state: {generation: number; operationId: string}): Promise<void> {
+        try {
+            let completed: number;
+            do {
+                completed = state.generation;
+                const parent = this.tabs.get(path);
+                if (!parent?.panel.querySelector('.workbench-directory')) return;
+                try {
+                    await this.runEntryStage(state.operationId, 'background-refresh', true, () => refreshDirectoryList(parent.panel));
+                    parent.panel.querySelector('[data-creation-refresh-error]')?.remove();
+                } catch (error) {
+                    if (!this.closed && this.tabs.get(path) === parent) this.showDirectoryRefreshFailure(parent.panel, error, path, state.operationId);
+                }
+            } while (!this.closed && completed !== state.generation);
+        } finally { this.backgroundDirectoryRefreshes.delete(path); }
+    }
+    private showDirectoryRefreshFailure(panel: HTMLElement, error: unknown, path: string, operationId: string): void {
+        panel.querySelector('[data-creation-refresh-error]')?.remove();
+        const notice = document.createElement('div'); notice.className = 'session-detail__error';
+        notice.dataset.creationRefreshError = ''; notice.setAttribute('role', 'alert');
+        notice.textContent = describeErrorReason(error);
+        const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = t('workbench.refresh');
+        retry.onclick = () => this.refreshCreatedFileDirectory(path, operationId);
+        notice.append(retry); panel.append(notice);
+    }
+    private async runEntryStage(operationId: string, stage: string, created: boolean, action: () => Promise<unknown>): Promise<void> {
+        const started = performance.now();
+        try {
+            await action();
+            sidebarLog.info('project.entry.create', {operationId, stage, result: 'success', durationMs: Math.round(performance.now() - started)});
+        } catch (error) {
+            const code = (error as {code?: unknown})?.code;
+            sidebarLog.warn('project.entry.create', {operationId, stage, result: 'failure', code: typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'ENTRY_OPERATION_FAILED', durationMs: Math.round(performance.now() - started)});
+            throw new Error(`${t(stage === 'background-refresh' ? 'project.createdRefreshFailed' : created ? 'project.createdFollowupFailed' : 'project.createEntryFailed')} ${describeErrorReason(error)}`);
+        }
     }
     private showTasks(sessionId: string): Promise<void> { return this.taskView.list(sessionId); }
     private showTask(path: string): Promise<void> { return this.taskView.detail(path); }

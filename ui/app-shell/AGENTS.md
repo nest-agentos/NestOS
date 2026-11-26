@@ -33,6 +33,8 @@ SessionWorkbench 统一项目草稿、智能体快捷入口和原生新会话入
 
 peerDependencies: `@nestos/{app-settings,common,driver-llm,llm-session,durable-kernel,kernel-adapters,mdxeditor,vfs-ui,vfs-core,ui-common}`
 
+项目侧栏和目录页复用创建链：新建文件后先激活编辑标签，已打开的父目录在后台定向刷新，侧栏消费创建事件；新建目录继续刷新并打开父目录。创建成功但打开失败时保留已创建路径和名称，重试只打开；后台刷新失败独立诊断并保留手工刷新入口。
+
 项目目录页搜索默认文件名、会话页默认会话名，复用 ProjectSearchPanel 的异步查询与生命周期；内容和仅用户提问显式切换。目录分页游标不能限制搜索，通用 DirectoryList 通过插槽接入，不包含后端或 harness 分支。
 
 项目/全部项目目录优先消费 SessionBrowserPort.readDirectory 的聚合读模型，标题、动作和搜索共用同一项目归属，导航复用准备结果。目录种子只按当前文件视图 revision 使用，变更事件、过期结果和显式刷新仍回到实时端口；不要用长期缓存掩盖授权或数据变化。目录页的四类结构事件使用单一 onAny 并在本地过滤。
