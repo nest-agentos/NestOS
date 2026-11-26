@@ -58,6 +58,21 @@ it('defaults to no optional verification and keeps conflict guidance short and d
  expect(kanbanConfigurationDefaults['task-integrate-pre.md'].length).toBeLessThan(1000);
 });
 
+it('assigns source handoff to execution and final software delivery to coordination',()=>{
+ const {planning,task,delivery,coordination,actions}={
+  planning:kanbanConfigurationDefaults['planning.md'],task:kanbanConfigurationDefaults['task.md'],
+  delivery:kanbanConfigurationDefaults['delivery.md'],coordination:kanbanConfigurationDefaults['task-coordinate-pre.md'],
+  actions:kanbanConfigurationDefaults['coordination-actions.md'],
+ };
+ expect(planning).toContain('子任务的 acceptance 只描述源代码交接标准');
+ expect(task).toContain('The coordination task owns final integration, build, deployment and acceptance');
+ expect(delivery).toContain('The coordination task owns end-to-end acceptance');
+ expect(coordination).toContain('Disabled deployment and acceptance steps stay disabled');
+ expect(actions).toContain('On the top-level management task');
+ expect(actions).toContain('`delivery.read`');
+ expect(actions).toContain('`delivery.run`');
+});
+
 it('makes report packaging guidance available during delivery and keeps recovery on the existing result', () => {
     const delivery = promptReferenceSections(files, 'task.md');
     const recovery = promptReferenceSections(files, 'task-recovery-pre.md');
