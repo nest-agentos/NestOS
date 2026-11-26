@@ -318,15 +318,11 @@ export async function createNativeChatView(container: HTMLElement, binding: Nati
     return createChatView(container, prepareNativeView(binding, options));
 }
 
-/** One presentation group per native turn; legacy history uses real user-message boundaries. */
+/** Preserve the native sequence while opting into adjacent activity grouping. */
 function nativeMessages(state: NativeSnapshot, operations: OperationLedger, conversationId: string): ChatMessage[] {
-    let boundary = 'history';
-    return state.messages.filter(message => !message.id.startsWith('steered:')).map(message => {
-        if (message.role === 'user') boundary = message.id;
-        const scope = message.turnId && message.turnId !== 'rollout-history' ? ['turn', message.turnId] : ['prompt', boundary];
-        return {...nativeMessage(message, operations, state, conversationId),
-            toolGroupId: message.role === 'tool' ? JSON.stringify(scope) : undefined};
-    });
+    return state.messages.filter(message => !message.id.startsWith('steered:')).map(message => ({
+        ...nativeMessage(message, operations, state, conversationId), groupActivity: true,
+    }));
 }
 
 function nativeMessage(message: NativeSnapshot['messages'][number], operations: OperationLedger, state: NativeSnapshot, conversationId: string): ChatMessage {
