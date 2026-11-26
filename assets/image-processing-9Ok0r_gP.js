@@ -1,0 +1,1 @@
+function o(m){if(!m||typeof m!="object")return!1;const e=m;return e.mode==="original"||e.mode==="max-edge"&&typeof e.maxEdge=="number"&&Number.isInteger(e.maxEdge)&&e.maxEdge>=1&&e.maxEdge<=32768}export{o as i};

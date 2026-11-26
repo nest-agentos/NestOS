@@ -1,0 +1,183 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <!-- 背景渐变 -->
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a1a2e" />
+      <stop offset="100%" stop-color="#0f0f1a" />
+    </radialGradient>
+
+    <!-- 核心光源渐变 -->
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+      <stop offset="30%" stop-color="#e8e0ff" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#7c5ce0" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- 棱镜主体渐变 -->
+    <linearGradient id="prismMain" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4a3f8a" />
+      <stop offset="50%" stop-color="#3a3c6e" />
+      <stop offset="100%" stop-color="#2d1f5e" />
+    </linearGradient>
+
+    <!-- 棱镜切面高光 -->
+    <linearGradient id="prismHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c6fd4" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#4a3f8a" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- 外层弧线渐变（青到电光蓝） -->
+    <linearGradient id="arcGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.3" />
+      <stop offset="50%" stop-color="#00b4d8" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#3a7bd5" stop-opacity="1" />
+    </linearGradient>
+
+    <linearGradient id="arcGradient2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.2" />
+      <stop offset="50%" stop-color="#0096c7" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#4361ee" stop-opacity="1" />
+    </linearGradient>
+
+    <linearGradient id="arcGradient3" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#48cae4" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#3f37c9" stop-opacity="0.9" />
+    </linearGradient>
+
+    <!-- 发光滤镜 -->
+    <filter id="glowFilter" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 深色背景（可选，用于展示） -->
+  <circle cx="100" cy="100" r="100" fill="url(#bgGlow)" />
+
+  <!-- ====== 外层星环弧线（智能体编排） ====== -->
+  <g filter="url(#glowFilter)">
+    <!-- 弧线 1 - 右上 -->
+    <path d="M 115 35 Q 155 50 160 80 Q 165 110 145 135"
+          fill="none"
+          stroke="url(#arcGradient1)"
+          stroke-width="2.8"
+          stroke-linecap="round"
+          opacity="0.9">
+      <animate attributeName="stroke-opacity"
+               values="0.6;1;0.6" dur="3s" repeatCount="indefinite" />
+    </path>
+    <!-- 弧线 1 箭头 -->
+    <polygon points="145,135 140,125 138,137" fill="#00e5ff" opacity="0.9" />
+
+    <!-- 弧线 2 - 左下 -->
+    <path d="M 40 130 Q 30 100 45 65 Q 60 35 90 30"
+          fill="none"
+          stroke="url(#arcGradient2)"
+          stroke-width="2.8"
+          stroke-linecap="round"
+          opacity="0.9">
+      <animate attributeName="stroke-opacity"
+               values="1;0.6;1" dur="3s" repeatCount="indefinite" />
+    </path>
+    <polygon points="90,30 80,35 88,38" fill="#4361ee" opacity="0.9" />
+
+    <!-- 弧线 3 - 底部 -->
+    <path d="M 70 170 Q 100 178 130 165"
+          fill="none"
+          stroke="url(#arcGradient3)"
+          stroke-width="2.8"
+          stroke-linecap="round"
+          opacity="0.9">
+      <animate attributeName="stroke-opacity"
+               values="0.7;1;0.7" dur="4s" repeatCount="indefinite" />
+    </path>
+    <polygon points="130,165 118,162 125,172" fill="#48cae4" opacity="0.9" />
+  </g>
+
+  <!-- ====== 内层棱镜结构（认知熔炉 + 验证皮层） ====== -->
+  <g filter="url(#softGlow)">
+    <!-- 棱镜外层大六边形 -->
+    <polygon points="100,52 142,74 142,126 100,148 58,126 58,74"
+             fill="url(#prismMain)"
+             stroke="#7c6fd4"
+             stroke-width="1.5"
+             opacity="0.8" />
+
+    <!-- 棱镜切面 - 左上 -->
+    <polygon points="100,52 100,100 58,74"
+             fill="url(#prismHighlight)"
+             opacity="0.35" />
+
+    <!-- 棱镜切面 - 右上 -->
+    <polygon points="100,52 142,74 100,100"
+             fill="url(#prismHighlight)"
+             opacity="0.25" />
+
+    <!-- 棱镜切面 - 右中 -->
+    <polygon points="142,74 142,126 100,100"
+             fill="url(#prismHighlight)"
+             opacity="0.15" />
+
+    <!-- 棱镜切面 - 左下 -->
+    <polygon points="58,74 100,100 58,126"
+             fill="#1a1a3e"
+             opacity="0.3" />
+
+    <!-- 棱镜切面 - 右下 -->
+    <polygon points="100,100 142,126 100,148"
+             fill="#1a1a3e"
+             opacity="0.4" />
+
+    <!-- 棱镜底部 -->
+    <polygon points="100,100 58,126 100,148"
+             fill="#0d0d24"
+             opacity="0.5" />
+
+    <!-- 中心三层嵌套六边形（加密/结构化） -->
+    <polygon points="100,66 126,80 126,120 100,134 74,120 74,80"
+             fill="none"
+             stroke="#9d8ce0"
+             stroke-width="1"
+             opacity="0.5" />
+
+    <polygon points="100,78 116,88 116,112 100,122 84,112 84,88"
+             fill="none"
+             stroke="#b8a8f0"
+             stroke-width="1"
+             opacity="0.4" />
+  </g>
+
+  <!-- ====== 核心光点（元认知本源） ====== -->
+  <g filter="url(#softGlow)">
+    <circle cx="100" cy="100" r="14" fill="url(#coreGlow)" opacity="0.6" />
+    <circle cx="100" cy="100" r="5" fill="#ffffff" opacity="0.95" />
+    <circle cx="100" cy="100" r="2.5" fill="#ffffff" />
+
+    <!-- 核心十字星芒 -->
+    <line x1="100" y1="85" x2="100" y2="115" stroke="#ffffff" stroke-width="0.8" opacity="0.4" />
+    <line x1="85" y1="100" x2="115" y2="100" stroke="#ffffff" stroke-width="0.8" opacity="0.4" />
+  </g>
+
+  <!-- ====== 神经连接节点（Cognitive Forge 刻意练习） ====== -->
+  <g opacity="0.6">
+    <!-- 六边形顶点节点 -->
+    <circle cx="100" cy="52" r="2" fill="#c4b5fd" filter="url(#glowFilter)" />
+    <circle cx="142" cy="74" r="2" fill="#a78bfa" filter="url(#glowFilter)" />
+    <circle cx="142" cy="126" r="2" fill="#8b5cf6" filter="url(#glowFilter)" />
+    <circle cx="100" cy="148" r="2" fill="#7c3aed" filter="url(#glowFilter)" />
+    <circle cx="58" cy="126" r="2" fill="#6d28d9" filter="url(#glowFilter)" />
+    <circle cx="58" cy="74" r="2" fill="#5b21b6" filter="url(#glowFilter)" />
+  </g>
+
+</svg>
