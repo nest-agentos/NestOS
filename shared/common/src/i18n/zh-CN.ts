@@ -81,6 +81,7 @@ export const zhCN = {
     'kanban.recoveryAssistMissingResult': '在原执行会话中继续',
     'kanban.recoveryReply': '在看板回复原执行会话',
     'kanban.recoveryReplyContent': '续办说明',
+    'kanban.recoveryReplyTarget': '回复的问题',
     'kanban.recoveryReplySend': '发送到原会话',
     'kanban.verificationQueue': '延后验证',
     'kanban.verificationTitle': '验证项',

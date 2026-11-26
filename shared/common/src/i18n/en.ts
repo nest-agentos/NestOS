@@ -80,6 +80,7 @@ export const en: LocaleStrings = {
     'kanban.recoveryAssistMissingResult': 'Continue in the original execution session',
     'kanban.recoveryReply': 'Reply to the original session',
     'kanban.recoveryReplyContent': 'Continuation instructions',
+    'kanban.recoveryReplyTarget': 'Issue to reply to',
     'kanban.recoveryReplySend': 'Send to original session',
     'kanban.verificationQueue': 'Deferred verification',
     'kanban.verificationTitle': 'Check',
