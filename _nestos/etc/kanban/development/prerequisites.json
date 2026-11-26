@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "executables": ["node", "pnpm"],
+  "files": ["node_modules/.modules.yaml"]
+}
