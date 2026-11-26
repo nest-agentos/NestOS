@@ -5,7 +5,7 @@ import {InteractionDraftPersistence} from '../services/InteractionDraftPersisten
 import {IndependentCallPanel} from '../components/IndependentCallPanel';
 import {flowInputAssets} from '../flows/input-assets';
 import {prepareAgentFlow, prepareCallTarget} from '../flows/agent-flow';
-import {createOperationLedger, type OperationLedger} from '@nestos/llm-ui';
+import {createOperationLedger, localPromptCommandSuggestions, type OperationLedger} from '@nestos/llm-ui';
 import {WorkspaceDraftRecovery} from './WorkspaceDraftRecovery';
 import {DraftFilesCodec} from '../services/DraftFilesCodec';
 import {readInputContextDraft} from '../domain/context-draft';
@@ -17,7 +17,7 @@ import { rememberTaskAttachment, restoreTaskAttachment } from './task-attachment
 import type { SessionViewPort } from '@nestos/llm-session/contracts';
 import { acquireConnectionOptions } from './connection-options-cache';
 import { rerunSession } from './rerun-session';
-import { t } from '@nestos/common';
+import { getLocale, t } from '@nestos/common';
 import { bindWorkspaceInput } from './drafts/workspace-handoff';
 import { mountConversationSource } from './conversation-source';
 import { openSessionFlowOutputs } from '../flows/session-output';
@@ -1281,7 +1281,11 @@ export class LLMWorkspaceEditor implements IEditor {
                         refresh: () => this.refreshSkillSnapshot(),
                     },
                 } : {}),
-            })
+            }),
+            localPromptCommandSuggestions(getLocale()).map(command => ({
+                ...command, label: '/' + command.name, hasArgs: true, preserveInput: true,
+                execute: args => {this.promptCommands?.handle(`/${command.name} ${args}`);},
+            })),
         );
         chatInput.registerPlugin(this.slashPlugin);
     }

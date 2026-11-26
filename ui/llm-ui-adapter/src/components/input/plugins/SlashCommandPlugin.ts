@@ -3,7 +3,7 @@ import { createSlashCommandCatalog } from './slash-command-catalog';
 // @file: llm-ui/components/input/plugins/SlashCommandPlugin.ts
 
 import type { InputPlugin, InputPluginContext } from './InputPlugin';
-import { PopupPanel, PopupItem } from '@nestos/llm-ui';
+import { commandCompletionQuery, PopupPanel, PopupItem } from '@nestos/llm-ui';
 import type { SkillInfo, SkillInvocation } from '../../../domain/types';
 import { parseSkillArgs } from '../SkillInvocationParser';
 import { injectStyle } from '../../../utils/styleInjector';
@@ -228,9 +228,9 @@ export class SlashCommandPlugin implements InputPlugin {
     private commands: SlashCommandDef[] = [];
     private readonly cb: SlashCommandCallbacks;
 
-    constructor(callbacks: SlashCommandCallbacks) {
+    constructor(callbacks: SlashCommandCallbacks, leadingCommands: SlashCommandDef[] = []) {
         this.cb = callbacks;
-        this.commands = this.buildDefaultCommands(callbacks);
+        this.commands = [...leadingCommands, ...this.buildDefaultCommands(callbacks)];
     }
 
     activate(ctx: InputPluginContext): void {
@@ -289,20 +289,12 @@ export class SlashCommandPlugin implements InputPlugin {
     }
 
     onInput(text: string, _cursorPos: number): void {
-        if (!text.startsWith('/')) {
+        const query = commandCompletionQuery(text);
+        if (query === undefined) {
             if (this.panel?.isVisible) this.closePanel();
             return;
         }
-
-        const afterSlash = text.slice(1);
-        // Close the popup once the user has moved past the command name
-        // (a space means they're now typing args / @files)
-        if (afterSlash.includes(' ')) {
-            if (this.panel?.isVisible) this.closePanel();
-            return;
-        }
-
-        this.showCommands(afterSlash);
+        this.showCommands(query);
     }
 
     onBeforeSend(text: string): boolean | void {
@@ -345,14 +337,8 @@ export class SlashCommandPlugin implements InputPlugin {
         const allCommands = [...this.commands, ...skillCommands];
         const items = this.commandsToPopupItems(allCommands);
 
-        if (!this.panel.isVisible) {
-            this.panel.show(items, {
-                onSelect: (item) => this.handleSelect(item, allCommands),
-                onClose: () => { },
-            });
-        }
-
-        this.panel.filter(query);
+        if (this.panel.isVisible) this.panel.updateItems(items, query);
+        else this.panel.show(items, {onSelect: item => this.handleSelect(item)}, query);
     }
 
     /**
@@ -396,11 +382,10 @@ export class SlashCommandPlugin implements InputPlugin {
         });
     }
 
-    private handleSelect(item: PopupItem, allCommands?: SlashCommandDef[]): void {
+    private handleSelect(item: PopupItem): void {
         if (!this.ctx) return;
 
-        const commands = allCommands ?? this.commands;
-        const command = commands.find(c => c.name === item.id);
+        const command = this.commands.find(c => c.name === item.id) ?? this.buildSkillCommands().find(c => c.name === item.id);
         if (!command) return;
 
         if (command.hasArgs) {
@@ -444,6 +429,8 @@ export class SlashCommandPlugin implements InputPlugin {
     private closePanel(): void {
         this.panel?.hide();
     }
+
+    onBlur(): void {this.closePanel();}
 
     // ================================================================
     // 默认命令注册

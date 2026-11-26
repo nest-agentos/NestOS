@@ -1,4 +1,4 @@
-import {ComposerHistory, SavedPrompts, type ChatMessage, type SavedPromptsPort} from '@nestos/llm-ui';
+import {ComposerHistory, parseLocalPromptCommand, SavedPrompts, type ChatMessage, type SavedPromptsPort} from '@nestos/llm-ui';
 import {getLocale} from '@nestos/common';
 import type {InputPlugin, InputPluginContext} from '../components/input/plugins/InputPlugin';
 
@@ -15,13 +15,13 @@ export class LegacyPromptCommands implements InputPlugin {
     onBeforeSend(text: string): boolean {return !this.handle(text);}
     onBeforeRemoteSend(text: string): boolean {return !this.handle(text);}
     handle(text: string): boolean {
-        const value = text.trim();
-        if (!/^\/(?:history\s*|prompt(?:\s+[\s\S]*)?)$/.test(value) || !this.context) return false;
-        if (value === '/history') {this.saved?.close(); this.historyPanel().show(); return true;}
+        const command = parseLocalPromptCommand(text);
+        if (!command || !this.context) return false;
+        if (command.name === 'history') {this.saved?.close(); this.historyPanel().show(); return true;}
         this.history?.close();
-        if (value === '/prompt') {void this.savedPanel().open(); return true;}
-        const context = this.context, revision = context.getDraftRevision?.();
-        void this.savedPanel().save(value.slice(8)).then(saved => {
+        if (!command.arguments) {void this.savedPanel().open(); return true;}
+        const context = this.context, revision = context.getDraftRevision?.(), value = text.trim();
+        void this.savedPanel().save(command.arguments).then(saved => {
             if (saved && this.context === context && context.getText().trim() === value && context.getDraftRevision?.() === revision) context.setText('');
         });
         return true;

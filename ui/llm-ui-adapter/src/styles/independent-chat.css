@@ -45,3 +45,4 @@
 .llm-chat__header[data-project-draft] > .llm-chat__host-menu,
 .llm-chat__header[data-project-draft] > .llm-chat__status { display: none; }
 .llm-draft-loading { margin: 0; padding: 24px 16px; color: var(--text-secondary, #666); overflow-wrap: anywhere; }
+.llm-draft-submitting { margin: 0; padding: 4px 16px; color: var(--text-secondary, #666); }
