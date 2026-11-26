@@ -109,6 +109,22 @@ it('consumes fix clarifications through the channel and repairs their receipts w
     expect((await f.events.listNotifications()).items.filter(row=>row.event.value.type==='kanban.fix.clarification')).toHaveLength(1);
 });
 
+it('preserves an existing channel acknowledgement and resumes repair observation after restart',async()=>{
+    const f=await fixture(),fix=await f.run();
+    f.channels.report(fix.id,'shared-notice',{type:'clarification',content:'Confirm the required behavior'});
+    const original=f.channels.channel.getMockImplementation()!;
+    f.channels.channel.mockImplementation(async(project,operation,input)=>{
+        if(operation==='acknowledge'&&input.id==='shared-notice')
+            throw Object.assign(new Error('Acknowledgement immutable'),{code:'EIO',remoteCode:'CHANNEL_ACK_CHANGED'});
+        return original(project,operation,input);
+    });
+    await createTaskFix(f.options).scan();
+    await expect(f.run()).resolves.toMatchObject({id:fix.id,state:'clarifying'});
+    expect(f.submission.start).toHaveBeenCalledOnce();
+    expect(f.channels.channel.mock.calls.filter(([,op,input])=>op==='acknowledge'&&input.id==='shared-notice')).toHaveLength(1);
+    expect((await f.events.listNotifications()).items.filter(row=>row.event.value.type==='kanban.fix.clarification')).toHaveLength(1);
+});
+
 it('abandons an unconfirmed fix without creating a task, preserves the original execution and rejects late confirmation after restart',async()=>{
     const f=await fixture(),fix=await f.run();await f.publish(fix.id);
     const original=(await f.service.item('development','original')).item;

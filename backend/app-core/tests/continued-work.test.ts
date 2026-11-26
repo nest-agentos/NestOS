@@ -60,7 +60,10 @@ it('distinguishes a confirmed writer rejection from an uncertain submitted reque
     await expect(sessionSubmission(options).start(request)).rejects.toMatchObject({code: 'SESSION_WRITER_UNAVAILABLE', executionOutcome: 'not-started', retryable: true});
     expect(open).not.toHaveBeenCalled();
     const lease = {commandBus: {execute: vi.fn(async () => {throw Object.assign(new Error('transport'), {code: 'EIO'});})}, dispose: vi.fn()};
-    options.ensureWritable = async () => true; open.mockResolvedValue(lease);
+    options.ensureWritable = async () => true;
+    open.mockRejectedValueOnce(Object.assign(new Error('Stopping before opening context'), {code:'SERVICE_STOPPING'}));
+    await expect(sessionSubmission(options).start(request)).rejects.toMatchObject({code:'SERVICE_STOPPING',executionOutcome:'not-started',retryable:true});
+    open.mockResolvedValue(lease);
     const error = await sessionSubmission(options).start(request).catch(error => error);
     expect(error.code).toBe('EIO'); expect(error.executionOutcome).toBeUndefined(); expect(lease.dispose).toHaveBeenCalledOnce();
 });

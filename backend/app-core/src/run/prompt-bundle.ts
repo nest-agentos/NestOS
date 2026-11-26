@@ -49,10 +49,12 @@ async function readPromptSnapshot(fs: IFileSystem, path: string) {
 }
 
 /** Freeze before transmission; a restart never resolves current authoring files again. */
-export async function freezePrompts(journal: PromptJournal, key: string, resolve: () => Promise<PromptFile[]>): Promise<PromptBundle> {
+export async function freezePrompts(journal: PromptJournal, key: string, resolve: () => Promise<PromptFile[]>, hostFiles: readonly PromptFile[] = [], resolvedLimit=32): Promise<PromptBundle> {
     const saved = await journal.get<PromptBundle>(key); if (saved) return saved;
-    const files = await resolve();
-    if (files.length > 32 || new Set(files.map(file => file.name)).size !== files.length) throw failure('PROMPT_BUNDLE_INVALID');
+    const authored = await resolve();
+    if (authored.length > resolvedLimit || hostFiles.length > 4) throw failure('PROMPT_BUNDLE_COUNT_LIMIT');
+    const files = [...authored, ...hostFiles];
+    if (new Set(files.map(file => file.name)).size !== files.length) throw failure('PROMPT_BUNDLE_INVALID');
     for (const file of files) {
         if (!/^[a-zA-Z0-9_-]+\.(md|json|yaml|yml|txt)$/.test(file.name) || file.sha256 !== sha256HexSync(file.content)
             || new TextEncoder().encode(file.content).byteLength > 65536) throw failure('PROMPT_BUNDLE_INVALID');

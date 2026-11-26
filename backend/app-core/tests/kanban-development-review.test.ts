@@ -273,7 +273,8 @@ it('keeps customized management acceptance prompts when adding plugin defaults',
  const f=await fixture(),snapshot=await f.api.snapshot(f.board,f.item);
  const {ensureKanbanConfiguration}=await import('../src/presets/kanban-global-configuration');await ensureKanbanConfiguration(f.fs);
  const path='/workspace/_nestos/etc/kanban/development';
- const manifest=JSON.parse(await readPrompt(f.fs,'/etc/kanban/development/profile.json'));manifest.files.push('management-integration-pre.md');
+ const manifest=JSON.parse(await readPrompt(f.fs,'/etc/kanban/development/profile.json'));
+ manifest.files=manifest.files.map((name:string)=>name==='decision-propose.md'?'management-integration-pre.md':name);
  await f.fs.driver.createFile({parentPath:path,name:'profile.json',content:JSON.stringify(manifest),recursive:true});
  await f.fs.driver.createFile({parentPath:path,name:'management-integration-pre.md',content:'Project acceptance rules',recursive:true});
  await f.api.prepareOperation!({id:'custom-acceptance',action:'build',board:f.board,item:f.item,snapshot,extraPrompts:[{name:'management-integration-pre.md',content:'Plugin default',sha256:sha256HexSync('Plugin default'),source:'plugin'}]} as never);

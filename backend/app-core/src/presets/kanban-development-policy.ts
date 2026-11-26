@@ -1,4 +1,4 @@
-import {resolveKanbanConfiguration} from './kanban-configuration-files';
+import {kanbanResolvedPromptLimit,resolveKanbanConfiguration} from './kanban-configuration-files';
 import type {IFileSystem} from '@nestos/vfs-core';
 import type {KanbanBoard} from '@nestos/kanban/contracts';
 import {freezePrompts, failure, type PromptJournal, type PromptBundle} from '../run/prompt-bundle';
@@ -11,7 +11,7 @@ export async function developmentPolicy(journal: PromptJournal, fs: IFileSystem,
     options: Record<string, string> = {}): Promise<DevelopmentPolicy> {
     const key = 'development-policy:' + id, old = await journal.get<DevelopmentPolicy>(key); if (old) return old;
     const {profile, commit, modules} = validateDevelopmentOptions(options);
-    const prompts = await freezePrompts(journal, 'development-prompts:' + id, () => resolveKanbanConfiguration(fs, project, profile));
+    const prompts = await freezePrompts(journal, 'development-prompts:' + id, () => resolveKanbanConfiguration(fs, project, profile), [], kanbanResolvedPromptLimit);
     return journal.update<DevelopmentPolicy>(key, previous => previous ?? {version: 1, profile, commit: commit as DevelopmentPolicy['commit'], modules, prompts});
 }
 export function validateDevelopmentOptions(options: Record<string, string> = {}) {

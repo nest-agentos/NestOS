@@ -29,7 +29,7 @@ export async function resolveKanbanPluginRequest(options:DecisionConversationOpt
         }),
         ...conversation.binding.purpose==='coordination'?[]:[
             method('status','Read this draft, confirmation and available actions.',schema({}),decision('read')),
-            method('propose','Preview one decision. dependsOn blocks all planning until upstream delivery completes.',schema({id:string,title:string,content:string,rationale:string,projectIds:{type:'array',items:string},verificationMode:{enum:['release','quick','full','build','source']},dependsOn:{type:'array',maxItems:16,items:schema({boardId:string,recordId:string},['boardId','recordId'])}},['id','title','content','rationale','projectIds','verificationMode']),decision('propose'),'command'),
+            method('propose','Preview one decision. dependsOn blocks all planning until upstream delivery completes.',schema({id:string,title:string,content:string,rationale:string,projectIds:{type:'array',items:string},verificationMode:{enum:['build-cleanup','release','quick','full','build','source'],description:'Defaults to merge, build and cleanup. Choose release, quick or full only when deployment is requested.'},dependsOn:{type:'array',maxItems:16,items:schema({boardId:string,recordId:string},['boardId','recordId'])}},['id','title','content','rationale','projectIds']),decision('propose'),'command'),
             method('confirm','Create only after the real user says the exact returned confirmation. Read the execution receipt.',schema({proposalDigest:string},['proposalDigest']),decision('confirm'),'command'),
         ],
     ]}];

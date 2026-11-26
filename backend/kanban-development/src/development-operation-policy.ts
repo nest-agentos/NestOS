@@ -1,4 +1,4 @@
-import {selectDeliverySteps,jobKey,type AutomaticDeliveryPolicy} from '@nestos/kanban/integration';
+import {selectDeliverySteps,jobKey,reviewKey,reviewCleanupKey,type AutomaticDeliveryPolicy} from '@nestos/kanban/integration';
 export const developmentDeliveryPolicy:AutomaticDeliveryPolicy={steps:['build','deploy','accept','analyze','merge','cleanup'],targetActions:['build','deploy','accept','analyze','merge'],finalizeAction:'cleanup',handoffAction:'accept',refreshAction:'analyze',refreshableActions:['analyze','merge'],refreshCodes:['OPERATION_SOURCE_CHANGED_REANALYZE','OPERATION_TARGET_CHANGED_REANALYZE','MERGE_PLAN_SOURCE_CHANGED'],unstartedCodes:['OPERATION_ORIGINAL_SESSION_BUSY','OPERATION_WORKSPACE_BUSY','OPERATION_STALE_REFRESH']};
 export const operationSteps=(configured=developmentDeliveryPolicy.steps,ordering?:'configured')=>selectDeliverySteps(configured,developmentDeliveryPolicy.steps,ordering);
 
@@ -9,12 +9,28 @@ export const developmentAuthority={confirmationActions:['deploy','merge'],follow
 export async function releasableDevelopmentTarget(options:Pick<import('./item-operation-types').ReviewOperationsOptions,'service'|'adapter'|'journal'>,scope:import('@nestos/kanban/integration').DeliveryScope,state:import('@nestos/kanban/integration').AutomaticDeliveryState):Promise<boolean> {
     const finalizer=!state.targetActions&&!scope.scopeId&&state.cleanupPrecondition&&state.steps?.length===1&&state.steps[0]===developmentDeliveryPolicy.finalizeAction;
     const action=state.steps?.[state.step],request=action?state.requests[action]:undefined;
-    const preparation=action===developmentDeliveryPolicy.refreshAction&&state.code==='WORKTREE_MISSING'&&request&&!await options.journal.get(jobKey(request.operationId));
-    if(!finalizer&&!preparation)return false;
+    const promptFailure=state.code==='PROMPT_BUNDLE_INVALID'||state.code==='PROMPT_BUNDLE_COUNT_LIMIT';
+    const preparation=action===developmentDeliveryPolicy.refreshAction&&(state.code==='WORKTREE_MISSING'||promptFailure)
+        &&request&&!await options.journal.get(jobKey(request.operationId));
+    const finalization=!!scope.scopeId&&(action==='accept'||action===developmentDeliveryPolicy.finalizeAction)
+        &&await acceptedScopeCleanup(options.journal,scope);
+    if(!finalizer&&!preparation&&!finalization)return false;
     const board=await options.service.read(scope.boardId),{item}=await options.service.item(scope.boardId,scope.itemId);
     const projects=item.externalRefs?.filter(ref=>ref.system==='nestos-remote-project')??[];
-    return (!finalizer||item.status==='completed')&&!item.deletedAt&&item.status!=='cancelled'&&item.planning?.execution==='children'&&state.executionId===item.id
-        &&projects.length===1&&projects[0].id===scope.target&&options.adapter.supports?.(board,item)===true;
+    return (!(finalizer||finalization)||item.status==='completed')&&!item.deletedAt&&item.status!=='cancelled'&&item.planning?.execution==='children'&&state.executionId===item.id
+        &&projects.length===1&&projects[0].id===scope.target
+        &&((promptFailure||finalization)&&!!scope.scopeId&&state.scopeId===scope.scopeId||options.adapter.supports?.(board,item)===true);
+}
+
+async function acceptedScopeCleanup(journal:import('@nestos/kanban/integration').KanbanAutomationJournal,scope:import('@nestos/kanban/integration').DeliveryScope):Promise<boolean> {
+    const {boardId,itemId,scopeId}=scope;
+    const cleanup=await journal.get<import('@nestos/kanban/integration').ReviewCleanup>(reviewCleanupKey(boardId,itemId,scopeId));
+    if(!cleanup)return false;
+    const settings=await journal.get<import('./item-operation-types').ReviewSettings>(reviewKey(boardId,itemId,scopeId));
+    const jobs=await journal.getMany<import('./item-operation-types').ReviewJob>((settings?.jobs??[]).map(jobKey));
+    const settled=(job:import('./item-operation-types').ReviewJob|undefined,action:string)=>job?.phase==='settled'
+        &&job.state==='succeeded'&&job.action===action&&job.boardId===boardId&&job.itemId===itemId&&job.scopeId===scopeId;
+    return jobs.some(job=>settled(job,'accept'))&&jobs.some(job=>job?.id===cleanup.runId&&settled(job,'merge'));
 }
 
 /** Historical waivers settle delivery only for the accepted dispatch, never a new handoff. */

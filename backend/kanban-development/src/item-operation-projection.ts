@@ -1,6 +1,6 @@
 import {t} from '@nestos/common';
 import {replacementMismatchCode,replacementTarget} from './item-operation-jobs';
-import type {KanbanItem,KanbanItemOperation} from '@nestos/kanban/contracts';
+import type {KanbanItem,KanbanItemOperation,KanbanItemOperations} from '@nestos/kanban/contracts';
 import type {ReviewContext as Context,ReviewAction,ReviewJob,MergePlan} from './item-operation-types';
 import {operationDependencies} from './item-operation-skips';
 import {operationSteps} from './development-operation-policy';
@@ -28,7 +28,7 @@ export function operation(context: Context, action: ReviewAction, active: boolea
     const built=latest(context,'build'),auto=built?.followUp,autoPending=action==='deploy'&&auto?.state==='queued'&&built?.state==='succeeded'&&(!job||job.createdAt<built.createdAt);
     const autoFailed=action==='deploy'&&auto?.state==='failed'&&!job;
     const replacement=job?.action==='deploy'&&job.code===replacementMismatchCode?replacementRecovery(job):undefined;
-    return {...(action==='merge'&&job?.state==='failed'&&enabled?{runLabel:t('kanban.operationRetryMerge')}:{}),...(action==='analyze'&&invalidated?{runLabel:t('kanban.operationReanalyzeMerge')}:{}),...(action==='build'?{runLabel:job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...(!context.deliveryPlan?.manualAfter?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
+    return {...(action==='merge'&&job?.state==='failed'&&enabled?{runLabel:t('kanban.operationRetryMerge')}:{}),...(action==='analyze'&&invalidated?{runLabel:t('kanban.operationReanalyzeMerge')}:{}),...(action==='build'?{runLabel:job?.state==='failed'?t('kanban.operationRetryBuild'):job?.state==='succeeded'?t('kanban.operationRebuild'):undefined,...((!context.deliveryPlan||!context.deliveryPlan.manualAfter&&context.deliveryPlan.steps.includes('deploy'))?{followUp:{action:'deploy',label:t('kanban.operationAutoDeploy'),confirmation:t('kanban.operationConfirmDeploy')}}:{})}:{}),...(action==='deploy'?{hideRun:!!auto&&auto.state!=='failed'&&!(job&&job.createdAt>=(built?.createdAt??0)&&job.state==='failed')}:{}),id: action, label: action==='accept'&&context.deliveryPlan?.acceptanceLabel||t(('kanban.operationAction.' + action) as Parameters<typeof t>[0]),
         state:action==='merge'&&invalidated&&(!job||job.phase==='settled')?'unavailable':action==='analyze'&&invalidated?(enabled?'ready':'unavailable'):autoPending?'running':autoFailed?'failed':action === 'accept' && !context.scoped&&context.item.status === 'completed' ? 'succeeded' : job?.phase !== undefined && job.phase !== 'settled' ? job.state : job?.state ?? (enabled ? action === 'accept' || action === 'merge' ? 'waiting-confirmation' : 'ready' : 'unavailable'), enabled,
         ...(replacement||job?.state==='unknown'?{attention:{kind:'recovery' as const}}:action==='merge'&&plan?.conflicts.length?{attention:{kind:'choice' as const}}:{}),
         ...(replacement?{recovery:replacement}:job?.state==='unknown'&&job.phase==='submitting'?{recovery:{runId:job.id,label:t('kanban.operationReconcile'),
@@ -84,4 +84,15 @@ function operationProgress(job:ReviewJob|undefined,queued:boolean):KanbanItemOpe
     const stage=queued?'queued':!job||job.phase==='settled'?undefined:job.code==='WORKSPACE_CONTEXT_PENDING'?'waiting-context':job.state==='unknown'?'reconciling':job.phase==='prepared'?'preparing':'running';
     if(!stage)return;
     return {stage,label:t(('kanban.operationProgress.'+stage) as Parameters<typeof t>[0]),...(!queued&&job?.createdAt?{requestedAt:job.createdAt}:{})};
+}
+
+/** Present the coordinator's current ownership without changing the scheduler's action view. */
+export function projectAutomaticOperation(view:KanbanItemOperations):KanbanItemOperations {
+    const status=view.automatic;
+    if(status?.state!=='running')return view;
+    return {...view,operations:view.operations.map(row=>{
+        if(row.id!==status.stage||!['ready','waiting-confirmation'].includes(row.state))return row;
+        return {...row,state:'running',enabled:false,confirmation:undefined,attention:undefined,
+            fields:undefined,statusText:t(status.waitingForTarget?'kanban.operationAutomaticWaitingTarget':'kanban.operationAutomaticQueued')};
+    })};
 }

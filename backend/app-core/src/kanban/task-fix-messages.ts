@@ -13,6 +13,19 @@ export async function observeFixMessages(options:Options,fix:SavedFix):Promise<v
                     ...(['clarification','error'].includes(message.type)?{notification:message.type==='error'?'error' as const:'info' as const}:{})},Date.now());
                 await tx.setState(key,'delivered');
             });
-        },async (message,rejection)=>{await options.automation.sessionChannel!(fix.resourceId,'acknowledge',{
-            scopeId:fix.id,id:message.id,ack:rejection?{status:'rejected',code:rejection}:{status:'delivered'}});});
+        },(message,rejection)=>acknowledgeFixNotice(options,fix,message.id,rejection));
+}
+
+async function acknowledgeFixNotice(options:Options,fix:SavedFix,id:string,rejection?:string):Promise<void> {
+    const started=Date.now();
+    try {
+        await options.automation.sessionChannel!(fix.resourceId,'acknowledge',{
+            scopeId:fix.id,id,ack:rejection?{status:'rejected',code:rejection}:{status:'delivered'}});
+    } catch(error) {
+        const code=error as {code?:string;remoteCode?:string};
+        if(rejection || (code?.remoteCode??code?.code)!=='CHANNEL_ACK_CHANGED')throw error;
+        // Another observer already acknowledged the same immutable publication.
+        options.log({operationId:fix.id,boardId:fix.boardId,stage:'task.repair.notice.acknowledge',
+            result:'success',code:'CHANNEL_ACK_CHANGED',durationMs:Date.now()-started});
+    }
 }

@@ -4,7 +4,7 @@ import {resolveBrowserTarget} from '@nestos/app-contracts';
 import {kanbanTaskType,type KanbanClient,type KanbanItem} from '@nestos/kanban/contracts';
 import {safeCode} from '@nestos/kanban/integration';
 import {freezePrompts,publishPromptBundle,type PromptFile} from '../run/prompt-bundle';
-import {resolveKanbanConfiguration} from '../presets/kanban-configuration-files';
+import {kanbanResolvedPromptLimit,resolveKanbanConfiguration} from '../presets/kanban-configuration-files';
 import type {DevelopmentWorkspaceRecord} from '../presets/kanban-development';
 import type {TaskRecoveryOptions} from './task-recovery-ports';
 import {requireValue} from './validation';
@@ -79,7 +79,7 @@ async function publishConfiguration(options:TaskRecoveryOptions,record:Developme
     requireValue(options.projects.openWorkspace,'TASK_CONFIGURATION_WORKSPACE_UNAVAILABLE');
     const view=await options.projects.openWorkspace(project.path);
     try{
-        const prompts=await freezePrompts(options.journal,key+':snapshot',()=>resolveKanbanConfiguration(options.fs,view.fs,record.policy.profile));
+        const prompts=await freezePrompts(options.journal,key+':snapshot',()=>resolveKanbanConfiguration(options.fs,view.fs,record.policy.profile),[],kanbanResolvedPromptLimit);
         const revision=await publishPromptBundle(view.fs,record.directory+'/'+relativeDirectory(request),prompts,
             {operationId:request.operationId,profile:record.policy.profile});
         return {revision,configuration:configurationDigest(prompts.files),operationId:request.operationId};

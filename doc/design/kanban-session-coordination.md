@@ -172,6 +172,8 @@ Node 宿主通过部署环境变量 `NESTOS_KANBAN_MODULE_PERMISSIONS` 读取规
 
 原执行会话用 `session_report` 上报具体缺项。获授权的恢复会话可用 `session_request` 的 `kanban.recovery.inspect` 读取当前状态和可用操作，再按返回的修订调用允许的操作。管理会话可通过 `kanban.discover`、`kanban.describe` 和 `kanban.invoke` 查询或申请软件交付操作。先读 `delivery.read` 确认可用动作，再通过 `delivery.run` 按当前作用域、修订和确认要求提交。项目工具链变更仍需项目或服务相应权限。
 
+自动交付的已确认决策允许每次派发自动续办一次执行方自行处理的错误。宿主等原生轮次结束，核对派发所有权、工作树和暂停状态后，沿用原任务回复通道提交续办请求。提交请求后仍保留原阻塞，直至原会话发布关联的解决回执。需要管理方处理的错误继续由管理任务接手。决策详情的运行摘要随管理任务的阻塞状态展示。
+
 ## 受管项目自身升级与验收
 
 项目可在 _nestos/etc/deployment.json 选择 httpd（当前受管 HTTP 服务的稳定别名）或管理员注册的服务 ID，例如 cells-x1。管理员在 ~/.config/nestos/service-projects.json（0600）或 NESTOS_SERVICE_PROJECTS 声明允许的项目与服务对应关系。记录由 serviceId、serverId、serverProjectId、principalId、alias 和 root 组成。宿主取已挂载根授权，并向 Cells 核对同一项目 ID 的导出别名与目录。改节点、项目、授权主体、根目录或服务后，旧构建需要重做；已提交的操作继续按原操作 ID 核对回执。

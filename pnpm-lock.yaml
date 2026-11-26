@@ -81,6 +81,9 @@ importers:
       '@nestos/vfsdriver-local':
         specifier: workspace:*
         version: link:libraries/vfsdriver-local
+      esbuild:
+        specifier: 0.25.12
+        version: 0.25.12
       jsdoc:
         specifier: ^4.0.5
         version: 4.0.5

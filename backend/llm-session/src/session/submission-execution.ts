@@ -19,7 +19,11 @@ export function createSessionSubmission(options: SessionSubmissionOptions) {
         requireValue(request.expectedSessionId && request.submission?.id && request.expectedBranch, 'SUBMISSION_INVALID');
         if (options.ensureWritable && !await options.ensureWritable(request.expectedSessionId))
             throw Object.assign(failure('SESSION_WRITER_UNAVAILABLE'), {executionOutcome: 'not-started', retryable: true});
-        const lease = await options.contexts.open(request.expectedSessionId);
+        const lease = await options.contexts.open(request.expectedSessionId).catch(error => {
+            if ((error as {code?:string})?.code === 'SERVICE_STOPPING')
+                throw Object.assign(error as Error, {executionOutcome:'not-started',retryable:true});
+            throw error;
+        });
         try {await lease.commandBus.execute(SessionCommand.Submit, request);}
         catch (error) {
             if ((error as {code?: string})?.code === 'QUEUE_READ_ONLY')

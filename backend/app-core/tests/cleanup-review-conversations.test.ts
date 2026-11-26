@@ -24,6 +24,7 @@ it('reopens explicitly selected retained resources once in the same native Sessi
  const f=await fixture(),review=await f.start();await f.start();expect(f.enqueue).toHaveBeenCalledOnce();
  expect(f.open).toHaveBeenCalledWith('p','codex','native');
  expect(f.enqueue.mock.calls[0][0]).not.toContain('excluded');
+ expect(f.enqueue.mock.calls[0][0]).toContain('Keep the assigned execution branch checked out');
  expect(await readManagementCleanup(f.options,f.conversation as any,review.reviewId)).toMatchObject({status:{state:'running',reviewState:'pending'}});
  expect(await f.journal.get('management-operation-scope:scope')).toMatchObject({stage:'accepted'});
 });

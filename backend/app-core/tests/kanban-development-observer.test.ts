@@ -12,7 +12,7 @@ import {developmentObserver} from '../src/presets/kanban-development-observer';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});
-async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, lifecycle?: Parameters<typeof developmentObserver>[0]['lifecycle'], exchange?: Parameters<typeof developmentObserver>[0]['exchange'], deniedLearning = false) {
+async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, lifecycle?: Parameters<typeof developmentObserver>[0]['lifecycle'], exchange?: Parameters<typeof developmentObserver>[0]['exchange'], deniedLearning = false, replyTask?:Parameters<typeof developmentObserver>[0]['replyTask']) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
     const fs = await manager.openFileSystem('/'), store = await SeqKanbanStore.open(fs), journal = new KanbanAutomationJournal(fs, kanbanJournalOptions);
     await journal.open();
@@ -40,7 +40,7 @@ async function fixture(verifyDelivery?: (dispatchId: string) => Promise<void>, l
     await journal.update('development-workspace:attempt',()=>({channelId:'attempt',projectId:'project',directory:'/workspace/_nestos/worktrees/attempt',policy:{commit:'changes',prompts:{version:1,files:[]}},repositories:[],availableRepositories:[]}));
     const events = await UserEventService.open(fs);
     let learningService = deniedLearning ? coordinator : service;
-    const observer = developmentObserver({learningService: () => learningService, fs, events, verifyDelivery, lifecycle, exchange, kernel: {inspectSession: async () => ({getShared: async () => undefined})},
+    const observer = developmentObserver({learningService: () => learningService, fs, events, verifyDelivery, lifecycle, exchange, replyTask, kernel: {inspectSession: async () => ({getShared: async () => undefined})},
         remote:{sessionChannel:channels.channel,projectHarness:async()=>({subscribeChannel:()=>()=>{},close:async()=>{}}) as never},
         projects: {get: async () => ({path: '/project'}) as never, openWorkspace: async () => ({fs, dispose: async () => {}}) as never}, wake() {}});
     closes.push(() => observer.dispose());
@@ -82,6 +82,25 @@ it('projects a management blocker reported after the dispatch was marked result 
     f.channels.report('attempt','missing-delivery',{type:'error',content:'No implementation or acceptance evidence',payload:{handler:'parent'}});
     expect(await f.observe('succeeded')).toMatchObject({outcome:'running',code:'WORKSPACE_ERROR_REPORTED'});
     expect((await f.service.item('board','item')).item.issues).toMatchObject([{id:'missing-delivery',handler:'parent',summary:'No implementation or acceptance evidence'}]);
+});
+it('queues a self-handled issue only after its native turn ends and preserves the blocker',async()=>{
+    const reply=vi.fn<NonNullable<Parameters<typeof developmentObserver>[0]['replyTask']>>();
+    const f=await fixture(undefined,undefined,undefined,false,reply);
+    vi.spyOn(f.coordinator,'record').mockResolvedValue({status:'confirmed'} as never);
+    await f.journal.update<Record<string,unknown>>('development-workspace:attempt',old=>({...old,context:{
+        decision:{sourceBoardId:'board',recordId:'decision',snapshot:{completion:'automatic'}},
+    }}));
+    reply.mockImplementation(async (_board,request)=>{await f.journal.update('task-reply-delivered:'+request.operationId,()=>true);});
+    const channel=f.channels.ensure('attempt');
+    channel.execution={sessionId:'native',turnId:'turn',operationId:'operation',status:'running'};
+    f.channels.report('attempt','self-issue',{type:'error',content:'Incomplete implementation',payload:{handler:'self'}});
+    await f.observe('running');
+    expect(reply).not.toHaveBeenCalled();
+    channel.execution.status='completed';
+    await f.observe('succeeded');
+    await f.observe('succeeded');
+    expect(reply).toHaveBeenCalledExactlyOnceWith('board',expect.objectContaining({itemId:'item',attemptId:'attempt',replyTo:'self-issue'}));
+    expect((await f.service.item('board','item')).item.blocked?.reason).toBe('WORKSPACE_ERROR_REPORTED');
 });
 it('blocks clarification, emits one global notification, and does not let a result bypass it', async () => {
     const f = await fixture(); await f.publish('question', 'clarification');

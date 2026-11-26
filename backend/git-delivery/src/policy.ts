@@ -4,7 +4,7 @@ export interface DeliveryPlan {ordering?:'configured';manualAfter?:string;steps:
 export interface DeliveryItem {externalRefs?:Array<{system:string;id:string;revision?:string}>}
 export interface FrozenDeliveryPolicy {prompts:{files:Array<{name:string;content:string}>}}
 export interface DeliveryProfile extends DeliveryPlan {id:string;label:string;readOnly?:boolean}
-interface Policy {verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build';preferenceInstruction?:string;requireSplitJustification?:boolean;schema:1;profiles:DeliveryProfile[];instruction:string}
+interface Policy {verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'|'build-cleanup';preferenceInstruction?:string;requireSplitJustification?:boolean;schema:1;profiles:DeliveryProfile[];instruction:string}
 const system='nestos-work-delivery';
 export function deliveryPolicy(policy:FrozenDeliveryPolicy):Policy|undefined {
     const content=policy.prompts.files.find(file=>file.name==='delivery-policy.json')?.content;if(!content)return;
@@ -19,14 +19,15 @@ export function deliveryProfile(policy:FrozenDeliveryPolicy,item:DeliveryItem):D
     const selected=deliveryPolicy(policy)?.profiles.find(profile=>profile.id===refs[0].id);
     requireValue(refs.length===1&&refs[0].revision==='1'&&selected,'DELIVERY_PROFILE_UNAVAILABLE');return selected.id==='source'?{...selected,acceptanceLabel:t('kanban.operationAcceptSource'),acceptanceConfirmation:t('kanban.operationConfirmSource')}:selected;
 }
-/** Frozen decision choices override the default release without optional verification. */
+/** Frozen decision choices override the default build without deployment or verification. */
 export function decisionDeliveryPolicy(policy:FrozenDeliveryPolicy,context:unknown):Policy|undefined {
     const base=deliveryPolicy(policy);if(!base)return;
-    const saved=(context as {decision?:{snapshot?:{deliveryOptions?:{verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'};verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'}}})?.decision?.snapshot;
+    const saved=(context as {decision?:{snapshot?:{deliveryOptions?:{verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'|'build-cleanup'};verificationLevel?:'full'|'quick'|'none';deliveryMode?:'release'|'source'|'build'|'build-cleanup'}}})?.decision?.snapshot;
     const snapshot=saved?.deliveryOptions??saved;
-    const verificationLevel=snapshot?.verificationLevel??'none',deliveryMode=snapshot?.deliveryMode??'release';
-    requireValue(['full','quick','none'].includes(verificationLevel)&&['release','source','build'].includes(deliveryMode),'DELIVERY_PREFERENCES_INVALID');
-    requireValue(verificationLevel==='none'?deliveryMode==='source'||deliveryMode==='build'||deliveryMode==='release':deliveryMode==='release','DELIVERY_PREFERENCES_INVALID');
+    const verificationLevel=snapshot?.verificationLevel??'none';
+    const deliveryMode=snapshot?.deliveryMode??(snapshot?.verificationLevel===undefined?'build-cleanup':'release');
+    requireValue(['full','quick','none'].includes(verificationLevel)&&['release','source','build','build-cleanup'].includes(deliveryMode),'DELIVERY_PREFERENCES_INVALID');
+    requireValue(verificationLevel==='none'||deliveryMode==='release','DELIVERY_PREFERENCES_INVALID');
     return {...base,verificationLevel,deliveryMode,instruction:base.preferenceInstruction??base.instruction};
 }
 export function validateDeliveryDecomposition(policy:FrozenDeliveryPolicy,output:unknown,context?:unknown):void {
@@ -36,7 +37,7 @@ export function validateDeliveryDecomposition(policy:FrozenDeliveryPolicy,output
     const snapshot=saved?.deliveryOptions??saved;
     if(value?.ready&&(snapshot?.verificationLevel||snapshot?.deliveryMode))requireValue(!!value.subtasks?.length,'DELIVERY_PROFILE_REQUIRED');
     if(!value?.subtasks||!selected)return;
-    const tasks=value.subtasks,mode=selected.deliveryMode==='build'?'release':selected.deliveryMode!,full=selected.verificationLevel==='full';
+    const tasks=value.subtasks,mode=selected.deliveryMode==='source'?'source':'release',full=selected.verificationLevel==='full';
     requireValue(Array.isArray(tasks)&&tasks.length>0&&tasks.every(task=>task.executionProfile?.system===system&&task.executionProfile.revision==='1'&&selected.profiles.some(profile=>profile.id===task.executionProfile!.id)),'DELIVERY_PROFILE_REQUIRED');
     const integrations=tasks.filter(task=>task.executionProfile!.id===mode),verifiers=tasks.filter(task=>task.executionProfile!.id==='verification');
     requireValue((mode==='release'?integrations.length===1:integrations.length>0&&!tasks.some(task=>task.executionProfile!.id==='release'))&&(full?verifiers.length===1:verifiers.length===0),'DELIVERY_CHAIN_INVALID');
@@ -50,6 +51,7 @@ export function validateDeliveryDecomposition(policy:FrozenDeliveryPolicy,output
 export function selectedDeliveryProfile(policy:FrozenDeliveryPolicy,item:DeliveryItem,context:unknown):DeliveryProfile|undefined {
     const profile=deliveryProfile(policy,item),selected=decisionDeliveryPolicy(policy,context);
     if(profile?.id==='release'&&selected?.deliveryMode==='source'){const source=selected.profiles.find(value=>value.id==='source');return source?{...source,acceptanceLabel:t('kanban.operationAcceptSource'),acceptanceConfirmation:t('kanban.operationConfirmSource')}:undefined;}
+    if(profile?.id==='release'&&selected?.deliveryMode==='build-cleanup')return {...profile,ordering:'configured',steps:['analyze','merge','build','accept','cleanup'],acceptance:'source',acceptanceLabel:t('kanban.operationConfirmBuildReceipt'),acceptanceConfirmation:null};
     return profile?.id==='release'&&selected?.deliveryMode==='build'?{...profile,manualAfter:'build'}:profile;
 }
 /** Verification accepts a running release, never uncommitted repairs or another version. */

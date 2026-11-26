@@ -7,6 +7,7 @@ import {channelRequests,channelDigest,type ChannelResponse,type ChannelRequest} 
 import type {TaskRecoveryOptions,RecoverySession} from './task-recovery-ports';
 import {requireValue} from './validation';
 import {channelMessages,type ChannelMessage} from '../run/channel-results';
+import {sha256HexSync} from '@nestos/common';
 interface Ports {active():boolean;inspect:typeof import('./task-recovery-state').taskRecoveryState;recoverTask(board:string,request:KanbanTaskRecoveryRequest):Promise<KanbanTaskRecoveryResult>}
 export function taskRecoveryChannels(options:TaskRecoveryOptions,ports:Ports) {
     const watches=new DirectorySubscriptions(),pending=new Map<string,Promise<void>>(),restored=new Set<string>();
@@ -35,7 +36,8 @@ export function taskRecoveryChannels(options:TaskRecoveryOptions,ports:Ports) {
 async function requestMissingResult(options:TaskRecoveryOptions,scope:RecoverySession,
     record:NonNullable<Awaited<ReturnType<typeof recoveryWorkspace>>>['record'],active:()=>boolean):Promise<void> {
     const {boardId,itemId,projectId,scopeId,sessionId,dispatchId}=scope;
-    const started=Date.now(),operationId='recovery-result-v2-'+dispatchId;
+    const started=Date.now();
+    let operationId='recovery-result-v2-'+dispatchId;
     let stage='task.recovery.admission';
     try {
         const board=await options.service.read(boardId),item=board.items.find(row=>row.id===itemId);
@@ -44,8 +46,11 @@ async function requestMissingResult(options:TaskRecoveryOptions,scope:RecoverySe
             &&!await options.journal.get('worktree-cleanup:'+(record.worktreeId??dispatchId)),'RECOVERY_TARGET_NOT_READY');
         stage='task.recovery.scope';
         const binding=await options.remote.sessionChannel(projectId,'current',{cwd:record.directory}) as
-            {scopeId?:string;execution?:{sessionId?:string}};
+            {scopeId?:string;execution?:{sessionId?:string;status?:string;turnId?:string}};
         requireValue(binding.scopeId===scopeId&&binding.execution?.sessionId===sessionId,'RECOVERY_STALE_REFRESH');
+        if(['running','submitting'].includes(binding.execution.status??''))return;
+        if(binding.execution.status==='completed'&&binding.execution.turnId)
+            operationId='recovery-result-v3-'+sha256HexSync(JSON.stringify([dispatchId,sessionId,binding.execution.turnId]));
         const existing=publishedRecoveryOutcome(await channelMessages(options.remote,projectId,scopeId));
         if(existing){
             options.log({operationId,boardId,stage,result:'success',code:existing,durationMs:Date.now()-started});

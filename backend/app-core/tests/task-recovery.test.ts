@@ -182,9 +182,9 @@ it('requests formal result recovery in the original session without dispatching 
  const enqueue=vi.fn(async()=>{}),close=vi.fn(async()=>{});
  f.options.remote.projectHarness=vi.fn(async()=>({subscribeChannel:()=>()=>{},close}));
  f.options.remote.projectConversation=vi.fn(async()=>({enqueue,close}));
- let scopeId='newer-dispatch',messages:unknown[]=[];
+ let scopeId='newer-dispatch',messages:unknown[]=[],turn: {status?:string;turnId?:string}={};
  f.options.remote.sessionChannel=vi.fn(async(_project:string,method:string)=>{
-    if(method==='current')return {scopeId,execution:{sessionId:'canonical-session'}};
+    if(method==='current')return {scopeId,execution:{sessionId:'canonical-session',...turn}};
     if(method==='messages')return {messages};
     throw new Error('Supplemental recovery channel unavailable');
  });
@@ -198,11 +198,23 @@ it('requests formal result recovery in the original session without dispatching 
  expect(f.options.remote.projectConversation).toHaveBeenCalledWith('project','profile','canonical-session');
  expect(enqueue).toHaveBeenCalledWith(expect.stringContaining('Complete remaining authorized work'),[],undefined,'recovery-result-v2-failed-dispatch','next-turn');
  expect(enqueue.mock.calls[0]).toEqual(expect.arrayContaining([expect.stringContaining('exact blocker and next action')]));
+ turn={status:'running',turnId:'continuation-turn'};
+ await expect(f.recovery.openTaskRecovery('b',request)).resolves.toMatchObject({state:'accepted',resourceId});
+ expect(enqueue).toHaveBeenCalledOnce();
+ turn={...turn,status:'completed'};
+ await f.recovery.openTaskRecovery('b',request);
+ await f.recovery.openTaskRecovery('b',{...request,operationId:'repeat-click'});
+ const continuedId=enqueue.mock.lastCall?.[3];
+ expect(continuedId).toMatch(/^recovery-result-v3-/);
+ expect(enqueue.mock.calls[1]?.[3]).toBe(continuedId);
+ turn={status:'completed',turnId:'later-incomplete-turn'};
+ await f.recovery.openTaskRecovery('b',request);
+ expect(enqueue.mock.lastCall?.[3]).not.toBe(continuedId);
  messages=[{id:'missing',message:{type:'error',content:'Evidence unavailable',payload:{handler:'parent'}}}];
  await expect(f.recovery.openTaskRecovery('b',request)).resolves.toMatchObject({state:'accepted',resourceId});
  messages=[{id:'final',message:{type:'result',content:'Verified'}}];
  await expect(f.recovery.openTaskRecovery('b',request)).resolves.toMatchObject({state:'accepted',resourceId});
- expect(enqueue).toHaveBeenCalledOnce();
+ expect(enqueue).toHaveBeenCalledTimes(4);
  expect(f.options.remote.projectHarness).not.toHaveBeenCalled();
  const attempts=Object.values((await f.service.workflow('b')).dispatches).filter(row=>row.itemId==='verify');
  expect(attempts).toMatchObject([{id:'failed-dispatch',outcome:'unknown'}]);

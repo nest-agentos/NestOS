@@ -82,9 +82,9 @@ it('leaves no decision when discussion stops, restores the preview and rejects a
 });
 
 it.each([
- ['full','full','release'],['quick','quick','release'],['release','none','release'],['build','none','build'],['source','none','source'],
+ [undefined,'none','build-cleanup'],['build-cleanup','none','build-cleanup'],['full','full','release'],['quick','quick','release'],['release','none','release'],['build','none','build'],['source','none','source'],
 ])('preserves the %s delivery choice when the preview becomes a confirmed decision',async(mode,verificationLevel,deliveryMode)=>{
- const f=await fixture(),proposal=await f.request('decision.propose',{id:'choice',title:'Choice',content:'Scope',rationale:'Check',projectIds:['one'],verificationMode:mode}) as any;
+ const f=await fixture(),proposal=await f.request('decision.propose',{id:'choice',title:'Choice',content:'Scope',rationale:'Check',projectIds:['one'],...(mode===undefined?{}:{verificationMode:mode})}) as any;
  f.read.mockResolvedValue({messages:[{id:'confirm',role:'user',text:'确认决策'}]});
  await f.request('decision.confirm',{proposalDigest:proposal.proposalDigest});
  expect(await f.service.record('b','choice')).toMatchObject({status:'confirmed',verificationLevel,deliveryMode,completion:'automatic'});

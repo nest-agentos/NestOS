@@ -24,6 +24,7 @@ import type {UserEventService} from '../events/service';
 
 type Input = Parameters<NonNullable<PersonalKanbanAutomationOptions['observeWork']>>[0];
 interface Options {learningService(): import('@nestos/kanban/contracts').KanbanService; exchange?: ReturnType<typeof import('./kanban-channel-exchange').developmentWorkExchange>;
+    replyTask?: NonNullable<import('@nestos/kanban/contracts').KanbanClient['replyTask']>;
     verifyDelivery?(dispatchId: string): Promise<void>;
     handoffReports?(board:string,item:string,dispatch:string,service:import('@nestos/kanban/contracts').KanbanService):Promise<unknown>;
     lifecycle?: Pick<ReturnType<typeof import('./kanban-development-lifecycle').developmentLifecycle>, 'enqueue' | 'scan' | 'dispose' | 'settled'>;
@@ -42,7 +43,7 @@ export function developmentObserver(options: Options) {
         const workspace = await journal.get<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id);
         if (!worktree && !workspace?.directoryOnly) return input.observation;
         const {item} = await input.service.item(input.boardId, input.dispatch.itemId);
-        const stopping = (await input.service.read(input.boardId)).lifecycle !== undefined;
+        const board = await input.service.read(input.boardId), stopping = board.lifecycle !== undefined;
         if (['failed', 'cancelled'].includes(input.observation.outcome)) {
             const started=Date.now();
             if (!stopping && item.control?.action !== 'cancel') try {await options.lifecycle?.enqueue(input.boardId, input.dispatch, item, input.observation);}
@@ -81,6 +82,8 @@ export function developmentObserver(options: Options) {
             });
             const unresolved = unresolvedWorkIssues(messages);
             await reconcileIssues(journal, input, messages);
+            if (!stopped && !stopping && !board.deletedAt && !board.executionControl?.paused && envelope.execution?.status === 'completed' && worktree)
+                await continueSelfHandledIssue(options, journal, input, item, unresolved, workspace, worktree.id??input.dispatch.id);
             if(envelope.execution?.sessionId&&['running','submitting'].includes(envelope.execution.status??''))return {...input.observation,outcome:'running',outputs:undefined,code:unresolved.some(message=>message.type==='error')?'WORKSPACE_ERROR_REPORTED':unresolved.some(message=>message.type==='clarification')?'WORKSPACE_INPUT_REQUIRED':undefined};
             if (options.exchange && !workspace.directoryOnly && !unresolved.length) input = {...input, observation: await observeExchange(options.exchange,journal,input,workspace,
                 messages.some(message=>message.type==='result'),envelope.messages as ChannelMessage[])};
@@ -138,6 +141,29 @@ export function developmentObserver(options: Options) {
     };
     async function close(id:string){await watches.close(id);}
     return {observe,sessionObservation:(...args:Parameters<typeof sessionObservation>)=>stopped?nativeActivity.read(...args):sessionObservation(...args), scan: () => options.lifecycle?.scan(), async quiesce() {stopped = true; await options.lifecycle?.dispose();}, async dispose() {stopped = true; await options.lifecycle?.dispose(); await watches.dispose();nativeActivity.clear();}};
+}
+
+async function continueSelfHandledIssue(options:Options,journal:KanbanAutomationJournal,input:Input,item:import('@nestos/kanban/contracts').KanbanItem,issues:WorkMessage[],workspace:DevelopmentWorkspaceRecord,worktreeId:string) {
+    const [issue]=issues,{boardId,dispatch}=input;
+    if (!options.replyTask || issues.length!==1 || issue.type!=='error' || issue.handler!=='self'
+        || item.control || item.restartPending || item.deletedAt || item.owner?.token!==dispatch.fence) return;
+    const operationId='self-retry-'+sha256HexSync(dispatch.id),started=Date.now(),key='task-auto-self-retry:'+dispatch.id;
+    try {
+        if (await journal.get('task-reply-delivered:'+operationId)) return;
+        if (await journal.get('worktree-cleanup:'+(workspace.worktreeId??worktreeId))) return;
+        const decision=(workspace.context as {decision?:{sourceBoardId:string;recordId:string;snapshot?:{completion?:string}}}|undefined)?.decision;
+        if (decision?.snapshot?.completion!=='automatic') return;
+        if ((await input.service.record(decision.sourceBoardId,decision.recordId)).status!=='confirmed') return;
+        const selected=await journal.update<string>(key,old=>old??issue.id);
+        if(selected!==issue.id)return;
+        await options.replyTask(boardId,{itemId:item.id,attemptId:dispatch.id,replyTo:issue.id,operationId,
+            content:'Continue the reported self-handled issue in this same workspace and Session. Preserve the original scope and checks. If repaired, publish a linked resolved report and complete the normal handoff. Otherwise report the concrete remaining blocker once.'});
+        createModuleLogger('kanban').info('Self-handled issue continuation queued',{operationId,boardId,stage:'task.recovery.self',result:'success',durationMs:Date.now()-started});
+    }catch(error){
+        const code=(error as {code?:string}).code;
+        createModuleLogger('kanban').warn('Self-handled issue continuation unavailable',{operationId,boardId,stage:'task.recovery.self',result:'failure',
+            code:code&&/^[A-Z0-9_]{1,80}$/.test(code)?code:'WORKSPACE_REPLY_FAILED',durationMs:Date.now()-started});
+    }
 }
 
 async function observeExchange(exchange:NonNullable<Options['exchange']>,journal:KanbanAutomationJournal,input:Input,

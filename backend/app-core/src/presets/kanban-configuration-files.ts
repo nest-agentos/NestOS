@@ -7,6 +7,9 @@ import {readPrompt,failure,type PromptFile} from '../run/prompt-bundle';
 import {KANBAN_CONFIGURATION_DIRECTORY,kanbanConfigurationRevision} from './kanban-global-configuration';
 const log=createModuleLogger('kanban-configuration');
 const validName=(name:unknown):name is string=>typeof name==='string'&&/^[a-zA-Z0-9_-]+\.(md|json|yaml|yml|txt)$/.test(name)&&name!=='profile.json';
+const supplemental=['coordination-conversation.md','session-protocol.md','decision-actions.md','coordination-actions.md','workspace-rules.md','delivery.md','report-packaging.md','operation-result.md'];
+const optional=[workspacePrerequisitesFile,...supplemental,...['decision','task'].flatMap(entry=>LIFECYCLE_PROMPT_SUFFIXES.map(suffix=>entry+'-'+suffix+'.md'))];
+export const kanbanResolvedPromptLimit=32+optional.length;
 /** A bounded manifest selects data files; no file can authorize execution or escape its profile. */
 export async function resolveKanbanConfiguration(fs:IFileSystem,project:IFileSystem,profile:string):Promise<PromptFile[]> {
     const operationId=randomUUID(),started=Date.now();
@@ -28,8 +31,6 @@ async function resolveFiles(fs:IFileSystem,project:IFileSystem,profile:string):P
         if(['decision.md','task.md','planning.md','bootstrap.md'].some(name=>!names.includes(name)))throw failure('KANBAN_PROFILE_REQUIRED_FILE');
     }else{if(profile!=='development'||await fs.driver.exists(KANBAN_CONFIGURATION_DIRECTORY+'/.defaults.json'))throw failure('PROMPT_PROFILE_NOT_FOUND');names=Object.keys(kanbanConfigurationDefaults);}
     const files:PromptFile[]=manifest?[manifest]:[];
-    const supplemental=['coordination-conversation.md','session-protocol.md','decision-actions.md','coordination-actions.md','workspace-rules.md','delivery.md','report-packaging.md','operation-result.md'];
-    const optional=[workspacePrerequisitesFile,...supplemental,...['decision','task'].flatMap(entry=>LIFECYCLE_PROMPT_SUFFIXES.map(suffix=>entry+'-'+suffix+'.md'))];
     for(const name of new Set([...names,...optional])){
         if(supplemental.includes(name)&&name!=='coordination-conversation.md'&&!names.includes(name)&&!files.some(file=>file.content.includes(name)))continue;
         const file=await selected(fs,project,global,local,name);

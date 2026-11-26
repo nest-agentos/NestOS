@@ -33,7 +33,7 @@ it('accepts the minimum implementation-plus-verification plan and rejects unexpl
  const extra={...task('extra','source'),splitJustification:undefined};
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[extra,task('implementation','release',['extra']),subtasks[1]]},full)).toThrowError(expect.objectContaining({code:'DELIVERY_SPLIT_JUSTIFICATION_REQUIRED'}));
 });
-it.each([['quick','release','release'],['none','release','release'],['none','build','release'],['none','source','source']])('accepts %s/%s without redundant verification tasks', (verificationLevel,deliveryMode,profile)=>{
+it.each([['quick','release','release'],['none','release','release'],['none','build','release'],['none','build-cleanup','release'],['none','source','source']])('accepts %s/%s without redundant verification tasks', (verificationLevel,deliveryMode,profile)=>{
  const context={decision:{snapshot:{verificationLevel,deliveryMode}}};
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation',profile)]},context)).not.toThrow();
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation',profile),task('verify','verification',['implementation'])]},context)).toThrowError(expect.objectContaining({code:'DELIVERY_CHAIN_INVALID'}));
@@ -49,11 +49,13 @@ it('rejects a ready plan that bypasses explicit decision delivery profiles',()=>
  expect(()=>validateDeliveryDecomposition(policy,{ready:true},{decision:{snapshot:{verificationLevel:'quick',deliveryMode:'release'}}})).toThrowError(expect.objectContaining({code:'DELIVERY_PROFILE_REQUIRED'}));
 });
 
-it('defaults to automatic release without optional checks or an independent verifier',()=>{
- expect(decisionDeliveryPolicy(policy,{})).toMatchObject({verificationLevel:'none',deliveryMode:'release'});
+it('defaults to automatic build without deployment or an independent verifier',()=>{
+ expect(decisionDeliveryPolicy(policy,{})).toMatchObject({verificationLevel:'none',deliveryMode:'build-cleanup'});
  const automatic=repositoryDeliveryPlan([selectedDeliveryProfile(policy,{externalRefs:[{system:'nestos-work-delivery',id:'release',revision:'1'}]}, {})!]);
- expect(automatic.steps).toEqual(expect.arrayContaining(['merge','build','deploy','accept','cleanup']));expect(automatic).not.toHaveProperty('manualAfter');
- expect(kanbanVerificationMode({})).toBe('release');expect(kanbanVerificationMode({verificationLevel:'full',deliveryMode:'release'})).toBe('full');
+ expect(automatic.steps).toEqual(['analyze','merge','build','accept','cleanup']);expect(automatic).not.toHaveProperty('manualAfter');
+ expect(kanbanVerificationMode({})).toBe('build-cleanup');expect(kanbanVerificationMode({verificationLevel:'full',deliveryMode:'release'})).toBe('full');
+ expect(decisionDeliveryPolicy(policy,{decision:{snapshot:{verificationLevel:'none'}}})).toMatchObject({deliveryMode:'release'});
+ expect(kanbanVerificationMode({verificationLevel:'none'})).toBe('release');
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation','release')]})).not.toThrow();
  expect(()=>validateDeliveryDecomposition(policy,{subtasks:[task('implementation','release'),task('verify','verification',['implementation'])]})).toThrowError(expect.objectContaining({code:'DELIVERY_CHAIN_INVALID'}));
 });
@@ -62,4 +64,12 @@ it('keeps build-only delivery before the explicit manual integration boundary',(
  const plan=repositoryDeliveryPlan([{steps:['build','deploy','accept','analyze','merge','cleanup'],acceptance:'runtime',manualAfter:'build'}]);
  expect(plan.steps[0]).toBe('build');expect(plan.manualAfter).toBe('build');
  expect(plan.steps.indexOf('merge')).toBeGreaterThan(plan.steps.indexOf('build'));
+});
+
+it('builds the integrated commit and cleans up without deploying or requiring manual acceptance',()=>{
+ const context={decision:{snapshot:{verificationLevel:'none',deliveryMode:'build-cleanup'}}};
+ const profile=selectedDeliveryProfile(policy,{externalRefs:[task('implementation','release').executionProfile]},context)!;
+ const plan=repositoryDeliveryPlan([profile]);
+ expect(plan).toEqual({ordering:'configured',steps:['analyze','merge','build','accept','cleanup'],acceptance:'source'});
+ expect(kanbanVerificationMode({verificationLevel:'none',deliveryMode:'build-cleanup'})).toBe('build-cleanup');
 });

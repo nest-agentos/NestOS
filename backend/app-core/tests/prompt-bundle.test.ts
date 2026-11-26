@@ -1,6 +1,18 @@
 import {describe, expect, it, vi} from 'vitest';
 import type {IFileSystem} from '@nestos/vfs-core';
-import {publishImmutableFile, readPrompt} from '../src/run/prompt-bundle';
+import {freezePrompts, publishImmutableFile, readPrompt, type PromptJournal} from '../src/run/prompt-bundle';
+import {sha256HexSync} from '@nestos/common';
+
+it('reserves space for host operation instructions in a full project prompt bundle',async()=>{
+    const journal:PromptJournal={get:async()=>undefined,update:async(_key,write)=>write(undefined)};
+    const file=(name:string)=>({name,source:'fixture',content:'Instructions',sha256:sha256HexSync('Instructions')});
+    const authored=Array.from({length:32},(_,index)=>file('project-'+index+'.md'));
+    const host=file('management-integration-pre.md');
+    await expect(freezePrompts(journal,'review',async()=>authored,[host])).resolves.toMatchObject({files:[...authored,host]});
+    await expect(freezePrompts(journal,'too-many',async()=>[...authored,host])).rejects.toMatchObject({code:'PROMPT_BUNDLE_COUNT_LIMIT'});
+    const resolved=[...authored,file('prerequisites.json')];
+    await expect(freezePrompts(journal,'expanded-profile',async()=>resolved,[host],33)).resolves.toMatchObject({files:[...resolved,host]});
+});
 
 function fixture() {
     const bytes = new TextEncoder().encode('original');

@@ -3,7 +3,7 @@ import {operationRuntimeVersion} from './item-operation-runtime';
 import {developmentAnalysisPolicy,developmentAuthority} from './development-operation-policy';
 import {developmentDeliveryPolicy,releasableDevelopmentTarget} from './development-operation-policy';
 import {requireOperationAuthority,type OperationOrigin} from '@nestos/kanban/integration';
-import {operation,latestReviewJob as latest} from './item-operation-projection';
+import {operation,latestReviewJob as latest,projectAutomaticOperation} from './item-operation-projection';
 import type {ReviewContext as Context} from './item-operation-types';
 import {discoverOperationScopes} from './item-operation-discovery';
 import {scanRetiredScope} from './item-operation-retirement';
@@ -33,10 +33,10 @@ export function createItemOperations(input: ReviewOperationsOptions) {
         const pending = (tails.get(key) ?? Promise.resolve()).catch(() => {}).then(() => {requireValue(!stopped, 'SERVICE_STOPPING'); return work();}); tails.set(key, pending);
         void pending.finally(() => {if (tails.get(key) === pending) tails.delete(key);}).catch(() => {}); return pending;
     };
-    const read=(board:string,item:string)=>readOperationScopes(options,board,item,scoped=>load(scoped,board,item,false).then(context=>view(scoped,context)));
+    const read=(board:string,item:string)=>readOperationScopes(options,board,item,scoped=>load(scoped,board,item,false).then(context=>view(scoped,context)).then(projectAutomaticOperation));
     const write=async(board:string,request:KanbanItemOperationRequest|KanbanItemOperationBinding,work:(scoped:ReviewOperationsOptions)=>Promise<KanbanItemOperations>)=>{
         const result=await work(await operationRequestOptions(options,board,request));
-        return request.scopeId?read(board,request.itemId):result;
+        return request.scopeId?read(board,request.itemId):projectAutomaticOperation(result);
     };
     const createAutomatic=(scoped:ReviewOperationsOptions)=>automaticDelivery({...scoped,policy:developmentDeliveryPolicy,releasableTarget:(scope,state)=>releasableDevelopmentTarget(options,scope,state),handoff:scoped.scopes?.handoff,
         automatic:scoped.automatic||scoped.scopes?.handoff?async(board,item)=>{
@@ -48,7 +48,7 @@ export function createItemOperations(input: ReviewOperationsOptions) {
         reanalysis:(board,item,id)=>queue(board,item,()=>prepareAutomaticReanalysis({...scoped,policy:developmentAnalysisPolicy},board,item,id)),
         settle:(board,item)=>settleDeliveryAcceptance(scoped,board,item),
         target:scoped.automaticTarget,plan:scoped.deliveryPlan,cleanup:(board,item,id)=>cleanupAfterSubmission(scoped,board,item,id),active:()=>!stopped,
-        report:scoped.reportAutomatic,retryPrecondition:(board,item,action,code)=>recoverAcceptancePrecondition(scoped,board,item,action,code),
+        report:scoped.reportAutomatic,retryPrecondition:(board,item,action,code)=>recoverDeliveryPrecondition(scoped,board,item,action,code),
         view:(board,item)=>queue(board,item,async()=>view(scoped,await load(scoped,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(scoped,board,request,'automatic'))});
     const automatic=createAutomatic(options);
     const contexts=async(board:string,item:string)=>{
@@ -112,10 +112,11 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
         if(entry.sessionId&&options.sessionResource){const id=entry.sessionId;let resource=sessionResources.get(id);if(!resource){resource=options.sessionResource(id);sessionResources.set(id,resource);}entry.sessionId=await resource??id;}
         return entry;
     }));
-    const selected=raw.filter(op=>!context.deliveryPlan||context.deliveryPlan.steps.includes(op.id)||context.jobs.some(job=>job.action===op.id&&job.phase!=='settled'));
+    const selected=raw.filter(op=>!context.deliveryPlan||context.deliveryPlan.steps.includes(op.id)||context.jobs.some(job=>job.action===op.id&&(job.phase!=='settled'||op.id==='deploy'&&job.state==='succeeded')));
     if(context.deliveryPlan?.ordering==='configured'){const order=context.deliveryPlan.steps;selected.sort((left,right)=>order.indexOf(left.id)-order.indexOf(right.id));}
-    const actor=await options.service.currentPrincipal(),canSkip=!options.scopeId&&actor.kind==='human'&&context.board.members?.some(row=>row.kind===actor.kind&&row.id===actor.id&&row.roles?.includes('coordinator'));
-    const projected=projectOperationSkips(cancelDependentOperations(context,selected),context.deliveryPlan,activeWaivers,!!canSkip&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel').map(entry=>canSkip||!entry.cancel?entry:{...entry,cancel:{...entry.cancel,enabled:false,reason:t('kanban.errors.OPERATION_COORDINATOR_REQUIRED')}});
+    const actor=await options.service.currentPrincipal(),coordinator=actor.kind==='human'&&context.board.members?.some(row=>row.kind===actor.kind&&row.id===actor.id&&row.roles?.includes('coordinator'));
+    const canSkip=!!coordinator&&!options.scopeId&&supported&&!active&&!context.board.lifecycle&&!context.item.deletedAt&&context.item.control?.action!=='cancel';
+    const projected=projectOperationSkips(cancelDependentOperations(context,selected),context.deliveryPlan,activeWaivers,canSkip).map(entry=>coordinator||!entry.cancel?entry:{...entry,cancel:{...entry.cancel,enabled:false,reason:t('kanban.errors.OPERATION_COORDINATOR_REQUIRED')}});
     const operations=projected.map(entry=>{
         const cleanup=context.cleanup,merged=latest(context,'merge');
         if(entry.id==='merge'&&cleanup&&merged&&cleanup.runId===merged.id&&cleanup.state!=='succeeded')return {...entry,group:{...operationGroup(entry.id),label:t('kanban.operationCleanup')},label:t('kanban.operationCleanup'),state:cleanup.state==='failed'?'failed' as const:'running' as const,
@@ -124,7 +125,7 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
         return {...entry,group:operationGroup(entry.id)};
     });
     const halted=operationHalt(context,activeWaivers);
-    const audit={...(context.settings.invalidatedAnalysis?{code:context.settings.invalidatedAnalysis.code}:{}),...(halted?{halted:{runId:halted.runId,state:halted.state==='cancelled'?'cancelled' as const:'cancelling' as const}}:{}),waivers:activeWaivers,waiverHistory:context.item.operationWaivers,acceptance:context.item.acceptanceResult,skippedActions:[...new Set(activeWaivers.flatMap(row=>row.operations.map(op=>op.id)))].filter(id=>{const entry=operations.find(row=>row.id===id);return entry?entry.state==='skipped':!active;})};
+    const audit={...(context.settings.invalidatedAnalysis?{code:context.settings.invalidatedAnalysis.code}:{}),...(halted?{halted:{runId:halted.runId,state:halted.state==='cancelled'?'cancelled' as const:'cancelling' as const}}:{}),waivers:activeWaivers,waiverHistory:context.item.operationWaivers,acceptance:context.item.acceptanceResult,skippedActions:skippedDeliveryActions(context,operations,activeWaivers,active)};
     const automatic=cleanupReviewStatus(context.cleanup)??await automaticDeliveryStatus(options.journal,context.board.id,context.item.id,options.scopeId,developmentDeliveryPolicy.steps);
     if(options.adapter.prepareOperation)return {revision:revision(context),operations,automatic,...audit};
     const catalog = await options.catalog(), flows = catalog.entries.filter(entry => entry.target.kind === 'flow' && entry.input?.parameters.some(parameter => parameter.name === 'context' && parameter.type === 'string'));
@@ -135,6 +136,15 @@ async function authorize(options: ReviewOperationsOptions, context: Context): Pr
     requireValue(actor.kind === 'human' && context.board.members?.some(member => member.kind === actor.kind && member.id === actor.id
         && member.roles?.includes('coordinator')), 'OPERATION_COORDINATOR_REQUIRED');
 }
+function skippedDeliveryActions(context:Context,operations:KanbanItemOperation[],waivers:NonNullable<KanbanItem['operationWaivers']>,active:boolean):string[] {
+    const waived=waivers.flatMap(row=>row.operations.map(op=>op.id)).filter(id=>{
+        const entry=operations.find(row=>row.id===id);return entry?entry.state==='skipped':!active;
+    });
+    // A decision amendment may omit replacement before any deployment job is frozen.
+    const omitDeploy=context.deliveryPlan&&!context.deliveryPlan.steps.includes('deploy')&&!context.jobs.some(job=>job.action==='deploy');
+    return [...new Set(omitDeploy?[...waived,'deploy']:waived)];
+}
+
 async function bind(options: ReviewOperationsOptions, board: string, request: KanbanItemOperationBinding) {
     const context = await load(options, board, request.itemId, false); await authorize(options, context);requireValue(!context.archived,'ITEM_ARCHIVED');
     requireValue(!context.board.lifecycle || request.action === 'accept','BOARD_STOPPING');
@@ -203,7 +213,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     requireValue(!waivers.some(row=>row.operations.some(op=>op.id===request.action)),'OPERATION_SKIPPED');
     requireValue(entry.enabled, 'OPERATION_PREREQUISITE_REQUIRED');
     await requireOperationAuthority({...options,...developmentAuthority},context,request,origin);
-    requireValue(request.followUp===undefined||request.action==='build'&&request.followUp==='deploy'&&!context.deliveryPlan?.manualAfter,'OPERATION_REQUEST_INVALID');
+    requireValue(request.followUp===undefined||request.action==='build'&&request.followUp==='deploy'&&(!context.deliveryPlan||!context.deliveryPlan.manualAfter&&context.deliveryPlan.steps.includes('deploy')),'OPERATION_REQUEST_INVALID');
     const input = await operationInput(options, context, request), job = prior ?? (request.action === 'accept' ? await acceptanceJob(options, context, request)
         : await prepareReviewJob(options, context.board, context.item, context.settings, request, input,request.action==='analyze'?latest(context,'accept')?.snapshot.sourceVersion:undefined));
     await options.journal.update<Array<{board: string; item: string;scopeId?:string}>>('review-operation-scopes', old => old?.some(row => row.board === board && row.item === request.itemId&&row.scopeId===options.scopeId) ? old : [...old ?? [], {board, item: request.itemId,...(options.scopeId?{scopeId:options.scopeId}:{})}]);
@@ -276,6 +286,7 @@ function validateRequest(request: KanbanItemOperationRequest | KanbanItemOperati
 /** The user's build-time approval is frozen; restart resumes this exact replacement request. */
 async function followUp(options:ReviewOperationsOptions,board:string,item:string):Promise<void> {
     const started=Date.now(),context=await load(options,board,item,false),build=latest(context,'build');
+    if(context.deliveryPlan&&!context.deliveryPlan.steps.includes('deploy'))return;
     if(context.cancellations.some(row=>row.runId===build?.id&&!['failed','not-required'].includes(row.state)))return;
     if((await currentWaivers(options,context)).some(row=>row.operations.some(op=>op.id==='deploy')))return;
     if(context.board.executionControl?.paused||context.board.lifecycle||context.item.deletedAt||context.item.control?.action==='cancel')return;
@@ -296,8 +307,13 @@ async function markFollowUp(options:ReviewOperationsOptions,build:ReviewJob,stat
     await options.journal.update<ReviewJob>(jobKey(build.id),old=>({...old!,followUp:{...old!.followUp!,state,code}}));
 }
 
-/** Only an unadmitted acceptance may retry after trusted runtime provenance becomes available. */
-async function recoverAcceptancePrecondition(options:ReviewOperationsOptions,board:string,item:string,action:string,code:string):Promise<boolean> {
+/** Retry only when the host can verify evidence that satisfies the failed precondition. */
+async function recoverDeliveryPrecondition(options:ReviewOperationsOptions,board:string,item:string,action:string,code:string):Promise<boolean> {
+    if(action==='build'&&code==='OPERATION_RESULT_AGENT_BLOCKED'&&options.adapter.managed?.reuseBuild){
+        const context=await load(options,board,item,false),build=latest(context,'build');
+        return !!build&&build.phase==='settled'&&build.state==='failed'&&build.code===code
+            &&!!await options.adapter.managed.reuseBuild(build,context.item);
+    }
     if(action!=='accept'||code!=='OPERATION_RUNNING_VERSION_MISMATCH'||!options.adapter.acceptanceVersion)return false;
     const context=await load(options,board,item,false),deployed=latest(context,'deploy');
     const expected=(deployed?.result as {version?:string})?.version;if(!expected)return false;

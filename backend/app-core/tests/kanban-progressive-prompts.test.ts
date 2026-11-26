@@ -45,6 +45,8 @@ it('keeps automatic local commit guidance concise and separate from integration 
  expect(delivery).toContain('policy.gitIdentity');expect(delivery).toContain('commit-trailers.txt');
  expect(delivery).toContain('does not authorize merge, push');expect(delivery).toContain('without edits, commits');
  expect(rules).not.toContain('commit-trailers.txt');
+ expect(delivery).toContain('read and follow `task-source-sync.md` before final delivery');
+ expect(promptReferenceSections(files,'task.md')['task-source-sync.md']).toContain('Never pull into, checkout or mutate the shared target');
 });
 
 it('defaults to no optional verification and keeps conflict guidance short and discoverable',()=>{

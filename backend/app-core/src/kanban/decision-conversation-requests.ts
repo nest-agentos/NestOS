@@ -53,7 +53,7 @@ async function command(options:DecisionConversationOptions,conversation:Decision
     }
 }
 async function propose(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest) {
-    const value=request.params as {id:string;title:string;content:string;rationale:string;projectIds:string[];verificationMode:string;dependsOn?:import('@nestos/kanban/contracts').KanbanDecisionDependency[]};
+    const value=request.params as {id:string;title:string;content:string;rationale:string;projectIds:string[];verificationMode?:string;dependsOn?:import('@nestos/kanban/contracts').KanbanDecisionDependency[]};
     requireValue(typeof value.id==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.id)&&Array.isArray(value.projectIds)&&value.projectIds.length>0&&value.projectIds.length<=16,'DECISION_PROPOSAL_INVALID');
     requireValue(new Set(value.projectIds).size===value.projectIds.length,'DECISION_PROPOSAL_INVALID');
     const dependsOn=await validateDecisionDependencies(options.service,conversation.boardId,value.id,value.dependsOn);
@@ -66,7 +66,7 @@ async function propose(options:DecisionConversationOptions,conversation:Decision
         revision:JSON.stringify({projectId:source.projectId,profileId:source.profileId})});
     const modules=conversation.binding.modules??[];
     externalRefs.push(...modules.map(decisionModuleReference));
-    const selected=kanbanVerificationOptions(value.verificationMode),record:KanbanRecordInput={id:value.id,kind:'decision',...(dependsOn.length?{dependsOn}:{}),completion:'automatic',title:value.title,content:value.content,rationale:value.rationale,itemIds:[],externalRefs,discussionSessionId:conversation.resourceId,...selected,
+    const selected=kanbanVerificationOptions(value.verificationMode===undefined?'build-cleanup':value.verificationMode),record:KanbanRecordInput={id:value.id,kind:'decision',...(dependsOn.length?{dependsOn}:{}),completion:'automatic',title:value.title,content:value.content,rationale:value.rationale,itemIds:[],externalRefs,discussionSessionId:conversation.resourceId,...selected,
         ...(conversation.recurrence?{recurrence:conversation.recurrence}:{}),
         sources:[{sessionId:conversation.resourceId!,messageId:request.id,revision:channelDigest(request),role:'assistant'}]};
     const previous=await options.journal.get<Link>(linkKey(conversation.id));requireValue(!previous,'DECISION_ALREADY_CONFIRMED');

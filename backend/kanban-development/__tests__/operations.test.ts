@@ -7,7 +7,7 @@ import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createItemOperations} from '@nestos/kanban-development';
 import { type ReviewOperationsOptions, type ReviewJob} from '@nestos/kanban-development';
 import {advanceReviewJob} from '../src/item-operation-jobs';
-import {jobKey, reviewKey} from '@nestos/kanban/integration';
+import {jobKey, reviewKey,reviewCleanupKey} from '@nestos/kanban/integration';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});
@@ -637,10 +637,10 @@ it('does not require a product acceptance checkbox to retry a proven source hand
  await f.run('accept','handoff-retry');expect(f.service.execute).toHaveBeenCalledOnce();
 });
 
-async function automaticAnalysisFixture(){
+async function automaticAnalysisFixture(steps=['analyze','merge','accept','cleanup']){
  const f=await fixture(options=>{
   options.automatic=async()=>true;
-  options.deliveryPlan=async()=>({ordering:'configured',steps:['analyze','merge','accept','cleanup'],acceptance:'source',acceptanceConfirmation:null});
+  options.deliveryPlan=async()=>({ordering:'configured',steps,acceptance:'source',acceptanceConfirmation:null});
   options.cleanup=vi.fn(async()=>true);options.reportAutomatic=vi.fn();
   options.adapter.prepareOperation=vi.fn(async input=>({expectedSessionId:'original',expectedBranch:'main',submission:{id:input.id,source:{kind:'conversation',ownerId:'original',id:input.id}}}));
   options.adapter.readOperation=vi.fn(async job=>job.action==='analyze'?{...job.snapshot,summary:'No unresolved choices',conflicts:[]}:{schema:'nestos.kanban.operation-result/1',operationId:job.id,status:'succeeded',sourceVersion:job.snapshot.sourceVersion,targetVersion:job.snapshot.targetVersion,targetHead:'merged'});
@@ -651,8 +651,42 @@ async function automaticAnalysisFixture(){
 }
 async function scans(api:ReturnType<typeof createItemOperations>,count=10){for(let n=0;n<count;n++)await api.scan();}
 const submittedActions=(f:Awaited<ReturnType<typeof automaticAnalysisFixture>>)=>f.submission.start.mock.calls.map(([request])=>request.submission.id.includes('-analyze')?'analyze':'merge');
+it('automatically merges, builds and cleans up without requesting deployment',async()=>{
+ const f=await automaticAnalysisFixture(['analyze','merge','build','accept','cleanup']);
+ const read=f.options.adapter.readOperation!;
+ f.options.adapter.readOperation=vi.fn(async job=>job.action==='build'
+    ? {...f.result(job.id),status:'succeeded',evidence:{path:'artifact.json',sha256:'a'.repeat(64)}}
+    : read(job));
+ const view=await f.api.itemOperations('board','task');
+ expect(view.operations.find(row=>row.id==='build')?.followUp).toBeUndefined();
+ await scans(f.api,15);
+ expect(f.submission.start.mock.calls.map(([request])=>request.submission.id.split('-').at(-1))).toEqual(['analyze','merge','build']);
+ expect(f.item.status).toBe('completed');
+ expect(f.options.cleanup).toHaveBeenCalledOnce();
+ expect((await f.api.itemOperations('board','task')).automatic).toMatchObject({state:'completed',waitingForUser:false});
+});
+
+it('honors a later decision to omit replacement from a frozen automatic delivery',async()=>{
+ const steps=['analyze','merge','build','deploy','accept','cleanup'];
+ const f=await automaticAnalysisFixture(steps);
+ const read=f.options.adapter.readOperation!;
+ f.options.adapter.readOperation=vi.fn(async job=>job.action==='build'
+    ? {...f.result(job.id),status:'succeeded',evidence:{path:'artifact.json',sha256:'a'.repeat(64)}}
+    : read(job));
+ await scans(f.api,6);
+ expect((await f.api.itemOperations('board','task')).automatic).toMatchObject({stage:'deploy'});
+ steps.splice(steps.indexOf('deploy'),1);
+ await scans(f.api);
+ expect(f.submission.start.mock.calls.map(([request])=>request.submission.id.split('-').at(-1))).toEqual(['analyze','merge','build']);
+ expect(f.item.status).toBe('completed');
+ expect(f.options.cleanup).toHaveBeenCalledOnce();
+});
+
 it('automatically refreshes target drift, resumes the original Session and survives restart without extra verification',async()=>{
  const f=await automaticAnalysisFixture();await scans(f.api,2);
+ const queued=await f.api.itemOperations('board','task');
+ expect(queued.automatic).toMatchObject({state:'running',stage:'merge',waitingForUser:false});
+ expect(queued.operations.find(row=>row.id==='merge')).toMatchObject({state:'running',enabled:false,confirmation:undefined});
  f.snapshot.version='target-2-state';f.snapshot.targetVersion='target-2';await f.api.scan();
  const saved=await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['board','task']));
  expect(saved).toMatchObject({step:0,revisionEpoch:expect.any(String)});expect(saved.code).toBeUndefined();
@@ -760,6 +794,28 @@ it('releases missing-worktree analysis only before a delivery job exists',async(
  journal.get.mockResolvedValue(undefined);
  expect(await releasableDevelopmentTarget(options,scope,{...state,code:'UNKNOWN'})).toBe(false);
  expect(await releasableDevelopmentTarget(options,{...scope,target:'other'},state)).toBe(false);
+ const promptFailure={...state,scopeId:scope.scopeId,code:'PROMPT_BUNDLE_COUNT_LIMIT'};
+ expect(await releasableDevelopmentTarget({...options,adapter:{}},scope,promptFailure)).toBe(true);
+ expect(await releasableDevelopmentTarget({...options,adapter:{}},scope,{...promptFailure,scopeId:'other'})).toBe(false);
+ journal.get.mockResolvedValue({phase:'submitting'} as never);
+ expect(await releasableDevelopmentTarget({...options,adapter:{}},scope,promptFailure)).toBe(false);
+});
+
+it('releases the scoped target after accepted delivery while cleanup is independent',async()=>{
+ const {releasableDevelopmentTarget}=await import('../src/development-operation-policy');
+ const scope={id:'auto',boardId:'board',itemId:'owner',target:'project',scopeId:'repository'};
+ const item={id:'owner',status:'completed',planning:{execution:'children'},externalRefs:[{system:'nestos-remote-project',id:'project'}]};
+ const binding={boardId:'board',itemId:'owner',scopeId:'repository',phase:'settled',state:'succeeded'};
+ const merge={...binding,id:'merge',action:'merge'},accept={...binding,id:'accept',action:'accept'};
+ const get=vi.fn(async(key:string)=>key===reviewCleanupKey('board','owner','repository')?{runId:'merge'}:{jobs:['merge','accept']});
+ const getMany=vi.fn(async()=>[merge,accept]);
+ const options={service:{read:async()=>({id:'board'}),item:async()=>({item})},adapter:{},journal:{get,getMany}} as any;
+ const state={...scope,executionId:'owner',steps:['accept','cleanup'],step:0,requests:{}} as any;
+ expect(await releasableDevelopmentTarget(options,scope,state)).toBe(true);
+ getMany.mockResolvedValueOnce([merge,{...accept,state:'failed'}]);
+ expect(await releasableDevelopmentTarget(options,scope,state)).toBe(false);
+ item.status='review';
+ expect(await releasableDevelopmentTarget(options,scope,state)).toBe(false);
 });
 
 it('retires settled archived scopes without resolving ownership or replaying completion',async()=>{
