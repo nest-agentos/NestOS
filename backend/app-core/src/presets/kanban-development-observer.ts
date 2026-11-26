@@ -25,6 +25,7 @@ import type {UserEventService} from '../events/service';
 type Input = Parameters<NonNullable<PersonalKanbanAutomationOptions['observeWork']>>[0];
 interface Options {learningService(): import('@nestos/kanban/contracts').KanbanService; exchange?: ReturnType<typeof import('./kanban-channel-exchange').developmentWorkExchange>;
     replyTask?: NonNullable<import('@nestos/kanban/contracts').KanbanClient['replyTask']>;
+    recoverMissingResult?(boardId:string,itemId:string,operationId:string):Promise<boolean>;
     verifyDelivery?(dispatchId: string): Promise<void>;
     handoffReports?(board:string,item:string,dispatch:string,service:import('@nestos/kanban/contracts').KanbanService):Promise<unknown>;
     lifecycle?: Pick<ReturnType<typeof import('./kanban-development-lifecycle').developmentLifecycle>, 'enqueue' | 'scan' | 'dispose' | 'settled'>;
@@ -97,6 +98,8 @@ export function developmentObserver(options: Options) {
             if (input.observation.outcome !== 'succeeded') return input.observation;
             if (!messages.some(message => message.type === 'result')) {
                 const code = 'WORKSPACE_RESULT_MISSING';
+                if (!stopped && !stopping && !board.executionControl?.paused && worktree && envelope.execution?.status==='completed' && input.dispatch.code===code)
+                    await continueMissingResult(options,journal,input,item,workspace);
                 if (input.dispatch.code !== code) createModuleLogger('kanban').warn('Workspace result publication missing', {
                     operation: 'kanban.observe', operationId: input.dispatch.id, stage: 'channel.result', result: 'failure',
                     code, durationMs: Date.now() - observedAt, messageCount: messages.length,
@@ -141,6 +144,23 @@ export function developmentObserver(options: Options) {
     };
     async function close(id:string){await watches.close(id);}
     return {observe,sessionObservation:(...args:Parameters<typeof sessionObservation>)=>stopped?nativeActivity.read(...args):sessionObservation(...args), scan: () => options.lifecycle?.scan(), async quiesce() {stopped = true; await options.lifecycle?.dispose();}, async dispose() {stopped = true; await options.lifecycle?.dispose(); await watches.dispose();nativeActivity.clear();}};
+}
+
+async function continueMissingResult(options:Options,journal:KanbanAutomationJournal,input:Input,item:import('@nestos/kanban/contracts').KanbanItem,workspace:DevelopmentWorkspaceRecord) {
+    if(!options.recoverMissingResult||item.control||item.deletedAt||item.restartPending||item.owner?.token!==input.dispatch.fence)return;
+    const {boardId,dispatch}=input,operationId='auto-result-'+sha256HexSync(dispatch.id),key='task-auto-missing-result:'+dispatch.id,started=Date.now();
+    const decision=(workspace.context as {decision?:{sourceBoardId:string;recordId:string;snapshot?:{completion?:string}}}|undefined)?.decision;
+    if(decision?.snapshot?.completion!=='automatic')return;
+    try {
+        if(await journal.get(key)||(await input.service.record(decision.sourceBoardId,decision.recordId)).status!=='confirmed')return;
+        if(!await options.recoverMissingResult(boardId,item.id,operationId))return;
+        await journal.update(key,old=>old??true);
+        createModuleLogger('kanban').info('Missing result continuation queued',{operationId,boardId,stage:'task.recovery.result',result:'success',durationMs:Date.now()-started});
+    }catch(error){
+        const code=(error as {code?:string}).code;
+        createModuleLogger('kanban').warn('Missing result continuation unavailable',{operationId,boardId,stage:'task.recovery.result',result:'failure',
+            code:code&&/^[A-Z0-9_]{1,80}$/.test(code)?code:'WORKSPACE_RESULT_RECOVERY_FAILED',durationMs:Date.now()-started});
+    }
 }
 
 async function continueSelfHandledIssue(options:Options,journal:KanbanAutomationJournal,input:Input,item:import('@nestos/kanban/contracts').KanbanItem,issues:WorkMessage[],workspace:DevelopmentWorkspaceRecord,worktreeId:string) {

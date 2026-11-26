@@ -724,6 +724,11 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             journal: new KanbanAutomationJournal(systemFS, kanbanJournalOptions), kernel: kernelCore, calls: independentCalls, submission: fileSubmission,
             recovery:async(board,item)=>{if(!recoveryClient?.taskRecovery)throw Object.assign(new Error('Recovery service is starting'),{code:'RECOVERY_SERVICE_STARTING'});return recoveryClient.taskRecovery(board,item);}}) : undefined, kernel: kernelCore, fs: systemFS, events, projects, remote: remoteConnections, lifecycle,
             replyTask:async(board,request)=>{if(!recoveryClient?.replyTask)throw Object.assign(new Error('Task reply unavailable'),{code:'WORKSPACE_REPLY_UNAVAILABLE'});await recoveryClient.replyTask(board,request);},
+            recoverMissingResult:async(board,itemId,operationId)=>{
+                const state=await recoveryClient?.taskRecovery?.(board,itemId);
+                if(state?.code!=='WORKSPACE_RESULT_MISSING'||!recoveryClient?.openTaskRecovery)return false;
+                return (await recoveryClient.openTaskRecovery(board,{itemId,operationId,expectedRevision:state.revision})).state==='accepted';
+            },
             handoffReports:developmentBindings?(board,item,id,service)=>handoffDevelopmentReports({...developmentBindings,journal:new KanbanAutomationJournal(systemFS,kanbanJournalOptions)},service,board,item,id):undefined,
             verifyDelivery: verifyDevelopment ? id => developmentOperations.run(() => verifyDevelopment(id)) : undefined,
             wake: () => wakeKanban()});
