@@ -6,10 +6,14 @@ import { pendingInteractionTask, restoreWaitingAttachment } from './pending-inte
 const ACTIVE_TASK_KEY = 'ui.privileged.active-task';
 
 export async function rememberTaskAttachment(control: EditorTaskControlPlane, sessionId: string,
-    attachment: RunAttachmentController, taskId: string): Promise<void> {
+    attachment: RunAttachmentController, taskId: string, assertCurrent:()=>void=()=>{}): Promise<void> {
+    assertCurrent();
     const session = await control.openSession(sessionId);
+    assertCurrent();
     await session.setShared(ACTIVE_TASK_KEY, { taskId });
+    assertCurrent();
     await attachment.attach(taskId);
+    assertCurrent();
 }
 
 /** Async restoration checks editor identity before every visible effect. */

@@ -36,7 +36,7 @@ import {itemOperationReporter} from '@nestos/kanban-development';
 import {createItemOperations} from '@nestos/kanban-development';
 import {createPublishedOperation as publishedOperation} from '@nestos/llm-session';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
-import {developmentCatalog} from '@nestos/kanban-development';
+import {developmentCatalog,kanbanWorkSkillProvider} from '@nestos/kanban-development';
 import {handoffDevelopmentReports,inspectDevelopmentReports} from '../presets/kanban-report-delivery';
 import {validateDevelopmentOptions, requiresDevelopmentProject} from '../presets/kanban-development-policy';
 import {prepareHarnessDraftConnection} from '../projects/harness-draft-connection';
@@ -128,6 +128,7 @@ import { createInfrastructure } from './infrastructure';
 import { syncSkillsToKernel } from '../kernel/sync-skills';
 import { DigitalTwinService, type TwinWorkspaceBinding } from '../digital-twin/service';
 import { createNativeDigitalTwin } from '../digital-twin/native-service';
+import {sessionChannelSkillSource} from '../projects/session-channel-skills';
 
 export interface ApplicationPlatformServices {
     sessionFiles: SessionFilesService;
@@ -204,6 +205,9 @@ export interface ApplicationRuntimeOptions {
     /** Trusted host configuration keyed by decision module id. */
     kanbanModulePermissions?: Readonly<Record<string,unknown>>;
     kanbanApprovalModules?: readonly KanbanApprovalModule[];
+    kanbanSkillContributions?: readonly import('@nestos/kanban/contracts').KanbanSkillContribution[];
+    kanbanSkillProviders?: readonly import('@nestos/kanban/contracts').KanbanSkillProvider[];
+    kanbanSkillPermissions?(input:import('../presets/kanban-native-workspace').NativeWorkInput,projectId:string):Promise<readonly string[]>;
     /** Optional host integrations own bindings and execution, never the portable board library. */
     configureKanban?(context: {fs: import('@nestos/vfs-core').IFileSystem; service: import('@nestos/kanban').KanbanModuleHandle;
         kernel: import('@nestos/durable-kernel').Kernel; calls?: import('@nestos/llm-session').IndependentCallService;
@@ -463,7 +467,11 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 return variables ? withProjectEnvironment(context,variables) : context;
             } : undefined,
             skillSource: options.kernelPlatform?.skillSource,
-            skillSourceForSession: options.kernelPlatform?.skillSourceForSession,
+            skillSourceForSession: remoteConnections ? files => {
+                const local=options.kernelPlatform?.skillSourceForSession?.(files)??options.kernelPlatform?.skillSource;
+                return sessionChannelSkillSource(files,local,{kernel:()=>harnessKernel?.kernel,
+                    manifest:id=>sessionRepository.getManifest(id),project:folder=>projects.forFolder(folder),remote:remoteConnections!});
+            } : options.kernelPlatform?.skillSourceForSession,
             skillToolHandlerFactory: options.kernelPlatform?.skillToolHandlerFactory,
             beforeRecover: async runtime => {
                 harnessKernel = runtime;
@@ -690,7 +698,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const approvalModules=developmentBindings?[softwareApprovalModule(options.kanbanModulePermissions?.['software-development']),...options.kanbanApprovalModules??[]]:[];
         const decisionModules=approvalModules.map(({decide,...module})=>module);
         const observeApprovals=developmentBindings?observeDevelopmentPermissions(developmentBindings.remote,approvalModules,commandBus.execute.bind(commandBus)):undefined;
-        const prepareDevelopment = developmentBindings ? developmentPreparation(developmentBindings) : undefined;
+        const prepareDevelopment = developmentBindings ? developmentPreparation({...developmentBindings,skillContributions:options.kanbanSkillContributions,skillProviders:[kanbanWorkSkillProvider,...options.kanbanSkillProviders??[]],skillPermissions:options.kanbanSkillPermissions}) : undefined;
         const prepareDirectory=developmentBindings?prepareKanbanProjectDirectory(developmentBindings):undefined;
         const prepareKanbanWork:typeof prepareDevelopment=prepareDevelopment&&prepareDirectory?input=>(
             isProjectDirectoryPreparation(input.preparation)?prepareDirectory:prepareDevelopment)(input):undefined;

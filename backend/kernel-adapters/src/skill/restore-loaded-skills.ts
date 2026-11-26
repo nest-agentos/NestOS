@@ -10,10 +10,11 @@ export async function restoreLoadedSkills(service: ISkillService, value: unknown
     try {
         for (const id of ids) {
             const skill = service.getSkill(id);
+            const snapshot = versions && Object.hasOwn(versions.snapshots, id) ? versions.snapshots[id] : undefined;
+            if(previous.has(id)&&snapshot&&service.getSkillSnapshot?.(id)?.digest===snapshot.digest)continue;
             if (skill?.disableModelInvocation || skill?.triggerStrategy === 'action') {
                 throw new Error(`Skill cannot be restored for model invocation: ${id}`);
             }
-            const snapshot = versions && Object.hasOwn(versions.snapshots, id) ? versions.snapshots[id] : undefined;
             if (snapshot && !service.restoreSkillSnapshot) throw new Error('Skill service cannot restore frozen versions');
             const result = snapshot ? await service.restoreSkillSnapshot!(snapshot) : await service.loadSkill(id);
             if (!result.success) throw new Error(result.error ?? `Failed to restore Skill: ${id}`);

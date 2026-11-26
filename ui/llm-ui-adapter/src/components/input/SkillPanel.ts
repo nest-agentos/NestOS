@@ -11,6 +11,7 @@ export interface SkillPanelDeps {
     onRequestSkills?: () => Promise<SkillInfo[]>;
     onLoadSkill?: (skillId: string) => Promise<unknown>;
     onUnloadSkill?: (skillId: string) => Promise<void>;
+    onRequestMcpApproval?: (skillId:string)=>Promise<void>;
 }
 
 export class SkillPanel {
@@ -36,6 +37,8 @@ export class SkillPanel {
             else this.unload(skillId);
         });
         this.section.addEventListener('click', event => {
+            const approval=(event.target as Element).closest<HTMLButtonElement>('[data-skill-approval]');
+            if(approval?.dataset.skillApproval){void this.requestApproval(approval,approval.dataset.skillApproval);return;}
             const button = (event.target as Element).closest<HTMLButtonElement>('[data-skill-reload]');
             if (button?.dataset.skillReload) void this.load(button.dataset.skillReload);
         });
@@ -66,12 +69,21 @@ export class SkillPanel {
     private render(): void {
         if (this.skills.length === 0) {
             this.list.innerHTML = '<span class="llm-input__skills-empty">No skills available</span>';
-        } else this.list.innerHTML = this.skills.map(s => ChatInputTemplates.renderSkillItem(s)).join('');
+        } else this.list.innerHTML = this.skills.map(s => ChatInputTemplates.renderSkillItem({...s,mcpApprovalAvailable:s.mcpApprovalAvailable&&!!this.deps.onRequestMcpApproval})).join('');
         if (this.deps.onConfigureCapabilities) {
             const button = document.createElement('button'); button.type = 'button';
             button.textContent = t('skill.configureCapabilities');
             button.addEventListener('click', () => this.deps.onConfigureCapabilities?.()); this.list.append(button);
         }
+    }
+
+    private async requestApproval(button:HTMLButtonElement,skillId:string):Promise<void> {
+        if(!this.deps.onRequestMcpApproval||button.disabled)return;
+        button.disabled=true;
+        try {await this.deps.onRequestMcpApproval(skillId);}
+        catch(error) {const notice=document.createElement('span');notice.setAttribute('role','alert');
+            notice.textContent=error instanceof Error?error.message:String(error);this.list.append(notice);}
+        finally {button.disabled=false;}
     }
 
     private async load(skillId: string): Promise<void> {

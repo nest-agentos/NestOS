@@ -40,6 +40,7 @@ export interface ISkillService {
     restoreSkillSnapshot?(snapshot: SkillVersionSnapshot): Promise<SkillLoadResult>;
     getSkillSnapshot?(id: string): SkillVersionSnapshot | undefined;
     getSkillDrifts?(): Record<string, SkillVersionDrift>;
+    getMcpSkillUpdates?():Record<string,{previousManifest:string;observedManifest:string|null;detectedAt:number;status:'restart-required'}>;
 
     /**
      * 卸载 Skill。
@@ -146,9 +147,17 @@ export interface ISkillService {
 
 /** Host-owned controls for persisted Skill selections in a single Session. */
 export interface SessionSkillControls {
+    /** Ephemeral identity of the current live Session capability scope. */
+    mcpApprovalWindow?(sessionId:string):Promise<string>;
+    /** Submit a durable user interaction for one source, manifest and acting window. */
+    requestMcpApproval?(sessionId:string,skillId:string,requestId:string,windowId:string):Promise<string>;
+    /** Verify the actual completed interaction against the current source and manifest. */
+    verifyMcpApproval?(sessionId:string,taskId:string,skillId:string,windowId:string):Promise<boolean>;
+    readMcpApproved?(sessionId:string,skillId:string,taskId:string,windowId:string):Promise<string>;
+    activateMcpApproved?(sessionId:string,skillId:string,taskId:string,windowId:string):Promise<string[]>;
     list(sessionId: string): ReturnType<SessionSkillControls['listLoaded']>;
     load(sessionId: string, skillId: string): Promise<string[]>;
-    listLoaded(sessionId: string): Promise<Array<{ id: string; name: string; description: string; loaded: boolean; enabled: boolean; definitionEnabled: boolean; toolCount: number; toolIds?: string[];
+    listLoaded(sessionId: string): Promise<Array<{ id: string; name: string; description: string; loaded: boolean; enabled: boolean; definitionEnabled: boolean; toolCount: number; toolIds?: string[]; mcpApprovalAvailable?:boolean; mcpUpdateRequired?:boolean;
         versionDigest?: string; versionPolicy?: import('./skill-types').SkillVersionPolicy; drift?: SkillVersionDrift; unversioned?: boolean }>>;
     /**
      * Read one Skill definition for an explicit invocation (`/sk-<id>`).

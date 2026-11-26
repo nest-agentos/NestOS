@@ -3,6 +3,7 @@ import type { SessionCapabilityRegistry } from '../ports/capabilities';
 import { buildSkillPromptContext } from './prompt-context';
 import { rememberLoadedSkill, withSkillDriftPersistence, requireLoadedSkillVersions, rollbackFailedLoad } from './loaded-state';
 import { runSessionSkillOperation } from './operation-queue';
+import {assertMcpContextWindow,assertMcpSkillExecution,MCP_CONTEXT_WINDOW_KEY} from './mcp-execution-window';
 
 /** Restore identities and freeze new-run instructions under the shared Skill queue. */
 export function resolveSessionSkillContext(kernel: Kernel, registry: SessionCapabilityRegistry,
@@ -16,8 +17,12 @@ export function resolveSessionSkillContext(kernel: Kernel, registry: SessionCapa
         const scope = await registry.get(sessionId);
         return withSkillDriftPersistence(scope.skillService, state, async () => {
             await registry.restore(sessionId, loaded?.value);
-            return await buildSkillPromptContext(scope.skillService, { userMessage,
+            assertMcpContextWindow(scope,(await session.getShared(MCP_CONTEXT_WINDOW_KEY))?.value);
+            await assertMcpSkillExecution(scope);
+            const result=await buildSkillPromptContext(scope.skillService, { userMessage,
                 onAutoLoaded: id => rememberLoadedSkill(id, state, scope.skillService.getSkillSnapshot?.(id)) });
+            assertMcpContextWindow(scope,(await session.getShared(MCP_CONTEXT_WINDOW_KEY))?.value);
+            await assertMcpSkillExecution(scope);return result;
         });
     });
 }

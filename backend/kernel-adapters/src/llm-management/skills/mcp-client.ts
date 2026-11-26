@@ -8,6 +8,9 @@ import { snapshotMCPConnectionOptions, type MCPConnectionOptions } from '../cont
 import { MCP_PROTOCOL_VERSION, type MCPDiscovery } from '@nestos/tools/mcp-contracts';
 import { type ToolDefinition } from '@nestos/llm-context';
 import type { MCPConfig, MCPServerConfig } from './types';
+import type {McpSkillEntry} from '../../skill/mcp-skill-verification';
+
+const extensionResultSchema = {'~standard': {version:1 as const,vendor:'nestos',validate:(value:unknown)=>({value})}};
 
 const noopLog = { debug() {}, info() {}, warn() {}, error() {} };
 
@@ -289,6 +292,38 @@ export class MCPServerConnection {
         return this.client.readResource({ uri }, { ...options, timeout: this.config.timeout ?? 30000 });
     }
 
+    supportsSkills(): boolean {
+        const capabilities=this.client?.getServerCapabilities() as {resources?:unknown;extensions?:Record<string,unknown>}|undefined;
+        return !!capabilities?.resources && !!capabilities.extensions?.['io.modelcontextprotocol/skills'];
+    }
+    async listMcpSkills(): Promise<McpSkillEntry[]> {
+        if (!this.client) throw new Error('MCP not connected');
+        if (!this.supportsSkills()) return [];
+        return this.listPages('skills',async cursor=>{
+            const result=await this.client!.request({method:'skills/list',params:{...(cursor?{cursor}:{})}},extensionResultSchema,{timeout:this.config.timeout??30000});
+            const page=skillResult(result,'skills');
+            return {items:page.skills as McpSkillEntry[],nextCursor:page.nextCursor as string|undefined};
+        });
+    }
+    async getMcpSkill(uri:string): Promise<McpSkillEntry> {
+        if (!this.client) throw new Error('MCP not connected');
+        if (!this.supportsSkills()) throw new Error('MCP_SKILLS_UNSUPPORTED');
+        const result=await this.client.request({method:'skills/get',params:{uri}},extensionResultSchema,{timeout:this.config.timeout??30000});
+        const page=skillResult(result,'skill');
+        if ((page.skill as McpSkillEntry).uri!==uri) throw new Error('MCP_SKILL_ORIGIN_MISMATCH');
+        return page.skill as McpSkillEntry;
+    }
+    async readMcpSkillBytes(uri:string): Promise<Uint8Array> {
+        const result=await this.readResource(uri);
+        if(result.contents.length!==1||result.contents[0].uri!==uri)throw new Error('MCP_SKILL_RESOURCE_MISMATCH');
+        const item=result.contents[0];
+        if('text' in item&&typeof item.text==='string')return new TextEncoder().encode(item.text);
+        if('blob' in item&&typeof item.blob==='string'&&/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(item.blob)) {
+            const decoded=atob(item.blob);return Uint8Array.from(decoded,character=>character.charCodeAt(0));
+        }
+        throw new Error('MCP_SKILL_RESOURCE_INVALID');
+    }
+
     async getPrompt(name: string, args?: Record<string, string>, options?: { signal?: AbortSignal }) {
         if (!this.client) throw new Error('MCP not connected');
         return this.client.getPrompt({ name, arguments: args }, { ...options, timeout: this.config.timeout ?? 30000 });
@@ -298,4 +333,13 @@ export class MCPServerConnection {
         if (!this.client) throw new Error('MCP not connected');
         return this.client.callTool({ name, arguments: args }, { timeout: Math.min(options?.timeout ?? Infinity, this.config.timeout ?? 30000), signal: options?.signal, onprogress: options?.onProgress });
     }
+}
+
+function skillResult(value:unknown,key:'skills'|'skill'):Record<string,unknown> {
+    if(!value||typeof value!=='object')throw new Error('MCP_SKILL_RESULT_INVALID');
+    const result=value as Record<string,unknown>;
+    if((result.resultType!==undefined&&result.resultType!=='complete')||!Number.isSafeInteger(result.ttlMs)||(result.ttlMs as number)<0||!['private','public'].includes(String(result.cacheScope))
+        ||(key==='skills'?!Array.isArray(result.skills):!result.skill||typeof result.skill!=='object')
+        ||(result.nextCursor!==undefined&&typeof result.nextCursor!=='string'))throw new Error('MCP_SKILL_RESULT_INVALID');
+    return result;
 }

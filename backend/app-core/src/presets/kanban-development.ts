@@ -21,12 +21,19 @@ import type {PersonalKanbanAutomationOptions} from '../kanban/personal-automatio
 import {publishPromptBundle} from '../run/prompt-bundle';
 import {developmentPolicy, type DevelopmentPolicy} from './kanban-development-policy';
 import {developmentWorkspace} from './kanban-development-workspace';
+import {projectKanbanSkills, type KanbanSkillContribution, type KanbanSkillProjection,type KanbanSkillProvider,type KanbanSkillProviderContext} from '@nestos/kanban/contracts';
+import {load as loadYaml} from 'js-yaml';
+import {createModuleLogger} from '@nestos/common';
 
-interface Options extends NativeWorkspaceOptions {provider:RemoteFileSourceProvider}
+const skillLog=createModuleLogger('kanban-skills');
+
+interface Options extends NativeWorkspaceOptions {provider:RemoteFileSourceProvider; skillContributions?:readonly KanbanSkillContribution[];skillProviders?:readonly KanbanSkillProvider[];
+    skillPermissions?(input:Input,projectId:string):Promise<readonly string[]>}
 type Input=NativeWorkInput;
 export interface DevelopmentWorkspaceRecord extends NativeWorkChannel {
     directoryOnly?:true;worktreeId?:string;communicationDirectory?:string;repositories:WorktreeRepository[];availableRepositories:WorktreeRepository[];
     policy:DevelopmentPolicy;gitIdentity?:GitCommitIdentity;commitContext?:CommitContext;
+    skillProjection?:KanbanSkillProjection[];
 }
 
 /** Product policy selects resources; generic Kanban persists opaque preparation options. */
@@ -68,8 +75,11 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
             const tree = await developmentStage(input.dispatch.id, 'worktree.prepare', () => prepareWorktree(journal, input.dispatch.id, '/workspace/' + directory, process));
             const repositories = await developmentStage(input.dispatch.id, 'modules.prepare', () => prepareWorktreeModules(journal, tree, policy.modules, process));
             const availableRepositories = await availableWorktreeModules(process, tree);
+            const root=options.remote.list(projectId).find(mount=>mount.at==='/');
+            const source=root?.serverProjectId&&root.serverProjectRevision&&root.serverId?skillProviderContext(view.fs,root.serverProjectId,root.serverProjectRevision,root.alias,directory,input.dispatch.id,root.serverId):undefined;
+            const skillProjection=existing?.skillProjection??(existing?undefined:await developmentStage(input.dispatch.id,'skills.project',()=>projectWorkSkills(options,input,projectId,context,root?.serverProjectId,source)));
             return journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id,
-                old => old ?? {channelId: input.dispatch.id, projectId,contextProjects,directory: tree.directory, repositories, availableRepositories, policy, gitIdentity, instructions,...(context===undefined?{}:{context})});
+                old => old ?? {channelId: input.dispatch.id, projectId,contextProjects,directory: tree.directory, repositories, availableRepositories, policy, gitIdentity, instructions,skillProjection,...(context===undefined?{}:{context})});
         });
         if ((record.context as {board?: {id?: string}})?.board?.id) {
             const commitContext = record.commitContext ?? await freezeCommitContext(journal, {projectId, boardId: (record.context as {board:{id:string}}).board.id, itemId: input.item.id, itemRevision: input.item.revision, executionId: input.dispatch.id, context: record.context});
@@ -81,7 +91,7 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
         const digest = await developmentStage(input.dispatch.id, 'prompts.publish', () => publishPromptBundle(view.fs, record.directory + '/_nestos/kanban', record.policy.prompts,
             {...scope, entry: input.stage === 'decision' ? 'prompts/decision.md' : input.stage === 'fix' ? 'prompts/task-fix-pre.md' : 'prompts/task.md', commit: policy.commit, gitIdentity: record.gitIdentity, repositories: record.repositories, availableRepositories: record.availableRepositories,...(record.context===undefined?{}:{input:planningSections(record.context).context})}));
         await recordWorkspacePublication(journal, input.dispatch.id, digest);
-        await openDevelopmentChannel(options.remote, input.dispatch.id, record, scope, input.item);
+        await openDevelopmentChannel(options.remote, input.dispatch.id, record, scope, input.item,undefined,true);
         await registerWorkResource(journal,input.dispatch.id,record);
         return record;
     } finally {await view.dispose();}
@@ -94,11 +104,41 @@ export function channelInstruction(policy: DevelopmentPolicy, entry: string, pre
 }
 
 export async function openDevelopmentChannel(remote: Pick<ProjectRemoteMountService, 'sessionChannel'>, id: string, record: DevelopmentWorkspaceRecord,
-    identity: {runId: string; itemId: string; attemptId: string}, task: unknown, binding?: {previousScopeId: string; previousSessionId: string; sessionId?: string}): Promise<void> {
+    identity: {runId: string; itemId: string; attemptId: string}, task: unknown, binding?: {previousScopeId: string; previousSessionId: string; sessionId?: string}, includeSkillProjection=false): Promise<void> {
     requireValue(record.channelId===id,'SESSION_CHANNEL_SCOPE_REQUIRED');
     const planning=record.policy.prompts.files.find(file=>file.name==='planning.md')?.content??defaults['planning.md'];
     const policy={commit:record.policy.commit,gitIdentity:record.gitIdentity,repositories:record.repositories,availableRepositories:record.availableRepositories};
-    return openNativeWorkChannel(remote,record,identity,task,record.policy.prompts,planning,binding,record.directoryOnly?undefined:{policy});
+    return openNativeWorkChannel(remote,record,identity,task,record.policy.prompts,planning,binding,record.directoryOnly?undefined:{policy,...(includeSkillProjection&&record.skillProjection?{skillProjection:record.skillProjection}:{})});
+}
+
+export async function projectWorkSkills(options:Pick<Options,'skillContributions'|'skillPermissions'|'skillProviders'>,input:Input,projectId:string,context:unknown,sourceProjectId?:string,source?:KanbanSkillProviderContext):Promise<KanbanSkillProjection[]> {
+    if((!options.skillContributions?.length&&!options.skillProviders?.length)||!options.skillPermissions)return [];
+    requireValue(sourceProjectId,'MCP_SKILL_PROJECT_BINDING_REQUIRED');
+    const decision=(context as {decision?:{snapshot?:{externalRefs?:import('@nestos/kanban/contracts').KanbanExternalReference[]}}}|undefined)?.decision;
+    const permissions=await options.skillPermissions(input,projectId);
+    const refs=decision?.snapshot?.externalRefs??[],stage=input.stage??'task';
+    const providers=(options.skillProviders??[]).filter(provider=>provider.stages.includes(stage)&&permissions.includes(provider.permission)
+        &&refs.some(ref=>ref.system==='nestos-decision-module'&&ref.id===provider.moduleId&&ref.revision===provider.moduleVersion));
+    if(providers.length)requireValue(source,'MCP_SKILL_SOURCE_BINDING_REQUIRED');
+    const built=await Promise.all(providers.map(async provider=>{
+        const contribution=await provider.build(source!);
+        requireValue(contribution.moduleId===provider.moduleId&&contribution.moduleVersion===provider.moduleVersion&&contribution.permission===provider.permission
+            &&contribution.source?.projectId===source!.projectId&&contribution.source.revision===source!.revision&&contribution.source.mountId===source!.mountId
+            &&contribution.serverId===source!.serverId&&contribution.stages.every(stage=>provider.stages.includes(stage))
+            &&(contribution.resources==='dynamic'||contribution.resources?.every(resource=>resource.path.startsWith(source!.workspacePath+'/'))),'MCP_SKILL_PROVIDER_BINDING_MISMATCH');
+        return contribution;
+    }));
+    const candidates=[...options.skillContributions??[],...built].filter(skill=>!skill.source||skill.source.projectId===sourceProjectId);
+    return projectKanbanSkills(candidates,{modules:decision?.snapshot?.externalRefs??[],stage:input.stage??'task',permissions,projectId:sourceProjectId});
+}
+
+function skillProviderContext(fs:import('@nestos/vfs-core').IFileSystem,projectId:string,revision:number,mountId:string,workspacePath:string,operationId:string,serverId:string):KanbanSkillProviderContext {
+    return {projectId,revision,mountId,workspacePath,operationId,serverId,parseYaml:loadYaml,
+        log:event=>skillLog[event.result==='failure'?'warn':'info']('Skill contribution',event),
+        readBytes:async path=>{
+            requireValue(path.startsWith(workspacePath+'/')&&!path.split('/').some(part=>!part||part==='.'||part==='..'),'MCP_SKILL_PATH_INVALID');
+            return new Uint8Array(await fs.driver.readContent('/workspace/'+path,{encoding:'binary',representation:'bytes'}));
+        }};
 }
 
 export {currentChannelBinding} from './kanban-work-channel';

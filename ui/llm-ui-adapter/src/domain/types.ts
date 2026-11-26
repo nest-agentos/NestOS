@@ -245,6 +245,8 @@ export interface SkillInvocation {
  * Skill 信息（供 UI 渲染，不含内部实现细节）
  */
 export interface SkillInfo {
+    mcpApprovalAvailable?: boolean;
+    mcpUpdateRequired?: boolean;
     versionDigest?: string;
     unversioned?: boolean;
     versionPolicy?: import('@nestos/tools/contracts').SkillVersionPolicy;

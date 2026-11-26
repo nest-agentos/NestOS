@@ -55,6 +55,37 @@ export class ApprovedEffectProgram implements DurableTaskProgram<ApprovedEffectS
     }
 }
 
+export interface McpSkillApprovalBinding {
+    sessionId:string;serverId:string;uri:string;manifestDigest:string;windowId:string;scopeId?:string;
+    projectId?:string;projectRevision?:number;mountId?:string;principalId?:string;authorizationRevision?:string;
+}
+
+/** The durable interaction itself is the authority; a failed task carries no approval. */
+export class McpSkillApprovalProgram implements DurableTaskProgram<McpSkillApprovalBinding,McpSkillApprovalBinding,McpSkillApprovalBinding> {
+    readonly manifest={kind:'kernel-adapters.mcp-skill-approval',version:'1'};
+    init(input:McpSkillApprovalBinding):Decision<McpSkillApprovalBinding,McpSkillApprovalBinding> {
+        validateMcpSkillApproval(input);
+        const binding={...input};
+        return {state:binding,actions:[{type:'request-interaction',interaction:{id:'approve:mcp-skill',kind:'approval',
+            prompt:'Allow this remote Skill in this session?',payload:{...binding}}}],next:{type:'wait',on:{type:'interaction',id:'approve:mcp-skill'}}};
+    }
+    reduce(state:Readonly<McpSkillApprovalBinding>,event:TaskInputEvent):Decision<McpSkillApprovalBinding,McpSkillApprovalBinding> {
+        if(event.type!=='interaction-resolved'||event.interactionId!=='approve:mcp-skill')return {state:{...state},next:{type:'fail',error:{code:'MCP_SKILL_APPROVAL_EVENT_INVALID',message:'Unexpected approval event'}}};
+        if(!interactionApproved(event.value))return {state:{...state},next:{type:'fail',error:{code:'MCP_SKILL_APPROVAL_DENIED',message:'Remote Skill approval denied'}}};
+        return {state:{...state},next:{type:'complete',output:{...state}}};
+    }
+}
+
+export function validateMcpSkillApproval(value:McpSkillApprovalBinding):void {
+    const source=[value?.projectId,value?.projectRevision,value?.mountId,value?.principalId,value?.authorizationRevision];
+    const sourcePresent=source.some(part=>part!==undefined);
+    if(!value||[value.sessionId,value.serverId,value.uri,value.windowId].some(part=>typeof part!=='string'||!part.trim()||part.length>4096)
+        ||(value.scopeId!==undefined&&(typeof value.scopeId!=='string'||!value.scopeId.trim()||value.scopeId.length>128))
+        ||(sourcePresent&&(!value.scopeId||[value.projectId,value.mountId,value.principalId,value.authorizationRevision].some(part=>typeof part!=='string'||!part.trim()||part.length>4096)
+            ||!Number.isSafeInteger(value.projectRevision)||value.projectRevision! < 1))
+        ||!/^sha256:[a-f0-9]{64}$/.test(value.manifestDigest))throw new Error('MCP_SKILL_APPROVAL_INVALID');
+}
+
 function handleApproval(
     state: Readonly<ApprovedEffectState>,
     event: TaskInputEvent,
