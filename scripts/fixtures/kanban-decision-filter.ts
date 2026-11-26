@@ -40,7 +40,19 @@ async function run() {
  const editor=document.getElementById('editor')!,view=new KanbanWorkbench({service:client,editor,initialResource:'/board/board/@decision',selected(){},openSession:async id=>{openedSessions.push(id);},presentation:{...kanbanPresentation,text:key=>(zhCN as Record<string,string>)['kanban.'+key]??key,icons:{close:'×',more:'…',refreshView:'↻'}}});
  const metrics:Array<{operation:string;durationMs:number;logicalApiCalls:number;httpRequests:number;methods:string[]}>=[];
  const measure=async(operation:string,action:()=>Promise<unknown>|void,ready:()=>boolean)=>{calls=[];const started=performance.now();try{await action();await wait(ready);}catch(error){throw Error(operation+':'+(error instanceof Error?error.message:'UNKNOWN'));}const row={operation,durationMs:Math.round((performance.now()-started)*100)/100,logicalApiCalls:calls.length,httpRequests:0,methods:[...calls]};metrics.push(row);if(row.durationMs>=5000||row.logicalApiCalls>=30)throw Error('PERFORMANCE_LIMIT:'+operation);};
- await measure('cold.open-decision-list',()=>view.start(),()=>visible(editor,'[data-record-resource]'));
+ await measure('cold.open-decision-list',()=>view.start(),()=>location.hash==='#all-decisions'?!!editor.querySelector('.kanban__decision-table')&&!editor.hasAttribute('aria-busy'):visible(editor,'[data-record-resource]'));
+ if(location.hash==='#all-decisions'){
+    const project=editor.querySelector<HTMLButtonElement>('[data-action=decision-filter-projects]')!;
+    const details=project.closest('details')!;
+    const inputs=[...details.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];
+    if(inputs.length!==2||inputs.some(input=>!input.checked))throw Error('DEFAULT_PROJECTS_NOT_ALL');
+    const statuses=[...editor.querySelector<HTMLButtonElement>('[data-action=decision-filter-states]')!.closest('details')!.querySelectorAll<HTMLInputElement>('input:not([value=include-archived])')];
+    if(statuses.some(input=>!input.checked))throw Error('DEFAULT_STATES_NOT_ALL');
+    if(editor.querySelectorAll('[data-decision-row]').length!==50||!editor.querySelector('[data-action=records-next]'))throw Error('DEFAULT_PAGINATION_MISSING');
+    await measure('warm.filter-project',()=>{inputs[0].checked=false;project.click();},()=>!editor.hasAttribute('aria-busy')&&[...editor.querySelectorAll<HTMLElement>('[data-record]')].every(row=>Number(row.dataset.record!.slice('decision-'.length))%2===0));
+    publish({result:'passed',environment:'Google Chrome headless; actual DOM and MemoryBackend/SeqKanbanStore; in-process KanbanClient; no HTTP transport',dataset:{boards:1,decisions:100,projects:2,backgroundLoad:'none'},metrics});
+    return;
+ }
  if(location.hash==='#planning-retry'){
     const retry=()=>editor.querySelector<HTMLButtonElement>('[data-action=retry-analysis]');
     await measure('warm.open-failed-planning',()=>view.openResource('/board/board/coord'),()=>!!retry()&&!retry()!.disabled);
