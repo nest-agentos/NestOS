@@ -249,6 +249,21 @@ it('retains a submodule commit present only in the current checkout',async()=>{
     expect(f.commands.some(args=>args[0]==='worktree'&&args[1]==='remove')).toBe(false);
 });
 
+it('cleans an unchanged frozen submodule when the integrated superproject selects divergent history',async()=>{
+ const f=await fixture(true),target=join(f.root,'library');
+ const frozen=(await f.git(f.root,['rev-parse','HEAD:library'])).stdout.trim();
+ await f.journal.update<Record<string,unknown>>('development-workspace:ready',old=>({...old,availableRepositories:[{path:'library',baseCommit:frozen}]}));
+ await f.git(target,['switch','--orphan','new-mainline']);
+ await writeFile(join(target,'replacement.txt'),'New mainline');
+ await f.git(target,['add','replacement.txt']);
+ await f.git(target,['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','test: replace module history']);
+ await f.git(f.root,['commit','-am','test: pin replacement history']);
+ const [resource]=await f.api.workResources('board','item');
+ expect(resource.canCleanup).toBe(true);
+ await f.api.cleanupWorkResource('board',{operationId:'frozen-module-clean',itemId:'item',resourceId:'ready',version:resource.version});
+ await expect(stat(f.physical)).rejects.toMatchObject({code:'ENOENT'});
+});
+
 it('allows ignored module files only within the settled owned software worktree',async()=>{
  const f=await fixture(true);await mkdir(join(f.physical,'library/cache'));await writeFile(join(f.physical,'library/cache/private'),'Retain');
  const resource=(await f.api.workResources('board','item'))[0];expect(resource).toMatchObject({canCleanup:true});

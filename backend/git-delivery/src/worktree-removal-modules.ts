@@ -13,7 +13,7 @@ export async function inspectRemovalModules(process:RemoteProcessHandle,director
         requireValue(!!path&&path.split('/').every(part=>/^[\w.-]+$/.test(part)&&part!=='.'&&part!=='..'),'WORKTREE_MODULE_SCOPE_INVALID');
         requireValue(authorized.some(row=>row.path===path||row.path!=='.'&&path.startsWith(row.path+'/')),'WORKTREE_MODULE_SCOPE_INVALID');
         const target=await pinnedModuleCommit(process,path,targetCommit,modules);
-        modules.push(await inspectModule(process,directory,path,target,approveIgnored));
+        modules.push(await inspectModule(process,directory,path,target,authorized.find(row=>row.path===path)?.baseCommit,approveIgnored));
     }
     requireValue(modules.length>0,'WORKTREE_MODULE_INSPECTION_UNKNOWN');
     return {modules,reasons:[...new Set(modules.flatMap(row=>row.reasons))],version:sha256HexSync(JSON.stringify(modules))};
@@ -29,7 +29,7 @@ async function pinnedModuleCommit(process:RemoteProcessHandle,path:string,target
     return match[1];
 }
 
-async function inspectModule(process:RemoteProcessHandle,directory:string,path:string,targetHead:string,approveIgnored:((directory:string,paths:readonly string[])=>Promise<readonly string[]>)|undefined):Promise<ModuleProof> {
+async function inspectModule(process:RemoteProcessHandle,directory:string,path:string,targetHead:string,frozenHead:string|undefined,approveIgnored:((directory:string,paths:readonly string[])=>Promise<readonly string[]>)|undefined):Promise<ModuleProof> {
     const source=directory+'/'+path,target='/workspace/'+path;
     const head=(await gitWorkspace(process,source,['rev-parse','--verify','HEAD^{commit}'])).stdout.trim();
     const changed=(await gitWorkspace(process,source,['status','--porcelain=v1','--untracked-files=all','--ignore-submodules=none'])).stdout;
@@ -37,7 +37,7 @@ async function inspectModule(process:RemoteProcessHandle,directory:string,path:s
     const ignoredPaths=ignored.split('\0').filter(Boolean),removable=await approveIgnored?.(source,ignoredPaths)??[];
     const merged=await gitWorkspace(process,target,['merge-base','--is-ancestor',head,targetHead],true);
     requireValue(merged.code===0||merged.code===1,'WORKTREE_MODULE_INTEGRATION_UNKNOWN');
-    return {path,head,target:targetHead,ignoredPaths,retainedIgnored:ignoredPaths.filter(entry=>!removable.includes(entry)),reasons:[changed&&'WORKTREE_DIRTY',ignoredPaths.some(entry=>!removable.includes(entry))&&'WORKTREE_UNTRACKED_IGNORED',merged.code===1&&'WORKTREE_NOT_INTEGRATED'].filter((value):value is string=>!!value)};
+    return {path,head,target:targetHead,ignoredPaths,retainedIgnored:ignoredPaths.filter(entry=>!removable.includes(entry)),reasons:[changed&&'WORKTREE_DIRTY',ignoredPaths.some(entry=>!removable.includes(entry))&&'WORKTREE_UNTRACKED_IGNORED',merged.code===1&&head!==frozenHead&&'WORKTREE_NOT_INTEGRATED'].filter((value):value is string=>!!value)};
 }
 
 /** Linked module worktrees share their source repository registry and must be unregistered explicitly. */
