@@ -17,6 +17,7 @@ export class DreamPage {
     private readonly status = document.createElement('p');
     private readonly owners = document.createElement('select');
     private projects: Project[] = [];
+    private projectDreams: Awaited<ReturnType<DreamService['list']>>['items'] = [];
     private owner = '';
     private dream = '';
     private config?: DreamConfigurationRecord;
@@ -30,8 +31,8 @@ export class DreamPage {
     private closed = false;
     constructor(private readonly service: DreamService, private readonly projectsPort: ProjectService,
         private readonly openSession: (id: string) => Promise<void>, private readonly openTask: (board: string, item: string) => Promise<void>,
-        private readonly openDecision: (board: string, record: string) => Promise<void>, private readonly projectId?: string) {
-        this.section.className = 'twin__body';
+        private readonly openDecision: (board: string, record: string) => Promise<void>, private readonly project?: Project) {
+        this.section.className = 'twin twin__body';
         this.section.dataset.dreamPage = '';
         this.section.setAttribute('aria-label', t('dream.title'));
         const title = document.createElement('h2'); title.textContent = t('dream.title');
@@ -41,7 +42,7 @@ export class DreamPage {
             this.owner = this.owners.value; this.dream = ''; this.mergeSelection = undefined;
             void this.switchOwner();
         };
-        this.owners.hidden = !!this.projectId;
+        this.owners.hidden = !!this.project;
         this.section.append(title, this.owners, this.status, this.body);
     }
     mount(container: HTMLElement): Promise<void> {
@@ -56,7 +57,7 @@ export class DreamPage {
         this.owners.disabled = true;
         this.body.replaceChildren(text(t('status.loading')));
         try {
-            this.projects = this.projectId ? [await this.projectsPort.get(this.projectId)] : await this.projectsPort.list();
+            this.projects = this.project ? [this.project] : await this.projectsPort.list();
             if (this.closed) return;
             this.owners.replaceChildren();
             for (const project of this.projects)
@@ -88,7 +89,7 @@ export class DreamPage {
         if (!this.owner) {this.body.replaceChildren(text(t('dream.noProjects'))); return;}
         const owner = this.owner, result = await this.service.list(owner);
         if (this.closed || owner !== this.owner) return;
-        if (this.projectId) return this.loadProjectDream(owner, result);
+        if (this.project) return this.loadProjectDream(owner, result);
         const name = document.createElement('input'); name.placeholder = t('dream.name');
         const create = button(t('dream.create'), async () => {
             const signature = JSON.stringify([owner, name.value]);
@@ -103,6 +104,7 @@ export class DreamPage {
         if (result.truncated) this.body.append(text(t('dream.listTruncated')));
     }
     private async loadProjectDream(owner: string, result: Awaited<ReturnType<DreamService['list']>>): Promise<void> {
+        this.projectDreams = result.items;
         const primary = result.primaryId ?? (!result.truncated && result.items.length === 1 ? result.items[0].id : undefined);
         if (primary) {
             this.dream = primary;
@@ -131,7 +133,8 @@ export class DreamPage {
         if (this.closed || owner !== this.owner || dream !== this.dream || !view) return;
         const {config, history, targets, models, scheduleStatus} = view;
         this.config = config; this.body.replaceChildren();
-        if (!this.projectId) this.body.append(button(t('dream.back'), () => this.loadList()));
+        if (this.project) this.appendProjectDreams(dream);
+        else this.body.append(button(t('dream.back'), () => this.loadList()));
         this.body.append(text(config.config.name));
         this.body.append(button(t(config.config.enabled ? 'dream.pause' : 'dream.resume'), async () => {
             await this.command(JSON.stringify([owner, dream, 'enabled', config.revision, !config.config.enabled]),
@@ -160,10 +163,22 @@ export class DreamPage {
         this.scheduleForm(owner, dream, config, scheduleStatus);
         this.consolidationForm(owner, dream, config, targets);
         this.body.append(text(t('dream.history')));
-        if (this.projectId) this.body.append(new DreamHistoryCalendar(history, config.config.schedule?.timeZone,
+        if (this.project) this.body.append(new DreamHistoryCalendar(history, config.config.schedule?.timeZone,
             before => this.service.history(owner, dream, before),
             (items, section) => this.appendHistory(owner, dream, {items, scanned: 0}, section)).element);
         else this.appendHistory(owner, dream, history);
+    }
+    private appendProjectDreams(active: string): void {
+        const others = this.projectDreams.filter(item => item.id !== active);
+        if (!others.length) return;
+        const panel = document.createElement('details'), summary = document.createElement('summary');
+        summary.textContent = t('dream.otherProjectDreams');
+        panel.append(summary);
+        for (const dream of others) panel.append(button(dream.name, async () => {
+            this.dream = dream.id; this.mergeSelection = undefined;
+            await this.loadDream();
+        }));
+        this.body.append(panel);
     }
     private consolidationForm(owner: string, dream: string, config: DreamConfigurationRecord, targets: Target[]): void {
         const panel = document.createElement('details'), summary = document.createElement('summary');
@@ -524,11 +539,20 @@ export class DreamPage {
         const project = document.createElement('select'), scanner = document.createElement('select');
         const directory = document.createElement('input'), exclude = document.createElement('input'), limit = document.createElement('input');
         const kind = document.createElement('select'), extensions = document.createElement('input');
+        const allFolders = document.createElement('input'), allFoldersLabel = document.createElement('label');
+        allFolders.type = 'checkbox';
+        allFoldersLabel.append(allFolders, t('dream.allFolders'));
+        allFolders.onchange = () => {directory.disabled = allFolders.checked;};
         kind.setAttribute('aria-label', t('dream.scanKind'));
         kind.add(option('files', t('dream.scanKind.files')));
         const gitOption = option('commits', t('dream.scanKind.commits')); kind.add(gitOption);
         extensions.placeholder = t('dream.changeExtensions'); extensions.setAttribute('aria-label', t('dream.changeExtensions'));
-        kind.onchange = () => {extensions.hidden = kind.value === 'commits';};
+        const updateVisibility = () => {
+            const git = kind.value === 'commits';
+            extensions.hidden = allFoldersLabel.hidden = git;
+            directory.disabled = !git && allFolders.checked;
+        };
+        kind.onchange = updateVisibility;
         project.setAttribute('aria-label', t('dream.source')); scanner.setAttribute('aria-label', t('dream.changeScanner'));
         directory.setAttribute('aria-label', t('dream.changeDirectory')); directory.placeholder = t('dream.changeDirectory');
         exclude.setAttribute('aria-label', t('dream.changeExclude')); exclude.placeholder = t('dream.changeExclude');
@@ -537,7 +561,7 @@ export class DreamPage {
         const updateKinds = () => {
             gitOption.disabled = !this.connection(project.value) || this.connection(project.value) === 'dream-local';
             if (gitOption.disabled && kind.value === 'commits') kind.value = 'files';
-            extensions.hidden = kind.value === 'commits';
+            updateVisibility();
         };
         project.onchange = updateKinds; updateKinds();
         for (const file of config.config.files) {
@@ -551,7 +575,8 @@ export class DreamPage {
             const git = kind.value === 'commits';
             if (git && connectionId === 'dream-local') throw new Error('DREAM_GIT_UNAVAILABLE');
             const suffixes = extensions.value.split(',').map(item => item.trim().replace(/^\./, '').toLowerCase()).filter(Boolean);
-            const next = [...changes, {id: sourceId, projectId: project.value, connectionId, directory: directory.value,
+            const next = [...changes, {id: sourceId, projectId: project.value, connectionId,
+                directory: !git && allFolders.checked ? '/' : directory.value,
                 exclude: exclude.value.split(',').map(item => item.trim()).filter(Boolean), maxEntries: Number(limit.value), scannerSourceId: scanner.value,
                 ...(git ? {commits: true as const} : suffixes.length ? {extensions: suffixes} : {})}];
             await this.command(JSON.stringify([owner, dream, 'changes', config.revision, next]),
@@ -559,7 +584,7 @@ export class DreamPage {
             await this.refreshAfterWrite(() => this.loadDream());
         });
         add.disabled = !project.options.length || !scanner.options.length;
-        this.body.append(project, kind, directory, exclude, extensions, limit, scanner, add);
+        this.body.append(project, kind, allFoldersLabel, directory, exclude, extensions, limit, scanner, add);
     }
     private sessionSourceForm(owner: string, dream: string, config: DreamConfigurationRecord): void {
         if (!config.config.files.length) return;

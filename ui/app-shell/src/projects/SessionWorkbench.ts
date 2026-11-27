@@ -34,7 +34,7 @@ import { RemoteSessionStatusView } from './remote-session-status';
 import { projectIconMenu } from './project-menu-icons';
 import { sessionCreationReason } from './session-creation-policy';
 import { projectDirectoryActions } from './directory-actions';
-import {fileFirst, navigationPriority, projectItems, navigationSelectionPath} from './navigation-policy';
+import {fileFirst, isProjectDreamResource, projectIdFromDreamResource, navigationPriority, projectItems, navigationSelectionPath} from './navigation-policy';
 import {projectNavigationPreview} from './navigation-preview';
 import { ProjectSearchPanel } from './project-search-panel';
 import { NavigationFilters } from '../workbench/navigation-filters';
@@ -149,7 +149,9 @@ export interface SessionWorkbenchOptions {
     opening?: import('@nestos/app-contracts/services').ConversationWorkbenchView;
     sources?: WorkbenchSources;
     onUnavailableResource?(path:string):Promise<boolean>;
-    openProjectDream?(projectId: string): Promise<void>;
+    projectDream?: {service: import('@nestos/app-contracts/services').DreamService;
+        openSession(id: string): Promise<void>; openTask(board: string, item: string): Promise<void>;
+        openDecision(board: string, record: string): Promise<void>};
     openProjectDecisions?(projectId:string):Promise<void>;
     createLoopFromSession?(source:KanbanDecisionSourceSession):Promise<void>;
     initialResource?: string;
@@ -197,14 +199,14 @@ function afterSidebarPaint(): Promise<void> {
 }
 
 function initialSessionId(resource?: string): string | undefined {
-    if (!resource || resource.startsWith('@project/') || resource.startsWith('draft:') || isFlowPath(resource)) return;
+    if (!resource || isProjectDreamResource(resource) || resource.startsWith('@project/') || resource.startsWith('draft:') || isFlowPath(resource)) return;
     try {
         const target = resolveBrowserTarget(parseSessionRoute(resource).path);
         return target.kind === 'session' ? target.sessionId : undefined;
     } catch { return undefined; }
 }
 function workbenchSessionId(resource: string | null): string | undefined {
-    if (!resource || resource.startsWith('draft:') || resource.startsWith('@agent/')) return;
+    if (!resource || isProjectDreamResource(resource) || resource.startsWith('draft:') || resource.startsWith('@agent/')) return;
     const target = resolveBrowserTarget(resource.startsWith('/') ? resource : '/' + resource);
     if ('sessionId' in target) return target.sessionId;
 }
@@ -289,7 +291,7 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly onBeforeNavigate: SessionWorkbenchOptions['onBeforeNavigate'];
     private readonly onUnavailableResource:SessionWorkbenchOptions['onUnavailableResource'];
     private readonly createLoopFromSession:SessionWorkbenchOptions['createLoopFromSession'];
-    private readonly openProjectDream: SessionWorkbenchOptions['openProjectDream'];
+    private readonly projectDream: SessionWorkbenchOptions['projectDream'];
     private readonly openProjectDecisions:SessionWorkbenchOptions['openProjectDecisions'];
     private readonly digitalTwin?: import('@nestos/app-contracts/services').DigitalTwinService;
     private readonly hostContext: SessionWorkbenchOptions['hostContext'];
@@ -319,7 +321,7 @@ export class SessionWorkbench implements WorkspaceController {
     private chatConfiguration?: WorkbenchChatControls['configuration'];
     constructor(options: SessionWorkbenchOptions) {
         this.onUnavailableResource=options.onUnavailableResource;
-        this.openProjectDream = options.openProjectDream;
+        this.projectDream = options.projectDream;
         this.openProjectDecisions=options.openProjectDecisions;
         this.createLoopFromSession=options.createLoopFromSession;
         this.backend = options.backend;
@@ -971,7 +973,7 @@ export class SessionWorkbench implements WorkspaceController {
         const directory = target && ['folder', 'favorites', 'project-conversations'].includes(target.kind) ? path : undefined;
         if (this.opening && this.sources) {
             const project = this.projectNavigation?.currentProject();
-            const route = path ?? (project && active?.startsWith('draft:') ? folderBrowserPath(project.path) : this.initialResource) ?? '/';
+            const route = path ?? (project && (active?.startsWith('draft:') || !!active && isProjectDreamResource(active)) ? folderBrowserPath(project.path) : this.initialResource) ?? '/';
             const data = await this.readNavigationSnapshot(route, true, reads);
             if (active !== this.active || !this.resourceNavigationVisible || !this.visible || this.closed) {this.navigationDirty = true; return;}
             if (!data) {this.scheduleRefresh('navigation:stale'); return;}
@@ -1129,6 +1131,7 @@ export class SessionWorkbench implements WorkspaceController {
         const navigationStarted = performance.now();
         const projectAction=parseProjectAction(resourceId);
         if(projectAction)return this.openProjectAction(projectAction);
+        if (isProjectDreamResource(resourceId)) return this.openProjectDream(resourceId);
         if (resourceId.startsWith('@agent/')) return this.openAgentSettings(decodeURIComponent(resourceId.slice(7)));
         this.onBeforeNavigate?.();
         this.sessions ??= await this.sessionsReady;
@@ -2035,7 +2038,7 @@ export class SessionWorkbench implements WorkspaceController {
             refresh: () => this.refresh(),
             projectRenamed: (from, to) => this.remapProjectRoutes(folderBrowserPath(from.path), folderBrowserPath(to.path), to.name),
             projectSettings: id => this.projectSettingsDialog(id),
-            openDream: this.openProjectDream,
+            showDream: !!this.projectDream,
             projectStatus: id => this.showProjectStatus(id),
             projectMenu: async (event, project) => {
                 void this.syncMenu.refresh(project.project.id).catch(error => this.report(error));
@@ -2286,6 +2289,35 @@ export class SessionWorkbench implements WorkspaceController {
     }
     private isRemoteProject(project: ProjectFolder): boolean {
         return project.project.source?.kind === 'remote' || !!this.projects?.remoteMounts?.list(project.project.id).some(mount => mount.at === '/');
+    }
+    private async openProjectDream(id: string): Promise<void> {
+        const dream = this.projectDream, projects = this.projects;
+        if (!dream || !projects) throw new Error(t('toolbox.unavailable'));
+        const projectId = projectIdFromDreamResource(id);
+        ++this.openIntent;
+        this.onBeforeNavigate?.(); this.cancelViewLoad();
+        const load = this.viewLoads.begin();
+        const work = this.tail.then(async () => {
+            await this.leaveEditor(); load.check();
+            const project = this.projectNavigation?.currentProject();
+            const owner = project?.project.id === projectId ? project : await load.read(() => projects.get(projectId));
+            const tab = await this.tabs.open(id, t('dream.title'), false); load.check();
+            if (tab.value) await this.restoreEditor(tab.value);
+            else {
+                const {DreamPage} = await load.read(() => import('../dream/page'));
+                const page = new DreamPage(dream.service, projects, dream.openSession, dream.openTask, dream.openDecision, owner);
+                this.active = id; this.previewCleanup = () => page.destroy();
+                this.tabs.context(id, owner.displayName ?? owner.name);
+                this.retainEditor();
+                await load.read(() => page.mount(tab.panel));
+            }
+            load.check();
+            if (project?.project.id !== projectId) this.scheduleNavigation(folderBrowserPath(owner.path), {project: owner}, false);
+            this.onSelect(id);
+        });
+        this.tail = work.catch(() => {});
+        try {await work;}
+        catch (error) {if (!load.signal.aborted) throw error;}
     }
     private async openAgentSettings(agentId: string): Promise<void> {
         ++this.openIntent; this.onBeforeNavigate?.(); this.cancelViewLoad(); const load = this.viewLoads.begin();

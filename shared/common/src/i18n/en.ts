@@ -1479,6 +1479,8 @@ export const en: LocaleStrings = {
     'dream.errors.DREAM_MONTH_DAY_INVALID': 'Enter a whole day from 1 to 31.',
     'dream.errors.DREAM_PRIMARY_CONFLICT': 'A main Dream has already been selected. Reopen the project Dream.',
     'dream.noFindings': 'No new findings.',
+    'dream.allFolders': 'Scan all folders',
+    'dream.otherProjectDreams': 'Other Dreams in this project',
     'dream.title': 'Dream',
     'dream.close': 'Close',
     'dream.owner': 'Owner project',

@@ -1,9 +1,9 @@
 import {showProjectSettings} from './project-settings';
 import {projectStatusLabel} from '../diagnostics/presentation';
 import { sessionCreationReason } from './session-creation-policy';
-import { fileFirst, projectItems } from './navigation-policy';
+import { fileFirst, projectDreamItem, projectItems } from './navigation-policy';
 import { remapProjectPath } from './project-paths';
-import { t, ACTION_ICONS, FILE_BROWSER_ICONS, VFS_TOOLBAR_ICONS, ENTITY_ICONS, FEEDBACK_ICONS, PROJECT_ACTION_ICONS } from '@nestos/common';
+import { t, FILE_BROWSER_ICONS, VFS_TOOLBAR_ICONS, ENTITY_ICONS, FEEDBACK_ICONS, PROJECT_ACTION_ICONS } from '@nestos/common';
 import { ProjectSyncStatusIndicator, projectSyncIcon } from './sync/indicator';
 import type { ProjectSyncIndicator } from './sync/presentation';
 import { browserTargetFolder, folderBrowserPath, resolveBrowserTarget } from '@nestos/app-contracts';
@@ -17,7 +17,7 @@ interface Actions {
     scopeChanged?(projectId?: string): void;
     refresh?(): Promise<void>;
     projectRenamed?(from: ProjectFolder, to: ProjectFolder): void;
-    openDream?(projectId: string): Promise<void>;
+    showDream?: boolean;
     projectSettings?(projectId: string): Promise<void>;
     projectStatus?(projectId: string): Promise<void>;
     projectMenu?(event: MouseEvent, project: ProjectFolder): Promise<void>;
@@ -40,7 +40,6 @@ export class ProjectNavigation {
     readonly header = document.createElement('div');
     readonly toolbarContainer = document.createElement('span');
     readonly options: Pick<VFSColumnsOptions, 'navigationToolbarOptions'>;
-    private readonly dream = document.createElement('button');
     private readonly up = document.createElement('button');
     private readonly create = document.createElement('button');
     private readonly selector: ScopeSelector;
@@ -124,11 +123,7 @@ export class ProjectNavigation {
         this.button(this.remoteState, t('diagnostics.projectStatus'), async () => {if (this.project) await this.actions.projectStatus?.(this.project.project.id);});
         this.remoteState.className = 'project-remote-status'; this.remoteState.hidden = true;
         this.context.append(this.selector.element);
-        this.button(this.dream, t('dream.title'), async () => {
-            if (this.project) await this.actions.openDream?.(this.project.project.id);
-        });
-        decorateButton(this.dream, ACTION_ICONS.calendarView, t('dream.title'));
-        this.header.append(this.up, this.create, this.dream, this.settings, this.toolbarContainer);
+        this.header.append(this.up, this.create, this.settings, this.toolbarContainer);
     }
     private async configureSettings(): Promise<void> {
         if (this.settingsPending) return;
@@ -281,7 +276,6 @@ export class ProjectNavigation {
     private updateCreation(): void {
         const project = this.project;
         this.create.hidden = !project;
-        this.dream.hidden = !project || !this.actions.openDream;
         const reason = project ? sessionCreationReason(this.projects, project.project.id) : undefined;
         this.create.disabled = !!reason;
         this.create.title = reason ?? t('project.createSession');
@@ -296,6 +290,7 @@ export class ProjectNavigation {
         this.updateCreation();
         const root = this.project ? findNode(items, folderBrowserPath(this.project.path)) : undefined;
         const nodes = projectItems(this.project ? root?.children ?? [] : items, query);
+        if (this.project && this.actions.showDream) nodes.push(projectDreamItem(this.project.project.id));
         return this.syncItems(nodes).sort((a, b) => fileFirst(a, b) ?? 0);
     }
     refreshSyncIndicators(): void {

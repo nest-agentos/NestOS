@@ -1,9 +1,11 @@
 import {conversationResourcePath, resolveBrowserTarget} from '@nestos/app-contracts';
 import type {VFSNodeUI} from '@nestos/vfs-ui';
+import {isProjectDreamResource} from './navigation-policy';
 import type {ShortcutRequest} from '../navigation/assistant-actions';
 
 export function projectAssistantShortcut(item: VFSNodeUI): ShortcutRequest {
     const title = item.metadata.title || item.id;
+    if (isProjectDreamResource(item.id)) return {title, target: {kind: 'resource', workspace: 'chat', resource: item.id}};
     const resource = conversationResourcePath(item.id);
     const projectId = item.metadata.custom.projectId;
     const context = typeof item.metadata.custom.projectName === 'string' ? item.metadata.custom.projectName : undefined;

@@ -423,19 +423,14 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         }
 
         if (strategyType === 'twin') {
-            const {DREAM_PATH, TwinWorkbench} = await import('./digital-twin');
+            const {TwinWorkbench} = await import('./digital-twin');
             if (!services.digitalTwin) throw new Error('Digital twin is unavailable in this services');
             const service = services.digitalTwin;
             let pendingToolbox: ReturnType<typeof backend.toolboxView> | undefined;
             const toolbox = () => pendingToolbox ??= backend.toolboxView().then(value => {own(() => value.dispose()); return value;})
                 .catch(error => {pendingToolbox = undefined; throw error;});
             const module = createPageWindows({sidebar: sidebarEl, editor: editorEl, title: translate('twin.title'), windows: windowBinding, initialResource, initializeAtResource: true,
-                titleFor: path => translate((path === DREAM_PATH || path.startsWith(DREAM_PATH + '/')) && services.dream ? 'dream.title' : 'twin.title'),
                 selected: path => selectionHistory(elementId, path, 'push'), create: host => new TwinWorkbench({...host, service, showNavigationTitle: false,
-                dream: services.dream && {service: services.dream, projects: services.projects,
-                    openSession: id => handleNavigationRequest({target: 'chat', resourceId: id, options: {newTab: true}}, true),
-                    openTask: (board, item) => handleNavigationRequest({target: 'kanban', resourceId: kanbanEntityPath(board, item, 'task')}, true),
-                    openDecision: (board, record) => handleNavigationRequest({target: 'kanban', resourceId: kanbanEntityPath(board, record, 'decision')}, true)},
                 packages: lazyScannerPackages(async () => (await toolbox()).resources.toolPackages, own),
                 projects: async () => (await services.projects.list()).map(project => ({id: project.project.id, name: project.name})),
                 connections: async () => (await agentService.getConnections()).filter(connection => connection.enabled)
@@ -505,9 +500,10 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                     if (!(kanban instanceof KanbanWindowWorkbench)) throw new Error(translate('kanban.errors.DECISION_SESSION_UNAVAILABLE'));
                     await kanban.openLoopCreation(source);
                 }:undefined,
-                openProjectDream: services.dream && services.digitalTwin
-                    ? id => handleNavigationRequest({target: 'twin', resourceId: '/dream/' + encodeURIComponent(id)})
-                    : undefined,
+                projectDream: services.dream && {service: services.dream,
+                    openSession: id => handleNavigationRequest({target: 'chat', resourceId: id, options: {newTab: true}}, true),
+                    openTask: (board, item) => handleNavigationRequest({target: 'kanban', resourceId: kanbanEntityPath(board, item, 'task')}, true),
+                    openDecision: (board, record) => handleNavigationRequest({target: 'kanban', resourceId: kanbanEntityPath(board, record, 'decision')}, true)},
                 openProjectDecisions:services.kanban?id=>handleNavigationRequest({target:'kanban',resourceId:projectDecisionsPath(id)}):undefined,
                 executorUsage, agentFactory,
                 fileFactory: defaultEditorFactory, createFlowContextMenu: options.ui.createFlowContextMenu,

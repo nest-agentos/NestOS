@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it, vi} from 'vitest';
-import type {DigitalTwinService, DreamService, ProjectService} from '@nestos/app-contracts/services';
+import type {DreamService, ProjectService} from '@nestos/app-contracts/services';
 import {t} from '@nestos/common';
-import {DigitalTwinService as NativeTwinService} from '@nestos/app-core';
-import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {DreamPage} from '../src/dream/page';
-import {DREAM_PATH, TwinWorkbench} from '../src/digital-twin';
 
 afterEach(() => {vi.restoreAllMocks(); document.body.replaceChildren();});
 it('configures a source and retries a failed scan with the same operation identity', async () => {
@@ -189,26 +186,22 @@ it('manually scans selected directories across projects and applies the source t
     } finally {page.destroy();}
 });
 
-it('opens Dream directly, retries its list and skips ordinary Twin reads', async () => {
+it('opens only the owning project and retries its list', async () => {
     const list = vi.fn().mockRejectedValueOnce(new Error('DREAM_AUTHORIZATION_UNAVAILABLE'))
         .mockResolvedValue({items: [{id: 'dream', name: 'Project Dream'}]});
-    const projects = {list: vi.fn(async () => [{project: {id: 'owner'}, name: 'Owner'}])} as unknown as ProjectService;
-    const service = {onChange: vi.fn(), readView: vi.fn()} as unknown as DigitalTwinService;
-    const sidebar = document.createElement('aside'), editor = document.createElement('main');
-    document.body.append(sidebar, editor);
-    const selected = vi.fn(), workbench = new TwinWorkbench({sidebar, editor, selected, service, connections: async () => [],
-        dream: {service: {list} as unknown as DreamService, projects, openTask: vi.fn(), openSession: vi.fn(), openDecision: vi.fn()}});
+    const project = {project: {id: 'owner'}, name: 'Owner'} as Awaited<ReturnType<ProjectService['get']>>;
+    const projects = {list: vi.fn()} as unknown as ProjectService;
+    const service = {list, openView: async () => ({config: {revision: 1, config: {name: 'Project Dream', enabled: true, files: []}},
+        history: {items: [], scanned: 0}, targets: [], models: [], scheduleStatus: null})} as unknown as DreamService;
+    const page = new DreamPage(service, projects, vi.fn(), vi.fn(), vi.fn(), project);
     try {
-        await workbench.start(DREAM_PATH);
-        expect(sidebar.querySelector('[data-item-id="/dream"]')?.textContent).toContain(t('dream.title'));
-        expect(workbench.getActiveResourceId()).toBe(DREAM_PATH);
-        expect(selected).toHaveBeenCalledWith(DREAM_PATH);
-        expect(editor.querySelector('[role=alert]')?.textContent).toContain('DREAM_AUTHORIZATION_UNAVAILABLE');
+        await page.mount(document.body);
+        expect(document.querySelector('[role=alert]')?.textContent).toContain('DREAM_AUTHORIZATION_UNAVAILABLE');
         click(t('dream.retry'));
-        await vi.waitFor(() => expect(find('Project Dream')).toBeTruthy());
-        expect(service.onChange).not.toHaveBeenCalled();
-        expect(service.readView).not.toHaveBeenCalled();
-    } finally {await workbench.destroy();}
+        await vi.waitFor(() => expect(document.body.textContent).toContain('Project Dream'));
+        expect(list.mock.calls).toEqual([['owner'], ['owner']]);
+        expect(projects.list).not.toHaveBeenCalled();
+    } finally {page.destroy();}
 });
 
 it('configures, scans and removes a selected directory change source', async () => {
@@ -235,6 +228,14 @@ it('configures, scans and removes a selected directory change source', async () 
         await vi.waitFor(() => expect(run).toHaveBeenCalledOnce()); expect(run.mock.calls[0][0].sourceId).toBe(config.config.changes[0].id);
         [...row.querySelectorAll('button')].find(button => button.textContent === t('dream.remove'))!.click();
         await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2)); expect(save.mock.calls[1][4]).toEqual([]);
+        await vi.waitFor(() => expect(document.body.textContent).not.toContain('Owner: /docs'));
+        const checkbox = [...document.querySelectorAll('label')].find(label => label.textContent === t('dream.allFolders'))!.querySelector('input')!;
+        checkbox.click();
+        const exclusion = document.querySelector<HTMLInputElement>(`[aria-label="${t('dream.changeExclude')}"]`)!;
+        exclusion.value = '/private';
+        click(t('dream.addChangeSource'));
+        await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(3));
+        expect(save.mock.calls[2][4][0]).toMatchObject({directory: '/', exclude: ['/private']});
     } finally {page.destroy();}
 });
 
@@ -340,7 +341,7 @@ it('selects an authorized remote Session by profile and title', async () => {
     } finally {page.destroy();}
 });
 
-it('opens Dream from the Twin sidebar, adopts a suggestion and opens the created task', async () => {
+it('adopts a Dream suggestion and opens the created task', async () => {
     const config = {revision: 1, config: {name: 'Dream', enabled: true, files: [{id: 'source', projectId: 'remote', path: '/notes/a.md'}], adoptions: [] as Array<Record<string, unknown>>}};
     const finding = {id: 'finding', sourceId: 'source', kind: 'fact', content: '<script>private</script>', quote: 'evidence',
         revision: 1, state: 'active', origin: 'user-correction'};
@@ -370,18 +371,11 @@ it('opens Dream from the Twin sidebar, adopts a suggestion and opens the created
         memorySessions: async () => ({items: [{id: 'session', title: 'Session'}], scanned: 1}), sessionMemoryBinding: async () => null, bindSessionMemory} as unknown as DreamService;
     const projects = {list: async () => [{project: {id: 'owner'}, name: 'Owner'}, {project: {id: 'remote', source: {kind: 'remote'}}, name: 'Remote'}],
         remoteMounts: {list: () => []}} as unknown as ProjectService;
-    const sidebar = document.createElement('aside'), editor = document.createElement('main');
-    document.body.append(sidebar, editor);
-    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
-    const twin = new NativeTwinService({fs: await manager.openFileSystem('/'),
-        reader: {sessions: async () => [], read: vi.fn()}, extractor: {run: vi.fn(), cleanup: vi.fn(), cancel: vi.fn()}, deleteSession: vi.fn()});
-    const page = new TwinWorkbench({sidebar, editor, service: twin, connections: async () => [], selected: vi.fn(),
-        dream: {service, projects, openSession: vi.fn(), openTask, openDecision}});
+    const editor = document.createElement('main');
+    document.body.append(editor);
+    const page = new DreamPage(service, projects, vi.fn(), openTask, openDecision);
     try {
-        await page.start('/overview');
-        sidebar.querySelector<HTMLElement>('[data-item-id="/dream"]')!.click();
-        await vi.waitFor(() => expect(editor.querySelector('[data-dream-page]')).not.toBeNull());
-        await vi.waitFor(() => expect(find('Dream')).toBeTruthy());
+        await page.mount(editor);
         click('Dream');
         await vi.waitFor(() => expect(find(t('dream.retry'))).toBeTruthy());
         const history = [...document.querySelectorAll('button')].find(item => item.textContent?.includes('DREAM_EXECUTION_FAILED'))!;
@@ -430,7 +424,7 @@ it('opens Dream from the Twin sidebar, adopts a suggestion and opens the created
         await vi.waitFor(() => expect(configureAdoptionSources).toHaveBeenCalledTimes(2)); expect(configureAdoptionSources.mock.calls[1][4]).toEqual([]);
         click(t('dream.retry')); await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(3));
         expect(run).toHaveBeenCalledWith({ownerProjectId: 'owner', dreamId: 'dream', sourceId: 'source', operationId: 'original'});
-    } finally {await page.destroy(); await twin.dispose(); await manager.dispose();}
+    } finally {page.destroy();}
 });
 
 it('selects a remote Dream owner, defaults to daily scanning and keeps the schedule identity on retry', async () => {

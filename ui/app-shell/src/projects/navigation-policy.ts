@@ -10,8 +10,14 @@ export function navigationSelectionPath(path:string,projectRoot:string|undefined
     return projectRoot??'/';
 }
 
+const dreamPrefix = '@dream/';
+export const projectDreamResource = (projectId: string): string => dreamPrefix + encodeURIComponent(projectId);
+export const isProjectDreamResource = (id: string): boolean => id.startsWith(dreamPrefix);
+export const projectIdFromDreamResource = (id: string): string => decodeURIComponent(id.slice(dreamPrefix.length));
+
 /** Fixed project entries keep their order independently of user sort direction. */
 export function navigationPriority(path: string): number {
+    if (isProjectDreamResource(path)) return -25;
     const target = resolveBrowserTarget(path);
     if (target.kind === 'favorites') return -30;
     if (target.kind === 'project-conversations') return 20;
@@ -59,6 +65,14 @@ export function projectItems(items: VFSNodeUI[], query = ''): VFSNodeUI[] {
         if (kind !== 'folder') return [];
         return [{ ...item, children: item.children && projectItems(item.children, query) }];
     });
+}
+
+export function projectDreamItem(projectId: string): VFSNodeUI {
+    const id = projectDreamResource(projectId);
+    return {id, parentId: null, version: '1', kind: 'group', type: 'file', icon: ACTION_ICONS.calendarView,
+        presentation: {fileDetails: false},
+        metadata: {path: id, parentPath: null, title: t('dream.title'), tags: [], createdAt: '', lastModified: '',
+            custom: {_fixedEntry: true, _readOnly: true, navigationMenu: true}}};
 }
 
 function navigationEntry(item: VFSNodeUI, title: string, icon: string): VFSNodeUI {

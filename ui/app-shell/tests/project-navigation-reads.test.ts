@@ -6,9 +6,11 @@ import { createVFS, MemoryBackend, type IFileSystem } from '@nestos/vfs-core';
 import { SessionRepository } from '@nestos/llm-session';
 import { DirectoryMountService, ProjectService, SessionFilesService, folderBrowserPath } from '@nestos/app-core';
 import { ProjectNavigation } from '../src/projects/ProjectNavigation';
-import { projectItems } from '../src/projects/navigation-policy';
+import { projectDreamResource, projectItems } from '../src/projects/navigation-policy';
 import { refreshDirectoryList } from '../src/workbench/directory-list';
 import { conversationResourcePath } from '@nestos/app-contracts';
+import type { DreamService } from '@nestos/app-contracts/services';
+import { t } from '@nestos/common';
 
 function actions() {
     return { createProject: vi.fn(), createSession: vi.fn(), createChild: vi.fn(), importItems: vi.fn(),
@@ -416,4 +418,43 @@ it('updates connection health without reloading directories and still reloads on
         for(const listener of listeners)listener();
         await vi.waitFor(()=>expect(refresh).toHaveBeenCalled());expect(invalidate).toHaveBeenCalledOnce();
     }finally{await workbench.destroy();await mounts.dispose();await files.dispose();await repository.dispose();await manager.dispose();sidebar.remove();main.remove();}
+});
+
+
+it('places Dream between Favorites and Files and opens only the selected project', async () => {
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    const root = await manager.openFileSystem('/'), repository = new SessionRepository(root);
+    await repository.init();
+    const {projects, mounts, files} = await projectServices(root, repository);
+    await projects.ensureStartup();
+    const first = (await projects.current())!, second = await projects.create('Other project');
+    const sidebar = document.createElement('aside'), main = document.createElement('main');
+    document.body.append(sidebar, main);
+    const list = vi.fn(async () => ({items: [], scanned: 0, truncated: false}));
+    const workbench = createTestWorkbench({sidebar, container: main, repository, files, projects, directoryMounts: mounts,
+        kernel: {onChanged: () => () => {}, async *listSessions() {}} as never,
+        factory: async () => ({destroy() {}}) as never, onSelect() {},
+        projectDream: {service: {list} as unknown as DreamService, openSession: vi.fn(), openTask: vi.fn(), openDecision: vi.fn()}});
+    try {
+        await workbench.start();
+        expect(sidebar.querySelector('[data-item-id^="@dream/"]')).toBeNull();
+        await workbench.openResource(folderBrowserPath(first.path));
+        const firstDream = projectDreamResource(first.project.id);
+        const row = () => sidebar.querySelector<HTMLElement>(`[data-item-id="${firstDream}"]`)!;
+        await vi.waitFor(() => expect(row().textContent).toContain(t('dream.title')));
+        expect(row().previousElementSibling?.getAttribute('data-item-id')).toMatch(/\/@favorites$/);
+        expect(row().nextElementSibling?.getAttribute('data-item-id')).toMatch(/\/@files(?:\/workspace)?$/);
+        expect(list).not.toHaveBeenCalled();
+        row().click();
+        await vi.waitFor(() => expect(main.querySelector('[data-dream-page]')).not.toBeNull());
+        expect(workbench.getActiveResourceId()).toBe(firstDream);
+        expect(list.mock.calls).toEqual([[first.project.id]]);
+        await workbench.openResource(projectDreamResource(second.project.id));
+        await vi.waitFor(() => expect(list.mock.calls).toEqual([[first.project.id], [second.project.id]]));
+        await vi.waitFor(() => expect(sidebar.querySelector(`[data-item-id="${projectDreamResource(second.project.id)}"]`)).not.toBeNull());
+        expect(row()).toBeNull();
+    } finally {
+        await workbench.destroy(); await mounts.dispose(); await files.dispose(); await repository.dispose(); await manager.dispose();
+        sidebar.remove(); main.remove();
+    }
 });

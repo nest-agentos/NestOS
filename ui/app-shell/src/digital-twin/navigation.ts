@@ -4,17 +4,13 @@ import { VFSUIShell, type BrowserNode, type BrowserSource } from '@nestos/vfs-ui
 import { nestOSVFSPresentation } from '../browser/vfs-presentation';
 import { TWIN_PAGES, label } from './view';
 
-export const DREAM_PATH = '/dream';
-
 /** Project domain pages into the same resource list used by Settings. */
-export function twinNavigationSource(includeDream = false): BrowserSource {
+export function twinNavigationSource(): BrowserSource {
     const icons = [ENTITY_ICONS.agent, ENTITY_ICONS.nav, ENTITY_ICONS.history, ENTITY_ICONS.project, ENTITY_ICONS.sync, ENTITY_ICONS.history];
     const nodes: BrowserNode[] = TWIN_PAGES.map((page, index) => ({
         id: '/' + page, parentId: null, kind: 'file', label: label(page),
         icon: icons[index], readOnly: true, fileDetails: false,
     }));
-    if (includeDream) nodes.push({id: DREAM_PATH, parentId: null, kind: 'file', label: t('dream.title'),
-        icon: ENTITY_ICONS.llm, readOnly: true, fileDetails: false});
     return {
         get: async id => nodes.find(node => node.id === id),
         children: async parent => parent === null ? nodes : [],
@@ -29,11 +25,11 @@ export class TwinNavigation {
     private stopped = false;
     private pending = Promise.resolve();
 
-    constructor(container: HTMLElement, navigate: (path: string) => Promise<void>, report: (error: unknown) => void, resource: (path: string) => string = path => path, showTitle = true, includeDream = false) {
-        const paths = [...TWIN_PAGES.map(page => '/' + page), DREAM_PATH];
+    constructor(container: HTMLElement, navigate: (path: string) => Promise<void>, report: (error: unknown) => void, resource: (path: string) => string = path => path, showTitle = true) {
+        const paths = TWIN_PAGES.map(page => '/' + page);
         const rank = (id: string) => paths.indexOf(id);
         this.list = new VFSUIShell({
-            sessionListContainer: container, source: twinNavigationSource(includeDream), title: t('twin.title'),
+            sessionListContainer: container, source: twinNavigationSource(), title: t('twin.title'),
             searchPlaceholder: t('twin.navigationSearch'),
             presentation: nestOSVFSPresentation, readOnly: true, autoSelectFirst: false,
             persistence: false, hideGitignored: false, toolbar: 'hidden',
