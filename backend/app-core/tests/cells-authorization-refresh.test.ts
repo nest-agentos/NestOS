@@ -1,6 +1,6 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {MemoryBackend,FSError} from '@nestos/vfs-core';
-import type {CellsDescriptor} from '@nestos/cells-driver';
+import type {CellsDescriptor, ProjectClient, RemoteProject} from '@nestos/cells-driver';
 import {createApplicationRuntime} from '../src/runtime/create-application-runtime';
 import {RemoteMountStore} from '../src/projects/remote-mount-store';
 import {ProjectRemoteMountService} from '../src/projects/remote-mounts';
@@ -8,18 +8,21 @@ const revision=(value:string)=>value.repeat(64);
 const authorization=(value:string)=>({principalId:'owner',anonymous:false,revision:revision(value)});
 const changed=()=>Object.assign(new FSError('EACCES','AUTHORIZATION_CHANGED'),{remoteCode:'AUTHORIZATION_CHANGED'});
 afterEach(()=>vi.restoreAllMocks());
-async function setup(){
+async function setup(authoritativeProject?:RemoteProject){
     const runtime=await createApplicationRuntime({backend:new MemoryBackend(),ownerKind:'web'});
     const fs=await runtime.vfs.openFileSystem('/'),store=new RemoteMountStore(fs),beforeChange=vi.fn(async()=>{});
     let descriptor:CellsDescriptor={version:1,httpEndpoint:'https://node.test',serverId:'node',fileProtocol:'fs-agent-http-v1',harness:true,projects:true,authorization:authorization('b')};
     const source={setCredential:vi.fn(),dispose:vi.fn(),open:vi.fn(async()=>{throw changed();}),
         check:vi.fn(async()=>{throw changed();}),nodeStatus:vi.fn(async()=>{throw changed();}),
-        discover:vi.fn(async()=>structuredClone(descriptor))};
+        discover:vi.fn(async()=>structuredClone(descriptor)),
+        ...(authoritativeProject?{projects:()=>({
+            read:vi.fn(async()=>structuredClone(authoritativeProject)),close:vi.fn(async()=>{}),
+        }) as unknown as ProjectClient}:{})};
     const remote=new ProjectRemoteMountService(fs,source,beforeChange,async()=>{});
     await store.load();await store.save({version:1,revision:1,connections:[{id:'node',name:'Node',endpoint:'https://node.test',credentialRef:'private-reference',serverId:'node',authorization:authorization('a')}],
         projects:{demo:[{mountId:'root',at:'/',alias:'prj',root:'/demo',access:'rw',connectionId:'node',endpoint:'https://node.test',credentialRef:'private-reference',authorization:authorization('a'),serverProjectId:'demo',serverProjectRevision:1}]}});
     await remote.init();remote.projectSummaries=async()=>[{id:'demo',name:'Demo',remote:true}];
-    return {remote,source,beforeChange,setDescriptor:(value:Partial<CellsDescriptor>)=>{descriptor={...descriptor,...value};},close:async()=>{await remote.dispose();await runtime.dispose();}};
+    return {remote,source,beforeChange,load:()=>new RemoteMountStore(fs).load(),setDescriptor:(value:Partial<CellsDescriptor>)=>{descriptor={...descriptor,...value};},close:async()=>{await remote.dispose();await runtime.dispose();}};
 }
 async function proposal(f:Awaited<ReturnType<typeof setup>>){
     const value=await f.remote.nodeOverview('node');
@@ -46,6 +49,21 @@ it('discovers a changed grant without writing and commits only a fresh explicit 
         expect(f.source.discover).toHaveBeenCalledTimes(2);
         expect((await f.remote.nodeOverview('node')).authorizationRefresh).toBeUndefined();
         await expect(f.remote.confirmAuthorizationRefresh('node',value.proposalId)).rejects.toThrow('CELLS_AUTHORIZATION_REFRESH_EXPIRED');
+    }finally{await f.close();}
+});
+it.each(['unchanged','relocated','read-only'] as const)('refreshes only verified saved bindings with the connection (%s)',async(change)=>{
+    const f=await setup({id:'demo',name:'Demo',alias:'prj',path:change==='relocated'?'other':'demo',
+        access:change==='read-only'?'ro':'rw',revision:2,mounts:[],authorization:authorization('b'),
+        capabilities:{fileRead:true,fileWrite:change!=='read-only',run:true,sessionRead:true,sessionControl:true}});
+    try{
+        const value=await proposal(f);
+        await f.remote.confirmAuthorizationRefresh('node',value.proposalId);
+        const saved=await f.load(),mount=saved?.projects.demo?.[0];
+        expect(saved?.connections?.[0]?.authorization).toEqual(authorization('b'));
+        expect(mount).toMatchObject({root:'/demo',access:'rw',
+            authorization:authorization(change==='unchanged'?'b':'a'),serverProjectRevision:change==='unchanged'?2:1});
+        expect(mount?.mountId==='root').toBe(change!=='unchanged');
+        expect(saved?.revision).toBe(2);
     }finally{await f.close();}
 });
 it.each([

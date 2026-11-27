@@ -315,20 +315,71 @@ export class ProjectRemoteMountService {
                 const descriptor=await this.authorizationRefreshes.verify(current,proposalId,(value,request)=>this.discoverAuthorization(value,request),options);
                 stage='project-guard';for(const projectId of this.connectionProjects(id))await this.beforeChange(projectId);
                 checkOperation(options);
-                stage='persist';const next={...current,authorization:descriptor.authorization,projects:descriptor.projects};
+                const next={...current,authorization:descriptor.authorization,projects:descriptor.projects};
                 const affectedProjects=this.connectionProjects(id);
-                const staleMounts=affectedProjects.flatMap(projectId=>this.list(projectId).filter(mount=>mount.connectionId===id&&this.isMountAuthorizationOutdated(mount,next)));
-                await this.persist({...this.catalog,connections:this.connections().map(value=>value.id===id?next:value)});
+                const previousMounts=affectedProjects.flatMap(projectId=>this.list(projectId).filter(mount=>mount.connectionId===id));
+                stage='binding-verify';const refreshed=await this.verifyAuthorizationBindings(next,affectedProjects,operationId,options);
+                const refreshedIds=new Set([...refreshed.keys()].flatMap(projectId=>this.list(projectId).map(mount=>mount.mountId)));
+                checkOperation(options);
+                stage='persist';await this.persist({...this.catalog,projects:{...this.catalog.projects,...Object.fromEntries(refreshed)},
+                    connections:this.connections().map(value=>value.id===id?next:value)});
                 this.authorizationRefreshes.clear(id);this.setConnectionStatus(id,'online');
-                await this.releaseSources(staleMounts);
-                for(const mount of staleMounts)this.setStatus(mount.mountId,'offline');
+                const replaced=previousMounts.filter(mount=>refreshedIds.has(mount.mountId)||this.isMountAuthorizationOutdated(mount,next));
+                await Promise.all(replaced.map(mount=>this.settleAuthorizationMount(mount,refreshedIds.has(mount.mountId),operationId)));
+                await Promise.all([...refreshed.keys()].map(projectId=>this.notifyAuthorizationBinding(projectId,id,operationId)));
                 for(const listener of this.listeners)listener();
                 remoteLog.info('cells.authorization.updated',{operationId,connectionId:id,operation:'cells.authorization.refresh',stage:'persist',result:'success',
-                    affectedProjectCount:affectedProjects.length,outdatedMountCount:staleMounts.length,durationMs:Date.now()-started});
+                    affectedProjectCount:affectedProjects.length,refreshedProjectCount:refreshed.size,durationMs:Date.now()-started});
             }catch(error){
                 this.recordFailure(error,{operation:'cells.authorization.refresh',stage,connectionId:id,operationId,durationMs:Date.now()-started});throw error;
             }
         });
+    }
+    private async settleAuthorizationMount(mount:ProjectRemoteMount,refreshed:boolean,operationId:string) {
+        const started=Date.now();
+        try {await (refreshed?this.evictMount(mount.mountId):this.releaseSource(mount.mountId));}
+        catch(error){this.recordFailure(error,{operation:'cells.authorization.refresh',stage:'binding-release',
+            projectId:this.mountProject(mount.mountId),connectionId:mount.connectionId,mountId:mount.mountId,operationId,durationMs:Date.now()-started});}
+        if(!refreshed)this.setStatus(mount.mountId,'offline');
+    }
+    private async notifyAuthorizationBinding(projectId:string,connectionId:string,operationId:string) {
+        const started=Date.now();
+        try {await this.changed(projectId);}
+        catch(error){this.recordFailure(error,{operation:'cells.authorization.refresh',stage:'binding-notify',
+            projectId,connectionId,operationId,durationMs:Date.now()-started});}
+    }
+    private async verifyAuthorizationBindings(connection:RemoteFileSystemConfig,projects:string[],operationId:string,options?:OperationOptions) {
+        const result=new Map<string,ProjectRemoteMount[]>();
+        if(!this.provider.projects||!projects.length)return result;
+        const client=this.provider.projects(connection);
+        try {
+            for(const id of projects){
+                checkOperation(options);
+                const started=Date.now(), mounts=this.list(id), root=mounts.find(mount=>mount.at==='/');
+                if(!root?.serverProjectId||root.connectionId!==connection.id||!mounts.every(mount=>mount.connectionId===connection.id))continue;
+                if(!mounts.some(mount=>this.isMountAuthorizationOutdated(mount,connection)))continue;
+                try {
+                    const project=await client.read(root.serverProjectId,options);
+                    this.assertProjectGrant(id,root,project);
+                    const patched=this.revisedAuthorizationMounts(mounts,project,connection);
+                    result.set(id,patched);
+                }catch(error){
+                    checkOperation(options);
+                    this.recordFailure(error,{operation:'cells.authorization.refresh',stage:'binding-verify',projectId:id,
+                        connectionId:connection.id,operationId,durationMs:Date.now()-started});
+                }
+            }
+        }finally{await client.close();}
+        return result;
+    }
+    private revisedAuthorizationMounts(mounts:ProjectRemoteMount[],project:RemoteProject,connection:RemoteFileSystemConfig):ProjectRemoteMount[] {
+        if(!project.authorization||project.authorization.revision!==connection.authorization?.revision
+            ||project.authorization.principalId!==connection.authorization?.principalId||!project.capabilities?.fileRead)
+            throw new FSError('EACCES','Saved project authorization could not be verified');
+        if(mounts.some(mount=>mount.access==='rw'&&(project.access!=='rw'||!project.capabilities?.fileWrite)
+            ||Object.entries(mount.capabilities??{}).some(([key,allowed])=>allowed&&!project.capabilities?.[key as keyof typeof project.capabilities])))
+            throw new FSError('EACCES','Saved project permissions changed');
+        return mounts.map(mount=>({...mount,mountId:randomUUID(),authorization:project.authorization,serverProjectRevision:project.revision}));
     }
     async checkDraft(input: RemoteFileSystemInput, password: string, id?: string, options?: OperationOptions): Promise<void> {
         const value = normalizeConnection(input);
@@ -679,9 +730,6 @@ export class ProjectRemoteMountService {
                 finally { await this.evictMounts(grants); }
             } finally { await client.close(); }
         }));
-    }
-    private async releaseSources(grants: readonly ProjectRemoteMount[]): Promise<void> {
-        await Promise.all(grants.map(mount => this.releaseSource(mount.mountId)));
     }
     private async evictMounts(grants: readonly ProjectRemoteMount[]): Promise<void> {
         await Promise.all(grants.map(mount => this.evictMount(mount.mountId)));
