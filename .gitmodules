@@ -93,3 +93,6 @@
 	path = libraries/dream
 	url = git@github.com:nest-agentos/dream.git
 	branch = main
+[submodule "libraries/dream-ui"]
+	path = libraries/dream-ui
+	url = git@github.com:nest-agentos/dream-ui.git

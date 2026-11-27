@@ -46,6 +46,7 @@ overrides:
   '@nestos/kanban': workspace:*
   '@nestos/kanban-ui': workspace:*
   '@nestos/dream': workspace:*
+  '@nestos/dream-ui': workspace:*
 
 pnpmfileChecksum: sha256-uQ0d3PQ0+pbddyWXfxfVRlNdIWzrxNYCQkNeykIDrrU=
 
@@ -1080,6 +1081,15 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  libraries/dream-ui:
+    devDependencies:
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.1(@microsoft/api-extractor@7.55.1(@types/node@25.2.3))(jiti@1.21.7)(postcss@8.5.16)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   libraries/driver-llm:
     devDependencies:
       '@types/node':
@@ -1640,6 +1650,9 @@ importers:
       '@nestos/app-transport':
         specifier: workspace:*
         version: link:../../shared/app-transport
+      '@nestos/dream-ui':
+        specifier: workspace:*
+        version: link:../../libraries/dream-ui
       '@nestos/kanban':
         specifier: workspace:*
         version: link:../../libraries/kanban

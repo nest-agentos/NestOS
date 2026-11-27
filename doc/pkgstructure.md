@@ -8,7 +8,7 @@ pnpm monorepo：前端包位于 `ui/`，后端包位于 `backend/`，共享应�
 | `ui/` | app-shell、app-settings、llm-ui-adapter、mdx-adapter、ui-common-adapter |
 | `backend/` | app-core、dream、kanban-development、git-delivery、llm-context、llm-session、llm-flow、llm-tasks、kernel-adapters、tools、sanbox、sync-adapters |
 | `shared/` | app-contracts、common、app-transport |
-| `libraries/` | driver-llm、cells-driver、vfs-core、vfs-sync、vfsdriver-indexeddb、vfsdriver-local、vfs-ui、mdxeditor、llm-ui、image-parser、durable-kernel、device-tty、kanban、kanban-ui、mail、ui-common、terminal-ui 等 |
+| `libraries/` | driver-llm、cells-driver、vfs-core、vfs-sync、vfsdriver-indexeddb、vfsdriver-local、vfs-ui、mdxeditor、llm-ui、image-parser、durable-kernel、device-tty、kanban、kanban-ui、dream-ui、mail、ui-common、terminal-ui 等 |
 | `apps/` | web-app、tauri-app、cli、http-app、demo、node-host（共享 Node 宿主适配包） |
 
 业务/共享包、独立库、应用和共享 Node 宿主适配包按上述目录组织；另有 `tools/cells` Rust 工具子模块（包名与命令为 `cells`），寓意蜂房中的单个巢室，将信息与 Agent 集成为 NestOS 的单个智能节点。原 `packages/` 已清理，不再使用。目录和加载规则见 [前后端模块边界](design/frontend-backend-modules.md)。
@@ -56,7 +56,8 @@ llm-session ──▶ llm-flow ──▶ llm-tasks ──▶ durable-kernel ─�
 | `@nestos/app-transport` | 平台中立的 HTTP/SSE 与能力 RPC，应用描述/selector 注入机制，不加载 Node 或 UI。 |
 | `@nestos/kanban-development` | 软件开发操作插件：构建、部署、验收、合并分析、合并及清理；向 Kanban 注册插件，接收已授权的 Session/Git/部署端口，不依赖 app-core 或 Kernel。 |
 | `@nestos/git-delivery` | Git 交付领域：工作树、源与批次快照、提交来源、合并与 gitlink 核验、归档及清理回执；仅消费进程/日志/VFS 端口，不依赖 app-core 或执行运行时。 |
-| `@nestos/dream` | 位于 `libraries/dream` 的独立库。主入口提供零运行时依赖的有界扫描、授权复验和证据校验；`/vfs` 依赖 vfs-core 的 SeqFile 事务，原子保存证据、游标和回执。项目来源、配置、调度和看板接入由 app-core 装配，项目工作台提供「梦境」入口，页面位于 app-shell 的 dream 目录。 |
+| `@nestos/dream` | 位于 `libraries/dream` 的独立库。主入口提供零运行时依赖的有界扫描、授权复验和证据校验；`/vfs` 依赖 vfs-core 的 SeqFile 事务，原子保存证据、游标和回执。项目来源、配置、调度和看板接入由 app-core 装配，项目工作台提供「梦境」入口。 |
+| `@nestos/dream-ui` | 位于 `libraries/dream-ui` 的独立 DOM 界面，包含梦境配置、运行历史、发现与记忆处理。app-shell 注入服务、文案、导航和操作 ID。 |
 | `@nestos/app-core` | 无 UI 应用核心：NestOS profile、RunDefinition、共享 Session 文件/目录服务，以及统一装配 `createApplicationRuntime`（VFS/LLM/Session/Flow）与 headless `createKernelRuntime`（durable-kernel + kernel-adapters + Flow programs）。Web/Tauri/CLI 共用。 |
 | `@nestos/app-shell` | Web/Tauri UI shell：`initApp()`（宿主注入 services/localBackend，不创建 Runtime）、workspace 策略、路由、Workbench/编辑器装配；通过 shared/app-contracts 的独立服务接口与宿主注入端口调用后端。 |
 

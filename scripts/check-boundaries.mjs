@@ -17,6 +17,7 @@ const browserGlobals = new Set(['window', 'document', 'localStorage', 'sessionSt
 
 export function dependencyError(source, target) {
     if (source === target) return;
+    if (source === '@nestos/dream-ui') return 'dream-ui must receive all host capabilities through its view ports';
     if (source === '@nestos/dream' && target.startsWith('@nestos/') && target !== '@nestos/vfs-core') return 'dream must receive host capabilities through its own ports';
     if (['@nestos/durable-kernel','@nestos/kernel-adapters','@nestos/llm-tasks','@nestos/llm-flow','@nestos/llm-session'].includes(source)
         && ['@nestos/kanban','@nestos/kanban-ui','@nestos/git-delivery'].includes(target)) return 'execution mechanisms must not depend on Kanban or delivery policy';
