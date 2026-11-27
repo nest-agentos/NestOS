@@ -208,8 +208,9 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
             choices: [...(stale ? [{id: agentId, label: t('harness.executorInvalid')}] : []), ...native.map(item => ({id: item.id, label: item.name}))]}];
         if (!catalog?.models.length) return selectors;
         const current = catalog.current ?? catalog.default, models = catalog.models;
-        selectors.push({id: 'modelId', placement: 'end', label: t('chatInput.model'), value: current?.modelId ?? models[0].id,
-            choices: models.map(model => ({id: model.id, label: model.label}))});
+        selectors.push({id: 'modelId', placement: 'end', label: t('chatInput.model'), value: current?.modelId ?? '',
+            choices: [...(current ? [] : [{id: '', label: t('harness.followNativeSettings')}]),
+                ...models.map(model => ({id: model.id, label: model.label}))]});
         selectors.push({id: 'reasoningEffort', placement: 'more', label: t('thinking.effort.label'), value: current?.reasoningEffort ?? '', choices: [], variants: {selectorId: 'modelId',
             values: Object.fromEntries(models.map(model => [model.id, {value: current?.modelId === model.id ? current.reasoningEffort ?? model.defaultReasoningEffort ?? '' : model.defaultReasoningEffort ?? '',
                 choices: [{id: '', label: t('chatSettings.followDefault')}, ...model.reasoningEfforts]}]))}});
@@ -277,12 +278,12 @@ export class ChatDraftEditor extends BaseSettingsEditor<IAgentConfigService> {
     private switchRemoteExecutor(executorId: string): void {
         const started = Date.now(); this.remoteExecutor = executorId;
         const catalog = this.nativeModels.get(executorId), current = catalog?.current ?? catalog?.default;
-        const model = catalog?.models.find(item => item.id === current?.modelId) ?? catalog?.models[0];
+        const model = catalog?.models.find(item => item.id === current?.modelId);
         this.publish();
         const draft = this.view.getDraft();
         const selection: Record<string, string> = {...draft.selection, executorId}; delete selection.modelId; delete selection.reasoningEffort;
         if (model) {selection.modelId = model.id;
-            selection.reasoningEffort = current?.modelId === model.id ? current.reasoningEffort ?? model.defaultReasoningEffort ?? '' : model.defaultReasoningEffort ?? '';}
+            selection.reasoningEffort = current?.reasoningEffort ?? model.defaultReasoningEffort ?? '';}
         this.view.configureInput({selection}, draft.revision);
         this.refreshModels();
         log.info('chat.draft.executor', {operationId: randomUUID(), stage: 'selection', result: 'success',

@@ -7,13 +7,13 @@ import {getLogger} from '@nestos/common';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of cleanup.splice(0)) await close(); document.body.replaceChildren(); vi.unstubAllGlobals();});
-async function fixture(promptHarness = false, waitForModels?: Promise<void>, waitForExecutors?: Promise<void>) {
+async function fixture(promptHarness = false, waitForModels?: Promise<void>, waitForExecutors?: Promise<void>, withNativeDefault = true) {
     vi.stubGlobal('matchMedia', () => ({matches: false, addEventListener() {}, removeEventListener() {}}));
     const host = document.createElement('div'); document.body.append(host);
     const catalog = (label: string): ConversationModelCatalog => ({models: [
         {id: 'shared', label, reasoningEfforts: [{id: 'low', label: 'Low'}, {id: 'high', label: 'High'}], defaultReasoningEffort: 'low'},
         {id: 'other', label: 'Other', reasoningEfforts: [{id: 'medium', label: 'Medium'}], defaultReasoningEffort: 'medium'}],
-        default: {modelId: 'shared', reasoningEffort: 'low'}});
+        ...(withNativeDefault ? {default: {modelId: 'shared', reasoningEffort: 'low'}} : {})});
     const models = vi.fn(async (id: string) => {await waitForModels; return catalog(id);}), save = vi.fn(async (_value: string) => {}), materialize = vi.fn();
     const nativeB = promptHarness ? 'remote:' + encodeURIComponent(JSON.stringify(['node', 'project', 'claude'])) : 'remote:b';
     const nativeId = promptHarness ? 'remote:' + encodeURIComponent(JSON.stringify(['node', 'project', 'codex'])) : 'remote:a';
@@ -66,6 +66,18 @@ it('opens a remote draft with model and effort choices and preserves the draft w
     await f.editor.flushPendingSave();
     expect(JSON.parse(f.save.mock.calls.at(-1)![0]).config.settings.nativeModelSelection).toMatchObject({modelId: 'other', reasoningEffort: 'medium'});
     expect(f.materialize).not.toHaveBeenCalled();
+});
+it('follows native settings when the catalog has no explicit default and allows an override', async () => {
+    const f = await fixture(false, undefined, undefined, false);
+    expect(f.select('modelId').value).toBe('');
+    f.choose('modelId', 'shared');
+    f.choose('reasoningEffort', 'high');
+    f.choose('executorId', 'remote:b');
+    await vi.waitFor(() => expect(f.select('modelId').value).toBe(''));
+    f.choose('executorId', 'remote:a');
+    await vi.waitFor(() => expect(f.select('modelId').value).toBe(''));
+    await f.editor.flushPendingSave();
+    expect(JSON.parse(f.save.mock.calls.at(-1)![0]).config.settings.nativeModelSelection).toBeUndefined();
 });
 it('reads the initial target catalog only once for a prompt harness draft', async () => {
     const f = await fixture(true); expect(f.commands.execute).toHaveBeenCalledOnce();
