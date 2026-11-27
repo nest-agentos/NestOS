@@ -6,6 +6,7 @@ import {drainBoardAnalyses} from '@nestos/kanban/integration';
 import {scanTaskControls} from '@nestos/kanban/integration';
 import type {CallLifecyclePorts as TaskControlPorts} from './call-lifecycle';
 import {workContext} from './work-context';
+import {managementOwner} from './task-owner';
 import {createKanbanAutomation,type KanbanExecutorContext,type KanbanAutomationJournal,type KanbanWorkLog,type WorkLogFact} from '@nestos/kanban/integration';
 import {executionSessionReference} from '@nestos/app-contracts';
 import {t} from '@nestos/common';
@@ -104,7 +105,9 @@ async function createExecutor(options:Options,context:KanbanExecutorContext,prep
             const target = automationTarget(board.automation.executor, await options.catalog());
             if (board.automation.preparation) {
                 requireValue(options.prepareWork, 'WORK_PREPARATION_UNAVAILABLE');
-                return options.prepareWork({board,context:{...await workContext(options.journal,board,item,options.service),inputs:dispatch.inputs,dependencies:await context.dependencies(item)},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
+                const [work,dependencies,owner]=await Promise.all([workContext(options.journal,board,item,options.service),
+                    context.dependencies(item),managementOwner(options.service,board,item)]);
+                return options.prepareWork({board,context:{...work,inputs:dispatch.inputs,dependencies,...(owner?{coordinationTaskId:owner.id}:{})},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
                     reportActivity: fact => options.workLog?.append(options.service, boardId, item.id, {...fact, actor: fact.actor ?? dispatch.principal, dispatchId: dispatch.id}) ?? Promise.resolve()});
             }
             return {target:await options.prepareTarget?.({board,dispatch,target})??target};

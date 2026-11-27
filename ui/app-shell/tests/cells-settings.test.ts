@@ -8,16 +8,16 @@ const cleanups:Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const cleanup of cleanups.splice(0))await cleanup();document.body.replaceChildren();vi.restoreAllMocks();});
 function snapshot():CellsNodeOverview{return {connectionId:'node-a',sampledAt:Date.now(),mounts:[{projectId:'demo',projectName:'Demo',mountId:'root',alias:'prj',root:'/x1',at:'/',access:'rw',status:'unknown',projectStatus:'offline',canRemount:true,unmount:'project'}],statistics:{state:'unsupported'}};}
 async function setup(pending?:Promise<CellsNodeOverview>){
-    const project=vi.fn(async()=>{}),confirmAuthorizationRefresh=vi.fn(async()=>{});
+    const project=vi.fn(async()=>{}),confirmAuthorizationRefresh=vi.fn(async()=>{}),refreshProjectBinding=vi.fn(async()=>{});
     let change=()=>{};
     const connection={id:'node-a',name:'VM cells',endpoint:'http://127.0.0.1:18787',credentialRef:'private-ref'};
     const nodeOverview=vi.fn(async()=>pending??snapshot()),saveConnection=vi.fn(async()=>connection.id),checkDraft=vi.fn(async()=>{});
-    const service={connections:()=>[connection],connectionStatus:()=> 'online',nodeOverview,saveConnection,confirmAuthorizationRefresh,
+    const service={connections:()=>[connection],connectionStatus:()=> 'online',nodeOverview,saveConnection,confirmAuthorizationRefresh,refreshProjectBinding,
         checkDraft,checkConnection:vi.fn(async()=>{}),onChange:(listener:()=>void)=>{change=listener;return ()=>{};}} as unknown as ProjectRemoteMountPort;
     const root=document.createElement('div');document.body.append(root);
     const editor=new CellsSettingsEditor(root,service,{target:{kind:'file',path:'/node-a'}} as EditorOptions,{project});
     const initialized=editor.init(root);cleanups.push(()=>editor.destroy());
-    return {root,editor,initialized,nodeOverview,saveConnection,checkDraft,project,confirmAuthorizationRefresh,change:()=>change()};
+    return {root,editor,initialized,nodeOverview,saveConnection,checkDraft,project,confirmAuthorizationRefresh,refreshProjectBinding,change:()=>change()};
 }
 it('shows only the selected node, its project paths and an honest unsupported statistics state',async()=>{
     const f=await setup();await f.initialized;
@@ -111,4 +111,34 @@ it('explains an expired authorization proposal without submitting it',async()=>{
     f.root.querySelector<HTMLButtonElement>('[data-cells-action=authorization]')!.click();
     await vi.waitFor(()=>expect(f.root.querySelector('[data-cells-status]')!.textContent).toContain('已过期'));
     expect(f.confirmAuthorizationRefresh).not.toHaveBeenCalled();expect(f.saveConnection).not.toHaveBeenCalled();
+});
+it('uses an accurate heading when node authorization is already unchanged',async()=>{
+    const f=await setup(Promise.resolve({...snapshot(),authorizationRefresh:{state:'unchanged'}}));await f.initialized;
+    expect(f.root.textContent).toContain('节点授权已同步');
+    expect(f.root.textContent).not.toContain('尚未更新');
+});
+it('offers in-place per-project and batch binding refresh when project bindings are outdated',async()=>{
+    const outdated=snapshot();
+    outdated.mounts=[
+        {...outdated.mounts[0]!,projectId:'x1',projectName:'x1',mountId:'m1',status:'offline',projectStatus:'offline',problem:'binding-outdated'},
+        {...outdated.mounts[0]!,projectId:'self-improve',projectName:'self-improve',mountId:'m2',status:'offline',projectStatus:'offline',problem:'binding-outdated'},
+    ];
+    const healthy=snapshot();healthy.mounts=outdated.mounts.map(m=>({...m,status:'online',projectStatus:'online',problem:undefined}));
+    const f=await setup(Promise.resolve(outdated));await f.initialized;
+    expect(f.root.querySelector('[data-cells-action="refresh-bindings"]')).not.toBeNull();
+    const rowButton=f.root.querySelector<HTMLButtonElement>('[data-cells-mount="m1"][data-cells-project-action="refresh-binding"]')!;
+    expect(rowButton).not.toBeNull();
+    f.refreshProjectBinding.mockRejectedValueOnce(Object.assign(new Error('PRIVATE_BODY'),{code:'EACCES'}));
+    f.nodeOverview.mockResolvedValueOnce({...outdated,mounts:[outdated.mounts[0]!,{...outdated.mounts[1]!,status:'online',projectStatus:'online',problem:undefined}]});
+    f.root.querySelector<HTMLButtonElement>('[data-cells-action="refresh-bindings"]')!.click();
+    await vi.waitFor(()=>expect(f.root.querySelector('[data-cells-status]')!.textContent).toContain('1 个未完成'));
+    expect(f.project).not.toHaveBeenCalled();
+    expect(f.root.querySelector('[data-cells-status]')!.textContent).not.toContain('PRIVATE_BODY');
+    await vi.waitFor(()=>expect(f.root.querySelector<HTMLButtonElement>('[data-cells-mount="m1"][data-cells-project-action="refresh-binding"]')!.disabled).toBe(false));
+    f.nodeOverview.mockResolvedValueOnce(healthy);
+    f.root.querySelector<HTMLButtonElement>('[data-cells-mount="m1"][data-cells-project-action="refresh-binding"]')!.click();
+    await vi.waitFor(()=>expect(f.root.querySelector('[data-cells-status]')!.textContent).toContain('项目绑定已刷新'));
+    expect(f.refreshProjectBinding).toHaveBeenCalledTimes(3);
+    expect(f.refreshProjectBinding).toHaveBeenLastCalledWith('x1',{timeoutMs:10000});
+    expect(f.root.querySelector('[data-cells-action="refresh-bindings"]')).toBeNull();
 });

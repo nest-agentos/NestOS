@@ -6,7 +6,7 @@ import {gitWorkspace,verifyWorktreeDelivery,type WorktreeRepository} from './wor
 import {dirtyIntegrationModules,integrationSourceSnapshotScript} from './integration-source-script';
 import {requireValue} from './errors';
 export interface GitSnapshot {version:string;sourceVersion:string;targetVersion:string;context:Record<string,unknown>}
-export interface GitSourceRequest {projectId:string;tree:PreparedWorktree;repositories:WorktreeRepository[];availableRepositories?:WorktreeRepository[];commit:'changes'|'worktree';commitContext?:unknown}
+export interface GitSourceRequest {projectId:string;tree:PreparedWorktree;repositories:WorktreeRepository[];availableRepositories?:WorktreeRepository[];commit:'changes'|'worktree';commitContext?:{coordinationTaskId?:string;trailers?:string}}
 /** Git evidence and version semantics are owned here; task and Session status are supplied elsewhere. */
 export async function snapshotGitSource(process:GitProcess,input:GitSourceRequest) {
     const {tree}=input,status=await inspectWorktree(process,tree,'_nestos/kanban/');requireValue(status.exists,'WORKTREE_MISSING');
@@ -14,15 +14,16 @@ export async function snapshotGitSource(process:GitProcess,input:GitSourceReques
     const targetWorktree={dirty:!!changes.stdout.trim(),statusDigest:sha256HexSync(changes.stdout)};
     const repositories=await verifyWorktreeDelivery(process,tree.directory,input.repositories,input.commit,input.availableRepositories);
     const modules=dirtyIntegrationModules(repositories);
-    const sourceTree=input.commit==='changes'&&repositories.some(row=>row.path==='.'&&row.dirty)?await snapshotIntegrationTree(process,tree.directory,status.head,modules):undefined;
+    const moduleTrailers=modules.length&&input.commitContext?.coordinationTaskId?input.commitContext.trailers:undefined;
+    const sourceTree=input.commit==='changes'&&repositories.some(row=>row.path==='.'&&row.dirty)?await snapshotIntegrationTree(process,tree.directory,status.head,modules,moduleTrailers):undefined;
     const sourceVersion=sha256HexSync(JSON.stringify([input.projectId,tree.id,repositories,...(modules.length?[sourceTree]:[])])),targetVersion=status.targetHead;
     return {sourceVersion,targetVersion,version:sha256HexSync(JSON.stringify([sourceVersion,status.targetBranch,targetVersion])),context:{
-        ...(input.commitContext?{commitContext:input.commitContext}:{}),commitPolicy:input.commit,projectId:input.projectId,worktreeId:tree.id,directory:tree.directory,branch:tree.branch,
+        ...(input.commitContext?{commitContext:input.commitContext}:{}),...(moduleTrailers?{moduleTrailers}:{}),commitPolicy:input.commit,projectId:input.projectId,worktreeId:tree.id,directory:tree.directory,branch:tree.branch,
         sourceHead:status.head,...(sourceTree?{sourceTree}:{}),targetBranch:status.targetBranch,targetHead:targetVersion,targetWorktree,repositories}};
 }
-async function snapshotIntegrationTree(process:GitProcess,directory:string,head:string|undefined,modules:Array<[string,string]>):Promise<string>{
+async function snapshotIntegrationTree(process:GitProcess,directory:string,head:string|undefined,modules:Array<[string,string]>,trailers?:string):Promise<string>{
     requireValue(head&&/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(head),'INTEGRATION_SOURCE_CAPTURE_FAILED');
-    const result=await process.nativeShell.exec('sh',['-c',integrationSourceSnapshotScript,'nestos-source-snapshot',head,JSON.stringify(modules)],{cwd:directory,timeoutMs:120000});
+    const result=await process.nativeShell.exec('sh',['-c',integrationSourceSnapshotScript,'nestos-source-snapshot',head,JSON.stringify(modules),trailers??''],{cwd:directory,timeoutMs:120000});
     const tree=result.stdout.trim();
     requireValue(result.code===0&&/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(tree),'INTEGRATION_SOURCE_CAPTURE_FAILED');
     return tree;

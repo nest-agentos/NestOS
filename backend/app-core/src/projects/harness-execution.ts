@@ -1,4 +1,4 @@
-import {recoverNativeTerminal} from './harness-terminal-recovery';
+import {hasAdmittedNativeTurn,recoverAdmittedNativeTurn,recoverNativeTerminal} from './harness-terminal-recovery';
 import {HarnessConnectionCleanup} from './harness-connection-cleanup';
 import type { EffectExecutionContext, EffectSessionState } from '@nestos/durable-kernel';
 import type { ConnectionCancelResult, ConnectionReconcileResult, HarnessExecutionProvider, HarnessExecutionRequest, HarnessExecutionResult } from '@nestos/kernel-adapters/contracts';
@@ -7,7 +7,7 @@ import { ExecutionJournal, executionError, harnessExecutionJournalKey, type Exec
 import { prepareNativeTurn, type NativeExecution } from './harness-execution-operations';
 import { finishNativeTurn, observeNativeTurn } from './harness-execution-observation';
 import { cancelNativeExecution } from './harness-execution-cancel';
-import {claimExecutionContext, settleExecutionContext, validateExecutionContext} from './harness-execution-context';
+import {claimExecutionContext, settleExecutionContext, validateExecutionContext, type RetainedConnectionReader} from './harness-execution-context';
 import {prepareExecutionAttachments} from './harness-execution-assets';
 import {nativeTurnFailure} from './harness-turn-failure';
 
@@ -19,8 +19,9 @@ export interface HarnessExecutionOptions {
     settleContextForCleanup?: (journal: ExecutionJournal, unstarted: boolean, context: EffectExecutionContext) => Promise<import('@nestos/kernel-adapters/contracts').ContextBindingRef | undefined>;
     pollMs?: number;
     cancelTimeoutMs?: number;
+    readRetainedConnection?: RetainedConnectionReader;
 }
-type Connections = Pick<HarnessConnectionService, 'acquire' | 'validate'>;
+type Connections = Pick<HarnessConnectionService, 'acquire' | 'validate'>&Partial<Pick<HarnessConnectionService,'acquireHistory'>>;
 export function createHarnessExecutionProvider(connections: Connections, options: HarnessExecutionOptions = {}): HarnessExecutionProvider {
     return new NativeHarnessExecutionProvider(connections, options);
 }
@@ -39,7 +40,7 @@ class NativeHarnessExecutionProvider implements HarnessExecutionProvider {
             if (!await journal.load()) return {status: 'not-started', evidence: {kind: 'not-started', ref: harnessExecutionJournalKey(context),
                 sessionId: context.sessionId, taskId: context.taskId, effectId: context.effectId}};
             if (journal.data.result) return { status: 'completed', result: journal.data.result };
-            return { status: 'completed', result: await this.track(context, this.run(request, context)) };
+            return { status: 'completed', result: await this.track(context, this.run(request, context, true)) };
         } catch (error) {
             const code = safeCode(error);
             if(code==='WORKER_OBSERVATION_DRAINED')throw error;
@@ -64,7 +65,7 @@ class NativeHarnessExecutionProvider implements HarnessExecutionProvider {
     private async acquire(request: HarnessExecutionRequest, context: EffectExecutionContext): Promise<HarnessConnectionAcquisition> {
         return this.connectionCleanup.own(context, await this.connections.acquire(request.connection));
     }
-    private async run(request: HarnessExecutionRequest, context: EffectExecutionContext): Promise<HarnessExecutionResult> {
+    private async run(request: HarnessExecutionRequest, context: EffectExecutionContext, reconciling = false): Promise<HarnessExecutionResult> {
         const startedAt = Date.now();
         await this.connectionCleanup.retry(context);
         const journal = this.journal(request, context);
@@ -73,28 +74,50 @@ class NativeHarnessExecutionProvider implements HarnessExecutionProvider {
         if (exists && journal.data.forkRejected) throw Object.assign(executionError(journal.data.forkRejected), {executionOutcome: 'not-started'});
         if (exists && replayableTerminal(journal.data)) return finishNativeTurn({ journal });
         context.abortSignal.throwIfAborted();
-        const acquired = await this.acquire(request, context);
+        let acquired:HarnessConnectionAcquisition;
+        try{acquired=await this.acquire(request,context);}
+        catch(error){
+            if(!reconciling||!exists||!hasAdmittedNativeTurn(journal.data)||safeCode(error)!=='ECONFLICT'||!this.connections.acquireHistory)throw error;
+            return this.recoverWithCurrentGrant(request,context,journal,startedAt);
+        }
         try {
-            return await this.dispatch(request, context, journal, acquired, exists, startedAt);
+            return await this.dispatch(request, context, journal, acquired, exists, startedAt, reconciling);
         } catch (error) {return this.failExecution(error, request, context, journal, startedAt);}
         finally { await acquired.release(); }
     }
-    private async dispatch(request: HarnessExecutionRequest, context: EffectExecutionContext, journal: ExecutionJournal,
-        acquired: HarnessConnectionAcquisition, exists: boolean, startedAt: number): Promise<HarnessExecutionResult> {
-        if (!exists) await journal.initialize(acquired.epoch);
-        if(journal.data.epoch!==acquired.epoch){
+    private async recoverWithCurrentGrant(request:HarnessExecutionRequest,context:EffectExecutionContext,journal:ExecutionJournal,startedAt:number) {
+        let acquired;
+        try{acquired=await this.connections.acquireHistory!(request.connection);}
+        catch(error){throw safeCode(error)==='ECONFLICT'?executionError('NATIVE_HISTORY_AUTHORIZATION_CHANGED'):error;}
+        try{
             const result=await recoverNativeTerminal({acquired,journal,request,signal:context.abortSignal});
+            await diagnose(context,'observe-current-grant','completed',startedAt,undefined,executionCorrelation(request,journal));
+            return result;
+        }finally{await acquired.release();}
+    }
+    private async dispatch(request: HarnessExecutionRequest, context: EffectExecutionContext, journal: ExecutionJournal,
+        acquired: HarnessConnectionAcquisition, exists: boolean, startedAt: number, reconciling: boolean): Promise<HarnessExecutionResult> {
+        if (!exists) await journal.initialize(acquired.epoch);
+        const run:NativeExecution={acquired,journal,request,signal:context.abortSignal};
+        if(journal.data.epoch!==acquired.epoch){
+            const result=await recoverNativeTerminal(run);
             await diagnose(context,'observe-previous-epoch','completed',startedAt,undefined,executionCorrelation(request,journal));return result;
+        }
+        if(reconciling){
+            const result=await recoverAdmittedNativeTurn(run);
+            if(result){
+                await diagnose(context,'observe-admitted-history','completed',startedAt,undefined,executionCorrelation(request,journal));
+                return result;
+            }
         }
         const attachments = journal.data.turnId || journal.data.operations.turn ? undefined
             : await this.prepareInput(request, context, journal, acquired, startedAt);
         if (request.context?.conversation.mode === 'fork' && (!acquired.profile.capabilities.checkpointFork || !acquired.client.fork))
             throw executionError('CONTEXT_CHECKPOINT_FORK_UNSUPPORTED');
-        await claimExecutionContext(journal, request, acquired, context.abortSignal);
+        await claimExecutionContext(journal, request, acquired, context.abortSignal,this.options.readRetainedConnection);
         const correlation = executionCorrelation(request, journal);
         if (request.context) await diagnose(context, 'context-binding', 'claimed', startedAt, undefined, correlation);
-        const run: NativeExecution = {acquired, journal, request, attachments, signal: context.abortSignal};
-        await prepareNativeTurn(run);
+        await prepareNativeTurn({...run,attachments});
         await diagnose(context, 'observe', 'accepted', startedAt, undefined, correlation);
         const result = await observeNativeTurn(run, context, this.options.pollMs ?? 1000);
         await diagnose(context, 'observe', 'completed', startedAt, undefined, correlation);

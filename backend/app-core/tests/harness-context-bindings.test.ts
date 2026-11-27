@@ -3,11 +3,12 @@ import type {HarnessContextRequest, NativeContextRef} from '@nestos/kernel-adapt
 import {CONTEXT_BINDINGS_KEY, HarnessContextBindings} from '../src/projects/harness-context-bindings';
 import {durableState, request} from './harness-execution-fixture';
 import {context, operation} from './harness-context-fixture';
+import {directHarnessContextIdentity} from '@nestos/llm-session/contracts';
 
 const native: NativeContextRef = {nodeConnectionId: 'node', profileId: 'claude', workspaceId: 'workspace', sessionId: 'thread', epoch: 'e'};
 function fixture() {const storage = durableState(); return {...storage, store: new HarnessContextBindings(storage.state, 's')};}
-async function completed(f: ReturnType<typeof fixture>) {
-    await f.store.claim('binding', context, request.connection, operation); await f.store.attach('binding', operation.operationId, native);
+async function completed(f: ReturnType<typeof fixture>, initial = context, connection = request.connection) {
+    await f.store.claim('binding', initial, connection, operation); await f.store.attach('binding', operation.operationId, native);
     const prepared = await f.store.prepareSettlement('binding', operation.operationId, {operationId: operation.operationId, kind: 'terminal', knownHeadRef: 'head-1'});
     return f.store.release('binding', operation.operationId, prepared.revision + 1);
 }
@@ -16,6 +17,24 @@ function continuation(revision: number, patch: Partial<HarnessContextRequest> = 
         conversation: {mode: 'continue', bindingId: 'binding', expectedBindingRevision: revision, expectedGeneration: 1}, ...patch};
 }
 const nextOperation = {...operation, operationId: 'op-2', invocationId: 'call-2', fingerprint: 'input-2'};
+
+it('resumes the same binding after grant renewal and rejects changed access or policy', async () => {
+    const f = fixture(), identity = (project:unknown) => directHarnessContextIdentity({id:'agent',version:'1'},project);
+    const previous = {...request.connection,project:{authorization:{principalId:'owner',anonymous:false,revision:'a'.repeat(64)},
+        serverProjectId:'workspace',grants:[{mountId:'old',at:'/',access:'rw'}]}};
+    const binding = await completed(f,{...context,workspaceRef:identity(previous.project).workspaceRef},previous);
+    const project = {...previous.project,authorization:{...previous.project.authorization,revision:'b'.repeat(64)},
+        grants:[{...previous.project.grants[0],mountId:'new'}]};
+    const selection = {mode:'resume' as const,bindingId:binding.id,expectedBindingRevision:binding.revision,expectedGeneration:binding.generation};
+    const resume = (current:typeof project,policyRef=context.policyRef) =>
+        f.store.claim(binding.id,continuation(binding.revision,{conversation:selection,workspaceRef:identity(current).workspaceRef,policyRef}),
+            {...previous,project:current},nextOperation,previous);
+    await expect(resume({...project,grants:[{...project.grants[0],access:'ro'}]})).rejects.toMatchObject({code:'CONTEXT_POLICY_CHANGED'});
+    await expect(resume(project,'different-policy')).rejects.toMatchObject({code:'CONTEXT_POLICY_CHANGED'});
+    const resumed = await resume(project);
+    expect(resumed).toMatchObject({nativeRef:native,generation:binding.generation,workspaceRef:identity(project).workspaceRef,activeOperation:nextOperation});
+    expect(await resume(project)).toEqual(resumed);
+});
 
 it('retains confirmed earlier heads and forks one without following the latest native head', async () => {
     const f = fixture(), first = await completed(f);

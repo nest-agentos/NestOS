@@ -3,6 +3,7 @@ import type {KanbanItemSummary,KanbanRecordPage,KanbanTaskProjection} from '@nes
 import {deliveryStatus,recordFinalization,safeCode,type AutomaticDeliveryState,type KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {randomUUID} from '@nestos/common';
 import {automaticDeliveryStatuses} from '@nestos/kanban/integration';
+import {managementScopeKey,managementScopesKey,supersededManagementScopes,type ManagementScope} from '../presets/kanban-management-scope-catalog';
 
 /** Finalization facts supplement completion; they never reopen a settled task group. */
 const awaitingFinalization=(progress:import('@nestos/kanban/contracts').KanbanRecordProgress|undefined)=>
@@ -70,12 +71,23 @@ async function readDevelopmentDelivery(journal:KanbanAutomationJournal,boardId:s
     const started=Date.now(),operationId=randomUUID(),stage='closed-groups.delivery.read';
     try {
         const rows=await journal.find<AutomaticDeliveryState>(prefix,value=>value.boardId===boardId&&ids.has(value.itemId));
+        const obsolete=await supersededDeliveryScopes(journal,boardId,rows.map(row=>row.value));
         journal.diagnostic({operationId,boardId,stage,result:'success',count:rows.length,durationMs:Date.now()-started});
-        return rows;
+        return rows.filter(({value})=>!value.scopeId||!obsolete.has(value.scopeId));
     } catch(error) {
         const code=safeCode(error,'DELIVERY_STATUS_UNCONFIRMED');
         journal.diagnostic({operationId,boardId,stage,result:'failure',code,durationMs:Date.now()-started});
     }
+}
+
+async function supersededDeliveryScopes(journal:KanbanAutomationJournal,boardId:string,states:AutomaticDeliveryState[]):Promise<Set<string>> {
+    const owners=new Set(states.filter(row=>row.scopeId&&row.code).map(row=>row.itemId));
+    if(!owners.size)return new Set();
+    const indexes=await journal.getMany<string[]>([...owners].map(owner=>managementScopesKey(boardId,owner)));
+    const ids=new Set(indexes.flatMap(rows=>rows??[]));
+    if(!ids.size)return new Set();
+    const rows=await journal.getMany<ManagementScope>([...ids].map(managementScopeKey));
+    return supersededManagementScopes(journal,rows.filter((row):row is ManagementScope=>!!row&&row.boardId===boardId&&owners.has(row.ownerId)));
 }
 
 function developmentDeliveryPhase(rows:AutomaticDeliveryState[]):Pick<KanbanTaskProjection,'phase'|'reason'>|undefined {

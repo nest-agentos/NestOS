@@ -3,7 +3,8 @@ import {assertHarnessContextRequest} from '@nestos/kernel-adapters/contracts';
 import type {EffectSessionState} from '@nestos/durable-kernel';
 import type {ContextBinding, ContextBindingOperation, HarnessConnectionSnapshot, HarnessContextRequest,
     NativeContextRef, ContextCheckpoint} from '@nestos/kernel-adapters/contracts';
-import {canonical} from './harness-connection-policy';
+import {canonical, sameHarnessHistoryAuthorization} from './harness-connection-policy';
+import {directHarnessWorkspaceRef} from '@nestos/llm-session/contracts';
 import {executionError, jsonValue} from './harness-execution-journal';
 
 export const CONTEXT_BINDINGS_KEY = 'harness.context.bindings';
@@ -21,7 +22,7 @@ export class HarnessContextBindings {
     }
 
     async claim(id: string, context: HarnessContextRequest, connection: HarnessConnectionSnapshot,
-        operation: ContextBindingOperation): Promise<ContextBinding> {
+        operation: ContextBindingOperation, previousConnection?: HarnessConnectionSnapshot): Promise<ContextBinding> {
         assertHarnessContextRequest(context);
         if (!validOperation(operation)) throw executionError('CONTEXT_OPERATION_INVALID');
         operation = operationSnapshot(operation);
@@ -30,7 +31,7 @@ export class HarnessContextBindings {
             if (sameOperation(current?.activeOperation, operation) || sameOperation(current?.lastOperation, operation)) {
                 assertCompatible(current!, context, connection); return current!;
             }
-            if (context.conversation.mode === 'continue' || context.conversation.mode === 'resume') return continueBinding(current, context, connection, operation);
+            if (context.conversation.mode === 'continue' || context.conversation.mode === 'resume') return continueBinding(current, context, connection, operation, previousConnection);
             if (current) throw executionError('CONTEXT_BINDING_CONFLICT');
             if (context.conversation.mode === 'fork') return forkBinding(id, this.sessionId, collection, context, connection, operation);
             return newBinding(id, this.sessionId, context, connection, operation);
@@ -147,15 +148,27 @@ function forkBinding(id: string, sessionId: string, collection: BindingCollectio
 }
 
 function continueBinding(current: ContextBinding | undefined, context: HarnessContextRequest, connection: HarnessConnectionSnapshot,
-    operation: ContextBindingOperation): ContextBinding {
+    operation: ContextBindingOperation, previousConnection?: HarnessConnectionSnapshot): ContextBinding {
     if (!current) throw executionError('CONTEXT_BINDING_NOT_FOUND');
     const selection = context.conversation as Extract<Selection, {mode: 'continue' | 'resume'}>;
     if (current.id !== selection.bindingId || current.revision !== selection.expectedBindingRevision
         || current.generation !== selection.expectedGeneration) throw executionError('CONTEXT_BINDING_CHANGED');
     if (current.validity !== 'valid') throw executionError('CONTEXT_BINDING_INVALID');
     if (current.activeOperation) throw executionError('CONTEXT_BINDING_BUSY');
-    assertCompatible(current, context, connection);
-    return {...current, activeOperation: structuredClone(operation)};
+    const refreshed = context.conversation.mode === 'resume' && previousConnection
+        ? refreshConnectionGrant(current, context, connection, previousConnection) : current;
+    assertCompatible(refreshed, context, connection);
+    return {...refreshed, activeOperation: structuredClone(operation)};
+}
+
+/** The live connection was validated before claiming this binding. Only its grant metadata may change. */
+function refreshConnectionGrant(binding: ContextBinding, context: HarnessContextRequest, current: HarnessConnectionSnapshot,
+    previous: HarnessConnectionSnapshot): ContextBinding {
+    if (!binding.nativeRef || !binding.knownHeadRef || binding.connectionRef !== connectionRef(previous)
+        || canonical({...previous, project: current.project}) !== canonical(current)
+        || !sameHarnessHistoryAuthorization(previous.project, current.project)) return binding;
+    if (directHarnessWorkspaceRef(previous.project) !== binding.workspaceRef || directHarnessWorkspaceRef(current.project) !== context.workspaceRef) return binding;
+    return {...binding, connectionRef: connectionRef(current), workspaceRef: context.workspaceRef};
 }
 
 function assertCompatible(binding: ContextBinding, context: HarnessContextRequest, connection: HarnessConnectionSnapshot, fork = false): void {

@@ -5,6 +5,23 @@ import { recoverSessionsWithLeases } from '../src/runtime/session-recovery';
 import { Kernel, SeqFileKernelStore } from '@nestos/durable-kernel';
 
 describe('Session recovery with leases', () => {
+    it('rechecks indexed work after another host releases its startup lease', async () => {
+        const {manager}=await createVFS({rootBackend:new MemoryBackend()});
+        const store=new SessionLeaseStore(await manager.openFileSystem('/'));
+        const held=(await store.acquire('pending',{id:'previous',kind:'httpd'}))!;
+        const acquire=vi.spyOn(store,'acquire');
+        const kernel={listRuntimeRecoverySessions:vi.fn(async()=>['pending']),recoverSession:vi.fn(async()=>{})};
+        const recovery=await recoverSessionsWithLeases(kernel as never,store,{id:'current',kind:'httpd'},1000,undefined,new Set(),'deferred');
+        try{
+            recovery.startBackground();
+            await vi.waitFor(()=>expect(acquire).toHaveBeenCalledOnce());
+            expect(kernel.recoverSession).not.toHaveBeenCalled();
+            await store.release(held);
+            await vi.waitFor(()=>expect(kernel.recoverSession).toHaveBeenCalledExactlyOnceWith('pending'),{timeout:3000});
+            expect(kernel.listRuntimeRecoverySessions).toHaveBeenCalledTimes(2);
+        }finally{await recovery.release();await manager.dispose();}
+    });
+
     it('does not begin Kernel recovery after close while an accepted preparation callback is draining', async () => {
         const {manager} = await createVFS({rootBackend: new MemoryBackend()});
         const fs = await manager.openFileSystem('/'), store = new SessionLeaseStore(fs);

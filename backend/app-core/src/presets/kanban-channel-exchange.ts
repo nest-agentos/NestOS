@@ -15,6 +15,7 @@ import {prepareChannelContinuation} from '../run/channel-session-continuation';
 import {resolveCommitRequest} from './kanban-commit-query';
 import {developmentWorkspace} from './kanban-development-workspace';
 import type {DevelopmentWorkspaceRecord} from './kanban-development';
+import {dedicatedRecoveryRequests} from '../kanban/task-recovery-channel';
 export interface DevelopmentExchangeOptions {
     remote: ProjectRemoteMountService; provider: RemoteFileSourceProvider;
     kernel: Pick<Kernel, 'inspectSession' | 'sessionActivity'>; journal: KanbanAutomationJournal;
@@ -30,7 +31,12 @@ export async function developmentChannelExchange(options: DevelopmentExchangeOpt
     const channel = (operation: 'requests' | 'respond', value: Record<string, unknown> = {}) =>
         options.remote.sessionChannel(input.record.projectId, operation, {scopeId: input.id, ...value});
     return advanceChannelExchange({id: input.id, scopeId: input.id, journal: options.journal,
-        readRequests: async () => channelRequests(await channel('requests'), input.id),
+        readRequests: async () => {
+            const rows=channelRequests(await channel('requests'),input.id);
+            if(!rows.some(row=>row.request.method.startsWith('kanban.recovery.')))return rows;
+            const ownsRecovery=await dedicatedRecoveryRequests(options.journal,input.id);
+            return rows.filter(row=>!ownsRecovery(row.request));
+        },
         publishResponse: async response => await channel('respond', {...response}) as ChannelResponse,
         submission: options.submission, report: input.report,
         finalPublished: input.finalPublished ?? (async () => (await channelMessages(options.remote, input.record.projectId, input.id)).some(row => row.message.type === 'result')),

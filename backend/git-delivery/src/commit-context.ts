@@ -6,23 +6,27 @@ import type {GitProcess as RemoteProcessHandle} from './contracts';
 const log=createModuleLogger('kanban-commit-context');
 export interface CommitContext {
     schema: 'nestos.commit-context/1'; scopeId: string; projectId: string; boardId: string; itemId: string;
-    itemRevision: number; executionId: string; digest: string; input: unknown; trailers: string;
+    itemRevision: number; executionId: string; coordinationTaskId?:string; digest: string; input: unknown; trailers: string;
 }
-export async function freezeCommitContext(journal: PromptJournal, input: {projectId: string; boardId: string; itemId: string; itemRevision: number; executionId: string; context: unknown}): Promise<CommitContext> {
+export async function freezeCommitContext(journal: PromptJournal, input: {projectId: string; boardId: string; itemId: string; itemRevision: number; executionId: string;coordinationTaskId?:string; context: unknown}): Promise<CommitContext> {
     const started=Date.now();
     const key = 'development-commit-context:' + input.executionId, old = await journal.get<CommitContext>(key);
     if (old) {
-        if (old.projectId !== input.projectId || old.boardId !== input.boardId || old.itemId !== input.itemId) throw failure('COMMIT_CONTEXT_SCOPE_CHANGED');
+        if (old.projectId !== input.projectId || old.boardId !== input.boardId || old.itemId !== input.itemId
+            ||old.coordinationTaskId!==undefined&&old.coordinationTaskId!==input.coordinationTaskId) throw failure('COMMIT_CONTEXT_SCOPE_CHANGED');
         await journal.update<CommitContext>('commit-context:' + old.digest, previous => previous ?? old); return old;}
     if ([input.projectId, input.boardId, input.itemId, input.executionId].some(value => !value || /[\r\n]/.test(value))) throw failure('COMMIT_CONTEXT_INVALID');
+    if(input.coordinationTaskId!==undefined&&!/^[A-Za-z0-9_-]{1,128}$/.test(input.coordinationTaskId))throw failure('COMMIT_CONTEXT_INVALID');
     const scopeId = await journal.update<string>('kanban-context-scope', value => value ?? randomUUID());
     const value = {schema: 'nestos.commit-context/1' as const, scopeId, projectId: input.projectId, boardId: input.boardId,
-        itemId: input.itemId, itemRevision: input.itemRevision, executionId: input.executionId, input: commitInput(input.context)};
+        itemId: input.itemId, itemRevision: input.itemRevision, executionId: input.executionId,
+        ...(input.coordinationTaskId?{coordinationTaskId:input.coordinationTaskId}:{}),input: commitInput(input.context)};
     const bytes=new TextEncoder().encode(JSON.stringify(value)).byteLength;
     if(bytes>49152){log.warn('Commit context rejected',{operation:'kanban.commit-context',operationId:input.executionId,stage:'freeze',result:'failure',code:'COMMIT_CONTEXT_LIMIT',bytes,limit:49152,durationMs:0});throw failure('COMMIT_CONTEXT_LIMIT');}
     const digest = sha256HexSync(JSON.stringify(value));
     const trailers = Object.entries({'NestOS-Scope': scopeId, 'NestOS-Board': input.boardId, 'NestOS-Task': input.itemId,
-        'NestOS-Execution': input.executionId, 'NestOS-Context': 'sha256:' + digest}).map(([key, value]) => key + ': ' + value).join('\n') + '\n';
+        'NestOS-Execution': input.executionId, 'NestOS-Context': 'sha256:' + digest,
+        ...(input.coordinationTaskId?{'NestOS-Coordination-Task':input.coordinationTaskId}:{})}).map(([key, value]) => key + ': ' + value).join('\n') + '\n';
     const saved = await journal.update<CommitContext>(key, previous => previous ?? {...value, digest, trailers});
     await journal.update<CommitContext>('commit-context:' + saved.digest, previous => previous ?? saved);
     log.info('Commit provenance frozen',{operation:'kanban.commit-context',operationId:input.executionId,stage:'freeze',result:'success',bytes,durationMs:Date.now()-started});
@@ -31,7 +35,7 @@ export async function freezeCommitContext(journal: PromptJournal, input: {projec
 export function parseCommitTrailers(text: string): Record<string, string> {
     const result: Record<string, string> = Object.create(null);
     for (const line of text.split('\n')) {
-        const match = /^(NestOS-(?:Scope|Board|Task|Execution|Context)): (.+)$/.exec(line.trim());
+        const match = /^(NestOS-(?:Scope|Board|Task|Execution|Context|Coordination-Task)): (.+)$/.exec(line.trim());
         if (match) {if (Object.hasOwn(result, match[1])) throw failure('COMMIT_TRAILERS_AMBIGUOUS'); result[match[1]] = match[2];}
     }
     return result;

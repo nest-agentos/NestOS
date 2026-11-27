@@ -4,6 +4,8 @@ import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 import {UserEventService} from '../src/events/service';
 import {developmentLifecycle} from '../src/presets/kanban-development-lifecycle';
+import {archiveTemporaryReviewSession} from '../src/kanban/temporary-review-session';
+import type {ReviewJob} from '@nestos/kanban-development';
 
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); vi.restoreAllMocks();});
@@ -82,4 +84,21 @@ it('refuses to archive a request that belongs to another caller Session', async 
     await f.journal.update(f.key, () => ({...f.job, request: {...f.job.request, input: {request: {expectedSessionId: 'management-session', submission: {id: f.id}}}}}));
     await f.open().scan();
     expect(f.inspect).not.toHaveBeenCalled(); expect(f.archiveSession).not.toHaveBeenCalled();
+});
+
+it('archives a dedicated review child only after its exact persisted operation settles',async()=>{
+    const f=await fixture(),id='build',input={request:{expectedSessionId:id,submission:{id,source:{kind:'conversation',ownerId:id,id}}}} as ReviewJob['input'];
+    const job={id,boardId:'board',itemId:'item',input,sessionId:'build-child',phase:'settled',state:'succeeded'} as ReviewJob;
+    const inspect=vi.fn(async()=>({state:'succeeded' as const,sessionId:'build-child'})),log=vi.fn();
+    const options={journal:f.journal,inspect,archive:f.archiveSession,log};
+    const archive=archiveTemporaryReviewSession(options);
+    await archive({...job,phase:'submitting'});await archive({...job,request:{} as ReviewJob['request']});
+    expect(inspect).not.toHaveBeenCalled();
+    const now=Date.now(),clock=vi.spyOn(Date,'now').mockReturnValue(now);
+    inspect.mockResolvedValueOnce({state:'succeeded',sessionId:'another-child'});
+    await archive(job);expect(f.archiveSession).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({result:'failure',code:'SESSION_ARCHIVE_BINDING_CHANGED'}));
+    await archive(job);expect(inspect).toHaveBeenCalledTimes(1);
+    clock.mockReturnValue(now+60_000);await archive(job);await archiveTemporaryReviewSession(options)(job);
+    expect(f.archiveSession).toHaveBeenCalledExactlyOnceWith('build-child','review-session-archive:build');
 });

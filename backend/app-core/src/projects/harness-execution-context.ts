@@ -22,11 +22,15 @@ export function validateExecutionContext(request: HarnessExecutionRequest): void
     } catch (error) {throw Object.assign(error as Error, {executionOutcome: 'not-started'});}
 }
 
-export async function claimExecutionContext(journal: ExecutionJournal, request: HarnessExecutionRequest, acquired?: HarnessConnectionAcquisition, signal?: AbortSignal): Promise<void> {
+export type RetainedConnectionReader = (sessionId:string,binding:ContextBinding)=>Promise<HarnessExecutionRequest['connection']|undefined>;
+
+export async function claimExecutionContext(journal: ExecutionJournal, request: HarnessExecutionRequest, acquired?: HarnessConnectionAcquisition,
+    signal?: AbortSignal, readRetained?:RetainedConnectionReader): Promise<void> {
     if (!request.context) return;
     const store = bindings(journal);
     if ((journal.data.operations.create || journal.data.operations.fork) && !await store.get(journal.data.bindingId!)) throw executionError('CONTEXT_BINDING_NOT_FOUND');
-    let binding = await store.claim(journal.data.bindingId!, request.context, request.connection, journal.contextOperation());
+    const previous = acquired && readRetained ? await previousResumeConnection(store,journal,request,readRetained) : undefined;
+    let binding = await store.claim(journal.data.bindingId!, request.context, request.connection, journal.contextOperation(),previous);
     if (request.context.conversation.mode === 'resume') {
         if (binding.nativeRef?.epoch !== (acquired?.profile.contextId ?? journal.data.epoch) && acquired) binding = await recoverEpoch(store,binding,journal,request,acquired,signal);
         const native = binding.nativeRef;
@@ -38,6 +42,13 @@ export async function claimExecutionContext(journal: ExecutionJournal, request: 
     if (binding.forkedFrom && journal.data.forkSource && canonical(binding.forkedFrom) !== canonical(journal.data.forkSource))
         throw executionError('JOURNAL_CONFLICT');
     if (binding.forkedFrom && !journal.data.forkSource) await journal.save({forkSource: binding.forkedFrom});
+}
+
+async function previousResumeConnection(store:HarnessContextBindings,journal:ExecutionJournal,request:HarnessExecutionRequest,read:RetainedConnectionReader) {
+    if (request.context?.conversation.mode !== 'resume' || journal.data.sessionId || Object.keys(journal.data.operations).length) return;
+    const binding = await store.get(journal.data.bindingId!);
+    if (binding && binding.workspaceRef !== request.context.workspaceRef && !binding.activeOperation)
+        return read(journal.context.sessionId,binding);
 }
 
 async function recoverEpoch(store: HarnessContextBindings, binding: ContextBinding, journal: ExecutionJournal,

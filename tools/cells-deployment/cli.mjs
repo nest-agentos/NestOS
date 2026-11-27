@@ -4,16 +4,20 @@ import {readFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {createServiceControl} from './index.mjs';
 import {fail} from './artifact.mjs';
-import {build, finishedTarget, redeploy, redeployStatus, targetsFor} from './redeploy.mjs';
+import {build, finishedTarget, parseRedeployArgs, redeploy, redeployStatus, targetsFor} from './redeploy.mjs';
 const root=fileURLToPath(new URL('../..',import.meta.url));
 try{
- const [verb, argument, operation, ...extra] = process.argv.slice(2);
- if (verb === 'redeploy' || verb === 'redeploy-status') {
+ const [verb, ...rest] = process.argv.slice(2);
+ if (verb === 'redeploy') {
+  const {targets, configOnly} = parseRedeployArgs(rest);
+  const report = await redeploy(root, targets, undefined, {configOnly});
+  console.log(JSON.stringify(report));
+  if (!report.targets.every(finishedTarget)) process.exitCode = 1;
+ } else if (verb === 'redeploy-status') {
+  const [argument, operation, ...extra] = rest;
   const targets = targetsFor(argument);
-  if (extra.length || (verb === 'redeploy' && operation)) throw fail('CELLS_REDEPLOY_ARGUMENTS_INVALID');
-  const report = verb === 'redeploy'
-   ? await redeploy(root, targets)
-   : await redeployStatus(root, targets, operation);
+  if (extra.length) throw fail('CELLS_REDEPLOY_ARGUMENTS_INVALID');
+  const report = await redeployStatus(root, targets, operation);
   console.log(JSON.stringify(report));
   if (!report.targets.every(finishedTarget)) process.exitCode = 1;
  } else if(verb==='describe'){

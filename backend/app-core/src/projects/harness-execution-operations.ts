@@ -11,7 +11,7 @@ export interface NativeExecution {
 }
 type Mutation = (options: HarnessMutationOptions) => Promise<unknown>;
 export const NATIVE_MUTATION_HELD = Symbol('native-mutation-held');
-export function nativeOptions(run: NativeExecution, requestId?: string): HarnessMutationOptions {
+export function nativeOptions(run: Pick<NativeExecution,'signal'|'journal'>, requestId?: string): HarnessMutationOptions {
     return { signal: run.signal, epoch: run.journal.data.epoch, ...(requestId ? { requestId } : {}) };
 }
 export async function nativeMutation(run: NativeExecution, step: string, call: Mutation, requireRunning = false): Promise<unknown> {

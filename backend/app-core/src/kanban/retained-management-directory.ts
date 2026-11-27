@@ -5,10 +5,15 @@ import {readPrompt} from '../run/prompt-bundle';
 type Channel={scopeId?:string;execution?:{sessionId?:string}};
 /** Use the durable ownership stamp on ordinary reads; probe the directory again only after a missing-path receipt. */
 export async function retainedManagementChannel(options:DecisionConversationOptions,value:DecisionConversation):Promise<{channel:Channel;repaired:boolean}> {
-    let repaired=await retainManagementDirectory(options,value);
+    const repaired=await retainManagementDirectory(options,value);
     const read=()=>options.remote.sessionChannel(value.binding.projectId,'current',{cwd:value.binding.directory}) as Promise<Channel>;
     try{return {channel:await read(),repaired};}
-    catch(error){if(safeCode(error,'UNKNOWN')!=='ENOENT')throw error;repaired=await retainManagementDirectory(options,value,true)||repaired;return {channel:await read(),repaired};}
+    catch(error){
+        if(safeCode(error,'UNKNOWN')!=='ENOENT')throw error;
+        const restored=await retainManagementDirectory(options,value,true);
+        if(!restored)throw error;
+        return {channel:await read(),repaired:true};
+    }
 }
 /** Repair only a proven legacy cleanup. This never creates a Session or restores a Git worktree. */
 export async function retainManagementDirectory(options:DecisionConversationOptions,value:DecisionConversation,verify=false):Promise<boolean> {

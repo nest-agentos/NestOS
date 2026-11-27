@@ -38,9 +38,10 @@ class LeasedRecovery implements SessionRecovery {
     private backgroundStopped = false;
     private quiescing?: Promise<void>;
     private scanning?: Promise<void>;
+    private scanRetry?: ReturnType<typeof setTimeout>;
     private readonly acquisitions = new Map<string, Promise<boolean>>();
     constructor(private kernel: RecoveryKernel, private store: SessionLeaseStore, private owner: Owner,
-        heartbeatMs: number, private beforeRecover?: BeforeRecovery, private excluded = new Set<string>()) {
+        private readonly heartbeatMs: number, private beforeRecover?: BeforeRecovery, private excluded = new Set<string>()) {
         this.heartbeat = setInterval(() => {
             for (const id of this.leases.keys()) void this.renew(id).catch(error => console.warn(`[Lease] renew failed for Session ${id}`, error));
         }, heartbeatMs);
@@ -65,11 +66,19 @@ class LeasedRecovery implements SessionRecovery {
 
     /** Online recovery is per Session and respects Task/Effect leases in other active Sessions. */
     startBackground(): void {
-        if (this.scanning || this.released || this.stopping || this.backgroundStopped) return;
-        this.scanning = this.scanOnline();
-        void this.scanning.catch(() => {}); // The indexed stage logs classified failures before rejecting.
+        if (this.scanning || this.scanRetry || this.released || this.stopping || this.backgroundStopped) return;
+        this.scanning = this.scanOnline().then(retry=>{
+            if(retry)this.scheduleScanRetry();
+        },()=>this.scheduleScanRetry()).finally(()=>{this.scanning=undefined;});
     }
-    private async scanOnline(): Promise<void> {
+    private scheduleScanRetry():void {
+        if(this.released||this.stopping||this.backgroundStopped)return;
+        this.scanRetry=setTimeout(()=>{
+            this.scanRetry=undefined;
+            this.startBackground();
+        },Math.max(1000,this.heartbeatMs));
+    }
+    private async scanOnline(): Promise<boolean> {
         const operationId = randomUUID(), started = performance.now();
         const candidates = await this.kernel.listRuntimeRecoverySessions().catch(error => {
             console.warn(`[Lease] operation=runtime-recovery stage=index result=failed operationId=${operationId} code=${recoveryErrorCode(error)} durationMs=${Math.round(performance.now() - started)}`);
@@ -87,6 +96,7 @@ class LeasedRecovery implements SessionRecovery {
             }
         });
         console.log(`[Lease] operation=runtime-recovery stage=indexed-sessions result=${failed ? 'partial' : 'success'} operationId=${operationId} candidates=${candidates.length} recovered=${recovered} refused=${refused} skipped=${skipped} failed=${failed} durationMs=${Math.round(performance.now() - started)}`);
+        return refused>0||failed>0;
     }
     private async ensureReconciliationLeases(ids: string[]): Promise<void> {
         for (const id of ids) {
@@ -223,7 +233,11 @@ class LeasedRecovery implements SessionRecovery {
         }
     }
 
-    stopBackground(): void {this.backgroundStopped = true;}
+    stopBackground(): void {
+        this.backgroundStopped = true;
+        clearTimeout(this.scanRetry);
+        this.scanRetry=undefined;
+    }
     quiesce(): Promise<void> {
         this.stopBackground(); this.stopping = true;
         return this.quiescing ??= Promise.allSettled([...(this.scanning ? [this.scanning] : []), ...(this.sweep ? [this.sweep] : []),

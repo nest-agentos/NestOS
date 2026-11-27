@@ -113,12 +113,15 @@ it('verifies two changes-only sources against their respective integration steps
     await writeFile(join(f.source, 'shared'), first);
     await writeFile(join(second, 'shared'), contents.replace('line 24\n', 'source two\n'));
     const firstSource = {...f.input.sources[0], commitContext: {trailers: 'NestOS-Task: source-one'}};
-    const input = {...f.input, sources: [firstSource, {...f.input.sources[0], directory: '/workspace/second'}]};
+    const input = {...f.input, coordinationTaskId:'coordination-task',sources: [firstSource, {...f.input.sources[0], directory: '/workspace/second'}]};
     expect(await tryGitIntegration(f.process, input)).toBe('applied');
     const target = await f.git('rev-parse', 'HEAD');
     expect(await inspectGitIntegration(f.process, input)).toBe(target);
     expect(await f.git('show', 'HEAD:shared')).toBe(first.replace('line 24\n', 'source two\n').trim());
-    expect(await f.git('log', '-1', '--format=%(trailers:only)', 'HEAD^')).toBe('NestOS-Task: source-one');
+    expect(await f.git('log', '-1', '--format=%(trailers:only)', 'HEAD^')).toBe('NestOS-Task: source-one\nNestOS-Coordination-Task: coordination-task');
+    expect(await f.git('log', '-1', '--format=%(trailers:only)', 'HEAD')).toBe('NestOS-Coordination-Task: coordination-task');
+    await expect(inspectGitIntegration(f.process,{...input,coordinationTaskId:'another-task'}))
+        .rejects.toMatchObject({code:'INTEGRATION_COORDINATION_ID_MISMATCH'});
 });
 
 it('records a no-op when the frozen source is already integrated', async () => {
@@ -311,9 +314,11 @@ it.each(['aligned','diverged','conflicted'])('publishes a frozen module snapshot
     const file=join(sourceModule,'history');
     await writeFile(file,'approved\n');
     const objects=JSON.stringify([['module',base]]);
-    const frozen=await f.process.nativeShell.exec('sh',['-c',integrationSourceSnapshotScript,'test',sourceHead,objects],{cwd:'/workspace/source'});
+    const trailers='NestOS-Task: execution-task\nNestOS-Coordination-Task: coordination-task';
+    const frozen=await f.process.nativeShell.exec('sh',['-c',integrationSourceSnapshotScript,'test',sourceHead,objects,trailers],{cwd:'/workspace/source'});
     expect(frozen).toMatchObject({code:0});
-    const input:GitIntegrationTransaction={...f.input,previousTarget,sources:[{...f.input.sources[0],sourceHead,sourceTree:frozen.stdout.trim(),
+    const input:GitIntegrationTransaction={...f.input,previousTarget,coordinationTaskId:'coordination-task',sources:[{...f.input.sources[0],taskId:'execution-task',
+        moduleTrailers:trailers,sourceHead,sourceTree:frozen.stdout.trim(),
         repositories:[{path:'.',head:sourceHead,dirty:true},{path:'module',head:base,dirty:true}]}]};
     await writeFile(file,'changed after review\n');
     await expect(tryGitIntegration(f.process,input)).rejects.toMatchObject({code:'INTEGRATION_SOURCE_CHANGED'});
@@ -336,6 +341,7 @@ it.each(['aligned','diverged','conflicted'])('publishes a frozen module snapshot
     const link=/^160000 commit ([a-f0-9]+)\s/.exec(await f.git('ls-tree','HEAD','module'))?.[1];
     expect(link).toBeDefined();
     expect(await f.git('-C',targetModule,'show',link+':history')).toBe(history);
+    expect(await f.git('-C',targetModule,'show','-s','--format=%(trailers:only)',link!)).toBe(trailers);
     expect(await f.git('-C',targetModule,'rev-parse','refs/nestos/module-delivery/'+link)).toBe(link);
     expect(await f.git('-C',targetModule,'rev-parse','HEAD')).toBe(targetModuleHead);
     if(variant!=='aligned')expect(await f.git('-C',targetModule,'show',link+':target-only')).toBe('retained');

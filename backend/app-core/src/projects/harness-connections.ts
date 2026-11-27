@@ -3,7 +3,7 @@ import type { HarnessClient, HarnessProfile } from '@nestos/cells-driver';
 import type { HarnessConnectionSnapshot, HarnessExecutionConnection } from '@nestos/kernel-adapters/contracts';
 import type { ProjectRemoteMountService } from './remote-mounts';
 import { HarnessConnectionStore, type HarnessConnectionRecord } from './harness-connection-store';
-import { canonical, harnessProjectIdentity, normalizeHarnessConnection, sameHarnessProjectAuthorization } from './harness-connection-policy';
+import { canonical, harnessProjectIdentity, normalizeHarnessConnection, sameHarnessProjectAuthorization, sameHarnessHistoryAuthorization } from './harness-connection-policy';
 import { traceHarnessConnection } from './harness-connection-diagnostics';
 import { readHarnessConnectionTargets } from './harness-connection-targets';
 import type { ProjectFolder } from './project-service';
@@ -12,6 +12,7 @@ type Remote = Pick<ProjectRemoteMountService, 'list' | 'resolveConnection' | 'pr
 export interface HarnessConnectionAcquisition {
     client: HarnessClient; profile: HarnessProfile; workspaceId: string; epoch: string; release(): Promise<void>;
 }
+export type HarnessHistoryAcquisition=Omit<HarnessConnectionAcquisition,'client'>&{client:Pick<HarnessClient,'read'>};
 export interface HarnessConnectionInspection {
     snapshot: HarnessConnectionSnapshot; profile: HarnessProfile; workspaceId: string; epoch: string; checkpointFork: boolean;
 }
@@ -72,15 +73,33 @@ export class HarnessConnectionService {
         return snapshot;
     }
     async validate(snapshot: HarnessConnectionSnapshot): Promise<void> {
+        const liveProject=await this.currentProject(snapshot);
+        if (!sameHarnessProjectAuthorization(liveProject, snapshot.project)) throw changed();
+        if (canonical(liveProject) !== canonical(snapshot.project))
+            await traceHarnessConnection('harness.connection.validate-remount', snapshot.id, async () => {});
+    }
+    private async currentProject(snapshot:HarnessConnectionSnapshot) {
         if (!snapshot || snapshot.version !== 1 || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 1) throw changed();
-        const { version: _version, revision: _revision, project, ...definition } = snapshot;
+        const { version: _version, revision: _revision, project: _project, ...definition } = snapshot;
         const normalized = normalizeHarnessConnection(definition), current = await this.get(snapshot.id);
         if (!current?.connection || current.connection.enabled === false || current.revision !== snapshot.revision
             || canonical(current.connection) !== canonical(normalized)) throw changed();
-        const liveProject = await this.project(normalized);
-        if (!sameHarnessProjectAuthorization(liveProject, project)) throw changed();
-        if (canonical(liveProject) !== canonical(project))
-            await traceHarnessConnection('harness.connection.validate-remount', snapshot.id, async () => {});
+        return this.project(normalized);
+    }
+    acquireHistory(snapshot:HarnessConnectionSnapshot):Promise<HarnessHistoryAcquisition>{
+        return traceHarnessConnection('harness.connection.acquire-history',snapshot.id,async()=>{
+            const project=await this.currentProject(snapshot);
+            if(!sameHarnessHistoryAuthorization(project,snapshot.project))throw changed();
+            const client=await this.requireRemote().projectHarness(snapshot.projectId,{requireRegistered:true});
+            try {
+                const descriptor=await client.profiles(),{profile,workspaceId}=inspectProfile(snapshot,descriptor);
+                if(canonical(await this.currentProject(snapshot))!==canonical(project))throw changed();
+                return {client:{read:client.read.bind(client)},profile,workspaceId,epoch:descriptor.epoch,release:()=>client.close()};
+            }catch(error){
+                try{await client.close();}catch(cleanup){throw new AggregateError([error,cleanup],'Harness history acquisition and cleanup failed');}
+                throw error;
+            }
+        });
     }
     acquire(snapshot: HarnessConnectionSnapshot): Promise<HarnessConnectionAcquisition> {
         return traceHarnessConnection('harness.connection.acquire', snapshot?.id, () => this.acquireConnection(snapshot));

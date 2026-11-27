@@ -46,7 +46,7 @@ it('projects repository target waiting and merge failure from one scoped journal
   {boardId:'b',itemId:'failure',scopeId:'repository-f',step:1,steps:['analyze','merge','accept'],code:'OPERATION_SELECTION_REQUIRED'},
   {boardId:'b',itemId:'done',scopeId:'repository-d',step:3,steps:['analyze','merge','accept','cleanup']},
  ];
- const journal={find:vi.fn(async(_prefix:string)=>rows.map(value=>({value}))),diagnostic:vi.fn()};
+ const journal={find:vi.fn(async(_prefix:string)=>rows.map(value=>({value}))),getMany:vi.fn(async()=>[]),diagnostic:vi.fn()};
  const items=rows.map(row=>({id:row.itemId,externalRefs:[{system:'nestos-software-reports',id:'source'}]})) as KanbanItemSummary[];
  const result=await projectClosedDevelopmentGroups(journal as never,'b',items);
  expect(result.get('queued')).toEqual({phase:'waiting-dependency',reason:'DELIVERY_WAITING_FOR_TARGET'});
@@ -54,4 +54,26 @@ it('projects repository target waiting and merge failure from one scoped journal
  expect(result.has('done')).toBe(false);
  expect(journal.find).toHaveBeenCalledTimes(1);
  expect(journal.find.mock.calls[0]?.[0]).toBe('automatic-delivery:["b",');
+});
+
+it('keeps a closed group out of the conflict queue when a newer verified scope delivered the same dispatch',async()=>{
+ const contribution={itemId:'child',dispatchId:'dispatch'},owner={boardId:'b',ownerId:'group',projectId:'repo',contributors:[contribution]};
+ const saved:Record<string,unknown>={
+  'management-operation-scopes:["b","group"]':['old','replacement'],
+  'management-operation-scope:old':{...owner,id:'old',stage:'prepared'},
+  'management-operation-scope:replacement':{...owner,id:'replacement',stage:'accepted'},
+  'management-integrated:["b","group","dispatch"]':{scopeId:'replacement',operationId:'merge',targetHead:'verified'},
+  'review-operations:["b","group","old"]':{jobs:['old-merge']},
+  'review-operation:old-merge':{phase:'settled',state:'failed'},
+ };
+ const rows=[
+  {boardId:'b',itemId:'group',scopeId:'old',step:1,steps:['analyze','merge','accept'],code:'OPERATION_SELECTION_REQUIRED'},
+  {boardId:'b',itemId:'group',scopeId:'replacement',step:3,steps:['analyze','merge','accept','cleanup']},
+ ];
+ const journal={find:vi.fn(async()=>rows.map(value=>({value}))),getMany:vi.fn(async(keys:string[])=>keys.map(key=>saved[key])),
+  get:vi.fn(async(key:string)=>saved[key]),diagnostic:vi.fn()};
+ const items=[{id:'group',externalRefs:[{system:'nestos-software-reports',id:'source'}]}] as KanbanItemSummary[];
+ expect((await projectClosedDevelopmentGroups(journal as never,'b',items)).has('group')).toBe(false);
+ saved['review-operation:old-merge']={phase:'submitting',state:'unknown'};
+ expect((await projectClosedDevelopmentGroups(journal as never,'b',items)).get('group')).toMatchObject({phase:'error',reason:'OPERATION_SELECTION_REQUIRED'});
 });

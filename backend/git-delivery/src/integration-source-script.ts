@@ -29,6 +29,6 @@ ${captureIntegrationModules}
 if [ "\${2:-[]}" = '[]' ]; then
     capture_source_tree . "$1" "$tmp/index"
 else
-    capture_module_tree . "$1" "$2" "$tmp" '' ''
+    capture_module_tree . "$1" "$2" "$tmp" '' '' '' "\${3:-}"
 fi
 `;

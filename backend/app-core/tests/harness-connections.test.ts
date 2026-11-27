@@ -23,7 +23,7 @@ async function fixture() {
     const profiles = vi.fn(async () => ({ epoch: 'mutation-epoch', profiles: [structuredClone(profile)] }));
     const models = vi.fn(async () => ({ models: [{ id: 'fixture-model', label: 'Fixture', reasoningEfforts: [{ id: 'high', label: 'High' }] }] }));
     const remote = { list: () => structuredClone(mounts), resolveConnection: vi.fn(async () => structuredClone(node)),
-        projectHarness: vi.fn(async () => { const client = { profiles, models, close: vi.fn(async () => {}) }; clients.push(client); return client as unknown as HarnessClient; }) };
+        projectHarness: vi.fn(async () => { const client = { profiles, models, read: vi.fn(), close: vi.fn(async () => {}) }; clients.push(client); return client as unknown as HarnessClient; }) };
     const service = new HarnessConnectionService(fs, remote);
     return { fs, service, remote, node, mounts, profile, profiles, clients, models };
 }
@@ -72,6 +72,21 @@ it('rechecks authorization after profile discovery and closes a rejected acquisi
     f.profiles.mockImplementationOnce(async () => { f.mounts[0].serverProjectRevision = 3; return { epoch: 'mutation-epoch', profiles: [f.profile] }; });
     await expect(f.service.acquire(snapshot)).rejects.toMatchObject({ code: 'ECONFLICT' });
     expect(f.clients[1].close).toHaveBeenCalledOnce();
+});
+
+it('allows only history after a revision-only reauthorization of the same project and principal',async()=>{
+    const f=await fixture();await f.service.save(definition,0);
+    const snapshot=(await f.service.freeze(definition.id))!;
+    const authorization={...f.node.authorization,revision:'b'.repeat(64)};
+    f.node.authorization=authorization;f.mounts[0].authorization=authorization;
+    await expect(f.service.acquire(snapshot)).rejects.toMatchObject({code:'ECONFLICT'});
+    const acquired=await f.service.acquireHistory(snapshot);
+    expect(Object.keys(acquired.client)).toEqual(['read']);await acquired.release();
+    const other={...authorization,principalId:'another'};
+    f.node.authorization=other;f.mounts[0].authorization=other;
+    await expect(f.service.acquireHistory(snapshot)).rejects.toMatchObject({code:'ECONFLICT'});
+    f.node.authorization=authorization;f.mounts[0].authorization=authorization;f.mounts[0].root='/another';
+    await expect(f.service.acquireHistory(snapshot)).rejects.toMatchObject({code:'ECONFLICT'});
 });
 
 it('requires the scoped project workspace and execution capabilities instead of selecting another workspace', async () => {

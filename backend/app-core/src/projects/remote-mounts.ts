@@ -274,8 +274,19 @@ export class ProjectRemoteMountService {
         // offline, and the mounts' own probes are what the workbench availability state derives from.
         if (projects.length) await Promise.all(projects.map(projectId => this.checkConnections(projectId, options)));
         if (options?.signal?.aborted) { this.setConnectionStatus(id, previous); return; }
-        const offline = projects.some(projectId => this.projectOffline(projectId)) || (handshakeFailed && !projects.length);
+        const current = this.connections().find(item => item.id === id) ?? connection;
+        const offline = projects.some(projectId => this.projectOffline(projectId)
+            && (handshakeFailed || !this.isProjectBindingOutdatedOnly(projectId, current)))
+            || (handshakeFailed && !projects.length);
         this.setConnectionStatus(id, offline ? 'offline' : 'online');
+    }
+    private isMountAuthorizationOutdated(mount: ProjectRemoteMount, connection = mount.connectionId ? this.connections().find(item => item.id === mount.connectionId) : undefined): boolean {
+        return Boolean(mount.authorization && connection && (connection.authorization?.principalId !== mount.authorization.principalId
+            || connection.authorization?.revision !== mount.authorization.revision));
+    }
+    private isProjectBindingOutdatedOnly(projectId: string, connection: RemoteFileSystemConfig): boolean {
+        const offlineMounts = this.list(projectId).filter(mount => mount.connectionId === connection.id && this.status(mount.mountId) === 'offline');
+        return offlineMounts.length > 0 && offlineMounts.every(mount => this.isMountAuthorizationOutdated(mount, connection));
     }
     private async detectAuthorizationChange(error:unknown,connection:RemoteFileSystemConfig,options?:OperationOptions):Promise<void> {
         if(diagnosticFailure(error).reason!=='authorization-changed')return;
@@ -305,11 +316,15 @@ export class ProjectRemoteMountService {
                 stage='project-guard';for(const projectId of this.connectionProjects(id))await this.beforeChange(projectId);
                 checkOperation(options);
                 stage='persist';const next={...current,authorization:descriptor.authorization,projects:descriptor.projects};
+                const affectedProjects=this.connectionProjects(id);
+                const staleMounts=affectedProjects.flatMap(projectId=>this.list(projectId).filter(mount=>mount.connectionId===id&&this.isMountAuthorizationOutdated(mount,next)));
                 await this.persist({...this.catalog,connections:this.connections().map(value=>value.id===id?next:value)});
-                this.authorizationRefreshes.clear(id);this.setConnectionStatus(id,'unknown');
+                this.authorizationRefreshes.clear(id);this.setConnectionStatus(id,'online');
+                await this.releaseSources(staleMounts);
+                for(const mount of staleMounts)this.setStatus(mount.mountId,'offline');
                 for(const listener of this.listeners)listener();
                 remoteLog.info('cells.authorization.updated',{operationId,connectionId:id,operation:'cells.authorization.refresh',stage:'persist',result:'success',
-                    affectedProjectCount:this.connectionProjects(id).length,durationMs:Date.now()-started});
+                    affectedProjectCount:affectedProjects.length,outdatedMountCount:staleMounts.length,durationMs:Date.now()-started});
             }catch(error){
                 this.recordFailure(error,{operation:'cells.authorization.refresh',stage,connectionId:id,operationId,durationMs:Date.now()-started});throw error;
             }
@@ -389,6 +404,7 @@ export class ProjectRemoteMountService {
             const credentialRef = this.connection(id).credentialRef;
             await this.persist({ ...this.catalog, connections:this.connections().filter(item => item.id !== id) });
             this.provider.clearCredential?.(credentialRef);
+            this.authorizationRefreshes.clear(id);
             this.connectionStates.delete(id);
             for (const listener of this.listeners) listener();
         });
@@ -405,8 +421,11 @@ export class ProjectRemoteMountService {
             const projects = {...this.catalog.projects}, mounts = missing.flatMap(id => projects[id]);
             for (const id of missing) delete projects[id];
             await this.persist({...this.catalog,projects});
-            for (const mount of mounts) await this.releaseSource(mount.mountId);
-            for (const id of missing) { this.diagnostics.delete(id); await this.changed(id); }
+            await this.evictMounts(mounts);
+            for (const id of missing) {
+                this.diagnostics.delete(id); this.projectIssues.delete(id);
+                this.eventLog.endSource({projectId: id}); await this.changed(id);
+            }
         });
     }
     forgetProject(projectId: string): Promise<void> {
@@ -417,8 +436,9 @@ export class ProjectRemoteMountService {
             const projects = { ...this.catalog.projects }; delete projects[projectId];
             await this.persist({ ...this.catalog, projects });
             await this.changed(projectId);
-            this.diagnostics.delete(projectId); this.eventLog.endSource({projectId});
-            for (const mount of mounts) await this.releaseSource(mount.mountId);
+            this.diagnostics.delete(projectId); this.projectIssues.delete(projectId);
+            this.eventLog.endSource({projectId});
+            await this.evictMounts(mounts);
         }));
     }
     private connectionProjects(id?: string): string[] {
@@ -428,6 +448,11 @@ export class ProjectRemoteMountService {
         this.eventLog.endSource({mountId: id});
         const source = this.sources.get(id); this.sources.delete(id); this.states.delete(id);
         await (await source?.catch(() => undefined))?.dispose();
+    }
+    private async evictMount(id: string): Promise<void> {
+        const missing = this.missing.get(id);
+        this.missing.delete(id); this.observations.delete(id); this.authorizationInspections.delete(id);
+        await Promise.all([this.releaseSource(id), (await missing?.catch(() => undefined))?.dispose()]);
     }
     findRemoteProject(connectionId: string, path: string): string | undefined {
         const started = Date.now(), connection = this.connection(connectionId), { alias, root } = remoteProjectPath(path);
@@ -567,7 +592,7 @@ export class ProjectRemoteMountService {
                 const project = await client.setExecution(expected, execution, options);
                 this.assertProjectGrant(projectId, root, project);
                 await this.save(projectId, grants.map(m => ({...m, serverProjectRevision: project.revision, mountId: randomUUID()})));
-                try { await this.changed(projectId); } finally { await this.releaseSources(grants); }
+                try { await this.changed(projectId); } finally { await this.evictMounts(grants); }
             } finally { await client.close(); }
         }));
     }
@@ -575,7 +600,6 @@ export class ProjectRemoteMountService {
         const root = this.list(projectId).find(mount => mount.at === '/');
         if (!root?.connectionId) throw new FSError('ECAPABILITY', 'Registered project binding unavailable');
         await this.trackProject('project.binding.refresh', projectId, async () => {
-            await this.beforeChange(projectId);
             checkOperation(options);
             await this.remountProject(projectId, root.access, options);
             await this.checkConnections(projectId, options);
@@ -613,7 +637,7 @@ export class ProjectRemoteMountService {
                     throw new FSError('ECONFLICT','Remote remount receipt does not match the requested directory');
                 const next=this.reboundGrants(root,applied);
                 checkOperation(options);await this.save(projectId,next);
-                try{await this.changed(projectId);}finally{await this.releaseSources(grants);}
+                try{await this.changed(projectId);}finally{await this.evictMounts(grants);}
             }finally{await client.close();}
         }));
     }
@@ -652,12 +676,15 @@ export class ProjectRemoteMountService {
                         : project.mounts.find(item => item.at === '/workspace' + mount.at)!.access}));
                 await this.save(projectId, next);
                 try { await this.changed(projectId); }
-                finally { await this.releaseSources(grants); }
+                finally { await this.evictMounts(grants); }
             } finally { await client.close(); }
         }));
     }
     private async releaseSources(grants: readonly ProjectRemoteMount[]): Promise<void> {
         await Promise.all(grants.map(mount => this.releaseSource(mount.mountId)));
+    }
+    private async evictMounts(grants: readonly ProjectRemoteMount[]): Promise<void> {
+        await Promise.all(grants.map(mount => this.evictMount(mount.mountId)));
     }
     private assertProjectGrant(projectId: string, mount: ProjectRemoteMount, project: RemoteProject): void {
             if (mount.serverProjectId && project.id !== mount.serverProjectId || project.alias!==mount.alias || project.path!==mount.root.replace(/^\//,'')) throw new FSError('ECONFLICT','Project directory changed');
@@ -927,7 +954,8 @@ export class ProjectRemoteMountService {
             this.setStatus(mount.mountId, 'online');
         } catch (error) {
             if (cancelledByCaller(parent)) {this.setStatus(mount.mountId, previous); return;}
-            if(mount.connectionId)await this.detectAuthorizationChange(error,this.connection(mount.connectionId),scoped);
+            const current = mount.connectionId ? this.connections().find(item => item.id === mount.connectionId) : undefined;
+            if (current && !this.isMountAuthorizationOutdated(mount, current)) await this.detectAuthorizationChange(error, current, scoped);
             const failure = this.recordFailure(error, {...context, durationMs: Date.now() - started}, scoped.signal?.aborted ? 'timeout' : undefined);
             this.observations.set(mount.mountId, {...this.observations.get(mount.mountId), checkedAt: Date.now(), failure});
             // The remote file gate can reject reads during execution while the connection stays usable.
@@ -990,7 +1018,7 @@ export class ProjectRemoteMountService {
             : mounts.length && mounts.every(mount => mount.status === 'online') ? 'online' : 'unknown';
         const times = [...mounts.flatMap(mount => mount.checkedAt ? [mount.checkedAt] : []), ...issues.map(issue => issue.timestamp)];
         const problem: RemoteProjectStatus['problem'] = mounts.some(mount => mount.authorization?.exportAccess === 'none' || mount.authorization?.projectAccess === 'denied')
-            ? 'authorization-denied' : status === 'offline' && mounts.some(mount => mount.authorizationChanged) ? 'binding-outdated' : status === 'offline' ? 'connection-failed'
+            ? 'authorization-denied' : mounts.some(mount => mount.authorizationChanged) ? 'binding-outdated' : status === 'offline' ? 'connection-failed'
                 : filesBusy ? 'files-busy' : issue ? 'native-unavailable' : undefined;
         return {projectId, status, problem, ...(issue ? {issue: structuredClone(issue), issues: structuredClone(issues)} : {}), ...(times.length ? {checkedAt: Math.max(...times)} : {}), mounts};
     }
@@ -1053,9 +1081,7 @@ export class ProjectRemoteMountService {
             await this.beforeChange(projectId);
             await this.save(projectId, this.list(projectId).filter(item => item.mountId !== mountId));
             await this.changed(projectId);
-            const owner = this.sources.get(mountId); this.sources.delete(mountId);
-            this.states.delete(mountId);
-            await (await owner)?.dispose();
+            await this.evictMount(mountId);
         });
     }
     reconnect(projectId: string, mountId: string, secret: string, options?: OperationOptions): Promise<void> {
@@ -1076,7 +1102,7 @@ export class ProjectRemoteMountService {
             this.setStatus(mountId, 'online');
             // The replaced source is released even when view invalidation fails, or repeated
             // reconnects would leak a live remote connection each time.
-            try { await this.changed(projectId); } finally { await (await old)?.dispose(); }
+            try { await this.changed(projectId); } finally { await (await old?.catch(() => undefined))?.dispose(); }
         });
     }
     async compose(projectId: string, input: FileSystemSourceOwner | (() => Promise<FileSystemSourceOwner>)): Promise<FileSystemSourceOwner> {
@@ -1119,7 +1145,9 @@ export class ProjectRemoteMountService {
         await Promise.allSettled(this.probes.values());
         await Promise.all([...this.views.values()].flatMap(views => [...views].map(owner => owner.dispose())));
         await Promise.all([...this.sources.values(), ...this.missing.values()].map(async value => (await value.catch(() => undefined))?.dispose()));
-        this.sources.clear(); this.missing.clear(); this.listeners.clear(); this.states.clear(); this.connectionStates.clear(); await this.provider.dispose();
+        this.sources.clear(); this.missing.clear(); this.observations.clear(); this.authorizationInspections.clear();
+        this.projectIssues.clear(); this.diagnostics.clear();
+        this.listeners.clear(); this.states.clear(); this.connectionStates.clear(); await this.provider.dispose();
     }
     private async changed(projectId: string) {
         await Promise.all([...(this.views.get(projectId) ?? [])].map(owner => owner.dispose()));
@@ -1176,16 +1204,25 @@ export class ProjectRemoteMountService {
         if (Date.now() - checkedAt < 3000) return;
         await this.probe(mount);
     }
+    private hasMount(mountId: string): boolean {
+        return !this.closed && Boolean(this.mountProject(mountId));
+    }
     private resolve(mount: ProjectRemoteMount, options?: OperationOptions) {
-        if (mount.connectionId) {
-            const current = this.connection(mount.connectionId);
-            if (mount.authorization && (current?.authorization?.principalId !== mount.authorization.principalId
-                || current.authorization.revision !== mount.authorization.revision)) return Promise.reject(new FSError('EACCES','Remote authorization changed; refresh the project binding'));
+        if (!this.hasMount(mount.mountId)) return Promise.reject(new FSError('ENOENT', 'Remote mount removed'));
+        if (mount.connectionId && this.isMountAuthorizationOutdated(mount, this.connection(mount.connectionId))) {
+            return Promise.reject(new FSError('EACCES', 'Remote authorization changed; refresh the project binding'));
         }
         let owner = this.sources.get(mount.mountId);
         if (!owner) {
-            owner = this.provider.open(mount, options); this.sources.set(mount.mountId, owner);
-            void owner.catch(() => { if (this.sources.get(mount.mountId) === owner) this.sources.delete(mount.mountId); });
+            const opened = this.provider.open(mount, options).then(async source => {
+                if (!this.hasMount(mount.mountId) || this.sources.get(mount.mountId) !== opened) {
+                    await source.dispose().catch(() => {});
+                    throw new FSError('ECANCELLED', 'Remote mount released while opening');
+                }
+                return source;
+            });
+            owner = opened; this.sources.set(mount.mountId, opened);
+            void opened.catch(() => { if (this.sources.get(mount.mountId) === opened) this.sources.delete(mount.mountId); });
         }
         return owner;
     }

@@ -5,6 +5,9 @@ import type {createSessionSubmission as sessionSubmission, SessionSubmissionObse
 import {channelDigest, type ChannelRequest, type ChannelResponse, type ChannelReply, type ChannelEnvelope} from './channel-protocol';
 interface Turn {history?: Array<{id: string; requests: string[]}>; phase: 'idle' | 'prepared' | 'submitting'; consumed: string[]; requests?: string[]; request?: SubmissionRequest}
 interface Receipt {digest: string; request: ChannelRequest; response?: ChannelResponse}
+export async function inFlightChannelRequests(journal:PromptJournal,id:string):Promise<string[]>{
+    return (await journal.get<Turn>('channel-exchange:'+id))?.requests??[];
+}
 export interface ChannelExchangeOptions {
     finalPublished?: boolean | (() => Promise<boolean>);
     id: string; scopeId: string; readRequests(): Promise<ChannelEnvelope[]>; publishResponse(response: ChannelResponse): Promise<ChannelResponse>; journal: PromptJournal & {claim(key: string): Promise<boolean>};

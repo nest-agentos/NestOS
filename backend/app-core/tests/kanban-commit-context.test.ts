@@ -47,6 +47,15 @@ it('verifies actual Git trailers and rejects an unassociated commit without rewr
     await expect(verifyCommitContexts(f.process, f.record.directory, [{...f.evidence[0], head: next}], f.context)).rejects.toMatchObject({code: 'COMMIT_TASK_CONTEXT_MISMATCH'});
     expect(await f.git(f.physical, ['rev-parse', 'HEAD'])).toBe(next);
 });
+it('freezes the coordination task ID in the source commit and rejects a different ID',async()=>{
+    const f=await fixture(),input={...f.source,executionId:'coordinated-execution',coordinationTaskId:'owner-task'};
+    const context=await freezeCommitContext(f.journal,input);
+    expect(parseCommitTrailers(context.trailers)['NestOS-Coordination-Task']).toBe('owner-task');
+    await expect(freezeCommitContext(f.journal,{...input,coordinationTaskId:'other-owner'})).rejects.toMatchObject({code:'COMMIT_CONTEXT_SCOPE_CHANGED'});
+    await f.git(f.physical,['commit','--amend','-m','feat(test): delivery','-m',context.trailers.replace('owner-task','other-owner')]);
+    const head=await f.git(f.physical,['rev-parse','HEAD']);
+    await expect(verifyCommitContexts(f.process,f.record.directory,[{...f.evidence[0],head}],context)).rejects.toMatchObject({code:'COMMIT_TASK_CONTEXT_MISMATCH'});
+});
 it('excludes imported project history while verifying the task merge and delivery commits', async () => {
     const f = await fixture();
     await writeFile(join(f.root, 'platform'), 'Platform fix'); await f.git(f.root, ['add', 'platform']);

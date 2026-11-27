@@ -31,7 +31,10 @@ export class ConnectionDiagnostics {
     constructor(private readonly audit:AuditPort) {}
     accept(socket:Socket):void {
         const value=trackConnection(this.audit,socket,false),key=tuple(socket);
-        if(key){this.pending.set(key,value);socket.once('close',()=>{if(this.pending.get(key)===value)this.pending.delete(key);});}
+        if(key){
+            this.pending.set(key,value);
+            socket.once('close',()=>queueMicrotask(()=>{if(this.pending.get(key)===value)this.pending.delete(key);}));
+        }
     }
     secure(socket:TLSSocket):string {
         const value=this.lookup(socket);
@@ -49,7 +52,8 @@ export class ConnectionDiagnostics {
             ...tlsErrorMetadata(error)});
     }
     private lookup(socket:Socket):Connection|undefined {
-        const key=tuple(socket),value=connections.get(socket)??(key?this.pending.get(key):undefined);
+        const parent=(socket as TLSSocket&{_parent?:Socket})._parent;
+        const key=tuple(socket),value=connections.get(socket)??(parent?connections.get(parent):undefined)??(key?this.pending.get(key):undefined);
         if(value)connections.set(socket,value);
         return value;
     }

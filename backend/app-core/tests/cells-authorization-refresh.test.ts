@@ -36,7 +36,15 @@ it('discovers a changed grant without writing and commits only a fresh explicit 
         await f.remote.nodeOverview('node');expect(f.source.discover).toHaveBeenCalledTimes(1);
         await f.remote.confirmAuthorizationRefresh('node',value.proposalId);
         expect(f.source.discover).toHaveBeenCalledTimes(2);expect(f.remote.connection('node').authorization).toEqual(authorization('b'));
+        expect(f.remote.connectionStatus('node')).toBe('online');
         expect(f.remote.list('demo')[0]!.authorization).toEqual(authorization('a'));expect(f.beforeChange).toHaveBeenCalledWith('demo');
+        expect(await f.remote.projectStatus('demo')).toMatchObject({status:'offline',problem:'binding-outdated'});
+        f.source.check.mockResolvedValue(undefined);
+        f.source.nodeStatus.mockResolvedValue({cpu:null,memory:null,exports:[],harness:{activeSessions:0,loadedRuntimes:0}});
+        await f.remote.checkConnection('node');
+        expect(f.remote.connectionStatus('node')).toBe('online');
+        expect(f.source.discover).toHaveBeenCalledTimes(2);
+        expect((await f.remote.nodeOverview('node')).authorizationRefresh).toBeUndefined();
         await expect(f.remote.confirmAuthorizationRefresh('node',value.proposalId)).rejects.toThrow('CELLS_AUTHORIZATION_REFRESH_EXPIRED');
     }finally{await f.close();}
 });

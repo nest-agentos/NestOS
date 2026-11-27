@@ -8,7 +8,13 @@ import type {TaskRecoveryOptions,RecoverySession} from './task-recovery-ports';
 import {requireValue} from './validation';
 import {channelMessages,type ChannelMessage} from '../run/channel-results';
 import {sha256HexSync} from '@nestos/common';
+import {inFlightChannelRequests} from '../run/channel-exchange';
 interface Ports {active():boolean;inspect:typeof import('./task-recovery-state').taskRecoveryState;recoverTask(board:string,request:KanbanTaskRecoveryRequest):Promise<KanbanTaskRecoveryResult>}
+export async function dedicatedRecoveryRequests(journal:TaskRecoveryOptions['journal'],scopeId:string,dispatchId=scopeId):Promise<(row:ChannelRequest)=>boolean>{
+    const [recovery,generic]=await Promise.all([journal.get<RecoverySession>('task-recovery-session:'+dispatchId),inFlightChannelRequests(journal,scopeId)]);
+    const bound=recovery?.scopeId===scopeId;
+    return request=>bound&&request.method.startsWith('kanban.recovery.')&&!generic.includes(request.id);
+}
 export function taskRecoveryChannels(options:TaskRecoveryOptions,ports:Ports) {
     const watches=new DirectorySubscriptions(),pending=new Map<string,Promise<void>>(),restored=new Set<string>();
     const advance=(scope:RecoverySession)=>{if(!ports.active())return Promise.resolve();const next=(pending.get(scope.scopeId)??Promise.resolve()).catch(()=>{}).then(()=>processRequests(options,ports,scope));pending.set(scope.scopeId,next);void next.finally(()=>{if(pending.get(scope.scopeId)===next)pending.delete(scope.scopeId);}).catch(()=>{});return next;};
@@ -76,7 +82,8 @@ async function processRequests(options:TaskRecoveryOptions,ports:Ports,scope:Rec
     const rows=channelRequests(await options.remote.sessionChannel(scope.projectId,'requests',{scopeId:scope.scopeId}),scope.scopeId);
     const envelope=await options.remote.sessionChannel(scope.projectId,'messages',{scopeId:scope.scopeId}) as {execution?:{status?:string}};
     if(['running','submitting'].includes(envelope.execution?.status??''))return;
-    for(const row of rows.filter(row=>row.request.method.startsWith('kanban.recovery.'))) {
+    const owns=await dedicatedRecoveryRequests(options.journal,scope.scopeId,scope.dispatchId);
+    for(const row of rows.filter(row=>owns(row.request))) {
         if(!ports.active())return;
         const key='task-recovery-response:'+scope.scopeId+':'+row.request.id;
         let response=await options.journal.get<ChannelResponse>(key);

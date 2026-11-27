@@ -51,9 +51,11 @@ function assertOptionsShape(query: ContextOptionsQuery): void {
 
 /** Shared with direct execution; the browser must not construct or parse these host identities. */
 export function directHarnessContextIdentity(agent: {id: string; version: string}, project: unknown) {
-    return {targetRef: `agent:${agent.id}@${agent.version}`, workspaceRef: sha256HexSync(JSON.stringify(project)),
+    return {targetRef: `agent:${agent.id}@${agent.version}`, workspaceRef: directHarnessWorkspaceRef(project),
         memoryPolicyRef: 'native-project-inherited' as const};
 }
+
+export function directHarnessWorkspaceRef(project: unknown): string {return sha256HexSync(JSON.stringify(project));}
 
 function assertOptionsCursor(cursor: ContextOptionsCursor): void {
     if (!cursor || typeof cursor !== 'object' || Array.isArray(cursor) || !/^[a-f0-9]{64}$/.test(cursor.basis)

@@ -22,14 +22,20 @@ export function createDefaultHarnessConversationResolver(kernel: Pick<Kernel, 'i
 }
 async function retainedConnection(kernel: Pick<Kernel, 'task'>, sessionId: string, binding: ContextBinding, current: HarnessConnectionSnapshot): Promise<HarnessConnectionSnapshot> {
     if (binding.connectionRef === sha256HexSync(canonical(current))) return current;
+    const frozen = await readRetainedHarnessConnection(kernel, sessionId, binding);
+    if (!frozen || frozen.id !== current.id || frozen.projectId !== current.projectId
+        || frozen.nodeConnectionId !== current.nodeConnectionId || frozen.profileId !== current.profileId || frozen.directory !== current.directory)
+        throw executionError('CONTEXT_SELECTION_REQUIRED');
+    return frozen;
+}
+
+export async function readRetainedHarnessConnection(kernel: Pick<Kernel, 'task'>, sessionId: string, binding: ContextBinding) {
     const previous = binding.lastOperation?.executionRef;
-    if (!previous) throw executionError('CONTEXT_SELECTION_REQUIRED');
+    if (!previous) return;
     const task = await kernel.task(sessionId, previous.taskId);
     const request = task.effects[previous.effectId]?.request.request as {connection?: HarnessConnectionSnapshot; context?: HarnessContextRequest} | undefined;
     const frozen = request?.connection;
     if (task.sessionId !== sessionId || !frozen || binding.connectionRef !== sha256HexSync(canonical(frozen))
-        || binding.workspaceRef !== request?.context?.workspaceRef || frozen.id !== current.id || frozen.projectId !== current.projectId
-        || frozen.nodeConnectionId !== current.nodeConnectionId || frozen.profileId !== current.profileId || frozen.directory !== current.directory)
-        throw executionError('CONTEXT_SELECTION_REQUIRED');
+        || binding.workspaceRef !== request?.context?.workspaceRef) return;
     return frozen;
 }

@@ -7,6 +7,7 @@ import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {advanceChannelExchange, type ChannelExchangeOptions} from '../src/run/channel-exchange';
 import {channelDigest, channelRequests, type ChannelRequest} from '../src/run/channel-protocol';
 import {memoryChannels} from './helpers/session-channels';
+import {dedicatedRecoveryRequests} from '../src/kanban/task-recovery-channel';
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); vi.restoreAllMocks();});
 async function fixture() {
@@ -46,6 +47,18 @@ it('survives a lost submission reply and a new coordinator instance without repl
     expect(await advanceChannelExchange(restored, f.initial)).toMatchObject({outcome: 'running'});
     f.complete(); await advanceChannelExchange(restored, f.initial);
     expect(f.submission.start).toHaveBeenCalledOnce(); expect(f.resolve).toHaveBeenCalledOnce();
+});
+it('leaves settled recovery replies with their dedicated handler while normal requests still progress',async()=>{
+    const f=await fixture(),request={...f.request,id:'recovery',method:'kanban.recovery.inspect',params:{}};
+    await f.publish(request);await f.publish();
+    await f.publishResponse({id:request.id,scopeId:request.scopeId,requestDigest:channelDigest(request),status:'ok',payload:{canRetry:false},error:null});
+    await f.journal.update('task-recovery-session:operation',()=>({scopeId:'operation'}));
+    const owns=await dedicatedRecoveryRequests(f.journal,'operation');
+    expect(owns(request)).toBe(true);expect(owns(f.request)).toBe(false);
+    const readRequests=async()=>(await f.options.readRequests()).filter(row=>!owns(row.request));
+    expect(await advanceChannelExchange({...f.options,readRequests},f.initial)).toMatchObject({outcome:'running'});
+    expect(f.resolve).toHaveBeenCalledExactlyOnceWith(f.request);
+    expect(f.responses()[0].response).toMatchObject({payload:{canRetry:false}});
 });
 it('keeps the frozen response when Cells disconnects during publication and resumes after reconnect', async () => {
     const f = await fixture(); await f.publish(); f.publishResponse.mockRejectedValueOnce(Object.assign(new Error('offline'), {code: 'ECONNRESET'}));

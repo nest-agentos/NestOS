@@ -67,7 +67,7 @@ for offset in range(0, len(blockers), 128):
 PYTHON
 }
 merge_source() {
-    source=$1 head=$2 dirty=$3 trailers=$4 frozen_tree=$5 source_modules=$6
+    source=$1 head=$2 dirty=$3 trailers=$4 frozen_tree=$5 source_modules=$6 module_trailers=$7 module_merge_trailers=$8
     [ "$(git -C "$source" rev-parse HEAD)" = "$head" ] || stop 4 INTEGRATION_SOURCE_CHANGED
     next=$head
     if [ "$dirty" = dirty ]; then
@@ -76,7 +76,7 @@ merge_source() {
             source_tree=$(capture_source_tree "$source" "$head" "$tmp/index")
         else
             rc=0
-            source_tree=$(capture_module_tree "$source" "$head" "$source_modules" "$tmp" "$PWD" "$frozen_tree" "$choices") || rc=$?
+            source_tree=$(capture_module_tree "$source" "$head" "$source_modules" "$tmp" "$PWD" "$frozen_tree" "$choices" "$module_trailers") || rc=$?
             [ "$rc" -ne 4 ] || stop 4 INTEGRATION_SOURCE_CHANGED
             [ "$rc" -eq 0 ] || stop 3 INTEGRATION_MODULE_CAPTURE_FAILED
         fi
@@ -88,7 +88,7 @@ merge_source() {
         return
     fi
     rc=0
-    tree=$(approved_merge "$candidate" "$next" "$source_modules") || rc=$?
+    tree=$(approved_merge "$candidate" "$next" "$source_modules" "$module_merge_trailers") || rc=$?
     [ "$rc" -ne 5 ] || stop 5 MERGE_PLAN_CONFLICTS_MISSING
     [ "$rc" -ne 6 ] || stop 6 INTEGRATION_APPROVED_BLOB_MISSING
     [ "$rc" -ne 7 ] || stop 7 INTEGRATION_RETAIN_TARGET_INVALID
@@ -105,10 +105,10 @@ candidate=$target
 step=0
 while [ "$#" -gt 0 ]
 do
-    merge_source "$1" "$2" "$3" "$4" "$5" "$6"
+    merge_source "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
     printf 'create %s/steps/%s %s\\ncreate %s/sources/%s %s\\n' "$ref" "$step" "$candidate" "$ref" "$step" "$next" >> "$tmp/steps"
     step=$((step + 1))
-    shift 6
+    shift 8
 done
 
 stage=INTEGRATION_TARGET_CAPTURE_FAILED

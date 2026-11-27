@@ -7,6 +7,7 @@ import { nativeOptions, type NativeExecution } from './harness-execution-operati
 import { driveNativeInteractions } from './harness-execution-interactions';
 import {settleExecutionContext} from './harness-execution-context';
 import {nativeFailureCode,nativeTurnFailure} from './harness-turn-failure';
+import type {HarnessHistoryAcquisition} from './harness-connections';
 
 type Terminal = ExecutionJournalData['terminal'];
 type Message = HarnessEvents['events'][number]['message'];
@@ -82,7 +83,8 @@ function historyRowTexts(turn: HistoryRow, turnId: string): NativeText[] {
     }
     return texts;
 }
-export async function refreshNativeHistory(run: NativeExecution,readEpoch?:string): Promise<boolean> {
+export type NativeHistoryRun=Omit<NativeExecution,'acquired'>&{acquired:HarnessHistoryAcquisition};
+export async function refreshNativeHistory(run: NativeHistoryRun,readEpoch?:string): Promise<boolean> {
     const { client, profile } = run.acquired, data = run.journal.data;
     const cursors = new Set<string>();
     let cursor: string | undefined, texts: NativeText[] = [], terminal = data.terminal, terminalCode=data.terminalCode, active = false;
@@ -106,7 +108,7 @@ function trackHistoryCursor(cursor: string | undefined, cursors: Set<string>): v
     if (cursors.has(cursor) || cursors.size >= 100) throw executionError('NATIVE_HISTORY_LIMIT');
     cursors.add(cursor);
 }
-async function saveChanges(run: NativeExecution, update: Partial<ExecutionJournalData>): Promise<void> {
+async function saveChanges(run: Pick<NativeExecution,'journal'>, update: Partial<ExecutionJournalData>): Promise<void> {
     if (canonical({ ...run.journal.data, ...update }) !== canonical(run.journal.data)) await run.journal.save(update);
 }
 export async function observeNativePage(run: NativeExecution): Promise<HarnessEvents> {

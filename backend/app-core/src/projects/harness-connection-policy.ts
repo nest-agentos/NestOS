@@ -63,3 +63,15 @@ export function sameHarnessProjectAuthorization(left: unknown, right: unknown): 
     };
     return canonical(stable(left)) === canonical(stable(right));
 }
+
+/** Only an authenticated principal with the same project and grants can observe an old turn. */
+export function sameHarnessHistoryAuthorization(left:unknown,right:unknown):boolean {
+    const withoutRevision=(value:unknown)=>{
+        if(!value||typeof value!=='object'||Array.isArray(value))return;
+        const project=value as Record<string,unknown>,authorization=validateAuthorization(project.authorization);
+        if(!authorization||authorization.anonymous)return;
+        return {...project,authorization:{principalId:authorization.principalId,anonymous:false}};
+    };
+    const current=withoutRevision(left),frozen=withoutRevision(right);
+    return !!current&&!!frozen&&sameHarnessProjectAuthorization(current,frozen);
+}

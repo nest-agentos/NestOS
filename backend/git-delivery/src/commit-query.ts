@@ -44,7 +44,8 @@ async function resolveCommits(options: CommitQueryOptions, repository: string, c
         const digest = trailers['NestOS-Context']?.match(/^sha256:([a-f0-9]{64})$/)?.[1], saved = digest ? await options.journal.get<CommitContext>('commit-context:' + digest) : undefined;
         if (!saved || saved.scopeId !== await options.journal.get('kanban-context-scope') || saved.projectId !== options.record.projectId
             || saved.scopeId !== trailers['NestOS-Scope'] || saved.boardId !== trailers['NestOS-Board'] || saved.itemId !== trailers['NestOS-Task']
-            || saved.executionId !== trailers['NestOS-Execution'] || saved.digest !== digest) {unresolved.push({commit, code: 'COMMIT_CONTEXT_UNAVAILABLE'}); continue;}
+            || saved.executionId !== trailers['NestOS-Execution'] || saved.digest !== digest
+            || saved.coordinationTaskId!==undefined&&saved.coordinationTaskId!==trailers['NestOS-Coordination-Task']) {unresolved.push({commit, code: 'COMMIT_CONTEXT_UNAVAILABLE'}); continue;}
         const {digest: storedDigest, trailers: _trailers, ...body} = saved;
         if (sha256HexSync(JSON.stringify(body)) !== storedDigest) throw failure('COMMIT_CONTEXT_INTEGRITY_INVALID');
         const value = {commit, repository, contextDigest: saved.digest, historical: selectHistorical(saved.input, include), current: await options.currentContext(saved,include)};

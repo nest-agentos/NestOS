@@ -8,6 +8,7 @@ import {inspectApprovedMergeScript} from './integration-merge-script';
 import {integrationRecoveryScript} from './integration-publication-script';
 import {dirtyIntegrationModules} from './integration-source-script';
 import {integrationScript} from './integration-transaction-script';
+import {parseCommitTrailers} from './commit-context';
 
 export interface GitConflictResolution {path:string;choice:string;mode:'100644'|'100755'|'delete';oid?:string}
 type GitChoice='source'|'target'|'retain-target'|Pick<GitConflictResolution,'mode'|'oid'>;
@@ -16,11 +17,13 @@ export interface GitIntegrationTransaction {
     previousTarget: string;
     targetBranch: string;
     sources: Array<GitSource & {commitContext?: {trailers?: string}}>;
+    coordinationTaskId?: string;
     approval?: GitApproval;
     resolutions?:GitConflictResolution[];
 }
 const log = createModuleLogger('git-delivery');
 const objectId = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
+const coordinationTrailer = 'NestOS-Coordination-Task';
 function operationRef(input: GitIntegrationTransaction): string {
     return 'refs/nestos/integration/' + sha256HexSync(input.operationId);
 }
@@ -31,7 +34,9 @@ export async function tryGitIntegration(process: GitProcess, input: GitIntegrati
     if(input.sources.some(source=>dirtyIntegrationModules(source.repositories).length>0&&!source.sourceTree))return 'session';
     requireValue(objectId.test(input.previousTarget) && input.sources.every(source => objectId.test(source.sourceHead!)&&(!source.sourceTree||objectId.test(source.sourceTree))), 'OPERATION_GIT_IDENTITY_INVALID');
     const sources = await Promise.all(input.sources.map(async source => [
-        await processWorkspacePath(process, source.directory), source.sourceHead!, source.repositories?.find(repo => repo.path === '.')?.dirty ? 'dirty' : 'clean', source.commitContext?.trailers ?? '',source.sourceTree??'', JSON.stringify(dirtyIntegrationModules(source.repositories)),
+        await processWorkspacePath(process, source.directory), source.sourceHead!, source.repositories?.find(repo => repo.path === '.')?.dirty ? 'dirty' : 'clean',
+        integrationTrailers(source,input.coordinationTaskId),source.sourceTree??'', JSON.stringify(dirtyIntegrationModules(source.repositories)),source.moduleTrailers??'',
+        moduleMergeTrailers(source,input.coordinationTaskId),
     ]));
     const args = ['-c', integrationScript, 'nestos-integration', operationRef(input),
         input.previousTarget, 'refs/heads/' + input.targetBranch, JSON.stringify(choices), ...sources.flat()];
@@ -53,6 +58,21 @@ export async function tryGitIntegration(process: GitProcess, input: GitIntegrati
     }
     if (result.code !== 0) throw failure(code);
     return 'applied';
+}
+
+function integrationTrailers(source:GitIntegrationTransaction['sources'][number],coordinationTaskId?:string):string {
+    const original=source.commitContext?.trailers??'',actual=parseCommitTrailers(original),additions:string[]=[];
+    for(const [key,id] of [['NestOS-Task',source.taskId],[coordinationTrailer,coordinationTaskId]] as const){
+        if(id===undefined)continue;
+        requireValue(/^[A-Za-z0-9_-]{1,128}$/.test(id),'INTEGRATION_COORDINATION_ID_INVALID');
+        requireValue(actual[key]===undefined||actual[key]===id,'INTEGRATION_COORDINATION_ID_MISMATCH');
+        if(actual[key]===undefined)additions.push(key+': '+id);
+    }
+    return [original.trimEnd(),...additions].filter(Boolean).join('\n');
+}
+
+function moduleMergeTrailers(source:GitIntegrationTransaction['sources'][number],coordinationTaskId?:string):string{
+    return source.taskId||coordinationTaskId?integrationTrailers(source,coordinationTaskId):'';
 }
 
 export async function resumeGitIntegration(process:GitProcess,input:GitIntegrationTransaction):Promise<string|undefined>{
@@ -102,12 +122,19 @@ async function verifyIntegrationSteps(process: GitProcess, input: GitIntegration
     for (const [index, source] of input.sources.entries()) {
         const actualTarget = refs.get(ref + '/steps/' + index), captured = refs.get(ref + '/sources/' + index);
         requireValue(actualTarget && captured && objectId.test(actualTarget) && objectId.test(captured), 'INTEGRATION_RECEIPT_INVALID');
+        if(actualTarget!==previousTarget&&(input.coordinationTaskId||source.taskId))await verifyTaskTrailers(process,actualTarget,source.taskId,input.coordinationTaskId);
         const repositories = await capturedRepositories(process,source,captured);
-        await verifyCapturedTree(process, source, captured, previousTarget, actualTarget,input.approval,input.resolutions);
+        await verifyCapturedTree(process, source, captured, previousTarget, actualTarget,input.approval,input.resolutions,moduleMergeTrailers(source,input.coordinationTaskId));
         await verifyGitIntegration(process, {...input, previousTarget, actualTarget, reportedTarget: actualTarget, sources: [{...source, repositories}]});
         previousTarget = actualTarget;
     }
     requireValue(previousTarget === target, 'INTEGRATION_RECEIPT_INVALID');
+}
+
+async function verifyTaskTrailers(process:GitProcess,head:string,taskId?:string,coordinationTaskId?:string):Promise<void> {
+    const message=(await gitWorkspace(process,'/workspace',['show','-s','--format=%(trailers:only,unfold)',head])).stdout;
+    const actual=parseCommitTrailers(message);
+    requireValue((taskId===undefined||actual['NestOS-Task']===taskId)&&(coordinationTaskId===undefined||actual[coordinationTrailer]===coordinationTaskId),'INTEGRATION_COORDINATION_ID_MISMATCH');
 }
 
 async function capturedRepositories(process:GitProcess,source:GitSource,captured:string):Promise<GitSource['repositories']> {
@@ -124,7 +151,7 @@ async function capturedRepositories(process:GitProcess,source:GitSource,captured
     }));
 }
 
-async function verifyCapturedTree(process: GitProcess, source: GitSource, captured: string, previous: string, target: string,approval?:GitApproval,resolutions?:GitConflictResolution[]): Promise<void> {
+async function verifyCapturedTree(process: GitProcess, source: GitSource, captured: string, previous: string, target: string,approval?:GitApproval,resolutions?:GitConflictResolution[],trailers=''): Promise<void> {
     const git = async (args: string[]) => (await gitWorkspace(process, '/workspace', args)).stdout.trim();
     if (source.repositories?.some(repo => repo.path === '.' && repo.dirty)) {
         requireValue(await git(['show', '-s', '--format=%P', captured]) === source.sourceHead, 'INTEGRATION_RECEIPT_INVALID');
@@ -135,7 +162,7 @@ async function verifyCapturedTree(process: GitProcess, source: GitSource, captur
     const actual = await git(['rev-parse', target + '^{tree}']);
     if(captured===previous){requireValue(actual===await git(['rev-parse',previous+'^{tree}']),'INTEGRATION_RECEIPT_INVALID');return;}
     const choices=integrationChoices(approval,resolutions);requireValue(choices,'INTEGRATION_RECEIPT_INVALID');
-    const replay=await process.nativeShell.exec('sh',['-c',inspectApprovedMergeScript,'nestos-merge-proof',previous,captured,JSON.stringify(choices),JSON.stringify(dirtyIntegrationModules(source.repositories))],
+    const replay=await process.nativeShell.exec('sh',['-c',inspectApprovedMergeScript,'nestos-merge-proof',previous,captured,JSON.stringify(choices),JSON.stringify(dirtyIntegrationModules(source.repositories)),trailers],
         {cwd:'/workspace',timeoutMs:120000});
     requireValue(replay.code===0&&actual===replay.stdout.trim(),'INTEGRATION_RECEIPT_INVALID');
 }

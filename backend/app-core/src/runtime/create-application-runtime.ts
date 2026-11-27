@@ -3,6 +3,8 @@ import {nativeRestartIdle} from '../kanban/restart-barrier';
 import {requestManagementCleanup} from '../kanban/cleanup-review-conversations';
 import {createIndependentCallExecutionReader,createSessionActivityReader} from '@nestos/llm-session';
 import {originalSession} from '../projects/original-execution-session';
+import {archiveTemporaryReviewSession} from '../kanban/temporary-review-session';
+import {readRetainedHarnessConnection} from '../projects/harness-default-conversation';
 import {createSessionExecutionReader} from '../session/execution-facts';
 import {developmentCompletedResult} from '../presets/kanban-completed-result';
 import {kanbanHarnessTarget} from '../presets/kanban-harness-target';
@@ -416,6 +418,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             additionalEffectTools: dreamSearchTools(() => kernel.kernel, () => dreamHost),
             harnessExecution: createHarnessExecutionProvider(executionConnections, {
                 readTaskAsset: createTaskAssetReader(() => harnessKernel!.kernel, systemFS),
+                readRetainedConnection:(sessionId,binding)=>readRetainedHarnessConnection(harnessKernel!.kernel,sessionId,binding),
                 stateForCleanup: createHarnessCleanupState(() => harnessKernel!.kernel, id => ensureExecutionWrite(id)),
                 readContextForCleanup: createHarnessCleanupContextReader(() => harnessKernel!.kernel, id => ensureExecutionWrite(id)),
                 settleContextForCleanup: createHarnessContextCleanup(() => harnessKernel!.kernel, id => ensureExecutionWrite(id)),
@@ -760,14 +763,17 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
                 const review={...developmentBindings,...context,cancelSubmission:submissionControl({contexts:conversationContexts,repository:sessionRepository,kernel:kernelCore,ensureWritable:conversationOptions.ensureWritable}),calls:independentCalls,kernel:kernelCore,runningVersion:options.runningVersion,serviceControl:options.serviceControl,submission:fileSubmission,wake:()=>wakeKanban()};
                 const scopes=managementOperationScopes({...review,basePlan:developmentDeliveryPlan(context.journal,context.service)});
                 const report=itemOperationReporter(context);
+                const published=publishedOperation({calls:independentCalls,kernel:kernelCore,ensureSession:(id,title)=>sessionRepository.ensureSession(id,title),
+                    prepareSession:async id=>{await initializeProjects();await prepareChildExecution(id);return recovery.acquireLater(id);}});
+                const archiveTemporary=archiveKanbanSession&&archiveTemporaryReviewSession({journal:context.journal,inspect:published.inspect,
+                    archive:(sessionId,operationId)=>archiveKanbanSession(sessionId,operationId,true),log:context.log});
                 return createItemOperations({...context,scopes,cleanupReview:input=>requestManagementCleanup({...developmentBindings,...context,client:()=>kanban,executionResource},input).then(()=>{}),cancelOperation:async(job,id)=>{const request=job.input!.request;const result=await controlCall({calls:independentCalls,callControl:(command,input)=>commandBus.execute(command,input),callCancel:(command,input)=>commandBus.execute(command,input)},context.journal,request.expectedSessionId!,id,'cancel',request.submission!.id);return result==='cancelled'?'cancelled':result==='unknown'?'unknown':'accepted';},deliveryPlan:scopes.deliveryPlan,
                 adapter:developmentReviewAdapter(review),
-                published: publishedOperation({calls: independentCalls, kernel: kernelCore, ensureSession: (id, title) => sessionRepository.ensureSession(id, title),
-                    prepareSession: async id => {await initializeProjects(); await prepareChildExecution(id); return recovery.acquireLater(id);}}),
+                published,
                 submission: sessionSubmission({contexts: conversationContexts, repository: sessionRepository, kernel: kernelCore, ensureWritable: conversationOptions.ensureWritable}),
                 catalog: () => commandBus.execute('session.targets.list'),
                 sessionResource: remoteConnections ? id => nativeSessionResource(kernelCore, projects, developmentBindings!.remote)(id, 'main') : undefined,
-                report:async job=>{await report(job);await scopes.report(job);},
+                report:async job=>{await report(job);await scopes.report(job);await archiveTemporary?.(job);},
             });} : undefined,
             archiveSession: archiveKanbanSession,
             relatedSessions: lifecycle ? (boardId, itemId) => lifecycle.sessions(boardId, itemId) : undefined,

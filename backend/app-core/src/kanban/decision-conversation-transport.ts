@@ -19,11 +19,13 @@ export function decisionConversationTransport(options:DecisionConversationOption
     return {verifyDraftRemoval:value=>verifyDecisionDraftRemoval(options,value as DecisionConversation),referenceUnavailable:value=>unavailableDecisionReference(options,value as DecisionConversation),prepare:(id,board,resources,primary,modules,source)=>prepare(options,id,board,resources,primary,modules,source),start:(binding,first,active)=>start(options,binding as DecisionConversationBinding,first,active),advance,
         watchKey:value=>{const binding=value.binding as DecisionConversationBinding;return binding.channelId??binding.id;},
         watch:async(value,wake)=>{const binding=value.binding as DecisionConversationBinding,client=await options.remote.projectHarness(binding.projectId);
-            try {requireValue(client.subscribeChannel,'SESSION_CHANNEL_REQUIRED');const stop=client.subscribeChannel(binding.channelId??binding.id,wake);
-                const reader=binding.retainedPlanning?await options.remote.projectConversation(binding.projectId,binding.profileId,value.sessionId,undefined,true):undefined;
-                const off=reader?.subscribe(()=>{const state=reader.snapshot();if(!state.active&&!state.pending)wake();});
-                return async()=>{stop();off?.();await reader?.close();await client.close();};}
-            catch(error){await client.close();throw error;}},close:async()=>{}};
+            let stop:(()=>void)|undefined,reader:Awaited<ReturnType<DecisionConversationOptions['remote']['projectConversation']>>|undefined;
+            try {requireValue(client.subscribeChannel,'SESSION_CHANNEL_REQUIRED');stop=client.subscribeChannel(binding.channelId??binding.id,wake);
+                reader=binding.retainedPlanning?await options.remote.projectConversation(binding.projectId,binding.profileId,value.sessionId,undefined,true):undefined;
+                let wasBusy=Boolean(reader?.snapshot().active||reader?.snapshot().pending);
+                const off=reader?.subscribe(()=>{const state=reader!.snapshot(),busy=Boolean(state.active||state.pending);if(wasBusy&&!busy)wake();wasBusy=busy;});
+                return async()=>{stop?.();off?.();await reader?.close();await client.close();};}
+            catch(error){stop?.();await reader?.close();await client.close();throw error;}},close:async()=>{}};
 }
 async function prepare(options:DecisionConversationOptions,id:string,boardId:string,resources?:KanbanExternalReference[],primary?:KanbanExternalReference,moduleIds:string[]=[],source?:KanbanDecisionSourceSession):Promise<DecisionConversationBinding> {
     requireValue(Array.isArray(resources)&&resources.length>0&&resources.length<=16&&resources.every(ref=>ref.system===REMOTE_PROJECT_REFERENCE)&&new Set(resources.map(ref=>ref.id)).size===resources.length,'DECISION_PROJECTS_REQUIRED');

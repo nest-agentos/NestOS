@@ -1,4 +1,4 @@
-import {authorizationNotice,authorizationError} from './cells-authorization';
+import {authorizationNotice,authorizationError,bindingRefreshError,safeErrorCode} from './cells-authorization';
 import {BaseSettingsEditor, editorResourceId} from '@nestos/ui-common-adapter';
 import type {EditorOptions} from '@nestos/ui-common-adapter';
 import type {CellsAuthorizationRefresh,CellsNodeOverview,ProjectRemoteMountPort} from '@nestos/app-contracts/services';
@@ -34,6 +34,7 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
         if(path?.startsWith('/')&&path!=='/manage')this.selected=decodeURIComponent(path.slice(1));
     }
     async render():Promise<void> {
+        this.refresh?.abort();this.refresh=undefined;
         this.clearListeners();
         const node=this.selected?this.service?.connections().find(n=>n.id===this.selected):undefined;
         this.originalAuth=node?.anonymous?'anonymous':node?.username?'basic':'bearer';
@@ -89,6 +90,7 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
             if(action==='cancel')this.cancel();
             if(action==='test'&&this.form().reportValidity())void this.run('test',()=>this.testDraft());
             if(action==='authorization')void this.run('authorization',()=>this.confirmAuthorization());
+            if(action==='refresh-bindings')void this.run('refresh-bindings',()=>this.refreshOutdatedBindings());
             if(action==='configure'){this.container.querySelector<HTMLDetailsElement>('.cells-node__configuration')!.open=true;this.control('endpoint').focus();}
             if(action==='refresh')void this.refreshOverview();
             if(action==='mount')void this.run('project',async()=>{await this.navigation.mount?.(this.selected!);await this.refreshOverview();});
@@ -114,12 +116,20 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
         this.mounts=[];target.textContent=t('cells.loading');
         try {
             const value=await this.service.nodeOverview(this.selected,{signal:controller.signal,timeoutMs:3000});
-            if(!controller.signal.aborted&&!this.closed){this.mounts=value.mounts;target.innerHTML=overview(value,!!this.navigation.project);this.authorization=value.authorizationRefresh;this.renderAuthorization();}
+            if(!controller.signal.aborted&&!this.closed){
+                this.mounts=value.mounts;
+                target.innerHTML=overview(value,!!this.navigation.project,!!this.service.refreshProjectBinding);
+                this.authorization=value.authorizationRefresh;this.renderAuthorization();
+            }
         }catch(error){if(!controller.signal.aborted&&!this.closed)target.textContent=error instanceof Error?error.message:t('cells.failed');}
+    }
+    private outdatedProjectIds():string[] {
+        return [...new Set(this.mounts.filter(m=>m.canRemount&&m.problem==='binding-outdated').map(m=>m.projectId))];
     }
     private renderAuthorization():void {
         const target=this.container.querySelector<HTMLElement>('[data-cells-authorization]');
-        if(target)target.innerHTML=authorizationNotice(this.authorization);
+        const outdated=this.service?.refreshProjectBinding?this.outdatedProjectIds().length:0;
+        if(target)target.innerHTML=authorizationNotice(this.authorization,outdated);
     }
     private async confirmAuthorization():Promise<void> {
         if(this.authorization?.state!=='available'||!this.selected)return;
@@ -129,9 +139,38 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
         this.authorization=undefined;this.renderAuthorization();
         await this.refreshOverview();
     }
+    private async refreshSingleBinding(projectId:string):Promise<void> {
+        const operationId=randomUUID(),started=performance.now();
+        try {
+            await this.service!.refreshProjectBinding(projectId,{timeoutMs:10000});
+            log.info('cells.binding.refreshed',{operationId,operation:'refresh-binding',projectId,stage:'commit',result:'success',durationMs:Math.round(performance.now()-started)});
+        }catch(error){
+            log.warn('cells.binding.failed',{operationId,operation:'refresh-binding',projectId,stage:'commit',result:'failure',code:safeErrorCode(error,'BINDING_REFRESH_FAILED'),durationMs:Math.round(performance.now()-started)});
+            throw new Error(bindingRefreshError(error));
+        }
+    }
+    private async refreshOutdatedBindings():Promise<void> {
+        if(!this.service?.refreshProjectBinding)return;
+        const targets=this.outdatedProjectIds();if(!targets.length)return;
+        let refreshed=0,firstProject='',firstReason='';
+        try {
+            for(const projectId of targets) {
+                try{await this.refreshSingleBinding(projectId);refreshed++;}
+                catch(error){if(!firstProject){firstProject=projectId;firstReason=error instanceof Error?error.message:t('diagnostics.bindingRefreshFailed');}}
+            }
+        }finally{if(!this.closed)await this.refreshOverview();}
+        const failed=targets.length-refreshed;
+        if(failed>0)throw new Error(t('cells.authorization.bindingsPartial',{refreshed,failed,project:firstProject,reason:firstReason}));
+        if(!this.closed)this.message(t('cells.authorization.bindingsRefreshed',{count:refreshed}));
+    }
     private async openProject(element:HTMLElement):Promise<void> {
         const {cellsProject:projectId,cellsMount:mountId,cellsProjectAction:action}=element.dataset;
         const mount=this.mounts.find(item=>item.projectId===projectId&&item.mountId===mountId);
+        if(mount&&action==='refresh-binding'&&mount.canRemount&&this.service?.refreshProjectBinding){
+            try{await this.refreshSingleBinding(mount.projectId);}
+            finally{if(!this.closed)await this.refreshOverview();}
+            if(!this.closed)this.message(t('diagnostics.bindingRefreshed'));return;
+        }
         if(mount&&action==='reconnect'){
             await this.service!.reconnect(mount.projectId,mount.mountId,'',{timeoutMs:10000});await this.refreshOverview();return;
         }
@@ -164,11 +203,11 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
         if(navigate&&this.navigation.saved){if(created){this.selected=undefined;this.form().reset();this.originalAuth='bearer';this.authFields();}await this.navigation.saved(id);}
         else if(!this.closed)await this.refreshOverview();
     }
-    private async run(action:'save'|'test'|'check'|'remove'|'project'|'authorization',work:()=>Promise<void>):Promise<void> {
+    private async run(action:'save'|'test'|'check'|'remove'|'project'|'authorization'|'refresh-bindings',work:()=>Promise<void>):Promise<void> {
         if(this.busy)return;this.busy=true;this.disable(true);
         const operationId=randomUUID(),started=performance.now();
-        try{await work();if(!this.closed&&action!=='project')this.message(t(action==='authorization'?'cells.authorization.updated':action==='test'?'cells.tested':action==='check'?'cells.checked':'cells.saved'));log.info('cells.action.completed',{operationId,operation:action,stage:'complete',result:'success',durationMs:Math.round(performance.now()-started)});}
-        catch(error){if(!this.closed)this.message(authorizationError(error)??(error instanceof Error?(error.message.includes('CELLS_TEST_REQUIRED')?t('cells.testRequired'):error.message):t('cells.failed')),true);log.warn('cells.action.failed',{operationId,operation:action,stage:'complete',result:'failure',code:(error as {code?:string})?.code??'CELLS_ACTION_FAILED',durationMs:Math.round(performance.now()-started)});}
+        try{await work();if(!this.closed&&action!=='project'&&action!=='refresh-bindings')this.message(t(action==='authorization'?'cells.authorization.updated':action==='test'?'cells.tested':action==='check'?'cells.checked':'cells.saved'));log.info('cells.action.completed',{operationId,operation:action,stage:'complete',result:'success',durationMs:Math.round(performance.now()-started)});}
+        catch(error){if(!this.closed)this.message(authorizationError(error)??(error instanceof Error?(error.message.includes('CELLS_TEST_REQUIRED')?t('cells.testRequired'):error.message):t('cells.failed')),true);log.warn('cells.action.failed',{operationId,operation:action,stage:'complete',result:'failure',code:safeErrorCode(error,'CELLS_ACTION_FAILED'),durationMs:Math.round(performance.now()-started)});}
         finally{this.busy=false;if(!this.closed){this.disable(false);this.authFields();this.updateStatus();this.saveButton();}}
     }
     private disable(disabled:boolean):void{this.container.querySelectorAll<HTMLInputElement>('button,input,select').forEach(control=>control.disabled=disabled);}
@@ -185,5 +224,5 @@ export class CellsSettingsEditor extends BaseSettingsEditor<ProjectRemoteMountPo
     override isDirty():boolean{return this.dirty;}
     override setDirty(value:boolean):void{this.dirty=value;}
     override async flushPendingSave():Promise<void>{if(this.dirty)throw new Error(t('cells.unsaved'));}
-    override async destroy():Promise<void>{this.closed=true;this.refresh?.abort();await super.destroy();}
+    override async destroy():Promise<void>{this.closed=true;this.refresh?.abort();this.refresh=undefined;await super.destroy();}
 }

@@ -15,14 +15,35 @@ export function targetsFor(target = 'all') {
     throw fail('CELLS_REDEPLOY_TARGET_INVALID');
 }
 
-export async function build(root) {
+export function parseRedeployArgs(args) {
+    let target, configOnly = false;
+    for (const arg of args) {
+        if (arg === '--config-only') {
+            if (configOnly) throw fail('CELLS_REDEPLOY_ARGUMENTS_INVALID');
+            configOnly = true;
+        } else if (arg.startsWith('-') || target !== undefined) {
+            throw fail('CELLS_REDEPLOY_ARGUMENTS_INVALID');
+        } else {
+            target = arg;
+        }
+    }
+    return {targets: targetsFor(target), configOnly};
+}
+
+function cellsSourceDirty(root, cells, git) {
+    return Boolean(git(root, 'status', '--porcelain', '--untracked-files=no', '--', 'tools/cells')
+        || git(cells, 'status', '--porcelain', '--untracked-files=no', '--', '.'));
+}
+
+export async function build(root, compile) {
     const git = (directory, ...args) => execFileSync('git', ['-C', directory, ...args],
         {encoding: 'utf8', timeout: 10000}).trim();
     const cells = path.join(root, 'tools/cells'), output = path.join(root, 'release/cells-build');
     const commit = git(root, 'rev-parse', 'HEAD'), before = git(cells, 'rev-parse', 'HEAD');
-    const dirty = () => git(root, 'status', '--porcelain', '--untracked-files=no');
+    const dirty = () => cellsSourceDirty(root, cells, git);
     if (dirty()) throw fail('BUILD_SOURCE_DIRTY');
-    execFileSync('cargo', ['build', '--locked', '--release', '--manifest-path', path.join(cells, 'Cargo.toml'),
+    if (compile) await compile({root, cells, output});
+    else execFileSync('cargo', ['build', '--locked', '--release', '--manifest-path', path.join(cells, 'Cargo.toml'),
         '--target-dir', output], {cwd: root, stdio: 'inherit', timeout: 600000});
     if (git(root, 'rev-parse', 'HEAD') !== commit || dirty() || git(cells, 'rev-parse', 'HEAD') !== before)
         throw fail('BUILD_SOURCE_CHANGED');
@@ -171,18 +192,26 @@ export const finishedTarget = row => row.state === 'succeeded' || row.state === 
 
 const controlFor = (root, target) => target === 'local' ? localControl(root) : vmControl(root);
 
-export async function redeploy(root, targets, operations = {build, controlFor, deploymentConfiguration, validateConfig}) {
+export async function redeploy(root, targets, operations, options = {}) {
+    const provided = operations ?? {};
+    const resolved = operations === undefined
+        ? {build, controlFor, deploymentConfiguration, validateConfig}
+        : {build, controlFor, ...provided};
+    const configOnly = options.configOnly === true;
     const operationId = randomUUID();
-    const report = {operation: 'cells.redeploy', operationId, targets: []};
-    const plans = await preflight(root, targets, operations, operationId);
+    const report = {operation: 'cells.redeploy', operationId, ...(configOnly ? {mode: 'config-only'} : {}), targets: []};
+    const plans = await preflight(root, targets, resolved, operationId);
     if (plans.some(plan => plan.code)) {
         report.targets = plans.map(({target, code}) => code
             ? {target, state: 'failed', code} : {target, state: 'skipped', code: 'PREFLIGHT_INCOMPLETE'});
         return report;
     }
-    const artifact = await operations.build(root);
-    report.version = artifact.value.id;
-    const invalid = await checkConfigurations(plans, artifact.binary, operations.validateConfig, operationId);
+    const artifact = configOnly ? undefined : await resolved.build(root);
+    if (artifact) report.version = artifact.value.id;
+    const validator = configOnly
+        ? (provided.validateConfig ?? ((_binary, bytes, control) => control.validateConfiguration(bytes)))
+        : resolved.validateConfig;
+    const invalid = await checkConfigurations(plans, artifact?.binary, validator, operationId, configOnly);
     if (invalid) {
         report.targets = plans.map(row => row.target === invalid.target
             ? {target: row.target, state: 'failed', code: invalid.code}
@@ -193,19 +222,22 @@ export async function redeploy(root, targets, operations = {build, controlFor, d
         const previous = report.targets.at(-1);
         const result = previous && !finishedTarget(previous)
             ? {state: 'skipped', code: 'EARLIER_TARGET_INCOMPLETE'}
-            : await deploy(plan, artifact, operationId);
+            : configOnly ? await deployConfigOnly(plan, operationId) : await deploy(plan, artifact, operationId);
         report.targets.push({target: plan.target, ...result});
     }
     return report;
 }
 
-async function checkConfigurations(plans, binary, validate, operationId) {
-    for (const {target, config} of plans) {
-        if (!config) continue;
+async function checkConfigurations(plans, binary, validate, operationId, requireConfig = false) {
+    for (const {target, control, config} of plans) {
+        if (!config) {
+            if (!requireConfig) continue;
+            return {target, code: 'CELLS_CONFIG_SOURCE_REQUIRED'};
+        }
         const started = Date.now();
         const event = (result, code) => console.info(JSON.stringify({operation: 'cells.redeploy', operationId,
             target, stage: 'config.validate', result, code, durationMs: Date.now() - started}));
-        try {await validate(binary, config.bytes); event('success');}
+        try {await validate(binary, config.bytes, control); event('success');}
         catch (error) {
             const code = error.code ?? 'CELLS_CONFIG_INVALID';
             event('failure', code);
@@ -239,6 +271,17 @@ async function deploy({control, target, expectedVersion, config}, artifact, oper
         await control.verifyArtifact({...request, version: request.targetVersion,
             sha256: artifact.digest, sourceVersion: artifact.value.commit});
         await control.submit(request, config?.bytes);
+        return present(await control.inspect(request));
+    } catch (error) {
+        return {state: 'failed', code: error.code ?? 'SERVICE_REDEPLOY_FAILED'};
+    }
+}
+
+async function deployConfigOnly({control, target, expectedVersion, config}, operationId) {
+    const request = {operationId, serviceId: target, expectedVersion, targetVersion: expectedVersion,
+        configOnly: true, configSha256: config.sha256, expectedConfigSha256: config.previous};
+    try {
+        await control.submit(request, config.bytes);
         return present(await control.inspect(request));
     } catch (error) {
         return {state: 'failed', code: error.code ?? 'SERVICE_REDEPLOY_FAILED'};

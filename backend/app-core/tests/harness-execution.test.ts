@@ -331,6 +331,13 @@ it('recovers only the admitted terminal turn across transport epoch replacement 
  expect(f.client.read).toHaveBeenCalledWith('claude','native-session',expect.objectContaining({epoch:'replacement'}));
  const journal=f.records.get(harnessExecutionJournalKey(f.context))!.value as any;expect(journal.epoch).toBe('service-epoch');
 });
+it('recovers the admitted terminal turn from history when the same transport cannot deliver events',async()=>{
+ const f=fixture();f.client.eventSnapshot=vi.fn(async()=>{throw Object.assign(new Error('events unavailable'),{code:'EIO'});});
+ await expect(f.make().execute(request,f.context)).rejects.toMatchObject({code:'EIO'});
+ f.data.history.turns=[{id:'native-turn',status:'completed',items:[{id:'final',type:'agentMessage',text:'Original result'}]}];
+ expect(await f.make().reconcile(request,f.context)).toMatchObject({status:'completed',result:{turnId:'native-turn',text:'Original result'}});
+ expect(f.client.eventSnapshot).toHaveBeenCalledOnce();expect(f.client.turn).toHaveBeenCalledOnce();expect(f.client.resume).not.toHaveBeenCalled();
+});
 it('does not use another turn or a missing terminal result to settle a replaced transport epoch',async()=>{
  const f=fixture();f.client.eventSnapshot=vi.fn(async()=>{throw Object.assign(new Error('connection unavailable'),{code:'EIO'});});
  await expect(f.make().execute(request,f.context)).rejects.toMatchObject({code:'EIO'});

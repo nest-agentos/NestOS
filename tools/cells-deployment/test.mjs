@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {createServiceControl} from './index.mjs';
 import {packageArtifact,digest,save} from './artifact.mjs';
-import {deploymentConfiguration, readConfiguration, redeploy, sameDirectory, sameExecutablePath, targetsFor, vmConfigurationSource} from './redeploy.mjs';
+import {build, deploymentConfiguration, parseRedeployArgs, readConfiguration, redeploy, sameDirectory, sameExecutablePath, targetsFor, vmConfigurationSource} from './redeploy.mjs';
 import {command, serviceStorage} from './guest.mjs';
 async function fixture(t){
  const root=await mkdtemp(path.join(tmpdir(),'cells-delivery-'));t.after(()=>rm(root,{recursive:true,force:true}));
@@ -315,4 +315,135 @@ test('a project-bound Cells update verifies saved executable and config across r
  assert.deepEqual(await recovered.inspect(request),{state:'succeeded',version:request.targetVersion});
  await recovered.submit(request);assert.equal(restarts,1);
  await assert.rejects(recovered.inspect({...request,project:{...project,root:'/other'}}),{code:'SERVICE_REQUEST_CHANGED'});
+});
+
+test('scopes build source cleanliness to tools/cells instead of unrelated workspace files', async t => {
+ const root = await mkdtemp(path.join(tmpdir(), 'cells-build-scope-'));
+ t.after(() => rm(root, {recursive: true, force: true}));
+ const git = (dir, ...args) => execFileSync('git', ['-C', dir, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']}).trim();
+ const commit = (dir, message) => git(dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '-qm', message);
+ const submodule = path.join(root, 'cells-upstream');
+ await mkdir(submodule, {recursive: true});
+ git(submodule, 'init', '-q');
+ await writeFile(path.join(submodule, 'Cargo.toml'), '[package]\nname="cells"\n');
+ git(submodule, 'add', '.');
+ commit(submodule, 'Initial cells');
+ const workspace = path.join(root, 'workspace');
+ await mkdir(path.join(workspace, 'backend'), {recursive: true});
+ git(workspace, 'init', '-q');
+ await writeFile(path.join(workspace, 'backend/app.ts'), 'export const v = 1;\n');
+ execFileSync('git', ['-C', workspace, '-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', submodule, 'tools/cells'], {stdio: 'ignore'});
+ git(workspace, 'add', '.');
+ commit(workspace, 'Initial workspace');
+ const compile = async ({output}) => {
+  await mkdir(path.join(output, 'release'), {recursive: true});
+  await writeFile(path.join(output, 'release/cells'), 'compiled-binary');
+ };
+ await writeFile(path.join(workspace, 'backend/app.ts'), 'export const v = 2;\n');
+ const built = await build(workspace, compile);
+ assert.equal(built.value.commit, git(workspace, 'rev-parse', 'HEAD'));
+ const cellsDir = path.join(workspace, 'tools/cells');
+ await writeFile(path.join(cellsDir, 'Cargo.toml'), '[package]\nname="cells"\nversion="0.1.1"\n');
+ await assert.rejects(build(workspace, compile), {code: 'BUILD_SOURCE_DIRTY'});
+ git(cellsDir, 'add', 'Cargo.toml');
+ commit(cellsDir, 'Advance cells submodule without updating parent');
+ await assert.rejects(build(workspace, compile), {code: 'BUILD_SOURCE_DIRTY'});
+ git(workspace, 'add', 'tools/cells');
+ commit(workspace, 'Record updated cells submodule');
+ await assert.rejects(build(workspace, async context => {
+  await compile(context);
+  await writeFile(path.join(cellsDir, 'Cargo.toml'), '[package]\nname="cells"\nversion="0.1.2"\n');
+ }), {code: 'BUILD_SOURCE_CHANGED'});
+});
+
+test('parses redeploy arguments including --config-only in either position', () => {
+ assert.deepEqual(parseRedeployArgs([]), {targets: ['cells-x1', 'local'], configOnly: false});
+ assert.deepEqual(parseRedeployArgs(['local']), {targets: ['local'], configOnly: false});
+ assert.deepEqual(parseRedeployArgs(['--config-only']), {targets: ['cells-x1', 'local'], configOnly: true});
+ assert.deepEqual(parseRedeployArgs(['local', '--config-only']), {targets: ['local'], configOnly: true});
+ assert.deepEqual(parseRedeployArgs(['--config-only', 'cells-x1']), {targets: ['cells-x1'], configOnly: true});
+ assert.throws(() => parseRedeployArgs(['--config-only', '--config-only']), {code: 'CELLS_REDEPLOY_ARGUMENTS_INVALID'});
+ assert.throws(() => parseRedeployArgs(['local', 'cells-x1']), {code: 'CELLS_REDEPLOY_ARGUMENTS_INVALID'});
+ assert.throws(() => parseRedeployArgs(['--unknown']), {code: 'CELLS_REDEPLOY_ARGUMENTS_INVALID'});
+});
+
+test('validates and installs config-only updates without touching the binary or creating binary backups', async t => {
+ const f = await fixture(t), root = f.options.root;
+ const binary = Buffer.from('#!/bin/sh\n[ "$1" = --check-config ] && ! grep -q invalid "$2"\n');
+ const originalConfig = Buffer.from('original private config'), nextConfig = Buffer.from('new private config');
+ await writeFile(root + '/cells', binary, {mode: 0o755});
+ await writeFile(root + '/cells.toml', originalConfig, {mode: 0o600});
+ const storage = serviceStorage(([file, ...args], input) => command(file, args, 15000, input), root);
+ const binaryHash = digest(binary);
+ await storage.checkConfiguration(nextConfig);
+ await assert.rejects(storage.checkConfiguration(Buffer.from('invalid config')), {code: 'CELLS_CONFIG_INVALID'});
+ const request = {...f.request, configOnly: true, configSha256: digest(nextConfig), expectedConfigSha256: digest(originalConfig)};
+ await assert.rejects(storage.installConfig(digest(Buffer.from('other')), request, nextConfig), {code: 'CELLS_INSTALL_DIGEST_MISMATCH'});
+ await assert.rejects(storage.installConfig(binaryHash, {...request, expectedConfigSha256: digest(Buffer.from('stale'))}, nextConfig), {code: 'CELLS_CONFIG_CHANGED'});
+ await assert.rejects(storage.installConfig(binaryHash, {...request, configSha256: digest(Buffer.from('invalid'))}, Buffer.from('invalid')), {code: 'CELLS_CONFIG_INVALID'});
+ await storage.installConfig(binaryHash, request, nextConfig);
+ assert.equal(await storage.configHash(), request.configSha256);
+ assert.deepEqual(await readFile(root + '/cells'), binary);
+ assert.deepEqual(await readFile(root + '/previous-' + request.operationId + '.toml'), originalConfig);
+ assert.equal((await stat(root + '/previous-' + request.operationId + '.toml')).mode & 0o777, 0o600);
+ await assert.rejects(readFile(root + '/previous-' + request.operationId), {code: 'ENOENT'});
+});
+
+test('redeploy --config-only skips build, validates all targets first, and recovers across restart', async t => {
+ const f = await fixture(t), root = f.options.root;
+ const binaryHash = digest(Buffer.from('running-cells')), oldConfig = digest(Buffer.from('old'));
+ const desired = Buffer.from('desired');
+ let builds = 0, generation = 'before', installedConfig = oldConfig, installedBinary = binaryHash, restarts = 0, validated = 0;
+ const controlFor = async (_root, target) => createServiceControl({...f.options, id: target, stateDirectory: root + '/state-' + target}, {
+  ready: async () => true,
+  hash: async () => binaryHash,
+  process: async () => ({hash: binaryHash, generation}),
+  installedHash: async () => installedBinary,
+  configHash: async () => installedConfig,
+  checkConfiguration: async bytes => {
+   validated++;
+   if (bytes.toString().includes('bad')) throw Object.assign(Error('bad'), {code: 'CELLS_CONFIG_INVALID'});
+  },
+  installConfig: async (hash, request, bytes) => {
+   assert.equal(hash, binaryHash);
+   assert.equal(digest(bytes), request.configSha256);
+   installedConfig = digest(bytes);
+  },
+  restart: async () => {restarts++; generation = 'after';},
+ });
+ const blocked = await redeploy(root, ['local'], {
+  build: async () => {builds++; return f.value;},
+  controlFor,
+  deploymentConfiguration: async () => ({bytes: Buffer.from('bad'), sha256: digest(Buffer.from('bad')), previous: oldConfig}),
+ }, {configOnly: true});
+ assert.equal(builds, 0);
+ assert.equal(restarts, 0);
+ assert.equal(blocked.mode, 'config-only');
+ assert.deepEqual(blocked.targets, [{target: 'local', state: 'failed', code: 'CELLS_CONFIG_INVALID'}]);
+ installedBinary = digest(Buffer.from('drifted-on-disk'));
+ const drifted = await redeploy(root, ['local'], {
+  build: async () => {builds++; return f.value;},
+  controlFor,
+  deploymentConfiguration: async () => ({bytes: desired, sha256: digest(desired), previous: oldConfig}),
+ }, {configOnly: true});
+ assert.equal(drifted.targets[0].code, 'CELLS_INSTALL_DIGEST_MISMATCH');
+ assert.equal(restarts, 0);
+ installedBinary = binaryHash;
+ const report = await redeploy(root, ['local'], {
+  build: async () => {builds++; return f.value;},
+  controlFor,
+  deploymentConfiguration: async () => ({bytes: desired, sha256: digest(desired), previous: oldConfig}),
+ }, {configOnly: true});
+ assert.equal(builds, 0);
+ assert.equal(validated, 3);
+ assert.equal(restarts, 1);
+ assert.equal(report.version, undefined);
+ assert.equal(report.targets[0].state, 'succeeded');
+ const unchanged = await redeploy(root, ['local'], {
+  build: async () => {builds++; return f.value;},
+  controlFor,
+  deploymentConfiguration: async () => ({bytes: desired, sha256: digest(desired), previous: installedConfig}),
+ }, {configOnly: true});
+ assert.equal(unchanged.targets[0].state, 'unchanged');
+ assert.equal(restarts, 1);
 });

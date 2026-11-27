@@ -17,6 +17,21 @@ it.each(['EACCES','CONTEXT_NATIVE_EPOCH_CHANGED','JOURNAL_CONFLICT'])('does not 
  const f=fixture();f.record.effects.original.error!.code=code;
  expect(await reconcileWorkExecution(f.kernel,'original-session',f.state)).toBe(true);expect(f.kernel.resolveEffect).not.toHaveBeenCalled();
 });
+it.each(['NATIVE_OUTCOME_UNKNOWN','NATIVE_TERMINAL_UNKNOWN'])('rechecks %s through the original effect',async code=>{
+ const f=fixture();f.record.effects.original.error!.code=code;
+ await reconcileWorkExecution(f.kernel,'original-session',f.state);
+ expect(f.kernel.resolveEffect).toHaveBeenCalledTimes(1);
+ expect(f.kernel.resolveEffect).toHaveBeenCalledWith('original-session','owned-task',
+  expect.objectContaining({effectId:'original',outcome:{type:'reconcile'}}));
+});
+it('lets the native provider revalidate a connection conflict through reconciliation only',async()=>{
+ const f=fixture();const effect=f.record.effects.original;effect.error!.code='ECONFLICT';
+ await reconcileWorkExecution(f.kernel,'original-session',f.state);expect(f.kernel.resolveEffect).not.toHaveBeenCalled();
+ effect.request={kind:'harness.execute'} as typeof effect.request;
+ await reconcileWorkExecution(f.kernel,'original-session',f.state);
+ expect(f.kernel.resolveEffect).toHaveBeenCalledWith('original-session','owned-task',
+  expect.objectContaining({effectId:'original',outcome:{type:'reconcile'}}));
+});
 it('backs off transient observation failures and respects explicit pause',async()=>{
  const f=fixture();f.record.effects.original.attempts[0].finishedAt=Date.now();
  expect(await reconcileWorkExecution(f.kernel,'original-session',f.state)).toBe(true);expect(f.kernel.resolveEffect).not.toHaveBeenCalled();

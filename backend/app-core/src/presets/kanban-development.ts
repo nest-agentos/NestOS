@@ -82,7 +82,8 @@ async function prepareWorkspace(options: Options, journal: KanbanAutomationJourn
                 old => old ?? {channelId: input.dispatch.id, projectId,contextProjects,directory: tree.directory, repositories, availableRepositories, policy, gitIdentity, instructions,skillProjection,...(context===undefined?{}:{context})});
         });
         if ((record.context as {board?: {id?: string}})?.board?.id) {
-            const commitContext = record.commitContext ?? await freezeCommitContext(journal, {projectId, boardId: (record.context as {board:{id:string}}).board.id, itemId: input.item.id, itemRevision: input.item.revision, executionId: input.dispatch.id, context: record.context});
+            const {board,coordinationTaskId}=record.context as {board:{id:string};coordinationTaskId?:string};
+            const commitContext = record.commitContext ?? await freezeCommitContext(journal, {projectId, boardId:board.id, itemId: input.item.id, itemRevision: input.item.revision, executionId: input.dispatch.id, coordinationTaskId,context: record.context});
             const enriched = await journal.update<DevelopmentWorkspaceRecord>('development-workspace:' + input.dispatch.id, old => ({...old!, commitContext: old!.commitContext ?? commitContext}));
             record.commitContext = enriched.commitContext;
             await publishImmutableFile(view.fs, record.directory + '/_nestos/kanban', 'commit-trailers.txt', commitContext.trailers);

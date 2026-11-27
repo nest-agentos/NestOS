@@ -1,14 +1,14 @@
 /** Capture declared module edits as deterministic child commits without moving refs or real indexes. */
 export const captureIntegrationModules = `
 capture_module_tree() {
-    python3 - "$1" "$2" "$3" "$4" "$5" "$6" "\${7:-}" <<'PYTHON'
+    python3 - "$1" "$2" "$3" "$4" "$5" "$6" "\${7:-}" "\${8:-}" <<'PYTHON'
 import json
 import os
 import subprocess
 import sys
 import tempfile
 
-source, head, modules, scratch, destination, expected_tree, raw_choices = sys.argv[1:]
+source, head, modules, scratch, destination, expected_tree, raw_choices, trailers = sys.argv[1:]
 choices = json.loads(raw_choices) if raw_choices else {}
 def git(root, *args, env=None, input=None):
     return subprocess.check_output(['git', '-C', root, *args], env=env, input=input).strip()
@@ -42,8 +42,9 @@ def snapshot_module(root, base, scratch):
     identity = {**os.environ, 'GIT_AUTHOR_NAME': 'NestOS Delivery', 'GIT_AUTHOR_EMAIL': 'delivery@nestos.invalid',
                 'GIT_COMMITTER_NAME': 'NestOS Delivery', 'GIT_COMMITTER_EMAIL': 'delivery@nestos.invalid',
                 'GIT_AUTHOR_DATE': date, 'GIT_COMMITTER_DATE': date}
+    footer = ['-m', trailers] if trailers else []
     return git(root, '-c', 'commit.gpgSign=false', 'commit-tree', tree, '-p', base,
-               '-m', 'chore(delivery): snapshot approved module changes', env=identity)
+               '-m', 'chore(delivery): snapshot approved module changes', *footer, env=identity)
 
 def import_approved_blobs(root, target, name):
     for path, choice in choices.items():

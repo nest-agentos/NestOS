@@ -155,6 +155,43 @@ fi
 sync -f .
 `;
 
+const installConfigOnly = `${verifyInstallation}
+operation=$2
+binary_hash=$3
+config_hash=$4
+previous_config=$5
+file_hash() { sha256sum < "$1" | cut -d ' ' -f 1; }
+[ "$(file_hash cells)" = "$binary_hash" ] ||
+    { echo CELLS_INSTALL_DIGEST_MISMATCH >&2; exit 1; }
+[ "$(file_hash cells.toml)" = "$previous_config" ] ||
+    { echo CELLS_CONFIG_CHANGED >&2; exit 1; }
+staging=$(mktemp -d .config.XXXXXXXX)
+trap 'rm -rf -- "$staging"' EXIT
+cat > "$staging/cells.toml"
+[ "$(file_hash "$staging/cells.toml")" = "$config_hash" ] ||
+    { echo CELLS_CONFIG_DIGEST_MISMATCH >&2; exit 1; }
+chmod 0600 "$staging/cells.toml"
+./cells --check-config "$staging/cells.toml" >/dev/null 2>&1 ||
+    { echo CELLS_CONFIG_INVALID >&2; exit 1; }
+if [ "$(stat -c %u:%g cells.toml)" != "$(stat -c %u:%g "$staging/cells.toml")" ]; then
+    chown --reference=cells.toml "$staging/cells.toml"
+fi
+sync "$staging/cells.toml"
+ln -- cells.toml "previous-$operation.toml"
+sync -f .
+mv -T -- "$staging/cells.toml" cells.toml
+sync -f .
+`;
+
+const checkInstalledConfig = `${verifyInstallation}
+staging=$(mktemp -d .check.XXXXXXXX)
+trap 'rm -rf -- "$staging"' EXIT
+cat > "$staging/cells.toml"
+chmod 0600 "$staging/cells.toml"
+./cells --check-config "$staging/cells.toml" >/dev/null 2>&1 ||
+    { echo CELLS_CONFIG_INVALID >&2; exit 1; }
+`;
+
 function checkedHash(output) {
     const hash = output.split(/\s+/, 1)[0];
     if (!/^[a-f0-9]{64}$/.test(hash)) throw fail('CELLS_INSTALL_DIGEST_INVALID');
@@ -180,6 +217,13 @@ export function serviceStorage(run, directory = '/usr/local/lib/nestos/cells') {
         installedHash: async () => checkedHash(await run(shell(verifyInstallation + '\nsha256sum cells'))),
         readConfiguration: () => configSnapshot(run, shell(readInstalledConfig)),
         configHash: async () => checkedHash(await run(shell(verifyInstallation + '\nsha256sum cells.toml'))),
+        checkConfiguration: async config => {
+            await run(shell(checkInstalledConfig), config);
+        },
+        installConfig: async (binaryHash, request, config) => {
+            await run([...shell(installConfigOnly), request.operationId, binaryHash,
+                request.configSha256, request.expectedConfigSha256], config);
+        },
         install: async (artifact, request, config) => {
             if (config) {
                 const binary = await readFile(artifact.binary);

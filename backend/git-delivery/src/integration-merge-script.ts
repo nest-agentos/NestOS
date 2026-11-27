@@ -1,7 +1,7 @@
 /** Resolve only explicitly selected Git stages from the frozen conflict plan. */
 export const approvedMerge = `
 approved_merge() {
-    python3 - "$1" "$2" "$choices" "$tmp" "\${3:-[]}" <<'PYTHON'
+    python3 - "$1" "$2" "$choices" "$tmp" "\${3:-[]}" "\${4:-}" <<'PYTHON'
 import json
 import os
 import re
@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 
-target, source, raw_choices, root, raw_modules = sys.argv[1:]
+target, source, raw_choices, root, raw_modules, trailers = sys.argv[1:]
 choices = json.loads(raw_choices)
 modules = dict(json.loads(raw_modules))
 
@@ -31,8 +31,9 @@ def merge_module(path, stages):
     identity = {**os.environ, 'GIT_AUTHOR_NAME': 'NestOS Delivery', 'GIT_AUTHOR_EMAIL': 'delivery@nestos.invalid',
                 'GIT_COMMITTER_NAME': 'NestOS Delivery', 'GIT_COMMITTER_EMAIL': 'delivery@nestos.invalid',
                 'GIT_AUTHOR_DATE': date, 'GIT_COMMITTER_DATE': date}
+    footer = ['-m', trailers] if trailers else []
     oid = subprocess.check_output(['git', '-C', path, '-c', 'commit.gpgSign=false', 'commit-tree', tree,
-        '-p', left, '-p', right, '-m', 'chore(delivery): integrate approved module histories'], env=identity).strip()
+        '-p', left, '-p', right, '-m', 'chore(delivery): integrate approved module histories', *footer], env=identity).strip()
     git('update-ref', b'refs/nestos/module-delivery/' + oid, oid)
     return b'160000', oid
 def conflict_entries(rows):
@@ -121,5 +122,5 @@ choices=$3
 tmp=$(mktemp -d "$(git rev-parse --absolute-git-dir)/nestos-merge-proof.XXXXXXXX")
 trap 'rmdir "$tmp"' EXIT
 ${approvedMerge}
-approved_merge "$1" "$2" "$4"
+approved_merge "$1" "$2" "$4" "\${5:-}"
 `;

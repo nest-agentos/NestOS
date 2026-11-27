@@ -15,8 +15,13 @@ class CellsDeployment {
  write(file,value){return save(path.join(this.options.stateDirectory,file),value);}
  check(request){
   if(request.serviceId!==this.options.id||!validId(request.operationId)||!validId(request.targetVersion)||!validId(request.expectedVersion))throw fail('SERVICE_REQUEST_INVALID');
+  if(request.configOnly&&(request.project||request.targetVersion!==request.expectedVersion||!request.configSha256||!request.expectedConfigSha256))throw fail('SERVICE_REQUEST_INVALID');
   if((request.configSha256!==undefined||request.expectedConfigSha256!==undefined)&&
    ![request.configSha256,request.expectedConfigSha256].every(value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value)))throw fail('CELLS_CONFIG_DIGEST_INVALID');
+ }
+ async validateConfiguration(bytes){
+  if(!this.ports.checkConfiguration)throw fail('CELLS_CONFIG_INSTALL_UNAVAILABLE');
+  await this.ports.checkConfiguration(bytes);
  }
  async configuration(){
   if(!this.ports.configHash||!this.ports.process)throw fail('CELLS_CONFIG_INSTALL_UNAVAILABLE');
@@ -58,7 +63,7 @@ class CellsDeployment {
   if(row.state==='succeeded'||row.state==='unchanged')return {state:'succeeded',version:request.targetVersion,...(row.state==='unchanged'?{changed:false}:{})};
   if(row.state==='failed')return {state:'failed',code:row.code};
   const started=Date.now();
-  try{const value=await this.verified(request.targetVersion,request.project);
+  try{const value=request.configOnly?{value:{sha256:row.binarySha256}}:await this.verified(request.targetVersion,request.project);
    const verification=await this.runningRelease(value,request,row);
    if(verification){
     await this.write('current.json',{version:request.targetVersion,sha256:value.value.sha256,...verification});
@@ -112,18 +117,22 @@ class CellsDeployment {
    await this.checkConfiguration(request,config);
    const current=await this.version(!!request.configSha256);
    if(current.id!==request.expectedVersion)throw fail('SERVICE_VERSION_CHANGED');
-   const value=await this.verified(request.targetVersion,request.project);
+   const value=request.configOnly?await this.currentRelease(current):await this.verified(request.targetVersion,request.project);
    if(await this.unchanged(current,value,request)){
     const prior=await this.read('current.json');
     await this.write('current.json',{...prior,version:request.targetVersion,sha256:current.hash});
     await this.write('operation-'+request.operationId+'.json',{request,state:'unchanged'});
     log(request,'service.switch','unchanged',undefined,started);return;
    }
-   const row={request,state:'running',startedAt:Date.now(),previousGeneration:current.generation};
+   const row={request,state:'running',startedAt:Date.now(),previousGeneration:current.generation,...(request.configOnly?{binarySha256:current.hash}:{})};
    await this.write('operation-'+request.operationId+'.json',row);await this.write('pending.json',{operationId:request.operationId});
    if(!await this.installRelease(value,request,row,config))return;
    await this.restart(request,row,started);
   }catch(error){log(request,'service.admission','failure',error.code??'SERVICE_OPERATION_BUSY',started);throw error;}finally{db.close();}
+ }
+ async currentRelease(current){
+  if(await this.installedHash()!==current.hash)throw fail('CELLS_INSTALL_DIGEST_MISMATCH');
+  return {value:{sha256:current.hash}};
  }
  async restart(request,row,started){
   try{
@@ -149,6 +158,13 @@ class CellsDeployment {
   }
  }
  async install(value,request,config){
+  if(request.configOnly){
+   if(!this.ports.installConfig)throw fail('CELLS_CONFIG_INSTALL_UNAVAILABLE');
+   const started=Date.now();
+   try{await this.ports.installConfig(value.value.sha256,request,config);log(request,'config.install','success',undefined,started);}
+   catch(error){log(request,'config.install','failure',error.code??'CELLS_CONFIG_INSTALL_FAILED',started);throw error;}
+   return;
+  }
   if(this.ports.install){
    const started=Date.now();
    try{await this.ports.install(value,request,config);log(request,config?'release.install':'binary.install','success',undefined,started);}
@@ -193,7 +209,7 @@ async function sourceCommit(root,commit){
 
 function sameRequest(a,b){
  const keys=['operationId','serviceId','expectedVersion','targetVersion'];
- if(!keys.every(key=>a[key]===b[key])||projectKey(a.project)!==projectKey(b.project))return false;
+ if(!keys.every(key=>a[key]===b[key])||!!a.configOnly!==!!b.configOnly||projectKey(a.project)!==projectKey(b.project))return false;
  return !!b.project&&b.configSha256===undefined||
     ['configSha256','expectedConfigSha256'].every(key=>a[key]===b[key]);
 }
