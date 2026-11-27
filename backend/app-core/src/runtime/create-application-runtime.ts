@@ -209,7 +209,8 @@ export interface ApplicationRuntimeOptions {
     kanbanApprovalModules?: readonly KanbanApprovalModule[];
     kanbanSkillContributions?: readonly import('@nestos/kanban/contracts').KanbanSkillContribution[];
     kanbanSkillProviders?: readonly import('@nestos/kanban/contracts').KanbanSkillProvider[];
-    kanbanSkillPermissions?(input:import('../presets/kanban-native-workspace').NativeWorkInput,projectId:string):Promise<readonly string[]>;
+    kanbanSkillPermissions?(input:import('../presets/kanban-native-workspace').NativeWorkInput,projectId:string,
+        source?:{serverId:string;projectId:string}):Promise<readonly string[]>;
     /** Optional host integrations own bindings and execution, never the portable board library. */
     configureKanban?(context: {fs: import('@nestos/vfs-core').IFileSystem; service: import('@nestos/kanban').KanbanModuleHandle;
         kernel: import('@nestos/durable-kernel').Kernel; calls?: import('@nestos/llm-session').IndependentCallService;
@@ -399,6 +400,9 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             remove: (id, revision) => executionConnections.remove(id, revision),
             targets: async () => { await initializeProjects(); return executionConnections.targets(await projects.list()); },
         });
+        const approvalModules=remoteConnections&&options.remoteSourceProvider
+            ?[softwareApprovalModule(options.kanbanModulePermissions?.['software-development']),...options.kanbanApprovalModules??[]]:[];
+        const publishedModuleVersions=new Map(approvalModules.map(module=>[module.id,module.version]));
         let harnessKernel: HeadlessKernelRuntime | undefined;
         let ensureExecutionWrite = async (_id: string): Promise<void> => { throw new FSError('ECONFLICT', 'Session ownership is not ready'); };
         let mayCollectContext = (_id: string): boolean => false;
@@ -473,7 +477,8 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             skillSourceForSession: remoteConnections ? files => {
                 const local=options.kernelPlatform?.skillSourceForSession?.(files)??options.kernelPlatform?.skillSource;
                 return sessionChannelSkillSource(files,local,{kernel:()=>harnessKernel?.kernel,
-                    manifest:id=>sessionRepository.getManifest(id),project:folder=>projects.forFolder(folder),remote:remoteConnections!});
+                    manifest:id=>sessionRepository.getManifest(id),project:folder=>projects.forFolder(folder),remote:remoteConnections!,
+                    publishedModuleVersion:id=>publishedModuleVersions.get(id)});
             } : options.kernelPlatform?.skillSourceForSession,
             skillToolHandlerFactory: options.kernelPlatform?.skillToolHandlerFactory,
             beforeRecover: async runtime => {
@@ -698,7 +703,6 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         cleanupFns.push(cleanupStep('developmentOperations.close', () => developmentOperations.close()));
         const developmentBindings = remoteConnections && options.remoteSourceProvider ? {fs: systemFS, agents: agentService,
             connections: executionConnections, remote: remoteConnections, provider: options.remoteSourceProvider, projects} : undefined;
-        const approvalModules=developmentBindings?[softwareApprovalModule(options.kanbanModulePermissions?.['software-development']),...options.kanbanApprovalModules??[]]:[];
         const decisionModules=approvalModules.map(({decide,...module})=>module);
         const observeApprovals=developmentBindings?observeDevelopmentPermissions(developmentBindings.remote,approvalModules,commandBus.execute.bind(commandBus)):undefined;
         const prepareDevelopment = developmentBindings ? developmentPreparation({...developmentBindings,skillContributions:options.kanbanSkillContributions,skillProviders:[kanbanWorkSkillProvider,...options.kanbanSkillProviders??[]],skillPermissions:options.kanbanSkillPermissions}) : undefined;

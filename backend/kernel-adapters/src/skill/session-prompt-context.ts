@@ -13,9 +13,10 @@ export function resolveSessionSkillContext(kernel: Kernel, registry: SessionCapa
         const state: NonNullable<import('@nestos/durable-kernel').EffectExecutionContext['sessionState']> = {
             get: key => session.getShared(key), set: (key, value, expectedVersion) => session.setShared(key, value, { expectedVersion }) };
         const loaded = await session.getShared('kernel-adapters.skills.loaded');
-        requireLoadedSkillVersions(loaded?.value);
+        const versions=requireLoadedSkillVersions(loaded?.value);
         const scope = await registry.get(sessionId);
         return withSkillDriftPersistence(scope.skillService, state, async () => {
+            if(versions)scope.checkMcpSkillVersions?.(Object.values(versions.snapshots));
             await registry.restore(sessionId, loaded?.value);
             assertMcpContextWindow(scope,(await session.getShared(MCP_CONTEXT_WINDOW_KEY))?.value);
             await assertMcpSkillExecution(scope);

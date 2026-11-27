@@ -25,15 +25,47 @@ import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {sha256HexSync} from '@nestos/llm-context';
 
 describe('createKernelAdaptersRuntime', () => {
+    it('consumes a dynamic approval before fetching and pins only the approved bytes',async()=>{
+        const {manager}=await createVFS({rootBackend:new MemoryBackend()});const fs=await manager.openFileSystem('/dynamic');
+        const kernel=new Kernel({catalog:{fs},pollMs:0});kernel.registerStorageResolver({kind:'dynamic',async resolve(){return {fs,rootPath:'/session'};}});
+        kernel.registerProgram(new McpSkillApprovalProgram());await kernel.initialize();
+        const session=await kernel.createSession({id:'session-a',storage:{kind:'dynamic',locator:null}});
+        const uri='skill://example/SKILL.md',entry={uri,frontmatter:{name:'example',description:'Example'},resources:'dynamic' as const};
+        const read=vi.fn(async()=>new TextEncoder().encode('---\nname: example\ndescription: Example\n---\napproved body\n'));
+        const source=new McpSkillSource('node',{listMcpSkills:async()=>[entry],getMcpSkill:async()=>entry,readMcpSkillBytes:read});
+        const runtime=await createKernelAdaptersRuntime({llmDriver:{} as IDeviceDriver,skillSourceForSession:()=>source,
+            fileContextForSession:async()=>({cwd:'/workspace',vfs:{readFile:async()=>'',writeFile:async()=>{},listFiles:async()=>[]},release:async()=>{}})});
+        try {
+            const controls=createSessionSkillControls(kernel,runtime.sessions),window=await controls.mcpApprovalWindow!('session-a');
+            const [skill]=await controls.list('session-a');expect(skill.mcpApprovalAvailable).toBe(true);
+            const id=await controls.requestMcpApproval!('session-a',skill.id,'dynamic-approval',window),task=await session.attachTask(id);
+            await vi.waitFor(async()=>expect((await task.status()).task.interactions['approve:mcp-skill']?.status).toBe('pending'));
+            await task.respond({interactionId:'approve:mcp-skill',value:true});await task.wait({timeoutMs:5000});
+            await expect(controls.readMcpApproved!('session-a',skill.id,id,window)).rejects.toThrow('MCP_SKILL_ACTIVATION_GATE_REQUIRED');
+            expect(read).not.toHaveBeenCalled();
+            expect(await controls.activateMcpApproved!('session-a',skill.id,id,window)).toEqual([]);
+            expect((await resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).skillInstructions).toContain('approved body');
+            await controls.unload('session-a',skill.id);
+            await expect(controls.activateMcpApproved!('session-a',skill.id,id,window)).rejects.toThrow('MCP_SKILL_APPROVAL_CONSUMED');
+            expect(read).toHaveBeenCalledOnce();
+        } finally {await runtime.dispose();await kernel.dispose();await manager.dispose();}
+    });
+
     it('uses the durable user approval window at the actual tool adapter',async()=>{
         const {manager}=await createVFS({rootBackend:new MemoryBackend()});const fs=await manager.openFileSystem('/gate');
         const kernel=new Kernel({catalog:{fs},pollMs:0});kernel.registerStorageResolver({kind:'gate',async resolve(){return {fs,rootPath:'/session'};}});
         kernel.registerProgram(new McpSkillApprovalProgram());await kernel.initialize();
         const session=await kernel.createSession({id:'session-a',storage:{kind:'gate',locator:null}});
         const uri='skill://example/SKILL.md',text='---\nname: example\ndescription: Example\n---\nBody\n';
-        const entry={uri,frontmatter:{name:'example',description:'Example'},resources:[{uri,digest:'sha256:'+sha256HexSync(text),size:new TextEncoder().encode(text).length}]};
+        const nestedUri='skill://example/nested/SKILL.md',nested='example nested text';
+        const entry={uri,frontmatter:{name:'example',description:'Example'},resources:[{uri,digest:'sha256:'+sha256HexSync(text),size:new TextEncoder().encode(text).length},
+            {uri:nestedUri,digest:'sha256:'+sha256HexSync(nested),size:nested.length}]};
         const origin={projectId:'project',projectRevision:1,mountId:'root',principalId:'alice',authorizationRevision:'auth-rev'};
-        const source=new McpSkillSource('node',{listMcpSkills:async()=>[entry],getMcpSkill:async()=>entry,readMcpSkillBytes:async()=>new TextEncoder().encode(text)},'scope',origin);
+        let publishedVersion:string|undefined;
+        const reads=vi.fn(async(target:string)=>new TextEncoder().encode(target===uri?text:nested));
+        const source=new McpSkillSource('node',{listMcpSkills:async()=>[entry],getMcpSkill:async()=>entry,
+            module:()=>({id:'example',version:'1',...(publishedVersion?{publishedVersion}:{})}),
+            readMcpSkillBytes:reads},'scope',origin);
         const runtime=await createKernelAdaptersRuntime({llmDriver:{} as IDeviceDriver,skillSourceForSession:()=>source,
             fileContextForSession:async()=>({cwd:'/workspace',vfs:{readFile:async()=> 'file',writeFile:async()=>{},listFiles:async()=>[]},release:async()=>{}})});
         try {
@@ -61,6 +93,12 @@ describe('createKernelAdaptersRuntime', () => {
             const request={resourceHandleId:'tool-handle',toolId:'Read',args:{file_path:'/workspace/file'}};
             const state:NonNullable<EffectExecutionContext['sessionState']>={get:key=>session.getShared(key),set:(key,value,version)=>session.setShared(key,value,{expectedVersion:version})};
             expect(await tool.execute(request,context(state))).toMatchObject({success:true});
+            const resource={...request,toolId:'read_skill_resource',args:{skill_id:skill.id,path:'nested/SKILL.md'}};
+            expect(reads.mock.calls.every(([target])=>target===uri)).toBe(true);
+            expect(await tool.execute(resource,context(state))).toMatchObject({success:true,output:nested});
+            expect(scope.skillService.getLoadedSkills().map(item=>item.id)).toEqual([skill.id]);
+            await expect(tool.execute({...resource,args:{...resource.args,path:'../private.md'}},context(state))).rejects.toThrow('MCP_SKILL_RESOURCE_UNAUTHORIZED');
+            expect(reads.mock.calls.filter(([target])=>target!==uri)).toEqual([[nestedUri]]);
             await controls.unload('session-a',skill.id);
             await expect(resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).rejects.toThrow('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
             await expect(tool.execute(request,context(state))).rejects.toThrow('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
@@ -74,12 +112,13 @@ describe('createKernelAdaptersRuntime', () => {
             await recovery.respond({interactionId:'approve:mcp-skill',value:true});expect((await recovery.wait({timeoutMs:5000})).status).toBe('succeeded');
             expect(await controls.activateMcpApproved!('session-a',skill.id,recoveryId,recoveryWindow)).toEqual([]);
             expect((await resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).skillInstructions).toContain('Body');
-            entry.resources[0].digest='sha256:'+'f'.repeat(64);await scope.skillService.refreshScopedSkills();
+            publishedVersion='2';
+            await expect(resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).rejects.toThrow('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
             await expect(tool.execute(request,context(state))).rejects.toThrow();
             const update=(await session.getShared('kernel-adapters.skills.mcp-updates'))?.value as {items:Record<string,{status:string;previousManifest:string;observedManifest:string}>};
-            expect(update.items[skill.id]).toMatchObject({status:'restart-required',previousManifest:expect.stringMatching(/^sha256:/),observedManifest:expect.stringMatching(/^sha256:/)});
-            expect(update.items[skill.id].observedManifest).not.toBe(update.items[skill.id].previousManifest);
-            expect(await controls.list('session-a')).toContainEqual(expect.objectContaining({id:skill.id,loaded:false,mcpUpdateRequired:true}));
+            expect(update.items[skill.id]).toMatchObject({status:'restart-required',previousManifest:expect.stringMatching(/^sha256:/),
+                observedManifest:expect.stringMatching(/^sha256:/),module:{id:'example',previousVersion:'1',observedVersion:'2'}});
+            expect(await controls.list('session-a')).toContainEqual(expect.objectContaining({id:skill.id,loaded:false,mcpUpdateRequired:true,mcpApprovalAvailable:false}));
             await runtime.disposeSession('session-a');await expect(resolveSessionSkillContext(kernel,runtime.sessions,'session-a','review')).rejects.toThrow();
             expect((await session.getShared('kernel-adapters.skills.mcp-updates'))?.value).toEqual(update);
         } finally {await runtime.dispose();await kernel.dispose();await manager.dispose();}

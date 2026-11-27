@@ -20,7 +20,7 @@ export async function buildSkillPromptContext(service: ISkillService, options: {
         const loaded = refreshed.find(result => result.skillId === skill.id && result.instructions !== undefined)
             ?? await service.loadSkill(skill.id);
         if (!loaded.success) throw new Error(loaded.error ?? `Failed to load Skill: ${skill.id}`);
-        instructions.push(`Skill ${skill.id}:\n${loaded.instructions ?? skill.instructions}`);
+        instructions.push(`${skillPromptHeader(skill)}\n${loaded.instructions ?? skill.instructions}`);
         if (loaded.compactInstructions) instructions.push(`Skill ${skill.id} — critical rules:\n${loaded.compactInstructions}`);
     }
     return {
@@ -28,6 +28,15 @@ export async function buildSkillPromptContext(service: ISkillService, options: {
         skillInstructions: instructions.join('\n\n'),
         skillIndex: skillIndexPrompt(layers.index, indexByteLimit),
     };
+}
+
+function skillPromptHeader(skill:import('@nestos/tools/contracts').SkillDefinition):string {
+    const origin=skill.metadata?.mcpOrigin as {serverId:string;uri:string}|undefined;
+    if(!origin)return `Skill ${skill.id}:`;
+    const entry=skill.metadata?.mcpEntry as {resources?:unknown}|undefined;
+    const resourceHint=Array.isArray(entry?.resources)&&entry.resources.length>1
+        ?' Use read_skill_resource with this Skill ID and a relative path when a supporting file is needed.':'';
+    return `Skill ${skill.id} (MCP server ${origin.serverId}, URI ${origin.uri}):${resourceHint}`;
 }
 
 async function loadAutomaticSkills(service: ISkillService, options: {

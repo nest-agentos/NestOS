@@ -1,5 +1,5 @@
 import {startCellsReconnect} from './cells-reconnect';
-import {kanbanModulePermissions} from './kanban-module-permissions';
+import {kanbanModulePermissions,kanbanSkillPermissions} from './kanban-module-permissions';
 import {serviceControlModules} from './service-control-modules';
 import {tracedCellsFetch} from '../logging/request-trace';
 import {localServiceControl} from './service-control';
@@ -60,6 +60,7 @@ export async function createNodeRuntime(source: IStorageBackend, root?: string, 
             ...options.kernelPlatform?.additionalTools ?? []]), packages.initialTools(), BUILTIN_TOOLS);
         const runtime = await createApplicationRuntime({remoteSourceProvider: createCellsDriver(undefined, tracedCellsFetch(undefined,event=>traceAudit?.write(event))), ownerKind:'cli',runningVersion:process.env.NESTOS_HTTPD_VERSION,...options,serviceControl:options.configurationReadonly?undefined:options.serviceControl??serviceControlModules(localServiceControl()),backend: borrowed,
             kanbanModulePermissions: options.kanbanModulePermissions??(options.configurationReadonly?undefined:kanbanModulePermissions(process.env.NESTOS_KANBAN_MODULE_PERMISSIONS)),
+            kanbanSkillPermissions: options.kanbanSkillPermissions??(options.configurationReadonly?undefined:kanbanSkillPermissions(process.env.NESTOS_KANBAN_SKILL_PERMISSIONS)),
             toolDependencies: options.toolDependencies ?? packages,
             kernelPlatform: { ...options.kernelPlatform, additionalTools, configure: async (kernel, services) => {
                 await packages.bind(kernel); await options.kernelPlatform?.configure?.(kernel, services);

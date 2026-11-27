@@ -12,7 +12,7 @@ import { matchGlob } from './glob-matcher';
 import { skillSupportPrompt } from './support-files';
 import type { SkillSource, SkillToolHandlerFactory } from '../ports/capabilities';
 import { createSkillVersionSnapshot, snapshotLoadResult, validateSkillVersionSnapshot } from './version-snapshot';
-import {mcpSkillManifestDigest,type McpSkillEntry} from './mcp-skill-verification';
+import {mcpSkillManifestDigest,sameMcpSkillEntry,type McpSkillEntry} from './mcp-skill-verification';
 
 export interface SkillDeviceDriverOptions {
     registry?: Map<string, SkillDefinition>;
@@ -35,7 +35,7 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
     private readonly snapshots = new Map<string, SkillVersionSnapshot>();
     private readonly pins = new Map<string, SkillVersionSnapshot>();
     private readonly drifts = new Map<string, SkillVersionDrift>();
-    private readonly mcpUpdates=new Map<string,{previousManifest:string;observedManifest:string|null;detectedAt:number;status:'restart-required'}>();
+    private readonly mcpUpdates=new Map<string,ReturnType<NonNullable<ISkillService['getMcpSkillUpdates']>>[string]>();
     private readonly stagedMcp = new WeakMap<SkillVersionSnapshot,{revision:number;definition:SkillDefinition}>();
     private changeListeners: Array<() => void> = [];
     private toolService: IToolService | null = null;
@@ -46,6 +46,7 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
     private cwd: string = '';
     private readonly fileSystemSkills = new Map<string, SkillDefinition>();
     private scopeRevision = 0;
+    private scopeScanReady = false;
     private closed = false;
     private registeredTools = new Map<string, Set<string>>();
     /** _agent/AGENT.md 内容（项目级永久指令，始终注入系统 Prompt） */
@@ -176,7 +177,7 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
             ||this.loaded.has(snapshot.definition.id))throw new Error('MCP_SKILL_SCOPE_CHANGED');
         const current=validateSkillVersionSnapshot(snapshot),selected=this.selectVersion(current);
         if(selected.digest!==current.digest)throw new Error('MCP_SKILL_VERSION_CHANGED');
-        const result=this.activateVersion(selected);this.notifyChange();return result;
+        const result=this.activateVersion(selected);this.mcpUpdates.delete(snapshot.definition.id);this.notifyChange();return result;
     }
 
     getSkillSnapshot(id: string): SkillVersionSnapshot | undefined {
@@ -186,6 +187,14 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
 
     getSkillDrifts(): Record<string, SkillVersionDrift> { return structuredClone(Object.fromEntries(this.drifts)); }
     getMcpSkillUpdates() {return structuredClone(Object.fromEntries(this.mcpUpdates));}
+
+    checkMcpSkillVersions(snapshots:SkillVersionSnapshot[]):void {
+        if(!this.scopeScanReady)return;
+        for(const snapshot of snapshots.filter(item=>item.definition.metadata?.mcpOrigin)) {
+            const current=this.getSkill(snapshot.definition.id);
+            if(!sameMcpSkillVersion(snapshot.definition,current))this.recordMcpUpdate(snapshot,current);
+        }
+    }
 
     async restoreSkillSnapshot(value: SkillVersionSnapshot): Promise<SkillLoadResult> {
         const snapshot = validateSkillVersionSnapshot(value);
@@ -417,23 +426,26 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
     async refreshScopedSkills(): Promise<SkillLoadResult[]> {
         if (this.closed) throw new Error('Skill service is closed');
         if (!this.options.source) return [];
-        const retained=[...this.snapshots.values()].filter(snapshot=>snapshot.definition.metadata?.mcpOrigin);
         const revision = ++this.scopeRevision;
-        this.agentMdContent = '';
-        this.replaceFileSystemSkills([], true);
+        const retained=[...this.pins.values()].filter(item=>item.definition.metadata?.mcpOrigin&&this.fileSystemLoadIntent.has(item.definition.id));
+        this.scopeScanReady=false;
+        this.agentMdContent='';
+        this.replaceFileSystemSkills([],true);
         const snapshot = await this.options.source.loadScope(this.cwd);
         if (revision !== this.scopeRevision) return [];
         this.agentMdContent = snapshot.agentInstructions;
         const results = this.replaceFileSystemSkills(snapshot.skills, true);
+        this.scopeScanReady=true;
         for(const previous of retained) {
-            const current=this.fileSystemSkills.get(previous.definition.id);
-            if(current?.metadata?.mcpActivationPending===true&&JSON.stringify(current.metadata.mcpOrigin)===JSON.stringify(previous.definition.metadata?.mcpOrigin)
-                &&JSON.stringify(current.metadata.mcpEntry)===JSON.stringify(previous.definition.metadata?.mcpEntry))this.activateVersion(previous);
+            const id=previous.definition.id,current=this.fileSystemSkills.get(id);
+            if(this.pins.get(id)!==previous||this.mcpUpdates.has(id))continue;
+            if(sameMcpSkillVersion(previous.definition,current))this.activateVersion(previous);
             else this.recordMcpUpdate(previous,current);
         }
         for (const id of [...this.fileSystemLoadIntent]) {
             if (revision !== this.scopeRevision) return [];
             const skill = this.fileSystemSkills.get(id);
+            if(this.mcpUpdates.has(id))continue;
             if(this.loaded.has(id)&&skill?.metadata?.mcpActivationPending===true)continue;
             if (!skill?.enabled || skill.disableModelInvocation || !this.isSkillInScope(skill)) {
                 results.push({ skillId: id, success: false, toolIds: [], error: `Loaded Skill is unavailable or unauthorized: ${id}` });
@@ -452,8 +464,13 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
         let observedManifest:string|null=null;
         try {if(current?.metadata?.mcpEntry)observedManifest=mcpSkillManifestDigest(current.metadata.mcpEntry as McpSkillEntry);}catch {}
         const previousManifest=mcpSkillManifestDigest(old),prior=this.mcpUpdates.get(previous.definition.id);
+        const observedModule=current?.metadata?.mcpModule as {id:string;version:string;publishedVersion?:string}|undefined;
+        const previousModule=(previous.definition.metadata?.mcpModule??observedModule) as {id:string;version:string}|undefined;
+        const observedVersion=observedModule?.publishedVersion??observedModule?.version??null;
+        if(prior?.observedManifest===observedManifest&&(prior.module?.observedVersion??null)===observedVersion)return;
         this.mcpUpdates.set(previous.definition.id,{previousManifest,observedManifest,
-            detectedAt:prior?.observedManifest===observedManifest?prior.detectedAt:Date.now(),status:'restart-required'});
+            detectedAt:Date.now(),
+            ...(previousModule?{module:{id:previousModule.id,previousVersion:previousModule.version,observedVersion}}:{}),status:'restart-required'});
         this.notifyChange();
     }
 
@@ -519,6 +536,15 @@ export class SkillDeviceDriver implements IDeviceDriver, ISkillService {
     private notifyChange(): void {
         for (const l of this.changeListeners) l();
     }
+}
+
+function sameMcpSkillVersion(previous:SkillDefinition,current?:SkillDefinition):boolean {
+    const before=previous.metadata,after=current?.metadata;
+    const module=after?.mcpModule as {publishedVersion?:string}|undefined;
+    if(after?.mcpActivationPending!==true||JSON.stringify(before?.mcpOrigin)!==JSON.stringify(after.mcpOrigin)
+        ||module?.publishedVersion||(before?.mcpModule&&JSON.stringify(before.mcpModule)!==JSON.stringify(after.mcpModule)))return false;
+    try {return sameMcpSkillEntry(before?.mcpEntry as McpSkillEntry,after.mcpEntry as McpSkillEntry);}
+    catch {return false;}
 }
 
 function toolMeta(skill: SkillDefinition, binding: SkillToolBinding): import('@nestos/tools/contracts').ToolMeta {

@@ -9,6 +9,7 @@ type Files={cwd:string;sessionId:string;scopeId?:string};
 type Manifest={folder?:string|null;currentBranch:string};
 type Project={project:{id:string}};
 type Dependencies={kernel:()=>ContextInspector|undefined;manifest(id:string):Promise<Manifest>;project(folder:string|null|undefined):Promise<Project|undefined>;
+    publishedModuleVersion?(id:string):string|undefined;
     remote:Pick<ProjectRemoteMountService,'list'|'projectHarness'|'sessionChannel'>};
 
 /** Discover metadata through a confirmed native context; content remains unavailable here. */
@@ -21,7 +22,9 @@ export function sessionChannelSkillSource(files:Files,local:SkillSource|undefine
             if(current!==generation)throw new Error('MCP_SKILL_SCOPE_CHANGED');
             const selected=remote?new McpSkillSource(remote.serverId,{
                 listMcpSkills:async()=>remote.skills,
+                module:uri=>moduleVersion(remote,uri,deps),
                 getMcpSkill:async uri=>{const fresh=await sameBinding(files,deps,remote);const skill=fresh.skills.find(item=>item.uri===uri);
+                    if(moduleVersion(fresh,uri,deps)?.publishedVersion)throw new Error('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
                     if(!skill)throw new Error('MCP_SKILL_UNAVAILABLE');return skill;},
                 readMcpSkillBytes:async uri=>{
                     await sameBinding(files,deps,remote);
@@ -39,9 +42,20 @@ export function sessionChannelSkillSource(files:Files,local:SkillSource|undefine
             if(sessionId!==files.sessionId||!source)throw new Error('MCP_SKILL_UNAVAILABLE');
             return source.readApproved(sessionId,skillId,taskId,windowId,controls);
         },
+        readSupporting:async(skillId,entry,path)=>{
+            if(!source)throw new Error('MCP_SKILL_UNAVAILABLE');
+            return source.readSupporting(skillId,entry,path);
+        },
         dispose:async()=>{generation++;source?.invalidate();source=undefined;await local?.dispose?.();},
         ...(local?.loadDirectory?{loadDirectory:local.loadDirectory.bind(local)}:{}),
     };
+}
+
+function moduleVersion(remote:{modules:ReadonlyMap<string,{id:string;version:string}>},uri:string,deps:Dependencies):
+    {id:string;version:string;publishedVersion?:string}|undefined {
+    const module=remote.modules.get(uri);if(!module)return;
+    const publishedVersion=deps.publishedModuleVersion?.(module.id);
+    return publishedVersion&&publishedVersion!==module.version?{...module,publishedVersion}:module;
 }
 
 async function metadata(files:Files,deps:Dependencies) {
@@ -73,7 +87,7 @@ async function readMetadata(files:Files,deps:Dependencies) {
     catch(error) {const detail=error as {remoteCode?:string;code?:string};
         if(['CHANNEL_SCOPE_UNKNOWN','CHANNEL_WORKSPACE_INVALID'].includes(detail.remoteCode??detail.code??''))return;throw error;}
     if(typeof current.scopeId!=='string'||current.execution?.sessionId!==native.sessionId||files.scopeId&&files.scopeId!==current.scopeId)return;
-    const result=await deps.remote.sessionChannel(project.project.id,'messages',{cwd,scopeId:current.scopeId,nativeSessionId:native.sessionId,skillsMetadata:true}) as {skills?:unknown};
+    const result=await deps.remote.sessionChannel(project.project.id,'messages',{cwd,scopeId:current.scopeId,nativeSessionId:native.sessionId,skillsMetadata:true}) as {skills?:unknown;skillModules?:unknown};
     const [after,latest]=await Promise.all([readContextCatalog(kernel,files.sessionId),deps.manifest(files.sessionId)]);
     const rebound=deps.remote.list(project.project.id).find(mount=>mount.at==='/');
     if(after.version!==catalog.version||latest.currentBranch!==manifest.currentBranch||rebound?.serverId!==root.serverId
@@ -84,8 +98,19 @@ async function readMetadata(files:Files,deps:Dependencies) {
     if(!Array.isArray(result.skills))throw new Error('MCP_SKILL_RESULT_INVALID');
     return {serverId:root.serverId,scopeId:current.scopeId,projectId:project.project.id,cwd,nativeSessionId:native.sessionId,
         sourceProjectId:root.serverProjectId!,projectRevision:root.serverProjectRevision,mountId:root.mountId,mountAlias:root.alias,
-        principalId:root.authorization.principalId,authorizationRevision:root.authorization.revision,
+        principalId:root.authorization.principalId,authorizationRevision:root.authorization.revision,modules:skillModules(result.skillModules),
         skills:result.skills as Array<{uri:string;frontmatter:Record<string,unknown>;resources:Array<{uri:string;digest:string;size:number}>|'dynamic'}>};
+}
+
+function skillModules(value:unknown):Map<string,{id:string;version:string}> {
+    const modules=new Map<string,{id:string;version:string}>();
+    if(value===undefined)return modules;
+    if(!Array.isArray(value))throw new Error('MCP_SKILL_RESULT_INVALID');
+    for(const row of value) {
+        if(typeof row?.uri!=='string'||typeof row.moduleId!=='string'||typeof row.moduleVersion!=='string'||modules.has(row.uri))throw new Error('MCP_SKILL_RESULT_INVALID');
+        modules.set(row.uri,{id:row.moduleId,version:row.moduleVersion});
+    }
+    return modules;
 }
 
 async function sameBinding(files:Files,deps:Dependencies,expected:NonNullable<Awaited<ReturnType<typeof metadata>>>) {

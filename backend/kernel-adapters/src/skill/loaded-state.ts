@@ -11,11 +11,12 @@ export interface LoadedSkillVersions {
 }
 
 /** An ID-only record cannot prove which definition an earlier host used. */
-export function requireLoadedSkillVersions(value: unknown): void {
-    const ids = parseLoadedSkillIds(value);
+export function requireLoadedSkillVersions(value: unknown): LoadedSkillVersions | undefined {
     const versions = parseLoadedSkillVersions(value);
+    const ids = versions?.ids ?? parseLoadedSkillIds(value);
     const missing = ids.find(id => !versions || !Object.hasOwn(versions.snapshots, id));
     if (missing) throw new Error(`Skill has no saved version; reload required: ${missing}`);
+    return versions;
 }
 
 /** Merge a successful load into the durable identity set using the Session CAS boundary. */
@@ -126,7 +127,12 @@ export async function persistMcpSkillUpdates(service:ISkillService,state:EffectE
     for(let attempt=0;attempt<3;attempt++) {
         const saved=await state.get(key),value=saved?.value as {format?:unknown;items?:Record<string,unknown>}|undefined;
         if(value&&(value.format!==1||!value.items||typeof value.items!=='object'||Array.isArray(value.items)))throw new Error('MCP_SKILL_UPDATE_STATE_INVALID');
-        const next={format:1,items:{...value?.items,...updates}};
+        const items={...value?.items};
+        for(const [id,update] of Object.entries(updates)) {
+            const previous=items[id] as typeof update|undefined;
+            items[id]=previous&&JSON.stringify({...previous,detectedAt:0})===JSON.stringify({...update,detectedAt:0})?previous:update;
+        }
+        const next={format:1,items};
         if(JSON.stringify(saved?.value)===JSON.stringify(next))return;
         try {await state.set(key,next as never,saved?.version??null);return;}
         catch(error){if(!(error instanceof KernelError)||error.code!==KernelErrorCode.CONFLICT||attempt===2)throw error;}

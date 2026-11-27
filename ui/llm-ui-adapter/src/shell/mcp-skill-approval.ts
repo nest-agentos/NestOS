@@ -23,9 +23,17 @@ export class McpSkillApprovalAction {
         if(event.type!=='task.succeeded'){this.pending.delete(skillId);return;}
         if(!this.controls.activateMcpApproved){this.pending.delete(skillId);return;}
         const current=this.activating.get(skillId);if(current)return current;
-        const work=(async()=>{this.check();await this.controls.activateMcpApproved!(this.sessionId,skillId,pending.taskId!,pending.windowId);this.check();
-            if(this.pending.get(skillId)===pending)this.pending.delete(skillId);})().finally(()=>{if(this.activating.get(skillId)===work)this.activating.delete(skillId);});
+        const work=this.activate(skillId,pending).finally(()=>{if(this.activating.get(skillId)===work)this.activating.delete(skillId);});
         this.activating.set(skillId,work);return work;
+    }
+    private async activate(skillId:string,pending:{requestId:string;windowId:string;taskId?:string}):Promise<void> {
+        const started=Date.now();
+        try {
+            this.check();await this.controls.activateMcpApproved!(this.sessionId,skillId,pending.taskId!,pending.windowId);this.check();
+            report(this.sessionId,pending.requestId,'activate','success',started);
+        } catch(error) {
+            report(this.sessionId,pending.requestId,'activate','failure',started,error);throw error;
+        } finally {if(this.pending.get(skillId)===pending)this.pending.delete(skillId);}
     }
     private async run(skillId:string):Promise<void> {
         const started=Date.now();let stage='validate',operationId:string|undefined;
@@ -45,7 +53,8 @@ export class McpSkillApprovalAction {
 }
 function failure(code:string,message:string):Error {return Object.assign(new Error(message),{code});}
 function report(sessionId:string,operationId:string|undefined,stage:string,result:'success'|'failure',started:number,error?:unknown):void {
-    const raw=(error as {code?:unknown}|undefined)?.code;
+    const detail=error as {code?:unknown;message?:unknown}|undefined;
+    const raw=detail?.code??detail?.message;
     const code=typeof raw==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(raw)?raw:`SKILL_APPROVAL_${stage.toUpperCase()}_FAILED`;
     const fields={operation:'skill.approval.request',operationId,sessionId,stage,result,durationMs:Date.now()-started,...(result==='failure'?{code}:{})};
     try {const log=createModuleLogger('skill-approval');if(result==='success')log.info('Skill approval request',fields);else log.warn('Skill approval request',fields);}catch {/* Diagnostics do not change the task receipt. */}

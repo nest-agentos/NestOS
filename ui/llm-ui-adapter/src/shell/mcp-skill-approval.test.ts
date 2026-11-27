@@ -32,3 +32,14 @@ it('does not activate a denied task',async()=>{
  const action=new McpSkillApprovalAction(controls as never,'session',()=>({current:async()=>undefined}) as never,async()=>{},()=>{});
  await action.request('skill');await action.observe({type:'task.failed',taskId:'task'} as never);expect(activate).not.toHaveBeenCalled();
 });
+it('starts a new approval after activation fails',async()=>{
+ const submit=vi.fn().mockResolvedValueOnce('first').mockResolvedValueOnce('second');
+ const controls={mcpApprovalWindow:async()=> 'window',requestMcpApproval:submit,
+  activateMcpApproved:vi.fn().mockRejectedValueOnce(new Error('MCP_SKILL_FRONTMATTER_MISMATCH'))};
+ const action=new McpSkillApprovalAction(controls as never,'session',()=>({current:async()=>undefined}) as never,async()=>{},()=>{});
+ await action.request('skill');
+ await expect(action.observe({type:'task.succeeded',taskId:'first'} as never)).rejects.toThrow('MCP_SKILL_FRONTMATTER_MISMATCH');
+ await action.request('skill');
+ expect(submit.mock.calls).toHaveLength(2);
+ expect(submit.mock.calls[1][2]).not.toBe(submit.mock.calls[0][2]);
+});

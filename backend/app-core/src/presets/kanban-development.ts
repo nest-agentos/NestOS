@@ -22,13 +22,13 @@ import {publishPromptBundle} from '../run/prompt-bundle';
 import {developmentPolicy, type DevelopmentPolicy} from './kanban-development-policy';
 import {developmentWorkspace} from './kanban-development-workspace';
 import {projectKanbanSkills, type KanbanSkillContribution, type KanbanSkillProjection,type KanbanSkillProvider,type KanbanSkillProviderContext} from '@nestos/kanban/contracts';
-import {load as loadYaml} from 'js-yaml';
+import {JSON_SCHEMA,load as loadYaml} from 'js-yaml';
 import {createModuleLogger} from '@nestos/common';
 
 const skillLog=createModuleLogger('kanban-skills');
 
 interface Options extends NativeWorkspaceOptions {provider:RemoteFileSourceProvider; skillContributions?:readonly KanbanSkillContribution[];skillProviders?:readonly KanbanSkillProvider[];
-    skillPermissions?(input:Input,projectId:string):Promise<readonly string[]>}
+    skillPermissions?(input:Input,projectId:string,source?:Pick<KanbanSkillProviderContext,'serverId'|'projectId'>):Promise<readonly string[]>}
 type Input=NativeWorkInput;
 export interface DevelopmentWorkspaceRecord extends NativeWorkChannel {
     directoryOnly?:true;worktreeId?:string;communicationDirectory?:string;repositories:WorktreeRepository[];availableRepositories:WorktreeRepository[];
@@ -116,7 +116,7 @@ export async function projectWorkSkills(options:Pick<Options,'skillContributions
     if((!options.skillContributions?.length&&!options.skillProviders?.length)||!options.skillPermissions)return [];
     requireValue(sourceProjectId,'MCP_SKILL_PROJECT_BINDING_REQUIRED');
     const decision=(context as {decision?:{snapshot?:{externalRefs?:import('@nestos/kanban/contracts').KanbanExternalReference[]}}}|undefined)?.decision;
-    const permissions=await options.skillPermissions(input,projectId);
+    const permissions=await options.skillPermissions(input,projectId,source&&{serverId:source.serverId,projectId:source.projectId});
     const refs=decision?.snapshot?.externalRefs??[],stage=input.stage??'task';
     const providers=(options.skillProviders??[]).filter(provider=>provider.stages.includes(stage)&&permissions.includes(provider.permission)
         &&refs.some(ref=>ref.system==='nestos-decision-module'&&ref.id===provider.moduleId&&ref.revision===provider.moduleVersion));
@@ -126,7 +126,9 @@ export async function projectWorkSkills(options:Pick<Options,'skillContributions
         requireValue(contribution.moduleId===provider.moduleId&&contribution.moduleVersion===provider.moduleVersion&&contribution.permission===provider.permission
             &&contribution.source?.projectId===source!.projectId&&contribution.source.revision===source!.revision&&contribution.source.mountId===source!.mountId
             &&contribution.serverId===source!.serverId&&contribution.stages.every(stage=>provider.stages.includes(stage))
-            &&(contribution.resources==='dynamic'||contribution.resources?.every(resource=>resource.path.startsWith(source!.workspacePath+'/'))),'MCP_SKILL_PROVIDER_BINDING_MISMATCH');
+            &&(contribution.resources==='dynamic'
+                ? contribution.dynamicPath?.startsWith(source!.workspacePath+'/')
+                : contribution.resources?.every(resource=>resource.path.startsWith(source!.workspacePath+'/'))),'MCP_SKILL_PROVIDER_BINDING_MISMATCH');
         return contribution;
     }));
     const candidates=[...options.skillContributions??[],...built].filter(skill=>!skill.source||skill.source.projectId===sourceProjectId);
@@ -134,7 +136,7 @@ export async function projectWorkSkills(options:Pick<Options,'skillContributions
 }
 
 function skillProviderContext(fs:import('@nestos/vfs-core').IFileSystem,projectId:string,revision:number,mountId:string,workspacePath:string,operationId:string,serverId:string):KanbanSkillProviderContext {
-    return {projectId,revision,mountId,workspacePath,operationId,serverId,parseYaml:loadYaml,
+    return {projectId,revision,mountId,workspacePath,operationId,serverId,parseYaml:text=>loadYaml(text,{schema:JSON_SCHEMA}),
         log:event=>skillLog[event.result==='failure'?'warn':'info']('Skill contribution',event),
         readBytes:async path=>{
             requireValue(path.startsWith(workspacePath+'/')&&!path.split('/').some(part=>!part||part==='.'||part==='..'),'MCP_SKILL_PATH_INVALID');

@@ -18,6 +18,14 @@ import type {
  * 由 kernel-adapters 的 SkillDeviceDriver 实现。
  * 每个 Session 独立管理 Skill 的加载状态。
  */
+export interface McpSkillUpdate {
+    previousManifest:string;
+    observedManifest:string|null;
+    detectedAt:number;
+    status:'restart-required';
+    module?:{id:string;previousVersion:string;observedVersion:string|null};
+}
+
 export interface ISkillService {
     /** 获取所有已注册的 Skill 定义 */
     listSkills(): SkillDefinition[];
@@ -40,7 +48,7 @@ export interface ISkillService {
     restoreSkillSnapshot?(snapshot: SkillVersionSnapshot): Promise<SkillLoadResult>;
     getSkillSnapshot?(id: string): SkillVersionSnapshot | undefined;
     getSkillDrifts?(): Record<string, SkillVersionDrift>;
-    getMcpSkillUpdates?():Record<string,{previousManifest:string;observedManifest:string|null;detectedAt:number;status:'restart-required'}>;
+    getMcpSkillUpdates?():Record<string,McpSkillUpdate>;
 
     /**
      * 卸载 Skill。

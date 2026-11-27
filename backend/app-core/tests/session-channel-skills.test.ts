@@ -7,17 +7,20 @@ vi.mock('../src/projects/harness-context-catalog',()=>({readContextCatalog:async
 
 it('discovers only from the bound native session and retains the local source',async()=>{
  const close=vi.fn(),inspect=vi.fn(async()=>({session:{id:'native',cwd:'/projects/cell-project/work'}}));
- let serverId='node-one',channelScope='scope',projectRevision=1,hold:(()=>Promise<unknown>)|undefined;
+ let serverId='node-one',channelScope='scope',projectRevision=1,publishedVersion='1',hold:(()=>Promise<unknown>)|undefined;
  const text='---\nname: example\ndescription: Example\n---\nBody\n',uri='skill://example/SKILL.md';
  const grant={uri,frontmatter:{name:'example',description:'Example'},resources:[{uri,digest:'sha256:'+sha256HexSync(text),size:new TextEncoder().encode(text).length}]};
  const sessionChannel=vi.fn(async(_project:string,operation:string,input:Record<string,unknown>)=>operation==='current'
-  ?{scopeId:channelScope,execution:{sessionId:'native'}}:input.skillResourceUri?(hold?hold():{contents:[{uri,text}]}):input.nativeSessionId==='native'?{skills:[grant]}:{skills:[]});
+  ?{scopeId:channelScope,execution:{sessionId:'native'}}:input.skillResourceUri?(hold?hold():{contents:[{uri,text}]}):input.nativeSessionId==='native'
+  ?{skills:[grant],skillModules:[{uri,moduleId:'example',moduleVersion:'1'}]}:{skills:[]});
  const deps={kernel:()=>({}),manifest:async()=>({folder:'folder',currentBranch:'main'}),project:async()=>({project:{id:'project'}}),
+  publishedModuleVersion:(id:string)=>id==='example'?publishedVersion:undefined,
   remote:{list:()=>[{at:'/',connectionId:'connection',serverId,serverProjectId:'cell-project',serverProjectRevision:projectRevision,mountId:'mount',alias:'root',authorization:{principalId:'alice',revision:'1'}}],projectHarness:async()=>({inspect,close}),sessionChannel}} as never;
  const local={loadScope:async(cwd:string)=>({cwd,skills:[],agentInstructions:'local'})};
  const result=await sessionChannelSkillSource({sessionId:'session',cwd:'/workspace',scopeId:'scope'},local,deps).loadScope('/workspace');
  expect(result.agentInstructions).toBe('local');expect(result.skills).toHaveLength(1);
  expect(result.skills[0].metadata?.mcpOrigin).toMatchObject({serverId:'node-one',uri:grant.uri,scopeId:'scope',projectId:'cell-project',projectRevision:1,mountId:'root'});
+ expect(result.skills[0].metadata?.mcpModule).toEqual({id:'example',version:'1'});
  expect(sessionChannel).toHaveBeenLastCalledWith('project','messages',expect.objectContaining({scopeId:'scope',nativeSessionId:'native',skillsMetadata:true}));
  expect(close).toHaveBeenCalledOnce();
  const other=await sessionChannelSkillSource({sessionId:'session',cwd:'/workspace',scopeId:'other'},local,deps).loadScope('/workspace');
@@ -45,6 +48,9 @@ it('discovers only from the bound native session and retains the local source',a
  expect(readCount()).toBe(0);
  expect(await source.readApproved!('session',approved.id,'task','window',{verifyMcpApproval:async()=>true})).toBe(text);
  expect(readCount()).toBe(1);
+ publishedVersion='2';
+ await expect(source.readApproved!('session',approved.id,'task','window',{verifyMcpApproval:async()=>true})).rejects.toThrow('MCP_SKILL_CONTEXT_RESTART_REQUIRED');
+ expect(readCount()).toBe(1);publishedVersion='1';
  let release!:(value:unknown)=>void,entered!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;});
  hold=()=>{entered();return new Promise(resolve=>{release=resolve;});};
  const pending=source.readApproved!('session',approved.id,'task','window',{verifyMcpApproval:async()=>true});

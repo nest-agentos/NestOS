@@ -42,6 +42,7 @@ import { ExecProgram } from '../programs/exec-program';
 import { ContextPrepareEffect, ContextLlmEffect, ContextToolEffect, type ContextServiceResolver } from '../context/effects';
 import {LiveTools} from './live-tools';
 import {assertMcpSkillExecution} from '../skill/mcp-execution-window';
+import {createReadSkillResourceHandler,readSkillResourceDefinition,readSkillResourceMeta} from '../tool/read-skill-resource';
 
 export interface KernelAdaptersRuntimeOptions extends KernelAdapterDiagnostics {
     authorizeTool?(request: import('../effects/tool-call-effect').ToolCallEffectRequest, context: import('@nestos/durable-kernel').EffectExecutionContext): Promise<void>;
@@ -96,6 +97,7 @@ export async function createKernelAdaptersRuntime(options: KernelAdaptersRuntime
     const catalogSkills = new SkillDeviceDriver({ registry: definitions });
     const catalogTools = new ToolDeviceDriver(liveTools.list());
     registerCoreTools(catalogTools, catalogSkills);
+    catalogTools.registerTool(readSkillResourceMeta,readSkillResourceDefinition,createReadSkillResourceHandler());
     registerEffectTools(catalogTools, options.effectTools);
     await catalogTools.init();
     liveTools.attach(catalogTools);
@@ -351,6 +353,8 @@ class KernelAdaptersSessionRegistry implements SessionCapabilityRegistry {
         }
         catch (error) { detachTools(); return cleanupAfterFailure(error, [() => files?.release(), () => toolDriver.dispose(), () => skillDriver.dispose()]); }
         const scope = createScope(toolDriver, skillDriver, { cwd: files?.cwd, shellAttached: !!nativeShell }, ttySessions);
+        if(source?.readSupporting)toolDriver.registerTool(readSkillResourceMeta,readSkillResourceDefinition,createReadSkillResourceHandler(scope,source));
+        scope.checkMcpSkillVersions=snapshots=>skillDriver.checkMcpSkillVersions(snapshots);
         scope.stageMcpSkill=(id,content)=>skillDriver.stageMcpSkill(id,content);
         scope.commitMcpSkill=snapshot=>skillDriver.commitMcpSkill(snapshot);
         if(source?.readApproved) scope.readMcpSkillApproved=(id,skillId,taskId,windowId,controls)=>{

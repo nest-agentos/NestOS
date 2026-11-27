@@ -19,6 +19,7 @@ export interface SkillSource {
     dispose?():void|Promise<void>;
     readApproved?(sessionId:string,skillId:string,taskId:string,windowId:string,
         controls:Pick<import('@nestos/tools/contracts').SessionSkillControls,'verifyMcpApproval'>):Promise<string>;
+    readSupporting?(skillId:string,entry:import('../skill/mcp-skill-verification').McpSkillEntry,path:string):Promise<Uint8Array>;
     loadDirectory?(
         dirPath: string,
         scopeLevel: SkillScopeLevel,
@@ -37,6 +38,7 @@ export interface SessionCapabilityScope {
     validateMcpSkillWindow?(skill:SkillDefinition):Promise<boolean>;
     /** A separate host authorization is required for effects with side effects. */
     validateMcpSkillEffect?(skill:SkillDefinition,kind:string):Promise<boolean>;
+    checkMcpSkillVersions?(snapshots:import('@nestos/tools/contracts').SkillVersionSnapshot[]):void;
     stageMcpSkill?(id:string,content:string):import('@nestos/tools/contracts').SkillVersionSnapshot;
     commitMcpSkill?(snapshot:import('@nestos/tools/contracts').SkillVersionSnapshot):SkillLoadResult;
     readMcpSkillApproved?(sessionId:string,skillId:string,taskId:string,windowId:string,

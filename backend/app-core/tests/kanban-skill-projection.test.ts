@@ -73,4 +73,10 @@ it('builds a provider only after its module, stage and permission are authorized
  await expect(projectWorkSkills(options,input,'project',context,'project',source)).rejects.toMatchObject({code:'MCP_SKILL_PROVIDER_BINDING_MISMATCH'});
  build.mockResolvedValueOnce({...bound,resources:[{...bound.resources[0],path:'outside/SKILL.md'}]});
  await expect(projectWorkSkills(options,input,'project',context,'project',source)).rejects.toMatchObject({code:'MCP_SKILL_PROVIDER_BINDING_MISMATCH'});
+ const dynamic={...bound,resources:'dynamic' as const,dynamicPath:'worktrees/task/generated.md'};
+ const dynamicOptions={...options,skillProviders:[{...provider,build:async()=>dynamic}]};
+ await expect(projectWorkSkills(dynamicOptions,input,'project',context,'project',source))
+   .resolves.toMatchObject([{resources:'dynamic',dynamicPath:dynamic.dynamicPath}]);
+ dynamic.dynamicPath='worktrees/task/../outside.md';
+ await expect(projectWorkSkills(dynamicOptions,input,'project',context,'project',source)).rejects.toThrow('SKILL_SOURCE_INVALID');
 });

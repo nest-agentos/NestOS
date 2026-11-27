@@ -36,8 +36,12 @@ export function createFlowCapabilities(runtime: HeadlessKernelRuntime, identitie
     };
     const resolveHarnessToolIds = async (sessionId: string) => {
         const scope = await runtime.sessions.get(sessionId);
-        return DEFAULT_HARNESS_TOOL_IDS
-            .filter(id => scope.toolService.getToolMeta(id)?.enabled);
+        const defaults=DEFAULT_HARNESS_TOOL_IDS.filter(id=>scope.toolService.getToolMeta(id)?.enabled);
+        if(scope.toolService.getToolMeta('read_skill_resource')?.enabled&&scope.skillService.getLoadedSkills().some(skill=>{
+            const resources=(skill.metadata?.mcpEntry as {resources?:unknown}|undefined)?.resources;
+            return Array.isArray(resources)&&resources.length>1;
+        }))defaults.push('read_skill_resource');
+        return defaults;
     };
     return { resolveSkills, resolveTools, resolveHarnessToolIds, resolveMCPToolIds,
         bindNode: (sessionId: string, node: FlowNodeDefinition, defaults?: FlowNodeDefinition['config']) =>

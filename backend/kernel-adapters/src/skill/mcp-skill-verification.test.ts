@@ -26,12 +26,24 @@ describe('MCP skill verification',()=>{
   const altered=new Uint8Array(main);altered[altered.length-2]^=1;
   await expect(new McpSkillVerification('server',entry(),{read:async()=>altered}).load(async()=>true)).rejects.toThrow('MCP_SKILL_DIGEST_MISMATCH');
  });
- it('rejects unknown, duplicated, foreign and dynamic manifests before reads',()=>{
+ it('rejects duplicated and foreign manifests before reads',()=>{
   const port={read:vi.fn()},duplicate=entry(),foreign=entry();
   (duplicate.resources as any[]).push((duplicate.resources as any[])[0]);
   (foreign.resources as any[])[1].uri='skill://other/reference.md';
-  for(const value of [duplicate,foreign,{...entry(),resources:'dynamic' as const}])expect(()=>new McpSkillVerification('server',value,port)).toThrow();
+  for(const value of [duplicate,foreign])expect(()=>new McpSkillVerification('server',value,port)).toThrow();
   expect(port.read).not.toHaveBeenCalled();
+ });
+ it('verifies dynamic frontmatter and does not grant subsequent resource access',async()=>{
+  const read=vi.fn(async()=>main),value={...entry(),resources:'dynamic' as const};
+  const verifier=new McpSkillVerification('server',value,{read});
+  await expect(verifier.load(async()=>false)).rejects.toThrow('MCP_SKILL_APPROVAL_DENIED');
+  expect(read).not.toHaveBeenCalled();
+  await expect(verifier.load(async()=>true)).resolves.toContain('Body');
+  await expect(verifier.read(uri)).rejects.toThrow('MCP_SKILL_RESOURCE_UNAUTHORIZED');
+  await expect(verifier.read(support)).rejects.toThrow('MCP_SKILL_RESOURCE_UNAUTHORIZED');
+  expect(read.mock.calls).toEqual([[uri]]);
+  read.mockResolvedValue(bytes('---\nname: example\ndescription: Different\n---\n'));
+  await expect(verifier.load(async()=>true)).rejects.toThrow('MCP_SKILL_FRONTMATTER_MISMATCH');
  });
  it('revokes pending activation and in-flight supporting reads',async()=>{
   let accept!:(allowed:boolean)=>void;
