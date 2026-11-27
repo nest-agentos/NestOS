@@ -18,13 +18,18 @@ it('exposes only authorized Dream configuration commands through RPC', async () 
         const dream = client.decode(boot.value!).services.dream;
         expect(await dream.create(project.project.id, 'dream', 'create', 'Dream')).toMatchObject({revision: 1});
         expect(await dream.list(project.project.id)).toMatchObject({items: [{id: 'dream', name: 'Dream'}], scanned: 1, truncated: false});
+        await dream.selectPrimary(project.project.id, 'dream');
+        expect(await dream.list(project.project.id)).toMatchObject({primaryId: 'dream'});
+        await expect(dream.selectPrimary('missing', 'dream')).rejects.toThrow();
         expect(await dream.readConfig(project.project.id, 'dream')).toMatchObject({config: {name: 'Dream', files: []}});
         expect(await dream.openView(project.project.id, 'dream')).toMatchObject({config: {revision: 1}, history: {items: []}});
         expect(await dream.readRun(project.project.id, 'dream', 'unknown')).toBeNull();
         await expect(dream.adoptDecision({operationId: 'invalid'})).rejects.toThrow('DREAM_ADOPTION_INVALID');
         expect(await dream.history(project.project.id, 'dream')).toEqual({items: [], scanned: 0});
-        const schedule = {state: 'active', firstAt: Date.now() + 60000, timeZone: 'UTC',
-            cadence: {kind: 'interval', milliseconds: 60000}, trigger: 'fixed', maxConcurrency: 1};
+        const schedule = {state: 'active', firstAt: 0, timeZone: 'Asia/Shanghai',
+            cadence: {kind: 'monthly', hour: 18, minute: 0, dayOfMonth: 31}, trigger: 'fixed', maxConcurrency: 1};
+        await expect(dream.configureSchedule(project.project.id, 'dream', 'invalid-month-day', 1,
+            {...schedule, cadence: {...schedule.cadence, dayOfMonth: 32}})).rejects.toThrow('DREAM_MONTH_DAY_INVALID');
         expect(await dream.configureSchedule(project.project.id, 'dream', 'schedule', 1, schedule)).toMatchObject({config: {revision: 2}, activation: 'ready'});
         expect((await dream.openView(project.project.id, 'dream')).scheduleStatus).toMatchObject({state: 'scheduled'});
         expect(await dream.configureSchedule(project.project.id, 'dream', 'pause-schedule', 2, {...schedule, state: 'paused'}))

@@ -52,11 +52,12 @@ export interface DreamRunView {
     execution?: {scanRunId: string; sessionId: string; taskId: string; additionalTasks?: Array<{sessionId: string; taskId: string}>};
 }
 export interface DreamService {
-    list(owner: string): Promise<{items: Array<{id: string; name: string; enabled: boolean; revision: number}>; scanned: number; truncated: boolean}>;
+    list(owner: string): Promise<{items: Array<{id: string; name: string; enabled: boolean; revision: number}>; primaryId?: string; scanned: number; truncated: boolean}>;
+    selectPrimary(owner: string, dream: string): Promise<void>;
     create(owner: string, dream: string, operationId: string, name: string): Promise<DreamConfigurationRecord>;
     readConfig(owner: string, dream: string): Promise<DreamConfigurationRecord | null>;
     readRun(owner: string, dream: string, operationId: string): Promise<DreamRunView | null>;
-    history(owner: string, dream: string, before?: number): Promise<{items: Array<{operationId: string; startedAt: number; state: 'prepared' | 'failed' | 'settled'; sourceId?: string; code?: string; settledAt?: number}>; scanned: number; nextCursor?: number}>;
+    history(owner: string, dream: string, before?: number): Promise<{items: Array<{operationId: string; startedAt: number; state: 'prepared' | 'failed' | 'settled'; sourceId?: string; code?: string; settledAt?: number; unchanged?: boolean}>; scanned: number; nextCursor?: number}>;
     scannerTargets(owner: string, dream: string): Promise<RootCallTarget[]>;
     openView(owner: string, dream: string): Promise<{config: DreamConfigurationRecord;
         history: Awaited<ReturnType<DreamService['history']>>; targets: RootCallTarget[]; models: Array<{id: string; name: string}>;
@@ -100,7 +101,7 @@ export interface DreamService {
         phase?: import('@nestos/kanban/contracts').KanbanTaskProjection['phase']; completion?: import('@nestos/kanban/contracts').KanbanTaskProjection['completion']}>;
     readAdoptionResults(request: DreamAdoptionRequest, cursor: string | null, limit: number): Promise<{items: string[]; cursor: string; version: string; scanned: number}>;
     adoptionBoards(owner: string): Promise<Array<{id: string; title: string; projectId?: string}>>;
-    kanbanSourceCandidates(owner: string, project: string, connection: string, board: string, kind: 'task' | 'decision', cursor?: string): Promise<{items: Array<{id: string; title: string}>; returned: number; nextCursor?: string}>;
+    kanbanSourceCandidates(owner: string, project: string, connection: string, board: string, kind: 'task' | 'decision', cursor?: string, search?: string): Promise<{items: Array<{id: string; title: string}>; returned: number; nextCursor?: string}>;
     adoptionTargets(owner: string, board: string, cursor?: string): Promise<{items: Array<{itemId: string; title: string; projectId: string}>; scanned: number; nextCursor?: string}>;
     memorySessions(owner: string, cursor?: string): Promise<{items: Array<{id: string; title: string}>; scanned: number; nextCursor?: string}>;
     remoteSessionProfiles(owner: string, project: string, connection: string): Promise<Array<{id: string; name: string}>>;

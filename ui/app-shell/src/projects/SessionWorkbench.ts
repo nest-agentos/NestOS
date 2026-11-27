@@ -149,6 +149,7 @@ export interface SessionWorkbenchOptions {
     opening?: import('@nestos/app-contracts/services').ConversationWorkbenchView;
     sources?: WorkbenchSources;
     onUnavailableResource?(path:string):Promise<boolean>;
+    openProjectDream?(projectId: string): Promise<void>;
     openProjectDecisions?(projectId:string):Promise<void>;
     createLoopFromSession?(source:KanbanDecisionSourceSession):Promise<void>;
     initialResource?: string;
@@ -288,6 +289,7 @@ export class SessionWorkbench implements WorkspaceController {
     private readonly onBeforeNavigate: SessionWorkbenchOptions['onBeforeNavigate'];
     private readonly onUnavailableResource:SessionWorkbenchOptions['onUnavailableResource'];
     private readonly createLoopFromSession:SessionWorkbenchOptions['createLoopFromSession'];
+    private readonly openProjectDream: SessionWorkbenchOptions['openProjectDream'];
     private readonly openProjectDecisions:SessionWorkbenchOptions['openProjectDecisions'];
     private readonly digitalTwin?: import('@nestos/app-contracts/services').DigitalTwinService;
     private readonly hostContext: SessionWorkbenchOptions['hostContext'];
@@ -317,6 +319,7 @@ export class SessionWorkbench implements WorkspaceController {
     private chatConfiguration?: WorkbenchChatControls['configuration'];
     constructor(options: SessionWorkbenchOptions) {
         this.onUnavailableResource=options.onUnavailableResource;
+        this.openProjectDream = options.openProjectDream;
         this.openProjectDecisions=options.openProjectDecisions;
         this.createLoopFromSession=options.createLoopFromSession;
         this.backend = options.backend;
@@ -2032,6 +2035,7 @@ export class SessionWorkbench implements WorkspaceController {
             refresh: () => this.refresh(),
             projectRenamed: (from, to) => this.remapProjectRoutes(folderBrowserPath(from.path), folderBrowserPath(to.path), to.name),
             projectSettings: id => this.projectSettingsDialog(id),
+            openDream: this.openProjectDream,
             projectStatus: id => this.showProjectStatus(id),
             projectMenu: async (event, project) => {
                 void this.syncMenu.refresh(project.project.id).catch(error => this.report(error));

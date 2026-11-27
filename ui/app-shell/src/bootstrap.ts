@@ -430,7 +430,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             const toolbox = () => pendingToolbox ??= backend.toolboxView().then(value => {own(() => value.dispose()); return value;})
                 .catch(error => {pendingToolbox = undefined; throw error;});
             const module = createPageWindows({sidebar: sidebarEl, editor: editorEl, title: translate('twin.title'), windows: windowBinding, initialResource, initializeAtResource: true,
-                titleFor: path => translate(path === DREAM_PATH && services.dream ? 'dream.title' : 'twin.title'),
+                titleFor: path => translate((path === DREAM_PATH || path.startsWith(DREAM_PATH + '/')) && services.dream ? 'dream.title' : 'twin.title'),
                 selected: path => selectionHistory(elementId, path, 'push'), create: host => new TwinWorkbench({...host, service, showNavigationTitle: false,
                 dream: services.dream && {service: services.dream, projects: services.projects,
                     openSession: id => handleNavigationRequest({target: 'chat', resourceId: id, options: {newTab: true}}, true),
@@ -505,6 +505,9 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                     if (!(kanban instanceof KanbanWindowWorkbench)) throw new Error(translate('kanban.errors.DECISION_SESSION_UNAVAILABLE'));
                     await kanban.openLoopCreation(source);
                 }:undefined,
+                openProjectDream: services.dream && services.digitalTwin
+                    ? id => handleNavigationRequest({target: 'twin', resourceId: '/dream/' + encodeURIComponent(id)})
+                    : undefined,
                 openProjectDecisions:services.kanban?id=>handleNavigationRequest({target:'kanban',resourceId:projectDecisionsPath(id)}):undefined,
                 executorUsage, agentFactory,
                 fileFactory: defaultEditorFactory, createFlowContextMenu: options.ui.createFlowContextMenu,

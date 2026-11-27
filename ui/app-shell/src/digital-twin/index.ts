@@ -40,7 +40,7 @@ export class TwinWorkbench {
     private tools: import('@nestos/app-contracts').TwinScannerTool[] = [];
     private packages: ToolPackageInfo[] = [];
     private page: TwinPage = 'overview';
-    private dreamActive = false;
+    private dreamResource = '';
     private dreamPage?: DreamPage;
     private selectedSession = '';
     private workspaceRoute = false;
@@ -93,7 +93,8 @@ export class TwinWorkbench {
         await this.autosave.flush();
         if (this.abort.signal.aborted) return;
         if (this.autosave.pending) { await this.navigation.sync(this.navigationPath()); return; }
-        if (path === DREAM_PATH && this.options.dream) return this.openDream(this.options.dream);
+        if ((path === DREAM_PATH || path.startsWith(DREAM_PATH + '/')) && this.options.dream)
+            return this.openDream(this.options.dream, path);
         if (path.startsWith('/workspace/')) {
             const parts = path.split('/'), id = decodeURIComponent(parts[2] ?? '');
             if (id !== this.snapshot?.workspace.id) {
@@ -102,7 +103,7 @@ export class TwinWorkbench {
             }
             this.workspaceRoute = true; this.routeWorkspaceId = id; path = '/' + parts.slice(3).join('/');
         }
-        this.dreamActive = false;
+        this.dreamResource = '';
         this.dirty = false;
         this.viewOffset = 0; this.viewFilters = {};
         const page = path.split('/')[1] as TwinPage;
@@ -124,21 +125,26 @@ export class TwinWorkbench {
         }
         await this.navigation.sync(this.navigationPath());
     }
-    private async openDream(dream: NonNullable<TwinWorkbenchOptions['dream']>): Promise<void> {
-        if (!this.dreamActive && (this.dirty || this.busy)) {
+    private async openDream(dream: NonNullable<TwinWorkbenchOptions['dream']>, path: string): Promise<void> {
+        if (!this.dreamResource && (this.dirty || this.busy)) {
             await this.navigation.sync(this.navigationPath());
             const alert = this.options.editor.querySelector('[role=alert]');
             if (alert) alert.textContent = label('workspaceUnsaved');
             return;
         }
-        this.dreamActive = true;
+        if (this.dreamResource !== path) {
+            this.dreamPage?.destroy();
+            this.dreamPage = undefined;
+        }
+        this.dreamResource = path;
         this.generation++;
-        this.dreamPage ??= new DreamPage(dream.service, dream.projects, dream.openSession, dream.openTask, dream.openDecision);
-        this.options.selected(DREAM_PATH);
+        const owner = path === DREAM_PATH ? undefined : decodeURIComponent(path.slice(DREAM_PATH.length + 1));
+        this.dreamPage ??= new DreamPage(dream.service, dream.projects, dream.openSession, dream.openTask, dream.openDecision, owner);
+        this.options.selected(path);
         await Promise.all([this.dreamPage.mount(this.options.editor), this.navigation.sync(DREAM_PATH)]);
     }
-    private navigationPath(): string {return this.dreamActive ? DREAM_PATH : '/' + this.page;}
-    getActiveResourceId(): string { if (this.dreamActive) return DREAM_PATH; return (this.workspaceRoute && this.snapshot ? '/workspace/' + encodeURIComponent(this.routeWorkspaceId || this.snapshot.workspace.id) : '') + this.navigationPath() + (this.selectedSession ? '/' + encodeURIComponent(this.selectedSession) : ''); }
+    private navigationPath(): string {return this.dreamResource ? DREAM_PATH : '/' + this.page;}
+    getActiveResourceId(): string { if (this.dreamResource) return this.dreamResource; return (this.workspaceRoute && this.snapshot ? '/workspace/' + encodeURIComponent(this.routeWorkspaceId || this.snapshot.workspace.id) : '') + this.navigationPath() + (this.selectedSession ? '/' + encodeURIComponent(this.selectedSession) : ''); }
     captureRecovery(): unknown {
         if (this.busy || this.dirty || this.autosave.pending)
             throw Object.assign(new Error(t('httpApp.recoverySettings')), {code: 'RECOVERY_SETTINGS_FORM'});
@@ -154,7 +160,7 @@ export class TwinWorkbench {
 
     private serviceChanged(): void {
         this.eventsDirty = true;
-        if (this.dreamActive || !this.visible || this.busy || this.dirty || this.error || this.autosave.pending
+        if (this.dreamResource || !this.visible || this.busy || this.dirty || this.error || this.autosave.pending
             || this.options.editor.querySelector('[data-scan-filter]:focus')
             || this.options.editor.querySelector('[data-form=settings]')?.contains(document.activeElement)) return;
         if (this.loading) { this.refreshQueued = true; return; }
@@ -166,7 +172,7 @@ export class TwinWorkbench {
         if (visible && this.eventsDirty && !this.abort.signal.aborted) this.serviceChanged();
     }
     private async refresh(): Promise<void> {
-        if (this.dreamActive) return;
+        if (this.dreamResource) return;
         this.unsubscribe ??= this.options.service.onChange(() => this.serviceChanged());
         this.unsubscribePackages ??= this.options.packages?.onChange?.(() => this.serviceChanged());
         const generation = ++this.generation;
@@ -185,7 +191,7 @@ export class TwinWorkbench {
         }
     }
     private render(): void {
-        if (this.dreamActive || this.abort.signal.aborted) return;
+        if (this.dreamResource || this.abort.signal.aborted) return;
         const expandedHistory = new Set([...this.options.editor.querySelectorAll<HTMLDetailsElement>('[data-scanner-history][open]')].map(item => item.dataset.scannerHistory));
         const previousSettings = this.options.editor.querySelector<HTMLDetailsElement>('[data-scan-settings]');
         const snapshot = this.snapshot;

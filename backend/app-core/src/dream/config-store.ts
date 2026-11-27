@@ -26,6 +26,24 @@ export interface DreamScheduleRow {owner: string; dream: string; configRevision:
 /** Configuration belongs to the owner project; authorization is rechecked at execution. */
 export class DreamConfigStore {
     constructor(private readonly fs: IFileSystem) {}
+    async primary(owner: string): Promise<string | null> {
+        const path = primaryPath(owner);
+        if (!await this.fs.driver.exists(path)) return null;
+        const value = await this.fs.meta.seq!.getEntry(path, 'primary');
+        if (value && !validId(value)) throw new Error('DREAM_CONFIG_INVALID');
+        return value || null;
+    }
+    async selectPrimary(owner: string, dream: string): Promise<void> {
+        const config = configPath(owner, dream), path = primaryPath(owner);
+        try {await this.fs.driver.createFile({parentPath: path.slice(0, path.lastIndexOf('/')), name: 'dream-primary.seq', type: 'seqfile', recursive: true});}
+        catch (error) {if (!(error instanceof FSError) || error.code !== 'EEXIST') throw error;}
+        await this.fs.meta.seq!.transaction!(async tx => {
+            if (!decode(await tx.getEntry(config, 'config'))) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
+            const previous = await tx.getEntry(path, 'primary');
+            if (previous && previous !== dream) throw new Error('DREAM_PRIMARY_CONFLICT');
+            if (!previous) await tx.setEntry(path, 'primary', dream);
+        });
+    }
     async reserveFile(owner: string, dream: string, operationId: string, expectedRevision: number, fingerprint: string) {
         if (!validId(operationId) || !/^[a-f0-9]{64}$/.test(fingerprint)) throw new Error('DREAM_INVALID_OPERATION');
         const path = configPath(owner, dream);
@@ -205,6 +223,10 @@ async function updateSchedule(tx: import('@nestos/vfs-core').ISeqFileTransaction
         nextAt: unchanged || !next.config.schedule ? old!.nextAt : nextRecurrence(recurrence, Date.now() - 1), ...(old?.tasks?.length ? {tasks: old.tasks} : {})};
     await tx.setEntry(DREAM_SCHEDULE_INDEX, key, JSON.stringify(row));
 }
+function primaryPath(owner: string): string {
+    if (!validId(owner)) throw new Error('DREAM_INVALID_SCOPE');
+    return `/var/lib/projects/${owner}/dream-primary.seq`;
+}
 function configPath(owner: string, dream: string): string {
     if (!validId(owner) || !validId(dream)) throw new Error('DREAM_INVALID_SCOPE');
     return `/var/lib/projects/${owner}/dream/${dream}/config.seq`;
@@ -292,7 +314,11 @@ function normalize(config: DreamConfig): DreamConfig {
     }
     let schedule: KanbanRecurrence | undefined;
     if (config.schedule !== undefined) {
-        try {validateRecurrence(config.schedule);} catch {throw new Error('DREAM_SCHEDULE_INVALID');}
+        try {validateRecurrence(config.schedule);}
+        catch (error) {
+            const code = (error as {code?: string} | null)?.code;
+            throw new Error(code === 'RECURRENCE_MONTH_DAY_INVALID' ? 'DREAM_MONTH_DAY_INVALID' : 'DREAM_SCHEDULE_INVALID');
+        }
         if (config.schedule.trigger !== 'fixed' || config.schedule.maxConcurrency !== 1) throw new Error('DREAM_SCHEDULE_INVALID');
         schedule = structuredClone(config.schedule);
     }

@@ -41,7 +41,15 @@ export async function runDreamTwinFileScan(input: Input, twin: Twin, port: Dream
         const saved = await store.readCapturedOperation(input.ownerProjectId, input.dreamId, input.operationId,
             captured => authorizeCaptured(input, captured, port));
         const result = saved ? capturedResult(input, saved) : await readScanSource(input.source, port);
-        if (!result.items.length) {await checkOwner(authorizeOwner); await store.settle(input.ownerProjectId, input.dreamId, input.operationId, [result], [], undefined, requestHash, input.configRevision); return;}
+        if (!result.items.length) {
+            stage = 'settle';
+            await checkOwner(authorizeOwner);
+            await store.settle(input.ownerProjectId, input.dreamId, input.operationId, [result], [], undefined, requestHash, input.configRevision);
+            log.info('dream.scan', {operationId: input.operationId, stage, result: 'success',
+                reason: result.evidence.startCursor !== null && result.evidence.startCursor === result.evidence.endCursor ? 'unchanged' : 'empty',
+                scanned: result.evidence.scanned, durationMs: Date.now() - started});
+            return;
+        }
         if (result.items.length !== 1 || (input.evidenceSourceType === 'session'
             ? new TextEncoder().encode(result.items[0]).length > TWIN_MANAGED_SOURCE_MAX_BYTES
             : result.items[0].length > TWIN_CHUNK_CHARACTERS)) throw new Error('DREAM_SOURCE_LIMIT');

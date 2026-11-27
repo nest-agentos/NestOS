@@ -1,6 +1,8 @@
 import {createModuleLogger, randomUUID, t} from '@nestos/common';
 import type {DreamService, DreamAdoptionRecord, DreamAdoptionRequest, DreamConfigurationRecord, DreamProposalView, DreamRunView, ProjectService} from '@nestos/app-contracts/services';
 
+import {DreamHistoryCalendar} from './history-calendar';
+
 type Project = Awaited<ReturnType<ProjectService['list']>>[number];
 type Target = Awaited<ReturnType<DreamService['scannerTargets']>>[number];
 const everyDay = [0, 1, 2, 3, 4, 5, 6];
@@ -28,7 +30,7 @@ export class DreamPage {
     private closed = false;
     constructor(private readonly service: DreamService, private readonly projectsPort: ProjectService,
         private readonly openSession: (id: string) => Promise<void>, private readonly openTask: (board: string, item: string) => Promise<void>,
-        private readonly openDecision: (board: string, record: string) => Promise<void>) {
+        private readonly openDecision: (board: string, record: string) => Promise<void>, private readonly projectId?: string) {
         this.section.className = 'twin__body';
         this.section.dataset.dreamPage = '';
         this.section.setAttribute('aria-label', t('dream.title'));
@@ -39,6 +41,7 @@ export class DreamPage {
             this.owner = this.owners.value; this.dream = ''; this.mergeSelection = undefined;
             void this.switchOwner();
         };
+        this.owners.hidden = !!this.projectId;
         this.section.append(title, this.owners, this.status, this.body);
     }
     mount(container: HTMLElement): Promise<void> {
@@ -53,7 +56,7 @@ export class DreamPage {
         this.owners.disabled = true;
         this.body.replaceChildren(text(t('status.loading')));
         try {
-            this.projects = await this.projectsPort.list();
+            this.projects = this.projectId ? [await this.projectsPort.get(this.projectId)] : await this.projectsPort.list();
             if (this.closed) return;
             this.owners.replaceChildren();
             for (const project of this.projects)
@@ -85,6 +88,7 @@ export class DreamPage {
         if (!this.owner) {this.body.replaceChildren(text(t('dream.noProjects'))); return;}
         const owner = this.owner, result = await this.service.list(owner);
         if (this.closed || owner !== this.owner) return;
+        if (this.projectId) return this.loadProjectDream(owner, result);
         const name = document.createElement('input'); name.placeholder = t('dream.name');
         const create = button(t('dream.create'), async () => {
             const signature = JSON.stringify([owner, name.value]);
@@ -98,13 +102,37 @@ export class DreamPage {
         for (const item of result.items) this.body.append(button(item.name, async () => {this.dream = item.id; await this.loadDream();}));
         if (result.truncated) this.body.append(text(t('dream.listTruncated')));
     }
+    private async loadProjectDream(owner: string, result: Awaited<ReturnType<DreamService['list']>>): Promise<void> {
+        const primary = result.primaryId ?? (!result.truncated && result.items.length === 1 ? result.items[0].id : undefined);
+        if (primary) {
+            this.dream = primary;
+            return this.loadDream();
+        }
+        this.body.replaceChildren();
+        if (!result.items.length && !result.truncated) {
+            this.body.append(button(t('dream.create'), async () => {
+                await this.service.create(owner, 'dream', this.createOperation, t('dream.title'));
+                this.dream = 'dream';
+                await this.refreshAfterWrite(() => this.loadDream());
+            }));
+            return;
+        }
+        this.body.append(text(t('dream.selectPrimary')));
+        for (const item of result.items) this.body.append(button(item.name, async () => {
+            await this.service.selectPrimary(owner, item.id);
+            this.dream = item.id;
+            await this.refreshAfterWrite(() => this.loadDream());
+        }));
+        if (result.truncated) this.body.append(text(t('dream.listTruncated')));
+    }
     private async loadDream(): Promise<void> {
         const owner = this.owner, dream = this.dream;
         const view = await this.service.openView(owner, dream);
         if (this.closed || owner !== this.owner || dream !== this.dream || !view) return;
         const {config, history, targets, models, scheduleStatus} = view;
         this.config = config; this.body.replaceChildren();
-        this.body.append(button(t('dream.back'), () => this.loadList()), text(config.config.name));
+        if (!this.projectId) this.body.append(button(t('dream.back'), () => this.loadList()));
+        this.body.append(text(config.config.name));
         this.body.append(button(t(config.config.enabled ? 'dream.pause' : 'dream.resume'), async () => {
             await this.command(JSON.stringify([owner, dream, 'enabled', config.revision, !config.config.enabled]),
                 id => this.service.setEnabled(owner, dream, id, config.revision, !config.config.enabled)); await this.refreshAfterWrite(() => this.loadDream());
@@ -132,7 +160,10 @@ export class DreamPage {
         this.scheduleForm(owner, dream, config, scheduleStatus);
         this.consolidationForm(owner, dream, config, targets);
         this.body.append(text(t('dream.history')));
-        this.appendHistory(owner, dream, history);
+        if (this.projectId) this.body.append(new DreamHistoryCalendar(history, config.config.schedule?.timeZone,
+            before => this.service.history(owner, dream, before),
+            (items, section) => this.appendHistory(owner, dream, {items, scanned: 0}, section)).element);
+        else this.appendHistory(owner, dream, history);
     }
     private consolidationForm(owner: string, dream: string, config: DreamConfigurationRecord, targets: Target[]): void {
         const panel = document.createElement('details'), summary = document.createElement('summary');
@@ -355,34 +386,43 @@ export class DreamPage {
             section.append(text(`${this.sourceLabel(config, failure.sourceId)}: ${failure.code}`));
         }
         const cadence = document.createElement('select'), zone = document.createElement('input'), interval = document.createElement('input'), time = document.createElement('input');
+        const monthDayField = document.createElement('label'), monthDay = document.createElement('input');
+        monthDay.type = 'number'; monthDay.min = '1'; monthDay.max = '31';
+        monthDayField.append(t('dream.monthDay'), monthDay);
+        monthDay.value = String(existing?.cadence.kind === 'monthly' ? existing.cadence.dayOfMonth : 1);
         cadence.setAttribute('aria-label', t('dream.cadence'));
-        cadence.add(option('daily', t('dream.daily'))); cadence.add(option('calendar', t('dream.weekly'))); cadence.add(option('interval', t('dream.interval')));
+        cadence.add(option('daily', t('dream.daily'))); cadence.add(option('calendar', t('dream.weekly'))); cadence.add(option('monthly', t('dream.monthly'))); cadence.add(option('interval', t('dream.interval')));
         const remote = this.projects.find(item => item.project.id === owner)?.project.source?.kind === 'remote';
         cadence.value = existing?.cadence.kind === 'calendar' && existing.cadence.weekdays.length === everyDay.length
-            ? 'daily' : existing?.cadence.kind ?? (remote ? 'daily' : 'interval');
+            ? 'daily' : existing?.cadence.kind ?? 'daily';
         zone.setAttribute('aria-label', t('dream.timeZone')); zone.placeholder = t('dream.timeZone');
         zone.value = existing?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
         interval.type = 'number'; interval.min = '1'; interval.setAttribute('aria-label', t('dream.intervalMinutes'));
         interval.value = String(existing?.cadence.kind === 'interval' ? existing.cadence.milliseconds / 60000 : 60);
         time.type = 'time'; time.setAttribute('aria-label', t('dream.timeOfDay'));
-        time.value = existing?.cadence.kind === 'calendar' ? `${String(existing.cadence.hour).padStart(2, '0')}:${String(existing.cadence.minute).padStart(2, '0')}` : remote ? '18:00' : '09:00';
-        section.append(cadence, zone, interval, time);
+        time.value = existing && existing.cadence.kind !== 'interval' ? `${String(existing.cadence.hour).padStart(2, '0')}:${String(existing.cadence.minute).padStart(2, '0')}` : remote ? '18:00' : '09:00';
+        section.append(cadence, zone, interval, time, monthDayField);
         const weekdays = Array.from({length: 7}, (_, day) => {
             const label = document.createElement('label'), box = document.createElement('input'); box.type = 'checkbox';
             box.checked = existing?.cadence.kind === 'calendar' ? existing.cadence.weekdays.includes(day) : true;
             label.append(box, t(`dream.weekday.${day}` as Parameters<typeof t>[0])); section.append(label); return box;
         });
-        const updateCadence = () => {interval.hidden = cadence.value !== 'interval'; time.hidden = !interval.hidden;
+        const updateCadence = () => {interval.hidden = cadence.value !== 'interval'; time.hidden = !interval.hidden; monthDayField.hidden = cadence.value !== 'monthly';
             for (const box of weekdays) if (box.parentElement) box.parentElement.hidden = cadence.value !== 'calendar';};
         cadence.onchange = updateCadence; updateCadence();
         let draft: {signature: string; value: NonNullable<DreamConfigurationRecord['config']['schedule']>} | undefined;
         const save = button(t('dream.saveSchedule'), async () => {
             const [hour, minute] = time.value.split(':').map(Number);
             const days = cadence.value === 'daily' ? everyDay : weekdays.flatMap((box, index) => box.checked ? [index] : []);
-            const minutes = Number(interval.value), signature = JSON.stringify([cadence.value, zone.value, minutes, hour, minute, days]);
+            const minutes = Number(interval.value), dayOfMonth = Number(monthDay.value);
+            if (cadence.value === 'monthly' && (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31))
+                throw new Error('DREAM_MONTH_DAY_INVALID');
+            const signature = JSON.stringify([cadence.value, zone.value, minutes, hour, minute, days, dayOfMonth]);
             if (!draft || draft.signature !== signature) draft = {signature, value: {state: 'active', timeZone: zone.value, trigger: 'fixed', maxConcurrency: 1,
                 firstAt: cadence.value === 'interval' ? Date.now() + minutes * 60000 : 0,
-                cadence: cadence.value === 'interval' ? {kind: 'interval', milliseconds: minutes * 60000} : {kind: 'calendar', hour, minute, weekdays: days}}};
+                cadence: cadence.value === 'interval' ? {kind: 'interval', milliseconds: minutes * 60000}
+                    : cadence.value === 'monthly' ? {kind: 'monthly', hour, minute, dayOfMonth}
+                    : {kind: 'calendar', hour, minute, weekdays: days}}};
             await this.saveSchedule(owner, dream, config.revision, draft.value); await this.refreshAfterWrite(() => this.loadDream());
         });
         section.append(save);
@@ -403,21 +443,21 @@ export class DreamPage {
         this.commandOperations.delete(key);
         if (result.activation === 'pending') this.status.textContent = `${t('dream.schedulePending')} (${result.code ?? 'DREAM_SCHEDULE_RECONCILE_FAILED'})`;
     }
-    private appendHistory(owner: string, dream: string, history: Awaited<ReturnType<DreamService['history']>>): void {
+    private appendHistory(owner: string, dream: string, history: Awaited<ReturnType<DreamService['history']>>, section: HTMLElement = this.body): void {
         for (const item of history.items) {
             const row = document.createElement('div');
-            row.append(button(`${new Date(item.startedAt).toLocaleString()} · ${t(`dream.state.${item.state}`)}${item.code ? ` (${item.code})` : ''}`,
+            row.append(button(`${scheduleTime(item.startedAt, this.config?.config.schedule?.timeZone)} · ${t(item.unchanged ? 'dream.unchanged' : `dream.state.${item.state}`)}${item.code ? ` (${item.code})` : ''}`,
                 async () => {const run = await this.service.readRun(owner, dream, item.operationId);
                     if (owner === this.owner && dream === this.dream) this.showRun(run, item.operationId);}));
             if (item.state !== 'settled' && item.sourceId && this.hasSource(item.sourceId))
                 row.append(button(t('dream.retry'), async () => {await this.service.run({ownerProjectId: owner, dreamId: dream,
                     sourceId: item.sourceId!, operationId: item.operationId}); await this.refreshAfterWrite(() => this.loadDream());}));
-            this.body.append(row);
+            section.append(row);
         }
         if (history.nextCursor) {
             const more = button(t('dream.moreHistory'), async () => {
                 const next = await this.service.history(owner, dream, history.nextCursor); more.remove(); this.appendHistory(owner, dream, next);
-            }); this.body.append(more);
+            }); section.append(more);
         }
     }
     private hasSource(id: string): boolean {
@@ -570,7 +610,9 @@ export class DreamPage {
     private kanbanSourceForm(owner: string, dream: string, record: DreamConfigurationRecord): void {
         const config = record.config; if (!config.files.length) return;
         const project = document.createElement('select'), board = document.createElement('select'), kind = document.createElement('select');
-        const item = document.createElement('select'), scanner = document.createElement('select');
+        const item = document.createElement('select'), scanner = document.createElement('select'), search = document.createElement('input');
+        search.type = 'search'; search.maxLength = 256; search.placeholder = t('dream.searchKanban');
+        search.setAttribute('aria-label', t('dream.searchKanban'));
         project.setAttribute('aria-label', t('dream.kanbanProject')); board.setAttribute('aria-label', t('dream.kanbanBoard'));
         kind.setAttribute('aria-label', t('dream.kanbanKind')); item.setAttribute('aria-label', t('dream.kanbanItem'));
         scanner.setAttribute('aria-label', t('dream.kanbanScanner'));
@@ -584,18 +626,19 @@ export class DreamPage {
         });
         let loaded = '', cursor: string | undefined;
         const clear = () => {loaded = ''; cursor = undefined; item.replaceChildren(); more.hidden = false; add.disabled = true;};
-        project.onchange = clear; board.onchange = clear; kind.onchange = clear;
+        project.onchange = clear; board.onchange = clear; kind.onchange = clear; search.oninput = clear;
+        const currentScope = () => JSON.stringify([project.value, this.connection(project.value), board.value, kind.value, search.value.trim()]);
         const more = button(t('dream.loadKanbanSources'), async () => {
-            const connection = this.connection(project.value), scope = JSON.stringify([project.value, connection, board.value, kind.value]);
+            const connection = this.connection(project.value), scope = currentScope();
             if (!connection || !board.value) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
             const page = await this.service.kanbanSourceCandidates(owner, project.value, connection, board.value,
-                kind.value as 'task' | 'decision', loaded === scope ? cursor : undefined);
-            if (!item.isConnected || scope !== JSON.stringify([project.value, this.connection(project.value), board.value, kind.value])) return;
+                kind.value as 'task' | 'decision', loaded === scope ? cursor : undefined, search.value.trim() || undefined);
+            if (!item.isConnected || scope !== currentScope()) return;
             if (loaded !== scope) item.replaceChildren(); loaded = scope; cursor = page.nextCursor;
             for (const value of page.items) item.add(option(value.id, value.title)); more.hidden = !cursor; add.disabled = !item.options.length;
         });
         const sourceId = randomUUID(), add = button(t('dream.addKanbanSource'), async () => {
-            const connectionId = this.connection(project.value), scope = JSON.stringify([project.value, connectionId, board.value, kind.value]);
+            const connectionId = this.connection(project.value), scope = currentScope();
             if (!connectionId || !item.value || scope !== loaded) throw new Error('DREAM_SOURCE_NOT_CONFIGURED');
             const base = {id: sourceId, projectId: project.value, connectionId, boardId: board.value, scannerSourceId: scanner.value};
             if (kind.value === 'task') {
@@ -607,7 +650,7 @@ export class DreamPage {
             }
             await this.refreshAfterWrite(() => this.loadDream());
         });
-        add.disabled = true; loadBoards.disabled = !project.options.length; this.body.append(project, loadBoards, board, kind, more, item, scanner, add);
+        add.disabled = true; loadBoards.disabled = !project.options.length; this.body.append(project, loadBoards, board, kind, search, more, item, scanner, add);
     }
     private sourceForm(owner: string, dream: string, config: DreamConfigurationRecord, targets: Target[], models: Array<{id: string; name: string}>) {
         const source = document.createElement('select'), model = document.createElement('select'), target = document.createElement('select');
@@ -652,6 +695,8 @@ export class DreamPage {
         this.resultSection = section;
         if (!run) section.append(text(t('dream.pending')));
         else {
+            if (!run.findings.length && run.sources.length && run.sources.every(source => source.status === 'available'))
+                section.append(text(t('dream.noFindings')));
             for (const source of run.sources) if (source.status !== 'available') {
                 section.append(text(`${this.config ? this.sourceLabel(this.config, source.sourceId) : t('dream.unavailableProject')}: ${source.code}`));
             }

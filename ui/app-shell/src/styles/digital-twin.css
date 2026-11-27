@@ -1,5 +1,7 @@
 .twin { overflow: auto; color: var(--llm-text-primary, #222); background: var(--llm-bg-secondary, #f8fafc); }
 .twin__body { box-sizing: border-box; width: 100%; min-width: 0; padding: 28px 32px 48px; max-width: 1080px; margin: auto; line-height: 1.6; }
+[data-dream-page] .calendar__day { min-height: 0; padding: 0; }
+[data-dream-page] .calendar__date { width: 100%; min-height: 44px; padding: 2px; }
 .twin__body > h2 { margin: 0 0 8px; font-size: 24px; font-weight: 650; letter-spacing: -.025em; }
 .twin__form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; margin-block: 16px; }
 .twin__form label { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 13px; font-weight: 500; }

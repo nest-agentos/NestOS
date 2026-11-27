@@ -63,6 +63,7 @@ export class DreamHost {
     readonly evidence: DreamEvidenceStore;
     readonly registry: DreamExecutionRegistry;
     readonly sessionMemory: DreamSessionMemoryStore;
+    private readonly activeSourceScans = new Map<string, Promise<void>>();
     private readonly opened = new Map<string, Promise<Entry>>();
     private closed = false;
     private kanban?: {service: KanbanService; journal: KanbanAutomationJournal};
@@ -95,22 +96,24 @@ export class DreamHost {
             id: board.id, title: board.title, ...(board.scope.kind === 'project' ? {projectId: board.scope.projectId} : {}),
         }));
     }
-    async kanbanSourceCandidates(owner: string, project: string, connection: string, board: string, kind: 'task' | 'decision', cursor?: string) {
+    async kanbanSourceCandidates(owner: string, project: string, connection: string, board: string, kind: 'task' | 'decision', cursor?: string, search?: string) {
         const started = Date.now(), operationId = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(board) ? board : 'invalid';
         try {
-        if (kind !== 'task' && kind !== 'decision') throw new Error('DREAM_SOURCE_SCOPE_CHANGED');
-        await this.options.authorizeOwner(owner);
-        if (!this.kanban) throw new Error('DREAM_KANBAN_UNAVAILABLE');
-        const authority = await this.sourceAuthorization.authorizeDreamSource(project, connection, 'fileRead');
-        const reference = {system: 'nestos-remote-project', id: project};
-        const page = kind === 'task' ? await this.kanban.service.query(board, {view: 'all', excludeArchived: true, reference, limit: 50, ...(cursor ? {cursor} : {})})
-            : await this.kanban.service.records(board, {kind: 'decision', status: 'confirmed', resource: reference, limit: 50, ...(cursor ? {cursor} : {})});
-        await this.options.authorizeOwner(owner);
-        if (!sameAuthority(authority, await this.sourceAuthorization.authorizeDreamSource(project, connection, 'fileRead'))) throw new Error('DREAM_AUTHORIZATION_CHANGED');
-        const rows = kind === 'task' ? page.items.filter(item => 'taskType' in item && item.taskType === 'execution') : page.items;
-        log.info('dream.kanban.candidates', {operationId, stage: 'page', result: 'success', kind,
-            returned: page.items.length, selected: rows.length, durationMs: Date.now() - started});
-        return {items: rows.map(item => ({id: item.id, title: item.title})), returned: page.items.length, ...(page.nextCursor ? {nextCursor: page.nextCursor} : {})};
+            if (search !== undefined && (typeof search !== 'string' || search.length > 256)) throw new Error('DREAM_KANBAN_SEARCH_INVALID');
+            const filter = search?.trim() ? {search: search.trim()} : {};
+            if (kind !== 'task' && kind !== 'decision') throw new Error('DREAM_SOURCE_SCOPE_CHANGED');
+            await this.options.authorizeOwner(owner);
+            if (!this.kanban) throw new Error('DREAM_KANBAN_UNAVAILABLE');
+            const authority = await this.sourceAuthorization.authorizeDreamSource(project, connection, 'fileRead');
+            const reference = {system: 'nestos-remote-project', id: project};
+            const page = kind === 'task' ? await this.kanban.service.query(board, {view: 'all', excludeArchived: true, reference, limit: 50, ...filter, ...(cursor ? {cursor} : {})})
+                : await this.kanban.service.records(board, {kind: 'decision', status: 'confirmed', resource: reference, limit: 50, ...filter, ...(cursor ? {cursor} : {})});
+            await this.options.authorizeOwner(owner);
+            if (!sameAuthority(authority, await this.sourceAuthorization.authorizeDreamSource(project, connection, 'fileRead'))) throw new Error('DREAM_AUTHORIZATION_CHANGED');
+            const rows = kind === 'task' ? page.items.filter(item => 'taskType' in item && item.taskType === 'execution') : page.items;
+            log.info('dream.kanban.candidates', {operationId, stage: 'page', result: 'success', kind,
+                returned: page.items.length, selected: rows.length, durationMs: Date.now() - started});
+            return {items: rows.map(item => ({id: item.id, title: item.title})), returned: page.items.length, ...(page.nextCursor ? {nextCursor: page.nextCursor} : {})};
         } catch (error) {
             const code = error instanceof Error && /^DREAM_[A-Z_]+$/.test(error.message) ? error.message : 'DREAM_CANDIDATE_READ_FAILED';
             log.warn('dream.kanban.candidates', {operationId, stage: 'page', result: 'failure', code, durationMs: Date.now() - started});
@@ -507,13 +510,20 @@ export class DreamHost {
         await this.options.authorizeOwner(owner);
         if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(owner)) throw new Error('DREAM_INVALID_SCOPE');
         const path = `/var/lib/projects/${owner}/dream`, fs = this.options.fs;
-        const entries = await fs.driver.exists(path) ? await fs.driver.getChildren(path, {fields: 'entry'}) : [];
+        const [entries, primaryId] = await Promise.all([
+            fs.driver.exists(path).then(exists => exists ? fs.driver.getChildren(path, {fields: 'entry'}) : []),
+            this.configs.primary(owner),
+        ]);
         const names = entries.filter(item => item.type === 'directory' && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(item.name))
             .map(item => item.name).sort();
         const results = await Promise.all(names.slice(0, 100).map(async id => ({id, record: await this.configs.read(owner, id)})));
         await this.options.authorizeOwner(owner);
         return {items: results.flatMap(({id, record}) => record ? [{id, name: record.config.name, enabled: record.config.enabled, revision: record.revision}] : []),
-            scanned: entries.length, truncated: names.length > 100};
+            ...(primaryId ? {primaryId} : {}), scanned: entries.length, truncated: names.length > 100};
+    }
+    async selectPrimary(owner: string, dream: string): Promise<void> {
+        await this.options.authorizeOwner(owner);
+        await this.configs.selectPrimary(owner, dream);
     }
     async readRun(owner: string, dream: string, operationId: string) {
         await this.options.authorizeOwner(owner);
@@ -938,9 +948,18 @@ export class DreamHost {
         const config = await this.configs.read(input.ownerProjectId, input.dreamId);
         if (config?.config.consolidation) await this.consolidateRun(input, config);
     }
-    private async scanConfigured(input: ConfiguredDreamRequest): Promise<void> {
+    private async scanConfigured(input: ConfiguredDreamRequest, expectedRevision?: number): Promise<void> {
+        const key = JSON.stringify([input.ownerProjectId, input.dreamId, input.sourceId]);
+        const previous = this.activeSourceScans.get(key);
+        const scan = (previous?.catch(() => undefined) ?? Promise.resolve()).then(() => this.scanSource(input, expectedRevision));
+        this.activeSourceScans.set(key, scan);
+        try {await scan;}
+        finally {if (this.activeSourceScans.get(key) === scan) this.activeSourceScans.delete(key);}
+    }
+    private async scanSource(input: ConfiguredDreamRequest, expectedRevision?: number): Promise<void> {
         const entry = await this.open(input.ownerProjectId, input.dreamId);
         const config = await this.configs.read(input.ownerProjectId, input.dreamId);
+        if (expectedRevision !== undefined && config?.revision !== expectedRevision) throw new Error('DREAM_CONFIG_CONFLICT');
         const selected = config?.config.decisions?.find(source => source.id === input.sourceId) ?? config?.config.tasks?.find(source => source.id === input.sourceId) ?? config?.config.sessions?.find(source => source.id === input.sourceId) ?? config?.config.changes?.find(source => source.id === input.sourceId);
         if (selected && config) await this.runSummary(input, entry, config, selected);
         else if (config?.config.adoptions?.some(source => source.id === input.sourceId)) await this.runAdoption(input, entry, config);
@@ -1214,7 +1233,7 @@ export class DreamHost {
         await this.configs.reserveBatch(owner, dream, operationId, configRevision, sourceIds === undefined ? undefined : selected);
         const gaps = current.config.consolidation ? await this.retryBatchGaps(owner, dream, operationId, current, selected) : [];
         const results: DreamBatchResult[] = [];
-        for (const sourceId of selected) results.push(await this.runBatchSource(owner, dream, operationId, configRevision, sourceId, !!current.config.consolidation));
+        for (const sourceId of selected) results.push(await this.runBatchSource(owner, dream, operationId, configRevision, sourceId));
         if (current.config.consolidation) await this.consolidateBatch(owner, dream, operationId, current, [...gaps, ...results]);
         await this.options.authorizeOwner(owner); await this.evidence.checkConfig(owner, dream, configRevision);
         log.info('dream.scan.batch', {operationId, stage: 'complete', result: 'success', count: results.length,
@@ -1429,11 +1448,11 @@ export class DreamHost {
         }
         return result;
     }
-    private async runBatchSource(owner: string, dream: string, batch: string, revision: number, sourceId: string, scanOnly = false) {
+    private async runBatchSource(owner: string, dream: string, batch: string, revision: number, sourceId: string) {
         const operationId = 'batch-' + sha256HexSync(JSON.stringify([owner, dream, batch, revision, sourceId]));
         try {
             const input = {ownerProjectId: owner, dreamId: dream, sourceId, operationId};
-            if (scanOnly) await this.scanConfigured(input); else await this.run(input);
+            await this.scanConfigured(input, revision);
             return {sourceId, operationId, status: 'settled' as const};
         } catch (error) {
             await this.options.authorizeOwner(owner);
