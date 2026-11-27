@@ -13,7 +13,7 @@ Artifact verification persists the manifest digest outside the project. Replacem
 - 宿主机默认读取 `tools/` 下由 Git 忽略的私有配置 `cells.toml`；该文件由宿主管理，不随仓库提供。可用 `NESTOS_CELLS_LOCAL_CONFIG` 指定绝对路径。
 - VM 默认读取 `/etc/nestos/firecracker/service-sources/cells-x1/service.toml` 中目标为 `cells.toml` 的声明，兼容目标为 `config.toml` 的旧清单。可用管理员 `service-modules.json` 中的 `options.configSource` 或 `NESTOS_CELLS_X1_CONFIG` 指定该 VM 专用配置的绝对路径，环境变量优先。未指定配置源且默认清单不存在或不可读时，命令从 VM 的安装目录读取现有 `cells.toml`，校验后与二进制一起发布。预检日志以 `configurationSource: "vm-installed"` 标注这一分支；如需应用新的 VM 配置，请提供可读的服务清单或显式配置源。
 
-源配置须为非符号链接的普通文件且仅属主可访问，例如权限 0600。命令会在切换任何目标前检查两个目标的绑定、读取配置并用新二进制校验 TOML。目标端复核实际安装文件的原配置摘要，校验后将二进制和配置分别安装到 `/usr/local/lib/nestos/cells/cells` 和 `/usr/local/lib/nestos/cells/cells.toml`。宿主机通过 `sudo -n` 操作 `nestos-cells-local.service`。VM 的安装目录须允许现有 SSH 管理账号写入，并保存在持久根盘。
+源配置须为非符号链接的普通文件且仅属主可访问，例如权限 0600。切换前校验目标绑定和 TOML，宿主机预检也核对本机路径和授权。VM 在目标机上使用暂存的二进制和配置校验路径与授权。目标端复核已安装配置的摘要，通过后分别安装二进制和配置到 `/usr/local/lib/nestos/cells/cells` 和 `/usr/local/lib/nestos/cells/cells.toml`。宿主机通过 `sudo -n` 操作 `nestos-cells-local.service`。VM 的安装目录须允许现有 SSH 管理账号写入，并保存在持久根盘。
 
 每个目标保留 `previous-<操作ID>` 和私有的 `previous-<操作ID>.toml`。发布核对运行进程、二进制及落盘配置摘要；仅配置改变也会重启。已确认运行进程加载同一组版本且文件未变化时返回 `unchanged`。操作台账只保存摘要和关联信息。若重启后的运行版本暂时无法核实，执行 `node tools/cells-deployment/cli.mjs redeploy-status all <操作ID>` 查询同一操作。重启会结束当前服务进程，在途原生操作按既有持久回执恢复。配置与应用发布保留持久根盘及会话。
 

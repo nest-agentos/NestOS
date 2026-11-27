@@ -183,8 +183,9 @@ export async function deploymentConfiguration(control, resolveSource = vmConfigu
     return {bytes, sha256: digest(bytes), previous: await control.configuration(), kind};
 }
 
-async function validateConfig(binary, bytes) {
-    try {await command(binary, ['--check-config', '-'], 15000, bytes);}
+async function validateConfig(binary, bytes, _control, target) {
+    const args = target === 'local' ? ['--check-config', '-', '--policy'] : ['--check-config', '-'];
+    try {await command(binary, args, 15000, bytes);}
     catch {throw fail('CELLS_CONFIG_INVALID');}
 }
 
@@ -237,7 +238,7 @@ async function checkConfigurations(plans, binary, validate, operationId, require
         const started = Date.now();
         const event = (result, code) => console.info(JSON.stringify({operation: 'cells.redeploy', operationId,
             target, stage: 'config.validate', result, code, durationMs: Date.now() - started}));
-        try {await validate(binary, config.bytes, control); event('success');}
+        try {await validate(binary, config.bytes, control, target); event('success');}
         catch (error) {
             const code = error.code ?? 'CELLS_CONFIG_INVALID';
             event('failure', code);
