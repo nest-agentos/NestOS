@@ -5,7 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {withTemporaryScope,processOutput} from '../tools/temporary-process/node/index.mjs';
 
-const root=fileURLToPath(new URL('..',import.meta.url)),base=resolve(root,'_nestos/kanban/artifacts');
+const root=fileURLToPath(new URL('..',import.meta.url)),base=resolve(root,'_nestos/kanban/retained-environment');
 await mkdir(base,{recursive:true});
 for(const [name,folder] of [['XDG_STATE_HOME','state'],['XDG_CACHE_HOME','cache'],['TMPDIR','tmp']]){process.env[name]=join(base,folder);await mkdir(process.env[name],{recursive:true});}
 const directory=await mkdtemp(join(base,'recurrence-browser-'));

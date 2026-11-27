@@ -31,7 +31,7 @@ async function fixture(enabled:boolean|null = true, workTypes?: KanbanWorkType[]
         coordinator: {kind: 'service', id: 'planner'}, worker: {kind: 'service', id: 'worker'}}});
     await command({type: 'append-record', record: {id: 'decision', kind: 'decision', title: 'Goal', content: 'PRIVATE_REQUIREMENT', rationale: 'Acceptance criteria', itemIds: [], sources: [],
         externalRefs: ['one', 'two'].map(id => ({system: 'nestos-remote-project', id}))}});
-    const open = () => createRecordExecution({service, journal, resources: projectResourceCatalog(projects), log});
+    const open = () => createRecordExecution({service, journal, store, resources: projectResourceCatalog(projects), log});
     return {service, command, open, projects, log, journal,fs};
 }
 
@@ -44,7 +44,7 @@ async function completeCoordination(f:Awaited<ReturnType<typeof fixture>>,id:str
  await f.command({type:'review',itemId:child,accept:true});await f.command({type:'close-plan',itemId:id,resultRef:'children-verified'});
 }
 
-it('resumes a persisted recurring intent through the existing execution path with a frozen snapshot',async()=>{
+it('skips reserved rounds without execution receipts after pausing',async()=>{
  const f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
  const before=await f.service.record('source','decision');
  await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:{state:'active',firstAt:1000,timeZone:'UTC',cadence:{kind:'interval',milliseconds:60000},trigger:'fixed',maxConcurrency:2}});
@@ -60,10 +60,10 @@ it('resumes a persisted recurring intent through the existing execution path wit
  await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:reserved.revision,recurrence:{...snapshot.recurrence!,state:'paused'}});
  expect((await f.service.read('source')).items).toHaveLength(0);
  const result=await engine.reconcile((await engine.read('source','decision'))[0]);
- expect(result).toMatchObject({id:first.id,phase:'admitted',runId:first.id});
- await engine.reconcile(second);
- expect((await f.service.read('source')).items).toHaveLength(2);
- expect((await execution.recordExecutions('source','decision')).map(row=>row.id)).toEqual([first.id,second.id]);
+ expect(result).toMatchObject({id:first.id,phase:'skipped',code:'RECURRENCE_RESERVATION_SUPERSEDED'});
+ expect(await engine.reconcile(second)).toMatchObject({phase:'skipped'});
+ expect((await f.service.read('source')).items).toHaveLength(0);
+ expect(await execution.recordExecutions('source','decision')).toEqual([]);
  expect(JSON.stringify(f.log.mock.calls)).not.toContain('PRIVATE_REQUIREMENT');
 });
 
@@ -109,6 +109,12 @@ it('automatically schedules due rounds through runtime scans and pauses new admi
  const current=await f.service.record('source','decision');await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:current.revision,recurrence:{...config,state:'paused'}});
  clock+=60000;await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(1);
  expect((await f.service.record('source','decision')).recurrenceFence?.pending[0].record.recurrence?.state).toBe('active');
+ const [task]=(await f.service.read('source')).items;
+ await completeCoordination(f,task.id);
+ await runtime.service.scan();
+ await runtime.service.scan();
+ expect((await runtime.service.recordExecutions!('source','decision'))[0].state).toBe('completed');
+ expect((await f.service.record('source','decision')).recurrenceFence?.pending).toEqual([]);
 });
 it('retries the same reserved round after board automation is enabled',async()=>{
  const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture(false);
@@ -201,15 +207,50 @@ it('rebuilds today once and creates one manager with 18 manual cards on each fol
     expect(children.every(item=>item.launch?.mode==='manual'&&item.status==='backlog')).toBe(true);
  }
 });
-it('recovers a fenced intent after restart even if scheduling was paused',async()=>{
+it('skips unstarted reservations after restart and resumes at the next fixed slot',async()=>{
  const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});
  const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:1000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
  await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:config});
  const configured=await f.service.record('source','decision');await f.command({type:'reserve-record-recurrence',recordId:'decision',configRevision:configured.recurrenceRevision!,scheduledAt:1000});
  const fenced=await f.service.record('source','decision');await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:fenced.revision,recurrence:{...config,state:'paused'}});
- const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log});cleanup.push(()=>runtime.service.quiesce());
- await runtime.service.scan();await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(1);
- expect((await runtime.service.recordExecutions!('source','decision'))[0].id).toBe(fenced.recurrenceFence!.pending[0].id);
+ let clock=121000;
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},resources:projectResourceCatalog(f.projects),log:f.log,now:()=>clock});cleanup.push(()=>runtime.service.quiesce());
+ await runtime.service.scan();await runtime.service.scan();expect((await f.service.read('source')).items).toHaveLength(0);
+ const paused=await f.service.record('source','decision');
+ expect(paused.recurrence?.state).toBe('paused');expect(paused.recurrenceFence?.pending).toEqual([]);
+ expect(await runtime.service.recordExecutions!('source','decision')).toEqual([]);
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:paused.revision,recurrence:config});
+ await runtime.service.scan();
+ expect((await runtime.service.record('source','decision')).recurrenceNextAt).toBe(181000);
+ clock=181000;await runtime.service.scan();await runtime.service.scan();
+ expect((await f.service.read('source')).items).toHaveLength(1);
+ expect(await runtime.service.recordExecutions!('source','decision')).toHaveLength(1);
+});
+it('fences a pause that commits while the scheduler is preparing admission',async()=>{
+ const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();
+ await f.command({type:'review-record',recordId:'decision',accept:true});
+ let clock=Date.now();
+ const before=await f.service.record('source','decision'),config={state:'active' as const,firstAt:clock+60000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
+ await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:before.revision,recurrence:config});
+ let entered!:()=>void,release!:()=>void;
+ const preparing=new Promise<void>(resolve=>{entered=resolve;}),paused=new Promise<void>(resolve=>{release=resolve;});
+ const runtime=await assembleKanbanRuntime({fs:f.fs,journal:f.journal,actor:{kind:'human',id:'admin'},authorize:async()=>{},
+    resources:projectResourceCatalog(f.projects),log:f.log,now:()=>clock,
+    recurringAutomation:async board=>{entered();await paused;return board.automation!;}});
+ cleanup.push(()=>runtime.service.quiesce());
+ await runtime.service.scan();
+ clock=config.firstAt;
+ const scan=runtime.service.scan();
+ try{
+    await preparing;
+    const reserved=await f.service.record('source','decision');
+    expect(reserved.recurrenceFence?.pending).toHaveLength(1);
+    await f.command({type:'configure-record-recurrence',recordId:'decision',expectedRecordRevision:reserved.revision,recurrence:{...config,state:'paused'}});
+ }finally{release();}
+ await scan;
+ expect(await runtime.service.recordExecutions!('source','decision')).toEqual([]);
+ expect((await f.service.record('source','decision')).recurrenceFence?.pending).toEqual([]);
+ expect(f.log).toHaveBeenCalledWith(expect.objectContaining({stage:'recurrence.admit',result:'failure',code:'RECURRENCE_RESERVATION_SUPERSEDED'}));
 });
 it('does not replay fixed slots missed while runtime was stopped',async()=>{
  const {assembleKanbanRuntime}=await import('@nestos/kanban/integration'),f=await fixture();await f.command({type:'review-record',recordId:'decision',accept:true});

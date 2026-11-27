@@ -212,6 +212,8 @@ export const zhCN = {
     'kanban.recurrence.more': '下一页',
     'kanban.recurrence.nextUnavailable': '等待调度时间',
     'kanban.recurrence.edit': '设置周期',
+    'kanban.recurrence.pauseDecision': '暂停「{title}」的循环调度',
+    'kanban.recurrence.resumeDecision': '恢复「{title}」的循环调度',
     'kanban.recurrence.pause': '暂停',
     'kanban.recurrence.resume': '启动',
     'kanban.recurrence.stop': '停止',

@@ -211,6 +211,8 @@ export const en: LocaleStrings = {
     'kanban.recurrence.more': 'Next page',
     'kanban.recurrence.nextUnavailable': 'Waiting for schedule',
     'kanban.recurrence.edit': 'Set schedule',
+    'kanban.recurrence.pauseDecision': 'Pause scheduling for {title}',
+    'kanban.recurrence.resumeDecision': 'Resume scheduling for {title}',
     'kanban.recurrence.pause': 'Pause',
     'kanban.recurrence.resume': 'Start',
     'kanban.recurrence.stop': 'Stop',

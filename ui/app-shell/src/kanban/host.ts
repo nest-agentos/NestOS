@@ -3,6 +3,7 @@ import type {KanbanPresentation, KanbanUIOptions} from '@nestos/kanban-ui';
 const log = createModuleLogger('kanban');
 export const kanbanPresentation: KanbanPresentation = {
     typeIcons: KANBAN_TYPE_ICONS,
+    defaultDecisionModuleId: 'software-development',
     resourceRole: (reference,references) => reference.system==='nestos-remote-project'&&references.some(ref=>ref.system==='nestos-primary-project')?t(references.some(ref=>ref.system==='nestos-primary-project'&&ref.id===reference.id)?'kanban.primaryProject':'kanban.secondaryProject'):undefined,
     resourceLabel: (reference,resources) => {
         if(reference.system!=='nestos-remote-project')return;

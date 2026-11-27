@@ -40,16 +40,27 @@ async function run() {
  const editor=document.getElementById('editor')!,view=new KanbanWorkbench({service:client,editor,initialResource:'/board/board/@decision',selected(){},openSession:async id=>{openedSessions.push(id);},presentation:{...kanbanPresentation,text:key=>(zhCN as Record<string,string>)['kanban.'+key]??key,icons:{close:'×',more:'…',refreshView:'↻'}}});
  const metrics:Array<{operation:string;durationMs:number;logicalApiCalls:number;httpRequests:number;methods:string[]}>=[];
  const measure=async(operation:string,action:()=>Promise<unknown>|void,ready:()=>boolean)=>{calls=[];const started=performance.now();try{await action();await wait(ready);}catch(error){throw Error(operation+':'+(error instanceof Error?error.message:'UNKNOWN'));}const row={operation,durationMs:Math.round((performance.now()-started)*100)/100,logicalApiCalls:calls.length,httpRequests:0,methods:[...calls]};metrics.push(row);if(row.durationMs>=5000||row.logicalApiCalls>=30)throw Error('PERFORMANCE_LIMIT:'+operation);};
- await measure('cold.open-decision-list',()=>view.start(),()=>location.hash==='#all-decisions'?!!editor.querySelector('.kanban__decision-table')&&!editor.hasAttribute('aria-busy'):visible(editor,'[data-record-resource]'));
+ await measure('cold.open-decision-list',()=>view.start(),()=>['#all-decisions','#decision-modules'].includes(location.hash)?!!editor.querySelector('.kanban__decision-table')&&!editor.hasAttribute('aria-busy'):visible(editor,'[data-record-resource]'));
  if(location.hash==='#all-decisions'){
     const project=editor.querySelector<HTMLButtonElement>('[data-action=decision-filter-projects]')!;
     const details=project.closest('details')!;
     const inputs=[...details.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];
-    if(inputs.length!==2||inputs.some(input=>!input.checked))throw Error('DEFAULT_PROJECTS_NOT_ALL');
+    if(inputs.length!==2||inputs.some(input=>input.checked))throw Error('DEFAULT_PROJECTS_NOT_ALL');
     const statuses=[...editor.querySelector<HTMLButtonElement>('[data-action=decision-filter-states]')!.closest('details')!.querySelectorAll<HTMLInputElement>('input:not([value=include-archived])')];
-    if(statuses.some(input=>!input.checked))throw Error('DEFAULT_STATES_NOT_ALL');
+    if(statuses.some(input=>input.checked))throw Error('DEFAULT_STATES_NOT_ALL');
     if(editor.querySelectorAll('[data-decision-row]').length!==50||!editor.querySelector('[data-action=records-next]'))throw Error('DEFAULT_PAGINATION_MISSING');
-    await measure('warm.filter-project',()=>{inputs[0].checked=false;project.click();},()=>!editor.hasAttribute('aria-busy')&&[...editor.querySelectorAll<HTMLElement>('[data-record]')].every(row=>Number(row.dataset.record!.slice('decision-'.length))%2===0));
+    const rows=()=>[...editor.querySelectorAll<HTMLElement>('[data-decision-row]')];
+    if(rows()[0]?.querySelector('[data-record]')?.getAttribute('data-record')!=='decision-98')throw Error('BLOCKED_DECISION_NOT_FIRST');
+    for(let page=2;editor.querySelector('[data-action=records-next]');page++){
+        const previous=rows()[0];
+        await measure('warm.open-decision-page-'+page,()=>editor.querySelector<HTMLButtonElement>('[data-action=records-next]')!.click(),
+            ()=>!editor.hasAttribute('aria-busy')&&rows()[0]!==previous);
+    }
+    if(!rows().at(-2)?.matches('[data-decision-state=completed]')||!rows().at(-1)?.matches('[data-decision-state=cancelled]'))throw Error('SETTLED_DECISIONS_NOT_LAST');
+    const apply=editor.querySelector<HTMLButtonElement>('[data-action=decision-filter-projects]')!;
+    const choice=apply.closest('details')!.querySelectorAll<HTMLInputElement>('input[type=checkbox]')[1];
+    await measure('warm.filter-project',()=>{choice.checked=true;apply.click();},
+        ()=>!editor.hasAttribute('aria-busy')&&calls.includes('records')&&[...editor.querySelectorAll<HTMLElement>('[data-record]')].every(row=>Number(row.dataset.record!.slice('decision-'.length))%2===0));
     publish({result:'passed',environment:'Google Chrome headless; actual DOM and MemoryBackend/SeqKanbanStore; in-process KanbanClient; no HTTP transport',dataset:{boards:1,decisions:100,projects:2,backgroundLoad:'none'},metrics});
     return;
  }
@@ -70,18 +81,18 @@ async function run() {
     await measure('warm.open-new-decision-dialog',()=>editor.querySelector<HTMLButtonElement>('[data-action=new-decision]')!.click(),
         ()=>visible(editor,'[name=primaryResource]')&&!!editor.querySelector('[name=decisionModule]'));
  const module=editor.querySelector<HTMLInputElement>('[name=decisionModule][value=software-development]')!;
- if(!module||module.checked)throw Error('MODULE_CHOICE_NOT_OPTIONAL');
+ if(!module?.checked)throw Error('MODULE_DEFAULT_MISSING');
  module.click();
- await measure('warm.create-decision-with-module',()=>editor.querySelector<HTMLButtonElement>('[data-form=decision-conversation] button:not([type])')!.click(),()=>openedSessions.includes('/native/module-choice'));
- if(JSON.stringify(selectedModules)!==JSON.stringify(['software-development']))throw Error('MODULE_SELECTION_NOT_PRESERVED');
+ await measure('warm.create-decision-without-module',()=>editor.querySelector<HTMLButtonElement>('[data-form=decision-conversation] button:not([type])')!.click(),()=>openedSessions.includes('/native/module-choice'));
+ if(JSON.stringify(selectedModules)!==JSON.stringify([]))throw Error('MODULE_SELECTION_NOT_PRESERVED');
     publish({result:'passed',environment:'Google Chrome headless; in-process KanbanClient; no HTTP transport',dataset:{boards:1,decisions:100,projects:2,modules:1,backgroundLoad:'none'},metrics});
     return;
  }
  if(editor.querySelector('[data-context]')?.getAttribute('data-context')!=='decision')throw Error('DECISION_TAB_NOT_FIRST');
  await measure('warm.filter-secondary-project',()=>{const select=editor.querySelector<HTMLSelectElement>('[data-record-resource]')!;select.value=JSON.stringify(ref('two'));select.dispatchEvent(new Event('change',{bubbles:true}));},()=>!editor.hasAttribute('aria-busy')&&visible(editor,'[data-record-resource]')&&view.getActiveResourceId().endsWith('/nestos-remote-project/'+projectIds.two));
  const rows=[...editor.querySelectorAll<HTMLTableRowElement>('[data-decision-row]')],records=[...editor.querySelectorAll<HTMLElement>('[data-record]')];
- const activity=rows.map(row=>Date.parse(row.querySelector('td:nth-child(7) time')!.getAttribute('datetime')!));
- if(activity.some((time,index)=>index>0&&time>activity[index-1])||editor.querySelector('th:nth-child(7)')?.getAttribute('aria-sort')!=='descending')throw Error('DEFAULT_DECISION_ORDER_MISMATCH');
+ const planned=rows.filter(row=>row.dataset.decisionState==='waiting').flatMap(row=>[...row.querySelectorAll<HTMLElement>('[data-record]')].map(button=>Number(button.dataset.record!.slice('decision-'.length))));
+ if(rows[0]?.querySelector('[data-record]')?.getAttribute('data-record')!=='decision-98'||planned.some((number,index)=>index>0&&number>planned[index-1]))throw Error('DEFAULT_DECISION_ORDER_MISMATCH');
  const projectBox=editor.querySelector('[data-record-resource]')!.getBoundingClientRect(),attentionBox=editor.querySelector('[data-action=decision-attention-filter]')!.getBoundingClientRect();
  if(Math.abs(projectBox.top+projectBox.height/2-attentionBox.top-attentionBox.height/2)>20)throw Error('DECISION_FILTERS_NOT_ON_SAME_ROW');
  await measure('warm.sort-created-desc',()=>editor.querySelector<HTMLButtonElement>('[data-sort=created-desc]')!.click(),()=>!editor.hasAttribute('aria-busy')&&editor.querySelector('th:nth-child(6)')?.getAttribute('aria-sort')==='descending');
