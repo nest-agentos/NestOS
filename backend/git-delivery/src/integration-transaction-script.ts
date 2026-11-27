@@ -76,7 +76,7 @@ merge_source() {
             source_tree=$(capture_source_tree "$source" "$head" "$tmp/index")
         else
             rc=0
-            source_tree=$(capture_module_tree "$source" "$head" "$source_modules" "$tmp" "$PWD" "$frozen_tree") || rc=$?
+            source_tree=$(capture_module_tree "$source" "$head" "$source_modules" "$tmp" "$PWD" "$frozen_tree" "$choices") || rc=$?
             [ "$rc" -ne 4 ] || stop 4 INTEGRATION_SOURCE_CHANGED
             [ "$rc" -eq 0 ] || stop 3 INTEGRATION_MODULE_CAPTURE_FAILED
         fi
@@ -90,6 +90,8 @@ merge_source() {
     rc=0
     tree=$(approved_merge "$candidate" "$next" "$source_modules") || rc=$?
     [ "$rc" -ne 5 ] || stop 5 MERGE_PLAN_CONFLICTS_MISSING
+    [ "$rc" -ne 6 ] || stop 6 INTEGRATION_APPROVED_BLOB_MISSING
+    [ "$rc" -ne 7 ] || stop 7 INTEGRATION_RETAIN_TARGET_INVALID
     [ "$rc" -eq 0 ] || stop "$rc" INTEGRATION_SOURCE_MERGE
     verify_module_links "$next" "$tree" "$candidate" "$source_modules" || stop 3 INTEGRATION_MODULE_REVIEW_REQUIRED
     if [ "$dirty" = dirty ] && git merge-base --is-ancestor "$head" "$candidate"; then

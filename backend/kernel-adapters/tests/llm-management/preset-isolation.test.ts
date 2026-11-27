@@ -10,6 +10,12 @@ describe('host-owned model policies', () => {
         const templates = createNestosProviderTemplates();
         expect(templates.map(item => item.id)).toContain('openai');
         expect(templates.map(item => item.id)).toContain('doubao-speech');
+        const gemini = templates.find(item => item.id === 'gemini');
+        expect(gemini).toMatchObject({
+            name: 'Google Gemini', implementation: 'gemini',
+            baseURL: 'https://generativelanguage.googleapis.com',
+        });
+        expect(gemini?.models.map(model => model.id)).toContain('gemini-3.8-flash');
         expect(templates.some(item => item.credentialMode === 'host')).toBe(false);
         templates.find(item => item.id === 'doubao-speech')!.models[0].operations!['speech.synthesize']!.voices!.push('new');
         expect(createNestosProviderTemplates().find(item => item.id === 'doubao-speech')!.models[0].operations!['speech.synthesize']!.voices).not.toContain('new');

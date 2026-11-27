@@ -4,6 +4,7 @@ import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {SeqKanbanStore,createKanbanModule} from '@nestos/kanban';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createTaskRecovery} from '../src/kanban/task-recovery';
+import {taskRecoveryState} from '../src/kanban/task-recovery-state';
 const closes:Array<()=>Promise<void>>=[];afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});
 async function fixture(group=false,active=false,missing=false,handler:'self'|'parent'='self') {
  const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());const fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs);
@@ -128,8 +129,8 @@ it('reports missing tools, then rechecks after manual installation and continues
  expect(f.options.recheck.run).toHaveBeenCalledTimes(2);
 });
 
-it('rechecks a reported blocker and replies to the original issue without clearing it or creating a dispatch',async()=>{
- const f=await fixture(false,true);
+it.each(['self','parent'] as const)('rechecks a %s blocker and replies to the original issue without clearing it or creating a dispatch',async(handler)=>{
+ const f=await fixture(false,true,false,handler);
  await f.run({type:'link-reference',itemId:'verify',reference:{system:'nestos-remote-project',id:'project'}});
  await f.journal.update('development-workspace:failed-dispatch',()=>({...f.original,context:{}}));
  const replyTask=vi.fn(async(_board:string,request:{operationId:string})=>{await f.journal.update('task-reply-delivered:'+request.operationId,()=>true);});
@@ -138,6 +139,13 @@ it('rechecks a reported blocker and replies to the original issue without cleari
  const state=await f.recovery.taskRecovery('b','verify');
  expect(state).toMatchObject({state:'blocked',canRecheck:true});
  const request={itemId:'verify',expectedRevision:state.revision,action:'recheck' as const};
+ if(handler==='parent'){
+    expect(await taskRecoveryState(f.options,'b','verify','session')).not.toHaveProperty('canRecheck');
+    f.options.service=f.worker;
+    expect(await f.recovery.taskRecovery('b','verify')).not.toHaveProperty('canRecheck');
+    await expect(f.recovery.recoverTask('b',{...request,operationId:'worker-recheck'})).rejects.toMatchObject({code:'RECOVERY_TARGET_NOT_READY'});
+    f.options.service=f.service;
+ }
  expect(await f.recovery.recoverTask('b',{...request,operationId:'missing'})).toMatchObject({state:'blocked',missing:['tool:npm']});
  expect(replyTask).not.toHaveBeenCalled();
  const ready={...request,operationId:'available'};

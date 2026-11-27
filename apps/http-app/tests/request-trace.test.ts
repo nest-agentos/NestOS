@@ -150,6 +150,18 @@ it('defers exact capability compatibility diagnostics until the new view can rep
     expect(records[0]).toMatchObject({stage:'rpc.decode',code:'RPC_METHOD_UNSUPPORTED',http:{capabilityKind:'KanbanService',rpcMethod:'removeRecordConversations'}});
     expect(JSON.stringify(records)).not.toContain('PRIVATE');
 });
+it('correlates an unknown reply capability with its HTTP request without logging the reference', async () => {
+    const browser = new BrowserRequestTrace(), report = vi.fn(async value => reportClientDiagnostic(value));
+    browser.setReporter(report);
+    browser.compatibility({code:'ECAPABILITY', remoteCode:'RPC_CAPABILITY_REFERENCE_UNKNOWN',
+        capabilityKind:'ConversationWorkbenchView', rpcMethod:'openConversation', requestId:'reply-request', durationMs:352,
+        message:'PRIVATE_CAPABILITY_REFERENCE'});
+    await vi.waitFor(() => expect(report).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+        stage:'rpc.decode', code:'RPC_CAPABILITY_REFERENCE_UNKNOWN', requestId:'reply-request', durationMs:352,
+        http:expect.objectContaining({capabilityKind:'ConversationWorkbenchView', rpcMethod:'openConversation'}),
+    })));
+    expect(JSON.stringify(report.mock.calls)).not.toContain('PRIVATE_CAPABILITY_REFERENCE');
+});
 it.each(['updates-read','reply'])('preserves %s failure classification and safe batch metadata across reload',async rpcKind=>{
     const headers=new Headers({'X-NestOS-RPC-Kind':rpcKind,'X-NestOS-RPC-Batch-Size':'0','X-NestOS-RPC-Attempt':'1'});
     const http={browserSessionId:'11111111-1111-4111-8111-111111111111',traceId:'1'.repeat(32),spanId:'2'.repeat(16),occurredAt:1,

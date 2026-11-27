@@ -3,9 +3,10 @@ import {waivedManagementDelivery} from './kanban-management-completion';
 import {sha256HexSync} from '@nestos/common';
 import type {KanbanBoard,KanbanItem,KanbanService,KanbanDispatch} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
+import {jobKey,reviewKey} from '@nestos/kanban/integration';
 import {workProjectId} from '../kanban/task-projects';
 import {requireValue} from '../kanban/validation';
-import type {ReviewOperationScope} from '@nestos/kanban-development';
+import type {ReviewJob,ReviewOperationScope,ReviewSettings} from '@nestos/kanban-development';
 
 export interface ManagementContribution {itemId:string;title:string;dispatchId?:string;worktreeId?:string}
 export interface ManagementScope extends ReviewOperationScope {
@@ -45,7 +46,30 @@ export async function managementScopes(options:{service:KanbanService;journal:Ka
         current.push({schema:1,id,boardId:board.id,ownerId:owner.id,projectId,label:await options.projectLabel(projectId),contributors:pending,...(completed?{completed:true}:{})});
     }
     const previous=await savedManagementScopes(options.journal,board.id,owner.id);
-    return [...previous.filter(scope=>!current.some(row=>row.id===scope.id)),...current];
+    const historical=await supersededScopes(options.journal,previous);
+    return [...previous.filter(scope=>!historical.has(scope.id)&&!current.some(row=>row.id===scope.id)),...current];
+}
+/** Keep failed attempts accessible by ID without treating integrated sources as outstanding work. */
+async function supersededScopes(journal:KanbanAutomationJournal,scopes:ManagementScope[]):Promise<Set<string>> {
+    const integrated=new Map(scopes.filter(scope=>scope.stage&&scope.stage!=='prepared').map(scope=>[scope.id,scope]));
+    const superseded=new Set<string>();
+    if(!integrated.size)return superseded;
+    for(const scope of scopes.filter(row=>row.stage==='prepared'&&row.contributors.length>0)){
+        const keys=scope.contributors.map(row=>integratedContributionKey(scope.boardId,scope.ownerId,row.dispatchId??row.itemId));
+        const receipts=await journal.getMany<{scopeId:string;operationId:string;targetHead:string}>(keys);
+        const replaced=scope.contributors.every((row,index)=>{
+            const receipt=receipts[index],replacement=receipt&&integrated.get(receipt.scopeId);
+            return !!receipt?.operationId&&!!receipt.targetHead&&replacement?.projectId===scope.projectId
+                &&replacement.contributors.some(source=>source.itemId===row.itemId&&source.dispatchId===row.dispatchId);
+        });
+        if(replaced&&await settledScopeJobs(journal,scope))superseded.add(scope.id);
+    }
+    return superseded;
+}
+async function settledScopeJobs(journal:KanbanAutomationJournal,scope:ManagementScope):Promise<boolean> {
+    const settings=await journal.get<ReviewSettings>(reviewKey(scope.boardId,scope.ownerId,scope.id));
+    const jobs=await journal.getMany<ReviewJob>((settings?.jobs??[]).map(jobKey));
+    return jobs.every(job=>job?.phase==='settled');
 }
 export async function savedManagementScopes(journal:KanbanAutomationJournal,board:string,item:string):Promise<ManagementScope[]> {
     const ids=await journal.get<string[]>(managementScopesKey(board,item))??[];

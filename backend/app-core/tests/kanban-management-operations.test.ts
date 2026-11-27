@@ -2,7 +2,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {managementTaskOwner as managementOwner} from '@nestos/kanban/integration';
-import {managementScopes,freezeManagementScope,integratedContributionKey} from '../src/presets/kanban-management-scope-catalog';
+import {managementScopes,freezeManagementScope,integratedContributionKey,managementScopeKey} from '../src/presets/kanban-management-scope-catalog';
 import {managementBatchSnapshot} from '../src/presets/kanban-management-snapshot';
 import {verifyManagementMerge} from '../src/presets/kanban-management-review';
 import {verifyManagementChanges} from '@nestos/git-delivery/integration';
@@ -27,6 +27,19 @@ it('groups execution contributions by repository under the actual management own
  expect(await f.journal.get('management-operation-scopes:'+JSON.stringify(['board','manager']))).toBeUndefined();
  expect(managementOwner(f.board as never,f.items[1] as never)?.id).toBe('manager');
  const bad={...f.owner,planning:{execution:'children',parentId:'a'}};expect(()=>managementOwner({...f.board,items:[bad,...f.items.slice(1)]} as never,bad as never)).toThrowError(expect.objectContaining({code:'OPERATION_OWNER_INVALID'}));
+});
+it('stops displaying a prepared scope after a newer scope integrates its exact contributions',async()=>{
+ const f=await fixture(),replacement=f.scopes[0],previous={...replacement,id:'previous',contributors:[replacement.contributors[1]]};
+ await freezeManagementScope(f.journal,previous);await freezeManagementScope(f.journal,replacement);
+ await f.journal.update(managementScopeKey(replacement.id),()=>({...replacement,stage:'merged'}));
+ const view=()=>managementScopes(f.options as never,f.board as never,f.owner as never);
+ expect(await view()).toContainEqual(expect.objectContaining({id:previous.id}));
+ for(const source of replacement.contributors)await f.journal.update(integratedContributionKey('board','manager',source.dispatchId!),()=>({
+    scopeId:replacement.id,operationId:'merged',targetHead:'integrated',
+ }));
+ expect(await view()).not.toContainEqual(expect.objectContaining({id:previous.id}));
+ expect(await view()).toContainEqual(expect.objectContaining({id:replacement.id,stage:'merged'}));
+ expect(await f.journal.get(managementScopeKey(previous.id))).toMatchObject({stage:'prepared'});
 });
 it('retains a verified repository receipt and includes a new execution attempt in a new scope',async()=>{
  const f=await fixture(),scope=f.scopes[0];await freezeManagementScope(f.journal,scope);

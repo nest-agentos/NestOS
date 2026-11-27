@@ -7,9 +7,17 @@ import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createItemOperations} from '@nestos/kanban-development';
 import { type ReviewOperationsOptions, type ReviewJob} from '@nestos/kanban-development';
 import {advanceReviewJob} from '../src/item-operation-jobs';
+import {projectAutomaticOperation} from '../src/item-operation-projection';
 import {jobKey, reviewKey,reviewCleanupKey} from '@nestos/kanban/integration';
 
 const closes: Array<() => Promise<void>> = [];
+it('projects waiting for another delivery as queued until an operation actually runs',()=>{
+    const queued=projectAutomaticOperation({revision:'r',automatic:{state:'running',stage:'analyze',waitingForTarget:true},
+        operations:[{id:'analyze',label:'Analyze',enabled:true,state:'ready'}]});
+    expect(queued.operations[0]).toMatchObject({state:'unavailable',enabled:false,statusText:t('kanban.operationAutomaticWaitingTarget')});
+    const running={...queued,operations:[{id:'analyze',label:'Analyze',enabled:false,state:'running' as const}]};
+    expect(projectAutomaticOperation(running).operations[0].state).toBe('running');
+});
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close();});
 async function fixture(configure?:(options:ReviewOperationsOptions)=>void) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose());
@@ -686,7 +694,7 @@ it('automatically refreshes target drift, resumes the original Session and survi
  const f=await automaticAnalysisFixture();await scans(f.api,2);
  const queued=await f.api.itemOperations('board','task');
  expect(queued.automatic).toMatchObject({state:'running',stage:'merge',waitingForUser:false});
- expect(queued.operations.find(row=>row.id==='merge')).toMatchObject({state:'running',enabled:false,confirmation:undefined});
+ expect(queued.operations.find(row=>row.id==='merge')).toMatchObject({state:'unavailable',enabled:false,confirmation:undefined});
  f.snapshot.version='target-2-state';f.snapshot.targetVersion='target-2';await f.api.scan();
  const saved=await f.journal.get<any>('automatic-delivery:'+JSON.stringify(['board','task']));
  expect(saved).toMatchObject({step:0,revisionEpoch:expect.any(String)});expect(saved.code).toBeUndefined();
@@ -816,6 +824,36 @@ it('releases the scoped target after accepted delivery while cleanup is independ
  expect(await releasableDevelopmentTarget(options,scope,state)).toBe(false);
  item.status='review';
  expect(await releasableDevelopmentTarget(options,scope,state)).toBe(false);
+});
+
+it('lets other deliveries claim a target while a scoped merge awaits choices',async()=>{
+ const {releasableDevelopmentTarget}=await import('../src/development-operation-policy');
+ const scope={id:'auto',boardId:'board',itemId:'owner',target:'project',scopeId:'repository'};
+ const item={id:'owner',status:'backlog',planning:{execution:'children'},externalRefs:[{system:'nestos-remote-project',id:'project'}]};
+ const binding={boardId:'board',itemId:'owner',scopeId:'repository',phase:'settled'};
+ const analysis={...binding,action:'analyze',state:'succeeded'};
+ const merge={...binding,action:'merge',state:'failed',code:'OPERATION_RESULT_INTEGRATION_UNSUPPORTED'};
+ const get=vi.fn(async()=>({jobs:['analyze','merge']})),getMany=vi.fn(async()=>[analysis,merge]);
+ const options={service:{read:async()=>({id:'board'}),item:async()=>({item})},adapter:{},journal:{get,getMany}} as any;
+ const state={...scope,executionId:'owner',steps:['analyze','merge'],step:1,requests:{},code:'OPERATION_SELECTION_REQUIRED'} as any;
+ expect(await releasableDevelopmentTarget(options,scope,state)).toBe(true);
+ for(const job of [{...merge,phase:'submitting'},{...merge,state:'succeeded'},{...merge,code:'INTEGRATION_PUBLICATION_UNKNOWN'}]){
+  getMany.mockResolvedValueOnce([analysis,job]);
+  expect(await releasableDevelopmentTarget(options,scope,state)).toBe(false);
+ }
+});
+
+it('releases a stale scoped analysis only after its frozen request has a failed receipt',async()=>{
+ const {releasableDevelopmentTarget}=await import('../src/development-operation-policy');
+ const scope={id:'auto',boardId:'board',itemId:'owner',target:'project',scopeId:'repository'};
+ const item={id:'owner',status:'backlog',planning:{execution:'children'},externalRefs:[{system:'nestos-remote-project',id:'project'}]};
+ const analysis={boardId:'board',itemId:'owner',scopeId:'repository',action:'analyze',state:'failed',phase:'settled',code:'MERGE_PLAN_SOURCE_CHANGED'};
+ const journal={get:vi.fn(async(key:string)=>key===jobKey('analysis')?analysis:{jobs:['analysis']}),getMany:async()=>[analysis]};
+ const options={service:{read:async()=>({id:'board'}),item:async()=>({item})},adapter:{},journal} as any;
+ const state={...scope,executionId:'owner',steps:['analyze','merge'],step:0,requests:{analyze:{operationId:'analysis'}},code:'OPERATION_RESULT_PENDING'} as any;
+ expect(await releasableDevelopmentTarget(options,scope,state)).toBe(true);
+ analysis.phase='submitting';expect(await releasableDevelopmentTarget(options,scope,state)).toBe(false);
+ analysis.phase='settled';analysis.code='OPERATION_OUTCOME_UNKNOWN';expect(await releasableDevelopmentTarget(options,scope,state)).toBe(false);
 });
 
 it('retires settled archived scopes without resolving ownership or replaying completion',async()=>{

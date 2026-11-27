@@ -45,3 +45,21 @@ it('waits for remote navigation invalidation before refreshing the VFS list', as
     await vi.waitFor(() => expect(invalidateNavigation).toHaveBeenCalledOnce()); expect(refresh).not.toHaveBeenCalled();
     finish(); await pending; expect(refresh).toHaveBeenCalledOnce(); expect(workbench.report).not.toHaveBeenCalled();
 });
+
+it.each([false, true])('visibility resumes only a cancelled open (cancelled=%s)', async cancelled => {
+    let finish!: () => void;
+    const visibility = new Promise<void>(resolve => {finish = resolve;});
+    const openResource = vi.fn(), signal = cancelled ? AbortSignal.abort() : new AbortController().signal;
+    const workbench = Object.assign(Object.create(SessionWorkbench.prototype) as SessionWorkbench, {
+        visible: false, opening: {setVisible: () => visibility}, syncNavigationVisibility: async () => {},
+        viewRefresh: {dirty: false}, openResource,
+    });
+    const showing = workbench.setVisible(true);
+    const navigation = {operationId: 'test-navigation', source: 'kanban-link'};
+    Object.assign(workbench, {pendingTarget: {id: 'new-decision', options: {navigation}, load: {signal}}});
+    finish(); await showing;
+    if (cancelled) expect(openResource).toHaveBeenCalledExactlyOnceWith('new-decision', {
+        navigation: {operationId: navigation.operationId, source: 'visibility-resume'},
+    });
+    else expect(openResource).not.toHaveBeenCalled();
+});

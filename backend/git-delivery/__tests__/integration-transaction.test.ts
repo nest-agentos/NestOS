@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {promisify} from 'node:util';
 import {integrationSourceSnapshotScript} from '../src/integration-source-script';
-import {inspectGitIntegration, resumeGitIntegration, tryGitIntegration, validateGitConflictResolutions} from '../src/integration-transaction';
+import {inspectGitIntegration, resumeGitIntegration, tryGitIntegration, validateGitConflictResolutions, type GitIntegrationTransaction} from '../src/integration-transaction';
 
 const exec = promisify(execFile);
 const roots: string[] = [];
@@ -83,6 +83,26 @@ it('requires a fresh approval when the frozen plan omitted a real Git conflict',
     await expect(tryGitIntegration(f.process,input)).rejects.toMatchObject({code:'MERGE_PLAN_CONFLICTS_MISSING',executionOutcome:'not-started'});
     expect(await f.git('rev-parse','HEAD')).toBe(previousTarget);
     expect(await inspectGitIntegration(f.process,input)).toBeUndefined();
+});
+
+it('keeps the named target file and replays its unpublished edit when an older source overlaps it',async()=>{
+    const f=await fixture();
+    const original=contents+'local assertion\n';
+    await writeFile(join(f.root,'shared'),original);
+    await writeFile(join(f.source,'shared'),contents+'obsolete assertion\n');
+    await writeFile(join(f.source,'delivered'),'current implementation\n');
+    const path='shared',choice='retain-target';
+    const approve=(path:string)=>({selections:{overlap:choice},plan:{conflicts:[{id:'overlap',path,options:[{id:choice}]}]}});
+    await expect(tryGitIntegration(f.process,{...f.input,approval:approve('missing')}))
+        .rejects.toMatchObject({code:'INTEGRATION_RETAIN_TARGET_INVALID',executionOutcome:'not-started'});
+    const input={...f.input,approval:approve(path)};
+    expect(await tryGitIntegration(f.process,input)).toBe('applied');
+    const target=await f.git('rev-parse','HEAD');
+    expect(await inspectGitIntegration(f.process,input)).toBe(target);
+    expect(await f.git('show','HEAD:shared')).toBe(contents.trim());
+    expect(await readFile(join(f.root,'shared'),'utf8')).toBe(original);
+    expect(await f.git('show','HEAD:delivered')).toBe('current implementation');
+    expect(await readFile(join(f.source,'shared'),'utf8')).toBe(contents+'obsolete assertion\n');
 });
 
 it('verifies two changes-only sources against their respective integration steps', async () => {
@@ -266,7 +286,7 @@ it('reports an external index change without resetting its staged blob',async()=
     expect(await f.git('rev-parse','HEAD')).toBe(f.input.previousTarget);
 });
 
-it.each([false,true])('publishes a frozen module snapshot without moving either module checkout (diverged=%s)',async diverged=>{
+it.each(['aligned','diverged','conflicted'])('publishes a frozen module snapshot without moving either module checkout (%s)',async variant=>{
     const f=await fixture(),repo=await mkdtemp(join(tmpdir(),'nestos-module-capture-'));
     roots.push(repo);
     await f.git('init','-qb','main',repo);
@@ -280,9 +300,10 @@ it.each([false,true])('publishes a frozen module snapshot without moving either 
     await f.git('-C',f.source,'merge','--ff-only',sourceHead);
     await f.git('-C',f.source,'-c','protocol.file.allow=always','submodule','update','--init','--','module');
     const sourceModule=join(f.source,'module'),targetModule=join(f.root,'module');
-    if(diverged){
+    if(variant!=='aligned'){
         await writeFile(join(targetModule,'target-only'),'retained\n');
-        await f.git('-C',targetModule,'add','target-only');
+        if(variant==='conflicted')await writeFile(join(targetModule,'history'),'target history\n');
+        await f.git('-C',targetModule,'add','target-only','history');
         await f.git('-C',targetModule,'-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','-qm','target module change');
         await f.git('add','module');await f.git('commit','-qm','advance target module');
     }
@@ -292,19 +313,32 @@ it.each([false,true])('publishes a frozen module snapshot without moving either 
     const objects=JSON.stringify([['module',base]]);
     const frozen=await f.process.nativeShell.exec('sh',['-c',integrationSourceSnapshotScript,'test',sourceHead,objects],{cwd:'/workspace/source'});
     expect(frozen).toMatchObject({code:0});
-    const input={...f.input,previousTarget,sources:[{...f.input.sources[0],sourceHead,sourceTree:frozen.stdout.trim(),
+    const input:GitIntegrationTransaction={...f.input,previousTarget,sources:[{...f.input.sources[0],sourceHead,sourceTree:frozen.stdout.trim(),
         repositories:[{path:'.',head:sourceHead,dirty:true},{path:'module',head:base,dirty:true}]}]};
     await writeFile(file,'changed after review\n');
     await expect(tryGitIntegration(f.process,input)).rejects.toMatchObject({code:'INTEGRATION_SOURCE_CHANGED'});
     expect(await f.git('rev-parse','HEAD')).toBe(previousTarget);
     await writeFile(file,'approved\n');
+    const history=variant==='conflicted'?'merged history':'approved';
+    if(variant==='conflicted'){
+        await expect(tryGitIntegration(f.process,input)).rejects.toMatchObject({code:'MERGE_PLAN_CONFLICTS_MISSING'});
+        const path='module/history', proposed=join(f.root,'resolution');
+        await writeFile(proposed,history+'\n');
+        const oid=await f.git('-C',sourceModule,'hash-object','-w','--no-filters',proposed);
+        await expect(f.git('-C',targetModule,'cat-file','-e',oid)).rejects.toThrow();
+        input.approval={selections:{history:'combined'},plan:{conflicts:[{id:'history',path,options:[{id:'combined'}]}]}};
+        const recorded=[{path,choice:'combined',mode:'100644' as const,oid}];
+        await expect(tryGitIntegration(f.process,{...input,resolutions:[{...recorded[0],oid:'b'.repeat(40)}]}))
+            .rejects.toMatchObject({code:'INTEGRATION_APPROVED_BLOB_MISSING',executionOutcome:'not-started'});
+        input.resolutions=recorded;
+    }
     expect(await tryGitIntegration(f.process,input)).toBe('applied');
     const link=/^160000 commit ([a-f0-9]+)\s/.exec(await f.git('ls-tree','HEAD','module'))?.[1];
     expect(link).toBeDefined();
-    expect(await f.git('-C',targetModule,'show',link+':history')).toBe('approved');
+    expect(await f.git('-C',targetModule,'show',link+':history')).toBe(history);
     expect(await f.git('-C',targetModule,'rev-parse','refs/nestos/module-delivery/'+link)).toBe(link);
     expect(await f.git('-C',targetModule,'rev-parse','HEAD')).toBe(targetModuleHead);
-    if(diverged)expect(await f.git('-C',targetModule,'show',link+':target-only')).toBe('retained');
+    if(variant!=='aligned')expect(await f.git('-C',targetModule,'show',link+':target-only')).toBe('retained');
     expect(await f.git('-C',sourceModule,'rev-parse','HEAD')).toBe(base);
     expect(await f.git('-C',sourceModule,'diff','--cached','--name-only')).toBe('');
     expect(await readFile(file,'utf8')).toBe('approved\n');

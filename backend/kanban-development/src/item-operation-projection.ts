@@ -92,7 +92,7 @@ export function projectAutomaticOperation(view:KanbanItemOperations):KanbanItemO
     if(status?.state!=='running')return view;
     return {...view,operations:view.operations.map(row=>{
         if(row.id!==status.stage||!['ready','waiting-confirmation'].includes(row.state))return row;
-        return {...row,state:'running',enabled:false,confirmation:undefined,attention:undefined,
+        return {...row,state:'unavailable',enabled:false,confirmation:undefined,attention:undefined,
             fields:undefined,statusText:t(status.waitingForTarget?'kanban.operationAutomaticWaitingTarget':'kanban.operationAutomaticQueued')};
     })};
 }

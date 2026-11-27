@@ -9,7 +9,7 @@ import {parseProjectAction, type ProjectActionRoute} from './project-action-rout
 import type {ChatEditorFactory as EditorFactory, ChatEditorOptions as EditorOptions} from '@nestos/llm-ui-adapter/contracts';
 import {confirmRemoteRemoval, remoteRemovalItems} from './remote-session-removal';
 import { PROJECT_ACTION_ICONS } from '@nestos/common';
-import {projectFileSource} from '@nestos/app-contracts';
+import {projectFileSource, type ConversationOpenTrace, type WorkspaceOpenOptions} from '@nestos/app-contracts';
 import {showProjectSettings} from './project-settings';
 import {showDiagnostics} from '../diagnostics/dialog';
 import {diagnosticReasonText} from '@nestos/app-settings';
@@ -110,8 +110,7 @@ import {SESSION_BROWSER_SCOPE} from '../persistence/documents';
 export {SESSION_BROWSER_SCOPE} from '../persistence/documents';
 
 /** One navigation request. `fileNavigation` decides how the content column follows a file. */
-export interface OpenResourceOptions {
-    newTab?: boolean;
+export interface OpenResourceOptions extends WorkspaceOpenOptions {
     fromSidebar?: boolean;
     initialInputState?: { text?: string; agentId?: string };
     reload?: boolean;
@@ -1017,7 +1016,7 @@ export class SessionWorkbench implements WorkspaceController {
     }
     private visible = true;
     private readonly viewLoads = new LatestViewLoad();
-    private pendingTarget?: { id: string; options: OpenResourceOptions };
+    private pendingTarget?: { id: string; options: OpenResourceOptions; load: ViewLoad };
     private readonly readCleanup = new Set<Promise<void>>();
     private cancelViewLoad(): void {
         this.viewLoads.cancel();
@@ -1048,8 +1047,10 @@ export class SessionWorkbench implements WorkspaceController {
             if (this.remoteAvailabilityDirty) {this.remoteAvailabilityDirty = false; this.updateRemoteAvailability();}
             void this.syncNavigationVisibility().catch(error => this.report(error));
             const pending = this.pendingTarget;
-            if (pending) await this.openResource(pending.id, pending.options);
-            else await this.editor?.activate?.();
+            if (pending?.load.signal.aborted) await this.openResource(pending.id, {...pending.options,navigation:{
+                operationId:pending.options.navigation?.operationId??randomUUID(),source:'visibility-resume',
+            }});
+            else if (!pending) await this.editor?.activate?.();
             if (this.viewRefresh.dirty) void this.viewRefresh.flush().catch(error => this.report(error));
         }
     }
@@ -1116,7 +1117,7 @@ export class SessionWorkbench implements WorkspaceController {
         const tab = this.tabs.get(id);
         const complete = beginNavigationTiming(!!tab?.value && !tab.failed, diagnostic => this.backend.reportClientDiagnostic?.(diagnostic));
         try {
-            await this.openResource(id);
+            await this.openResource(id,{navigation:{operationId:complete.operationId,source:'tab-activation'}});
             complete(this.tabs.current?.id === id ? this.tabs.current.failed ? 'failure' : 'success' : 'superseded');
         } catch (error) {complete('failure'); throw error;}
     }
@@ -1151,9 +1152,11 @@ export class SessionWorkbench implements WorkspaceController {
         const target = resolveBrowserTarget(path);
         if (target.kind === 'project-draft' || target.kind === 'remote' && target.draft)
             return this.openDraftResource(path, target, options, current);
+        if(target.kind==='remote'&&target.nativeSessionId&&!options.navigation)
+            options={...options,navigation:{operationId:randomUUID(),source:'workbench-open'}};
         this.cancelViewLoad();
         const load = this.viewLoads.begin();
-        this.pendingTarget = { id: resourceId, options };
+        this.pendingTarget = { id: resourceId, options, load };
         if (!this.visible) this.viewLoads.cancel();
         const branch = options.branch ?? route.branch;
         const id = target.kind === 'session' ? target.sessionId : path;
@@ -1251,7 +1254,7 @@ export class SessionWorkbench implements WorkspaceController {
                 const failure = this.initialFailure; this.initialFailure = undefined;
                 if (failure?.resourceId === path) throw Object.assign(new FSError('EIO', failure.code), failure);
                 const prepared = this.initialConversation?.resourceId === path ? this.initialConversation : this.opening
-                    ? await load.read(async () => unopenedConversation = this.sources!.conversation(await this.opening!.openConversation(path))) : undefined;
+                    ? await load.read(async () => unopenedConversation = await this.traceConversationOpen(path,target.nativeSessionId,options.navigation,load.signal)) : undefined;
                 if (prepared === this.initialConversation) this.initialConversation = undefined;
                 const project = prepared?.project ?? await this.projectForOpen(target.folder); load.check();
                 if (!project || project.path !== target.folder) throw Object.assign(new FSError('ENOENT',t('kanban.errors.DECISION_CONVERSATION_PROJECT_MISSING')),{reason:'REMOTE_PROJECT_MISSING'});
@@ -1445,6 +1448,25 @@ export class SessionWorkbench implements WorkspaceController {
             if (this.viewLoads.isCurrent(load)) this.pendingTarget = undefined;
         });
         this.tail = result.catch(() => {}); return result;
+    }
+    private async traceConversationOpen(path:string,sessionId:string|undefined,navigation:ConversationOpenTrace|undefined,signal:AbortSignal) {
+        const started=performance.now(),trace:ConversationOpenTrace={operationId:randomUUID(),source:navigation?.source??'workbench-open',
+            ...(navigation?{parentOperationId:navigation.operationId}:{})};
+        const entry={operation:'workbench.conversation.open',...trace,
+            ...(/^[a-zA-Z0-9_-]{1,128}$/.test(sessionId??'')?{sessionId}:{})};
+        sidebarLog.info('workbench.conversation.open',{...entry,stage:'start',result:'started',durationMs:0});
+        try {
+            const result=this.sources!.conversation(await this.opening!.openConversation(path,trace));
+            sidebarLog.info('workbench.conversation.open',{...entry,stage:'reply',result:signal.aborted?'superseded':'success',durationMs:Math.round(performance.now()-started)});
+            return result;
+        } catch(error) {
+            const {remoteCode,code,requestId}=(error??{}) as {remoteCode?:string;code?:string;requestId?:string};
+            const failure=remoteCode??code??'CONVERSATION_OPEN_FAILED';
+            sidebarLog.warn('workbench.conversation.open',{...entry,stage:'reply',result:signal.aborted?'superseded':'failure',
+                code:/^[A-Z][A-Z0-9_]{0,63}$/.test(failure)?failure:'CONVERSATION_OPEN_FAILED',
+                ...(/^[a-f0-9-]{36}$/i.test(requestId??'')?{requestId}:{}),durationMs:Math.round(performance.now()-started)});
+            throw error;
+        }
     }
     private async missingRemoteReference(target:Extract<ReturnType<typeof resolveBrowserTarget>,{kind:'remote'}>,error:unknown):Promise<boolean> {
         if((error as {code?:string})?.code!=='ENOENT')return false;

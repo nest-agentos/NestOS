@@ -252,9 +252,30 @@ export class RpcPeer {
         this.lifetime.describe(id, { fields, snapshots, lookups });
         return { id, kind, fields, snapshots, lookups };
     }
-    async refresh(): Promise<WireValue[]> {
-        const pending = this.operation(() => this.refreshTail.then(() => this.refreshDirty()));
+    async refresh(replies: readonly Reply[] = []): Promise<WireValue[]> {
+        const pending = this.operation(() => this.refreshTail.then(async () => {
+            const updates = await this.refreshDirty();
+            return this.includeResultCapabilities(updates, replies);
+        }));
         this.refreshTail = pending.catch(() => {}); return pending;
+    }
+    /** Responses can overtake the refresh that first published their result handles. */
+    private includeResultCapabilities(updates: WireValue[], replies: readonly Reply[]): WireValue[] {
+        const required = new Set(replies.flatMap(reply => [...capabilityReferences(reply.value ?? null)]));
+        if (!required.size) return updates;
+        const positions = new Map(updates.map((update, index) => [updateDescriptorId(update), index]));
+        for (const id of required) {
+            const descriptor = this.emitted.get(id);
+            if (!descriptor || this.handles.get(id)?.retired) continue;
+            const position = positions.get(id);
+            const full = { $capability: descriptor as unknown as WireValue };
+            if (position === undefined) updates.push(full);
+            else updates[position] = full;
+            for (const part of [descriptor.fields, descriptor.snapshots, descriptor.lookups]) {
+                for (const dependency of capabilityReferences(part)) required.add(dependency);
+            }
+        }
+        return updates;
     }
     private async refreshDirty(): Promise<WireValue[]> {
         const updates: WireValue[] = [];
@@ -325,7 +346,10 @@ export class RpcPeer {
             const handle = this.handles.get(id);
             if (handle?.retired) throw new FSError('ECAPABILITY', 'Capability was released');
             if (handle) return handle.value;
-            const remote = this.remote.get(id); if (!remote) throw new FSError('ECAPABILITY', 'Unknown capability reference'); return remote;
+            const remote = this.remote.get(id);
+            if (remote) return remote;
+            if (this.remoteRetirements.has(id)) throw new FSError('ECAPABILITY', 'Capability was released');
+            throw Object.assign(new FSError('ECAPABILITY', 'Unknown capability reference'), {remoteCode: 'RPC_CAPABILITY_REFERENCE_UNKNOWN'});
         }
         if ('$capability' in value) return this.hydrate(value.$capability as unknown as Descriptor);
         const result: Record<string, unknown> = {};
@@ -586,18 +610,32 @@ export class RpcPeer {
         if (this.binaryCall(id, method, args)) return this.fileTransport!(id, method, args);
         const encoded = await Promise.all(args.map(arg => this.side === 'server' ? this.encode(arg, new Set()) : this.expose(arg)));
         const releaseArguments = this.side === 'server' ? this.lifetime.acquire(encoded) : undefined;
-        const mode = this.schemas[this.descriptors.get(id)?.kind ?? '']?.methods[method];
+        const kind = this.descriptors.get(id)?.kind;
+        const mode = this.schemas[kind ?? '']?.methods[method];
         const callbacks = this.acquireCallbacks(encoded, subscriptionMode(mode));
         try {
             const released = this.retirementUpdates().map(update => (update as { $retired: string }).$retired);
+            const started = Date.now();
             const reply = await this.send({ target: id, method, args: encoded, ...(released.length ? { released } : {}), ...(this.eventCallbacks.has(id) ? { notification: true } : {}) });
-            this.applyUpdates(reply.updates);
-            await this.waitUpdates(reply.updates);
-            if (reply.error) { const error = new Error(reply.error.message); Object.assign(error, reply.error); throw error; }
-            return this.decode(reply.value ?? null);
+            return await this.decodeReply(reply, kind, method, started);
         } finally {
             for (const key of callbacks) this.releaseCallback(key, true);
             if (releaseArguments) { releaseArguments(); this.collectionNeeded = true; if (!this.operations) this.collectReleased(); }
+        }
+    }
+    private async decodeReply(reply: Reply, kind: string | undefined, method: string, started: number): Promise<unknown> {
+        try {
+            this.applyUpdates(reply.updates);
+            await this.waitUpdates(reply.updates);
+            if (reply.error) throw Object.assign(new Error(reply.error.message), reply.error);
+            return this.decode(reply.value ?? null);
+        } catch (error) {
+            if (!reply.error && (error as {remoteCode?: string})?.remoteCode === 'RPC_CAPABILITY_REFERENCE_UNKNOWN') {
+                Object.assign(error as Error, {stage: 'rpc.decode', result: 'failure', requestId: reply.requestId,
+                    capabilityKind: kind, rpcMethod: method, durationMs: Date.now() - started});
+                try { this.report(error); } catch { /* Preserve the original decode failure. */ }
+            }
+            throw error;
         }
     }
     private acquireCallbacks(values: WireValue[], persistent: boolean): Set<string> {
@@ -674,7 +712,7 @@ export class RpcPeer {
         if (subscriptionMode(handle.schema.methods[call.method])) this.lifetime.attach(call.target, value);
         else this.retain(value);
         if (this.operations === 1 && this.collectionNeeded) this.collectReleased();
-        return { value, updates: incremental ? await this.refresh() : this.retirementUpdates() };
+        return { value, updates: incremental ? await this.refresh([{ value }]) : this.retirementUpdates() };
     }
     private applyReleased(ids: string[] = []): void {
         for (const id of ids) {

@@ -61,6 +61,13 @@ export class HttpViewClient {
     }
     private reportPeer(error: unknown): void {
         if (this.expired && error === this.expired) return;
+        const decodeFailure = error as {remoteCode?: string; durationMs?: number};
+        if (decodeFailure?.remoteCode === 'RPC_CAPABILITY_REFERENCE_UNKNOWN') {
+            const diagnostic = {...safeFailure(error), operation: 'rpc.reply', result: 'failure', durationMs: decodeFailure.durationMs};
+            console.error('[View] Capability diagnostic', diagnostic);
+            try {this.onDiagnostic?.(error);} catch { /* Diagnostics cannot interrupt decoding. */ }
+            return;
+        }
         if((error as {code?:string})?.code!=='RPC_METHOD_UNSUPPORTED'){console.error('[View]',safeFailure(error));return;}
         console.warn('[View] Capability diagnostic',safeFailure(error));
         try {this.onDiagnostic?.(error);} catch { /* Diagnostics cannot interrupt decoding. */ }
@@ -160,6 +167,11 @@ export class HttpViewClient {
             throw failure;
         }
         if (!response.ok) throw Object.assign(new Error(reply.error?.message ?? 'View request failed'), reply.error);
+        const requestId = response.headers.get('X-Request-ID');
+        if (requestId && /^[a-f0-9-]{36}$/i.test(requestId)) {
+            if (body.kind === 'call') reply.requestId = requestId;
+            for (const item of reply.replies ?? []) item.requestId = requestId;
+        }
         this.showReconnected();
         return reply;
     }

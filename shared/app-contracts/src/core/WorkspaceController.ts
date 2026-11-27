@@ -1,5 +1,12 @@
 /** Workspace routing uses resource identities; each workspace defines their meaning. */
-export interface WorkspaceOpenOptions {newTab?: boolean}
+export const conversationOpenSources = ['kanban-link', 'navigation', 'history-restore', 'visibility-resume', 'tab-activation', 'workbench-open'] as const;
+export type ConversationOpenSource = typeof conversationOpenSources[number];
+export interface ConversationOpenTrace {
+    operationId: string;
+    parentOperationId?: string;
+    source: ConversationOpenSource;
+}
+export interface WorkspaceOpenOptions {newTab?: boolean; navigation?: ConversationOpenTrace}
 export interface WorkspaceController {
     start(initialResource?: string): Promise<void>;
     /** Suspend view-only work and flush edits when hidden; keep background execution alive. */

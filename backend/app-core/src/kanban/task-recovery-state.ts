@@ -8,11 +8,11 @@ import type {KanbanTaskRecovery,KanbanBoard,KanbanItem,KanbanDispatch} from '@ne
 import type {TaskRecoveryOptions} from './task-recovery-ports';
 import {requireValue} from './validation';
 
-export async function taskRecoveryState(options:TaskRecoveryOptions,boardId:string,itemId:string):Promise<KanbanTaskRecovery> {
+export async function taskRecoveryState(options:TaskRecoveryOptions,boardId:string,itemId:string,origin:'operator'|'session'='operator'):Promise<KanbanTaskRecovery> {
     const board=await options.service.read(boardId),item=board.items.find(row=>row.id===itemId);requireValue(item,'ITEM_NOT_FOUND');
     const workflow=await options.service.workflow(boardId),dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===itemId).sort((a,b)=>b.attempt-a.attempt)[0];
     const handoff=await reportHandoff(options,board,item,dispatch);if(handoff)return handoff;
-    const blocked=await activeBlocker(options,board,item,dispatch);if(blocked)return blocked;
+    const blocked=await activeBlocker(options,board,item,dispatch,origin);if(blocked)return blocked;
     const reportReceipt=dispatch&&['succeeded','accepted'].includes(dispatch.outcome)&&await options.journal.get<import('@nestos/kanban/contracts').KanbanRecoveryReceipt>('task-report-recovery:'+dispatch.id);
     if(reportReceipt&&dispatch&&['succeeded','accepted'].includes(dispatch.outcome))return {itemId,related:[],canRetry:false,canSelectCurrentVersion:false,
         revision:sha256HexSync(JSON.stringify([item.id,item.revision,dispatch.id,dispatch.outcome])),
@@ -65,22 +65,30 @@ export function canSettleDelivery(board:KanbanBoard,item:KanbanItem,dispatch:Kan
         &&!board.executionControl?.paused&&!board.lifecycle&&!board.deletedAt;
 }
 
-async function activeBlocker(options:TaskRecoveryOptions,board:KanbanBoard,item:KanbanItem,dispatch:KanbanDispatch|undefined):Promise<KanbanTaskRecovery|undefined>{
+async function activeBlocker(options:TaskRecoveryOptions,board:KanbanBoard,item:KanbanItem,dispatch:KanbanDispatch|undefined,origin:'operator'|'session'):Promise<KanbanTaskRecovery|undefined>{
     const pendingIssueIds=activeRecoveryIssueIds(item,dispatch);
     if(!dispatch||!pendingIssueIds.length)return;
     const sessionId=dispatch.executionSessionId,resourceId=sessionId?await options.executionResource(sessionId,'main',board):undefined;
-    const canRecheck=sessionId&&!board.executionControl?.paused&&!board.lifecycle&&board.deletedAt===undefined&&dispatch.outcome==='running'&&pendingIssueIds.length===1&&
-        item.issues?.some(issue=>issue.id===pendingIssueIds[0]&&issue.attemptId===dispatch.id&&issue.type==='error'&&issue.handler!=='parent')&&
-        await canRecheckActiveWorkspace(options,dispatch.id);
-    return {state:'blocked',itemId:item.id,pendingIssueIds,...(resourceId&&canSettleDelivery(board,item,dispatch)?{canSettleDelivery:true}:{}),revision:sha256HexSync(JSON.stringify([item.id,item.revision,dispatch.id,dispatch.outcome,pendingIssueIds])),
+    const issue=pendingIssueIds.length===1?item.issues?.find(row=>row.id===pendingIssueIds[0]&&row.attemptId===dispatch.id):undefined;
+    const canSettle=canSettleDelivery(board,item,dispatch);
+    const canRecheck=sessionId&&!board.executionControl?.paused&&!board.lifecycle&&board.deletedAt===undefined&&dispatch.outcome==='running'&&issue?.type==='error'&&
+        (issue.handler!=='parent'||origin==='operator'&&canSettle&&await isHumanCoordinator(options,board))&&
+        await canRecheckActiveWorkspace(options,item,dispatch.id);
+    return {state:'blocked',itemId:item.id,pendingIssueIds,...(resourceId&&canSettle?{canSettleDelivery:true}:{}),revision:sha256HexSync(JSON.stringify([item.id,item.revision,dispatch.id,dispatch.outcome,pendingIssueIds])),
         related:[],canRetry:false,canSelectCurrentVersion:false,...(canRecheck?{canRecheck:true}:{}),...optional({sessionId,resourceId,code:dispatch.code??item.blocked?.reason})};
 }
 
-async function canRecheckActiveWorkspace(options:TaskRecoveryOptions,dispatchId:string) {
+async function isHumanCoordinator(options:TaskRecoveryOptions,board:KanbanBoard):Promise<boolean> {
+    const actor=await options.service.currentPrincipal();
+    return actor.kind==='human'&&!!board.members?.some(member=>member.kind===actor.kind&&member.id===actor.id&&member.roles?.includes('coordinator'));
+}
+
+async function canRecheckActiveWorkspace(options:TaskRecoveryOptions,item:KanbanItem,dispatchId:string) {
     if(!options.recheck)return false;
     const record=await options.journal.get<import('../presets/kanban-development').DevelopmentWorkspaceRecord>('development-workspace:'+dispatchId);
     const readOnly=(record?.context as {delivery?:{readOnly?:boolean}}|undefined)?.delivery?.readOnly;
-    return !!record&&!readOnly&&!await options.journal.get('worktree-cleanup:'+(record.worktreeId??dispatchId))&&options.recheck.supports(record);
+    return !!record&&!readOnly&&item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'&&ref.id===record.projectId)&&
+        !await options.journal.get('worktree-cleanup:'+(record.worktreeId??dispatchId))&&options.recheck.supports(record);
 }
 
 /** Omit absent DTO fields before durable storage and strict channel hashing. */

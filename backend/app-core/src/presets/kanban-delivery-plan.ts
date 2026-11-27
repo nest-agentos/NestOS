@@ -1,6 +1,6 @@
 import {currentDeliveryRecord} from './kanban-delivery-options';
 import {t} from '@nestos/common';
-import {selectedDeliveryProfile,deliveryProfile,type DeliveryProfile as Profile} from '@nestos/git-delivery/policy';
+import {decisionDeliveryPolicy,selectedDeliveryProfile,deliveryProfile,type DeliveryProfile as Profile} from '@nestos/git-delivery/policy';
 import {savedManagementScopes} from './kanban-management-scope-catalog';
 import type {KanbanBoard,KanbanItem} from '@nestos/kanban/contracts';
 import type {KanbanAutomationJournal} from '@nestos/kanban/integration';
@@ -16,8 +16,20 @@ export function developmentDeliveryPlan(journal:KanbanAutomationJournal,service:
         const frozen=(record?.context as {delivery?:Profile}|undefined)?.delivery;
         const updated=(record?.context as {decision?:{snapshot?:{deliveryOptions?:unknown}}})?.decision?.snapshot?.deliveryOptions;
         if(updated&&record){const selected=selectedDeliveryProfile(record.policy,item,record.context);if(selected)return selected;}
-        return frozen?{...frozen,...(frozen.id==='source'?{acceptanceLabel:t('kanban.operationAcceptSource'),acceptanceConfirmation:t('kanban.operationConfirmSource')}:{})}:record&&deliveryProfile(record.policy,item)||{steps:['build','deploy','accept','analyze','merge','cleanup'],acceptance:'runtime'};
+        if(frozen)return {...frozen,...(frozen.id==='source'?{acceptanceLabel:t('kanban.operationAcceptSource'),acceptanceConfirmation:t('kanban.operationConfirmSource')}:{})};
+        return (record && recoverDeliveryPlan(record,item)) ?? {steps:['build','deploy','accept','analyze','merge','cleanup'],acceptance:'runtime'};
     };
+}
+/** Repair dispatches can omit a task profile while retaining an explicit decision policy. */
+function recoverDeliveryPlan(record:DevelopmentWorkspaceRecord,item:KanbanItem):DeliveryPlan|undefined {
+    const explicit=deliveryProfile(record.policy,item);
+    if(explicit)return selectedDeliveryProfile(record.policy,item,record.context)??explicit;
+    const snapshot=(record.context as {decision?:{snapshot?:{deliveryMode?:string;deliveryOptions?:{deliveryMode?:string}}}}|undefined)?.decision?.snapshot;
+    if((snapshot?.deliveryOptions??snapshot)?.deliveryMode!=='build-cleanup')return;
+    const policy=decisionDeliveryPolicy(record.policy,record.context);
+    if(policy?.deliveryMode!=='build-cleanup')return;
+    return {ordering:'configured',steps:['analyze','merge','build','accept','cleanup'],acceptance:'source',
+        acceptanceLabel:t('kanban.operationConfirmBuildReceipt'),acceptanceConfirmation:null};
 }
 /** Only a confirmed deployment receipt may become the independent verifier's input. */
 export async function deliveryEvidence(journal:KanbanAutomationJournal,context:unknown) {

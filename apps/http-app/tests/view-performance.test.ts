@@ -128,6 +128,36 @@ it('buffers out-of-order view patches and ignores stale snapshots', async () => 
     expect(root.getSnapshot()).toEqual(manager.snapshot);
     client.applyUpdates(first); expect(root.getSnapshot()).toEqual(manager.snapshot);
 });
+it('opens a native conversation when a concurrent update publishes its capability first', async () => {
+    let finishObservation!: () => void, observationStarted!: () => void;
+    const observing = new Promise<void>(resolve => { observationStarted = resolve; });
+    const release = new Promise<void>(resolve => { finishObservation = resolve; });
+    const snapshot = {messages: [{text: 'Decision'}]};
+    const conversation = {snapshot: () => snapshot, respond: vi.fn(), subscribe: async () => {
+        observationStarted(); await release; return () => {};
+    }, close: vi.fn()};
+    const openConversation = vi.fn(async () => ({conversation}));
+    const workbench = {readNavigation() {}, openConversation, eventSnapshot() {}, subscribe() {}, dispose() {}};
+    const {root, server, client, calls} = await pair(workbench);
+    const opened = root.openConversation('decision');
+    try {
+        await observing;
+        const updates = await server.refresh();
+        expect(updates).toEqual(expect.arrayContaining([expect.objectContaining({
+            $capability: expect.objectContaining({kind: 'HarnessConversationPort'}),
+        })]));
+        finishObservation();
+        const result = await opened;
+        expect(result.conversation.snapshot()).toEqual(snapshot);
+        client.applyUpdates(updates);
+        await result.conversation.close();
+        expect(openConversation).toHaveBeenCalledExactlyOnceWith('decision');
+        expect(conversation.close).toHaveBeenCalledTimes(1);
+        expect(calls.map(call => call.method)).toEqual(['openConversation', 'close']);
+    } finally {
+        finishObservation(); await Promise.allSettled([opened]);
+    }
+});
 it('refreshes previously requested remote status lookups after a scoped subscription event', async () => {
     const listeners = new Set<() => void>(); let observation = { execution: 'idle' };
     const status = { fileVersion: () => undefined, record: () => ({ observation }), get: () => observation,

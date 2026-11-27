@@ -1,6 +1,6 @@
 import {developmentDeliveryPolicy} from '@nestos/kanban-development';
-import type {KanbanRecordPage} from '@nestos/kanban/contracts';
-import {recordFinalization,safeCode,type KanbanAutomationJournal} from '@nestos/kanban/integration';
+import type {KanbanItemSummary,KanbanRecordPage,KanbanTaskProjection} from '@nestos/kanban/contracts';
+import {deliveryStatus,recordFinalization,safeCode,type AutomaticDeliveryState,type KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {randomUUID} from '@nestos/common';
 import {automaticDeliveryStatuses} from '@nestos/kanban/integration';
 
@@ -42,4 +42,49 @@ export async function projectManagementFinalization(
     if(status.state==='blocked')return {...task,phase:'error',reason:status.code??'DELIVERY_BLOCKED'};
     if(status.state==='waiting-confirmation')return {...task,phase:'waiting-input',reason:'DELIVERY_CONFIRMATION_REQUIRED'};
     return task;
+}
+
+/** Use the persisted delivery journal for board placement without opening workspaces or Sessions. */
+export async function projectClosedDevelopmentGroups(journal:KanbanAutomationJournal,boardId:string,items:readonly KanbanItemSummary[]) {
+    const ids=new Set(items.filter(item=>item.externalRefs?.some(ref=>ref.system==='nestos-software-reports')).map(item=>item.id));
+    const result=new Map<string,Pick<KanbanTaskProjection,'phase'|'reason'>>();
+    if(!ids.size)return result;
+    const keys=ids.size===1?[boardId,[...ids][0]]:[boardId];
+    const prefix='automatic-delivery:'+JSON.stringify(keys).slice(0,-1)+(ids.size===1?'':',');
+    const saved=await readDevelopmentDelivery(journal,boardId,prefix,ids);
+    if(!saved)return new Map([...ids].map(id=>[id,{phase:'unknown' as const,reason:'DELIVERY_STATUS_UNCONFIRMED'}]));
+    const states=new Map<string,AutomaticDeliveryState[]>();
+    for(const {value} of saved){
+        const rows=states.get(value.itemId)??[];
+        rows.push(value);states.set(value.itemId,rows);
+    }
+    for(const id of ids){
+        const rows=states.get(id)??[],scopes=rows.filter(row=>row.scopeId);
+        const delivery=developmentDeliveryPhase(scopes.length?scopes:rows);
+        if(delivery)result.set(id,delivery);
+    }
+    return result;
+}
+
+async function readDevelopmentDelivery(journal:KanbanAutomationJournal,boardId:string,prefix:string,ids:Set<string>) {
+    const started=Date.now(),operationId=randomUUID(),stage='closed-groups.delivery.read';
+    try {
+        const rows=await journal.find<AutomaticDeliveryState>(prefix,value=>value.boardId===boardId&&ids.has(value.itemId));
+        journal.diagnostic({operationId,boardId,stage,result:'success',count:rows.length,durationMs:Date.now()-started});
+        return rows;
+    } catch(error) {
+        const code=safeCode(error,'DELIVERY_STATUS_UNCONFIRMED');
+        journal.diagnostic({operationId,boardId,stage,result:'failure',code,durationMs:Date.now()-started});
+    }
+}
+
+function developmentDeliveryPhase(rows:AutomaticDeliveryState[]):Pick<KanbanTaskProjection,'phase'|'reason'>|undefined {
+    if(!rows.length)return {phase:'waiting-dependency',reason:'DELIVERY_PENDING'};
+    const pending=rows.map(row=>deliveryStatus({...row,steps:row.steps??developmentDeliveryPolicy.steps}))
+        .filter(row=>row.state!=='completed'&&row.stage!=='cleanup');
+    const blocked=pending.find(row=>row.state==='blocked');
+    if(blocked)return {phase:'error',reason:blocked.code??'DELIVERY_BLOCKED'};
+    if(pending.some(row=>row.state==='waiting-confirmation'))return {phase:'waiting-input',reason:'DELIVERY_CONFIRMATION_REQUIRED'};
+    if(pending.some(row=>row.waitingForTarget))return {phase:'waiting-dependency',reason:'DELIVERY_WAITING_FOR_TARGET'};
+    if(pending.length)return {phase:'running',reason:'DELIVERY_IN_PROGRESS'};
 }

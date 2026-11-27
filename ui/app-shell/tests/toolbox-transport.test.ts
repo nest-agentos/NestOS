@@ -44,6 +44,7 @@ it('renders and refreshes prepared toolbox data without frontend filesystem call
         expect(reverseReads).toEqual([]);
         expect(methods).not.toContain('getChildren'); expect(methods).not.toContain('getNodeType');
         expect(toolbox.resources.providerTemplates).toContainEqual({id: 'doubao-speech', name: 'Doubao (豆包语音)'});
+        expect(toolbox.resources.providerTemplates).toContainEqual({id: 'gemini', name: 'Google Gemini'});
         expect(toolbox.resources.providerTemplates.every((item: object) => Object.keys(item).sort().join(',') === 'id,name')).toBe(true);
         const before = runtime.agentService.getProviders().length;
         await expect(toolbox.resources.create('providers', 'Missing preset', undefined, 'missing')).rejects.toMatchObject({code: 'PROVIDER_TEMPLATE_MISSING'});
@@ -57,6 +58,11 @@ it('renders and refreshes prepared toolbox data without frontend filesystem call
         const created = (await runtime.agentService.getFullProvider(path.slice('/providers/'.length)))!;
         expect(created).toMatchObject({name: 'Remote speech', isBuiltin: false, media: {'speech.synthesize': {adapter: 'doubao-speech'}}});
         expect(created.apiKey).toBeUndefined(); expect(created.models[0].operations?.['speech.synthesize']?.formats).toContain('mp3');
+        expect(await toolbox.resources.create('providers', 'Google Gemini', undefined, 'gemini')).toBe('/providers/gemini');
+        const google = await runtime.agentService.getFullProvider('gemini');
+        expect(google).toMatchObject({implementation: 'gemini', connectionTestModel: 'gemini-3.8-flash'});
+        expect(google?.models).toContainEqual(expect.objectContaining({id: 'gemini-3.8-flash'}));
+        expect(google?.apiKey).toBeUndefined();
         const skills = await root.backend.skillsFiles();
         expect((await skills.driver.getChildren('/')).some((node: {metadata: {title: string}}) => node.metadata.title === 'Updated prepared skill')).toBe(true);
         expect(reverseReads).toEqual([]);

@@ -207,7 +207,7 @@ export class ViewApi {
                 result: reply.error ? 'failure' : 'success', ...replyDiagnostics([reply]), durationMs: Date.now() - started});
             return reply;
         })));
-        const started = Date.now(), updates = await client.peer.refresh();
+        const started = Date.now(), updates = await client.peer.refresh(replies);
         if (Date.now() - started >= 1000) this.audit?.write({...diagnosticContext(),event: 'application.call', requestId: String(response?.getHeader('X-Request-ID') ?? ''),
             stage: 'snapshots', result: 'success', durationMs: Date.now() - started});
         return { replies, updates };

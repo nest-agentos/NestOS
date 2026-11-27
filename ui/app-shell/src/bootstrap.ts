@@ -327,6 +327,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         wsConfig: WorkspaceConfig,
         own: (cleanup: Cleanup) => void,
         initialResource?: string,
+        openingTrace?: import('@nestos/app-contracts').ConversationOpenTrace,
     ): Promise<WorkspaceController | undefined> => {
         const { elementId } = wsConfig;
         const windowBinding = {registry: windows, id: elementId, isActive: () => visibleWorkspaceId === elementId,
@@ -411,7 +412,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                 },
                 openSessionInteraction:sessionInteractionDialog(services.projects,id=>handleNavigationRequest({target:'chat',resourceId:id,options:{newTab:true}})),
                 selected: path => selectionHistory(elementId, path, 'push'),
-                openSession: id => handleNavigationRequest({target: 'chat', resourceId: id, options: {newTab: true}})});
+                openSession: id => handleNavigationRequest({target: 'chat', resourceId: id, options: {newTab: true}},false,'kanban-link')});
             own(module.dispose); await module.workbench.start(); managerCache.set(elementId, module.workbench);
             if (visibleWorkspaceId !== elementId || document.hidden) await module.workbench.setVisible?.(false);
             else options.onWorkspaceReady?.({editor: editorEl});
@@ -480,11 +481,13 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             const target = resourcePath ? resourceTarget(resourcePath) : undefined;
             const initialOpening = projection?.opening ?? opened?.conversationWorkbench;
             const preparedLocal = !!target && target.kind === 'session' && opened?.initial?.sessionId === target.sessionId;
+            const trace = target?.kind==='remote'&&target.nativeSessionId&&openingTrace
+                ? {...openingTrace,operationId:randomUUID(),parentOperationId:openingTrace.operationId}:undefined;
             const opening = initialOpening && (initialOpening.resourceId ?? initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === (resourcePath ?? initialResource) ? initialOpening
                 : target && !preparedLocal && backend.openWorkbench
-                ? await backend.openWorkbench({resourceId: resourcePath!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore'})
+                ? await backend.openWorkbench({resourceId: resourcePath!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore',...(trace?{trace}:{})})
                 : target && target.kind === 'remote' && target.nativeSessionId && backend.openConversationWorkbench
-                ? await backend.openConversationWorkbench({resourceId: initialResource!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore'}) : undefined;
+                ? await backend.openConversationWorkbench({resourceId: initialResource!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore',...(trace?{trace}:{})}) : undefined;
             if (opening) uiDocs.seed(opening.documents);
             const [uiPersistence, workbenchState] = await traceBoot('workspace.chatState (parallel)', () => Promise.all([
                 uiState.port(SESSION_BROWSER_SCOPE), uiState.workbenchPort(SESSION_BROWSER_SCOPE),
@@ -629,13 +632,13 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     };
 
     /** Keep workspace creation independent of resource navigation; only the latest route may open content. */
-    const loadWorkspace = (wsConfig: WorkspaceConfig, initialResource?: string): Promise<WorkspaceController | undefined> => {
+    const loadWorkspace = (wsConfig: WorkspaceConfig, initialResource?: string, navigation?: import('@nestos/app-contracts').ConversationOpenTrace): Promise<WorkspaceController | undefined> => {
         const { elementId } = wsConfig;
         if (pendingLoads.has(elementId)) return pendingLoads.get(elementId)!;
         if (managerCache.has(elementId)) return Promise.resolve(managerCache.get(elementId));
         const owned = cleanupGroup(() => recoveringView);
         const eventGeneration = applicationEvents?.generation;
-        const loading = doLoadWorkspace(wsConfig, owned.own, initialResource).then(manager => {
+        const loading = doLoadWorkspace(wsConfig, owned.own, initialResource, navigation).then(manager => {
             if (options.recovery?.workspaces.has(elementId)) {
                 managerCache.get(elementId)?.restoreRecovery?.(options.recovery.workspaces.get(elementId));
             }
@@ -682,7 +685,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         if (!closed && !replayingHistory && routingRevision === undefined && visibleWorkspaceId === id) updateHistory(id, resource, mode);
     };
 
-    const performNavigation = async (workspaceId: string, resourceId?: string, sourceSlug?: string, historyReplay?: symbol, openOptions?: import('@nestos/app-contracts').WorkspaceOpenOptions, failOnError = false): Promise<void> => {
+    const performNavigation = async (workspaceId: string, resourceId?: string, sourceSlug?: string, historyReplay?: symbol, openOptions?: import('@nestos/app-contracts').WorkspaceOpenOptions, failOnError = false, openSource?: import('@nestos/app-contracts').ConversationOpenSource): Promise<void> => {
         if (replayingHistory !== historyReplay) replayingHistory = undefined;
         const revision = ++navigationRevision;
         if (closed) return;
@@ -697,7 +700,8 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         let navigationFailed = false;
         visibleWorkspaceId = workspaceId; windows.changed();
         for (const [id, workbench] of managerCache) {
-            void Promise.resolve(workbench.setVisible?.(id === workspaceId && !document.hidden)).catch(error => console.error('[Shell] Workspace save failed', error));
+            const visible = id === workspaceId && !document.hidden;
+            void Promise.resolve(workbench.setVisible?.(visible)).catch(error => console.error('[Shell] Workspace visibility update failed', {workspaceId: id, visible}, error));
         }
         if (diagnostics) console.debug(`[Shell] performNavigation: ${workspaceId} resourceId=${resourceId ?? '—'} cached=${managerCache.has(workspaceId)}`);
         document.querySelectorAll('.workspace-view').forEach(ws => {
@@ -729,11 +733,12 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             }
             if (closed || revision !== navigationRevision) return;
             const wsConfig = workspaces.find(w => w.elementId === workspaceId);
-            const mgr = wsConfig ? await loadWorkspace(wsConfig, resourceId) : undefined;
+            const navigation = {operationId:completeNavigation.operationId, source:openSource??(historyReplay?'history-restore' as const:'navigation' as const)};
+            const mgr = wsConfig ? await loadWorkspace(wsConfig, resourceId, navigation) : undefined;
             if (closed || revision !== navigationRevision) return;
             if (mgr && resourceId) {
                 const wasAlreadyOpen = mgr.getActiveResourceId() === resourceId;
-                await restoreWorkspaceResource(mgr, resourceId, openOptions);
+                await restoreWorkspaceResource(mgr, resourceId, isNativeConversationRoute(resourceId)?{...openOptions,navigation}:openOptions);
                 if (closed || revision !== navigationRevision) return;
                 // A retained editor needs the anchor forwarded explicitly.
                 if (wasAlreadyOpen) {
@@ -794,7 +799,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     };
 
     const isProjectWorkspace = (id: string) => workspaces.some(ws => ws.elementId === id && ws.type === 'chat');
-    const handleNavigationRequest = async (req: NavigationRequest, failOnError = false): Promise<void> => {
+    const handleNavigationRequest = async (req: NavigationRequest, failOnError = false, source?: import('@nestos/app-contracts').ConversationOpenSource): Promise<void> => {
         rememberCurrentPage();
         const moved = toolboxId && req.target === 'settings' ? toolboxSettingsRoute(req.resourceId, req.state?.anchor) : undefined;
         if (moved) req = { ...req, target: 'toolbox', resourceId: moved, state: undefined };
@@ -846,7 +851,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                 }
                 const resourceId = req.resourceId ?? (isProjectWorkspace(targetWsId) ? '/' : undefined);
                 updateHistory(targetWsId, resourceId ?? null, 'push');
-                await performNavigation(targetWsId, resourceId, req.target, undefined, req.options?.newTab ? {newTab: true} : undefined, failOnError);
+                await performNavigation(targetWsId, resourceId, req.target, undefined, req.options?.newTab?{newTab:true}:undefined, failOnError, source);
             }
         }
     };

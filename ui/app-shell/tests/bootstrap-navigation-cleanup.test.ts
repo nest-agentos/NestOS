@@ -551,7 +551,9 @@ it('opens a Kanban Session in a new NestOS tab and retains the source workspace'
     try {
         expect(kanbanSession.open).toBeTypeOf('function');
         await kanbanSession.open!('/folder:x1/@harness/codex/native');
-        expect(lifecycle.open).toHaveBeenCalledWith('/folder:x1/@harness/codex/native', {newTab: true});
+        expect(lifecycle.open).toHaveBeenCalledWith('/folder:x1/@harness/codex/native', {
+            newTab: true, navigation: {source: 'kanban-link', operationId: expect.any(String)},
+        });
         expect(document.getElementById(workspace.elementId)?.textContent).toContain('Retained kanban');
         expect(kanbanSession.destroy).not.toHaveBeenCalled();
     } finally {await app.destroy();}

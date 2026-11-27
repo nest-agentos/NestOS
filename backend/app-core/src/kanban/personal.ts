@@ -3,7 +3,7 @@ import {cleanupExecutionSessions} from './cleanup-execution-sessions';
 import {retainedManagementDirectory} from '../presets/kanban-management-retention';
 import {KANBAN_EXECUTION_SESSION} from '@nestos/app-contracts';
 import {createSoftwareDevelopmentPlugin} from '@nestos/kanban-development';
-import {projectManagementFinalization,recordFollowUps} from './record-follow-ups';
+import {projectClosedDevelopmentGroups,projectManagementFinalization,recordFollowUps} from './record-follow-ups';
 import {assertWorkspaceCleanup} from './workspace-cleanup-blocker';
 import {workProjectId} from './task-projects';
 import {taskCommunication} from './task-communication';
@@ -48,7 +48,8 @@ export async function createPersonalKanban(fs: IFileSystem, events: UserEventSer
         requiresItemResource:automationOptions?.requiresItemResource,archiveSession:automationOptions?.archiveSession,
         control:kanbanControlOptions(automationOptions??{calls:{list:async()=>[]}},journal),
         prepareRecordReads:service=>createRecordReadSource(service,{...base,referenceSystem:KANBAN_EXECUTION_SESSION}),
-        createService:options=>createNestOSKanban({...options,notifications:base.notifications}),
+        createService:options=>createNestOSKanban({...options,notifications:base.notifications,
+            projectClosedGroups:(board,items)=>projectClosedDevelopmentGroups(journal,board,items)}),
         extensions:context=>personalExtensions(context,automationOptions,events,base.log,value=>{operations=value;},()=>client)});
     client=runtime.service;
     try{await runtime.service.scan();await reportKanbanHealth(events);}catch(error){await reportKanbanHealth(events,error);}

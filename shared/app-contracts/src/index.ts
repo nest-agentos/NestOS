@@ -8,7 +8,8 @@ export { remoteLog, RemoteConnectionUnavailableError, reportRemoteFailure } from
 export type { CellsConnectionReason, CellsConnectionDiagnostic } from './projects/remote-diagnostics';
 export { TOOLBOX_KINDS, toolboxKind, toolboxSourcePath, toolboxPath } from './configuration/toolbox-identity';
 export type { ToolboxKind } from './configuration/toolbox-identity';
-export type { WorkspaceController, WorkspaceCreation, WorkspaceOpenOptions } from './core/WorkspaceController';
+export {conversationOpenSources} from './core/WorkspaceController';
+export type { ConversationOpenSource, ConversationOpenTrace, WorkspaceController, WorkspaceCreation, WorkspaceOpenOptions } from './core/WorkspaceController';
 export { TWIN_KINDS, memoryData, validateRelation } from './digital-twin/domain';
 export type { TwinMemoryKind, TwinRelation, TwinMemoryData, TwinSourceSpec, TwinDiscoveredSource, TwinSourceCatalog, TwinSourceData, TwinSourceContent, TwinSourceReader, TwinSettings, TwinGrantData, TwinAnalysisJob, TwinCandidate } from './digital-twin/domain';
 export { userIdentity, identityKey } from './digital-twin/identity';

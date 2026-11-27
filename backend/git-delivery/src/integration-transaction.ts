@@ -10,7 +10,7 @@ import {dirtyIntegrationModules} from './integration-source-script';
 import {integrationScript} from './integration-transaction-script';
 
 export interface GitConflictResolution {path:string;choice:string;mode:'100644'|'100755'|'delete';oid?:string}
-type GitChoice='source'|'target'|Pick<GitConflictResolution,'mode'|'oid'>;
+type GitChoice='source'|'target'|'retain-target'|Pick<GitConflictResolution,'mode'|'oid'>;
 export interface GitIntegrationTransaction {
     operationId: string;
     previousTarget: string;
@@ -41,8 +41,12 @@ export async function tryGitIntegration(process: GitProcess, input: GitIntegrati
     const code = stage && /^[A-Z_]{1,70}$/.test(stage) ? stage : 'INTEGRATION_OUTCOME_UNKNOWN';
     log.info('Git integration transaction', {operationId: input.operationId, stage: 'integration.apply',
         result: result.code === 0 ? 'success' : 'failure', code, durationMs: Date.now() - started});
-    if (code === 'INTEGRATION_MODULE_CAPTURE_FAILED') throw Object.assign(failure(code), {executionOutcome:'not-started'});
-    if (code === 'MERGE_PLAN_CONFLICTS_MISSING') throw Object.assign(failure(code), {executionOutcome:'not-started'});
+    if (['INTEGRATION_MODULE_CAPTURE_FAILED','MERGE_PLAN_CONFLICTS_MISSING','INTEGRATION_APPROVED_BLOB_MISSING','INTEGRATION_RETAIN_TARGET_INVALID'].includes(code)) {
+        throw Object.assign(failure(code), {executionOutcome:'not-started'});
+    }
+    if (result.code === 3 && input.resolutions && code !== 'INTEGRATION_PUBLICATION_UNKNOWN') {
+        throw Object.assign(failure(code), {executionOutcome:'not-started'});
+    }
     if (result.code === 3 && code !== 'INTEGRATION_PUBLICATION_UNKNOWN') return 'session';
     if (code === 'INTEGRATION_SOURCE_CHANGED' || code === 'INTEGRATION_TARGET_CHANGED') {
         throw Object.assign(failure(code), {executionOutcome: 'not-started'});
@@ -157,7 +161,7 @@ function integrationChoices(approval?:GitApproval,resolutions?:GitConflictResolu
     for(const conflict of approval?.plan?.conflicts??[]){
         const choice=approval?.selections?.[conflict.id];
         if(!choice||!conflict.options.some(option=>option.id===choice)||choices.has(conflict.path))return;
-        if(choice==='source'||choice==='target'){choices.set(conflict.path,choice);continue;}
+        if(choice==='source'||choice==='target'||choice==='retain-target'){choices.set(conflict.path,choice);continue;}
         const proposal=supplied.get(conflict.path);
         if(!proposal||proposal.choice!==choice)return;
         supplied.delete(conflict.path);

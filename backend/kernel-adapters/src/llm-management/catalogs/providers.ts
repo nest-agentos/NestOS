@@ -252,7 +252,7 @@ export const LLM_PROVIDERS: Record<string, LLMProvider> = {
     },
 
     gemini: {
-        connectionTestModel: 'gemini-3.5-flash',
+        connectionTestModel: 'gemini-3.8-flash',
         id: 'gemini', isBuiltin: true,
         name: 'Google Gemini',
         implementation: 'gemini',
@@ -265,6 +265,10 @@ export const LLM_PROVIDERS: Record<string, LLMProvider> = {
         },
         models: [
             { id: 'gemini-3.1-pro', name: MODEL_NAME_GEMINI_31_PRO, icon: '🌟' },
+            { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', icon: '⚡', supportsThinking: true, reasoning: {
+                transport: 'effort', defaultEffort: 'medium',
+                efforts: [{ id: 'low', value: 'LOW' }, { id: 'medium', value: 'MEDIUM' }, { id: 'high', value: 'HIGH' }],
+            } },
             { id: 'gemini-3.5-flash', name: MODEL_NAME_GEMINI_35_FLASH, icon: '⚡' },
         ],
     },

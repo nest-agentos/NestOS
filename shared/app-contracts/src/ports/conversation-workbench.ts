@@ -1,6 +1,7 @@
 import type {ProjectConversationPort, ProjectDraftComposer, ProjectFolder} from './projects';
 import type {SessionDirectoryView, SessionOpenView, WorkbenchView} from './session';
 import type {ApplicationViewEvent} from './open-view';
+import type {ConversationOpenTrace} from '../core/WorkspaceController';
 
 export interface ProjectDraftOpening {
     project: ProjectFolder;
@@ -23,6 +24,7 @@ export interface WorkbenchOpenRequest {
     resourceId: string;
     documents: string[];
     displayedFilesPolicy?: 'gitignore' | 'all';
+    trace?: ConversationOpenTrace;
 }
 export interface WorkbenchNavigationRequest {
     projectId?: string | null;
@@ -56,7 +58,7 @@ export interface ResourceWorkbenchView {
     subscribe(listener: (event: ApplicationViewEvent) => void, failed?: (failure: {code: string}) => void): Promise<() => void>;
     cursor: number;
     prepareChat(): Promise<NonNullable<WorkbenchView['chat']>>;
-    openConversation(resourceId: string): Promise<PreparedConversation>;
+    openConversation(resourceId: string, trace?: ConversationOpenTrace): Promise<PreparedConversation>;
     openSession?(sessionId: string): Promise<SessionOpenView>;
     prepareDraftSession?(draftId: string, request?: Parameters<ProjectDraftComposer['prepare']>[0]):
         Promise<Awaited<ReturnType<ProjectDraftComposer['prepare']>> & {view: SessionOpenView}>;

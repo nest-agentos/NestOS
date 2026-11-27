@@ -92,10 +92,11 @@ async function processRequests(options:TaskRecoveryOptions,ports:Ports,scope:Rec
     }
 }
 async function resolve(options:TaskRecoveryOptions,ports:Ports,scope:RecoverySession,request:ChannelRequest):Promise<unknown> {
-    const state=await ports.inspect(options,scope.boardId,scope.itemId);
+    const state=await ports.inspect(options,scope.boardId,scope.itemId,'session');
     if(request.method==='kanban.recovery.inspect')return {...state,methods:[{method:'kanban.recovery.retry',params:{expectedRevision:state.revision},available:state.canRetry},...(state.canRecheck||state.reportHandoff?.canRecheck?[{method:'kanban.recovery.recheck',params:{expectedRevision:state.revision},available:true}]:[]),{method:'kanban.recovery.retry-current',params:{expectedRevision:state.revision},available:state.canSelectCurrentVersion,confirmationRequired:true},{method:'kanban.recovery.fix',params:{expectedRevision:state.revision,sourceItemId:state.related[0]?.itemId??scope.itemId},available:!state.reportHandoff}],confirmation:(await conversationPolicy(options.fs)).confirmVersion};
     const action=request.method==='kanban.recovery.retry'?'retry':request.method==='kanban.recovery.retry-current'?'retry-current':request.method==='kanban.recovery.fix'?'fix':request.method==='kanban.recovery.recheck'?'recheck':undefined;requireValue(action,'RECOVERY_METHOD_UNSUPPORTED');
     requireValue(request.params.itemId===undefined||request.params.itemId===scope.itemId,'RECOVERY_SCOPE_MISMATCH');
+    if(action==='recheck')requireValue(state.canRecheck||state.reportHandoff?.canRecheck,'RECOVERY_TARGET_NOT_READY');
     if(action==='retry-current') {
         const port=await options.remote.projectConversation(scope.projectId,scope.profileId,scope.sessionId);
         try {const message=(await port.read()).messages.filter(row=>row.role==='user').at(-1);requireValue(message?.text.trim()===(await conversationPolicy(options.fs)).confirmVersion,'RECOVERY_USER_CONFIRMATION_REQUIRED');requireValue(request.params.expectedRevision===state.revision,'RECOVERY_STALE_REFRESH');

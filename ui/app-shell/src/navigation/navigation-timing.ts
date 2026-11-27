@@ -8,7 +8,7 @@ export function beginNavigationTiming(cached: boolean, report?: (diagnostic: Cli
     const context = {operation:'navigation.open', operationId, cached};
     window.dispatchEvent(new CustomEvent(NAVIGATION_EVENTS.START, {detail:context}));
     log.info('navigation.open', {...context,stage:'start',result:'started',durationMs:0});
-    return (result: 'success' | 'failure' | 'superseded') => {
+    const complete = (result: 'success' | 'failure' | 'superseded') => {
         const record = {...context,stage:'ready',result,durationMs:Math.round(performance.now()-started)};
         window.dispatchEvent(new CustomEvent(NAVIGATION_EVENTS.END, {detail:record}));
         if (result === 'failure') log.warn('navigation.open',record); else log.info('navigation.open',record);
@@ -18,4 +18,5 @@ export function beginNavigationTiming(cached: boolean, report?: (diagnostic: Cli
             try {void Promise.resolve(report?.(diagnostic)).catch(()=>{});} catch { /* Diagnostics cannot block navigation or retry commands. */ }
         }
     };
+    return Object.assign(complete,{operationId});
 }

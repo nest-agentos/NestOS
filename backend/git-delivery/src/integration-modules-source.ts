@@ -1,14 +1,15 @@
 /** Capture declared module edits as deterministic child commits without moving refs or real indexes. */
 export const captureIntegrationModules = `
 capture_module_tree() {
-    python3 - "$1" "$2" "$3" "$4" "$5" "$6" <<'PYTHON'
+    python3 - "$1" "$2" "$3" "$4" "$5" "$6" "\${7:-}" <<'PYTHON'
 import json
 import os
 import subprocess
 import sys
 import tempfile
 
-source, head, modules, scratch, destination, expected_tree = sys.argv[1:]
+source, head, modules, scratch, destination, expected_tree, raw_choices = sys.argv[1:]
+choices = json.loads(raw_choices) if raw_choices else {}
 def git(root, *args, env=None, input=None):
     return subprocess.check_output(['git', '-C', root, *args], env=env, input=input).strip()
 
@@ -44,7 +45,22 @@ def snapshot_module(root, base, scratch):
     return git(root, '-c', 'commit.gpgSign=false', 'commit-tree', tree, '-p', base,
                '-m', 'chore(delivery): snapshot approved module changes', env=identity)
 
-def import_module(root, target, commit, base, scratch):
+def import_approved_blobs(root, target, name):
+    for path, choice in choices.items():
+        if not path.startswith(name + '/') or not isinstance(choice, dict) or 'oid' not in choice:
+            continue
+        oid = choice['oid'].encode('ascii')
+        kind = subprocess.run(['git', '-C', root, 'cat-file', '-t', oid], capture_output=True)
+        if kind.stdout.strip() != b'blob':
+            continue
+        with tempfile.TemporaryFile() as blob:
+            subprocess.run(['git', '-C', root, 'cat-file', 'blob', oid], stdout=blob, check=True)
+            blob.seek(0)
+            actual = subprocess.check_output(['git', '-C', target, 'hash-object', '-w', '--stdin'], stdin=blob).strip()
+        if actual != oid:
+            raise ValueError('Approved blob identity changed during import')
+
+def import_module(root, target, commit, base, scratch, name):
     git(target, 'cat-file', '-e', base + '^{commit}')
     packfile = os.path.join(scratch, 'module.pack')
     with open(packfile, 'w+b') as pack:
@@ -53,6 +69,7 @@ def import_module(root, target, commit, base, scratch):
         pack.seek(0)
         subprocess.run(['git', '-C', target, 'unpack-objects'], stdin=pack, check=True)
     git(target, 'cat-file', '-e', commit + b'^{commit}')
+    import_approved_blobs(root, target, name)
     git(target, 'update-ref', b'refs/nestos/module-delivery/' + commit, commit)
 
 with tempfile.TemporaryDirectory(dir=scratch) as temp:
@@ -69,7 +86,7 @@ with tempfile.TemporaryDirectory(dir=scratch) as temp:
         commit = snapshot_module(module, base, child_scratch)
         if destination:
             target = module_root(destination, name)
-            imports.append((module, target, commit, base, child_scratch))
+            imports.append((module, target, commit, base, child_scratch, name))
         git(source, 'update-index', '--cacheinfo', b'160000,' + commit + b',' + os.fsencode(name),
             env=index_environment(root_index))
     tree = git(source, 'write-tree', env=index_environment(root_index)).decode()

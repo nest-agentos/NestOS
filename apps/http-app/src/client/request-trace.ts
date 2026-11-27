@@ -32,13 +32,16 @@ export class BrowserRequestTrace {
             && !/^0+$/.test(operationId.replaceAll('-','')) ? operationId.replaceAll('-','') : traceId();
     }
     compatibility(error: unknown): void {
-        const value=error as {code?:string;capabilityKind?:string;rpcMethod?:string};
-        if(value?.code!=='RPC_METHOD_UNSUPPORTED'||!value.capabilityKind||!value.rpcMethod
+        const value=error as {code?:string;remoteCode?:string;capabilityKind?:string;rpcMethod?:string;requestId?:string;durationMs?:number};
+        const code=value?.remoteCode==='RPC_CAPABILITY_REFERENCE_UNKNOWN'?value.remoteCode:value?.code;
+        if((code!=='RPC_METHOD_UNSUPPORTED'&&code!=='RPC_CAPABILITY_REFERENCE_UNKNOWN')||!value.capabilityKind||!value.rpcMethod
             ||![value.capabilityKind,value.rpcMethod].every(name=>/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name)))return;
         const operationId=randomUUID();
-        this.diagnostics.add({operation:'http.rpc',operationId,stage:'rpc.decode',code:value.code,result:'failure',durationMs:0,
+        const durationMs=typeof value.durationMs==='number'&&Number.isFinite(value.durationMs)?Math.min(86400000,Math.max(0,value.durationMs)):0;
+        this.diagnostics.add({operation:'http.rpc',operationId,stage:'rpc.decode',code,result:'failure',durationMs,requestId:safeId(value.requestId??null),
             http:{browserSessionId:this.browserSessionId,traceId:this.navigation,spanId:randomUUID().replaceAll('-','').slice(0,16),occurredAt:Date.now(),
                 method:'POST',route:'/api/application',capabilityKind:value.capabilityKind,rpcMethod:value.rpcMethod}});
+        this.diagnostics.flush();
     }
     viewUpdateFailure(clientId: string, error: unknown): void {
         const failure = error as {code?: unknown; remoteCode?: unknown; reason?: unknown; requestId?: unknown; name?: string};

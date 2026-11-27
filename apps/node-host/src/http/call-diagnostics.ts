@@ -1,7 +1,7 @@
-import { InputAssetCommand } from '@nestos/app-contracts';
+import { conversationOpenSources, InputAssetCommand, resolveBrowserTarget } from '@nestos/app-contracts';
 import type { Call, Reply } from '@nestos/app-transport/rpc';
 
-/** Only registered command names and bounded upload metadata may enter the audit log. */
+/** Only registered operations and bounded metadata may enter the audit log. */
 export function callDiagnostics(calls: Call[], operations: string[], commands: ReadonlySet<string>) {
     const rpcCommands = calls.flatMap((call, index) => operations[index] === 'ICommandBus.execute'
         && typeof call.args[0] === 'string' && commands.has(call.args[0]) ? [call.args[0]] : []);
@@ -18,7 +18,33 @@ export function callDiagnostics(calls: Call[], operations: string[], commands: R
     });
     const rpcUnavailable = calls.flatMap((call, index) => operations[index]?.startsWith('unknown.') && /^(?:client|server):(?:[a-f0-9-]{36}:)?[0-9]{1,10}$/.test(call.target)
         ? [{target: call.target, method: operations[index].slice(8)}] : []);
-    return {...(rpcUnavailable.length ? {rpcUnavailable} : {}), ...(rpcCommands.length ? {rpcCommands} : {}), ...(uploads.length ? {uploads} : {})};
+    const conversationOpens = calls.flatMap((call,index)=>{
+        const rpc=operations[index];
+        if(rpc==='ConversationWorkbenchView.openConversation')return conversationOpen(call.args[0],call.args[1]);
+        if(rpc==='ApplicationBackend.openWorkbench'||rpc==='ApplicationBackend.openConversationWorkbench'){
+            const request=call.args[0] as {$object?:{resourceId?:unknown;trace?:unknown}}|undefined;
+            return conversationOpen(request?.$object?.resourceId,request?.$object?.trace);
+        }
+        return [];
+    });
+    return {...(rpcUnavailable.length ? {rpcUnavailable} : {}), ...(rpcCommands.length ? {rpcCommands} : {}), ...(uploads.length ? {uploads} : {}),
+        ...(conversationOpens.length?{conversationOpens}:{})};
+}
+
+function conversationOpen(resource:unknown,wire:unknown) {
+    if(typeof resource!=='string'||resource.length>4096)return [];
+    const envelope=wire as {$object?:{operationId?:unknown;parentOperationId?:unknown;source?:unknown}}|undefined;
+    const trace=envelope?.$object;
+    if(!trace||!traceId(trace.operationId)||!conversationOpenSources.some(source=>source===trace.source))return [];
+    try {
+        const target=resolveBrowserTarget(resource);
+        if(target.kind!=='remote'||!target.nativeSessionId||!/^[a-zA-Z0-9_-]{1,128}$/.test(target.nativeSessionId))return [];
+        return [{operationId:trace.operationId,source:trace.source,sessionId:target.nativeSessionId,
+            ...(traceId(trace.parentOperationId)?{parentOperationId:trace.parentOperationId}:{})}];
+    } catch {return [];}
+}
+function traceId(value:unknown):value is string {
+    return typeof value==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value);
 }
 
 function fileMetadata(value: unknown): {mimeType: string; bytes?: number} {

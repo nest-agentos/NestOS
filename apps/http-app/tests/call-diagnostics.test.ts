@@ -21,3 +21,18 @@ it('records only bounded capability IDs and registered missing methods for stale
     expect(details).toEqual({rpcUnavailable:[{target:'server:123',method:'dispose'}]});
     expect(JSON.stringify(details)).not.toContain('PRIVATE');
 });
+
+it('correlates native conversation opens without recording full resource paths or other arguments',()=>{
+    const operationId='0a6f924f-3bb1-4a52-b359-9fcf7ecd1711',parentOperationId='83b11ee8-a946-4ce3-9d95-00078a7d86aa';
+    const sessionId='01a217c8-6027-7802-8c47-2cf6e6134ed8',resource='/folder:private-project/@harness/codex/'+sessionId;
+    const call={target:'workbench',method:'openConversation',args:[resource,{$object:{operationId,parentOperationId,source:'visibility-resume',content:'PRIVATE'}}]};
+    const invalid={...call,args:[resource,{$object:{operationId,source:'PRIVATE'}}]};
+    const initial={target:'backend',method:'openWorkbench',args:[{$object:{resourceId:resource,trace:{$object:{operationId,source:'kanban-link'}},content:'PRIVATE'}}]};
+    const operations=['ConversationWorkbenchView.openConversation','ConversationWorkbenchView.openConversation'];
+    const details=callDiagnostics([call,invalid],operations,new Set());
+    expect(details).toEqual({conversationOpens:[{operationId,parentOperationId,source:'visibility-resume',sessionId}]});
+    expect(JSON.stringify(details)).not.toMatch(/private-project|PRIVATE/);
+    expect(callDiagnostics([initial],['ApplicationBackend.openWorkbench'],new Set())).toEqual({
+        conversationOpens:[{operationId,source:'kanban-link',sessionId}],
+    });
+});

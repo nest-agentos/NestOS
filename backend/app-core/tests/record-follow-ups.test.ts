@@ -1,5 +1,6 @@
 import {expect,it,vi} from 'vitest';
-import {recordFollowUps} from '../src/kanban/record-follow-ups';
+import {projectClosedDevelopmentGroups,recordFollowUps} from '../src/kanban/record-follow-ups';
+import type {KanbanItemSummary} from '@nestos/kanban/contracts';
 const page={revision:1,total:1,items:[{id:'decision',kind:'decision',progress:{state:'completed',completion:'waived',lastActivityAt:1,groupIds:['group'],boardId:'execution'}}]} as any;
 it('keeps accepted task facts while projecting pending decision cleanup in one batch',async()=>{
  const state={id:'cleanup',boardId:'execution',itemId:'group',step:5,requests:{}};
@@ -37,4 +38,20 @@ it('projects a failed merge while a completed set of execution tasks awaits sett
  const waiting={...page,items:[{...page.items[0],progress:{...page.items[0].progress,state:'waiting',phase:'waiting-dependency',reason:'GROUP_SETTLEMENT_PENDING'}}]};
  const result=await recordFollowUps({diagnostic:vi.fn()} as any,'source',waiting,async()=>({state:'blocked',stage:'merge',code:'OPERATION_RESULT_AGENT_BLOCKED'}));
  expect(result.items[0].progress).toMatchObject({state:'needs-action',stage:'finalization',reason:'OPERATION_RESULT_AGENT_BLOCKED',followUps:[{phase:'merge',state:'blocked'}]});
+});
+
+it('projects repository target waiting and merge failure from one scoped journal read',async()=>{
+ const rows=[
+  {boardId:'b',itemId:'queued',scopeId:'repository-q',step:0,steps:['analyze','merge','accept'],waitingForTarget:true},
+  {boardId:'b',itemId:'failure',scopeId:'repository-f',step:1,steps:['analyze','merge','accept'],code:'OPERATION_SELECTION_REQUIRED'},
+  {boardId:'b',itemId:'done',scopeId:'repository-d',step:3,steps:['analyze','merge','accept','cleanup']},
+ ];
+ const journal={find:vi.fn(async(_prefix:string)=>rows.map(value=>({value}))),diagnostic:vi.fn()};
+ const items=rows.map(row=>({id:row.itemId,externalRefs:[{system:'nestos-software-reports',id:'source'}]})) as KanbanItemSummary[];
+ const result=await projectClosedDevelopmentGroups(journal as never,'b',items);
+ expect(result.get('queued')).toEqual({phase:'waiting-dependency',reason:'DELIVERY_WAITING_FOR_TARGET'});
+ expect(result.get('failure')).toEqual({phase:'error',reason:'OPERATION_SELECTION_REQUIRED'});
+ expect(result.has('done')).toBe(false);
+ expect(journal.find).toHaveBeenCalledTimes(1);
+ expect(journal.find.mock.calls[0]?.[0]).toBe('automatic-delivery:["b",');
 });

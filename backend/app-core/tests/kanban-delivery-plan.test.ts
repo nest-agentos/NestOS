@@ -2,6 +2,7 @@ import {expect,it} from 'vitest';
 import {kanbanVerificationMode} from '@nestos/kanban/contracts';
 import defaults from '../src/resources/kanban/kanban-delivery-policy.json';
 import {repositoryDeliveryPlan,decisionDeliveryPolicy, selectedDeliveryProfile, deliveryProfile, validateDeliveryDecomposition, verifyReadOnlyDelivery} from '@nestos/git-delivery/policy';
+import {developmentDeliveryPlan} from '../src/presets/kanban-delivery-plan';
 const policy={prompts:{files:[{name:'delivery-policy.json',content:JSON.stringify(defaults)}]}} as any;
 const full={decision:{snapshot:{verificationLevel:'full',deliveryMode:'release'}}};
 const task=(key:string,id:string,dependsOn:string[]=[])=>({key,dependsOn,...(id==='source'?{splitJustification:'An independently owned library deliverable with its own release and acceptance boundary, beyond this feature implementation.'}:{}),executionProfile:{system:'nestos-work-delivery',id,revision:'1'}});
@@ -72,4 +73,17 @@ it('builds the integrated commit and cleans up without deploying or requiring ma
  const plan=repositoryDeliveryPlan([profile]);
  expect(plan).toEqual({ordering:'configured',steps:['analyze','merge','build','accept','cleanup'],acceptance:'source'});
  expect(kanbanVerificationMode({verificationLevel:'none',deliveryMode:'build-cleanup'})).toBe('build-cleanup');
+});
+
+it('keeps a repair dispatch with a frozen build-cleanup decision from falling back to deployment',async()=>{
+ const saved={policy,context:{decision:{sourceBoardId:'board',recordId:'decision',snapshot:{verificationLevel:'none',deliveryMode:'build-cleanup'}}}};
+ const plan=developmentDeliveryPlan({get:async()=>saved} as never,{
+   workflow:async()=>({dispatches:{repair:{id:'repair',itemId:'task',attempt:1}}}) as never,
+   record:async()=>({deliveryMode:'build-cleanup'}) as never,
+ });
+ const recovered=await plan({id:'board'} as never,{id:'task'} as never);
+ const legacy=selectedDeliveryProfile(policy,{externalRefs:[task('initial','release').executionProfile]},saved.context)!;
+ expect(repositoryDeliveryPlan([legacy,recovered])).toEqual({
+   ordering:'configured',steps:['analyze','merge','build','accept','cleanup'],acceptance:'source',
+ });
 });
