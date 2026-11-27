@@ -15,6 +15,7 @@ export class ShellApplicationEvents {
     private closed = false;
     private started = false;
     private needsReset = false;
+    private caughtUp = false;
     private unread?: number;
     private readonly badgeListeners = new Set<(count: number) => void>();
     generation = 0;
@@ -34,9 +35,11 @@ export class ShellApplicationEvents {
         private readonly visible: () => boolean) {}
 
     /** Capture before loading snapshots; preloaded snapshots need a fresh invalidation. */
-    async prepare(preloaded = false,baseline?:EventCursor): Promise<void> {
+    async prepare(preloaded = false,baseline?:EventCursor, unread?: number): Promise<void> {
         const started = Date.now();
         this.needsReset = preloaded && !baseline;
+        this.caughtUp = baseline !== undefined && unread !== undefined;
+        this.unread = unread;
         try {this.cursor = baseline??await this.source.eventBaseline();}
         catch (error) {this.needsReset = true; this.report('baseline', error, started);}
     }
@@ -72,7 +75,9 @@ export class ShellApplicationEvents {
             reset: () => this.deliver(reset), failure: error => this.report('consume', error),
         }, {delayMs: 350, visible: this.visible});
         this.feed = feed;
-        try {await feed.start();}
+        const caughtUp = this.caughtUp;
+        this.caughtUp = false;
+        try {await feed.start(caughtUp);}
         catch (error) {this.cursor = feed.getCursor(); feed.close(); this.feed = undefined; throw error;}
         if (!this.closed) log.info('events.subscribe', {operationId, stage: 'ready', result: 'success', durationMs: Date.now() - started});
     }

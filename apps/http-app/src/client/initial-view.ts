@@ -11,7 +11,7 @@ export function initialView(hash: string) {
     const deferEvents = !!resourceId;
     const deferCatalogs = !!resourceId && resolveBrowserTarget(resourceId).kind === 'remote';
     if (request && deferCatalogs) request.documents = INITIAL_NATIVE_CHAT_DOCUMENTS;
-    return {deferEvents, deferCatalogs, initialRead:chat?undefined:initialReadRequest(route),request,editor};
+    return {deferEvents, deferCatalogs, initialRead:chat?undefined:initialReadRequest(route),request,editor:deferCatalogs?'native':editor};
 }
 
 function chatEditor(resource?: string): 'chat' | undefined {

@@ -517,7 +517,7 @@ export class ProjectRemoteMountService {
         const fingerprint = JSON.stringify(this.list(projectId));
         const client=this.provider.projects(await this.resolveConnection(mount.connectionId, options));
         try {
-            const project=options?.requireRegistered || mount.serverProjectId ? await client.read(mount.serverProjectId!,options)
+            const project=options?.requireRegistered || mount.serverProjectId ? await (client.readForHarness ?? client.read).call(client, mount.serverProjectId!, options)
                 : await client.register({name:projectId,alias:mount.alias,path:mount.root.replace(/^\//,''),access:mount.access},options);
             this.assertProjectGrant(projectId, mount, project);
             if (options?.requireRegistered && (project.revision !== mount.serverProjectRevision

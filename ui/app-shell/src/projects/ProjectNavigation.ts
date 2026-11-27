@@ -1,6 +1,5 @@
 import {showProjectSettings} from './project-settings';
 import {projectStatusLabel} from '../diagnostics/presentation';
-import {diagnosticReasonText} from '@nestos/app-settings';
 import { sessionCreationReason } from './session-creation-policy';
 import { fileFirst, projectItems } from './navigation-policy';
 import { remapProjectPath } from './project-paths';
@@ -55,7 +54,6 @@ export class ProjectNavigation {
     private transferPending = false;
     private scopeRevision = 0;
     private readonly remoteState = document.createElement('button');
-    private stateRead = 0;
     private stopRemote?: () => void;
     private readonly syncStatus: ProjectSyncStatusIndicator;
     private project?: ProjectFolder;
@@ -205,7 +203,7 @@ export class ProjectNavigation {
         button.type = 'button'; button.textContent = label;
         button.onclick = () => { void action().catch(this.actions.report); };
     }
-    destroy(): void { ++this.stateRead; this.stopRemote?.(); this.cancelPending(); this.selector.destroy(); this.menuEvents.abort(); }
+    destroy(): void { this.stopRemote?.(); this.cancelPending(); this.selector.destroy(); this.menuEvents.abort(); }
     cancelPending(): void { ++this.revision; ++this.scopeRevision; this.menu.open = false; }
     showDraft(project: ProjectFolder): void {
         this.cancelPending();
@@ -250,26 +248,25 @@ export class ProjectNavigation {
         for (const button of [this.settings,this.overflowSettings]) decorateButton(button,PROJECT_ACTION_ICONS.settings,t(project ? 'project.settings' : 'project.default.settings'),button === this.settings);
         this.syncStatus.update(project && this.actions.syncIndicator?.(project.project.id));
         delete this.settings.dataset.status;
-        void this.updateRemoteStatus();
+        this.updateRemoteStatus();
         this.updateCreation();
         for (const button of this.menu.querySelectorAll<HTMLButtonElement>('[data-project-action="import"], [data-project-action="export"]')) button.hidden = !project;
         this.retry.hidden = !pending; this.retry.textContent = t('project.retryDeletion', { count: pending });
         this.updateSelector();
         this.actions.scopeChanged?.(this.project?.project.id); this.updateTransferControls();
     }
-    private async updateRemoteStatus(): Promise<void> {
-        const projectId = this.project?.project.id, remote = this.projects.remoteMounts, revision = ++this.stateRead;
-        this.remoteState.hidden = !projectId || !this.actions.projectStatus || !remote?.list(projectId).length;
-        if (this.remoteState.hidden || !projectId) return;
-        decorateButton(this.settings, PROJECT_ACTION_ICONS.settings, t('diagnostics.projectStatus'), true);
-        try {
-            const state = await remote?.projectStatus?.(projectId);
-            if (revision !== this.stateRead || !state) return;
-            this.settings.dataset.status = state.status;
-            const label = t('project.settings') + ' · ' + t('diagnostics.projectState', {state: projectStatusLabel(state)});
-            decorateButton(this.settings, state.status === 'offline' || state.status === 'degraded' ? PROJECT_ACTION_ICONS.warning : PROJECT_ACTION_ICONS.settings, label, true);
-            this.settings.title = [label, ...(state.issue ? [state.issue.code, diagnosticReasonText(state.issue.reason)] : []), ...state.mounts.flatMap(mount => mount.failure ? [mount.failure.code, mount.failure.reason ? diagnosticReasonText(mount.failure.reason) : ''] : []).filter(Boolean)].filter(Boolean).join(' · ');
-        } catch {if (revision === this.stateRead) decorateButton(this.settings, PROJECT_ACTION_ICONS.warning, t('diagnostics.statusFailed'), true);}
+    private updateRemoteStatus(): void {
+        const projectId = this.project?.project.id, remote = this.projects.remoteMounts;
+        const mounts = projectId ? remote?.list(projectId) ?? [] : [];
+        this.remoteState.hidden = !this.actions.projectStatus || !mounts.length;
+        if (!projectId || !remote || this.remoteState.hidden) return;
+        const states = mounts.map(mount => remote.status(mount.mountId));
+        const status = states.includes('offline') ? 'offline' : remote.degraded(projectId) ? 'degraded'
+            : states.includes('checking') ? 'checking' : states.every(state => state === 'online') ? 'online' : 'unknown';
+        this.settings.dataset.status = status;
+        const label = t('project.settings') + ' · ' + t('diagnostics.projectState', {state: projectStatusLabel({status})});
+        decorateButton(this.settings, status === 'offline' || status === 'degraded' ? PROJECT_ACTION_ICONS.warning : PROJECT_ACTION_ICONS.settings, label, true);
+        this.settings.title = label;
     }
     private async createSession(): Promise<unknown> {
         if (!this.project) return;
@@ -331,7 +328,7 @@ export class ProjectNavigation {
     currentProject(): ProjectFolder | undefined { return this.project; }
     refreshAvailability():void {
         this.offlinePaths=new Set(this.projectChoices.filter(project=>this.projects.remoteMounts?.projectOffline(project.project.id)).map(project=>folderBrowserPath(project.path)));
-        this.updateCreation();this.ui()?.refreshList();
+        this.updateRemoteStatus();this.updateCreation();this.ui()?.refreshList();
     }
     registeredProjects(): readonly ProjectFolder[] { return this.projectChoices; }
 }

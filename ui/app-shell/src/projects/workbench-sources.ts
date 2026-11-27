@@ -14,6 +14,7 @@ export class WorkbenchSources {
     private recovering?: Promise<void>;
     private readonly skills = new Map<string, number>();
     private readonly changes = new Map<keyof ApplicationViewSources, number>();
+    private initialNavigationUsed = false;
     constructor(readonly opening: ConversationWorkbenchView) {this.cursor = opening.cursor;}
     async start(): Promise<void> {
         const stop = await this.opening.subscribe(event => this.deliver(event), failure => this.recover(failure.code));
@@ -32,7 +33,8 @@ export class WorkbenchSources {
     private deliver(event: ApplicationViewEvent): void {
         if (this.closed) return;
         if (event.sequence > 0) {if (event.sequence <= this.cursor) return; this.cursor = event.sequence;}
-        if (event.topic !== 'repository' || event.value?.kind !== 'ui-state') this.changes.set(event.topic, this.cursor);
+        if (!(event.topic === 'repository' && event.value?.kind === 'ui-state' || event.topic === 'mounts' && event.value?.kind === 'status'))
+            this.changes.set(event.topic, this.cursor);
         if (event.topic === 'remoteStatus') this.statuses.set(event.value.projectId, event.value.rows);
         for (const listener of [...(this.listeners.get(event.topic) ?? [])]) listener(event.value);
     }
@@ -115,5 +117,15 @@ export class WorkbenchSources {
     navigation(view: WorkbenchNavigationView): WorkbenchNavigationView {
         for (const [projectId, rows] of Object.entries(view.statuses)) this.statuses.set(projectId, rows);
         return view;
+    }
+    initialNavigation(path: string): WorkbenchNavigationView | undefined {
+        const view = this.opening.initialNavigation;
+        if (this.initialNavigationUsed || !view || this.opening.resourceId !== path) return;
+        this.initialNavigationUsed = true;
+        if (this.recovering || (['navigation', 'repository', 'files', 'favorites', 'mounts'] as const)
+            .some(topic => this.changes.has(topic))) return;
+        const statuses = {...view.statuses};
+        for (const projectId of Object.keys(statuses)) statuses[projectId] = this.statuses.get(projectId) ?? statuses[projectId];
+        return {...view, statuses};
     }
 }

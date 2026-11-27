@@ -17,6 +17,7 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
     native?: PreparedConversation;
     draft?: ConversationWorkbenchView['draft'];
     failure?: ConversationWorkbenchView['failure'];
+    initialNavigation?: WorkbenchNavigationView;
     workbench!: WorkbenchView;
     private readonly eventSource: ViewObservation;
     cursor = 0;
@@ -37,10 +38,13 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
             const target = resolveBrowserTarget(request.resourceId);
             const native = target.kind === 'remote' && !!target.nativeSessionId;
             const chatControls = !native && !['project-files', 'files', 'folder', 'favorites', 'favorite'].includes(target.kind);
-            await this.prepareView(backend, request, chatControls);
             const folder = 'folder' in target ? target.folder : target.kind === 'folder' ? folderPathFromBrowserPath(target.path) : undefined;
+            const [view, project] = await Promise.allSettled([this.prepareView(backend, request, chatControls),
+                folder && target.kind !== 'project-draft' ? this.services.projects.forFolder(folder) : null]);
+            if (view.status === 'rejected') throw view.reason;
+            if (project.status === 'rejected') throw project.reason;
             if (target.kind === 'project-draft') await this.prepareDraft(backend, request.resourceId);
-            else await this.prepareTarget(request.resourceId, folder, native);
+            else await this.prepareTarget(request.resourceId, project.value, native, request.initialPage);
             await this.eventSource.addChat(this.workbench);
             if (this.closed) throw new FSError('EIO', 'Workbench closed');
             this.cursor = this.eventSource.getViewCursor();
@@ -60,13 +64,32 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
         }
         if (this.draft) await this.updateProjectInterest(this.draft.project.project.id);
     }
-    private async prepareTarget(resourceId: string, folder: string | null | undefined, native: boolean): Promise<void> {
-        const project = folder ? await this.services.projects.forFolder(folder) : null;
+    private async prepareTarget(resourceId: string, project: ProjectFolder | null | undefined, native: boolean, initialPage: ConversationWorkbenchRequest['initialPage']): Promise<void> {
         if (project) await this.updateProjectInterest(project.project.id);
         if (native) {
-            try { await this.openNativeConversation(resourceId, project ?? null); }
-            catch (error) { this.failedOpening(resourceId, error); }
+            const cursor = this.eventSource.getViewCursor();
+            const [, navigation] = await Promise.all([
+                this.openNativeConversation(resourceId, project ?? null, initialPage?.composer).catch(error => this.failedOpening(resourceId, error)),
+                project && this.shouldPrepareSidebar(initialPage) ? this.readNavigation({resourceId, projectId: project.project.id}).catch(() => undefined) : undefined,
+            ]);
+            if (navigation && !navigation.directories.some(directory => directory.stale)
+                && !this.navigationChangedSince(cursor)) {
+                for (const id of Object.keys(navigation.statuses))
+                    navigation.statuses[id] = this.services.projects.remoteMounts?.sessionStatus.records?.(id) ?? [];
+                this.initialNavigation = navigation;
+            }
         }
+    }
+    private shouldPrepareSidebar(page: ConversationWorkbenchRequest['initialPage']): boolean {
+        if (page?.sidebar !== true) return false;
+        if (typeof page.sidebarDocument !== 'string' || !Object.hasOwn(this.documents, page.sidebarDocument)) return true;
+        const document = this.documents[page.sidebarDocument] as {state?: unknown} | undefined;
+        const state = (document?.state && typeof document.state === 'object' ? document.state : document) as {version?: number; isSidebarCollapsed?: boolean} | undefined;
+        return state?.version !== undefined && state.version !== 1 || state?.isSidebarCollapsed !== true;
+    }
+    private navigationChangedSince(cursor: number): boolean {
+        return this.eventSource.changedSince(cursor, ['navigation', 'repository', 'files', 'favorites'])
+            || this.eventSource.eventSnapshot().events.some(event => event.sequence > cursor && event.topic === 'mounts' && event.value?.kind !== 'status');
     }
     private async prepareView(backend: ApplicationBackend, request: ConversationWorkbenchRequest, chatControls: boolean): Promise<void> {
         const results = await Promise.allSettled([backend.workbenchView({chatControls, initialNavigation: false, displayedFilesPolicy: request.displayedFilesPolicy}), backend.readUiDocuments(request.documents)]);
@@ -135,10 +158,10 @@ export class ResourceWorkbench implements ConversationWorkbenchView {
     openConversation(resourceId: string): Promise<PreparedConversation> {
         return this.openNativeConversation(resourceId);
     }
-    private async openNativeConversation(resourceId: string, project?: ProjectFolder | null): Promise<PreparedConversation> {
+    private async openNativeConversation(resourceId: string, project?: ProjectFolder | null, prepareInput?: boolean): Promise<PreparedConversation> {
         if (this.closed) throw new FSError('EIO', 'Workbench closed');
         const revision = ++this.conversationRevision;
-        const prepared = await prepareConversation(this.services.projects, resourceId, project);
+        const prepared = await prepareConversation(this.services.projects, resourceId, project, prepareInput);
         if (this.closed) {await prepared.conversation.close(); throw new FSError('EIO', 'Workbench closed');}
         const owned = await this.ownConversation(prepared);
         if (this.closed) {await owned.conversation.close(); throw new FSError('EIO', 'Workbench closed');}

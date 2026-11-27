@@ -4,6 +4,17 @@ import {NativeChatStore} from './independent/native-store';
 import {createModuleLogger} from '@nestos/common';
 import type {IEditor} from '@nestos/ui-common-adapter';
 import type {WorkspaceHandoff, RetainedWorkspaceHandoff} from './shell/drafts/workspace-handoff';
+import type {SessionViewBinding} from './chat';
+import './styles/index.css';
+
+export function savedPromptControls(deps: SessionViewBinding) {
+    const promptPort = () => {
+        const port = (deps.sessionManager ?? deps.resolveSessionView?.())?.promptHistory;
+        if (!port) throw Object.assign(new Error('Saved prompt storage unavailable'), {code: 'PROMPT_STORAGE_UNAVAILABLE'});
+        return port;
+    };
+    return {listSaved: () => promptPort().listSaved(), savePrompt: (text: string, operationId: string) => promptPort().savePrompt(text, operationId)};
+}
 
 /** A presentation factory independent of the execution location. */
 export async function createConversationEditor(container: HTMLElement, controls: ConversationControls, options: EditorOptions, handoff?: WorkspaceHandoff | RetainedWorkspaceHandoff, ocr?: import('@nestos/app-contracts/services').OcrControls): Promise<IEditor> {

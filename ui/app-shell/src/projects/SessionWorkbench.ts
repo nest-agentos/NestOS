@@ -429,6 +429,7 @@ export class SessionWorkbench implements WorkspaceController {
 
     async start(): Promise<void> {
         this.sessions ??= await this.sessionsReady;
+        if (this.uiPersistence?.load?.()?.isSidebarCollapsed) this.sidebar.classList.add('is-collapsed');
         const view = this.opening?.workbench ?? await this.backend.workbenchView({ displayedFilesPolicy: 'gitignore', chatControls: !!this.createFactory,
             initialNavigation: this.resourceNavigationVisible, initialSessionId: initialSessionId(this.initialResource) });
         this.initialSession = view.initialSession;
@@ -1895,7 +1896,8 @@ export class SessionWorkbench implements WorkspaceController {
             const response = reads && (reads.activity.length || reads.sessionId) && this.opening!.readRefresh
                 ? await this.opening!.readRefresh({navigation: request, activity: reads.activity, sessionId: reads.sessionId}) : undefined;
             if (reads) reads.result = response;
-            const data = response?.navigation ?? await this.opening!.readNavigation(request);
+            const initial = !refresh && !reads && !this.navigationReady ? this.sources!.initialNavigation(path) : undefined;
+            const data = response?.navigation ?? initial ?? await this.opening!.readNavigation(request);
             const stale = this.closed || active !== this.active || revision !== this.navigationFiles!.revision
                 || generation !== this.directorySeeds?.generation || selected !== this.projectNavigation?.currentProject()?.project.id
                 || data.directories.some(directory => directory.stale);

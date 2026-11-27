@@ -7,6 +7,7 @@ export interface OpenViewRequest {
     workbench: NonNullable<Parameters<ApplicationBackend['workbenchView']>[0]>;
     branch?: string;
     taskAttachmentKey?: string;
+    initialPage?: import('./conversation-workbench').WorkbenchOpenRequest['initialPage'];
 }
 export interface ApplicationViewSources {
     repository: Parameters<Parameters<NonNullable<ApplicationServices['sessionRepository']['subscribe']>>[0]>[0];
@@ -38,6 +39,8 @@ export interface ApplicationViewObservation {
 export interface OpenedApplicationView {
     /** Global event cursor captured before preparing the initial snapshots. */
     eventBaseline?: import('@nestos/vfs-core').EventCursor;
+    /** Present when the journal head still matches the opening baseline. */
+    initialUnreadNotifications?: number;
     sharedEventHints?: true;
     conversationWorkbench?: import('./conversation-workbench').ConversationWorkbenchView;
     connectionInterests?: string[];

@@ -17,6 +17,14 @@ it('includes draft preferences in the resource bootstrap and defers the event st
     expect(view.request?.resourceId).toBe(path);
     expect(view.request?.documents).toEqual(INITIAL_CHAT_DOCUMENTS);
 });
+it('requests the native composer but skips the hidden compact sidebar', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({matches: true})));
+    try {
+        const view = initialView('#/workbench/' + encodeURIComponent('/folder:x1/@harness/codex/s1'));
+        expect(view.editor).toBe('native');
+        expect(view.request?.initialPage).toMatchObject({sidebar: false, composer: true});
+    } finally {vi.unstubAllGlobals();}
+});
 it('retains flow preloading and skips chat on the workspace landing page', () => {
     expect(initialView('#/flows').editor).toBe('flows');
     expect(initialView('#/workbench').editor).toBeUndefined();

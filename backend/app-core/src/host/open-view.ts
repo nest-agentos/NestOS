@@ -12,7 +12,11 @@ export async function openView(services: LocalApplicationServices, backend: Appl
         throw new FSError('EBUSY', 'Cold view opening requires an unbound client');
     const eventBaseline = await services.events?.eventBaseline();
     const sharedEventHints = services.events ? true : undefined;
-    if (request.resourceId) return {...await openResourceView(services, backend, request, createWorkbench), eventBaseline, sharedEventHints};
+    if (request.resourceId) {
+        const view = await openResourceView(services, backend, request, createWorkbench);
+        const initialUnreadNotifications = view.conversationWorkbench?.native ? await notificationBaseline(services, eventBaseline) : undefined;
+        return {...view, eventBaseline, sharedEventHints, initialUnreadNotifications};
+    }
     const observation = new ViewObservation(services);
     let workbench: WorkbenchView | undefined;
     try {
@@ -37,6 +41,17 @@ export async function openView(services: LocalApplicationServices, backend: Appl
         const failures = cleanup.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
         if (failures.length) throw new AggregateError([error, ...failures], 'View opening and cleanup failed');
         throw error;
+    }
+}
+
+async function notificationBaseline(services: LocalApplicationServices, baseline?: OpenedApplicationView['eventBaseline']) {
+    if (!baseline) return;
+    try {
+        const summary = await services.events?.notificationSummary?.();
+        if (summary?.head.streamId === baseline.streamId && summary.head.sequence === baseline.sequence) return summary.unread;
+    } catch (error) {
+        const code = error instanceof FSError ? error.code : 'EVENT_BASELINE_SUMMARY_FAILED';
+        console.warn('[workbench.events]', {operation: 'workbench.open', stage: 'event-summary', result: 'failure', code});
     }
 }
 
@@ -83,7 +98,8 @@ async function closeOpenedView(observation: ViewObservation, view?: WorkbenchVie
 
 async function openResourceView(services: LocalApplicationServices, backend: ApplicationBackend, request: OpenViewRequest,
     createWorkbench: WorkbenchOpener = input => new ResourceWorkbench(services).initialize(backend, input)): Promise<OpenedApplicationView> {
-    const opening = await createWorkbench({resourceId: request.resourceId!, documents: request.documents, displayedFilesPolicy: request.workbench.displayedFilesPolicy});
+    const opening = await createWorkbench({resourceId: request.resourceId!, documents: request.documents, displayedFilesPolicy: request.workbench.displayedFilesPolicy,
+        initialPage: request.initialPage ?? {sidebar: true, composer: true}});
     return {documents: opening.documents, workbench: opening.workbench, conversationWorkbench: opening,
         observation: opening.observation, cursor: opening.cursor, dispose: () => opening.dispose()};
 }

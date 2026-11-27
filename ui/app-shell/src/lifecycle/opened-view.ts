@@ -10,6 +10,7 @@ export class OpenedViewProjection {
     private snapshotCursor = 0;
     private hydrating = true;
     private stopped = false;
+    private applicationEventPending = false;
     private stop?: () => void;
     private flushConnections?: () => void;
     private prepared?: WorkbenchView;
@@ -29,7 +30,7 @@ export class OpenedViewProjection {
             subscribe: async listener => this.subscribeEvents(listener),
         });
         this.backend = overlay(backend, {
-            ...(backend.events && view.sharedEventHints && {events: overlay(backend.events, {onChange: listener => this.subscribe('applicationEvents', listener)})}),
+            ...(backend.events && view.sharedEventHints && {events: overlay(backend.events, {onChange: listener => this.subscribeApplicationEvents(listener)})}),
             workbenchView: settings => {const ready = this.prepared; this.prepared = undefined; return ready ? Promise.resolve(ready) : backend.workbenchView(settings);},
             taskAttachment: async (id, key) => {
                 const matches = id === view.initial?.sessionId && key === view.taskAttachmentKey;
@@ -64,6 +65,11 @@ export class OpenedViewProjection {
         const notify = (value: unknown) => listener(value as ApplicationViewSources[K]); listeners.add(notify);
         return () => {listeners.delete(notify);};
     }
+    private subscribeApplicationEvents(listener: () => void): () => void {
+        const stop = this.subscribe('applicationEvents', listener);
+        if (this.applicationEventPending && !this.stopped) {this.applicationEventPending = false; listener();}
+        return stop;
+    }
     private receive(event: ApplicationViewEvent): void {
         if (this.stopped || event.sequence <= this.cursor) return;
         if (event.sequence !== this.cursor + 1) throw new Error('Application view event gap');
@@ -79,6 +85,7 @@ export class OpenedViewProjection {
         } else this.dispatch(event);
     }
     private dispatch(event: ApplicationViewEvent): void {
+        if (event.topic === 'applicationEvents' && !this.listeners.get('applicationEvents')?.size) this.applicationEventPending = true;
         for (const listener of this.eventListeners) {
             try {listener(event);} catch (error) {console.error('[Workbench observation] Observer failed', error);}
         }

@@ -55,6 +55,57 @@ it('prepares fresh read models, observes once and releases all owned resources',
     off(); await view.dispose(); await view.dispose();
     expect(f.conversation.close).toHaveBeenCalledOnce(); expect(f.browser.dispose).toHaveBeenCalledOnce(); expect(f.connections.dispose).toHaveBeenCalledOnce(); expect(f.nativeListeners.size).toBe(0);
 });
+it('returns the cold native sidebar, conversation and composer with one opening', async () => {
+    const f = fixture();
+    const baseline = {streamId: 'journal', sequence: 4};
+    Object.assign(f.services, {events: {onChange: () => () => {}, eventBaseline: async () => baseline,
+        notificationSummary: async () => ({head: baseline, unread: 2})}});
+    let finishHistory!: () => void;
+    f.conversation.read.mockImplementationOnce(() => new Promise(resolve => {finishHistory = () => resolve(f.conversation.snapshot());}));
+    const {openView} = await import('../../src/host/open-view');
+    const opening = openView(f.services, f.backend, {...request, workbench: {}});
+    await vi.waitFor(() => {
+        expect(f.browser.readDirectory).toHaveBeenCalledOnce();
+        expect(f.conversation.models).toHaveBeenCalledOnce();
+        expect(f.conversation.commands).toHaveBeenCalledOnce();
+        expect(f.conversation.read).toHaveBeenCalledOnce();
+    });
+    finishHistory();
+    const opened = await opening;
+    try {
+        expect(opened.initialUnreadNotifications).toBe(2);
+        expect(opened.conversationWorkbench).toMatchObject({native: {models: {models: []}, commands: [], deferredMetadata: false},
+            initialNavigation: {statuses: {}}});
+        expect(f.browser.readDirectory).toHaveBeenCalledExactlyOnceWith('/folder:P', expect.objectContaining({projectId: 'p'}));
+        expect(f.conversation.models).toHaveBeenCalledOnce();
+        expect(f.conversation.commands).toHaveBeenCalledOnce();
+        expect(f.conversation.refreshMetrics).not.toHaveBeenCalled();
+    } finally {await opened.dispose();}
+});
+it('keeps the native view usable if the sidebar or composer read fails', async () => {
+    const f = fixture();
+    f.browser.readDirectory.mockRejectedValueOnce(new FSError('EIO', 'Sidebar unavailable'));
+    f.conversation.models.mockRejectedValueOnce(new FSError('ETIMEDOUT', 'Models unavailable'));
+    const opened = await new ConversationWorkbench(f.services).initialize(f.backend, {...request, initialPage: {sidebar: true, composer: true}});
+    try {
+        expect(opened.initialNavigation).toBeUndefined();
+        expect(opened.native).toMatchObject({issues: {models: 'ETIMEDOUT'}, commands: [], deferredMetadata: true});
+        expect(opened.failure).toBeUndefined();
+    } finally {await opened.dispose();}
+});
+it('omits a folded sidebar and unrequested model and command catalogs', async () => {
+    const f = fixture();
+    vi.mocked(f.backend.readUiDocuments).mockResolvedValueOnce({layout: {version: 1, isSidebarCollapsed: true}});
+    const opened = await new ConversationWorkbench(f.services).initialize(f.backend, {...request,
+        initialPage: {sidebar: true, composer: false, sidebarDocument: 'layout'}});
+    try {
+        expect(opened.initialNavigation).toBeUndefined();
+        expect(f.browser.readDirectory).not.toHaveBeenCalled();
+        expect(f.conversation.models).not.toHaveBeenCalled();
+        expect(f.conversation.commands).not.toHaveBeenCalled();
+        expect(f.conversation.read).toHaveBeenCalledOnce();
+    } finally {await opened.dispose();}
+});
 it('keeps a denied conversation local to its view while navigation and another conversation remain usable', async () => {
     const f = fixture(); f.conversation.read.mockRejectedValueOnce(new FSError('EACCES', 'Denied'));
     const view = await new ConversationWorkbench(f.services).initialize(f.backend, request);

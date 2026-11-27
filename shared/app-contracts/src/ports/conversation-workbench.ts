@@ -25,6 +25,7 @@ export interface WorkbenchOpenRequest {
     documents: string[];
     displayedFilesPolicy?: 'gitignore' | 'all';
     trace?: ConversationOpenTrace;
+    initialPage?: { sidebar: boolean; composer: boolean; sidebarDocument?: string };
 }
 export interface WorkbenchNavigationRequest {
     projectId?: string | null;
@@ -54,6 +55,7 @@ export interface ResourceWorkbenchView {
     native?: PreparedConversation;
     draft?: ProjectDraftOpening;
     failure?: {resourceId: string; code: string; reason?: string};
+    initialNavigation?: WorkbenchNavigationView;
     eventSnapshot(): {cursor: number; firstSequence: number; events: ApplicationViewEvent[]};
     subscribe(listener: (event: ApplicationViewEvent) => void, failed?: (failure: {code: string}) => void): Promise<() => void>;
     cursor: number;

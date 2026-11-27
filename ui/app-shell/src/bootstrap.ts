@@ -146,7 +146,8 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const initialDocuments = startupWorkspace?.type === 'chat'
         ? INITIAL_CHAT_DOCUMENTS : ['theme', 'nestos_assistant_menu_v1'];
     const prefetchedDocuments = !options.initialRead?.documents?.value && !options.initialView && startupWorkspace?.type !== 'chat' ? new VfsJsonStore(backend) : undefined;
-    const eventPreparation = applicationEvents?.prepare(!!options.initialView,options.initialView?.eventBaseline??options.initialRead?.eventBaseline?.value);
+    const eventPreparation = applicationEvents?.prepare(!!options.initialView,options.initialView?.eventBaseline??options.initialRead?.eventBaseline?.value,
+        options.initialView?.initialUnreadNotifications);
     prefetchedDocuments?.prefetch(initialDocuments);
     await eventPreparation;
     const opened = options.initialView ?? (startupWorkspace?.type === 'chat' && typeof backend.openView === 'function' ? await openInitialView(backend, initialDocuments, startupRoute.resource) : undefined);
@@ -166,6 +167,8 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     if(options.initialRead?.documents?.value)uiDocs.seed(options.initialRead.documents.value);
     if (opened) uiDocs.seed(opened.documents);
     else if (!prefetchedDocuments&&!options.initialRead?.documents?.value) uiDocs.prefetch(initialDocuments);
+    const finishInitialPresentation = opened?.conversationWorkbench?.native ? uiDocs.begin() : undefined;
+    if (finishInitialPresentation) cleanupFns.push(finishInitialPresentation);
     const executorUsage = new ExecutorUsage(uiDocs);
     cleanupFns.push(() => uiDocs.flush());
     const themeReady = themeService.init(uiDocs);
@@ -485,9 +488,11 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
                 ? {...openingTrace,operationId:randomUUID(),parentOperationId:openingTrace.operationId}:undefined;
             const opening = initialOpening && (initialOpening.resourceId ?? initialOpening.native?.resourceId ?? initialOpening.failure?.resourceId) === (resourcePath ?? initialResource) ? initialOpening
                 : target && !preparedLocal && backend.openWorkbench
-                ? await backend.openWorkbench({resourceId: resourcePath!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore',...(trace?{trace}:{})})
+                ? await backend.openWorkbench({resourceId: resourcePath!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore',
+                    ...(target.kind === 'remote' && target.nativeSessionId && {initialPage: {sidebar: contentFirst, composer: !target.archived, sidebarDocument: `${SESSION_BROWSER_SCOPE}.ui`}}), ...(trace ? {trace} : {})})
                 : target && target.kind === 'remote' && target.nativeSessionId && backend.openConversationWorkbench
-                ? await backend.openConversationWorkbench({resourceId: initialResource!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore',...(trace?{trace}:{})}) : undefined;
+                ? await backend.openConversationWorkbench({resourceId: initialResource!, documents: [`${SESSION_BROWSER_SCOPE}.ui`, `${SESSION_BROWSER_SCOPE}.workbench`], displayedFilesPolicy: 'gitignore',
+                    initialPage: {sidebar: contentFirst, composer: !target.archived, sidebarDocument: `${SESSION_BROWSER_SCOPE}.ui`}, ...(trace ? {trace} : {})}) : undefined;
             if (opening) uiDocs.seed(opening.documents);
             const [uiPersistence, workbenchState] = await traceBoot('workspace.chatState (parallel)', () => Promise.all([
                 uiState.port(SESSION_BROWSER_SCOPE), uiState.workbenchPort(SESSION_BROWSER_SCOPE),
@@ -933,7 +938,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     options.onShellReady?.();
     await initialLoad;
     const notificationBadge = backend.events?.notificationSummary
-        ? {unread: options.initialRead?.unreadNotifications?.value, read: backend.events.notificationSummary.bind(backend.events),
+        ? {unread: opened?.initialUnreadNotifications ?? options.initialRead?.unreadNotifications?.value, read: backend.events.notificationSummary.bind(backend.events),
             subscribe: opened?.sharedEventHints && applicationEvents
                 ? applicationEvents.subscribeNotificationCount.bind(applicationEvents) : undefined} : undefined;
     cleanupFns.push(installAssistantMenu({services, backend, events:applicationEvents, notificationBadge, documents: uiDocs, signal: navigationSignal,
@@ -960,7 +965,12 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     // ── AppHandle ──────────────────────────────────────────────────────────────
 
     projection?.finishHydration();
-    if (options.prepareCatalogs) {
+    if (finishInitialPresentation) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const frame = requestAnimationFrame(() => {timer = setTimeout(finishInitialPresentation, 0);});
+        cleanupFns.push(() => {cancelAnimationFrame(frame); clearTimeout(timer);});
+    }
+    if (options.prepareCatalogs && !opened?.conversationWorkbench?.native) {
         let timer: ReturnType<typeof setTimeout> | undefined;
         const frame = requestAnimationFrame(() => {timer = setTimeout(() => {
             void options.prepareCatalogs!().catch(error => console.warn('[Boot] Deferred catalog load failed', {

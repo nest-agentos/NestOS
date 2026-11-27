@@ -24,11 +24,11 @@ export class ApplicationEventFeed {
         private readonly hints?: EventHintPolicy) {
         this.cursor = {...after};
     }
-    async start(): Promise<void> {
+    async start(caughtUp = false): Promise<void> {
         if (this.closed || this.stop) return;
         const stop=this.source.onChange(() => this.onHint()) as (()=>void)&{ready?:Promise<void>};
         this.stop=stop;
-        try {await stop.ready;await this.refresh();} catch (error) {this.close(); throw error;}
+        try {await stop.ready;if (!caughtUp) await this.refresh();} catch (error) {this.close(); throw error;}
     }
     getCursor(): EventCursor {return {...this.cursor};}
     close(): void {this.closed = true; this.clearHint(); this.stop?.(); this.stop = undefined;}

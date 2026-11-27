@@ -29,6 +29,20 @@ it('replays changes between baseline and first paint independently in two browse
     expect(f.source.setNotificationRead).not.toHaveBeenCalled();
 });
 
+it('skips an empty startup replay and still reads changes after the confirmed baseline', async () => {
+    vi.useFakeTimers();
+    const f = await fixture(), badge = vi.fn();
+    await f.bridge.prepare(true, await f.journal.baseline(), 0);
+    f.bridge.subscribeNotificationCount(badge);
+    await f.bridge.start();
+    expect(badge).toHaveBeenCalledWith(0);
+    expect(f.source.readEvents).not.toHaveBeenCalled();
+    await f.journal.append('after-bootstrap', {type: 'repository.changed'});
+    await vi.advanceTimersByTimeAsync(350);
+    expect(f.source.readEvents).toHaveBeenCalledOnce();
+    expect(f.invalidate).toHaveBeenCalledExactlyOnceWith({type: 'repository.changed'});
+});
+
 it('repairs lost hints on the visible polling interval and leaves hidden windows idle', async () => {
     vi.useFakeTimers(); const f = await fixture();
     vi.mocked(f.source.onChange).mockImplementation(() => () => {});
