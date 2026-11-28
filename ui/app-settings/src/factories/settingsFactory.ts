@@ -110,7 +110,7 @@ async function mountModelDefaults(container: HTMLElement, editors: LLMUIEditors,
     const models = document.createElement('div'), extension = document.createElement('div');
     const hadSettingsClass = container.classList.contains('settings-root');
     container.classList.add('settings-root', 'model-defaults-host');
-    container.replaceChildren(models, extension);
+    container.replaceChildren(extension, models);
     const editor = new editors.ModelDefaultsEditor(models, service, options, ocr);
     const section = mountSection(extension);
     const destroy = editor.destroy.bind(editor);

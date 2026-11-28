@@ -23,6 +23,7 @@ it('edits the chosen board’s decision default through the existing revision-ch
     const host = document.createElement('div');
     const editor = await factory(host, {target:{kind:'configuration',id:'model-defaults'}} as never);
     await vi.waitFor(() => expect(host.querySelector('option[value=board]')).toBeTruthy());
+    expect(host.firstElementChild?.querySelector('option[value=board]')).toBeTruthy();
     expect(service.boardSettings).not.toHaveBeenCalled();
     const select = host.querySelector('select')!;
     select.value='board'; select.dispatchEvent(new Event('change'));
