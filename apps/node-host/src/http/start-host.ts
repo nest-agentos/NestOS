@@ -44,6 +44,7 @@ export async function startHost(options: HttpHostOptions) {
         }));
         if (!options.signal?.aborted) {
             await listen(server, options);
+            host.runtime.startBackground?.();
             audit.write({ event: 'server.started', route: `https://${options.host}:${options.port}` });
             console.log(`NestOS HTTPS UI: https://${options.host}:${options.port}\nClient certificate required\nAudit log: ${options.auditFile}`);
         }

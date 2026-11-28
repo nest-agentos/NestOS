@@ -316,12 +316,34 @@ export const TOOLBOX_PROVIDER_ICONS: Readonly<Record<string, string>> = {
     volcengine: providerMark('V'), 'doubao-speech': providerMark('DB'), codex: TOOLBOX_ICONS.terminal, custom: TOOLBOX_ICONS.providers,
 };
 
-const harnessMark = (label: string, mark: string) => ({label, icon: providerMark(mark)
-    .replace('aria-hidden="true"', `role="img" aria-label="${label}"`).replace('><rect', `><title>${label}</title><rect`)});
+const harnessIcon = (label: string, body: string) => ({
+    label,
+    icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="${label}"><title>${label}</title>${body}</svg>`,
+});
+
+const NESTOS_ICON = harnessIcon('NestOS',
+    '<path d="M12 2.5 20 7v10l-8 4.5L4 17V7z"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><path d="M12 9.8V4.5m1.9 8.6 4.4 2.5m-8.2-2.5-4.4 2.5"/>');
+
+// OpenAI hexagonal knot mark for Codex
+const CODEX_ICON = harnessIcon('Codex',
+    '<path d="M12 3.2a3.3 3.3 0 0 1 3.1 2.1l4.1 2.4a3.3 3.3 0 0 1 1.4 4.1 3.3 3.3 0 0 1-1.4 4.5l-4.1 2.4A3.3 3.3 0 0 1 12 20.8a3.3 3.3 0 0 1-3.1-2.1l-4.1-2.4a3.3 3.3 0 0 1-1.4-4.1 3.3 3.3 0 0 1 1.4-4.5l4.1-2.4A3.3 3.3 0 0 1 12 3.2Z"/><path d="M12 3.2v5.4l4.7 2.7m3.9-2.2-4.7 2.7v5.4m3.9-1.1-4.7-2.7-4.7 2.7M12 20.8v-5.4l-4.7-2.7m-3.9 2.2 4.7-2.7V6.8m-3.9 1.1 4.7 2.7 4.7-2.7"/>');
+
+// DeepSeek whale silhouette mark for DSHT
+const DSHT_ICON = harnessIcon('DSHT',
+    '<path d="M3.5 14.5c0-4.2 3.4-7.5 7.8-7.5 2.7 0 4.6 1.3 5.8 3.2.7-1.1 1.8-2.3 3.4-2.5-.6 1.6-.6 3.1 0 4.5.3.7.5 1.4.5 2.2 0 2.9-3.1 5.1-8.5 5.1-5.3 0-9-2-9-5Z"/><circle cx="9.2" cy="12.2" r="1.1" fill="currentColor" stroke="none"/><path d="M11 7c0-1.6-.9-2.8-2.2-3.3M11 7c.8-1.4 1.9-2.2 3.2-2.4"/>');
+
+// Anthropic Claude starburst mark
+const CLAUDE_ICON = harnessIcon('Claude Code',
+    '<path d="M12 2.5v19M2.5 12h19M5.3 5.3l13.4 13.4M18.7 5.3 5.3 18.7" stroke-width="2.1"/>');
+
+// Google Antigravity floating A-prism + orbit arc mark
+const AGY_ICON = harnessIcon('Antigravity',
+    '<path d="M12 3.5 4.8 18.5c-.4.8.5 1.6 1.3 1.2l4.1-2.2a3.8 3.8 0 0 1 3.6 0l4.1 2.2c.8.4 1.7-.4 1.3-1.2L12 3.5Z"/><path d="M8.5 13.8a5.8 5.8 0 0 1 7 0"/>');
+
 const HARNESS_MARKS: Readonly<Record<string, {label: string; icon: string}>> = {
-    nestos: harnessMark('NestOS', 'M'), codex: harnessMark('Codex', 'CX'), dsht: harnessMark('DSHT', 'DS'),
-    dsh: harnessMark('DSHT', 'DS'), claude: harnessMark('Claude Code', 'CC'),
-    'claude-code': harnessMark('Claude Code', 'CC'), claudecode: harnessMark('Claude Code', 'CC'),
+    nestos: NESTOS_ICON, codex: CODEX_ICON, dsht: DSHT_ICON, dsh: DSHT_ICON,
+    claude: CLAUDE_ICON, 'claude-code': CLAUDE_ICON, claudecode: CLAUDE_ICON,
+    agy: AGY_ICON, antigravity: AGY_ICON,
 };
 /** Provider-declared kinds choose a visual mark; unknown kinds retain a readable label. */
 export function harnessPresentation(kind: string, profileId?: string): {label: string; icon: string} {

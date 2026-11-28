@@ -12,7 +12,7 @@ import type {DecisionConversationOptions,DecisionConversationBinding,DecisionCon
 import {resolveKanbanConfiguration} from '../presets/kanban-configuration-files';
 import {requireValue} from './validation';
 import {REMOTE_PROJECT_REFERENCE,validateRemoteReferences} from './resource-catalog';
-import type {KanbanDecisionSourceSession,KanbanExternalReference} from '@nestos/kanban/contracts';
+import {kanbanReference,type KanbanDecisionSourceSession,type KanbanExternalReference} from '@nestos/kanban/contracts';
 import {diagnosticFailure} from '../diagnostics/failure';
 import {decisionProjectScope,requireDecisionProjectContext} from './decision-project-scope';
 
@@ -63,7 +63,8 @@ async function prepare(options:DecisionConversationOptions,id:string,boardId:str
         }finally{await view.dispose();}
         const frozen=await freezeKanbanHarness(options.journal,id,boardId,role,candidate);
         requireValue(JSON.stringify(frozen)===JSON.stringify(candidate),'KANBAN_HARNESS_BINDING_CHANGED');
-        return {id,boardId,...(coordination?{purpose:'coordination' as const,recordId:coordination.recordId}:{decisionProtocol:1 as const}),projectId,projectIds:resources.map(ref=>ref.id),...(modules.length?{modules}:{}),profileId:frozen.profileId,...(frozen.selection?{selection:frozen.selection}:{}),workspaceId:workspaceId!,directory,epoch:descriptor.epoch,...(source?{sourceSession:source}:{}),createId:randomUUID(),inputId:randomUUID()};
+        const title=(record?`${kanbanReference(board,record)} · ${record.title}`:`Decision · ${carrier.displayName??carrier.name} · ${id.slice(0,8)}`).slice(0,120);
+        return {id,boardId,...(coordination?{purpose:'coordination' as const,recordId:coordination.recordId}:{decisionProtocol:1 as const}),projectId,projectIds:resources.map(ref=>ref.id),...(modules.length?{modules}:{}),profileId:frozen.profileId,...(frozen.selection?{selection:frozen.selection}:{}),workspaceId:workspaceId!,directory,epoch:descriptor.epoch,...(source?{sourceSession:source}:{}),createId:randomUUID(),inputId:randomUUID(),title,titleId:randomUUID()};
     }finally{await client.close();}
 }
 async function start(options:DecisionConversationOptions,binding:DecisionConversationBinding,first:boolean,active:()=>boolean) {
@@ -77,6 +78,10 @@ async function start(options:DecisionConversationOptions,binding:DecisionConvers
             if(first)sessionId=(await client!.create(binding.profileId,binding.workspaceId,{directory:binding.directory,requestId:binding.createId,epoch:binding.epoch})).session.id;
             else {const receipt=await client!.operation(binding.profileId,binding.createId,{epoch:binding.epoch});requireValue(receipt.outcome==='committed','DECISION_SESSION_OUTCOME_UNKNOWN');sessionId=(receipt.result as {session?:{id?:string}})?.session?.id;}
             requireValue(sessionId,'DECISION_SESSION_OUTCOME_UNKNOWN');native=await options.journal.update<{sessionId:string}>(key,old=>old??{sessionId});
+            if(binding.title&&client?.rename){
+                try{await client.rename(binding.profileId,sessionId,binding.title,{...(binding.titleId?{requestId:binding.titleId}:{}),epoch:binding.epoch});}
+                catch(error){options.log({operationId:binding.id,boardId:binding.boardId,stage:(binding.purpose??'decision')+'.harness.title',result:'failure',code:diagnosticFailure(error).code,durationMs:Date.now()-started});}
+            }
         }
         options.log({operationId:binding.id,boardId:binding.boardId,stage,result:'success',durationMs:Date.now()-started});
     }catch(error){

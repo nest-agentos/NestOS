@@ -44,7 +44,7 @@ export async function developmentLifecycleSessions(options: Pick<Options, 'journ
     return rows;
 }
 function lifecycleExecutor(options: Options) {
-    return createPublishedKanbanWorkExecutor({...options, title: (dispatch, item) => `${t('kanban.lifecycleTitle', {stage: dispatch.id.split('-postload-').at(-1) ?? ''})} · ${item.number ? '#' + item.number : item.title}`,
+    return createPublishedKanbanWorkExecutor({...options, title: (dispatch, item) => `${t('kanban.lifecycleTitle', {stage: dispatch.id.split('-postload-').at(-1) ?? ''})} · ${item.number ? '#' + item.number + (item.subNumber ? '#' + item.subNumber : '') : item.title}`,
         binding: async (dispatch) => {
             const id=dispatch.id.replace(/-postload-(succeeded|failed|cancelled)$/,'');
             const override=await options.journal.get<TargetRef>('lifecycle-target:'+dispatch.id);

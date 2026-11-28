@@ -1,7 +1,7 @@
 import {ensureNativeRuntime} from './httpd-native-runtime.mjs';
 import {isHttpBuildSource} from './build-source-policy.mjs';
 import path from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { pinSnapshotManifests, copyLibrarySnapshot, copyNativeRuntimes, copySource, freezeWorkspaceDependencies, sourceFiles, sourceFingerprint, verifyRelease } from './httpd-runtime.mjs';
@@ -12,6 +12,16 @@ import { preparedSnapshot } from './local-library-plan.mjs';
 import {retainUiAssets} from './httpd-ui-assets.mjs';
 
 const run = (command, args, cwd, env = process.env) => execFileSync(command, args, {cwd, env, stdio: 'inherit'});
+/** Run a command asynchronously while preserving inherited stdio and exit code errors. */
+const runAsync = (command, args, cwd, env = process.env) => new Promise((resolve, reject) => {
+    const child = spawn(command, args, {cwd, env, stdio: 'inherit'});
+    child.once('error', reject);
+    child.once('close', (code, signal) => {
+        if (code === 0) return resolve();
+        const error = new Error(`Command failed (${code ?? signal}): ${command} ${args.join(' ')}`);
+        reject(Object.assign(error, {status: code ?? 1, signal}));
+    });
+});
 /** Run a command while keeping its output readable for failure classification. */
 const runCaptured = (command, args, cwd, env) => {
     const result = spawnSync(command, args, {cwd, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024});
@@ -74,10 +84,22 @@ export function captureSourceGuard(root, inputs = inputsAt(root)) {
     }};
 }
 function reporter(operationId) {
+    const logFailure = (stage, started, error) => {
+        console.error(`[HTTPBuild] operationId=${operationId} stage=${stage} result=failure durationMs=${Date.now() - started} code=${error.code ?? error.status ?? 'HTTP_BUILD_FAILED'}`);
+    };
     return (stage, work) => {
         const started = Date.now(); console.log(`[HTTPBuild] operationId=${operationId} stage=${stage} result=start`);
-        try { const result = work(); console.log(`[HTTPBuild] operationId=${operationId} stage=${stage} result=success durationMs=${Date.now() - started}`); return result; }
-        catch (error) { console.error(`[HTTPBuild] operationId=${operationId} stage=${stage} result=failure durationMs=${Date.now() - started} code=${error.code ?? error.status ?? 'HTTP_BUILD_FAILED'}`); throw error; }
+        try {
+            const result = work();
+            if (result && typeof result.then === 'function') {
+                return result.then(
+                    value => { console.log(`[HTTPBuild] operationId=${operationId} stage=${stage} result=success durationMs=${Date.now() - started}`); return value; },
+                    error => { logFailure(stage, started, error); throw error; }
+                );
+            }
+            console.log(`[HTTPBuild] operationId=${operationId} stage=${stage} result=success durationMs=${Date.now() - started}`);
+            return result;
+        } catch (error) { logFailure(stage, started, error); throw error; }
     };
 }
 function installationHit(directory, key) {
@@ -133,29 +155,29 @@ function assertDependencies(directory, snapshot, visited = new Set()) {
         if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) throw new Error(`External release dependency: ${file}`);
     }
 }
-function deployment(context, source, staging) {
-    context.stage('deploy', () => {
-        run('pnpm', ['--config.package-import-method=copy', '--config.prefer-offline=true', '--ignore-scripts', '--filter', '@nestos/http-app', 'deploy', '--prod', '--legacy', staging], source, context.env);
+async function deployment(context, source, staging) {
+    await context.stage('deploy', async () => {
+        await runAsync('pnpm', ['--config.package-import-method=copy', '--config.prefer-offline=true', '--ignore-scripts', '--filter', '@nestos/http-app', 'deploy', '--prod', '--legacy', staging], source, context.env);
         freezeWorkspaceDependencies(staging); copyNativeRuntimes(path.join(source, 'apps/http-app'), staging);
-        run(process.execPath, [path.join(context.root, 'scripts/check-node-native-runtime.mjs'), staging], staging);
+        await runAsync(process.execPath, [path.join(context.root, 'scripts/check-node-native-runtime.mjs'), staging], staging);
         for (const entry of readdirSync(staging)) if (!['package.json', 'node_modules'].includes(entry)) rmSync(path.join(staging, entry), {recursive: true, force: true});
     });
 }
-function compile(context, source, staging, kind) {
+async function compile(context, source, output, kind) {
     const {cacheDirectory, dependencyKey, environment, inputs, cache, stage, operationId, env} = context;
-    const directory = path.join(cacheDirectory, 'artifacts', kind), output = path.join(staging, kind === 'ui' ? 'dist' : 'server');
+    const directory = path.join(cacheDirectory, 'artifacts', kind);
     const common = artifactContext(source, inputs, dependencyKey, environment);
     const restored = cache ? restoreArtifact(directory, output, source, common) : {hit: false, reason: 'disabled'};
     console.log(`[HTTPBuild] operationId=${operationId} stage=${kind} cache=${restored.hit ? 'hit' : 'miss'} reason=${restored.reason ?? 'validated'}`);
-    stage(kind, () => {
+    await stage(kind, async () => {
         if (restored.hit) return;
         const app = path.join(source, 'apps/http-app'), graph = path.join(source, '.httpd-ui-inputs.json');
         let files;
         if (kind === 'ui') {
-            run('pnpm', ['exec', 'vite', 'build', '--outDir', output, '--emptyOutDir'], app, {...env, NESTOS_HTTPD_BUILD_GRAPH: graph});
+            await runAsync('pnpm', ['exec', 'vite', 'build', '--outDir', output, '--emptyOutDir'], app, {...env, NESTOS_HTTPD_BUILD_GRAPH: graph});
             files = readJSON(graph); rmSync(graph);
         } else {
-            run('pnpm', ['exec', 'tsup', 'src/server/main.ts', 'src/server/tool-worker.ts', '--format', 'esm', '--platform', 'node', '--out-dir', output, '--splitting', '--clean', '--metafile'], app, env);
+            await runAsync('pnpm', ['exec', 'tsup', 'src/server/main.ts', 'src/server/tool-worker.ts', '--format', 'esm', '--platform', 'node', '--out-dir', output, '--splitting', '--clean', '--metafile'], app, env);
             const metafile = path.join(output, 'metafile-esm.json');
             const metadata = readJSON(metafile);
             files = Object.keys(metadata.inputs).map(file => path.resolve(app, file));
@@ -179,7 +201,7 @@ function reuseRelease(releases, key, root, operationId) {
         } catch { /* A removed or modified release is rebuilt. */ }
     }
 }
-function buildRelease(context, activate) {
+async function buildRelease(context, activate) {
     const {root, releases, snapshot, stage, fingerprint, key, commit, dirty, cache, operationId} = context;
     const reused = cache && reuseRelease(releases, key, root, operationId);
     if (reused) {
@@ -191,10 +213,17 @@ function buildRelease(context, activate) {
     }
     const id = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '') + '-' + commit.slice(0, 8) + (dirty ? '-dirty' : '');
     const staging = path.join(releases, '.building-' + operationId);
+    const uiStaging = `${staging}.ui`, serverStaging = `${staging}.server`;
     let captured;
     try {
-        captured = workspace(context); deployment(context, captured.source, staging);
-        compile(context, captured.source, staging, 'ui'); compile(context, captured.source, staging, 'server');
+        captured = workspace(context);
+        await Promise.all([
+            deployment(context, captured.source, staging),
+            compile(context, captured.source, uiStaging, 'ui'),
+            compile(context, captured.source, serverStaging, 'server'),
+        ]);
+        renameSync(uiStaging, path.join(staging, 'dist'));
+        renameSync(serverStaging, path.join(staging, 'server'));
         const retained = stage('retain-ui-assets', () => retainUiAssets(releases, staging));
         console.log(`[HTTPBuild] operationId=${operationId} stage=retain-ui-assets result=retained count=${retained.retained} generations=${retained.generations}`);
         stage('validate', () => {
@@ -209,13 +238,18 @@ function buildRelease(context, activate) {
         if (activate) activate(id); else markPendingRelease(releases, id);
         writeFileSync(path.join(context.cacheDirectory, 'last-release.json'), JSON.stringify({id}));
         return id;
-    } finally { rmSync(staging, {recursive: true, force: true}); if (!cache && captured) rmSync(captured.directory, {recursive: true, force: true}); }
+    } finally {
+        rmSync(uiStaging, {recursive: true, force: true});
+        rmSync(serverStaging, {recursive: true, force: true});
+        rmSync(staging, {recursive: true, force: true});
+        if (!cache && captured) rmSync(captured.directory, {recursive: true, force: true});
+    }
 }
-export function buildHttpRelease(root, {cache = true, activate, releases = path.join(root, 'release/httpd')} = {}) {
+export async function buildHttpRelease(root, {cache = true, activate, releases = path.join(root, 'release/httpd')} = {}) {
     const cacheDirectory = path.join(releases, '.build-cache');
     const unlock = acquireBuildLock(cacheDirectory), operationId = randomUUID(), stage = reporter(operationId);
     let unlockLibraries;
-    try { return stage('total', () => {
+    try { return await stage('total', async () => {
         if (path.resolve(releases) !== path.resolve(root, 'release/httpd')) {
             unlockLibraries = acquireLibraryLock(state.localRoot(root), operationId);
         }
@@ -230,7 +264,7 @@ export function buildHttpRelease(root, {cache = true, activate, releases = path.
             platform: process.platform, arch: process.arch, pnpm,
             inputs: sourceFingerprint(root, dependencyInputs(inputs))}));
         const key = digest(JSON.stringify({fingerprint, dependencyKey, environment, commit, dirty}));
-        return buildRelease({root, releases, cacheDirectory, snapshot, inputs, fingerprint, environment, dependencyKey, key,
+        return await buildRelease({root, releases, cacheDirectory, snapshot, inputs, fingerprint, environment, dependencyKey, key,
             cache, stage, sourceGuard, operationId, commit, dirty, env: {...process.env, NESTOS_LIBRARY_DEPLOYMENT: '1'}}, activate);
     }); } finally { try {unlockLibraries?.();} finally {unlock();} }
 }

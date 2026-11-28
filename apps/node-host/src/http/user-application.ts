@@ -52,7 +52,7 @@ export async function openUserApplication(options: HttpHostOptions, userId: stri
         const application = new RuntimeApi(Promise.resolve(host.runtime), scoped, false, userId !== 'admin', path.join(internal, 'private', 'terminal'));
         cleanup.push(namedCleanup('views.close', () => application.close()));
         scoped.write({event: 'user.runtime.ready', operationId, stage: 'ready', result: 'success', durationMs: Date.now() - started});
-        return {application, quiesce: () => host.runtime.quiesce(), close: () => closeUser(cleanup, scoped)};
+        return {application, startBackground: () => host.runtime.startBackground?.(), quiesce: () => host.runtime.quiesce(), close: () => closeUser(cleanup, scoped)};
     } catch (error) {
         scoped.write({event: 'user.runtime.failed', operationId, stage, result: 'failure', code: userErrorCode(error), durationMs: Date.now() - started});
         try {await closeHostResources(cleanup);} catch {scoped.write({event: 'user.runtime.cleanup.failed', operationId, result: 'failure', code: 'USER_CLEANUP_FAILED'});}

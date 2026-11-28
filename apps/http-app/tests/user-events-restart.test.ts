@@ -46,7 +46,7 @@ it('serves independent browser cursors, isolates users and reopens their real pe
         const page = await b.backend.events!.readEvents(before);
         expect(page.events.some(event => event.value.type === 'node:created')).toBe(true);
         expect(JSON.stringify(page)).not.toContain('PRIVATE_BODY');
-        expect((await c.backend.events!.readEvents(other)).events).toEqual([]);
+        expect((await c.backend.events!.readEvents(other)).events.filter(event => event.value.type !== 'scanner.changed')).toEqual([]);
         await expect(c.backend.events!.readEvents(before)).rejects.toMatchObject({code: 'ECONFLICT'});
         feedA.close(); feedB.close();
         for (const client of clients.splice(0)) await client.close();

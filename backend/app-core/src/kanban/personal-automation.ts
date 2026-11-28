@@ -17,7 +17,7 @@ import type {IndependentCallService,SessionRepository} from '@nestos/llm-session
 import type {IndependentCallExecutionReader} from '@nestos/llm-session';
 import type {OriginalSessionResolver} from '../projects/original-execution-session';
 import type {RootTargetCatalog} from '@nestos/llm-session/contracts';
-import type {KanbanActor,KanbanBoard,KanbanItem,KanbanService} from '@nestos/kanban/contracts';
+import {kanbanReference,type KanbanActor,type KanbanBoard,type KanbanItem,type KanbanService} from '@nestos/kanban/contracts';
 import {createPublishedKanbanWorkExecutor} from './published-work';
 import {analyzeItem} from './analysis-adapter';
 import {automationCatalog,automationTarget} from '@nestos/kanban-development';
@@ -109,12 +109,13 @@ async function createExecutor(options:Options,context:KanbanExecutorContext,prep
                 requireValue(options.prepareWork, 'WORK_PREPARATION_UNAVAILABLE');
                 const [work,dependencies,owner]=await Promise.all([workContext(options.journal,board,item,options.service),
                     context.dependencies(item),managementOwner(options.service,board,item)]);
-                return options.prepareWork({board,context:{...work,inputs:dispatch.inputs,dependencies,...(owner?{coordinationTaskId:owner.id}:{})},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
+                const prepared=await options.prepareWork({board,context:{...work,inputs:dispatch.inputs,dependencies,...(owner?{coordinationTaskId:owner.id}:{})},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
                     reportActivity: fact => options.workLog?.append(options.service, boardId, item.id, {...fact, actor: fact.actor ?? dispatch.principal, dispatchId: dispatch.id}) ?? Promise.resolve()});
+                return {title:`${kanbanReference(board,item)} · ${item.title}`,...prepared};
             }
             const work=item.externalRefs?.some(ref=>ref.system===kanbanReferences.decision)
                 ?await workContext(options.journal,board,item):undefined;
-            return {target:await options.prepareTarget?.({board,dispatch,target,context:work,projectId:workProjectId(item)})??target};
+            return {title:`${kanbanReference(board,item)} · ${item.title}`,target:await options.prepareTarget?.({board,dispatch,target,context:work,projectId:workProjectId(item)})??target};
         }});
     const executor = options.continuation ? withContinuedWork(primary, {...options.continuation, calls: options.calls, originalSession:options.originalSession, observe}) : primary;
     return executor;

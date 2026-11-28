@@ -17,7 +17,7 @@ export interface PublishedKanbanWorkOptions {
     calls: Pick<IndependentCallService,'prepareTaskCall'|'submitPreparedTaskCall'|'inspectTaskCallSubmission'|'list'>; execution:Pick<IndependentCallExecutionReader,'inspect'>;
     /** Stable Session preparation is owned by the host's existing session journal. */
     prepareSession(dispatchId: string): Promise<string>;
-    binding(dispatch: KanbanDispatch, item: KanbanItem): Promise<{target: TargetRef; contextRef?: unknown; instruction?: string; dependencies?: unknown; overrides?: IndependentCallInput['request']['overrides']}>;
+    binding(dispatch: KanbanDispatch, item: KanbanItem): Promise<{target: TargetRef; title?: string; contextRef?: unknown; instruction?: string; dependencies?: unknown; overrides?: IndependentCallInput['request']['overrides']}>;
     context?(dispatch: KanbanDispatch, item: KanbanItem): Promise<unknown>;
     executionPolicy?: WorkExecutionPolicy;
 }
@@ -29,7 +29,7 @@ export function createPublishedKanbanWorkExecutor(options: PublishedKanbanWorkOp
             const text=binding.contextRef!==undefined?referencePrompt(binding):formatPromptSections([{title:'Task',content:{item,inputs:dispatch.inputs,dependencies:await options.context?.(dispatch,item),planId:dispatch.planId,planRevision:dispatch.planRevision}}]);
             const sessionId=await options.prepareSession(dispatch.id);
             await options.onSessionPrepared?.(dispatch, item, sessionId);
-            const input: IndependentCallInput={title:options.title?.(dispatch, item) ?? `${item.number ? '#' + item.number + ' · ' : ''}${item.title}`, request:{expectedSessionId:sessionId,expectedBranch:'main',expectedTarget:binding.target,
+            const input: IndependentCallInput={title:options.title?.(dispatch, item) ?? binding.title ?? `${item.number ? '#' + item.number + (item.subNumber ? '#' + item.subNumber : '') + ' · ' : ''}${item.title}`, request:{expectedSessionId:sessionId,expectedBranch:'main',expectedTarget:binding.target,
                 target:{kind:binding.target.kind,id:binding.target.id,version:binding.target.version},overrides:binding.overrides,
                 source:{kind:'composer',text,attachments:[],values:{}},
                 submission:{id:dispatch.id,source:{kind:'conversation',ownerId:sessionId,id:dispatch.id}}}};

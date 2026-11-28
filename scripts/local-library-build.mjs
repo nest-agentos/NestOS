@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { availableParallelism } from 'node:os';
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, basename, resolve } from 'node:path';
 import { libraries } from './npm-libraries.mjs';
@@ -37,7 +38,10 @@ function buildCaptured(work, log, selected) {
         cwd: work, stdio: 'inherit', env: { ...process.env, NESTOS_LIBRARY_SNAPSHOT: 'source', CI: 'true' },
     }));
     const filters = selected.flatMap(name => ['--filter', name]);
-    log('build', () => execFileSync('pnpm', ['-r', '--workspace-concurrency=1', ...filters, 'build'], {
+    const configured = Number(process.env.NESTOS_BUILD_CONCURRENCY);
+    const concurrency = Number.isInteger(configured) && configured > 0
+        ? configured : Math.min(4, Math.max(2, availableParallelism()));
+    log('build', () => execFileSync('pnpm', ['-r', `--workspace-concurrency=${concurrency}`, ...filters, 'build'], {
         cwd: work, stdio: 'inherit', env: { ...process.env, NESTOS_LIBRARY_SNAPSHOT: 'source' },
     }));
 }

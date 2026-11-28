@@ -1,11 +1,11 @@
 import {execFileSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
-import {readFile, readlink, realpath, stat} from 'node:fs/promises';
+import {mkdir, readFile, readlink, realpath, stat, writeFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {createServiceControl} from './index.mjs';
 import {checkedGeneration, command, installedConfig, installedExecutable, readConfiguration, serviceStorage} from './guest.mjs';
-import {digest, fail, packageArtifact, validId} from './artifact.mjs';
+import {artifact, digest, fail, packageArtifact, validId} from './artifact.mjs';
 
 const localUnit = 'nestos-cells-local.service';
 
@@ -35,19 +35,58 @@ function cellsSourceDirty(root, cells, git) {
         || git(cells, 'status', '--porcelain', '--untracked-files=no', '--', '.'));
 }
 
-export async function build(root, compile) {
+function rustcFingerprint() {
+    try { return execFileSync('rustc', ['--version'], {encoding: 'utf8', timeout: 5000}).trim(); }
+    catch { return 'unknown'; }
+}
+
+async function tryReuseCellsBuild(root, output, commit, cellsCommit, rustc, rustflags) {
+    try {
+        const cache = JSON.parse(await readFile(path.join(output, '.build-cache.json'), 'utf8'));
+        if (cache.format !== 1 || cache.cellsCommit !== cellsCommit || cache.rustc !== rustc || cache.rustflags !== rustflags) return null;
+        if (cache.commit === commit && cache.artifactId) {
+            const existing = await artifact(root, cache.artifactId);
+            console.info(JSON.stringify({operation: 'cells.build', stage: 'cache', result: 'hit', mode: 'artifact', version: existing.value.id}));
+            return existing;
+        }
+        const binary = path.join(output, 'release/cells');
+        if (cache.binarySha256 && digest(await readFile(binary)) === cache.binarySha256) {
+            console.info(JSON.stringify({operation: 'cells.build', stage: 'cache', result: 'hit', mode: 'binary', commit}));
+            return await packageArtifact(root, commit, binary);
+        }
+    } catch { /* Missing or stale build cache falls back to cargo build. */ }
+    return null;
+}
+
+async function writeCellsBuildCache(output, data) {
+    await mkdir(output, {recursive: true});
+    await writeFile(path.join(output, '.build-cache.json'), JSON.stringify({format: 1, ...data}) + '\n');
+}
+
+export async function build(root, compile, options = {}) {
     const git = (directory, ...args) => execFileSync('git', ['-C', directory, ...args],
         {encoding: 'utf8', timeout: 10000}).trim();
     const cells = path.join(root, 'tools/cells'), output = path.join(root, 'release/cells-build');
     const commit = git(root, 'rev-parse', 'HEAD'), before = git(cells, 'rev-parse', 'HEAD');
     const dirty = () => cellsSourceDirty(root, cells, git);
     if (dirty()) throw fail('BUILD_SOURCE_DIRTY');
+    const useCache = (options.cache ?? !compile) && !process.env.NESTOS_CELLS_NO_CACHE;
+    const rustc = useCache ? rustcFingerprint() : '', rustflags = process.env.RUSTFLAGS ?? '';
+    const reused = useCache ? await tryReuseCellsBuild(root, output, commit, before, rustc, rustflags) : null;
+    if (reused) {
+        if (reused.value.commit !== commit || reused.value.id !== undefined) {
+            await writeCellsBuildCache(output, {commit, cellsCommit: before, rustc, rustflags, binarySha256: reused.value.sha256, artifactId: reused.value.id});
+        }
+        return reused;
+    }
     if (compile) await compile({root, cells, output});
     else execFileSync('cargo', ['build', '--locked', '--release', '--manifest-path', path.join(cells, 'Cargo.toml'),
         '--target-dir', output], {cwd: root, stdio: 'inherit', timeout: 600000});
     if (git(root, 'rev-parse', 'HEAD') !== commit || dirty() || git(cells, 'rev-parse', 'HEAD') !== before)
         throw fail('BUILD_SOURCE_CHANGED');
-    return packageArtifact(root, commit, path.join(output, 'release/cells'));
+    const packaged = await packageArtifact(root, commit, path.join(output, 'release/cells'));
+    if (useCache) await writeCellsBuildCache(output, {commit, cellsCommit: before, rustc, rustflags, binarySha256: packaged.value.sha256, artifactId: packaged.value.id});
+    return packaged;
 }
 
 export async function sameDirectory(first, second) {

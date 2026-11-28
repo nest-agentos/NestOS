@@ -586,11 +586,11 @@ it('opens notebook files through one default window and preserves pinned resourc
         expect(active().querySelector('[aria-pressed="true"]')).not.toBeNull();
         expect(workbench.getActiveFilePath()).toBeNull();
         await workbench.openFile('/a/notes/same.md');
-        expect(active().dataset.tabId).toBe('notebook-notes-same.md');
+        expect(active().dataset.tabId).toBe('notebook-a/notes/same.md');
         await workbench.openFile('/b/notes/same.md');
         expect(active().dataset.tabId).toBe('notebook');
         pin();
-        await vi.waitFor(() => expect(active().dataset.tabId).toBe('notebook-notes-same.md~%2Fb%2Fnotes%2Fsame.md'));
+        await vi.waitFor(() => expect(active().dataset.tabId).toBe('notebook-b/notes/same.md'));
         await workbench.openFile('/third.md');
         await workbench.openFile('/fourth.md');
         expect(active().dataset.tabId).toBe('notebook');
@@ -602,7 +602,7 @@ it('opens notebook files through one default window and preserves pinned resourc
         expect(workbench.getActiveFilePath()).toBe('/fourth.md');
         expect(main.querySelector('.workbench-tabs__panel:not([hidden]) .session-editor-mount')?.textContent).toBe('fourth.md');
         await workbench.openFile('/a/notes/same.md');
-        expect(active().dataset.tabId).toBe('notebook-notes-same.md');
+        expect(active().dataset.tabId).toBe('notebook-a/notes/same.md');
         expect(factory).toHaveBeenCalledTimes(6);
     } finally { await workbench.destroy(); await manager.dispose(); }
 });

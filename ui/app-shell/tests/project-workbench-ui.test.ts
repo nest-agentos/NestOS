@@ -152,7 +152,7 @@ it('creates project Sessions from the selected project and edits its files in th
         const fileTab = () => main.querySelector<HTMLElement>(`[data-resource="${projectPath}/@files/notes.md"].workbench-tabs__tab`)!;
         expect(fileTab().dataset.tabId).toBe('workbench');
         fileTab().querySelector<HTMLButtonElement>('.workbench-tabs__pin')!.click();
-        expect(fileTab().dataset.tabId).toBe('workbench-workspace-notes.md');
+        expect(fileTab().dataset.tabId).toBe(`workbench-${other.project.id}-notes.md`);
         await workbench.openResource(projectPath);
         expect(options.signal.aborted).toBe(false);
         await options.files.fs.driver.rename('/workspace/notes.md', 'renamed.txt');

@@ -28,13 +28,13 @@ function mainCheckout(directory) {
     const shared = path.dirname(common);
     return path.resolve(shared) === path.resolve(directory) ? null : shared;
 }
-function build(args) {
+async function build(args) {
     const shared = args.includes('--share-main') ? mainCheckout(root) : null;
     const directory = shared ? path.join(shared, 'release/httpd') : releases;
     console.log(`[HTTPBuild] stage=plan source=${root} releases=${directory}${shared ? ' shared=main' : ''}`);
     run(process.execPath, [path.join(root, 'scripts/local-libraries.mjs'), 'build'], root,
         shared ? { ...process.env, NESTOS_LIBRARY_SEED_ROOT: shared } : process.env);
-    const id = buildHttpRelease(root, { cache: !args.includes('--no-cache'), releases: directory,
+    const id = await buildHttpRelease(root, { cache: !args.includes('--no-cache'), releases: directory,
         activate: args.includes('--no-activate') ? undefined : value => activate(value, directory) });
     console.log(`HTTP release ready: ${id}\nStart: ${shared ? `NESTOS_HTTPD_RELEASE_ROOT=${directory} pnpm httpd` : 'pnpm httpd'}\nDevelopment: pnpm httpd:dev`);
     return id;
@@ -108,10 +108,10 @@ try {
     if (command === 'deploy' && args.includes('--help')) console.log('Usage: ./httpd.sh [--no-cache]\nBuild, switch the running HTTP service, and verify its version and health.');
     else if (command === 'deploy') await (await import('./httpd-deploy.mjs')).deployHttpd(root, releases, args, build);
     else if (command === 'build') {
-        if(!args.includes('--receipt'))build(args);
+        if(!args.includes('--receipt')) await build(args);
         else {
             if(args.some(arg=>!['--no-activate','--receipt','--no-cache'].includes(arg)))throw new Error('HTTPD_BUILD_RECEIPT_ARGUMENTS_INVALID');
-            const version=build([...args,'--no-activate']);
+            const version=await build([...args,'--no-activate']);
             const evidence='release/httpd/'+version+'/release.json';
             const sha256=createHash('sha256').update(readFileSync(path.join(releaseDirectory(releases,version),'release.json'))).digest('hex');
             console.log(JSON.stringify({operation:'httpd.build',result:'success',version,evidence:{path:evidence,sha256}}));

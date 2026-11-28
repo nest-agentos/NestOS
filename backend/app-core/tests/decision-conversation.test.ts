@@ -397,3 +397,20 @@ it('settles normal creation through two durable host replies without any schema 
  expect(enqueue.mock.calls.map(call=>(call as unknown[])[3])).toEqual(['reply-preview','reply-confirm']);
  expect(f.runRecord).toHaveBeenCalledOnce();
 });
+
+it('names newly created decision sessions with recognizable project and id metadata',async()=>{
+ const f=await fixture(),rename=vi.fn(async()=>{throw Object.assign(new Error('nope'),{code:'NATIVE_RENAME_FAILED'});}),enqueue=vi.fn(async()=>{});
+ const {decisionConversationTransport}=await import('../src/kanban/decision-conversation-transport');
+ const harness={profiles:async()=>({epoch:'e1',profiles:[{id:'codex',projectRuntime:true,capabilities:{create:true,sessionChannels:true,workingDirectory:true,rename:true},workspaces:[{id:'srv-1'}],models:[]}]}),
+  create:async()=>({session:{id:'native-1'}}),rename,close:async()=>{}};
+ f.options.projects={...f.options.projects,list:async()=>[{project:{id:'one',source:{kind:'remote'}},path:'/p/one',name:'One'}] as never,get:async()=>({path:'/p/one',name:'One',displayName:'One',project:{id:'one',source:{kind:'remote'}}} as never),openWorkspace:async()=>({fs:f.options.fs,dispose:async()=>{}}) as never};
+ f.options.remote={...f.options.remote,list:()=>[{at:'/',serverId:'cell',serverProjectId:'srv-1',serverProjectRevision:1,authorization:{principalId:'p1',revision:1}} as never],
+  sessionChannel:async()=>({projectContext:{projects:[{projectId:'srv-1',revision:1,directory:'/p/one'}]}} as never),
+  projectHarness:async()=>harness as never,projectConversation:async()=>({enqueue,close:async()=>{}}) as never};
+ const port=decisionConversationTransport(f.options,vi.fn());
+ const binding=await port.prepare('conv-12345678','b',[{system:'nestos-remote-project',id:'one'}],{system:'nestos-remote-project',id:'one'});
+ expect(binding).toMatchObject({title:'Decision · One · conv-123'});
+ await expect(port.start(binding,true,()=>true)).resolves.toMatchObject({sessionId:'native-1'});
+ expect(rename).toHaveBeenCalledWith('codex','native-1','Decision · One · conv-123',{requestId:expect.any(String),epoch:'e1'});
+ expect(f.options.log).toHaveBeenCalledWith(expect.objectContaining({stage:'decision.harness.title',result:'failure',code:'NATIVE_RENAME_FAILED'}));
+});

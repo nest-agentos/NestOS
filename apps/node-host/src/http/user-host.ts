@@ -16,13 +16,23 @@ type UserApplication = Awaited<ReturnType<typeof openUserApplication>>;
 export class UserApplications {
     private readonly users = new Map<string, Promise<UserApplication>>();
     private closed = false;
+    private backgroundReady = false;
     constructor(private readonly options: HttpHostOptions, private readonly audit: AuditPort) {}
+    markReady(): void {
+        if (this.closed || this.backgroundReady) return;
+        this.backgroundReady = true;
+        for (const opening of this.users.values()) void opening.then(user => { if (!this.closed) user.startBackground(); }).catch(() => {});
+    }
     get(userId: string): Promise<UserApplication> {
         if (this.closed) return Promise.reject(new FSError('ECAPABILITY', 'User runtimes are stopping'));
         let opening = this.users.get(userId);
         if (!opening) {
             if (this.users.size >= 100) return Promise.reject(new FSError('EBUSY', 'User runtime limit reached'));
-            opening = openUserApplication(this.options, userId, this.audit); this.users.set(userId, opening);
+            opening = openUserApplication(this.options, userId, this.audit).then(user => {
+                if (this.backgroundReady && !this.closed) user.startBackground();
+                return user;
+            });
+            this.users.set(userId, opening);
             void opening.catch(() => {if (this.users.get(userId) === opening) this.users.delete(userId);});
         }
         return opening;
@@ -64,20 +74,17 @@ export async function startUserHost(options: HttpHostOptions) {
         await privateDirectory(path.join(options.root, '_meta'));
         cleanup.push(namedCleanup('storage.host-lock.release', await acquireHostLock(path.join(options.root, '_meta'))));
         const users = new UserApplications(options, audit); cleanup.push(namedCleanup('users.close', () => users.close()));
-        // Seed shared definitions before opening any read-only consumer; recover all enrolled users before listen.
+        // Seed shared definitions via admin before listen; open other enrolled users lazily on demand.
         const enrolled = await options.certificates.users();
         if (!enrolled.includes('admin')) throw new FSError('EINVAL', 'Multi-user hosting requires an enrolled admin certificate');
         if (!options.signal?.aborted) await users.get('admin');
-        for (const userId of enrolled.filter(id => id !== 'admin')) {
-            if (options.signal?.aborted) break;
-            await users.get(userId);
-        }
         const server = createHttpServer({certificates: options.certificates, staticDir: options.staticDir, audit, application: users, multiUser: true,
             userAudit: id => userAudit(audit, id), build: {mode: options.logMode ?? 'standalone', version:process.env.NESTOS_HTTPD_VERSION,serviceId:process.env.NESTOS_HTTPD_SERVICE_ID}});
         let serverClosing: Promise<void> | undefined;
         const stopServer = () => serverClosing ??= (async () => {users.endStreams(); await stopUserServer(server);})();
         cleanup.push(namedCleanup('server.close', stopServer));
         await listenUserServer(server, options);
+        users.markReady();
         audit.write({event: 'server.started', operationId, stage: 'listen', result: 'success', count: enrolled.length, durationMs: Date.now() - started});
         console.log(`NestOS HTTPS UI: https://${options.host}:${(server.address() as {port: number}).port}\nClient certificate required; multi-user hosting enabled\nAudit log: ${options.auditFile}`);
         let closing: Promise<void> | undefined;

@@ -24,9 +24,9 @@ function dependencyVersions(release) {
     }
     return result;
 }
-function prepare() {
+async function prepare() {
     execFileSync('pnpm', ['lib:build'], {cwd: root, stdio: 'inherit'});
-    const id = buildHttpRelease(root), release = path.join(root, 'release/httpd', id), staging = path.join(output, 'package');
+    const id = await buildHttpRelease(root), release = path.join(root, 'release/httpd', id), staging = path.join(output, 'package');
     const template = path.join(root, 'apps/http-app/npm'), manifest = read(path.join(template, 'package.json'));
     manifest.dependencies = dependencyVersions(release);
     rmSync(staging, {recursive: true, force: true}); mkdirSync(staging, {recursive: true});
@@ -46,7 +46,7 @@ function publish() {
     execFileSync('npm', ['publish', artifact.tarball, '--access', 'public', '--registry', 'https://registry.npmjs.org/'], {cwd: root, stdio: 'inherit'});
 }
 try {
-    if (process.argv[2] === 'prepare') prepare();
+    if (process.argv[2] === 'prepare') await prepare();
     else if (process.argv[2] === 'publish') publish();
     else throw new Error('Usage: node scripts/release-nestos.mjs prepare | publish');
 } catch (error) {console.error(error.message); process.exitCode = 1;}

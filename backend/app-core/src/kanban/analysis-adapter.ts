@@ -3,7 +3,7 @@ import {workContext} from './work-context';
 import {transientOperationFailure} from '../run/operation-recovery';
 import {inheritWorkReferences} from './task-projects';
 import {formatPromptSections} from '@nestos/llm-context/prompt';
-import {DEFAULT_KANBAN_WORK_TYPES,type KanbanBoard,type KanbanItem,type KanbanService} from '@nestos/kanban/contracts';
+import {DEFAULT_KANBAN_WORK_TYPES,kanbanReference,type KanbanBoard,type KanbanItem,type KanbanService} from '@nestos/kanban/contracts';
 import {validateDecisionSource,analyzeItem as coordinateAnalysis,type KanbanAutomationJournal,type KanbanAnalysisObservation} from '@nestos/kanban/integration';
 import {t} from '@nestos/common';
 import {type IndependentCallExecutionReader} from '@nestos/llm-session';
@@ -40,7 +40,7 @@ export function analyzeItem(options:AnalysisOptions,board:KanbanBoard,item:Kanba
 }
 function analysisInput(board:KanbanBoard,item:KanbanItem,target:TargetRef,id:string,instruction=defaults['planning.md'],contextRef?:unknown):IndependentCallInput {
     const items=board.items.map(({id,title,responsibility,acceptance,planning,status})=>({id,title,responsibility,acceptance,planning,status}));
-    return {title:`${t('kanban.automationAnalysis')} · ${item.number?'#'+item.number+' · ':''}${item.title}`,
+    return {title:`${t('kanban.automationAnalysis')} · ${kanbanReference(board,item)} · ${item.title}`,
         request:{expectedSessionId:id,expectedBranch:'main',expectedTarget:target,target:{kind:target.kind,id:target.id,version:target.version},
             source:{kind:'composer',text:contextRef!==undefined?contextReferenceInstruction(contextRef,instruction):formatPromptSections([{title:'Instructions',content:instruction},{title:'Snapshot',content:{item,items,workTypes:board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:board.defaultWorkType??'task'}}]),attachments:[],values:{}},
             submission:{id,source:{kind:'conversation',ownerId:id,id}}}};

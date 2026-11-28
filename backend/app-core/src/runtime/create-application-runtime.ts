@@ -901,9 +901,21 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             if (!startup.active) return;
             const hasDreamSchedules = await dreamSchedules?.hasSchedules() ?? false;
             const hasDreamOutbox = await dreamOutbox?.hasPendingIndex() ?? false;
-            kanbanMonitor = startKanbanMonitor({service: {scan:async()=>{const results = await Promise.allSettled([kanban.scan(), developmentMessages.scan(), ...(dreamSchedules ? [dreamSchedules.scan()] : []), ...(dreamOutbox ? [dreamOutbox.scan()] : []), ...(dreamRecompute ? [dreamRecompute.scan()] : []), ...kanbanIntegrations.map(integration => integration.scan())]);
+            kanbanMonitor = startKanbanMonitor({service: {scan:async(signal?: AbortSignal)=>{
+                const work = Promise.allSettled([kanban.scan(), developmentMessages.scan(), ...(dreamSchedules ? [dreamSchedules.scan()] : []), ...(dreamOutbox ? [dreamOutbox.scan()] : []), ...(dreamRecompute ? [dreamRecompute.scan()] : []), ...kanbanIntegrations.map(integration => integration.scan())]);
+                if (!signal) {
+                    const failures = (await work).filter(result => result.status === 'rejected');
+                    if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'KANBAN_SCAN_FAILED');
+                    return;
+                }
+                if (signal.aborted) return;
+                let onAbort: (() => void) | undefined;
+                const results = await Promise.race([work, new Promise<undefined>(resolve => { onAbort = () => resolve(undefined); signal.addEventListener('abort', onAbort, {once: true}); })])
+                    .finally(() => { if (onAbort) signal.removeEventListener('abort', onAbort); });
+                if (!results || signal.aborted) return;
                 const failures = results.filter(result => result.status === 'rejected');
-                if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'KANBAN_SCAN_FAILED');}}, initialScan: kanbanIntegrations.length > 0 || !!developmentBindings || hasDreamSchedules || hasDreamOutbox || !!dreamRecompute, subscribeTick: tick => {
+                if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'KANBAN_SCAN_FAILED');
+            }}, initialScan: kanbanIntegrations.length > 0 || !!developmentBindings || hasDreamSchedules || hasDreamOutbox || !!dreamRecompute, subscribeTick: tick => {
                 wakeKanban = tick;
                 const timer = setInterval(tick, 30_000); return () => {wakeKanban = () => {}; clearInterval(timer);};
             }, subscribeChanges: tick => {
@@ -922,7 +934,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
             }
         });
         const startBackground = () => startup.activate();
-        if (policy.projects === 'before-ready') startBackground();
+        if (policy.workers !== 'after-ready') startBackground();
         diagnostics.record({module: 'application', operation: 'application.runtime', stage: 'ready', result: 'success', level: 'info'});
         return { sessionRecovery, events, diagnostics, serviceControl:options.serviceControl,vfs, llmDriver, agentService, configuration, sessionRepository, flowEngine, sessionFiles, directoryMounts, projects, executionConnections, toolConnections: options.toolConnections,
             flowInstallations: installations, toolPackages: installations.toolPackages, kernel, sessionManager, commandBus, independentCalls, runCatalog, quiesce, dispose, startBackground, prepareSession: async id => { await initializeProjects(); return recovery.acquireLater(id); },

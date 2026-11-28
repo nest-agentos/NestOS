@@ -1185,15 +1185,15 @@ export class SessionWorkbench implements WorkspaceController {
         let finishPresentation: (() => void) | undefined;
         let origin: WorkbenchTab<RetainedEditor> | undefined, candidate: WorkbenchTab<RetainedEditor> | undefined;
         const fileTarget = target.kind === 'files' || target.kind === 'project-files' ? target : undefined;
-        const windowLabel = fileTarget && !options.directory && fileTarget.path !== WORKSPACE_PATH &&
-            fileTarget.path !== '/' && this.sidebarUI?.getNode(path)?.type !== 'directory' ? fileWindowLabel(fileTarget.path) : undefined;
+        const isFileWindow = Boolean(fileTarget && !options.directory && fileTarget.path !== WORKSPACE_PATH &&
+            fileTarget.path !== '/' && this.sidebarUI?.getNode(path)?.type !== 'directory');
         const windowOperationId = options.navigation?.operationId ?? randomUUID();
-        const finishFile = async () => {
-            if (!candidate || !windowLabel) return;
+        const finishFile = async (folder?: string | null) => {
+            if (!candidate || !isFileWindow || !fileTarget) return;
             if (candidate.panel.querySelector('.workbench-directory')) this.tabs.publishCandidate(candidate);
             else {
                 this.retainEditor(this.viewLoads.detach(load));
-                await this.tabs.commitDefault(candidate, windowLabel);
+                await this.tabs.commitDefault(candidate, await this.fileWindowLabelFor(fileTarget, folder));
                 reportWindowOpen('file', windowOperationId, navigationStarted);
             }
             candidate = undefined;
@@ -1249,8 +1249,8 @@ export class SessionWorkbench implements WorkspaceController {
                     this.scheduleNavigation(navigationPath, {reveal: true, preserveProject: options.preserveProject});
                 }
                 else this.scheduleNavigation(navigationPath, {reveal: true, preserveProject: true, reuseScope: target.kind === 'remote'});
-                if (windowLabel && (!existing.defaultLabel || !existing.pinned) && !existing.panel.querySelector('.workbench-directory'))
-                    await this.tabs.commitDefault(existing, windowLabel);
+                if (isFileWindow && fileTarget && (!existing.defaultLabel || !existing.pinned) && !existing.panel.querySelector('.workbench-directory'))
+                    await this.tabs.commitDefault(existing, await this.fileWindowLabelFor(fileTarget, openingManifest?.folder));
                 this.onSelect(this.getActiveResourceId()!); return;
             }
             if (existing?.value) await this.tabs.close(tabId, false);
@@ -1260,9 +1260,9 @@ export class SessionWorkbench implements WorkspaceController {
                 ? this.sidebarUI?.getNode(path)?.metadata.title || t('harness.remoteSessions')
                 : path.split('/').pop() || t('project.workspace');
             const conversation = target.kind === 'session' || target.kind === 'remote' && !!target.nativeSessionId;
-            const preview = !windowLabel && !conversation && !options.newTab && (!options.fromSidebar || !!sidebarListing);
-            const tab = await this.tabs.open(tabId, title, preview, !!windowLabel);
-            if (windowLabel) candidate = tab;
+            const preview = !isFileWindow && !conversation && !options.newTab && (!options.fromSidebar || !!sidebarListing);
+            const tab = await this.tabs.open(tabId, title, preview, isFileWindow);
+            if (isFileWindow) candidate = tab;
             load.check();
             if (!await load.read(() => this.checkRemoteFiles(path, target, load))) {
                 if (candidate && origin?.value) throw new FSError('EIO', t('remote.projectOffline'));
@@ -1442,7 +1442,7 @@ export class SessionWorkbench implements WorkspaceController {
             if (this.closed) throw new Error('Session workspace closed');
             this.active = id;
             this.activeBranch = target.kind === 'session' ? branch ?? manifest.currentBranch ?? 'main' : undefined;
-            await finishFile();
+            await finishFile(manifest.folder);
             if (!current()) return;
             this.onSelect(this.getActiveResourceId()!);
             this.scheduleNavigation(path, {reveal: true, preserveProject: true});
@@ -1454,7 +1454,7 @@ export class SessionWorkbench implements WorkspaceController {
                 if (!this.tabs.current.value) this.retainEditor(cancel); else cancel();
             }
         }).catch(async error => {
-            if (windowLabel && !(error instanceof ViewLoadCancelled))
+            if (isFileWindow && !(error instanceof ViewLoadCancelled))
                 reportWindowOpen('file', windowOperationId, navigationStarted, {error});
             if (candidate && await this.restoreFailedWindow(candidate, origin)) {
                 if (error instanceof ViewLoadCancelled) return;
@@ -2243,7 +2243,7 @@ export class SessionWorkbench implements WorkspaceController {
         this.editor = opened.editor; this.context = opened.context; this.previewCleanup = opened.previewCleanup;
         this.tabs.setIcon(this.tabs.current!.id, this.sidebarUI!.getResourceIcon(opened.node));
         this.tabs.title(this.tabs.current!.id, target.path.split('/').pop() || target.path);
-        if (opened.editor) this.trackProjectFileRenames(opened.context.context.fs, target.folder, target.path);
+        if (opened.editor) this.trackProjectFileRenames(opened.context.context.fs, target.folder, target.path, project?.project.id);
     }
 
     private async openSystemPath(projectId: string, value: string): Promise<void> {
@@ -2307,7 +2307,14 @@ export class SessionWorkbench implements WorkspaceController {
         if (result) this.editor.gotoMatch(result);
     }
 
-    private trackProjectFileRenames(fs: IFileSystem, folder: string, path: string): void {
+    private async fileWindowLabelFor(target: { kind: 'project-files'; folder: string; path: string } | { kind: 'files'; sessionId: string; path: string },
+        folder?: string | null): Promise<string> {
+        const targetFolder = target.kind === 'project-files' ? target.folder : folder;
+        const project = targetFolder ? await this.projectForOpen(targetFolder) : undefined;
+        return fileWindowLabel(target.path, project?.project.id ?? (target.kind === 'files' ? target.sessionId : undefined));
+    }
+
+    private trackProjectFileRenames(fs: IFileSystem, folder: string, path: string, projectId?: string): void {
         const editor = this.editor, tab = this.tabs.current!;
         const remap = (event: { payload: { nodes: { oldPath: string; newPath: string }[] } }) => {
             for (const { oldPath, newPath } of event.payload.nodes) {
@@ -2319,7 +2326,7 @@ export class SessionWorkbench implements WorkspaceController {
                 const next = folderBrowserPath(folder) + '/@files' + projectRelativePath(path);
                 const selected = this.tabs.current === tab;
                 this.tabs.location(tab.id, path);
-                this.tabs.rename(tab.id, next, filename, tab.defaultLabel ? fileWindowLabel(path) : undefined);
+                this.tabs.rename(tab.id, next, filename, tab.defaultLabel ? fileWindowLabel(path, projectId) : undefined);
                 if (tab.value) tab.value.active = next;
                 if (selected) { this.active = next; if (this.visible) this.onSelect(next, 'replace'); }
                 this.scheduleRefresh('file-rename');
