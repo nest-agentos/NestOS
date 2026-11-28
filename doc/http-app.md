@@ -726,7 +726,7 @@ HTTP 工作台以 `nestos@0.1.0` 发布，使用 `npm install -g nestos@0.1.0` �
 
 `pnpm httpd` 常驻启动器管理 release 子进程。`pnpm httpd:status` 返回服务 ID、当前版本和切换回执；`pnpm httpd:switch <release-id> --operation-id <id> --expected-current <version>` 请求版本切换。`httpd:restart` 选取构建后的 release，不重新构建。旧宿主在安全点退出后才启动候选版本，健康检查失败自动回退原版本。
 
-在使用 systemd 的 Linux 宿主上，`pnpm httpd:restart` 先检查已安装的 `nestos-cells-local.service`，在其尚未运行时启动并等待 systemd 的就绪检查。随后启动已安装且尚未运行的 `firecracker-server.service`，再从 `list --all --json` 检查 VM ID `cells-x1`。清单中该 VM 处于 `stopped` 时才启动，已绑定服务包的 VM 使用受管服务启动。临时 VM 停止后会从清单消失，下次重启时跳过。Firecracker 检查或启动失败会在替换 HTTP 进程前结束本次重启，运行日志包含失败阶段、错误码和耗时。
+在使用 systemd 的 Linux 宿主上，`pnpm httpd:restart` 先检查已安装的 `nestos-cells-local.service`，在其尚未运行时启动并等待 systemd 的就绪检查。随后启动已安装且尚未运行的 `firecracker-server.service`，再从 `list --all --json` 检查 VM ID `cell-x1`。清单中该 VM 处于 `stopped` 时才启动，已绑定服务包的 VM 使用受管服务启动。当前部署绑定的服务包 ID 为 `cells-x1`。临时 VM 停止后会从清单消失，下次重启时跳过。Firecracker 检查或启动失败会在替换 HTTP 进程前结束本次重启，运行日志包含失败阶段、错误码和耗时。
 
 控制状态位于 `$XDG_CONFIG_HOME/nestos/httpd-launchers/<项目路径摘要>/release.json`（默认 `~/.config`），可用 `NESTOS_HTTPD_CONTROL_DIR` 覆盖；文件权限 0600，独立于 worktree 和 release。状态保存服务 ID、目标版本、进程身份和幂等回执；启动器重启接管已登记的候选进程，继续核对。显式 stop 持久化停止意图，不会被守护循环复活；未到安全点时最多等待 15 秒，然后按登记身份强制退出并确认死亡；启动器不再无限等待。
 

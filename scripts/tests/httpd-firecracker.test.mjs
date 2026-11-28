@@ -12,13 +12,13 @@ const unitStatus = (load, active) => `LoadState=${load}\nActiveState=${active}\n
 const scenarios = [
     ['skips an uninstalled service', unitStatus('not-found', 'inactive'), [], [status]],
     ['starts the inactive service, then starts the stopped VM', unitStatus('loaded', 'inactive'),
-        [{id: 'cells-x1', state: 'stopped'}], [status, start, list, [server, ['start', 'cells-x1'], true]]],
+        [{id: 'cell-x1', state: 'stopped'}], [status, start, list, [server, ['start', 'cell-x1'], true]]],
     ['uses the existing service binding for a stopped managed VM', unitStatus('loaded', 'active'),
-        [{id: 'cells-x1', state: 'stopped', service: 'managed'}], [status, list, [server, ['service', 'start', 'cells-x1'], true]]],
+        [{id: 'cell-x1', state: 'stopped', service: 'cells-x1'}], [status, list, [server, ['service', 'start', 'cell-x1'], true]]],
     ['does not use a service package ID as a VM ID', unitStatus('loaded', 'active'),
-        [{id: 'cell-x1', state: 'stopped', service: 'cells-x1'}], [status, list]],
+        [{id: 'cells-x1', state: 'stopped'}], [status, list]],
     ...['vmm-running', 'starting', 'stopping'].map(state => [`does not start a VM in state ${state}`,
-        unitStatus('loaded', 'active'), [{id: 'cells-x1', state}], [status, list]]),
+        unitStatus('loaded', 'active'), [{id: 'cell-x1', state, service: 'cells-x1'}], [status, list]]),
 ];
 
 for (const [name, unitOutput, vms, expected] of scenarios) {

@@ -4,7 +4,7 @@ import {lifecycleLog} from './httpd-process.mjs';
 const unit = 'firecracker-server.service';
 const localCellsUnit = 'nestos-cells-local.service';
 const server = '/usr/local/bin/firecracker-server';
-const vmId = 'cells-x1';
+const vmId = 'cell-x1';
 
 function failure(code) {
     return Object.assign(new Error(code), {code});
