@@ -9,26 +9,27 @@ export async function claimIntegrationTarget(options:ReviewOperationsOptions,job
     const target=job.integrationTarget;
     if(!target)return true;
     const started=Date.now(),entry={id:job.id,fingerprint:job.fingerprint};
-    const queue=await options.journal.update<Entry[]>(target,old=>{
-        const saved=old?.find(row=>row.id===entry.id);
-        requireValue(!saved||saved.fingerprint===entry.fingerprint,'RESOURCE_RESERVATION_ID_CONFLICT');
-        return saved?old!:[...old??[],entry];
-    });
-    const head=queue[0].id===job.id?queue[0]:await skipSettled(options,target,queue);
+    const saved=await options.journal.get<Entry[]>(target);
+    const queue=saved?.some(row=>row.id===entry.id)?appendEntry(saved,entry):
+        await options.journal.update<Entry[]>(target,old=>appendEntry(old??[],entry));
+    const head=queue[0].id===job.id?queue[0]:await skipSettled(options,target,queue[0]);
     const claimed=head?.id===job.id;
     if(job.code!==waitingIntegrationTarget||claimed)options.log({operationId:job.id,boardId:job.boardId,itemId:job.itemId,
         stage:'integration.target.claim',result:'success',reason:claimed?'admitted':'queued',durationMs:Date.now()-started});
     return claimed;
 }
 
-async function skipSettled(options:ReviewOperationsOptions,target:string,queue:Entry[]):Promise<Entry|undefined> {
-    const stored=await options.journal.getMany<ReviewJob>(queue.map(row=>jobKey(row.id)));
-    const completed=new Map(queue.flatMap((row,index)=>{
-        const saved=stored[index];
-        return saved?.fingerprint===row.fingerprint&&saved.integrationTarget===target&&saved.phase==='settled'?[[row.id,row.fingerprint]]:[];
-    }));
-    if(!completed.size)return queue[0];
-    return (await options.journal.update<Entry[]>(target,old=>(old??[]).filter(row=>completed.get(row.id)!==row.fingerprint)))[0];
+function appendEntry(queue:Entry[],entry:Entry):Entry[] {
+    const saved=queue.find(row=>row.id===entry.id);
+    requireValue(!saved||saved.fingerprint===entry.fingerprint,'RESOURCE_RESERVATION_ID_CONFLICT');
+    return saved?queue:[...queue,entry];
+}
+
+async function skipSettled(options:ReviewOperationsOptions,target:string,head:Entry):Promise<Entry|undefined> {
+    const saved=await options.journal.get<ReviewJob>(jobKey(head.id));
+    if(saved?.fingerprint!==head.fingerprint||saved.integrationTarget!==target||saved.phase!=='settled')return head;
+    return (await options.journal.update<Entry[]>(target,old=>(old??[])
+        .filter(row=>row.id!==head.id||row.fingerprint!==head.fingerprint)))[0];
 }
 
 export async function releaseIntegrationTarget(options:ReviewOperationsOptions,job:ReviewJob):Promise<void> {
