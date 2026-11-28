@@ -104,11 +104,31 @@ class CellsDeployment {
   return row ? this.inspect(row.request) : {state:'missing'};
  }
  async inspect(request){const db=this.lock();try{return await this.observe(request);}finally{db.close();}}
+ async reconcilePending(operationId){
+  const db=this.lock();
+  try{await this.settlePending(operationId);}finally{db.close();}
+ }
+ async settlePending(operationId){
+  const pending=await this.read('pending.json');if(!pending)return;
+  const started=Date.now(),pendingOperationId=pending.operationId;
+  const row=validId(pendingOperationId)?await this.read('operation-'+pendingOperationId+'.json'):undefined;
+  if(row&&row.request?.operationId===pendingOperationId){
+   this.check(row.request);
+   const receipt=await this.observe(row.request);
+   if(receipt.state==='succeeded'||receipt.state==='failed'){
+    if(row.state!=='running')await this.write('pending.json',null);
+    log({operationId},'service.pending.reconcile','success',undefined,started,pendingOperationId);return;
+   }
+  }
+  log({operationId},'service.pending.reconcile','failure','SERVICE_OPERATION_PENDING',started,
+   validId(pendingOperationId)?pendingOperationId:undefined);
+  throw fail('SERVICE_OPERATION_PENDING');
+ }
  async submit(request,config){
   this.check(request);const started=Date.now(),db=this.lock();
   try{
    const existing=await this.read('operation-'+request.operationId+'.json');if(existing){if(!sameRequest(existing.request,request))throw fail('SERVICE_REQUEST_CHANGED');return;}
-   if(await this.read('pending.json'))throw fail('SERVICE_OPERATION_PENDING');
+   await this.settlePending(request.operationId);
    if(request.project&&!request.configSha256){
     config=this.options.configSource===undefined?await this.installedConfiguration():await readConfiguration(this.options.configSource);
     const configSha256=digest(config),expectedConfigSha256=this.options.configSource===undefined?configSha256:await this.configuration();
@@ -192,7 +212,7 @@ class CellsDeployment {
  }
 
 }
-function log(request,stage,result,code,started=Date.now()){console.info(JSON.stringify({operation:'cells.delivery',operationId:request.operationId,stage,result,code,durationMs:Date.now()-started}));}
+function log(request,stage,result,code,started=Date.now(),pendingOperationId){console.info(JSON.stringify({operation:'cells.delivery',operationId:request.operationId,pendingOperationId,stage,result,code,durationMs:Date.now()-started}));}
 
 function projectKey(project){
  return project?JSON.stringify(['serverId','serverProjectId','principalId','alias','root'].map(key=>project[key])):undefined;

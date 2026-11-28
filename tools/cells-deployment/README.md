@@ -20,3 +20,5 @@ Artifact verification persists the manifest digest outside the project. Replacem
 Project `_nestos/etc/deployment.json` schema 2 selects the registered service for each management task with `bindings: { "<item-id>": "<service-id>" }` and an optional `defaultServiceId`. Project data selects existing authority only. Existing schema 1 remains compatible. Selection is frozen into each build result; changing the target requires a new build.
 
 Enable `host_log = true` in the installed Cells service definition to mirror startup and runtime output to a private rotating archive on the Firecracker host. Operators and authorized collectors can read the archive when Cells or its VM is offline. See [Firecracker service logging](../fc-server/doc/services.md#停止销毁与日志).
+
+新的发布命令在构建前核对上一笔待确认操作。能确认原目标版本时记回原回执并继续，仍缺少运行证据时返回 `SERVICE_OPERATION_PENDING`，诊断中的 `pendingOperationId` 可用于查询原操作。

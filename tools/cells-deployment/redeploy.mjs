@@ -292,6 +292,7 @@ async function preflight(root, targets, operations, operationId) {
             operationId, target, stage: 'preflight', result, code, configurationSource, durationMs: Date.now() - started}));
         try {
             const control = await operations.controlFor(root, target);
+            await control.reconcilePending?.(operationId);
             const current = await control.describe();
             const config = await operations.deploymentConfiguration?.(control);
             log('success', undefined, config?.kind);

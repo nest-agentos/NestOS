@@ -40,6 +40,16 @@ test('preserves unknown replacement and serializes later switches until its heal
  await assert.rejects(control.submit({...f.request,operationId:'second'}),{code:'SERVICE_OPERATION_PENDING'});
  f.setHash(f.value.value.sha256);assert.deepEqual(await control.inspect(f.request),{state:'succeeded',version:f.request.targetVersion});
 });
+test('reconciles the original operation before freezing the next expected version',async t=>{
+ const f=await fixture(t);await f.verify();
+ let restarts=0;f.ports.restart=async()=>{restarts++;throw Object.assign(Error('timeout'),{code:'SERVICE_COMMAND_TIMEOUT'});};
+ await f.control.submit(f.request);
+ f.setHash(f.value.value.sha256);
+ const report=await redeploy(f.options.root,[f.options.id],{controlFor:async()=>f.control,build:async()=>f.value});
+ assert.deepEqual(report.targets.map(row=>row.state),['unchanged']);
+ assert.equal(restarts,1);
+ assert.deepEqual(await f.control.inspectOperation(f.request.operationId),{state:'succeeded',version:f.request.targetVersion});
+});
 test('uses a SQLite OS lock to reject concurrent controllers before a second mutation',async t=>{
  const f=await fixture(t);await f.verify();let release;f.ports.command=()=>new Promise(resolve=>{release=resolve;});
  const first=f.control.submit(f.request);while(!release)await new Promise(resolve=>setTimeout(resolve,2));
