@@ -19,3 +19,7 @@
     border-bottom-color: var(--st-color-primary, #3b82f6);
     font-weight: 600;
 }
+
+[data-model-defaults-general] > .model-defaults > h2:first-child {
+    display: none;
+}

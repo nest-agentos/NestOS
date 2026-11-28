@@ -7,6 +7,7 @@ const log=createModuleLogger('model-defaults');
 export function modelDefaultsTabs(container: HTMLElement, mount: MountSettingsSection) {
     const nav=document.createElement('div'), models=document.createElement('div'), kanban=document.createElement('div');
     const lifetime=new AbortController(), id=randomUUID(), panels=[models,kanban];
+    models.dataset.modelDefaultsGeneral='';
     nav.className='model-defaults-tabs'; nav.setAttribute('role','tablist'); nav.setAttribute('aria-label',t('modelDefaults.title'));
     const tabs=[t('modelDefaults.modelsTab'),t('modelDefaults.kanbanTab')].map((label,index)=>tab(id,label,index,panels[index]));
     const section=lazySection(kanban,mount,lifetime.signal);
