@@ -197,3 +197,5 @@ function integrationChoices(approval?:GitApproval,resolutions?:GitConflictResolu
     if(supplied.size)return;
     return Object.fromEntries(choices);
 }
+
+export {previewGitIntegration, type GitIntegrationPreview} from './integration-preview';

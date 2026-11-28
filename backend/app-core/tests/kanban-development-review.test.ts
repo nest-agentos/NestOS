@@ -58,7 +58,13 @@ it('prepares merge analysis in the original logical Session and exact native con
     const f = await fixture(), snapshot = await f.api.snapshot(f.board, f.item);
     const request = await f.api.prepareAnalysis({id: 'analysis', board: f.board, item: f.item, snapshot});
     expect(request).toMatchObject({expectedSessionId: 'original-session', expectedTarget: f.target, overrides: {branchMode: 'continue', harnessConversation: {mode: 'resume', bindingId: 'binding', expectedBindingRevision: 7, expectedGeneration: 2}}});
-    expect(request.source).toMatchObject({kind: 'composer', text: expect.stringContaining('`task-merge-pre.md`')});
+    expect(request.source).toMatchObject({kind: 'composer', text: expect.stringContaining('`integration-analysis`')});
+    expect(f.channels.channel).toHaveBeenCalledWith('project','open',expect.objectContaining({scopeId:'analysis',snapshot:expect.objectContaining({
+        'integration-analysis':expect.objectContaining({guidance:expect.objectContaining({'session-protocol.md':expect.any(String)}),
+            operation:expect.objectContaining({sourceVersion:snapshot.sourceVersion,targetVersion:snapshot.targetVersion}),
+            gitPreview:{state:'unavailable',code:'INTEGRATION_PREVIEW_SOURCE_UNSUPPORTED'}}),
+        'commit-contexts':expect.any(Object),
+    })}));
     expect(await f.journal.get('worktree:analysis')).toMatchObject({id: 'original'});
     const bundle = (await f.journal.get<{prompts: {files: Array<{name: string}>}}>('development-policy:analysis'))!;
     expect(bundle.prompts.files.map(row => row.name)).toContain('task-merge-pre.md'); expect(bundle.prompts.files.map(row => row.name)).toContain('task-merge-post.md');
@@ -250,7 +256,7 @@ it('runs management scope phases in the retained coordination Session and keeps 
  const api=managementReviewAdapter(f.options as never,scope as never);closes.push(()=>api.close!());
  await retainManager(f);
  const snapshot=await api.snapshot(f.board,owner as never),request=await api.prepareOperation!({id:'batch-analysis',action:'analyze',board:f.board,item:owner as never,snapshot});
- expect(request.expectedSessionId).toBe('manager-session');expect((request.source as any).text).toContain('management-integration-pre.md');
+ expect(request.expectedSessionId).toBe('manager-session');expect((request.source as any).text).toContain('integration-analysis');
  const manifest=JSON.parse(await readPrompt(f.fs,'/workspace/_nestos/worktrees/planning/_nestos/kanban/review/batch-analysis/manifest.json'));
  expect(manifest.context.input).toEqual({board:{id:'board'},task:{id:'manager'}});
  expect(manifest.context.resources.management).toMatchObject({ownerId:'manager',sources:[{itemId:'task'}]});

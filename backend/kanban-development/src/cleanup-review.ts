@@ -3,7 +3,10 @@ import {reviewCleanupKey,type ReviewCleanup,type KanbanAutomationJournal} from '
 import prompt from './prompts/cleanup-review.json';
 export type CleanupReviewInput=ReviewCleanup&{boardId:string;itemId:string;scopeId?:string};
 export const cleanupReviewId=(input:CleanupReviewInput)=>'cleanup-review-'+sha256HexSync(JSON.stringify([input.boardId,input.itemId,input.scopeId,input.runId,input.operationId])).slice(0,48);
-export function cleanupReviewInstruction(context:unknown):string{return prompt.instruction+'\nAuthorized cleanup context:\n'+JSON.stringify(context);}
+export function cleanupReviewInstruction(reviewId:string,legacyContext?:unknown):string {
+ return legacyContext===undefined?prompt.reviewInstruction+'\nreviewId: '+reviewId
+    :prompt.instruction+'\nAuthorized cleanup context:\n'+JSON.stringify(legacyContext);
+}
 /** A model attempt permits one new host inspection, never a model-authored success result. */
 export async function finishCleanupReview(journal:KanbanAutomationJournal,input:CleanupReviewInput):Promise<void>{
  const key=reviewCleanupKey(input.boardId,input.itemId,input.scopeId);

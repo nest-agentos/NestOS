@@ -1,3 +1,4 @@
+import {cleanupReviewInstruction} from '@nestos/kanban-development';
 import {expect,it} from 'vitest';
 import {kanbanConfigurationDefaults} from '../src/resources/catalog';
 import {promptReferenceSections} from '../src/run/prompt-reference-sections';
@@ -91,4 +92,13 @@ it('keeps automatic reanalysis instructions short without asking to confirm rout
  expect(kanbanConfigurationDefaults['task-merge-pre.md']).toContain('List every actual conflict even if the resolution is clear');
  expect(kanbanConfigurationDefaults['task-integrate-pre.md']).toContain('Report version drift for host reanalysis');
  expect(kanbanConfigurationDefaults['task-merge-pre.md']).not.toContain('separate merge confirmation');
+});
+
+it('sends the cleanup review ID and retains the old enqueue body for legacy recovery',()=>{
+ const context={directory:'private-worktree',resources:['legacy-details'.repeat(512)]};
+ const current=cleanupReviewInstruction('review-id'),legacy=cleanupReviewInstruction('review-id',context);
+ expect(current).toContain('method:"cleanup.read"');expect(current).toContain('method:"cleanup.complete"');
+ expect(current).toContain('review-id');expect(current).not.toContain(context.directory);
+ expect(Buffer.byteLength(current)).toBeLessThan(1250);
+ expect(legacy).toContain(JSON.stringify(context));
 });

@@ -1,3 +1,5 @@
+import type {KanbanItem,KanbanPlanning} from "@nestos/kanban/contracts";
+import {planningCandidates} from "../src/presets/kanban-planning-candidates";
 import {expect,it} from 'vitest';
 import {planningSections} from '../src/presets/kanban-planning-sections';
 it('keeps the current requirement and provenance while exposing other scopes only through lazy sections',()=>{
@@ -13,4 +15,16 @@ it('keeps the current requirement and provenance while exposing other scopes onl
 });
 it('preserves ordinary work contexts without manufacturing planning sections',()=>{
     const context={task:{id:'work'}};expect(planningSections(context)).toEqual({context});
+});
+
+it('keeps active candidates and the relevant history of the current decision',()=>{
+    const row=(id:string,values:Partial<KanbanItem>={})=>({id,title:id,status:'completed',...values} as KanbanItem);
+    const plan=(parentId?:string,dependencies:string[]=[]):KanbanPlanning=>({kind:'task',priority:2,parentId,dependencies,references:[]});
+    const externalRefs=[{system:'nestos-decision-run',id:'decision'}];
+    const current=row('current',{status:'open',planning:plan(undefined,['direct']),externalRefs});
+    const items=[row('unrelated'),row('active',{status:'backlog'}),current,
+        row('deleted',{deletedAt:1,status:'open'}),row('child',{planning:plan('current',['child-input'])}),
+        row('peer',{externalRefs}),row('direct',{planning:plan(undefined,['transitive'])}),row('transitive'),row('child-input')];
+    expect(planningCandidates(current,items).map(item=>item.id))
+        .toEqual(['active','current','child','peer','direct','transitive','child-input']);
 });

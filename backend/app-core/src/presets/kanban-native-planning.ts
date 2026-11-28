@@ -1,3 +1,4 @@
+import {planningCandidates} from './kanban-planning-candidates';
 import {planningConversationControl} from './kanban-planning-control';
 import {kanbanJournalOptions} from '../kanban/host-policy';
 import {DEFAULT_KANBAN_WORK_TYPES} from '@nestos/kanban/contracts';
@@ -16,7 +17,7 @@ export function nativeWorkPlanning(options:NativeWorkspaceOptions,prepare:NonNul
     const prepareAnalysis:NonNullable<PersonalKanbanAutomationOptions['prepareAnalysis']>=async input => {
         const preparation=input.board.automation?.preparation;
         requireValue(preparation,'SESSION_CHANNEL_WORKSPACE_REQUIRED');
-        const prepared=await prepare({board:input.board,context:{...input.context as object, snapshot:{item:input.item,items:input.board.items.map(({id,title,responsibility,acceptance,planning,status})=>({id,title,responsibility,acceptance,planning,status})),workTypes:input.board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:input.board.defaultWorkType??'task'}},reportActivity:input.reportActivity,target:input.target,preparation,item:input.item,
+        const prepared=await prepare({board:input.board,context:{...input.context as object, snapshot:{item:input.item,items:planningCandidates(input.item,input.board.items),workTypes:input.board.workTypes??DEFAULT_KANBAN_WORK_TYPES,defaultWorkType:input.board.defaultWorkType??'task'}},reportActivity:input.reportActivity,target:input.target,preparation,item:input.item,
             options:input.board.automation?.preparationOptions,stage:'decision',
             dispatch:{id:input.id,itemId:input.item.id,itemRevision:input.item.revision,planId:input.id,planRevision:1,
                 principal:input.board.automation!.coordinator,definitionDigest:input.target.digest,attempt:1,fence:input.id,

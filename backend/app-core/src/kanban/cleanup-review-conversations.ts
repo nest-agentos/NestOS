@@ -6,7 +6,7 @@ import type {KanbanItemOperations} from '@nestos/kanban/contracts';
 import type {DecisionConversationOptions,DecisionConversation} from './decision-conversation-ports';
 import {requireValue} from './validation';
 import {coordinationRoots} from './coordination-roots';
-interface Saved {id:string;input:CleanupReviewInput;projectId:string;profileId:string;sessionId:string;channelId:string;resourceId:string;resources:Array<{id:string;itemId:string;location:string}>;context:unknown}
+interface Saved {id:string;instructionVersion?:1;input:CleanupReviewInput;projectId:string;profileId:string;sessionId:string;channelId:string;resourceId:string;resources:Array<{id:string;itemId:string;location:string}>;context:unknown}
 const savedKey=(id:string)=>'software-cleanup-review:'+id;
 /** The native durable queue owns submission and recovery; these records only freeze authority and receipts. */
 export async function requestManagementCleanup(options:DecisionConversationOptions,input:CleanupReviewInput,selected?:string[]):Promise<Saved> {
@@ -15,7 +15,7 @@ export async function requestManagementCleanup(options:DecisionConversationOptio
  if(await options.journal.get('software-cleanup-submitted:'+id))return review;
  try {
  const port=await options.remote.projectConversation(review.projectId,review.profileId,review.sessionId);
- try{requireValue(port.enqueue,'NATIVE_QUEUE_UNSUPPORTED');await port.enqueue(cleanupReviewInstruction(review.context),[],undefined,'reply-'+id,'next-turn');}
+ try{requireValue(port.enqueue,'NATIVE_QUEUE_UNSUPPORTED');await port.enqueue(cleanupReviewInstruction(id,review.instructionVersion===1?undefined:review.context),[],undefined,'reply-'+id,'next-turn');}
  finally{await port.close();}
  await options.journal.update('decision-response:'+review.channelId+':'+id+':resumed',()=>true);
  await options.journal.update('software-cleanup-submitted:'+id,()=>true);
@@ -35,7 +35,7 @@ async function freeze(options:DecisionConversationOptions,id:string,input:Cleanu
  const resources=rows.filter(row=>allowed.has(row.id)&&row.state!=='cleaned'&&(selected?selected.includes(row.id):!row.resolution));
  requireValue(!selected||selected.length>0&&selected.every(id=>resources.some(row=>row.id===id)),'CLEANUP_REVIEW_RESOURCE_INVALID');
  requireValue(resources.every(row=>row.ownership==='current'&&row.owner?.itemId===allowed.get(row.id)!.itemId&&row.location===allowed.get(row.id)!.snapshot.context.directory),'CLEANUP_REVIEW_RESOURCE_INVALID');
- const review:Saved={id,input,projectId:retained.binding.projectId,profileId:retained.binding.profileId,sessionId:retained.sessionId,channelId:retained.binding.channelId??retained.id,resourceId:session.resourceId,
+ const review:Saved={id,instructionVersion:1,input,projectId:retained.binding.projectId,profileId:retained.binding.profileId,sessionId:retained.sessionId,channelId:retained.binding.channelId??retained.id,resourceId:session.resourceId,
   resources:resources.map(row=>({id:row.id,itemId:row.owner!.itemId,location:row.location})),context:{reviewId:id,boardId:input.boardId,itemId:input.itemId,scopeId:input.scopeId,cause:input.reviewCode??input.code,integratedCommit:(job.result as {targetHead?:string})?.targetHead,
    sources:management.sources.map(source=>({itemId:source.itemId,sourceVersion:source.snapshot.sourceVersion,worktreeId:source.snapshot.context.worktreeId,directory:source.snapshot.context.directory,sourceHead:source.snapshot.context.sourceHead,repositories:source.snapshot.context.repositories})),resources:resources.map(row=>({id:row.id,location:row.location,reasons:row.reasons,version:row.version})),protectedDirectory:retained.binding.directory}};
  return options.journal.update<Saved>(savedKey(id),old=>old??review);

@@ -57,8 +57,8 @@ async function prepareManagementOperation(options:DevelopmentReviewOptions,scope
     if(workspace)await indexResourceJob(options.journal,workspace.id,'review',input.id);
     for(const source of batch.sources){const id=(source.snapshot.context as {worktreeId?:string}).worktreeId;requireValue(id,'OPERATION_WORKSPACE_UNAVAILABLE');await indexResourceJob(options.journal,id,'review',input.id);}
     requireValue(request.source.kind==='composer','OPERATION_CONTEXT_SOURCE_INVALID');
-    const text=input.action==='analyze'?'Read `management-integration-pre.md` via `session_context` and follow the coordination analysis instructions.':maintenanceInstruction(input.action,['management-integration-pre.md']);
-    return {...request,source:{...request.source,text}};
+    if(input.action==='analyze')return request;
+    return {...request,source:{...request.source,text:maintenanceInstruction(input.action,['management-integration-pre.md'])}};
 }
 async function managementWorkspace(options:DevelopmentReviewOptions,scope:ManagementScope) {
     const analysis=await currentAnalysis<IndependentCallInput>(options.journal,scope.boardId,scope.ownerId);

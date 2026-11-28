@@ -1,3 +1,4 @@
+import {integrationAnalysisView} from './kanban-integration-analysis';
 import {resolveNativeWork,publishNativeWork,requireNativeWorkspaceHarness,type NativeWorkspaceOptions,type NativeWorkInput} from './kanban-native-workspace';
 import {openNativeWorkChannel,recordWorkspacePublication,scopedWorkContext,workChannelScope,type NativeWorkChannel} from './kanban-work-channel';
 import {registerWorkResource} from './kanban-work-resource-catalog';
@@ -109,7 +110,8 @@ export async function openDevelopmentChannel(remote: Pick<ProjectRemoteMountServ
     requireValue(record.channelId===id,'SESSION_CHANNEL_SCOPE_REQUIRED');
     const planning=record.policy.prompts.files.find(file=>file.name==='planning.md')?.content??defaults['planning.md'];
     const policy={commit:record.policy.commit,gitIdentity:record.gitIdentity,repositories:record.repositories,availableRepositories:record.availableRepositories};
-    return openNativeWorkChannel(remote,record,identity,task,record.policy.prompts,planning,binding,record.directoryOnly?undefined:{policy,...(includeSkillProjection&&record.skillProjection?{skillProjection:record.skillProjection}:{})});
+    const view=integrationAnalysisView(record.context,record.policy.prompts,policy);
+    return openNativeWorkChannel(remote,{...record,context:view.context},identity,task,record.policy.prompts,planning,binding,record.directoryOnly?undefined:{policy,...view.sections,...(includeSkillProjection&&record.skillProjection?{skillProjection:record.skillProjection}:{})});
 }
 
 export async function projectWorkSkills(options:Pick<Options,'skillContributions'|'skillPermissions'|'skillProviders'>,input:Input,projectId:string,context:unknown,sourceProjectId?:string,source?:KanbanSkillProviderContext):Promise<KanbanSkillProjection[]> {

@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {promisify} from 'node:util';
 import {integrationSourceSnapshotScript} from '../src/integration-source-script';
-import {inspectGitIntegration, resumeGitIntegration, tryGitIntegration, validateGitConflictResolutions, type GitIntegrationTransaction} from '../src/integration-transaction';
+import {inspectGitIntegration, previewGitIntegration, resumeGitIntegration, tryGitIntegration, validateGitConflictResolutions, type GitIntegrationTransaction} from '../src/integration-transaction';
 
 const exec = promisify(execFile);
 const roots: string[] = [];
@@ -350,4 +350,33 @@ it.each(['aligned','diverged','conflicted'])('publishes a frozen module snapshot
     expect(await readFile(file,'utf8')).toBe('approved\n');
     await writeFile(file,'later task work\n');
     expect(await inspectGitIntegration(f.process,input)).toBe(await f.git('rev-parse','HEAD'));
+});
+
+it('previews a batch conflict between two frozen changes-only contributors without updating Git state', async () => {
+    const f=await fixture(),source=f.input.sources[0],target=f.input.previousTarget;
+    const frozen=async (content:string)=>{
+        await writeFile(join(f.source,'shared'),content);
+        const result=await f.process.nativeShell.exec('sh',['-c',integrationSourceSnapshotScript,'snapshot',target],{cwd:'/workspace/source'});
+        expect(result.code).toBe(0);
+        return {...source,sourceTree:result.stdout.trim()};
+    };
+    const first=await frozen(contents.replace('line 1\n','first\n'));
+    const second=await frozen(contents.replace('line 1\n','second\n'));
+    const refs=await f.git('show-ref'),objects=await f.git('count-objects','-v');
+    await writeFile(join(f.root,'shared'),'working copy\n');
+    expect(await previewGitIntegration(f.process,'preview',target,[first])).toEqual({state:'clean',checkedSources:1});
+    expect(await previewGitIntegration(f.process,'preview',target,[first,second,first]))
+        .toEqual({state:'conflicts',checkedSources:2,paths:['shared'],truncated:false});
+    expect(await f.git('show-ref')).toBe(refs);
+    expect(await f.git('count-objects','-v')).toBe(objects);
+    expect(await f.git('show',':shared')).toBe(contents.trim());
+    expect(await readFile(join(f.root,'shared'),'utf8')).toBe('working copy\n');
+    expect(await readFile(join(f.source,'shared'),'utf8')).toBe(contents.replace('line 1\n','second\n'));
+});
+
+it('leaves module changes to the existing review path', async () => {
+    const f=await fixture(),source=f.input.sources[0];
+    expect(await previewGitIntegration(f.process,'modules',f.input.previousTarget,[{
+        ...source,repositories:[...source.repositories,{path:'module',head:source.sourceHead,dirty:true}],
+    }])).toEqual({state:'unavailable',code:'INTEGRATION_PREVIEW_SOURCE_UNSUPPORTED'});
 });
