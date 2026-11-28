@@ -1240,6 +1240,7 @@ export const en: LocaleStrings = {
     "kanban.errors.FILE_EXCHANGE_PROTOCOL_MISSING": "The exchange protocol is missing. Check exchange.json in the original workspace.",
     "kanban.errors.FILE_EXCHANGE_RECEIPT_UNKNOWN": "Reconciling the original continuation receipt. Do not send it again.",
     "kanban.errors.FILE_EXCHANGE_ORIGIN_UNAVAILABLE": "The original execution association is missing. Automatic continuation is unavailable.",
+    "kanban.errors.WORKTREE_CLEANUP_CONFLICT": "An earlier cleanup request is being reconciled. Check its receipt and the worktree status.",
     "kanban.errors.OPERATION_WAITING_INTEGRATION_TARGET": "Another integration owns the target branch. This operation is queued.",
     "kanban.errors.PROMPT_MANIFEST_LIMIT": "The manifest exceeds 64 KiB. Reduce context or reference separate content files.",
     "kanban.errors.COMMIT_CONTEXT_SCOPE_CHANGED": "The commit context project or task changed. Reuse was refused.",

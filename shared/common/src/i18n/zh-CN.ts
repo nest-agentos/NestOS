@@ -1241,6 +1241,7 @@ export const zhCN = {
     "kanban.errors.FILE_EXCHANGE_PROTOCOL_MISSING": "文件通信协议缺失，请检查原工作区的 exchange.json。",
     "kanban.errors.FILE_EXCHANGE_RECEIPT_UNKNOWN": "续办回执暂不能确认，正在核对原提交，请勿重复发送。",
     "kanban.errors.FILE_EXCHANGE_ORIGIN_UNAVAILABLE": "未找到原执行会话关联，无法自动续办。",
+    "kanban.errors.WORKTREE_CLEANUP_CONFLICT": "已有清理请求正在核对。请检查原回执和工作树状态。",
     "kanban.errors.OPERATION_WAITING_INTEGRATION_TARGET": "同一仓库的目标分支正在处理另一项整合，本操作已排队。",
     "kanban.errors.PROMPT_MANIFEST_LIMIT": "任务清单超过 64 KiB，请缩小上下文或将正文拆分为引用文件。",
     "kanban.errors.COMMIT_CONTEXT_SCOPE_CHANGED": "提交上下文的项目或任务归属变化，已拒绝复用。",
