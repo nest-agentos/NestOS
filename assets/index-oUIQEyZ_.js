@@ -1,1 +1,0 @@
-import{_ as r}from"./index--DGcS5sg.js";var e={type:"sync",importFFI:()=>r(()=>import("./ffi-Boa1QuFa.js"),[],import.meta.url).then(t=>t.QuickJSFFI),importModuleLoader:()=>r(()=>import("./emscripten-module.browser-XIKQQPVU-BEEooDk2.js"),[],import.meta.url).then(t=>t.default)},_=e;export{_ as default};
