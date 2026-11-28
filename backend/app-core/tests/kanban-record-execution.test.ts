@@ -661,3 +661,28 @@ it('cancels a dependency wait without creating any management work or Session',a
  await api.controlRecord('source',{operationId:'cancel-wait',recordId:'waiting',action:'cancel',expectedRevision:(await f.service.record('source','waiting')).revision});
  expect((await f.service.record('source','waiting')).status).toBe('cancelled');expect((await f.service.read('source')).items.some(row=>row.id===run.rootItemId)).toBe(false);await api.quiesce();
 });
+
+it('retains decision Harness references inside the admitted recurring run snapshot',async()=>{
+ const f=await fixture();
+ const externalRefs=[
+    {system:'nestos-remote-project',id:'one'},
+    {system:'nestos-decision-harness-coordination',id:'planning-harness'},
+    {system:'nestos-decision-harness-execution',id:'worker-harness'},
+ ];
+ await f.command({type:'revise-record',recordId:'decision',title:'Goal',content:'Build',rationale:'Check',externalRefs});
+ await f.command({type:'review-record',recordId:'decision',accept:true});
+ const before=await f.service.record('source','decision');
+ const recurrence={state:'active' as const,firstAt:1000,timeZone:'UTC',cadence:{kind:'interval' as const,milliseconds:60000},trigger:'fixed' as const,maxConcurrency:1};
+ await f.command({type:'configure-record-recurrence',recordId:before.id,expectedRecordRevision:before.revision,recurrence});
+ const configured=await f.service.record('source',before.id),execution=f.open();
+ await f.command({type:'reserve-record-recurrence',recordId:before.id,configRevision:configured.recurrenceRevision!,scheduledAt:1000});
+ const reservation=(await f.service.record('source',before.id)).recurrenceFence!.pending[0];
+ const engine=recurrenceAdmission({journal:f.journal,log:f.log,inspect:async()=>({state:'unknown'}),submit:async intent=>{
+    const run=await execution.runRecurring(intent);return {state:'admitted',runId:run.id};
+ }});
+ const intent=await engine.reserve('source',reservation.record,reservation.configRevision,reservation.scheduledAt);
+ const admitted=await engine.reconcile(intent);
+ expect(admitted.phase).toBe('admitted');
+ const run=await f.journal.run('source',intent.id);
+ expect(run).toMatchObject({rootItemId:expect.any(String),record:{externalRefs}});
+});

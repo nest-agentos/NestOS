@@ -39,3 +39,13 @@ it.each(['decision','coordination'] as const)('uses the board %s profile in real
     const first=await transport.prepare('operation','board',resources,resources[0]);expect(first).toMatchObject({profileId:'chosen',...(role==='coordination'?{purpose:'coordination'}:{})});
     board.settings['harness-'+role]='missing';expect(await transport.prepare('operation','board',resources,resources[0])).toMatchObject({profileId:'chosen'});expect(close).toHaveBeenCalledTimes(2);
 });
+
+it.each([
+    ['KANBAN_HARNESS_UNAVAILABLE',undefined],
+    ['KANBAN_HARNESS_CAPABILITIES_REQUIRED',profile('selected',false)],
+    ['KANBAN_HARNESS_WORKSPACE_MISMATCH',{...profile('selected'),workspaces:[{id:'another'}]}],
+    ['KANBAN_HARNESS_PERMISSION_REQUIRED',{...profile('selected'),projectCapabilities:{sessionControl:false}}],
+])('reports %s while a usable board default is available',(code,selected)=>{
+    expect(()=>selectKanbanHarness([profile('default'),...(selected?[selected as HarnessProfile]:[])],'workspace','selected'))
+        .toThrow(expect.objectContaining({code}));
+});

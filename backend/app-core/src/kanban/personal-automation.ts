@@ -5,6 +5,8 @@ import {kanbanControlOptions} from './control-adapter';
 import {drainBoardAnalyses} from '@nestos/kanban/integration';
 import {scanTaskControls} from '@nestos/kanban/integration';
 import type {CallLifecyclePorts as TaskControlPorts} from './call-lifecycle';
+import {kanbanReferences} from './work-log-policy';
+import {workProjectId} from './task-projects';
 import {workContext} from './work-context';
 import {managementOwner} from './task-owner';
 import {createKanbanAutomation,type KanbanExecutorContext,type KanbanAutomationJournal,type KanbanWorkLog,type WorkLogFact} from '@nestos/kanban/integration';
@@ -23,8 +25,8 @@ import {requireValue} from './validation';
 import {withContinuedWork,type ContinueWorkOptions} from './continued-work';
 export interface PersonalKanbanAutomationOptions extends TaskControlPorts {
     operationPlugins?:import('@nestos/kanban/integration').KanbanOperationPlugin[];
-    prepareTarget?(input:{board:KanbanBoard;dispatch:import('@nestos/kanban/contracts').KanbanDispatch;target:import('@nestos/llm-flow/contracts').TargetRef}):Promise<import('@nestos/llm-flow/contracts').TargetRef>;
-    boardSettings?:{catalog(board:KanbanBoard):Promise<import('@nestos/kanban/contracts').KanbanBoardSettingsCatalog>;validate(board:KanbanBoard,settings:Record<string,string>):Promise<void>};
+    prepareTarget?(input:{board:KanbanBoard;context?:unknown;projectId?:string;dispatch:import('@nestos/kanban/contracts').KanbanDispatch;target:import('@nestos/llm-flow/contracts').TargetRef}):Promise<import('@nestos/llm-flow/contracts').TargetRef>;
+    boardSettings?:{models?(projectId:string,profileId:string):Promise<import('@nestos/kanban/contracts').KanbanHarnessModel[]>;catalog(board:KanbanBoard):Promise<import('@nestos/kanban/contracts').KanbanBoardSettingsCatalog>;validate(board:KanbanBoard,settings:Record<string,string>):Promise<void>};
     taskRecovery?(context:{service:import('@nestos/kanban/contracts').KanbanClient;client():import('@nestos/kanban/contracts').KanbanClient;journal:KanbanAutomationJournal;log:import('./task-recovery-ports').TaskRecoveryOptions['log']}):ReturnType<typeof import('./task-recovery').createTaskRecovery>;
     decisionConversations?(context:{service:import('@nestos/kanban/contracts').KanbanClient;client():import('@nestos/kanban/contracts').KanbanClient;journal:KanbanAutomationJournal;log:import('./decision-conversation-ports').DecisionConversationOptions['log']}):ReturnType<typeof import('./decision-conversations').decisionConversations>;
     deliveryReady?(boardId:string,item:KanbanItem):Promise<boolean>;
@@ -110,7 +112,9 @@ async function createExecutor(options:Options,context:KanbanExecutorContext,prep
                 return options.prepareWork({board,context:{...work,inputs:dispatch.inputs,dependencies,...(owner?{coordinationTaskId:owner.id}:{})},dispatch, item, target, preparation: board.automation.preparation, options: board.automation.preparationOptions,
                     reportActivity: fact => options.workLog?.append(options.service, boardId, item.id, {...fact, actor: fact.actor ?? dispatch.principal, dispatchId: dispatch.id}) ?? Promise.resolve()});
             }
-            return {target:await options.prepareTarget?.({board,dispatch,target})??target};
+            const work=item.externalRefs?.some(ref=>ref.system===kanbanReferences.decision)
+                ?await workContext(options.journal,board,item):undefined;
+            return {target:await options.prepareTarget?.({board,dispatch,target,context:work,projectId:workProjectId(item)})??target};
         }});
     const executor = options.continuation ? withContinuedWork(primary, {...options.continuation, calls: options.calls, originalSession:options.originalSession, observe}) : primary;
     return executor;

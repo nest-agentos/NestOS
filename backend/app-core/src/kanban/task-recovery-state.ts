@@ -1,16 +1,20 @@
+import {taskHarnessRecovery,taskHarnessRecoveryView} from './task-harness-recovery';
 import {folderBrowserPath,projectRelativePath,resolveBrowserTarget} from '@nestos/app-contracts';
 import {taskRecoveryEligibility,activeRecoveryIssueIds} from '@nestos/kanban/integration';
 import {recoveryWorkspace} from './recovery-workspace';
 import {reportHandoffFailure,type ReviewSettings,type ReviewJob} from '@nestos/kanban-development';
 import {reviewKey,jobKey} from '@nestos/kanban/integration';
 import {sha256HexSync} from '@nestos/common';
-import type {KanbanTaskRecovery,KanbanBoard,KanbanItem,KanbanDispatch} from '@nestos/kanban/contracts';
+import {kanbanTaskType,type KanbanTaskRecovery,type KanbanBoard,type KanbanItem,type KanbanDispatch} from '@nestos/kanban/contracts';
 import type {TaskRecoveryOptions} from './task-recovery-ports';
 import {requireValue} from './validation';
 
 export async function taskRecoveryState(options:TaskRecoveryOptions,boardId:string,itemId:string,origin:'operator'|'session'='operator'):Promise<KanbanTaskRecovery> {
     const board=await options.service.read(boardId),item=board.items.find(row=>row.id===itemId);requireValue(item,'ITEM_NOT_FOUND');
     const workflow=await options.service.workflow(boardId),dispatch=Object.values(workflow.dispatches).filter(row=>row.itemId===itemId).sort((a,b)=>b.attempt-a.attempt)[0];
+    const harness=origin==='operator'?await taskHarnessRecovery(options,board,item,dispatch):undefined;
+    if(harness)return taskHarnessRecoveryView(item,harness);
+    if(kanbanTaskType(item)==='coordination')return {itemId,revision:String(item.revision),related:[],canRetry:false,canSelectCurrentVersion:false,...optional({code:item.analysis?.code})};
     const handoff=await reportHandoff(options,board,item,dispatch);if(handoff)return handoff;
     const blocked=await activeBlocker(options,board,item,dispatch,origin);if(blocked)return blocked;
     const reportReceipt=dispatch&&['succeeded','accepted'].includes(dispatch.outcome)&&await options.journal.get<import('@nestos/kanban/contracts').KanbanRecoveryReceipt>('task-report-recovery:'+dispatch.id);

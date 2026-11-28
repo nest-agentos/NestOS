@@ -1,3 +1,4 @@
+import {prepareHarnessRecovery} from './task-harness-recovery';
 import {reportHandoffFailure} from '@nestos/kanban-development';
 import {reloadTaskConfiguration,taskConfigurationStatus} from './task-configuration-reload';
 import {resumeCompletedResults} from './task-recovery-results';
@@ -52,11 +53,17 @@ async function latestTaskDispatch(options:TaskRecoveryOptions,boardId:string,ite
 }
 
 async function recover(options:TaskRecoveryOptions,boardId:string,request:KanbanTaskRecoveryRequest):Promise<KanbanTaskRecoveryResult> {
-    requireValue(/^[a-zA-Z0-9_-]{1,128}$/.test(request.operationId)&&['retry','retry-current','fix','recheck','reconcile-report','settle-delivery'].includes(request.action),'INVALID_RECOVERY_REQUEST');
+    requireValue(/^[a-zA-Z0-9_-]{1,128}$/.test(request.operationId)&&['retry','retry-current','fix','recheck','reconcile-report','settle-delivery','reselect-harness'].includes(request.action),'INVALID_RECOVERY_REQUEST');
     if(request.action==='settle-delivery')return settleTaskDelivery(options,boardId,request);
     if(request.action==='reconcile-report')return reconcileReportHandoff(options,boardId,request);
     const key='task-recovery-operation:'+request.operationId,digest=sha256HexSync(JSON.stringify([boardId,request]));
     const saved=await options.journal.get<RecoveryIntent>(key);if(saved){requireValue(saved.digest===digest,'IDEMPOTENCY_CONFLICT');return settle(options,saved);}
+    if(request.action==='reselect-harness'){
+        const validated=await prepareHarnessRecovery(options,boardId,request,digest);
+        const intent=await options.journal.update<RecoveryIntent>(key,old=>old??validated);
+        requireValue(intent.digest===digest,'IDEMPOTENCY_CONFLICT');
+        return settle(options,intent);
+    }
     const state=await taskRecoveryState(options,boardId,request.itemId);requireValue(state.revision===request.expectedRevision,'RECOVERY_STALE_REFRESH');
     if(request.action==='fix') {
         const selected=request.sourceItemId??request.itemId;requireValue(selected===request.itemId||state.related.some(row=>row.itemId===selected),'RECOVERY_SCOPE_MISMATCH');
@@ -179,6 +186,7 @@ async function recheck(options:TaskRecoveryOptions,boardId:string,request:Kanban
 async function settle(options:TaskRecoveryOptions,intent:RecoveryIntent):Promise<KanbanTaskRecoveryResult> {
     if(intent.done)return intent.result!;
     const board=await options.service.read(intent.boardId);if(board.executionControl?.paused)return {operationId:intent.request.operationId,state:'pending',code:'BOARD_EXECUTION_PAUSED'};
+    if(intent.request.action==='reselect-harness')return settleHarnessRecovery(options,intent);
     if(intent.reportHandoff)return recheckReportHandoff(options,intent);
     if(intent.issueId)return recheckReportedIssue(options,intent);
     const ready=await taskRecoveryState(options,intent.boardId,intent.request.itemId);if(ready.blockingItems?.length)return {operationId:intent.request.operationId,state:'pending',code:'RECOVERY_REPAIR_PENDING'};
@@ -194,6 +202,19 @@ async function settle(options:TaskRecoveryOptions,intent:RecoveryIntent):Promise
     await journalCommand(options.journal,options.service,intent.boardId,commandKey,intent.command!);
     options.log({operationId:intent.request.operationId,boardId:intent.boardId,stage:'task.recovery.admitted',result:'success',durationMs:0});
     return finishRecovery(options,intent,{operationId:intent.request.operationId,state:'accepted',dispatchId:intent.dispatchId});
+}
+
+async function settleHarnessRecovery(options:TaskRecoveryOptions,intent:RecoveryIntent):Promise<KanbanTaskRecoveryResult> {
+    const {operationId}=intent.request;
+    try {
+        await journalCommand(options.journal,options.service,intent.boardId,'task-recovery-command:'+operationId,intent.command!);
+        return finishRecovery(options,intent,{operationId,state:'accepted',...(intent.command?.type==='continue-execution'?{dispatchId:intent.dispatchId}:{})});
+    }catch(error){
+        const code=safeCode(error,'KANBAN_HARNESS_RECOVERY_FAILED');
+        if(['RECOVERY_STALE_REFRESH','ANALYSIS_NOT_RETRYABLE','STALE_CONTINUATION','ITEM_NOT_CONTINUABLE'].includes(code))
+            return finishRecovery(options,intent,{operationId,state:'blocked',code});
+        throw error;
+    }
 }
 
 async function scopedRecoveryWorkspace(options:TaskRecoveryOptions,intent:{boardId:string;request:{itemId:string};previousDispatchId:string}) {

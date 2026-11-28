@@ -1,3 +1,5 @@
+import {t} from '@nestos/common';
+import {decisionHarnessReferences} from '../presets/kanban-harness-settings';
 import {decisionModuleReference} from './decision-modules';
 import {validateDecisionDependencies} from '@nestos/kanban/integration';
 import {confirmRecordExecution,itemsWithinRoots,itemWithinRoots} from '@nestos/kanban/integration';
@@ -65,8 +67,9 @@ async function propose(options:DecisionConversationOptions,conversation:Decision
     if(source)externalRefs.push({system:'nestos-decision-source-session',id:source.sessionId,
         revision:JSON.stringify({projectId:source.projectId,profileId:source.profileId})});
     const modules=conversation.binding.modules??[];
-    externalRefs.push(...modules.map(decisionModuleReference));
+    externalRefs.push(...modules.map(decisionModuleReference),...decisionHarnessReferences(conversation.harnesses,conversation.harnessModels));
     const selected=kanbanVerificationOptions(value.verificationMode===undefined?'build-cleanup':value.verificationMode),record:KanbanRecordInput={id:value.id,kind:'decision',...(dependsOn.length?{dependsOn}:{}),completion:'automatic',title:value.title,content:value.content,rationale:value.rationale,itemIds:[],externalRefs,discussionSessionId:conversation.resourceId,...selected,
+        ...(conversation.manualStart?{manualStart:true}:{}),
         ...(conversation.recurrence?{recurrence:conversation.recurrence}:{}),
         sources:[{sessionId:conversation.resourceId!,messageId:request.id,revision:channelDigest(request),role:'assistant'}]};
     const previous=await options.journal.get<Link>(linkKey(conversation.id));requireValue(!previous,'DECISION_ALREADY_CONFIRMED');
@@ -93,17 +96,27 @@ async function confirm(options:DecisionConversationOptions,conversation:Decision
     const run=await confirmRecordExecution(options.service,options.journal,{boardId:conversation.boardId,recordId,runKey:'decision-run-request:'+conversation.id,runOperationId:'decision-run-'+conversation.id,
         active:()=>options.active?.()!==false,commit:value=>command(options,conversation,request,value),
         confirmed:async()=>{await options.journal.update<Link>(linkKey(conversation.id),old=>({...old!,state:'confirmed'}));},run:frozen=>{requireValue(client.runRecord,'RECORD_EXECUTION_UNAVAILABLE');return client.runRecord(conversation.boardId,frozen);}});
-    return {recordId,state:'confirmed',...(run?{execution:run}:{executionMode:'recurring'})};
+    return {recordId,state:'confirmed',...(run?{execution:run}:{executionMode:proposal?.record.manualStart||conversation.manualStart?'manual':'recurring'})};
 }
 async function reviseTasks(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,link:Link) {
-    const record=await options.service.record(conversation.boardId,link.recordId),value=request.params as {editId:string;recordRevision:number;items:any[];title:string;content:string;rationale:string};
+    const record=await options.service.record(conversation.boardId,link.recordId),value=request.params as {editId:string;recordRevision:number;items:any[];title:string;content:string;rationale:string;changeSummary?:unknown};
     requireValue(record.status==='confirmed','DECISION_NOT_CONFIRMED');
     requireValue(typeof value.editId==='string'&&value.editId.startsWith(conversation.id+'-'),'EDIT_SCOPE_MISMATCH');
     const type=request.method==='decision.begin-edit'?'begin-record-edit':request.method==='decision.apply-edit'?'save-record-edit':'end-record-edit';
-    if(type==='save-record-edit')await requireUserConfirmation(options,conversation,request,(await conversationPolicy(options.fs)).confirmAdjustment);
-    await command(options,conversation,request,{...value,type,recordId:link.recordId} as KanbanCommand);
+    const {editId,items,recordRevision,title,content,rationale}=value;
+    const identity={recordId:link.recordId,editId,items};
+    const editCommand:KanbanCommand=type==='save-record-edit'?{...identity,type,recordRevision,title,content,rationale,
+        changeNote:await confirmedChangeNote(options,conversation,request,value.changeSummary)}:
+        type==='begin-record-edit'?{...identity,type,recordRevision}:{...identity,type};
+    await command(options,conversation,request,editCommand);
     const board=await options.service.read(conversation.boardId),ids=value.items.map(row=>typeof row==='string'?row:row.id);
     return {record:await options.service.record(board.id,link.recordId),blocked:type==='begin-record-edit',items:board.items.filter(row=>ids.includes(row.id)).map(row=>({id:row.id,revision:row.revision,title:row.title,editing:row.launch?.editing}))};
+}
+async function confirmedChangeNote(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,summary:unknown) {
+    requireValue(summary===undefined||typeof summary==='string'&&summary.trim().length>0&&summary.length<=1200,'INVALID_CHANGE_SUMMARY');
+    const messageId=await requireUserConfirmation(options,conversation,request,(await conversationPolicy(options.fs)).confirmAdjustment);
+    return {summary:typeof summary==='string'?summary.trim():t('kanban.requirementChangeConfirmed'),
+        ...(conversation.resourceId?{source:{sessionId:conversation.resourceId,messageId}}:{})};
 }
 async function openCoordination(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,link:Link) {
     const value=request.params as {itemId:string},board=await options.service.read(conversation.boardId),record=await options.service.record(board.id,link.recordId);

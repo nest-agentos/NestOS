@@ -19,7 +19,7 @@ export function prepareKanbanProjectDirectory(options:NativeWorkspaceOptions) {
         requireValue(isProjectDirectoryPreparation(input.preparation),'WORK_PREPARATION_UNSUPPORTED');
         const id=input.dispatch.id,directory='_nestos/kanban/runs/'+id;
         const binding=await resolveNativeWork(options,journal,input);
-        await developmentStage(id,'harness.profiles',()=>requireNativeWorkspaceHarness(options,binding.projectId,binding.profileId));
+        if(!binding.explicit)await developmentStage(id,binding.role+'.harness.profiles',()=>requireNativeWorkspaceHarness(options,binding.projectId,binding.profileId));
         await prepareDirectory(options,journal,input,binding.projectId,directory);
         const entry=input.stage==='decision'?'decision.md':'task.md';
         const target=await publishNativeWork(options,journal,input,binding,directory,

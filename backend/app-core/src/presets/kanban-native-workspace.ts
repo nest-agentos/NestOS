@@ -6,7 +6,7 @@ import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import type {HarnessConnectionService} from '../projects/harness-connections';
 import {requireValue} from '../kanban/validation';
 import {REMOTE_PROJECT_REFERENCE} from '../kanban/resource-catalog';
-import {freezeKanbanHarness,harnessSettingKey} from './kanban-harness-settings';
+import {decisionHarnessProfile,decisionHarnessModel,freezeKanbanHarness,harnessSettingKey,harnessRetryTarget,selectProjectHarness,recordHarnessPreparation,coordinationHarnessScope} from './kanban-harness-settings';
 import {developmentStage} from './kanban-development-log';
 import {publishManagedAgent} from '../configuration/managed-agent';
 
@@ -28,16 +28,23 @@ export async function resolveNativeWork(options:NativeWorkspaceOptions,journal:K
     requireValue(template&&template.enabled!==false,'NATIVE_CONNECTION_REQUIRED');
     const primary=(input.context as {primaryProjectId?:string}|undefined)?.primaryProjectId;
     const projectId=input.stage==='decision'&&primary?primary:selected[0].id,role=input.stage==='decision'?'coordination':'execution';
-    const profileId=await freezeKanbanHarness(journal,id,input.board?.id??'legacy',role,input.board?.settings?.[harnessSettingKey(role)]||template.profileId);
-    return {source,template,projectId,profileId};
+    const retry=role==='coordination'?input.item.launch?.analysisPreparation:input.dispatch.continuation?.preparation;
+    const explicit=harnessRetryTarget(retry,role)??decisionHarnessProfile(input.context,role);
+    const selection=retry?undefined:decisionHarnessModel(input.context,role);
+    const requested=explicit??(input.board?.settings?.[harnessSettingKey(role)]||template.profileId);
+    const profileId=await freezeKanbanHarness(journal,id,input.board?.id??'legacy',role,requested);
+    const attempt=role==='coordination'?coordinationHarnessScope(input.board?.id??'legacy',input.item.id,input.item.launch?.analysisEpoch):id;
+    const selectedProfile=explicit?await developmentStage(id,role+'.harness.select',()=>recordHarnessPreparation(journal,attempt,projectId,profileId,role,
+        ()=>selectProjectHarness(options.remote,projectId,profileId,selection))):profileId;
+    return {source,template,projectId,profileId:selectedProfile,selection,explicit:explicit!==undefined,role};
 }
 
 export async function publishNativeWork(options:NativeWorkspaceOptions,journal:KanbanAutomationJournal,input:NativeWorkInput,
     workspace:Awaited<ReturnType<typeof resolveNativeWork>>,directory:string,systemPrompt:string) {
-    const {template,projectId,profileId,source:{definition}}=workspace;
+    const {template,projectId,profileId,selection,source:{definition}}=workspace;
     const root=options.remote.list(projectId).find(mount=>mount.at==='/');
     requireValue(root?.connectionId,'REMOTE_WORKSPACE_REQUIRED');
-    const connection={...template,profileId,...(profileId!==template.profileId?{selection:undefined}:{}),id:'work-'+input.dispatch.id,
+    const connection={...template,profileId,...(selection||profileId!==template.profileId?{selection}:{}),id:'work-'+input.dispatch.id,
         projectId,nodeConnectionId:root.connectionId,directory};
     const existing=await options.connections.get(connection.id);
     if(existing)requireValue(JSON.stringify(existing.connection)===JSON.stringify(connection),'WORK_CONNECTION_CHANGED');
@@ -53,7 +60,8 @@ export async function publishNativeWork(options:NativeWorkspaceOptions,journal:K
 export async function requireNativeWorkspaceHarness(options:Pick<NativeWorkspaceOptions,'remote'>,projectId:string,profileId:string):Promise<void> {
     const harness=await options.remote.projectHarness(projectId,{requireRegistered:true});
     try {
-        const capabilities=(await harness.profiles()).profiles.find(profile=>profile.id===profileId)?.capabilities;
+        const {profiles}=await harness.profiles();
+        const capabilities=profiles.find(profile=>profile.id===profileId)?.capabilities;
         requireValue(capabilities,'KANBAN_HARNESS_UNAVAILABLE');
         requireValue(capabilities.workingDirectory,'NATIVE_WORKING_DIRECTORY_UNSUPPORTED');
         requireValue(capabilities.sessionChannels===true,'NATIVE_SESSION_CHANNEL_REQUIRED');

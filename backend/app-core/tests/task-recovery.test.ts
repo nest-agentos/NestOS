@@ -4,20 +4,21 @@ import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {SeqKanbanStore,createKanbanModule} from '@nestos/kanban';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {createTaskRecovery} from '../src/kanban/task-recovery';
+import {coordinationHarnessScope,harnessPreparationKey} from '../src/presets/kanban-harness-settings';
 import {taskRecoveryState} from '../src/kanban/task-recovery-state';
 const closes:Array<()=>Promise<void>>=[];afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});
-async function fixture(group=false,active=false,missing=false,handler:'self'|'parent'='self') {
+async function fixture(group=false,active=false,missing=false,handler:'self'|'parent'='self',harnessFailure=false) {
  const {manager}=await createVFS({rootBackend:new MemoryBackend()});closes.push(()=>manager.dispose());const fs=await manager.openFileSystem('/'),store=await SeqKanbanStore.open(fs);
  const service=createKanbanModule({store,actor:{kind:'human',id:'admin'},authorize:async()=>{},log(){},verifyOutputs:async()=>true}),worker=createKanbanModule({store,actor:{kind:'service',id:'worker'},authorize:async()=>{},log(){}});
  await service.create({id:'b',title:'Work',scope:{kind:'system'},members:[{kind:'human',id:'admin',roles:['coordinator','reviewer'],responsibility:'Manage'},{kind:'service',id:'worker',roles:['worker'],responsibility:'Implement'}],policy:{requireEstimate:false,review:'independent'}});
  let serial=0;const run=async(command:any,client=service)=>client.execute('b',{operationId:'test-'+(++serial),expectedRevision:(await service.read('b')).revision,command});
  await run({type:'create-item',item:{id:'group',title:'Group',responsibility:'Coordinate',acceptance:'Delivered'},planning:{kind:'task',priority:2,dependencies:[],references:[]}});
  if(group){await run({type:'configure-automation',settings:{enabled:true,autoAccept:false,coordinator:{kind:'human',id:'admin'},worker:{kind:'service',id:'worker'},planner:{system:'external',id:'planner',revision:'1'},executor:{system:'external',id:'executor',revision:'1'}}});}
- await run({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'p',revision:1,sealed:true,rootItemId:'group',items:[{id:'source',workType:'subtask',title:'Implementation',responsibility:'Build',acceptance:'Evidence',assignee:{kind:'service',id:'worker'},dependsOn:[],outputs:[]},{id:'verify',workType:'subtask',title:'Acceptance',responsibility:'Check',acceptance:'Actual version',assignee:{kind:'service',id:'worker'},dependsOn:['source'],outputs:[]}]}});
+ await run({type:'publish-plan',plan:{schema:'kanban.plan/1',id:'p',revision:1,sealed:true,rootItemId:'group',items:[{id:'source',workType:'subtask',title:'Implementation',responsibility:'Build',acceptance:'Evidence',assignee:{kind:'service',id:'worker'},dependsOn:[],outputs:[]},{id:'verify',workType:'subtask',title:'Acceptance',responsibility:'Check',acceptance:'Actual version',...(harnessFailure?{externalRefs:[{system:'nestos-remote-project',id:'project'},{system:'nestos-decision-run',id:'stage-run'}]}:{}),assignee:{kind:'service',id:'worker'},dependsOn:['source'],outputs:[]}]}});
  await run({type:'prepare-dispatch',itemId:'source',dispatchId:'source-dispatch'},worker);let dispatch=(await service.workflow('b')).dispatches['source-dispatch'];
  await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:'succeeded',outputs:[]});await run({type:'accept-execution',dispatchId:dispatch.id,accept:true});
  await run({type:'prepare-dispatch',itemId:'verify',dispatchId:'failed-dispatch'},worker);dispatch=(await service.workflow('b')).dispatches['failed-dispatch'];
- await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:missing?'unknown':active?'running':'failed',code:missing?'WORKSPACE_RESULT_MISSING':active?'WORKSPACE_ERROR_REPORTED':'VERIFICATION_RUNNING_VERSION_MISMATCH',executionSessionId:'canonical-session'});
+ await run({type:'observe-execution',dispatchId:dispatch.id,fence:dispatch.fence,outcome:missing?'unknown':active?'running':'failed',code:missing?'WORKSPACE_RESULT_MISSING':active?'WORKSPACE_ERROR_REPORTED':harnessFailure?'KANBAN_HARNESS_UNAVAILABLE':'VERIFICATION_RUNNING_VERSION_MISMATCH',...(harnessFailure?{}:{executionSessionId:'canonical-session'})});
  if(active)await run({type:'report-issue',itemId:'verify',issue:{id:'repository-registration-error',type:'error',attemptId:dispatch.id,handler}});
  const journal=new KanbanAutomationJournal(fs);await journal.open();const original={channelId:'failed-dispatch',projectId:'project',directory:'/workspace/worktree',context:{delivery:{readOnly:true,evidence:{operationId:'original-deploy',result:{version:'old'}}}}};
  await journal.update('development-workspace:failed-dispatch',()=>original);
@@ -256,4 +257,36 @@ it('settles only the exact completed parent-reported delivery blocker and retain
  expect(item).toMatchObject({status:'backlog',issues:[{id:blocker.id,handler:'parent'}]});
  expect(item.owner).toBeUndefined();
  expect(await f.journal.get('development-workspace:failed-dispatch')).toEqual(f.original);
+});
+
+
+it.each(['coordination','execution'] as const)('admits a new authorized %s target only after a versioned Harness reselection',async role=>{
+ const f=await fixture(false,false,false,'self',true);
+ const itemId=role==='coordination'?'planning-harness':'verify',oldProfile='removed';
+ const externalRefs=[{system:'nestos-remote-project',id:'project'},{system:'nestos-decision-harness-'+role,id:oldProfile}];
+ if(role==='coordination'){
+    await f.run({type:'create-item',item:{id:itemId,taskType:'coordination',purpose:'planning',title:'Planning',responsibility:'Plan',acceptance:'Ready',
+        externalRefs:[externalRefs[0],{system:'nestos-decision-run',id:'stage-run'}]}});
+    await f.run({type:'report-analysis',itemId,operationId:'failed-planning',status:{itemId,state:'failed',code:'KANBAN_HARNESS_UNAVAILABLE'}});
+ }
+ await f.journal.update('record-context:stage-run',()=>({sourceBoardId:'b',recordId:'stage-decision',recordRevision:1,runId:'stage-run'}));
+ await f.journal.update('record-runs:b',()=>[{id:'stage-run',boardId:'b',sourceBoardId:'b',recordId:'stage-decision',recordRevision:1,state:'running',createdAt:1,updatedAt:1,record:{externalRefs}}]);
+ const failure=role==='coordination'?coordinationHarnessScope('b',itemId):'failed-dispatch';
+ await f.journal.update(harnessPreparationKey(failure),()=>({projectId:'project',profileId:oldProfile,role,code:'KANBAN_HARNESS_UNAVAILABLE'}));
+ const profiles=[{id:'replacement',projectRuntime:true,workspaces:[{id:'workspace'}],capabilities:{create:true,workingDirectory:true,sessionChannels:true}}];
+ f.options.remote={list:()=>[{at:'/',serverProjectId:'workspace'}],projectHarness:async()=>({profiles:async()=>({profiles}),close:async()=>{}})};
+ const state=await f.recovery.taskRecovery('b',itemId);
+ expect(state).toMatchObject({code:'KANBAN_HARNESS_UNAVAILABLE',harnessReselection:{role,profileId:oldProfile}});
+ const request={itemId,operationId:'replace-harness',expectedRevision:state.revision,action:'reselect-harness' as const,harnessProfileId:'replacement'};
+ await expect(f.recovery.recoverTask('b',{...request,expectedRevision:'old'})).rejects.toMatchObject({code:'RECOVERY_STALE_REFRESH'});
+ await expect(f.recovery.recoverTask('b',{...request,harnessProfileId:'removed'})).rejects.toMatchObject({code:'KANBAN_HARNESS_UNAVAILABLE'});
+ const result=await f.recovery.recoverTask('b',request);
+ expect(result.state).toBe('accepted');expect(await f.recovery.recoverTask('b',request)).toEqual(result);
+ const target={system:'nestos-decision-harness-'+role,id:'replacement'};
+ if(role==='coordination')expect((await f.service.item('b',itemId)).item.launch?.analysisPreparation).toEqual(target);
+ else {
+    const {dispatches}=await f.service.workflow('b');
+    expect(dispatches[result.dispatchId!].continuation).toEqual({previousDispatchId:'failed-dispatch',preparation:target});
+    expect(dispatches['failed-dispatch']).toMatchObject({outcome:'failed',code:'KANBAN_HARNESS_UNAVAILABLE'});
+ }
 });

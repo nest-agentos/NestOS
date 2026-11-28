@@ -292,3 +292,52 @@ it('keeps the host-selected module version in the preview and the confirmed reco
  await f.request('decision.confirm',{proposalDigest:proposal.proposalDigest});
  expect((await f.service.record('b','module-approval')).externalRefs).toEqual(proposal.record.externalRefs);
 });
+
+it('persists the operator stage choices through confirmation and excludes the already bound discussion choice',async()=>{
+ const f=await fixture();
+ f.conversation.harnesses={decision:'discussion-harness',coordination:'planning-harness',execution:'worker-harness'};
+ const proposal=await f.request('decision.propose',{id:'harness-choice',title:'Stages',content:'Scope',rationale:'Check',projectIds:['one']}) as any;
+ f.read.mockResolvedValue({messages:[{id:'confirm',role:'user',text:'确认决策'}]});
+ await f.request('decision.confirm',{proposalDigest:proposal.proposalDigest});
+ const saved=await f.service.record('b','harness-choice');
+ expect(saved.externalRefs).toEqual([
+    {system:'nestos-remote-project',id:'one'},
+    {system:'nestos-decision-harness-coordination',id:'planning-harness'},
+    {system:'nestos-decision-harness-execution',id:'worker-harness'},
+ ]);
+});
+
+it('confirms a manually started decision once and never creates a run during confirmation or replay',async()=>{
+ const f=await fixture();f.conversation.manualStart=true;f.conversation.harnesses={execution:'manual-worker'};
+ const proposal=await f.request('decision.propose',{id:'manual-start',title:'Manual',content:'Scope',rationale:'Check',projectIds:['one']}) as any;
+ f.read.mockResolvedValue({messages:[{id:'confirm',role:'user',text:'确认决策'}]});
+ const params={proposalDigest:proposal.proposalDigest};
+ for(let retry=0;retry<2;retry++)await expect(f.request('decision.confirm',params,'manual-confirm')).resolves.toMatchObject({state:'confirmed',executionMode:'manual'});
+ expect(f.runRecord).not.toHaveBeenCalled();
+ expect(await f.service.record('b','manual-start')).toMatchObject({status:'confirmed',manualStart:true,itemIds:[],
+    externalRefs:expect.arrayContaining([{system:'nestos-decision-harness-execution',id:'manual-worker'}])});
+});
+
+
+it('writes one task change remark and its confirmation source with the confirmed edit',async()=>{
+ const f=await fixture(),proposal=await f.request('decision.propose',{id:'edit-scope',title:'Initial',content:'Scope',rationale:'Check',projectIds:['one']}) as any;
+ f.read.mockResolvedValue({messages:[{id:'confirm',role:'user',text:'确认决策'}]});
+ await f.request('decision.confirm',{proposalDigest:proposal.proposalDigest});
+ let serial=0;const command=async(command:any)=>f.service.execute('b',{operationId:'setup-'+ ++serial,expectedRevision:(await f.service.read('b')).revision,command});
+ await command({type:'create-item',item:{id:'work',title:'Initial',responsibility:'Build',acceptance:'Done'},
+    planning:{kind:'task',priority:2,dependencies:[],references:[]}});
+ await command({type:'link-record',recordId:'edit-scope',itemId:'work'});
+ const record=await f.service.record('b','edit-scope'),{item}=await f.service.item('b','work');
+ const editId='conversation-adjust';
+ const held=await f.request('decision.begin-edit',{editId,recordRevision:record.revision,items:[{id:item.id,revision:item.revision}]}) as any;
+ const updated={editId,recordRevision:held.record.revision,title:'Updated',content:'Expanded scope',rationale:'Updated tests',
+    changeSummary:'Include the alternate project flow.',items:[{id:item.id,revision:held.items[0].revision,title:'Updated',responsibility:'Build both flows',acceptance:'Check both paths'}]};
+ await expect(f.request('decision.apply-edit',updated,'apply')).rejects.toMatchObject({code:'DECISION_USER_CONFIRMATION_REQUIRED'});
+ f.read.mockResolvedValue({messages:[{id:'confirmed-change',role:'user',text:'确认调整'}]});
+ await f.request('decision.apply-edit',updated,'apply');await f.request('decision.apply-edit',updated,'apply');
+ const notes=(await f.service.events('b','latest',200)).filter(event=>event.kind==='message'&&event.itemId==='work');
+ expect(notes).toHaveLength(1);
+ expect(notes[0].data).toMatchObject({message:updated.changeSummary,recordId:'edit-scope',requirementChange:{revision:held.record.revision+1,
+    source:{sessionId:'/native/original',messageId:'confirmed-change'}}});
+ expect((await f.service.item('b','work')).item.acceptance).toBe('Check both paths');
+});

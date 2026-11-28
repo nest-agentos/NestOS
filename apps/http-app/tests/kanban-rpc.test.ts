@@ -141,18 +141,23 @@ it('round-trips draft removal as one declared mutation RPC with per-entry receip
     }finally{await client.close();await server.close();}
 });
 
-it('round-trips decision automation selection and concrete prerequisite failures',async()=>{
+it('round-trips decision launch choices, Harness catalogs and concrete prerequisite failures',async()=>{
     const modules=[{id:'software-development',version:'1',label:'Software development'}];
     const decisionModules=vi.fn(async()=>modules),startRecordConversation=vi.fn(async()=>({id:'conversation'}));
+    const models=[{id:'model',label:'Model',reasoningEfforts:[{id:'high',label:'High'}]}];
+    const decisionHarnessModels=vi.fn(async()=>models);
     const recoverTask=vi.fn(async()=>({operationId:'check',state:'blocked',code:'WORKSPACE_PREREQUISITES_MISSING',missing:['tool:pnpm']}));
     let server!:RpcPeer;
     const client=new RpcPeer('client',call=>server.handle(call),vi.fn(),installViewProjections);
     server=new RpcPeer('server',async call=>{client.applyUpdates(await server.refresh());return client.handle(call);},vi.fn());
     try {
-        const boot=await server.bootstrap({overview:async()=>({}),related:async()=>[],scan:async()=>{},execute:async()=>{},decisionModules,startRecordConversation,recoverTask});
+        const boot=await server.bootstrap({overview:async()=>({}),related:async()=>[],scan:async()=>{},execute:async()=>{},decisionModules,decisionHarnessModels,startRecordConversation,recoverTask});
         client.applyUpdates(boot.updates);const remote=client.decode(boot.value!);
         expect(await remote.decisionModules()).toEqual(modules);
-        const draft={operationId:'start',moduleIds:['software-development']};
+        expect(await remote.decisionHarnessModels('development','project','profile')).toEqual(models);
+        expect(decisionHarnessModels).toHaveBeenCalledExactlyOnceWith('development','project','profile');
+        const draft={operationId:'start',moduleIds:['software-development'],manualStart:true,harnesses:{execution:'profile'},
+            harnessModels:{execution:{modelId:'model',reasoningEffort:'high'}}};
         await remote.startRecordConversation('development',draft);
         expect(startRecordConversation).toHaveBeenCalledExactlyOnceWith('development',draft);
         expect(await remote.recoverTask('development',{operationId:'check',itemId:'task',expectedRevision:'revision',action:'recheck'}))

@@ -46,7 +46,7 @@ export function developmentPreparation(options: Options): NonNullable<PersonalKa
         await registerWorkResource(journal,input.dispatch.id,{projectId,context:input.context});
         const instructions=[source.definition.config.systemPrompt,...source.systemPrompt?.content??[]].filter(Boolean).join('\n\n');
         const work=input.stage==='decision'?{...input,options:{...input.options,commit:'changes',modules:''}}:input;
-        const record=await prepareWorkspace(options,journal,work,projectId,profileId,directory,instructions);
+        const record=await prepareWorkspace(options,journal,work,projectId,profileId,directory,instructions,binding.explicit);
         await input.reportActivity?.({stage:'worktree.prepared',result:'success',fields:{directory:record.directory,branch:record.repositories[0]?.branch??'',baseCommit:record.repositories[0]?.baseCommit??''},
             references:[{system:'nestos-worktree',id:input.dispatch.id,revision:JSON.stringify({projectId,directory:record.directory,repositories:record.repositories})}]});
         const entry=input.stage==='decision'?'decision.md':input.stage==='fix'?'task-fix-pre.md':'task.md';
@@ -55,10 +55,10 @@ export function developmentPreparation(options: Options): NonNullable<PersonalKa
         return {target,contextRef:{scopeId:record.channelId,sections:['task']}};
     };
 }
-async function prepareWorkspace(options: Options, journal: KanbanAutomationJournal, input: Input, projectId: string, profileId: string, directory: string, instructions: string): Promise<DevelopmentWorkspaceRecord> {
+async function prepareWorkspace(options: Options, journal: KanbanAutomationJournal, input: Input, projectId: string, profileId: string, directory: string, instructions: string, explicit: boolean): Promise<DevelopmentWorkspaceRecord> {
     const scoped=scopedWorkContext(options.remote,input,projectId);
     const {contextProjects}=scoped;
-    await developmentStage(input.dispatch.id, 'harness.profiles', () => requireNativeWorkspaceHarness(options, projectId, profileId));
+    if(!explicit)await developmentStage(input.dispatch.id, (input.stage==='decision'?'coordination':'execution')+'.harness.profiles', () => requireNativeWorkspaceHarness(options, projectId, profileId));
     const folder = await options.projects.get(projectId), view = await developmentStage(input.dispatch.id, 'workspace.open', () => options.projects.openWorkspace(folder.path));
     try {
         const policy = await developmentStage(input.dispatch.id, 'policy.freeze', () => developmentPolicy(journal,options.fs,view.fs,input.dispatch.id,input.options));
