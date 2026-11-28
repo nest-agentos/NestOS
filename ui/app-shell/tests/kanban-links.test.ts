@@ -25,3 +25,19 @@ it('links Dream decision evidence to the source task or decision on its own boar
     expect(await resolve({system: 'nestos-dream-source-decision', id: 'invalid'})).toBeUndefined();
     expect(get).not.toHaveBeenCalled();
 });
+
+it('builds all three task references from the authorized project projection', async () => {
+    const get = vi.fn(), resolve = kanbanReferenceLink({get});
+    const resources=[{reference:{system:'nestos-remote-project',id:'cx1'},label:'Cell Project',resourceId:'/folder:parent/folder:cx1'}];
+    const scope={projectId:'cx1',directory:'work/tree',profileId:'codex'};
+    const links=await Promise.all([
+        resolve({system:'nestos-primary-project',id:'cx1'},resources),
+        resolve({system:'nestos-work-directory',id:'work',revision:JSON.stringify(scope)},resources),
+        resolve({system:'nestos-native-session',id:'native',revision:JSON.stringify(scope)},resources),
+    ]);
+    expect(links.map(link=>decodeURIComponent(link!.href.split('#/workbench/')[1]))).toEqual([
+        '/folder:parent/folder:cx1/@files','/folder:parent/folder:cx1/@files/work/tree','/folder:parent/folder:cx1/@harness/codex/native',
+    ]);
+    expect(links[1]?.label).toBe('Cell Project · /workspace/work/tree');
+    expect(get).not.toHaveBeenCalled();
+});

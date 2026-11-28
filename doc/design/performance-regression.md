@@ -16,7 +16,7 @@ pnpm test:performance transport ui
 
 入口串行执行对应测试，任一步失败即返回非零；所有临时驱动在 temporary-process 有界作用域内执行，确认清理后才输出成功。已有全量 `pnpm test` 仍包含这些文件；定向入口减少每次修改的验证成本。
 
-性能入口默认在当前工作树的 `_nestos/tmp/performance-processes` 写入临时进程回执，设置 `XDG_STATE_HOME` 时沿用该目录下的登记位置。入口日志记录实际目录和作用域 ID，便于按登记记录查询或恢复。
+性能入口默认在当前工作树的 `_nestos/tmp/performance-processes` 写入临时进程回执，设置 `XDG_STATE_HOME` 时沿用该目录下的登记位置。成功时返回各组检查数量、耗时和回执 ID，失败时附带有界日志片段。用入口记录的目录和 `recordId` 定位完整的 `<recordId>.output.log`。
 
 - budget：严格时间/次数边界、批量 RPC 计数、缺失指标、未完成操作与基线退化的失败测试。
 - core：后台运行责任空索引仅一次查询、零历史读取/零租约获取，已按需恢复的 Session 不重复执行；Flow/调用恢复空索引仅三次查询、单个待办仅读取目标根且不扫描 2000 条无关会话目录；直达会话不枚举无关会话/历史，独立准备并行且仅读一次，业务 Effect 未完成时摘要仍可冷读；有界目录预览、原生会话身份与状态读取契约。

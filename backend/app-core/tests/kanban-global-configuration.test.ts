@@ -19,6 +19,7 @@ it('preserves customized prompts across restarts and shipped-default upgrades',a
 it('ships only declared data files and conventional lifecycle hooks, honoring project overrides',async()=>{
     const fs=await fixture();await ensureKanbanConfiguration(fs);
     const path='/etc/kanban/development/profile.json',manifest=JSON.parse(await readPrompt(fs,path));
+    manifest.files=manifest.files.filter((name:string)=>name!=='recovery-policy.json');
     manifest.files.push('report.yaml');await fs.driver.writeContent(path,JSON.stringify(manifest));
     await fs.driver.createFile({parentPath:'/etc/kanban/development',name:'report.yaml',content:'schema: report/1',recursive:true});
     await fs.driver.createFile({parentPath:'/etc/kanban/development',name:'unlisted.txt',content:'Do not transfer',recursive:true});
@@ -26,7 +27,7 @@ it('ships only declared data files and conventional lifecycle hooks, honoring pr
     const files=await resolveKanbanConfiguration(fs,fs,'development');
     expect(files.find(file=>file.name==='report.yaml')).toMatchObject({content:'schema: project-report/1'});
     expect(files.some(file=>file.name==='unlisted.txt')).toBe(false);
-    manifest.files.push('../secret.txt');await fs.driver.writeContent(path,JSON.stringify(manifest));
+    manifest.files[manifest.files.indexOf('report.yaml')]='../secret.txt';await fs.driver.writeContent(path,JSON.stringify(manifest));
     await expect(resolveKanbanConfiguration(fs,fs,'development')).rejects.toMatchObject({code:'KANBAN_PROFILE_INVALID'});
 });
 it('includes report packaging guidance referenced by delivery in an older profile manifest', async () => {

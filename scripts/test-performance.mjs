@@ -17,6 +17,11 @@ const suites = {
         'tests/bootstrap-navigation-cleanup.test.ts', 'tests/navigation-timing.test.ts', 'tests/kanban-windows.test.ts',
         'tests/study-save-destination.test.ts', 'tests/session-editor-load.test.ts', 'tests/navigation-performance.test.ts']],
 };
+function summarizeChecks(output) {
+    return output.split(/\r?\n/).map(line => line.trim())
+        .filter(line => /^(?:Test Files|Tests|Duration)\s{2,}\d|^ℹ (?:tests|pass|fail|cancelled|skipped|todo) \d+$/.test(line))
+        .slice(-8);
+}
 async function main() {
     const selection = process.argv.slice(2);
     if (selection.some(name => !Object.hasOwn(suites, name))) throw new Error('PERFORMANCE_SUITE_INVALID');
@@ -26,11 +31,15 @@ async function main() {
     await withTemporaryScope({scopeId, directory, log: event => console.log(JSON.stringify(event))}, async scope => {
         for (const name of names) {
             const [command, args] = suites[name];
+            const started = performance.now();
             const result = await (await scope.start(command, args, {cwd: root, timeoutMs: 180000})).result;
             const output = await processOutput(directory, result.id);
-            console.log(JSON.stringify({suite: name, outcome: result.outcome, exitCode: result.exitCode}));
-            process.stdout.write(output.output.slice(result.outcome === 'succeeded' ? -1600 : -20000) + '\n');
-            if (result.outcome !== 'succeeded') throw new Error('PERFORMANCE_SUITE_FAILED');
+            console.log(JSON.stringify({suite:name,outcome:result.outcome,exitCode:result.exitCode,durationMs:Math.round(performance.now()-started),
+                recordId:result.id,outputBytes:output.outputBytes,checks:summarizeChecks(output.output)}));
+            if (result.outcome !== 'succeeded') {
+                process.stderr.write(output.output.slice(-8192)+'\n');
+                throw new Error('PERFORMANCE_SUITE_FAILED');
+            }
         }
     });
     console.log(JSON.stringify({operation: 'performance.regression', scopeId, result: 'success', cleanup: 'confirmed'}));

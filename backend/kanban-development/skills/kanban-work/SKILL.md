@@ -12,3 +12,5 @@ Read the current task, identity and admitted stage from `session_context`. Those
 - For management operations, use the admitted phase and its session guidance; do not infer integration, build or deployment authority from a source task.
 
 Use the existing session request and report protocol for durable exchanges. Distinguish acceptance of a message from completion of the operation it describes. Preserve stable operation identities and report unknown outcomes rather than replaying them.
+
+Keep tool output bounded. Search by path and symbol before reading small relevant ranges. For checks, return outcome, counts, duration and the retained log location. On failure, include the failed assertion or stage and nearby lines. Read more from the log only when needed. Keep the required checks and their real exit status.

@@ -25,6 +25,9 @@ it('loads the task entry before workspace and delivery manuals and preserves hos
  expect(bootstrap).toContain('identity, instructions, task.md');expect(bootstrap).not.toContain('identity, policy');
  expect(bootstrap).not.toContain('policy.gitIdentity');expect(bootstrap.length).toBeLessThan(400);
  expect(kanbanConfigurationDefaults['task.md']).toContain('workspace-rules.md');
+ expect(kanbanConfigurationDefaults['workspace-rules.md']).toContain('Limit search and debug output');
+ expect(kanbanConfigurationDefaults['delivery.md']).toContain('preserve the command exit status');
+ expect(kanbanConfigurationDefaults['delivery.md']).toContain('complete log in the authorized evidence scope');
  for(const stage of ['postload.failed','postload.cancelled','cleanup'])expect(hasMarkdownSection(kanbanConfigurationDefaults['task.md'],stage)).toBe(true);
 });
 it.each(['analyze','build','deploy','merge'] as const)('starts %s with one Markdown entry and defers result instructions',action=>{
