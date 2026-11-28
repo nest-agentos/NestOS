@@ -93,7 +93,7 @@ export function projectAutomaticOperation(view:KanbanItemOperations):KanbanItemO
     const status=view.automatic;
     if(status?.state==='blocked'&&status.code&&status.code!=='OPERATION_SELECTION_REQUIRED'){
         return {...view,operations:view.operations.map(row=>row.id===status.stage&&['ready','failed','unavailable'].includes(row.state)
-            ?{...row,state:'failed',code:status.code}:row)};
+            ?{...row,state:'failed',code:status.code,...(row.id==='analyze'&&row.enabled?{runLabel:t('kanban.operationReanalyzeMerge')}:{})}:row)};
     }
     if(status?.state!=='running')return view;
     return {...view,operations:view.operations.map(row=>{
