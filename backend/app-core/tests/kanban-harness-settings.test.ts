@@ -8,7 +8,9 @@ import {kanbanHarnessDefaults} from '../src/kanban/harness-defaults';
 import {kanbanHarnessTarget} from '../src/presets/kanban-harness-target';
 import {kanbanJournalOptions} from '../src/kanban/host-policy';
 const cleanup:Array<()=>Promise<void>>=[];afterEach(async()=>{for(const close of cleanup.splice(0))await close();});
-function profile(id:string,ready=true):HarnessProfile{return {id,kind:id,projectRuntime:true,workspaces:[{id:'workspace'}],capabilities:{history:true,create:true,resume:true,interrupt:true,interactions:true,sessionChannels:ready,workingDirectory:ready}};}
+function profile(id:string,ready=true):HarnessProfile{return {id,kind:id,projectRuntime:true,workspaces:[{id:'workspace'}],capabilities:{history:true,create:true,resume:true,interrupt:true,interactions:true,sessionChannels:ready,workingDirectory:ready,models:true}};}
+const modelChoice={modelId:'model',reasoningEffort:'high'};
+const modelCatalog=[{id:'model',label:'Model',reasoningEfforts:[{id:'high',label:'High'}]}];
 it('selects the explicitly configured profile and rejects unsupported profiles without falling back',()=>{
     const profiles=[profile('default'),profile('chosen'),profile('dsh',false)];
     expect(selectKanbanHarness(profiles,'workspace','chosen').id).toBe('chosen');expect(selectKanbanHarness(profiles,'workspace').id).toBe('default');
@@ -24,40 +26,47 @@ it('exposes three board-specific fields with a default and disabled capability-m
 });
 it('freezes the chosen profile once per operation and preserves it when board defaults change',async()=>{
     const {manager}=await createVFS({rootBackend:new MemoryBackend()});cleanup.push(()=>manager.dispose());const journal=new KanbanAutomationJournal(await manager.openFileSystem('/'));await journal.open();
-    expect(await freezeKanbanHarness(journal,'operation','board','execution','codex')).toBe('codex');
-    expect(await freezeKanbanHarness(journal,'operation','board','execution','another')).toBe('codex');
-    await expect(freezeKanbanHarness(journal,'operation','other','execution','codex')).rejects.toMatchObject({code:'KANBAN_HARNESS_BINDING_CHANGED'});
+    const choice={profileId:'codex',selection:{modelId:'model',reasoningEffort:'high'}};
+    expect(await freezeKanbanHarness(journal,'operation','board','execution',choice)).toEqual(choice);
+    expect(await freezeKanbanHarness(journal,'operation','board','execution',{profileId:'another'})).toEqual(choice);
+    await expect(freezeKanbanHarness(journal,'operation','other','execution',choice)).rejects.toMatchObject({code:'KANBAN_HARNESS_BINDING_CHANGED'});
 });
 
 it('stores independently revisioned defaults for all roles and honors board inheritance',async()=>{
     const {manager}=await createVFS({rootBackend:new MemoryBackend()});cleanup.push(()=>manager.dispose());
     const fs=await manager.openFileSystem('/');
     const remote={mountedProjectIds:()=>['p'],list:()=>[{at:'/',connectionId:'node'}],projectHarness:async()=>({
-        profiles:async()=>({profiles:[profile('agy'),profile('codex')]}),close:async()=>{},
+        profiles:async()=>({profiles:[profile('agy'),profile('codex')]}),models:async()=>({models:modelCatalog}),close:async()=>{},
     })} as never;
-    const {api,preferred}=kanbanHarnessDefaults(fs,kanbanHarnessSettings(remote));
+    const {api,preferred,forBoard}=kanbanHarnessDefaults(fs,kanbanHarnessSettings(remote));
     expect(await api.readKanbanHarnessDefaults()).toMatchObject({revision:0,settings:{}});
     expect(await fs.driver.exists('/var/lib/kanban/harness-defaults.seq')).toBe(false);
-    const request={operationId:'first',revision:0,settings:{'harness-decision':'agy','harness-coordination':'codex','harness-execution':'agy'}};
+    const request={operationId:'first',revision:0,settings:{'harness-decision':'agy','harness-coordination':'codex','harness-execution':'agy','harness-execution-selection':JSON.stringify({profileId:'agy',...modelChoice})}};
+    const bad={...request,operationId:'bad',settings:{...request.settings,
+        'harness-execution-selection':JSON.stringify({profileId:'agy',modelId:'model',reasoningEffort:'missing'})}};
+    await expect(api.saveKanbanHarnessDefaults(bad)).rejects.toMatchObject({code:'KANBAN_HARNESS_EFFORT_UNAVAILABLE'});
     expect(await api.saveKanbanHarnessDefaults(request)).toEqual({revision:1,settings:request.settings});
     expect(await api.saveKanbanHarnessDefaults(request)).toMatchObject({revision:1});
     await expect(api.saveKanbanHarnessDefaults({...request,operationId:'stale'})).rejects.toMatchObject({code:'CONFLICT'});
     await expect(api.saveKanbanHarnessDefaults({...request,settings:{'harness-decision':'codex'}})).rejects.toMatchObject({code:'IDEMPOTENCY_CONFLICT'});
-    expect(await preferredHarness('decision',{'harness-decision':'codex'},preferred)).toBe('codex');
-    expect(await preferredHarness('coordination',{},preferred)).toBe('codex');
-    expect(await preferredHarness('execution',{'harness-execution':''},preferred)).toBe('agy');
+    expect(await preferredHarness('decision',{'harness-decision':'codex'},preferred)).toEqual({profileId:'codex'});
+    expect(await preferredHarness('coordination',{},preferred)).toEqual({profileId:'codex'});
+    expect(await preferredHarness('execution',{'harness-execution':''},preferred)).toEqual({profileId:'agy',selection:modelChoice});
+    expect((await forBoard({settings:{'harness-decision':'codex'}})).harnessDefaults).toEqual({
+        harnesses:{decision:'codex',coordination:'codex',execution:'agy'},models:{execution:modelChoice},
+    });
 });
 
 it('leaves direct Flow execution in place when a global execution Harness is configured',async()=>{
     const {manager}=await createVFS({rootBackend:new MemoryBackend()});cleanup.push(()=>manager.dispose());
     const fs=await manager.openFileSystem('/');
     await new KanbanAutomationJournal(fs,kanbanJournalOptions).open();
-    const readHarnessDefault=vi.fn(async()=>'agy'), getAgentRevision=vi.fn();
+    const readHarnessDefault=vi.fn(async()=>({profileId:'agy'})), getAgentRevision=vi.fn();
     const prepare=kanbanHarnessTarget({fs,readHarnessDefault,agents:{getAgentRevision}} as never);
     const input={board:{id:'board'},dispatch:{id:'dispatch'},target:{kind:'flow',id:'flow',version:1,digest:'digest'}};
     expect(await prepare(input as never)).toEqual(input.target);
     expect(await prepare(input as never)).toEqual(input.target);
-    expect(readHarnessDefault).toHaveBeenCalledExactlyOnceWith('execution');
+    expect(readHarnessDefault).not.toHaveBeenCalled();
     expect(getAgentRevision).not.toHaveBeenCalled();
 });
 
@@ -67,15 +76,15 @@ it.each(['decision','coordination'] as const)('uses the board %s profile in real
     const journal=new KanbanAutomationJournal(fs);await journal.open();if(role==='coordination')await journal.update('record-coordination-scope:operation',()=>({recordId:'decision'}));
     const board={id:'board',settings:{['harness-'+role]:'chosen'}};
     const close=vi.fn(async()=>{}),channel=vi.fn(async()=>({projectContext:{projects:[{projectId:'workspace',revision:1,directory:'/workspace'}]}}));
-    const options={fs,journal,readHarnessDefault:async()=>'default',service:{read:async()=>board,record:async()=>({kind:'decision',status:'confirmed'})},projects:{get:async()=>({path:'/project',project:{id:'project',source:{kind:'remote'}}}),openWorkspace:async()=>({fs,dispose:async()=>{}})},
-        remote:{projectHarness:async()=>({profiles:async()=>({epoch:'epoch',profiles:[profile('default'),profile('chosen')]}),close}),sessionChannel:channel,
+    const options={fs,journal,readHarnessDefault:async()=>({profileId:'default',selection:modelChoice}),service:{read:async()=>board,record:async()=>({kind:'decision',status:'confirmed'})},projects:{get:async()=>({path:'/project',project:{id:'project',source:{kind:'remote'}}}),openWorkspace:async()=>({fs,dispose:async()=>{}})},
+        remote:{projectHarness:async()=>({profiles:async()=>({epoch:'epoch',profiles:[profile('default'),profile('chosen')]}),models:async()=>({models:modelCatalog}),close}),sessionChannel:channel,
             list:()=>[{at:'/',serverId:'cell',serverProjectId:'workspace',serverProjectRevision:1,authorization:{principalId:'owner',revision:'auth'}}]},log:vi.fn()} as never;
     const transport=decisionConversationTransport(options,async()=>{}),resources=[{system:'nestos-remote-project',id:'project'}];
     const first=await transport.prepare('operation','board',resources,resources[0]);expect(first).toMatchObject({profileId:'chosen',...(role==='coordination'?{purpose:'coordination'}:{})});
     board.settings['harness-'+role]='missing';expect(await transport.prepare('operation','board',resources,resources[0])).toMatchObject({profileId:'chosen'});
     board.settings['harness-'+role]='';
     if(role==='coordination')await journal.update('record-coordination-scope:inherited',()=>({recordId:'decision'}));
-    expect(await transport.prepare('inherited','board',resources,resources[0])).toMatchObject({profileId:'default'});expect(close).toHaveBeenCalledTimes(3);
+    expect(await transport.prepare('inherited','board',resources,resources[0])).toMatchObject({profileId:'default',selection:modelChoice});expect(close).toHaveBeenCalledTimes(3);
 });
 
 it.each([

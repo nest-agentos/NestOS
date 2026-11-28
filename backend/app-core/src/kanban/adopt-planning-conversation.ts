@@ -4,6 +4,7 @@ import type {DecisionConversationOptions,DecisionConversation} from './decision-
 import type {KanbanPlanningSession} from '@nestos/kanban/contracts';
 import {currentAnalysis,safeCode} from '@nestos/kanban/integration';
 import {requireValue} from './validation';
+import {readFrozenHarness} from '../presets/kanban-harness-settings';
 /** Register observation of a verified retained planning Session; never create or relocate one. */
 export function adoptPlanningConversation(options:DecisionConversationOptions,start:(board:string,request:{operationId:string})=>Promise<unknown>) {
  return async(board:string,item:string,session:KanbanPlanningSession):Promise<void>=>{
@@ -12,7 +13,7 @@ export function adoptPlanningConversation(options:DecisionConversationOptions,st
     const analysis=await currentAnalysis(options.journal,board,item);if(analysis?.id!==session.analysisId||analysis.phase!=='settled')return;
     const workspace=await options.journal.get<import('../presets/kanban-development').DevelopmentWorkspaceRecord>('development-workspace:'+session.analysisId);
     const context=workspace?.context as {decision?:{recordId:string;sourceBoardId:string}}|undefined;if(!workspace||!context?.decision||!session.resourceId)return;
-    const choice=await options.journal.get<{profileId:string}>('kanban-harness-choice:'+session.analysisId);requireValue(choice,'KANBAN_HARNESS_BINDING_CHANGED');
+    const choice=await readFrozenHarness(options.journal,session.analysisId);requireValue(choice,'KANBAN_HARNESS_BINDING_CHANGED');
     const {channel,repaired}=saved?.binding.retainedPlanning&&saved.resourceId===session.resourceId?await retainedManagementChannel(options,saved):{channel:await options.remote.sessionChannel(workspace.projectId,'current',{cwd:workspace.directory}) as {scopeId:string;execution?:{sessionId?:string}},repaired:false};
     const native=channel.execution?.sessionId;requireValue(native&&session.resourceId.endsWith('/'+encodeURIComponent(choice.profileId)+'/'+encodeURIComponent(native)),'PLANNING_SOURCE_UNVERIFIED');
     requireValue(channel.scopeId,'CHANNEL_SCOPE_REQUIRED');if(saved?.binding.channelId===channel.scopeId&&saved.binding.retainedPlanning){if(repaired)await start(saved.boardId,{operationId:saved.id});return;}
@@ -20,7 +21,7 @@ export function adoptPlanningConversation(options:DecisionConversationOptions,st
     let epoch:string;try{epoch=(await harness.profiles()).epoch;}finally{await harness.close();}
     const workspaceId=options.remote.list(workspace.projectId).find(row=>row.at==='/')?.serverProjectId;requireValue(workspaceId,'DECISION_PROJECT_BINDING_CHANGED');
     const binding={id:session.analysisId,channelId:channel.scopeId,retainedPlanning:true as const,boardId:context.decision.sourceBoardId,purpose:'coordination' as const,recordId:record.id,projectId:workspace.projectId,
-        projectIds:record.externalRefs?.filter(ref=>ref.system==='nestos-remote-project').map(ref=>ref.id),profileId:choice.profileId,workspaceId,directory:workspace.directory,epoch,createId:session.analysisId,inputId:session.analysisId};
+        projectIds:record.externalRefs?.filter(ref=>ref.system==='nestos-remote-project').map(ref=>ref.id),profileId:choice.profileId,...(choice.selection?{selection:choice.selection}:{}),workspaceId,directory:workspace.directory,epoch,createId:session.analysisId,inputId:session.analysisId};
     await retainAnsweredRequests(options,workspace.projectId,channel.scopeId);
     await options.journal.update<DecisionConversation>('record-conversation:'+session.analysisId,old=>old?{...old,binding}:{id:session.analysisId,boardId:binding.boardId,purpose:'coordination',recordId:record.id,state:'confirmed',phase:'submitting',submitted:true,createdAt:record.createdAt,sessionId:native,resourceId:session.resourceId,binding});
     options.log({operationId:session.analysisId,boardId:binding.boardId,stage:'coordination.session.adopt',result:'success',durationMs:Date.now()-started});

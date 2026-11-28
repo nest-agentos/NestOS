@@ -9,14 +9,35 @@ import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import {requireValue} from '../kanban/validation';
 export type KanbanHarnessRole=KanbanHarnessStage;
 export const harnessSettingKey=(role:KanbanHarnessRole)=>'harness-'+role;
-const roles:KanbanHarnessRole[]=['decision','coordination','execution'];
-export type ReadHarnessDefault=(role:KanbanHarnessRole)=>Promise<string|undefined>;
-export async function preferredHarness(role:KanbanHarnessRole, settings?:Record<string,string>, readGlobal?:ReadHarnessDefault):Promise<string|undefined> {
-    return settings?.[harnessSettingKey(role)] || await readGlobal?.(role);
+export const harnessSelectionKey=(role:KanbanHarnessRole)=>harnessSettingKey(role)+'-selection';
+export const harnessRoles=['decision','coordination','execution'] as const;
+export interface HarnessChoice {profileId:string;selection?:KanbanHarnessModelSelection}
+export type ReadHarnessDefault=(role:KanbanHarnessRole)=>Promise<HarnessChoice|undefined>;
+export async function preferredHarness(role:KanbanHarnessRole, settings?:Record<string,string>, readGlobal?:ReadHarnessDefault):Promise<HarnessChoice|undefined> {
+    return readHarnessChoice(role,settings) ?? await readGlobal?.(role);
+}
+export function readHarnessChoice(role:KanbanHarnessRole,settings?:Record<string,string>):HarnessChoice|undefined {
+    const profileId=settings?.[harnessSettingKey(role)];
+    if(!profileId)return;
+    const saved=storedHarnessSelection(settings?.[harnessSelectionKey(role)]);
+    return {profileId,...(saved?.profileId===profileId?{selection:saved.selection}:{})};
+}
+function storedHarnessSelection(raw?:string):{profileId:string;selection:KanbanHarnessModelSelection}|undefined {
+    if(!raw)return;
+    let choice:{profileId?:unknown};
+    try{choice=JSON.parse(raw);}catch{requireValue(false,'DECISION_HARNESS_SELECTION_INVALID');}
+    requireValue(choice&&typeof choice.profileId==='string'&&choice.profileId.length<=128,'DECISION_HARNESS_SELECTION_INVALID');
+    return {profileId:choice.profileId,selection:validateSelection(choice)};
+}
+function validateSelection(selection:unknown):KanbanHarnessModelSelection {
+    const value=selection as KanbanHarnessModelSelection|null;
+    requireValue(value&&typeof value.modelId==='string'&&value.modelId.length>0&&value.modelId.length<=256&&
+        (value.reasoningEffort===undefined||typeof value.reasoningEffort==='string'&&value.reasoningEffort.length<=128),'DECISION_HARNESS_SELECTION_INVALID');
+    return {modelId:value.modelId,...(value.reasoningEffort?{reasoningEffort:value.reasoningEffort}:{})};
 }
 const decisionHarnessSystem=(role:KanbanHarnessRole)=>'nestos-decision-harness-'+role;
 export function decisionHarnessReferences(harnesses?:KanbanStageHarnesses,models?:KanbanStageHarnessModels):KanbanExternalReference[]{
-    return roles.filter(role=>role!=='decision').flatMap(role=>{
+    return harnessRoles.filter(role=>role!=='decision').flatMap(role=>{
         const id=harnesses?.[role],selection=models?.[role];
         return id?[{system:decisionHarnessSystem(role),id,...(selection?{revision:JSON.stringify(selection)}:{})}]:[];
     });
@@ -33,8 +54,7 @@ export function decisionHarnessModel(context:unknown,role:KanbanHarnessRole):Kan
     if(!revision)return;
     let selection:KanbanHarnessModelSelection;
     try{selection=JSON.parse(revision);}catch{requireValue(false,'DECISION_HARNESS_SELECTION_INVALID');}
-    requireValue(selection&&typeof selection.modelId==='string'&&(selection.reasoningEffort===undefined||typeof selection.reasoningEffort==='string'),'DECISION_HARNESS_SELECTION_INVALID');
-    return {modelId:selection.modelId,...(selection.reasoningEffort?{reasoningEffort:selection.reasoningEffort}:{})};
+    return validateSelection(selection);
 }
 export function harnessRetryTarget(target:KanbanExternalReference|undefined,role:KanbanHarnessRole):string|undefined {
     return target?.system===decisionHarnessSystem(role)?target.id:undefined;
@@ -58,14 +78,17 @@ async function withProjectHarnessProfile<T>(remote:ProjectRemoteMountService,pro
         return await read(client,selectKanbanHarness((await client.profiles()).profiles,workspaceId,profileId));
     }finally{await client.close();}
 }
-async function harnessModels(client:Pick<import('@nestos/cells-driver').HarnessClient,'models'>,profile:HarnessProfile):Promise<KanbanHarnessModel[]> {
+async function harnessModels(client:Pick<import('@nestos/cells-driver').HarnessClient,'models'>,profile:HarnessProfile,options?:import('@nestos/vfs-core').OperationOptions):Promise<KanbanHarnessModel[]> {
     if(!profile.capabilities.models||!client.models)return [];
-    const {models}=await client.models(profile.id);
+    const {models}=await client.models(profile.id,undefined,options);
     return models.map(({id,label,reasoningEfforts})=>({id,label,reasoningEfforts}));
 }
 export async function requireHarnessModel(client:Pick<import('@nestos/cells-driver').HarnessClient,'models'>,profile:HarnessProfile,selection?:KanbanHarnessModelSelection):Promise<void> {
     if(!selection)return;
-    const model=(await harnessModels(client,profile)).find(row=>row.id===selection.modelId);
+    requireAvailableSelection(await harnessModels(client,profile),selection);
+}
+function requireAvailableSelection(models:KanbanHarnessModel[],selection:KanbanHarnessModelSelection):void {
+    const model=models.find(row=>row.id===selection.modelId);
     requireValue(model,'KANBAN_HARNESS_MODEL_UNAVAILABLE');
     requireValue(!selection.reasoningEffort||model.reasoningEfforts.some(row=>row.id===selection.reasoningEffort),'KANBAN_HARNESS_EFFORT_UNAVAILABLE');
 }
@@ -100,27 +123,43 @@ const log=createModuleLogger('kanban-harness-settings');
 export function kanbanHarnessSettings(remote:ProjectRemoteMountService){
     const catalog=async(board:Pick<KanbanBoard,'settings'>):Promise<KanbanBoardSettingsCatalog>=>{
         const profiles=await availableProfiles(remote);
-        return {description:t('kanban.harnessSettingsHelp'),fields:roles.map(role=>{
+        return {description:t('kanban.harnessSettingsHelp'),fields:harnessRoles.map(role=>{
             const value=board.settings?.[harnessSettingKey(role)];const choices=[{value:'',label:t('kanban.harnessDefault'),disabled:false},...profiles.values()];
             if(value && !profiles.has(value))choices.push({value,label:value+' · '+t('kanban.harnessUnavailable'),disabled:true});
             return {name:harnessSettingKey(role),label:t(('kanban.harnessRole.'+role) as Parameters<typeof t>[0]),choices};
         })};
     };
-    return {catalog,models:(projectId:string,profileId:string)=>projectHarnessModels(remote,projectId,profileId),validate:async(board:Pick<KanbanBoard,'settings'>,settings:Record<string,string>)=>{
-        requireValue(Object.keys(settings).every(key=>roles.some(role=>harnessSettingKey(role)===key)),'KANBAN_SETTINGS_UNKNOWN_FIELD');
+    const modelsForDefaults=(profileId:string)=>availableModels(remote,profileId);
+    return {catalog,modelsForDefaults,models:(projectId:string,profileId:string)=>projectHarnessModels(remote,projectId,profileId),validate:async(board:Pick<KanbanBoard,'settings'>,settings:Record<string,string>)=>{
+        requireValue(Object.keys(settings).every(key=>harnessRoles.some(role=>harnessSettingKey(role)===key||harnessSelectionKey(role)===key)),'KANBAN_SETTINGS_UNKNOWN_FIELD');
         const view=await catalog(board);
         for(const field of view.fields){const value=settings[field.name]??'';
             requireValue(!value || value===board.settings?.[field.name] || field.choices.some(choice=>choice.value===value&&!choice.disabled),'KANBAN_HARNESS_UNAVAILABLE');}
+        await validateDefaultModels(board.settings,settings,modelsForDefaults);
     }};
+}
+async function validateDefaultModels(previous:Record<string,string>|undefined,settings:Record<string,string>,models:(profile:string)=>Promise<KanbanHarnessModel[]>):Promise<void> {
+    const reads=new Map<string,Promise<KanbanHarnessModel[]>>();
+    const choices=harnessRoles.flatMap(role=>{
+        const key=harnessSelectionKey(role),raw=settings[key];
+        if(!raw||raw===previous?.[key]&&settings[harnessSettingKey(role)]===previous?.[harnessSettingKey(role)])return [];
+        const choice=readHarnessChoice(role,settings);
+        if(raw===previous?.[key]&&!choice?.selection)return [];
+        requireValue(choice?.selection,'DECISION_HARNESS_SELECTION_INVALID');
+        return [{profileId:choice.profileId,selection:choice.selection}];
+    });
+    const checked=await Promise.allSettled(choices.map(async choice=>{
+        const pending=reads.get(choice.profileId)??models(choice.profileId);
+        reads.set(choice.profileId,pending);
+        requireAvailableSelection(await pending,choice.selection);
+    }));
+    const failure=checked.find(choice=>choice.status==='rejected');
+    if(failure?.status==='rejected')throw failure.reason;
 }
 async function availableProfiles(remote:ProjectRemoteMountService){
     const operationId=randomUUID(),started=Date.now(),scope=operationScope({timeoutMs:3000});
-    const profiles=new Map<string,{value:string;label:string;disabled:boolean}>(),projects=new Map<string,string>();
-    for(const id of remote.mountedProjectIds()){
-        const root=remote.list(id).find(m=>m.at==='/');if(!root?.connectionId)continue;
-        if(!projects.has(root.connectionId)||root.capabilities?.sessionControl===true)projects.set(root.connectionId,id);
-    }
-    try{await mapConcurrent([...projects.values()],4,async projectId=>{
+    const profiles=new Map<string,{value:string;label:string;disabled:boolean}>();
+    try{await mapConcurrent(harnessProjects(remote),4,async projectId=>{
         let client:Awaited<ReturnType<ProjectRemoteMountService['projectHarness']>>|undefined;
         try{checkOperation(scope.options);client=await remote.projectHarness(projectId,scope.options);
             for(const profile of (await client.profiles(scope.options)).profiles){
@@ -133,6 +172,49 @@ async function availableProfiles(remote:ProjectRemoteMountService){
     log.info('kanban.settings.catalog',{operationId,stage:'complete',result:'success',count:profiles.size,durationMs:Date.now()-started});return profiles;
 }
 
+function harnessProjects(remote:ProjectRemoteMountService):string[] {
+    const projects=new Map<string,string>();
+    for(const id of remote.mountedProjectIds()){
+        const root=remote.list(id).find(mount=>mount.at==='/');if(!root?.connectionId)continue;
+        if(!projects.has(root.connectionId)||root.capabilities?.sessionControl===true)projects.set(root.connectionId,id);
+    }
+    return [...projects.values()];
+}
+
+async function availableModels(remote:ProjectRemoteMountService,profileId:string):Promise<KanbanHarnessModel[]> {
+    requireValue(typeof profileId==='string'&&/^[\w-]{1,128}$/.test(profileId),'DECISION_HARNESS_SELECTION_INVALID');
+    const scope=operationScope({timeoutMs:4000}), operationId=randomUUID(), started=Date.now(), stage='defaults.models';
+    const failures:unknown[]=[];
+    try{
+        const results=await mapConcurrent(harnessProjects(remote),4,async projectId=>{
+            const measured=Date.now();
+            let client:Awaited<ReturnType<ProjectRemoteMountService['projectHarness']>>|undefined;
+            try {
+                checkOperation(scope.options);client=await remote.projectHarness(projectId,scope.options);
+                const {profiles}=await client.profiles(scope.options);
+                const profile=profiles.find(profile=>profile.id===profileId&&eligible(profile)&&profile.projectCapabilities?.sessionControl!==false);
+                if(profile)return await harnessModels(client,profile,scope.options);
+            } catch(error) {
+                failures.push(error);
+                log.warn('kanban.settings.models',{operationId,stage,projectId,result:'failure',code:safeCode(error,'KANBAN_HARNESS_MODEL_UNAVAILABLE'),durationMs:Date.now()-measured});
+            } finally {await client?.close();}
+        });
+        const catalogs=results.filter(catalog=>catalog!==undefined);
+        if(!catalogs.length&&failures.length)throw failures[0];
+        const models=catalogs.reduce(intersectModels,catalogs[0]??[]);
+        log.info('kanban.settings.models',{operationId,stage,result:'success',count:models.length,durationMs:Date.now()-started});
+        return models;
+    }finally{scope.dispose();}
+}
+
+function intersectModels(left:KanbanHarnessModel[],right:KanbanHarnessModel[]):KanbanHarnessModel[] {
+    const byId=new Map(right.map(model=>[model.id,model]));
+    return left.flatMap(model=>{
+        const match=byId.get(model.id);
+        return match?[{...model,reasoningEfforts:model.reasoningEfforts.filter(effort=>match.reasoningEfforts.some(level=>level.id===effort.id))}]:[];
+    });
+}
+
 function eligible(profile:HarnessProfile):boolean{
     return !!profile.projectRuntime && profile.capabilities.create && !!profile.capabilities.sessionChannels && !!profile.capabilities.workingDirectory;
 }
@@ -141,7 +223,13 @@ export function selectKanbanHarness(profiles:HarnessProfile[],workspaceId:string
     requireValue(profile,'KANBAN_HARNESS_UNAVAILABLE');requireValue(profile.workspaces.some(w=>w.id===workspaceId),'KANBAN_HARNESS_WORKSPACE_MISMATCH');requireValue(profile.projectCapabilities?.sessionControl!==false,'KANBAN_HARNESS_PERMISSION_REQUIRED');
     requireValue(eligible(profile),'KANBAN_HARNESS_CAPABILITIES_REQUIRED');return profile;
 }
-export async function freezeKanbanHarness(journal:KanbanAutomationJournal,id:string,boardId:string,role:KanbanHarnessRole,profileId:string):Promise<string>{
-    const binding=await journal.update<{boardId:string;role:KanbanHarnessRole;profileId:string}>('kanban-harness-choice:'+id,old=>old??{boardId,role,profileId});
-    requireValue(binding.boardId===boardId && binding.role===role,'KANBAN_HARNESS_BINDING_CHANGED');return binding.profileId;
+type HarnessBinding={boardId:string;role:KanbanHarnessRole;profileId:string;selection?:KanbanHarnessModelSelection|null};
+export async function readFrozenHarness(journal:KanbanAutomationJournal,id:string,legacySelection?:KanbanHarnessModelSelection):Promise<HarnessChoice|undefined> {
+    const binding=await journal.get<HarnessBinding>('kanban-harness-choice:'+id);
+    if(binding)return {profileId:binding.profileId,selection:binding.selection===undefined?legacySelection:binding.selection??undefined};
+}
+export async function freezeKanbanHarness(journal:KanbanAutomationJournal,id:string,boardId:string,role:KanbanHarnessRole,choice:HarnessChoice):Promise<HarnessChoice>{
+    const binding=await journal.update<HarnessBinding>('kanban-harness-choice:'+id,old=>old??{boardId,role,profileId:choice.profileId,selection:choice.selection??null});
+    requireValue(binding.boardId===boardId && binding.role===role,'KANBAN_HARNESS_BINDING_CHANGED');
+    return {profileId:binding.profileId,selection:binding.selection===undefined?choice.selection:binding.selection??undefined};
 }

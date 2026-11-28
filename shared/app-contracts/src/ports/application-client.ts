@@ -82,6 +82,7 @@ export interface ApplicationBackend {
     setPinnedWindow?(change: import('./pinned-windows').PinnedWindowChange): Promise<void>;
     settings(sources: readonly SettingsWorkspaceSource[]): Promise<SettingsPort>;
     readKanbanHarnessDefaults?(): Promise<import('../settings').KanbanHarnessDefaultsView>;
+    readKanbanHarnessModels?(profileId:string): Promise<import('@nestos/kanban/contracts').KanbanHarnessModel[]>;
     saveKanbanHarnessDefaults?(request: import('../settings').SaveKanbanHarnessDefaults): Promise<import('../settings').KanbanHarnessDefaults>;
     ocr(): Promise<OcrService>;
     initialFiles(): Promise<NestosInitialFiles>;

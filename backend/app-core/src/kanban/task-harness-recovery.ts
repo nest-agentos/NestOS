@@ -15,11 +15,11 @@ export async function taskHarnessRecovery(options:TaskRecoveryOptions,board:Kanb
     const [actor,context]=await Promise.all([options.service.currentPrincipal(),workContext(options.journal,board,item)]);
     if(actor.kind!=='human'||!board.members?.some(member=>member.kind===actor.kind&&member.id===actor.id&&member.roles?.includes('coordinator')))return;
     const retry=role==='coordination'?item.launch?.analysisPreparation:dispatch?.continuation?.preparation;
-    const profileId=harnessRetryTarget(retry,role)??decisionHarnessProfile(context,role);
     const projectId=role==='coordination'?(context.primaryProjectId??workProjectId(item)):workProjectId(item);
-    if(!profileId||!projectId)return;
+    if(!projectId)return;
     const attempt=role==='coordination'?coordinationHarnessScope(board.id,item.id,item.launch?.analysisEpoch):dispatch!.id;
     const failure=await options.journal.get<HarnessPreparation>(harnessPreparationKey(attempt));
+    const profileId=harnessRetryTarget(retry,role)??decisionHarnessProfile(context,role)??failure?.profileId;
     if(failure?.projectId!==projectId||failure.profileId!==profileId||failure.role!==role||failure.code!==code)return;
     const revision=sha256HexSync(JSON.stringify([board.id,item.id,item.revision,role,profileId,code,dispatch?.id,projectId]));
     return {role,profileId,projectId,revision,code};

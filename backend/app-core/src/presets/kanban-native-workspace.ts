@@ -6,7 +6,7 @@ import type {ProjectRemoteMountService} from '../projects/remote-mounts';
 import type {HarnessConnectionService} from '../projects/harness-connections';
 import {requireValue} from '../kanban/validation';
 import {REMOTE_PROJECT_REFERENCE} from '../kanban/resource-catalog';
-import {decisionHarnessProfile,decisionHarnessModel,freezeKanbanHarness,preferredHarness,harnessRetryTarget,selectProjectHarness,recordHarnessPreparation,coordinationHarnessScope,type ReadHarnessDefault} from './kanban-harness-settings';
+import {decisionHarnessProfile,decisionHarnessModel,freezeKanbanHarness,preferredHarness,readFrozenHarness,harnessRetryTarget,selectProjectHarness,recordHarnessPreparation,coordinationHarnessScope,type ReadHarnessDefault} from './kanban-harness-settings';
 import {developmentStage} from './kanban-development-log';
 import {publishManagedAgent} from '../configuration/managed-agent';
 
@@ -31,14 +31,15 @@ export async function resolveNativeWork(options:NativeWorkspaceOptions,journal:K
     const projectId=input.stage==='decision'&&primary?primary:selected[0].id,role=input.stage==='decision'?'coordination':'execution';
     const retry=role==='coordination'?input.item.launch?.analysisPreparation:input.dispatch.continuation?.preparation;
     const explicit=harnessRetryTarget(retry,role)??decisionHarnessProfile(input.context,role);
-    const selection=retry?undefined:decisionHarnessModel(input.context,role);
-    const stored=await journal.get<{profileId:string}>('kanban-harness-choice:'+id);
-    const requested=stored?.profileId??explicit??await preferredHarness(role,input.board?.settings,options.readHarnessDefault)??template.profileId;
-    const profileId=await freezeKanbanHarness(journal,id,input.board?.id??'legacy',role,requested);
+    const manualModel=retry?undefined:decisionHarnessModel(input.context,role);
+    const stored=await readFrozenHarness(journal,id,manualModel);
+    const choice=stored??(explicit?{profileId:explicit,selection:manualModel}:await preferredHarness(role,input.board?.settings,options.readHarnessDefault));
+    const {profileId,selection}=await freezeKanbanHarness(journal,id,input.board?.id??'legacy',role,choice??{profileId:template.profileId});
     const attempt=role==='coordination'?coordinationHarnessScope(input.board?.id??'legacy',input.item.id,input.item.launch?.analysisEpoch):id;
-    const selectedProfile=explicit?await developmentStage(id,role+'.harness.select',()=>recordHarnessPreparation(journal,attempt,projectId,profileId,role,
+    const check=explicit!==undefined||selection!==undefined;
+    const selectedProfile=check?await developmentStage(id,role+'.harness.select',()=>recordHarnessPreparation(journal,attempt,projectId,profileId,role,
         ()=>selectProjectHarness(options.remote,projectId,profileId,selection))):profileId;
-    return {source,template,projectId,profileId:selectedProfile,selection,explicit:explicit!==undefined,role};
+    return {source,template,projectId,profileId:selectedProfile,selection,explicit:check,role};
 }
 
 export async function publishNativeWork(options:NativeWorkspaceOptions,journal:KanbanAutomationJournal,input:NativeWorkInput,

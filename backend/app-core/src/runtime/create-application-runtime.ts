@@ -755,7 +755,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const executionResource=remoteConnections?kanbanSessionResource(projects,nativeSessionResource(kernelCore,projects,remoteConnections)):undefined;
         const kanban:import('@nestos/kanban').KanbanModuleHandle = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,createSessionActivityReader(kernelCore), independentCalls ? {
             prepareTarget:developmentBindings?kanbanHarnessTarget(developmentBindings):undefined,
-            boardSettings:harnessPolicy,
+            boardSettings:harnessPolicy&&harnessDefaults?{...harnessPolicy,catalog:harnessDefaults.forBoard}:undefined,
             verifyNativeRestartIdle:remoteConnections?nativeRestartIdle(projects):undefined,
             sessionObservation:developmentBindings?developmentMessages.sessionObservation:undefined,
             taskRecovery:developmentBindings?context=>createTaskRecovery({...developmentBindings,...context,executionResource:executionResource!,

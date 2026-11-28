@@ -1,10 +1,11 @@
 import {createModuleLogger, randomUUID, t} from '@nestos/common';
 import {boardSettingsCommand,boardSettingsFields} from '@nestos/kanban-ui';
-import type {KanbanBoardSummary, KanbanBoardSettingsCatalog, KanbanClient} from '@nestos/kanban/contracts';
+import type {KanbanBoardSummary, KanbanBoardSettingsCatalog, KanbanClient, KanbanHarnessModel} from '@nestos/kanban/contracts';
 import type {ApplicationBackend} from '@nestos/app-contracts/services';
+import {harnessDefaultModels} from './harness-default-models';
 const log=createModuleLogger('kanban-settings');
 type BoardSettingsState=Pick<KanbanBoardSummary,'id'|'revision'|'settings'>;
-export type GlobalHarnessDefaults=Required<Pick<ApplicationBackend,'readKanbanHarnessDefaults'|'saveKanbanHarnessDefaults'>>;
+export type GlobalHarnessDefaults=Required<Pick<ApplicationBackend,'readKanbanHarnessDefaults'|'saveKanbanHarnessDefaults'>>&Pick<ApplicationBackend,'readKanbanHarnessModels'>;
 export const allBoards='*';
 interface Draft {board:BoardSettingsState;catalog:KanbanBoardSettingsCatalog;form:HTMLFormElement;operationId?:string;fingerprint?:string;unknown?:boolean}
 const harnessLabels={
@@ -17,6 +18,7 @@ const label=(key:string)=>t(('kanban.'+key) as Parameters<typeof t>[0]);
 export class KanbanBoardSettings {
     readonly element=document.createElement('section');
     private readonly drafts=new Map<string,Draft>();
+    private readonly models=new Map<string,Promise<KanbanHarnessModel[]>>();
     private generation=0;
     private closed=false;
     constructor(private readonly service:KanbanClient,private readonly changed:()=>Promise<void>,private readonly saved:()=>void,
@@ -56,15 +58,15 @@ export class KanbanBoardSettings {
         const draft=this.drafts.get(board.id);
         if(draft&&!draft.unknown&&draft.board.revision===previousRevision)draft.board={...draft.board,revision:board.revision};
     }
-    destroy():void {this.closed=true;this.generation++;this.drafts.clear();this.element.remove();}
+    destroy():void {this.closed=true;this.generation++;this.drafts.clear();this.models.clear();this.element.remove();}
     private create(board:BoardSettingsState,catalog:KanbanBoardSettingsCatalog):Draft {
         const form=document.createElement('form');form.dataset.boardSettings=board.id;
-        if(this.global)form.append(harnessFields(board,catalog));
+        if(this.global)form.append(harnessFields(board,catalog,this.global.readKanbanHarnessModels?profile=>this.lookupModels(profile):undefined));
         else form.innerHTML=boardSettingsFields(board as KanbanBoardSummary,catalog,label);
         const status=document.createElement('p');status.setAttribute('role','status');form.append(status);
         const save=document.createElement('button');save.type='submit';save.textContent=label('save');
         const refresh=document.createElement('button');refresh.type='button';refresh.textContent=label('refresh');
-        refresh.onclick=()=>{this.drafts.delete(board.id);void this.select(board.id);};const actions=document.createElement('div');actions.className='kanban-sidebar-controls__actions';actions.append(save,refresh);form.append(actions);
+        refresh.onclick=()=>{this.drafts.delete(board.id);this.models.clear();void this.select(board.id);};const actions=document.createElement('div');actions.className='kanban-sidebar-controls__actions';actions.append(save,refresh);form.append(actions);
         const draft={board,catalog,form};form.onsubmit=event=>{event.preventDefault();void this.submit(draft,status);};return draft;
     }
     private async submit(draft:Draft,status:HTMLElement):Promise<void> {
@@ -92,8 +94,22 @@ export class KanbanBoardSettings {
         return this.service.execute(board.id,{operationId,expectedRevision:board.revision,command});
     }
     private command(draft:Draft):ReturnType<typeof boardSettingsCommand> {
-        const command=boardSettingsCommand(new FormData(draft.form),draft.catalog,draft.board.settings??{});
+        const data=new FormData(draft.form);
+        const command=boardSettingsCommand(data,draft.catalog,draft.board.settings??{});
+        for(const field of draft.catalog.fields){
+            const key=field.name+'-selection',value=data.get('setting-'+key);
+            if(typeof value==='string'&&value)command.settings[key]=value;
+            else if(value==='')delete command.settings[key];
+        }
         return this.global?{type:command.type,settings:command.settings}:command;
+    }
+    private lookupModels(profile:string):Promise<KanbanHarnessModel[]> {
+        const cached=this.models.get(profile);if(cached)return cached;
+        const pending=this.global!.readKanbanHarnessModels!(profile).catch(error=>{
+            if(this.models.get(profile)===pending)this.models.delete(profile);
+            throw error;
+        });
+        this.models.set(profile,pending);return pending;
     }
     private disable(draft:Draft,saving:boolean):void {
         draft.form.querySelectorAll<HTMLButtonElement|HTMLSelectElement|HTMLInputElement>('button,select,input').forEach(input=>{input.disabled=saving||!!draft.unknown&&(input.tagName==='SELECT'||input.tagName==='INPUT'||input instanceof HTMLButtonElement&&input.type==='button');});
@@ -114,7 +130,7 @@ function harnessCatalog(catalog:KanbanBoardSettingsCatalog,board:boolean):Kanban
     return {fields};
 }
 
-function harnessFields(board:BoardSettingsState,catalog:KanbanBoardSettingsCatalog):DocumentFragment {
+function harnessFields(board:BoardSettingsState,catalog:KanbanBoardSettingsCatalog,models?:(profile:string)=>Promise<KanbanHarnessModel[]>):DocumentFragment {
     const fragment=document.createDocumentFragment();
     for(const field of catalog.fields){
         const row=document.createElement('div'), label=document.createElement('label'), select=document.createElement('select');
@@ -127,7 +143,10 @@ function harnessFields(board:BoardSettingsState,catalog:KanbanBoardSettingsCatal
             option.disabled=!!choice.disabled&&choice.value!==selected;
             select.add(option);
         }
-        row.append(label,select);fragment.append(row);
+        const controls=document.createElement('div');controls.append(select);
+        const key=field.name+'-selection';
+        if(models)controls.append(harnessDefaultModels(select,key,board.settings?.[key],models));
+        row.append(label,controls);fragment.append(row);
     }
     return fragment;
 }

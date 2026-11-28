@@ -15,6 +15,7 @@ async function fixture(){
     };
     const global={
         readKanbanHarnessDefaults:vi.fn(async()=>({revision:2,settings:{'harness-decision':'agy'},catalog})),
+        readKanbanHarnessModels:vi.fn(async()=>[{id:'neon',label:'Gemini Neon',reasoningEfforts:[{id:'high',label:'High'}]}]),
         saveKanbanHarnessDefaults:vi.fn(async(request)=>({...request,revision:3})).mockRejectedValueOnce(Object.assign(new Error('Unknown receipt'),{code:'ETIMEDOUT',outcome:'unknown'})),
     };
     class Editor {async init(host:HTMLElement){host.textContent='Models';} async destroy(){}}
@@ -36,6 +37,11 @@ it('loads the Kanban tab on demand and retries one global save with all three ro
     expect(f.tabs[1].getAttribute('aria-selected')).toBe('true');
     expect(f.service.boardSettings).not.toHaveBeenCalled();
     f.field('coordination').value='codex'; f.field('execution').value='agy';
+    const decisionModel=()=>f.field('decision').parentElement!.querySelectorAll<HTMLSelectElement>('select')[1];
+    const decisionEffort=()=>f.field('decision').parentElement!.querySelectorAll<HTMLSelectElement>('select')[2];
+    await vi.waitFor(()=>expect(decisionModel().querySelector('option[value=neon]')).toBeTruthy());
+    decisionModel().value='neon'; decisionModel().dispatchEvent(new Event('change'));
+    decisionEffort().value='high'; decisionEffort().dispatchEvent(new Event('change'));
     const form=f.field('decision').form!;
     form.dispatchEvent(new Event('submit',{cancelable:true}));
     await vi.waitFor(()=>expect(f.host.querySelector('[role=alert]')?.textContent).toContain('ETIMEDOUT'));
@@ -44,7 +50,8 @@ it('loads the Kanban tab on demand and retries one global save with all three ro
     await vi.waitFor(()=>expect(f.field('decision').disabled).toBe(false));
     expect(f.global.saveKanbanHarnessDefaults.mock.calls[1]).toEqual(f.global.saveKanbanHarnessDefaults.mock.calls[0]);
     expect(f.global.saveKanbanHarnessDefaults).toHaveBeenCalledWith({operationId:expect.any(String),revision:2,
-        settings:{'harness-decision':'agy','harness-coordination':'codex','harness-execution':'agy'}});
+        settings:{'harness-decision':'agy','harness-coordination':'codex','harness-execution':'agy',
+            'harness-decision-selection':JSON.stringify({profileId:'agy',modelId:'neon',reasoningEffort:'high'})}});
     f.tabs[0].click(); f.tabs[1].click();
     expect(f.global.readKanbanHarnessDefaults).toHaveBeenCalledOnce();
     await f.editor.destroy(); expect(f.host.children).toHaveLength(0);

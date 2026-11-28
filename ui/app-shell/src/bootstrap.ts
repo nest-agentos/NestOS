@@ -188,6 +188,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
         modelDefaultsSection: services.kanban?.boardSettings && backend.readKanbanHarnessDefaults && backend.saveKanbanHarnessDefaults ? async container =>
             (await import('./kanban/model-defaults-section')).mountKanbanHarnessSettings(container, services.kanban!, {
                 readKanbanHarnessDefaults: () => backend.readKanbanHarnessDefaults!(),
+                readKanbanHarnessModels: backend.readKanbanHarnessModels?.bind(backend),
                 saveKanbanHarnessDefaults: request => backend.saveKanbanHarnessDefaults!(request),
             }) : undefined,
         ocr,
