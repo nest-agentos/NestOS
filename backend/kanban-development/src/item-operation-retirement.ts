@@ -1,3 +1,4 @@
+import {releaseIntegrationTarget} from './item-operation-integration-queue';
 import {jobKey,reviewKey} from '@nestos/kanban/integration';
 import type {ReviewJob,ReviewOperationsOptions,ReviewSettings} from './item-operation-types';
 import {scopedOperationOptions} from './item-operation-scopes';
@@ -11,6 +12,8 @@ export async function scanRetiredScope(options:ReviewOperationsOptions,scope:Sco
     const started=Date.now(),settings=await options.journal.get<ReviewSettings>(reviewKey(scope.board,scope.item,scope.scopeId));
     const jobs=await options.journal.getMany<ReviewJob>((settings?.jobs??[]).map(jobKey));
     for(const job of jobs)requireValue(!job||job.boardId===scope.board&&job.itemId===scope.item&&job.scopeId===scope.scopeId,'OPERATION_SCOPE_MISMATCH');
+    for(const [index,job] of jobs.entries())if(job?.integrationTarget&&job.phase==='prepared')
+        jobs[index]=await retirePendingIntegration(options,job);
     const pending=jobs.filter(job=>job?.phase!=='settled');
     if(pending.some(job=>job?.phase==='submitting'&&job.action!=='accept')){
         const scoped=await scopedOperationOptions(options,scope.board,scope.item,scope.scopeId);
@@ -26,4 +29,13 @@ export async function scanRetiredScope(options:ReviewOperationsOptions,scope:Sco
     await options.journal.update<Scope[]>('review-operation-scopes',old=>(old??[]).filter(row=>!same(row,scope)));
     options.log({operationId:scope.scopeId??scope.item,boardId:scope.board,itemId:scope.item,stage:'operation.scope.retired',result:'success',reason,count:jobs.length,durationMs:Date.now()-started});
     return true;
+}
+
+async function retirePendingIntegration(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
+    const saved=await options.journal.update<ReviewJob>(jobKey(job.id),old=>{
+        requireValue(old?.fingerprint===job.fingerprint,'OPERATION_IDENTITY_CONFLICT');
+        return old.phase==='prepared'?{...old,phase:'settled',state:'failed',code:'OPERATION_CANCELLED'}:old;
+    });
+    await releaseIntegrationTarget(options,saved);
+    return saved;
 }
