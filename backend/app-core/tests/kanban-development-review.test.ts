@@ -217,7 +217,7 @@ async function retainManager(f:Awaited<ReturnType<typeof fixture>>) {
  await f.journal.update('analysis-current:["board","manager"]',()=> 'analysis:management-test');
  await f.journal.update('analysis:management-test',()=>({id:'planning',input:{request:{expectedSessionId:'planning'}}}));
  await f.journal.update('worktree:planning',()=>({id:'planning',directory:dir,branch:'work/planning',phase:'ready'}));
- await f.journal.update('development-workspace:planning',()=>({directory:dir,projectId:'project',context:{board:{id:'board'},task:{id:'manager'}},policy:{profile:'development',commit:'changes',modules:[]}}));
+ await f.journal.update('development-workspace:planning',()=>({directory:dir,projectId:'project',context:{board:{id:'board'},task:{id:'manager'},snapshot:{items:[{title:'Planning snapshot '.repeat(5000)}]}},policy:{profile:'development',commit:'changes',modules:[]}}));
  const original=await f.calls.list();
  f.calls.list.mockImplementation(async ({sessionId}: {sessionId:string}={sessionId:'original'})=>sessionId==='planning'?
     [{...original[0],receipt:{executionSessionId:'manager-session'},input:{request:{...original[0].input.request,submission:{id:'planning'}}}}]:original);
@@ -233,6 +233,7 @@ it('runs management scope phases in the retained coordination Session and keeps 
  const snapshot=await api.snapshot(f.board,owner as never),request=await api.prepareOperation!({id:'batch-analysis',action:'analyze',board:f.board,item:owner as never,snapshot});
  expect(request.expectedSessionId).toBe('manager-session');expect((request.source as any).text).toContain('management-integration-pre.md');
  const manifest=JSON.parse(await readPrompt(f.fs,'/workspace/_nestos/worktrees/planning/_nestos/kanban/review/batch-analysis/manifest.json'));
+ expect(manifest.context.input).toEqual({board:{id:'board'},task:{id:'manager'}});
  expect(manifest.context.resources.management).toMatchObject({ownerId:'manager',sources:[{itemId:'task'}]});
  f.channels.request('batch-analysis','request','unsupported.context',{});
  expect(await api.exchange!({id:'batch-analysis',boardId:'board',itemId:'manager',scopeId:scope.id,request,snapshot} as never,{sessionId:'manager-session',outcome:'succeeded'})).toMatchObject({outcome:'running'});

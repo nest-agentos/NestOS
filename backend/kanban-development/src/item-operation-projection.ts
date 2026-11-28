@@ -89,6 +89,10 @@ function operationProgress(job:ReviewJob|undefined,queued:boolean):KanbanItemOpe
 /** Present the coordinator's current ownership without changing the scheduler's action view. */
 export function projectAutomaticOperation(view:KanbanItemOperations):KanbanItemOperations {
     const status=view.automatic;
+    if(status?.state==='blocked'&&status.code&&status.code!=='OPERATION_SELECTION_REQUIRED'){
+        return {...view,operations:view.operations.map(row=>row.id===status.stage&&['ready','failed','unavailable'].includes(row.state)
+            ?{...row,state:'failed',code:status.code}:row)};
+    }
     if(status?.state!=='running')return view;
     return {...view,operations:view.operations.map(row=>{
         if(row.id!==status.stage||!['ready','waiting-confirmation'].includes(row.state))return row;

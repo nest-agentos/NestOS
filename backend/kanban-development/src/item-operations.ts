@@ -120,6 +120,7 @@ async function view(options: ReviewOperationsOptions, context: Context): Promise
     const raw = await Promise.all(actions.map(async action => {
         const entry = cancellationView(options,context,operation(context, action, active, supported, !!options.adapter.prepareOperation,activeWaivers));
         if (context.board.lifecycle && action !== 'accept') {entry.enabled=false;entry.reason=t('kanban.errors.BOARD_STOPPING');}
+        if(context.scoped&&related&&action==='analyze'&&['ready','failed','unavailable'].includes(entry.state))entry.sessionId=related;
         entry.sessionId??=related;
         if(entry.sessionId&&options.sessionResource){const id=entry.sessionId;let resource=sessionResources.get(id);if(!resource){resource=options.sessionResource(id);sessionResources.set(id,resource);}entry.sessionId=await resource??id;}
         return entry;

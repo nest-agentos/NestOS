@@ -778,6 +778,16 @@ it('starts a ready management scope without a prior manual action and refreshes 
  expect(await f.journal.get('automatic-delivery:'+JSON.stringify(['board','task','repository-auto']))).toMatchObject({step:4});
 });
 
+it('shows the current automatic preparation failure on the available retry action',async()=>{
+ const f=await automaticAnalysisFixture();
+ f.options.adapter.prepareOperation=vi.fn(async()=>{throw Object.assign(Error('Manifest exceeds budget'),{code:'PROMPT_MANIFEST_LIMIT'});});
+ await scans(f.api);
+ const view=await f.api.itemOperations('board','task');
+ expect(view.automatic).toMatchObject({state:'blocked',stage:'analyze',code:'PROMPT_MANIFEST_LIMIT'});
+ expect(view.operations.find(row=>row.id==='analyze')).toMatchObject({state:'failed',enabled:true,code:'PROMPT_MANIFEST_LIMIT'});
+ expect(f.submission.start).not.toHaveBeenCalled();
+});
+
 it.each([true,false])('automatically applies only conflict choices supported by the coordination analysis (%s)',async (resolved)=>{
  const f=await automaticAnalysisFixture(),read=f.options.adapter.readOperation!;
  Object.assign(f.item,{status:'open',planning:{execution:'children'}});

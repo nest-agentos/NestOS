@@ -67,9 +67,10 @@ async function managementWorkspace(options:DevelopmentReviewOptions,scope:Manage
     const [tree,record,cleanup]=await Promise.all([options.journal.get<PreparedWorktree>('worktree:'+id),
         options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+id),options.journal.get('worktree-cleanup:'+id)]);
     requireValue(tree&&record&&!cleanup&&tree.directory===record.directory&&record.projectId===scope.projectId,'OPERATION_WORKSPACE_UNAVAILABLE');
-    const context=record.context as {board?:{id:string};task?:{id:string}}|undefined;
+    const context=record.context as {board?:{id:string};task?:{id:string};snapshot?:unknown}|undefined;
     requireValue(context?.board?.id===scope.boardId&&context.task?.id===scope.ownerId,'OPERATION_WORKSPACE_SCOPE_MISMATCH');
-    return {id,tree,record,planningCall:true as const};
+    const {snapshot:_planningBoard,...operationContext}=context;
+    return {id,tree,record:{...record,context:operationContext},planningCall:true as const};
 }
 async function managementSession(options:DevelopmentReviewOptions,boardId:string,itemId:string) {
     const analysis=await currentAnalysis<IndependentCallInput>(options.journal,boardId,itemId);
