@@ -14,13 +14,13 @@ export function projectApprovalSettings(parent: HTMLElement, defaults: Approvals
     if (!defaults) return () => undefined;
     const field = document.createElement('fieldset'), legend = document.createElement('legend');
     legend.textContent = t('remote.harnessApprovalDefaults'); field.append(legend);
-    const kinds = ['codex', 'dsh', 'claude'] as const;
-    const names = {codex: 'Codex', dsh: 'DSH', claude: 'Claude'};
+    const kinds = (['codex', 'dsh', 'claude', 'agy'] as const).filter(kind => kind !== 'agy' || Object.hasOwn(defaults, kind));
+    const names = {codex: 'Codex', dsh: 'DSH', claude: 'Claude', agy: 'AGY'};
     const controls = kinds.map(kind => {
         const label = document.createElement('label'), select = document.createElement('select');
         label.textContent = names[kind];
         for (const value of Object.keys(labels) as Array<keyof typeof labels>) {
-            if (value === 'allowRead' && kind !== 'claude') continue;
+            if (value === 'allowRead' && kind !== 'claude' && kind !== 'agy') continue;
             const option = document.createElement('option');
             option.value = value; option.textContent = t(labels[value]); select.append(option);
         }
